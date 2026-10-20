@@ -1,0 +1,135 @@
+# Ketra Orc support (KetraOrcSupport): the village folk of a Ketra Orc ally of level 5, each first talk answering by the level.
+# The ally buys the last blessing for 6 tokens (the soul guide's cast of it is in
+# tests/quest/alliance_support_test.go: a scenario civilian has no MP to pay it), and finds the
+# warehouse empty. Killing a soldier of the side then breaks the alliance: the level 5 badge
+# becomes the level 4 one, the alliance mission ends with its item, and every folk answers a
+# player of no alliance.
+# Expectations are derived from the reference source (KetraOrcSupport.onFirstTalk, onAdvEvent,
+# onMyDying) and replay the reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/ketra_support_ally_5.golden
+character Ally 40
+standing 5
+hold 7215 1
+hold 7186 6
+hold 7216 3
+quest Q605_AllianceWithKetraOrcs <state>=STARTED <cond>=1
+stub quest.Q605_AllianceWithKetraOrcs
+script script.feature.KetraOrcSupport
+item 7215 7214 7186 7216
+page script/feature/KetraOrcSupport/
+npc kadun 31370 Folk 10 0 0
+npc wahkan 31371 Folk 0 10 0
+npc asefa 31372 Folk -10 0 0
+npc atan 31373 Merchant 0 -10 0
+npc jaff 31374 WarehouseKeeper 10 10 0
+npc jumara 31375 Merchant -10 -10 0
+npc kurfa 31376 Gatekeeper 10 -10 0
+npc footman 21324 Monster 40 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=script/feature/KetraOrcSupport/31370-friend.htm
+  S ActionFailed
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=script/feature/KetraOrcSupport/31371-friend.htm
+  S ActionFailed
+action atan
+action atan
+  S ActionFailed
+  S NpcHtmlMessage obj=atan item=0 page=script/feature/KetraOrcSupport/31373-2.htm
+  S ActionFailed
+action jumara
+action jumara
+  S ActionFailed
+  S NpcHtmlMessage obj=jumara item=0 page=script/feature/KetraOrcSupport/31375-3.htm
+  S ActionFailed
+action kurfa
+action kurfa
+  S ActionFailed
+  S NpcHtmlMessage obj=kurfa item=0 page=script/feature/KetraOrcSupport/31376-3.htm
+  S ActionFailed
+action jaff
+action jaff
+  S ActionFailed
+  S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-3.htm
+  S ActionFailed
+action asefa
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=script/feature/KetraOrcSupport/31372-4.htm
+  S ActionFailed
+bypass Quest KetraOrcSupport 7
+  S SystemMessage id=301 3:7186 6:6
+  S NpcHtmlMessage obj=asefa item=0 page=script/feature/KetraOrcSupport/31372-4.htm
+  S ActionFailed
+  items 7186=0
+action jaff
+action jaff
+  S ActionFailed
+  S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-3.htm
+  S ActionFailed
+bypass Quest KetraOrcSupport Withdraw
+  S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-0.htm
+  S ActionFailed
+
+kill footman
+  S SystemMessage id=302 3:7215
+  S SystemMessage id=54 3:7214
+  S QuestList
+  S SystemMessage id=301 3:7216 6:3
+  Q delete-quest Q605_AllianceWithKetraOrcs
+  rows Q605_AllianceWithKetraOrcs -
+  items 7215=0 7214=1
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=script/feature/KetraOrcSupport/31370-no.htm
+  S ActionFailed
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=script/feature/KetraOrcSupport/31371-no.htm
+  S ActionFailed
+action atan
+action atan
+  S ActionFailed
+  S NpcHtmlMessage obj=atan item=0 page=script/feature/KetraOrcSupport/31373-no.htm
+  S ActionFailed
+action jumara
+action jumara
+  S ActionFailed
+  S NpcHtmlMessage obj=jumara item=0 page=script/feature/KetraOrcSupport/31375-no.htm
+  S ActionFailed
+action kurfa
+action kurfa
+  S ActionFailed
+  S NpcHtmlMessage obj=kurfa item=0 page=script/feature/KetraOrcSupport/31376-no.htm
+  S ActionFailed
+action jaff
+action jaff
+  S ActionFailed
+  S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-no.htm
+  S ActionFailed
+action asefa
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=script/feature/KetraOrcSupport/31372-3.htm
+  S ActionFailed
+# The no-alliance pages carry no blessing, withdrawal or teleport link, so each answers nothing.
+bypass Quest KetraOrcSupport 0
+action jaff
+action jaff
+  S ActionFailed
+  S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-no.htm
+  S ActionFailed
+bypass Quest KetraOrcSupport Withdraw
+action kurfa
+action kurfa
+  S ActionFailed
+  S NpcHtmlMessage obj=kurfa item=0 page=script/feature/KetraOrcSupport/31376-no.htm
+  S ActionFailed
+bypass Quest KetraOrcSupport Teleport

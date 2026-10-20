@@ -1,0 +1,66 @@
+# Varka Silenos support (VarkaSilenosSupport): the village folk of a Varka Silenos ally of level 4, each first talk answering by the level.
+# One token is too few for a blessing of 3. Killing a soldier of the side breaks the alliance,
+# the level 4 badge becoming the level 3 one.
+# Expectations are derived from the reference source (VarkaSilenosSupport.onFirstTalk, onAdvEvent,
+# onMyDying) and replay the reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/varka_support_ally_4.golden
+character Ally 40
+standing -4
+hold 7224 1
+hold 7187 1
+script script.feature.VarkaSilenosSupport
+item 7224 7223 7187
+page script/feature/VarkaSilenosSupport/
+npc ashas 31377 Folk 10 0 0
+npc naran 31378 Folk 0 10 0
+npc udan 31379 Folk -10 0 0
+npc diyabu 31380 Merchant 0 -10 0
+npc hagos 31381 WarehouseKeeper 10 10 0
+npc shikon 31382 Merchant -10 -10 0
+npc teranu 31383 Gatekeeper 10 -10 0
+npc recruit 21350 Monster 40 0 0
+
+action ashas
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=script/feature/VarkaSilenosSupport/31377-friend.htm
+  S ActionFailed
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=script/feature/VarkaSilenosSupport/31378-friend.htm
+  S ActionFailed
+action diyabu
+action diyabu
+  S ActionFailed
+  S NpcHtmlMessage obj=diyabu item=0 page=script/feature/VarkaSilenosSupport/31380-2.htm
+  S ActionFailed
+action shikon
+action shikon
+  S ActionFailed
+  S NpcHtmlMessage obj=shikon item=0 page=script/feature/VarkaSilenosSupport/31382-2.htm
+  S ActionFailed
+action teranu
+action teranu
+  S ActionFailed
+  S NpcHtmlMessage obj=teranu item=0 page=script/feature/VarkaSilenosSupport/31383-2.htm
+  S ActionFailed
+action hagos
+action hagos
+  S ActionFailed
+  S NpcHtmlMessage obj=hagos item=0 page=script/feature/VarkaSilenosSupport/31381-3.htm
+  S ActionFailed
+action udan
+action udan
+  S ActionFailed
+  S NpcHtmlMessage obj=udan item=0 page=script/feature/VarkaSilenosSupport/31379-4.htm
+  S ActionFailed
+bypass Quest VarkaSilenosSupport 2
+  S NpcHtmlMessage obj=udan item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  items 7187=1
+
+kill recruit
+  S SystemMessage id=302 3:7224
+  S SystemMessage id=54 3:7223
+  items 7224=0 7223=1
