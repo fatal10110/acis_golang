@@ -1,0 +1,78 @@
+# Make Formal Wear (Q037), last part: a level 60 character at the quest's sixth step, holding the
+# mysterious cloth, the jewel box and the sewing kit of the helper quests and the dress shoes box,
+# gives Leikar the three, then the box, for formal wear and the quest completes; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q037_make_formal_wear_finish.golden
+character Tailor 60
+quest Q037_MakeFormalWear <cond>=6 <state>=STARTED
+hold 7076 1
+hold 7077 1
+hold 7078 1
+hold 7113 1
+script quest.Q037_MakeFormalWear
+item 7076 7077 7078 7113 7164 7160 7159 6408
+page merchant/30842.htm
+page default/31520.htm
+page script/quest/Q037_MakeFormalWear/
+npc alexis 30842 Merchant 10 0 0
+npc leikar 31520 Folk 20 0 0
+
+# Leikar takes the cloth, the jewel box and the sewing kit.
+action leikar
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q037_MakeFormalWear 31520-5.htm
+  S QuestList 37:0x8000007f
+  S ExShowQuestMark quest=37
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7077
+  S SystemMessage id=302 3:7076
+  S SystemMessage id=302 3:7078
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-5.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <cond> | 7
+  items 7076=0 7077=0 7078=0
+  rows Q037_MakeFormalWear <cond>=7 <state>=STARTED
+
+# Leikar trades the dress shoes box for formal wear; the quest completes.
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-6.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q037_MakeFormalWear 31520-7.htm
+  S SystemMessage id=302 3:7113
+  S SystemMessage id=54 3:6408
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x00000000
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-7.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <state> | COMPLETED
+  Q delete-except-state Q037_MakeFormalWear
+  state Q037_MakeFormalWear COMPLETED
+  rows Q037_MakeFormalWear <state>=COMPLETED
+  items 7113=0 6408=1
+
+# Relog: the completed quest loads from its one row, and the formal wear stays.
+relog
+  state Q037_MakeFormalWear COMPLETED
+  rows Q037_MakeFormalWear <state>=COMPLETED
+  items 6408=1
+action alexis
+action alexis
+  S ActionFailed
+  S NpcHtmlMessage obj=alexis item=0 page=merchant/30842.htm
+  S ActionFailed
+bypass npc_{alexis}_Quest
+  S NpcHtmlMessage obj=alexis item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

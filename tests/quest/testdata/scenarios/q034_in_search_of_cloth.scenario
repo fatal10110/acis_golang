@@ -1,0 +1,243 @@
+# In Search of Cloth (Q034): a level 60 character whose formal wear (Q037) is at its sixth step
+# accepts at Radia, sees Varan and Radia again, then Ralford, kills trisalim spiders for ten
+# spinnerets (every drop roll pinned to land; the tenth moves the quest on), has Ralford spin them
+# into spider silk, and Radia weaves the silk, three thousand suede and five thousand threads into
+# a mysterious cloth and the quest completes; then relog. Expectations replay the reference trace
+# of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q034_in_search_of_cloth.golden
+character Weaver 60
+quest Q037_MakeFormalWear <cond>=6 <state>=STARTED
+hold 1866 3000
+hold 1868 5000
+random always 0
+script quest.Q034_InSearchOfCloth
+script quest.Q037_MakeFormalWear
+item 7528 1866 1868 7161 7076
+page merchant/30088.htm
+page merchant/30165.htm
+page merchant/30294.htm
+page script/quest/Q034_InSearchOfCloth/
+npc radia 30088 Merchant 10 0 0
+npc ralford 30165 Merchant 20 0 0
+npc varan 30294 Merchant -20 0 0
+npc spider 20560 Monster 0 40 0
+
+# Radia: accept.
+action radia
+action radia
+  S ActionFailed
+  S NpcHtmlMessage obj=radia item=0 page=merchant/30088.htm
+  S ActionFailed
+bypass npc_{radia}_Quest
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q034_InSearchOfCloth CREATED
+bypass Quest Q034_InSearchOfCloth 30088-1.htm
+  S QuestList 37:0x8000003f 34:0x80000001
+  S ExShowQuestMark quest=34
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-1.htm
+  S ActionFailed
+  Q upsert Q034_InSearchOfCloth | <state> | STARTED
+  Q upsert Q034_InSearchOfCloth | <cond> | 1
+  state Q034_InSearchOfCloth STARTED
+  rows Q034_InSearchOfCloth <cond>=1 <state>=STARTED
+action radia
+  S ActionFailed
+  S NpcHtmlMessage obj=radia item=0 page=merchant/30088.htm
+  S ActionFailed
+bypass npc_{radia}_Quest
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Varan.
+action varan
+action varan
+  S ActionFailed
+  S NpcHtmlMessage obj=varan item=0 page=merchant/30294.htm
+  S ActionFailed
+bypass npc_{varan}_Quest
+  S NpcHtmlMessage obj=varan item=0 page=script/quest/Q034_InSearchOfCloth/30294-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q034_InSearchOfCloth 30294-1.htm
+  S QuestList 37:0x8000003f 34:0x80000003
+  S ExShowQuestMark quest=34
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=varan item=0 page=script/quest/Q034_InSearchOfCloth/30294-1.htm
+  S ActionFailed
+  Q upsert Q034_InSearchOfCloth | <cond> | 2
+  rows Q034_InSearchOfCloth <cond>=2 <state>=STARTED
+action varan
+  S ActionFailed
+  S NpcHtmlMessage obj=varan item=0 page=merchant/30294.htm
+  S ActionFailed
+bypass npc_{varan}_Quest
+  S NpcHtmlMessage obj=varan item=0 page=script/quest/Q034_InSearchOfCloth/30294-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Radia again.
+action radia
+action radia
+  S ActionFailed
+  S NpcHtmlMessage obj=radia item=0 page=merchant/30088.htm
+  S ActionFailed
+bypass npc_{radia}_Quest
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q034_InSearchOfCloth 30088-3.htm
+  S QuestList 37:0x8000003f 34:0x80000007
+  S ExShowQuestMark quest=34
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-3.htm
+  S ActionFailed
+  Q upsert Q034_InSearchOfCloth | <cond> | 3
+  rows Q034_InSearchOfCloth <cond>=3 <state>=STARTED
+action radia
+  S ActionFailed
+  S NpcHtmlMessage obj=radia item=0 page=merchant/30088.htm
+  S ActionFailed
+bypass npc_{radia}_Quest
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-3a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ralford asks for the spinnerets.
+action ralford
+action ralford
+  S ActionFailed
+  S NpcHtmlMessage obj=ralford item=0 page=merchant/30165.htm
+  S ActionFailed
+bypass npc_{ralford}_Quest
+  S NpcHtmlMessage obj=ralford item=0 page=script/quest/Q034_InSearchOfCloth/30165-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q034_InSearchOfCloth 30165-1.htm
+  S QuestList 37:0x8000003f 34:0x8000000f
+  S ExShowQuestMark quest=34
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ralford item=0 page=script/quest/Q034_InSearchOfCloth/30165-1.htm
+  S ActionFailed
+  Q upsert Q034_InSearchOfCloth | <cond> | 4
+  rows Q034_InSearchOfCloth <cond>=4 <state>=STARTED
+action ralford
+  S ActionFailed
+  S NpcHtmlMessage obj=ralford item=0 page=merchant/30165.htm
+  S ActionFailed
+bypass npc_{ralford}_Quest
+  S NpcHtmlMessage obj=ralford item=0 page=script/quest/Q034_InSearchOfCloth/30165-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Trisalim spiders: a spinneret each; the tenth moves the quest on.
+kill spider x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7528=9
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7528
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x8000003f 34:0x8000001f
+  S ExShowQuestMark quest=34
+  Q upsert Q034_InSearchOfCloth | <cond> | 5
+  items 7528=10
+  rows Q034_InSearchOfCloth <cond>=5 <state>=STARTED
+
+# Ralford spins the spinnerets into spider silk.
+action ralford
+  S ActionFailed
+  S NpcHtmlMessage obj=ralford item=0 page=merchant/30165.htm
+  S ActionFailed
+bypass npc_{ralford}_Quest
+  S NpcHtmlMessage obj=ralford item=0 page=script/quest/Q034_InSearchOfCloth/30165-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q034_InSearchOfCloth 30165-3.htm
+  S QuestList 37:0x8000003f 34:0x8000003f
+  S ExShowQuestMark quest=34
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7528 6:10
+  S SystemMessage id=54 3:7161
+  S NpcHtmlMessage obj=ralford item=0 page=script/quest/Q034_InSearchOfCloth/30165-3.htm
+  S ActionFailed
+  Q upsert Q034_InSearchOfCloth | <cond> | 6
+  items 7528=0 7161=1
+  rows Q034_InSearchOfCloth <cond>=6 <state>=STARTED
+action ralford
+  S ActionFailed
+  S NpcHtmlMessage obj=ralford item=0 page=merchant/30165.htm
+  S ActionFailed
+bypass npc_{ralford}_Quest
+  S NpcHtmlMessage obj=ralford item=0 page=script/quest/Q034_InSearchOfCloth/30165-3a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Radia weaves the mysterious cloth; the quest completes.
+action radia
+action radia
+  S ActionFailed
+  S NpcHtmlMessage obj=radia item=0 page=merchant/30088.htm
+  S ActionFailed
+bypass npc_{radia}_Quest
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q034_InSearchOfCloth 30088-5.htm
+  S SystemMessage id=302 3:7161
+  S SystemMessage id=301 3:1866 6:3000
+  S SystemMessage id=301 3:1868 6:5000
+  S SystemMessage id=54 3:7076
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x8000003f 34:0x00000000
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-5.htm
+  S ActionFailed
+  Q upsert Q034_InSearchOfCloth | <state> | COMPLETED
+  Q delete-except-state Q034_InSearchOfCloth
+  state Q034_InSearchOfCloth COMPLETED
+  rows Q034_InSearchOfCloth <state>=COMPLETED
+  items 7161=0 1866=0 1868=0 7076=1
+
+# Relog: the completed quest loads from its one row, and the cloth stays.
+relog
+  state Q034_InSearchOfCloth COMPLETED
+  rows Q034_InSearchOfCloth <state>=COMPLETED
+  items 7076=1
+action radia
+action radia
+  S ActionFailed
+  S NpcHtmlMessage obj=radia item=0 page=merchant/30088.htm
+  S ActionFailed
+bypass npc_{radia}_Quest
+  S NpcHtmlMessage obj=radia item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
