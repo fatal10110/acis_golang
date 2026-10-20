@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q325"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q330"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q333"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q336"
 )
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
@@ -34,7 +35,7 @@ func quests301Up() script.Catalog {
 		"quest.Q333_HuntOfTheBlackLion":                q333.New,
 		"quest.Q334_TheWishingPotion":                  nil,
 		"quest.Q335_SongOfTheHunter":                   nil,
-		"quest.Q336_CoinsOfMagic":                      nil,
+		"quest.Q336_CoinsOfMagic":                      q336.New,
 		"quest.Q337_AudienceWithTheLandDragon":         nil,
 		"quest.Q338_AlligatorHunter":                   nil,
 		"quest.Q340_SubjugationOfLizardmen":            nil,
