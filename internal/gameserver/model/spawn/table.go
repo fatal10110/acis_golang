@@ -2,7 +2,6 @@ package spawn
 
 import (
 	"errors"
-	"sort"
 	"strings"
 )
 
@@ -11,10 +10,13 @@ type Table struct {
 	territories    map[string]*Territory
 	territoryCount int
 	makers         map[string]*Maker
-	order          []*Maker
+	// order is makers in list order: the order they were handed in,
+	// which is the spawnlist's file and declaration order.
+	order []*Maker
 }
 
-// NewTable builds a Table from already-validated territories and makers.
+// NewTable builds a Table from already-validated territories and makers,
+// keeping makers in the order given.
 func NewTable(territories []*Territory, makers []*Maker) (*Table, error) {
 	if len(territories) == 0 {
 		return nil, errors.New("spawn: table has no territories")
@@ -45,7 +47,6 @@ func NewTable(territories []*Territory, makers []*Maker) (*Table, error) {
 	}
 
 	order := append([]*Maker(nil), makers...)
-	sort.Slice(order, func(i, j int) bool { return order[i].Name < order[j].Name })
 
 	return &Table{
 		territories:    territoryMap,
@@ -86,7 +87,8 @@ func (t *Table) SpawnCount() int {
 	return total
 }
 
-// Makers returns every maker ordered by name.
+// Makers returns every maker in list order: npcmakers start, and lookups
+// that take the first match find them, in this order.
 func (t *Table) Makers() []*Maker {
 	return append([]*Maker(nil), t.order...)
 }

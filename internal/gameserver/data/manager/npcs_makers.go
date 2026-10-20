@@ -2,6 +2,8 @@ package manager
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +48,12 @@ type makerGroup struct {
 	// rows are, per entry, its persisted row; nil for an entry that is
 	// not database-tracked.
 	rows []*dbRow
+	// orphansAlive is what the NPCs of g's orphan slots add to its alive
+	// count: one more as each enters the world, one less as each leaves,
+	// back to zero on DeleteAll, which leaves them in the world. An orphan
+	// that leaves after a DeleteAll takes the count below the NPCs in the
+	// world. Guarded by n.mu.
+	orphansAlive int
 }
 
 // newGroups builds the run-time npcmakers of spawns for RespawnAll run gen
@@ -83,7 +91,7 @@ func (g *makerGroup) Maker() *spawn.Maker { return g.def }
 func (g *makerGroup) Alive() int {
 	g.n.mu.Lock()
 	defer g.n.mu.Unlock()
-	alive := 0
+	alive := g.orphansAlive
 	for _, keys := range g.keys {
 		for _, key := range keys {
 			if g.n.liveLocked(key) {
@@ -98,10 +106,14 @@ func (g *makerGroup) Held() bool { return g.n.held(g.def) }
 
 func (g *makerGroup) Listed(event string) bool { return g.n.events.has(event) }
 
-func (g *makerGroup) Spawns() []spawn.GroupSpawn {
+func (g *makerGroup) Spawns() []spawn.GroupSpawn { return g.spawns(nil) }
+
+// spawns returns the spawns of g as a hook running in scope sees them; a
+// nil scope for none.
+func (g *makerGroup) spawns(scope *hookScope) []spawn.GroupSpawn {
 	out := make([]spawn.GroupSpawn, len(g.def.Entries))
 	for i := range out {
-		out[i] = groupSpawn{g: g, i: i}
+		out[i] = groupSpawn{g: g, i: i, scope: scope}
 	}
 	return out
 }
@@ -122,26 +134,35 @@ func (g *makerGroup) Every(d time.Duration, fn func()) *sim.Ticker {
 }
 
 // DeleteAll deletes every NPC of g, one spawn after another, as each
-// spawn's DeleteNPCs does.
-func (g *makerGroup) DeleteAll() {
+// spawn's DeleteNPCs does. The NPCs of its orphan slots stay in the world,
+// their respawns armed, and no longer count alive.
+func (g *makerGroup) DeleteAll() { g.deleteAll(nil) }
+
+// deleteAll is DeleteAll run by a hook in scope; a nil scope for none.
+func (g *makerGroup) deleteAll(scope *hookScope) {
+	g.n.mu.Lock()
+	g.orphansAlive = 0
+	g.n.mu.Unlock()
 	for i := range g.def.Entries {
-		g.deleteEntry(i)
+		g.deleteEntry(i, scope)
 	}
 }
 
 // deleteEntry deletes every NPC entry i of g keeps, and its
 // database-tracked row goes back to uninitialized. Its slots are dropped
 // first, so no maker hook runs for the deleted NPCs and no respawn comes
-// back; a master's privates leave with it. Each NPC is out of the world,
+// back; a master's privates leave with it. A hook running in scope that
+// deletes them may still arm their respawns (see groupNPC.ScheduleRespawn). Each NPC is out of the world,
 // its decayed hooks run, when it returns. The NPCs decay on the calling
 // goroutine, without waiting for their own queues (the npc package's
 // off-queue delete contract).
-func (g *makerGroup) deleteEntry(i int) {
+func (g *makerGroup) deleteEntry(i int, scope *hookScope) {
 	n := g.n
 	var ids []int32
 	n.mu.Lock()
 	for _, key := range g.keys[i] {
 		slot := n.slot[key]
+		scope.recordLocked(slot.serial)
 		n.respawn.Cancel(key)
 		if n.liveLocked(key) {
 			ids = append(ids, slot.liveID)
@@ -176,8 +197,9 @@ func (g *makerGroup) deleteEntry(i int) {
 // groupSpawn is one spawn entry of a makerGroup (spawn.GroupSpawn). A slot
 // whose first NPC is still being placed is none of its NPCs yet.
 type groupSpawn struct {
-	g *makerGroup
-	i int
+	g     *makerGroup
+	i     int
+	scope *hookScope
 }
 
 func (s groupSpawn) Entry() spawn.Entry { return s.g.def.Entries[s.i] }
@@ -230,7 +252,7 @@ func (s groupSpawn) NPCs() []spawn.GroupNPC {
 	out := make([]spawn.GroupNPC, 0, len(s.g.keys[s.i]))
 	for _, key := range s.g.keys[s.i] {
 		if !n.slot[key].spawning {
-			out = append(out, groupNPC{n: n, key: key})
+			out = append(out, groupNPC{n: n, slot: n.slot[key], scope: s.scope})
 		}
 	}
 	return out
@@ -255,7 +277,7 @@ func (s groupSpawn) Respawn() {
 	}
 }
 
-func (s groupSpawn) LoadDBInfo() { s.g.behavior.NPCDBInfo(s.g, s) }
+func (s groupSpawn) LoadDBInfo() { s.g.behavior.NPCDBInfo(s.g.in(s.scope), s) }
 
 func (s groupSpawn) ClearDBLoaded() {
 	if row := s.g.rows[s.i]; row != nil {
@@ -264,28 +286,50 @@ func (s groupSpawn) ClearDBLoaded() {
 }
 
 // groupNPC is the NPC one spawn slot keeps (spawn.GroupNPC): the slot
-// lives on across the NPC's respawns.
+// lives on across the NPC's respawns. slot is the slot as the NPC was
+// handed out: a respawn armed after its spawn dropped it brings it back as
+// an orphan slot.
 type groupNPC struct {
-	n   *Npcs
-	key string
+	n     *Npcs
+	slot  slotInfo
+	scope *hookScope
+}
+
+// keyLocked returns the key c's slot lives under now, listed or orphan,
+// and whether it lives at all: a slot declared anew under the same key is
+// another NPC's. The caller holds n.mu.
+func (c groupNPC) keyLocked() (string, bool) {
+	for _, key := range [2]string{c.slot.key, orphanKey(c.slot)} {
+		if slot, ok := c.n.slot[key]; ok && slot.serial == c.slot.serial {
+			return key, true
+		}
+	}
+	return "", false
 }
 
 func (c groupNPC) Decayed() bool {
 	c.n.mu.Lock()
 	defer c.n.mu.Unlock()
-	return !c.n.liveLocked(c.key)
+	key, ok := c.keyLocked()
+	return !ok || !c.n.liveLocked(key)
 }
 
 func (c groupNPC) Delete() {
 	c.n.mu.Lock()
-	slot := c.n.slot[c.key]
-	live := c.n.liveLocked(c.key)
+	key, ok := c.keyLocked()
+	slot := c.n.slot[key]
+	live := ok && c.n.liveLocked(key)
 	c.n.mu.Unlock()
 	if live {
 		c.n.deleteLive(slot.liveID)
 	}
 }
 
+// ScheduleRespawn arms the slot's respawn. A slot that a DeleteAll or a
+// DeleteNPCs of the hook that handed c out dropped comes back as an orphan
+// slot, its NPC placed again once d has passed. One that any other caller
+// dropped stays gone, as does one of an npcmaker that DespawnAll or
+// RespawnAll replaced since.
 func (c groupNPC) ScheduleRespawn(d time.Duration) {
 	if d <= 0 {
 		return
@@ -293,9 +337,40 @@ func (c groupNPC) ScheduleRespawn(d time.Duration) {
 	now := c.n.now()
 	c.n.mu.Lock()
 	defer c.n.mu.Unlock()
-	if _, ok := c.n.slot[c.key]; ok {
-		c.n.respawn.AddEarliest(c.key, now.Add(d))
+	key, ok := c.keyLocked()
+	if !ok {
+		if !c.scope.droppedLocked(c.slot.serial) {
+			return
+		}
+		if key, ok = c.n.adoptOrphanLocked(c.slot); !ok {
+			return
+		}
 	}
+	c.n.respawn.AddEarliest(key, now.Add(d))
+}
+
+// orphanKey is the key slot lives under once its spawn lets it go. Only
+// a database-tracked slot needs a new one: its spawn declares every slot
+// under its one key, where any other slot key is declared once.
+func orphanKey(slot slotInfo) string {
+	if slot.orphan || slot.dbName == "" {
+		return slot.key
+	}
+	return slot.key + "~" + strconv.Itoa(slot.serial)
+}
+
+// adoptOrphanLocked declares slot again as an orphan slot of its group,
+// its NPC out of the world, and returns its key: none for a slot of no
+// npcmaker, nor one DespawnAll or RespawnAll dropped. The caller holds
+// n.mu.
+func (n *Npcs) adoptOrphanLocked(slot slotInfo) (string, bool) {
+	if slot.group == nil || slot.key == "" || slot.epoch != n.despawns || !slices.Contains(n.groups, slot.group) {
+		return "", false
+	}
+	slot.key = orphanKey(slot)
+	slot.orphan, slot.liveID, slot.spawning, slot.first = true, 0, false, false
+	n.slot[slot.key] = slot
+	return slot.key, true
 }
 
 // liveLocked reports whether the slot key has its NPC in the world. The
@@ -342,12 +417,13 @@ func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
 	n.endSpawn(key)
 }
 
-// created runs the maker hook of the npcmaker g for the NPC its entry i
-// placed under the slot key, once that NPC's created hooks have run. A
-// created hook may have deleted the NPC already: the maker still hears of
-// it, and finds it decayed.
-func (n *Npcs) created(g *makerGroup, i int, key string) {
-	g.behavior.NPCCreated(g, groupSpawn{g: g, i: i}, groupNPC{n: n, key: key})
+// created runs the maker hook of the npcmaker of slot for the NPC it
+// placed, once that NPC's created hooks have run. A created hook may have
+// deleted the NPC already: the maker still hears of it, and finds it
+// decayed.
+func (n *Npcs) created(slot slotInfo) {
+	g, scope := slot.group, &hookScope{}
+	g.behavior.NPCCreated(g.in(scope), groupSpawn{g: g, i: slot.spawnIdx, scope: scope}, groupNPC{n: n, slot: slot, scope: scope})
 }
 
 // held reports whether the spawn condition of m holds, keeping its NPCs out
@@ -470,7 +546,7 @@ func (n *Npcs) startEvent(event string) {
 	}
 	for _, g := range n.currentGroups() {
 		if g.def.EventName() == event {
-			g.behavior.Start(g)
+			g.behavior.Start(g.in(&hookScope{}))
 		}
 	}
 }
@@ -496,7 +572,7 @@ func (n *Npcs) deleteEvent(event string) {
 func (n *Npcs) MakerEvent(maker, name string, int1, int2 int) bool {
 	for _, g := range n.currentGroups() {
 		if strings.EqualFold(g.def.Name, maker) {
-			g.behavior.ScriptEvent(g, name, int1, int2)
+			g.behavior.ScriptEvent(g.in(&hookScope{}), name, int1, int2)
 			return true
 		}
 	}

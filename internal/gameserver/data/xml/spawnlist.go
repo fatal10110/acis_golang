@@ -50,7 +50,9 @@ type spawnPrivateEl struct {
 }
 
 // LoadSpawnlist parses every region-sharded spawnlist XML file directly under
-// dir and returns the full in-memory territory/maker table.
+// dir and returns the full in-memory territory/maker table. The table lists
+// the makers file by file, in file name order, and in declaration order
+// inside each file.
 //
 // log receives skipped-territory diagnostics; the zero logger discards them.
 // spawnMultiplier is the npcs.properties SpawnMultiplier (default 1): it
