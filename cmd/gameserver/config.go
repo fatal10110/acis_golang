@@ -319,7 +319,12 @@ func loadPlayerSpawnProtection(paths gameServerPaths) (playerSpawnProtection, er
 	if err != nil {
 		return 0, err
 	}
-	return playerSpawnProtection(time.Duration(config.NewFields(props, "player spawn protection").Int("PlayerSpawnProtection", 0)) * time.Second), nil
+	f := config.NewFields(props, "player spawn protection")
+	v := int32Setting(f, "PlayerSpawnProtection", 0)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return playerSpawnProtection(time.Duration(v) * time.Second), nil
 }
 
 func loadRespawnRestoreHP(paths gameServerPaths) (respawnRestoreHP, error) {
@@ -327,7 +332,12 @@ func loadRespawnRestoreHP(paths gameServerPaths) (respawnRestoreHP, error) {
 	if err != nil {
 		return 0, err
 	}
-	return respawnRestoreHP(config.NewFields(props, "respawn restore hp").Float64("RespawnRestoreHP", 0.7)), nil
+	f := config.NewFields(props, "respawn restore hp")
+	v := f.Float64("RespawnRestoreHP", 0.7)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return respawnRestoreHP(v), nil
 }
 
 func loadDeathPenaltyChance(paths gameServerPaths) (deathPenaltyChance, error) {
@@ -335,7 +345,12 @@ func loadDeathPenaltyChance(paths gameServerPaths) (deathPenaltyChance, error) {
 	if err != nil {
 		return 0, err
 	}
-	return deathPenaltyChance(config.NewFields(props, "death penalty chance").Int("DeathPenaltyChance", 20)), nil
+	f := config.NewFields(props, "death penalty chance")
+	v := int32Setting(f, "DeathPenaltyChance", 20)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return deathPenaltyChance(v), nil
 }
 
 type maxBuffsAmount int
@@ -345,7 +360,12 @@ func loadMaxBuffsAmount(paths gameServerPaths) (maxBuffsAmount, error) {
 	if err != nil {
 		return 0, err
 	}
-	return maxBuffsAmount(config.NewFields(props, "max buffs amount").Int("MaxBuffsAmount", 20)), nil
+	f := config.NewFields(props, "max buffs amount")
+	v := int32Setting(f, "MaxBuffsAmount", 20)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return maxBuffsAmount(v), nil
 }
 
 // perfectShieldBlockRate is the roll threshold (out of 100) below which a
@@ -358,7 +378,12 @@ func loadPerfectShieldBlockRate(paths gameServerPaths) (perfectShieldBlockRate, 
 	if err != nil {
 		return 0, err
 	}
-	return perfectShieldBlockRate(config.NewFields(props, "perfect shield block rate").Int("PerfectShieldBlockRate", 5)), nil
+	f := config.NewFields(props, "perfect shield block rate")
+	v := int32Setting(f, "PerfectShieldBlockRate", 5)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return perfectShieldBlockRate(v), nil
 }
 
 // magicFailures is the players.properties MagicFailures switch: when true,
@@ -418,7 +443,12 @@ func loadWeightLimitMultiplier(paths gameServerPaths) (weightLimitMultiplier, er
 	if err != nil {
 		return 0, err
 	}
-	return weightLimitMultiplier(config.NewFields(props, "weight limit").Float64("WeightLimit", 1)), nil
+	f := config.NewFields(props, "weight limit")
+	v := f.Float64("WeightLimit", 1)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return weightLimitMultiplier(v), nil
 }
 
 // loadRegenMultipliers reads the players.properties HpRegenMultiplier,
@@ -613,7 +643,12 @@ func loadRateKarmaExpLost(paths gameServerPaths) (rateKarmaExpLost, error) {
 	if err != nil {
 		return 0, err
 	}
-	return rateKarmaExpLost(config.NewFields(props, "rate karma exp lost").Float64("RateKarmaExpLost", 1)), nil
+	f := config.NewFields(props, "rate karma exp lost")
+	v := f.Float64("RateKarmaExpLost", 1)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return rateKarmaExpLost(v), nil
 }
 
 // loadMerchantConfig reads the server.properties shop settings.
@@ -667,7 +702,12 @@ func loadCharacterSelectDelay(paths gameServerPaths) (characterSelectDelay, erro
 	if err != nil {
 		return 0, err
 	}
-	return characterSelectDelay(time.Duration(config.NewFields(props, "character select reuse delay").Int("CharacterSelectTime", 3000)) * time.Millisecond), nil
+	f := config.NewFields(props, "character select reuse delay")
+	v := int32Setting(f, "CharacterSelectTime", 3000)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return characterSelectDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // serverBypassDelay is the reuse delay between two bypass commands on one
@@ -679,7 +719,12 @@ func loadServerBypassDelay(paths gameServerPaths) (serverBypassDelay, error) {
 	if err != nil {
 		return 0, err
 	}
-	return serverBypassDelay(time.Duration(config.NewFields(props, "server bypass reuse delay").Int("ServerBypassTime", 100)) * time.Millisecond), nil
+	f := config.NewFields(props, "server bypass reuse delay")
+	v := int32Setting(f, "ServerBypassTime", 100)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return serverBypassDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // manufactureDelay is the reuse delay between two crafts on one client
@@ -691,7 +736,12 @@ func loadManufactureDelay(paths gameServerPaths) (manufactureDelay, error) {
 	if err != nil {
 		return 0, err
 	}
-	return manufactureDelay(time.Duration(config.NewFields(props, "manufacture reuse delay").Int("ManufactureTime", 300)) * time.Millisecond), nil
+	f := config.NewFields(props, "manufacture reuse delay")
+	v := int32Setting(f, "ManufactureTime", 300)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return manufactureDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // craftingEnabled switches recipe registration and crafting on, read from
@@ -715,7 +765,12 @@ func loadMultisellDelay(paths gameServerPaths) (multisellDelay, error) {
 	if err != nil {
 		return 0, err
 	}
-	return multisellDelay(time.Duration(config.NewFields(props, "multisell reuse delay").Int("MultisellTime", 100)) * time.Millisecond), nil
+	f := config.NewFields(props, "multisell reuse delay")
+	v := int32Setting(f, "MultisellTime", 100)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return multisellDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // manorDelay is the reuse delay between two seed purchases on one client
@@ -727,7 +782,12 @@ func loadManorDelay(paths gameServerPaths) (manorDelay, error) {
 	if err != nil {
 		return 0, err
 	}
-	return manorDelay(time.Duration(config.NewFields(props, "manor reuse delay").Int("ManorTime", 3000)) * time.Millisecond), nil
+	f := config.NewFields(props, "manor reuse delay")
+	v := int32Setting(f, "ManorTime", 3000)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return manorDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // rollDiceDelay is the reuse delay between two dice throws on one client
@@ -739,7 +799,12 @@ func loadRollDiceDelay(paths gameServerPaths) (rollDiceDelay, error) {
 	if err != nil {
 		return 0, err
 	}
-	return rollDiceDelay(time.Duration(config.NewFields(props, "roll dice reuse delay").Int("RollDiceTime", 4200)) * time.Millisecond), nil
+	f := config.NewFields(props, "roll dice reuse delay")
+	v := int32Setting(f, "RollDiceTime", 4200)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return rollDiceDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // socialDelay is the reuse delay between two emote requests on one client
@@ -751,7 +816,12 @@ func loadSocialDelay(paths gameServerPaths) (socialDelay, error) {
 	if err != nil {
 		return 0, err
 	}
-	return socialDelay(time.Duration(config.NewFields(props, "social reuse delay").Int("SocialTime", 2000)) * time.Millisecond), nil
+	f := config.NewFields(props, "social reuse delay")
+	v := int32Setting(f, "SocialTime", 2000)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return socialDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // subclassDelay is the reuse delay between two subclass add, change or
@@ -763,7 +833,12 @@ func loadSubclassDelay(paths gameServerPaths) (subclassDelay, error) {
 	if err != nil {
 		return 0, err
 	}
-	return subclassDelay(time.Duration(config.NewFields(props, "subclass reuse delay").Int("SubclassTime", 2000)) * time.Millisecond), nil
+	f := config.NewFields(props, "subclass reuse delay")
+	v := int32Setting(f, "SubclassTime", 2000)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return subclassDelay(time.Duration(v) * time.Millisecond), nil
 }
 
 // subclassWithoutQuests lets a subclass be added without its quests, read
@@ -841,7 +916,12 @@ func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
 	if err != nil {
 		return 0, err
 	}
-	return spawnMultiplier(config.NewFields(props, "spawn multiplier").Float64("SpawnMultiplier", 1)), nil
+	f := config.NewFields(props, "spawn multiplier")
+	v := f.Float64("SpawnMultiplier", 1)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return spawnMultiplier(v), nil
 }
 
 // loadSpawnEvents reads the npcs.properties SpawnEvents list: the spawn
@@ -863,7 +943,12 @@ func loadRandomWalkRate(paths gameServerPaths) (randomWalkRate, error) {
 	if err != nil {
 		return 0, err
 	}
-	return randomWalkRate(config.NewFields(props, "random walk rate").Int("RandomWalkRate", 30)), nil
+	f := config.NewFields(props, "random walk rate")
+	v := int32Setting(f, "RandomWalkRate", 30)
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return randomWalkRate(v), nil
 }
 
 // maxGeoPathFailCount is the consecutive pathfinding-fail overflow
