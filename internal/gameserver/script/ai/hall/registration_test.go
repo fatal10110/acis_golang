@@ -28,6 +28,7 @@ var chain = []struct {
 	{"script.ai.siegablehall.Agit03Alfred", Alfred},
 	{"script.ai.siegablehall.Agit03Giselle", Giselle},
 	{"script.ai.siegablehall.Agit03Lidia", Lidia},
+	{"script.ai.siegablehall.AzitWateringCrazyYeti", CrazyYeti},
 	{"script.ai.siegablehall.AzitWateringGroud", Gourd},
 	{"script.ai.siegablehall.AzitWateringMimic", Mimic},
 	{"script.ai.siegablehall.AzitWateringMimicMagical", MimicMagical},
@@ -40,8 +41,9 @@ var chain = []struct {
 }
 
 // folkIDs are the chain's civilian NPCs, as the datapack types them: the
-// Rainbow Springs gourds and sweeper. Every other id is a monster.
-var folkIDs = []int32{35588, 35589, 35590, 35591, 35600}
+// Rainbow Springs gourds, enraged yeti and sweeper. Every other id is a
+// monster.
+var folkIDs = []int32{35588, 35589, 35590, 35591, 35592, 35600}
 
 // manifestView is what the reference manifest records of the chain: per
 // script its kind and bind lines, and the folded per-(npc, event) lists
@@ -129,7 +131,7 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // manifest for the chain: each script's kind and bind lines, and every
 // folded per-(npc, event) list restricted to the chain's scripts: the
 // sorcerer's id on 2 events, Dietrich's on 5, Gustav's on 5, Mikhail's on 4,
-// Alfred's and Giselle's on 3 each, Lidia's on 5, the four gourds' on 2
+// Alfred's and Giselle's on 3 each, Lidia's on 5, the yeti's on 10, the four gourds' on 2
 // each, the mimic's on 1, the magical mimic's on 2, the sweeper's on 4, the
 // treasure box's on 3, the three soldiers' on 4 each, the second sorcerer's
 // on 4 and the healer's on 1.
@@ -174,13 +176,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 2+5+5+4+3+3+5+4*2+1+2+4+3+3*4+4+1, len(want.folds); got != wantFolds {
+	if wantFolds, got := 2+5+5+4+3+3+5+10+4*2+1+2+4+3+3*4+4+1, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{35373, 35408, 35410, 35409, 35630, 35631, 35629, 35588, 35589, 35590, 35591, 35593, 35594, 35600, 35595, 35372, 35379, 35381, 35380, 35369} {
+	for _, id := range []int32{35373, 35408, 35410, 35409, 35630, 35631, 35629, 35592, 35588, 35589, 35590, 35591, 35593, 35594, 35600, 35595, 35372, 35379, 35381, 35380, 35369} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
