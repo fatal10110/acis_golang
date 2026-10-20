@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"slices"
 	"sync"
 	"testing"
@@ -117,10 +118,12 @@ func TestAdminReloadZone(t *testing.T) {
 	}
 
 	frames := exchangeZones(t, gm, encodeBuildCmd("reload zone"))
-	if len(frames) != 2 || !compassFrame(frames[0], serverpackets.CompassPvPZone) {
-		t.Fatalf("//reload zone frames = %x, want the PvP compass zone then the answer", testsupport.FrameOpcodes(frames))
+	// Entering the reloaded arena tells the game master it entered a combat
+	// zone, ahead of its compass update.
+	if len(frames) != 3 || frames[0][0] != serverpackets.OpcodeSystemMessage || binary.LittleEndian.Uint32(frames[0][1:5]) != serverpackets.SystemMessageEnteredCombatZone || !compassFrame(frames[1], serverpackets.CompassPvPZone) {
+		t.Fatalf("//reload zone frames = %x, want ENTERED_COMBAT_ZONE, the PvP compass zone, then the answer", testsupport.FrameOpcodes(frames))
 	}
-	assertTexts(t, frames[1:], "Zones have been reloaded.")
+	assertTexts(t, frames[2:], "Zones have been reloaded.")
 
 	if got := occupantIDs(oldPeace); len(got) != 0 {
 		t.Fatalf("the replaced peace zone still holds %v", got)

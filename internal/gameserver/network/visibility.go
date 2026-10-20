@@ -423,7 +423,9 @@ func (l *GameClientLink) summonInfoSnapshot(a *summon.Actor, viewer *livePlayer,
 		AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, tmpl.AtkSpd),
 		CollisionRadius:  a.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		Running: a.Running(), MoveType: int(a.Move().MoveType()),
-		InCombat: inCombat, AlikeDead: a.AlikeDead(),
+		// A summon's show-summon-animation flag is set when it is created
+		// and never cleared, so every summon NpcInfo carries 2.
+		InCombat: inCombat, AlikeDead: a.AlikeDead(), SummonAnimation: 2,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
 		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
 		AbnormalEffect: a.AbnormalEffect(), Team: team,

@@ -753,6 +753,13 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// A rider neither sits nor stands: the request goes idle, stopping any
+	// ride under way, and is refused.
+	if live.Mounted() {
+		live.goIdle()
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	// A stand while lying in fake death gets up out of it instead of
 	// standing up: the Fake Death effect, if still on, ends with its own
 	// get-up, then the player gets up again. During a get-up the player is
