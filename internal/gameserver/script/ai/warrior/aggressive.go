@@ -8,8 +8,18 @@ import (
 // Aggressive is WarriorAggressive: a Warrior that attacks the players and
 // summons it sees.
 func Aggressive() script.Script {
+	return script.Script{Dir: aggressiveDir, Behavior: true, NPCs: aggressiveIDs(), Hooks: AggressiveHooks()}
+}
+
+// aggressiveDir is the directory of WarriorAggressive and the children
+// that keep it.
+const aggressiveDir = "ai/individual/Monster/WarriorBase/Warrior/WarriorAggressive"
+
+// AggressiveHooks are WarriorAggressive's hooks, which its children derive
+// theirs from.
+func AggressiveHooks() script.Hooks {
 	base := WarriorHooks()
-	hooks := base.With(script.Hooks{
+	return base.With(script.Hooks{
 		OnSeeCreature: func(s *script.Script, e script.SeeCreature) {
 			if !e.Creature.Playable() {
 				return
@@ -17,8 +27,7 @@ func Aggressive() script.Script {
 			defaultnpc.TryToAttack(s, e.NPC, e.Creature)
 			base.SeeCreature(s, e)
 		},
-	})
-	return script.Script{Dir: "ai/individual/Monster/WarriorBase/Warrior/WarriorAggressive", Behavior: true, NPCs: aggressiveIDs(), Hooks: hooks}
+	}).Named("WarriorAggressive")
 }
 
 // aggressiveIDs are WarriorAggressive's own NPCs.
