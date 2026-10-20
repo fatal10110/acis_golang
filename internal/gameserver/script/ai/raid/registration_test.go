@@ -24,7 +24,6 @@ var chain = []struct {
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.individual.Monster.MonsterAI", monster.New},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossStandard", BossStandard},
-	{"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon", Gordon},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1", BossType1},
 	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard", PrivateStandard},
 }
@@ -115,8 +114,8 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // the chain: each script's kind and bind lines, none for RaidBossStandard,
 // which binds no NPC of its own, and every folded per-(npc, event) list
 // restricted to the chain's scripts: RaidPrivateStandard's 95 ids on 6
-// events each, Gordon's 7 events on 29095 and RaidBossType1's 4 events on
-// each of its 39 ids but 25512. In the reference, DrChaosGiganticGolem,
+// events each and RaidBossType1's 4 events on each of its 39 ids but
+// 25512. In the reference, DrChaosGiganticGolem,
 // listed later and not ported yet, takes every event of 25512 from
 // RaidBossType1, so the dump's 25512 lists, RaidBossType1's own until that
 // child is ported, are left out of the comparison.
@@ -157,13 +156,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 95*6+7+38*4, len(want.folds); got != wantFolds {
+	if wantFolds, got := 95*6+38*4, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{25006, 25526, 29097, 25019, 25163, 29036, 29095} {
+	for _, id := range []int32{25006, 25526, 29097, 25019, 25163, 29036} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

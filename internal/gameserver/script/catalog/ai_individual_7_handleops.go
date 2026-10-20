@@ -64,11 +64,6 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnTimer":            {"NPC.CanAutoAttack", "NPC.CastingNow", "NPC.HateList", "NPC.InCombat", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 			"OnUseSkillFinished": {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted"},
 		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon": {
-			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":    {"NPC.RandomizeAttack"},
-		},
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1": {
 			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
 			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},

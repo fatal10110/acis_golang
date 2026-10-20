@@ -152,7 +152,6 @@ var scenarioScripts = script.Catalog{
 
 	// The raid bosses.
 	"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                          raid.BossStandard,
-	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon":        raid.Gordon,
 	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1": raid.BossType1,
 }
 

@@ -3,26 +3,27 @@ package ai
 import (
 	"slices"
 	"testing"
-	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	actorai "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/raid"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // The raid boss fixtures' skills by type: a physical special on one target,
-// two specials around the boss and its self buff, and the raid mute.
+// two specials around the boss and its self buff, and the raid mute (the
+// strider slow is below).
 const (
 	rbPhysical = modelskill.ID(9941)
 	rbRange    = modelskill.ID(9942)
@@ -36,7 +37,7 @@ const (
 func rbSkills() []modelskill.Definition {
 	return []modelskill.Definition{
 		ind1Skill(rbPhysical, 2000, false), ind1Skill(rbRange, 0, true), ind1Skill(rbCancel, 0, true),
-		ind1Skill(rbSelfBuff, 0, true), ind1Skill(rbMuteID, 600, false),
+		ind1Skill(rbSelfBuff, 0, true), ind1Skill(rbMuteID, 600, false), ind1Skill(rbStriderSlow, 600, false),
 	}
 }
 
@@ -48,7 +49,7 @@ func rbTemplate(id int32, level int, ai npc.AIParams, skills map[npc.SkillType]m
 	return tmpl
 }
 
-// bootRaidBosses boots the raid boss chain (RaidBossStandard, Gordon,
+// bootRaidBosses boots the raid boss chain (RaidBossStandard,
 // RaidBossType1) beside templates, with extra, every NPC casting the raid
 // boss fixture skills and the raid curse, every draw 0 until a test queues
 // others.
@@ -58,11 +59,10 @@ func bootRaidBosses(t *testing.T, extra raidBoot, templates ...*npc.Template) *i
 		"script.ai.individual.DefaultNpc",
 		"script.ai.individual.Monster.MonsterAI",
 		"script.ai.individual.Monster.RaidBoss.RaidBossStandard",
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon",
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1",
 	}
 	catalog := script.Catalog{
-		paths[0]: defaultnpc.New, paths[1]: monster.New, paths[2]: raid.BossStandard, paths[3]: raid.Gordon, paths[4]: raid.BossType1,
+		paths[0]: defaultnpc.New, paths[1]: monster.New, paths[2]: raid.BossStandard, paths[3]: raid.BossType1,
 	}
 	var list []script.Listing
 	for _, p := range paths {
@@ -205,134 +205,181 @@ func TestRaidBossType1UsesItsSpecials(t *testing.T) {
 	w.wantCasts(t, "hit by its top desire target", boss, map[modelskill.ID]ind1Cast{rbPhysical: {me, 1000000}, rbCancel: {boss.ObjectID(), 1000000}})
 }
 
-// gordonWeapons is the cursed weapon data of the Gordon scenarios: Zariche
-// alone.
-func gordonWeapons(t *testing.T) *entity.CursedWeaponTable {
+// rbStriderSlow is the slow a raid boss casts on a strider rider.
+const rbStriderSlow = modelskill.ID(4258)
+
+// rbAggroSpellBoot is ind1AggroSpellBoot with a self buff of aggro points.
+func rbAggroSpellBoot(t *testing.T, aggro int) raidBoot {
 	t.Helper()
-	table, err := entity.NewCursedWeaponTable([]entity.CursedWeapon{{
-		ItemID: zaricheItemID, Skill: modelskill.Ref{ID: 3603, Level: 1}, Name: "Demonic Sword Zariche",
-		DropRate: 1, Duration: 72, DurationLost: 24, DisappearChance: 50, StageKills: 10,
-	}})
-	if err != nil {
-		t.Fatalf("NewCursedWeaponTable: %v", err)
+	db := sqltest.SharedDB(t)
+	def := modelskill.Definition{
+		ID: ind1AggroBuffID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		SkillType: "BUFF", HitTime: 500, StaticHitTime: true, StaticReuse: true, AggroPoints: aggro,
 	}
-	return table
+	table := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}, def})
+	return raidBoot{
+		opts: []gameservertest.Option{
+			gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), table, gamesql.NewCharacterSkillStore(db))),
+			gameservertest.WithScriptSkills(def),
+		},
+		ready: func(srv *gameservertest.Server, objID int32) {
+			if err := srv.KnownSkills.SetKnownSkill(t.Context(), objID, 0, int(ind1AggroBuffID), 1); err != nil {
+				t.Fatalf("seed the hate buff: %v", err)
+			}
+		},
+	}
 }
 
-// TestGordonPicksUpACursedWeaponAndLeaves ports Gordon's created, timer,
-// see-item and picked-item hooks. Gordon appears with no raid music, in
-// its walk stance, wanting to walk the gordon route at 10. 3 s later, and
-// every 3 s, it looks for Zariche or Akamanah within 500: Zariche lies 15
-// from it, so it wants to pick it up at 1000000. Its AI picks it up; 3 s
-// later Gordon leaves the world.
-func TestGordonPicksUpACursedWeaponAndLeaves(t *testing.T) {
+// onPlayer reports whether h stands where the character does.
+func (w *ind7World) onPlayer(t *testing.T, h *npc.Hostile) bool {
+	t.Helper()
+	x, y, z := w.srv.PlayerPosition(t, w.player.ObjectID())
+	return positionOf(h) == location.Location{X: x, Y: y, Z: z}
+}
+
+// TestRaidBossStandardSlowsAStriderRider ports the attacked hook's mount
+// rule: hit by the character riding a strider (mount type 1), the boss
+// wants its strider slow (4258) on it at 1000000, the character holding no
+// effect of the slow, beside its attack.
+func TestRaidBossStandardSlowsAStriderRider(t *testing.T) {
 	t.Parallel()
-	tmpl := rbTemplate(29095, 20, nil, nil)
-	w := bootRaidBosses(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithCursedWeapons(gordonWeapons(t))}}, tmpl)
-	s := w.spawnFrames(t, 29095, 200, 0)
-	gordon := s.h
-	if got := ind8Pick(s.frames, serverpackets.OpcodePlaySound); len(got) != 0 {
-		t.Fatalf("Gordon's PlaySound frames = %x, want none", got)
-	}
-	if gordon.Running() {
-		t.Fatal("Gordon runs, want its walk stance")
-	}
-	if d, ok := desire(gordon, actorai.IntentionMoveRoute); !ok || d.Weight != 10 {
-		t.Fatalf("route desire = %+v (%v), want weight 10", d, ok)
-	}
-
-	if id, ok := w.srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || id != zaricheItemID {
-		t.Fatalf("RollDrop = %d, %v; want Zariche", id, ok)
-	}
-	at := positionOf(gordon)
-	w.srv.SeedGroundItem(t, 0, zaricheItemID, 1, at.X+15, at.Y, at.Z)
-	zariche := groundItemOf(t, w.srv, zaricheItemID)
-	x, y, z := zariche.Position()
-	w.srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche.ObjectID(), location.Location{X: x, Y: y, Z: z})
-
-	w.srv.Advance(t, 3*time.Second)
-	d, ok := desire(gordon, actorai.IntentionPickUp)
-	if !ok || d.Weight != 1000000 {
-		t.Fatalf("pick-up desire after the look = %+v (%v), want weight 1000000", d, ok)
-	}
-	w.srv.AdvanceUntil(t, "Zariche picked up", func() bool {
-		cycle(t, w.srv)
-		_, lying := w.srv.State.Object(zariche.ObjectID())
-		return !lying
+	w := bootRaidBosses(t, raidBoot{}, rbTemplate(25019, 20, nil, nil))
+	boss := w.spawn(t, 25019, 400, 0)
+	var mountType int32
+	w.onCharacter(t, func(c *player.Character) {
+		c.Mount(12526, 0)
+		mountType = c.MountType()
 	})
-	if got := w.liveNPCs(29095); len(got) != 1 {
-		t.Fatalf("Gordon left the world as it picked Zariche up")
+	if mountType != 1 {
+		t.Fatalf("setup: mount type = %d, want 1 (a strider)", mountType)
 	}
-	w.srv.Advance(t, 3*time.Second)
-	if got := w.liveNPCs(29095); len(got) != 0 {
-		t.Fatalf("Gordon still in the world 3 s after picking Zariche up")
+
+	w.hit(t, boss, 10)
+	w.wantCasts(t, "after the hit", boss, map[modelskill.ID]ind1Cast{rbStriderSlow: {w.player.ObjectID(), 1000000}})
+	if got, want := w.attackWeight(boss), rbHate(10, 20); got != want {
+		t.Fatalf("attack desire = %v, want %v", got, want)
 	}
 }
 
-// TestGordonHuntsTheCarrierOfACursedWeapon ports Gordon's attacked hook: a
-// hit of 10 from the character carrying Zariche adds 10 per point of
-// damage, 100, to the RaidBossStandard attack desire of 10 / 27 * 20000.
-func TestGordonHuntsTheCarrierOfACursedWeapon(t *testing.T) {
+// TestRaidBossStandardJumpsWhenLost ports the attacked hook's path-failure
+// branch: after more than 10 failed paths, a hit makes a boss whose top
+// desire target stands within 1000 jump onto it. One whose top desire
+// target stands 1200 away drops its attack desires, wants the attacker
+// again for this hit alone and jumps onto the attacker. Every draw is 1,
+// so neither boss's minute check sends it home.
+func TestRaidBossStandardJumpsWhenLost(t *testing.T) {
 	t.Parallel()
-	ready := func(srv *gameservertest.Server, objID int32) { srv.GiveItem(t, objID, zaricheItemID, 1) }
-	w := bootRaidBosses(t, raidBoot{ready: ready}, rbTemplate(29095, 20, nil, nil))
-	gordon := w.spawn(t, 29095, 400, 0)
-
-	w.hit(t, gordon, 10)
-	if got, want := w.attackWeight(gordon), 100+rbHate(10, 20); got != want {
-		t.Fatalf("attack desire after the hit = %v, want %v", got, want)
-	}
-}
-
-// groundItemOf returns the one itemID lying in the world.
-func groundItemOf(t *testing.T, srv *gameservertest.Server, itemID int32) *grounditem.Item {
-	t.Helper()
-	for _, obj := range srv.State.Objects() {
-		if g, ok := obj.(*grounditem.Item); ok && g.ItemID() == itemID {
-			return g
+	near, far := rbTemplate(25019, 20, nil, nil), rbTemplate(25050, 20, nil, nil)
+	near.CanMove, far.CanMove = false, false
+	w := bootRaidBosses(t, raidBoot{}, near, far)
+	w.draws.set(1)
+	for _, row := range []struct {
+		id     int32
+		dx     int
+		weight float64
+	}{{25019, 400, 2 * rbHate(10, 20)}, {25050, 1200, rbHate(10, 20)}} {
+		boss := w.spawn(t, row.id, row.dx, 0)
+		w.hit(t, boss, 10)
+		if top := boss.AI().TopDesireTarget(); top == nil || top.ObjectID() != w.player.ObjectID() {
+			t.Fatalf("npc %d top desire target = %v, want the character", row.id, top)
+		}
+		w.onQueue(t, boss, func() {
+			for range 11 {
+				boss.AddGeoPathFailCount()
+			}
+		})
+		w.hit(t, boss, 10)
+		w.srv.AdvanceUntil(t, "the jump onto the character", func() bool { return w.onPlayer(t, boss) })
+		if got := w.attackWeight(boss); got != row.weight {
+			t.Fatalf("npc %d attack desire after the jump = %v, want %v", row.id, got, row.weight)
 		}
 	}
-	t.Fatalf("no item %d on the ground", itemID)
-	return nil
 }
 
-// TestGordonHuntsTheWielderOfACursedWeapon ports Gordon's see-creature
-// hook, which its look at the creatures around it raises every 40 s: a
-// raid boss sees within its aggro range, here 1000. Seeing the character,
-// Gordon wants nothing of it; once the character wields Zariche, picked up
-// at its feet, Gordon's next look wants to attack it at 1000000.
-func TestGordonHuntsTheWielderOfACursedWeapon(t *testing.T) {
+// TestRaidBossStandardHitInPeaceGoesHome ports the attacked hook's peace
+// zone branch: a boss hit inside a peace zone drops its attack desires, the
+// one the hit just added included, and goes back to its spawn point.
+func TestRaidBossStandardHitInPeaceGoesHome(t *testing.T) {
 	t.Parallel()
-	tmpl := rbTemplate(29095, 20, nil, nil)
-	tmpl.AggroRange, tmpl.CanMove = 1000, false
-	w := bootRaidBosses(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithCursedWeapons(gordonWeapons(t))}}, tmpl)
-	gordon := w.spawn(t, 29095, 400, 0)
-
-	w.srv.Advance(t, 40*time.Second)
-	if d, ok := attackOn(gordon, w.player); ok {
-		t.Fatalf("attack desire on the unarmed character = %+v, want none", d)
+	form, err := zone.NewCuboid(200, 3_000, -1_000, 1_000, -1_000, 1_000)
+	if err != nil {
+		t.Fatalf("zone form: %v", err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewPeace(1, form))
+	tmpl := rbTemplate(25019, 20, nil, nil)
+	tmpl.CanMove = false
+	w := bootRaidBosses(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithZones(zones)}}, tmpl)
+	w.draws.set(1)
+	boss := w.spawn(t, 25019, 400, 0)
+	home := positionOf(boss)
+	w.teleport(t, boss, 600, 0)
+	if !boss.InsideZone(zone.FlagPeace) || positionOf(boss) == home {
+		t.Fatal("setup: the boss is not in the peace zone, off its spawn point")
 	}
 
-	if id, ok := w.srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || id != zaricheItemID {
-		t.Fatalf("RollDrop = %d, %v; want Zariche", id, ok)
+	w.hit(t, boss, 10)
+	w.srv.AdvanceUntil(t, "the boss back home", func() bool { return positionOf(boss) == home })
+	if d, ok := desire(boss, actorai.IntentionAttack); ok {
+		t.Fatalf("attack desire after a hit in peace = %+v, want none", d)
 	}
-	w.srv.SeedGroundItem(t, 0, zaricheItemID, 1, w.at.X, w.at.Y, w.at.Z)
-	zariche := groundItemOf(t, w.srv, zaricheItemID)
-	w.srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche.ObjectID(), w.at)
-	p := wire.NewPacketWriter(clientpackets.OpcodeAction)
-	for _, v := range []int32{zariche.ObjectID(), int32(w.at.X), int32(w.at.Y), int32(w.at.Z)} {
-		p.WriteInt32(v)
+}
+
+// TestRaidBossStandardWantsTheAggroCasterWhileFighting ports the see-spell
+// hook's aggro rule: a boss attacking another creature that sees the
+// character cast a self buff of 100000 aggro points wants to attack the
+// character at (100000 / its maximum HP, an integer division) * 4000 * 150.
+func TestRaidBossStandardWantsTheAggroCasterWhileFighting(t *testing.T) {
+	t.Parallel()
+	tmpl := rbTemplate(25019, 20, nil, nil)
+	tmpl.CanMove = false
+	w := bootRaidBosses(t, rbAggroSpellBoot(t, 100000), tmpl, warriorTemplate(unboundID, nil))
+	w.draws.set(1)
+	boss := w.spawn(t, 25019, 400, 0)
+	other := w.spawn(t, unboundID, 450, 0)
+	w.onQueue(t, boss, func() { script.NPCOf(boss).AddAttackDesire(script.NPCOf(other), 1000) })
+	w.ticks(t, 2)
+	if got := boss.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("setup: boss intention = %v, want attack", got)
 	}
-	p.WriteUint8(0)
-	w.srv.Client.Send(p.Bytes())
-	w.srv.AdvanceUntil(t, "Zariche picked up", func() bool {
-		_, lying := w.srv.State.Object(zariche.ObjectID())
-		return !lying
+
+	w.castAggroBuff()
+	w.srv.AdvanceUntil(t, "the attack desire on the caster", func() bool {
+		_, ok := attackOn(boss, w.player)
+		return ok
 	})
-	w.srv.SettlePickup(t, w.player.ObjectID())
-
-	w.srv.Advance(t, 40*time.Second)
-	if got := w.attackWeight(gordon); got != 1000000 {
-		t.Fatalf("attack desire on the wielder = %v, want 1000000", got)
+	if got, want := w.attackWeight(boss), float64(((int32(100000)/int32(boss.MaxHP()))*4000)*150); got != want {
+		t.Fatalf("attack desire on the caster = %v, want %v", got, want)
 	}
+}
+
+// TestRaidBossStandardJumpsOntoTheLostCaster ports the see-spell hook's
+// path-failure branch: a hurt boss whose top desire target is the
+// character, after more than 10 failed paths, jumps onto the character when
+// it sees it cast. Every draw is 1, so its minute check, out of its
+// territory, does not send it home.
+func TestRaidBossStandardJumpsOntoTheLostCaster(t *testing.T) {
+	t.Parallel()
+	tmpl := rbTemplate(25019, 20, nil, nil)
+	tmpl.CanMove = false
+	w := bootRaidBosses(t, raidSpellBoot(t), tmpl)
+	w.draws.set(1)
+	boss := w.spawn(t, 25019, 400, 0)
+	w.hit(t, boss, 100)
+	if top := boss.AI().TopDesireTarget(); top == nil || top.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("top desire target = %v, want the character", top)
+	}
+	w.onQueue(t, boss, func() {
+		script.NPCOf(boss).InstantTeleportTo(script.Loc{X: w.at.X + 500, Y: w.at.Y, Z: w.at.Z})
+		for range 11 {
+			boss.AddGeoPathFailCount()
+		}
+	})
+	w.srv.ReadQueued(t, w.srv.Client)
+	if boss.HP() == float64(boss.MaxHP()) {
+		t.Fatal("setup: the boss is not hurt")
+	}
+
+	w.castSelfBuff()
+	w.srv.AdvanceUntil(t, "the jump onto the caster", func() bool { return w.onPlayer(t, boss) })
 }
