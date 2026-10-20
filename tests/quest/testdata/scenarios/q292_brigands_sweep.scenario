@@ -1,0 +1,251 @@
+# Brigands Sweep (Q292): a dwarven fighter of level 5 accepts at Spiron. Balanki has nothing to buy
+# yet. Eight goblin brigands give eight necklaces, a brigand leader a pendant and a goblin lord a lord
+# pendant (each roll pinned to 9, over 5); Spiron pays 12, 36 and 33 for them, with 1000 more for ten.
+# A roll of 5 gives a suspicious memo instead: one memo and a necklace are paid on the one-memo page,
+# two on the two-memo page; the third memo becomes a suspicious contract, which Balanki buys for 1500.
+# Three more memos give another contract, which Spiron buys with the necklaces for 1120 more on the
+# contract page; then the player quits the repeatable quest; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q292_brigands_sweep.golden
+character Sweeper 5
+class 53
+random 9 0 9 0 9 0 9 0 9 0 9 0 9 0 9 0 9 0 9 0 5 0 9 0 5 0 9 0 5 0 5 0 5 0 5 0 9 0
+script quest.Q292_BrigandsSweep
+item 1483 1484 1485 1486 1487
+page default/30532.htm
+page default/30533.htm
+page script/quest/Q292_BrigandsSweep/
+npc spiron 30532 Folk 10 0 0
+npc balanki 30533 Folk -10 0 0
+npc brigand 20322 Monster 40 0 0
+npc leader 20323 Monster 0 40 0
+npc lord 20528 Monster 0 -40 0
+
+# Spiron: accept.
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q292_BrigandsSweep CREATED
+bypass Quest Q292_BrigandsSweep 30532-03.htm
+  S QuestList 292:0x80000001
+  S ExShowQuestMark quest=292
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-03.htm
+  S ActionFailed
+  Q upsert Q292_BrigandsSweep | <state> | STARTED
+  Q upsert Q292_BrigandsSweep | <cond> | 1
+  state Q292_BrigandsSweep STARTED
+  rows Q292_BrigandsSweep <cond>=1 <state>=STARTED
+
+# Spiron: nothing to pay yet.
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Balanki: no contract.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q292_BrigandsSweep/30533-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# Eight brigands, a leader and a lord: a necklace, a pendant and a lord pendant.
+kill brigand x8
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1483=8
+kill leader
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1484
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1484=1
+kill lord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1485
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1485=1
+
+# Spiron: 8 x 12 + 36 + 33, and 1000 for ten.
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S SystemMessage id=301 3:1483 6:8
+  S SystemMessage id=302 3:1484
+  S SystemMessage id=302 3:1485
+  S SystemMessage id=52 6:1165
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1483=0 1484=0 1485=0 57=1165
+
+# A memo, then a necklace: Spiron pays the necklace on the one-memo page.
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1486
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1486=1
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1483=1
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S SystemMessage id=302 3:1483
+  S SystemMessage id=52 6:12
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-08.htm
+  S ActionFailed
+  S ActionFailed
+  items 1483=0 1486=1 57=1177
+
+# A second memo and a necklace: the two-memo page.
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1486
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1486=2
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1483=1
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S SystemMessage id=302 3:1483
+  S SystemMessage id=52 6:12
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-09.htm
+  S ActionFailed
+  S ActionFailed
+  items 1483=0 1486=2 57=1189
+
+# The third memo: the memos become a contract.
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1486
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 292:0x80000003
+  S ExShowQuestMark quest=292
+  S SystemMessage id=301 3:1486 6:3
+  S SystemMessage id=54 3:1487
+  Q upsert Q292_BrigandsSweep | <cond> | 2
+  items 1486=0 1487=1
+  rows Q292_BrigandsSweep <cond>=2 <state>=STARTED
+
+# Balanki buys the contract.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S QuestList 292:0x80000001
+  S ExShowQuestMark quest=292
+  S SystemMessage id=302 3:1487
+  S SystemMessage id=52 6:1500
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q292_BrigandsSweep/30533-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q292_BrigandsSweep | <cond> | 1
+  items 1487=0 57=2689
+  rows Q292_BrigandsSweep <cond>=1 <state>=STARTED
+
+# Three more memos, another contract, and a necklace: Spiron pays the contract too; then quit.
+kill brigand x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1486
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1486
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1486
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 292:0x80000003
+  S ExShowQuestMark quest=292
+  S SystemMessage id=301 3:1486 6:3
+  S SystemMessage id=54 3:1487
+  Q upsert Q292_BrigandsSweep | <cond> | 2
+  items 1486=0 1487=1
+  rows Q292_BrigandsSweep <cond>=2 <state>=STARTED
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1483
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1483=1
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S SystemMessage id=302 3:1483
+  S QuestList 292:0x80000001
+  S ExShowQuestMark quest=292
+  S SystemMessage id=302 3:1487
+  S SystemMessage id=52 6:1132
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q292_BrigandsSweep | <cond> | 1
+  items 1483=0 1487=0 57=3821
+  rows Q292_BrigandsSweep <cond>=1 <state>=STARTED
+bypass Quest Q292_BrigandsSweep 30532-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q292_BrigandsSweep/30532-06.htm
+  S ActionFailed
+  Q delete-quest Q292_BrigandsSweep
+  state Q292_BrigandsSweep -
+  rows Q292_BrigandsSweep -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q292_BrigandsSweep -
+  rows Q292_BrigandsSweep -
+  items 57=3821

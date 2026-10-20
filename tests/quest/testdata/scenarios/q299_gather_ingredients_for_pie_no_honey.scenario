@@ -1,0 +1,26 @@
+# Gather Ingredients for Pie (Q299), the honey lost: a character at cond 2 without the hundred honey
+# pouches is told so by Emily, and the quest ends. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q299_gather_ingredients_for_pie_no_honey.golden
+character Baker 34
+quest Q299_GatherIngredientsForPie <cond>=2 <state>=STARTED
+script quest.Q299_GatherIngredientsForPie
+item 7136 7137 7138
+page default/30620.htm
+page script/quest/Q299_GatherIngredientsForPie/
+npc emily 30620 Folk 10 0 0
+
+# Emily: no honey; the quest ends.
+action emily
+action emily
+  S ActionFailed
+  S NpcHtmlMessage obj=emily item=0 page=default/30620.htm
+  S ActionFailed
+bypass npc_{emily}_Quest
+  S QuestList
+  S NpcHtmlMessage obj=emily item=0 page=script/quest/Q299_GatherIngredientsForPie/30620-2a.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q299_GatherIngredientsForPie
+  state Q299_GatherIngredientsForPie -
+  rows Q299_GatherIngredientsForPie -
