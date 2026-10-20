@@ -16,6 +16,7 @@ import (
 // Population is the live NPC population scripts spawn NPCs into.
 type Population interface {
 	AddSpawn(npcID int32, x, y, z, heading int, scatter bool, despawn time.Duration) (attackable.Combatant, error)
+	SpawnForClan(npcID int32, x, y, z, heading int, clanID int32) (attackable.Combatant, error)
 	CreatePrivate(master npc.PartyMember, npcID int32, at *location.Location, heading int, despawn time.Duration, params [3]int32) (npc.PartyMember, error)
 	CreatePrivates(master npc.PartyMember) error
 	ScheduleDespawn(live attackable.Combatant, d time.Duration)

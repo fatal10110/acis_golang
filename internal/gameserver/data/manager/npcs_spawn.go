@@ -159,6 +159,8 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	inst.Maker = info.maker
 	inst.Summoner = info.summoner
 	inst.CastleID = info.castleID
+	inst.ClanID = info.clanID
+	inst.ResidenceOwner = n.owners
 	// Each life of the slot starts with the script value cleared; its
 	// other script memory carries over.
 	var slot npc.SpawnSlot

@@ -32,6 +32,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q035"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q036"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q037"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q038"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q039"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q042"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q043"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q044"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q045"
 )
 
 // quests001To050 is the catalog of quests 001 to 050 (#178), except the two the engine slices ported.
@@ -71,12 +77,12 @@ func quests001To050() script.Catalog {
 		"quest.Q035_FindGlitteringJewelry":            q035.New,
 		"quest.Q036_MakeASewingKit":                   q036.New,
 		"quest.Q037_MakeFormalWear":                   q037.New,
-		"quest.Q038_DragonFangs":                      nil,
-		"quest.Q039_RedEyedInvaders":                  nil,
-		"quest.Q042_HelpTheUncle":                     nil,
-		"quest.Q043_HelpTheSister":                    nil,
-		"quest.Q044_HelpTheSon":                       nil,
-		"quest.Q045_ToTalkingIsland":                  nil,
+		"quest.Q038_DragonFangs":                      q038.New,
+		"quest.Q039_RedEyedInvaders":                  q039.New,
+		"quest.Q042_HelpTheUncle":                     q042.New,
+		"quest.Q043_HelpTheSister":                    q043.New,
+		"quest.Q044_HelpTheSon":                       q044.New,
+		"quest.Q045_ToTalkingIsland":                  q045.New,
 		"quest.Q046_OnceMoreInTheArmsOfTheMotherTree": nil,
 		"quest.Q047_IntoTheDarkForest":                nil,
 		"quest.Q048_ToTheImmortalPlateau":             nil,

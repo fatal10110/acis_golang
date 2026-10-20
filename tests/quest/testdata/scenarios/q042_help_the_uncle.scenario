@@ -1,0 +1,175 @@
+# Help the Uncle! (Q042): a level 25 character holding the trident and 29 map pieces accepts at Waters, who takes the
+# trident. One monster eye destroyer brings the thirtieth piece (the cond moves); Waters trades the pieces for the whole one,
+# which Sophya takes; Waters pays with a pet ticket and the quest completes; then relog. Every script
+# roll is pinned to 0.
+# Not traced (#4105): the starter's page lists multisell 101, the Go run's player object id, which
+# the Go render names {player}. Played with its trace line, the reference trace matched every step;
+# the starter's page lines below are that page with 101 written as {player}.
+character Helper 25
+hold 291 1
+hold 7548 29
+random always 0
+script quest.Q042_HelpTheUncle
+item 291 7548 7549 7583
+page merchant/30828.htm
+page default/30735.htm
+page script/quest/Q042_HelpTheUncle/
+npc waters 30828 Merchant 10 0 0
+npc sophya 30735 Folk -10 0 0
+npc mob 20068 Monster 0 40 0
+
+# Waters: accept.
+action waters
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>Pet Manager Waters:<br>\nWe've got a special food that wolves absolutely love. If you feed this to your wolf, it will tear even a turek war hound to shreds! We also have Steel teeth made by Dwarven hooligans! And hatchling products! Feel free to look around! Good owners always come to this Pet Kennel of Dion Castle Town.<br>\n<a action=\"bypass -h npc_{waters}_Buy 91\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{waters}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{waters}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{waters}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{waters}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q042_HelpTheUncle CREATED
+bypass Quest Q042_HelpTheUncle 30828-01.htm
+  S QuestList 42:0x80000001
+  S ExShowQuestMark quest=42
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-01.htm
+  S ActionFailed
+  Q upsert Q042_HelpTheUncle | <state> | STARTED
+  Q upsert Q042_HelpTheUncle | <cond> | 1
+  state Q042_HelpTheUncle STARTED
+  rows Q042_HelpTheUncle <cond>=1 <state>=STARTED
+
+# Waters takes the trident.
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>Pet Manager Waters:<br>\nWe've got a special food that wolves absolutely love. If you feed this to your wolf, it will tear even a turek war hound to shreds! We also have Steel teeth made by Dwarven hooligans! And hatchling products! Feel free to look around! Good owners always come to this Pet Kennel of Dion Castle Town.<br>\n<a action=\"bypass -h npc_{waters}_Buy 91\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{waters}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{waters}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{waters}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{waters}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q042_HelpTheUncle 30828-03.htm
+  S QuestList 42:0x80000003
+  S ExShowQuestMark quest=42
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:291
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-03.htm
+  S ActionFailed
+  Q upsert Q042_HelpTheUncle | <cond> | 2
+  items 291=0
+  rows Q042_HelpTheUncle <cond>=2 <state>=STARTED
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>Pet Manager Waters:<br>\nWe've got a special food that wolves absolutely love. If you feed this to your wolf, it will tear even a turek war hound to shreds! We also have Steel teeth made by Dwarven hooligans! And hatchling products! Feel free to look around! Good owners always come to this Pet Kennel of Dion Castle Town.<br>\n<a action=\"bypass -h npc_{waters}_Buy 91\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{waters}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{waters}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{waters}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{waters}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-03a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The thirtieth piece.
+kill mob
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7548
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 42:0x80000007
+  S ExShowQuestMark quest=42
+  Q upsert Q042_HelpTheUncle | <cond> | 3
+  items 7548=30
+  rows Q042_HelpTheUncle <cond>=3 <state>=STARTED
+
+# Waters trades the pieces.
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>Pet Manager Waters:<br>\nWe've got a special food that wolves absolutely love. If you feed this to your wolf, it will tear even a turek war hound to shreds! We also have Steel teeth made by Dwarven hooligans! And hatchling products! Feel free to look around! Good owners always come to this Pet Kennel of Dion Castle Town.<br>\n<a action=\"bypass -h npc_{waters}_Buy 91\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{waters}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{waters}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{waters}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{waters}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q042_HelpTheUncle 30828-05.htm
+  S QuestList 42:0x8000000f
+  S ExShowQuestMark quest=42
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7548 6:30
+  S SystemMessage id=54 3:7549
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-05.htm
+  S ActionFailed
+  Q upsert Q042_HelpTheUncle | <cond> | 4
+  items 7548=0 7549=1
+  rows Q042_HelpTheUncle <cond>=4 <state>=STARTED
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>Pet Manager Waters:<br>\nWe've got a special food that wolves absolutely love. If you feed this to your wolf, it will tear even a turek war hound to shreds! We also have Steel teeth made by Dwarven hooligans! And hatchling products! Feel free to look around! Good owners always come to this Pet Kennel of Dion Castle Town.<br>\n<a action=\"bypass -h npc_{waters}_Buy 91\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{waters}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{waters}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{waters}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{waters}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-05a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sophya takes it.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q042_HelpTheUncle/30735-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q042_HelpTheUncle 30735-06.htm
+  S QuestList 42:0x8000001f
+  S ExShowQuestMark quest=42
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7549
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q042_HelpTheUncle/30735-06.htm
+  S ActionFailed
+  Q upsert Q042_HelpTheUncle | <cond> | 5
+  items 7549=0
+  rows Q042_HelpTheUncle <cond>=5 <state>=STARTED
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q042_HelpTheUncle/30735-06a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Waters pays with the pet ticket; the quest completes.
+action waters
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>Pet Manager Waters:<br>\nWe've got a special food that wolves absolutely love. If you feed this to your wolf, it will tear even a turek war hound to shreds! We also have Steel teeth made by Dwarven hooligans! And hatchling products! Feel free to look around! Good owners always come to this Pet Kennel of Dion Castle Town.<br>\n<a action=\"bypass -h npc_{waters}_Buy 91\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{waters}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{waters}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{waters}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{waters}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q042_HelpTheUncle 30828-07.htm
+  S SystemMessage id=54 3:7583
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 42:0x00000000
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-07.htm
+  S ActionFailed
+  Q upsert Q042_HelpTheUncle | <state> | COMPLETED
+  Q delete-except-state Q042_HelpTheUncle
+  state Q042_HelpTheUncle COMPLETED
+  rows Q042_HelpTheUncle <state>=COMPLETED
+  items 7583=1
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q042_HelpTheUncle COMPLETED
+  rows Q042_HelpTheUncle <state>=COMPLETED
+  items 7583=1
+action waters
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>Pet Manager Waters:<br>\nWe've got a special food that wolves absolutely love. If you feed this to your wolf, it will tear even a turek war hound to shreds! We also have Steel teeth made by Dwarven hooligans! And hatchling products! Feel free to look around! Good owners always come to this Pet Kennel of Dion Castle Town.<br>\n<a action=\"bypass -h npc_{waters}_Buy 91\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{waters}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{waters}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{waters}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{waters}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{waters}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

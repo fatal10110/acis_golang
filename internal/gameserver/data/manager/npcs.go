@@ -85,6 +85,9 @@ type slotInfo struct {
 	// castleID is the castle the slot's NPC belongs to as it spawns; 0
 	// for none.
 	castleID int
+	// clanID is the clan the slot's NPC belongs to as it spawns; 0 for
+	// none.
+	clanID int32
 	// memory is what the slot hands every NPC it spawns: the entry's own
 	// AI parameters and the script memory carried from one life to the
 	// next.
@@ -311,6 +314,9 @@ type Npcs struct {
 	// guarded resolves the siege a siege guard defends, and the one a
 	// control tower stands for; nil gives none. Set once, before any spawn.
 	guarded func(*npc.Instance) npc.GuardedSiege
+	// owners resolves the clan owning the residence an NPC serves; nil
+	// gives none. Set once, before any spawn.
+	owners func(*npc.Instance) int32
 	// regen answers the base regeneration multipliers of every NPC; nil
 	// gives the shipped ones. Set once, before any spawn.
 	regen npc.RegenSettings
@@ -335,6 +341,13 @@ func (n *Npcs) SetRegenSettings(s npc.RegenSettings) {
 // nil for none. Call it before SpawnOnStart.
 func (n *Npcs) SetGuardedSieges(resolve func(*npc.Instance) npc.GuardedSiege) {
 	n.guarded = resolve
+}
+
+// SetResidenceOwners makes owner give each NPC spawned from now on
+// the clan owning the residence it serves, read at each use. Call it before
+// SpawnOnStart.
+func (n *Npcs) SetResidenceOwners(owner func(*npc.Instance) int32) {
+	n.owners = owner
 }
 
 // NewNpcs builds a population that raises no script hook and spawns it at

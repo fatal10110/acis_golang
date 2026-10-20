@@ -10,6 +10,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -54,7 +55,8 @@ func DefaultSiegeConfig() SiegeConfig {
 
 // SiegeScript is the script running a siegable hall's siege. Its hooks run
 // with no lock of the halls held and may read the halls back; they must not
-// take a siege step themselves.
+// take a siege step themselves (Instant, End): an override runs the base
+// steps through its SiegeBase instead.
 type SiegeScript struct {
 	// Winner names the clan that won the siege, 0 for none. The siege's
 	// end asks it first.
@@ -62,6 +64,19 @@ type SiegeScript struct {
 	// SpawnNPCs puts the hall's siege NPCs in the world as the siege
 	// starts; UnspawnNPCs takes them out as it ends.
 	SpawnNPCs, UnspawnNPCs func()
+	// Prepare, Start and End, when set, run in place of the base steps:
+	// the registrations' close (after delay, the siege's start is due),
+	// the start and the end. The timers, Instant and End run them, one
+	// step at a time; base runs the base steps as their part.
+	Prepare func(base SiegeBase, delay time.Duration)
+	Start   func(base SiegeBase)
+	End     func(base SiegeBase)
+	// OwnAttackers keeps the stored attackers out as the script binds the
+	// siege: the script loads its attackers itself.
+	OwnAttackers bool
+	// DoorsUnattackable keeps the hall's doors out of everyone's attacks,
+	// even while the siege is fought.
+	DoorsUnattackable bool
 }
 
 // AttackerRow is one clanhall_siege_attackers row.
@@ -110,9 +125,10 @@ type SiegeNotifier interface {
 	FlagPvP(field *zone.Siege, hallID, ownerID int32)
 }
 
-// hallSiege is a siegable hall's siege state. Every field but field is
-// changed holding both the halls' mu and their siegeMu, and read holding
-// either; field is guarded by their fieldMu.
+// hallSiege is a siegable hall's siege state. Every field but field and
+// restartPoints is changed holding both the halls' mu and their siegeMu,
+// and read holding either; field is guarded by their fieldMu,
+// restartPoints by their siegeMu.
 type hallSiege struct {
 	status siege.Status
 	// next is the next siege's date, in Unix milliseconds.
@@ -129,6 +145,9 @@ type hallSiege struct {
 	task  *sim.Timer
 	armed bool
 	field *zone.Siege
+	// restartPoints are where the players of a clan restart to town while
+	// the siege's battlefield is on, by clan.
+	restartPoints map[int32]location.Location
 }
 
 // HallSiege is one siegable hall's siege, as readers and its script see it.
@@ -318,8 +337,11 @@ func (s *HallSiege) withBattlefield(fn func(f *zone.Siege)) {
 
 // AllowsDoorAttack reports whether attacker may attack one of the hall's
 // doors: while the siege is fought, a player of an attacking clan or its
-// summon.
+// summon, unless the script keeps the doors out of attacks.
 func (s *HallSiege) AllowsDoorAttack(attacker skilltarget.Actor, _ bool) bool {
+	if sc := s.script(); sc != nil && sc.DoorsUnattackable {
+		return false
+	}
 	return s.Attacking(siege.ActingClanID(attacker))
 }
 
@@ -556,8 +578,8 @@ func (hs *Halls) ClearRainbowDecrees() {
 // BindSiege makes script run siegable hall hallID's siege, reporting false
 // for a hall that is not siegable, has no stored row and so no siege date,
 // or whose siege a script runs already. The
-// hall takes its stored attackers that are still clans, Rainbow Springs
-// none, and its registrations close an hour before its siege date: at once
+// hall takes its stored attackers that are still clans, Rainbow Springs and
+// a script loading its own attackers none, and its registrations close an hour before its siege date: at once
 // when that hour has come. Once the sieges run (RunSieges) that step is
 // armed now, before then as they start.
 func (hs *Halls) BindSiege(hallID int32, script SiegeScript) (*HallSiege, bool) {
@@ -575,7 +597,7 @@ func (hs *Halls) BindSiege(hallID int32, script SiegeScript) (*HallSiege, bool) 
 		return nil, false
 	}
 	var stored []int32
-	if hallID != RainbowSprings {
+	if hallID != RainbowSprings && !script.OwnAttackers {
 		hs.siegeMu.Lock()
 		rows := hs.storedAttackers[hallID]
 		hs.siegeMu.Unlock()
