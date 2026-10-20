@@ -40,7 +40,9 @@ func (n *Npcs) DespawnAll() int {
 	clear(n.privates)
 	for _, g := range n.groups {
 		clear(g.keys)
+		g.orphansAlive = 0
 	}
+	n.despawns++
 	clear(n.live)
 	n.liveCount = 0
 	n.mu.Unlock()
