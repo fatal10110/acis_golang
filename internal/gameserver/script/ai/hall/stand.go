@@ -26,8 +26,7 @@ const (
 
 // swordPost and bowPost are post i of the escort's swordsmen and archers:
 // the offset from the master it first walks to, then the two points it
-// walks to as the master's flag reaches 1 and then any other value. An i
-// out of the posts panics.
+// walks to as the master's flag reaches 1 and then any other value.
 func swordPost(i int) [8]int {
 	return [swordPosts][8]int{
 		{40, 0, 45842, 109981, -1970, 44565, 108867, -2020},
@@ -93,8 +92,8 @@ func Stand1() script.Script {
 // every 10 seconds, while it has a master, it is meant to walk to its
 // post by the master's flag. The kind test there compares with the
 // archer's id, so each guard looks itself up among the other kind's
-// posts, holds none, and the post read panics before it walks: no guard
-// of the escort ever walks to a post. Dying frees its post.
+// posts, holds none, and its check ends there: no guard of the escort
+// ever walks to a post. Dying frees its post.
 func Stand2() script.Script {
 	base := stand1Hooks()
 	swordGuards := &script.ListCell[int32]{}
@@ -118,11 +117,20 @@ func Stand2() script.Script {
 				n := e.NPC
 				if n.HasMaster() {
 					isSwordGuard := n.NpcID() == guardBowID
-					var post [8]int
+					guards := bowGuards
 					if isSwordGuard {
-						post = swordPost(swordGuards.Index(n.ObjectID()))
-					} else {
-						post = bowPost(bowGuards.Index(n.ObjectID()))
+						guards = swordGuards
+					}
+					i := guards.Index(n.ObjectID())
+					if i < 0 {
+						// The other kind's posts never hold this guard:
+						// the check ends here, with no walk and no
+						// parent timer hook.
+						return ""
+					}
+					post := bowPost(i)
+					if isSwordGuard {
+						post = swordPost(i)
 					}
 					master := n.Master()
 					switch flag := master.Int(script.SlotFlag); {
