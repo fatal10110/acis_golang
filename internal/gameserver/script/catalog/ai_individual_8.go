@@ -2,7 +2,9 @@ package catalog
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/guard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/royalrush"
 )
 
 // aiIndividual8 is the catalog of batch 8 of 8 of the individual NPC behaviors (#193).
@@ -17,14 +19,14 @@ func aiIndividual8() script.Catalog {
 		"script.ai.individual.AreadataSwitch":                                                      individual.AreadataSwitch,
 		"script.ai.individual.Corpse":                                                              individual.Corpse,
 		"script.ai.individual.DaimonTheWhiteEyed":                                                  individual.DaimonTheWhiteEyed,
-		"script.ai.individual.Guard.GuardFixed":                                                    nil,
-		"script.ai.individual.Guard.GuardMoveAroundFixed":                                          nil,
+		"script.ai.individual.Guard.GuardFixed":                                                    guard.Fixed,
+		"script.ai.individual.Guard.GuardMoveAroundFixed":                                          guard.MoveAroundFixed,
 		"script.ai.individual.ImperialGravekeeper":                                                 individual.ImperialGravekeeper,
-		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict":                                nil,
+		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict":                                royalrush.Afflict,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAreaController":                         nil,
-		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc":                             nil,
+		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc":                             royalrush.DefaultNpc,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushKeyBox":                                 nil,
-		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox":                             nil,
+		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox":                             royalrush.TreasureBox,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox1":    nil,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox2":    nil,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox3":    nil,
