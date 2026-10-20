@@ -82,7 +82,8 @@ func TestDoorByID(t *testing.T) {
 		run(t, srv, objID, func(sc *script.Script, _ *script.Player) {
 			d := sc.DoorByID(scriptGateID)
 			if d == nil {
-				t.Fatal("DoorByID found no door")
+				t.Error("DoorByID found no door")
+				return
 			}
 			if open {
 				d.Open()
