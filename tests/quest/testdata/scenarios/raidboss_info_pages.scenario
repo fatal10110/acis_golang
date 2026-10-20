@@ -1,0 +1,24 @@
+# Raid boss information (RaidbossInfo): an Adventurer Guildsman's link opens the raid boss
+# levels, whose level 20 link is the page it names. The radar marks are in
+# tests/npcs/raidboss_info_test.go: the reference server holds the datapack's spawns, the
+# scenario world none. Expectations are the reference trace's (RaidbossInfo.onTalk,
+# onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/raidboss_info_pages.golden
+character Seeker 20
+script script.feature.RaidbossInfo
+page adventurer_guildsman/31729.htm
+page script/feature/RaidbossInfo/
+npc guild 31729 Adventurer 10 0 0
+
+action guild
+action guild
+  S ActionFailed
+  S NpcHtmlMessage obj=guild item=0 page=adventurer_guildsman/31729.htm
+  S ActionFailed
+bypass npc_{guild}_Quest RaidbossInfo
+  S NpcHtmlMessage obj=guild item=0 page=script/feature/RaidbossInfo/info.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest RaidbossInfo level20.htm
+  S NpcHtmlMessage obj=guild item=0 page=script/feature/RaidbossInfo/level20.htm
+  S ActionFailed

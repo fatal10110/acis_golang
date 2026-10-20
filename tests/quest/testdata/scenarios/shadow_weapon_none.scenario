@@ -1,0 +1,20 @@
+# Shadow weapons (ShadowWeapon): at Grand Master Ramos, a level 20 human fighter holding no
+# exchange coupon is told it has none. Expectations are the reference trace's
+# (ShadowWeapon.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/shadow_weapon_none.golden
+character Shadow 20
+script script.feature.ShadowWeapon
+item 8869 8870
+page villagemaster/30373.htm
+page script/feature/ShadowWeapon/
+npc ramos 30373 VillageMasterFighter 10 0 0
+
+action ramos
+action ramos
+  S ActionFailed
+  S NpcHtmlMessage obj=ramos item=0 page=villagemaster/30373.htm
+  S ActionFailed
+bypass npc_{ramos}_Quest ShadowWeapon
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/ShadowWeapon/exchange-no.htm
+  S ActionFailed
+  S ActionFailed

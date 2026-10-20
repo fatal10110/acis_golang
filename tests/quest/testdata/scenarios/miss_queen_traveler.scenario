@@ -1,0 +1,40 @@
+# Miss Queen (MissQueen): a level 20 human Warrior, of a first occupation with no PK, asks for
+# the traveler's coupon and gets it, the coupon's player memo set; asked again it is told it has
+# it. The trainee's coupon is refused to a first occupation. Expectations are the reference
+# trace's (MissQueen.onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/miss_queen_traveler.golden
+character Traveler 20
+class 1
+script script.feature.MissQueen
+item 7832 7833
+page default/31760.htm
+page script/feature/MissQueen/
+npc queen 31760 Folk 10 0 0
+
+action queen
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen traveller_coupon
+  S SystemMessage id=54 3:7833
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-05.htm
+  S ActionFailed
+  M set MissQueen_Traveler | true
+  items 7833=1
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen traveller_coupon
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-04.htm
+  S ActionFailed
+  items 7833=1
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen newbie_coupon
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-03.htm
+  S ActionFailed
+  items 7832=0
