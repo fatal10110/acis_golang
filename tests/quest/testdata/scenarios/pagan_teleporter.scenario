@@ -1,0 +1,46 @@
+# The Pagan Temple (PaganTeleporter): the temple gatekeeper and the chapel gatekeeper, asked by a
+# character holding no mark, answer their refusals; Triol's mirror sends the character to the
+# temple, answering no page (onTalk). A scenario has no door the reference also stands, so the
+# doors the gatekeepers open are in tests/npcs/teleporters_210_pr3_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/pagan_teleporter.golden
+character Pilgrim 40
+script script.teleport.PaganTeleporter
+page default/32034.htm
+page default/32036.htm
+page default/32039.htm
+page script/teleport/PaganTeleporter/
+npc temple 32034 Folk 10 0 0
+npc chapel 32036 Folk -10 0 0
+npc mirror 32039 Folk 0 10 0
+
+action temple
+action temple
+  S ActionFailed
+  S NpcHtmlMessage obj=temple item=0 page=default/32034.htm
+  S ActionFailed
+bypass npc_{temple}_Quest PaganTeleporter
+  S NpcHtmlMessage obj=temple item=0 page=script/teleport/PaganTeleporter/32034-1.htm
+  S ActionFailed
+  S ActionFailed
+action chapel
+action chapel
+  S ActionFailed
+  S NpcHtmlMessage obj=chapel item=0 page=default/32036.htm
+  S ActionFailed
+bypass npc_{chapel}_Quest PaganTeleporter
+  S NpcHtmlMessage obj=chapel item=0 page=script/teleport/PaganTeleporter/32036-1.htm
+  S ActionFailed
+  S ActionFailed
+action mirror
+action mirror
+  S ActionFailed
+  S NpcHtmlMessage obj=mirror item=0 page=default/32039.htm
+  S ActionFailed
+bypass npc_{mirror}_Quest PaganTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=34962,-49758,-763 fast=0
+  S ActionFailed
