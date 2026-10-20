@@ -5,9 +5,8 @@ package classmaster
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Item is a count of one item template.
@@ -41,7 +40,7 @@ func ParseJobs(line string) (map[int]Job, error) {
 	jobs := map[int]Job{}
 	tokens := splitTokens(strings.TrimSpace(line), ";")
 	for i := 0; i < len(tokens); {
-		tier, err := commons.ParseInt(tokens[i], 32)
+		tier, err := strconv.ParseInt(tokens[i], 10, 32)
 		if err != nil {
 			return nil, fmt.Errorf("class master tier %q: %w", tokens[i], err)
 		}
@@ -75,11 +74,11 @@ func parseItems(token string) ([]Item, error) {
 		if len(parts) < 2 {
 			return nil, fmt.Errorf("class master item %q: want id(count)", entry)
 		}
-		id, err := commons.ParseInt(parts[0], 32)
+		id, err := strconv.ParseInt(parts[0], 10, 32)
 		if err != nil {
 			return nil, fmt.Errorf("class master item id %q: %w", parts[0], err)
 		}
-		count, err := commons.ParseInt(parts[1], 32)
+		count, err := strconv.ParseInt(parts[1], 10, 32)
 		if err != nil {
 			return nil, fmt.Errorf("class master item count %q: %w", parts[1], err)
 		}

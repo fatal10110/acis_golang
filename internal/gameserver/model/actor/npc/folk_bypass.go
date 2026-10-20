@@ -480,7 +480,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassAborted
 			return reply
 		}
-		choice, err := commons.Atoi(strings.TrimFunc(arg, isCtrlOrSpace))
+		choice, err := strconv.Atoi(strings.TrimFunc(arg, isCtrlOrSpace))
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply
@@ -576,7 +576,7 @@ func observeCommand(reply BypassReply, outcome BypassOutcome, command string) By
 		reply.Outcome = BypassAborted
 		return reply
 	}
-	id, err := commons.ParseInt(words[1], 32)
+	id, err := strconv.ParseInt(words[1], 10, 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply
@@ -594,7 +594,7 @@ func teleportCommand(reply BypassReply, outcome BypassOutcome, command string) B
 		reply.Outcome = BypassReleased
 		return reply
 	}
-	index, err := commons.ParseInt(words[1], 32)
+	index, err := strconv.ParseInt(words[1], 10, 32)
 	if err != nil {
 		reply.Outcome = BypassReleased
 		return reply
@@ -617,7 +617,7 @@ func (f *Folk) adventurerCommand(pages Pages, command string, reply BypassReply)
 			reply.Outcome = BypassAborted
 			return reply, true
 		}
-		level, err := commons.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 32)
+		level, err := strconv.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 10, 32)
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply, true
@@ -657,7 +657,7 @@ func merchantCommand(reply BypassReply, rules ChatRules, command string) (Bypass
 		reply.Outcome = BypassRefused
 		return reply, true
 	}
-	id, err := commons.ParseInt(tokens[1], 32)
+	id, err := strconv.ParseInt(tokens[1], 10, 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply, true
@@ -714,8 +714,8 @@ func isCtrlOrSpace(r rune) bool { return r <= ' ' }
 // its end when end is negative, counting characters as the client encodes
 // them: one per UTF-16 unit, so a character outside the Basic Multilingual
 // Plane counts two. ok is false when command is too short for the range. A
-// bound that splits such a character keeps its half as an unpaired
-// surrogate, which no number reads.
+// bound that splits such a character leaves its half as U+FFFD, which no
+// number reads.
 func commandChars(command string, begin, end int) (string, bool) {
 	units := commons.UTF16Units(command)
 	if end < 0 {
@@ -742,7 +742,7 @@ func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply
 		reply.Outcome = BypassAborted
 		return reply
 	}
-	choice, err := commons.Atoi(arg)
+	choice, err := strconv.Atoi(arg)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply

@@ -65,14 +65,14 @@ func buildAll[T any](path string, els []attrsElement, build func(*attrValues) (T
 	return out, nil
 }
 
-// coord is a world-coordinate attribute. It parses itself with commons.Atoi
+// coord is a world-coordinate attribute. It parses itself with strconv.Atoi
 // so the accepted input set matches the attribute bag it replaces exactly:
 // the decoder's own int conversion accepts an empty value as 0 and trims
 // surrounding space, both of which the bag rejected.
 type coord int
 
 func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
-	n, err := commons.Atoi(attr.Value)
+	n, err := strconv.Atoi(attr.Value)
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
@@ -88,7 +88,7 @@ func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
 type coord32 int32
 
 func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
-	n, err := commons.ParseInt(attr.Value, 32)
+	n, err := strconv.ParseInt(attr.Value, 10, 32)
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
@@ -166,11 +166,11 @@ func (d *dashPairAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 	if len(parts) != 2 {
 		return fmt.Errorf("%s: want \"left-right\"", attr.Name.Local)
 	}
-	id, err := commons.ParseInt(parts[0], 32)
+	id, err := strconv.ParseInt(parts[0], 10, 32)
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
-	count, err := commons.Atoi(parts[1])
+	count, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
@@ -179,7 +179,7 @@ func (d *dashPairAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 }
 
 // intListAttr is a ";"-separated list of ints (a soul crystal's level
-// list). It parses itself with commons.Atoi per element, rejecting the same
+// list). It parses itself with strconv.Atoi per element, rejecting the same
 // malformed and empty input the attribute bag's array accessor did.
 type intListAttr []int
 
@@ -187,7 +187,7 @@ func (l *intListAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 	parts := strings.Split(attr.Value, ";")
 	out := make(intListAttr, len(parts))
 	for i, p := range parts {
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return fmt.Errorf("%s: %w", attr.Name.Local, err)
 		}

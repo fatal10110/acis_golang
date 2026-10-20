@@ -64,7 +64,8 @@ func TestDeferTeleportsMovesThePlayersTeleportToTheEndOfItsTask(t *testing.T) {
 
 // teleportTrace is a scenario trace of a talk that teleports the player
 // (object 500): the teleport's abort, the teleport, then the talk's own
-// ActionFailed; the next tick sends one more.
+// ActionFailed; the next tick's hook teleports the player again, then
+// sends a message.
 const teleportTrace = `# test trace
 # player object 500; format: README.md in this directory.
 C RequestBypassToServer Quest X 1
@@ -73,21 +74,29 @@ S TeleportToLocation 28f401000001000000020000000300000000000000
 S ActionFailed 25
 T 500
 S ActionFailed 25
+S TeleportToLocation 28f401000001000000020000000300000000000000
+S SystemMessage 642e01000001000000030000007b060000
 `
 
-// The trace replays with the teleport after the rest of the talk's
-// packets, where the Go run sends it, and before the next tick's.
-func TestCheckTraceDefersThePlayersTeleport(t *testing.T) {
-	const tp = "  S TeleportToLocation obj=player loc=1,2,3 fast=0\n"
-	sc := traceScenario(t, "bypass Quest X 1\n  S ActionFailed\n  S ActionFailed\n"+tp+"  S ActionFailed\n")
+// The talk, the client packet's own run on the player's queue, replays in
+// the reference's order: its teleport runs inside the call. The tick's
+// hook, which may run on another queue, replays with its teleport after the
+// rest of its packets, where the Go run sends it.
+func TestCheckTraceDefersThePlayersTeleportOffItsQueue(t *testing.T) {
+	const (
+		tp  = "  S TeleportToLocation obj=player loc=1,2,3 fast=0\n"
+		af  = "  S ActionFailed\n"
+		msg = "  S SystemMessage id=302 3:1659\n"
+	)
+	sc := traceScenario(t, "bypass Quest X 1\n"+af+tp+af+msg+af+tp)
 	if _, err := checkTrace(sc, []byte(teleportTrace), nil); err != nil {
 		t.Fatal(err)
 	}
 	for name, steps := range map[string]string{
-		"the reference's order": "bypass Quest X 1\n  S ActionFailed\n" + tp + "  S ActionFailed\n  S ActionFailed\n",
-		"after the next tick's": "bypass Quest X 1\n  S ActionFailed\n  S ActionFailed\n  S ActionFailed\n" + tp,
+		"the talk's teleport deferred":  af + af + tp + msg + af + tp,
+		"the tick's in the reference's": af + tp + af + af + tp + msg,
 	} {
-		_, err := checkTrace(traceScenario(t, steps), []byte(teleportTrace), nil)
+		_, err := checkTrace(traceScenario(t, "bypass Quest X 1\n"+steps), []byte(teleportTrace), nil)
 		if err == nil || !strings.Contains(err.Error(), "scenario packet") {
 			t.Errorf("%s: checkTrace error = %v, want a packet difference", name, err)
 		}

@@ -2,8 +2,8 @@ package script
 
 import (
 	"fmt"
+	"strconv"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
@@ -63,7 +63,7 @@ func (qs *QuestState) GetInt(key string) int32 {
 	if !ok {
 		return 0
 	}
-	n, err := commons.ParseInt(v, 32)
+	n, err := strconv.ParseInt(v, 10, 32)
 	if err != nil {
 		panic(fmt.Sprintf("script: quest %s variable %s %q: %v", qs.state.Quest().Name, key, v, err))
 	}

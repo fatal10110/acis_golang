@@ -432,12 +432,12 @@ func TestReaderReadStringDecodesUTF16(t *testing.T) {
 		{[]uint16{'a', 'b', 'c'}, "abc"},
 		{[]uint16{0x0439, 0x4E2D, 0xFFFF}, "\u0439\u4E2D\uFFFF"}, // 2- and 3-byte UTF-8 runes
 		{[]uint16{0xD83D, 0xDE00}, "\U0001F600"},                 // valid surrogate pair
-		// An unpaired surrogate keeps its unit in the three-byte form.
-		{[]uint16{0xD83D}, "\xED\xA0\xBD"},                                               // lone high surrogate at end
-		{[]uint16{0xDE00, 'x'}, "\xED\xB8\x80x"},                                         // lone low surrogate
-		{[]uint16{0xD83D, 'x', 0xD83D, 0xDE00}, "\xED\xA0\xBDx\U0001F600"},               // high surrogate followed by non-low
-		{[]uint16{0xD83D, 0xD83D, 0xDE00, 0xDE00}, "\xED\xA0\xBD\U0001F600\xED\xB8\x80"}, // high, pair, low
-		{[]uint16{0xDE00, 0xD83D}, "\xED\xB8\x80\xED\xA0\xBD"},                           // reversed pair
+		// An unpaired surrogate reads as U+FFFD, one unit for one.
+		{[]uint16{0xD83D}, "\uFFFD"},                                         // lone high surrogate at end
+		{[]uint16{0xDE00, 'x'}, "\uFFFDx"},                                   // lone low surrogate
+		{[]uint16{0xD83D, 'x', 0xD83D, 0xDE00}, "\uFFFDx\U0001F600"},         // high surrogate followed by non-low
+		{[]uint16{0xD83D, 0xD83D, 0xDE00, 0xDE00}, "\uFFFD\U0001F600\uFFFD"}, // high, pair, low
+		{[]uint16{0xDE00, 0xD83D}, "\uFFFD\uFFFD"},                           // reversed pair
 	}
 	for _, tc := range cases {
 		r := NewReader(append(utf16LE(tc.units, true), 0x7F))
@@ -613,5 +613,14 @@ func TestFrameFootprintCountsOwnedWriterCapacity(t *testing.T) {
 	}
 	if got := BorrowedFrame(make([]byte, 40)).Footprint(); got != 40 {
 		t.Fatalf("borrowed 40-byte frame: Footprint = %d, want 40", got)
+	}
+}
+
+func TestWriterWriteUTF16WritesUnitsVerbatim(t *testing.T) {
+	units := []uint16{'a', 0xD83D, 0xDE00, 0xD83D}
+	var w Writer
+	w.WriteUTF16(units)
+	if got, want := w.Bytes(), utf16LE(units, true); !bytes.Equal(got, want) {
+		t.Fatalf("WriteUTF16(%04X) = % X, want % X", units, got, want)
 	}
 }

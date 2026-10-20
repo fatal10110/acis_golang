@@ -1,6 +1,7 @@
 package network
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -86,7 +87,7 @@ func heroPageParam(token string) (int32, bool) {
 	if len(parts) < 2 {
 		return 0, false
 	}
-	v, err := commons.ParseInt(parts[1], 32)
+	v, err := strconv.ParseInt(parts[1], 10, 32)
 	if err != nil {
 		return 0, false
 	}

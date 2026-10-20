@@ -79,7 +79,7 @@ func (m *Manager) Restore(rows []Row, log zerolog.Logger) {
 			if text == "" {
 				break
 			}
-			id, err := commons.ParseInt(text, 32)
+			id, err := strconv.ParseInt(text, 10, 32)
 			if err != nil {
 				log.Error().Err(err).Int32("object_id", row.OwnerID).Str("scheme", row.Name).Msg("scheme buffer: failed to load schemes data")
 				return

@@ -1,9 +1,8 @@
 package npc
 
 import (
+	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // DialogCommand is one of the generic dialog commands every NPC that talks
@@ -54,7 +53,7 @@ func ParseDialogCommand(command string) DialogReply {
 	case strings.HasPrefix(command, "Chat"):
 		reply := DialogReply{Command: DialogChat}
 		if arg, ok := commandChars(command, 5, -1); ok {
-			if n, err := commons.ParseInt(arg, 32); err == nil {
+			if n, err := strconv.ParseInt(arg, 10, 32); err == nil {
 				reply.Val = int(n)
 			}
 		}

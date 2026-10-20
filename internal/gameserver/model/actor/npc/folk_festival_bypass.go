@@ -1,9 +1,8 @@
 package npc
 
 import (
+	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // festivalGuideBypass answers the commands a festival guide or witch
@@ -24,7 +23,7 @@ func (f *Folk) festivalGuideBypass(pages Pages, kind InstanceKind, talker Talker
 			reply.Outcome = BypassAborted
 			return reply, true
 		}
-		n, err := commons.ParseInt(arg, 32)
+		n, err := strconv.ParseInt(arg, 10, 32)
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply, true
@@ -36,7 +35,7 @@ func (f *Folk) festivalGuideBypass(pages Pages, kind InstanceKind, talker Talker
 			reply.Outcome = BypassAborted
 			return reply, true
 		}
-		n, err := commons.Atoi(arg)
+		n, err := strconv.Atoi(arg)
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply, true

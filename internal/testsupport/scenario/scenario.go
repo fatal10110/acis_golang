@@ -190,10 +190,12 @@
 // those steps' S, Q and M lines (a relog's packets excepted, as in the run);
 // a read, and a statement on another table than character_quests and
 // character_memo, is not compared, an unknown write on one of them fails.
-// A script's teleport of the character goes out once the hook's task is
-// done, after the packets the rest of the hook sends (script engine plan,
-// section 9, item 4), where the reference sends it inside the call: the
-// comparison moves each of the trace's TeleportToLocation lines of the
+// A script's teleport of the character from a hook on another queue goes
+// out once the hook's task is done, after the packets the rest of the hook
+// sends (script engine plan, section 9, item 4), where the reference sends
+// it inside the call: outside a client packet's own run, which runs on the
+// character's queue and teleports inside the call as the reference does,
+// the comparison moves each of the trace's TeleportToLocation lines of the
 // character, with the ActionFailed lines right before it (its aborts'), to
 // the end of the packets its task sent.
 // The script draws the trace pins (needing a random line) must be those the

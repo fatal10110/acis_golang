@@ -2,9 +2,9 @@ package route
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -91,7 +91,7 @@ func parseMessageList(raw string) ([]int, error) {
 		if p == "" {
 			continue
 		}
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return nil, err
 		}
@@ -121,11 +121,11 @@ func parseDashPair(raw string) (int, int, error) {
 	if !ok {
 		return 0, 0, fmt.Errorf("%q must be formatted id-delay", raw)
 	}
-	a, err := commons.Atoi(left)
+	a, err := strconv.Atoi(left)
 	if err != nil {
 		return 0, 0, err
 	}
-	b, err := commons.Atoi(right)
+	b, err := strconv.Atoi(right)
 	if err != nil {
 		return 0, 0, err
 	}

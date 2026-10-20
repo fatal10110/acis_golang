@@ -8,7 +8,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 )
@@ -162,7 +161,7 @@ func (s *PetitionStore) Save(ctx context.Context, records []petition.Record) err
 			unread = 1
 		}
 		if _, err := petitions.ExecContext(ctx, r.ID, r.Type.String(), r.Petitioner, r.SubmitDate, r.Content, unread,
-			r.State.String(), r.Rate.String(), truncateRunes(db.StoredText(r.Feedback), petitionFeedbackWidth), strings.Join(responders, ";")); err != nil {
+			r.State.String(), r.Rate.String(), truncateRunes(r.Feedback, petitionFeedbackWidth), strings.Join(responders, ";")); err != nil {
 			return fmt.Errorf("save petition %d: %w", r.ID, err)
 		}
 		for i, msg := range r.Messages {

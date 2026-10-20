@@ -1,9 +1,9 @@
 package network
 
 import (
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -40,11 +40,11 @@ func parseManorMenu(s string) (manorMenu, bool) {
 		}
 		values[i] = parts[1]
 	}
-	ask, err := commons.ParseInt(values[0], 32)
+	ask, err := strconv.ParseInt(values[0], 10, 32)
 	if err != nil {
 		return manorMenu{}, false
 	}
-	state, err := commons.ParseInt(values[1], 32)
+	state, err := strconv.ParseInt(values[1], 10, 32)
 	if err != nil {
 		return manorMenu{}, false
 	}

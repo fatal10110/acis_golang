@@ -124,6 +124,11 @@ func (s groupSpawn) CheckAlive(at spawn.Position) bool {
 	return alive
 }
 
+func (s groupSpawn) SavedX() int {
+	row, _ := s.g.n.currentSpawns().State(s.rowName())
+	return row.Location.X
+}
+
 // rowName returns the name of the spawn's database row; a spawn that keeps
 // none panics.
 func (s groupSpawn) rowName() string {

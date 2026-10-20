@@ -73,6 +73,11 @@ func parseAPIMap(data []byte) (map[string]string, error) {
 		if len(fields) != 2 || !strings.Contains(fields[0], ".") {
 			return nil, fmt.Errorf("scriptfp: apimap.txt line %d: want \"<Owner>.<method> <Go name>|%s|%s\"", n, Inline, Exempt)
 		}
+		if strings.Contains(fields[1], ",") && slices.ContainsFunc(strings.Split(fields[1], ","), func(name string) bool {
+			return name == "" || name == Inline || name == Exempt
+		}) {
+			return nil, fmt.Errorf("scriptfp: apimap.txt line %d: a list of Go names holds an empty name, %s or %s", n, Inline, Exempt)
+		}
 		if _, dup := out[fields[0]]; dup {
 			return nil, fmt.Errorf("scriptfp: apimap.txt line %d: %s mapped twice", n, fields[0])
 		}
