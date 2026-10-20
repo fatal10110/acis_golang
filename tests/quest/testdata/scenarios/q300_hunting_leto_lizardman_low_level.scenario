@@ -1,0 +1,22 @@
+# Hunting Leto Lizardman (Q300), under level: a level 33 character is turned away by Rath, and the
+# quest stays unstarted. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q300_hunting_leto_lizardman_low_level.golden
+character Leto 33
+script quest.Q300_HuntingLetoLizardman
+item 7139
+page guard/30126.htm
+page script/quest/Q300_HuntingLetoLizardman/
+npc rath 30126 Guard 10 0 0
+
+# Rath: too young.
+action rath
+action rath
+  S ActionFailed
+  S NpcHtmlMessage obj=rath item=0 page=guard/30126.htm
+  S ActionFailed
+bypass npc_{rath}_Quest
+  S NpcHtmlMessage obj=rath item=0 page=script/quest/Q300_HuntingLetoLizardman/30126-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q300_HuntingLetoLizardman CREATED
+  rows Q300_HuntingLetoLizardman -
