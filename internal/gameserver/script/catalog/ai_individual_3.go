@@ -9,8 +9,8 @@ import (
 func aiIndividual3() script.Catalog {
 	return script.Catalog{
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaGardener":                                                                         warrior.FreyaGardener,
-		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaPet":                                                                              nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaSecretaryLeader":                                                                  nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaPet":                                                                              warrior.FreyaPet,
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaSecretaryLeader":                                                                  warrior.FreyaSecretaryLeader,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderBombSpawn":                                                                  warrior.PartyLeaderBombSpawn,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCannibaliAggressiva":                                                        warrior.PartyLeaderCannibaliAggressiva,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastCurseAggressive":                                                        warrior.PartyLeaderCastCurseAggressive,
