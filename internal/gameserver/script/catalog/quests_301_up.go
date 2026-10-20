@@ -13,6 +13,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q330"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q333"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q336"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
@@ -105,7 +107,7 @@ func quests301Up() script.Catalog {
 		"quest.Q432_BirthdayPartySong":                 nil,
 		"quest.Q501_ProofOfClanAlliance":               nil,
 		"quest.Q503_PursuitOfClanAmbition":             nil,
-		"quest.Q504_CompetitionForTheBanditStronghold": nil,
+		"quest.Q504_CompetitionForTheBanditStronghold": q504.New,
 		"quest.Q509_TheClansPrestige":                  nil,
 		"quest.Q601_WatchingEyes":                      nil,
 		"quest.Q602_ShadowOfLight":                     nil,
@@ -156,7 +158,7 @@ func quests301Up() script.Catalog {
 		"quest.Q652_AnAgedExAdventurer":                nil,
 		"quest.Q653_WildMaiden":                        nil,
 		"quest.Q654_JourneyToASettlement":              nil,
-		"quest.Q655_AGrandPlanForTamingWildBeasts":     nil,
+		"quest.Q655_AGrandPlanForTamingWildBeasts":     q655.New,
 		"quest.Q659_IdRatherBeCollectingFairyBreath":   nil,
 		"quest.Q660_AidingTheFloranVillage":            nil,
 		"quest.Q661_MakingTheHarvestGroundsSafe":       nil,
