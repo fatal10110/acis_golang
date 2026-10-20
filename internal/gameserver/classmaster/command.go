@@ -1,9 +1,8 @@
 package classmaster
 
 import (
+	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // CommandKind is a class manager dialog command.
@@ -50,7 +49,7 @@ func ParseCommand(command string) (Command, bool) {
 	case strings.HasPrefix(command, "change_class"):
 		cmd := Command{Kind: CommandChangeClass, Malformed: true}
 		if len(command) >= changeClassArg {
-			if id, err := commons.ParseInt(command[changeClassArg:], 32); err == nil {
+			if id, err := strconv.ParseInt(command[changeClassArg:], 10, 32); err == nil {
 				cmd.ClassID, cmd.Malformed = int(id), false
 			}
 		}

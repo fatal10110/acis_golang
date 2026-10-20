@@ -2,9 +2,9 @@ package skill
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -558,11 +558,11 @@ func ParseRef(raw string) (Ref, error) {
 		return Ref{}, fmt.Errorf("want \"skillId-level\"")
 	}
 	id, level := parts[0], parts[1]
-	rawID, err := commons.ParseInt(id, 32)
+	rawID, err := strconv.ParseInt(id, 10, 32)
 	if err != nil {
 		return Ref{}, err
 	}
-	lvl, err := commons.Atoi(level)
+	lvl, err := strconv.Atoi(level)
 	if err != nil {
 		return Ref{}, err
 	}

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -156,7 +156,7 @@ func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setValue, tabl
 // positions, and a level whose position has no built definition fails the
 // element. Any error fails the element, and with it the rest of its file.
 func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]skill.Definition, error) {
-	rawID, err := commons.ParseInt(el.ID, 32)
+	rawID, err := strconv.ParseInt(el.ID, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("skill id %q: %w", el.ID, err)
 	}
@@ -315,7 +315,7 @@ func (sl *skillLoader) applyTemplatesAt(built []skill.Definition, pos int, conds
 // parseLevelCount parses a level-count attribute: an int32 that may not be
 // negative.
 func parseLevelCount(s string) (int, error) {
-	n, err := commons.ParseInt(s, 32)
+	n, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
 		return 0, err
 	}
@@ -757,7 +757,7 @@ func parseCommaInts(raw string) ([]int, error) {
 	parts := strings.Split(raw, ",")
 	out := make([]int, len(parts))
 	for i, p := range parts {
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return nil, err
 		}

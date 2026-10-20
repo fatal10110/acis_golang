@@ -559,13 +559,14 @@ func (*pickupTestOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool
 }
 
 // TestPetLevelConditionReadsIntegerLiterals: the reference reads a <player
-// level> use condition with Integer.decode, so hex, "#" hex, leading-zero
-// octal and non-ASCII digits all name a level (Java probe, OpenJDK
-// 21.0.11: "0x32", "#32", "062" and fullwidth "５０" are 50, "0x33" is 51).
+// level> use condition with Integer.decode, so hex, "#" hex and
+// leading-zero octal all name a level (Java probe, OpenJDK 21.0.11: "0x32",
+// "#32" and "062" are 50, "0x33" is 51). Only ASCII digits read: fullwidth
+// "５０" names none.
 func TestPetLevelConditionReadsIntegerLiterals(t *testing.T) {
 	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Level: 50})
 	for raw, want := range map[string]bool{
-		"50": true, "0x32": true, "#32": true, "062": true, "５０": true,
+		"50": true, "0x32": true, "#32": true, "062": true, "５０": false,
 		"0x33": false, "063": false, "08": false, "0b1": false,
 	} {
 		uses := []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": raw}}}}

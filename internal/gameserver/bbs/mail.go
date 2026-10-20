@@ -14,7 +14,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/rs/zerolog"
 )
 
@@ -425,5 +424,5 @@ func (m *Mailbox) fileLocked(mail Mail, stored bool) {
 
 // columnLen is how many characters s takes in its column once stored.
 func columnLen(s string) int {
-	return utf8.RuneCountInString(db.StoredText(s))
+	return utf8.RuneCountInString(s)
 }

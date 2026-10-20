@@ -3,8 +3,6 @@ package npc
 import (
 	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // The classes an Olympiad manager ranks: the third occupations.
@@ -37,7 +35,7 @@ func (f *Folk) olympiadNobleCommand(pages Pages, talker Talker, command string, 
 		reply.Outcome = BypassAborted
 		return reply
 	}
-	choice, err := commons.ParseInt(arg, 32)
+	choice, err := strconv.ParseInt(arg, 10, 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply
@@ -56,7 +54,7 @@ func classRankingCommand(reply BypassReply, command string) BypassReply {
 		reply.Outcome = BypassAborted
 		return reply
 	}
-	classID, err := commons.ParseInt(arg, 32)
+	classID, err := strconv.ParseInt(arg, 10, 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply

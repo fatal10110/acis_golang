@@ -229,8 +229,8 @@ func (l *List) NextRevision() int32 {
 
 // EncodeCommands serializes cmds into the persisted command text: each line
 // as type,d1,d2 then ",text" when it has text, closed by ';', and the whole
-// cut to 255 UTF-16 code units. A cut through a surrogate pair keeps its
-// leading half on its own.
+// cut to 255 UTF-16 code units. A cut through a surrogate pair leaves
+// U+FFFD in its place.
 func EncodeCommands(cmds []Command) string {
 	var sb strings.Builder
 	for _, c := range cmds {
@@ -262,7 +262,7 @@ func DecodeCommands(s string) ([]Command, error) {
 		}
 		var nums [3]int32
 		for i := range nums {
-			n, err := commons.ParseInt(fields[i], 32)
+			n, err := strconv.ParseInt(fields[i], 10, 32)
 			if err != nil {
 				return nil, errBadCommand(line, err)
 			}
@@ -303,7 +303,7 @@ func equalFoldUTF16(a, b string) bool {
 	if commons.UTF16Len(a) != commons.UTF16Len(b) {
 		return false
 	}
-	ra, rb := commons.UTF16Runes(a), commons.UTF16Runes(b)
+	ra, rb := []rune(a), []rune(b)
 	if len(ra) != len(rb) {
 		return false
 	}

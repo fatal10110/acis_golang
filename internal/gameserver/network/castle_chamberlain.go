@@ -162,7 +162,7 @@ func (d chamberlainDialog) sendRaw(file string, pairs ...string) {
 
 // parseInt reads s as a decimal int32.
 func parseInt(s string) (int, bool) {
-	n, err := commons.ParseInt(s, 32)
+	n, err := strconv.ParseInt(s, 10, 32)
 	return int(n), err == nil
 }
 
