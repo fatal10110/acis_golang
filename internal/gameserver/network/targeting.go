@@ -753,8 +753,8 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// A rider neither sits nor stands: the request goes idle, stopping any
-	// ride under way, and is refused.
+	// A rider neither sits nor stands: the request goes idle and is
+	// refused.
 	if live.Mounted() {
 		live.goIdle()
 		live.SendFrame(serverpackets.FrameActionFailed())

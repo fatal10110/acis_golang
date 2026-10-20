@@ -58,10 +58,10 @@ func TestMountedRiderSitRequestRefused(t *testing.T) {
 	}
 }
 
-// TestRidingRiderSitRequestStopsTheRide pins the idle a rider's refused sit
-// goes to: a ride under way stops, the StopMove ahead of the ActionFailed,
-// and the rider stays mounted and standing.
-func TestRidingRiderSitRequestStopsTheRide(t *testing.T) {
+// TestRidingRiderStandRequestStopsTheRide pins the idle a rider's refused
+// stand goes to: a ride under way stops, the StopMove ahead of the
+// ActionFailed, and the rider stays mounted and standing.
+func TestRidingRiderStandRequestStopsTheRide(t *testing.T) {
 	t.Parallel()
 	h, watcher := mountedStriderRider(t)
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
@@ -73,13 +73,13 @@ func TestRidingRiderSitRequestStopsTheRide(t *testing.T) {
 		t.Fatal("rider not moving after the walk request")
 	}
 
-	h.client.Send(encodeRequestChangeWaitType(false))
+	h.client.Send(encodeRequestChangeWaitType(true))
 	frames := drainFrames(t, h.client)
 	if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeStopMove, serverpackets.OpcodeActionFailed}; string(got) != string(want) {
-		t.Fatalf("sit from a riding rider = % x, want % x", got, want)
+		t.Fatalf("stand from a riding rider = % x, want % x", got, want)
 	}
 	if h.srv.PlayerMove(t, h.ownerID).Moving() {
-		t.Fatal("rider still moving after the refused sit")
+		t.Fatal("rider still moving after the refused stand")
 	}
 	rider := h.character(t)
 	if !rider.Mounted() || !rider.Standing() {
