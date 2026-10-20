@@ -41,23 +41,48 @@ func GuideOf(npcID int) (Guide, bool) {
 	return Guide{FestivalID: id, Cabal: cabal, Blue: s[0], Green: s[1], Red: s[2]}, true
 }
 
-// GuideTalker is what a guide's dialog reads of the player talking.
+// GuideTalker is what a guide's dialog reads of the player talking, and
+// how it charges it.
 type GuideTalker struct {
-	Name string
+	ObjectID int32
+	Name     string
 	// Winning is set when the player's cabal is the one the Seven Signs
 	// scores put ahead; on a tie, a player of no cabal counts as winning.
 	Winning bool
+	// Party is the player's party; nil when it is in none.
+	Party *GuideParty
+	// Pay destroys count units of the item itemID the player holds,
+	// telling it what disappeared; holding fewer, it destroys nothing,
+	// tells the player it has not enough items and reports false.
+	Pay func(itemID int32, count int) bool
+	// TakeOfferings destroys every blood offering the player holds,
+	// without a word, and returns how many there were: held is false when
+	// it holds none, taken false when they could not be destroyed.
+	TakeOfferings func() (count int, held, taken bool)
+}
+
+// GuideParty is the party of a player talking to a guide.
+type GuideParty struct {
+	Leader int32
+	// Members are the party's members in the order they joined.
+	Members []Member
+	// Level is the level of the party's highest member.
+	Level int
 }
 
 // GuideReply is a guide's answer to one dialog command.
 type GuideReply struct {
 	// Aborted stops the handling outright: nothing is sent.
 	Aborted bool
-	// Unported names a command of the festival run, which is not in place
-	// yet (#3957): the caller logs it and answers nothing of its own.
-	Unported bool
 	// Message is a plain-text message, sent first.
 	Message string
+	// NotEnoughItems tells the player it has not enough items, first.
+	NotEnoughItems bool
+	// Contribution, when positive, tells the player its contribution
+	// score rose by that much, after Message.
+	Contribution int
+	// Expel expels the player from its party once the rest is sent.
+	Expel bool
 	// Page is the data/html/seven_signs/festival/ page to open and Fill
 	// its placeholders as name and value pairs, filled after %objectId%.
 	// HTML is a page built instead.
@@ -80,17 +105,23 @@ func (m *Manager) Description(g Guide, val int) GuideReply {
 	return m.chatWindow(g, val, "", true)
 }
 
-// Command answers "Festival <val>" at g, sent by t to the NPC objectID:
+// Command answers "Festival <val>" at g, sent by t to the NPC objectID;
+// command is the whole command:
 //   - 0 pays t its share of the accumulated bonus during seal validation
 //     (see distributeBonus) and says whether there was one; any other
 //     period it says bonuses are not paid;
+//   - 1 checks t's party may sign up (see signupRefusal), then shows the
+//     fee, or with t already signed up signs its party up again;
+//   - 2 <stone> signs t's party up, paid in seal stones (see signUp);
+//   - 3 registers the score of t's party (see registerScore);
 //   - 4 shows the festival's best score of each cabal this cycle and its
 //     best score ever;
-//   - 1, 2, 3, 8 and 9 sign up, pay, register a score, raise the challenge
-//     and leave, all of the festival run (#3957);
+//   - 8 raises the challenge of the festival under way (see
+//     raiseChallenge);
+//   - 9 takes t out of the festival (see leave);
 //   - any other val opens page val, 5 with the festivals' standings and 6
 //     with their accumulated bonuses.
-func (m *Manager) Command(g Guide, t GuideTalker, objectID int32, val int) GuideReply {
+func (m *Manager) Command(g Guide, t GuideTalker, objectID int32, val int, command string) GuideReply {
 	switch val {
 	case 0:
 		if m.calendar.CurrentPeriod() != sevensigns.SealValidation {
@@ -100,10 +131,27 @@ func (m *Manager) Command(g Guide, t GuideTalker, objectID int32, val int) Guide
 			return m.chatWindow(g, 0, "a", false)
 		}
 		return m.chatWindow(g, 0, "b", false)
-	case 1, 2, 3, 8, 9:
-		return GuideReply{Unported: true}
+	case 1:
+		if reply, refused := m.signupRefusal(g, t); refused {
+			return reply
+		}
+		if m.IsParticipant(t.ObjectID) {
+			m.mu.Lock()
+			m.setParticipantsLocked(g.Cabal, g.FestivalID, t.Party.Members)
+			m.mu.Unlock()
+			return m.chatWindow(g, 2, "f", false)
+		}
+		return m.chatWindow(g, 1, "", false)
+	case 2:
+		return m.signUp(g, t, command)
+	case 3:
+		return m.registerScore(g, t)
 	case 4:
 		return m.highScores(g, objectID)
+	case 8:
+		return m.raiseChallenge(g, t)
+	case 9:
+		return m.leave(t)
 	}
 	return m.chatWindow(g, val, "", false)
 }
@@ -120,6 +168,9 @@ func (m *Manager) chatWindow(g Guide, val int, suffix string, description bool) 
 	}
 	reply := GuideReply{Page: prefix + strconv.Itoa(val) + suffix + ".htm", Release: true}
 	reply.Fill = []string{"%festivalType%", Names[g.FestivalID], "%cycleMins%", strconv.Itoa(m.minutesToNextCycle())}
+	if !description && val == 2 && suffix == "b" {
+		reply.Fill = append(reply.Fill, "%minFestivalPartyMembers%", strconv.Itoa(m.cfg.MinPlayers))
+	}
 	switch val {
 	case 1:
 		reply.Fill = append(reply.Fill, "%blueStoneNeeded%", strconv.Itoa(g.Blue), "%greenStoneNeeded%", strconv.Itoa(g.Green), "%redStoneNeeded%", strconv.Itoa(g.Red))

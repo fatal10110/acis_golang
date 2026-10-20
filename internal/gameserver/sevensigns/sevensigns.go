@@ -321,6 +321,24 @@ func (s *State) Save(ctx context.Context) error {
 	return err
 }
 
+// SaveStatus writes the status row alone, stamping it with the time of the
+// write, then the festival's status columns.
+func (s *State) SaveStatus(ctx context.Context) error {
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+
+	s.mu.Lock()
+	s.row.LastSave = s.now()
+	row := s.row
+	s.mu.Unlock()
+
+	err := s.store.SaveStatus(ctx, row)
+	if s.festival != nil {
+		err = errors.Join(err, s.festival.SaveStatus(ctx))
+	}
+	return err
+}
+
 // CurrentPeriod returns the active period.
 func (s *State) CurrentPeriod() Period {
 	s.mu.Lock()

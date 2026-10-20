@@ -94,8 +94,8 @@ func festivalDate(millis int64) string {
 //     in blue, green and red stones and the 38 minutes to the next
 //     festival cycle; each page then releases the client twice;
 //   - Chat with any page re-opens the guide page;
-//   - Festival 3, of the festival run, only releases the client, and a
-//     Festival command naming no choice answers nothing at all.
+//   - Festival 3 from a player in no party opens page 3b, missing here,
+//     and a Festival command naming no choice answers nothing at all.
 func TestFestivalGuideScorePages(t *testing.T) {
 	t.Parallel()
 	boot := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
@@ -148,7 +148,8 @@ func TestFestivalGuideScorePages(t *testing.T) {
 	guidePage := festivalGuidePages()["seven_signs/festival/dawn_guide.htm"]
 	assertAnswer(t, w.festivalAnswer(t, guide, "Chat 9"), pageAnswer, guide, wantChatPage(strings.ReplaceAll(guidePage, "%festivalMins%", countdown), guide))
 
-	assertAnswer(t, w.festivalAnswer(t, guide, "Festival 3"), releaseOnly, guide, "")
+	assertAnswer(t, w.festivalAnswer(t, guide, "Festival 3"), pageAnswer, guide,
+		"<html><body>My html is missing:<br>data/html/seven_signs/festival/festival_3b.htm</body></html>")
 	if frames := w.festivalAnswer(t, guide, "Festival"); len(frames) != 0 {
 		t.Fatalf("malformed Festival answer = %x, want nothing", opcodes(frames))
 	}

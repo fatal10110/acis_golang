@@ -123,6 +123,9 @@ type Hostile struct {
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
 	running        atomic.Bool
+	// offeringBonus is how many blood offerings a festival monster's kill
+	// is worth above one; see OfferingBonus.
+	offeringBonus atomic.Int32
 	// speedMu serializes refreshMoveSpeed's read of the stance and stats
 	// with its hand-off to the movement, so the last refresh to run always
 	// sets the speed that the latest stance and stat funcs give.

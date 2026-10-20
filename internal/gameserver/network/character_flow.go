@@ -794,6 +794,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	l.castController(live)
 	// The intention source reads cast, combat and move, all built above.
 	c.SetIntentionSource(live)
+	if l.festival != nil {
+		c.SetFestivalRoster(l.festival)
+	}
 	return live, nil
 }
 

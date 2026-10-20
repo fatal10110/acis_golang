@@ -345,6 +345,7 @@ func (r *Registry[M]) remove(out *notices, g *group[M], player M, reason Reason)
 	}
 	out.add(Edited[M]{Leader: g.leader})
 	g.recalculateLevel()
+	out.add(Departing[M]{Member: player, Members: g.members})
 	out.add(FusionStop[M]{Member: player})
 	if reason == Expelled {
 		out.add(Msg[M]{To: []M{player}, ID: MsgExpelledFromParty})
@@ -375,6 +376,7 @@ func (r *Registry[M]) disband(out *notices, g *group[M]) {
 	for _, m := range g.members {
 		delete(r.byMember, m.ObjectID())
 		out.add(WindowDeleteAll[M]{To: m})
+		out.add(Departing[M]{Member: m, Members: g.members})
 		out.add(FusionStop[M]{Member: m})
 		out.add(Msg[M]{To: []M{m}, ID: MsgPartyDispersed})
 	}
