@@ -1,0 +1,178 @@
+# Find Glittering Jewelry (Q035): a level 60 character whose formal wear (Q037) is at its sixth
+# step accepts at Ellie, sees Felton, kills alligators for ten rough jewels (every drop roll pinned
+# to land; the tenth moves the quest on), hands the jewels to Ellie, then trades five oriharukon,
+# five hundred silver nuggets and a hundred and fifty thons for the jewel box and the quest
+# completes; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q035_find_glittering_jewelry.golden
+character Jeweler 60
+quest Q037_MakeFormalWear <cond>=6 <state>=STARTED
+hold 1893 5
+hold 1873 500
+hold 4044 150
+random always 0
+script quest.Q035_FindGlitteringJewelry
+script quest.Q037_MakeFormalWear
+item 7162 1893 1873 4044 7077
+page merchant/30091.htm
+page merchant/30879.htm
+page script/quest/Q035_FindGlitteringJewelry/
+npc ellie 30091 Merchant 10 0 0
+npc felton 30879 Merchant 20 0 0
+npc alligator 20135 Monster 0 40 0
+
+# Ellie: accept.
+action ellie
+action ellie
+  S ActionFailed
+  S NpcHtmlMessage obj=ellie item=0 page=merchant/30091.htm
+  S ActionFailed
+bypass npc_{ellie}_Quest
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q035_FindGlitteringJewelry CREATED
+bypass Quest Q035_FindGlitteringJewelry 30091-1.htm
+  S QuestList 37:0x8000003f 35:0x80000001
+  S ExShowQuestMark quest=35
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-1.htm
+  S ActionFailed
+  Q upsert Q035_FindGlitteringJewelry | <state> | STARTED
+  Q upsert Q035_FindGlitteringJewelry | <cond> | 1
+  state Q035_FindGlitteringJewelry STARTED
+  rows Q035_FindGlitteringJewelry <cond>=1 <state>=STARTED
+action ellie
+  S ActionFailed
+  S NpcHtmlMessage obj=ellie item=0 page=merchant/30091.htm
+  S ActionFailed
+bypass npc_{ellie}_Quest
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Felton.
+action felton
+action felton
+  S ActionFailed
+  S NpcHtmlMessage obj=felton item=0 page=merchant/30879.htm
+  S ActionFailed
+bypass npc_{felton}_Quest
+  S NpcHtmlMessage obj=felton item=0 page=script/quest/Q035_FindGlitteringJewelry/30879-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q035_FindGlitteringJewelry 30879-1.htm
+  S QuestList 37:0x8000003f 35:0x80000003
+  S ExShowQuestMark quest=35
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=felton item=0 page=script/quest/Q035_FindGlitteringJewelry/30879-1.htm
+  S ActionFailed
+  Q upsert Q035_FindGlitteringJewelry | <cond> | 2
+  rows Q035_FindGlitteringJewelry <cond>=2 <state>=STARTED
+action felton
+  S ActionFailed
+  S NpcHtmlMessage obj=felton item=0 page=merchant/30879.htm
+  S ActionFailed
+bypass npc_{felton}_Quest
+  S NpcHtmlMessage obj=felton item=0 page=script/quest/Q035_FindGlitteringJewelry/30879-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Alligators: a rough jewel each; the tenth moves the quest on.
+kill alligator x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7162=9
+kill alligator
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7162
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x8000003f 35:0x80000007
+  S ExShowQuestMark quest=35
+  Q upsert Q035_FindGlitteringJewelry | <cond> | 3
+  items 7162=10
+  rows Q035_FindGlitteringJewelry <cond>=3 <state>=STARTED
+
+# Ellie takes the jewels.
+action ellie
+action ellie
+  S ActionFailed
+  S NpcHtmlMessage obj=ellie item=0 page=merchant/30091.htm
+  S ActionFailed
+bypass npc_{ellie}_Quest
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q035_FindGlitteringJewelry 30091-3.htm
+  S QuestList 37:0x8000003f 35:0x8000000f
+  S ExShowQuestMark quest=35
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7162 6:10
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-3.htm
+  S ActionFailed
+  Q upsert Q035_FindGlitteringJewelry | <cond> | 4
+  items 7162=0
+  rows Q035_FindGlitteringJewelry <cond>=4 <state>=STARTED
+
+# Ellie makes the jewel box; the quest completes.
+action ellie
+  S ActionFailed
+  S NpcHtmlMessage obj=ellie item=0 page=merchant/30091.htm
+  S ActionFailed
+bypass npc_{ellie}_Quest
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q035_FindGlitteringJewelry 30091-5.htm
+  S SystemMessage id=301 3:1893 6:5
+  S SystemMessage id=301 3:1873 6:500
+  S SystemMessage id=301 3:4044 6:150
+  S SystemMessage id=54 3:7077
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x8000003f 35:0x00000000
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-5.htm
+  S ActionFailed
+  Q upsert Q035_FindGlitteringJewelry | <state> | COMPLETED
+  Q delete-except-state Q035_FindGlitteringJewelry
+  state Q035_FindGlitteringJewelry COMPLETED
+  rows Q035_FindGlitteringJewelry <state>=COMPLETED
+  items 1893=0 1873=0 4044=0 7077=1
+
+# Relog: the completed quest loads from its one row, and the box stays.
+relog
+  state Q035_FindGlitteringJewelry COMPLETED
+  rows Q035_FindGlitteringJewelry <state>=COMPLETED
+  items 7077=1
+action ellie
+action ellie
+  S ActionFailed
+  S NpcHtmlMessage obj=ellie item=0 page=merchant/30091.htm
+  S ActionFailed
+bypass npc_{ellie}_Quest
+  S NpcHtmlMessage obj=ellie item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

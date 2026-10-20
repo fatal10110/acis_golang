@@ -1,0 +1,24 @@
+# Make a Sewing Kit (Q036), refused: a level 60 character whose formal wear (Q037) is at its fifth
+# step, not the sixth, is turned away by Ferris and the quest is not started. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q036_make_a_sewing_kit_unready.golden
+character Seamster 60
+quest Q037_MakeFormalWear <cond>=5 <state>=STARTED
+script quest.Q036_MakeASewingKit
+script quest.Q037_MakeFormalWear
+item 7163 1891 1893 7078
+page villagemaster/30847.htm
+page script/quest/Q036_MakeASewingKit/
+npc ferris 30847 VillageMasterDwarf 10 0 0
+
+action ferris
+action ferris
+  S ActionFailed
+  S NpcHtmlMessage obj=ferris item=0 page=villagemaster/30847.htm
+  S ActionFailed
+bypass npc_{ferris}_Quest
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q036_MakeASewingKit CREATED
+  rows Q036_MakeASewingKit -

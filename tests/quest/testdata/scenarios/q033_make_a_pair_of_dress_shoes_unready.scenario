@@ -1,0 +1,24 @@
+# Make a Pair of Dress Shoes (Q033), refused: a level 60 character whose formal wear (Q037) is at
+# its sixth step, not the seventh, is turned away by Woodley and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q033_make_a_pair_of_dress_shoes_unready.golden
+character Cobbler 60
+quest Q037_MakeFormalWear <cond>=6 <state>=STARTED
+script quest.Q033_MakeAPairOfDressShoes
+script quest.Q037_MakeFormalWear
+item 1882 1868 57 7113
+page merchant/30838.htm
+page script/quest/Q033_MakeAPairOfDressShoes/
+npc woodley 30838 Merchant 10 0 0
+
+action woodley
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q033_MakeAPairOfDressShoes CREATED
+  rows Q033_MakeAPairOfDressShoes -

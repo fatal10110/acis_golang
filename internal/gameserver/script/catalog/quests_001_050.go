@@ -26,6 +26,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q029"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q030"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q031"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q032"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q033"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q034"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q035"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q036"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q037"
 )
 
 // quests001To050 is the catalog of quests 001 to 050 (#178), except the two the engine slices ported.
@@ -59,12 +65,12 @@ func quests001To050() script.Catalog {
 		"quest.Q029_ChestCaughtWithABaitOfEarth":      q029.New,
 		"quest.Q030_ChestCaughtWithABaitOfFire":       q030.New,
 		"quest.Q031_SecretBuriedInTheSwamp":           q031.New,
-		"quest.Q032_AnObviousLie":                     nil,
-		"quest.Q033_MakeAPairOfDressShoes":            nil,
-		"quest.Q034_InSearchOfCloth":                  nil,
-		"quest.Q035_FindGlitteringJewelry":            nil,
-		"quest.Q036_MakeASewingKit":                   nil,
-		"quest.Q037_MakeFormalWear":                   nil,
+		"quest.Q032_AnObviousLie":                     q032.New,
+		"quest.Q033_MakeAPairOfDressShoes":            q033.New,
+		"quest.Q034_InSearchOfCloth":                  q034.New,
+		"quest.Q035_FindGlitteringJewelry":            q035.New,
+		"quest.Q036_MakeASewingKit":                   q036.New,
+		"quest.Q037_MakeFormalWear":                   q037.New,
 		"quest.Q038_DragonFangs":                      nil,
 		"quest.Q039_RedEyedInvaders":                  nil,
 		"quest.Q042_HelpTheUncle":                     nil,
