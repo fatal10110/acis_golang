@@ -1,0 +1,19 @@
+# RoyalRushKeyBox (31455), the key box a sepulcher room leaves. The first action selects it;
+# the talk gives the character one Sepulcher Key (7260) and takes the box out of the world,
+# showing no page: the action's ActionFailed, the key's message, the ActionFailed of the
+# selection the box's leaving clears, and the empty first talk's. Its minute-54 removal reads the local clock, so
+# tests/ai/royal_rush_rooms_test.go covers it, with the charms and the trigger boxes.
+character Hunter 20
+item 7260
+script script.ai.individual.DefaultNpc
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushKeyBox
+npc box 31455 Folk 40 0 0
+
+action box
+action box
+  S ActionFailed
+  S SystemMessage id=54 3:7260
+  S ActionFailed
+  S ActionFailed
+  items 7260=1

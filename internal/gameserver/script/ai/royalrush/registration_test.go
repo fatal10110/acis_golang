@@ -22,8 +22,16 @@ var chain = []struct {
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict", Afflict},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAreaController", AreaController},
 	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc", DefaultNpc},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushKeyBox", KeyBox},
 	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox", TreasureBox},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox1", TriggerBox1},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox2", TriggerBox2},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox3", TriggerBox3},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox4", TriggerBox4},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox5", TriggerBox5},
+	{"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBoxBase", TriggerBoxBase},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -107,12 +115,14 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 
 // TestRegistrationMatchesReferenceManifest registers the chain's Go
 // scripts through the engine registry, with the engine's own seam gate and
-// every id a hostile NPC, as the datapack types the watchmen (Monster) and
-// the treasure box (HalishaChest). None is refused, and the registry dump
-// equals the reference manifest for the chain: each script's kind and bind
-// lines, and every folded per-(npc, event) list restricted to the chain's
-// scripts, RoyalRushAfflict's 12 ids and RoyalRushTrasureBox's 1 on 5
-// events each.
+// each id of the kind the datapack's type gives it: the watchmen and the
+// charms (Monster) and the treasure box (HalishaChest) hostile, the key
+// and trigger boxes (Folk) civilians. None is refused, and the registry
+// dump equals the reference manifest for the chain: each script's kind and
+// bind lines, and every folded per-(npc, event) list restricted to the
+// chain's scripts: RoyalRushAfflict's 12 ids and RoyalRushTrasureBox's 1
+// on 5 events each, RoyalRushAreaController's 16 on 3, and
+// RoyalRushKeyBox's 13 and the trigger boxes' 20 on 2.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -120,7 +130,12 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 		list[i] = script.Listing{Path: c.path}
 		catalog[c.path] = c.ctor
 	}
-	kindOf := func(int32) (script.NPCKind, bool) { return script.KindHostile, true }
+	kindOf := func(id int32) (script.NPCKind, bool) {
+		if id >= 31455 && id <= 31487 {
+			return script.KindFolk, true
+		}
+		return script.KindHostile, true
+	}
 	r := script.Build(list, catalog, script.Config{KindOf: kindOf, Log: zerolog.Nop()})
 	var dump strings.Builder
 	if err := r.Dump(&dump); err != nil {
@@ -149,13 +164,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := (12+1)*5, len(want.folds); got != wantFolds {
-		t.Fatalf("reference folds = %d entries, want %d: RoyalRushAfflict's 12 ids and RoyalRushTrasureBox's 1 on 5 events each", got, wantFolds)
+	if wantFolds, got := (12+1)*5+16*3+(13+20)*2, len(want.folds); got != wantFolds {
+		t.Fatalf("reference folds = %d entries, want %d: RoyalRushAfflict's 12 ids and RoyalRushTrasureBox's 1 on 5 events each, RoyalRushAreaController's 16 on 3, RoyalRushKeyBox's 13 and the trigger boxes' 20 on 2", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{18244, 18255, 18256} {
+	for _, id := range []int32{18244, 18255, 18256, 18196, 18211, 31455, 31467, 31468, 31487} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

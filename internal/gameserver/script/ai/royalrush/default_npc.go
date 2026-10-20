@@ -1,7 +1,8 @@
 // Package royalrush holds the Royal Rush behaviors of the Four Sepulchers:
 // RoyalRushDefaultNpc, whose NPCs leave the world at minute 54 of the
-// hour, and the classes derived from it, the afflicting watchmen of the
-// graves and Halisha's treasure box.
+// hour, and the classes derived from it: the afflicting watchmen of the
+// graves, Halisha's treasure box, the room charms, the key boxes and the
+// trigger boxes that start the rooms.
 package royalrush
 
 import (

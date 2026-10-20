@@ -97,6 +97,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Guard.GuardStand":                                                                  guard.Stand,
 	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict":                                              royalrush.Afflict,
 	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc":                                           royalrush.DefaultNpc,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushKeyBox":                                               royalrush.KeyBox,
 	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox":                                           royalrush.TreasureBox,
 	"script.ai.individual.RoyalRushMissionNpc":                                                               individual.RoyalRushMissionNpc,
 	"script.ai.individual.WarriorPetForPC":                                                                   individual.WarriorPetForPC,
