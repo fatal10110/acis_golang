@@ -46,6 +46,7 @@ func TestMakers3Bindings(t *testing.T) {
 		{"freya_deacon_keeper_maker", maker.FreyaDeaconKeeper, 1},
 		{"frintessa_evilate_maker", maker.FrintezzaEvilate, 2},
 		{"sailren_dummy_maker", maker.SailrenDummy, 1},
+		{"sailren_maker", maker.Sailren, 1},
 		{"sculpture_garden_maker", maker.SculptureGarden, 1},
 		{"sculpture_ice_fairy_maker", maker.SculptureIceFairy, 1},
 		{"statue_of_shilen_maker", maker.StatueOfShilen, 1},
@@ -59,7 +60,7 @@ func TestMakers3Bindings(t *testing.T) {
 			t.Errorf("shipped npcmakers of %s = %d, want %d", tc.typ, n, tc.count)
 		}
 	}
-	if ported != 12 {
-		t.Errorf("ported batch 3 types = %d, want 12", ported)
+	if ported != 13 {
+		t.Errorf("ported batch 3 types = %d, want 13", ported)
 	}
 }

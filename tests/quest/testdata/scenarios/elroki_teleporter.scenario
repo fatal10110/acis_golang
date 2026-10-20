@@ -1,0 +1,23 @@
+# The Elroki teleporters (ElrokiTeleporter): Orahochin sends a character out of combat on,
+# answering no page (onTalk). A scenario puts no character in its attack stance, so Orahochin's
+# refusal and Gariachin's trip back are in tests/npcs/teleporters_210_pr3_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/elroki_teleporter.golden
+character Islander 40
+script script.teleport.ElrokiTeleporter
+page default/32111.htm
+page script/teleport/ElrokiTeleporter/
+npc orahochin 32111 Folk 10 0 0
+
+action orahochin
+action orahochin
+  S ActionFailed
+  S NpcHtmlMessage obj=orahochin item=0 page=default/32111.htm
+  S ActionFailed
+bypass npc_{orahochin}_Quest ElrokiTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=4990,-1879,-3178 fast=0
+  S ActionFailed
