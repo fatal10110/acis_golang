@@ -1,0 +1,798 @@
+# Testimony of Trust (Q217), a second class-change testimony for humans, played by a level 38
+# Knight, every script roll pinned to 0: Hollint starts it and pays the level 37 set's
+# Dimensional Diamonds (96 for a human, once per character) with his letters to the elves
+# and the dark elves; Hierarch Asterios wants the Seed of Verdure and the Breath of Winds of
+# Actea and Luell, the guardians a dryad or a lirein calls; Thifiell sends the traveller to
+# Clayton, who wants the basilisk plasma, honey dew and stakato ichor of ten kills each;
+# Hollint sends a letter to Seresin, who sends it on to Kakai and Lockirin; Manakia wants
+# ten Windsus parasites, Nikola ten Porta heartstones; Hollint's recommendation earns the
+# Mark of Trust from Biotin; then relog. A dryad's or a lirein's call is not played (a
+# script spawn's offset is drawn outside the script draws here); the guardians stand in the
+# world from the start. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q217_testimony_of_trust.golden
+character Trusty 38
+class 4
+random always 0
+script quest.Q217_TestimonyOfTrust
+item 2734 2735 2736 2737 2738 2739 2740 2741 2742 2743 2744 2745 2746 2747 2748 2749 2750 2751 2752 2753 2754 2755 2756 2757 2758 2759 2760 2761 7562
+page villagemaster/30191.htm
+page villagemaster/30154.htm
+page villagemaster/30358.htm
+page trainer/30464.htm
+page default/30657.htm
+page villagemaster/30565.htm
+page trainer/30515.htm
+page default/30531.htm
+page default/30621.htm
+page villagemaster/30031.htm
+page script/quest/Q217_TestimonyOfTrust/
+npc hollint 30191 VillageMasterPriest 10 0 0
+npc asterios 30154 VillageMasterPriest -10 0 0
+npc thifiell 30358 VillageMasterDElf 0 10 0
+npc clayton 30464 Trainer 0 -10 0
+npc seresin 30657 Folk 20 20 0
+npc kakai 30565 VillageMasterOrc -20 20 0
+npc manakia 30515 Trainer 20 -20 0
+npc lockirin 30531 Folk -20 -20 0
+npc nikola 30621 Folk 30 0 0
+npc biotin 30031 VillageMasterPriest -30 0 0
+npc actea 27121 Monster 40 0 0
+npc luell 27120 Monster -40 0 0
+npc stakato 20157 Monster 0 40 0
+npc ant 20082 Monster 0 -40 0
+npc basilisk 20550 Monster 40 40 0
+npc windsus 20553 Monster -40 40 0
+npc porta 20213 Monster 40 -40 0
+
+
+# Hollint: a human of the first occupation at level 37 or more may start; the first testimony
+# of the set pays the diamonds, which turns the accept page into 30191-04a.htm.
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30191-04.htm
+  S QuestList 217:0x80000001
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2735
+  S SystemMessage id=54 3:2736
+  S SystemMessage id=53 3:7562 6:96
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-04a.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <state> | STARTED
+  Q upsert Q217_TestimonyOfTrust | <cond> | 1
+  M set secondClassChange37 | true
+  items 2735=1 2736=1 7562=96
+  state Q217_TestimonyOfTrust STARTED
+  rows Q217_TestimonyOfTrust <state>=STARTED <cond>=1
+
+# Hollint waits for the trust of the elves and the dark elves.
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Hierarch Asterios takes the letter to the elves and gives his order.
+action asterios
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q217_TestimonyOfTrust/30154-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30154-02.htm
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q217_TestimonyOfTrust/30154-02.htm
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30154-03.htm
+  S QuestList 217:0x80000003
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2735
+  S SystemMessage id=54 3:2745
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q217_TestimonyOfTrust/30154-03.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 2
+  items 2735=0 2745=1
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q217_TestimonyOfTrust/30154-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Actea's death gives the Seed of Verdure, Luell's the Breath of Winds.
+kill actea
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2747
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 2747=1
+kill luell
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2746
+  S QuestList 217:0x80000007
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q217_TestimonyOfTrust | <cond> | 3
+  items 2746=1
+
+# Asterios takes both and the order for the scroll of the elves' trust.
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S QuestList 217:0x8000000f
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2746
+  S SystemMessage id=302 3:2747
+  S SystemMessage id=302 3:2745
+  S SystemMessage id=54 3:2741
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q217_TestimonyOfTrust/30154-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 4
+  items 2741=1 2745=0 2746=0 2747=0
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q217_TestimonyOfTrust/30154-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Thifiell takes the letter to the dark elves and sends the traveller to Clayton.
+action thifiell
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q217_TestimonyOfTrust/30358-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30358-02.htm
+  S QuestList 217:0x8000001f
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2736
+  S SystemMessage id=54 3:2748
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q217_TestimonyOfTrust/30358-02.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 5
+  items 2736=0 2748=1
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q217_TestimonyOfTrust/30358-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Clayton gives his order.
+action clayton
+action clayton
+  S ActionFailed
+  S NpcHtmlMessage obj=clayton item=0 page=trainer/30464.htm
+  S ActionFailed
+bypass npc_{clayton}_Quest
+  S QuestList 217:0x8000003f
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2748
+  S SystemMessage id=54 3:2755
+  S NpcHtmlMessage obj=clayton item=0 page=script/quest/Q217_TestimonyOfTrust/30464-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 6
+  items 2748=0 2755=1
+action clayton
+  S ActionFailed
+  S NpcHtmlMessage obj=clayton item=0 page=trainer/30464.htm
+  S ActionFailed
+bypass npc_{clayton}_Quest
+  S NpcHtmlMessage obj=clayton item=0 page=script/quest/Q217_TestimonyOfTrust/30464-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten kills each: the stakato fluids make the ichor, the giant aphids the honey dew, the
+# basilisk blood the plasma; the third one completes the set.
+kill stakato x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2751
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2751 6:10
+  S SystemMessage id=54 3:2754
+  items 2751=0 2754=1
+kill ant x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2750
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2750 6:10
+  S SystemMessage id=54 3:2753
+  items 2750=0 2753=1
+kill basilisk x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2749
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2749 6:10
+  S SystemMessage id=54 3:2752
+  S QuestList 217:0x8000007f
+  S ExShowQuestMark quest=217
+  Q upsert Q217_TestimonyOfTrust | <cond> | 7
+  items 2749=0 2752=1
+
+# Clayton takes his order back; Thifiell takes the three for the scroll of the dark elves' trust.
+action clayton
+  S ActionFailed
+  S NpcHtmlMessage obj=clayton item=0 page=trainer/30464.htm
+  S ActionFailed
+action clayton
+  S ActionFailed
+  S NpcHtmlMessage obj=clayton item=0 page=trainer/30464.htm
+  S ActionFailed
+bypass npc_{clayton}_Quest
+  S QuestList 217:0x800000ff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2755
+  S NpcHtmlMessage obj=clayton item=0 page=script/quest/Q217_TestimonyOfTrust/30464-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 8
+  items 2755=0
+action thifiell
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S QuestList 217:0x800001ff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2752
+  S SystemMessage id=302 3:2753
+  S SystemMessage id=302 3:2754
+  S SystemMessage id=54 3:2740
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q217_TestimonyOfTrust/30358-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 9
+  items 2740=1 2752=0 2753=0 2754=0
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q217_TestimonyOfTrust/30358-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Hollint takes both scrolls and writes to Seresin.
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S QuestList 217:0x800003ff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2740
+  S SystemMessage id=302 3:2741
+  S SystemMessage id=54 3:2739
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 10
+  items 2739=1 2740=0 2741=0
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Seresin, at level 38: the letters to the dwarves and the orcs.
+action seresin
+action seresin
+  S ActionFailed
+  S NpcHtmlMessage obj=seresin item=0 page=default/30657.htm
+  S ActionFailed
+bypass npc_{seresin}_Quest
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30657-03.htm
+  S QuestList 217:0x80000bff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2739
+  S SystemMessage id=54 3:2737
+  S SystemMessage id=54 3:2738
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-03.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2147480577
+  Q upsert Q217_TestimonyOfTrust | <cond> | 12
+  items 2737=1 2738=1 2739=0
+action seresin
+  S ActionFailed
+  S NpcHtmlMessage obj=seresin item=0 page=default/30657.htm
+  S ActionFailed
+bypass npc_{seresin}_Quest
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kakai takes the letter to the orcs and writes to Manakia, who takes it.
+action kakai
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q217_TestimonyOfTrust/30565-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30565-02.htm
+  S QuestList 217:0x80001bff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2738
+  S SystemMessage id=54 3:2757
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q217_TestimonyOfTrust/30565-02.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2147476481
+  Q upsert Q217_TestimonyOfTrust | <cond> | 13
+  items 2738=0 2757=1
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q217_TestimonyOfTrust/30565-03.htm
+  S ActionFailed
+  S ActionFailed
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q217_TestimonyOfTrust/30515-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30515-02.htm
+  S QuestList 217:0x80003bff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2757
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q217_TestimonyOfTrust/30515-02.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2147468289
+  Q upsert Q217_TestimonyOfTrust | <cond> | 14
+  items 2757=0
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q217_TestimonyOfTrust/30515-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten Windsus parasites, at half a chance each, every roll landing.
+kill windsus x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2756
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 217:0x80007bff
+  S ExShowQuestMark quest=217
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2147451905
+  Q upsert Q217_TestimonyOfTrust | <cond> | 15
+  items 2756=10
+
+# Manakia takes them and writes to Kakai, who gives the scroll of the orcs' trust.
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S QuestList 217:0x8000fbff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2756 6:10
+  S SystemMessage id=54 3:2758
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q217_TestimonyOfTrust/30515-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2147419137
+  Q upsert Q217_TestimonyOfTrust | <cond> | 16
+  items 2756=0 2758=1
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q217_TestimonyOfTrust/30515-05.htm
+  S ActionFailed
+  S ActionFailed
+action kakai
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S QuestList 217:0x8001fbff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2758
+  S SystemMessage id=54 3:2743
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q217_TestimonyOfTrust/30565-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2147353601
+  Q upsert Q217_TestimonyOfTrust | <cond> | 17
+  items 2743=1 2758=0
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q217_TestimonyOfTrust/30565-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Lockirin takes the letter to the dwarves and writes to Nikola, who gives her order.
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q217_TestimonyOfTrust/30531-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30531-02.htm
+  S QuestList 217:0x8003fbff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2737
+  S SystemMessage id=54 3:2759
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q217_TestimonyOfTrust/30531-02.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2147222529
+  Q upsert Q217_TestimonyOfTrust | <cond> | 18
+  items 2737=0 2759=1
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q217_TestimonyOfTrust/30531-03.htm
+  S ActionFailed
+  S ActionFailed
+action nikola
+action nikola
+  S ActionFailed
+  S NpcHtmlMessage obj=nikola item=0 page=default/30621.htm
+  S ActionFailed
+bypass npc_{nikola}_Quest
+  S NpcHtmlMessage obj=nikola item=0 page=script/quest/Q217_TestimonyOfTrust/30621-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30621-02.htm
+  S QuestList 217:0x8007fbff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2759
+  S SystemMessage id=54 3:2760
+  S NpcHtmlMessage obj=nikola item=0 page=script/quest/Q217_TestimonyOfTrust/30621-02.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2146960385
+  Q upsert Q217_TestimonyOfTrust | <cond> | 19
+  items 2759=0 2760=1
+action nikola
+  S ActionFailed
+  S NpcHtmlMessage obj=nikola item=0 page=default/30621.htm
+  S ActionFailed
+bypass npc_{nikola}_Quest
+  S NpcHtmlMessage obj=nikola item=0 page=script/quest/Q217_TestimonyOfTrust/30621-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten Porta heartstones.
+kill porta x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2761
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 217:0x800ffbff
+  S ExShowQuestMark quest=217
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2146436097
+  Q upsert Q217_TestimonyOfTrust | <cond> | 20
+  items 2761=10
+
+# Nikola takes them and her order; Lockirin gives the scroll of the dwarves' trust.
+action nikola
+  S ActionFailed
+  S NpcHtmlMessage obj=nikola item=0 page=default/30621.htm
+  S ActionFailed
+action nikola
+  S ActionFailed
+  S NpcHtmlMessage obj=nikola item=0 page=default/30621.htm
+  S ActionFailed
+bypass npc_{nikola}_Quest
+  S QuestList 217:0x801ffbff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2761 6:10
+  S SystemMessage id=302 3:2760
+  S NpcHtmlMessage obj=nikola item=0 page=script/quest/Q217_TestimonyOfTrust/30621-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2145387521
+  Q upsert Q217_TestimonyOfTrust | <cond> | 21
+  items 2760=0 2761=0
+action nikola
+  S ActionFailed
+  S NpcHtmlMessage obj=nikola item=0 page=default/30621.htm
+  S ActionFailed
+bypass npc_{nikola}_Quest
+  S NpcHtmlMessage obj=nikola item=0 page=script/quest/Q217_TestimonyOfTrust/30621-05.htm
+  S ActionFailed
+  S ActionFailed
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S QuestList 217:0x803ffbff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2742
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q217_TestimonyOfTrust/30531-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2143290369
+  Q upsert Q217_TestimonyOfTrust | <cond> | 22
+  items 2742=1
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q217_TestimonyOfTrust/30531-05.htm
+  S ActionFailed
+  S ActionFailed
+action seresin
+action seresin
+  S ActionFailed
+  S NpcHtmlMessage obj=seresin item=0 page=default/30657.htm
+  S ActionFailed
+bypass npc_{seresin}_Quest
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Hollint takes both scrolls and gives his recommendation; Biotin gives the Mark of Trust
+# and completes the quest.
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S QuestList 217:0x807ffbff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2742
+  S SystemMessage id=302 3:2743
+  S SystemMessage id=54 3:2744
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <flags> | -2139096065
+  Q upsert Q217_TestimonyOfTrust | <cond> | 23
+  items 2742=0 2743=0 2744=1
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-07.htm
+  S ActionFailed
+  S ActionFailed
+action biotin
+action biotin
+  S ActionFailed
+  S NpcHtmlMessage obj=biotin item=0 page=villagemaster/30031.htm
+  S ActionFailed
+bypass npc_{biotin}_Quest
+  S SystemMessage id=302 3:2744
+  S SystemMessage id=54 3:2734
+  S SystemMessage id=95 1:39571 1:2500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 217:0x00000000
+  S NpcHtmlMessage obj=biotin item=0 page=script/quest/Q217_TestimonyOfTrust/30031-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <state> | COMPLETED
+  Q delete-except-state Q217_TestimonyOfTrust
+  items 2734=1 2744=0
+  state Q217_TestimonyOfTrust COMPLETED
+  rows Q217_TestimonyOfTrust <state>=COMPLETED
+relog
+  state Q217_TestimonyOfTrust COMPLETED
+  rows Q217_TestimonyOfTrust <state>=COMPLETED
+  items 2734=1 2744=0 7562=96
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
