@@ -44,6 +44,11 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 			"OnAttacked":     {"NPC.MaxHP"},
 			"OnClanAttacked": {"NPC.MaxHP"},
 		},
+		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager": {
+			"OnScriptEvent": {"NPC.HP"},
+			"OnSpelled":     {"NPC.HP"},
+			"OnTimer":       {"NPC.HP"},
+		},
 		"script.ai.siegablehall.AzitWateringTreasureBox": {
 			"OnAttacked": {"NPC.HP"},
 			"OnMyDying":  {"NPC.DropItem"},

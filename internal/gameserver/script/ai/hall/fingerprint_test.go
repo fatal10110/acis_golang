@@ -10,7 +10,10 @@ import (
 // classes: literals, engine calls and hook shapes. The reference names the
 // shouts and lines by their NpcString constants and Dietrich's healer and
 // buffer classes by their class id constants; the port writes their ids
-// (30, the Elven Elder's, is a literal of the reference already).
+// (30, the Elven Elder's, is a literal of the reference already). The game
+// manager's slowing area name is never read (its area is left out), and
+// its party reads (Player.PartyMembers) share their name with the quest
+// helper.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"script.ai.siegablehall.Agit01PartisanSorcerer1",
@@ -28,10 +31,13 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.siegablehall.Agit01Move1.Agit01Move1",
 		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2",
 		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1",
+		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager",
 	},
 		"number 1000275", "number 1000276", "number 1000277", "number 1000278", "number 1000279", "number 1000280",
 		"number 1010624", "number 1010625", "number 1010636", "number 1010637", "number 1010638",
 		"number 1800023", "number 1010639",
+		"number 1010628", "number 1010633", "number 1010634", "number 1010635", "number 1010640", "number 1010641",
+		"string \"azit_watering_game_manager_default\"", "call Quest.getPartyMembers",
 		"number 16", "number 17", "number 43", "number 51", "number 52",
 	)
 	if err != nil {

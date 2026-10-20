@@ -7,6 +7,7 @@ import (
 
 // siegableHall is the catalog of the siegable clan hall scripts and behaviors (#3502).
 func siegableHall() script.Catalog {
+	watering := hall.NewWateringGame()
 	return script.Catalog{
 		"script.ai.siegablehall.Agit01Move1.Agit01Move1":                                hall.Move1,
 		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2":                    hall.PartisanSorcerer2,
@@ -22,7 +23,7 @@ func siegableHall() script.Catalog {
 		"script.ai.siegablehall.Agit03Giselle":                                          hall.Giselle,
 		"script.ai.siegablehall.Agit03Lidia":                                            hall.Lidia,
 		"script.ai.siegablehall.AzitWateringCrazyYeti":                                  nil,
-		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager":        nil,
+		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager":        func() script.Script { return hall.GameManager(watering) },
 		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle1": nil,
 		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle2": nil,
 		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle3": nil,

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -211,6 +212,15 @@ func (s *HallSiege) DropClanRestartPoint(clanID int32) {
 	s.hs.siegeMu.Lock()
 	defer s.hs.siegeMu.Unlock()
 	delete(s.h.siege.restartPoints, clanID)
+}
+
+// SetMiniGameWinner tells the hall's script that winner broke gourd in the
+// hall's mini game. Without a script, or a script that keeps no mini game,
+// nothing happens.
+func (s *HallSiege) SetMiniGameWinner(gourd, winner attackable.Combatant) {
+	if sc := s.script(); sc != nil && sc.MiniGameWinner != nil {
+		sc.MiniGameWinner(gourd, winner)
+	}
 }
 
 // ClanRestartPointAt returns where a player of clanID standing at (x, y, z)
