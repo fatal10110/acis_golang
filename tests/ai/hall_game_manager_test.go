@@ -39,14 +39,20 @@ const (
 	wordThreeCallerID  = int32(29983)
 	gourdBrokeCallerID = int32(29984)
 	rainbowKeeperID    = int32(29985)
+	gourdCallerID      = int32(29986)
+	bombCallerID       = int32(29987)
 	rainbowSpringsHall = int32(62)
 )
 
-// The hot springs waters: the character's nectar, and the nectar the
-// manager casts at its gourd.
+// The hot springs waters the character pours, and the skills the manager
+// casts: its nectar and mineral water at its gourd, its bomb on itself.
 const (
-	hotSpringNectar = modelskill.ID(2240)
-	npcNectar       = modelskill.ID(4989)
+	hotSpringNectar  = modelskill.ID(2240)
+	hotSpringMineral = modelskill.ID(2241)
+	hotSpringSulfur  = modelskill.ID(2243)
+	npcNectar        = modelskill.ID(4989)
+	npcMineral       = modelskill.ID(4990)
+	npcUltraBomb     = modelskill.ID(5039)
 )
 
 // managerDir is where the manager's pages are, under data/html.
@@ -124,12 +130,12 @@ func letterItems() *item.Table {
 }
 
 // gameManagerSetup is a game manager test's boot: its script draw, the
-// letters the character starts with, whether it knows the nectar, the
+// letters the character starts with, the hot springs waters it knows, the
 // extra scripts and options.
 type gameManagerSetup struct {
 	draw    int
 	letters map[int32]int32
-	nectar  bool
+	waters  []modelskill.ID
 	scripts script.Catalog
 	kinds   map[int32]script.NPCKind
 	opts    []gameservertest.Option
@@ -161,10 +167,15 @@ func bootGameManager(t *testing.T, s gameManagerSetup) *warriorWorld {
 		kinds[id] = kind
 		templates = append(templates, agitTemplate(id))
 	}
-	npcSkills := modelskill.NewTable([]modelskill.Definition{{
-		ID: npcNectar, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-		SkillType: "BUFF", CastRange: 600, HitTime: 500, StaticHitTime: true, StaticReuse: true,
-	}})
+	npcSkill := func(id modelskill.ID, target modelskill.Target) modelskill.Definition {
+		return modelskill.Definition{
+			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: target,
+			SkillType: "BUFF", CastRange: 600, HitTime: 500, StaticHitTime: true, StaticReuse: true,
+		}
+	}
+	npcSkills := modelskill.NewTable([]modelskill.Definition{
+		npcSkill(npcNectar, modelskill.TargetOne), npcSkill(npcMineral, modelskill.TargetOne), npcSkill(npcUltraBomb, modelskill.TargetSelf),
+	})
 	opts := append([]gameservertest.Option{
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
@@ -172,23 +183,25 @@ func bootGameManager(t *testing.T, s gameManagerSetup) *warriorWorld {
 		gameservertest.WithItemTemplates(letterItems()),
 		gameservertest.WithNpcSpawnSkills(npcSkills),
 	}, s.opts...)
-	var nectar []modelskill.Definition
-	if s.nectar {
-		db := sqltest.SharedDB(t)
-		nectar = []modelskill.Definition{{
-			ID: hotSpringNectar, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+	var waters []modelskill.Definition
+	for _, id := range s.waters {
+		waters = append(waters, modelskill.Definition{
+			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "BUFF", CastRange: 400, HitTime: 500, StaticHitTime: true, StaticReuse: true,
-		}}
-		table := modelskill.NewTable(nectar)
+		})
+	}
+	if len(waters) > 0 {
+		db := sqltest.SharedDB(t)
+		table := modelskill.NewTable(waters)
 		opts = append(opts,
 			gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), table, gamesql.NewCharacterSkillStore(db))),
-			gameservertest.WithScriptSkills(nectar...))
+			gameservertest.WithScriptSkills(waters...))
 	}
 	ready := func(srv *gameservertest.Server, objID int32) {
 		for id, count := range s.letters {
 			srv.GiveItem(t, objID, id, count)
 		}
-		for _, def := range nectar {
+		for _, def := range waters {
 			if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, int(def.ID), 1); err != nil {
 				t.Fatalf("seed skill %d: %v", def.ID, err)
 			}
@@ -249,21 +262,21 @@ func folkCasts(frames [][]byte, casterID int32, id modelskill.ID) []int32 {
 	return out
 }
 
-// talkTo opens the manager's first page, the manager being selected, and
+// managerTalk opens the manager's first page, the manager being selected, and
 // returns the frames sent.
-func (w *warriorWorld) talkTo(t *testing.T, f *npc.Folk) [][]byte {
+func (w *warriorWorld) managerTalk(t *testing.T, f *npc.Folk) [][]byte {
 	t.Helper()
 	w.srv.Client.Send(encodeFolkAction(f.ObjectID(), w.at))
 	w.srv.Settle(t)
 	return w.srv.ReadQueued(t, w.srv.Client)
 }
 
-// command talks to the manager, then sends it the bypass of command and
+// managerCommand talks to the manager, then sends it the bypass of command and
 // returns the frames the command sent. The boot sets no bypass reuse
 // delay, so commands may follow each other at once.
-func (w *warriorWorld) command(t *testing.T, f *npc.Folk, command string) [][]byte {
+func (w *warriorWorld) managerCommand(t *testing.T, f *npc.Folk, command string) [][]byte {
 	t.Helper()
-	w.talkTo(t, f)
+	w.managerTalk(t, f)
 	w.srv.Client.Send(encodeManagerBypass("Quest GameManager " + command))
 	w.srv.Settle(t)
 	return w.srv.ReadQueued(t, w.srv.Client)
@@ -328,12 +341,12 @@ func TestGameManagerWordGame(t *testing.T) {
 	})
 	objID := w.player.ObjectID()
 	manager := w.spawnFolk(t, gameManagerID, 100, 0)
-	w.talkTo(t, manager) // selects it
+	w.managerTalk(t, manager) // selects it
 
-	wantPage(t, "talk", w.talkTo(t, manager), "manager001")
-	wantPage(t, "howTo", w.command(t, manager, "howTo"), "manager003")
-	wantPage(t, "showCurrentWord before a word", w.command(t, manager, "showCurrentWord"), "word "+script.NpcString(1010635))
-	frames := w.command(t, manager, "giveWord")
+	wantPage(t, "talk", w.managerTalk(t, manager), "manager001")
+	wantPage(t, "howTo", w.managerCommand(t, manager, "howTo"), "manager003")
+	wantPage(t, "showCurrentWord before a word", w.managerCommand(t, manager, "showCurrentWord"), "word "+script.NpcString(1010635))
+	frames := w.managerCommand(t, manager, "giveWord")
 	if got := managerHTML(frames); len(got) != 0 {
 		t.Fatalf("giveWord before a word showed %q, want no page", got)
 	}
@@ -345,7 +358,7 @@ func TestGameManagerWordGame(t *testing.T) {
 	if got, want := screenTexts(frames), []string{"BABYDUCK@10000"}; !slices.Equal(got, want) {
 		t.Fatalf("word 0: screen messages %q, want %q", got, want)
 	}
-	wantPage(t, "giveWord lacking the letters", w.command(t, manager, "giveWord"), "manager002")
+	wantPage(t, "giveWord lacking the letters", w.managerCommand(t, manager, "giveWord"), "manager002")
 	for id, count := range kingfisher() {
 		if got := w.srv.PlayerItemCount(t, objID, id); got != int(count) {
 			t.Fatalf("after a wrong word: %d of item %d, want %d", got, id, count)
@@ -356,8 +369,8 @@ func TestGameManagerWordGame(t *testing.T) {
 	if got, want := screenTexts(frames), []string{"KINGFISHER@10000"}; !slices.Equal(got, want) {
 		t.Fatalf("word 3: screen messages %q, want %q", got, want)
 	}
-	wantPage(t, "showCurrentWord", w.command(t, manager, "showCurrentWord"), "word KINGFISHER")
-	wantPage(t, "giveWord with the letters", w.command(t, manager, "giveWord"), "manager004")
+	wantPage(t, "showCurrentWord", w.managerCommand(t, manager, "showCurrentWord"), "word KINGFISHER")
+	wantPage(t, "giveWord with the letters", w.managerCommand(t, manager, "giveWord"), "manager004")
 	for id := range kingfisher() {
 		if got := w.srv.PlayerItemCount(t, objID, id); got != 0 {
 			t.Fatalf("after the word: %d of item %d, want none", got, id)
@@ -387,7 +400,7 @@ func (w *warriorWorld) pourNectar(t *testing.T) (manager, gourd *npc.Folk) {
 	gourd = w.spawnFolk(t, gourdID, 150, 0)
 	w.srv.Advance(t, 10*time.Second)
 	w.srv.ReadQueued(t, w.srv.Client)
-	w.talkTo(t, manager) // selects it
+	w.managerTalk(t, manager) // selects it
 	w.cast(t, hotSpringNectar)
 	return manager, gourd
 }
@@ -400,7 +413,7 @@ func TestGameManagerNectar(t *testing.T) {
 	t.Parallel()
 	t.Run("cast at the gourd", func(t *testing.T) {
 		t.Parallel()
-		w := bootGameManager(t, gameManagerSetup{nectar: true})
+		w := bootGameManager(t, gameManagerSetup{waters: []modelskill.ID{hotSpringNectar}})
 		manager, gourd := w.pourNectar(t)
 		var frames [][]byte
 		w.srv.AdvanceUntil(t, "the manager's nectar on its gourd", func() bool {
@@ -413,7 +426,7 @@ func TestGameManagerNectar(t *testing.T) {
 	})
 	t.Run("enraged yeti", func(t *testing.T) {
 		t.Parallel()
-		w := bootGameManager(t, gameManagerSetup{draw: 95, nectar: true})
+		w := bootGameManager(t, gameManagerSetup{draw: 95, waters: []modelskill.ID{hotSpringNectar}})
 		manager, _ := w.pourNectar(t)
 		mx, my, mz := manager.Position()
 		var yetis []string
@@ -429,13 +442,12 @@ func TestGameManagerNectar(t *testing.T) {
 	})
 }
 
-// TestGameManagerNamesTheMiniGameWinner ports the manager's answer to a
-// broken gourd (script event 5 with 40000): the player who last poured
-// nectar on it, within 1000 of it, wins Rainbow Springs' mini game with the
-// manager's gourd, and the NPCs within 8000 hear script event 0 with 20002.
-func TestGameManagerNamesTheMiniGameWinner(t *testing.T) {
-	t.Parallel()
-	won := make(chan string, 4)
+// rainbowSprings boots Rainbow Springs (62), a siegable hall whose siege
+// comes in a week, run by the rainbowKeeper sending its mini game winners
+// to won, with the callers telling a gourd broke (5 with 40000) and the
+// manager's gourd (0 with 30003) and its bomb (0 with 50000).
+func rainbowSprings(t *testing.T, won chan<- string, waters ...modelskill.ID) gameManagerSetup {
+	t.Helper()
 	rainbow, err := hallmodel.NewHall(hallmodel.HallAttrs{
 		ID: int(rainbowSpringsHall), ParentID: -1, Alias: "rainbow_spring", Name: "Rainbow Springs Chateau",
 		Description: "Contestable Clan Hall", Town: "Goddard", Grade: 3, SiegeLength: 3600000,
@@ -448,13 +460,18 @@ func TestGameManagerNamesTheMiniGameWinner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := bootGameManager(t, gameManagerSetup{
-		nectar: true,
+	return gameManagerSetup{
+		waters: waters,
 		scripts: script.Catalog{
 			"test.GourdBrokeCaller": hallCaller(gourdBrokeCallerID, 5, 40000, 0),
+			"test.GourdCaller":      hallCaller(gourdCallerID, 0, 30003, 0),
+			"test.BombCaller":       hallCaller(bombCallerID, 0, 50000, 0),
 			"test.RainbowKeeper":    rainbowKeeper(won),
 		},
-		kinds: map[int32]script.NPCKind{gourdBrokeCallerID: script.KindHostile, rainbowKeeperID: script.KindHostile},
+		kinds: map[int32]script.NPCKind{
+			gourdBrokeCallerID: script.KindHostile, gourdCallerID: script.KindHostile,
+			bombCallerID: script.KindHostile, rainbowKeeperID: script.KindHostile,
+		},
 		opts: []gameservertest.Option{
 			gameservertest.WithClanHalls(halls, nil),
 			gameservertest.WithResidences(halls, nil),
@@ -465,26 +482,183 @@ func TestGameManagerNamesTheMiniGameWinner(t *testing.T) {
 				}
 			}),
 		},
-	})
+	}
+}
+
+// bindRainbowSprings spawns the rainbowKeeper, binding Rainbow Springs'
+// siege, and an event listener; it returns the listener.
+func (w *warriorWorld) bindRainbowSprings(t *testing.T, won <-chan string) *npc.Hostile {
+	t.Helper()
 	w.spawn(t, rainbowKeeperID, -200, 0)
 	select {
 	case got := <-won:
 		t.Fatalf("binding Rainbow Springs: %s", got)
 	default:
 	}
-	listener := w.spawn(t, hallListenerID, -100, 100)
-	_, gourd := w.pourNectar(t)
+	return w.spawn(t, hallListenerID, -100, 100)
+}
 
+// breakGourd spawns the caller telling the managers around that a gourd
+// broke, and returns the frames sent and the mini game winner named, ""
+// for none.
+func (w *warriorWorld) breakGourd(t *testing.T, won <-chan string) ([][]byte, string) {
+	t.Helper()
 	_, frames := w.spawnSeen(t, gourdBrokeCallerID, location.Location{X: w.at.X - 100, Y: w.at.Y - 100, Z: w.at.Z})
 	select {
 	case got := <-won:
-		if want := fmt.Sprintf("%d %d", gourd.ObjectID(), w.player.ObjectID()); got != want {
-			t.Fatalf("mini game winner = %q, want %q", got, want)
-		}
+		return frames, got
 	default:
-		t.Fatal("the manager named no mini game winner")
+		return frames, ""
 	}
-	if got := says(frames, listener.ObjectID()); !slices.Contains(got, "event 0 20002 0") {
-		t.Fatalf("listener heard %q, want event 0 20002 0", got)
+}
+
+// castFrames has the character cast its skill id on its target and
+// returns every frame sent until the cast landed and ended.
+func (w *warriorWorld) castFrames(t *testing.T, id modelskill.ID) [][]byte {
+	t.Helper()
+	p := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
+	p.WriteInt32(int32(id))
+	p.WriteInt32(1)
+	p.WriteUint8(0)
+	w.srv.Client.Send(p.Bytes())
+	var frames [][]byte
+	w.srv.AdvanceUntil(t, "the character's cast to land and end", func() bool {
+		frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+		return slices.ContainsFunc(frames, func(f []byte) bool {
+			return f[0] == serverpackets.OpcodeMagicSkillLaunched && int32(binary.LittleEndian.Uint32(f[1:5])) == w.player.ObjectID()
+		}) && !w.srv.PlayerCastingNow(t, w.player.ObjectID())
+	})
+	w.srv.Settle(t)
+	return append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+}
+
+// lineCount returns how many times line is among lines.
+func lineCount(lines []string, line string) int {
+	n := 0
+	for _, l := range lines {
+		if l == line {
+			n++
+		}
+	}
+	return n
+}
+
+// TestGameManagerNamesTheMiniGameWinner ports the manager's answer to a
+// broken gourd (script event 5 with 40000): the player who last poured
+// nectar on it, within 1000 of it, wins Rainbow Springs' mini game with the
+// manager's gourd, and the NPCs within 8000 hear script event 0 with 20002.
+func TestGameManagerNamesTheMiniGameWinner(t *testing.T) {
+	t.Parallel()
+	won := make(chan string, 4)
+	w := bootGameManager(t, rainbowSprings(t, won, hotSpringNectar))
+	listener := w.bindRainbowSprings(t, won)
+	_, gourd := w.pourNectar(t)
+
+	frames, got := w.breakGourd(t, won)
+	if want := fmt.Sprintf("%d %d", gourd.ObjectID(), w.player.ObjectID()); got != want {
+		t.Fatalf("mini game winner = %q, want %q", got, want)
+	}
+	if n := lineCount(says(frames, listener.ObjectID()), "event 0 20002 0"); n != 1 {
+		t.Fatalf("listener heard event 0 20002 %d times, want once", n)
+	}
+}
+
+// TestGameManagerParty ports what the manager does for the party of the
+// players around it. Its look 60 s after it appears (timer 1004) shouts
+// the leader of the last player seen and the share of its gourd's hit
+// points left. The sulfur (2243) shouts the leader and tells circles 1 to 4
+// but its own (0 here) to slow (20001); the mineral water (2241) tells
+// them to cast theirs (30003). The first water poured lists the pourer's
+// party, and with no nectar poured, a broken gourd makes the first player
+// listed, the leader, the mini game's winner, heard once as event 0 with
+// 20002.
+func TestGameManagerParty(t *testing.T) {
+	t.Parallel()
+	won := make(chan string, 4)
+	w := bootGameManager(t, rainbowSprings(t, won, hotSpringMineral, hotSpringSulfur))
+	listener := w.bindRainbowSprings(t, won)
+	manager := w.spawnFolk(t, gameManagerID, 100, 0)
+	gourd := w.spawnFolk(t, gourdID, 150, 0)
+	w.joinMate(t)
+
+	w.srv.Advance(t, 60*time.Second)
+	frames := w.srv.ReadQueued(t, w.srv.Client)
+	if got, want := says(frames, manager.ObjectID()), []string{script.NpcString(1010634, "Hunter", 100)}; !slices.Equal(got, want) {
+		t.Fatalf("manager at 60 s said %q, want %q", got, want)
+	}
+
+	w.managerTalk(t, manager) // selects it
+	frames = w.castFrames(t, hotSpringSulfur)
+	if got, want := says(frames, manager.ObjectID()), []string{script.NpcString(1010640, "Hunter")}; !slices.Equal(got, want) {
+		t.Fatalf("sulfur: manager said %q, want %q", got, want)
+	}
+	if got, want := says(frames, listener.ObjectID()), []string{"event 1 20001 0", "event 2 20001 0", "event 3 20001 0", "event 4 20001 0"}; !slices.Equal(got, want) {
+		t.Fatalf("sulfur: listener heard %q, want %q", got, want)
+	}
+	frames = w.castFrames(t, hotSpringMineral)
+	if got, want := says(frames, listener.ObjectID()), []string{"event 1 30003 0", "event 2 30003 0", "event 3 30003 0", "event 4 30003 0"}; !slices.Equal(got, want) {
+		t.Fatalf("mineral water: listener heard %q, want %q", got, want)
+	}
+
+	frames, got := w.breakGourd(t, won)
+	if want := fmt.Sprintf("%d %d", gourd.ObjectID(), w.player.ObjectID()); got != want {
+		t.Fatalf("mini game winner = %q, want the leader %q", got, want)
+	}
+	if n := lineCount(says(frames, listener.ObjectID()), "event 0 20002 0"); n != 1 {
+		t.Fatalf("listener heard event 0 20002 %d times, want once", n)
+	}
+}
+
+// TestGameManagerAlone ports the manager's own circle's calls and a lone
+// player: told by its circle (0 here) to cast its mineral water (30003) it
+// does nothing without a gourd and casts it at the gourd it saw once it
+// has one; told to bomb (50000) it casts its bomb on itself. Its look at
+// 60 s shouts nothing for a player in no party, and a broken gourd names
+// no winner, with no one listed and no nectar poured, and tells no one.
+func TestGameManagerAlone(t *testing.T) {
+	t.Parallel()
+	won := make(chan string, 4)
+	w := bootGameManager(t, rainbowSprings(t, won))
+	listener := w.bindRainbowSprings(t, won)
+	manager := w.spawnFolk(t, gameManagerID, 100, 0)
+
+	_, frames := w.spawnSeen(t, gourdCallerID, location.Location{X: w.at.X - 100, Y: w.at.Y + 50, Z: w.at.Z})
+	for range 3 {
+		frames = append(frames, cycle(t, w.srv)...)
+	}
+	if got := folkCasts(frames, manager.ObjectID(), npcMineral); len(got) != 0 {
+		t.Fatalf("mineral water casts with no gourd = %v, want none", got)
+	}
+	w.spawnSeen(t, bombCallerID, location.Location{X: w.at.X - 100, Y: w.at.Y + 100, Z: w.at.Z})
+	frames = nil
+	w.srv.AdvanceUntil(t, "the manager's bomb", func() bool {
+		frames = append(frames, cycle(t, w.srv)...)
+		return len(folkCasts(frames, manager.ObjectID(), npcUltraBomb)) > 0
+	})
+	if got := folkCasts(frames, manager.ObjectID(), npcUltraBomb); !slices.Equal(got, []int32{manager.ObjectID()}) {
+		t.Fatalf("bomb casts = %v, want one on the manager itself", got)
+	}
+
+	gourd := w.spawnFolk(t, gourdID, 150, 0)
+	w.srv.Advance(t, 60*time.Second)
+	frames = w.srv.ReadQueued(t, w.srv.Client)
+	if got := says(frames, manager.ObjectID()); len(got) != 0 {
+		t.Fatalf("manager at 60 s said %q to a player in no party, want nothing", got)
+	}
+	_, frames = w.spawnSeen(t, gourdCallerID, location.Location{X: w.at.X - 150, Y: w.at.Y + 50, Z: w.at.Z})
+	w.srv.AdvanceUntil(t, "the manager's mineral water on its gourd", func() bool {
+		frames = append(frames, cycle(t, w.srv)...)
+		return len(folkCasts(frames, manager.ObjectID(), npcMineral)) > 0
+	})
+	if got := folkCasts(frames, manager.ObjectID(), npcMineral); !slices.Equal(got, []int32{gourd.ObjectID()}) {
+		t.Fatalf("mineral water casts = %v, want one on the gourd %d", got, gourd.ObjectID())
+	}
+
+	frames, got := w.breakGourd(t, won)
+	if got != "" {
+		t.Fatalf("mini game winner = %q with no one listed, want none", got)
+	}
+	if n := lineCount(says(frames, listener.ObjectID()), "event 0 20002 0"); n != 0 {
+		t.Fatalf("listener heard event 0 20002 %d times, want never", n)
 	}
 }
