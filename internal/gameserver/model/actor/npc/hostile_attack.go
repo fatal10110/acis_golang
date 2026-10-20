@@ -231,12 +231,12 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 	if physical && h.currentSoulshots > 0 && h.shotsMask&item.ShotSoul.Mask() == 0 {
 		h.currentSoulshots--
 		h.shotsMask |= item.ShotSoul.Mask()
-		skills = append(skills, 2154)
+		skills = append(skills, shotRechargeSoulSkill)
 	}
 	if magic && h.currentSpiritshots > 0 && h.shotsMask&item.ShotSpirit.Mask() == 0 {
 		h.currentSpiritshots--
 		h.shotsMask |= item.ShotSpirit.Mask()
-		skills = append(skills, 2061)
+		skills = append(skills, shotRechargeSpiritSkill)
 	}
 	h.shotsMu.Unlock()
 

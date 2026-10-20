@@ -26,7 +26,7 @@ func LocalVar() script.Script {
 // Param calls it through a function-typed parameter.
 func Param() script.Script {
 	return script.Script{Hooks: script.Hooks{OnAttacked: func(_ *script.Script, e script.Attacked) {
-		apply(e.NPC, func(n *script.NPC) { _ = n.Stunned() })
+		apply(e.NPC, func(n *script.NPC) { _ = n.PhysicalMuted() })
 	}}}
 }
 
@@ -46,7 +46,7 @@ func Field() script.Script {
 	}}}
 }
 
-var table = map[int]func(*script.NPC, uint8){1: func(n *script.NPC, _ uint8) { n.AbortAll() }}
+var table = map[int]func(*script.NPC, uint8){1: func(n *script.NPC, _ uint8) { n.StopAttack() }}
 
 // Map calls it through a package-level map element.
 func Map() script.Script {
@@ -55,7 +55,7 @@ func Map() script.Script {
 	}}}
 }
 
-var ranged = []func(*script.NPC, int16){func(n *script.NPC, _ int16) { _ = n.Paralyzed() }}
+var ranged = []func(*script.NPC, int16){func(n *script.NPC, _ int16) { _ = n.Muted() }}
 
 // Range calls it through a range variable over a package-level slice.
 func Range() script.Script {
@@ -68,7 +68,7 @@ func Range() script.Script {
 
 type stepFn func(*script.NPC, float32)
 
-var named = []stepFn{func(n *script.NPC, _ float32) { _ = n.Stunned() }}
+var named = []stepFn{func(n *script.NPC, _ float32) { _ = n.PhysicalMuted() }}
 
 // Named calls it through an element of a slice of a named function type,
 // set from a function literal of the unnamed signature.
