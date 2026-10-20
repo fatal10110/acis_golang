@@ -405,7 +405,7 @@ func (l *GameClientLink) stripCompetitor(live *livePlayer) {
 	}
 	l.stopCubicsGivenByOthers(live)
 	if l.parties != nil {
-		l.applyPartyNotices(l.parties.Leave(live, party.Expelled))
+		l.applyOwnPartyNotices(live, l.parties.Leave(live, party.Expelled))
 	}
 	l.unequipRestrictedItems(live)
 	ids := live.AutoSoulShotIDs()

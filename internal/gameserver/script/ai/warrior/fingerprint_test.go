@@ -9,14 +9,15 @@ import (
 
 // npcStrings are the NpcString ids the classes say: a named constant in the
 // reference, a number in Go.
-var npcStrings = []int{1000286, 1000287, 1000288, 1000290, 1000291, 1000292, 1000294, 1000307, 1000381, 1000382, 1000383, 1000384, 1000385, 1000386, 1000387, 1000388, 1000389, 1000390, 1000391, 1000392, 1000393, 1000394, 1000395, 1000396, 1000397, 1000398, 1000399, 1000400, 1000401, 1000402, 1000403, 1000404, 1000405, 1000406, 1000407, 1000408, 1000409, 1000410, 1000411, 1000412, 1000413, 1000414, 1000427, 1000428}
+var npcStrings = []int{1000286, 1000287, 1000288, 1000290, 1000291, 1000292, 1000294, 1000307, 1000381, 1000382, 1000383, 1000384, 1000385, 1000386, 1000387, 1000388, 1000389, 1000390, 1000391, 1000392, 1000393, 1000394, 1000395, 1000396, 1000397, 1000398, 1000399, 1000400, 1000401, 1000402, 1000403, 1000404, 1000405, 1000406, 1000407, 1000408, 1000409, 1000410, 1000411, 1000412, 1000413, 1000414, 1000427, 1000428, 1000452, 1800011}
 
 // TestMatchesReferenceFingerprints compares the package with the reference
 // classes: literals, engine calls and hook shapes. The panic of a berserker
 // whose template lists no fury skill stands for the reference's null
-// dereference.
+// dereference; the tyrannosaurus's failed capture message is a named
+// constant in the reference, a number in Go.
 func TestMatchesReferenceFingerprints(t *testing.T) {
-	exempt := []string{`string "warrior: a berserker's template lists no fury skill"`}
+	exempt := []string{`string "warrior: a berserker's template lists no fury skill"`, "number 2002"}
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
@@ -45,8 +46,26 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostPhysicalSpecial",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostPhysicalSpecialAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss2",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss5",
+		"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval",
+		"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimevalWalker",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecialAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecialBuffAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoison",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoisonAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastDDMagicEnchantPhysicalPoisonAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantRangePhysicalPoisonAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo",
 		"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2",
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive",
@@ -56,6 +75,12 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseNecroLongAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorDisguise",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorFlee",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecialGolemAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorTimerBomb",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorUseBow",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorUseBowNotFleeAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.CorePrivateWarriorAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagic",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagicAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.Agit02DoomServantAgit",
@@ -72,6 +97,14 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.WarriorCastingCurseAggressive.WarriorCastingCurseAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.WarriorCastingCurseAggressive.Agit02DoomKnightAgit",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.WarriorCastingCurseAggressive.CorePrivateDicor",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.WarriorCastingCurseAggressive.SpecialBloodyQueen",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.WarriorCastingEnchant",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.WarriorCastingEnchantClan",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.WarriorCastingEnchantClanAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.Agit02DoomArcherAgit",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.Agit02DoomArcherAgitParty",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.OrfenPrivateRaikel",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.Agit02DoomWarriorAgit",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderBombSpawn",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDD",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDDAggressive",
@@ -84,6 +117,8 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecialSummonAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarriorAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaGardener",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaPet",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.FreyaSecretaryLeader",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCannibaliAggressiva",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastCurseAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.FreyaBear",
@@ -102,6 +137,14 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePabelgolem",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalStone",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePriest",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePriestBuffer",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateSlowType2",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateSlowTypeMagic",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateSplit",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.QueenAntPrivateRoyalGuardAnt",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.RoyalRushPartyPrivateBomb",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.RoyalRushPartyPrivateHate",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoupleFollower.PartyPrivateCoupleFollower",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)

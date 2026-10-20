@@ -1,0 +1,26 @@
+# GludioHold's see-creature hook on a knight (35235): one that sees the character in its first
+# AI cycles leaves it alone, as its life time is not past 7 yet; once it is, it still leaves
+# alone the character it has in sight (a creature is seen once while it stays). Out of its
+# sight and back, the character is seen again, and the settled knight wants to attack it
+# with weight 200. Standing on its post with nothing to do, the knight walks there (it is
+# there already) and keeps still: GludioHold's no-desire and move-finished hooks queue a
+# do-nothing of 40, weight 30, which the cycles after wear down to 28.5.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 150 0 0 walks clan aden_siege_clan 300
+
+approach knight
+  hate knight 0
+  desires knight -
+
+tick x8
+  hate knight 0
+  desires knight nothing(40)=28.5
+
+away
+
+approach knight
+  hate knight 200
+  desires knight attack(player)=200 nothing(40)=28.5

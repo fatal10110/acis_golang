@@ -53,7 +53,7 @@ func arenaChangeID(command string) (int, bool) {
 	if len(units) < 12 {
 		return 0, false
 	}
-	n, err := commons.ParseInt(strings.TrimFunc(commons.UTF16String(units[12:]), isCtrlOrSpace), 32)
+	n, err := strconv.ParseInt(strings.TrimFunc(commons.UTF16String(units[12:]), isCtrlOrSpace), 10, 32)
 	if err != nil {
 		return 0, false
 	}
@@ -83,7 +83,7 @@ func (l *GameClientLink) enterOlympiadObserverMode(live *livePlayer, id int) {
 	}
 	l.dropAllSummons(live)
 	if l.parties != nil {
-		l.applyPartyNotices(l.parties.Leave(live, party.Expelled))
+		l.applyOwnPartyNotices(live, l.parties.Leave(live, party.Expelled))
 	}
 	live.SetOlympiadGameID(id)
 	live.Character.StandUp()

@@ -213,6 +213,8 @@ type options struct {
 	sevenSignsTimer        func(time.Duration, func()) *time.Timer
 	seedFestival           func(*gamesql.FestivalStore)
 	festivalClock          func() time.Time
+	festivalTimer          func(time.Duration, func()) *time.Timer
+	festivalConfig         *festival.Config
 	clanConfig             *clan.Config
 	seedClans              func(db *sql.DB)
 	clanHalls              *hallmodel.Table
@@ -751,6 +753,18 @@ func WithFestivalSeed(seed func(*gamesql.FestivalStore)) Option {
 // countdown on now instead of the wall clock.
 func WithFestivalClock(now func() time.Time) Option {
 	return func(o *options) { o.festivalClock = now }
+}
+
+// WithFestivalTimer schedules the Festival of Darkness's timers through
+// afterFunc instead of real timers, so a test can fire each at will.
+func WithFestivalTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
+	return func(o *options) { o.festivalTimer = afterFunc }
+}
+
+// WithFestivalConfig runs the Festival of Darkness on cfg instead of the
+// shipped settings.
+func WithFestivalConfig(cfg festival.Config) Option {
+	return func(o *options) { o.festivalConfig = &cfg }
 }
 
 // WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
@@ -2087,7 +2101,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.festivalClock != nil {
 		festivalClock = o.festivalClock
 	}
-	fest := festival.New(festival.DefaultConfig(), festivalStore, sevenSigns, o.log, festivalClock, nil)
+	festivalConfig := festival.DefaultConfig()
+	if o.festivalConfig != nil {
+		festivalConfig = *o.festivalConfig
+	}
+	fest := festival.New(festivalConfig, festivalStore, sevenSigns, o.log, festivalClock, o.festivalTimer)
 	if err := fest.Restore(context.Background(), sevenSigns.CurrentCycle()); err != nil {
 		t.Fatalf("restore festival: %v", err)
 	}
@@ -2366,7 +2384,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// armed; here the link exists only now, so a change firing earlier
 	// reaches no player, as none is online yet.
 	sevenSigns.SetOnline(gcl)
-	fest.SetWorld(gcl)
+	fest.SetWorld(gcl.FestivalWorld())
 	sevenSigns.SetCastles(gclConfig.Castles)
 	var npcSpawns *gamemanager.Npcs
 	var npcRespawns *task.Respawn

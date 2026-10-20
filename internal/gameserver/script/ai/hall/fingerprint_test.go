@@ -20,9 +20,18 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.siegablehall.Agit03Alfred",
 		"script.ai.siegablehall.Agit03Giselle",
 		"script.ai.siegablehall.Agit03Lidia",
+		"script.ai.siegablehall.AzitWateringGroud",
+		"script.ai.siegablehall.AzitWateringMimic",
+		"script.ai.siegablehall.AzitWateringMimicMagical",
+		"script.ai.siegablehall.AzitWateringRecycleCan",
+		"script.ai.siegablehall.AzitWateringTreasureBox",
+		"script.ai.siegablehall.Agit01Move1.Agit01Move1",
+		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2",
+		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1",
 	},
 		"number 1000275", "number 1000276", "number 1000277", "number 1000278", "number 1000279", "number 1000280",
 		"number 1010624", "number 1010625", "number 1010636", "number 1010637", "number 1010638",
+		"number 1800023", "number 1010639",
 		"number 16", "number 17", "number 43", "number 51", "number 52",
 	)
 	if err != nil {

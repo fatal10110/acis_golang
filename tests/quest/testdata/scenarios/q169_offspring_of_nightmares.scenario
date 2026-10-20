@@ -1,0 +1,111 @@
+# Offspring of Nightmares (Q169): a dark elven fighter of level 15 accepts at Vlasty; a dark
+# horror misses the perfect skull and drops a cracked one, and a lesser dark horror the perfect
+# skull, which moves the cond; Vlasty takes both skulls for bone gaiters and adena, twenty more
+# for the cracked skull; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q169_offspring_of_nightmares.golden
+character Nightborn 15
+class 31
+random 999999 0 0
+script quest.Q169_OffspringOfNightmares
+item 1030 1031 31 57
+page trainer/30145.htm
+page script/quest/Q169_OffspringOfNightmares/
+npc vlasty 30145 Trainer 10 0 0
+npc horror 20105 Monster 40 0 0
+npc lesser 20025 Monster 0 40 0
+
+# Vlasty: accept.
+action vlasty
+action vlasty
+  S ActionFailed
+  S NpcHtmlMessage obj=vlasty item=0 page=trainer/30145.htm
+  S ActionFailed
+bypass npc_{vlasty}_Quest
+  S NpcHtmlMessage obj=vlasty item=0 page=script/quest/Q169_OffspringOfNightmares/30145-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q169_OffspringOfNightmares CREATED
+bypass Quest Q169_OffspringOfNightmares 30145-04.htm
+  S QuestList 169:0x80000001
+  S ExShowQuestMark quest=169
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=vlasty item=0 page=script/quest/Q169_OffspringOfNightmares/30145-04.htm
+  S ActionFailed
+  Q upsert Q169_OffspringOfNightmares | <state> | STARTED
+  Q upsert Q169_OffspringOfNightmares | <cond> | 1
+  state Q169_OffspringOfNightmares STARTED
+  rows Q169_OffspringOfNightmares <cond>=1 <state>=STARTED
+action vlasty
+  S ActionFailed
+  S NpcHtmlMessage obj=vlasty item=0 page=trainer/30145.htm
+  S ActionFailed
+bypass npc_{vlasty}_Quest
+  S NpcHtmlMessage obj=vlasty item=0 page=script/quest/Q169_OffspringOfNightmares/30145-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# A dark horror: the perfect skull misses, a cracked skull drops.
+kill horror
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1030
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1030=1 1031=0
+  rows Q169_OffspringOfNightmares <cond>=1 <state>=STARTED
+action vlasty
+  S ActionFailed
+  S NpcHtmlMessage obj=vlasty item=0 page=trainer/30145.htm
+  S ActionFailed
+bypass npc_{vlasty}_Quest
+  S NpcHtmlMessage obj=vlasty item=0 page=script/quest/Q169_OffspringOfNightmares/30145-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# A lesser dark horror: the perfect skull, which moves the cond.
+kill lesser
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1031
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 169:0x80000003
+  S ExShowQuestMark quest=169
+  Q upsert Q169_OffspringOfNightmares | <cond> | 2
+  items 1030=1 1031=1
+  rows Q169_OffspringOfNightmares <cond>=2 <state>=STARTED
+
+# Vlasty: both skulls for the bone gaiters and adena; the quest completes.
+action vlasty
+  S ActionFailed
+  S NpcHtmlMessage obj=vlasty item=0 page=trainer/30145.htm
+  S ActionFailed
+bypass npc_{vlasty}_Quest
+  S NpcHtmlMessage obj=vlasty item=0 page=script/quest/Q169_OffspringOfNightmares/30145-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q169_OffspringOfNightmares 30145-08.htm
+  S SystemMessage id=302 3:1031
+  S SystemMessage id=302 3:1030
+  S SystemMessage id=54 3:31
+  S SystemMessage id=52 6:17020
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 169:0x00000000
+  S NpcHtmlMessage obj=vlasty item=0 page=script/quest/Q169_OffspringOfNightmares/30145-08.htm
+  S ActionFailed
+  Q upsert Q169_OffspringOfNightmares | <state> | COMPLETED
+  Q delete-except-state Q169_OffspringOfNightmares
+  items 1030=0 1031=0 31=1 57=17020
+  state Q169_OffspringOfNightmares COMPLETED
+  rows Q169_OffspringOfNightmares <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the rewards stay.
+relog
+  state Q169_OffspringOfNightmares COMPLETED
+  rows Q169_OffspringOfNightmares <state>=COMPLETED
+  items 31=1 57=17020
+action vlasty
+action vlasty
+  S ActionFailed
+  S NpcHtmlMessage obj=vlasty item=0 page=trainer/30145.htm
+  S ActionFailed
+bypass npc_{vlasty}_Quest
+  S NpcHtmlMessage obj=vlasty item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

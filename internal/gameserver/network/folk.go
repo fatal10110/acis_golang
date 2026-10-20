@@ -183,6 +183,10 @@ func (s *folkSink) Emit(ev event.Event) {
 		})
 	case event.SkillLaunched:
 		s.broadcast(func() wire.Frame { return frames.SkillLaunched(f.ObjectID(), e.SkillID, e.Level, e.TargetIDs) })
+	case event.ShotRecharged:
+		broadcastInRadius(s.world, f, shotRechargeRadius, func() wire.Frame {
+			return frames.SkillUse(f.ObjectID(), e.At, f.ObjectID(), e.At, e.SkillID, 1, 0, 0, false)
+		})
 	case event.SkillCanceled:
 		s.broadcast(func() wire.Frame { return frames.SkillCanceled(e.ObjectID) })
 	case event.MoveToPawn:

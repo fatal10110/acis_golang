@@ -15,7 +15,11 @@ import (
 type Group interface {
 	// Maker is the npcmaker's declaration.
 	Maker() *Maker
-	// Alive counts the group's NPCs in the world.
+	// Alive counts the group's NPCs in the world. An NPC that a respawn
+	// brought back after its spawn let it go (see GroupNPC.ScheduleRespawn)
+	// counts while it is in the world, until a DeleteAll, which leaves it
+	// in the world; leaving after that DeleteAll, it takes the count one
+	// below the NPCs in the world.
 	Alive() int
 	// Held reports whether the maker's spawn condition holds: while it
 	// does, the maker keeps its NPCs out of the world.
@@ -97,6 +101,11 @@ type GroupSpawn interface {
 	// max HP and MP, and CheckAlive reports false. Any other spawn keeps
 	// no row: asking panics.
 	CheckAlive(at Position) bool
+	// SavedX returns the X a database-tracked spawn's row holds, leaving
+	// the row as it is: where the row last placed or saved its NPC alive,
+	// 0 for a row never initialized or one saved dead. Any other spawn
+	// keeps no row: asking panics.
+	SavedX() int
 	// Spawn places one more NPC of the spawn; a database-tracked spawn
 	// comes back as its saved row says.
 	Spawn()
@@ -123,7 +132,12 @@ type GroupNPC interface {
 	SendScriptEvent(eventID, arg1, arg2 int32)
 	// ScheduleRespawn brings the NPC back once d has elapsed; nothing for
 	// a non-positive d. A respawn already pending that comes due sooner
-	// stands: the earlier of the two brings the NPC back.
+	// stands: the earlier of the two brings the NPC back. An NPC its spawn
+	// let go (its group's DeleteAll, its spawn's DeleteNPCs, or a spawn
+	// that does not respawn) comes back too, its maker's created hook run,
+	// though its spawn no longer lists it: no spawn count, list or delete
+	// reaches it, and its leaving runs no maker hook. One of a group that
+	// a despawn or respawn of every NPC replaced stays gone.
 	ScheduleRespawn(d time.Duration)
 }
 

@@ -15,7 +15,7 @@ func makers3() script.MakerCatalog {
 		"ice_fairy_sirr_maker":               maker.IceFairySirr,
 		"rhamphorhynchus_maker":              maker.Rhamphorhynchus,
 		"sailren_dummy_maker":                maker.SailrenDummy,
-		"sailren_maker":                      nil,
+		"sailren_maker":                      maker.Sailren,
 		"sculpture_garden_maker":             maker.SculptureGarden,
 		"sculpture_ice_fairy_maker":          maker.SculptureIceFairy,
 		"statue_of_shilen_maker":             maker.StatueOfShilen,

@@ -78,10 +78,17 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 //
 // An NPC that leaves during its slot's first placement, before the maker
 // counts it as one of its spawn's NPCs, is not reported to the maker, and
-// its slot stays, decayed, whatever the respawn delay.
+// its slot stays, decayed, whatever the respawn delay. A spawn that never
+// respawns drops the slot of an NPC its maker armed a respawn for anyway
+// from its list: the slot lives on as an orphan.
 func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
+	if slot.orphan {
+		n.orphanNPCDeleted(g, slot)
+		return
+	}
 	if !slot.first {
-		g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: slot.key})
+		scope := &hookScope{}
+		g.behavior.NPCDeleted(g.in(scope), groupSpawn{g: g, i: slot.spawnIdx, scope: scope}, groupNPC{n: n, slot: slot, scope: scope})
 	}
 
 	now := n.now()
@@ -89,7 +96,7 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 	defer n.mu.Unlock()
 	if slot.entry.RespawnDelay <= 0 {
 		if !slot.first {
-			n.dropGroupSlotLocked(g, slot)
+			n.unlistGroupSlotLocked(g, slot)
 		}
 		return
 	}
@@ -102,12 +109,41 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 	n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(slot.entry), now)
 }
 
-// dropGroupSlotLocked drops the slot of g. The caller holds n.mu.
-func (n *Npcs) dropGroupSlotLocked(g *makerGroup, slot slotInfo) {
+// orphanNPCDeleted answers the NPC of an orphan slot of g leaving the
+// world: no maker hook runs, it no longer counts alive, a database-tracked
+// row records a respawn time when the spawn respawns at all, and the slot
+// goes unless a respawn is armed for it.
+func (n *Npcs) orphanNPCDeleted(g *makerGroup, slot slotInfo) {
+	now := n.now()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if _, ok := n.slot[slot.key]; !ok {
 		return
 	}
+	g.orphansAlive--
+	if slot.dbName != "" && slot.entry.RespawnDelay > 0 {
+		n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(slot.entry), now)
+	}
+	if !n.respawn.Tracked(slot.key) {
+		n.dropSlotLocked(slot.key)
+	}
+}
+
+// unlistGroupSlotLocked takes the slot of g off its spawn's list: dropped,
+// or kept as an orphan, its armed respawn moved along, when a respawn is
+// armed for it. The caller holds n.mu.
+func (n *Npcs) unlistGroupSlotLocked(g *makerGroup, slot slotInfo) {
+	current, ok := n.slot[slot.key]
+	if !ok || current.serial != slot.serial {
+		return
+	}
 	n.dropSlotLocked(slot.key)
+	if deadline, armed := n.respawn.Deadline(slot.key); armed {
+		n.respawn.Cancel(slot.key)
+		if key, ok := n.adoptOrphanLocked(current); ok {
+			n.respawn.Add(key, deadline)
+		}
+	}
 	keys := g.keys[slot.spawnIdx]
 	if i := slices.Index(keys, slot.key); i >= 0 {
 		g.keys[slot.spawnIdx] = slices.Delete(keys, i, i+1)
@@ -324,7 +360,7 @@ func (n *Npcs) SyncPersistedState() {
 		n.mu.Lock()
 		slot, ok := n.slot[key]
 		n.mu.Unlock()
-		if !ok || slot.dbName == "" {
+		if !ok || slot.dbName == "" || slot.orphan {
 			continue
 		}
 		obj, ok := n.state.Object(id)

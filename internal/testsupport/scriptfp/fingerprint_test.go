@@ -2,6 +2,7 @@ package scriptfp
 
 import (
 	"bytes"
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -165,6 +166,22 @@ func TestCheckUnmappedCallAndExemptions(t *testing.T) {
 	}
 }
 
+// A row whose overloads are separate Go calls matches a call of any of its
+// names, and reports them all when the package calls none.
+func TestCheckRowWithSeveralGoNames(t *testing.T) {
+	amap := maps.Clone(fixtureAPIMap)
+	amap["Quest.playSound"] = "script.PlaySoundAt,script.PlaySound"
+	if got := fixtureCheck(t, amap, "testdata/go/q900"); len(got) != 0 {
+		t.Errorf("problems with the called name second in the list:\n%s", strings.Join(got, "\n"))
+	}
+	amap["Quest.playSound"] = "script.PlaySoundAt,script.PlaySoundTo"
+	got := fixtureCheck(t, amap, "testdata/go/q900")
+	want := []string{`quest.Q900_Fixture: call Quest.playSound is in the reference but the Go package never calls script.PlaySoundAt,script.PlaySoundTo`}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("problems:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 func TestCheckRejectsUnknownClass(t *testing.T) {
 	if _, err := check(map[string]Fingerprint{}, nil, "testdata/go/q900", []string{"quest.Missing"}, nil); err == nil {
 		t.Error("check of an unknown class succeeded")
@@ -228,16 +245,16 @@ func TestExemptCaller(t *testing.T) {
 }
 
 func TestParseAPIMapRejectsMalformedLines(t *testing.T) {
-	for _, data := range []string{"Quest.giveItems\n", "giveItems GiveItems\n", "Quest.a A\nQuest.a B\n"} {
+	for _, data := range []string{"Quest.giveItems\n", "giveItems GiveItems\n", "Quest.a A\nQuest.a B\n", "Quest.a A,\n", "Quest.a A,inline\n", "Quest.a exempt,A\n"} {
 		if _, err := parseAPIMap([]byte(data)); err == nil {
 			t.Errorf("parseAPIMap(%q) succeeded", data)
 		}
 	}
-	got, err := parseAPIMap([]byte("# comment\n\nQuest.giveItems script.GiveItems\nPlayer.getStatus inline\nClanHall.free exempt\n"))
+	got, err := parseAPIMap([]byte("# comment\n\nQuest.giveItems script.GiveItems\nPlayer.getStatus inline\nClanHall.free exempt\nDoorData.getDoor script.Door,script.DoorByID\n"))
 	if err != nil {
 		t.Fatalf("parseAPIMap: %v", err)
 	}
-	if want := map[string]string{"Quest.giveItems": "script.GiveItems", "Player.getStatus": Inline, "ClanHall.free": Exempt}; !reflect.DeepEqual(got, want) {
+	if want := map[string]string{"Quest.giveItems": "script.GiveItems", "Player.getStatus": Inline, "ClanHall.free": Exempt, "DoorData.getDoor": "script.Door,script.DoorByID"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("parseAPIMap = %v, want %v", got, want)
 	}
 }

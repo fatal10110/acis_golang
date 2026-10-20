@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -121,13 +120,13 @@ func (l *GameClientLink) saleCommand(live *livePlayer, f *npc.Folk, cl *clan.Cla
 		if len(tokens) < 2 {
 			return
 		}
-		days, err := commons.ParseInt(tokens[1], 32)
+		days, err := strconv.ParseInt(tokens[1], 10, 32)
 		if err != nil {
 			return
 		}
 		minBid := int64(0)
 		if len(tokens) > 2 {
-			if minBid, err = commons.ParseInt(tokens[2], 32); err != nil {
+			if minBid, err = strconv.ParseInt(tokens[2], 10, 32); err != nil {
 				return
 			}
 		}
@@ -171,13 +170,13 @@ func (l *GameClientLink) placeHallBid(live *livePlayer, cl *clan.Clan, tokens []
 	if len(tokens) < 2 {
 		return
 	}
-	hallID, err := commons.ParseInt(tokens[1], 32)
+	hallID, err := strconv.ParseInt(tokens[1], 10, 32)
 	if err != nil {
 		return
 	}
 	amount := int64(0)
 	if len(tokens) > 2 {
-		if amount, err = commons.ParseInt(tokens[2], 32); err != nil {
+		if amount, err = strconv.ParseInt(tokens[2], 10, 32); err != nil {
 			return
 		}
 	}
@@ -208,7 +207,7 @@ func (l *GameClientLink) showBidForm(live *livePlayer, f *npc.Folk, cl *clan.Cla
 	if val == "" {
 		return
 	}
-	hallID, err := commons.ParseInt(val, 32)
+	hallID, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
 		return
 	}
@@ -245,7 +244,7 @@ func (l *GameClientLink) showBidderList(live *livePlayer, f *npc.Folk, cl *clan.
 	hallID := int64(l.halls.BidAt(cl.ID()))
 	if val != "" {
 		var err error
-		if hallID, err = commons.ParseInt(val, 32); err != nil {
+		if hallID, err = strconv.ParseInt(val, 10, 32); err != nil {
 			return
 		}
 	}
@@ -359,7 +358,7 @@ func (l *GameClientLink) showAuctionList(live *livePlayer, f *npc.Folk, val stri
 	page := int64(1)
 	if val != "" {
 		var err error
-		if page, err = commons.ParseInt(val, 32); err != nil {
+		if page, err = strconv.ParseInt(val, 10, 32); err != nil {
 			return
 		}
 	}
@@ -395,7 +394,7 @@ func (l *GameClientLink) showAuctionInfo(live *livePlayer, f *npc.Folk, val stri
 	if val == "" {
 		return
 	}
-	hallID, err := commons.ParseInt(val, 32)
+	hallID, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
 		return
 	}

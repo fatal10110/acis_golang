@@ -1,0 +1,423 @@
+# Lizardmen's Conspiracy (Q298): a level 25 character accepts at Praga and gets the patrol report,
+# which Rohmer takes. Asked to report before the gems, Rohmer answers the not-yet page. Fifty Maille
+# lizardmen give fifty white gems and fifty Maille lizardman shamans fifty red gems (every roll pinned
+# to 0), the fiftieth red one moving the quest on; Rohmer takes them for 42000 SP, and the repeatable
+# quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q298_lizardmens_conspiracy.golden
+character Conspirator 25
+random always 0
+script quest.Q298_LizardmensConspiracy
+item 7182 7183 7184
+page guard/30333.htm
+page trainer/30344.htm
+page script/quest/Q298_LizardmensConspiracy/
+npc praga 30333 Guard 10 0 0
+npc rohmer 30344 Trainer -10 0 0
+npc white 20922 Monster 40 0 0
+npc red 20926 Monster 0 40 0
+
+# Praga: accept, and the patrol report.
+action praga
+action praga
+  S ActionFailed
+  S NpcHtmlMessage obj=praga item=0 page=guard/30333.htm
+  S ActionFailed
+bypass npc_{praga}_Quest
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q298_LizardmensConspiracy/30333-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q298_LizardmensConspiracy CREATED
+bypass Quest Q298_LizardmensConspiracy 30333-1.htm
+  S QuestList 298:0x80000001
+  S ExShowQuestMark quest=298
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7182
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q298_LizardmensConspiracy/30333-1.htm
+  S ActionFailed
+  Q upsert Q298_LizardmensConspiracy | <state> | STARTED
+  Q upsert Q298_LizardmensConspiracy | <cond> | 1
+  state Q298_LizardmensConspiracy STARTED
+  rows Q298_LizardmensConspiracy <cond>=1 <state>=STARTED
+  items 7182=1
+
+# Praga: go to Rohmer.
+action praga
+  S ActionFailed
+  S NpcHtmlMessage obj=praga item=0 page=guard/30333.htm
+  S ActionFailed
+bypass npc_{praga}_Quest
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q298_LizardmensConspiracy/30333-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rohmer: takes the report.
+action rohmer
+action rohmer
+  S ActionFailed
+  S NpcHtmlMessage obj=rohmer item=0 page=trainer/30344.htm
+  S ActionFailed
+bypass npc_{rohmer}_Quest
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q298_LizardmensConspiracy/30344-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q298_LizardmensConspiracy 30344-1.htm
+  S QuestList 298:0x80000003
+  S ExShowQuestMark quest=298
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7182
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q298_LizardmensConspiracy/30344-1.htm
+  S ActionFailed
+  Q upsert Q298_LizardmensConspiracy | <cond> | 2
+  items 7182=0
+  rows Q298_LizardmensConspiracy <cond>=2 <state>=STARTED
+
+# Rohmer: no gems yet.
+action rohmer
+  S ActionFailed
+  S NpcHtmlMessage obj=rohmer item=0 page=trainer/30344.htm
+  S ActionFailed
+bypass npc_{rohmer}_Quest
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q298_LizardmensConspiracy/30344-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q298_LizardmensConspiracy 30344-4.htm
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q298_LizardmensConspiracy/30344-4.htm
+  S ActionFailed
+  rows Q298_LizardmensConspiracy <cond>=2 <state>=STARTED
+
+# Fifty white gems and fifty red ones.
+kill white x50
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7183
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 7183=50
+kill red x50
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7184
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 298:0x80000007
+  S ExShowQuestMark quest=298
+  Q upsert Q298_LizardmensConspiracy | <cond> | 3
+  items 7184=50
+  rows Q298_LizardmensConspiracy <cond>=3 <state>=STARTED
+
+# Rohmer: the gems for 42000 SP; the quest ends.
+action rohmer
+  S ActionFailed
+  S NpcHtmlMessage obj=rohmer item=0 page=trainer/30344.htm
+  S ActionFailed
+bypass npc_{rohmer}_Quest
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q298_LizardmensConspiracy/30344-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q298_LizardmensConspiracy 30344-4.htm
+  S SystemMessage id=301 3:7183 6:50
+  S SystemMessage id=301 3:7184 6:50
+  S SystemMessage id=331 1:42000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q298_LizardmensConspiracy/30344-3.htm
+  S ActionFailed
+  Q delete-quest Q298_LizardmensConspiracy
+  items 7183=0 7184=0
+  state Q298_LizardmensConspiracy -
+  rows Q298_LizardmensConspiracy -
+
+# Relog: the quest is gone.
+relog
+  state Q298_LizardmensConspiracy -
+  rows Q298_LizardmensConspiracy -

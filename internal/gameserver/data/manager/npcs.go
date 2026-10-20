@@ -42,8 +42,21 @@ type slotInfo struct {
 	// one of its spawn's NPCs, so the maker is not told it left.
 	spawning bool
 	first    bool
-	entry    spawn.Entry
-	dbName   string
+	// orphan marks an npcmaker's slot its spawn no longer lists: its NPC
+	// came back through a respawn armed after the spawn let it go (a
+	// DeleteAll, or a spawn that does not respawn). Its group counts it
+	// alive, but no spawn count, list or delete reaches it, and its
+	// leaving runs no maker hook. It lives under a key of its own (see
+	// orphanKey), so the spawn can place an NPC of its own meanwhile.
+	orphan bool
+	// epoch is the DespawnAll run the slot was declared in.
+	epoch int
+	// serial tells an npcmaker's slot apart from any other declared under
+	// the same key: a database-tracked entry declares each of its slots
+	// under its one key.
+	serial int
+	entry  spawn.Entry
+	dbName string
 	// master is the master a private's slot spawns its NPC for, as the
 	// life it had when the slot was declared (npc.Current reads it now);
 	// nil for any other slot.
@@ -258,6 +271,11 @@ type Npcs struct {
 	// first, so a respawn armed for a slot of an earlier run never fires
 	// on the slot of the same maker entry spawned anew.
 	gen int
+	// despawns counts the DespawnAll runs: a slot declared before the
+	// last one is gone for good.
+	despawns int
+	// serials counts the npcmaker slots declared, numbering each.
+	serials int
 	// groups are the run-time npcmakers of the spawn list in use, in list
 	// order.
 	groups []*makerGroup
@@ -485,7 +503,7 @@ func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	}
 	for _, g := range groups {
 		if g.def.OnStart() {
-			g.behavior.Start(g)
+			g.behavior.Start(g.in(&hookScope{}))
 		}
 	}
 	for _, event := range n.events {

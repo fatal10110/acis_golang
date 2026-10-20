@@ -1,0 +1,55 @@
+# Echo crystals (EchoCrystal): Kantabilon's link opens the crystal list. A level 20 character
+# holding the Theme of Journey score and 300 adena trades the score's id for its crystal: 200
+# adena taken, the crystal given, the score kept. Asked again with 100 adena left it is told it
+# is short; asked for a score it does not hold, that it has none. Each answer page has no link
+# back, so the crystal list is opened again before each pick. Expectations are the
+# reference trace's (EchoCrystal.onTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/echo_crystal_kantabilon.golden
+character Singer 20
+hold 4410 1
+hold 57 300
+script script.feature.EchoCrystal
+item 4409 4410 4411
+page default/31042.htm
+page script/feature/EchoCrystal/
+npc kanta 31042 Folk 10 0 0
+
+action kanta
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest EchoCrystal
+  S NpcHtmlMessage obj=kanta item=0 page=script/feature/EchoCrystal/1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest EchoCrystal 4410
+  S SystemMessage id=672 1:200
+  S SystemMessage id=54 3:4411
+  S NpcHtmlMessage obj=kanta item=0 page=script/feature/EchoCrystal/31042-01.htm
+  S ActionFailed
+  items 57=100 4410=1 4411=1
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest EchoCrystal
+  S NpcHtmlMessage obj=kanta item=0 page=script/feature/EchoCrystal/1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest EchoCrystal 4410
+  S NpcHtmlMessage obj=kanta item=0 page=script/feature/EchoCrystal/31042-02.htm
+  S ActionFailed
+  items 57=100 4410=1 4411=1
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest EchoCrystal
+  S NpcHtmlMessage obj=kanta item=0 page=script/feature/EchoCrystal/1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest EchoCrystal 4409
+  S NpcHtmlMessage obj=kanta item=0 page=script/feature/EchoCrystal/31042-06.htm
+  S ActionFailed
+  items 57=100 4409=0 4411=1

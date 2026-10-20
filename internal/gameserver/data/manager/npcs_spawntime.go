@@ -78,7 +78,7 @@ func (n *Npcs) spawnTimeHeld(kind spawn.SpawnTimeKind, params []string) bool {
 func (n *Npcs) StartSpawnTime(name string, args ...string) int {
 	total := 0
 	for _, g := range n.spawnTimeGroups(name, args) {
-		g.behavior.Start(g)
+		g.behavior.Start(g.in(&hookScope{}))
 		total += g.Alive()
 	}
 	n.log.Info().Str("spawn_time", name).Strs("params", args).Int("npcs", total).Msg("spawned spawn-time npcs")

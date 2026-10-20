@@ -9,12 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// A GameClientLink reaches the players and clans as the festival's periods
-// change.
-var _ festival.World = (*GameClientLink)(nil)
-
-// RewardClanOf implements festival.World: the clan of the character named
-// name earns points of reputation, shown to its members online as any
+// RewardClanOf is the festival world's RewardClanOf: the clan of the
+// character named name earns points of reputation, shown to its members online as any
 // reputation change is, then each is told that name earned them in the
 // festival. A character online answers for its own clan; any other name is
 // looked up, in any case, in the clans' rosters. The message goes out even
@@ -68,9 +64,9 @@ func (l *GameClientLink) clanNamed(name string) (*clan.Clan, bool) {
 	return nil, false
 }
 
-// RemoveBloodOfferings implements festival.World: every player online,
-// on its own queue, loses the blood offerings it carries, told only by its
-// inventory update.
+// RemoveBloodOfferings is the festival world's RemoveBloodOfferings:
+// every player online, on its own queue, loses the blood offerings it
+// carries, told only by its inventory update.
 func (l *GameClientLink) RemoveBloodOfferings() {
 	l.onEachLivePlayer(func(live *livePlayer) {
 		if inv := live.Inventory(); inv != nil {

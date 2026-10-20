@@ -1,0 +1,32 @@
+# Possessor of a Precious Soul - 2 (Q242), started on a subclass (cond 9, the cornerstones) and
+# played on the base class: Kalis answers the no-quest page, and a Restrainer of Glory killed on
+# the base class gives no Orb of Binding. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q242_possessor_of_a_precious_soul_base_class_started.golden
+character Fighter 76
+class 2
+quest Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9
+script quest.Q242_PossessorOfAPreciousSoul
+item 7595
+page default/30759.htm
+page script/quest/Q242_PossessorOfAPreciousSoul/
+npc kalis 30759 Folk -20 20 0
+npc restrainer 27317 Monster 40 0 0
+
+# Kalis has nothing for the base class, though the quest waits at the cornerstones.
+action kalis
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9
+
+# A Restrainer of Glory killed on the base class leaves no orb.
+kill restrainer
+  S SystemMessage id=95 1:0 1:0
+  items 7595=0
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9

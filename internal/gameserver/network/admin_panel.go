@@ -1,7 +1,8 @@
 package network
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons"
+	"strconv"
+
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -74,14 +75,13 @@ func isDigits(s string) bool {
 	return true
 }
 
-// parseInt32 parses s as a signed decimal int: an optional ASCII sign,
-// then decimal digits, any Basic Multilingual Plane decimal digit included
-// (fullwidth, Arabic-Indic and the like), in int32 range.
+// parseInt32 parses s as a signed decimal int: an optional sign, then
+// ASCII decimal digits, in int32 range.
 func parseInt32(s string) (int32, bool) {
 	if s == "" || s == "+" || s == "-" {
 		return 0, false
 	}
-	v, err := commons.ParseInt(s, 32)
+	v, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
 		return 0, false
 	}

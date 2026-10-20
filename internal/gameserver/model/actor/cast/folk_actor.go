@@ -61,10 +61,13 @@ func (a FolkActor) PhysicalMuted() bool {
 	return a.Folk.EffectList().IsAffected(effect.FlagPhysicalMuted)
 }
 
-// A civilian NPC charges no shots, has no skill mastery, carries no items,
-// cubics, ground signet, skill lock or charges.
-func (FolkActor) SpiritshotCharged() bool                 { return false }
-func (FolkActor) BlessedSpiritshotCharged() bool          { return false }
+// SpiritshotCharged and BlessedSpiritshotCharged report the NPC's
+// spiritshot charges.
+func (a FolkActor) SpiritshotCharged() bool        { return a.Folk.SpiritshotCharged() }
+func (a FolkActor) BlessedSpiritshotCharged() bool { return a.Folk.BlessedSpiritshotCharged() }
+
+// A civilian NPC has no skill mastery, carries no items, cubics, ground
+// signet, skill lock or charges.
 func (FolkActor) SkillMastery(modelskill.Definition) bool { return false }
 func (FolkActor) ItemCount(int) int                       { return 0 }
 func (FolkActor) ConsumeItem(int, int) bool               { return false }

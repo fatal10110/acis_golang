@@ -30,10 +30,10 @@ func TestEncodeCommandsCutsAt255CodeUnits(t *testing.T) {
 		t.Fatalf("EncodeCommands length %d, want the first 255 chars", len(got))
 	}
 	// A supplementary character counts two code units: 248 + 6 ASCII
-	// fields = 254 units, so the pair would end at 256; the cut keeps its
-	// leading surrogate D83D on its own (three-byte form ED A0 BD).
+	// fields = 254 units, so the pair would end at 256; the cut leaves its
+	// leading unit as U+FFFD.
 	pair := EncodeCommands([]Command{{Type: 1, D1: 2, D2: 3, Text: strings.Repeat("b", 248) + "\U0001F600"}})
-	if want := "1,2,3," + strings.Repeat("b", 248) + "\xED\xA0\xBD"; pair != want {
+	if want := "1,2,3," + strings.Repeat("b", 248) + "\uFFFD"; pair != want {
 		t.Fatalf("cut through a surrogate pair = %q, want %q", pair, want)
 	}
 }

@@ -11,9 +11,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/guard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monsterbehavior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/royalrush"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/siegeguard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
@@ -80,8 +83,19 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.MonsterAI":                                                monster.New,
 	"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                              warrior.Warrior,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive": warrior.Cast2SkillsApproachAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorTimerBomb":                     warrior.TimerBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive":  warrior.Aggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":             warrior.Medusa,
 	"script.ai.individual.Monster.WarriorBase.WarriorBase":                                  warrior.Base,
 	"script.ai.individual.Monster.WarriorHero":                                              monster.WarriorHero,
+	"script.ai.individual.Guard.Guard":                                                      guard.Guard,
+	"script.ai.individual.Guard.GuardFixed":                                                 guard.Fixed,
+	"script.ai.individual.Guard.GuardMoveAround":                                            guard.MoveAround,
+	"script.ai.individual.Guard.GuardMoveAroundFixed":                                       guard.MoveAroundFixed,
+	"script.ai.individual.Guard.GuardStand":                                                 guard.Stand,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict":                             royalrush.Afflict,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc":                          royalrush.DefaultNpc,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox":                          royalrush.TreasureBox,
 	"script.ai.individual.RoyalRushMissionNpc":                                              individual.RoyalRushMissionNpc,
 	"script.ai.individual.WarriorPetForPC":                                                  individual.WarriorPetForPC,
 	"script.ai.siegablehall.Agit02Dietrich":                                                 hall.Dietrich,
@@ -90,11 +104,47 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegablehall.Agit03Alfred":                                                   hall.Alfred,
 	"script.ai.siegablehall.Agit03Giselle":                                                  hall.Giselle,
 	"script.ai.siegablehall.Agit03Lidia":                                                    hall.Lidia,
+	"script.ai.siegablehall.AzitWateringGroud":                                              hall.Gourd,
+	"script.ai.siegablehall.AzitWateringMimic":                                              hall.Mimic,
+	"script.ai.siegablehall.AzitWateringMimicMagical":                                       hall.MimicMagical,
+	"script.ai.siegablehall.AzitWateringRecycleCan":                                         hall.RecycleCan,
+	"script.ai.siegablehall.AzitWateringTreasureBox":                                        hall.TreasureBox,
+	"script.ai.siegablehall.Agit01Move1.Agit01Move1":                                        hall.Move1,
+	"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2":                            hall.PartisanSorcerer2,
+	"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1":                    hall.PartisanHealer1,
+	"script.ai.siegeguards.GludioCleric":                                                    siegeguard.Cleric,
+	"script.ai.siegeguards.GludioClericStand":                                               siegeguard.ClericStand,
+	"script.ai.siegeguards.GludioHold.GludioBowGuard":                                       siegeguard.BowGuard,
+	"script.ai.siegeguards.GludioHold.GludioCourtGuard":                                     siegeguard.CourtGuard,
+	"script.ai.siegeguards.GludioHold.GludioDukeLewinWaldner":                               siegeguard.DukeLewinWaldner,
 	"script.ai.siegeguards.GludioHold.GludioHold":                                           siegeguard.Hold,
+	"script.ai.siegeguards.GludioHold.GludioKnight":                                         siegeguard.Knight,
 	"script.ai.siegeguards.GludioHold.GludioSwordGuard":                                     siegeguard.SwordGuard,
 	"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill":                             siegeguard.SwordGuardUseSkill,
+	"script.ai.siegeguards.GludioWizardStand":                                               siegeguard.WizardStand,
 	"script.ai.siegeguards.GludioWizard.GludioWizard":                                       siegeguard.Wizard,
 	"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill":                               siegeguard.WizardUseSkill,
+
+	// The Four Sepulchers bombs and room bosses, and the tyrannosaurus.
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb":                   warrior.RoyalRushBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb":            warrior.RoyalRushHereticBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2":           warrior.RoyalRushHereticBomb2,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic": warrior.RoyalRushRoomBossBasic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1":     warrior.RoyalRushRoomBoss1,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4":     warrior.RoyalRushRoomBoss4,
+	"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":               warrior.TyrannoPrimeval,
+
+	// The DD magic physical specials and the physical poisons.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial":                warrior.CastDDMagicPhysicalSpecial,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecialBuffAggressive":  warrior.CastDDMagicPhysicalSpecialBuffAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoison":                  warrior.CastEnchantPhysicalPoison,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoisonAggressive":        warrior.CastEnchantPhysicalPoisonAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastDDMagicEnchantPhysicalPoisonAggressive": warrior.CastDDMagicEnchantPhysicalPoisonAggressive,
+
+	// The MonsterBehavior chain.
+	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                              monsterbehavior.MonsterBehavior,
+	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                monsterbehavior.WizardBehavior,
+	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill": monsterbehavior.WizardUseSkill,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios

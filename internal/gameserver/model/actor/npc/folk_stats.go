@@ -191,13 +191,8 @@ func (f *Folk) AttackType() item.WeaponType {
 	return f.fight.weapon.Type
 }
 
-// SoulshotCharged reports false: nothing charges a civilian NPC's shots.
-func (f *Folk) SoulshotCharged() bool { return false }
-
-// SpiritshotCharged reports false: a civilian NPC never casts.
-func (f *Folk) SpiritshotCharged() bool { return false }
-
-// BlessedSpiritshotCharged reports false: a civilian NPC never casts.
+// BlessedSpiritshotCharged reports false: an NPC charges plain spiritshots
+// only.
 func (f *Folk) BlessedSpiritshotCharged() bool { return false }
 
 // WeaponGradePenalty reports false: NPCs carry no weapon grade.

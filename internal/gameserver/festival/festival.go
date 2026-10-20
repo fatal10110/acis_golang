@@ -8,11 +8,13 @@
 // persists them; and it runs the festival schedule during the competition
 // period, which the Seven Signs period changes start, stop and reset.
 //
-// The festival guides and witches answer the pages that read the scores
-// and bonuses, and pay out the bonuses during seal validation. The
-// festival run itself is not in place yet (#3957): parties cannot sign up,
-// so no festival ever runs, no score is ever set and no bonus ever
-// accumulates; the schedule still counts down to each next festival.
+// Parties sign up at the festival guides, paying seal stones into the
+// festival's bonus. Each festival cycle, once the signup period is over,
+// the parties signed up are taken into their arenas, where waves of
+// monsters leave blood offerings to their leaders; at the end they are
+// taken back, and each leader may register the party's offerings as its
+// score. The guides and witches also answer the pages that read the scores
+// and bonuses, and pay out the bonuses during seal validation.
 package festival
 
 import (
@@ -70,9 +72,8 @@ type Store interface {
 	SaveStatus(ctx context.Context, status Status) error
 }
 
-// World is how the festival reaches the players and clans as the Seven
-// Signs periods change. Its methods are called without the festival's lock
-// held.
+// World is how the festival reaches the players, clans and arenas. Its
+// methods are called without the festival's lock held.
 type World interface {
 	// RewardClanOf adds points to the reputation of the clan of the
 	// character named name, online or not, and tells the clan's members
@@ -83,7 +84,48 @@ type World interface {
 	// RemoveBloodOfferings destroys every blood offering the players
 	// online carry, without a word, and returns once it is done.
 	RemoveBloodOfferings()
+	// Shout shouts text, spoken by sender, to every player inside the
+	// oracles' peace zones.
+	Shout(sender, text string)
+	// Locate returns where the player objectID stands; false when it is
+	// not in the world.
+	Locate(objectID int32) (Spot, bool)
+	// Admit takes the player objectID into an arena at (x, y, z): it stops
+	// what it does and lands within 20 of the point, its effects end but
+	// for those lasting through death, and the blood offerings it carries
+	// are destroyed, telling it. A player not in the world is skipped.
+	Admit(objectID int32, x, y, z int)
+	// Relocate takes the player objectID out of its arena: it stops what
+	// it does and lands within 20 of at, or in the nearest town when at
+	// is nil, and is told it was removed from the arena. A player not in
+	// the world is skipped.
+	Relocate(objectID int32, at *Spot)
+	// Tell sends the player objectID text as a plain message.
+	Tell(objectID int32, text string)
+	// Settle returns once everything Admit, Relocate and Tell did so far
+	// to each player of objectIDs in the world has been carried out. It
+	// must not be called on a player's queue.
+	Settle(objectIDs []int32)
+	// SpawnWitch places the witch npcID at s and shows its arrival, two
+	// casts on itself; false when it could not be placed.
+	SpawnWitch(npcID int, s Spot) (NPC, bool)
+	// Say has n say text to the players around it.
+	Say(n NPC, text string)
+	// SpawnMonster places the monster npcID at (x, y, z) facing a random
+	// way, its kills worth bonus blood offerings; false when it could not
+	// be placed. It never respawns.
+	SpawnMonster(npcID, x, y, z, bonus int) (NPC, bool)
+	// Swarm has n, when it is alive and idle, run to (x, y, z).
+	Swarm(n NPC, x, y, z int)
+	// Unspawn deletes n, alive or dead, unless it has left the world.
+	Unspawn(n NPC)
 }
+
+// Spot is a point and a heading.
+type Spot struct{ X, Y, Z, Heading int }
+
+// NPC is an NPC the festival placed in an arena.
+type NPC interface{ ObjectID() int32 }
 
 // BloodOfferingID is the blood offering, the item the festival's monsters
 // leave and its scores are counted in.
@@ -93,10 +135,17 @@ const BloodOfferingID = 5901
 // best-ever party earns for the clan as the competition ends.
 const highestRankedReward = 100
 
-// Calendar is the Seven Signs calendar the festival follows.
+// Calendar is the Seven Signs calendar the festival follows and scores
+// into.
 type Calendar interface {
 	CurrentPeriod() sevensigns.Period
 	NextChange() time.Time
+	// AddFestivalScore raises cabal's festival score by amount, at the
+	// rival's expense.
+	AddFestivalScore(cabal sevensigns.Cabal, amount int)
+	// SaveStatus writes the Seven Signs status, the festival's columns
+	// with it.
+	SaveStatus(ctx context.Context) error
 }
 
 // Config is the festival schedule's events.properties settings.
@@ -109,12 +158,25 @@ type Config struct {
 	// CycleLength is the length of a whole festival cycle: the signup
 	// period, the festival and a minute's pause.
 	CycleLength time.Duration
+	// MinPlayers is the fewest members a party signs up with and keeps
+	// its run with, 2 to 9.
+	MinPlayers int
+	// FirstSpawn is when, counted from a festival's start, its first
+	// monsters appear; FirstSwarm when they rush the arena's center;
+	// SecondSpawn when the archers join; SecondSwarm when everything
+	// rushes the center again; ChestSpawn when the chests appear.
+	FirstSpawn, FirstSwarm, SecondSpawn, SecondSwarm, ChestSpawn time.Duration
 }
 
 // DefaultConfig returns the shipped settings: the first cycle two minutes
-// after the start, 18-minute festivals in 38-minute cycles.
+// after the start, 18-minute festivals in 38-minute cycles, parties of at
+// least five, monsters at 2 minutes rushing at 5, archers at 9, the second
+// rush at 12 and chests at 15.
 func DefaultConfig() Config {
-	return Config{ManagerStart: 2 * time.Minute, Length: 18 * time.Minute, CycleLength: 38 * time.Minute}
+	return Config{
+		ManagerStart: 2 * time.Minute, Length: 18 * time.Minute, CycleLength: 38 * time.Minute, MinPlayers: 5,
+		FirstSpawn: 2 * time.Minute, FirstSwarm: 5 * time.Minute, SecondSpawn: 9 * time.Minute, SecondSwarm: 12 * time.Minute, ChestSpawn: 15 * time.Minute,
+	}
 }
 
 // signup is how long parties may sign up before each festival.
@@ -152,6 +214,7 @@ type Manager struct {
 	// plus Count for Dawn's.
 	scores map[int]map[int]Score
 	schedule
+	run
 }
 
 // New returns a festival persisting through store and following calendar.
@@ -164,7 +227,9 @@ func New(cfg Config, store Store, calendar Calendar, log zerolog.Logger, now fun
 	if afterFunc == nil {
 		afterFunc = time.AfterFunc
 	}
-	return &Manager{cfg: cfg, store: store, calendar: calendar, now: now, afterFunc: afterFunc, log: log, scores: map[int]map[int]Score{}}
+	m := &Manager{cfg: cfg, store: store, calendar: calendar, now: now, afterFunc: afterFunc, log: log, scores: map[int]map[int]Score{}}
+	m.run = newRun()
+	return m
 }
 
 // SetWorld hands the festival the players and clans its period changes
@@ -243,13 +308,15 @@ func (m *Manager) overallHighestLocked(festivalID int) (Score, bool) {
 }
 
 // CycleBegun resets the festival for the Seven Signs cycle that began: no
-// festival cycle run, no bonus accumulated, and a blank score for each
-// festival and cabal, saved with every stored score. Then every blood
-// offering left on the players online is destroyed.
+// festival cycle run, no bonus accumulated, no party signed up or waiting
+// to register its score, and a blank score for each festival and cabal,
+// saved with every stored score. Then every blood offering left on the
+// players online is destroyed.
 func (m *Manager) CycleBegun(cycle int) {
 	m.mu.Lock()
 	m.status = Status{}
 	m.signsCycle = cycle
+	m.resetParticipantsLocked()
 	blank := make(map[int]Score, 2*Count)
 	for id := range Count {
 		for _, cabal := range [...]sevensigns.Cabal{sevensigns.Dusk, sevensigns.Dawn} {

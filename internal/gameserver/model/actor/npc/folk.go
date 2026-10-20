@@ -116,6 +116,7 @@ type Folk struct {
 
 	cast  folkCast
 	fight folkFight
+	shots folkShots
 
 	// observerGroups are the viewpoint groups a broadcasting tower offers;
 	// see folk_observer.go.
@@ -155,7 +156,12 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	if err != nil {
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
+	soul, spirit, err := shotCounts(inst.Template)
+	if err != nil {
+		return nil, err
+	}
 	f := &Folk{Instance: inst, spawnBinding: newSpawnBinding(inst.Template)}
+	f.shots.soul, f.shots.spirit = soul, spirit
 	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()
 	f.fight.aggro = attackable.NewThreatTable(f, f.now)

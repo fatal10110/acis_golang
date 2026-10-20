@@ -25,6 +25,7 @@ import net.sf.l2j.commons.pool.ThreadPool;
 import net.sf.l2j.commons.random.Rnd;
 
 import net.sf.l2j.Config;
+import net.sf.l2j.gameserver.data.manager.CastleManager;
 import net.sf.l2j.gameserver.data.manager.CoupleManager;
 import net.sf.l2j.gameserver.data.manager.DerbyTrackManager;
 import net.sf.l2j.gameserver.data.manager.FishingChampionshipManager;
@@ -42,6 +43,7 @@ import net.sf.l2j.gameserver.data.xml.ScriptData;
 import net.sf.l2j.gameserver.enums.CabalType;
 import net.sf.l2j.gameserver.enums.EventHandler;
 import net.sf.l2j.gameserver.enums.SealType;
+import net.sf.l2j.gameserver.enums.SiegeSide;
 import net.sf.l2j.gameserver.enums.actors.ClassId;
 import net.sf.l2j.gameserver.enums.actors.NpcSkillType;
 import net.sf.l2j.gameserver.enums.actors.Sex;
@@ -55,6 +57,7 @@ import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
 import net.sf.l2j.gameserver.model.pledge.Clan;
+import net.sf.l2j.gameserver.model.residence.castle.Castle;
 import net.sf.l2j.gameserver.model.spawn.Spawn;
 import net.sf.l2j.gameserver.network.GameClient;
 import net.sf.l2j.gameserver.network.GameClient.GameClientState;
@@ -77,7 +80,8 @@ import net.sf.l2j.gameserver.taskmanager.GameTimeTaskManager;
  * Quest scenario traces: each scenario file of the Go quest suite whose {@code trace} line names
  * a file under {@code oracle/scenarios/} is played here, from the scenario itself, and its trace
  * is written to that file. The header sets the player up as the Go runner does (name, level,
- * class, the subclass it plays, a led clan of the given level, quest rows, the script draws of the random line) and
+ * class, the subclass it plays, a led clan of the given level and its side of a castle's siege, quest rows, the script
+ * draws of the random line) and
  * spawns each NPC line's NPC at its offset from the player, who stands where the Go fixture
  * character enters the world. The hold, equip, standing, pk, cabal and festival lines are seeded
  * as the Go runner seeds them. The NPCs keep only the bindings of the scenario's script and stub
@@ -154,6 +158,8 @@ final class ScenarioTrace
 	private int _subclass;
 	private int _subclassLevel;
 	private int _clan = -1;
+	/** The siege line's castle id and side; null for none. */
+	private String[] _siege;
 	private int[] _draws;
 	private boolean _always;
 	private final List<int[]> _holds = new ArrayList<>();
@@ -292,7 +298,8 @@ final class ScenarioTrace
 		/**
 		 * Removes from the world every object of an id the scenario drew, wherever it stands (an NPC
 		 * a script spawned away from the player), and drops the registry entries keyed by one (the
-		 * clan, the character's Seven Signs sign-up and raid points). Fails on an object still in the
+		 * clan, its siege registrations and castle, the character's Seven Signs sign-up and raid
+		 * points). Fails on an object still in the
 		 * world: the next scenario's object of that id would not enter it.
 		 */
 		@SuppressWarnings("unchecked")
@@ -311,6 +318,12 @@ final class ScenarioTrace
 			}
 			ThreadPool.cancelAll();
 			((Map<Integer, ?>) field(ClanTable.class, ClanTable.getInstance(), "_clans")).keySet().removeIf(this::drawn);
+			for (Castle castle : CastleManager.getInstance().getCastles())
+			{
+				castle.getSiege().getRegisteredClans().keySet().removeIf(c -> drawn(c.getClanId()));
+				if (drawn(castle.getOwnerId()))
+					castle.setOwnerId(0);
+			}
 			((Map<Integer, ?>) field(SevenSignsManager.class, SevenSignsManager.getInstance(), "_playersData")).keySet().removeIf(this::drawn);
 			((Map<Integer, ?>) field(RaidPointManager.class, RaidPointManager.getInstance(), "_entries")).keySet().removeIf(this::drawn);
 			final List<String> kept = new ArrayList<>();
@@ -354,6 +367,11 @@ final class ScenarioTrace
 					_subclassLevel = Integer.parseInt(f[2]);
 				}
 				case "clan" -> _clan = Integer.parseInt(f[1]);
+				case "siege" -> _siege = new String[]
+				{
+					f[1],
+					f[2]
+				};
 				case "quest" -> _quests.add(f);
 				case "random" ->
 				{
@@ -478,7 +496,11 @@ final class ScenarioTrace
 			if (clan == null)
 				throw new IllegalStateException(_name + ": the clan line's clan was not created");
 			clan.changeLevel(_clan);
+			if (_siege != null)
+				siege(clan);
 		}
+		else if (_siege != null)
+			throw new IllegalStateException(_name + ": a siege line needs a clan line");
 		for (String[] q : _quests)
 		{
 			final Quest quest = ScriptData.getInstance().getQuest(q[1]);
@@ -514,6 +536,29 @@ final class ScenarioTrace
 			throw new IllegalStateException(_name + ": the subclass line's subclass is not played");
 	}
 
+	/**
+	 * The siege line: the clan registered on that side of the castle's siege, as the reference's
+	 * siege restore leaves a stored registration; an owner clan is the castle's owner, on its
+	 * siege's owner side, as the castle and clan restores leave a stored ownership.
+	 */
+	private void siege(Clan clan)
+	{
+		final Castle castle = CastleManager.getInstance().getCastleById(Integer.parseInt(_siege[0]));
+		if (castle == null)
+			throw new IllegalStateException(_name + ": no castle " + _siege[0]);
+		final SiegeSide side = SiegeSide.valueOf(_siege[1].toUpperCase());
+		if (side == SiegeSide.OWNER)
+		{
+			castle.setOwnerId(clan.getClanId());
+			clan.setCastle(castle.getId());
+			castle.getSiege().getRegisteredClans().put(clan, SiegeSide.OWNER);
+		}
+		else
+			castle.getSiege().registerClan(clan, side);
+		if (castle.getSiege().getSide(clan) != side)
+			throw new IllegalStateException(_name + ": the siege line's clan is not on the " + side + " side");
+	}
+	
 	/** The hold, equip, standing, pk, cabal and festival lines, as the Go runner seeds them. */
 	private void holdings(Player player) throws Exception
 	{

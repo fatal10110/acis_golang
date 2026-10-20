@@ -295,15 +295,15 @@ func TestScriptCreatedHooksRunAtBootBeforeTheMakerHook(t *testing.T) {
 	executors(t, func(t *testing.T, opts ...gameservertest.Option) {
 		w := bootLife(t, opts...)
 
-		// The npcmakers start in name order.
+		// The npcmakers start in declaration order.
 		want := []string{
-			"recorder created 21203 decayed=false",
-			"recorder created 21202 decayed=false",
-			"recorder decayed 21202 decayed=true",
-			"selfdel created 21204 decayed=false",
-			"selfdel deleted 21204 decayed=true",
 			"recorder created 21201 decayed=false",
 			"watcher created 21201 decayed=false",
+			"recorder created 21202 decayed=false",
+			"recorder decayed 21202 decayed=true",
+			"recorder created 21203 decayed=false",
+			"selfdel created 21204 decayed=false",
+			"selfdel deleted 21204 decayed=true",
 		}
 		if got := w.log.take(); !slices.Equal(got, want) {
 			t.Fatalf("boot hooks =\n%q\nwant\n%q", got, want)

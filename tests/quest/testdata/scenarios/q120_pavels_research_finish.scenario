@@ -1,0 +1,311 @@
+# Pavel's Research (Q120), cond 19 to the end: the stones send the character to the west weather
+# master, whose riddles end at cond 22 (his cast at the character is
+# q120_pavels_research_west_cast); the stones give the heart of Atlanta, Wendy takes it and gives
+# her necklace, and Yumi takes the necklace for the earring of binding; then relog. Q114 is a
+# completed stub, so the stones, Wendy and Yumi go through the quest chooser. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q120_pavels_research_finish.golden
+character Researcher 50
+quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
+quest Q120_PavelsResearch <cond>=19 <state>=STARTED talk=0 talk1=0
+stub quest.Q114_ResurrectionOfAnOldManager
+script quest.Q120_PavelsResearch
+item 8058 8059 8060 8290 8291 8292 854
+page default/32046.htm
+page default/32047.htm
+page default/32041.htm
+page default/32042.htm
+page default/32043.htm
+page default/32044.htm
+page default/32045.htm
+page script/quest/Q120_PavelsResearch/
+npc stones 32046 Folk 10 0 0
+npc wendy 32047 Folk 20 0 0
+npc yumi 32041 Folk 30 0 0
+npc north 32042 Folk 0 10 0
+npc east 32043 Folk 0 20 0
+npc west 32044 Folk 0 30 0
+npc shelf 32045 Folk -10 0 0
+
+# The stones.
+action stones
+action stones
+  S ActionFailed
+  S NpcHtmlMessage obj=stones item=0 page=default/32046.htm
+  S ActionFailed
+bypass npc_{stones}_Quest
+  S NpcHtmlMessage obj=stones item=0 html="<html><body><a action=\"bypass -h npc_{stones}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager (Done)]</a><br><a action=\"bypass -h npc_{stones}_Quest Q120_PavelsResearch\">[Pavel's Research (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{stones}_Quest Q120_PavelsResearch
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-31.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32046-32.htm
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-32.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32046-33.htm
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-33.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32046-34.htm
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-34.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32046-35.htm
+  S QuestList 114:0x00000000 120:0x800fffff
+  S ExShowQuestMark quest=120
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-35.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <cond> | 20
+
+# The west weather master: a wrong answer first, then both right.
+action west
+action west
+  S ActionFailed
+  S NpcHtmlMessage obj=west item=0 page=default/32044.htm
+  S ActionFailed
+bypass npc_{west}_Quest
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-02.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-02.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-04.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-04.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-05.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-05.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-06.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-03.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-02.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-02.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch w3_1
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-04.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | talk | 1
+bypass Quest Q120_PavelsResearch w3_2
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-05.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | talk1 | 1
+bypass Quest Q120_PavelsResearch 32044-06.htm
+  S QuestList 114:0x00000000 120:0x801fffff
+  S ExShowQuestMark quest=120
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=0 file=AmbSound.ac_percussion_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-06.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <cond> | 21
+  Q upsert Q120_PavelsResearch | talk | 0
+  Q upsert Q120_PavelsResearch | talk1 | 0
+action west
+  S ActionFailed
+  S NpcHtmlMessage obj=west item=0 page=default/32042.htm
+  S ActionFailed
+bypass npc_{west}_Quest
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-07.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-07.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-08.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-08.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-09.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-09.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | talk | 1
+bypass Quest Q120_PavelsResearch 32044-08.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-08.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-10.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-10.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | talk1 | 1
+bypass Quest Q120_PavelsResearch 32044-08.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-11.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-12.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-12.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-13.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-13.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-14.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-14.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-15.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-15.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-16.htm
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-16.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32044-17.htm
+  S QuestList 114:0x00000000 120:0x803fffff
+  S ExShowQuestMark quest=120
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=0 file=AmbSound.ed_drone_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-17.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <cond> | 22
+  Q upsert Q120_PavelsResearch | talk | 0
+  Q upsert Q120_PavelsResearch | talk1 | 0
+
+# The stones give the heart of Atlanta.
+action stones
+action stones
+  S ActionFailed
+  S NpcHtmlMessage obj=stones item=0 page=default/32046.htm
+  S ActionFailed
+bypass npc_{stones}_Quest
+  S NpcHtmlMessage obj=stones item=0 html="<html><body><a action=\"bypass -h npc_{stones}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager (Done)]</a><br><a action=\"bypass -h npc_{stones}_Quest Q120_PavelsResearch\">[Pavel's Research (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{stones}_Quest Q120_PavelsResearch
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-37.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32046-38.htm
+  S QuestList 114:0x00000000 120:0x807fffff
+  S ExShowQuestMark quest=120
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8291
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-38.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <cond> | 23
+  items 8291=1
+
+# Wendy takes it and gives her necklace.
+action wendy
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body><a action=\"bypass -h npc_{wendy}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager (Done)]</a><br><a action=\"bypass -h npc_{wendy}_Quest Q120_PavelsResearch\">[Pavel's Research (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{wendy}_Quest Q120_PavelsResearch
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-21.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-22.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-22.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-23.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-23.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-24.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-24.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-25.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-25.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-26.htm
+  S QuestList 114:0x00000000 120:0x80ffffff
+  S ExShowQuestMark quest=120
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8291
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-26.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <cond> | 24
+  items 8291=0
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body><a action=\"bypass -h npc_{wendy}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager (Done)]</a><br><a action=\"bypass -h npc_{wendy}_Quest Q120_PavelsResearch\">[Pavel's Research (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{wendy}_Quest Q120_PavelsResearch
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-26.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-27.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-27.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-28.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-28.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-29.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-29.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-30.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-30.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-31.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-31.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32047-32.htm
+  S QuestList 114:0x00000000 120:0x81ffffff
+  S ExShowQuestMark quest=120
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8292
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q120_PavelsResearch/32047-32.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <cond> | 25
+  items 8292=1
+
+# Yumi takes the necklace for the earring.
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body><a action=\"bypass -h npc_{yumi}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager (Done)]</a><br><a action=\"bypass -h npc_{yumi}_Quest Q120_PavelsResearch\">[Pavel's Research (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{yumi}_Quest Q120_PavelsResearch
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q120_PavelsResearch/32041-26.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32041-27.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q120_PavelsResearch/32041-27.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32041-28.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q120_PavelsResearch/32041-28.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32041-29.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q120_PavelsResearch/32041-29.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32041-30.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q120_PavelsResearch/32041-30.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32041-31.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q120_PavelsResearch/32041-31.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32041-32.htm
+  S SystemMessage id=302 3:8292
+  S SystemMessage id=54 3:854
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 114:0x00000000 120:0x00000000
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q120_PavelsResearch/32041-32.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <state> | COMPLETED
+  Q delete-except-state Q120_PavelsResearch
+  state Q120_PavelsResearch COMPLETED
+  rows Q120_PavelsResearch <state>=COMPLETED
+  items 8292=0 854=1
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body><a action=\"bypass -h npc_{yumi}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager (Done)]</a><br><a action=\"bypass -h npc_{yumi}_Quest Q120_PavelsResearch\">[Pavel's Research (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{yumi}_Quest Q120_PavelsResearch
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 854=1
+  state Q120_PavelsResearch COMPLETED
+  rows Q120_PavelsResearch <state>=COMPLETED

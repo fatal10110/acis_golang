@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
@@ -288,7 +287,7 @@ func (d hallDialog) npcCommand(command string, tokens []string) {
 			d.live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
-		index, err := commons.ParseInt(tokens[1], 32)
+		index, err := strconv.ParseInt(tokens[1], 10, 32)
 		if err != nil {
 			d.live.SendFrame(serverpackets.FrameActionFailed())
 			return
@@ -365,7 +364,7 @@ func (d hallDialog) functions(val string, tokens []string) {
 			d.sendPage("functions-disabled.htm")
 			return
 		}
-		list, err := commons.ParseInt(tokens[2], 32)
+		list, err := strconv.ParseInt(tokens[2], 10, 32)
 		if err != nil {
 			return
 		}
@@ -404,14 +403,14 @@ func (d hallDialog) support(val string, tokens []string) {
 		sendText(d.live, supportCursedMessage)
 		return
 	}
-	id, err := commons.ParseInt(val, 32)
+	id, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
 		sendText(d.live, supportInvalidMessage)
 		return
 	}
 	level := int64(0)
 	if len(tokens) > 2 {
-		if level, err = commons.ParseInt(tokens[2], 32); err != nil {
+		if level, err = strconv.ParseInt(tokens[2], 10, 32); err != nil {
 			sendText(d.live, supportInvalidMessage)
 			return
 		}
@@ -608,7 +607,7 @@ func linkLevel(args []string) (int, bool) {
 	if len(args) < 2 {
 		return 0, false
 	}
-	n, err := commons.ParseInt(args[1], 32)
+	n, err := strconv.ParseInt(args[1], 10, 32)
 	if err != nil {
 		return 0, false
 	}

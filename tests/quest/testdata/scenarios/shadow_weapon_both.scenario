@@ -1,0 +1,22 @@
+# Shadow weapons (ShadowWeapon): at Grand Master Ramos, a level 20 human fighter holding both
+# exchange coupons is offered the multisell of both. Expectations are the reference trace's
+# (ShadowWeapon.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/shadow_weapon_both.golden
+character Shadow 20
+hold 8869 1
+hold 8870 1
+script script.feature.ShadowWeapon
+item 8869 8870
+page villagemaster/30373.htm
+page script/feature/ShadowWeapon/
+npc ramos 30373 VillageMasterFighter 10 0 0
+
+action ramos
+action ramos
+  S ActionFailed
+  S NpcHtmlMessage obj=ramos item=0 page=villagemaster/30373.htm
+  S ActionFailed
+bypass npc_{ramos}_Quest ShadowWeapon
+  S NpcHtmlMessage obj=ramos item=0 html="<html><body>\nA Shadow Weapon is a special weapon that is made in cooperation between the Ivory Tower and the Black Anvil Guild. It is created by magically projecting the power of a weapon onto another catalytic object. While that means that it can only be used while the magic charge remains, it has made it possible to mass produce projectile weapons.<br>\nIts performance is no different than if you used the original weapon, except that it cannot possess the special ability to absorb souls or refine through a Stone of Life. Also, although it acts as a weapon, it is actually in the magic category -- once opened, it cannot be passed on to someone else. Consider it an aid on your new path until you lay your hands on some real weapons.<br>\nIf you have a Shadow Weapon exchange coupon, you can receive a Shadow Weapon right for you.<br>\n<a action=\"bypass -h npc_{ramos}_multisell 306893003\">Give the Shadow Weapon exchange coupon.</a>\n</body></html>\n"
+  S ActionFailed
+  S ActionFailed

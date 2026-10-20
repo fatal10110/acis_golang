@@ -121,14 +121,21 @@ func TestGludioStandAttacksWhoSpellsWhatItFights(t *testing.T) {
 	dummy := warriorTemplate(siegeDummyID, nil)
 	// It outlives the fight and the character's spells.
 	dummy.HPMax, dummy.PDef, dummy.MDef = 1_000_000, 1000, 1000
+	// It stays where it spawned, inside the guard's reach: a monster bound
+	// to no behavior wanders off to a random spot once idle, and the guard,
+	// attacking from where it stands, never reaches one that left it.
+	dummy.CanMove = false
 	boot := siegeSkillBoot(t)
 	boot.opts = append(boot.opts, gameservertest.WithAttackStanceClock(time.Now))
 	tmpl := siegeGuardTemplate(adenStandID)
 	// Clanless: the monster's hit calls no one, the guard included.
 	tmpl.Clans = nil
 	w := bootSiegeGuards(t, boot, tmpl, dummy)
+	// The guard, 1000 from the character, still sees its spells. The monster
+	// is 10 from the guard, inside the 20 their footprints span: a guard
+	// holding its post reaches nothing on that boundary or past it.
 	stand := w.spawn(t, adenStandID, 1000, 0)
-	monster := w.spawn(t, siegeDummyID, 1020, 0)
+	monster := w.spawn(t, siegeDummyID, 1010, 0)
 
 	w.onQueue(t, monster, func() { stand.TakeDamage(siegeTwentieth, monster) })
 	// damage / max HP / 0.05 * 100, in float arithmetic.

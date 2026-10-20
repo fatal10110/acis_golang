@@ -1,0 +1,165 @@
+# Tarantula's Spider Silk (Q296): a level 15 character holding a ring of raccoon accepts at Mion.
+# Defender Nathan has no spinnerette to spin yet. Nine crimson tarantulas give nine spider silks (roll
+# pinned to 50, over 45), one a spinnerette (roll 96, over 95) and one nothing (roll 10); Nathan spins
+# the spinnerette into 15 silks (the 15 + Rnd(10) roll pinned to 0). Mion pays 30 per silk and 2000
+# more for ten. One more silk is paid alone; then the player quits the repeatable quest; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q296_tarantulas_spider_silk.golden
+character Spinner 15
+hold 1508 1
+random 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 96 0 10 0 50 0
+script quest.Q296_TarantulasSpiderSilk
+item 1493 1494 1508 1509
+page merchant/30519.htm
+page guard/30548.htm
+page script/quest/Q296_TarantulasSpiderSilk/
+npc mion 30519 Merchant 10 0 0
+npc nathan 30548 Guard -10 0 0
+npc tarantula 20394 Monster 40 0 0
+
+# Mion: accept, with the ring.
+action mion
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q296_TarantulasSpiderSilk CREATED
+bypass Quest Q296_TarantulasSpiderSilk 30519-03.htm
+  S QuestList 296:0x80000001
+  S ExShowQuestMark quest=296
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-03.htm
+  S ActionFailed
+  Q upsert Q296_TarantulasSpiderSilk | <state> | STARTED
+  Q upsert Q296_TarantulasSpiderSilk | <cond> | 1
+  state Q296_TarantulasSpiderSilk STARTED
+  rows Q296_TarantulasSpiderSilk <cond>=1 <state>=STARTED
+
+# Mion: no silk yet.
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Nathan: no spinnerette.
+action nathan
+action nathan
+  S ActionFailed
+  S NpcHtmlMessage obj=nathan item=0 page=guard/30548.htm
+  S ActionFailed
+bypass npc_{nathan}_Quest
+  S NpcHtmlMessage obj=nathan item=0 page=script/quest/Q296_TarantulasSpiderSilk/30548-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q296_TarantulasSpiderSilk 30548-02.htm
+  S NpcHtmlMessage obj=nathan item=0 page=script/quest/Q296_TarantulasSpiderSilk/30548-02.htm
+  S ActionFailed
+
+# Nine silks, a spinnerette, and a tarantula that gives nothing.
+kill tarantula x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1493=9
+kill tarantula
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1494
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1494=1
+kill tarantula
+  S SystemMessage id=95 1:0 1:0
+  items 1493=9 1494=1
+
+# Nathan: the spinnerette becomes 15 silks.
+action nathan
+  S ActionFailed
+  S NpcHtmlMessage obj=nathan item=0 page=guard/30548.htm
+  S ActionFailed
+bypass npc_{nathan}_Quest
+  S NpcHtmlMessage obj=nathan item=0 page=script/quest/Q296_TarantulasSpiderSilk/30548-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q296_TarantulasSpiderSilk 30548-02.htm
+  S SystemMessage id=302 3:1494
+  S SystemMessage id=53 3:1493 6:15
+  S NpcHtmlMessage obj=nathan item=0 page=script/quest/Q296_TarantulasSpiderSilk/30548-03.htm
+  S ActionFailed
+  items 1494=0 1493=24
+
+# Mion: 24 x 30, and 2000 for ten.
+action mion
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S SystemMessage id=301 3:1493 6:24
+  S SystemMessage id=52 6:2720
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1493=0 57=2720
+
+# One silk alone; then quit.
+kill tarantula
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1493
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1493=1
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S SystemMessage id=302 3:1493
+  S SystemMessage id=52 6:30
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1493=0 57=2750
+bypass Quest Q296_TarantulasSpiderSilk 30519-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-06.htm
+  S ActionFailed
+  Q delete-quest Q296_TarantulasSpiderSilk
+  state Q296_TarantulasSpiderSilk -
+  rows Q296_TarantulasSpiderSilk -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q296_TarantulasSpiderSilk -
+  rows Q296_TarantulasSpiderSilk -
+  items 57=2750 1508=1

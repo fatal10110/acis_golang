@@ -1,0 +1,21 @@
+# The Ocean of Distant Stars (Q117), refused: a level 38 character, one short of the quest's
+# level, is turned away by Abey and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q117_the_ocean_of_distant_stars_low_level.golden
+character Stargazer 38
+script quest.Q117_TheOceanOfDistantStars
+item 8495
+page default/32053.htm
+page script/quest/Q117_TheOceanOfDistantStars/
+npc abey 32053 Folk 10 0 0
+
+action abey
+action abey
+  S ActionFailed
+  S NpcHtmlMessage obj=abey item=0 page=default/32053.htm
+  S ActionFailed
+bypass npc_{abey}_Quest
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q117_TheOceanOfDistantStars CREATED
+  rows Q117_TheOceanOfDistantStars -

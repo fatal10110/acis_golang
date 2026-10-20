@@ -20,7 +20,8 @@ const helperOwner = "Quest"
 //
 //   - a distinctive literal (number, string, char) on one side only;
 //   - an engine call of the classes with no Go name in apimap.txt, exempt
-//     from the API freeze, or whose Go name the package never calls; a Go call mapped from a Quest helper
+//     from the API freeze, or whose Go name (any of them, for a row with
+//     several) the package never calls; a Go call mapped from a Quest helper
 //     that none of the classes makes;
 //   - a hook (on* override) whose name or parent-call shape differs: the
 //     Go hook is the OnX field of a Hooks literal, its parent call a call
@@ -111,14 +112,14 @@ func check(ref map[string]Fingerprint, amap map[string]string, dir string, class
 		case goName == Inline:
 		case goName == Exempt:
 			add("call "+row, "is exempt from the API freeze and has no Go name yet")
-		case pkg.calls[lastSegment(goName)] == 0:
+		case !callsAny(pkg.calls, goName):
 			add("call "+row, fmt.Sprintf("is in the reference but the Go package never calls %s", goName))
 		}
 	}
 	for _, row := range slices.Sorted(maps.Keys(amap)) {
 		goName := amap[row]
 		owner, _, _ := strings.Cut(row, ".")
-		if owner != helperOwner || goName == Inline || goName == Exempt || calls[row] || pkg.calls[lastSegment(goName)] == 0 {
+		if owner != helperOwner || goName == Inline || goName == Exempt || calls[row] || !callsAny(pkg.calls, goName) {
 			continue
 		}
 		mappedHere := false
@@ -165,6 +166,17 @@ func check(ref map[string]Fingerprint, amap map[string]string, dir string, class
 }
 
 func lastSegment(name string) string { return name[strings.LastIndexByte(name, '.')+1:] }
+
+// callsAny reports whether calls holds a call of a Go name the apimap.txt
+// value goNames lists, matched on the name after its last '.'.
+func callsAny(calls map[string]int, goNames string) bool {
+	for name := range strings.SplitSeq(goNames, ",") {
+		if calls[lastSegment(name)] > 0 {
+			return true
+		}
+	}
+	return false
+}
 
 // multisetMinus returns the elements of a not matched one-for-one in b.
 func multisetMinus(a, b []string) []string {

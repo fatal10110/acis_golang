@@ -1,0 +1,33 @@
+# Dreaming of the Skies (Q295), the ring already held: a character at cond 2 with fifty floating
+# stones and a ring of firefly gets 2400 adena and 500 SP from Arin instead of a second ring, and the
+# quest ends. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q295_dreaming_of_the_skies_ring_held.golden
+character Dreamer 11
+quest Q295_DreamingOfTheSkies <cond>=2 <state>=STARTED
+hold 1492 50
+hold 1509 1
+script quest.Q295_DreamingOfTheSkies
+item 1492 1509
+page default/30536.htm
+page script/quest/Q295_DreamingOfTheSkies/
+npc arin 30536 Folk 10 0 0
+
+# Arin: adena for the stones.
+action arin
+action arin
+  S ActionFailed
+  S NpcHtmlMessage obj=arin item=0 page=default/30536.htm
+  S ActionFailed
+bypass npc_{arin}_Quest
+  S SystemMessage id=301 3:1492 6:50
+  S SystemMessage id=52 6:2400
+  S SystemMessage id=331 1:500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=arin item=0 page=script/quest/Q295_DreamingOfTheSkies/30536-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q295_DreamingOfTheSkies
+  items 1492=0 1509=1 57=2400
+  state Q295_DreamingOfTheSkies -
+  rows Q295_DreamingOfTheSkies -

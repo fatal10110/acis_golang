@@ -3,6 +3,7 @@ package catalog
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monsterbehavior"
 )
 
 // aiIndividual7 is the catalog of batch 7 of 8 of the individual NPC behaviors (#192).
@@ -22,7 +23,7 @@ func aiIndividual7() script.Catalog {
 		"script.ai.individual.Monster.LV3Monster.LV3Wizard":                                                                 monster.LV3Wizard,
 		"script.ai.individual.Monster.LV3Monster.LV3WizardPrivate":                                                          monster.LV3WizardPrivate,
 		"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill":                      nil,
-		"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill":                         nil,
+		"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill":                         monsterbehavior.WizardUseSkill,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon":                                          nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossAloneSummonPrivate":                      nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon":                      nil,

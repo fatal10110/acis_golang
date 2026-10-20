@@ -1,0 +1,22 @@
+# Make Formal Wear (Q037), refused: a level 59 character, one short of the quest's level, is turned
+# away by Alexis and the quest is not started. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q037_make_formal_wear_low_level.golden
+character Tailor 59
+script quest.Q037_MakeFormalWear
+item 7076 7077 7078 7113 7164 7160 7159 6408
+page merchant/30842.htm
+page script/quest/Q037_MakeFormalWear/
+npc alexis 30842 Merchant 10 0 0
+
+action alexis
+action alexis
+  S ActionFailed
+  S NpcHtmlMessage obj=alexis item=0 page=merchant/30842.htm
+  S ActionFailed
+bypass npc_{alexis}_Quest
+  S NpcHtmlMessage obj=alexis item=0 page=script/quest/Q037_MakeFormalWear/30842-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q037_MakeFormalWear CREATED
+  rows Q037_MakeFormalWear -

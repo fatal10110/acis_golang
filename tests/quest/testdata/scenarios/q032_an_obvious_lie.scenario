@@ -1,0 +1,311 @@
+# An Obvious Lie (Q032): a level 45 character accepts at Maximilian; Gentler gives a map, which
+# Miki the Cat takes; twenty alligators each drop a medicinal herb (the twentieth moves the quest
+# on); Gentler takes the herbs, then five hundred spirit ores; Miki agrees to the lie; Gentler
+# offers the ears and sews cat ears from five hundred suede and a thousand threads, and the quest
+# completes; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q032_an_obvious_lie.golden
+character Liar 45
+hold 3031 500
+hold 1866 500
+hold 1868 1000
+script quest.Q032_AnObviousLie
+item 1866 1868 3031 7165 7166 6843 7680 7683
+page villagemaster/30120.htm
+page merchant/30094.htm
+page default/31706.htm
+page script/quest/Q032_AnObviousLie/
+npc maximilian 30120 VillageMasterPriest 10 0 0
+npc gentler 30094 Merchant 20 0 0
+npc miki 31706 Folk -20 0 0
+npc alligator 20135 Monster 0 40 0
+
+# Maximilian: accept.
+action maximilian
+action maximilian
+  S ActionFailed
+  S NpcHtmlMessage obj=maximilian item=0 page=villagemaster/30120.htm
+  S ActionFailed
+bypass npc_{maximilian}_Quest
+  S NpcHtmlMessage obj=maximilian item=0 page=script/quest/Q032_AnObviousLie/30120-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q032_AnObviousLie CREATED
+bypass Quest Q032_AnObviousLie 30120-1.htm
+  S QuestList 32:0x80000001
+  S ExShowQuestMark quest=32
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maximilian item=0 page=script/quest/Q032_AnObviousLie/30120-1.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <state> | STARTED
+  Q upsert Q032_AnObviousLie | <cond> | 1
+  state Q032_AnObviousLie STARTED
+  rows Q032_AnObviousLie <cond>=1 <state>=STARTED
+action maximilian
+  S ActionFailed
+  S NpcHtmlMessage obj=maximilian item=0 page=villagemaster/30120.htm
+  S ActionFailed
+bypass npc_{maximilian}_Quest
+  S NpcHtmlMessage obj=maximilian item=0 page=script/quest/Q032_AnObviousLie/30120-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gentler gives the map.
+action gentler
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q032_AnObviousLie 30094-1.htm
+  S QuestList 32:0x80000003
+  S ExShowQuestMark quest=32
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7165
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-1.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <cond> | 2
+  items 7165=1
+  rows Q032_AnObviousLie <cond>=2 <state>=STARTED
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Miki the Cat takes the map.
+action miki
+action miki
+  S ActionFailed
+  S NpcHtmlMessage obj=miki item=0 page=default/31706.htm
+  S ActionFailed
+bypass npc_{miki}_Quest
+  S NpcHtmlMessage obj=miki item=0 page=script/quest/Q032_AnObviousLie/31706-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q032_AnObviousLie 31706-1.htm
+  S QuestList 32:0x80000007
+  S ExShowQuestMark quest=32
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7165
+  S NpcHtmlMessage obj=miki item=0 page=script/quest/Q032_AnObviousLie/31706-1.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <cond> | 3
+  items 7165=0
+  rows Q032_AnObviousLie <cond>=3 <state>=STARTED
+action miki
+  S ActionFailed
+  S NpcHtmlMessage obj=miki item=0 page=default/31706.htm
+  S ActionFailed
+bypass npc_{miki}_Quest
+  S NpcHtmlMessage obj=miki item=0 page=script/quest/Q032_AnObviousLie/31706-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Alligators: a medicinal herb each; the twentieth moves the quest on.
+kill alligator x19
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7166=19
+kill alligator
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7166
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 32:0x8000000f
+  S ExShowQuestMark quest=32
+  Q upsert Q032_AnObviousLie | <cond> | 4
+  items 7166=20
+  rows Q032_AnObviousLie <cond>=4 <state>=STARTED
+
+# Gentler takes the herbs, then the spirit ores.
+action gentler
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q032_AnObviousLie 30094-4.htm
+  S QuestList 32:0x8000001f
+  S ExShowQuestMark quest=32
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7166 6:20
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-4.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <cond> | 5
+  items 7166=0
+  rows Q032_AnObviousLie <cond>=5 <state>=STARTED
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-6.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q032_AnObviousLie 30094-7.htm
+  S QuestList 32:0x8000003f
+  S ExShowQuestMark quest=32
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3031 6:500
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-7.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <cond> | 6
+  items 3031=0
+  rows Q032_AnObviousLie <cond>=6 <state>=STARTED
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-8.htm
+  S ActionFailed
+  S ActionFailed
+
+# Miki agrees to the lie.
+action miki
+action miki
+  S ActionFailed
+  S NpcHtmlMessage obj=miki item=0 page=default/31706.htm
+  S ActionFailed
+bypass npc_{miki}_Quest
+  S NpcHtmlMessage obj=miki item=0 page=script/quest/Q032_AnObviousLie/31706-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q032_AnObviousLie 31706-4.htm
+  S QuestList 32:0x8000007f
+  S ExShowQuestMark quest=32
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=miki item=0 page=script/quest/Q032_AnObviousLie/31706-4.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <cond> | 7
+  rows Q032_AnObviousLie <cond>=7 <state>=STARTED
+action miki
+  S ActionFailed
+  S NpcHtmlMessage obj=miki item=0 page=default/31706.htm
+  S ActionFailed
+bypass npc_{miki}_Quest
+  S NpcHtmlMessage obj=miki item=0 page=script/quest/Q032_AnObviousLie/31706-5.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gentler offers the ears and sews cat ears; the quest completes.
+action gentler
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-9.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q032_AnObviousLie 30094-10.htm
+  S QuestList 32:0x800000ff
+  S ExShowQuestMark quest=32
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-10.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <cond> | 8
+  rows Q032_AnObviousLie <cond>=8 <state>=STARTED
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q032_AnObviousLie 30094-13.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-13.htm
+  S ActionFailed
+bypass Quest Q032_AnObviousLie cat
+  S SystemMessage id=301 3:1866 6:500
+  S SystemMessage id=301 3:1868 6:1000
+  S SystemMessage id=54 3:6843
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 32:0x00000000
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q032_AnObviousLie/30094-14.htm
+  S ActionFailed
+  Q upsert Q032_AnObviousLie | <state> | COMPLETED
+  Q delete-except-state Q032_AnObviousLie
+  state Q032_AnObviousLie COMPLETED
+  rows Q032_AnObviousLie <state>=COMPLETED
+  items 1866=0 1868=0 6843=1
+
+# Relog: the completed quest loads from its one row, and the ears stay.
+relog
+  state Q032_AnObviousLie COMPLETED
+  rows Q032_AnObviousLie <state>=COMPLETED
+  items 6843=1
+action maximilian
+action maximilian
+  S ActionFailed
+  S NpcHtmlMessage obj=maximilian item=0 page=villagemaster/30120.htm
+  S ActionFailed
+bypass npc_{maximilian}_Quest
+  S NpcHtmlMessage obj=maximilian item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

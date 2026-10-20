@@ -1,0 +1,23 @@
+# Hunt of the Black Lion (Q333), refused: a level 25 character without the Black Lion mark is sent
+# away by Sophya, and the quest is not started. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q333_hunt_of_the_black_lion_no_mark.golden
+character Recruit 25
+script quest.Q333_HuntOfTheBlackLion
+item 1369
+page default/30735.htm
+page script/quest/Q333_HuntOfTheBlackLion/
+npc sophya 30735 Folk 10 0 0
+
+# Sophya: the Black Lion mark first.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q333_HuntOfTheBlackLion CREATED
+  rows Q333_HuntOfTheBlackLion -

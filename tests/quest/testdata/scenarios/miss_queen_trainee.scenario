@@ -1,0 +1,49 @@
+# Miss Queen (MissQueen): a level 20 human fighter, of a starting class with no PK, asks for the
+# trainee's coupon and gets it, the coupon's player memo set; asked again, and after a relog,
+# it is told it has it. The traveler's coupon is refused to a starting class. Expectations are
+# the reference trace's (MissQueen.onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/miss_queen_trainee.golden
+character Trainee 20
+script script.feature.MissQueen
+item 7832 7833
+page default/31760.htm
+page script/feature/MissQueen/
+npc queen 31760 Folk 10 0 0
+
+action queen
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen newbie_coupon
+  S SystemMessage id=54 3:7832
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-02.htm
+  S ActionFailed
+  M set MissQueen_Trainees | true
+  items 7832=1
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen newbie_coupon
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-01.htm
+  S ActionFailed
+  items 7832=1
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen traveller_coupon
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-06.htm
+  S ActionFailed
+  items 7833=0
+relog
+action queen
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen newbie_coupon
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-01.htm
+  S ActionFailed
+  items 7832=1

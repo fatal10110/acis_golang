@@ -73,7 +73,7 @@ func (l *GameClientLink) enterObserverMode(live *livePlayer, loc observer.Locati
 	}
 	l.dropAllSummons(live)
 	if l.parties != nil {
-		l.applyPartyNotices(l.parties.Leave(live, party.Expelled))
+		l.applyOwnPartyNotices(live, l.parties.Leave(live, party.Expelled))
 	}
 	live.Character.StandUp()
 	live.SetSavedLocation(live.CurrentLocation())

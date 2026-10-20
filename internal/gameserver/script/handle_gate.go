@@ -20,21 +20,17 @@ const hostileOnly kindSet = 1 << KindHostile
 // operations that go through (*NPC).hostile, which panics on any other NPC;
 // a test checks the list against the source.
 var kindOps = map[string]kindSet{
-	"NPC.AbortAll":                    hostileOnly,
 	"NPC.ActualSpoiler":               hostileOnly,
 	"NPC.AttackingNow":                hostileOnly,
-	"NPC.CanAttack":                   hostileOnly,
 	"NPC.CanAutoAttack":               hostileOnly,
 	"NPC.CanAttemptCast":              hostileOnly,
 	"NPC.CastUnchecked":               hostileOnly,
 	"NPC.CastingNow":                  hostileOnly,
 	"NPC.CleanAllHate":                hostileOnly,
 	"NPC.DisableCoreAI":               hostileOnly,
-	"NPC.DoDie":                       hostileOnly,
 	"NPC.DropItem":                    hostileOnly,
 	"NPC.Earthquake":                  hostileOnly,
 	"NPC.EquipItem":                   hostileOnly,
-	"NPC.GeoPathFailCount":            hostileOnly,
 	"NPC.HP":                          hostileOnly,
 	"NPC.HateList":                    hostileOnly,
 	"NPC.InCombat":                    hostileOnly,
@@ -45,19 +41,15 @@ var kindOps = map[string]kindSet{
 	"NPC.MeetsHPMPConditions":         hostileOnly,
 	"NPC.MeetsHPMPDisabledConditions": hostileOnly,
 	"NPC.Muted":                       hostileOnly,
-	"NPC.Paralyzed":                   hostileOnly,
 	"NPC.PhysicalMuted":               hostileOnly,
 	"NPC.RandomizeAttack":             hostileOnly,
-	"NPC.RechargeShots":               hostileOnly,
 	"NPC.RemoveAggro":                 hostileOnly,
-	"NPC.RemoveAllAttackDesire":       hostileOnly,
 	"NPC.RemoveAttackDesire":          hostileOnly,
 	"NPC.RemoveDesires":               hostileOnly,
 	"NPC.Rooted":                      hostileOnly,
 	"NPC.SetEnchantEffect":            hostileOnly,
 	"NPC.SetTopDesireTarget":          hostileOnly,
 	"NPC.StopAttack":                  hostileOnly,
-	"NPC.Stunned":                     hostileOnly,
 	"NPC.TopDesireTarget":             hostileOnly,
 	"Spawner.DecayMe":                 hostileOnly,
 	"Spawner.RespawnDelay":            hostileOnly,
@@ -95,7 +87,7 @@ func gateHandles(s *Script, bound Bindings, cfg *Config) error {
 				return fmt.Errorf("%s calls %s, which is no kind-specific handle operation", h, op)
 			}
 			for _, id := range ids {
-				if k, _ := cfg.KindOf(id); ks&kinds(k) == 0 {
+				if k, _ := cfg.KindOf(id); ks&kinds(k) == 0 && !silent(h, k) {
 					return fmt.Errorf("%s on npc %d calls %s, which %s npcs do not have", h, id, op, k)
 				}
 			}

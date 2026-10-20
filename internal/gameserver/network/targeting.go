@@ -753,6 +753,13 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// A rider neither sits nor stands: the request goes idle and is
+	// refused.
+	if live.Mounted() {
+		live.goIdle()
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	// A stand while lying in fake death gets up out of it instead of
 	// standing up: the Fake Death effect, if still on, ends with its own
 	// get-up, then the player gets up again. During a get-up the player is
@@ -810,8 +817,15 @@ type positionedTarget interface {
 	Heading() int
 }
 
+// selectLiveTarget makes target live's selection, showing it to live and
+// its observers. A festival monster stays out of reach of a player who is
+// no festival participant: the selection is cleared instead.
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
 	if live == nil || target == nil {
+		return false
+	}
+	if h, ok := target.(*npc.Hostile); ok && h.FestivalMonster() && !live.FestivalParticipant() {
+		l.announceTargetCleared(live, live.TakeTarget())
 		return false
 	}
 	if cur := live.Target(); cur != nil && cur.ObjectID() == target.ObjectID() {

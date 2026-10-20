@@ -1,0 +1,92 @@
+# Dangerous Seduction (Q170): a dark elven fighter of level 21 accepts at Vellior; Merkenis cries
+# out at the first hit only, and dying gives his nightmare crystal with his last words; Vellior
+# takes the crystal for adena; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q170_dangerous_seduction.golden
+character Seducer 21
+class 31
+script quest.Q170_DangerousSeduction
+item 1046 57
+page default/30305.htm
+page script/quest/Q170_DangerousSeduction/
+npc vellior 30305 Folk 10 0 0
+npc merkenis 27022 Monster 40 0 0
+
+# Vellior: accept.
+action vellior
+action vellior
+  S ActionFailed
+  S NpcHtmlMessage obj=vellior item=0 page=default/30305.htm
+  S ActionFailed
+bypass npc_{vellior}_Quest
+  S NpcHtmlMessage obj=vellior item=0 page=script/quest/Q170_DangerousSeduction/30305-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q170_DangerousSeduction CREATED
+bypass Quest Q170_DangerousSeduction 30305-04.htm
+  S QuestList 170:0x80000001
+  S ExShowQuestMark quest=170
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=vellior item=0 page=script/quest/Q170_DangerousSeduction/30305-04.htm
+  S ActionFailed
+  Q upsert Q170_DangerousSeduction | <state> | STARTED
+  Q upsert Q170_DangerousSeduction | <cond> | 1
+  state Q170_DangerousSeduction STARTED
+  rows Q170_DangerousSeduction <cond>=1 <state>=STARTED
+action vellior
+  S ActionFailed
+  S NpcHtmlMessage obj=vellior item=0 page=default/30305.htm
+  S ActionFailed
+bypass npc_{vellior}_Quest
+  S NpcHtmlMessage obj=vellior item=0 page=script/quest/Q170_DangerousSeduction/30305-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Merkenis: a cry at the first hit only; the crystal as he dies.
+hit merkenis 10
+  S NpcSay obj=merkenis type=0 npc=1027022 text="I'll cast you into an eternal nightmare!"
+hit merkenis 10
+kill merkenis
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 170:0x80000003
+  S ExShowQuestMark quest=170
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1046
+  S NpcSay obj=merkenis type=0 npc=1027022 text="Send my soul to Lich King Icarus..."
+  Q upsert Q170_DangerousSeduction | <cond> | 2
+  items 1046=1
+  rows Q170_DangerousSeduction <cond>=2 <state>=STARTED
+
+# Vellior: the crystal for adena; the quest completes.
+action vellior
+  S ActionFailed
+  S NpcHtmlMessage obj=vellior item=0 page=default/30305.htm
+  S ActionFailed
+bypass npc_{vellior}_Quest
+  S SystemMessage id=302 3:1046
+  S SystemMessage id=52 6:102680
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 170:0x00000000
+  S NpcHtmlMessage obj=vellior item=0 page=script/quest/Q170_DangerousSeduction/30305-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q170_DangerousSeduction | <state> | COMPLETED
+  Q delete-except-state Q170_DangerousSeduction
+  items 1046=0 57=102680
+  state Q170_DangerousSeduction COMPLETED
+  rows Q170_DangerousSeduction <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q170_DangerousSeduction COMPLETED
+  rows Q170_DangerousSeduction <state>=COMPLETED
+  items 57=102680
+action vellior
+action vellior
+  S ActionFailed
+  S NpcHtmlMessage obj=vellior item=0 page=default/30305.htm
+  S ActionFailed
+bypass npc_{vellior}_Quest
+  S NpcHtmlMessage obj=vellior item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

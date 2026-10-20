@@ -446,9 +446,6 @@ func (f *Folk) WeaponReuseDelay() time.Duration {
 // WeaponGrade returns the weapon's crystal grade; zero when unarmed.
 func (f *Folk) WeaponGrade() int { return int(f.fight.crystal) }
 
-// SetChargedShot does nothing: nothing charges a civilian NPC's shots.
-func (f *Folk) SetChargedShot(item.ShotKind, bool) {}
-
 // ConsumeBowMP spends the weapon's MP cost as a bow fires.
 func (f *Folk) ConsumeBowMP() {
 	if w := f.fight.weapon; w != nil && w.MPConsume > 0 {

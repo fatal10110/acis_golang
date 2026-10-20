@@ -169,7 +169,7 @@ func (l *GameClientLink) withdrawParty(live *livePlayer) {
 	if notices == nil {
 		return
 	}
-	l.applyPartyNotices(notices)
+	l.applyOwnPartyNotices(live, notices)
 	l.applyRoomNotices(l.rooms.LeaveWithParty(live))
 }
 

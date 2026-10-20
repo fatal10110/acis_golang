@@ -21,7 +21,8 @@ const fullMP = -1
 func (n *Npcs) registerSlot(key string, g *makerGroup, i int, dbName string, tmpl *npc.Template) {
 	entry := g.def.Entries[i]
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, maker: g.def, group: g, spawnIdx: i, entry: entry, dbName: dbName, tmpl: tmpl, memory: newSlotMemory(entry, g.rows[i]), spawning: true, first: true}
+	n.serials++
+	n.slot[key] = slotInfo{key: key, maker: g.def, group: g, spawnIdx: i, entry: entry, dbName: dbName, tmpl: tmpl, memory: newSlotMemory(entry, g.rows[i]), spawning: true, first: true, epoch: n.despawns, serial: n.serials}
 	g.keys[i] = append(g.keys[i], key)
 	n.mu.Unlock()
 }
@@ -101,8 +102,13 @@ func (n *Npcs) spawnMaster(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	if master, ok := live.(*npc.Hostile); ok && !master.Decayed() {
 		n.spawnPrivates(key, entry, master)
 	}
-	if slot.group != nil {
-		n.created(slot.group, slot.spawnIdx, key)
+	if g := slot.group; g != nil {
+		if slot.orphan {
+			n.mu.Lock()
+			g.orphansAlive++
+			n.mu.Unlock()
+		}
+		n.created(slot)
 	}
 }
 

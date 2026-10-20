@@ -1,0 +1,33 @@
+# Possessor of a Precious Soul - 1 (Q241), started on a subclass (cond 6, Kantabilon's claws)
+# and played on the base class: Kantabilon answers the no-quest page, and a Malruk Succubus
+# killed on the base class gives no claw, every script roll pinned to 0. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q241_possessor_of_a_precious_soul_base_class_started.golden
+character Fighter 76
+class 2
+quest Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=6
+random always 0
+script quest.Q241_PossessorOfAPreciousSoul
+item 7597
+page default/31042.htm
+page script/quest/Q241_PossessorOfAPreciousSoul/
+npc kantabilon 31042 Folk 0 -10 0
+npc succubus 20244 Monster -40 0 0
+
+# Kantabilon has nothing for the base class, though the quest waits for his claws.
+action kantabilon
+action kantabilon
+  S ActionFailed
+  S NpcHtmlMessage obj=kantabilon item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kantabilon}_Quest
+  S NpcHtmlMessage obj=kantabilon item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  rows Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=6
+
+# A Malruk Succubus killed on the base class leaves no claw (the roll would pass).
+kill succubus
+  S SystemMessage id=95 1:0 1:0
+  items 7597=0
+  rows Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=6

@@ -85,6 +85,14 @@ type IconRefresh[M Member] struct {
 	Member M
 }
 
+// Departing reports Member leaving a party whose members are Members: the
+// members who stay when it leaves alone, every member as the party
+// disperses.
+type Departing[M Member] struct {
+	Member  M
+	Members []M
+}
+
 // FusionStop ends Member's own fusion channel and every fusion channel
 // held on Member.
 type FusionStop[M Member] struct{ Member M }
@@ -118,6 +126,7 @@ func (WindowAll[M]) isNotice()          {}
 func (WindowAdd[M]) isNotice()          {}
 func (WindowDelete[M]) isNotice()       {}
 func (WindowDeleteAll[M]) isNotice()    {}
+func (Departing[M]) isNotice()          {}
 func (Msg[M]) isNotice()                {}
 func (InfoRefresh[M]) isNotice()        {}
 func (IconRefresh[M]) isNotice()        {}

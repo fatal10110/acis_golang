@@ -1,0 +1,140 @@
+# Gatekeeper's Favor (Q297): a level 15 character accepts at Wirphy. A whinstone golem's drop misses
+# (roll pinned to 999999, over the 500000 chance); twenty more give twenty starstones (roll 0), the
+# twentieth moving the quest on. Wirphy takes them for two gatekeeper tokens, and the repeatable quest
+# ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q297_gatekeepers_favor.golden
+character Favor 15
+random 999999 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+script quest.Q297_GatekeepersFavor
+item 1573 1659
+page gatekeeper/30540.htm
+page script/quest/Q297_GatekeepersFavor/
+npc wirphy 30540 Gatekeeper 10 0 0
+npc golem 20521 Monster 40 0 0
+
+# Wirphy: accept.
+action wirphy
+action wirphy
+  S ActionFailed
+  S NpcHtmlMessage obj=wirphy item=0 page=gatekeeper/30540.htm
+  S ActionFailed
+bypass npc_{wirphy}_Quest
+  S NpcHtmlMessage obj=wirphy item=0 page=script/quest/Q297_GatekeepersFavor/30540-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q297_GatekeepersFavor CREATED
+bypass Quest Q297_GatekeepersFavor 30540-03.htm
+  S QuestList 297:0x80000001
+  S ExShowQuestMark quest=297
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wirphy item=0 page=script/quest/Q297_GatekeepersFavor/30540-03.htm
+  S ActionFailed
+  Q upsert Q297_GatekeepersFavor | <state> | STARTED
+  Q upsert Q297_GatekeepersFavor | <cond> | 1
+  state Q297_GatekeepersFavor STARTED
+  rows Q297_GatekeepersFavor <cond>=1 <state>=STARTED
+
+# Wirphy: not enough starstones.
+action wirphy
+  S ActionFailed
+  S NpcHtmlMessage obj=wirphy item=0 page=gatekeeper/30540.htm
+  S ActionFailed
+bypass npc_{wirphy}_Quest
+  S NpcHtmlMessage obj=wirphy item=0 page=script/quest/Q297_GatekeepersFavor/30540-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# A miss, then twenty starstones.
+kill golem
+  S SystemMessage id=95 1:0 1:0
+  items 1573=0
+kill golem x20
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1573
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 297:0x80000003
+  S ExShowQuestMark quest=297
+  Q upsert Q297_GatekeepersFavor | <cond> | 2
+  items 1573=20
+  rows Q297_GatekeepersFavor <cond>=2 <state>=STARTED
+
+# Wirphy: the starstones for two tokens; the quest ends.
+action wirphy
+  S ActionFailed
+  S NpcHtmlMessage obj=wirphy item=0 page=gatekeeper/30540.htm
+  S ActionFailed
+bypass npc_{wirphy}_Quest
+  S SystemMessage id=301 3:1573 6:20
+  S SystemMessage id=53 3:1659 6:2
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=wirphy item=0 page=script/quest/Q297_GatekeepersFavor/30540-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q297_GatekeepersFavor
+  items 1573=0 1659=2
+  state Q297_GatekeepersFavor -
+  rows Q297_GatekeepersFavor -
+
+# Relog: the quest is gone, and the tokens stay.
+relog
+  state Q297_GatekeepersFavor -
+  rows Q297_GatekeepersFavor -
+  items 1659=2

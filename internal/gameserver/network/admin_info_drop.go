@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -29,7 +28,7 @@ func (l *GameClientLink) adminNpcDrops(gm *livePlayer, inst *npc.Instance, isDro
 		if i >= len(args) {
 			break
 		}
-		n, err := commons.ParseInt(args[i], 32)
+		n, err := strconv.ParseInt(args[i], 10, 32)
 		if err != nil {
 			ok = false
 			break

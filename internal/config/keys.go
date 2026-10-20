@@ -87,8 +87,10 @@ var gameServerKeys = map[string]keySet{
 	},
 	"events.properties": {
 		Read: []string{
-			"AllowFishChampionship", "FestivalCycleLength", "FestivalLength",
-			"FestivalManagerStart", "FishChampionshipReward1", "FishChampionshipReward2",
+			"AllowFishChampionship", "FestivalChestSpawn", "FestivalCycleLength",
+			"FestivalFirstSpawn", "FestivalFirstSwarm", "FestivalLength", "FestivalManagerStart",
+			"FestivalMinPlayer", "FestivalSecondSpawn", "FestivalSecondSwarm",
+			"FishChampionshipReward1", "FishChampionshipReward2",
 			"FishChampionshipReward3", "FishChampionshipReward4", "FishChampionshipReward5",
 			"FishChampionshipRewardItemId", "Lottery2and1NumberPrize", "Lottery3NumberRate",
 			"Lottery4NumberRate", "Lottery5NumberRate", "LotteryPrize", "LotteryTicketPrice",
