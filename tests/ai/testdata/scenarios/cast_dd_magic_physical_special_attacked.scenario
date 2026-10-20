@@ -1,0 +1,17 @@
+# WarriorCastDDMagicPhysicalSpecial (22046, its shipped skills), every draw 0, 300 away from the
+# character. Its first hit finds it hating no one, so it only takes the Warrior's hate; the second,
+# by the character it now hates most from farther than 200, also wants its long range magic (4151)
+# on the character, weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial
+npc ragna 22046 Monster 300 0 0 skill PHYSICAL_SPECIAL_RANGE 4072 4 skill W_LONG_RANGE_DD_MAGIC 4151 4
+
+hit ragna 22
+  desires ragna attack(player)=275
+hit ragna 22
+  desires ragna attack(player)=550 cast(player,4151,move)=1000000
