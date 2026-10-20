@@ -1,8 +1,9 @@
 // Package hall contains the siegable clan hall NPC behaviors: the
-// defenders a hall siege raises, such as the Partisan Hideaway's sorcerer,
-// the Devastated Castle's Gustav with his lieutenants Dietrich and
-// Mikhail, and the Fortress of the Dead's Lidia von Hellmann with Alfred
-// and Giselle.
+// defenders a hall siege raises, such as the Partisan Hideaway's soldiers,
+// sorcerers and healer, the Devastated Castle's Gustav with his
+// lieutenants Dietrich and Mikhail, and the Fortress of the Dead's Lidia
+// von Hellmann with Alfred and Giselle; and the NPCs of Rainbow Springs'
+// hot springs game: its gourds, treasure chests and sweeper.
 package hall
 
 import (

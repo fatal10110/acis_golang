@@ -1,0 +1,42 @@
+# The Partisan Hideaway's defenders, of one clan within 300: Agit01Move1 (a soldier, 35372, and an
+# archer, 35381), Agit01PartisanSorcerer2 (35380, an Agit01Move1) and Agit01PartisanHealer1 (35369),
+# beside an unbound Bloody Lord Nurka (35368). A fixture monster has 440 hit points: a hit of 22 is
+# a twentieth of them. The soldier's own attacked hook wants to attack the character by 100 for
+# it, and the hit's clan calls, the soldier's own first, add 100 more to it and 100 to the archer;
+# the sorcerer answers the call with skill 4043 at the character from where it stands (a draw
+# under 10). Hit itself, the sorcerer fights back by the damage, as its parent does, but answers
+# its own clan call with 4043 again (it starts casting it), not with an attack. The healer answers
+# only a call from Nurka below 60% of his hit points, on a draw under 20, with its heal 4044 on him,
+# walking to him; a call from the archer hit as low changes nothing. The templates list 4043 and
+# 4044 so the fixture server knows the skills (the behaviors cast them by id).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.Agit01Move1.Agit01Move1
+script script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2
+script script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1
+npc soldier 35372 Monster 100 0 0 clan partisan_clan 300
+npc archer 35381 Monster 0 100 0 clan partisan_clan 300
+npc sorcerer 35380 Monster -100 0 0 clan partisan_clan 300 skill DD_MAGIC 4043 1
+npc healer 35369 Monster 100 100 0 clan partisan_clan 300 skill MAGIC_HEAL 4044 1
+npc nurka 35368 Monster 0 -100 0 clan partisan_clan 300
+
+hit soldier 22
+  desires soldier attack(player)=200
+  desires archer attack(player)=100
+  desires sorcerer cast(player,4043)=1000000
+  desires healer -
+
+hit sorcerer 22
+  S MagicSkillUse caster=sorcerer target=player skill=4043-1 hit=10571 reuse=39642 success=0
+  desires sorcerer cast(player,4043)=1000000 attack(player)=100
+
+hit nurka 22
+  desires healer -
+hit nurka 300
+hit nurka 1
+  desires healer cast(nurka,4044,move)=1000000
+
+hit archer 400
+hit archer 1
+  desires healer cast(nurka,4044,move)=1000000

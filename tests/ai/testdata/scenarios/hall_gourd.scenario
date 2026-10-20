@@ -1,0 +1,13 @@
+# AzitWateringGroud (35588), a Rainbow Springs hot springs gourd, a civilian. Its first talk has
+# nothing to say: talked to, it opens no window and releases the client (the talk's leading
+# ActionFailed, then the release). Its dying hook's script event, which the format cannot render,
+# is in tests/ai/hall_watering_test.go.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.AzitWateringGroud
+npc gourd 35588 Folk 40 0 0
+
+action gourd
+action gourd
+  S ActionFailed
+  S ActionFailed

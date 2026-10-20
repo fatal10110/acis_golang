@@ -845,6 +845,12 @@ Quest.addDoorChange inline
 # Siegable-hall rows the hall port has named (#3502). An NPC's cast check
 # of a skill's reuse is CanAttemptCast on its handle.
 CreatureCast.canAttemptCast script.NPC.CanAttemptCast
+# A treasure chest is invulnerable from the start (SetInvul) and takes the
+# hit points of a barehanded blow (HoldsWeapon on the attacker) through its
+# own script (SetHP).
+Creature.getActiveWeaponInstance script.Creature.HoldsWeapon
+Creature.setInvul script.NPC.SetInvul
+CreatureStatus.setHp script.NPC.SetHP
 
 # Siegable-hall rows, exempt from the freeze. Their only callers are the
 # siegable-hall scripts and behaviors, the AgitWarrior subtree and the two quests
@@ -871,9 +877,6 @@ ClanHallSiege.getAttackerClans exempt
 ClanHallSiege.unspawnNpcs exempt
 ClanTable.getClan exempt
 Creature.doDie exempt
-Creature.getActiveWeaponInstance exempt
-Creature.setInvul exempt
-CreatureStatus.setHp exempt
 GameTimeTaskManager.getGameTime exempt
 Npc.getClanId exempt
 Npc.getSiegableHall exempt
