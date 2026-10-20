@@ -93,52 +93,6 @@ func UTF16Cut(s string, n int) string {
 	return s
 }
 
-// UTF16LowerKey returns s lower-cased as a key for case-insensitive
-// matching of client text: comparing or searching two keys byte-wise
-// compares their UTF-16 unit sequences. Code points are lower-cased by
-// Unicode 15.0's simple mapping, with a surrogate pair taken as its
-// supplementary character and an unpaired surrogate left as it is; a
-// capital sigma that ends a word takes the final form. Every unit, each
-// half of a pair included, is then written on its own, so a lone surrogate
-// matches inside a pair that starts or ends with it. The key is not text to
-// show a client.
-func UTF16LowerKey(s string) string {
-	units := UTF16Units(s)
-	b := make([]byte, 0, len(s)+len(s)/2)
-	var words *wordText
-	for i := 0; i < len(units); i++ {
-		r := rune(units[i])
-		switch {
-		case utf16.IsSurrogate(r) && i+1 < len(units):
-			if pair := utf16.DecodeRune(r, rune(units[i+1])); pair != utf8.RuneError {
-				r = lowerRune(pair)
-				i++
-			}
-		case r == 'İ':
-			// Its full lower case is two code points: i and a combining dot above.
-			b = append(b, 'i')
-			r = '\u0307'
-		case r == 'Σ':
-			if words == nil {
-				words = newWordText(units)
-			}
-			r = 'σ'
-			if words.endsWord(i) {
-				r = 'ς'
-			}
-		default:
-			r = lowerRune(r)
-		}
-		if r >= 0x10000 {
-			high, low := utf16.EncodeRune(r)
-			b = appendUnitRune(appendUnitRune(b, high), low)
-			continue
-		}
-		b = appendUnitRune(b, r)
-	}
-	return string(b)
-}
-
 // decodeUnitRune decodes the code point s starts with and its byte width:
 // an unpaired surrogate in its three-byte form as that unit's value, an
 // invalid byte as utf8.RuneError of width 1.
