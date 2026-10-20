@@ -53,6 +53,7 @@ bypass Quest Q247_PossessorOfAPreciousSoul 31740-05.htm
   S ActionFailed
   S ActionFailed
   S ActionFailed
+  S TeleportToLocation obj=player loc=143209,43968,-3038 fast=0
   S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31740-05.htm
   S ActionFailed
   Q upsert Q247_PossessorOfAPreciousSoul | <cond> | 2
