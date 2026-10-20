@@ -1,0 +1,19 @@
+# Acts of Evil (Q171): Alvah turns away a character below level 27. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q171_acts_of_evil_low_level.golden
+character Novice 26
+script quest.Q171_ActsOfEvil
+page guard/30381.htm
+page script/quest/Q171_ActsOfEvil/
+npc alvah 30381 Guard 10 0 0
+
+action alvah
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-01a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q171_ActsOfEvil CREATED
