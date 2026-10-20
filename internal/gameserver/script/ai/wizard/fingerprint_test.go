@@ -16,7 +16,8 @@ var npcStrings = []int{1000290, 1000291, 1000292, 1000294, 1000395, 1000396, 100
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	// PartyLeaderWizardSaintAggressive's sight check measures the creature
 	// from itself against 40, always under it; the port keeps only the draw.
-	exempt := []string{"number 40"}
+	// DoormanOfDrain's do-nothing desire keeps the literal in the package.
+	var exempt []string
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
@@ -36,6 +37,12 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard",
 		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2",
 		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Curse",
+		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Heal",
+		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticCoward",
+		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2",
+		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2Curse",
+		"script.ai.individual.Monster.WizardBase.Wizard.Agit02VampireArcherAgit",
+		"script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)
