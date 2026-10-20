@@ -36,6 +36,7 @@ var chain = []struct {
 	{"script.ai.siegablehall.Agit01Move1.Agit01Move1", Move1},
 	{"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2", PartisanSorcerer2},
 	{"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1", PartisanHealer1},
+	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager", func() script.Script { return GameManager(NewWateringGame()) }},
 }
 
 // folkIDs are the chain's civilian NPCs, as the datapack types them: the

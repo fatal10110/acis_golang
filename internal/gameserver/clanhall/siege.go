@@ -77,6 +77,9 @@ type SiegeScript struct {
 	// DoorsUnattackable keeps the hall's doors out of everyone's attacks,
 	// even while the siege is fought.
 	DoorsUnattackable bool
+	// MiniGameWinner hears that winner broke gourd in the hall's mini game
+	// (HallSiege.SetMiniGameWinner); gourd may be nil.
+	MiniGameWinner func(gourd, winner attackable.Combatant)
 }
 
 // AttackerRow is one clanhall_siege_attackers row.

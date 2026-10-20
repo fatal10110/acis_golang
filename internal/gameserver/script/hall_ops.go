@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
@@ -60,6 +61,9 @@ type HallSiegeHooks struct {
 	// DoorsUnattackable keeps the hall's doors out of everyone's attacks,
 	// even while the siege is fought.
 	DoorsUnattackable bool
+	// MiniGameWinner hears that winner broke gourd in the hall's mini game
+	// (Hall.SetMiniGameWinner); gourd may be nil.
+	MiniGameWinner func(h *Hall, gourd *NPC, winner *Player)
 }
 
 // SiegableHall returns the siegable clan hall id, nil when there is none.
@@ -121,10 +125,20 @@ func (s *Script) BindHallSiege(id int32, hooks HallSiegeHooks) *Hall {
 	if f := hooks.End; f != nil {
 		sc.End = func(b clanhall.SiegeBase) { f(h, b) }
 	}
+	if f := hooks.MiniGameWinner; f != nil {
+		sc.MiniGameWinner = func(gourd, winner attackable.Combatant) { f(h, NPCOf(gourd), PlayerOf(winner)) }
+	}
 	if _, ok := s.env.Halls.BindSiege(id, sc); !ok {
 		return nil
 	}
 	return h
+}
+
+// SetMiniGameWinner tells the script running the hall's siege that winner
+// broke gourd in the hall's mini game; gourd may be nil. A hall whose
+// script keeps no mini game does nothing.
+func (h *Hall) SetMiniGameWinner(gourd *NPC, winner *Player) {
+	h.s.SetMiniGameWinner(gourd.combatant(), winner.combatant())
 }
 
 // ID returns the hall's id.
