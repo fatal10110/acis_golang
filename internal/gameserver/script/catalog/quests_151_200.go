@@ -18,6 +18,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q164"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q165"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q166"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q167"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q168"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q169"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q170"
 )
 
 // quests151To200 is the catalog of quests 151 to 200 (#181).
@@ -39,10 +43,10 @@ func quests151To200() script.Catalog {
 		"quest.Q164_BloodFiend":                    q164.New,
 		"quest.Q165_ShilensHunt":                   q165.New,
 		"quest.Q166_MassOfDarkness":                q166.New,
-		"quest.Q167_DwarvenKinship":                nil,
-		"quest.Q168_DeliverSupplies":               nil,
-		"quest.Q169_OffspringOfNightmares":         nil,
-		"quest.Q170_DangerousSeduction":            nil,
+		"quest.Q167_DwarvenKinship":                q167.New,
+		"quest.Q168_DeliverSupplies":               q168.New,
+		"quest.Q169_OffspringOfNightmares":         q169.New,
+		"quest.Q170_DangerousSeduction":            q170.New,
 		"quest.Q171_ActsOfEvil":                    nil,
 	}
 }

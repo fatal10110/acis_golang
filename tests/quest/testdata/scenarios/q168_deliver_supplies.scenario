@@ -1,0 +1,201 @@
+# Deliver Supplies (Q168): a dark elven fighter of level 3 accepts at Jenna with her letter;
+# Harant takes it for the three sentry blades; Jenna takes hers; Roselyn and Kristin each trade
+# theirs for an old bronze sword, the second moving the cond; Jenna takes the two swords for
+# adena; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q168_deliver_supplies.golden
+character Courier 3
+class 31
+script quest.Q168_DeliverSupplies
+item 1153 1154 1155 1156 1157 57
+page guard/30349.htm
+page trainer/30360.htm
+page guard/30355.htm
+page guard/30357.htm
+page script/quest/Q168_DeliverSupplies/
+npc jenna 30349 Guard 10 0 0
+npc harant 30360 Trainer 20 0 0
+npc roselyn 30355 Guard 0 20 0
+npc kristin 30357 Guard -10 0 0
+
+# Jenna: accept with her letter.
+action jenna
+action jenna
+  S ActionFailed
+  S NpcHtmlMessage obj=jenna item=0 page=guard/30349.htm
+  S ActionFailed
+bypass npc_{jenna}_Quest
+  S NpcHtmlMessage obj=jenna item=0 page=script/quest/Q168_DeliverSupplies/30349-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q168_DeliverSupplies CREATED
+bypass Quest Q168_DeliverSupplies 30349-03.htm
+  S QuestList 168:0x80000001
+  S ExShowQuestMark quest=168
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1153
+  S NpcHtmlMessage obj=jenna item=0 page=script/quest/Q168_DeliverSupplies/30349-03.htm
+  S ActionFailed
+  Q upsert Q168_DeliverSupplies | <state> | STARTED
+  Q upsert Q168_DeliverSupplies | <cond> | 1
+  state Q168_DeliverSupplies STARTED
+  rows Q168_DeliverSupplies <cond>=1 <state>=STARTED
+  items 1153=1
+action jenna
+  S ActionFailed
+  S NpcHtmlMessage obj=jenna item=0 page=guard/30349.htm
+  S ActionFailed
+bypass npc_{jenna}_Quest
+  S NpcHtmlMessage obj=jenna item=0 page=script/quest/Q168_DeliverSupplies/30349-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Harant: the letter for the three sentry blades; asked again, he waits.
+action harant
+action harant
+  S ActionFailed
+  S NpcHtmlMessage obj=harant item=0 page=trainer/30360.htm
+  S ActionFailed
+bypass npc_{harant}_Quest
+  S QuestList 168:0x80000003
+  S ExShowQuestMark quest=168
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1153
+  S SystemMessage id=54 3:1154
+  S SystemMessage id=54 3:1155
+  S SystemMessage id=54 3:1156
+  S NpcHtmlMessage obj=harant item=0 page=script/quest/Q168_DeliverSupplies/30360-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q168_DeliverSupplies | <cond> | 2
+  items 1153=0 1154=1 1155=1 1156=1
+  rows Q168_DeliverSupplies <cond>=2 <state>=STARTED
+action harant
+  S ActionFailed
+  S NpcHtmlMessage obj=harant item=0 page=trainer/30360.htm
+  S ActionFailed
+bypass npc_{harant}_Quest
+  S NpcHtmlMessage obj=harant item=0 page=script/quest/Q168_DeliverSupplies/30360-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Roselyn has nothing for the character before Jenna takes her blade.
+action roselyn
+action roselyn
+  S ActionFailed
+  S NpcHtmlMessage obj=roselyn item=0 page=guard/30355.htm
+  S ActionFailed
+bypass npc_{roselyn}_Quest
+  S NpcHtmlMessage obj=roselyn item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Jenna: her blade; then she sends the character on.
+action jenna
+action jenna
+  S ActionFailed
+  S NpcHtmlMessage obj=jenna item=0 page=guard/30349.htm
+  S ActionFailed
+bypass npc_{jenna}_Quest
+  S QuestList 168:0x80000007
+  S ExShowQuestMark quest=168
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1154
+  S NpcHtmlMessage obj=jenna item=0 page=script/quest/Q168_DeliverSupplies/30349-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q168_DeliverSupplies | <cond> | 3
+  items 1154=0
+  rows Q168_DeliverSupplies <cond>=3 <state>=STARTED
+action jenna
+  S ActionFailed
+  S NpcHtmlMessage obj=jenna item=0 page=guard/30349.htm
+  S ActionFailed
+bypass npc_{jenna}_Quest
+  S NpcHtmlMessage obj=jenna item=0 page=script/quest/Q168_DeliverSupplies/30349-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Roselyn: her blade for an old bronze sword; asked again, she has nothing more.
+action roselyn
+action roselyn
+  S ActionFailed
+  S NpcHtmlMessage obj=roselyn item=0 page=guard/30355.htm
+  S ActionFailed
+bypass npc_{roselyn}_Quest
+  S SystemMessage id=302 3:1155
+  S SystemMessage id=54 3:1157
+  S NpcHtmlMessage obj=roselyn item=0 page=script/quest/Q168_DeliverSupplies/30355-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1155=0 1157=1
+  rows Q168_DeliverSupplies <cond>=3 <state>=STARTED
+action roselyn
+  S ActionFailed
+  S NpcHtmlMessage obj=roselyn item=0 page=guard/30355.htm
+  S ActionFailed
+bypass npc_{roselyn}_Quest
+  S NpcHtmlMessage obj=roselyn item=0 page=script/quest/Q168_DeliverSupplies/30355-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kristin: her blade for the second sword, which moves the cond.
+action kristin
+action kristin
+  S ActionFailed
+  S NpcHtmlMessage obj=kristin item=0 page=guard/30357.htm
+  S ActionFailed
+bypass npc_{kristin}_Quest
+  S SystemMessage id=302 3:1156
+  S SystemMessage id=54 3:1157
+  S QuestList 168:0x8000000f
+  S ExShowQuestMark quest=168
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q168_DeliverSupplies/30357-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q168_DeliverSupplies | <cond> | 4
+  items 1156=0 1157=2
+  rows Q168_DeliverSupplies <cond>=4 <state>=STARTED
+action kristin
+  S ActionFailed
+  S NpcHtmlMessage obj=kristin item=0 page=guard/30357.htm
+  S ActionFailed
+bypass npc_{kristin}_Quest
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q168_DeliverSupplies/30357-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Jenna: the two swords for adena; the quest completes.
+action jenna
+action jenna
+  S ActionFailed
+  S NpcHtmlMessage obj=jenna item=0 page=guard/30349.htm
+  S ActionFailed
+bypass npc_{jenna}_Quest
+  S SystemMessage id=301 3:1157 6:2
+  S SystemMessage id=52 6:820
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 168:0x00000000
+  S NpcHtmlMessage obj=jenna item=0 page=script/quest/Q168_DeliverSupplies/30349-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q168_DeliverSupplies | <state> | COMPLETED
+  Q delete-except-state Q168_DeliverSupplies
+  items 1157=0 57=820
+  state Q168_DeliverSupplies COMPLETED
+  rows Q168_DeliverSupplies <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q168_DeliverSupplies COMPLETED
+  rows Q168_DeliverSupplies <state>=COMPLETED
+  items 57=820
+action jenna
+action jenna
+  S ActionFailed
+  S NpcHtmlMessage obj=jenna item=0 page=guard/30349.htm
+  S ActionFailed
+bypass npc_{jenna}_Quest
+  S NpcHtmlMessage obj=jenna item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
