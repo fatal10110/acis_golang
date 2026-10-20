@@ -1,0 +1,57 @@
+# Possessor of a Precious Soul - 4 (Q247), at the Lady of the Lake (cond 2) on a level 75
+# Sorcerer subclass: she makes the player a noblesse, gives the Noblesse Tiara and closes the
+# quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q247_possessor_of_a_precious_soul_lady.golden
+character Fighter 76
+class 2
+subclass 12 75
+quest Q247_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
+script quest.Q247_PossessorOfAPreciousSoul
+item 7694
+page default/31745.htm
+page script/quest/Q247_PossessorOfAPreciousSoul/
+npc lady 31745 Folk 10 0 0
+
+# The Lady of the Lake makes the player a noblesse and gives the tiara.
+action lady
+action lady
+  S ActionFailed
+  S NpcHtmlMessage obj=lady item=0 page=default/31745.htm
+  S ActionFailed
+bypass npc_{lady}_Quest
+  S NpcHtmlMessage obj=lady item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31745-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q247_PossessorOfAPreciousSoul 31745-02.htm
+  S NpcHtmlMessage obj=lady item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31745-02.htm
+  S ActionFailed
+bypass Quest Q247_PossessorOfAPreciousSoul 31745-03.htm
+  S NpcHtmlMessage obj=lady item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31745-03.htm
+  S ActionFailed
+bypass Quest Q247_PossessorOfAPreciousSoul 31745-04.htm
+  S NpcHtmlMessage obj=lady item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31745-04.htm
+  S ActionFailed
+bypass Quest Q247_PossessorOfAPreciousSoul 31745-05.htm
+  S SystemMessage id=54 3:7694
+  S SystemMessage id=45 1:93836
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 247:0x00000000
+  S NpcHtmlMessage obj=lady item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31745-05.htm
+  S ActionFailed
+  Q upsert Q247_PossessorOfAPreciousSoul | <state> | COMPLETED
+  Q delete-except-state Q247_PossessorOfAPreciousSoul
+  items 7694=1
+  state Q247_PossessorOfAPreciousSoul COMPLETED
+  rows Q247_PossessorOfAPreciousSoul <state>=COMPLETED
+relog
+  state Q247_PossessorOfAPreciousSoul COMPLETED
+  items 7694=1
+action lady
+action lady
+  S ActionFailed
+  S NpcHtmlMessage obj=lady item=0 page=default/31745.htm
+  S ActionFailed
+bypass npc_{lady}_Quest
+  S NpcHtmlMessage obj=lady item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

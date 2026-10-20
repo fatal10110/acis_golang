@@ -1,0 +1,24 @@
+# Possessor of a Precious Soul - 4 (Q247), at the Lady of the Lake (cond 2) on a level 74
+# Sorcerer subclass: she sends the player away, and the quest stays where it is. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q247_possessor_of_a_precious_soul_low_level.golden
+character Fighter 76
+class 2
+subclass 12 74
+quest Q247_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
+script quest.Q247_PossessorOfAPreciousSoul
+page default/31745.htm
+page script/quest/Q247_PossessorOfAPreciousSoul/
+npc lady 31745 Folk 10 0 0
+
+# Below level 75 the Lady of the Lake sends the player away.
+action lady
+action lady
+  S ActionFailed
+  S NpcHtmlMessage obj=lady item=0 page=default/31745.htm
+  S ActionFailed
+bypass npc_{lady}_Quest
+  S NpcHtmlMessage obj=lady item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31745-06.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q247_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
