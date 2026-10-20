@@ -36,11 +36,28 @@ func aiIndividual3HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDDMagicStoneAggressive": {
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastSplashAggressive": {
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCasting3SkillsMagicalAggressive.AntharasPrivateBehemothDragon": {
+			"OnAttacked":  {"NPC.TopDesireTarget"},
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCasting3SkillsMagicalAggressive.PartyLeaderCasting3SkillsMagicalAggressive": {
+			"OnAttacked":  {"NPC.TopDesireTarget"},
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCouplePhysicalSpecial": {
 			"OnAttacked":  {"NPC.TopDesireTarget"},
 			"OnPartyDied": {"NPC.TopDesireTarget", "Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPabelgolemAggressive": {
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPatrol": {
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPatrolPhysicalSpecialStoneAggressive": {
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecial": {
@@ -59,7 +76,17 @@ func aiIndividual3HandleOps() map[string]script.HandleOps {
 			"OnAttacked":  {"NPC.TopDesireTarget"},
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderSlowTypeAggressive": {
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarriorAggressive": {
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.QuestPartyLeader": {
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.RoyalRushPartyLeader": {
+			"OnAttacked":  {"NPC.TopDesireTarget"},
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
 	}

@@ -35,15 +35,24 @@ var individual3 = []struct {
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecialSummon", PartyLeaderPhysicalSpecialSummon},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecialSummonAggressive", PartyLeaderPhysicalSpecialSummonAggressive},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarriorAggressive", PartyLeaderWarriorAggressive},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastSplashAggressive", PartyLeaderCastSplashAggressive},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCasting3SkillsMagicalAggressive.AntharasPrivateBehemothDragon", AntharasPrivateBehemothDragon},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCasting3SkillsMagicalAggressive.PartyLeaderCasting3SkillsMagicalAggressive", PartyLeaderCasting3SkillsMagicalAggressive},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPabelgolemAggressive", PartyLeaderPabelgolemAggressive},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPatrolPhysicalSpecialStoneAggressive", PartyLeaderPatrolPhysicalSpecialStoneAggressive},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderSlowTypeAggressive", PartyLeaderSlowTypeAggressive},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.QuestPartyLeader", QuestPartyLeader},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.RoyalRushPartyLeader", RoyalRushPartyLeader},
 }
 
 // TestIndividual3RegistrationMatchesReferenceManifest registers the batch
 // after the behavior chain it derives from, through the engine registry
 // with its own seam gate and every id a hostile NPC (the datapack types all
-// 54 ids Monster). None is refused, and the registry dump equals the
+// 70 ids Monster). None is refused, and the registry dump equals the
 // reference manifest for the batch: each class's kind and bind lines (none
-// for PartyLeaderCastDD, which has no NPC of its own), and every folded
-// per-(npc, event) list restricted to the batch, each of the 54 ids on the
+// for PartyLeaderCastDD and PartyLeaderCasting3SkillsMagicalAggressive,
+// which have no NPC of their own), and every folded
+// per-(npc, event) list restricted to the batch, each of the 70 ids on the
 // 12 events of the PartyLeaderWarrior chain.
 func TestIndividual3RegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, 0, len(chain)+len(individual3))
@@ -75,7 +84,7 @@ func TestIndividual3RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual1View(t, path, ours, sc)
-	if wantFolds, got := (2+9+2+1+1+6+20+1+3+3+1+1+2+1+1)*12, len(want.folds); got != wantFolds {
+	if wantFolds, got := (2+9+2+1+1+6+20+1+3+3+1+1+2+1+1+5+1+0+2+2+1+4+1)*12, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 
@@ -93,7 +102,7 @@ func TestIndividual3RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{21517, 21512, 20963, 22028, 21345, 21371, 21432, 27041, 20947, 22096, 20983, 22135, 22029, 22032, 22038, 22039, 20376, 20520, 20522, 22100, 22104, 22102, 22113, 20773, 21081} {
+	for _, id := range []int32{21517, 21512, 20963, 22028, 21345, 21371, 21432, 27041, 20947, 22096, 20983, 22135, 22029, 22032, 22038, 22039, 20376, 20520, 20522, 22100, 22104, 22102, 22113, 20773, 21081, 21058, 20966, 20973, 21078, 20986, 22060, 22074, 21343, 21369, 22092, 27185, 27186, 27187, 27188, 21434, 29069} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
