@@ -96,61 +96,77 @@ func PartyPrivateCastCurseHooks() script.Hooks {
 // territory again.
 func PartyPrivateHereticCastCurse() script.Script {
 	base := PartyPrivateCastCurseHooks()
-	idle := func(n *script.NPC) bool {
-		i := n.Intention()
-		return i != script.IntentionAttack && i != script.IntentionCast
-	}
-	goHome := func(n *script.NPC) {
-		n.RemoveAllAttackDesire()
-		n.AddMoveToDesire(n.SpawnLocation(), 100)
-	}
 	return script.Script{Dir: partyPrivateDir, Behavior: true, NPCs: []int32{22157}, Hooks: base.With(script.Hooks{
 		OnCreated: func(s *script.Script, e script.Created) {
 			e.NPC.SetInt(script.SlotIntAI4, 0)
 			base.Created(s, e)
 		},
 		OnAttacked: func(s *script.Script, e script.Attacked) {
-			if n := e.NPC; idle(n) && n.Int(script.SlotIntAI4) == 0 {
+			if n := e.NPC; hereticIdle(n) && n.Int(script.SlotIntAI4) == 0 {
 				n.SetInt(script.SlotIntAI4, 1)
 			}
 			base.Attacked(s, e)
 		},
 		OnPartyAttacked: func(s *script.Script, e script.PartyAttacked) {
-			if called := e.Called; idle(called) && called.Int(script.SlotIntAI4) == 0 {
+			if called := e.Called; hereticIdle(called) && called.Int(script.SlotIntAI4) == 0 {
 				called.SetInt(script.SlotIntAI4, 1)
 			}
 			base.PartyAttacked(s, e)
 		},
-		OnOutOfTerritory: func(_ *script.Script, e script.OutOfTerritory) {
-			if e.NPC.Int(script.SlotIntAI4) == 0 {
-				goHome(e.NPC)
-			}
-		},
-		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
-			n := e.NPC
-			master := n.Master()
-			if master == nil || e.Arg2 != master.ObjectID() {
-				return
-			}
-			switch e.EventID {
-			case 10033, 10002:
-				c0 := s.Object(e.Arg1)
-				if c0 == nil {
-					return
-				}
-				if e.EventID == 10033 {
-					n.SetInt(script.SlotIntAI4, 1)
-				}
-				n.RemoveAllAttackDesire()
-				if c0.Playable() {
-					n.AddAttackDesire(c0, 200)
-				}
-			case 10035:
-				n.SetInt(script.SlotIntAI4, 0)
-				goHome(n)
-			}
-		},
+		OnOutOfTerritory: hereticOutOfTerritory,
+		OnScriptEvent:    hereticScriptEvent,
 	})}
+}
+
+// hereticIdle reports whether n is neither attacking nor casting.
+func hereticIdle(n *script.NPC) bool {
+	i := n.Intention()
+	return i != script.IntentionAttack && i != script.IntentionCast
+}
+
+// hereticGoHome drops n's attack desires and has it want to walk to its
+// spawn point.
+func hereticGoHome(n *script.NPC) {
+	n.RemoveAllAttackDesire()
+	n.AddMoveToDesire(n.SpawnLocation(), 100)
+}
+
+// hereticOutOfTerritory is the out-of-territory hook of the heretic
+// privates: one still bound to its territory (i_ai4 clear) walks home.
+func hereticOutOfTerritory(_ *script.Script, e script.OutOfTerritory) {
+	if e.NPC.Int(script.SlotIntAI4) == 0 {
+		hereticGoHome(e.NPC)
+	}
+}
+
+// hereticScriptEvent is the script-event hook of the heretic privates. Only
+// an event whose second argument is its master's id counts: 10002 and
+// 10033 turn it on the creature the first argument names (10033 also
+// releases it from its territory), and 10035 binds it to the territory
+// again and sends it home.
+func hereticScriptEvent(s *script.Script, e script.ScriptEvent) {
+	n := e.NPC
+	master := n.Master()
+	if master == nil || e.Arg2 != master.ObjectID() {
+		return
+	}
+	switch e.EventID {
+	case 10033, 10002:
+		c0 := s.Object(e.Arg1)
+		if c0 == nil {
+			return
+		}
+		if e.EventID == 10033 {
+			n.SetInt(script.SlotIntAI4, 1)
+		}
+		n.RemoveAllAttackDesire()
+		if c0.Playable() {
+			n.AddAttackDesire(c0, 200)
+		}
+	case 10035:
+		n.SetInt(script.SlotIntAI4, 0)
+		hereticGoHome(n)
+	}
 }
 
 // PartyPrivateCastDDHeal is PartyPrivateCastDDHeal: a PartyPrivateWarrior
