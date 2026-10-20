@@ -7,5 +7,16 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // featuresHandleOps holds, per script of features.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func featuresHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.feature.KetraOrcSupport": {
+			"OnAttacked":     {"NPC.RemoveAggro"},
+			"OnClanAttacked": {"NPC.RemoveAggro"},
+			"OnSeeSpell":     {"NPC.RemoveAggro"},
+		},
+		"script.feature.VarkaSilenosSupport": {
+			"OnAttacked":     {"NPC.RemoveAggro"},
+			"OnClanAttacked": {"NPC.RemoveAggro"},
+			"OnSeeSpell":     {"NPC.RemoveAggro"},
+		},
+	}
 }

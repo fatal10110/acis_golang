@@ -1,0 +1,26 @@
+# Ketra and Varka soldiers (KetraOrcSupport, VarkaSilenosSupport) and a Ketra ally of level 1 who
+# casts Detect Insect Weakness (75, a self buff of 303 aggro points) beside them: the Ketra footman
+# sees it and wants to petrify the ally (Raid Curse, 4515); the Varka recruit, whose side the ally
+# is not allied with, wants nothing. The footman then petrifies the ally. Each soldier lists the
+# curse, which a scenario monster needs to cast it. The cast of a summon is in
+# tests/quest/alliance_support_test.go.
+# Expectations are derived from the reference source (onSeeSpell).
+character Ally 40
+standing 1
+skill 75 1
+script script.feature.KetraOrcSupport
+script script.feature.VarkaSilenosSupport
+npc footman 21324 Monster 40 0 0 skill DEBUFF 4515 1
+npc recruit 21350 Monster -40 0 0 skill DEBUFF 4515 1
+
+cast footman 75
+  S MagicSkillUse caster=player target=player skill=75-1 hit=1958 reuse=13058 success=0
+  S SystemMessage id=46 4:75,1
+  S SystemMessage id=110 4:75,1
+  desires footman cast(player,4515,move)=1000000
+  desires recruit -
+tick x3
+  S MagicSkillUse caster=footman target=player skill=4515-1 hit=0 reuse=0 success=0
+  S ActionFailed
+  S ActionFailed
+  S SystemMessage id=110 4:4515,1
