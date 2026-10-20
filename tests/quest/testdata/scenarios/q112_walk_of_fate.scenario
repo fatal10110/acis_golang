@@ -1,0 +1,86 @@
+# Walk of Fate (Q112): a level 20 character accepts at Livina and reports to Karuda, who pays an
+# enchant scroll and adena; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q112_walk_of_fate.golden
+character Walker 20
+script quest.Q112_WalkOfFate
+item 956 57
+page trainer/30572.htm
+page default/32017.htm
+page script/quest/Q112_WalkOfFate/
+npc livina 30572 Trainer 10 0 0
+npc karuda 32017 Folk 20 0 0
+
+# Livina: accept.
+action livina
+action livina
+  S ActionFailed
+  S NpcHtmlMessage obj=livina item=0 page=trainer/30572.htm
+  S ActionFailed
+bypass npc_{livina}_Quest
+  S NpcHtmlMessage obj=livina item=0 page=script/quest/Q112_WalkOfFate/30572-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q112_WalkOfFate CREATED
+bypass Quest Q112_WalkOfFate 30572-02.htm
+  S QuestList 112:0x80000001
+  S ExShowQuestMark quest=112
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=livina item=0 page=script/quest/Q112_WalkOfFate/30572-02.htm
+  S ActionFailed
+  Q upsert Q112_WalkOfFate | <state> | STARTED
+  Q upsert Q112_WalkOfFate | <cond> | 1
+  state Q112_WalkOfFate STARTED
+  rows Q112_WalkOfFate <cond>=1 <state>=STARTED
+action livina
+  S ActionFailed
+  S NpcHtmlMessage obj=livina item=0 page=trainer/30572.htm
+  S ActionFailed
+bypass npc_{livina}_Quest
+  S NpcHtmlMessage obj=livina item=0 page=script/quest/Q112_WalkOfFate/30572-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Karuda pays.
+action karuda
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q112_WalkOfFate/32017-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q112_WalkOfFate 32017-02.htm
+  S SystemMessage id=54 3:956
+  S SystemMessage id=52 6:4665
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 112:0x00000000
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q112_WalkOfFate/32017-02.htm
+  S ActionFailed
+  Q upsert Q112_WalkOfFate | <state> | COMPLETED
+  Q delete-except-state Q112_WalkOfFate
+  state Q112_WalkOfFate COMPLETED
+  rows Q112_WalkOfFate <state>=COMPLETED
+  items 956=1 57=4665
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 956=1 57=4665
+  state Q112_WalkOfFate COMPLETED
+  rows Q112_WalkOfFate <state>=COMPLETED
+action livina
+action livina
+  S ActionFailed
+  S NpcHtmlMessage obj=livina item=0 page=trainer/30572.htm
+  S ActionFailed
+bypass npc_{livina}_Quest
+  S NpcHtmlMessage obj=livina item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

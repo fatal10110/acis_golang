@@ -1,0 +1,26 @@
+# Beyond the Hills of Winter (Q116), short of supplies: a dwarf on cond 1 holding all the bandages
+# and energy stones but nine thief keys is sent away by Filaur, who takes nothing. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q116_beyond_the_hills_of_winter_short.golden
+character Hauler 30
+class 53
+quest Q116_BeyondTheHillsOfWinter <cond>=1 <state>=STARTED
+hold 1833 20
+hold 5589 5
+hold 1661 9
+script quest.Q116_BeyondTheHillsOfWinter
+item 1833 5589 1661
+page default/30535.htm
+page script/quest/Q116_BeyondTheHillsOfWinter/
+npc filaur 30535 Folk 10 0 0
+
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/30535-04.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q116_BeyondTheHillsOfWinter <cond>=1 <state>=STARTED
+  items 1833=20 5589=5 1661=9

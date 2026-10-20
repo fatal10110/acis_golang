@@ -1,0 +1,26 @@
+# Last Imperial Prince (Q119), refused: a level 74 character without the brooch is turned away by
+# the Nameless Spirit; the accept bypass, sent anyway, is not a link of the page it was shown, so
+# it is refused without an answer and the quest stays unstarted. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q119_last_imperial_prince_refused.golden
+character Prince 74
+script quest.Q119_LastImperialPrince
+item 7262
+page default/31453.htm
+page script/quest/Q119_LastImperialPrince/
+npc spirit 31453 Folk 10 0 0
+
+action spirit
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q119_LastImperialPrince/31453-00a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q119_LastImperialPrince CREATED
+  rows Q119_LastImperialPrince -
+bypass Quest Q119_LastImperialPrince 31453-04.htm
+  state Q119_LastImperialPrince CREATED
+  rows Q119_LastImperialPrince -
