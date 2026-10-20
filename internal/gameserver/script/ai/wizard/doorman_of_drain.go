@@ -33,10 +33,11 @@ func drainSpell(n *script.NPC, c script.Creature) {
 
 // drainSummonKilled turns n on the owner of c, a summon it has just
 // killed: its DD magic, else an attack, and 200 on its hate list. A summon
-// whose owner has left turns it on no one.
+// whose owner has left only makes it give up its spells.
 func drainSummonKilled(n *script.NPC, c script.Creature) {
 	master := script.ActingPlayer(c)
 	if master == nil {
+		drainSpell(n, nil)
 		return
 	}
 	drainSpell(n, master)
