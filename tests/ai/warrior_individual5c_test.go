@@ -89,6 +89,14 @@ func ind5cCaptureDef(id modelskill.ID, level int) modelskill.Definition {
 	return d
 }
 
+// ind5cCaptureLevel0Def is the first capture skill at level 0, its effect
+// of a stack type of its own, so it lands beside the higher levels.
+func ind5cCaptureLevel0Def() modelskill.Definition {
+	d := ind5cCaptureDef(ind5cCaptureA, 0)
+	d.Effects[0].StackType += "_0"
+	return d
+}
+
 // ind5cSkills are the skills the batch's fixture NPCs cast: the self
 // skills self buffs, the clan buff a one-target buff and the others
 // one-target magic, both of reach 600.
@@ -176,7 +184,7 @@ func bootIndividual5c(t *testing.T, templates ...*npc.Template) *ind1World {
 		gameservertest.WithScriptRand(draws.rand),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 		gameservertest.WithNpcSpawnSkills(ind5cSkills()),
-		gameservertest.WithScriptSkills(ind5cCaptureDef(ind5cCaptureA, 1), ind5cCaptureDef(ind5cCaptureB, 1)),
+		gameservertest.WithScriptSkills(ind5cCaptureDef(ind5cCaptureA, 1), ind5cCaptureDef(ind5cCaptureA, 2), ind5cCaptureLevel0Def(), ind5cCaptureDef(ind5cCaptureB, 1)),
 	}}, append(templates, gameservertest.FolkTemplate("Folk", int(strongKeyBoxID)))...)
 	return &ind1World{warriorWorld: w, draws: draws, heard: heard}
 }
@@ -523,7 +531,7 @@ func TestRoyalRushRoomBossLeavesItsKeyBox(t *testing.T) {
 			if len(boxes) != 1 {
 				t.Fatalf("Key Boxes after the boss died = %d, want 1", len(boxes))
 			}
-			if at := ind8At(boxes[0]); at.X != point.X || at.Y != point.Y {
+			if at := ind8At(boxes[0]); at != point {
 				t.Fatalf("Key Box at %v, want %v", at, point)
 			}
 			if m := script.NPCOf(boxes[0]).Master(); m == nil || m.ObjectID() != n.ObjectID() {
@@ -642,6 +650,35 @@ func TestTyrannoPrimevalCaptureCycle(t *testing.T) {
 	ind5bRunUntil(t, w, "the capture timer", func() bool { return ind1Slot(n, npc.IntQuest0) == 0 })
 	if got := ind1Slot(n, npc.IntQuest1); got != 2 {
 		t.Fatalf("social animation after the capture timer = %d, want the drawn 2", got)
+	}
+}
+
+// TestTyrannoPrimevalCaptureLevels ports the level branches of
+// TyrannoPrimeval's abnormal-status hook for the capture skill matching
+// its last social animation (0). Level 1 with the capture stage clear
+// wants its first debuff on itself and sets the stage; level 2 with the
+// stage set wants its second debuff on itself and keeps the stage; level 0
+// with the stage set wants its cancel-all on itself and clears the stage.
+// Each desire weighs 10000000.
+func TestTyrannoPrimevalCaptureLevels(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual5c(t, ind5cTyrannoTemplate(nil, map[npc.SkillType]modelskill.ID{
+		npc.SkillTypeDebuff1: ind5cDebuff1, npc.SkillTypeDebuff2: ind5cDebuff2, npc.SkillTypeCaptureCancelAll: ind5cCancelAll,
+	}))
+	n := w.spawn(t, ind5cTyrannoID, 1500, 0)
+	self := n.ObjectID()
+	for _, row := range []struct {
+		level int
+		want  modelskill.ID
+		stage int32
+	}{{1, ind5cDebuff1, 1}, {2, ind5cDebuff2, 1}, {0, ind5cCancelAll, 0}} {
+		w.clear(t, n)
+		w.ind5cLand(t, modelskill.Ref{ID: ind5cCaptureA, Level: row.level}, n)
+		when := fmt.Sprintf("after the matching capture at level %d", row.level)
+		w.wantCasts(t, when, n, map[modelskill.ID]ind1Cast{row.want: {self, 10000000}})
+		if got := ind1Slot(n, npc.IntQuest0); got != row.stage {
+			t.Fatalf("%s: capture stage = %d, want %d", when, got, row.stage)
+		}
 	}
 }
 
