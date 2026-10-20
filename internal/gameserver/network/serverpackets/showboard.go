@@ -50,13 +50,26 @@ func FrameShowBoardFields(fields []string) wire.Frame {
 }
 
 func frameShowBoard(content string) wire.Frame {
+	w := showBoardWriter()
+	w.WriteString(content)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// frameShowBoardUnits is frameShowBoard over content's UTF-16 code units,
+// written as they are.
+func frameShowBoardUnits(content []uint16) wire.Frame {
+	w := showBoardWriter()
+	w.WriteUTF16(content)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func showBoardWriter() *wire.Writer {
 	w := newFrameWriter(OpcodeShowBoard)
 	w.WriteUint8(1)
 	for _, tab := range showBoardTabs {
 		w.WriteString(tab)
 	}
-	w.WriteString(content)
-	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+	return w
 }
 
 // The board page limits, in UTF-16 code units.
@@ -82,7 +95,9 @@ func FramesShowBoardPage(html string) []wire.Frame {
 	if n >= showBoardPageLength {
 		return nil
 	}
-	part := func(from, to int) string { return commons.UTF16String(units[from:to]) }
+	part := func(id string, from, to int) wire.Frame {
+		return frameShowBoardUnits(append(commons.UTF16Units(id+showBoardSeparator), units[from:to]...))
+	}
 	switch {
 	case n < showBoardPartLength:
 		return []wire.Frame{
@@ -92,15 +107,15 @@ func FramesShowBoardPage(html string) []wire.Frame {
 		}
 	case n < showBoardEditLength:
 		return []wire.Frame{
-			FrameShowBoard("101", part(0, showBoardPartLength)),
-			FrameShowBoard("102", part(showBoardPartLength, n)),
+			part("101", 0, showBoardPartLength),
+			part("102", showBoardPartLength, n),
 			FrameShowBoard("103", ShowBoardNoPage),
 		}
 	default:
 		return []wire.Frame{
-			FrameShowBoard("101", part(0, showBoardPartLength)),
-			FrameShowBoard("102", part(showBoardPartLength, showBoardEditLength)),
-			FrameShowBoard("103", part(showBoardEditLength, n)),
+			part("101", 0, showBoardPartLength),
+			part("102", showBoardPartLength, showBoardEditLength),
+			part("103", showBoardEditLength, n),
 		}
 	}
 }

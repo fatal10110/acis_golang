@@ -2,9 +2,8 @@ package item
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // SkillRef is an (id, level) pair naming one skill without resolving it:
@@ -21,11 +20,11 @@ func ParseSkillRef(s string) (SkillRef, error) {
 	if !ok {
 		return SkillRef{}, fmt.Errorf("item: skill reference %q: want \"id-level\"", s)
 	}
-	idNum, err := commons.ParseInt(id, 32)
+	idNum, err := strconv.ParseInt(id, 10, 32)
 	if err != nil {
 		return SkillRef{}, fmt.Errorf("item: skill reference %q: %w", s, err)
 	}
-	levelNum, err := commons.ParseInt(level, 32)
+	levelNum, err := strconv.ParseInt(level, 10, 32)
 	if err != nil {
 		return SkillRef{}, fmt.Errorf("item: skill reference %q: %w", s, err)
 	}

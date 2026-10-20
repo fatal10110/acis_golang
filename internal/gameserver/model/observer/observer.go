@@ -3,9 +3,9 @@ package observer
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -31,7 +31,7 @@ func ParseGroups(raw string) ([]int, error) {
 	parts := strings.Split(raw, ";")
 	groups := make([]int, 0, len(parts))
 	for _, part := range parts {
-		groupID, err := commons.Atoi(part)
+		groupID, err := strconv.Atoi(part)
 		if err != nil {
 			return nil, fmt.Errorf("groups %q: %w", raw, err)
 		}

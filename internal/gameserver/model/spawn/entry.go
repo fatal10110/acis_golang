@@ -2,10 +2,10 @@ package spawn
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -100,7 +100,7 @@ func ParsePositions(raw string) ([]Position, error) {
 func parsePosition(parts []string, weighted bool) (Position, error) {
 	nums := make([]int, 4)
 	for i, name := range []string{"x", "y", "z", "heading"} {
-		n, err := commons.Atoi(parts[i])
+		n, err := strconv.Atoi(parts[i])
 		if err != nil {
 			return Position{}, fmt.Errorf("spawn: pos %s: %w", name, err)
 		}
@@ -108,7 +108,7 @@ func parsePosition(parts []string, weighted bool) (Position, error) {
 	}
 	chance := 0
 	if weighted {
-		n, err := commons.Atoi(strings.TrimSuffix(parts[4], "%"))
+		n, err := strconv.Atoi(strings.TrimSuffix(parts[4], "%"))
 		if err != nil {
 			return Position{}, fmt.Errorf("spawn: pos chance: %w", err)
 		}
