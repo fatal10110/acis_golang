@@ -83,6 +83,122 @@ func FreyaGardener() script.Script {
 	})}
 }
 
+// FreyaPet is FreyaPet: a PartyLeaderWarriorAggressive that remembers the
+// first three clerics it sees. A hit may buff it, or on a small chance
+// turn all its hate on the attacker, shouted at when it was already its
+// target, and point its privates at it; under 80% of its HP every hit
+// calls those around it. A fallen party member turns it on each
+// remembered cleric still alive in turn. As it dies it tells Ice Fairy
+// Sirra's maker and those around it.
+func FreyaPet() script.Script {
+	base := PartyLeaderWarriorAggressiveHooks()
+	return script.Script{Dir: partyLeaderDir, Behavior: true, NPCs: []int32{22104}, Hooks: base.With(script.Hooks{
+		OnCreated: func(s *script.Script, e script.Created) {
+			n := e.NPC
+			n.SetSlot(script.SlotCreature0, nil)
+			n.SetSlot(script.SlotCreature1, nil)
+			n.SetSlot(script.SlotCreature2, nil)
+			base.Created(s, e)
+		},
+		OnSeeCreature: func(s *script.Script, e script.SeeCreature) {
+			if p, ok := e.Creature.(*script.Player); ok && p.InClassGroup("@cleric_group") {
+				n := e.NPC
+				switch {
+				case n.Slot(script.SlotCreature0) == nil:
+					n.SetSlot(script.SlotCreature0, e.Creature)
+				case n.Slot(script.SlotCreature1) == nil:
+					n.SetSlot(script.SlotCreature1, e.Creature)
+				case n.Slot(script.SlotCreature2) == nil:
+					n.SetSlot(script.SlotCreature2, e.Creature)
+				}
+			}
+			base.SeeCreature(s, e)
+		},
+		OnAttacked: func(s *script.Script, e script.Attacked) {
+			n, attacker := e.NPC, e.Attacker
+			if s.Rnd(100) < 5 {
+				addCastByType(n, n, npc.SkillTypeSelfBuff, 1000000)
+			}
+			if s.Rnd(100) < 3 {
+				if script.Same(n.TopDesireTarget(), attacker) {
+					n.Say(script.NpcString(1000399, attacker.Name()))
+				}
+				n.CleanAllHate()
+				n.AddAttackDesire(attacker, 1000000)
+				n.SetInt(script.SlotFlag, attacker.ObjectID())
+				s.BroadcastScriptEvent(n, 10002, n.ObjectID(), 2000)
+			}
+			if n.HPRatio() < 0.8 {
+				s.BroadcastScriptEvent(n, 10034, 0, 2000)
+			}
+			base.Attacked(s, e)
+		},
+		OnPartyDied: func(s *script.Script, e script.PartyDied) {
+			called := e.Called
+			if script.Same(e.Caller, called) {
+				return
+			}
+			called.LookNeighbor()
+			for _, slot := range []script.CreatureSlot{script.SlotCreature0, script.SlotCreature1, script.SlotCreature2} {
+				if c := called.Slot(slot); c != nil && !c.Dead() {
+					called.Say(script.NpcString(1000399, c.Name()))
+					called.CleanAllHate()
+					called.AddAttackDesire(c, 1000000)
+					called.SetInt(script.SlotFlag, c.ObjectID())
+					s.BroadcastScriptEvent(called, 10002, called.ObjectID(), 500)
+				}
+			}
+		},
+		OnMyDying: func(s *script.Script, e script.MyDying) {
+			s.Spawner().SendMakerEvent("schuttgart13_mb2314_05m1", "10005", 0, 0)
+			s.BroadcastScriptEvent(e.NPC, 11036, 2, 7000)
+		},
+	})}
+}
+
+// FreyaSecretaryLeader is FreyaSecretaryLeader: a
+// PartyLeaderWarriorAggressive that, up to 15 times, calls two privates
+// onto a party member fallen under a third of its HP, set on the
+// creature that hit it, and tells that member. It wants to attack the
+// players and summons it sees inside its territory, ignores a fallen
+// party member, and as it dies tells Ice Fairy Sirra's maker and those
+// around it.
+func FreyaSecretaryLeader() script.Script {
+	base := PartyLeaderWarriorAggressiveHooks()
+	return script.Script{Dir: partyLeaderDir, Behavior: true, NPCs: []int32{22102}, Hooks: base.With(script.Hooks{
+		OnCreated: func(s *script.Script, e script.Created) {
+			e.NPC.SetInt(script.SlotIntAI1, 0)
+			base.Created(s, e)
+		},
+		OnPartyAttacked: func(s *script.Script, e script.PartyAttacked) {
+			caller, called := e.Caller, e.Called
+			if !script.Same(caller, called) && !called.Dead() && called.Int(script.SlotIntAI1) < 15 && caller.HPRatio() < 0.33 {
+				at := script.LocOf(caller)
+				params := script.Params{P1: 1000, P2: e.Target.ObjectID()}
+				s.Spawner().CreateOnePrivateEx(called, 18327, script.Loc{X: at.X, Y: at.Y, Z: at.Z}, 0, params)
+				s.Spawner().CreateOnePrivateEx(called, 18327, script.Loc{X: at.X, Y: at.Y, Z: at.Z}, 0, params)
+				s.SendScriptEvent(caller, 10023, 0, 0)
+				called.SetInt(script.SlotIntAI1, called.Int(script.SlotIntAI1)+1)
+			}
+			base.PartyAttacked(s, e)
+		},
+		OnSeeCreature: func(s *script.Script, e script.SeeCreature) {
+			if !e.Creature.Playable() {
+				return
+			}
+			if e.NPC.InMyTerritory() {
+				e.NPC.AddAttackDesire(e.Creature, 200)
+			}
+			base.SeeCreature(s, e)
+		},
+		OnPartyDied: func(*script.Script, script.PartyDied) {},
+		OnMyDying: func(s *script.Script, e script.MyDying) {
+			s.Spawner().SendMakerEvent("schuttgart13_mb2314_05m1", "10005", 0, 0)
+			s.BroadcastScriptEvent(e.NPC, 11036, 1, 8000)
+		},
+	})}
+}
+
 // PartyLeaderCannibaliAggressiva is PartyLeaderCannibaliAggressiva: a
 // PartyLeaderWarriorAggressive whose attacked hook calls no parent. It
 // hates by the damage it takes, buffs itself once under half its HP, and
