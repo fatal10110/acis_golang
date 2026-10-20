@@ -73,18 +73,19 @@ func (m *Manager) signUp(g Guide, t GuideTalker, command string) GuideReply {
 	if reply, refused := m.signupRefusal(g, t); refused {
 		return reply
 	}
+	var stoneID int32
 	var needed, bonus int
 	switch stone {
 	case blueStoneID:
-		needed, bonus = g.Blue, blueStoneBonus
+		stoneID, needed, bonus = blueStoneID, g.Blue, blueStoneBonus
 	case greenStoneID:
-		needed, bonus = g.Green, greenStoneBonus
+		stoneID, needed, bonus = greenStoneID, g.Green, greenStoneBonus
 	case redStoneID:
-		needed, bonus = g.Red, redStoneBonus
+		stoneID, needed, bonus = redStoneID, g.Red, redStoneBonus
 	default:
 		return GuideReply{NotEnoughItems: true}
 	}
-	if t.Pay == nil || !t.Pay(int32(stone), needed) {
+	if t.Pay == nil || !t.Pay(stoneID, needed) {
 		return GuideReply{}
 	}
 	m.mu.Lock()
