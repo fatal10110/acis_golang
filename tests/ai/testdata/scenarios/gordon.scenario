@@ -1,0 +1,27 @@
+# Gordon (29095) wants to walk the gordon route at 10 from its creation (a fixture template
+# has no route of its alias, so it stands). 3 s after it appears, and every 3 s, it looks
+# for Zariche or Akamanah within 500 of it: Zariche lies 200 away, so it wants to pick it up
+# at 1000000. Its AI walks it there; arrived, it picks Zariche up, which leaves the world and
+# ends its life (S1_HAS_DISAPPEARED to every player). Its departure 3 s later, its hunt of a
+# cursed weapon's carrier and wielder are in tests/ai/raid_boss_test.go: the format checks no
+# NPC's presence and gives a raid boss no aggro range to see in.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1
+item 8689
+npc gordon 29095 RaidBoss 200 0 0 walks
+ground zariche 8190 1 400 0 0 cursed
+
+tick
+  desires gordon move_route()=10
+advance 3s
+  desires gordon move_route()=10 pick_up()=1000000
+tick x2
+walk gordon
+tick
+  S DeleteObject obj=zariche
+  S SystemMessage id=1818 3:8190
+advance 3s

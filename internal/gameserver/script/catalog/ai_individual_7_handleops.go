@@ -43,6 +43,17 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnSeeSpell":      {"NPC.AttackingNow", "NPC.TopDesireTarget"},
 			"OnTimer":         {"NPC.InCombat"},
 		},
+		"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill": {
+			"OnAttackFinished": {"NPC.CanAutoAttack", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
+			"OnAttacked":       {"NPC.CanAutoAttack", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
+			"OnClanAttacked":   {"NPC.CanAutoAttack", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
+			"OnPartyAttacked":  {"NPC.CanAutoAttack", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
+			"OnPartyDied":      {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnScriptEvent":    {"NPC.CanAutoAttack", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
+			"OnSeeCreature":    {"NPC.Muted", "NPC.PhysicalMuted", "NPC.TopDesireTarget"},
+			"OnSeeSpell":       {"NPC.InCombat", "NPC.Muted", "NPC.PhysicalMuted", "NPC.TopDesireTarget"},
+			"OnTimer":          {"NPC.CastingNow", "NPC.InCombat"},
+		},
 		"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill": {
 			"OnAttacked":         {"NPC.CanAutoAttack", "NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 			"OnClanAttacked":     {"NPC.CanAutoAttack", "NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
@@ -52,6 +63,21 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnSeeSpell":         {"NPC.HateList", "NPC.TopDesireTarget"},
 			"OnTimer":            {"NPC.CanAutoAttack", "NPC.CastingNow", "NPC.HateList", "NPC.InCombat", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 			"OnUseSkillFinished": {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted"},
+		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon": {
+			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1": {
+			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossStandard": {
+			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.RandomizeAttack"},
 		},
 	}
 }
