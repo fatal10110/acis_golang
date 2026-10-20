@@ -44,6 +44,16 @@ func aiIndividual4HandleOps() map[string]script.HandleOps {
 			"OnPartyDied": {"NPC.TopDesireTarget"},
 			"OnTimer":     {"Spawner.DecayMe"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoupleFollower.PartyPrivateCoupleFollowerBabyAggressive": {
+			"OnAttacked":  {"NPC.TopDesireTarget"},
+			"OnPartyDied": {"NPC.TopDesireTarget"},
+			"OnTimer":     {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoupleFollower.PartyPrivateCoupleFollowerFemaleAggressive": {
+			"OnAttacked":  {"NPC.TopDesireTarget"},
+			"OnPartyDied": {"NPC.TopDesireTarget"},
+			"OnTimer":     {"Spawner.DecayMe"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCouplePhysicalSpecial": {
 			"OnAttacked":  {"NPC.TopDesireTarget"},
 			"OnPartyDied": {"NPC.TopDesireTarget"},
@@ -57,6 +67,33 @@ func aiIndividual4HandleOps() map[string]script.HandleOps {
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePabelgolem": {
 			"OnTimer": {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateHereticZealot": {
+			"OnAttacked":  {"NPC.TopDesireTarget"},
+			"OnPartyDied": {"NPC.TopDesireTarget"},
+			"OnTimer":     {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateHereticZealot2": {
+			"OnAttacked":      {"NPC.TopDesireTarget"},
+			"OnPartyAttacked": {"NPC.TopDesireTarget"},
+			"OnPartyDied":     {"NPC.TopDesireTarget"},
+			"OnTimer":         {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecial": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialHeal": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialPowerShot": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePrimeval": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalStone": {
 			"OnTimer": {"Spawner.DecayMe"},

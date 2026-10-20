@@ -153,6 +153,14 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.RoyalRushPartyPrivateBomb",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.RoyalRushPartyPrivateHate",
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoupleFollower.PartyPrivateCoupleFollower",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoupleFollower.PartyPrivateCoupleFollowerBabyAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoupleFollower.PartyPrivateCoupleFollowerFemaleAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateHereticZealot",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateHereticZealot2",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecial",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialHeal",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialPowerShot",
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePrimeval",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)
