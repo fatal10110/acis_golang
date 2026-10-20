@@ -1,0 +1,196 @@
+# The Name of Evil - 2 (Q126), cond 18 to the end: with the bone powder the character goes to the
+# Shilen stone statue, which takes it, then to Asamanah, and Mushika finishes the quest with an
+# enchant scroll; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q126_the_name_of_evil_2_finish.golden
+character Seeker 77
+quest Q126_TheNameOfEvil_2 <cond>=18 <state>=STARTED
+hold 8783 1
+script quest.Q126_TheNameOfEvil_2
+item 8783 729
+page default/32109.htm
+page default/32115.htm
+page default/32114.htm
+page script/quest/Q126_TheNameOfEvil_2/
+npc statue 32109 Folk -10 0 0
+npc asamanah 32115 Folk 10 0 0
+npc mushika 32114 Folk 20 0 0
+
+# The statue takes the bone powder.
+action statue
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-05.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-05.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-07.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-07.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-08.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-08.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-10.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-10.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-11.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-11.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-12.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-12.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-13.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-13.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-15.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-15.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-16.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-16.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-17.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-17.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-18.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-18.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32109-19.htm
+  S QuestList 126:0x800bffff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8783
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-19.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <flags> | -2146697217
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 20
+  rows Q126_TheNameOfEvil_2 <cond>=20 <flags>=-2146697217 <state>=STARTED
+  items 8783=0
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q126_TheNameOfEvil_2/32109-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Asamanah.
+action asamanah
+action asamanah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamanah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamanah}_Quest
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-13.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-15.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-15.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-16.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-16.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-17.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-17.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-18.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-18.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-19.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-19.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-20.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-20.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-21.htm
+  S QuestList 126:0x801bffff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-21.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <flags> | -2145648641
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 21
+  rows Q126_TheNameOfEvil_2 <cond>=21 <flags>=-2145648641 <state>=STARTED
+bypass Quest Q126_TheNameOfEvil_2 32115-22.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-22.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-23.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-23.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-24.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-24.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-25.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-25.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-26.htm
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-26.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32115-28.htm
+  S QuestList 126:0x803bffff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-28.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <flags> | -2143551489
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 22
+  rows Q126_TheNameOfEvil_2 <cond>=22 <flags>=-2143551489 <state>=STARTED
+action asamanah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamanah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamanah}_Quest
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-29.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mushika finishes the quest.
+action mushika
+action mushika
+  S ActionFailed
+  S NpcHtmlMessage obj=mushika item=0 page=default/32114.htm
+  S ActionFailed
+bypass npc_{mushika}_Quest
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q126_TheNameOfEvil_2/32114-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32114-03.htm
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q126_TheNameOfEvil_2/32114-03.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32114-08.htm
+  S QuestList 126:0x807bffff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q126_TheNameOfEvil_2/32114-08.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <flags> | -2139357185
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 23
+  rows Q126_TheNameOfEvil_2 <cond>=23 <flags>=-2139357185 <state>=STARTED
+bypass Quest Q126_TheNameOfEvil_2 32114-09.htm
+  S SystemMessage id=54 3:729
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 126:0x00000000
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q126_TheNameOfEvil_2/32114-09.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <state> | COMPLETED
+  Q delete-except-state Q126_TheNameOfEvil_2
+  state Q126_TheNameOfEvil_2 COMPLETED
+  rows Q126_TheNameOfEvil_2 <state>=COMPLETED
+  items 729=1
+action mushika
+  S ActionFailed
+  S NpcHtmlMessage obj=mushika item=0 page=default/32114.htm
+  S ActionFailed
+bypass npc_{mushika}_Quest
+  S NpcHtmlMessage obj=mushika item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 729=1 8783=0
+  state Q126_TheNameOfEvil_2 COMPLETED
+  rows Q126_TheNameOfEvil_2 <state>=COMPLETED

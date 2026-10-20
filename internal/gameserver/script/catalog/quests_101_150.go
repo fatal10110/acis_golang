@@ -20,6 +20,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q119"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q120"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q121"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q122"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q124"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q125"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q126"
 )
 
 // quests101To150 is the catalog of quests 101 to 150 (#180).
@@ -46,11 +50,11 @@ func quests101To150() script.Catalog {
 		"quest.Q119_LastImperialPrince":         q119.New,
 		"quest.Q120_PavelsResearch":             q120.New,
 		"quest.Q121_PavelTheGiant":              q121.New,
-		"quest.Q122_OminousNews":                nil,
+		"quest.Q122_OminousNews":                q122.New,
 		"quest.Q123_TheLeaderAndTheFollower":    nil,
-		"quest.Q124_MeetingTheElroki":           nil,
-		"quest.Q125_TheNameOfEvil_1":            nil,
-		"quest.Q126_TheNameOfEvil_2":            nil,
+		"quest.Q124_MeetingTheElroki":           q124.New,
+		"quest.Q125_TheNameOfEvil_1":            q125.New,
+		"quest.Q126_TheNameOfEvil_2":            q126.New,
 		"quest.Q127_KamaelAWindowToTheFuture":   nil,
 	}
 }

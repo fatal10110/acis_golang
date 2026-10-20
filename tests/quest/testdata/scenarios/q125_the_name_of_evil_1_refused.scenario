@@ -1,0 +1,21 @@
+# The Name of Evil - 1 (Q125), refused: a level 76 character that has not met the Elroki (Q124) is
+# turned away by Mushika and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q125_the_name_of_evil_1_refused.golden
+character Seeker 76
+script quest.Q125_TheNameOfEvil_1
+item 8779 8780 8781 8782
+page default/32114.htm
+page script/quest/Q125_TheNameOfEvil_1/
+npc mushika 32114 Folk 10 0 0
+
+action mushika
+action mushika
+  S ActionFailed
+  S NpcHtmlMessage obj=mushika item=0 page=default/32114.htm
+  S ActionFailed
+bypass npc_{mushika}_Quest
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q125_TheNameOfEvil_1/32114-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q125_TheNameOfEvil_1 CREATED
+  rows Q125_TheNameOfEvil_1 -
