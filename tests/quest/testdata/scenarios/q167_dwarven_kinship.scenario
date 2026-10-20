@@ -1,0 +1,128 @@
+# Dwarven Kinship (Q167): a level 15 character accepts at Carlon with his letter; Haprock takes
+# it and gives Norman's letter and adena; Norman takes his letter for adena; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q167_dwarven_kinship.golden
+character Kinsman 15
+script quest.Q167_DwarvenKinship
+item 1076 1106 57
+page warehouse/30350.htm
+page warehouse/30255.htm
+page warehouse/30210.htm
+page script/quest/Q167_DwarvenKinship/
+npc carlon 30350 WarehouseKeeper 10 0 0
+npc haprock 30255 WarehouseKeeper 20 0 0
+npc norman 30210 WarehouseKeeper 0 20 0
+
+# Carlon: accept with his letter.
+action carlon
+action carlon
+  S ActionFailed
+  S NpcHtmlMessage obj=carlon item=0 page=warehouse/30350.htm
+  S ActionFailed
+bypass npc_{carlon}_Quest
+  S NpcHtmlMessage obj=carlon item=0 page=script/quest/Q167_DwarvenKinship/30350-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q167_DwarvenKinship CREATED
+bypass Quest Q167_DwarvenKinship 30350-04.htm
+  S QuestList 167:0x80000001
+  S ExShowQuestMark quest=167
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1076
+  S NpcHtmlMessage obj=carlon item=0 page=script/quest/Q167_DwarvenKinship/30350-04.htm
+  S ActionFailed
+  Q upsert Q167_DwarvenKinship | <state> | STARTED
+  Q upsert Q167_DwarvenKinship | <cond> | 1
+  state Q167_DwarvenKinship STARTED
+  rows Q167_DwarvenKinship <cond>=1 <state>=STARTED
+  items 1076=1
+action carlon
+  S ActionFailed
+  S NpcHtmlMessage obj=carlon item=0 page=warehouse/30350.htm
+  S ActionFailed
+bypass npc_{carlon}_Quest
+  S NpcHtmlMessage obj=carlon item=0 page=script/quest/Q167_DwarvenKinship/30350-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Norman has nothing for the character before Haprock.
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Haprock: the letter for Norman's letter and adena.
+action haprock
+action haprock
+  S ActionFailed
+  S NpcHtmlMessage obj=haprock item=0 page=warehouse/30255.htm
+  S ActionFailed
+bypass npc_{haprock}_Quest
+  S NpcHtmlMessage obj=haprock item=0 page=script/quest/Q167_DwarvenKinship/30255-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q167_DwarvenKinship 30255-02.htm
+  S NpcHtmlMessage obj=haprock item=0 page=script/quest/Q167_DwarvenKinship/30255-02.htm
+  S ActionFailed
+bypass Quest Q167_DwarvenKinship 30255-03.htm
+  S QuestList 167:0x80000003
+  S ExShowQuestMark quest=167
+  S SystemMessage id=302 3:1076
+  S SystemMessage id=54 3:1106
+  S SystemMessage id=52 6:2000
+  S NpcHtmlMessage obj=haprock item=0 page=script/quest/Q167_DwarvenKinship/30255-03.htm
+  S ActionFailed
+  Q upsert Q167_DwarvenKinship | <cond> | 2
+  items 1076=0 1106=1 57=2000
+  rows Q167_DwarvenKinship <cond>=2 <state>=STARTED
+action haprock
+  S ActionFailed
+  S NpcHtmlMessage obj=haprock item=0 page=warehouse/30255.htm
+  S ActionFailed
+bypass npc_{haprock}_Quest
+  S NpcHtmlMessage obj=haprock item=0 page=script/quest/Q167_DwarvenKinship/30255-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Norman: his letter for adena; the quest completes.
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q167_DwarvenKinship/30210-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q167_DwarvenKinship 30210-02.htm
+  S SystemMessage id=302 3:1106
+  S SystemMessage id=52 6:20000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 167:0x00000000
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q167_DwarvenKinship/30210-02.htm
+  S ActionFailed
+  Q upsert Q167_DwarvenKinship | <state> | COMPLETED
+  Q delete-except-state Q167_DwarvenKinship
+  items 1106=0 57=22000
+  state Q167_DwarvenKinship COMPLETED
+  rows Q167_DwarvenKinship <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q167_DwarvenKinship COMPLETED
+  rows Q167_DwarvenKinship <state>=COMPLETED
+  items 57=22000
+action carlon
+action carlon
+  S ActionFailed
+  S NpcHtmlMessage obj=carlon item=0 page=warehouse/30350.htm
+  S ActionFailed
+bypass npc_{carlon}_Quest
+  S NpcHtmlMessage obj=carlon item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
