@@ -48,9 +48,9 @@ const (
 // dGradeCoupon is the reward of every transfer.
 const dGradeCoupon = 8869
 
-// masters are the grand masters and high priests who talk about first
+// Masters are the grand masters and high priests who talk about first
 // occupations.
-func masters() []int32 {
+func Masters() []int32 {
 	return []int32{
 		30026, 30031, 30037, 30066, 30070, 30154, 30288, 30289, 30290, 30297,
 		30358, 30373, 30462, 30498, 30499, 30500, 30503, 30504, 30505, 30508,
@@ -62,7 +62,7 @@ func masters() []int32 {
 func New() script.Script {
 	return script.Script{
 		Dir:   "feature",
-		Bind:  script.Bindings{script.EventTalked: masters()},
+		Bind:  script.Bindings{script.EventTalked: Masters()},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk},
 	}
 }

@@ -66,8 +66,8 @@ const (
 	artisan        = 56
 )
 
-// masters are the masters who talk about second occupations.
-func masters() []int32 {
+// Masters are the masters who talk about second occupations.
+func Masters() []int32 {
 	return []int32{
 		// Dark elf.
 		31328, 30195, 30699, 30474, 31324, 30862, 30910, 31285, 31331, 31334, 31974, 32096,
@@ -89,7 +89,7 @@ func masters() []int32 {
 func New() script.Script {
 	return script.Script{
 		Dir:   "feature",
-		Bind:  script.Bindings{script.EventTalked: masters()},
+		Bind:  script.Bindings{script.EventTalked: Masters()},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk},
 	}
 }
