@@ -26,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q297"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q298"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q299"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q300"
 )
 
 // quests251To300 is the catalog of quests 251 to 300 (#183), except the one the engine slices ported.
@@ -57,6 +58,6 @@ func quests251To300() script.Catalog {
 		"quest.Q297_GatekeepersFavor":          q297.New,
 		"quest.Q298_LizardmensConspiracy":      q298.New,
 		"quest.Q299_GatherIngredientsForPie":   q299.New,
-		"quest.Q300_HuntingLetoLizardman":      nil,
+		"quest.Q300_HuntingLetoLizardman":      q300.New,
 	}
 }
