@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -46,7 +47,7 @@ func TestParseReadsWorldLines(t *testing.T) {
 		{Role: "both", ID: 35601, Type: "Folk", DY: 10, Walks: true, Maker: "isle"},
 		{Role: "wolf", ID: 20120, Type: "Monster", DY: -10, Walks: true, Maker: "isle"},
 	}
-	if !slices.Equal(sc.NPCs, wantNPCs) {
+	if !reflect.DeepEqual(sc.NPCs, wantNPCs) {
 		t.Fatalf("npcs = %+v", sc.NPCs)
 	}
 	if len(sc.Rolls) != 1 || sc.Rolls["vervato"] != 0 {
@@ -90,8 +91,8 @@ func TestParseRejectsMalformedWorldLines(t *testing.T) {
 		{"territory no box", "character A 1\nterritory t 0 0 0 1 0 0\nadvance 1s\n", "is no box"},
 		{"territory twice", "character A 1\nterritory t 0 0 1 1 0 0\nterritory t 0 0 1 1 0 0\nadvance 1s\n", "listed twice"},
 		{"maker unknown", "character A 1\nnpc a 1 Folk 0 0 0 maker t\nadvance 1s\n", "no territory line above"},
-		{"npc option", "character A 1\nnpc a 1 Folk 0 0 0 runs\nadvance 1s\n", "is not walks or maker"},
-		{"npc walks twice", "character A 1\nnpc a 1 Folk 0 0 0 walks walks\nadvance 1s\n", "is not walks or maker"},
+		{"npc option", "character A 1\nnpc a 1 Folk 0 0 0 runs\nadvance 1s\n", "is not walks, maker"},
+		{"npc walks twice", "character A 1\nnpc a 1 Folk 0 0 0 walks walks\nadvance 1s\n", "is not walks, maker"},
 		{"roll unknown role", "character A 1\nroll a 0\nadvance 1s\n", "no NPC line above"},
 		{"roll draw", "character A 1\nnpc a 1 Folk 0 0 0\nroll a -1\nadvance 1s\n", "not a number of 0 or more"},
 		{"roll twice", "character A 1\nnpc a 1 Folk 0 0 0\nroll a 0\nroll a 1\nadvance 1s\n", "listed twice"},

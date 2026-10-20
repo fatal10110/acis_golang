@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -45,7 +46,7 @@ func TestParseReadsHeaderStepsAndExpectations(t *testing.T) {
 		t.Fatalf("scripts %v items %v pages %v", sc.Scripts, sc.Items, sc.Pages)
 	}
 	wantNPCs := []NPC{{Role: "darin", ID: 30048, Type: "Folk", DX: 10, DZ: -5}, {Role: "wolf", ID: 20120, Type: "Monster", DX: 40}}
-	if !slices.Equal(sc.NPCs, wantNPCs) {
+	if !reflect.DeepEqual(sc.NPCs, wantNPCs) {
 		t.Fatalf("npcs = %+v", sc.NPCs)
 	}
 	var verbs []string

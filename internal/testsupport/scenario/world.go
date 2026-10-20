@@ -38,7 +38,8 @@ type Ground struct {
 // named reports whether name already names the player, an NPC role, a
 // member or a ground item.
 func (sc *Scenario) named(name string, roles map[string]bool) bool {
-	return name == "player" || roles[name] ||
+	_, isDoor := sc.door(name)
+	return name == "player" || roles[name] || isDoor || sc.summoned(name) ||
 		slices.ContainsFunc(sc.Members, func(m Member) bool { return m.Name == name }) ||
 		slices.ContainsFunc(sc.Grounds, func(g Ground) bool { return g.Role == name })
 }
@@ -138,6 +139,14 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 func npcOptions(args []string, territories []Territory) (NPC, error) {
 	var n NPC
 	for len(args) > 0 {
+		rest, ok, err := npcFightOption(&n, args)
+		if err != nil {
+			return NPC{}, err
+		}
+		if ok {
+			args = rest
+			continue
+		}
 		switch {
 		case args[0] == "walks" && !n.Walks:
 			n.Walks, args = true, args[1:]
@@ -148,7 +157,7 @@ func npcOptions(args []string, territories []Territory) (NPC, error) {
 			}
 			n.Maker, args = name, args[2:]
 		default:
-			return NPC{}, fmt.Errorf("npc option %q is not walks or maker <territory>", args[0])
+			return NPC{}, fmt.Errorf("npc option %q is not walks, maker <territory>, clan or skill", args[0])
 		}
 	}
 	return n, nil

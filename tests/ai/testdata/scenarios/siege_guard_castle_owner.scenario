@@ -1,0 +1,20 @@
+# The castle-state test of the siege guards' hooks (the pledge castle state is not 2) on
+# Aden's guards and the character whose clan owns Aden Castle (5): the standing wizard
+# (35249) that sees it casts nothing at it, and a knight (35235) it hits wants nothing of it,
+# its attacked hook and the hit's clan call alike.
+character Hunter 20
+clan 5
+siege 5 owner
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioWizardStand
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc wizard 35249 SiegeGuard 150 0 0 walks clan aden_siege_clan 300 skill DD_MAGIC 4114 1
+npc knight 35235 SiegeGuard 100 -400 0 walks clan aden_siege_clan 300
+
+approach wizard
+  desires wizard -
+
+hit knight 22
+  hate knight 0
+  desires knight -

@@ -1,0 +1,16 @@
+# The spelled hook of GludioKnight (35235): a good skill of the character landing on the
+# knight, Might (1068), leaves it alone; only Seal of Ruler (246) would make it attack. The
+# shipped Seal of Ruler targets a holy artifact alone (target HOLY), so it never lands on a
+# guard: tests/ai/siege_guard_test.go covers that branch with a fixture skill.
+character Hunter 20
+skill 1068 1
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 100 0 0 walks clan aden_siege_clan 300
+
+cast knight 1068
+  S MagicSkillUse caster=player target=knight skill=1068-1 hit=10015 reuse=15022 success=0
+  S SystemMessage id=46 4:1068,1
+  hate knight 0
+  desires knight -

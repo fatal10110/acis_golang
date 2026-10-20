@@ -1,0 +1,37 @@
+# GludioHold's see-spell hook on a knight (35235) fighting a monster: the monster (20999,
+# bound to no behavior) hits the knight, whose attacked hook ignores an attacker no player
+# controls while its clan call to itself does not, then the court guard (35238), whose call
+# reaches the knight too: each call adds damage / 440 / 0.05 * 50 to the knight's attack
+# desire on the monster, which the knight walks to and fights. The character then casts an
+# offensive spell on that monster, Ultimate Debuff (4694, 100 aggro points): the knight sees
+# it and wants to attack the character by 100 / 440 / 0.05 * 50; the fight's cycles have worn
+# its attack desire on the monster down meanwhile. (The fixture monster
+# does not outlive a ten-second cast of a good skill beside the knight's blows:
+# tests/ai/siege_guard_test.go covers the good skill seen on what the knight fights, and
+# its jump onto the caster past 10 failed paths.)
+character Hunter 20
+skill 4694 1
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioCourtGuard
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 150 0 0 walks clan aden_siege_clan 300
+npc court 35238 SiegeGuard 150 60 0 walks clan aden_siege_clan 300
+npc monster 20999 Monster 180 30 0
+
+hit knight 10 by monster
+hit court 50 by monster
+  hate knight 136.36363636363635 monster
+  desires knight attack(monster)=136.36363636363635
+  hate knight 0
+
+tick
+walk knight
+tick x2
+  at knight 180 30 0
+
+cast monster 4694
+  S MagicSkillUse caster=player target=monster skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  hate knight 227.27272727272725
+  desires knight attack(player)=227.27272727272725 attack(monster)=129.76363636363635
