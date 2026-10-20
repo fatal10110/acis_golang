@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monsterbehavior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/raid"
 )
 
 // aiIndividual7 is the catalog of batch 7 of 8 of the individual NPC behaviors (#192).
@@ -22,12 +23,12 @@ func aiIndividual7() script.Catalog {
 		"script.ai.individual.Monster.LV3Monster.LV3Summoner":                                                               monster.LV3Summoner,
 		"script.ai.individual.Monster.LV3Monster.LV3Wizard":                                                                 monster.LV3Wizard,
 		"script.ai.individual.Monster.LV3Monster.LV3WizardPrivate":                                                          monster.LV3WizardPrivate,
-		"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill":                      nil,
+		"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill":                      monsterbehavior.WarriorUseSkill,
 		"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill":                         monsterbehavior.WizardUseSkill,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon":                                          nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossAloneSummonPrivate":                      nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon":                      nil,
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1":                                   nil,
+		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1":                                   raid.BossType1,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.DrChaosGiganticGolem":    nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.FreyaRoyalGuard":         nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.RaidBossType1Aggressive": nil,
@@ -40,7 +41,7 @@ func aiIndividual7() script.Catalog {
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4":                                                 nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive":                                nil,
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5":                                                 nil,
-		"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                                                            nil,
+		"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                                                            raid.BossStandard,
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateArcher":                                                        nil,
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateFighter":                                                       nil,
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer":                                                        nil,
