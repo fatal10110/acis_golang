@@ -87,7 +87,8 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 		return
 	}
 	if !slot.first {
-		g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, slot: slot})
+		scope := &hookScope{}
+		g.behavior.NPCDeleted(g.in(scope), groupSpawn{g: g, i: slot.spawnIdx, scope: scope}, groupNPC{n: n, slot: slot, scope: scope})
 	}
 
 	now := n.now()

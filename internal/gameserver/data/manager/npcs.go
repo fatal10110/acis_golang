@@ -503,7 +503,7 @@ func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	}
 	for _, g := range groups {
 		if g.def.OnStart() {
-			g.behavior.Start(g)
+			g.behavior.Start(g.in(&hookScope{}))
 		}
 	}
 	for _, event := range n.events {
