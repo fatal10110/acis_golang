@@ -22,7 +22,9 @@ var chain = []struct {
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.individual.Guard.Guard", Guard},
+	{"script.ai.individual.Guard.GuardFixed", Fixed},
 	{"script.ai.individual.Guard.GuardMoveAround", MoveAround},
+	{"script.ai.individual.Guard.GuardMoveAroundFixed", MoveAroundFixed},
 	{"script.ai.individual.Guard.GuardStand", Stand},
 }
 
@@ -115,8 +117,8 @@ var folkIDs = []int32{31677, 31678, 31681, 31682, 31853}
 // NPC, as the datapack types them. None is refused, and the registry dump
 // equals the reference manifest for the chain: each script's kind and bind
 // lines, and every folded per-(npc, event) list restricted to the chain's
-// scripts, GuardStand's 88 ids on 5 events each and GuardMoveAround's 9 on
-// 4.
+// scripts: GuardStand's 88 ids and GuardFixed's 59 on 5 events each,
+// GuardMoveAround's 9 and GuardMoveAroundFixed's 5 on 4.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -158,13 +160,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 88*5+9*4, len(want.folds); got != wantFolds {
-		t.Fatalf("reference folds = %d entries, want %d: GuardStand's 88 ids on 5 events each, GuardMoveAround's 9 on 4", got, wantFolds)
+	if wantFolds, got := (88+59)*5+(9+5)*4, len(want.folds); got != wantFolds {
+		t.Fatalf("reference folds = %d entries, want %d: GuardStand's 88 ids and GuardFixed's 59 on 5 events each, GuardMoveAround's 9 and GuardMoveAroundFixed's 5 on 4", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range append([]int32{30042, 31340, 31844}, folkIDs...) {
+	for _, id := range append([]int32{30042, 31340, 31844, 30040, 31674, 31032, 31036}, folkIDs...) {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
