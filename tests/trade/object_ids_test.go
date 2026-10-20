@@ -82,7 +82,7 @@ func TestTradeTakesObjectIDsOnlyForSplitRows(t *testing.T) {
 			if got := h.srv.IssuedObjectIDs() - before; got != tc.wantIDs {
 				t.Fatalf("the trade took %d object ids, want %d", got, tc.wantIDs)
 			}
-			h.srv.FlushPersistence(t)
+			landItemRows(t, h)
 			assertItemRows(t, h, h.firstID, tc.firstRows)
 			assertItemRows(t, h, h.secondID, tc.secondRows)
 		})
@@ -109,7 +109,7 @@ func TestTradeOfAWholeSwordOntoAdenaTakesNoObjectID(t *testing.T) {
 	if got := h.srv.IssuedObjectIDs() - before; got != 0 {
 		t.Fatalf("the trade took %d object ids, want 0", got)
 	}
-	h.srv.FlushPersistence(t)
+	landItemRows(t, h)
 	assertItemRows(t, h, h.firstID, "57x60 30x1")
 	assertItemRows(t, h, h.secondID, "57x45")
 }
@@ -147,7 +147,7 @@ func TestPrivateStoresTakeObjectIDsOnlyForSplitRows(t *testing.T) {
 		buy(1, sellRow{potions, 3, 50})                         // the potions start the buyer's stack
 		buy(0, sellRow{potions, 1, 50}, sellRow{sword, 1, 300}) // onto that stack, and a whole sword
 		h.srv.InventoryUpdates.Tick()
-		h.srv.FlushPersistence(t)
+		landItemRows(t, h)
 		assertItemRows(t, h, h.firstID, "20x6 57x510")
 		assertItemRows(t, h, h.secondID, "57x500 20x4 30x1")
 	})
@@ -172,8 +172,20 @@ func TestPrivateStoresTakeObjectIDsOnlyForSplitRows(t *testing.T) {
 			t.Fatalf("the sale took %d object ids, want 0", got)
 		}
 		h.srv.InventoryUpdates.Tick()
-		h.srv.FlushPersistence(t)
+		landItemRows(t, h)
 		assertItemRows(t, h, h.firstID, "20x4 57x910")
 		assertItemRows(t, h, h.secondID, "20x7 57x95")
 	})
+}
+
+// landItemRows waits until the rows a deal changed are in the database, so a
+// suite can compare them with what the deal left in memory. The deal's own
+// write is bounded by a short deadline; on a loaded database it can miss it,
+// and the rows then land with the next lazy-persistence tick, as they would
+// in production. Flushing the tick as well makes the rows read here the
+// deal's outcome either way. Whether the deal's own write lands its rows is
+// pinned by the atomic trade suites.
+func landItemRows(t *testing.T, h *traders) {
+	t.Helper()
+	h.srv.FlushItems(t)
 }
