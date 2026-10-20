@@ -1,0 +1,31 @@
+# The grand boss cubes (GrandBossTeleporter): Benom's cube answers its own page (onFirstTalk);
+# Antharas's cube sends the character to the point of its two draws in its field outside the
+# lair, answering no page (onTalk). The other exits, the despawns of the cubes (onCreated) and
+# the fire dragon gatekeepers' doors are in tests/npcs/teleporters_210_pr4_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_cubes.golden
+character Pilgrim 60
+random 100 200
+script script.teleport.GrandBossTeleporter
+page default/31859.htm
+page script/teleport/GrandBossTeleporter/
+npc benom 29055 Folk 10 0 0
+npc antharas 31859 Folk -10 0 0
+
+action benom
+action benom
+  S ActionFailed
+  S NpcHtmlMessage obj=benom item=0 page=script/teleport/GrandBossTeleporter/29055-01.htm
+  S ActionFailed
+action antharas
+action antharas
+  S ActionFailed
+  S NpcHtmlMessage obj=antharas item=0 page=default/31859.htm
+  S ActionFailed
+bypass npc_{antharas}_Quest GrandBossTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=79900,151400,-3534 fast=0
+  S ActionFailed

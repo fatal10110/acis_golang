@@ -52,6 +52,7 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.maker.TyrannosaurusMaker",
 		"script.maker.DefaultUseDBMakerForFrintezza",
 		"script.maker.IceFairySirrMaker",
+		"script.maker.SailrenMaker",
 	},
 		// Delays are durations: the reference's seconds-to-milliseconds
 		// factor and its one-minute period in milliseconds have no Go
