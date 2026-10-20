@@ -266,6 +266,30 @@ func TestPartyLeaderPatrolStoneAnswersItsParty(t *testing.T) {
 	})
 }
 
+// TestPartyLeaderPatrolStoneAnswersItsClan ports
+// PartyLeaderPatrolPhysicalSpecialStoneAggressive's clan-attacked hook,
+// every draw 0: a settled Ketra member that is not attacking wants its
+// physical special and debuff on the attacker of another member, a
+// character with no alliance, each weight 1000000.
+func TestPartyLeaderPatrolStoneAnswersItsClan(t *testing.T) {
+	t.Parallel()
+	ketra := func(id int32) *npc.Template {
+		tmpl := ind3dTemplate(id, nil, 0, false)
+		tmpl.Clans, tmpl.ClanRange = []string{"ketra_orc_clan"}, 500
+		return tmpl
+	}
+	w := bootIndividual3d(t, raidBoot{}, ketra(ind3dKetraID))
+	victim := w.ind3dSpawn(t, ind3dKetraID, 1500, 0)
+	member := w.ind3dSpawn(t, ind3dKetraID, 1500, 200)
+	w.ticks(t, 8)
+	if fightingIntention(member) {
+		t.Fatalf("setup: member intention = %v, want neither attack nor cast", member.AI().CurrentIntention())
+	}
+	me := w.player.ObjectID()
+	w.hit(t, victim, 10)
+	w.wantCasts(t, "member after the hit", member, map[modelskill.ID]ind1Cast{ind3dSpecialSkill: {me, 1000000}, ind3dDebuffSkill: {me, 1000000}})
+}
+
 // TestPartyLeaderSlowTypeAggressiveSlowsWhatItFights ports
 // PartyLeaderSlowTypeAggressive's created, see-creature, attacked and
 // timer hooks, every draw 0. It spawns with i_ai0 and i_ai1 clear. Settled,
@@ -394,6 +418,26 @@ func TestQuestPartyLeaderReactsToNothing(t *testing.T) {
 	}
 }
 
+// TestQuestPartyLeaderIgnoresItsClan ports QuestPartyLeader's
+// clan-attacked hook: a settled tree of the clan, beside another tree the
+// character hits, gains no hate and no desire.
+func TestQuestPartyLeaderIgnoresItsClan(t *testing.T) {
+	t.Parallel()
+	const otherTreeID = int32(27186) // QuestPartyLeader
+	w := bootIndividual3d(t, raidBoot{}, ind3dTemplate(ind3dQuestID, nil, 0, true), ind3dTemplate(otherTreeID, nil, 0, true))
+	victim := w.ind3dSpawn(t, ind3dQuestID, 1500, 0)
+	member := w.ind3dSpawn(t, otherTreeID, 1500, 200)
+	w.ticks(t, 8)
+	w.hit(t, victim, 10)
+	if got := member.AggroHate(w.player); got != 0 {
+		t.Fatalf("member hate after the hit = %v, want 0", got)
+	}
+	if d, ok := desire(member, actorai.IntentionAttack); ok {
+		t.Fatalf("member queued an attack desire %+v", d)
+	}
+	w.wantCasts(t, "member after the hit", member, nil)
+}
+
 // TestRoyalRushPartyLeaderCallsItsSlaveOnce ports RoyalRushPartyLeader's
 // created and attacked hooks, every draw 0. It spawns with i_ai0 clear. A
 // first hit, with no creature to attack yet, does nothing of its own. The
@@ -501,8 +545,8 @@ func TestPartyLeaderCasting3SkillsMagicalCastsFromAfar(t *testing.T) {
 // private with its first spawn parameter 4, 5 or 6, it calls 3, 5 or 7
 // Dragon Bombers, and with any other none; a private's privates join its
 // master's, so the bombers are its master's. Its created hook calls no
-// parent, so its declared private never comes. A dead bomber arms no respawn. 240 minutes after it appears it
-// leaves the world.
+// parent, so its declared private never comes. A dead bomber arms no
+// respawn. 240 minutes after it appears it leaves the world.
 func TestAntharasPrivateBehemothDragonLeadsBombers(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
