@@ -15,8 +15,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// chain is the behavior chain down to the MonsterBehavior behaviors, in
-// scripts.xml order, with the Go constructor of each.
+// chain is the behavior chain down to the MonsterBehavior behaviors and the
+// children this package ports, in scripts.xml order, with the Go
+// constructor of each.
 var chain = []struct {
 	path string
 	ctor func() script.Script
@@ -26,6 +27,7 @@ var chain = []struct {
 	{"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior", MonsterBehavior},
 	{"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorBehavior", WarriorBehavior},
 	{"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior", WizardBehavior},
+	{"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill", WizardUseSkill},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -112,7 +114,9 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // every id a hostile NPC. None is refused, and the registry dump equals the
 // reference manifest for the chain: each script's kind and its bind lines,
 // none for MonsterBehavior, WarriorBehavior and WizardBehavior, which bind
-// no NPC of their own, so no folded per-(npc, event) list names them.
+// no NPC of their own, and the folded per-(npc, event) lists restricted to
+// the chain: WizardUseSkill's ten events on each of its eight ids, every
+// one of them then bound to a behavior.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -149,7 +153,15 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
+	if got := len(want.folds); got != 80 {
+		t.Fatalf("reference folds = %d entries, want 80", got)
+	}
 	if !slices.Equal(got.folds, want.folds) {
-		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
+		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
+	}
+	for _, id := range []int32{20216, 20220, 21036, 21038, 21039, 21040, 21394, 21395} {
+		if !r.Behaves(id) {
+			t.Errorf("Behaves(%d) = false, want WizardUseSkill bound", id)
+		}
 	}
 }

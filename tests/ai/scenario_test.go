@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monsterbehavior"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/siegeguard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
@@ -105,6 +106,11 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegeguards.GludioWizardStand":                                               siegeguard.WizardStand,
 	"script.ai.siegeguards.GludioWizard.GludioWizard":                                       siegeguard.Wizard,
 	"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill":                               siegeguard.WizardUseSkill,
+
+	// The MonsterBehavior chain.
+	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                              monsterbehavior.MonsterBehavior,
+	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                monsterbehavior.WizardBehavior,
+	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill": monsterbehavior.WizardUseSkill,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios

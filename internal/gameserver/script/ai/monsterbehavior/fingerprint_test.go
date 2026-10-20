@@ -15,6 +15,7 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior",
 		"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorBehavior",
 		"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior",
+		"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill",
 	}, "number 100000")
 	if err != nil {
 		t.Fatal(err)

@@ -1,8 +1,8 @@
-// Package monsterbehavior holds MonsterBehavior and the two behaviors that
-// derive from it, WarriorBehavior and WizardBehavior: monsters steered by
-// their AI parameters (MovingAttack, Party_Type, AttackRange, ...) rather
-// than by their own NPC lists. None binds an NPC of its own; their children
-// do.
+// Package monsterbehavior holds MonsterBehavior, the two behaviors that
+// derive from it, WarriorBehavior and WizardBehavior, and their children:
+// monsters steered by their AI parameters (MovingAttack, Party_Type,
+// AttackRange, ...). The first three bind no NPC of their own; their
+// children do.
 package monsterbehavior
 
 import (
