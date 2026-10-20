@@ -281,6 +281,9 @@ type Character struct {
 	// sessionDetached is set once the owning session has let go of this
 	// character; see DetachSession.
 	sessionDetached atomic.Bool
+	// ownQueue marks a task of the character's own queue running a stretch
+	// that may act on the character inside the call; see RunOnOwnQueue.
+	ownQueue sim.Turn
 
 	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
 	// teleport-confirm request state, which the caster's queue records

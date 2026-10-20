@@ -41,21 +41,36 @@ func (p *Player) HasAtLeastOneItem(itemIDs ...int32) bool {
 	return false
 }
 
-// TeleportTo moves the player to at, up to offset away on each axis. The
-// teleport runs on the player's own queue once the calling task is done,
-// whatever queue the hook runs on: the rest of the hook still reads the old
-// position.
+// TeleportTo moves the player to at, up to offset away on each axis. From
+// a hook running on the player's own queue (its talk, quest window or
+// quest event, its item use, a timer whose home queue is the player's,
+// After) the teleport runs inside the call: its packets go out before what
+// the rest of the hook sends, and the rest of the hook reads the new
+// position. From any
+// other queue (an NPC's hook, another player's) it runs on the player's own
+// queue once the calling task is done, and the rest of the hook still reads
+// the old position.
 func (p *Player) TeleportTo(at Place, offset int) {
 	loc := at.loc()
-	p.character().TeleportTo(loc.X, loc.Y, loc.Z, offset)
+	c := p.character()
+	if c.OnOwnQueue() {
+		c.TeleportOnQueue(loc.X, loc.Y, loc.Z, offset)
+		return
+	}
+	c.TeleportTo(loc.X, loc.Y, loc.Z, offset)
 }
 
-// After runs fn on the player's queue once d has passed. Nothing runs for
-// a player leaving the world: its queue drops what is still pending.
+// After runs fn on the player's queue once d has passed, as a hook on that
+// queue. Nothing runs for a player leaving the world: its queue drops what
+// is still pending.
 func (p *Player) After(d time.Duration, fn func()) {
 	pl, ok := p.combatant().(timerPlayer)
 	if !ok || pl.Detaching() {
 		return
+	}
+	if h, ok := pl.(player.CharacterHolder); ok {
+		c, inner := h.PlayerCharacter(), fn
+		fn = func() { c.RunOnOwnQueue(inner) }
 	}
 	pl.Queue().After(max(d, 0), fn)
 }
