@@ -221,6 +221,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	}
 	npcs.SetGroundTaker(link)
 	npcs.SetGuardedSieges(link.GuardedSiege)
+	npcs.SetResidenceOwners(link.NPCResidenceOwner)
 	npcs.SetSpawnTimes(network.SpawnTimes(link))
 	npcs.SetRegenSettings(link.PlayerRules())
 	link.SetNpcSpawns(npcs)

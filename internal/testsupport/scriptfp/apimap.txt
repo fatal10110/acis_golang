@@ -852,66 +852,72 @@ Creature.getActiveWeaponInstance script.Creature.HoldsWeapon
 Creature.setInvul script.NPC.SetInvul
 CreatureStatus.setHp script.NPC.SetHP
 
+# The siegable-hall rows (#3502): the hall and its siege as the hall scripts,
+# behaviors and the two quests reading hall siege state run them (script.Hall,
+# bound by Script.BindHallSiege), the clans they read, the NPC clan id and the
+# clan-bound spawn. A hall getter the Go handle folds in is inline;
+# ReleaseAttackers folds the end of a siege's attacker loop.
+Clan.getClanId script.ClanHandle.ID
+Clan.getDissolvingExpiryTime script.ClanHandle.DissolvingExpiry
+Clan.getLeaderId script.ClanHandle.LeaderID
+Clan.getLeaderName script.ClanHandle.LeaderName
+Clan.getMembersCount script.ClanHandle.MembersCount
+Clan.getName script.ClanHandle.Name
+Clan.getOnlineMembers script.ClanHandle.OnlineMembers
+Clan.hasClanHall script.ClanHandle.HasHall
+Clan.setClanHallId inline
+Clan.setFlag script.Hall.ReleaseAttackers
+ClanHall.banishForeigners script.Hall.BanishForeigners
+ClanHall.free script.Hall.Free
+ClanHall.getZone inline
+ClanHall.setOwner script.Hall.SetOwner
+ClanHallManager.getInstance inline
+ClanHallManager.getSiegableHall script.Script.SiegableHall
+ClanHallSiege.cancelSiegeTask script.Hall.CancelSiegeTask
+ClanHallSiege.endSiege script.Hall.EndSiege
+ClanHallSiege.getAttackerClans script.Hall.Attackers
+ClanHallSiege.unspawnNpcs inline
+ClanTable.getClan script.Script.Clan
+Creature.doDie script.NPC.DoDie
+GameTimeTaskManager.getGameTime script.Script.GameHour
+Npc.getClanId script.NPC.ClanID
+Npc.getSiegableHall script.Script.HallOf
+Player.destroyItem script.Script.DestroyItems
+Player.setSiegeState script.Hall.ReleaseAttackers
+Player.teleToLocation script.Player.TeleportTo
+Player.updatePvPStatus script.Hall.ReleaseAttackers
+Residence.closeDoor script.Hall.CloseDoor
+Residence.getName script.Hall.Name
+Residence.getOwnerId script.Hall.OwnerID
+Residence.getRndSpawn script.Hall.RandomSpawn
+Residence.isFree script.Hall.Unowned
+Residence.openDoor script.Hall.OpenDoor
+SiegableHall.addAttacker script.Hall.AddAttacker
+SiegableHall.getNextSiegeTime script.Hall.SiegeDate
+SiegableHall.getSiege inline
+SiegableHall.getSiegeDate script.Hall.SiegeDate
+SiegableHall.getSiegeLength script.Hall.SiegeLength
+SiegableHall.getSiegeZone inline
+SiegableHall.isInSiege script.Hall.InSiege
+SiegableHall.isRegistering script.Hall.Registering
+SiegableHall.isWaitingBattle script.Hall.WaitingBattle
+SiegableHall.setSiege script.Script.BindHallSiege
+SiegableHall.spawnDoor script.Hall.RespawnDoors
+SiegableHall.updateNextSiege script.Hall.UpdateNextSiege
+SiegableHall.updateSiegeStatus script.Hall.SetSiegeStatus
+SiegeZone.setActive script.Hall.SetBattlefieldActive
+Spawn.new script.Spawner.SpawnForClan
+Spawn.setLoc inline
+SystemMessage.addFortId script.Hall.Announce
+SystemMessage.addString script.Hall.Announce
+World.toAllOnlinePlayers script.Hall.Announce
+
 # Siegable-hall rows, exempt from the freeze. Their only callers are the
-# siegable-hall scripts and behaviors, the AgitWarrior subtree and the two quests
-# that read hall siege state; the hall siege runtime does not exist yet.
-Clan.getClanId exempt
-Clan.getDissolvingExpiryTime exempt
-Clan.getLeaderId exempt
-Clan.getLeaderName exempt
-Clan.getMembersCount exempt
-Clan.getName exempt
-Clan.getOnlineMembers exempt
-Clan.hasClanHall exempt
-Clan.setClanHallId exempt
-Clan.setFlag exempt
-ClanHall.banishForeigners exempt
-ClanHall.free exempt
-ClanHall.getZone exempt
-ClanHall.setOwner exempt
-ClanHallManager.getInstance exempt
-ClanHallManager.getSiegableHall exempt
-ClanHallSiege.cancelSiegeTask exempt
-ClanHallSiege.endSiege exempt
-ClanHallSiege.getAttackerClans exempt
-ClanHallSiege.unspawnNpcs exempt
-ClanTable.getClan exempt
-Creature.doDie exempt
-GameTimeTaskManager.getGameTime exempt
-Npc.getClanId exempt
-Npc.getSiegableHall exempt
-Player.destroyItem exempt
-Player.setSiegeState exempt
+# Rainbow Springs and flag war hall scripts; each takes its Go name with the
+# port of the script making it (#3502).
 Player.stopAllEffects exempt
-Player.teleToLocation exempt
-Player.updatePvPStatus exempt
-Residence.closeDoor exempt
-Residence.getName exempt
-Residence.getOwnerId exempt
-Residence.getRndSpawn exempt
-Residence.isFree exempt
-Residence.openDoor exempt
-SiegableHall.addAttacker exempt
-SiegableHall.getNextSiegeTime exempt
-SiegableHall.getSiege exempt
-SiegableHall.getSiegeDate exempt
-SiegableHall.getSiegeLength exempt
-SiegableHall.getSiegeZone exempt
-SiegableHall.isInSiege exempt
-SiegableHall.isRegistering exempt
-SiegableHall.isWaitingBattle exempt
-SiegableHall.setSiege exempt
-SiegableHall.spawnDoor exempt
-SiegableHall.updateNextSiege exempt
-SiegableHall.updateSiegeStatus exempt
-SiegeZone.setActive exempt
-Spawn.new exempt
-Spawn.setLoc exempt
 Summon.unSummon exempt
-SystemMessage.addFortId exempt
-SystemMessage.addString exempt
 ThreadPool.execute exempt
-World.toAllOnlinePlayers exempt
 WorldObject.forEachKnownTypeInRadius exempt
 ZoneType.getCreatures exempt
 ZoneType.getKnownTypeInside exempt

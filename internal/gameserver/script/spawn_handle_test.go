@@ -131,3 +131,7 @@ func (nopPopulation) FindSpawn(int32) spawn.Locator { return nil }
 func (nopPopulation) StartSpawnTime(string, ...string) int { return 0 }
 
 func (nopPopulation) StopSpawnTime(string, ...string) int { return 0 }
+
+func (nopPopulation) SpawnForClan(int32, int, int, int, int, int32) (attackable.Combatant, error) {
+	return nil, npc.ErrNoTemplate
+}

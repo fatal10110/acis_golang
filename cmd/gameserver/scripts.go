@@ -8,6 +8,10 @@ import (
 	"slices"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/config"
@@ -257,8 +261,9 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // random source, the world the scripts look NPCs up in, the skill and item
 // definitions, the in-game clock and the wall clock, the datapack pages a
 // script reads, the Seven Signs state, the grand boss wait times, the doors
-// scripts open and close, and the castles NPCs belong to with their sieges.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine) (*script.Env, error) {
+// scripts open and close, the castles NPCs belong to with their sieges, and
+// the clan halls with the siegable halls' sieges, and the clans.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine, halls *clanhall.Halls, clans *clan.Service) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -296,6 +301,8 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Castles:      castles,
 		SiegableHall: data.ClanHalls.Siegable,
 		Sieges:       sieges,
+		Halls:        halls,
+		Clans:        clanTable(clans),
 		Zones:        data.Zones,
 	}, nil
 }
@@ -373,4 +380,12 @@ func startSchedule(lc fx.Lifecycle, scripts *script.Registry, link *network.Game
 			return nil
 		},
 	})
+}
+
+// clanTable is clans' table, none for no clans.
+func clanTable(clans *clan.Service) script.Clans {
+	if clans == nil {
+		return nil
+	}
+	return clans.Table()
 }
