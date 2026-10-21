@@ -160,8 +160,16 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill": monsterbehavior.WarriorUseSkill,
 
 	// The raid bosses.
-	"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                          raid.BossStandard,
-	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1": raid.BossType1,
+	"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                                                            raid.BossStandard,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1":                                   raid.BossType1,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossAloneSummonPrivate":                      raid.BossAloneSummonPrivate,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon":                      raid.BossForTeleportDungeon,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Sailren":                                         raid.Sailren,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.DrChaosGiganticGolem":    raid.DrChaosGiganticGolem,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.FreyaRoyalGuard":         raid.FreyaRoyalGuard,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.RaidBossType1Aggressive": raid.BossType1Aggressive,
+	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty":                                                 raid.BossParty,
+	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType2":                                                 raid.BossType2,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
