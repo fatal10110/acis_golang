@@ -16,6 +16,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q272"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q273"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q274"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q275"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q276"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q277"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q291"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q292"
@@ -46,8 +48,8 @@ func quests251To300() script.Catalog {
 		"quest.Q272_WrathOfAncestors":          q272.New,
 		"quest.Q273_InvadersOfTheHolyLand":     q273.New,
 		"quest.Q274_SkirmishWithTheWerewolves": q274.New,
-		"quest.Q275_DarkWingedSpies":           nil,
-		"quest.Q276_TotemOfTheHestui":          nil,
+		"quest.Q275_DarkWingedSpies":           q275.New,
+		"quest.Q276_TotemOfTheHestui":          q276.New,
 		"quest.Q277_GatekeepersOffering":       q277.New,
 		"quest.Q291_RevengeOfTheRedbonnet":     q291.New,
 		"quest.Q292_BrigandsSweep":             q292.New,
