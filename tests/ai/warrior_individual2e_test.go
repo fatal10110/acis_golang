@@ -307,21 +307,26 @@ func TestWarriorPatrolWeaponEquippedDebuffsTheArmed(t *testing.T) {
 // it is the one it most wants to act on, each of two draws under 33 wants
 // its self range physical special skill and its second debuff on it
 // (weight 1000000), and the hit adds 10000 times the damage over its level
-// and seven to its hate, on top of its Warrior hate (125 for a hit of 10).
-// With no one to act on the hit adds only the Warrior hate.
+// and seven to its hate, a hit of no damage counting as 1, on top of its
+// Warrior hate (125 for a hit of 10). The hit of no damage reaches the
+// Warrior as a hit of 1 (hate 12.5) too. With no one to act on the hit adds
+// only the Warrior hate, none for a hit of no damage.
 func TestWarriorPatrolWeaponEquippedAnswersItsTopTarget(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
-		name   string
-		top    bool
-		draws  []int
-		casts  []modelskill.ID
-		hateUp float64
+		name  string
+		top   bool
+		zero  bool
+		draws []int
+		casts []modelskill.ID
+		hate  float64
 	}{
-		{"top, draws 0 0", true, []int{0, 0}, []modelskill.ID{ind2eRangeSkill, ind2eDebuff2Skill}, 12500},
-		{"top, draws 33 32", true, []int{33, 32}, []modelskill.ID{ind2eDebuff2Skill}, 12500},
-		{"top, draws 33 33", true, []int{33, 33}, nil, 12500},
-		{"no top", false, []int{0, 0}, nil, 0},
+		{"top, draws 0 0", true, false, []int{0, 0}, []modelskill.ID{ind2eRangeSkill, ind2eDebuff2Skill}, 125 + 12500},
+		{"top, draws 33 32", true, false, []int{33, 32}, []modelskill.ID{ind2eDebuff2Skill}, 125 + 12500},
+		{"top, draws 33 33", true, false, []int{33, 33}, nil, 125 + 12500},
+		{"top, no damage", true, true, []int{33, 33}, nil, 12.5 + 1250},
+		{"no top", false, false, []int{0, 0}, nil, 125},
+		{"no top, no damage", false, true, []int{0, 0}, nil, 0},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			t.Parallel()
@@ -334,14 +339,18 @@ func TestWarriorPatrolWeaponEquippedAnswersItsTopTarget(t *testing.T) {
 				w.clear(t, n)
 			}
 			w.draws.set(99, row.draws...)
-			w.hit(t, n, 10)
+			if row.zero {
+				w.zeroHit(t, n)
+			} else {
+				w.hit(t, n, 10)
+			}
 			want := map[modelskill.ID]ind1Cast{}
 			for _, id := range row.casts {
 				want[id] = ind1Cast{me, 1000000}
 			}
 			w.wantCasts(t, "after the hit", n, want)
-			if got := n.AggroHate(w.player); got != 125+row.hateUp {
-				t.Fatalf("hate after the hit = %v, want %v", got, 125+row.hateUp)
+			if got := n.AggroHate(w.player); got != row.hate {
+				t.Fatalf("hate after the hit = %v, want %v", got, row.hate)
 			}
 		})
 	}
@@ -697,6 +706,35 @@ func TestWarriorPhysicalSpecialSpoilAggressiveSpeaksAfterItsEffect(t *testing.T)
 				t.Fatalf("lines after the effect skill = %q, want %q", got, want)
 			}
 		})
+	}
+}
+
+// TestWarriorPhysicalSpecialSpoilAggressiveIsSilentOnAStoppedEffect
+// ports the success gate of WarriorPhysicalSpecialSpoilAggressive's skill
+// finished hook: its effect skill cast stopped before it lands ends in no
+// line, on a draw that would say 10068.
+func TestWarriorPhysicalSpecialSpoilAggressiveIsSilentOnAStoppedEffect(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual2e(t, raidBoot{}, ind2eSpoilTemplate(nil))
+	n := w.spawn(t, ind2eSpoilID, 1500, 0)
+	w.clear(t, n)
+	w.draws.set(0, 99)
+	w.hit(t, n, 1)
+	frames := w.srv.ReadQueued(t, w.srv.Client)
+	if !script.NPCOf(n).CastingNow() {
+		t.Fatal("setup: not casting its effect skill after the hit")
+	}
+	w.onQueue(t, n, func() {
+		n.AI().Desires().Clear()
+		n.StopCast()
+	})
+	w.srv.Advance(t, 3*time.Second)
+	frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+	if got := castsOf(frames, n, ind2eEffectSkill); len(got) != 1 || got[0] != w.player.ObjectID() {
+		t.Fatalf("effect skill casts = %v, want one on the character", got)
+	}
+	if got := says(frames, n.ObjectID()); len(got) != 0 {
+		t.Fatalf("lines after the stopped effect skill = %q, want none", got)
 	}
 }
 

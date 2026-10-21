@@ -13,7 +13,7 @@ import (
 )
 
 // individual2e are the classes of the second individual behavior batch
-// (#187) its fourth PR ports, in scripts.xml order, with the Go
+// (#187) its fifth PR ports, in scripts.xml order, with the Go
 // constructor of each.
 var individual2e = []struct {
 	path string

@@ -51,11 +51,11 @@ func PatrolWeaponEquipped() script.Script {
 							addCastByType(n, attacker, npc.SkillTypeDebuff2, 1000000)
 						}
 					}
-					damage := e.Damage
-					if damage == 0 {
-						damage = 1
+					// A hit of no damage counts as 1, for the parent too.
+					if e.Damage == 0 {
+						e.Damage = 1
 					}
-					n.AddAttackDesire(attacker, float64(damage)/float64(n.Level()+7)*10000)
+					n.AddAttackDesire(attacker, float64(e.Damage)/float64(n.Level()+7)*10000)
 				}
 			}
 			base.Attacked(s, e)
