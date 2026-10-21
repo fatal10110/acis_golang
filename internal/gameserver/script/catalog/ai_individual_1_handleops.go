@@ -38,6 +38,9 @@ func aiIndividual1HandleOps() map[string]script.HandleOps {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnMyDying":  {"NPC.DropItem"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproachRevivalAggressive": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSelfRangeDDMagicAggressive": {
 			"OnAttacked":         {"NPC.TopDesireTarget"},
 			"OnClanAttacked":     {"NPC.TopDesireTarget"},

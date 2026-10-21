@@ -1,0 +1,19 @@
+# WarriorCast3SkillsCurse (21301, level 72, its shipped debuff), every draw 0, 40 away from the
+# character. Its hit arms the 5 s timer "5001"; left alone, the timer wants its debuff (4047) on
+# the character it hates most, weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsMagical
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsCurse
+npc curse 21301 Monster 40 0 0 skill DEBUFF 4047 7
+
+hit curse 80
+  desires curse attack(player)=1000
+advance 4s
+  desires curse attack(player)=1000
+advance 1s
+  desires curse attack(player)=1000 cast(player,4047,move)=1000000

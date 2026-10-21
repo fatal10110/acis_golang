@@ -108,8 +108,15 @@ func Cast3SkillsApproachHooks() script.Hooks {
 // out of a fight in its territory most likely striking first with its
 // physical special skill.
 func Cast3SkillsApproachAggressive() script.Script {
+	return script.Script{Dir: cast3ApproachDir, Behavior: true, NPCs: cast3ApproachAggressiveIDs(), Hooks: Cast3SkillsApproachAggressiveHooks()}
+}
+
+// Cast3SkillsApproachAggressiveHooks are
+// WarriorCast3SkillsApproachAggressive's hooks, which its children derive
+// theirs from.
+func Cast3SkillsApproachAggressiveHooks() script.Hooks {
 	base := Cast3SkillsApproachHooks()
-	return script.Script{Dir: cast3ApproachDir, Behavior: true, NPCs: cast3ApproachAggressiveIDs(), Hooks: base.With(script.Hooks{
+	return base.With(script.Hooks{
 		OnSeeCreature: func(s *script.Script, e script.SeeCreature) {
 			n, c := e.NPC, e.Creature
 			if !c.Playable() {
@@ -123,7 +130,7 @@ func Cast3SkillsApproachAggressive() script.Script {
 			defaultnpc.TryToAttack(s, n, c)
 			base.SeeCreature(s, e)
 		},
-	})}
+	}).Named("WarriorCast3SkillsApproachAggressive")
 }
 
 // cast3ApproachAggressiveIDs are WarriorCast3SkillsApproachAggressive's own
