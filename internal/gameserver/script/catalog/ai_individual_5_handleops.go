@@ -56,5 +56,10 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantRangePhysicalPoisonAggressive": {
 			"OnAttacked": {"NPC.MeetsHPMPDisabledConditions"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit": {
+			"OnAttacked":     {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnSeeSpell":     {"NPC.MaxHP"},
+		},
 	}
 }

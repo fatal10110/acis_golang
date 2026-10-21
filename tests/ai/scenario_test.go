@@ -152,6 +152,10 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoisonAggressive":        warrior.CastEnchantPhysicalPoisonAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastDDMagicEnchantPhysicalPoisonAggressive": warrior.CastDDMagicEnchantPhysicalPoisonAggressive,
 
+	// The splash casters.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplash":     warrior.CastSplash,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit": warrior.Agit02DoomTrooperAgit,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                                 monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                   monsterbehavior.WizardBehavior,

@@ -1,0 +1,15 @@
+# Agit02DoomTrooperAgit (35414), every draw 0, 300 away from the character. A hit takes none of the
+# parent's hate: it wants to attack the character by the damage over its maximum HP (440 for the
+# scenario's level 1 template) over 0.05, times 100: 22 / 440 / 0.05 * 100 = 100.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplash
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit
+npc trooper 35414 Monster 300 0 0
+
+hit trooper 22
+  desires trooper attack(player)=100
