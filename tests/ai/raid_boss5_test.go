@@ -625,6 +625,56 @@ func TestRaidBossPartyJumpsWhenLost(t *testing.T) {
 	w.srv.AdvanceUntil(t, "the jump onto the character", func() bool { return w.onPlayer(t, boss) })
 }
 
+// TestRaidBossPartyJumpsOntoTheAttackerWhenItsTargetIsFar ports the
+// path-failure branch with the boss's top desire target, the listener it
+// wants at 1000000, standing 1100 away. With 20 failed paths and a draw of
+// 12 in 13 (8 + 12 = 20, not more) the hit on a private only adds 7407 on
+// the character. One more failed path and the next hit drops every attack
+// desire, the one on the listener included, wants the character for that
+// hit alone (7407) and jumps the boss onto it. Every other draw is 1.
+func TestRaidBossPartyJumpsOntoTheAttackerWhenItsTargetIsFar(t *testing.T) {
+	t.Parallel()
+	w := bootRaid5(t, raidBoot{}, rb5Leader(rb5Type2ID, 20, nil), rb5PrivateTemplate())
+	w.draws.set(1)
+	boss := w.spawn(t, rb5Type2ID, 400, 0)
+	far := w.spawn(t, rb5ListenerID, -700, 0)
+	privates := privatesOf(t, boss, 2)
+	w.onQueue(t, boss, func() {
+		script.NPCOf(boss).AddAttackDesire(script.NPCOf(far), 1000000)
+		for range 20 {
+			boss.AddGeoPathFailCount()
+		}
+	})
+	if top := boss.AI().TopDesireTarget(); top == nil || top.ObjectID() != far.ObjectID() || distance2D(boss, far) < 1000 {
+		_, queued := attackOn(boss, far)
+		t.Fatalf("setup: top desire target = %v (desire queued %v), want the listener 1000 or more away (%v)", top, queued, distance2D(boss, far))
+	}
+	home := positionOf(boss)
+
+	w.draws.set(1, 1, 12)
+	w.hit(t, privates[0], 10)
+	if d, ok := attackOn(boss, w.player); !ok || d.Weight != 7407 {
+		t.Fatalf("attack desire on the character after 20 failed paths = %+v (%v), want 7407", d, ok)
+	}
+	if _, ok := attackOn(boss, far); !ok {
+		t.Fatal("attack desire on the listener dropped after 20 failed paths, want it kept")
+	}
+	if got := positionOf(boss); got != home {
+		t.Fatalf("boss moved to %v after 20 failed paths, want it at %v", got, home)
+	}
+
+	w.onQueue(t, boss, func() { boss.AddGeoPathFailCount() })
+	w.draws.set(1, 1, 12)
+	w.hit(t, privates[0], 10)
+	w.srv.AdvanceUntil(t, "the jump onto the character", func() bool { return w.onPlayer(t, boss) })
+	if _, ok := attackOn(boss, far); ok {
+		t.Fatal("attack desire on the listener kept after the jump, want every attack desire dropped")
+	}
+	if d, ok := attackOn(boss, w.player); !ok || d.Weight != 7407 {
+		t.Fatalf("attack desire on the character after the jump = %+v (%v), want 7407 alone", d, ok)
+	}
+}
+
 // TestRaidBossPartyHitInPeaceGoesHome ports RaidBossParty's peace zone
 // branch: a hit on its party while the boss stands inside a peace zone
 // sends it back to its spawn point with no attack desire left.
