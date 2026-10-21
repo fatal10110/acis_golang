@@ -102,7 +102,7 @@ func sailrenHooks() script.Hooks {
 				s.StartTimerAtFixedRate("1001", n, nil, 60000*time.Millisecond, 60000*time.Millisecond)
 			case 11055:
 				n.SetInt(script.SlotIntAI3, 1)
-				// arg1 names no player: the reference's hook fails here.
+				// arg1 names no player: the hook ends here.
 				c0, ok := s.Object(e.Arg1).(*script.Player)
 				if !ok {
 					return
