@@ -31,7 +31,7 @@ func aiIndividual4() script.Catalog {
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialHeal":           warrior.PartyPrivatePhysicalSpecialHeal,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialPowerShot":      warrior.PartyPrivatePhysicalSpecialPowerShot,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePrimeval":                      warrior.PartyPrivatePrimeval,
-		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateSpawnPrivateAggressive":        nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateSpawnPrivateAggressive":        warrior.PartyPrivateSpawnPrivateAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalStone":                                             warrior.PartyPrivatePhysicalStone,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePriest":                                                    warrior.PartyPrivatePriest,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePriestBuffer":                                              warrior.PartyPrivatePriestBuffer,

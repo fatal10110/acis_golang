@@ -255,3 +255,27 @@ func PartyPrivateHereticZealot2() script.Script {
 		},
 	})}
 }
+
+// PartyPrivateSpawnPrivateAggressive is PartyPrivateSpawnPrivateAggressive:
+// a PartyPrivatePhysicalSpecial that wants nothing when idle, attacks the
+// players and summons it sees, and leaves the world on event 10023 or
+// 11039.
+func PartyPrivateSpawnPrivateAggressive() script.Script {
+	base := PartyPrivatePhysicalSpecialHooks()
+	return script.Script{Dir: partyPrivateDir, Behavior: true, NPCs: []int32{22101, 18327}, Hooks: base.With(script.Hooks{
+		OnNoDesire: func(*script.Script, script.NoDesire) {},
+		OnScriptEvent: func(_ *script.Script, e script.ScriptEvent) {
+			if e.EventID == 10023 || e.EventID == 11039 {
+				e.NPC.DeleteMe()
+			}
+		},
+		OnSeeCreature: func(s *script.Script, e script.SeeCreature) {
+			n, c := e.NPC, e.Creature
+			if !c.Playable() {
+				return
+			}
+			defaultnpc.TryToAttack(s, n, c)
+			base.SeeCreature(s, e)
+		},
+	})}
+}

@@ -80,6 +80,7 @@ var ind4Batch = []struct {
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialHeal", warrior.PartyPrivatePhysicalSpecialHeal},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialPowerShot", warrior.PartyPrivatePhysicalSpecialPowerShot},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePrimeval", warrior.PartyPrivatePrimeval},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateSpawnPrivateAggressive", warrior.PartyPrivateSpawnPrivateAggressive},
 	// PartyPrivateCast3SkillsMagical binds no NPC of its own; the
 	// scenarios bind its hooks to fixture ids to drive them.
 	{ind4Cast3Path, func() script.Script {
