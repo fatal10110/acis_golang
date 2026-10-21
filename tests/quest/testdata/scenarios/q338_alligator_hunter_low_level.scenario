@@ -1,0 +1,22 @@
+# Alligator Hunter (Q338), refused: a level 39 character is too young for Enverun, and the quest
+# is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q338_alligator_hunter_low_level.golden
+character Hunter 39
+script quest.Q338_AlligatorHunter
+item 4337
+page merchant/30892.htm
+page script/quest/Q338_AlligatorHunter/
+npc enverun 30892 Merchant 10 0 0
+
+# Enverun: too young.
+action enverun
+action enverun
+  S ActionFailed
+  S NpcHtmlMessage obj=enverun item=0 page=merchant/30892.htm
+  S ActionFailed
+bypass npc_{enverun}_Quest
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q338_AlligatorHunter CREATED
+  rows Q338_AlligatorHunter -

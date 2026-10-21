@@ -1,0 +1,36 @@
+# Sense for Business (Q328), a lens: for a player on the quest, a monster eye whose roll is its
+# chance exactly gives a lens instead of a carcass, and one past it gives nothing; Sarien pays
+# 1000 for the lens, with no bonus. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q328_sense_for_business_lens.golden
+character Merchant 21
+quest Q328_SenseForBusiness <cond>=1 <state>=STARTED
+random 48 0 49
+script quest.Q328_SenseForBusiness
+item 1366 1347 1348
+page merchant/30436.htm
+page script/quest/Q328_SenseForBusiness/
+npc sarien 30436 Merchant 10 0 0
+npc eye 20055 Monster 40 0 0
+
+# A lens, then nothing.
+kill eye x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1366
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  items 1347=0 1366=1
+
+# Sarien: 1000 for the lens.
+action sarien
+action sarien
+  S ActionFailed
+  S NpcHtmlMessage obj=sarien item=0 page=merchant/30436.htm
+  S ActionFailed
+bypass npc_{sarien}_Quest
+  S SystemMessage id=302 3:1366
+  S SystemMessage id=52 6:1000
+  S NpcHtmlMessage obj=sarien item=0 page=script/quest/Q328_SenseForBusiness/30436-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1366=0 57=1000
+  rows Q328_SenseForBusiness <cond>=1 <state>=STARTED

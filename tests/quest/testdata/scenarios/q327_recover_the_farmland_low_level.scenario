@@ -1,0 +1,26 @@
+# Recover the Farmland (Q327), refused: a level 24 character is too young for Piotur, and the
+# quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q327_recover_the_farmland_low_level.golden
+character Farmer 24
+script quest.Q327_RecoverTheFarmland
+item 5012 1846 1847 1848 1849 1850 1851 1852 1853 1854 1855 1463 2510 1061 734 735 736 737
+page default/30597.htm
+page guard/30382.htm
+page trainer/30034.htm
+page merchant/30313.htm
+page merchant/30314.htm
+page script/quest/Q327_RecoverTheFarmland/
+npc piotur 30597 Folk -10 0 0
+
+# Piotur: too young.
+action piotur
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q327_RecoverTheFarmland CREATED
+  rows Q327_RecoverTheFarmland -

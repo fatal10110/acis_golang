@@ -1,0 +1,97 @@
+# Curiosity of a Dwarf (Q329): a level 33 character accepts at Rolento; with nothing to sell he
+# asks for more; granite golems and punchers are killed with pinned rolls: a roll under 2 gives a
+# heartstone, one under 44 (golem) or 50 (puncher) a broken heartstone, one at the bound nothing;
+# Rolento pays 1000 a heartstone and 50 a broken one, with no bonus for three; then the player
+# quits the repeatable quest; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q329_curiosity_of_a_dwarf.golden
+character Dwarfish 33
+random 0 0 43 0 44 49 0 50
+script quest.Q329_CuriosityOfADwarf
+item 1346 1365
+page merchant/30437.htm
+page script/quest/Q329_CuriosityOfADwarf/
+npc rolento 30437 Merchant 10 0 0
+npc golem 20083 Monster 40 0 0
+npc puncher 20085 Monster 0 40 0
+
+# Rolento: accept.
+action rolento
+action rolento
+  S ActionFailed
+  S NpcHtmlMessage obj=rolento item=0 page=merchant/30437.htm
+  S ActionFailed
+bypass npc_{rolento}_Quest
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q329_CuriosityOfADwarf/30437-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q329_CuriosityOfADwarf CREATED
+bypass Quest Q329_CuriosityOfADwarf 30437-03.htm
+  S QuestList 329:0x80000001
+  S ExShowQuestMark quest=329
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q329_CuriosityOfADwarf/30437-03.htm
+  S ActionFailed
+  Q upsert Q329_CuriosityOfADwarf | <state> | STARTED
+  Q upsert Q329_CuriosityOfADwarf | <cond> | 1
+  state Q329_CuriosityOfADwarf STARTED
+  rows Q329_CuriosityOfADwarf <cond>=1 <state>=STARTED
+
+# Nothing to sell yet.
+action rolento
+  S ActionFailed
+  S NpcHtmlMessage obj=rolento item=0 page=merchant/30437.htm
+  S ActionFailed
+bypass npc_{rolento}_Quest
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q329_CuriosityOfADwarf/30437-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Golems: a heartstone, a broken one, nothing.
+kill golem x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1365
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  items 1346=1 1365=1
+# Punchers: a broken one, nothing.
+kill puncher x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1365
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  items 1346=1 1365=2
+
+# Rolento: 1000 + 2 x 50.
+action rolento
+  S ActionFailed
+  S NpcHtmlMessage obj=rolento item=0 page=merchant/30437.htm
+  S ActionFailed
+bypass npc_{rolento}_Quest
+  S SystemMessage id=302 3:1346
+  S SystemMessage id=301 3:1365 6:2
+  S SystemMessage id=52 6:1100
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q329_CuriosityOfADwarf/30437-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1346=0 1365=0 57=1100
+  rows Q329_CuriosityOfADwarf <cond>=1 <state>=STARTED
+
+# Quit.
+bypass Quest Q329_CuriosityOfADwarf 30437-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q329_CuriosityOfADwarf/30437-06.htm
+  S ActionFailed
+  Q delete-quest Q329_CuriosityOfADwarf
+  state Q329_CuriosityOfADwarf -
+  rows Q329_CuriosityOfADwarf -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q329_CuriosityOfADwarf -
+  rows Q329_CuriosityOfADwarf -
+  items 57=1100
