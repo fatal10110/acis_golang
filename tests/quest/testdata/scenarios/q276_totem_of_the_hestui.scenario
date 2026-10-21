@@ -1,0 +1,103 @@
+# Totem of the Hestui (Q276): an orc fighter of level 15 holding thirty-eight Kasha parasites
+# accepts at Tanapi; two Kasha bears give a parasite each, their rolls at 50 calling no totem
+# spirit at 38 and 39 parasites (the call is a Boot test, as a scenario cannot show a
+# script-spawned NPC, #4020 item 5); the Kasha bear totem spirit gives the crystal and moves the
+# quest on, and a bear killed with the crystal held gives nothing; Tanapi takes crystal and
+# parasites for the Hestui totem and leather pants, and the repeatable quest ends; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q276_totem_of_the_hestui.golden
+character Seer 15
+class 44
+hold 1480 38
+random 50 0 50 0
+script quest.Q276_TotemOfTheHestui
+item 29 1480 1481 1500
+page trainer/30571.htm
+page script/quest/Q276_TotemOfTheHestui/
+npc tanapi 30571 Trainer 10 0 0
+npc bear 20479 Monster 40 0 0
+npc spirit 27044 Monster 0 40 0
+
+# Tanapi: accept.
+action tanapi
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q276_TotemOfTheHestui/30571-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q276_TotemOfTheHestui CREATED
+bypass Quest Q276_TotemOfTheHestui 30571-03.htm
+  S QuestList 276:0x80000001
+  S ExShowQuestMark quest=276
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q276_TotemOfTheHestui/30571-03.htm
+  S ActionFailed
+  Q upsert Q276_TotemOfTheHestui | <state> | STARTED
+  Q upsert Q276_TotemOfTheHestui | <cond> | 1
+  state Q276_TotemOfTheHestui STARTED
+  rows Q276_TotemOfTheHestui <cond>=1 <state>=STARTED
+
+# Two bears: a parasite each, and no spirit called.
+kill bear x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1480
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1480
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1480=40
+
+# Tanapi: not yet.
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q276_TotemOfTheHestui/30571-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# The totem spirit: the crystal, and the quest moves on.
+kill spirit
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 276:0x80000003
+  S ExShowQuestMark quest=276
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1481
+  Q upsert Q276_TotemOfTheHestui | <cond> | 2
+  items 1480=40 1481=1
+  rows Q276_TotemOfTheHestui <cond>=2 <state>=STARTED
+
+# A bear, the crystal held: nothing.
+kill bear
+  S SystemMessage id=95 1:0 1:0
+  items 1480=40 1481=1
+
+# Tanapi: the totem and the pants; the quest ends.
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S SystemMessage id=302 3:1481
+  S SystemMessage id=301 3:1480 6:40
+  S SystemMessage id=54 3:1500
+  S SystemMessage id=54 3:29
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q276_TotemOfTheHestui/30571-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q276_TotemOfTheHestui
+  items 1480=0 1481=0 1500=1 29=1
+  state Q276_TotemOfTheHestui -
+  rows Q276_TotemOfTheHestui -
+
+# Relog: the quest is gone, and what it gave stays.
+relog
+  state Q276_TotemOfTheHestui -
+  rows Q276_TotemOfTheHestui -
+  items 1500=1 29=1
