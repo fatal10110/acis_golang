@@ -104,18 +104,25 @@ func i6eTemplate(id int32) *npc.Template {
 	})
 }
 
-// i6eSkills are a fixture wizard's skills, each costing mp MP: one-target
-// magics that harm nothing, and self range magics cast on the caster.
-func i6eSkills(mp int) *modelskill.Table {
+// i6eSkills are a fixture wizard's skills, each costing mp MP, or 100000
+// for the costly ones: one-target magics that harm nothing, and self range
+// magics cast on the caster.
+func i6eSkills(mp int, costly ...modelskill.ID) *modelskill.Table {
+	cost := func(id modelskill.ID) int {
+		if slices.Contains(costly, id) {
+			return 100000
+		}
+		return mp
+	}
 	var defs []modelskill.Definition
 	for _, id := range []modelskill.ID{i6eRangeDebuffID, wLongDDID, wShortDDID, i6eFiendID} {
 		d := harmlessSkill(id)
-		d.MPConsume = mp
+		d.MPConsume = cost(id)
 		defs = append(defs, d)
 	}
 	for _, id := range []modelskill.ID{i6eSelfDDID, i6eSelfDebuffID} {
 		defs = append(defs, modelskill.Definition{
-			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, MPConsume: mp,
+			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, MPConsume: cost(id),
 			Magic: true, SkillType: "BUFF", HitTime: 500, StaticHitTime: true, StaticReuse: true,
 		})
 	}
@@ -239,7 +246,8 @@ func TestRoyalRushHealer1AnswersHits(t *testing.T) {
 // range debuff on itself and, from an attacker farther than 100, its long
 // range DD magic on the attacker, else its self range DD magic. On a draw
 // of 50 only the self range DD magic. The end of a cast on the character
-// 300 away brings the long range DD magic again.
+// 300 away brings the long range DD magic again, unless the healer cannot
+// pay for it, when it changes nothing.
 func TestRoyalRushHealer2AnswersHits(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual6e(t, raidBoot{}, i6eTemplate(i6eHealer2ID))
@@ -274,6 +282,29 @@ func TestRoyalRushHealer2AnswersHits(t *testing.T) {
 		if _, ok := castDesireOf(calm, id); ok {
 			t.Fatalf("healer wants skill %d after a hit on a draw of 50", id)
 		}
+	}
+
+	// The end of the self range DD magic, every draw 0, picks the long
+	// range DD magic for the character 300 away; a healer that cannot pay
+	// for it on itself does nothing more, keeping its spells.
+	costly := w.spawn(t, i6eHealer2ID, 300, -100)
+	w.srv.InstallNPCCastSeam(t, costly, i6eSkills(0, wLongDDID))
+	w.hit(t, costly, 10)
+	w.draw.Store(0)
+	var frames [][]byte
+	for i := 0; i6eCasts(frames, costly.ObjectID(), i6eSelfDDID) == 0 || i < 3; i++ {
+		if i == 20 {
+			t.Fatal("the healer never cast its self range DD magic")
+		}
+		frames = append(frames, w.ticks(t, 1)...)
+		w.srv.Advance(t, time.Second)
+		frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+	}
+	if got := costly.Scratch().Int(npc.IntAI0); got != 0 {
+		t.Fatalf("healer short of MP for its long range DD magic int slot 0 = %d, want 0", got)
+	}
+	if _, ok := castDesireOf(costly, wLongDDID); ok || i6eCasts(frames, costly.ObjectID(), wLongDDID) != 0 {
+		t.Fatal("healer short of MP for its long range DD magic wants or casts it")
 	}
 }
 
@@ -638,5 +669,31 @@ func TestWizardFiendArcherRunAwayRootedGivesUpTheRun(t *testing.T) {
 	}
 	if !castOn(h, i6eFiendID, me) {
 		t.Fatal("rooted runner wants no fiend archer skill on its attacker")
+	}
+}
+
+// TestWizardFiendArcherRunAwayCallsOnlyWhenNotAttacking runs the 2001
+// timer of a runner that is already attacking when it fires: it calls no
+// kin and stays at its flee point (int slot 3 kept at 2).
+func TestWizardFiendArcherRunAwayCallsOnlyWhenNotAttacking(t *testing.T) {
+	t.Parallel()
+	w, h, listener := i6eDenRunner(t)
+	w.i6eFlee(t, h)
+	w.i6eArrive(t, h, 0)
+	w.onQueue(t, h, func() { script.NPCOf(h).AddAttackDesire(script.PlayerOf(w.player), 1e8) })
+	for i := 0; script.NPCOf(h).Intention() != script.IntentionAttack; i++ {
+		if i == 5 {
+			t.Fatal("the runner never turned to attack")
+		}
+		cycle(t, w.srv)
+	}
+	w.srv.ReadQueued(t, w.srv.Client)
+
+	w.srv.Advance(t, time.Second)
+	if got := says(w.srv.ReadQueued(t, w.srv.Client), listener); len(got) != 0 {
+		t.Fatalf("events heard from an attacking runner = %q, want none", got)
+	}
+	if got := h.Scratch().Int(npc.IntAI3); got != 2 {
+		t.Fatalf("attacking runner int slot 3 after its 2001 timer = %d, want 2", got)
 	}
 }
