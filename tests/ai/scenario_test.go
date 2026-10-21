@@ -134,13 +134,16 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill":                                                siegeguard.WizardUseSkill,
 
 	// The Four Sepulchers bombs and room bosses, and the tyrannosaurus.
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb":                   warrior.RoyalRushBomb,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb":            warrior.RoyalRushHereticBomb,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2":           warrior.RoyalRushHereticBomb2,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic": warrior.RoyalRushRoomBossBasic,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1":     warrior.RoyalRushRoomBoss1,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4":     warrior.RoyalRushRoomBoss4,
-	"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":               warrior.TyrannoPrimeval,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb":                                                         warrior.RoyalRushBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb":                                                  warrior.RoyalRushHereticBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2":                                                 warrior.RoyalRushHereticBomb2,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic":                                       warrior.RoyalRushRoomBossBasic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1":                                           warrior.RoyalRushRoomBoss1,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4":                                           warrior.RoyalRushRoomBoss4,
+	"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":                                                     warrior.TyrannoPrimeval,
+	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior":                                               warrior.PartyLeader,
+	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptain":                warrior.PartyLeaderCoupleCaptain,
+	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptainNurseAggressive": warrior.PartyLeaderCoupleCaptainNurseAggressive,
 
 	// The DD magic physical specials and the physical poisons.
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial":                warrior.CastDDMagicPhysicalSpecial,
