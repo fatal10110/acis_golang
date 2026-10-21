@@ -193,3 +193,24 @@ func TestPartyPrivateSpawnPrivateAggressiveMakesWayForTheSecretarysCall(t *testi
 		t.Fatalf("in the world after event 11039 to the first called private: %v, %v, want false, true", w.inWorld(called[0]), w.inWorld(called[1]))
 	}
 }
+
+// TestPartyPrivateSpawnPrivateAggressiveIgnoresMonstersItSees ports the
+// playable test of PartyPrivateSpawnPrivateAggressive's see-creature hook:
+// out of the character's sight, a look around (which another script may
+// make it run) tells it about the monster beside it, and it neither wants
+// to attack it nor hates it.
+func TestPartyPrivateSpawnPrivateAggressiveIgnoresMonstersItSees(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual4(t, raidBoot{}, ind4eSpawnPrivateTemplate(ind4eSpawnPrivateID, nil), warriorTemplate(siegeDummyID, nil))
+	private := w.spawn(t, ind4eSpawnPrivateID, 6000, 0)
+	monster := w.spawn(t, siegeDummyID, 6050, 0)
+	w.ticks(t, 1)
+	w.clearDesires(t, private)
+	w.onQueue(t, private, private.LookNeighbor)
+	if d, ok := desire(private, actorai.IntentionAttack); ok {
+		t.Fatalf("attack desire after seeing the monster = %+v, want none", d)
+	}
+	if got := private.AggroHate(monster); got != 0 {
+		t.Fatalf("hate of the monster it sees = %v, want 0", got)
+	}
+}
