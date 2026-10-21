@@ -1,0 +1,118 @@
+# Vanquish Remnants (Q326): a level 21 character accepts at Leopold; with no badge he asks for
+# more; four, three and three of the three badge kinds' remnants give ten badges (every roll
+# pinned to succeed); Leopold pays 46, 52 and 58 a badge and 4320 more for ten or more; then the
+# player quits the repeatable quest; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q326_vanquish_remnants.golden
+character Remnant 21
+random always 0
+script quest.Q326_VanquishRemnants
+item 1359 1360 1361 1369
+page default/30435.htm
+page script/quest/Q326_VanquishRemnants/
+npc leopold 30435 Folk 10 0 0
+npc red 20053 Monster 40 0 0
+npc blue 20436 Monster 0 40 0
+npc black 20066 Monster -40 0 0
+
+# Leopold: accept.
+action leopold
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q326_VanquishRemnants/30435-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q326_VanquishRemnants CREATED
+bypass Quest Q326_VanquishRemnants 30435-03.htm
+  S QuestList 326:0x80000001
+  S ExShowQuestMark quest=326
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q326_VanquishRemnants/30435-03.htm
+  S ActionFailed
+  Q upsert Q326_VanquishRemnants | <state> | STARTED
+  Q upsert Q326_VanquishRemnants | <cond> | 1
+  state Q326_VanquishRemnants STARTED
+  rows Q326_VanquishRemnants <cond>=1 <state>=STARTED
+
+# No badge yet.
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q326_VanquishRemnants/30435-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Four red, three blue and three black badges.
+kill red x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1359
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1359
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1359
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1359
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1359=4
+kill blue x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1360
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1360
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1360
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1360=3
+kill black x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1361
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1361
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1361
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1361=3
+
+# Leopold: 4 x 46 + 3 x 52 + 3 x 58 + 4320.
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S SystemMessage id=301 3:1359 6:4
+  S SystemMessage id=301 3:1360 6:3
+  S SystemMessage id=301 3:1361 6:3
+  S SystemMessage id=52 6:4834
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q326_VanquishRemnants/30435-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1359=0 1360=0 1361=0 1369=0 57=4834
+  rows Q326_VanquishRemnants <cond>=1 <state>=STARTED
+
+# Quit.
+bypass Quest Q326_VanquishRemnants 30435-07.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q326_VanquishRemnants/30435-07.htm
+  S ActionFailed
+  Q delete-quest Q326_VanquishRemnants
+  state Q326_VanquishRemnants -
+  rows Q326_VanquishRemnants -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q326_VanquishRemnants -
+  rows Q326_VanquishRemnants -
+  items 57=4834
