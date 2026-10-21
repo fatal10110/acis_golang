@@ -138,6 +138,7 @@ type options struct {
 	crests                 *datacache.Crests
 	cursedWeapons          []*entity.CursedWeaponTable
 	cursedWeaponClock      func() time.Time
+	gameClockNow           func() time.Time
 	karmaPlayerCanTeleport bool
 	awardPKKillPVPPoint    bool
 	karmaServiceGates      [3]bool
@@ -336,6 +337,13 @@ func WithCursedWeapons(tables ...*entity.CursedWeaponTable) Option {
 // so a suite can pin the deadlines its ticks reach.
 func WithCursedWeaponClock(now func() time.Time) Option {
 	return func(o *options) { o.cursedWeaponClock = now }
+}
+
+// WithGameClockNow sets the wall clock the in-game clock reads, and with it
+// the uptime the scripts count game ticks from (default time.Now), so a
+// suite can move the ticks along with Advance.
+func WithGameClockNow(now func() time.Time) Option {
+	return func(o *options) { o.gameClockNow = now }
 }
 
 // WithKarmaTeleport sets the players.properties KarmaPlayerCanTeleport gate
@@ -2012,7 +2020,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
-	clock := task.NewGameClock(time.Now)
+	clock := task.NewGameClock(o.gameClockNow)
 	playerClock, err := task.NewPlayerClock(clock, state, network.NewPlayerClockEffects(state))
 	if err != nil {
 		t.Fatalf("new player clock: %v", err)
