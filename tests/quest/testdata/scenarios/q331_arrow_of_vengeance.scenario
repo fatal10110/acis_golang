@@ -1,0 +1,139 @@
+# Arrow of Vengeance (Q331): a level 32 character accepts at Belton; with nothing to sell he asks
+# for more; four harpies, four medusas and three wyrms give eleven parts (every roll pinned to
+# succeed); Belton pays 78, 88 and 92 a part and 3100 more for over ten; one more wyrm tooth is
+# paid 92 with no bonus; then the player quits the repeatable quest; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q331_arrow_of_vengeance.golden
+character Avenger 32
+random always 0
+script quest.Q331_ArrowOfVengeance
+item 1452 1453 1454
+page guard/30125.htm
+page script/quest/Q331_ArrowOfVengeance/
+npc belton 30125 Guard 10 0 0
+npc harpy 20145 Monster 40 0 0
+npc medusa 20158 Monster 0 40 0
+npc wyrm 20176 Monster -40 0 0
+
+# Belton: accept.
+action belton
+action belton
+  S ActionFailed
+  S NpcHtmlMessage obj=belton item=0 page=guard/30125.htm
+  S ActionFailed
+bypass npc_{belton}_Quest
+  S NpcHtmlMessage obj=belton item=0 page=script/quest/Q331_ArrowOfVengeance/30125-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q331_ArrowOfVengeance CREATED
+bypass Quest Q331_ArrowOfVengeance 30125-03.htm
+  S QuestList 331:0x80000001
+  S ExShowQuestMark quest=331
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=belton item=0 page=script/quest/Q331_ArrowOfVengeance/30125-03.htm
+  S ActionFailed
+  Q upsert Q331_ArrowOfVengeance | <state> | STARTED
+  Q upsert Q331_ArrowOfVengeance | <cond> | 1
+  state Q331_ArrowOfVengeance STARTED
+  rows Q331_ArrowOfVengeance <cond>=1 <state>=STARTED
+
+# Nothing to sell yet.
+action belton
+  S ActionFailed
+  S NpcHtmlMessage obj=belton item=0 page=guard/30125.htm
+  S ActionFailed
+bypass npc_{belton}_Quest
+  S NpcHtmlMessage obj=belton item=0 page=script/quest/Q331_ArrowOfVengeance/30125-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Four feathers, four venoms and three teeth.
+kill harpy x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1452
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1452
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1452
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1452
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1452=4
+kill medusa x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1453
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1453
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1453
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1453
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1453=4
+kill wyrm x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1454
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1454
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1454
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1454=3
+
+# Belton: 4 x 78 + 4 x 88 + 3 x 92 + 3100.
+action belton
+  S ActionFailed
+  S NpcHtmlMessage obj=belton item=0 page=guard/30125.htm
+  S ActionFailed
+bypass npc_{belton}_Quest
+  S SystemMessage id=301 3:1452 6:4
+  S SystemMessage id=301 3:1453 6:4
+  S SystemMessage id=301 3:1454 6:3
+  S SystemMessage id=52 6:4040
+  S NpcHtmlMessage obj=belton item=0 page=script/quest/Q331_ArrowOfVengeance/30125-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1452=0 1453=0 1454=0 57=4040
+  rows Q331_ArrowOfVengeance <cond>=1 <state>=STARTED
+
+# One more tooth: 92, no bonus.
+kill wyrm
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1454
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1454=1
+action belton
+  S ActionFailed
+  S NpcHtmlMessage obj=belton item=0 page=guard/30125.htm
+  S ActionFailed
+bypass npc_{belton}_Quest
+  S SystemMessage id=302 3:1454
+  S SystemMessage id=52 6:92
+  S NpcHtmlMessage obj=belton item=0 page=script/quest/Q331_ArrowOfVengeance/30125-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1454=0 57=4132
+
+# Quit.
+bypass Quest Q331_ArrowOfVengeance 30125-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=belton item=0 page=script/quest/Q331_ArrowOfVengeance/30125-06.htm
+  S ActionFailed
+  Q delete-quest Q331_ArrowOfVengeance
+  state Q331_ArrowOfVengeance -
+  rows Q331_ArrowOfVengeance -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q331_ArrowOfVengeance -
+  rows Q331_ArrowOfVengeance -
+  items 57=4132

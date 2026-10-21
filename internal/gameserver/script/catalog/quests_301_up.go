@@ -10,9 +10,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q320"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q324"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q325"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q326"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q327"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q328"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q329"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q330"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q331"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q333"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q336"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q338"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q341"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -28,20 +35,20 @@ func quests301Up() script.Catalog {
 		"quest.Q320_BonesTellTheFuture":                q320.New,
 		"quest.Q324_SweetestVenom":                     q324.New,
 		"quest.Q325_GrimCollector":                     q325.New,
-		"quest.Q326_VanquishRemnants":                  nil,
-		"quest.Q327_RecoverTheFarmland":                nil,
-		"quest.Q328_SenseForBusiness":                  nil,
-		"quest.Q329_CuriosityOfADwarf":                 nil,
+		"quest.Q326_VanquishRemnants":                  q326.New,
+		"quest.Q327_RecoverTheFarmland":                q327.New,
+		"quest.Q328_SenseForBusiness":                  q328.New,
+		"quest.Q329_CuriosityOfADwarf":                 q329.New,
 		"quest.Q330_AdeptOfTaste":                      q330.New,
-		"quest.Q331_ArrowOfVengeance":                  nil,
+		"quest.Q331_ArrowOfVengeance":                  q331.New,
 		"quest.Q333_HuntOfTheBlackLion":                q333.New,
 		"quest.Q334_TheWishingPotion":                  nil,
 		"quest.Q335_SongOfTheHunter":                   nil,
 		"quest.Q336_CoinsOfMagic":                      q336.New,
 		"quest.Q337_AudienceWithTheLandDragon":         nil,
-		"quest.Q338_AlligatorHunter":                   nil,
+		"quest.Q338_AlligatorHunter":                   q338.New,
 		"quest.Q340_SubjugationOfLizardmen":            nil,
-		"quest.Q341_HuntingForWildBeasts":              nil,
+		"quest.Q341_HuntingForWildBeasts":              q341.New,
 		"quest.Q343_UnderTheShadowOfTheIvoryTower":     nil,
 		"quest.Q344_1000YearsTheEndOfLamentation":      nil,
 		"quest.Q345_MethodToRaiseTheDead":              nil,
