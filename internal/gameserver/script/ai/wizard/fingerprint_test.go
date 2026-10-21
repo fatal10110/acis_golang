@@ -43,6 +43,11 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2Curse",
 		"script.ai.individual.Monster.WizardBase.Wizard.Agit02VampireArcherAgit",
 		"script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain",
+		"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer1",
+		"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer2",
+		"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardDDMagic2Hold",
+		"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardShortSelfRange",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)
