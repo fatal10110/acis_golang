@@ -161,6 +161,8 @@ func (s *folkSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs) })
 	case event.NpcShout:
 		broadcastInRadius(s.world, f, e.Radius, func() wire.Frame { return frames.NpcSay(f.ObjectID(), e.NpcID, e.Text, true) })
+	case event.NpcSystemMessage:
+		broadcastInRadius(s.world, f, e.Radius, func() wire.Frame { return frameNpcSystemMessage(e) })
 	case event.MusicPlayed:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameMusicAt(f.ObjectID(), e.File, e.At) })
 	case event.HPChanged:

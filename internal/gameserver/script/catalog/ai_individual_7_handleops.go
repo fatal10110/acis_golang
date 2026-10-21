@@ -64,55 +64,10 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnTimer":            {"NPC.CanAutoAttack", "NPC.CastingNow", "NPC.HateList", "NPC.InCombat", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 			"OnUseSkillFinished": {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted"},
 		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossAloneSummonPrivate": {
-			"OnAttacked":  {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
-			"OnSeeSpell":  {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":     {"NPC.RandomizeAttack"},
-		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon": {
-			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":    {"NPC.RandomizeAttack"},
-		},
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1": {
 			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
 			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
 			"OnTimer":    {"NPC.RandomizeAttack"},
-		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.DrChaosGiganticGolem": {
-			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":    {"NPC.RandomizeAttack"},
-		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.FreyaRoyalGuard": {
-			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":    {"NPC.RandomizeAttack"},
-		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.RaidBossType1Aggressive": {
-			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":    {"NPC.RandomizeAttack"},
-		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Sailren": {
-			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnSeeSpell": {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":    {"NPC.HateList", "NPC.RandomizeAttack"},
-		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty": {
-			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
-			"OnSeeSpell":      {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":         {"NPC.RandomizeAttack"},
-		},
-		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType2": {
-			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
-			"OnSeeSpell":      {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":         {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.RaidBoss.RaidBossStandard": {
 			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},

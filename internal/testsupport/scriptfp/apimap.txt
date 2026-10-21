@@ -676,7 +676,7 @@ WorldObject.isIn3DRadius script.InRadius3D
 # siegable-hall system messages broadcast in a radius (FlagWar,
 # RainbowSpringsChateau) have no call yet and are tracked on #3502. A
 # binding a siegable-hall script registers is a field of the script.
-Creature.broadcastPacketInRadius script.NPC.ShoutInRadius
+Creature.broadcastPacketInRadius script.NPC.ShoutInRadius,script.NPC.SystemMessageInRadius
 NpcSay.new script.NPC.ShoutInRadius
 Quest.addClanAttacked inline
 Quest.addNoDesire inline
@@ -911,13 +911,13 @@ Spawn.setLoc inline
 SystemMessage.addFortId script.Hall.Announce
 SystemMessage.addString script.Hall.Announce
 World.toAllOnlinePlayers script.Hall.Announce
+WorldObject.forEachKnownTypeInRadius script.NPC.PlayersInRadius
+ZoneType.getKnownTypeInside script.Hall.PlayersInside
 
 # Siegable-hall rows, exempt from the freeze. Their only callers are the
-# Rainbow Springs and flag war hall scripts; each takes its Go name with the
-# port of the script making it (#3502).
+# Rainbow Springs hall script; each takes its Go name with the port of the
+# script making it (#3502).
 Player.stopAllEffects exempt
 Summon.unSummon exempt
 ThreadPool.execute exempt
-WorldObject.forEachKnownTypeInRadius exempt
 ZoneType.getCreatures exempt
-ZoneType.getKnownTypeInside exempt

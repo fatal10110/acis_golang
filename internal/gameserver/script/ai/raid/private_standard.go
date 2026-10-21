@@ -1,7 +1,6 @@
 // Package raid holds the raid behaviors: RaidPrivateStandard, the private a
 // raid boss leads, which every other raid private derives from, and
-// RaidBossStandard, which every raid boss derives from, with the
-// RaidBossType1 and RaidBossParty families.
+// RaidBossStandard, which every raid boss derives from, and RaidBossType1.
 package raid
 
 import (

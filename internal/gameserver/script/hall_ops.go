@@ -1,6 +1,7 @@
 package script
 
 import (
+	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -108,25 +109,30 @@ func (s *Script) BindHallSiege(id int32, hooks HallSiegeHooks) *Hall {
 	}
 	sc := clanhall.SiegeScript{OwnAttackers: hooks.OwnAttackers, DoorsUnattackable: hooks.DoorsUnattackable}
 	if f := hooks.Winner; f != nil {
-		sc.Winner = func() int32 { return f(h) }
+		sc.Winner = func() (winner int32) {
+			s.runHall("winner", func() { winner = f(h) })
+			return winner
+		}
 	}
 	if f := hooks.SpawnNPCs; f != nil {
-		sc.SpawnNPCs = func() { f(h) }
+		sc.SpawnNPCs = func() { s.runHall("spawn npcs", func() { f(h) }) }
 	}
 	if f := hooks.UnspawnNPCs; f != nil {
-		sc.UnspawnNPCs = func() { f(h) }
+		sc.UnspawnNPCs = func() { s.runHall("unspawn npcs", func() { f(h) }) }
 	}
 	if f := hooks.Prepare; f != nil {
-		sc.Prepare = func(b clanhall.SiegeBase, delay time.Duration) { f(h, b, delay) }
+		sc.Prepare = func(b clanhall.SiegeBase, delay time.Duration) { s.runHall("prepare", func() { f(h, b, delay) }) }
 	}
 	if f := hooks.Start; f != nil {
-		sc.Start = func(b clanhall.SiegeBase) { f(h, b) }
+		sc.Start = func(b clanhall.SiegeBase) { s.runHall("start", func() { f(h, b) }) }
 	}
 	if f := hooks.End; f != nil {
-		sc.End = func(b clanhall.SiegeBase) { f(h, b) }
+		sc.End = func(b clanhall.SiegeBase) { s.runHall("end", func() { f(h, b) }) }
 	}
 	if f := hooks.MiniGameWinner; f != nil {
-		sc.MiniGameWinner = func(gourd, winner attackable.Combatant) { f(h, NPCOf(gourd), PlayerOf(winner)) }
+		sc.MiniGameWinner = func(gourd, winner attackable.Combatant) {
+			s.runHall("mini game winner", func() { f(h, NPCOf(gourd), PlayerOf(winner)) })
+		}
 	}
 	if _, ok := s.env.Halls.BindSiege(id, sc); !ok {
 		return nil
@@ -302,4 +308,33 @@ func (s *Spawner) SpawnForClan(npcID int32, at Place, clanID int32) *NPC {
 		return nil
 	}
 	return NPCOf(live)
+}
+
+// runHall runs fn, a hall siege hook of the script, as one invocation: a
+// panic aborts it and is logged with its stack, as a hook's is.
+func (s *Script) runHall(what string, fn func()) {
+	r := s.registry
+	if r == nil {
+		fn()
+		return
+	}
+	epoch := r.runs.Begin()
+	defer r.runs.End(epoch)
+	defer func() {
+		if p := recover(); p != nil {
+			r.log.Error().Str("script", s.path).Str("hook", "hall siege "+what).Interface("panic", p).Str("stack", string(debug.Stack())).Msg("script: hook panicked")
+		}
+	}()
+	fn()
+}
+
+// BindHallSieges runs the hall siege binding (Script.BindHall) of every
+// registered script that has one, in list order, each as one invocation.
+// Run it once, after the halls are restored and before their sieges run.
+func (r *Registry) BindHallSieges() {
+	for _, e := range r.entries {
+		if s := e.script; s != nil && s.BindHall != nil {
+			s.runHall("binding", func() { s.BindHall(s) })
+		}
+	}
 }

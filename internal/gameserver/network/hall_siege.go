@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -206,4 +207,9 @@ func (l *GameClientLink) showHallSiegeMessenger(live *livePlayer, f *npc.Folk) b
 	sendFilledHTML(live, f.ObjectID(), l.setPage("data/html/siege/"+page+".htm"), 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 	return true
+}
+
+// frameNpcSystemMessage builds the system message an NPC sends around it.
+func frameNpcSystemMessage(e event.NpcSystemMessage) wire.Frame {
+	return frameSiegeMessage(siege.Message{ID: e.ID, Text: e.Text, CastleID: e.CastleID, Number: e.Number, HasNumber: e.HasNumber})
 }
