@@ -3,6 +3,8 @@ package raid
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
@@ -16,12 +18,12 @@ func BossParty() script.Script {
 
 // partyBossHate is the attack weight a party raid boss gives a hit of
 // damage on its party, damage at least 1: 20000 per point over its level
-// plus 7, truncated.
+// plus 7, truncated toward zero within the int32 range.
 func partyBossHate(n *script.NPC, damage int32) float64 {
 	if damage == 0 {
 		damage = 1
 	}
-	return float64(int32(((1.0 * float64(damage)) / float64(n.Level()+7)) * 20000))
+	return float64(commons.TruncInt32Sat(((1.0 * float64(damage)) / float64(n.Level()+7)) * 20000))
 }
 
 // bossPartyHooks are RaidBossParty's hooks, which its children derive

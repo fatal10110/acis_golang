@@ -3,6 +3,8 @@ package raid
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
@@ -39,7 +41,7 @@ func bossAloneSummonPrivateHooks() script.Hooks {
 				if damage == 0 {
 					damage = 1
 				}
-				e.Called.AddAttackDesire(e.Target, float64(int32(((1.0*float64(damage))/float64(e.Called.Level()+7))*100)))
+				e.Called.AddAttackDesire(e.Target, float64(commons.TruncInt32Sat(((1.0*float64(damage))/float64(e.Called.Level()+7))*100)))
 			}
 			base.PartyAttacked(s, e)
 		},
