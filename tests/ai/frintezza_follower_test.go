@@ -117,6 +117,13 @@ func frSkills() *modelskill.Table {
 // of type kind, after saving row as its live spawn_data row when it is set.
 func bootFollower(t *testing.T, row *spawn.State, kind string) *frWorld {
 	t.Helper()
+	return bootFollowerWith(t, row, kind, raidBoot{})
+}
+
+// bootFollowerWith is bootFollower with extra's options and step before the
+// character enters the world.
+func bootFollowerWith(t *testing.T, row *spawn.State, kind string, extra raidBoot) *frWorld {
+	t.Helper()
 	if row != nil {
 		if err := gamesql.NewSpawnStore(sqltest.SharedDB(t)).SaveStates(context.Background(), map[string]*spawn.State{frRow: row}); err != nil {
 			t.Fatalf("seed spawn data: %v", err)
@@ -166,14 +173,14 @@ func bootFollower(t *testing.T, row *spawn.State, kind string) *frWorld {
 	}
 	makers := &rb5Makers{}
 	draws := &ind1Draws{}
-	w := bootRaid(t, raidBoot{opts: []gameservertest.Option{
+	w := bootRaid(t, raidBoot{ready: extra.ready, opts: append([]gameservertest.Option{
 		gameservertest.WithScriptRand(draws.rand),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 		gameservertest.WithNpcSpawnSkills(frSkills()),
 		gameservertest.WithNpcSpawns(table),
 		gameservertest.WithSpawnData(),
 		gameservertest.WithMakers(makers.catalog()),
-	}}, templates...)
+	}, extra.opts...)}, templates...)
 	return &frWorld{warriorWorld: w, draws: draws, heard: heard, makers: makers}
 }
 
