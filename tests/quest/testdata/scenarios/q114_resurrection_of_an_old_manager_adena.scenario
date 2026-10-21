@@ -1,0 +1,96 @@
+# Resurrection of an Old Manager (Q114), cond 19 to 27 on the first story (choice 1) the other way:
+# the character turns down Yumi's letter (cond 20) and asks Wendy for the starstone, whose
+# page does not decode, so the 3000 adena offer is never reached and a forged bypass to it is
+# refused. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager_adena.golden
+character Manager 49
+quest Q114_ResurrectionOfAnOldManager <cond>=19 <state>=STARTED choice=1 talk=0
+hold 8091 1
+hold 57 3000
+script quest.Q114_ResurrectionOfAnOldManager
+item 57 8090 8091 8287 8288 8289
+page default/32041.htm
+page default/32047.htm
+page script/quest/Q114_ResurrectionOfAnOldManager/
+npc yumi 32041 Folk 10 0 0
+npc wendy 32047 Folk 20 0 0
+
+# Yumi: the character turns down the letter.
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-27.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-28.htm
+  S SystemMessage id=302 3:8091
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-28.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 1
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-29.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-29.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-30.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-30.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-31.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-31.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-36.htm
+  S QuestList 114:0x800fffff
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-36.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 20
+  rows Q114_ResurrectionOfAnOldManager <cond>=20 <state>=STARTED choice=1 talk=1
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>Collector Yumi:<br>\nThis area is know as the Ruins of Pavel. It is one of the research labs the Giants established in the distant past. I've come here to research the Starstones that are being produced in this area.<br>\nThe roaming golems make it very risky to go outside of the barracks, however. In addition, the remnants of ancient old experiments, vile and disgusting, add to the danger.<br>\n<a action=\"bypass -h npc_{yumi}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-36.htm
+  S ActionFailed
+  S ActionFailed
+
+# Wendy sells the starstone.
+action wendy
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-35.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-36.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-36.htm
+  S ActionFailed
+
+# The next page does not decode (a stray Latin-1 byte): the server shows the missing-page
+# notice, which leads nowhere, so the starstone cannot be bought.
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-37.htm
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q114_ResurrectionOfAnOldManager/32047-37.htm</body></html>"
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-38.htm
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-35.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q114_ResurrectionOfAnOldManager <cond>=20 <state>=STARTED choice=1 talk=1
+  items 57=3000 8289=0
