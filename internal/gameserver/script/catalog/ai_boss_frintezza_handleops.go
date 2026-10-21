@@ -7,5 +7,10 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiBossFrintezzaHandleOps holds, per script of ai_boss_frintezza.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiBossFrintezzaHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.boss.frintezza.FollowerOfFrintezza": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.EquipItem"},
+		},
+	}
 }
