@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q111"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q112"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q113"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q114"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q116"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q117"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q119"
@@ -42,7 +43,7 @@ func quests101To150() script.Catalog {
 		"quest.Q111_ElrokianHuntersProof":       q111.New,
 		"quest.Q112_WalkOfFate":                 q112.New,
 		"quest.Q113_StatusOfTheBeaconTower":     q113.New,
-		"quest.Q114_ResurrectionOfAnOldManager": nil,
+		"quest.Q114_ResurrectionOfAnOldManager": q114.New,
 		"quest.Q115_TheOtherSideOfTruth":        nil,
 		"quest.Q116_BeyondTheHillsOfWinter":     q116.New,
 		"quest.Q117_TheOceanOfDistantStars":     q117.New,

@@ -1,14 +1,14 @@
 # Pavel's Research (Q120), cond 19 to the end: the stones send the character to the west weather
 # master, whose riddles end at cond 22 (his cast at the character is
 # q120_pavels_research_west_cast); the stones give the heart of Atlanta, Wendy takes it and gives
-# her necklace, and Yumi takes the necklace for the earring of binding; then relog. Q114 is a
-# completed stub, so the stones, Wendy and Yumi go through the quest chooser. Expectations replay
+# her necklace, and Yumi takes the necklace for the earring of binding; then relog. Q114 is
+# completed, so the stones, Wendy and Yumi go through the quest chooser. Expectations replay
 # the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q120_pavels_research_finish.golden
 character Researcher 50
 quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
 quest Q120_PavelsResearch <cond>=19 <state>=STARTED talk=0 talk1=0
-stub quest.Q114_ResurrectionOfAnOldManager
+script quest.Q114_ResurrectionOfAnOldManager
 script quest.Q120_PavelsResearch
 item 8058 8059 8060 8290 8291 8292 854
 page default/32046.htm

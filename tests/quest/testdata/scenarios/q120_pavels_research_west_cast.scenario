@@ -10,7 +10,7 @@
 character Researcher 50
 quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
 quest Q120_PavelsResearch <cond>=19 <state>=STARTED talk=0 talk1=0
-stub quest.Q114_ResurrectionOfAnOldManager
+script quest.Q114_ResurrectionOfAnOldManager
 script quest.Q120_PavelsResearch
 item 8058 8059 8060 8290 8291 8292 854
 page default/32046.htm
