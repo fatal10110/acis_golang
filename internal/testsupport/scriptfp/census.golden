@@ -44,7 +44,7 @@ call CastleManager.updateTaxes classes 1 sites 1 go script.Server.UpdateCastleTa
 call Clan.addReputationScore classes 4 sites 4 go script.Player.AddClanReputation
 call Clan.broadcastToMembers classes 3 sites 3 go script.Player.BroadcastClanInfo
 call Clan.getCastleId classes 1 sites 1 go script.Player.ClanCastleID
-call Clan.getClanHallId classes 4 sites 8 go script.Player.ClanHallID
+call Clan.getClanHallId classes 4 sites 8 go script.Player.ClanHallID,script.ClanHandle.ClanHallID
 call Clan.getClanId classes 7 sites 21 go script.ClanHandle.ID
 call Clan.getClanMember classes 1 sites 1 go inline
 call Clan.getDissolvingExpiryTime classes 1 sites 1 go script.ClanHandle.DissolvingExpiry

@@ -9,6 +9,7 @@ package flagwar
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -267,7 +268,7 @@ func (w *War) Hooks() script.Hooks {
 			case e.Name == timerOneMinute:
 				w.announce(script.SiegeMessage{ID: msgWarBeginsInMinutes, Number: 1, HasNumber: true})
 			case strings.HasPrefix(e.Name, timerSeconds):
-				secs, _ := strconv.Atoi(strings.TrimPrefix(e.Name, timerSeconds))
+				secs, _ := strconv.ParseInt(strings.TrimPrefix(e.Name, timerSeconds), 10, 32)
 				w.announce(script.SiegeMessage{ID: msgWarBeginsInSeconds, Number: int32(secs), HasNumber: true})
 			case e.Name == timerTryouts:
 				if h := w.Hall(s); h != nil {
@@ -593,7 +594,7 @@ func (w *War) doClanlessNPCSpawns(s *script.Script, tents, npcs bool) {
 		taken = append(taken, cd.Flag-w.FlagRed)
 	}
 	for _, flg := range []int32{0, 1, 2, 3, 4} {
-		if containsInt32(taken, flg) {
+		if slices.Contains(taken, flg) {
 			continue
 		}
 		loc := w.FlagCoords[flg]
@@ -612,15 +613,6 @@ func (w *War) doClanlessNPCSpawns(s *script.Script, tents, npcs bool) {
 			w.clanlessNPCSpawns.Add(warrior)
 		}
 	}
-}
-
-func containsInt32(list []int32, v int32) bool {
-	for _, x := range list {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }
 
 // doUnSpawns takes the flags and warriors out of the world.

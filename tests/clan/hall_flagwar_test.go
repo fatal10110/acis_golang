@@ -3,6 +3,7 @@ package clan
 import (
 	"context"
 	"database/sql"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -14,12 +15,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/banditstronghold"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -48,7 +51,20 @@ const (
 	ally3ID           = 35430
 	teleport1ID       = 35560
 	banditMaker       = "oren15_azit_teleporter01"
+	q504Name          = "Q504_CompetitionForTheBanditStronghold"
+	// The items a trophy registration takes.
+	tarlkAmuletID        = 4332
+	contestCertificateID = 4333
+	trophyID             = 5009
 )
+
+// questItem is a stackable quest item template.
+func questItem(id int32) *item.Template {
+	return &item.Template{
+		ID: id, Name: "Quest Item " + strconv.Itoa(int(id)), Kind: item.KindEtcItem, Duration: -1,
+		Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{},
+	}
+}
 
 // banditFlagPoint is the Bandit Stronghold's flag point i.
 var banditFlagPoint = []location.Location{
@@ -74,6 +90,7 @@ const (
 	msgBeginsSeconds = 1828
 	msgClanDefeated  = 855
 	msgSiegeFinished = 843
+	msgMatchDraw     = 858
 )
 
 // flagWarSpawnlist is the teleporter maker, its messenger and teleporters
@@ -143,6 +160,11 @@ type flagWarSetup struct {
 	owned bool
 	// seed are more statements, run after the clans and the hall row.
 	seed []string
+	// q504 lists Competition for the Bandit Stronghold too, started by the
+	// Attacker.
+	q504 bool
+	// items are what the Attacker holds as it enters the world.
+	items map[int32]int32
 }
 
 // flagWarWorld is the Attacker, leading Besiegers, in the world beside
@@ -183,6 +205,14 @@ func bootFlagWar(t *testing.T, s flagWarSetup) *flagWarWorld {
 	zones.Add(field)
 	zones.Add(grounds)
 	w := &flagWarWorld{field: field, date: time.Now().Add(time.Hour + time.Minute).UnixMilli()}
+	listing := []script.Listing{{Path: banditScript}}
+	catalog := script.Catalog{banditScript: banditstronghold.New}
+	if s.q504 {
+		listing = append(listing, script.Listing{Path: "quest." + q504Name})
+		catalog["quest."+q504Name] = q504.New
+		s.seed = append(s.seed, "INSERT INTO character_quests (charId, name, var, value) SELECT obj_Id, '"+q504Name+"', '<state>', 'STARTED' FROM characters WHERE char_name = 'Attacker'",
+			"INSERT INTO character_quests (charId, name, var, value) SELECT obj_Id, '"+q504Name+"', '<cond>', '1' FROM characters WHERE char_name = 'Attacker'")
+	}
 	w.srv = gameservertest.Boot(t,
 		gameservertest.WithCharacter("Attacker", 40, 0),
 		gameservertest.WithWantChars(1),
@@ -193,7 +223,8 @@ func bootFlagWar(t *testing.T, s flagWarSetup) *flagWarWorld {
 		gameservertest.WithNPCs(flagWarTemplates()),
 		gameservertest.WithNpcSpawns(makers),
 		gameservertest.WithMakers(script.MakerCatalog{"farm_maker": maker.Farm}),
-		gameservertest.WithNPCScripts(flagWarKinds(), []script.Listing{{Path: banditScript}}, script.Catalog{banditScript: banditstronghold.New}),
+		gameservertest.WithNPCScripts(flagWarKinds(), listing, catalog),
+		gameservertest.WithItemTemplates(item.NewTable(append(gameservertest.ItemTemplates().All(), questItem(tarlkAmuletID), questItem(contestCertificateID), questItem(trophyID)))),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithLog(zerolog.New(zerolog.NewTestWriter(t)).Level(zerolog.WarnLevel)),
@@ -208,6 +239,9 @@ func bootFlagWar(t *testing.T, s flagWarSetup) *flagWarWorld {
 		t.Fatal("the Bandit Stronghold has no siege")
 	}
 	w.siege = hs
+	for _, id := range slices.Sorted(maps.Keys(s.items)) {
+		w.srv.GiveItem(t, w.objID, id, s.items[id])
+	}
 	startInWorld(t, w.c)
 	drainFrames(t, w.c)
 	return w
@@ -747,6 +781,99 @@ func TestBanditStrongholdLoneChallengerTakesAFreeHall(t *testing.T) {
 	if x, y, _ := w.srv.PlayerPosition(t, w.objID); x != 10 || y != 20 {
 		t.Fatalf("the owner's Attacker was moved to %d,%d", x, y)
 	}
+}
+
+// TestBanditStrongholdTrophyRegistration: the Attacker, holding two
+// Trophies of Alliance, 31 Tarlk Amulets and a Contest Certificate with
+// Competition for the Bandit Stronghold started, registers Besiegers after
+// the close by its trophy. One trophy pays the registration; then 30
+// amulets, every certificate and the trophies left are taken, the quest
+// ends with its finish sound and its rows are deleted, and Besiegers
+// fights under the red flag, the first free.
+func TestBanditStrongholdTrophyRegistration(t *testing.T) {
+	t.Parallel()
+	w := bootFlagWar(t, flagWarSetup{q504: true, items: map[int32]int32{trophyID: 2, tarlkAmuletID: 31, contestCertificateID: 1}})
+	messenger := w.messenger(t)
+	w.srv.Advance(t, time.Duration(w.date-w.srv.Halls.Now()-3_600_000)*time.Millisecond)
+	if !w.siege.WaitingBattle() {
+		t.Fatal("the registrations did not close")
+	}
+	drainFrames(t, w.c)
+
+	w.talk(t, messenger)
+	wantPage(t, "register after the close", w.bypass(t, "register"), "agit_oel_mahum_messeger_1.htm", messenger.ObjectID())
+	frames := w.bypass(t, "register_clan")
+	wantPage(t, "the trophy registration", frames, "agit_oel_mahum_messeger_4a.htm", messenger.ObjectID())
+	sound, ok := firstOpcode(frames, serverpackets.OpcodePlaySound)
+	if !ok {
+		t.Fatalf("the registration played no sound among %x", opcodes(frames))
+	}
+	r := wire.NewReader(sound[1:])
+	r.ReadInt32()
+	if file := r.ReadString(); file != script.SoundFinish {
+		t.Fatalf("the registration played %q, want %q", file, script.SoundFinish)
+	}
+	w.srv.RunScript(t, w.objID, banditScriptName, func(_ *script.Script, p *script.Player) {
+		for id, want := range map[int32]int32{trophyID: 0, tarlkAmuletID: 1, contestCertificateID: 0} {
+			if n := p.ItemCount(id); n != want {
+				t.Errorf("item %d after the registration = %d, want %d", id, n, want)
+			}
+		}
+	})
+	if got := w.rows(t, "SELECT COUNT(*) FROM character_quests WHERE name = '"+q504Name+"'"); !slices.Equal(got, []string{"0"}) {
+		t.Fatalf("Q504 rows after the registration = %v, want none", got)
+	}
+	if got, want := w.flagWarClans(t), []string{row(35, redFlagID, 0, int64(besiegersClanID))}; !slices.Equal(got, want) {
+		t.Fatalf("flag war clans = %v, want %v", got, want)
+	}
+	if got, want := w.flagWarMembers(t), []string{row(35, int64(besiegersClanID), int64(w.objID))}; !slices.Equal(got, want) {
+		t.Fatalf("flag war members = %v, want %v", got, want)
+	}
+}
+
+// TestBanditStrongholdTryoutsTimeOutKeepTheOwner: the tryouts of the hall
+// Holders owns run their 20 minutes with Besiegers' warrior standing. The
+// first phase ends drawn: Holders keeps the hall, everyone is told the
+// match was drawn and the siege is over, the flag war rows are cleared,
+// the owner NPC row stays and the registrations open again.
+func TestBanditStrongholdTryoutsTimeOutKeepTheOwner(t *testing.T) {
+	t.Parallel()
+	besiegers, holders := strconv.Itoa(int(besiegersClanID)), strconv.Itoa(int(holdersClanID))
+	w := bootFlagWar(t, flagWarSetup{owned: true, seed: []string{
+		"INSERT INTO clanhall_flagwar_attackers VALUES (35, 35423, 0, " + besiegers + ")",
+		"INSERT INTO clanhall_flagwar_members SELECT 35, " + besiegers + ", obj_Id FROM characters WHERE char_name = 'Attacker'",
+		"INSERT INTO clanhall_flagwar_owner_npcs VALUES (35, 35430, " + holders + ")",
+	}})
+	if !w.siege.Instant() {
+		t.Fatal("no script runs the Bandit Stronghold's siege")
+	}
+	w.srv.Advance(t, 0)
+	w.srv.Advance(t, 300*time.Second)
+	if !w.siege.InProgress() {
+		t.Fatal("the tryouts did not begin")
+	}
+	w.wantStanding(t, "the tryouts", map[int]int{35423: 1, 35424: 1, 35425: 1, 35426: 1, 35427: 1, ally2ID: 5}, flagWarIDs...)
+	drainFrames(t, w.c)
+
+	w.srv.Advance(t, 20*time.Minute)
+	got := flat(sysMsgParams(t, drainFrames(t, w.c)))
+	draw, over := slices.Index(got, strconv.Itoa(msgMatchDraw)+" 35"), slices.Index(got, strconv.Itoa(msgSiegeFinished)+" 35")
+	if draw < 0 || over < draw {
+		t.Fatalf("the time-out's notices = %v, want %d then %d", got, msgMatchDraw, msgSiegeFinished)
+	}
+	if owner := w.hallOwner(t); owner != holdersClanID {
+		t.Fatalf("hall owner = %#x, want Holders", owner)
+	}
+	if !w.siege.Registering() || w.field.Active() {
+		t.Fatalf("after the time-out: registering %v, battlefield %v", w.siege.Registering(), w.field.Active())
+	}
+	if c, m := w.flagWarClans(t), w.flagWarMembers(t); len(c) != 0 || len(m) != 0 {
+		t.Fatalf("flag war rows after the time-out: clans %v, members %v", c, m)
+	}
+	if got, want := w.ownerNPCs(t), []string{row(35, ally3ID, int64(holdersClanID))}; !slices.Equal(got, want) {
+		t.Fatalf("owner NPC rows = %v, want %v", got, want)
+	}
+	w.wantStanding(t, "the time-out", map[int]int{}, append(flagWarIDs, teleporterIDs...)...)
 }
 
 // near reports whether n stands within 50 of at on the plane.

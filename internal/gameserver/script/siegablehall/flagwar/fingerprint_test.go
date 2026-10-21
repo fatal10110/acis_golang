@@ -13,7 +13,8 @@ import (
 // sets on the message. It keeps its registrations in SQL of its own and
 // logs; the port's hall runtime stores them, and nothing is logged. Its
 // delayed steps are pool tasks, which the port runs as script timers of
-// its own names. Its warriors and flags spawn through ASpawn.doSpawn, the
+// its own names, a countdown's naming its second, parsed back as a 32-bit
+// int. Its warriors and flags spawn through ASpawn.doSpawn, the
 // port's through Spawner.SpawnForClan (the Spawn.new row). The siege's end
 // sets every attacker's flag, siege state and user info through the hall's
 // ReleaseAttackers (Clan.getOnlineMembers, Player.broadcastUserInfo), and
@@ -35,7 +36,7 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		`string "SELECT * FROM clanhall_flagwar_attackers WHERE clanhall_id = ?"`, `string "SELECT * FROM clanhall_flagwar_owner_npcs WHERE clanhall_id = ?"`,
 		`string "SELECT object_id FROM clanhall_flagwar_members WHERE clan_id = ?"`, `string "UPDATE clanhall_flagwar_attackers SET npc = ? WHERE clan_id = ?"`,
 		`string "clan_id"`, `string "flag"`, `string "npc"`, `string "npc_id"`, `string "object_id"`,
-		"call ThreadPool.schedule",
+		"call ThreadPool.schedule", "number 32",
 		`string "flagwar-final"`, `string "flagwar-move-to-center"`, `string "flagwar-one-minute"`, `string "flagwar-seconds-"`, `string "flagwar-tryouts"`,
 		"call ASpawn.doSpawn",
 		"call Clan.getOnlineMembers", "call Player.broadcastUserInfo",
