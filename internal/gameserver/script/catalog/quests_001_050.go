@@ -38,6 +38,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q043"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q044"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q045"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q046"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q047"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q048"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q049"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q050"
 )
 
 // quests001To050 is the catalog of quests 001 to 050 (#178), except the two the engine slices ported.
@@ -83,10 +88,10 @@ func quests001To050() script.Catalog {
 		"quest.Q043_HelpTheSister":                    q043.New,
 		"quest.Q044_HelpTheSon":                       q044.New,
 		"quest.Q045_ToTalkingIsland":                  q045.New,
-		"quest.Q046_OnceMoreInTheArmsOfTheMotherTree": nil,
-		"quest.Q047_IntoTheDarkForest":                nil,
-		"quest.Q048_ToTheImmortalPlateau":             nil,
-		"quest.Q049_TheRoadHome":                      nil,
-		"quest.Q050_LanoscosSpecialBait":              nil,
+		"quest.Q046_OnceMoreInTheArmsOfTheMotherTree": q046.New,
+		"quest.Q047_IntoTheDarkForest":                q047.New,
+		"quest.Q048_ToTheImmortalPlateau":             q048.New,
+		"quest.Q049_TheRoadHome":                      q049.New,
+		"quest.Q050_LanoscosSpecialBait":              q050.New,
 	}
 }

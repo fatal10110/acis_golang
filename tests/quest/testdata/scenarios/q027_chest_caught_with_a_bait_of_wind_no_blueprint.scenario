@@ -6,7 +6,7 @@ character Angler 27
 quest Q050_LanoscosSpecialBait <state>=COMPLETED
 quest Q027_ChestCaughtWithABaitOfWind <cond>=2 <state>=STARTED
 script quest.Q027_ChestCaughtWithABaitOfWind
-stub quest.Q050_LanoscosSpecialBait
+script quest.Q050_LanoscosSpecialBait
 item 6500 7625 880
 page fisherman/31570.htm
 page merchant/31434.htm

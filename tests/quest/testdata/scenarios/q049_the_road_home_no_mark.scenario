@@ -1,0 +1,23 @@
+# The Road Home (Q049), refused: a level 3 dwarven fighter without a mark of traveler gets Galladucci's
+# page with no offer, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q049_the_road_home_no_mark.golden
+character Traveler 3
+class 53
+script quest.Q049_TheRoadHome
+item 7563 7564 7565 7566 7567 7568 7570 7558
+page merchant/30097.htm
+page script/quest/Q049_TheRoadHome/
+npc galladucci 30097 Merchant 10 0 0
+
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q049_TheRoadHome/30097-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q049_TheRoadHome CREATED
+  rows Q049_TheRoadHome -
