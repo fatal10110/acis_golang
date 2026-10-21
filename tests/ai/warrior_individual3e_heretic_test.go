@@ -3,6 +3,7 @@ package ai
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -136,6 +137,53 @@ func TestPartyLeaderHeretic2AggressiveTellsOfItsHealers(t *testing.T) {
 			if got := heardFrom(w.heard.take(), n); !slices.Equal(got, want) {
 				t.Fatalf("the listener heard %q, want %q", got, want)
 			}
+		})
+	}
+}
+
+// TestPartyLeaderHeretic2AggressiveStopsOnAnNPCAttacker ports the branch
+// of PartyLeaderHeretic2Aggressive's attacked hook that reads the class of
+// the player behind the attacker. Hit at 30% of its HP by an NPC, which has
+// none, on a first draw of 0, it still broadcasts event 10033, then stops:
+// no event 10002, and its parents never run, so PartyLeaderWarrior, with
+// SummonPrivateRate 100, calls no private. On a first draw of 33 it never
+// reads the class, and the parent calls its private.
+func TestPartyLeaderHeretic2AggressiveStopsOnAnNPCAttacker(t *testing.T) {
+	t.Parallel()
+	for _, row := range []struct {
+		name    string
+		draw    int
+		parents bool
+	}{{"first draw 0", 0, false}, {"first draw 33", 33, true}} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			tmpl := heretic2Template(ind3eHeretic2ID, 1)
+			tmpl.CanMove = false
+			tmpl.AIParams = npc.AIParams{"SummonPrivateRate": "100"}
+			attackerTmpl := warriorTemplate(ind3eSilhouetteID, nil)
+			attackerTmpl.CanMove = false
+			w := bootIndividual3e(t, raidBoot{}, tmpl, attackerTmpl, warriorTemplate(partyPrivateID, nil))
+			n := w.ind3eSpawn(t, ind3eHeretic2ID, 1500, 0)
+			attacker := w.spawn(t, ind3eSilhouetteID, 1500, -100)
+			w.spawn(t, ind1ListenerID, 1500, 300)
+			privatesOf(t, n, 0)
+			w.setHPShare(t, n, 0.3)
+			w.clearDesires(t, n)
+			w.heard.take()
+			w.draws.set(0, row.draw)
+			w.onQueue(t, attacker, func() { n.TakeDamage(1, attacker) })
+			// A called private is seen as it spawns, and called for too.
+			call := fmt.Sprintf("event=10033 arg1=%d arg2=%d", attacker.ObjectID(), n.ObjectID())
+			got := heardFrom(w.heard.take(), n)
+			told := slices.ContainsFunc(got, func(e string) bool { return strings.HasPrefix(e, "event=10002 ") })
+			if !slices.Contains(got, call) || told {
+				t.Fatalf("the listener heard %q, want %q and no event 10002", got, call)
+			}
+			want := 0
+			if row.parents {
+				want = 1
+			}
+			privatesOf(t, n, want)
 		})
 	}
 }
