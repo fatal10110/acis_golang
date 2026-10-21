@@ -1,12 +1,12 @@
 # Pavel's Research (Q120), cond 1 to 12: a level 50 character that finished Resurrection of an Old
-# Manager (Q114, a stub here, its journal seeded) accepts at the pile of stones; Yumi, Wendy and the
+# Manager (Q114, its journal seeded) accepts at the pile of stones; Yumi, Wendy and the
 # stones pass Pavel's flower around, and the north weather master's riddles (both answers right,
 # then all three questions read) end at cond 12. The stones, Wendy and Yumi also list Q114, so
 # their dialog goes through the quest chooser. Expectations replay the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q120_pavels_research.golden
 character Researcher 50
 quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
-stub quest.Q114_ResurrectionOfAnOldManager
+script quest.Q114_ResurrectionOfAnOldManager
 script quest.Q120_PavelsResearch
 item 8058 8059 8060 8290 8291 8292 854
 page default/32046.htm
