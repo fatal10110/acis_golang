@@ -1,0 +1,19 @@
+# DrChaosGiganticGolem (25512), killed by the character: after the raid's success message
+# and sound, its dying hook says its last line (NpcString 1010583). It has no master, so it
+# tells none event 10029. Its camera shot, its waking 10 s later, its sight and its farewell
+# after 1200 s left alone are in tests/ai/raid_boss5_test.go: the format renders no
+# SpecialCamera, gives a raid boss no sight range, sets no master and moves no script clock.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.DrChaosGiganticGolem
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.RaidBossType1Aggressive
+npc golem 25512 RaidBoss 300 0 0
+
+kill golem
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=golem type=0 npc=1025512 text="Urggh! You will pay dearly for this insult."
