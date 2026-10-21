@@ -95,6 +95,10 @@ func aiIndividual4HandleOps() map[string]script.HandleOps {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnTimer":    {"Spawner.DecayMe"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateSpawnPrivateAggressive": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalStone": {
 			"OnTimer": {"Spawner.DecayMe"},
 		},
