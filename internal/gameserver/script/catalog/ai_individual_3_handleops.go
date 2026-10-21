@@ -47,6 +47,18 @@ func aiIndividual3HandleOps() map[string]script.HandleOps {
 			"OnAttacked":  {"NPC.TopDesireTarget"},
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptain": {
+			"OnPartyDied": {"NPC.TopDesireTarget", "Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptainMaleAggressive": {
+			"OnAttacked":  {"NPC.TopDesireTarget"},
+			"OnPartyDied": {"NPC.TopDesireTarget", "Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptainNurseAggressive": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+			"OnPartyDied":    {"NPC.TopDesireTarget", "Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCouplePhysicalSpecial": {
 			"OnAttacked":  {"NPC.TopDesireTarget"},
 			"OnPartyDied": {"NPC.TopDesireTarget", "Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
@@ -63,6 +75,21 @@ func aiIndividual3HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecial": {
 			"OnAttacked":  {"NPC.TopDesireTarget"},
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecial2.PartyLeaderHeretic2Aggressive": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+			"OnPartyDied":    {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecial2.PartyLeaderHereticAggressive": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+			"OnPartyDied":    {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecial2.PartyLeaderPhysicalSpecial2": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+			"OnPartyDied":    {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecialAggressive": {
 			"OnAttacked":  {"NPC.TopDesireTarget"},
@@ -81,6 +108,18 @@ func aiIndividual3HandleOps() map[string]script.HandleOps {
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarriorAggressive": {
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PrimevalRoamer.PrimevalRoamer": {
+			"OnAttacked":    {"NPC.TopDesireTarget"},
+			"OnNoDesire":    {"NPC.InCombat"},
+			"OnPartyDied":   {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnScriptEvent": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PrimevalRoamer.PrimevalRoamerWalker": {
+			"OnAttacked":    {"NPC.TopDesireTarget"},
+			"OnNoDesire":    {"NPC.InCombat"},
+			"OnPartyDied":   {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnScriptEvent": {"NPC.TopDesireTarget"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.QuestPartyLeader": {
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
