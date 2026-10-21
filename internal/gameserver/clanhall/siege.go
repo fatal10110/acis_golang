@@ -20,6 +20,8 @@ import (
 const (
 	// FortressOfResistance starts its siege even with no attacker.
 	FortressOfResistance int32 = 21
+	// BanditStronghold is fought as a flag war.
+	BanditStronghold int32 = 35
 	// RainbowSprings keeps its attackers in its own list (see
 	// RainbowDecrees), not in the stored siege attackers.
 	RainbowSprings int32 = 62
@@ -94,8 +96,8 @@ type DecreeRow struct {
 	Count  int
 }
 
-// SiegeStore persists the hall sieges' attackers and the Rainbow Springs
-// decrees.
+// SiegeStore persists the hall sieges' attackers, the Rainbow Springs
+// decrees and the flag war registrations.
 type SiegeStore interface {
 	LoadSiegeAttackers(ctx context.Context) ([]AttackerRow, error)
 	// SaveSiegeAttackers replaces hall hallID's attackers with clanIDs.
@@ -105,6 +107,17 @@ type SiegeStore interface {
 	AddRainbowDecree(ctx context.Context, row DecreeRow) error
 	DeleteRainbowDecree(ctx context.Context, clanID int32) error
 	DeleteRainbowDecrees(ctx context.Context) error
+	// LoadFlagWar returns the flag war tables.
+	LoadFlagWar(ctx context.Context) (FlagWarRows, error)
+	InsertFlagWarClan(ctx context.Context, row FlagWarClanRow) error
+	// UpdateFlagWarNPC sets the NPC of every flag war clan row of clanID.
+	UpdateFlagWarNPC(ctx context.Context, clanID, npcID int32) error
+	InsertFlagWarMember(ctx context.Context, row FlagWarMemberRow) error
+	InsertFlagWarOwnerNPC(ctx context.Context, row FlagWarOwnerNPCRow) error
+	// DeleteFlagWarOwnerNPCs deletes the owner NPC rows of clanID.
+	DeleteFlagWarOwnerNPCs(ctx context.Context, clanID int32) error
+	// ClearFlagWar deletes hall hallID's flag war clan and member rows.
+	ClearFlagWar(ctx context.Context, hallID int32) error
 }
 
 // SiegeNotifier tells the world what the hall sieges do. Its calls are made
@@ -502,8 +515,8 @@ func (hs *Halls) writeSiege(what string, hallID int32, fn func(context.Context, 
 	}
 }
 
-// RestoreSieges loads the stored siege attackers and the Rainbow Springs
-// decrees from store, which then stores their changes. Run it once at boot,
+// RestoreSieges loads the stored siege attackers, the Rainbow Springs
+// decrees and the flag war registrations from store, which then stores their changes. Run it once at boot,
 // after Restore. A hall takes its stored attackers as a script binds its
 // siege.
 func (hs *Halls) RestoreSieges(ctx context.Context, store SiegeStore) error {
@@ -518,9 +531,14 @@ func (hs *Halls) RestoreSieges(ctx context.Context, store SiegeStore) error {
 	if err != nil {
 		return fmt.Errorf("load rainbow springs decrees: %w", err)
 	}
+	flagWar, err := store.LoadFlagWar(ctx)
+	if err != nil {
+		return fmt.Errorf("load flag war registrations: %w", err)
+	}
 	hs.siegeMu.Lock()
 	defer hs.siegeMu.Unlock()
 	hs.siegeStore = store
+	hs.flagWar = flagWar
 	hs.storedAttackers = map[int32][]int32{}
 	for _, r := range rows {
 		hs.storedAttackers[r.HallID] = append(hs.storedAttackers[r.HallID], r.ClanID)

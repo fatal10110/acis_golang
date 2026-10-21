@@ -3,6 +3,7 @@ package catalog
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/banditstronghold"
 )
 
 // siegableHall is the catalog of the siegable clan hall scripts and behaviors (#3502).
@@ -35,7 +36,7 @@ func siegableHall() script.Catalog {
 		"script.ai.siegablehall.AzitWateringTreasureBox":                                hall.TreasureBox,
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":                      hall.Nurka1,
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2":                      nil,
-		"script.siegablehall.BanditStronghold":                                          nil,
+		"script.siegablehall.BanditStronghold":                                          banditstronghold.New,
 		"script.siegablehall.DevastatedCastle":                                          nil,
 		"script.siegablehall.FortressOfResistance":                                      nil,
 		"script.siegablehall.FortressOfTheDead":                                         nil,

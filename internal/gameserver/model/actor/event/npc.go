@@ -128,3 +128,17 @@ type NpcShout struct {
 }
 
 func (NpcShout) event() {}
+
+// NpcSystemMessage is the system message ID an NPC sends to the players
+// within Radius of it: Text first when set, the castle or hall CastleID
+// names after it when set, and Number last when HasNumber.
+type NpcSystemMessage struct {
+	ID        int
+	Text      string
+	CastleID  int
+	Number    int32
+	HasNumber bool
+	Radius    int
+}
+
+func (NpcSystemMessage) event() {}

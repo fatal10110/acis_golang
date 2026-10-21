@@ -671,12 +671,12 @@ Summon.getControlItemId script.PetControlItemID
 WorldObject.distance3D script.NPC.Distance3D
 WorldObject.isIn3DRadius script.InRadius3D
 # The NPC chat line a teleport dungeon NPC shouts to the players within a
-# radius of it is one call on the NPC handle; that NpcSay shout is the only
-# form of Creature.broadcastPacketInRadius the handle covers. The
-# siegable-hall system messages broadcast in a radius (FlagWar,
-# RainbowSpringsChateau) have no call yet and are tracked on #3502. A
-# binding a siegable-hall script registers is a field of the script.
-Creature.broadcastPacketInRadius script.NPC.ShoutInRadius
+# radius of it is one call on the NPC handle (ShoutInRadius); a system
+# message a siegable-hall NPC sends to the players within a radius of it is
+# another (SystemMessageInRadius: FlagWar's messenger, and Rainbow Springs'
+# caretaker once its script is ported, #3502). A binding a siegable-hall
+# script registers is a field of the script.
+Creature.broadcastPacketInRadius script.NPC.ShoutInRadius,script.NPC.SystemMessageInRadius
 NpcSay.new script.NPC.ShoutInRadius
 Quest.addClanAttacked inline
 Quest.addNoDesire inline
@@ -685,8 +685,9 @@ Quest.addPartyDied inline
 
 # Clan reads of the API freeze, residence lane (#3748). The clan and its
 # leader's member record fold into the Player handle calls; the leader is
-# the online player, nil while offline.
-Clan.getClanHallId script.Player.ClanHallID
+# the online player, nil while offline. A clan looked up by id reads its
+# hall on the clan handle (FlagWar.registerClan).
+Clan.getClanHallId script.Player.ClanHallID,script.ClanHandle.ClanHallID
 Clan.getLeader inline
 ClanMember.getPlayerInstance script.Player.ClanLeader
 
@@ -911,13 +912,13 @@ Spawn.setLoc inline
 SystemMessage.addFortId script.Hall.Announce
 SystemMessage.addString script.Hall.Announce
 World.toAllOnlinePlayers script.Hall.Announce
+WorldObject.forEachKnownTypeInRadius script.NPC.PlayersInRadius
+ZoneType.getKnownTypeInside script.Hall.PlayersInside
 
 # Siegable-hall rows, exempt from the freeze. Their only callers are the
-# Rainbow Springs and flag war hall scripts; each takes its Go name with the
-# port of the script making it (#3502).
+# Rainbow Springs hall script; each takes its Go name with the port of the
+# script making it (#3502).
 Player.stopAllEffects exempt
 Summon.unSummon exempt
 ThreadPool.execute exempt
-WorldObject.forEachKnownTypeInRadius exempt
 ZoneType.getCreatures exempt
-ZoneType.getKnownTypeInside exempt
