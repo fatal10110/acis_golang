@@ -1,0 +1,103 @@
+# Lanosco's Special Bait (Q050): a level 27 character holding 98 essences of wind accepts at
+# Lanosco, kills three singing winds (the first drop roll pinned to miss, the next two to land; the
+# third kill makes a hundred essences of wind and completes the quest's first step); Lanosco takes
+# the hundred for four lures, and the quest completes; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q050_lanoscos_special_bait.golden
+character Baiter 27
+hold 7621 98
+random 999999 0 0
+script quest.Q050_LanoscosSpecialBait
+item 7621 7610
+page fisherman/31570.htm
+page script/quest/Q050_LanoscosSpecialBait/
+npc lanosco 31570 Fisherman 10 0 0
+npc wind 21026 Monster 40 0 0
+
+# Lanosco: accept.
+action lanosco
+action lanosco
+  S ActionFailed
+  S NpcHtmlMessage obj=lanosco item=0 page=fisherman/31570.htm
+  S ActionFailed
+bypass npc_{lanosco}_Quest
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q050_LanoscosSpecialBait/31570-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q050_LanoscosSpecialBait CREATED
+bypass Quest Q050_LanoscosSpecialBait 31570-03.htm
+  S QuestList 50:0x80000001
+  S ExShowQuestMark quest=50
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q050_LanoscosSpecialBait/31570-03.htm
+  S ActionFailed
+  Q upsert Q050_LanoscosSpecialBait | <state> | STARTED
+  Q upsert Q050_LanoscosSpecialBait | <cond> | 1
+  state Q050_LanoscosSpecialBait STARTED
+  rows Q050_LanoscosSpecialBait <cond>=1 <state>=STARTED
+
+# Short of a hundred: Lanosco sends the player back out.
+action lanosco
+  S ActionFailed
+  S NpcHtmlMessage obj=lanosco item=0 page=fisherman/31570.htm
+  S ActionFailed
+bypass npc_{lanosco}_Quest
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q050_LanoscosSpecialBait/31570-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The kills.
+kill wind
+  S SystemMessage id=95 1:0 1:0
+  items 7621=98
+kill wind
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7621
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7621=99
+kill wind
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7621
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 50:0x80000003
+  S ExShowQuestMark quest=50
+  Q upsert Q050_LanoscosSpecialBait | <cond> | 2
+  rows Q050_LanoscosSpecialBait <cond>=2 <state>=STARTED
+  items 7621=100
+
+# A hundred: Lanosco trades them for four lures; the quest completes.
+action lanosco
+  S ActionFailed
+  S NpcHtmlMessage obj=lanosco item=0 page=fisherman/31570.htm
+  S ActionFailed
+bypass npc_{lanosco}_Quest
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q050_LanoscosSpecialBait/31570-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q050_LanoscosSpecialBait 31570-07.htm
+  S SystemMessage id=301 3:7621 6:100
+  S SystemMessage id=53 3:7610 6:4
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 50:0x00000000
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q050_LanoscosSpecialBait/31570-06.htm
+  S ActionFailed
+  Q upsert Q050_LanoscosSpecialBait | <state> | COMPLETED
+  Q delete-except-state Q050_LanoscosSpecialBait
+  state Q050_LanoscosSpecialBait COMPLETED
+  rows Q050_LanoscosSpecialBait <state>=COMPLETED
+  items 7621=0 7610=4
+
+# Relog: the completed quest loads from its one row, and the lures stay.
+relog
+  state Q050_LanoscosSpecialBait COMPLETED
+  rows Q050_LanoscosSpecialBait <state>=COMPLETED
+  items 7610=4
+action lanosco
+action lanosco
+  S ActionFailed
+  S NpcHtmlMessage obj=lanosco item=0 page=fisherman/31570.htm
+  S ActionFailed
+bypass npc_{lanosco}_Quest
+  S NpcHtmlMessage obj=lanosco item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

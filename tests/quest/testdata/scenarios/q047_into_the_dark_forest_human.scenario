@@ -1,0 +1,23 @@
+# Into the Dark Forest (Q047), refused: a level 3 human fighter holding a mark of traveler is not
+# a dark elf, and Galladucci turns it away; the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q047_into_the_dark_forest_human.golden
+character Traveler 3
+hold 7570 1
+script quest.Q047_IntoTheDarkForest
+item 7563 7564 7565 7566 7567 7568 7570 7556
+page merchant/30097.htm
+page script/quest/Q047_IntoTheDarkForest/
+npc galladucci 30097 Merchant 10 0 0
+
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q047_IntoTheDarkForest/30097-01a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q047_IntoTheDarkForest CREATED
+  rows Q047_IntoTheDarkForest -

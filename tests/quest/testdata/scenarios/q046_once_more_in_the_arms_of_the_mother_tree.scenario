@@ -1,0 +1,242 @@
+# Once More In the Arms of the Mother Tree (Q046): a level 3 elven fighter holding a mark of traveler accepts at Galladucci, who
+# gives the first order document; Gentler trades it for a magic sword hilt, Galladucci the hilt for
+# the second document, Sandra that for gemstone powder, Galladucci the powder for the third document
+# and Dustin that for a purified magic necklace; Galladucci takes the necklace and the mark and pays
+# with a special scroll of escape; the quest completes; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q046_once_more_in_the_arms_of_the_mother_tree.golden
+character Traveler 3
+class 18
+hold 7570 1
+script quest.Q046_OnceMoreInTheArmsOfTheMotherTree
+item 7563 7564 7565 7566 7567 7568 7570 7555
+page merchant/30097.htm
+page merchant/30094.htm
+page merchant/30090.htm
+page trainer/30116.htm
+page script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/
+npc galladucci 30097 Merchant 10 0 0
+npc gentler 30094 Merchant 20 0 0
+npc sandra 30090 Merchant -10 0 0
+npc dustin 30116 Trainer -20 0 0
+
+# Galladucci: accept, and the first order document.
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q046_OnceMoreInTheArmsOfTheMotherTree CREATED
+bypass Quest Q046_OnceMoreInTheArmsOfTheMotherTree 30097-03.htm
+  S QuestList 46:0x80000001
+  S ExShowQuestMark quest=46
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7563
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-03.htm
+  S ActionFailed
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <state> | STARTED
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <cond> | 1
+  state Q046_OnceMoreInTheArmsOfTheMotherTree STARTED
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <cond>=1 <state>=STARTED
+  items 7563=1
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gentler trades the document for the hilt.
+action gentler
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30094-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q046_OnceMoreInTheArmsOfTheMotherTree 30094-02.htm
+  S QuestList 46:0x80000003
+  S ExShowQuestMark quest=46
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7563
+  S SystemMessage id=54 3:7568
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30094-02.htm
+  S ActionFailed
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <cond> | 2
+  items 7563=0 7568=1
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <cond>=2 <state>=STARTED
+action gentler
+  S ActionFailed
+  S NpcHtmlMessage obj=gentler item=0 page=merchant/30094.htm
+  S ActionFailed
+bypass npc_{gentler}_Quest
+  S NpcHtmlMessage obj=gentler item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30094-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Galladucci trades the hilt for the second document.
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q046_OnceMoreInTheArmsOfTheMotherTree 30097-06.htm
+  S QuestList 46:0x80000007
+  S ExShowQuestMark quest=46
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7568
+  S SystemMessage id=54 3:7564
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-06.htm
+  S ActionFailed
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <cond> | 3
+  items 7568=0 7564=1
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <cond>=3 <state>=STARTED
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sandra trades it for gemstone powder.
+action sandra
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+bypass npc_{sandra}_Quest
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30090-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q046_OnceMoreInTheArmsOfTheMotherTree 30090-02.htm
+  S QuestList 46:0x8000000f
+  S ExShowQuestMark quest=46
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7564
+  S SystemMessage id=54 3:7567
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30090-02.htm
+  S ActionFailed
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <cond> | 4
+  items 7564=0 7567=1
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <cond>=4 <state>=STARTED
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+bypass npc_{sandra}_Quest
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30090-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Galladucci trades the powder for the third document.
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q046_OnceMoreInTheArmsOfTheMotherTree 30097-09.htm
+  S QuestList 46:0x8000001f
+  S ExShowQuestMark quest=46
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7567
+  S SystemMessage id=54 3:7565
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-09.htm
+  S ActionFailed
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <cond> | 5
+  items 7567=0 7565=1
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <cond>=5 <state>=STARTED
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-10.htm
+  S ActionFailed
+  S ActionFailed
+
+# Dustin trades it for the purified necklace.
+action dustin
+action dustin
+  S ActionFailed
+  S NpcHtmlMessage obj=dustin item=0 page=trainer/30116.htm
+  S ActionFailed
+bypass npc_{dustin}_Quest
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30116-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q046_OnceMoreInTheArmsOfTheMotherTree 30116-02.htm
+  S QuestList 46:0x8000003f
+  S ExShowQuestMark quest=46
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7565
+  S SystemMessage id=54 3:7566
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30116-02.htm
+  S ActionFailed
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <cond> | 6
+  items 7565=0 7566=1
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <cond>=6 <state>=STARTED
+action dustin
+  S ActionFailed
+  S NpcHtmlMessage obj=dustin item=0 page=trainer/30116.htm
+  S ActionFailed
+bypass npc_{dustin}_Quest
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30116-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Galladucci takes the necklace and the mark and pays; the quest completes.
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q046_OnceMoreInTheArmsOfTheMotherTree 30097-12.htm
+  S SystemMessage id=302 3:7570
+  S SystemMessage id=302 3:7566
+  S SystemMessage id=54 3:7555
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 46:0x00000000
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-12.htm
+  S ActionFailed
+  Q upsert Q046_OnceMoreInTheArmsOfTheMotherTree | <state> | COMPLETED
+  Q delete-except-state Q046_OnceMoreInTheArmsOfTheMotherTree
+  state Q046_OnceMoreInTheArmsOfTheMotherTree COMPLETED
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <state>=COMPLETED
+  items 7570=0 7566=0 7555=1
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q046_OnceMoreInTheArmsOfTheMotherTree COMPLETED
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree <state>=COMPLETED
+  items 7555=1
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
