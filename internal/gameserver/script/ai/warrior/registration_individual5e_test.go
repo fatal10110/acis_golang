@@ -13,12 +13,15 @@ import (
 )
 
 // individual5e are the classes of the fifth individual behavior batch's
-// fifth PR (the sleep casters and the splash casters), in scripts.xml
+// fifth PR (the hold, sleep and splash casters), in scripts.xml
 // order, with the Go constructor of each.
 var individual5e = []struct {
 	path string
 	ctor func() script.Script
 }{
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.OrfenPrivateRiba", OrfenPrivateRiba},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagic", CastHoldMagic},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagicAggressive", CastHoldMagicAggressive},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagic", CastSleepMagic},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagicAggressive", CastSleepMagicAggressive},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit", Agit02DoomTrooperAgit},
@@ -31,7 +34,7 @@ var individual5e = []struct {
 // engine registry with its own seam gate and every id a hostile NPC. None
 // is refused, and the registry dump equals the reference manifest for
 // them: each class's kind and bind lines, and every folded per-(npc,
-// event) list restricted to them: the 30 ids on the Warrior chain's 10
+// event) list restricted to them: the 45 ids on the Warrior chain's 10
 // events.
 func TestIndividual5eRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, 0, len(chain)+len(individual5e))
@@ -63,7 +66,7 @@ func TestIndividual5eRegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readBatchView(t, path, ours, sc)
-	if wantFolds, got := 30*10, len(want.folds); got != wantFolds {
+	if wantFolds, got := 45*10, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 
@@ -81,7 +84,7 @@ func TestIndividual5eRegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{20284, 20078, 20673, 20353, 35414, 35635, 20449, 21291, 21428, 21164} {
+	for _, id := range []int32{29017, 21628, 20134, 18008, 20284, 20078, 20673, 20353, 35414, 35635, 20449, 21291, 21428, 21164} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

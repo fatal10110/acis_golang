@@ -15,6 +15,9 @@ import (
 // The NPC ids of the fifth individual behavior batch's fifth PR the tests
 // spawn.
 const (
+	ind5eHoldID       = int32(21628) // WarriorCastHoldMagic
+	ind5eHoldAggrID   = int32(20134) // WarriorCastHoldMagicAggressive
+	ind5eRibaID       = int32(29017) // OrfenPrivateRiba
 	ind5eSleepID      = int32(20284) // WarriorCastSleepMagic
 	ind5eSleepAggrID  = int32(20673) // WarriorCastSleepMagicAggressive
 	ind5eSplashID     = int32(20449) // WarriorCastSplash
@@ -25,8 +28,9 @@ const (
 
 // The skills the batch's fixture NPCs list by type.
 const (
-	ind5eSleep  = modelskill.ID(9540) // SLEEP_MAGIC
-	ind5eSplash = modelskill.ID(9541) // SELF_RANGE_DD_MAGIC
+	ind5eSleep     = modelskill.ID(9540) // SLEEP_MAGIC
+	ind5eSplash    = modelskill.ID(9541) // SELF_RANGE_DD_MAGIC
+	ind5eHoldMagic = modelskill.ID(9542) // HOLD_MAGIC
 )
 
 // ind5eSleepStack is the stack type of the sleep's effect.
@@ -37,6 +41,9 @@ var ind5eBatch = []struct {
 	path string
 	ctor func() script.Script
 }{
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.OrfenPrivateRiba", warrior.OrfenPrivateRiba},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagic", warrior.CastHoldMagic},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagicAggressive", warrior.CastHoldMagicAggressive},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagic", warrior.CastSleepMagic},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagicAggressive", warrior.CastSleepMagicAggressive},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit", warrior.Agit02DoomTrooperAgit},
@@ -45,19 +52,23 @@ var ind5eBatch = []struct {
 }
 
 // ind5eDefs are the batch's skills: the sleep a one-target magic of reach
-// 900 with an effect of its own stack, the splash a self skill.
+// 900 with an effect of its own stack, the splash a self skill, the hold,
+// the raid curse and the raid mute one-target magic of reach 900 or 600.
 func ind5eDefs() []modelskill.Definition {
 	return []modelskill.Definition{
 		ind5dStacked(ind1Skill(ind5eSleep, 900, false), ind5eSleepStack, 1),
 		ind1Skill(ind5eSplash, 0, true),
+		ind1Skill(ind5eHoldMagic, 900, false),
+		raidCurseDefinition(),
+		ind1Skill(premoMuteID, 600, false),
 	}
 }
 
-// ind5eTemplate is a fixture monster of id listing the batch's sleep and
-// splash by type.
+// ind5eTemplate is a fixture monster of id listing the batch's sleep,
+// splash and hold by type.
 func ind5eTemplate(id int32) *npc.Template {
 	return ind5dTemplate(id, nil, map[npc.SkillType]modelskill.ID{
-		npc.SkillTypeSleepMagic: ind5eSleep, npc.SkillTypeSelfRangeDDMagic: ind5eSplash,
+		npc.SkillTypeSleepMagic: ind5eSleep, npc.SkillTypeSelfRangeDDMagic: ind5eSplash, npc.SkillTypeHoldMagic: ind5eHoldMagic,
 	})
 }
 

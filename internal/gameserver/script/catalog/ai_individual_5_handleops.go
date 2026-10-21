@@ -56,6 +56,18 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantRangePhysicalPoisonAggressive": {
 			"OnAttacked": {"NPC.MeetsHPMPDisabledConditions"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.OrfenPrivateRiba": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.LastAttacker", "NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagic": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.LastAttacker"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagicAggressive": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.LastAttacker"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit": {
 			"OnAttacked":     {"NPC.MaxHP", "NPC.TopDesireTarget"},
 			"OnClanAttacked": {"NPC.MaxHP", "NPC.TopDesireTarget"},
