@@ -25,7 +25,12 @@ func TestFinishedTestLetsGoOfItsWorld(t *testing.T) {
 		srv.Client.Send(encodeEnterWorld())
 		readEnterWorldBurst(t, srv.Client)
 	})
-	runtime.GC()
+	// A goroutine that signalled its stop may not have returned yet, its
+	// stack still holding the world for a moment; give it a few rounds.
+	for i := 0; i < 10 && state.Value() != nil; i++ {
+		runtime.GC()
+		runtime.Gosched()
+	}
 	if state.Value() != nil {
 		t.Fatal("the finished test's world is still reachable")
 	}
