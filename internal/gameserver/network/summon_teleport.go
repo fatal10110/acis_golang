@@ -15,22 +15,25 @@ import (
 // notice it. A summon in a teleport already, or gone from the world, is
 // left as it is.
 func (l *GameClientLink) teleportSummon(actor *summon.Actor, at location.Location) {
-	if l.world == nil || !actor.Spawned() || !actor.SetTeleporting(true) {
+	if l.world == nil || !actor.Spawned() {
 		return
 	}
 	target := l.landing(location.Jump{To: at}, l.inWater)
 	owner, _ := l.currentSummonOwner(actor)
-	landed := l.jumpSummon(owner, actor, target)
-	actor.SetTeleporting(false)
-	if landed {
+	if l.jumpSummon(owner, actor, target) {
 		npc.ForceSeeCreature(l.world, actor)
 	}
 }
 
 // jumpSummon moves actor to destination in a teleport, its own or the one
 // that follows its owner's, and reports whether it landed; owner, nil when
-// gone, is shown its crest on landing.
+// gone, is shown its crest on landing. A summon in a teleport already is
+// left to it. The summon is marked teleporting until it is back on the
+// grid, before it enters the zones there and acts again.
 func (l *GameClientLink) jumpSummon(owner *livePlayer, actor *summon.Actor, destination location.Location) bool {
+	if !actor.SetTeleporting(true) {
+		return false
+	}
 	// The summon leaves the zones around its old position before the jump
 	// and enters those at the destination once it has landed.
 	actor.LeaveZones()
@@ -51,11 +54,13 @@ func (l *GameClientLink) jumpSummon(owner *livePlayer, actor *summon.Actor, dest
 		if actor.Dead() {
 			l.world.Leave(actor)
 		}
+		actor.SetTeleporting(false)
 		actor.Vanish()
 		return false
 	}
 	actor.Move().SetPosition(destination)
 	_ = l.world.Teleport(actor, destination.X, destination.Y, destination.Z)
+	actor.SetTeleporting(false)
 	actor.EnterZones()
 	actor.OnTeleported()
 	l.showSummonCrestToOwner(owner, actor)

@@ -4,12 +4,14 @@ import (
 	"encoding/binary"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -51,7 +53,7 @@ type sendWorld struct {
 	dest    location.Location
 }
 
-func bootSender(t *testing.T) *sendWorld {
+func bootSender(t *testing.T, opts ...gameservertest.Option) *sendWorld {
 	t.Helper()
 	geo := &sinkGeo{}
 	seen := &sightings{calls: map[[2]int32]int{}}
@@ -82,12 +84,12 @@ func bootSender(t *testing.T) *sendWorld {
 			}}
 		},
 	}
-	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+	h := bootOwnerWithCollarOpts(t, append([]gameservertest.Option{
 		gameservertest.WithGeo(geo),
 		gameservertest.WithNPCScripts(map[int32]script.NPCKind{
 			senderID: script.KindHostile, watcherID: script.KindHostile,
 		}, []script.Listing{{Path: "ai.Sender"}, {Path: "ai.Watcher"}}, catalog),
-	})
+	}, opts...))
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 	spawn := func(id int32, at location.Location) *npc.Hostile {
 		tmpl := gameservertest.MovingHostileTemplate("Monster")
@@ -124,6 +126,26 @@ func teleports(frames [][]byte, id int32) (out []location.Location, fast []bool)
 	return out, fast
 }
 
+// sendSummon has the owner hit the sender, whose hook sends the owner's
+// summon to w.dest, and returns the frames the owner was sent.
+func (w *sendWorld) sendSummon(t *testing.T) [][]byte {
+	t.Helper()
+	owner, ok := w.srv.State.Object(w.ownerID)
+	if !ok {
+		t.Fatal("the owner is not in the world")
+	}
+	done := make(chan struct{})
+	if !w.srv.PlayerQueue(t, w.ownerID).Post(func() {
+		defer close(done)
+		w.sender.TakeDamage(10, owner.(attackable.Combatant))
+	}) {
+		t.Fatal("the owner's queue is closed")
+	}
+	<-done
+	w.srv.Settle(t)
+	return drainFrames(t, w.client)
+}
+
 // TestScriptTeleportOfTheActiveSummon (Creature.teleportTo on a summon,
 // Summon.onTeleported, SummonAI.onEvtTeleported, forceSeeCreature): a
 // script sends the summon of the player that hit its NPC to a point
@@ -141,20 +163,7 @@ func TestScriptTeleportOfTheActiveSummon(t *testing.T) {
 	wolf.SetTarget(w.sender)
 	ox, oy, oz := w.srv.PlayerPosition(t, w.ownerID)
 
-	owner, ok := w.srv.State.Object(w.ownerID)
-	if !ok {
-		t.Fatal("the owner is not in the world")
-	}
-	done := make(chan struct{})
-	if !w.srv.PlayerQueue(t, w.ownerID).Post(func() {
-		defer close(done)
-		w.sender.TakeDamage(10, owner.(attackable.Combatant))
-	}) {
-		t.Fatal("the owner's queue is closed")
-	}
-	<-done
-	w.srv.Settle(t)
-	frames := drainFrames(t, w.client)
+	frames := w.sendSummon(t)
 
 	landing := location.Location{X: w.dest.X, Y: w.dest.Y, Z: w.dest.Z - groundDrop}
 	got, fast := teleports(frames, wolf.ObjectID())
@@ -181,5 +190,41 @@ func TestScriptTeleportOfTheActiveSummon(t *testing.T) {
 	}
 	if x, y, z := w.srv.PlayerPosition(t, w.ownerID); x != ox || y != oy || z != oz {
 		t.Fatalf("owner at %d,%d,%d, want it kept at %d,%d,%d", x, y, z, ox, oy, oz)
+	}
+}
+
+// TestScriptTeleportOfTheActiveSummonEntersTheZonesAtItsLanding
+// (Creature.teleportTo: onTeleported clears the teleport before the summon
+// rejoins its region and its zones): a summon a script sends into a zone is
+// in it as soon as it lands, with no move in between, and has left the
+// zone it stood in.
+func TestScriptTeleportOfTheActiveSummonEntersTheZonesAtItsLanding(t *testing.T) {
+	t.Parallel()
+	// The owner stands at x 10 and its wolf appears 40 east of it; the
+	// script sends the wolf 1200 east of the owner.
+	swamp := zone.NewSwamp(1, summonZoneBox(t, 30, 100))
+	peace := zone.NewPeace(2, summonZoneBox(t, 1_100, 1_300))
+	var enters atomic.Int32
+	peace.OnEnter(func(a zone.Actor) {
+		if a.Class() == zone.ClassSummon {
+			enters.Add(1)
+		}
+	})
+	zones := zone.NewIndex()
+	zones.Add(swamp)
+	zones.Add(peace)
+	w := bootSender(t, gameservertest.WithZones(zones))
+	wolf, _ := w.spawnWolf(t)
+	drainUntilQuiet(t, w.client)
+	if !wolf.InsideZone(zone.FlagSwamp) || wolf.InsideZone(zone.FlagPeace) {
+		t.Fatal("test setup: the wolf does not start in the swamp alone")
+	}
+
+	w.sendSummon(t)
+	if !wolf.InsideZone(zone.FlagPeace) || enters.Load() != 1 {
+		t.Fatalf("wolf in the peace zone at its landing = %v, enters %d, want in it once", wolf.InsideZone(zone.FlagPeace), enters.Load())
+	}
+	if wolf.InsideZone(zone.FlagSwamp) {
+		t.Fatal("wolf sent out of the swamp is still in it")
 	}
 }

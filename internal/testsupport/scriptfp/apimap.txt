@@ -532,10 +532,11 @@ NpcAI.addPickUpDesire script.NPC.AddPickUpDesire
 # and from a behavior or a quest through the script's spawner; the
 # npcmaker lookup and its maker fold into that call, and the npcmaker that
 # placed an NPC is read by name on the NPC handle. A script's own record of
-# values (EchoCrystal's scores) is a Go struct of the script's. The desire queue is cleared, or
-# cleared of one kind, on the NPC handle. The NPC's own teleport wakes no
-# AI task: an NPC out of its territory never sleeps. A monster's soul
-# crystal record and its registration flag are read on the NPC handle.
+# values (EchoCrystal's scores) is a Go struct of the script's. The desire
+# queue is cleared, or cleared of one kind, on the NPC handle. The NPC's own
+# teleport wakes no AI task: an NPC out of its territory never sleeps. A
+# monster's soul crystal record and its registration flag are read on the
+# NPC handle.
 ASpawn.calculateRespawnDelay spawn.CalculateRespawnDelay
 ASpawn.doSpawn spawn.GroupSpawn.Spawn
 ASpawn.getTemplate inline
