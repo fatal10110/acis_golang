@@ -50,5 +50,5 @@ func (f *lotteryFixture) start(tb testing.TB, db *sql.DB, ids *sequentialIDs, l 
 		tb.Fatalf("restore lottery: %v", err)
 	}
 	l.Start()
-	tb.Cleanup(l.Stop)
+	cleanup(tb, l.Stop)
 }
