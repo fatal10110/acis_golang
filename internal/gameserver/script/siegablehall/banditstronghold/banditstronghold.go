@@ -175,8 +175,7 @@ func onEvent(s *script.Script, w *flagwar.War, e script.Event) string {
 			html = npcType(s, w, h, p)
 		}
 	case strings.HasPrefix(event, "select_npc_"):
-		// A link with no number answers with its own text, as the
-		// reference does after logging it.
+		// A link with no number answers with its own text.
 		if n, err := strconv.ParseInt(event[len("select_npc_"):], 10, 32); err == nil {
 			html = setNpcType(w, h, p, 35427+int32(n))
 		}

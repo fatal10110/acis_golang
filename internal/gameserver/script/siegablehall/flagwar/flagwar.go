@@ -206,9 +206,9 @@ func (w *War) BindHall(s *script.Script) {
 	w.winner.Set(int(h.OwnerID()))
 }
 
-// loadAttackers loads the stored registrations and the owner's NPC. The
-// reference loads them before its hall sets its warriors, so an owner with
-// no NPC stored keeps none.
+// loadAttackers loads the stored registrations and the owner's NPC. They
+// load before the hall sets its warriors, so an owner with no NPC stored
+// keeps none.
 func (w *War) loadAttackers(h *script.Hall) {
 	for _, c := range h.FlagWarClans() {
 		cd := newClanData(c.Flag, c.NPC)
@@ -349,7 +349,7 @@ func (w *War) startFinal(s *script.Script, h *script.Hall, owner int32) {
 			break
 		}
 	}
-	// A challenger that is no clan panics here, as the reference throws.
+	// A challenger that is no clan panics here.
 	w.announce(script.SiegeMessage{ID: msgClanWonMatch, Text: s.Clan(challenger).Name(), CastleID: int(h.ID())})
 	w.announce(script.SiegeMessage{ID: msgFinalMatchBegin})
 	h.CancelSiegeTask()
@@ -453,10 +453,9 @@ func (w *War) tryouts(s *script.Script, h *script.Hall) {
 			allowed[objID] = true
 		}
 	}
-	// The reference teleports at once, so a player thrown out is no longer
-	// in the grounds as the owner's are gathered, and every registered
-	// owner's member left is; here a teleport lands after this step, so the
-	// thrown out are left out by hand.
+	// A player thrown out is no longer in the grounds as the owner's are
+	// gathered, and every registered owner's member left is; a teleport
+	// lands after this step, so the thrown out are left out by hand.
 	banished := map[int32]bool{}
 	for _, p := range h.PlayersInside() {
 		if p.ClanID() == 0 || !allowed[p.ObjectID()] {
@@ -497,7 +496,7 @@ func (w *War) end(s *script.Script, h *script.Hall) {
 	w.sendMakerEvent(s, h, "onSiegeEnd")
 	w.doUnSpawns()
 	prevOwner := h.OwnerID()
-	// An owner that is no clan panics here, as the reference throws.
+	// An owner that is no clan panics here.
 	if prevOwner > 0 {
 		_ = s.Clan(prevOwner).ID()
 		h.Free()
