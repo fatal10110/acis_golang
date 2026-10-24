@@ -191,7 +191,7 @@ func FollowerOfFrintezza() script.Script {
 				n.SetInt(npc.IntQuest2, 0)
 				n.SetInt(npc.IntQuest3, 0)
 				n.SetInt(npc.IntQuest4, 0)
-				face(n, 16384)
+				n.SetHeading(16384)
 				n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
 			}
 			base.ScriptEvent(s, e)
@@ -202,7 +202,7 @@ func FollowerOfFrintezza() script.Script {
 			case strings.EqualFold(e.Name, "1001"):
 				s.StartTimer("1002", n, nil, 500*time.Millisecond)
 			case strings.EqualFold(e.Name, "1002"):
-				face(n, 16384)
+				n.SetHeading(16384)
 				n.TeleportTo(script.Loc{X: 174230, Y: -88012, Z: -5112})
 				n.SetInt(npc.IntQuest1, s.CurrentTick())
 				s.StartTimer("1003", n, nil, 8000*time.Millisecond)
@@ -233,7 +233,7 @@ func FollowerOfFrintezza() script.Script {
 				s.StartTimer("2100", n, nil, 400*time.Millisecond)
 			case strings.EqualFold(e.Name, "2100"):
 				if c4 := memoNPC(s, "6"); c4 != nil {
-					face(c4, 16384)
+					c4.SetHeading(16384)
 					c4.TeleportTo(n)
 					s.SendScriptEvent(c4, 7, 0, 0)
 				}
@@ -351,13 +351,6 @@ func memoNPC(s *script.Script, key string) *script.NPC {
 	return c.(*script.NPC)
 }
 
-// face turns n to heading where it stands.
-func face(n *script.NPC, heading int) {
-	at := script.LocOf(n)
-	at.Heading = heading
-	n.SetXYZ(at)
-}
-
 // stepNorth asks n to walk 50 north of where it stands.
 func stepNorth(n *script.NPC) {
 	at := script.LocOf(n)
@@ -384,7 +377,7 @@ func fallAsleep(s *script.Script, n *script.NPC) {
 	n.RemoveAllDesire()
 	s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 	n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
-	face(n, 16384)
+	n.SetHeading(16384)
 	n.EquipItem(changeWeaponStart, 0)
 	s.Spawner().SendMakerEvent("frintessa_evilate_maker1", "1000", 0, 0)
 	s.Spawner().SendMakerEvent("frintessa_evilate_maker2", "1000", 0, 0)

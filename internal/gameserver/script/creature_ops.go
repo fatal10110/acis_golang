@@ -139,11 +139,11 @@ func (p *Player) AbortAll() { p.character().AbortAll(false) }
 
 // TeleportTo jumps the NPC to at: it stops its movement, attack and cast,
 // lands on the ground at at unless at lies in water, and the players around
-// either end see it go and arrive. A teleport that starts while another is
-// under way is dropped.
+// either end see it go and arrive. It keeps the way it faces: at's heading
+// is not read (SetHeading turns it). A teleport that starts while another
+// is under way is dropped.
 func (n *NPC) TeleportTo(at Place) {
-	l := at.loc()
-	to := location.Location{X: l.X, Y: l.Y, Z: l.Z}
+	to := groundOf(at)
 	switch o := n.combatant().(type) {
 	case *npc.Hostile:
 		o.TeleportTo(to)
@@ -152,6 +152,52 @@ func (n *NPC) TeleportTo(at Place) {
 	default:
 		panic("script: the teleport of a handle on nothing")
 	}
+}
+
+// SetHeading turns the NPC to face heading where it stands. Nothing is
+// sent: the players around keep the way they saw it face, and those that
+// next see it, as when it arrives from a teleport, see it face heading.
+func (n *NPC) SetHeading(heading int) {
+	h, ok := n.combatant().(interface{ SetHeading(int) })
+	if !ok {
+		panic("script: the heading of a handle on nothing")
+	}
+	h.SetHeading(heading)
+}
+
+// summonTeleporter is a summon an ordinary teleport moves.
+type summonTeleporter interface {
+	TeleportTo(target location.Location)
+}
+
+// TeleportTo makes c do its ordinary teleport to at, with no scatter: an
+// NPC as NPC.TeleportTo does, a player as Player.TeleportTo does with
+// offset 0. A summon stops what it was doing and drops its target, lands
+// on the ground at at unless at lies in water, the players around either
+// end see it go and arrive, and it follows its owner again; each NPC
+// around the landing that sees it runs its see-creature hooks for it once.
+// A summon's teleport runs on its own queue once the caller's task is
+// done, and one that starts while another is under way is dropped. Any
+// other creature panics.
+func TeleportTo(c Creature, at Place) {
+	switch h := c.(type) {
+	case *NPC:
+		h.TeleportTo(at)
+	case *Player:
+		h.TeleportTo(at, 0)
+	default:
+		s, ok := tracked(c).(summonTeleporter)
+		if !ok {
+			panic(fmt.Sprintf("script: the teleport of %T", tracked(c)))
+		}
+		s.TeleportTo(groundOf(at))
+	}
+}
+
+// groundOf is the point of at, without its heading.
+func groundOf(at Place) location.Location {
+	l := at.loc()
+	return location.Location{X: l.X, Y: l.Y, Z: l.Z}
 }
 
 // instantTeleporter is a creature an instant teleport moves itself: an
@@ -174,10 +220,7 @@ func instantTeleport(c Creature, j location.Jump) {
 }
 
 // jumpTo is a jump to at with no scatter.
-func jumpTo(at Place) location.Jump {
-	l := at.loc()
-	return location.Jump{To: location.Location{X: l.X, Y: l.Y, Z: l.Z}}
-}
+func jumpTo(at Place) location.Jump { return location.Jump{To: groundOf(at)} }
 
 // InstantTeleportTo moves the NPC, hostile or civilian, to at in one step:
 // at is grounded unless it lies in water, the players around see the jump
