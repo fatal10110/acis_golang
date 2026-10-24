@@ -2538,6 +2538,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	hallQueue := queues.NewQueue("clanhalls")
 	cleanup(t, hallQueue.Close)
 	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl), network.ClanHallGrounds(gcl))
+	quests.registry.BindHallSieges()
 	startHallSieges(t, o, halls, gcl)
 	restoreCastles(t, db, gclConfig.Castles, worldObjects)
 	castleManorClock := startCastleManor(t, gclConfig.CastleManor, o, gcl)

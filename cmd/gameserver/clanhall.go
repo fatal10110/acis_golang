@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -61,9 +62,10 @@ func provideClanHalls(ctx bootContext, pool *sql.DB, worker *persist.Worker, dat
 
 // startClanHalls runs the clan hall leases and auctions, paid and refunded
 // through the clan warehouses of link, and the hall sieges with the
-// siege.properties hall settings, each over its hall's siege zone, before
-// any character can log in; on shutdown it stops them.
-func startClanHalls(lc fx.Lifecycle, paths gameServerPaths, data *gameData, halls *clanhall.Halls, link *network.GameClientLink, pool *sim.Pool) error {
+// siege.properties hall settings, each over its hall's siege zone and run
+// by the hall script that binds it, before any character can log in; on
+// shutdown it stops them.
+func startClanHalls(lc fx.Lifecycle, paths gameServerPaths, data *gameData, halls *clanhall.Halls, scripts *script.Registry, link *network.GameClientLink, pool *sim.Pool) error {
 	cfg, err := loadHallSiegeConfig(paths)
 	if err != nil {
 		return err
@@ -76,6 +78,7 @@ func startClanHalls(lc fx.Lifecycle, paths gameServerPaths, data *gameData, hall
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			halls.Start(queue, link, network.ClanHallNotifier(link), network.ClanHallGrounds(link))
+			scripts.BindHallSieges()
 			halls.RunSieges(cfg, network.ClanHallSiegeNotifier(link), fields)
 			return nil
 		},
