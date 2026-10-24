@@ -232,6 +232,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(reviveRefusalMessage(e.Reason)))
 	case event.Died:
 		l.broadcastLiveDie(live)
+		l.stopLiveAttackStance(live)
 	case event.FusionCastersStopRequested:
 		l.abortFusionTargeting(live)
 	case event.DeathItemDrop:
