@@ -1007,6 +1007,20 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	})
 }
 
+// stopLiveAttackStance ends the attack stance of live, which just died: it
+// is out of combat at once, and when it was in stance, live and its
+// observers see the stance end right after its Die. Its summon's stance is
+// left as it is; only the stance expiry ends both together.
+func (l *GameClientLink) stopLiveAttackStance(live *livePlayer) {
+	live.SetInCombat(false)
+	if l.attackStance == nil || !l.attackStance.Remove(live) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStop(live.ObjectID())
+	})
+}
+
 // startSummonAttackStance enters or refreshes the attack stance of actor's
 // owner, which a summon's stance is. Entering it shows the stance on actor,
 // then on its owner.
