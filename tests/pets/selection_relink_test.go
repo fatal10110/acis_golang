@@ -22,6 +22,13 @@ func (o *offlinePetWorld) selectAndDrop(t *testing.T) {
 	t.Helper()
 	o.client.Send(encodeRequestGameStart(0))
 	readUntilOpcode(t, o.client, serverpackets.OpcodeCharSelected, "CharSelected")
+	// The selection registers the player only after it sends CharSelected:
+	// wait for it to finish, or the wait below could pass before the player
+	// was ever in the world.
+	o.srv.AwaitHandled(t)
+	if _, ok := o.srv.State.Player(o.ownerID); !ok {
+		t.Fatal("selected owner not in the world after CharSelected")
+	}
 	if err := o.client.Close(); err != nil {
 		t.Fatalf("close the selecting client: %v", err)
 	}
