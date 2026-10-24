@@ -532,8 +532,7 @@ NpcAI.addPickUpDesire script.NPC.AddPickUpDesire
 # and from a behavior or a quest through the script's spawner; the
 # npcmaker lookup and its maker fold into that call, and the npcmaker that
 # placed an NPC is read by name on the NPC handle. A script's own record of
-# values (EchoCrystal's scores) is a Go struct of the script's, and a
-# heading is a field of the script's Loc. The desire queue is cleared, or
+# values (EchoCrystal's scores) is a Go struct of the script's. The desire queue is cleared, or
 # cleared of one kind, on the NPC handle. The NPC's own teleport wakes no
 # AI task: an NPC out of its territory never sleeps. A monster's soul
 # crystal record and its registration flag are read on the NPC handle.
@@ -578,7 +577,6 @@ ScoreData.new inline
 ScoreData.noAdenaMsg inline
 ScoreData.noScoreMsg inline
 ScoreData.okMsg inline
-SpawnLocation.setHeading inline
 SpawnMaker.checkHasSpawnCondition spawn.Group.Held
 SpawnMaker.onMakerScriptEvent script.Spawner.SendMakerEvent
 SpawnManager.getInstance inline
@@ -914,6 +912,14 @@ SystemMessage.addString script.Hall.Announce
 World.toAllOnlinePlayers script.Hall.Announce
 WorldObject.forEachKnownTypeInRadius script.NPC.PlayersInRadius
 ZoneType.getKnownTypeInside script.Hall.PlayersInside
+
+# Teleport rows (#4128, #4083). An NPC turns where it stands on its handle,
+# with nothing sent, before or after its teleport, which keeps the way it
+# faces; a heading set on a copied position is a field of the script's Loc
+# (Zaken), so that port exempts the row. The ordinary teleport of any
+# creature handle, a summon's included, is script.TeleportTo, under the
+# Go name Creature.teleportTo already has.
+SpawnLocation.setHeading script.NPC.SetHeading
 
 # Siegable-hall rows, exempt from the freeze. Their only callers are the
 # Rainbow Springs hall script; each takes its Go name with the port of the
