@@ -1,0 +1,36 @@
+package teleport
+
+import (
+	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/testsupport/scriptfp"
+	"github.com/fatal10110/acis_golang/internal/testsupport/scriptpages"
+)
+
+// TestDimensionalvortexMatchesReferenceFingerprints compares the package with the reference
+// class: literals, engine calls and hook shapes.
+func TestDimensionalvortexMatchesReferenceFingerprints(t *testing.T) {
+	problems, err := scriptfp.Check("dimensionalvortex", []string{"script.teleport.DimensionalVortex"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range problems {
+		t.Error(p)
+	}
+}
+
+// TestDimensionalvortexPagesAreInTheDatapack requires every page the teleporter names to be a
+// page of its datapack directory.
+func TestDimensionalvortexPagesAreInTheDatapack(t *testing.T) {
+	idx, err := scriptpages.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	problems, err := scriptpages.CheckPackage(idx, "dimensionalvortex", "teleport/DimensionalVortex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range problems {
+		t.Error(p)
+	}
+}
