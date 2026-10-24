@@ -315,6 +315,13 @@ func (s *summonSink) Emit(ev event.Event) {
 		if q := actor.Queue(); q != nil {
 			q.Post(func() { l.instantTeleportSummon(actor, j) })
 		}
+	case event.TeleportRequested:
+		// A script asks it from any queue: the teleport runs on the
+		// summon's own queue.
+		at := location.Location{X: e.X, Y: e.Y, Z: e.Z}
+		if q := actor.Queue(); q != nil {
+			q.Post(func() { l.teleportSummon(actor, at) })
+		}
 	case event.Unsummoning:
 		if actor.OwnerLeft() {
 			// A corpse its owner left behind has not acted since its row was
