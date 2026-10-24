@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -60,10 +61,11 @@ var committed []byte
 // Index maps a page name to its record.
 type Index map[string]Page
 
-// Load parses the committed index.
-func Load() (Index, error) {
+// Load returns the committed index, parsed once and shared by every caller,
+// so callers must not modify it.
+var Load = sync.OnceValues(func() (Index, error) {
 	return Parse(committed)
-}
+})
 
 // Parse reads an index in the form Build writes.
 func Parse(data []byte) (Index, error) {

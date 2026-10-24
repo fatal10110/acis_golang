@@ -10,7 +10,16 @@ package network
 // change runs ahead of a queued attack when the swing or cast ends, so it
 // is named first.
 func (p *livePlayer) intentionNames() (current, next string) {
-	current = "IDLE"
+	current = p.currentIntentionName()
+	if next = p.queuedIntentionName(); next == "IDLE" && p.combat != nil && p.combat.HasNext() {
+		next = "ATTACK"
+	}
+	return current, next
+}
+
+// currentIntentionName names p's current intention, IDLE for none.
+func (p *livePlayer) currentIntentionName() string {
+	current := "IDLE"
 	switch {
 	case p.cast != nil && p.cast.CastingNow(), p.castApproachTarget() != 0:
 		current = "CAST"
@@ -34,11 +43,7 @@ func (p *livePlayer) intentionNames() (current, next string) {
 			current = "STAND"
 		}
 	}
-
-	if next = p.queuedIntentionName(); next == "IDLE" && p.combat != nil && p.combat.HasNext() {
-		next = "ATTACK"
-	}
-	return current, next
+	return current
 }
 
 // queuedIntentionName names the intention queued in p's own next-intention
