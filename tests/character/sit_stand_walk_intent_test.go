@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -130,5 +131,40 @@ func TestSitRequestDuringWalkRunsOnArrival(t *testing.T) {
 				t.Fatalf("sat at (%d,%d,%d), want the walk destination %+v", x, y, z, sitWalkTarget)
 			}
 		})
+	}
+}
+
+// TestSitRequestRefusedDuringStoreSetUp pins the operating refusal of a sit:
+// a player setting up a private store is answered ActionFailed alone (it
+// goes idle, with nothing under way to stop) and keeps standing in the
+// set-up. A stand in the same state is refused only as a stand while not
+// seated, the store set-up not counting for a stand.
+func TestSitRequestRefusedDuringStoreSetUp(t *testing.T) {
+	t.Parallel()
+	srv, c, observer, objID, _ := bootSitObserverPair(t)
+	c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestPrivateStoreManageSell).Bytes())
+	if !slices.ContainsFunc(c.ReadQueued(), func(f []byte) bool { return f[0] == serverpackets.OpcodePrivateStoreManageListSell }) {
+		t.Fatal("sell set-up window did not open")
+	}
+	if got := srv.PlayerOperateType(t, objID); got != privatestore.OperateSellManage {
+		t.Fatalf("operate type = %v, want sell set-up", got)
+	}
+	observer.ReadQueued()
+
+	for _, stand := range []bool{false, true} {
+		c.Send(encodeRequestChangeWaitType(stand))
+		want := []byte{serverpackets.OpcodeActionFailed}
+		if got := sitResponseOpcodes(c.ReadQueued()); !slices.Equal(got, want) {
+			t.Fatalf("stand=%v during the store set-up = %#x, want %#x", stand, got, want)
+		}
+		if got := sitResponseOpcodes(observer.ReadQueued()); len(got) != 0 {
+			t.Fatalf("stand=%v: observer saw %#x, want nothing", stand, got)
+		}
+		if posture := playerPosture(t, srv, objID); !posture.Standing() || posture.SittingNow() {
+			t.Fatalf("stand=%v: standing=%v sittingNow=%v, want standing", stand, posture.Standing(), posture.SittingNow())
+		}
+		if got := srv.PlayerOperateType(t, objID); got != privatestore.OperateSellManage {
+			t.Fatalf("stand=%v: operate type = %v, want sell set-up kept", stand, got)
+		}
 	}
 }
