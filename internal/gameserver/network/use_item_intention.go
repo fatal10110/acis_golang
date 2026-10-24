@@ -183,11 +183,13 @@ func (p *livePlayer) heldIntention() heldIntention {
 }
 
 // arriveHeldIntention answers an arrival for a held intention: a walk to a
-// point ends idle, and a toggle left current toggles its item again.
+// point runs the intention queued behind it (a sit made during the walk),
+// else ends idle, and a toggle left current toggles its item again.
 func (l *GameClientLink) arriveHeldIntention(live *livePlayer) {
 	switch held := live.heldIntention(); held.kind {
 	case heldMoveTo:
 		live.dropHeldIntention()
+		l.finishDeferredAction(live)
 	case heldUseItem:
 		l.toggleHeldItem(live, held.itemID)
 	}
