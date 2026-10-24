@@ -1009,8 +1009,9 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 
 // stopLiveAttackStance ends the attack stance of live, which just died: it
 // is out of combat at once, and when it was in stance, live and its
-// observers see the stance end right after its Die. Its summon's stance is
-// left as it is; only the stance expiry ends both together.
+// observers see the stance end right after its Die. Its summon, whose stance
+// is this one, gets no AutoAttackStop: only the stance expiry sends that, and
+// it no longer runs.
 func (l *GameClientLink) stopLiveAttackStance(live *livePlayer) {
 	live.SetInCombat(false)
 	if l.attackStance == nil || !l.attackStance.Remove(live) {
