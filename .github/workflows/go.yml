@@ -21,7 +21,8 @@ jobs:
       matrix:
         # The slowest behavior suites get their own runners. In a single
         # `go test ./...` they queue behind compiling every other package.
-        # Keep the `rest` exclusion list in sync with these packages.
+        # `rest` runs cmd and internal, `suites` every other behavior suite;
+        # keep the `suites` exclusion list in sync with the suites named here.
         #
         # A shard runs either `pkgs` on the inline executor or `pool` on the
         # real pool, so the two passes over a suite run side by side. Each
@@ -43,7 +44,10 @@ jobs:
             pool: ./tests/combat ./tests/items
           - name: rest
             cache: rest
-            pkgs: all
+            pkgs: ./cmd/... ./internal/...
+          - name: suites
+            cache: rest
+            pkgs: suites
           - name: pool-rest
             cache: rest
             pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
@@ -94,14 +98,9 @@ jobs:
           find ~/.cache/go-build -type f -name '*-[ad]' -exec touch -d '2 hours ago' {} +
           touch "$RUNNER_TEMP/go-cache-start"
 
-      - name: Build
-        if: matrix.shard.name == 'rest'
-        run: go build ./...
-
-      - name: Vet
-        if: matrix.shard.name == 'rest'
-        run: go vet ./...
-
+      # No separate build or vet step: lint type-checks every package and runs
+      # govet, and docker builds the binaries.
+      #
       # gotest.sh keeps the log to package results and failing tests' output,
       # and ends it with the slowest packages and tests.
       - name: Test
@@ -109,8 +108,8 @@ jobs:
         env:
           PKGS: ${{ matrix.shard.pkgs }}
         run: |
-          if [ "$PKGS" = all ]; then
-            PKGS="$(go list ./... | grep -vE '/tests/(skills|pets|combat|items)$')"
+          if [ "$PKGS" = suites ]; then
+            PKGS="$(go list ./tests/... | grep -vE '/tests/(skills|pets|combat|items)$')"
           fi
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
           .github/scripts/gotest.sh -race $PKGS
