@@ -105,7 +105,7 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 	case "pool":
 		pool := sim.NewPool(0, log)
 		pool.Start(context.Background())
-		tb.Cleanup(func() {
+		cleanup(tb, func() {
 			ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 			defer cancel()
 			if err := pool.Stop(ctx); err != nil {
@@ -156,7 +156,7 @@ func startInline(tb testing.TB) *queues {
 			}
 		}
 	}()
-	tb.Cleanup(func() {
+	cleanup(tb, func() {
 		close(stop)
 		<-stopped
 	})

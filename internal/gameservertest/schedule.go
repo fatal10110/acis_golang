@@ -26,7 +26,7 @@ func startSchedule(t *testing.T, o *options, scripts *script.Registry, gcl *netw
 	}
 	clock := sim.NewInline(o.scheduleStart)
 	sch := script.StartSchedule(scripts, clock.NewQueue("script-schedule"), gcl)
-	t.Cleanup(sch.Stop)
+	cleanup(t, sch.Stop)
 	clock.Run()
 	return clock
 }
