@@ -110,7 +110,7 @@ Why this shape:
 | Path → constructor | Go literal catalogs, `map[path]func() script.Script`, joined in `cmd/gameserver` |
 | Listed path with no Go script | logged at error level and skipped; completeness is a test |
 | Catalog entry not listed | never built |
-| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Three ids are claimed by a parent and its child; the child is listed later |
+| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Four ids are bound by a behavior and a later-listed one: 25512, 29062 and 29096 on every event of the earlier one, 35596 on first talk and talk. A later one with no Go script still removes the earlier ones from the bindings it claims (`catalog.Claims`, checked against the manifest) |
 | Other scripts | accumulate in list order |
 | First talk | one slot: the first registered keeps it, except that a behavior replaces an earlier behavior. It fires only when exactly one script is bound |
 | Abnormal-status hook | dispatched over the see-spell list |
@@ -312,8 +312,8 @@ A nil NPC or player means "bound to none", never a wildcard.
 ## 8. Existing stand-ins
 
 Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A template
-switches to real behavior when its script registers. The three ids claimed by a parent and a
-child switch only when the child is ported. The walker alias rule and its walk-stance list
+switches to real behavior when its script registers. An id whose every behavior binding a later-listed,
+unported behavior claims keeps its stand-ins until that behavior is ported. The walker alias rule and its walk-stance list
 also step aside for an id whose creation any script reacts to: the walker script is a plain
 script in the reference manifest (`kind script`, not a behavior), and the created hook is
 where the reference asks an NPC to walk a route (A13).
