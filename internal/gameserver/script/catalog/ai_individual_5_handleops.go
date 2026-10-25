@@ -69,9 +69,8 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 			"OnTimer":    {"NPC.LastAttacker"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit": {
-			"OnAttacked":     {"NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnClanAttacked": {"NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnSeeSpell":     {"NPC.MaxHP"},
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
 		},
 	}
 }

@@ -32,8 +32,8 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 		"quest.KillDrop": func() Script {
 			return Script{QuestID: 1, Bind: Bindings{EventTalked: {1}, EventMyDying: {2}}, Hooks: Hooks{OnTalk: talk, OnMyDying: func(*Script, MyDying) {}}}
 		},
-		"ai.FolkHP":    behavior(1),
-		"ai.HostileHP": behavior(2),
+		"ai.FolkCombat":    behavior(1),
+		"ai.HostileCombat": behavior(2),
 		"quest.TimerDecay": func() Script {
 			return Script{QuestID: 2, Bind: Bindings{EventTalked: {1}}, Hooks: Hooks{OnTalk: talk, OnTimer: func(*Script, Timer) string { return "" }}}
 		},
@@ -44,13 +44,13 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 	}
 	ops := map[string]HandleOps{
 		"quest.KillDrop":   {"OnMyDying": {"NPC.DropItem"}},
-		"ai.FolkHP":        {"OnAttacked": {"NPC.HP"}},
-		"ai.HostileHP":     {"OnAttacked": {"NPC.HP", "NPC.MaxHP"}},
+		"ai.FolkCombat":    {"OnAttacked": {"NPC.InCombat"}},
+		"ai.HostileCombat": {"OnAttacked": {"NPC.InCombat", "NPC.MaxMP"}},
 		"quest.TimerDecay": {"OnTimer": {"Spawner.DecayMe"}},
 		"ai.Unknown":       {"OnAttacked": {"NPC.NoSuchOperation"}},
 		"ai.Timer":         {"OnTimer": {"NPC.HateList"}},
 	}
-	paths := []string{"quest.KillDrop", "ai.FolkHP", "ai.HostileHP", "quest.TimerDecay", "ai.Unknown", "ai.Timer"}
+	paths := []string{"quest.KillDrop", "ai.FolkCombat", "ai.HostileCombat", "quest.TimerDecay", "ai.Unknown", "ai.Timer"}
 	logs := &logBuffer{}
 	r := Build(listOf(paths...), catalog, Config{KindOf: kindOf, Log: zerolog.New(logs), HandleOps: ops, raises: raiseAll})
 
@@ -58,7 +58,7 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 	for _, e := range r.entries {
 		registered[e.path] = e.state == entryRegistered
 	}
-	want := map[string]bool{"quest.KillDrop": true, "ai.FolkHP": false, "ai.HostileHP": true, "quest.TimerDecay": false, "ai.Unknown": false, "ai.Timer": true}
+	want := map[string]bool{"quest.KillDrop": true, "ai.FolkCombat": false, "ai.HostileCombat": true, "quest.TimerDecay": false, "ai.Unknown": false, "ai.Timer": true}
 	if !reflect.DeepEqual(registered, want) {
 		t.Fatalf("registered = %v, want %v", registered, want)
 	}
@@ -66,7 +66,7 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 		t.Fatalf("handle refusals logged %d times, want 3: %s", n, logs)
 	}
 	for _, msg := range []string{
-		`onAttacked on npc 1 calls NPC.HP, which folk npcs do not have`,
+		`onAttacked on npc 1 calls NPC.InCombat, which folk npcs do not have`,
 		`onTimer on npc 1 calls Spawner.DecayMe, which folk npcs do not have`,
 		`onAttacked calls NPC.NoSuchOperation, which is no kind-specific handle operation`,
 	} {

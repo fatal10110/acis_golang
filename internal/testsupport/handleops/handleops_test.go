@@ -30,17 +30,17 @@ func TestScriptFollowsEveryCallShape(t *testing.T) {
 		ctor string
 		want map[string][]string
 	}{
-		{"Direct", map[string][]string{"OnAttacked": {"NPC.HP"}}},
+		{"Direct", map[string][]string{"OnAttacked": {"NPC.InCombat"}}},
 		{"LocalVar", map[string][]string{"OnAttacked": {"NPC.Rooted"}}},
-		{"Field", map[string][]string{"OnAttacked": {"NPC.MaxHP"}}},
+		{"Field", map[string][]string{"OnAttacked": {"NPC.MaxMP"}}},
 		{"Map", map[string][]string{"OnAttacked": {"NPC.StopAttack"}}},
 		{"Range", map[string][]string{"OnAttacked": {"NPC.Muted"}}},
 		{"Named", map[string][]string{"OnAttacked": {"NPC.PhysicalMuted"}}},
 		{"Returned", map[string][]string{"OnAttacked": {"NPC.InCombat"}}},
-		{"Invoker", map[string][]string{"OnAttacked": {"NPC.HP"}, "OnTalk": {"NPC.HP"}}},
-		{"Engine", map[string][]string{"OnAttacked": {"NPC.HP"}, "OnTalk": {"NPC.HP"}}},
-		{"Wrapped", map[string][]string{"OnAttacked": {"NPC.HP"}, "OnTimer": {"NPC.HP"}}},
-		{"Dispatch", map[string][]string{"OnPartyAttacked": {"NPC.HP"}}},
+		{"Invoker", map[string][]string{"OnAttacked": {"NPC.InCombat"}, "OnTalk": {"NPC.InCombat"}}},
+		{"Engine", map[string][]string{"OnAttacked": {"NPC.InCombat"}, "OnTalk": {"NPC.InCombat"}}},
+		{"Wrapped", map[string][]string{"OnAttacked": {"NPC.InCombat"}, "OnTimer": {"NPC.InCombat"}}},
+		{"Dispatch", map[string][]string{"OnPartyAttacked": {"NPC.InCombat"}}},
 	} {
 		t.Run(tc.ctor, func(t *testing.T) {
 			got, err := scan(tc.ctor)

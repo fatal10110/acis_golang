@@ -8,7 +8,7 @@ import (
 )
 
 // HandleOps lists, per Hooks field a script sets ("OnAttacked"), the
-// kind-specific handle operations that hook reaches ("NPC.HP"). A scan of
+// kind-specific handle operations that hook reaches ("NPC.InCombat"). A scan of
 // the script sources derives it; the boot passes it in Config.
 type HandleOps map[string][]string
 
@@ -31,12 +31,10 @@ var kindOps = map[string]kindSet{
 	"NPC.DropItem":                    hostileOnly,
 	"NPC.Earthquake":                  hostileOnly,
 	"NPC.EquipItem":                   hostileOnly,
-	"NPC.HP":                          hostileOnly,
 	"NPC.HateList":                    hostileOnly,
 	"NPC.InCombat":                    hostileOnly,
 	"NPC.InsideZone":                  hostileOnly,
 	"NPC.LastAttacker":                hostileOnly,
-	"NPC.MaxHP":                       hostileOnly,
 	"NPC.MaxMP":                       hostileOnly,
 	"NPC.MeetsHPMPConditions":         hostileOnly,
 	"NPC.MeetsHPMPDisabledConditions": hostileOnly,
