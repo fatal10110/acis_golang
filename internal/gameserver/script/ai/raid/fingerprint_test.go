@@ -10,12 +10,14 @@ import (
 // classes: literals, engine calls and hook shapes. The reference names the
 // gigantic golem's lines by their NpcString constants, which the port
 // writes as ids; its camera shot takes the NPC's object id, which the NPC
-// handle's camera shot centres on itself; and Sailren's party read
+// handle's camera shot centres on itself, and Gordon reads a seen ground
+// item's object id from the see-item list's field; and Sailren's party read
 // (Player.PartyMembers) shares its name with the quest helper.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"script.ai.individual.Monster.RaidBoss.RaidBossStandard",
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1",
+		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon",
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossAloneSummonPrivate",
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon",
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Sailren",
