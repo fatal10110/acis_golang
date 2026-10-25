@@ -98,6 +98,14 @@ func TestQ114WendyWakesOneGuardianAtATime(t *testing.T) {
 	t.Parallel()
 	w := q114World(t, 10)
 	w.spawnFolk(t, "wendy", q114Wendy, 40, 0, 0)
+	// The guardian beats the player for the whole 300 s it stands; its
+	// random hits would now and then kill the player before the third
+	// call, so the player takes no damage from them.
+	p, ok := playerCombatant(t, w.srv, w.player).(interface{ SetInvul(bool) bool })
+	if !ok {
+		t.Fatal("the player cannot be made invulnerable")
+	}
+	p.SetInvul(true)
 
 	got := w.wakeGuardian(t)
 	g := w.spawned(t, "golem", q114Golem)
@@ -124,6 +132,10 @@ func TestQ114WendyWakesOneGuardianAtATime(t *testing.T) {
 	saysNone(t, "the despawn", w.advance(t, 2*time.Second))
 	if n := len(npcsOf(w.srv, q114Golem)); n != 0 {
 		t.Fatalf("%d guardians after the despawn, want 0", n)
+	}
+
+	if w.srv.PlayerDead(t, w.player) {
+		t.Fatal("the player died while the guardian stood")
 	}
 
 	got = w.wakeGuardian(t)
