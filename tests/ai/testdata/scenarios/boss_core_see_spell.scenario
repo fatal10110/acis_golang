@@ -1,0 +1,17 @@
+# Core (29006), a level 1 grand boss, sees a level 10 character, more than 8 levels above it,
+# cast Ultimate Debuff (4694) on a monster beside it: it wants skill 4215 on the character at
+# 1000000 (its fixture template lists the skill, so the NPC can cast). The character's combat
+# draws are pinned so the debuff lands.
+character Hunter 10
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.core.Core
+npc core 29006 GrandBoss 250 0 0 skill DEBUFF 4215 1
+npc wolf 20120 Monster 150 0 0
+
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires core cast(player,4215,move)=1000000
