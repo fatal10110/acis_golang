@@ -90,9 +90,14 @@ what the reference does in the scenario's own world:
   before the contract scenes change some), since the Go runner registers no other script:
   another quest on the same NPC is not in its chooser, and a monster's own behavior does not
   run;
+- each NPC line's NPC has the casting stats of the Go runner's fixture NPC of its type, which
+  every NPC line's NPC has there: WIT and DEX 0, and a base attack speed of 253 for a civilian
+  kind (a Folk instance class, the siege towers and flag, not the Christmas tree), 300 for any
+  other; a cast's hit time and reuse delay follow them, so its `MagicSkillUse` matches the Go
+  run's;
 - an NPC the scenario kills or hits is made the Go runner's fixture monster of the NPC line's
   type: level 1, 1000 HP, no experience, SP, drops, skills, minions or aggression, its script
-  bindings kept;
+  bindings kept. The templates get their own values back once the scenario is over;
 - a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes
@@ -114,8 +119,12 @@ what the reference does in the scenario's own world:
   found it, after the boot, the quest traces and the contract scenes. Once a scenario is over,
   every world object of an id it drew is removed, wherever it stands, and so are the registry
   entries keyed by one (the clan table, the castle sieges' registrations and the castle owners, the
-  Seven Signs sign-ups, the raid points); an object
-  still in the world fails the run. What loads from the database on first use is loaded before
+  Seven Signs sign-ups, the raid points, and the task managers' creatures and items, since a world
+  object equals any other of its id: the attack stance a cast leaves would show the next NPC of
+  that id in combat); an object still in the world fails the run. Each world region's object map
+  is rebuilt at a scenario's start, holding what stood there before the first scenario in object
+  id order: a map keeps the capacity an earlier scenario grew it to, and the order a character
+  entering the world is shown what stands around it follows that capacity. What loads from the database on first use is loaded before
   the first scenario, so no scenario's trace holds its query: the events the reference loads at
   boot after the scripts (the derby track, whose runners also draw ids, the lottery, the couples,
   the fishing championship when enabled) and the friend lists, which the reference loads when a
