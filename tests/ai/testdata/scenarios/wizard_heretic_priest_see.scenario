@@ -1,0 +1,29 @@
+# WizardHereticPriestAggressive (22143, its shipped skills), every draw 0: its see-creature hook
+# for a cleric (15) in a party of two, more than its party_members (none set here: 0), with no
+# teleport point set (each 0). Seeing the cleric 100 away before it settled (life time 7 or less,
+# so it does not strike on sight), on a draw under 33 for a cleric it wants its hold magic (4047)
+# and its long range DD magic (4668) on it, both held in place. On the next draw under 33 it sends
+# the cleric to its first teleport point, 0,0,0: the teleport goes out once the priest's task is
+# done.
+# tests/ai/wizard_individual6f_test.go checks each hook family and weight, and
+# tests/pets/wizard_heretic_priest_summon_test.go the summon sent after its owner.
+character Hunter 20
+class 15
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1000 0 0 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9
+member Mate 20 -1500 0 0
+
+approach priest
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=0,0,0 fast=0
+  desires priest cast(player,4047)=1000000 cast(player,4668)=1000000
+  at player -10 -20 -30
