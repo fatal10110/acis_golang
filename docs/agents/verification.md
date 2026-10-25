@@ -28,6 +28,11 @@ Contract-specific checks supplement unit tests:
 - script ports: `scriptfp.Check` against the committed reference fingerprints (literals,
   engine calls through `apimap.txt`, hook parent-call shape); regenerate the fingerprints and
   the engine call census with `cmd/scriptfp` when the reference or `apimap.txt` changes;
+- static script checks location: for a `quest/*`, `feature/*` or `teleport/*` package, a test that
+  only runs `scriptfp.Check` and `scriptpages.CheckPackage` lives in the parent package as
+  `<tree>/<pkg>_test.go`, named `Test<Pkg>…`, so all of them share one test binary; run one with
+  `go test ./internal/gameserver/script/quest -run '^TestQ260'` (the sub-package itself reports
+  `[no test files]`). A sub-package keeps its own test file only when the test uses its symbols;
 - script engine contracts: run every row of the contract's goldens with `scriptcontract.Run`
   (`scriptcontract.Contracts` lists the tables per contract and slice); the probe goldens are
   regenerated only by `internal/gameserver/script/testdata/oracle/run.sh`;
