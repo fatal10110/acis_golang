@@ -507,6 +507,43 @@ func TestZakenScattersItsTargets(t *testing.T) {
 	}
 }
 
+// TestZakenMassTeleportSendsAMarkOnce covers a creature marked twice: Zaken
+// marks what it sees with no check for an earlier mark. Mate, its second
+// and third mark, stands 100 west of where the character lands (draws 7,
+// 252, 378) and is sent to room 6's corner (draws 5, 0, 0); its second mark
+// is measured where it lands, over 1500 from the character's landing
+// point, so it is left alone and draws nothing: the draws queued after (2,
+// 0, 0) stay queued.
+func TestZakenMassTeleportSendsAMarkOnce(t *testing.T) {
+	t.Parallel()
+	room6 := location.Location{X: 55970, Y: 217770, Z: -3216}
+	w := bootZaken(t, zakenBoot{})
+	h := w.zaken(t)
+	w.settle(t)
+	mate := (&ind1World{warriorWorld: w.warriorWorld}).joinCharacter(t, "mate", "Mate")
+	w.onQueue(t, h, func() {
+		n := script.NPCOf(h)
+		n.SetSlot(npc.CreatureQuest0, script.PlayerOf(w.player))
+		n.SetSlot(npc.CreatureQuest1, script.PlayerOf(mate))
+		n.SetSlot(npc.CreatureQuest2, script.PlayerOf(mate))
+		n.SetInt(npc.IntQuest0, 3)
+	})
+	landing := location.Location{X: zakenCharacter.X + 100, Y: zakenCharacter.Y, Z: -3216}
+	w.draws.set(1<<30, 7, 252, 378, 5, 0, 0, 2, 0, 0)
+	w.zakenCast(t, h, zakenMassTeleport, w.player, w.playerAt(t, w.player, landing))
+	w.srv.Settle(t)
+	if !w.playerAt(t, mate, room6)() {
+		x, y, _ := w.srv.PlayerPosition(t, mate.ObjectID())
+		t.Fatalf("Mate after the mass teleport at %d,%d, want room 6's corner %v", x, y, room6)
+	}
+	w.draws.mu.Lock()
+	left := slices.Clone(w.draws.queue)
+	w.draws.mu.Unlock()
+	if !slices.Equal(left, []int{2, 0, 0}) {
+		t.Fatalf("draws left after the mass teleport = %v, want [2 0 0]", left)
+	}
+}
+
 // TestZakenBringsBackADeadPrivate covers the party-died hook: once every
 // wave stands, a pirate captain dying while Zaken lives, its corpse then
 // decayed, is asked back 30 s plus a draw of 60 after its death, here the

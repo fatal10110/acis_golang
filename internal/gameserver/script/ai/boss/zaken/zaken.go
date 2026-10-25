@@ -1,6 +1,7 @@
 package zaken
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +33,12 @@ const (
 	// from by day.
 	slotQuarters = npc.IntQuest2
 )
+
+// landed is a creature a mass teleport sent and the point it lands at.
+type landed struct {
+	c  script.Creature
+	at script.Loc
+}
 
 // markSlot is the creature slot of mark k, 0 to 4.
 func markSlot(k int) script.CreatureSlot {
@@ -171,12 +178,14 @@ func Zaken() script.Script {
 				script.TeleportTo(c, randomRoomPoint(s))
 				n.StopHate(c)
 			case skill.Ref{ID: 4217, Level: 1}:
-				// The reference reads where c landed, its teleport done
-				// inside the call; here it lands once this task is done,
-				// so the marks are measured against its landing point.
+				// The reference reads where each creature it sent landed,
+				// its teleport done inside the call; here a creature lands
+				// once this task is done, so a creature sent by this cast
+				// is measured at the point drawn for it.
 				landing := randomRoomPoint(s)
 				script.TeleportTo(c, landing)
 				n.StopHate(c)
+				sent := []landed{{c, landing}}
 
 				for k := range 5 {
 					mark := n.Slot(markSlot(k))
@@ -184,9 +193,19 @@ func Zaken() script.Script {
 						continue
 					}
 					at := script.LocOf(mark)
+					i := slices.IndexFunc(sent, func(l landed) bool { return script.Same(l.c, mark) })
+					if i >= 0 {
+						at = sent[i].at
+					}
 					if at.Z > landing.Z-100 && at.Z < landing.Z+100 && !farther(at, landing, 250) {
-						script.TeleportTo(mark, randomRoomPoint(s))
+						to := randomRoomPoint(s)
+						script.TeleportTo(mark, to)
 						n.StopHate(mark)
+						if i >= 0 {
+							sent[i].at = to
+						} else {
+							sent = append(sent, landed{mark, to})
+						}
 					}
 				}
 			}
