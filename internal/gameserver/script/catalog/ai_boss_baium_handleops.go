@@ -8,6 +8,10 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // handle operations each of its hooks reaches.
 func aiBossBaiumHandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
+		"script.ai.boss.baium.Archangel": {
+			"OnSeeCreature": {"NPC.TopDesireTarget"},
+			"OnTimer":       {"NPC.TopDesireTarget"},
+		},
 		"script.ai.boss.baium.Baium": {
 			"OnTimer": {"NPC.Earthquake"},
 		},
