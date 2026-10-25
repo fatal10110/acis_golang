@@ -18,9 +18,10 @@ import (
 // goes to live's tutorial quest, which answers through the tutorial window.
 // A player with no tutorial quest state gets nothing at all;
 // the tutorial window and its question marks leave the client waiting on
-// no answer, so no ActionFailed is owed either.
+// no answer, so no ActionFailed is owed either. It runs on live's queue,
+// so the quest's hook runs as a hook on that queue.
 func (l *GameClientLink) tutorialRequest(live *livePlayer, name string) {
-	live.NotifyTutorial(name)
+	live.NotifyTutorialOnQueue(name)
 }
 
 // noteRestoredHP runs live's restored-HP tutorial step once (see

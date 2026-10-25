@@ -236,9 +236,10 @@ func (n *NPC) InstantTeleportTo(at Place) { instantTeleport(n, jumpTo(at)) }
 // hooks for it once. It stays in its region until its next position update.
 // A player in a teleport already is left to it.
 //
-// The jump runs on the player's own queue once the caller's task is done, not
-// inside the call (docs/script-engine-plan.md section 9): code after the call
-// still reads the player's old position.
+// From a hook on the player's own queue (as for TeleportTo of Player) the
+// jump runs inside the call. From any other queue it runs on the player's
+// own queue once the caller's task is done (docs/script-engine-plan.md
+// section 9): code after the call still reads the player's old position.
 func (p *Player) InstantTeleportTo(at Place) { instantTeleport(p, jumpTo(at)) }
 
 // InstantTeleportTo moves the creature to at in one step: an NPC jumps as
