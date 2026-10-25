@@ -349,12 +349,13 @@ func wakeBaium(t *testing.T, w *baiumWorld, talks baiumTalks) attackable.Combata
 // TestBaiumSleepsAndWakes ports Baium's sleep, wake and call (phases 1 and
 // 2): spawned outside its lair it names itself under global memo key 2,
 // stores db value 0 and leaves its stone in the lair, facing -25348. The
-// stone's script event teleports it into the lair and stores db value 1;
-// 2 s later it shakes the screens around (40 for 10 s) and plays BS02_A,
-// at 11.5 s it plays social action 3, 7.3 s later social action 1: it says
-// its line 22937, teleports the waker beside it and wants to cast 4136 at
-// it with 1100000 (no hero is around for its screen message). 8 s later
-// its five archangels appear, and the db value 1 is saved.
+// stone's script event turns it to -25348, teleports it into the lair
+// and stores db value 1; 2 s later it shakes the screens around (40 for
+// 10 s) and plays BS02_A, at 11.5 s it plays social action 3, 7.3 s later
+// social action 1: it says its line 22937, teleports the waker beside it
+// and wants to cast 4136 at it with 1100000 (no hero is around for its
+// screen message). 8 s later its five archangels appear, and the db value
+// 1 is saved.
 func TestBaiumSleepsAndWakes(t *testing.T) {
 	talks := make(baiumTalks, 4)
 	w := bootBaium(t, "-105200;-253104;-15264;0", talks)
@@ -370,8 +371,8 @@ func TestBaiumSleepsAndWakes(t *testing.T) {
 	}
 
 	wakeBaium(t, w, talks)
-	if x, y, z := boss.Position(); (location.Location{X: x, Y: y, Z: z}) != baiumLair {
-		t.Fatalf("woken Baium stands at %d,%d,%d, want %v", x, y, z, baiumLair)
+	if got, want := placeOf(boss), fmt.Sprintf("%d,%d,%d heading -25348", baiumLair.X, baiumLair.Y, baiumLair.Z); got != want {
+		t.Fatalf("woken Baium stands at %s, want %s", got, want)
 	}
 	roles := map[int32]string{boss.ObjectID(): "baium", w.player.ObjectID(): "player"}
 

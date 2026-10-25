@@ -68,7 +68,8 @@ func Baium() script.Script {
 			n.SetInt(slotFighting, 1)
 			n.SetInt(script.SlotFlag, 1)
 
-			n.TeleportTo(script.Loc{X: 116033, Y: 17447, Z: 10107, Heading: -25348})
+			n.SetHeading(-25348)
+			n.TeleportTo(script.Loc{X: 116033, Y: 17447, Z: 10107})
 
 			n.SetDBValue(1)
 
@@ -278,12 +279,12 @@ func Baium() script.Script {
 				if c0 != nil {
 					if n.Distance2D(c0) < 16000 {
 						n.Say(script.NpcString(22937))
-						teleport(c0, script.Loc{X: 115910, Y: 17337, Z: 10105})
+						script.TeleportTo(c0, script.Loc{X: 115910, Y: 17337, Z: 10105})
 						n.AddCastDesire(c0, skill.Ref{ID: 4136, Level: 1}, 1100000)
 					}
 				} else if first := n.Slot(slotFirstSeen); first != nil {
 					n.Say(script.NpcString(22937))
-					teleport(first, script.Loc{X: 115910, Y: 17337, Z: 10105})
+					script.TeleportTo(first, script.Loc{X: 115910, Y: 17337, Z: 10105})
 					n.AddCastDesire(first, skill.Ref{ID: 4136, Level: 1}, 1100000)
 				}
 
@@ -456,14 +457,6 @@ func castBaiumSkill(s *script.Script, n *script.NPC) {
 // empty, over 9000 away or dead.
 func gone(n *script.NPC, c script.Creature) bool {
 	return c == nil || n.Distance2D(c) > 9000 || c.Dead()
-}
-
-// teleport jumps c, the player that woke Baium or the first one it saw,
-// to at.
-func teleport(c script.Creature, at script.Loc) {
-	if p, ok := c.(*script.Player); ok {
-		p.TeleportTo(at, 0)
-	}
 }
 
 // saturatedInt converts f to an int32 as a cast of a double to an int

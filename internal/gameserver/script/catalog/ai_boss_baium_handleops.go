@@ -9,8 +9,7 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 func aiBossBaiumHandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
 		"script.ai.boss.baium.Baium": {
-			"OnAttacked": {"NPC.HP", "NPC.MaxHP"},
-			"OnTimer":    {"NPC.Earthquake"},
+			"OnTimer": {"NPC.Earthquake"},
 		},
 	}
 }
