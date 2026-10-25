@@ -82,16 +82,36 @@ func (c *IntMapCell[V]) Has(k int32) bool {
 func (c *IntMapCell[V]) Set(k int32, v V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if i, j, ok := c.find(k); ok {
+		c.buckets[i][j].Value = v
+		return
+	}
+	c.insert(k, v)
+}
+
+// SetIfAbsent maps k to v unless k is present, and returns the value k
+// then has and whether v was stored. A script sums into a map by storing
+// a counter cell this way and adding to the one returned, which no other
+// caller can replace in between.
+func (c *IntMapCell[V]) SetIfAbsent(k int32, v V) (V, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if i, j, ok := c.find(k); ok {
+		return c.buckets[i][j].Value, false
+	}
+	c.insert(k, v)
+	return v, true
+}
+
+// insert adds k, absent, with v at the end of its bucket. The caller holds
+// c.mu.
+func (c *IntMapCell[V]) insert(k int32, v V) {
 	if c.buckets == nil {
 		n := c.initial
 		if n == 0 {
 			n = intMapDefaultBuckets
 		}
 		c.buckets = make([][]IntMapEntry[V], n)
-	}
-	if i, j, ok := c.find(k); ok {
-		c.buckets[i][j].Value = v
-		return
 	}
 	i := c.bucket(k)
 	c.buckets[i] = append(c.buckets[i], IntMapEntry[V]{Key: k, Value: v})
