@@ -9,31 +9,22 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 func aiIndividual2HandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.Agit02DoomServantAgit": {
-			"OnClanAttacked": {"NPC.MaxHP"},
-			"OnTimer":        {"NPC.RandomizeAttack"},
+			"OnTimer": {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.CorePrivateWarriorCastDDMagicAggressive.CorePrivatePerum": {
 			"OnTimer": {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.Agit02DoomGuardAgit": {
-			"OnAttacked":     {"NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnClanAttacked": {"NPC.MaxHP"},
-			"OnSeeSpell":     {"NPC.MaxHP"},
+			"OnAttacked": {"NPC.TopDesireTarget"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.Agit02DoomKnightAgitParty": {
-			"OnPartyAttacked": {"NPC.MaxHP"},
-			"OnSeeSpell":      {"NPC.MaxHP"},
-			"OnTimer":         {"NPC.RandomizeAttack"},
+			"OnTimer": {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.Agit02VampireAgitParty": {
-			"OnClanAttacked":  {"NPC.MaxHP"},
-			"OnPartyAttacked": {"NPC.MaxHP"},
-			"OnSeeSpell":      {"NPC.MaxHP"},
-			"OnTimer":         {"NPC.RandomizeAttack"},
+			"OnTimer": {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.WarriorCastingCurseAggressive.Agit02DoomKnightAgit": {
-			"OnClanAttacked": {"NPC.MaxHP"},
-			"OnTimer":        {"NPC.RandomizeAttack"},
+			"OnTimer": {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingCurse.WarriorCastingCurseAggressive.CorePrivateDicor": {
 			"OnTimer": {"NPC.RandomizeAttack"},
@@ -49,20 +40,11 @@ func aiIndividual2HandleOps() map[string]script.HandleOps {
 			"OnAttacked":     {"NPC.TopDesireTarget"},
 			"OnClanAttacked": {"NPC.TopDesireTarget"},
 		},
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.Agit02DoomArcherAgit": {
-			"OnAttacked":                 {"NPC.MaxHP"},
-			"OnClanAttacked":             {"NPC.MaxHP"},
-			"OnSeeSpell":                 {"NPC.MaxHP"},
-			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
-		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.Agit02DoomArcherAgitParty": {
-			"OnPartyAttacked": {"NPC.MaxHP"},
-			"OnSeeSpell":      {"NPC.MaxHP"},
-			"OnTimer":         {"NPC.RandomizeAttack"},
+			"OnTimer": {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.Agit02DoomWarriorAgit": {
-			"OnClanAttacked": {"NPC.MaxHP"},
-			"OnTimer":        {"NPC.RandomizeAttack"},
+			"OnTimer": {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.OrfenPrivateRaikel": {
 			"OnTimer": {"NPC.RandomizeAttack"},

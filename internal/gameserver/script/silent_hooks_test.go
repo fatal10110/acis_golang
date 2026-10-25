@@ -30,19 +30,19 @@ func TestSeamGateRegistersAttackFinishedOnFolk(t *testing.T) {
 			OnAttackFinished: func(*Script, AttackFinished) {},
 		}}
 	}
-	catalog := Catalog{"ai.Warrior": warrior, "ai.FolkHP": warrior}
+	catalog := Catalog{"ai.Warrior": warrior, "ai.FolkCombat": warrior}
 	ops := map[string]HandleOps{
-		"ai.Warrior": {"OnAttackFinished": {"NPC.HP"}},
-		"ai.FolkHP":  {"OnAttacked": {"NPC.HP"}},
+		"ai.Warrior":    {"OnAttackFinished": {"NPC.InCombat"}},
+		"ai.FolkCombat": {"OnAttacked": {"NPC.InCombat"}},
 	}
 	logs := &logBuffer{}
-	r := Build(listOf("ai.Warrior", "ai.FolkHP"), catalog, Config{KindOf: kindOf, Log: zerolog.New(logs), HandleOps: ops})
+	r := Build(listOf("ai.Warrior", "ai.FolkCombat"), catalog, Config{KindOf: kindOf, Log: zerolog.New(logs), HandleOps: ops})
 
 	registered := map[string]bool{}
 	for _, e := range r.entries {
 		registered[e.path] = e.state == entryRegistered
 	}
-	if want := map[string]bool{"ai.Warrior": true, "ai.FolkHP": false}; !reflect.DeepEqual(registered, want) {
+	if want := map[string]bool{"ai.Warrior": true, "ai.FolkCombat": false}; !reflect.DeepEqual(registered, want) {
 		t.Fatalf("registered = %v, want %v: %s", registered, want, logs)
 	}
 	for _, id := range []int32{1, 2} {

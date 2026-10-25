@@ -490,7 +490,7 @@ func (p *Program) targets(fn *types.Func) []*types.Func {
 }
 
 // Ops returns the name of every exported engine operation that exists for
-// hostile NPCs only, sorted: "NPC.HP", "Spawner.DecayMe".
+// hostile NPCs only, sorted: "NPC.InCombat", "Spawner.DecayMe".
 func (p *Program) Ops() []string {
 	var out []string
 	for fn := range p.kinded {

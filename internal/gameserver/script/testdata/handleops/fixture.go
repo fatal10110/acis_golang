@@ -11,7 +11,7 @@ import (
 // Direct calls the operation in its hook.
 func Direct() script.Script {
 	return script.Script{Hooks: script.Hooks{OnAttacked: func(_ *script.Script, e script.Attacked) {
-		_ = e.NPC.HP()
+		_ = e.NPC.InCombat()
 	}}}
 }
 
@@ -34,7 +34,7 @@ func apply(n *script.NPC, f func(*script.NPC)) { f(n) }
 
 type step struct{ do func(*script.NPC, int8) }
 
-var steps = []step{{do: func(n *script.NPC, _ int8) { _ = n.MaxHP() }}}
+var steps = []step{{do: func(n *script.NPC, _ int8) { _ = n.MaxMP() }}}
 
 // Field calls it through a function-typed struct field held in a
 // package-level slice.
@@ -89,7 +89,7 @@ func Returned() script.Script {
 	}}}
 }
 
-func attacked(_ *script.Script, e script.Attacked) { _ = e.NPC.HP() }
+func attacked(_ *script.Script, e script.Attacked) { _ = e.NPC.InCombat() }
 
 // Invoker re-enters its attacked hook through the Hooks invoker from its
 // talk hook.
@@ -131,7 +131,7 @@ func Wrapped() script.Script {
 // NPC from its talk hook: their invocations, not its own hook's.
 func Dispatch() script.Script {
 	return script.Script{Hooks: script.Hooks{
-		OnPartyAttacked: func(_ *script.Script, e script.PartyAttacked) { _ = e.Called.HP() },
+		OnPartyAttacked: func(_ *script.Script, e script.PartyAttacked) { _ = e.Called.InCombat() },
 		OnTalk: func(s *script.Script, e script.Talk) string {
 			s.RaisePartyAttacked(e.NPC, e.NPC, nil, 0)
 			return ""

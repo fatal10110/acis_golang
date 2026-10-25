@@ -243,9 +243,11 @@ Quest.addCreated inline
 # newbie buff table is handed to the script's constructor, so its lookup
 # and a buff's skill are plain Go values, and a frequent skill is a skill
 # reference literal. The pooled delayed task runs on the player's queue.
+# The item check is on every creature handle: a player and a pet answer
+# from their inventories; a servitor, an NPC or a door has none and panics.
 ClassId.getLevel script.Player.ClassLevel
 Creature.teleportTo TeleportTo
-ItemContainer.hasAtLeastOneItem script.Player.HasAtLeastOneItem
+ItemContainer.hasAtLeastOneItem script.Creature.HasAtLeastOneItem
 MemoSet.unset script.QuestState.Unset
 NewbieBuff.getSkill inline
 NewbieBuffData.getInstance inline

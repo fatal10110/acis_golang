@@ -179,7 +179,7 @@ call ItemContainer.getItemByItemId classes 5 sites 7 go inline
 call ItemContainer.getItemCount classes 164 sites 777 go script.Player.ItemCount
 call ItemContainer.getItems classes 1 sites 2 go script.Player.HeldItems
 call ItemContainer.getSize classes 2 sites 4 go script.Player.WarehouseSize
-call ItemContainer.hasAtLeastOneItem classes 27 sites 52 go script.Player.HasAtLeastOneItem
+call ItemContainer.hasAtLeastOneItem classes 27 sites 52 go script.Creature.HasAtLeastOneItem
 call ItemContainer.hasItem classes 195 sites 972 go script.Player.HasItem
 call ItemContainer.hasItems classes 41 sites 138 go script.Player.HasItems
 call ItemData.getInstance classes 2 sites 2 go inline

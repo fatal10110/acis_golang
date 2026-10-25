@@ -33,7 +33,7 @@ var scriptHandleOps = map[string]script.HandleOps{
 	},
 	"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard": {
 		"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
-		"OnSeeSpell":      {"NPC.HP", "NPC.MaxHP", "NPC.TopDesireTarget"},
+		"OnSeeSpell":      {"NPC.TopDesireTarget"},
 		"OnTimer":         {"NPC.RandomizeAttack"},
 	},
 	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior": {
