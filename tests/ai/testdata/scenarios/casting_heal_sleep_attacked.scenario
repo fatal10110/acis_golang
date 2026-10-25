@@ -1,0 +1,19 @@
+# WarriorCastingHealSleep (21664, its shipped sleep and heal), every draw 0, 150 away from the
+# character. Its first hit, by a character it does not hate most yet, wants its sleep magic (4046)
+# on the character, weight 1000000, which the hit's desire selection casts. The second, by its most
+# hated, adds none: the first stays at 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingHeal.WarriorCastingHeal
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingHeal.WarriorCastingHealSleep
+npc sleeper 21664 Monster 150 0 0 skill MAGIC_SLEEP 4046 3 skill MAGIC_HEAL 4065 3
+
+hit sleeper 22
+  S MagicSkillUse caster=sleeper target=player skill=4046-3 hit=6607 reuse=21142 success=0
+  desires sleeper attack(player)=275 cast(player,4046,move)=1000000
+hit sleeper 22
+  desires sleeper attack(player)=550 cast(player,4046,move)=1000000

@@ -78,5 +78,23 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSummonPC.WarriorCastSummonPCAggressive": {
 			"OnAttacked": {"NPC.MeetsHPMPDisabledConditions"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombie": {
+			"OnTimer": {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagic": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagicAggressive": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecial": {
+			"OnTimer": {"Spawner.DecayMe"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecialAggressive": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"Spawner.DecayMe"},
+		},
 	}
 }

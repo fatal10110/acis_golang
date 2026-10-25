@@ -185,6 +185,12 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchantLabClan1.WarriorCastingEnchantLabClan2.WarriorPhysicalSpecialLabAggressive": warrior.PhysicalSpecialLabAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingHeal.WarriorCastingHeal":                                                           warrior.CastingHeal,
 
+	// The sleeping healer and the corpse zombies.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingHeal.WarriorCastingHealSleep":             warrior.CastingHealSleep,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombie":                warrior.CorpseZombie,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagic":         warrior.CorpseZombieDDMagic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecial": warrior.CorpseZombiePhysicalSpecial,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                                 monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                   monsterbehavior.WizardBehavior,
