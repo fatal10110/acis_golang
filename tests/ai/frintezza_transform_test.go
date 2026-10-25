@@ -408,9 +408,12 @@ func TestFrintezzaTransformDiesOnCamera(t *testing.T) {
 // the score (99 of 100), passes the no-charge case (2000 of 10000) and
 // draws its band's odds in turn: above 75% the anti-gravity on 999 of
 // 1000; between 50% and 75% the magic circle 5018 level 2 on 499 of 500
-// past the dash (1000) and the anti-gravity (750); between 10% and 25%
-// the vampiric touch on 999 of 1000 past the dash, the anti-gravity and
-// the magic circle (1000 each). A hit by 5008 level 2 starts the dash
+// past the dash (1000) and the anti-gravity (750); between 25% and 50% the
+// magic circle on 999 of 1000 past the same; between 10% and 25% the
+// vampiric touch on 999 of 1000 past the dash, the anti-gravity and the
+// magic circle (1000 each); at 10% or less the swing 5014 level 1 once the
+// dash (1000), the anti-gravity and the magic circle (500 each) and the
+// vampiric touch (0) all miss. A hit by 5008 level 2 starts the dash
 // chain: the first dash (5015 level 3) wanted at the attacker, checked,
 // then the chain's second unchecked, at i_ai2 3.
 func TestFrintezzaTransformFights(t *testing.T) {
@@ -449,8 +452,14 @@ func TestFrintezzaTransformFights(t *testing.T) {
 	}
 	choose(fmt.Sprintf("5018-2>%d=10000", me), 99, 2000, 1000, 750, 499)
 
+	w.hitTo(t, f, 0.4)
+	choose(fmt.Sprintf("5018-2>%d=10000", me), 99, 2000, 1000, 750, 999)
+
 	w.hitTo(t, f, 0.2)
 	choose(fmt.Sprintf("5019-1>%d=10000", me), 99, 2000, 1000, 1000, 1000, 999)
+
+	w.hitTo(t, f, 0.05)
+	choose(fmt.Sprintf("5014-1>%d=10000", me), 99, 2000, 1000, 500, 500, 0)
 
 	w.onQueue(t, f, func() { f.AI().Desires().Clear() })
 	w.scoreMe(t, f, 5000)
@@ -587,5 +596,64 @@ func TestFrintezzaTransformLooksAroundWithNothingToDo(t *testing.T) {
 	}
 	if c := n.Slot(npc.CreatureQuest2); c == nil || c.ObjectID() != w.player.ObjectID() {
 		t.Fatalf("second slot = %v, want the character", c)
+	}
+}
+
+// TestFrintezzaTransformEndsTheDashChain runs the skill-finished hook on a
+// transform restored at stage 7, past its own start, with the character
+// its only scored creature (5000) and the dash chain at its last step
+// (i_ai2 3). The end of its dash at every creature (5015 level 6) ends the
+// chain at i_ai2 0 before the attack choice, which then draws its full-HP
+// odds: its next cast is the anti-gravity (999 of 1000). The end of any
+// other cast keeps the chain, so the attack choice takes its last step:
+// its next cast is the dash at every creature on the character, at i_ai2
+// 0. The end of that next cast draws 99 of 10000, the no-charge case, and
+// casts nothing more.
+func TestFrintezzaTransformEndsTheDashChain(t *testing.T) {
+	t.Parallel()
+	for _, row := range []struct {
+		name  string
+		cast  modelskill.Ref
+		draws []int
+		next  string
+	}{
+		{"dash at every creature", modelskill.Ref{ID: 5015, Level: 6}, []int{99, 2000, 1000, 999}, "5016-1"},
+		{"swing", modelskill.Ref{ID: 5014, Level: 1}, []int{99}, "5015-6"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			w := bootTransform(t, trLiveRow(7, 1<<20), "GrandBoss", raidBoot{})
+			f := w.transform(t)
+			n := script.NPCOf(f)
+			me := w.player.ObjectID()
+			w.draws.set(99)
+			w.srv.Advance(t, 20*time.Second)
+			w.scoreMe(t, f, 5000)
+			target := w.me(t)
+			w.onQueue(t, f, func() {
+				f.AI().Desires().Clear()
+				n.SetInt(script.SlotIntAI2, 3)
+				n.AddCastDesireUnchecked(target, row.cast, 10000)
+			})
+			w.draws.set(99, row.draws...)
+			var frames [][]byte
+			w.srv.AdvanceUntil(t, "the two casts", func() bool {
+				frames = append(frames, w.ticks(t, 1)...)
+				frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+				return len(frCasts(frames, f)) >= 2 && !f.CastingNow()
+			})
+			for range 5 {
+				frames = append(frames, w.ticks(t, 1)...)
+			}
+			w.srv.Advance(t, 3*time.Second)
+			frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+			want := []string{fmt.Sprintf("%d-%d>%d", row.cast.ID, row.cast.Level, me), fmt.Sprintf("%s>%d", row.next, me)}
+			if got := frCasts(frames, f); !slices.Equal(got, want) {
+				t.Fatalf("casts = %q, want %q", got, want)
+			}
+			if got := n.Int(script.SlotIntAI2); got != 0 {
+				t.Fatalf("i_ai2 after the casts = %d, want 0", got)
+			}
+		})
 	}
 }
