@@ -233,6 +233,7 @@ type options struct {
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
 	wantChars              int
+	objectIDStart          int32
 	enchantRoll            func() float64
 	recipes                *recipe.Table
 	hennas                 *henna.Table
@@ -801,6 +802,11 @@ func WithSummonItems(items *item.SummonItemTable) Option {
 // WithWantChars asserts how many characters CharSelectInfo reports after the
 // handshake.
 func WithWantChars(n int) Option { return func(o *options) { o.wantChars = n } }
+
+// WithObjectIDsAfter makes the object id sequence hand out the ids after
+// start (default: after 100), so a suite can keep its objects' ids out of
+// the range of the small numbers a page or packet carries.
+func WithObjectIDsAfter(start int32) Option { return func(o *options) { o.objectIDStart = start } }
 
 // WithEnchantConfig sets the players.properties scroll-of-enchant rates and
 // limits; without it the shipped defaults apply.
@@ -1675,7 +1681,7 @@ func (s *Server) Shutdown(tb testing.TB) {
 	tb.Helper()
 	s.Drain(tb)
 	s.Stop()
-	// Boot's own t.Cleanup(taskEffects.Reset) only fires at the end of the
+	// Boot's own taskEffects.Reset cleanup only fires at the end of the
 	// whole test function, not between two Boot calls a restart test makes
 	// within one function — reset explicitly here too, so the second
 	// Boot's Effects.Tick doesn't also carry this server's leftovers.
@@ -1746,7 +1752,7 @@ func (s *Server) HoldPersistenceLane(tb testing.TB, ownerID int32) (release func
 			close(held)
 		})
 	}
-	tb.Cleanup(release)
+	cleanup(tb, release)
 	return release
 }
 
@@ -2005,7 +2011,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
-	t.Cleanup(func() { loginLink.Close() })
+	cleanup(t, func() { loginLink.Close() })
 
 	state := world.New()
 	taskEffects := task.NewEffects()
@@ -2016,7 +2022,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// registered without a clean teardown (an NPC or EffectPoint the test
 	// never decayed or despawned), so the next Boot in this process starts
 	// from an empty registry instead of also ticking this test's leftovers.
-	t.Cleanup(taskEffects.Reset)
+	cleanup(t, taskEffects.Reset)
 	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
@@ -2039,7 +2045,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if itemTemplates == nil {
 		itemTemplates = ItemTemplates()
 	}
-	ids := newSequentialIDs(100)
+	idStart := o.objectIDStart
+	if idStart == 0 {
+		idStart = 100
+	}
+	ids := newSequentialIDs(idStart)
 	ids.reserveStored(t, db)
 	var worldObjects *gamemanager.WorldObjects
 	var doors *doorHarness
@@ -2069,7 +2079,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Known-skill writes run on the worker in production too, so suites see
 	// the same ordering (FlushPersistence waits for them).
 	o.skills.SetPersistWorker(persistWorker, o.log)
-	t.Cleanup(func() {
+	cleanup(t, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 		defer cancel()
 		if err := persistWorker.Close(ctx); err != nil {
@@ -2119,9 +2129,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	sevenSigns.SetFestival(fest)
 	fest.Start()
-	t.Cleanup(fest.Stop)
+	cleanup(t, fest.Stop)
 	sevenSigns.Start()
-	t.Cleanup(sevenSigns.Stop)
+	cleanup(t, sevenSigns.Stop)
 
 	// Restore the ground items the previous session saved at shutdown,
 	// mirroring the production boot: hydrate into world state, then clear
@@ -2428,7 +2438,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			ai.Start,
 			task.NewNPCRegen(state).Start,
 		} {
-			t.Cleanup(start(o.log).StopAndWait)
+			cleanup(t, start(o.log).StopAndWait)
 		}
 	}
 
@@ -2449,7 +2459,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			handlersDone.Wait()
 		}
 	}
-	t.Cleanup(func() {
+	cleanup(t, func() {
 		cancel()
 		ln.Close()
 		waitHandlers()
@@ -2537,15 +2547,16 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore clan hall functions: %v", err)
 	}
 	hallFees := queues.NewQueue("clanhall-functions")
-	t.Cleanup(hallFees.Close)
+	cleanup(t, hallFees.Close)
 	hallFunctions.Start(hallFees, gcl)
 	if err := halls.Restore(context.Background()); err != nil {
 		t.Fatalf("restore clan halls: %v", err)
 	}
 	restoreHallSieges(t, db, halls)
 	hallQueue := queues.NewQueue("clanhalls")
-	t.Cleanup(hallQueue.Close)
+	cleanup(t, hallQueue.Close)
 	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl), network.ClanHallGrounds(gcl))
+	quests.registry.BindHallSieges()
 	startHallSieges(t, o, halls, gcl)
 	restoreCastles(t, db, gclConfig.Castles, worldObjects)
 	castleManorClock := startCastleManor(t, gclConfig.CastleManor, o, gcl)
@@ -2553,7 +2564,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
 	clanDissolutions := queues.NewQueue("clan-dissolution")
-	t.Cleanup(clanDissolutions.Close)
+	cleanup(t, clanDissolutions.Close)
 	gclConfig.Clans.StartDissolutions(clanDissolutions, gcl)
 	if o.seedBoard != nil {
 		ids.seed(t, db, func() { o.seedBoard(db) })
@@ -2574,7 +2585,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore heroes: %v", err)
 	}
 	heroes.Start(gcl)
-	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
+	cleanup(t, func() { olympiadState.Stop(context.Background()) })
 	o.lottery.start(t, db, ids, lotteryState)
 	o.fishChamp.start(t, db, ids, fishChampState)
 	if o.seedBoss != nil {
@@ -2718,7 +2729,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 func (s *Server) ObserveSends(tb testing.TB, fn func(payload []byte)) {
 	tb.Helper()
 	s.sendObserver.Store(&fn)
-	tb.Cleanup(func() { s.sendObserver.Store(nil) })
+	cleanup(tb, func() { s.sendObserver.Store(nil) })
 }
 
 // sharedRSAKeys is the GS-LS link key pool every Boot in the process shares.
@@ -2761,7 +2772,7 @@ func startLoginServerAcceptor(t *testing.T, accounts *loginsql.AccountStore) (ad
 		t.Fatalf("listen: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	cleanup(t, cancel)
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
 	go func() { _ = gsLink.Serve(ctx, ln) }()
 

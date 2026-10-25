@@ -36,6 +36,10 @@ type Script struct {
 	// ChangedDoors are the door ids whose opening or closing reaches the
 	// door-change hook.
 	ChangedDoors []int32
+	// BindHall, set on a siegable hall's script, binds the hall's siege
+	// (Script.BindHallSiege) once the halls are restored; the boot runs it
+	// once, through Registry.BindHallSieges, before the hall sieges run.
+	BindHall func(*Script)
 	Hooks
 
 	// path is the scripts.xml path the script was registered under.

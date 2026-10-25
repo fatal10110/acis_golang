@@ -110,7 +110,7 @@ Why this shape:
 | Path → constructor | Go literal catalogs, `map[path]func() script.Script`, joined in `cmd/gameserver` |
 | Listed path with no Go script | logged at error level and skipped; completeness is a test |
 | Catalog entry not listed | never built |
-| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Three ids are claimed by a parent and its child; the child is listed later |
+| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Four ids are bound by a behavior and a later-listed one: 25512, 29062 and 29096 on every event of the earlier one, 35596 on first talk and talk. A later one with no Go script still removes the earlier ones from the bindings it claims (`catalog.Claims`, checked against the manifest) |
 | Other scripts | accumulate in list order |
 | First talk | one slot: the first registered keeps it, except that a behavior replaces an earlier behavior. It fires only when exactly one script is bound |
 | Abnormal-status hook | dispatched over the see-spell list |
@@ -312,8 +312,8 @@ A nil NPC or player means "bound to none", never a wildcard.
 ## 8. Existing stand-ins
 
 Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A template
-switches to real behavior when its script registers. The three ids claimed by a parent and a
-child switch only when the child is ported. The walker alias rule and its walk-stance list
+switches to real behavior when its script registers. An id whose every behavior binding a later-listed,
+unported behavior claims keeps its stand-ins until that behavior is ported. The walker alias rule and its walk-stance list
 also step aside for an id whose creation any script reacts to: the walker script is a plain
 script in the reference manifest (`kind script`, not a behavior), and the created hook is
 where the reference asks an NPC to walk a route (A13).
@@ -342,27 +342,31 @@ where the reference asks an NPC to walk a route (A13).
    (memos hold the `<quest>_OneTimeQuestFlag` and class-change flags).
 3. The top-level `Quest` bypass is refused with ActionFailed while the player trades or runs
    a private store. This closes a check-then-take race.
-4. A script's instant teleport of a player or a summon runs on the moved creature's own
-   queue once the calling task is done; the reference moves it inside the call. The packets
-   and the landing are the same, but code after the call (the rest of the hook, other NPCs'
-   hooks in the same broadcast) still reads the old position. Running it inline would write
-   another player's position from the caller's queue while that player's own queue moves
-   it, or wait on that queue, which deadlocks when two players' hooks swap each other
-   (WarriorBase `SwapPosition`). An NPC's instant teleport, hostile or civilian, stays inline.
-   A script's ordinary teleport of a player (`Player.TeleportTo`) from a hook on any other
-   queue runs on the player's queue the same way, for the same reason: a teleport touches
-   state only that queue owns (#3710), and packets the rest of the hook sends go out before
-   the teleport's. From a hook the engine runs on that player's own queue (its talk, quest
-   window or quest event, its item use, a timer whose home queue is the player's,
-   `Player.After`) it runs inside the call, as in the reference (#4046): the engine marks
+4. A script's teleport, instant teleport or skill call that moves or casts with a player, asked
+   from a hook on any other queue than that player's, runs on the player's own queue once the
+   calling task is done; the reference runs it inside the call. The packets and the landing are
+   the same, but packets the rest of the hook sends go out first, and code after the call (the
+   rest of the hook, other NPCs' hooks in the same broadcast) still reads the old position or
+   state. Running it inline would write another player's state from the caller's queue while
+   that player's own queue changes it, or wait on that queue, which deadlocks when two players'
+   hooks swap each other (WarriorBase `SwapPosition`): a teleport touches state only that queue
+   owns (#3710), and the skill's handlers own the caster's state, a self-target recall or
+   teleport moving the caster inside the cast (#3843).
+   From a hook the engine runs on that player's own queue, the ordinary teleport
+   (`Player.TeleportTo`, #4046), the instant teleport (`Player.InstantTeleportTo`,
+   `Script.InstantTeleportNear`) and the skill call with that player as caster
+   (`Script.CallSkill`) run inside the call, as in the reference (#4056). The engine marks
    those hooks on the character with a `sim.Turn`, which only the goroutine running the hook
-   sees held, so a handle stored in a cell or captured by a closure and used from another
-   queue still posts.
-   A script's skill call with a player caster
-   (`Script.CallSkill`) runs on the caster's queue the same way: the skill's handlers own the
-   caster's state, and a self-target recall or teleport moves the caster inside the cast
-   (#3843). The cast's packets are the same; they go out after those the rest of the hook
-   sends.
+   sees held, so a handle stored in a cell or captured by a closure and used from another queue
+   still posts. The marked hooks: the player's talk, quest window and quest event, its item
+   use, a timer whose home queue is the player's, `Player.After`, and the tutorial events the
+   player's own actions raise on its queue (its tutorial requests, its entry, its sit request,
+   the seat of its store opening, its own pickup of adena or a blue gemstone). Not marked, as
+   they run on the goroutine of the damage, kill, reward or effect (an attacker's queue, an
+   effect's tick): the death hook, and the tutorial events a death, a level-up, an HP loss or
+   the restored HP of a selection raise, a seat an effect forces, and a pickup by the player's
+   pet. A summon's instant teleport always runs on the summon's queue: no hook runs there.
+   An NPC's instant teleport, hostile or civilian, stays inline.
 5. Journal rows the server never writes load leniently. Only a hand-edited or migrated
    `character_quests` row reaches either case.
    - A row whose quest name differs from the script's name only in case joins that quest's

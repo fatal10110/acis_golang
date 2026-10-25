@@ -67,10 +67,14 @@ func (hs *Halls) decide(step func(fx *siegeEffects)) {
 }
 
 // runStep runs a step of s, serialized with every other step: the
-// script's override when it has one, else the base step.
-func (s *HallSiege) runStep(override func(SiegeScript) func(SiegeBase), base func(SiegeBase)) {
+// script's override when it has one, else the base step. A step whose due
+// reports false as its turn comes does not run.
+func (s *HallSiege) runStep(due func() bool, override func(SiegeScript) func(SiegeBase), base func(SiegeBase)) {
 	s.hs.stepMu.Lock()
 	defer s.hs.stepMu.Unlock()
+	if due != nil && !due() {
+		return
+	}
 	b := SiegeBase{s: s}
 	if sc := s.script(); sc != nil {
 		if o := override(*sc); o != nil {
@@ -83,7 +87,7 @@ func (s *HallSiege) runStep(override func(SiegeScript) func(SiegeBase), base fun
 
 // prepareStep closes the registrations, the siege starting after delay.
 func (s *HallSiege) prepareStep(delay time.Duration) {
-	s.runStep(func(sc SiegeScript) func(SiegeBase) {
+	s.runStep(nil, func(sc SiegeScript) func(SiegeBase) {
 		if sc.Prepare == nil {
 			return nil
 		}
@@ -93,12 +97,22 @@ func (s *HallSiege) prepareStep(delay time.Duration) {
 
 // startStep starts the siege.
 func (s *HallSiege) startStep() {
-	s.runStep(func(sc SiegeScript) func(SiegeBase) { return sc.Start }, SiegeBase.Start)
+	s.runStep(nil, func(sc SiegeScript) func(SiegeBase) { return sc.Start }, SiegeBase.Start)
 }
 
-// endStep ends the siege.
+// endStep ends the siege, once: an end whose turn comes with the siege no
+// longer fought, another end having run first (the armed end and a script's
+// End racing), does not run, and the win the script recorded for it is
+// dropped so that it does not decide the next siege.
 func (s *HallSiege) endStep() {
-	s.runStep(func(sc SiegeScript) func(SiegeBase) { return sc.End }, SiegeBase.End)
+	s.runStep(func() bool {
+		if s.InProgress() {
+			return true
+		}
+		s.SetMissionAccomplished(false)
+		s.hs.log.Debug().Int32("hall_id", s.h.id()).Msg("clanhall: siege end dropped, the siege is not fought")
+		return false
+	}, func(sc SiegeScript) func(SiegeBase) { return sc.End }, SiegeBase.End)
 }
 
 // setSiege runs f, a change of the sieges' state, under siegeMu. The halls'
@@ -152,7 +166,8 @@ func (s *HallSiege) Instant() bool {
 }
 
 // End ends the siege now, as its time running out does, reporting false
-// when no script runs it.
+// when no script runs it. A siege no longer fought as the end's turn comes
+// is left as it is (see endStep).
 func (s *HallSiege) End() bool {
 	if s.script() == nil {
 		return false

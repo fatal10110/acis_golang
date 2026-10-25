@@ -1,0 +1,22 @@
+# Lanosco's Special Bait (Q050), refused: a level 26 character, one short of the quest's level,
+# is turned away by Lanosco and the quest is not started. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q050_lanoscos_special_bait_low_level.golden
+character Baiter 26
+script quest.Q050_LanoscosSpecialBait
+item 7621 7610
+page fisherman/31570.htm
+page script/quest/Q050_LanoscosSpecialBait/
+npc lanosco 31570 Fisherman 10 0 0
+
+action lanosco
+action lanosco
+  S ActionFailed
+  S NpcHtmlMessage obj=lanosco item=0 page=fisherman/31570.htm
+  S ActionFailed
+bypass npc_{lanosco}_Quest
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q050_LanoscosSpecialBait/31570-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q050_LanoscosSpecialBait CREATED
+  rows Q050_LanoscosSpecialBait -

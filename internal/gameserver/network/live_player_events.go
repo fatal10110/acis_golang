@@ -232,6 +232,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(reviveRefusalMessage(e.Reason)))
 	case event.Died:
 		l.broadcastLiveDie(live)
+		l.stopLiveAttackStance(live)
 	case event.FusionCastersStopRequested:
 		l.abortFusionTargeting(live)
 	case event.DeathItemDrop:
@@ -379,8 +380,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.SkillCalled:
 		// A script calls it from any queue (an NPC hook, a dying hook):
 		// the skill's handlers own the caster's state, so the cast runs on
-		// live's own queue once the calling task is done.
-		onOwnQueue(live, false, func() { l.callSkill(live, e) })
+		// live's own queue, inside the call from a hook on that queue.
+		onOwnQueue(live, e.OwnQueue, func() { l.callSkill(live, e) })
 	case event.ScriptMessage:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, e.Text))
 	case event.QuestOverweight:
@@ -481,9 +482,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		onOwnQueue(live, e.OwnQueue, func() { l.teleportLivePlayer(live, at, radius) })
 	case event.InstantTeleportRequested:
 		// A script asks it from any queue (a swap moves two players from
-		// an NPC hook): the jump runs on live's own queue.
+		// an NPC hook): the jump runs on live's own queue, inside the call
+		// from a hook on that queue.
 		j := e.Jump
-		postLive(live, func() { l.instantTeleportLivePlayer(live, j) })
+		onOwnQueue(live, e.OwnQueue, func() { l.instantTeleportLivePlayer(live, j) })
 	case event.RecallRequested:
 		dest := e.Destination
 		onOwnQueue(live, e.OwnQueue, func() { l.recallLivePlayer(live, dest) })

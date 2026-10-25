@@ -41,6 +41,13 @@ func (c *Character) NotifyTutorial(name string) {
 	}
 }
 
+// NotifyTutorialOnQueue is NotifyTutorial for a caller running a task of
+// c's own queue: the tutorial's hook runs as a hook on that queue (see
+// RunOnOwnQueue), so what it asks of c runs inside the call.
+func (c *Character) NotifyTutorialOnQueue(name string) {
+	c.RunOnOwnQueue(func() { c.NotifyTutorial(name) })
+}
+
 // writeHPLocked is the one place c's current HP is written, except the HP
 // clear of a character restored dead (MarkDead). It marks the write for
 // lowHPNotice, which SettleRegen runs after vitalsMu is released. A writer

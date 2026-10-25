@@ -158,6 +158,15 @@ func TestSkillStateSurvivesDropBeforeEnterWorld(t *testing.T) {
 	if reply := dropped.Read(); reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
 	}
+	// The selection registers the player only after it sends CharSelected,
+	// and the departure enqueues its saves before it takes the player out of
+	// the world: wait for the selection to finish, or the out-of-world wait
+	// below could pass before the player was ever in the world, ahead of
+	// the departure and its save.
+	srv.AwaitHandled(t)
+	if _, ok := srv.State.Player(objID); !ok {
+		t.Fatal("selected character not in the world after CharSelected")
+	}
 	if err := dropped.Close(); err != nil {
 		t.Fatalf("close the selecting client: %v", err)
 	}

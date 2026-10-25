@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
@@ -173,6 +174,12 @@ func (d *draws) unused() int {
 	return max(len(d.random.Draws)-d.next, 0)
 }
 
+// objectIDsAfter is where a run's object ids start: in the server's own id
+// range, as the reference trace's do, so no small number a page shows (a
+// multisell or buy list id) is the id of a run's object, which a rendered
+// page names by its role.
+const objectIDsAfter = idfactory.FirstObjectID - 1
+
 // Run boots the scenario's server, enters the world and runs every step,
 // failing at the first expectation that does not hold.
 func Run(t *testing.T, sc *Scenario, cfg Config) {
@@ -251,6 +258,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		templates = append(templates, summonTemplate(s))
 	}
 	opts := []gameservertest.Option{
+		gameservertest.WithObjectIDsAfter(objectIDsAfter),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithHTMLPages(r.pages),
@@ -795,12 +803,7 @@ func (r *run) check(t *testing.T, ck Check) string {
 		}
 		return FirstDiff("item", got, want)
 	case "rows":
-		quest, want := ck.Args[0], slices.Clone(ck.Args[1:])
-		if len(want) == 1 && want[0] == "-" {
-			want = nil
-		}
-		slices.Sort(want)
-		return FirstDiff(quest+" row", r.rows(t, quest), want)
+		return rowsDiff(ck.Args[0], r.rows(t, ck.Args[0]), ck.Args[1:])
 	case "state":
 		quest, want := ck.Args[0], ck.Args[1]
 		got := "-"
@@ -816,12 +819,26 @@ func (r *run) check(t *testing.T, ck Check) string {
 	return ""
 }
 
+// rowsDiff compares the var=value rows of quest the database holds with
+// those a rows check lists ("-" for none), both sorted the same way here: the
+// database's collation orders talk before talk1, a byte sort of var=value
+// the other way round.
+func rowsDiff(quest string, got, want []string) string {
+	got, want = slices.Clone(got), slices.Clone(want)
+	if len(want) == 1 && want[0] == "-" {
+		want = nil
+	}
+	slices.Sort(got)
+	slices.Sort(want)
+	return FirstDiff(quest+" row", got, want)
+}
+
 // rows returns the character's character_quests rows of quest as
-// var=value, sorted.
+// var=value.
 func (r *run) rows(t *testing.T, quest string) []string {
 	t.Helper()
 	rows, err := r.srv.DB.QueryContext(context.Background(),
-		"SELECT var,value FROM character_quests WHERE charId=? AND name=? ORDER BY var", r.player, quest)
+		"SELECT var,value FROM character_quests WHERE charId=? AND name=?", r.player, quest)
 	if err != nil {
 		t.Fatal(err)
 	}

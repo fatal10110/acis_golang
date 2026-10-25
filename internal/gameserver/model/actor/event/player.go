@@ -308,10 +308,11 @@ type SummonConfirmRequested struct {
 	Timeout    time.Duration
 }
 
-// TeleportRequested reports a discontinuous relocation to (X, Y, Z) within
-// Radius. OwnQueue marks a request raised on the character's own queue,
-// which moves it inside the call; any other runs on that queue once the
-// raising task is done.
+// TeleportRequested reports a discontinuous relocation of a player or a
+// summon to (X, Y, Z) within Radius (always 0 for a summon). OwnQueue
+// marks a request raised on the character's own queue, which moves it
+// inside the call; any other runs on that queue once the raising task is
+// done.
 type TeleportRequested struct {
 	X, Y, Z, Radius int
 	OwnQueue        bool
@@ -319,7 +320,11 @@ type TeleportRequested struct {
 
 // InstantTeleportRequested reports a jump of a player or a summon to where
 // Jump lands, keeping it in its region, shown without the teleport fade.
-type InstantTeleportRequested struct{ Jump location.Jump }
+// OwnQueue is as for TeleportRequested (always false for a summon).
+type InstantTeleportRequested struct {
+	Jump     location.Jump
+	OwnQueue bool
+}
 
 // RecallRequested reports a recall skill sending the character to the
 // place Destination names, resolved for the character where it stands.

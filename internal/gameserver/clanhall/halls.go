@@ -191,12 +191,13 @@ type Halls struct {
 	grounds Grounds
 
 	// The hall sieges (siege.go). siegeCfg and siegeNotify are guarded by
-	// mu, storedAttackers and decrees by siegeMu; siegeStore is set once at
-	// boot (RestoreSieges), before the halls start.
+	// mu, storedAttackers, flagWar and decrees by siegeMu; siegeStore is
+	// set once at boot (RestoreSieges), before the halls start.
 	siegeCfg        SiegeConfig
 	siegeNotify     SiegeNotifier
 	siegeStore      SiegeStore
 	storedAttackers map[int32][]int32
+	flagWar         FlagWarRows
 	decrees         map[int32]int
 	// stepMu serializes the siege steps. siegeMu guards the sieges' state
 	// with mu (see hallSiege) and the decrees; it is a leaf lock, held

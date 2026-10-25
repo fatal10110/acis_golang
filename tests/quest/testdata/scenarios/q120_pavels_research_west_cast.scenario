@@ -10,7 +10,7 @@
 character Researcher 50
 quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
 quest Q120_PavelsResearch <cond>=19 <state>=STARTED talk=0 talk1=0
-stub quest.Q114_ResurrectionOfAnOldManager
+script quest.Q114_ResurrectionOfAnOldManager
 script quest.Q120_PavelsResearch
 item 8058 8059 8060 8290 8291 8292 854
 page default/32046.htm
@@ -58,6 +58,7 @@ bypass Quest Q120_PavelsResearch 32046-35.htm
   S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-35.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | <cond> | 20
+  rows Q120_PavelsResearch <cond>=20 <state>=STARTED talk=0 talk1=0
 
 action west
 action west
@@ -87,10 +88,12 @@ bypass Quest Q120_PavelsResearch w3_1
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-04.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk | 1
+  rows Q120_PavelsResearch <cond>=20 <state>=STARTED talk=1 talk1=0
 bypass Quest Q120_PavelsResearch w3_2
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-05.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=20 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32044-06.htm
   S QuestList 114:0x00000000 120:0x801fffff
   S ExShowQuestMark quest=120
@@ -101,6 +104,7 @@ bypass Quest Q120_PavelsResearch 32044-06.htm
   Q upsert Q120_PavelsResearch | <cond> | 21
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
+  rows Q120_PavelsResearch <cond>=21 <state>=STARTED talk=0 talk1=0
 action west
   S ActionFailed
   S NpcHtmlMessage obj=west item=0 page=default/32042.htm
@@ -119,6 +123,7 @@ bypass Quest Q120_PavelsResearch 32044-09.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-09.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk | 1
+  rows Q120_PavelsResearch <cond>=21 <state>=STARTED talk=1 talk1=0
 bypass Quest Q120_PavelsResearch 32044-08.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-08.htm
   S ActionFailed
@@ -126,6 +131,7 @@ bypass Quest Q120_PavelsResearch 32044-10.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-10.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=21 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32044-08.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-11.htm
   S ActionFailed
@@ -154,6 +160,7 @@ bypass Quest Q120_PavelsResearch 32044-17.htm
   Q upsert Q120_PavelsResearch | <cond> | 22
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
+  rows Q120_PavelsResearch <cond>=22 <state>=STARTED talk=0 talk1=0
 
 # Three AI ticks: the weather master casts at the character.
 tick x3

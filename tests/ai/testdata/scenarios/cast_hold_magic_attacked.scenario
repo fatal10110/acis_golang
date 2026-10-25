@@ -1,0 +1,18 @@
+# WarriorCastHoldMagic (21628, its shipped hold), every draw 0, 400 away from the character. A hit
+# from farther than 300, on a draw under 50, wants its hold magic (4047) on the character, weight
+# 1000000, beside the Warrior's hate, which the hit's desire selection casts. Once it held, a
+# second hit adds no hold desire: the first stays at 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagic
+npc mage 21628 Monster 400 0 0 skill HOLD_MAGIC 4047 5
+
+hit mage 22
+  S MagicSkillUse caster=mage target=player skill=4047-5 hit=6607 reuse=21142 success=0
+  desires mage attack(player)=275 cast(player,4047,move)=1000000
+hit mage 22
+  desires mage attack(player)=550 cast(player,4047,move)=1000000

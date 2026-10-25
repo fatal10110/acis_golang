@@ -51,6 +51,7 @@ var individual4 = []struct {
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialHeal", PartyPrivatePhysicalSpecialHeal},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePhysicalSpecialPowerShot", PartyPrivatePhysicalSpecialPowerShot},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivatePrimeval", PartyPrivatePrimeval},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalSpecial.PartyPrivateSpawnPrivateAggressive", PartyPrivateSpawnPrivateAggressive},
 }
 
 // TestIndividual4RegistrationMatchesReferenceManifest registers the batch
@@ -105,15 +106,15 @@ func TestIndividual4RegistrationMatchesReferenceManifest(t *testing.T) {
 	// PartyPrivateSlowType2, QueenAntPrivateRoyalGuardAnt,
 	// RoyalRushPartyPrivateBomb, RoyalRushPartyPrivateHate,
 	// PartyPrivatePhysicalSpecial (29), PartyPrivatePhysicalSpecialHeal,
-	// PartyPrivatePhysicalSpecialPowerShot (6) and PartyPrivatePrimeval
-	// (5) on 11 events; OrfenPrivateRaikelLeos,
+	// PartyPrivatePhysicalSpecialPowerShot (6), PartyPrivatePrimeval (5)
+	// and PartyPrivateSpawnPrivateAggressive (2) on 11 events; OrfenPrivateRaikelLeos,
 	// PartyPrivateHereticCastCurse, PartyPrivateCouplePhysicalSpecial,
 	// PartyPrivateCoward, PartyPrivateSplit (2),
 	// PartyPrivateCoupleFollowerBabyAggressive and
 	// PartyPrivateCoupleFollowerFemaleAggressive on 12;
 	// PartyPrivateHereticZealot (4) and PartyPrivateHereticZealot2 (5) on
 	// 13.
-	if wantFolds, got := (1+1+1+9+2+4+3+11+2+6+9+6+29+1+6+5)*11+(4+2+1+1)*12+(4+5)*13, len(want.folds); got != wantFolds {
+	if wantFolds, got := (1+1+1+9+2+4+3+11+2+6+9+6+29+1+6+5+2)*11+(4+2+1+1)*12+(4+5)*13, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 
@@ -139,7 +140,7 @@ func TestIndividual4RegistrationMatchesReferenceManifest(t *testing.T) {
 		22120, 22108, 20971, 20772, 20961, 20965, 20759, 21518, 20955, 20995, 20954, 20949, 20957, 20967, 21436, 20946,
 		20937, 20746, 20938, 20984, 20992, 20993, 21073, 21076, 21079, 21082, 21091, 21519, 20952, 22027, 22083,
 		22161, 22169, 22172, 22190, 22156, 22160, 22164, 22170, 22189, 22122, 20985, 20760, 20978, 20770, 20750, 20756,
-		22204, 22201, 22209, 22197, 22212,
+		22204, 22201, 22209, 22197, 22212, 22101, 18327,
 	} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)

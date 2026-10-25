@@ -49,7 +49,7 @@ func TestSlowKnownSkillStoreKeepsQueuesFree(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	srv.Settle(t)
-	if lines := srv.SlowTaskLogs(); len(lines) != 0 {
+	if lines := srv.SlowTaskLogs(slowStoreDelay); len(lines) != 0 {
 		t.Fatalf("queue task blocked on character_skills: %v", lines)
 	}
 	assertKnownSkills(t, srv, objID, map[int]int{3: 1})

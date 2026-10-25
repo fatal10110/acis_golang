@@ -9,9 +9,7 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 func aiIndividual8HandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
 		"script.ai.individual.ImperialGravekeeper": {
-			"OnAttacked":      {"NPC.InsideZone", "NPC.MaxHP"},
-			"OnClanAttacked":  {"NPC.MaxHP"},
-			"OnPartyAttacked": {"NPC.MaxHP"},
+			"OnAttacked": {"NPC.InsideZone"},
 		},
 	}
 }

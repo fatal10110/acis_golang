@@ -3,6 +3,7 @@ package catalog
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/banditstronghold"
 )
 
 // siegableHall is the catalog of the siegable clan hall scripts and behaviors (#3502).
@@ -12,10 +13,10 @@ func siegableHall() script.Catalog {
 		"script.ai.siegablehall.Agit01Move1.Agit01Move1":                                hall.Move1,
 		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2":                    hall.PartisanSorcerer2,
 		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1":            hall.PartisanHealer1,
-		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer2":            nil,
+		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer2":            hall.PartisanHealer2,
 		"script.ai.siegablehall.Agit01PartisanSorcerer1":                                hall.PartisanSorcerer1,
-		"script.ai.siegablehall.Agit01Stand1.Agit01Stand1":                              nil,
-		"script.ai.siegablehall.Agit01Stand1.Agit01Stand2":                              nil,
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand1":                              hall.Stand1,
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand2":                              hall.Stand2,
 		"script.ai.siegablehall.Agit02Dietrich":                                         hall.Dietrich,
 		"script.ai.siegablehall.Agit02Gustav":                                           hall.Gustav,
 		"script.ai.siegablehall.Agit02Mikhail":                                          hall.Mikhail,
@@ -33,9 +34,9 @@ func siegableHall() script.Catalog {
 		"script.ai.siegablehall.AzitWateringMimicMagical":                               hall.MimicMagical,
 		"script.ai.siegablehall.AzitWateringRecycleCan":                                 hall.RecycleCan,
 		"script.ai.siegablehall.AzitWateringTreasureBox":                                hall.TreasureBox,
-		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":                      nil,
+		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":                      hall.Nurka1,
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2":                      nil,
-		"script.siegablehall.BanditStronghold":                                          nil,
+		"script.siegablehall.BanditStronghold":                                          banditstronghold.New,
 		"script.siegablehall.DevastatedCastle":                                          nil,
 		"script.siegablehall.FortressOfResistance":                                      nil,
 		"script.siegablehall.FortressOfTheDead":                                         nil,

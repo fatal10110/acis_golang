@@ -1,15 +1,14 @@
 # Chest caught with a bait of wind (Q027): a level 27 character who completed Lanosco's Special
-# Bait (Q050, not ported yet: registered from the reference manifest so its row loads) and holds a
-# large blue treasure chest accepts at the fisherman, who opens the chest and finds a strange
-# blueprint; Shaling trades it for a black pearl ring and the quest completes; then relog. The
-# fisherman's quest link lists both his quests. Expectations replay the reference trace of this
-# scenario.
+# Bait (Q050) and holds a large blue treasure chest accepts at the fisherman, who opens the chest
+# and finds a strange blueprint; Shaling trades it for a black pearl ring and the quest completes;
+# then relog. The fisherman's quest link lists both his quests. Expectations replay the reference
+# trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q027_chest_caught_with_a_bait_of_wind.golden
 character Angler 27
 quest Q050_LanoscosSpecialBait <state>=COMPLETED
 hold 6500 1
 script quest.Q027_ChestCaughtWithABaitOfWind
-stub quest.Q050_LanoscosSpecialBait
+script quest.Q050_LanoscosSpecialBait
 item 6500 7625 880
 page fisherman/31570.htm
 page merchant/31434.htm

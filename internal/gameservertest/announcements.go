@@ -28,6 +28,6 @@ func bootAnnouncements(t *testing.T, path, file string, queue *sim.Queue, state 
 	if err := registry.Load(); err != nil {
 		t.Fatalf("gameservertest: load announcements: %v", err)
 	}
-	t.Cleanup(registry.Stop)
+	cleanup(t, registry.Stop)
 	return registry
 }

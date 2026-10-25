@@ -1,11 +1,11 @@
 # Pavel's Research (Q120), declined: a level 50 character that finished Resurrection of an Old
-# Manager (Q114, a stub here, its journal seeded) reads the stones' offer and declines; the quest
+# Manager (Q114, its journal seeded) reads the stones' offer and declines; the quest
 # was never started, so the decline's exit leaves it as it is, with no rows. Expectations replay
 # the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q120_pavels_research_declined.golden
 character Researcher 50
 quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
-stub quest.Q114_ResurrectionOfAnOldManager
+script quest.Q114_ResurrectionOfAnOldManager
 script quest.Q120_PavelsResearch
 item 8058 8059 8060 8290 8291 8292 854
 page default/32046.htm

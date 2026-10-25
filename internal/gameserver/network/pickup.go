@@ -151,7 +151,10 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 
 	taken = true
 	l.takeGroundFromWorld(live, ground)
-	live.ItemAdded(obtained)
+	// The pickup runs on live's own queue: a cursed weapon it picks up
+	// expels it from its party, and a festival then takes it out of its
+	// arena inside the call, before the party's notices.
+	live.RunOnOwnQueue(func() { live.ItemAdded(obtained) })
 	l.lockPickupParalysis(live)
 	return true
 }
@@ -195,7 +198,9 @@ func (l *GameClientLink) pickupGroundInto(inv *itemcontainer.Inventory, ground *
 func (l *GameClientLink) takeGroundFromWorld(live *livePlayer, ground *grounditem.Item) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	l.broadcastGroundPickup(ground, live.ObjectID())
-	tutorialPickedUp(live, ground.ItemID())
+	// live's own pickup runs on its queue: the tutorial hook runs as a
+	// hook on that queue.
+	live.RunOnOwnQueue(func() { tutorialPickedUp(live, ground.ItemID()) })
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	// A cursed weapon is announced by its own activation instead.

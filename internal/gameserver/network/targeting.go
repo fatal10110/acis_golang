@@ -722,7 +722,10 @@ func (l *GameClientLink) playerCanDoInteract(live *livePlayer, target interactTa
 // invalid or unclaimable target (wrong type, busy, out of range) still falls
 // back to a plain sit: the sit happens unconditionally ahead of the chair
 // check. Any rejection releases the client with
-// ActionFailed instead of silence.
+// ActionFailed instead of silence. A request made during a swing, a cast or
+// a sit-down or stand-up waits for its end as the next intention, and so
+// does a sit made during a walk to a point: the walk goes on and the sit is
+// carried out on arrival. A stand during a walk runs at once.
 func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	if live == nil {
 		return
@@ -732,7 +735,7 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if itemAICastBusy(live) {
+	if itemAICastBusy(live) || (!stand && live.currentIntentionName() == "MOVE_TO") {
 		live.deferAction(waitTypeIntention(stand), func() { l.runChangeWaitType(live, stand, target) })
 		return
 	}
@@ -748,16 +751,14 @@ func waitTypeIntention(stand bool) string {
 	return "SIT"
 }
 
+// runChangeWaitType carries out a sit or stand request. Every refusal
+// sends the player idle, dropping its intentions and stopping a walk under
+// way (StopMove), then answers ActionFailed.
 func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target world.Tracked) {
-	if live.DenyAIAction() {
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
-	// A rider neither sits nor stands: the request goes idle and is
-	// refused.
-	if live.Mounted() {
-		live.goIdle()
-		live.SendFrame(serverpackets.FrameActionFailed())
+	// A player unable to act, a rider, or one running a store or its
+	// set-up (for a sit) neither sits nor stands.
+	if live.DenyAIAction() || live.Mounted() || (!stand && live.Operating()) {
+		refuseChangeWaitType(live)
 		return
 	}
 	// A stand while lying in fake death gets up out of it instead of
@@ -772,7 +773,7 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 	if !stand {
 		// An accepted sit stops a walk or follow first, so observers see
 		// the stop ahead of the sit and the throne range is measured
-		// where the player stopped. A refused sit stops nothing.
+		// where the player stopped.
 		if live.move != nil && !live.AlikeDead() && live.Standing() {
 			live.move.Stop()
 		}
@@ -781,12 +782,21 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 			return
 		}
 	}
+	// A posture already taken, or a player lying dead or playing dead,
+	// refuses the request.
 	if !l.changeLiveWaitType(live, stand) {
-		live.SendFrame(serverpackets.FrameActionFailed())
+		refuseChangeWaitType(live)
 		return
 	}
 	// The request stays the current intention until the transition ends.
 	live.holdPosture(stand)
+}
+
+// refuseChangeWaitType refuses a sit or stand request: live goes idle, then
+// is answered ActionFailed.
+func refuseChangeWaitType(live *livePlayer) {
+	live.goIdle()
+	live.SendFrame(serverpackets.FrameActionFailed())
 }
 
 // sitLiveOnChair claims target as a throne and sits live on it, for a sit
@@ -994,6 +1004,21 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameAutoAttackStart(live.ObjectID())
+	})
+}
+
+// stopLiveAttackStance ends the attack stance of live, which just died: it
+// is out of combat at once, and when it was in stance, live and its
+// observers see the stance end right after its Die. Its summon, whose stance
+// is this one, gets no AutoAttackStop: only the stance expiry sends that, and
+// it no longer runs.
+func (l *GameClientLink) stopLiveAttackStance(live *livePlayer) {
+	live.SetInCombat(false)
+	if l.attackStance == nil || !l.attackStance.Remove(live) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStop(live.ObjectID())
 	})
 }
 

@@ -3,8 +3,9 @@ package script
 import "github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 
 // The NPC operations a raid private's behavior reads its fight by: the top
-// desire target, its hit points, the zone it stands in, and the reshuffle
-// of its attack hate. Each is a hostile NPC's; any other NPC panics.
+// desire target, the zone it stands in, and the reshuffle of its attack
+// hate, each a hostile NPC's (any other NPC panics), and its hit points,
+// which a civilian NPC has too.
 
 // TopDesireTarget returns the final target of the desire the NPC's AI last
 // took up: the creature it attacks, casts on, flees from or follows. It
@@ -39,8 +40,8 @@ const ZonePeace = zone.FlagPeace
 // InsideZone reports whether the NPC stands in a zone of kind id.
 func (n *NPC) InsideZone(id ZoneID) bool { return n.hostile("check its zone").InsideZone(id) }
 
-// HP returns the NPC's current hit points.
-func (n *NPC) HP() float64 { return n.hostile("read its hit points").HP() }
+// HP returns the current hit points of the hostile or civilian NPC.
+func (n *NPC) HP() float64 { return n.fighter("read its hit points").HP() }
 
-// MaxHP returns the NPC's maximum hit points.
-func (n *NPC) MaxHP() int32 { return int32(n.hostile("read its hit points").MaxHP()) }
+// MaxHP returns the maximum hit points of the hostile or civilian NPC.
+func (n *NPC) MaxHP() int32 { return int32(n.fighter("read its hit points").MaxHP()) }

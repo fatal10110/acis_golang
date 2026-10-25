@@ -28,10 +28,12 @@ func (SoundPlayed) event() {}
 
 // SkillCalled reports a script making the character use Skill on the
 // creature TargetID at once: the cast animation shows, and the skill's
-// effects land with no cast time, cost, reuse or target check.
+// effects land with no cast time, cost, reuse or target check. OwnQueue
+// is as for TeleportRequested.
 type SkillCalled struct {
 	TargetID int32
 	Skill    modelskill.Ref
+	OwnQueue bool
 }
 
 func (SkillCalled) event() {}

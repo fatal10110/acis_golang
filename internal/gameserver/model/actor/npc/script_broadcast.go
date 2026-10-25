@@ -78,3 +78,11 @@ func (h *Hostile) ShoutInRadius(text string, radius int) {
 func (f *Folk) ShoutInRadius(text string, radius int) {
 	f.emit(event.NpcShout{NpcID: f.Instance.Template.ID, Text: text, Radius: radius})
 }
+
+// SystemMessageInRadius sends the system message m to the players within
+// m.Radius of h.
+func (h *Hostile) SystemMessageInRadius(m event.NpcSystemMessage) { h.emit(m) }
+
+// SystemMessageInRadius sends the system message m to the players within
+// m.Radius of f.
+func (f *Folk) SystemMessageInRadius(m event.NpcSystemMessage) { f.emit(m) }

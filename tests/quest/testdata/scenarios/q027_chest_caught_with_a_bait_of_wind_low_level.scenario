@@ -5,7 +5,7 @@ trace internal/gameserver/script/testdata/oracle/scenarios/q027_chest_caught_wit
 character Angler 26
 quest Q050_LanoscosSpecialBait <state>=COMPLETED
 script quest.Q027_ChestCaughtWithABaitOfWind
-stub quest.Q050_LanoscosSpecialBait
+script quest.Q050_LanoscosSpecialBait
 item 6500 7625 880
 page fisherman/31570.htm
 page script/quest/Q027_ChestCaughtWithABaitOfWind/

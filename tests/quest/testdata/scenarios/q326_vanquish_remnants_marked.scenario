@@ -1,0 +1,28 @@
+# Vanquish Remnants (Q326), a hundred badges with the mark already held: Leopold pays 4600 adena
+# and the 4320 bonus but gives no second mark. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q326_vanquish_remnants_marked.golden
+character Remnant 21
+quest Q326_VanquishRemnants <cond>=1 <state>=STARTED
+hold 1359 100
+hold 1369 1
+script quest.Q326_VanquishRemnants
+item 1359 1360 1361 1369
+page default/30435.htm
+page script/quest/Q326_VanquishRemnants/
+npc leopold 30435 Folk 10 0 0
+
+# Leopold: the badges for adena, no second mark.
+action leopold
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S SystemMessage id=301 3:1359 6:100
+  S SystemMessage id=52 6:8920
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q326_VanquishRemnants/30435-09.htm
+  S ActionFailed
+  S ActionFailed
+  items 1359=0 1369=1 57=8920
+  rows Q326_VanquishRemnants <cond>=1 <state>=STARTED

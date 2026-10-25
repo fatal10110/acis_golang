@@ -37,7 +37,11 @@ var chain = []struct {
 	{"script.ai.siegablehall.Agit01Move1.Agit01Move1", Move1},
 	{"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2", PartisanSorcerer2},
 	{"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1", PartisanHealer1},
+	{"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer2", PartisanHealer2},
+	{"script.ai.siegablehall.Agit01Stand1.Agit01Stand1", Stand1},
+	{"script.ai.siegablehall.Agit01Stand1.Agit01Stand2", Stand2},
 	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager", func() script.Script { return GameManager(NewWateringGame()) }},
+	{"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1", Nurka1},
 }
 
 // folkIDs are the chain's civilian NPCs, as the datapack types them: the
@@ -134,7 +138,8 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // Alfred's and Giselle's on 3 each, Lidia's on 5, the yeti's on 10, the four gourds' on 2
 // each, the mimic's on 1, the magical mimic's on 2, the sweeper's on 4, the
 // treasure box's on 3, the three soldiers' on 4 each, the second sorcerer's
-// on 4 and the healer's on 1.
+// on 4, the healer's on 1, the escort healer's on 3, the three standing
+// guards' on 4 each, the escort guards' on 6 each and Nurka's on 4.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -176,13 +181,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 2+5+5+4+3+3+5+10+4*2+1+2+4+3+3*4+4+1, len(want.folds); got != wantFolds {
+	if wantFolds, got := 2+5+5+4+3+3+5+10+4*2+1+2+4+3+3*4+4+1+3+3*4+2*6+4, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{35373, 35408, 35410, 35409, 35630, 35631, 35629, 35592, 35588, 35589, 35590, 35591, 35593, 35594, 35600, 35595, 35372, 35379, 35381, 35380, 35369} {
+	for _, id := range []int32{35373, 35408, 35410, 35409, 35630, 35631, 35629, 35592, 35588, 35589, 35590, 35591, 35593, 35594, 35600, 35595, 35372, 35379, 35381, 35380, 35369, 35376, 35370, 35371, 35374, 35377, 35378, 35368} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

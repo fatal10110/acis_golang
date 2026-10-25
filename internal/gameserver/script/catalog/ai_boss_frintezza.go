@@ -1,6 +1,9 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/frintezza"
+)
 
 // aiBossFrintezza is the catalog of the Frintezza behaviors (#198).
 func aiBossFrintezza() script.Catalog {
@@ -9,7 +12,7 @@ func aiBossFrintezza() script.Catalog {
 		"script.ai.boss.frintezza.EvilateA":                     nil,
 		"script.ai.boss.frintezza.EvilateB":                     nil,
 		"script.ai.boss.frintezza.FollowerDummy":                nil,
-		"script.ai.boss.frintezza.FollowerOfFrintezza":          nil,
+		"script.ai.boss.frintezza.FollowerOfFrintezza":          frintezza.FollowerOfFrintezza,
 		"script.ai.boss.frintezza.FollowerOfFrintezzaTransform": nil,
 		"script.ai.boss.frintezza.Frintezza":                    nil,
 		"script.ai.boss.frintezza.FrintezzaSeeker":              nil,

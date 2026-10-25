@@ -1,14 +1,14 @@
 # Pavel's Research (Q120), cond 12 to 19: Pavel's research report in hand, the character goes from
 # the stones to Wendy, Doctor Chaos's bookshelf (the lockup report; the shelf's cast at the
 # character is q120_pavels_research_shelf_cast) and Yumi, who gives and takes the key of enigma;
-# the east weather master's riddles end at cond 19. Q114 is a completed stub, so the stones, Wendy and Yumi go through the
+# the east weather master's riddles end at cond 19. Q114 is completed, so the stones, Wendy and Yumi go through the
 # quest chooser. Expectations replay the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q120_pavels_research_east.golden
 character Researcher 50
 quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
 quest Q120_PavelsResearch <cond>=12 <state>=STARTED
 hold 8059 1
-stub quest.Q114_ResurrectionOfAnOldManager
+script quest.Q114_ResurrectionOfAnOldManager
 script quest.Q120_PavelsResearch
 item 8058 8059 8060 8290 8291 8292 854
 page default/32046.htm
@@ -200,6 +200,7 @@ bypass Quest Q120_PavelsResearch w2_2
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-05.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=17 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32043-06.htm
   S QuestList 114:0x00000000 120:0x8003ffff
   S ExShowQuestMark quest=120
@@ -209,6 +210,7 @@ bypass Quest Q120_PavelsResearch 32043-06.htm
   Q upsert Q120_PavelsResearch | <cond> | 18
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
+  rows Q120_PavelsResearch <cond>=18 <state>=STARTED talk=0 talk1=0
 bypass Quest Q120_PavelsResearch 32043-11.htm
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-11.htm
   S ActionFailed
@@ -235,6 +237,7 @@ bypass Quest Q120_PavelsResearch 32043-20.htm
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-20.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk | 1
+  rows Q120_PavelsResearch <cond>=18 <state>=STARTED talk=1 talk1=0
 bypass Quest Q120_PavelsResearch 32043-15.htm
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-15.htm
   S ActionFailed

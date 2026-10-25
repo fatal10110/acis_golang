@@ -1,0 +1,159 @@
+# Resurrection of an Old Manager (Q114), cond 4 to 12 on the second story (choice 2): Yumi ends
+# it (cond 6), Wendy sends the character after her guardian (cond 10) and wakes it far away,
+# one at a time: a second call sees it, and once it leaves after 300 s she wakes another.
+# Killing a guardian (the npc line's) at cond 10 moves the quest to cond 11, and Wendy then
+# moves it to cond 12. A woken guardian's line and its attack are not seen from here; the Boot
+# test tests/quest/q114_golem_test.go covers them. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager_golem.golden
+character Manager 49
+quest Q114_ResurrectionOfAnOldManager <cond>=4 <state>=STARTED choice=2 talk=2
+script quest.Q114_ResurrectionOfAnOldManager
+item 57 8090 8091 8287 8288 8289
+page default/32041.htm
+page default/32047.htm
+page script/quest/Q114_ResurrectionOfAnOldManager/
+npc yumi 32041 Folk 10 0 0
+npc wendy 32047 Folk 20 0 0
+npc golem 27318 Monster 0 30 0
+
+# Yumi ends the second story.
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-18.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-19.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-19.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-20.htm
+  S QuestList 114:0x8000002f
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-20.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2147483601
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 6
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 0
+  rows Q114_ResurrectionOfAnOldManager <cond>=6 <flags>=-2147483601 <state>=STARTED choice=2 talk=0
+
+# Wendy sends the character after her guardian.
+action wendy
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-10a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-11a.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-11a.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-12a.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-12a.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-13a.htm
+  S QuestList 114:0x8000022f
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-13a.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2147483089
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 10
+  rows Q114_ResurrectionOfAnOldManager <cond>=10 <flags>=-2147483089 <state>=STARTED choice=2 talk=0
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-15a.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-15a.htm
+  S ActionFailed
+
+# A second call sees the guardian awake.
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-14a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-15a.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-19a.htm
+  S ActionFailed
+
+# The guardian leaves after 300 s; Wendy wakes another.
+advance 301s
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-14a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-15a.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-15a.htm
+  S ActionFailed
+
+# A guardian killed at cond 10 moves the quest on.
+kill golem
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 114:0x8000062f
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=golem type=0 npc=1027318 text="This enemy is far too powerful for me to fight. I must withdraw."
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2147482065
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 11
+  rows Q114_ResurrectionOfAnOldManager <cond>=11 <flags>=-2147482065 <state>=STARTED choice=2 talk=0
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-16a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-17a.htm
+  S QuestList 114:0x80000e2f
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-17a.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2147480017
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 12
+  rows Q114_ResurrectionOfAnOldManager <cond>=12 <flags>=-2147480017 <state>=STARTED choice=2 talk=0
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-18a.htm
+  S ActionFailed
+  S ActionFailed
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-22.htm
+  S ActionFailed
+  S ActionFailed

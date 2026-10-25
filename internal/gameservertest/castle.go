@@ -85,7 +85,7 @@ func startSieges(t *testing.T, sieges *siege.Engine, queue *sim.Queue, gcl *netw
 	if err := sieges.Restore(context.Background()); err != nil {
 		t.Fatalf("restore sieges: %v", err)
 	}
-	t.Cleanup(queue.Close)
+	cleanup(t, queue.Close)
 	sieges.Start(queue, network.SiegeNotifier(gcl))
 }
 

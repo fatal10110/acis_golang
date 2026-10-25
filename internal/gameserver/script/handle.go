@@ -48,6 +48,11 @@ type Creature interface {
 	// HoldsWeapon reports whether the creature holds an item in its right
 	// hand: a player or a pet can; a servitor or an NPC never does.
 	HoldsWeapon() bool
+	// HasAtLeastOneItem reports whether the creature's inventory holds an
+	// instance of any of itemIDs: a player answers from its inventory, a
+	// pet from its own. A servitor, an NPC or a door has no inventory and
+	// panics, so the invocation aborts there.
+	HasAtLeastOneItem(itemIDs ...int32) bool
 	// combatant is the creature as the world tracks it, nil for a handle on
 	// nothing.
 	combatant() attackable.Combatant

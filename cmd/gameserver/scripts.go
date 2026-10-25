@@ -234,7 +234,7 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 		engine.Close()
 		return nil
 	}})
-	return script.Build(list, joined, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, HandleOps: handleOps(), Queue: engine}), nil
+	return script.Build(list, joined, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, HandleOps: handleOps(), Claims: catalog.Claims(), Queue: engine}), nil
 }
 
 // handleOps returns the handle operations of every catalog script: those

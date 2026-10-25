@@ -88,6 +88,8 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive":                   warrior.Aggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":                              warrior.Medusa,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproach": warrior.Cast3SkillsApproach,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsMagical":   warrior.Cast3SkillsMagical,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsCurse":     warrior.Cast3SkillsCurse,
 	"script.ai.individual.Monster.WarriorBase.WarriorBase":                                                   warrior.Base,
 	"script.ai.individual.Monster.WarriorHero":                                                               monster.WarriorHero,
 	"script.ai.individual.Guard.Guard":                                                                       guard.Guard,
@@ -116,6 +118,8 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegablehall.Agit01Move1.Agit01Move1":                                                         hall.Move1,
 	"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2":                                             hall.PartisanSorcerer2,
 	"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1":                                     hall.PartisanHealer1,
+	"script.ai.siegablehall.Agit01Stand1.Agit01Stand1":                                                       hall.Stand1,
+	"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":                                               hall.Nurka1,
 	"script.ai.siegeguards.GludioCleric":                                                                     siegeguard.Cleric,
 	"script.ai.siegeguards.GludioClericStand":                                                                siegeguard.ClericStand,
 	"script.ai.siegeguards.GludioHold.GludioBowGuard":                                                        siegeguard.BowGuard,
@@ -130,13 +134,16 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill":                                                siegeguard.WizardUseSkill,
 
 	// The Four Sepulchers bombs and room bosses, and the tyrannosaurus.
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb":                   warrior.RoyalRushBomb,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb":            warrior.RoyalRushHereticBomb,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2":           warrior.RoyalRushHereticBomb2,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic": warrior.RoyalRushRoomBossBasic,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1":     warrior.RoyalRushRoomBoss1,
-	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4":     warrior.RoyalRushRoomBoss4,
-	"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":               warrior.TyrannoPrimeval,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb":                                                         warrior.RoyalRushBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb":                                                  warrior.RoyalRushHereticBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2":                                                 warrior.RoyalRushHereticBomb2,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic":                                       warrior.RoyalRushRoomBossBasic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1":                                           warrior.RoyalRushRoomBoss1,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4":                                           warrior.RoyalRushRoomBoss4,
+	"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":                                                     warrior.TyrannoPrimeval,
+	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior":                                               warrior.PartyLeader,
+	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptain":                warrior.PartyLeaderCoupleCaptain,
+	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptainNurseAggressive": warrior.PartyLeaderCoupleCaptainNurseAggressive,
 
 	// The DD magic physical specials and the physical poisons.
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial":                warrior.CastDDMagicPhysicalSpecial,
@@ -144,6 +151,11 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoison":                  warrior.CastEnchantPhysicalPoison,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoisonAggressive":        warrior.CastEnchantPhysicalPoisonAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastDDMagicEnchantPhysicalPoisonAggressive": warrior.CastDDMagicEnchantPhysicalPoisonAggressive,
+
+	// The hold and splash casters.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagic": warrior.CastHoldMagic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplash":       warrior.CastSplash,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit":   warrior.Agit02DoomTrooperAgit,
 
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                                 monsterbehavior.MonsterBehavior,
@@ -153,8 +165,16 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill": monsterbehavior.WarriorUseSkill,
 
 	// The raid bosses.
-	"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                          raid.BossStandard,
-	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1": raid.BossType1,
+	"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                                                            raid.BossStandard,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1":                                   raid.BossType1,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossAloneSummonPrivate":                      raid.BossAloneSummonPrivate,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon":                      raid.BossForTeleportDungeon,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Sailren":                                         raid.Sailren,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.DrChaosGiganticGolem":    raid.DrChaosGiganticGolem,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.FreyaRoyalGuard":         raid.FreyaRoyalGuard,
+	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.RaidBossType1Aggressive": raid.BossType1Aggressive,
+	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty":                                                 raid.BossParty,
+	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType2":                                                 raid.BossType2,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios

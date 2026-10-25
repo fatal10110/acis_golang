@@ -71,6 +71,10 @@ func hallScripts() ([]script.Listing, script.Catalog) {
 		"script.ai.siegablehall.Agit01Move1.Agit01Move1":                     hall.Move1,
 		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2":         hall.PartisanSorcerer2,
 		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1": hall.PartisanHealer1,
+		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer2": hall.PartisanHealer2,
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand1":                   hall.Stand1,
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand2":                   hall.Stand2,
+		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":           hall.Nurka1,
 	}
 	var list []script.Listing
 	for _, path := range []string{
@@ -90,6 +94,10 @@ func hallScripts() ([]script.Listing, script.Catalog) {
 		"script.ai.siegablehall.Agit01Move1.Agit01Move1",
 		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2",
 		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1",
+		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer2",
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand1",
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand2",
+		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1",
 	} {
 		list = append(list, script.Listing{Path: path})
 	}
@@ -134,6 +142,7 @@ func hallNPCSkills() *modelskill.Table {
 	}
 	return modelskill.NewTable([]modelskill.Definition{
 		strike(hallSorcererSkill), strike(hallGustavHit), strike(hallMikhailHit), strike(hallDDMagic), strike(hallSelfRangeDD),
+		strike(hallNurkaStrike),
 		self(hallEscape, 0), self(hallReuseCurse, 75000), self(hallSelfBuff, 0), self(hallSelfRangeBuff, 0),
 	})
 }

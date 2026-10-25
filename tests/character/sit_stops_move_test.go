@@ -20,10 +20,11 @@ var sitWalkTarget = location.Location{X: 810, Y: 20, Z: 30}
 
 // TestSitRequestStopsMoveFirst pins PlayerAI.thinkSit (PlayerAI.java:465-487):
 // an accepted sit runs CreatureMove.stop (CreatureMove.java:452-463) before
-// sitDown, so a walking or following player is answered StopMove ahead of
+// sitDown, so a following player is answered StopMove ahead of
 // ChangeWaitType, on its own client and on every observer's, and is no
-// longer moving or following afterwards. A throne sit keeps its ChairSit
-// after the ChangeWaitType. A player standing still has nothing to stop.
+// longer moving or following afterwards. A player standing still has
+// nothing to stop. A sit during a walk to a point waits for the arrival
+// instead (TestSitRequestDuringWalkRunsOnArrival).
 func TestSitRequestStopsMoveFirst(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -31,13 +32,6 @@ func TestSitRequestStopsMoveFirst(t *testing.T) {
 		setup func(t *testing.T, srv *gameservertest.Server, c, observer *testsupport.ScriptedClient, observerID int32)
 		want  []byte
 	}{
-		{
-			name: "walking",
-			setup: func(t *testing.T, _ *gameservertest.Server, c, observer *testsupport.ScriptedClient, _ int32) {
-				startSitWalk(t, c, observer)
-			},
-			want: []byte{serverpackets.OpcodeStopMove, serverpackets.OpcodeChangeWaitType},
-		},
 		{
 			name: "following",
 			setup: func(t *testing.T, _ *gameservertest.Server, c, observer *testsupport.ScriptedClient, observerID int32) {
@@ -49,17 +43,6 @@ func TestSitRequestStopsMoveFirst(t *testing.T) {
 				drainQuiet(t, observer)
 			},
 			want: []byte{serverpackets.OpcodeStopMove, serverpackets.OpcodeChangeWaitType},
-		},
-		{
-			name: "walking past a selected throne",
-			setup: func(t *testing.T, srv *gameservertest.Server, c, observer *testsupport.ScriptedClient, _ int32) {
-				chair := spawnChair(t, srv, c, observer)
-				c.Send(encodeAction(chair.ObjectID(), int32(spawnOrigin.X), int32(spawnOrigin.Y), int32(spawnOrigin.Z), false))
-				mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "chair selected")
-				drainQuiet(t, c)
-				startSitWalk(t, c, observer)
-			},
-			want: []byte{serverpackets.OpcodeStopMove, serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit},
 		},
 		{
 			name: "standing still",
