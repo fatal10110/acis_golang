@@ -539,3 +539,61 @@ func TestBaiumDeathLeavesTheCube(t *testing.T) {
 		t.Fatalf("memo key 2 after the death = %d, want none (-1)", got)
 	}
 }
+
+// TestBaiumWeighsItsPartysDamage ports Baium's half of the fight's damage
+// check (phase 3), every draw 0: resumed in its lair with its archangels
+// out, a hit of 7 on an archangel adds 7 to its party's damage count; a
+// hit of 5 on Baium itself adds 5 to its own damage count and nothing to
+// its party's, nor does a hit of 4 from Baium on the archangel. Its check at 60.002 s scales the party's count 8 by 2.73 to
+// 21, finds the gap to its own 6 over 3/10 of their sum, drops its flag to
+// 0 and sets both counts back to 1.
+func TestBaiumWeighsItsPartysDamage(t *testing.T) {
+	talks := make(baiumTalks, 4)
+	w := bootBaium(t, "116033;17447;10107;0", talks)
+	w.advance(t, 5*time.Second)
+	boss := soleBaiumNPC(t, w, baiumID).(*npc.Hostile)
+	handle := script.NPCOf(boss)
+	angel := baiumNPCs(w, baiumArchangelID)[0].(*npc.Hostile)
+
+	w.hit(t, angel, 7)
+	if got := handle.Int(script.SlotIntAI1); got != 1+7 {
+		t.Fatalf("Baium's party damage count after the archangel's hit = %d, want 8", got)
+	}
+	if got := handle.Int(script.SlotIntAI0); got != 1 {
+		t.Fatalf("Baium's own damage count after the archangel's hit = %d, want 1", got)
+	}
+	w.hit(t, boss, 5)
+	if got := handle.Int(script.SlotIntAI0); got != 1+5 {
+		t.Fatalf("Baium's own damage count after its hit = %d, want 6", got)
+	}
+	if got := handle.Int(script.SlotIntAI1); got != 8 {
+		t.Fatalf("Baium's party damage count after its own hit = %d, want it kept at 8", got)
+	}
+	done := make(chan struct{})
+	if !boss.Queue().Post(func() {
+		defer close(done)
+		angel.TakeDamage(4, boss)
+	}) {
+		t.Fatal("Baium's queue is closed")
+	}
+	<-done
+	w.srv.Settle(t)
+	if got := handle.Int(script.SlotIntAI1); got != 8 {
+		t.Fatalf("Baium's party damage count after its own hit on the archangel = %d, want it kept at 8", got)
+	}
+	if got := handle.Int(script.SlotFlag); got != 1 {
+		t.Fatalf("Baium's flag before its check = %d, want 1", got)
+	}
+
+	w.advance(t, 55001*time.Millisecond)
+	if got := handle.Int(script.SlotIntAI1); got != 8 {
+		t.Fatalf("Baium's party damage count at 60.001 s = %d, want 8 before its check", got)
+	}
+	w.advance(t, time.Millisecond)
+	if got := handle.Int(script.SlotFlag); got != 0 {
+		t.Fatalf("Baium's flag after its check = %d, want 0", got)
+	}
+	if a0, a1 := handle.Int(script.SlotIntAI0), handle.Int(script.SlotIntAI1); a0 != 1 || a1 != 1 {
+		t.Fatalf("Baium's damage counts after its check = %d and %d, want both 1", a0, a1)
+	}
+}
