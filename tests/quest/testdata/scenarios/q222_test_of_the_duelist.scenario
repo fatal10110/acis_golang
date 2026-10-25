@@ -1,0 +1,329 @@
+# Test of the Duelist (Q222), a second class-change test for fighters, played by a level 39
+# Warrior who already holds eight of each trophy of the first part and one of each of the second
+# (the kills below bring each list to its count): Kaien starts it, gives the five orders and
+# pays the level 39 set's Dimensional Diamonds (72 for a Warrior, once per character); ten of
+# each of ten trophies bring cond 3, Kaien takes them for the final order; three of each of five
+# stronger trophies bring cond 5, and Kaien gives the Mark of Duelist; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q222_test_of_the_duelist.golden
+character Duelist 39
+class 1
+script quest.Q222_TestOfTheDuelist
+item 2762 2763 2764 2765 2766 2767 2768 2769 2770 2771 2772 2773 2774 2775 2776 2777 2778 2779 2780 2781 2782 2783 7562
+hold 2768 8
+hold 2769 8
+hold 2770 8
+hold 2771 8
+hold 2772 8
+hold 2773 8
+hold 2774 8
+hold 2775 8
+hold 2776 8
+hold 2777 8
+hold 2779 1
+hold 2780 1
+hold 2781 1
+hold 2782 1
+hold 2783 1
+page default/30623.htm
+page script/quest/Q222_TestOfTheDuelist/
+npc kaien 30623 Folk 10 0 0
+npc puncher 20085 Monster 40 0 0
+npc antleader 20090 Monster -40 0 0
+npc drone 20234 Monster 0 40 0
+npc seeker 20202 Monster 0 -40 0
+npc breka 20270 Monster 40 40 0
+npc fettered 20552 Monster -40 40 0
+npc leto 20582 Monster 40 -40 0
+npc eye 20564 Monster -40 -40 0
+npc tamlin 20601 Monster 60 0 0
+npc archer 20602 Monster -60 0 0
+npc excuro 20214 Monster 0 60 0
+npc krator 20217 Monster 0 -60 0
+npc grandis 20554 Monster 60 60 0
+npc timak 20588 Monster -60 60 0
+npc lakin 20604 Monster 60 -60 0
+
+# Kaien: a Warrior of level 39 may start; the first test of the set pays the diamonds.
+action kaien
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-04.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-04.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-06.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-06.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-07.htm
+  S QuestList 222:0x80000001
+  S ExShowQuestMark quest=222
+  S QuestList 222:0x80000003
+  S ExShowQuestMark quest=222
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2763
+  S SystemMessage id=54 3:2764
+  S SystemMessage id=54 3:2765
+  S SystemMessage id=54 3:2766
+  S SystemMessage id=54 3:2767
+  S SystemMessage id=53 3:7562 6:72
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-07a.htm
+  S ActionFailed
+  Q upsert Q222_TestOfTheDuelist | <state> | STARTED
+  Q upsert Q222_TestOfTheDuelist | <cond> | 1
+  Q upsert Q222_TestOfTheDuelist | <cond> | 2
+  M set secondClassChange39 | true
+  items 2763=1 2764=1 2765=1 2766=1 2767=1 7562=72
+  state Q222_TestOfTheDuelist STARTED
+  rows Q222_TestOfTheDuelist <state>=STARTED <cond>=2
+bypass Quest Q222_TestOfTheDuelist 30623-08.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-08.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-09.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-09.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-10.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-10.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-11.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-11.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-12.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-12.htm
+  S ActionFailed
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-07a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kaien's final order, a link the page he shows does not offer, does nothing before cond 3.
+bypass Quest Q222_TestOfTheDuelist 30623-16.htm
+  items 2763=1 2778=0
+
+# Two more of each of the first ten trophies; the last one brings cond 3.
+kill puncher x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2768
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2768
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill antleader x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2769
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2769
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill drone x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2770
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2770
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill seeker x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2771
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2771
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill breka x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2772
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2772
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill fettered x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2773
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2773
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill leto x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2774
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2774
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill eye x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2775
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2775
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill tamlin x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2776
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2776
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill archer x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2777
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2777
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 222:0x80000007
+  S ExShowQuestMark quest=222
+  Q upsert Q222_TestOfTheDuelist | <cond> | 3
+  items 2768=10 2769=10 2770=10 2771=10 2772=10 2773=10 2774=10 2775=10 2776=10 2777=10
+  state Q222_TestOfTheDuelist STARTED
+  rows Q222_TestOfTheDuelist <state>=STARTED <cond>=3
+
+# Kaien takes the orders and trophies for the final order.
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-13.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-15.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-15.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-16.htm
+  S QuestList 222:0x8000000f
+  S ExShowQuestMark quest=222
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2763
+  S SystemMessage id=302 3:2764
+  S SystemMessage id=302 3:2765
+  S SystemMessage id=302 3:2766
+  S SystemMessage id=302 3:2767
+  S SystemMessage id=301 3:2768 6:10
+  S SystemMessage id=301 3:2769 6:10
+  S SystemMessage id=301 3:2770 6:10
+  S SystemMessage id=301 3:2771 6:10
+  S SystemMessage id=301 3:2772 6:10
+  S SystemMessage id=301 3:2773 6:10
+  S SystemMessage id=301 3:2774 6:10
+  S SystemMessage id=301 3:2775 6:10
+  S SystemMessage id=301 3:2776 6:10
+  S SystemMessage id=301 3:2777 6:10
+  S SystemMessage id=54 3:2778
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-16.htm
+  S ActionFailed
+  Q upsert Q222_TestOfTheDuelist | <cond> | 4
+  items 2763=0 2764=0 2765=0 2766=0 2767=0 2768=0 2769=0 2770=0 2771=0 2772=0 2773=0 2774=0 2775=0 2776=0 2777=0 2778=1
+  state Q222_TestOfTheDuelist STARTED
+  rows Q222_TestOfTheDuelist <state>=STARTED <cond>=4
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-17.htm
+  S ActionFailed
+  S ActionFailed
+
+# A monster of the first part drops nothing at cond 4.
+kill puncher
+  S SystemMessage id=95 1:0 1:0
+  items 2768=0
+
+# Two more of each of the five stronger trophies; the last one brings cond 5.
+kill excuro x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2779
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2779
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill krator x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2780
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2780
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill grandis x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2781
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2781
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill timak x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2782
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2782
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill lakin x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2783
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2783
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 222:0x8000001f
+  S ExShowQuestMark quest=222
+  Q upsert Q222_TestOfTheDuelist | <cond> | 5
+  items 2779=3 2780=3 2781=3 2782=3 2783=3
+  state Q222_TestOfTheDuelist STARTED
+  rows Q222_TestOfTheDuelist <state>=STARTED <cond>=5
+
+# Kaien takes the final order and the trophies and gives the Mark of Duelist.
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S SystemMessage id=302 3:2778
+  S SystemMessage id=301 3:2779 6:3
+  S SystemMessage id=301 3:2780 6:3
+  S SystemMessage id=301 3:2781 6:3
+  S SystemMessage id=301 3:2782 6:3
+  S SystemMessage id=301 3:2783 6:3
+  S SystemMessage id=54 3:2762
+  S SystemMessage id=95 1:47015 1:20000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 222:0x00000000
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-18.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q222_TestOfTheDuelist | <state> | COMPLETED
+  Q delete-except-state Q222_TestOfTheDuelist
+  items 2778=0 2779=0 2780=0 2781=0 2782=0 2783=0 2762=1
+  state Q222_TestOfTheDuelist COMPLETED
+  rows Q222_TestOfTheDuelist <state>=COMPLETED
+relog
+  state Q222_TestOfTheDuelist COMPLETED
+  rows Q222_TestOfTheDuelist <state>=COMPLETED
+  items 2762=1 2778=0 7562=72
+action kaien
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S NpcHtmlMessage obj=kaien item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

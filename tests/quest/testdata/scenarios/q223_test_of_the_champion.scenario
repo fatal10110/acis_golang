@@ -1,0 +1,511 @@
+# Test of the Champion (Q223), a second class-change test for warriors, played by a level 39
+# Warrior who already holds most of each trophy count (the kills below bring each to its count),
+# every script roll pinned to 1 (no harpy or road scavenger calls its kin, every drop lands):
+# Ascalon starts it and pays the level 39 set's Dimensional Diamonds (72 for a Warrior); Mason
+# wants a hundred Bloody Axe heads for his letter; Groot wants thirty harpy eggs, medusa venoms
+# and windsus biles for his letter; Mouen wants a hundred road ratman heads, then a hundred Leto
+# lizardman fangs, for his letter; Ascalon gives the Mark of Champion; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q223_test_of_the_champion.golden
+character Champion 39
+class 1
+random always 1
+hold 3290 97
+hold 3287 27
+hold 3288 28
+hold 3289 28
+hold 3291 97
+hold 3292 94
+script quest.Q223_TestOfTheChampion
+item 3276 3277 3278 3279 3280 3281 3282 3283 3284 3285 3286 3287 3288 3289 3290 3291 3292 7562
+page default/30624.htm
+page default/30625.htm
+page merchant/30093.htm
+page guard/30196.htm
+page script/quest/Q223_TestOfTheChampion/
+npc ascalon 30624 Folk 10 0 0
+npc mason 30625 Folk -10 0 0
+npc groot 30093 Merchant 0 10 0
+npc mouen 30196 Guard 0 -10 0
+npc axe 20780 Monster 40 0 0
+npc harpy 20145 Monster -40 0 0
+npc matriarch 27088 Monster 0 40 0
+npc medusa 20158 Monster 0 -40 0
+npc windsus 20553 Monster 40 40 0
+npc scavenger 20551 Monster -40 40 0
+npc collector 27089 Monster 40 -40 0
+npc lizardman 20577 Monster -40 -40 0
+npc lizarcher 20578 Monster 60 0 0
+npc lizsoldier 20579 Monster -60 0 0
+npc lizwarrior 20580 Monster 0 60 0
+npc lizshaman 20581 Monster 0 -60 0
+npc lizoverlord 20582 Monster 60 60 0
+
+# Ascalon: a Warrior of level 39 may start; the first test of the set pays the diamonds.
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-05.htm
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-05.htm
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-06.htm
+  S QuestList 223:0x80000001
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3277
+  S SystemMessage id=53 3:7562 6:72
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-06a.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <state> | STARTED
+  Q upsert Q223_TestOfTheChampion | <cond> | 1
+  M set secondClassChange39 | true
+  items 3277=1 7562=72
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=1
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mason takes Ascalon's letter and gives the Iron Rose ring.
+action mason
+action mason
+  S ActionFailed
+  S NpcHtmlMessage obj=mason item=0 page=default/30625.htm
+  S ActionFailed
+bypass npc_{mason}_Quest
+  S NpcHtmlMessage obj=mason item=0 page=script/quest/Q223_TestOfTheChampion/30625-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30625-02.htm
+  S NpcHtmlMessage obj=mason item=0 page=script/quest/Q223_TestOfTheChampion/30625-02.htm
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30625-03.htm
+  S QuestList 223:0x80000003
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3277
+  S SystemMessage id=54 3:3279
+  S NpcHtmlMessage obj=mason item=0 page=script/quest/Q223_TestOfTheChampion/30625-03.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 2
+  items 3277=0 3279=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=2
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-08.htm
+  S ActionFailed
+  S ActionFailed
+action mason
+action mason
+  S ActionFailed
+  S NpcHtmlMessage obj=mason item=0 page=default/30625.htm
+  S ActionFailed
+bypass npc_{mason}_Quest
+  S NpcHtmlMessage obj=mason item=0 page=script/quest/Q223_TestOfTheChampion/30625-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# The last three Bloody Axe heads bring cond 3; Mason takes them for his letter.
+kill axe x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3290
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3290
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3290
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 223:0x80000007
+  S ExShowQuestMark quest=223
+  Q upsert Q223_TestOfTheChampion | <cond> | 3
+  items 3290=100
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=3
+action mason
+  S ActionFailed
+  S NpcHtmlMessage obj=mason item=0 page=default/30625.htm
+  S ActionFailed
+action mason
+  S ActionFailed
+  S NpcHtmlMessage obj=mason item=0 page=default/30625.htm
+  S ActionFailed
+bypass npc_{mason}_Quest
+  S QuestList 223:0x8000000f
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3290 6:100
+  S SystemMessage id=302 3:3279
+  S SystemMessage id=54 3:3278
+  S NpcHtmlMessage obj=mason item=0 page=script/quest/Q223_TestOfTheChampion/30625-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 4
+  items 3290=0 3279=0 3278=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=4
+action mason
+  S ActionFailed
+  S NpcHtmlMessage obj=mason item=0 page=default/30625.htm
+  S ActionFailed
+bypass npc_{mason}_Quest
+  S NpcHtmlMessage obj=mason item=0 page=script/quest/Q223_TestOfTheChampion/30625-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ascalon takes Mason's letter and sends the traveller to Groot.
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-10.htm
+  S QuestList 223:0x8000001f
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3278
+  S SystemMessage id=54 3:3280
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-10.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 5
+  items 3278=0 3280=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=5
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-11.htm
+  S ActionFailed
+  S ActionFailed
+
+action groot
+action groot
+  S ActionFailed
+  S NpcHtmlMessage obj=groot item=0 page=merchant/30093.htm
+  S ActionFailed
+bypass npc_{groot}_Quest
+  S NpcHtmlMessage obj=groot item=0 page=script/quest/Q223_TestOfTheChampion/30093-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30093-02.htm
+  S QuestList 223:0x8000003f
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3280
+  S SystemMessage id=54 3:3281
+  S NpcHtmlMessage obj=groot item=0 page=script/quest/Q223_TestOfTheChampion/30093-02.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 6
+  items 3280=0 3281=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=6
+action groot
+  S ActionFailed
+  S NpcHtmlMessage obj=groot item=0 page=merchant/30093.htm
+  S ActionFailed
+bypass npc_{groot}_Quest
+  S NpcHtmlMessage obj=groot item=0 page=script/quest/Q223_TestOfTheChampion/30093-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Harpy eggs (a harpy matriarch drops them too), medusa venom and windsus bile; the last bile
+# brings cond 7.
+kill harpy x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3287
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3287
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill matriarch
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3287
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill medusa x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3288
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3288
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill windsus x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3289
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3289
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 223:0x8000007f
+  S ExShowQuestMark quest=223
+  Q upsert Q223_TestOfTheChampion | <cond> | 7
+  items 3287=30 3288=30 3289=30
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=7
+
+# Groot takes them for his letter; Ascalon takes it and sends the traveller to Mouen.
+action groot
+  S ActionFailed
+  S NpcHtmlMessage obj=groot item=0 page=merchant/30093.htm
+  S ActionFailed
+action groot
+  S ActionFailed
+  S NpcHtmlMessage obj=groot item=0 page=merchant/30093.htm
+  S ActionFailed
+bypass npc_{groot}_Quest
+  S QuestList 223:0x800000ff
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3281
+  S SystemMessage id=301 3:3287 6:30
+  S SystemMessage id=301 3:3288 6:30
+  S SystemMessage id=301 3:3289 6:30
+  S SystemMessage id=54 3:3282
+  S NpcHtmlMessage obj=groot item=0 page=script/quest/Q223_TestOfTheChampion/30093-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 8
+  items 3281=0 3287=0 3288=0 3289=0 3282=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=8
+action groot
+  S ActionFailed
+  S NpcHtmlMessage obj=groot item=0 page=merchant/30093.htm
+  S ActionFailed
+bypass npc_{groot}_Quest
+  S NpcHtmlMessage obj=groot item=0 page=script/quest/Q223_TestOfTheChampion/30093-05.htm
+  S ActionFailed
+  S ActionFailed
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-13.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-14.htm
+  S QuestList 223:0x800001ff
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3282
+  S SystemMessage id=54 3:3283
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-14.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 9
+  items 3282=0 3283=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=9
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-15.htm
+  S ActionFailed
+  S ActionFailed
+
+action mouen
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+bypass npc_{mouen}_Quest
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30196-02.htm
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-02.htm
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30196-03.htm
+  S QuestList 223:0x800003ff
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3283
+  S SystemMessage id=54 3:3284
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-03.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 10
+  items 3283=0 3284=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=10
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+bypass npc_{mouen}_Quest
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Road ratman heads, from road scavengers and road collectors; the hundredth brings cond 11.
+kill scavenger x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3291
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3291
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill collector
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3291
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 223:0x800007ff
+  S ExShowQuestMark quest=223
+  Q upsert Q223_TestOfTheChampion | <cond> | 11
+  items 3291=100
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=11
+
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+bypass npc_{mouen}_Quest
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30196-06.htm
+  S QuestList 223:0x80000fff
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3284
+  S SystemMessage id=302 3:3291
+  S SystemMessage id=54 3:3285
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-06.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 12
+  items 3284=0 3291=99 3285=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=12
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+bypass npc_{mouen}_Quest
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Leto lizardman fangs, one from each kind; the hundredth brings cond 13.
+kill lizardman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill lizarcher
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill lizsoldier
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill lizwarrior
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill lizshaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill lizoverlord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 223:0x80001fff
+  S ExShowQuestMark quest=223
+  Q upsert Q223_TestOfTheChampion | <cond> | 13
+  items 3292=100
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=13
+
+# Mouen takes the fangs and his order for his letter; Ascalon gives the Mark of Champion.
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+bypass npc_{mouen}_Quest
+  S QuestList 223:0x80003fff
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3292 6:100
+  S SystemMessage id=302 3:3285
+  S SystemMessage id=54 3:3286
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <cond> | 14
+  items 3292=0 3285=0 3286=1
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=14
+action mouen
+  S ActionFailed
+  S NpcHtmlMessage obj=mouen item=0 page=guard/30196.htm
+  S ActionFailed
+bypass npc_{mouen}_Quest
+  S NpcHtmlMessage obj=mouen item=0 page=script/quest/Q223_TestOfTheChampion/30196-09.htm
+  S ActionFailed
+  S ActionFailed
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S SystemMessage id=302 3:3286
+  S SystemMessage id=54 3:3276
+  S SystemMessage id=95 1:117454 1:25000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 223:0x00000000
+  S SystemMessage id=301 3:3291 6:99
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-17.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <state> | COMPLETED
+  Q delete-except-state Q223_TestOfTheChampion
+  items 3286=0 3291=0 3276=1
+  state Q223_TestOfTheChampion COMPLETED
+  rows Q223_TestOfTheChampion <state>=COMPLETED
+relog
+  state Q223_TestOfTheChampion COMPLETED
+  rows Q223_TestOfTheChampion <state>=COMPLETED
+  items 3276=1 3286=0 7562=72
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
