@@ -3,9 +3,11 @@
 # magic (RANGE_DD_MAGIC_A, 4077) on the character at 1000000. RaidBossStandard's see-spell
 # hook then finds no top desire target. The party hooks of RaidBossParty and RaidBossType2
 # (privates, the hit rules, the jump, the peace zone and the respawns) are in
-# tests/ai/raid_boss5_test.go: the format places no template privates.
+# tests/ai/raid_boss5_test.go: the format places no template privates. The character's
+# combat draws are pinned so the debuff lands.
 character Hunter 1
 skill 4694 1
+roll player 0
 random always 0
 script script.ai.individual.DefaultNpc
 script script.ai.individual.Monster.MonsterAI

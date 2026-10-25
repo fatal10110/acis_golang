@@ -8,9 +8,12 @@
 # its attack desire on the monster down meanwhile. (The fixture monster
 # does not outlive a ten-second cast of a good skill beside the knight's blows:
 # tests/ai/siege_guard_test.go covers the good skill seen on what the knight fights, and
-# its jump onto the caster past 10 failed paths.)
+# its jump onto the caster past 10 failed paths.) The knight holds its attack stance (in combat)
+# only once a blow of its own lands, and the debuff may be resisted: the knight's and the
+# character's combat draws are pinned so both land.
 character Hunter 20
 skill 4694 1
+roll player 0
 script script.ai.individual.DefaultNpc
 script script.ai.siegeguards.GludioHold.GludioCourtGuard
 script script.ai.siegeguards.GludioHold.GludioHold
@@ -18,6 +21,7 @@ script script.ai.siegeguards.GludioHold.GludioKnight
 npc knight 35235 SiegeGuard 150 0 0 walks clan aden_siege_clan 300
 npc court 35238 SiegeGuard 150 60 0 walks clan aden_siege_clan 300
 npc monster 20999 Monster 180 30 0
+roll knight 0
 
 hit knight 10 by monster
 hit court 50 by monster

@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -16,6 +17,7 @@ npc picker 35600 Folk 200 0 0 walks
 npc both 35601 Folk 0 10 0 maker isle walks
 npc wolf 20120 Monster 0 -10 0 walks maker isle
 roll vervato 0
+roll player 0
 ground potion 20 1 500 0 0
 ground zariche 8190 1 450 0 0 cursed
 
@@ -25,8 +27,8 @@ walk picker
   S DeleteObject obj=potion
 `
 
-// TestParseReadsWorldLines: the member, territory, roll and ground lines
-// (cursed among them), an npc line's walks and maker options, on a civilian
+// TestParseReadsWorldLines: the member, territory, roll (the character's
+// among them) and ground lines (cursed among them), an npc line's walks and maker options, on a civilian
 // as on a monster, and the look and walk steps.
 func TestParseReadsWorldLines(t *testing.T) {
 	sc, err := Parse("world.scenario", []byte(worldSample))
@@ -50,7 +52,7 @@ func TestParseReadsWorldLines(t *testing.T) {
 	if !reflect.DeepEqual(sc.NPCs, wantNPCs) {
 		t.Fatalf("npcs = %+v", sc.NPCs)
 	}
-	if len(sc.Rolls) != 1 || sc.Rolls["vervato"] != 0 {
+	if want := map[string]int{"vervato": 0, "player": 0}; !maps.Equal(sc.Rolls, want) {
 		t.Fatalf("rolls = %v", sc.Rolls)
 	}
 	want := []Ground{{Role: "potion", Item: 20, Count: 1, DX: 500}, {Role: "zariche", Item: 8190, Count: 1, DX: 450, Cursed: true}}
