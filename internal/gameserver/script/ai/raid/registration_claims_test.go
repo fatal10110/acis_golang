@@ -43,18 +43,19 @@ func TestUnportedChildKeepsItsIDOnTheStandIns(t *testing.T) {
 }
 
 // TestUnportedAndreasKeepsItsIDOnTheStandIns registers the chain with
-// RaidBossType4AndreasAggressive listed after it, not ported, and its
-// reference claim on 29062: 29062 keeps its stand-ins, and the other ids
+// RaidBossType4AndreasAggressive listed but not ported, and its reference
+// claim on 29062: 29062 keeps its stand-ins, and the other ids
 // RaidBossType4 binds run RaidBossType4.
 func TestUnportedAndreasKeepsItsIDOnTheStandIns(t *testing.T) {
 	const andreas = "script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive"
-	list := make([]script.Listing, 0, len(chain)+1)
+	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
-	for _, c := range chain {
-		list = append(list, script.Listing{Path: c.path})
-		catalog[c.path] = c.ctor
+	for i, c := range chain {
+		list[i] = script.Listing{Path: c.path}
+		if c.path != andreas {
+			catalog[c.path] = c.ctor
+		}
 	}
-	list = append(list, script.Listing{Path: andreas})
 	// The bindings RaidBossType4 has on 29062, which Andreas takes.
 	claim := script.Bindings{}
 	for _, ev := range []script.NPCEvent{script.EventAttacked, script.EventAttackFinished, script.EventCreated, script.EventPartyAttacked, script.EventPartyDied, script.EventSeeSpell} {
