@@ -47,6 +47,9 @@ func TestControllerRaidCurseGateBeforeDamage(t *testing.T) {
 	}
 }
 
+// TestControllerDualHitAndCompletionTiming pins a dual swing's schedule:
+// the attack time is halved twice, so its hits land at attackTime/4 and
+// attackTime/2 and the swing finishes at 3*attackTime/4.
 func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
 	target := &timingTarget{id: 2}
@@ -64,33 +67,91 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 		}
 	}
 
+	// attackTime 1000ms.
 	ctrl.DoAttack(target)
-	if next := clock.next(); next != 500*time.Millisecond {
-		t.Fatalf("first timer due at %v, want attackTime/2", next)
+	if next := clock.next(); next != 250*time.Millisecond {
+		t.Fatalf("first timer due at %v, want attackTime/4", next)
 	}
 
-	clock.fire(250 * time.Millisecond)
+	clock.fire(249 * time.Millisecond)
 	if target.hits != 0 {
-		t.Fatalf("hits at attackTime/4 = %d, want 0", target.hits)
+		t.Fatalf("hits before attackTime/4 = %d, want 0", target.hits)
+	}
+	clock.fire(250 * time.Millisecond)
+	if target.hits != 1 {
+		t.Fatalf("hits at attackTime/4 = %d, want 1", target.hits)
+	}
+	clock.fire(499 * time.Millisecond)
+	if target.hits != 1 {
+		t.Fatalf("hits before attackTime/2 = %d, want 1", target.hits)
 	}
 	clock.fire(500 * time.Millisecond)
-	if target.hits != 1 {
-		t.Fatalf("hits at attackTime/2 = %d, want 1", target.hits)
+	if target.hits != 2 {
+		t.Fatalf("hits at attackTime/2 = %d, want 2", target.hits)
 	}
-	clock.fire(800 * time.Millisecond)
+	if !ctrl.InHitAnimation() {
+		t.Fatal("InHitAnimation() at attackTime/2 = false, want true until the first landing + 300ms")
+	}
+	clock.fire(550 * time.Millisecond)
 	if ctrl.InHitAnimation() {
 		t.Fatal("InHitAnimation() after first dual landing + 300ms = true, want false")
 	}
-	clock.fire(time.Second)
-	if target.hits != 2 {
-		t.Fatalf("hits at attackTime = %d, want 2", target.hits)
-	}
+	clock.fire(749 * time.Millisecond)
 	if !ctrl.AttackingNow() || finished() != 0 {
-		t.Fatalf("completion before 3*attackTime/2: attacking = %v, finished = %d; want true, 0", ctrl.AttackingNow(), finished())
+		t.Fatalf("completion before 3*attackTime/4: attacking = %v, finished = %d; want true, 0", ctrl.AttackingNow(), finished())
 	}
-	clock.fire(1500 * time.Millisecond)
+	clock.fire(750 * time.Millisecond)
 	if ctrl.AttackingNow() || finished() != 1 {
-		t.Fatalf("completion at 3*attackTime/2: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished())
+		t.Fatalf("completion at 3*attackTime/4: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished())
+	}
+}
+
+// TestControllerSwingStepsRoundDownToWholeMilliseconds pins the whole
+// millisecond steps of an attack time with an odd millisecond count: each
+// halving rounds down before the landings and the finish are counted.
+func TestControllerSwingStepsRoundDownToWholeMilliseconds(t *testing.T) {
+	tests := []struct {
+		name       string
+		weapon     item.WeaponType
+		wantHits   []time.Duration
+		wantFinish time.Duration
+	}{
+		// attackTime 1243ms: one step of 621ms.
+		{"simple", item.WeaponSword, []time.Duration{621 * time.Millisecond}, 1242 * time.Millisecond},
+		// attackTime 1243ms: 621ms halved again to steps of 310ms.
+		{"dual", item.WeaponDual, []time.Duration{310 * time.Millisecond, 620 * time.Millisecond}, 930 * time.Millisecond},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// TimeBetweenAttacks(402) = 500000/402 = 1243ms.
+			actor := &timingActor{attackType: tt.weapon, attackSpeed: 402}
+			target := &timingTarget{id: 2}
+			clock := newTimingClock()
+			ctrl := NewCreature(actor, nil)
+			ctrl.SetQueue(clock.q)
+			rec := &event.Recorder{}
+			ctrl.sink = rec
+
+			ctrl.DoAttack(target)
+			for i, at := range tt.wantHits {
+				clock.fire(at - time.Millisecond)
+				if target.hits != i {
+					t.Fatalf("hits before %v = %d, want %d", at, target.hits, i)
+				}
+				clock.fire(at)
+				if target.hits != i+1 {
+					t.Fatalf("hits at %v = %d, want %d", at, target.hits, i+1)
+				}
+			}
+			clock.fire(tt.wantFinish - time.Millisecond)
+			if event.Count[event.AttackFinished](rec) != 0 {
+				t.Fatalf("swing finished before %v", tt.wantFinish)
+			}
+			clock.fire(tt.wantFinish)
+			if event.Count[event.AttackFinished](rec) != 1 {
+				t.Fatalf("swing not finished at %v", tt.wantFinish)
+			}
+		})
 	}
 }
 
@@ -1123,7 +1184,7 @@ func TestControllerSwingSpendsAndRechargesShotsOnce(t *testing.T) {
 	ctrl.SetQueue(clock.q)
 
 	ctrl.DoAttack(&timingTarget{id: 2})
-	clock.fire(500 * time.Millisecond)
+	clock.fire(250 * time.Millisecond)
 	if actor.discharges != 1 || event.Count[event.ShotsRechargeRequested](rec) != 1 {
 		t.Fatalf("after the first hit: discharges = %d, recharges = %d; want 1, 1", actor.discharges, event.Count[event.ShotsRechargeRequested](rec))
 	}
