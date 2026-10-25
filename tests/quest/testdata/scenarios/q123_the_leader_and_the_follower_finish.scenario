@@ -1,0 +1,60 @@
+# The Leader and the Follower (Q123), the finish: a level 19 character whose sponsor paid for the robe set
+# (cond 6) is sent after the Picot araneid (cond 7), and with eight legs gets the helm and the
+# robe set; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_finish.golden
+character Pupil 19
+quest Q123_TheLeaderAndTheFollower <cond>=6 <state>=STARTED state=3 stateEx=3
+hold 8550 8
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S QuestList 123:0x8000007f
+  S ExShowQuestMark quest=123
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-15.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q123_TheLeaderAndTheFollower | <cond> | 7
+  Q upsert Q123_TheLeaderAndTheFollower | state | 4
+  rows Q123_TheLeaderAndTheFollower <cond>=7 <state>=STARTED state=4 stateEx=3
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S SystemMessage id=301 3:8550 6:8
+  S SystemMessage id=54 3:7850
+  S SystemMessage id=54 3:7857
+  S SystemMessage id=54 3:7858
+  S SystemMessage id=54 3:7859
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 123:0x00000000
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-17.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q123_TheLeaderAndTheFollower | <state> | COMPLETED
+  Q delete-except-state Q123_TheLeaderAndTheFollower
+  items 8550=0 7850=1 7857=1 7858=1 7859=1 7851=0
+  rows Q123_TheLeaderAndTheFollower <state>=COMPLETED
+
+# Relog.
+relog
+  rows Q123_TheLeaderAndTheFollower <state>=COMPLETED
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

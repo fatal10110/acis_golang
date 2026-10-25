@@ -1,0 +1,59 @@
+# The Leader and the Follower (Q123), the armor choice: a level 19 character on cond 2 with ten bloods chooses
+# the light armor set (cond 4) and, with no sponsor, Newyear asks for one; a relog keeps the choice.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_blood.golden
+character Pupil 19
+quest Q123_TheLeaderAndTheFollower <cond>=2 <state>=STARTED state=1
+hold 8549 10
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q123_TheLeaderAndTheFollower 31961-05b.htm
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-05b.htm
+  S ActionFailed
+bypass Quest Q123_TheLeaderAndTheFollower 31961-05e.htm
+  S QuestList 123:0x8000000b
+  S ExShowQuestMark quest=123
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:8549 6:10
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-05e.htm
+  S ActionFailed
+  Q upsert Q123_TheLeaderAndTheFollower | <flags> | -2147483637
+  Q upsert Q123_TheLeaderAndTheFollower | <cond> | 4
+  Q upsert Q123_TheLeaderAndTheFollower | state | 2
+  Q upsert Q123_TheLeaderAndTheFollower | stateEx | 2
+  items 8549=0
+  rows Q123_TheLeaderAndTheFollower <cond>=4 <flags>=-2147483637 <state>=STARTED state=2 stateEx=2
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-06b.htm
+  S ActionFailed
+  S ActionFailed
+
+# Relog.
+relog
+  rows Q123_TheLeaderAndTheFollower <cond>=4 <flags>=-2147483637 <state>=STARTED state=2 stateEx=2
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-06b.htm
+  S ActionFailed
+  S ActionFailed

@@ -24,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q120"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q121"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q122"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q123"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q124"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q125"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q126"
@@ -54,7 +55,7 @@ func quests101To150() script.Catalog {
 		"quest.Q120_PavelsResearch":             q120.New,
 		"quest.Q121_PavelTheGiant":              q121.New,
 		"quest.Q122_OminousNews":                q122.New,
-		"quest.Q123_TheLeaderAndTheFollower":    nil,
+		"quest.Q123_TheLeaderAndTheFollower":    q123.New,
 		"quest.Q124_MeetingTheElroki":           q124.New,
 		"quest.Q125_TheNameOfEvil_1":            q125.New,
 		"quest.Q126_TheNameOfEvil_2":            q126.New,
