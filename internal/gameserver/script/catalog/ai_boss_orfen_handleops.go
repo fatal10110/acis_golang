@@ -7,5 +7,12 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiBossOrfenHandleOps holds, per script of ai_boss_orfen.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiBossOrfenHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.boss.orfen.Orfen": {
+			"OnAttacked":      {"NPC.MaxMP"},
+			"OnClanAttacked":  {"NPC.MaxMP"},
+			"OnPartyAttacked": {"NPC.MaxMP"},
+			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
+	}
 }
