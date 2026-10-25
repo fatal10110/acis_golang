@@ -24,13 +24,25 @@ const (
 
 // scatterWallGeo is open terrain with a wall across x at wallX: a walk
 // that crosses it stops on the last point before it, on the line walked.
-// It records the walks toward watch.
+// It records the walks toward watch. The ground at dip lies dipZ below the
+// height asked.
 type scatterWallGeo struct {
 	gameservertest.Geo
 	mu    sync.Mutex
 	wallX int
 	watch location.Location
 	walks [][6]int
+	dip   location.Location
+	dipZ  int
+}
+
+func (g *scatterWallGeo) Height(x, y, z int) int16 {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.dipZ != 0 && x == g.dip.X && y == g.dip.Y {
+		return int16(z - g.dipZ)
+	}
+	return g.Geo.Height(x, y, z)
 }
 
 func (g *scatterWallGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
@@ -46,17 +58,21 @@ func (g *scatterWallGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Loca
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
 
-// An NPC a script teleports with a random offset, a hostile one and a
-// civilian one alike: the script random source draws the x offset, then
-// the y one, each in [-200, 200]; the teleport walks from the point toward
-// the drawn one on the geodata and stops before the wall the line
-// crosses. The player sees one ordinary TeleportToLocation there, and the
-// NPC stands there.
+// An NPC a script teleports with a random offset, a hostile one, a
+// civilian one and a civilian one that cannot move alike: the script
+// random source draws the x offset, then the y one, each in [-200, 200];
+// the teleport walks from the point toward the drawn one on the geodata,
+// stops before the wall the line crosses, and lands on the ground there.
+// The player sees one ordinary TeleportToLocation there, and the NPC
+// stands there.
 func TestScriptTeleportNearScattersAnNPC(t *testing.T) {
 	t.Parallel()
-	for _, civilian := range []bool{false, true} {
-		name := map[bool]string{false: "hostile", true: "civilian"}[civilian]
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		civilian, immobile bool
+	}{{"hostile", false, false}, {"civilian", true, false}, {"immobile civilian", true, true}} {
+		civilian := tc.civilian
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			geo := &scatterWallGeo{wallX: 1 << 30}
 			var mu sync.Mutex
@@ -84,7 +100,7 @@ func TestScriptTeleportNearScattersAnNPC(t *testing.T) {
 				}}
 			}
 			folkTmpl := gameservertest.FolkTemplate("Folk", scatterFolkID)
-			folkTmpl.CanMove = true
+			folkTmpl.CanMove = !tc.immobile
 			w := bootWarriorsWith(t, []gameservertest.Option{
 				gameservertest.WithGeo(geo),
 				gameservertest.WithScriptRand(rand),
@@ -109,11 +125,13 @@ func TestScriptTeleportNearScattersAnNPC(t *testing.T) {
 			// south.
 			to := location.Location{X: w.at.X + 300, Y: w.at.Y + 100, Z: w.at.Z}
 			toward := location.Location{X: to.X + 100, Y: to.Y - 150, Z: to.Z}
+			landing := location.Location{X: to.X + 49, Y: to.Y - 73, Z: to.Z - 20}
 			mu.Lock()
 			dest, draws, bounds = to, []int{300, 50}, nil
 			mu.Unlock()
 			geo.mu.Lock()
 			geo.wallX, geo.watch = to.X+50, toward
+			geo.dip, geo.dipZ = landing, 20
 			geo.mu.Unlock()
 
 			done := make(chan struct{})
@@ -139,7 +157,6 @@ func TestScriptTeleportNearScattersAnNPC(t *testing.T) {
 			if want := [][6]int{{to.X, to.Y, to.Z, toward.X, toward.Y, to.Z}}; !slices.Equal(walks, want) {
 				t.Fatalf("geodata walks = %v, want %v", walks, want)
 			}
-			landing := location.Location{X: to.X + 49, Y: to.Y - 73, Z: to.Z}
 			var got []location.Location
 			for _, f := range framesOf(frames, serverpackets.OpcodeTeleportToLocation, target.ObjectID()) {
 				v := func(i int) int { return int(int32(binary.LittleEndian.Uint32(f[5+4*i:]))) }

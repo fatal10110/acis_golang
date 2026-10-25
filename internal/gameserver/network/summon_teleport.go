@@ -12,8 +12,8 @@ import (
 // its target, lands on the ground unless the landing lies in water, its
 // observers see the jump with its fade, it leaves the world grid and
 // re-enters it at the landing point, follows its owner again, and the NPCs
-// around the landing that see it notice it. A summon in a teleport already, or gone from the world, is
-// left as it is.
+// around the landing that see it notice it. A summon in a teleport
+// already, or gone from the world, is left as it is.
 func (l *GameClientLink) teleportSummon(actor *summon.Actor, j location.Jump) {
 	if l.world == nil || !actor.Spawned() {
 		return
