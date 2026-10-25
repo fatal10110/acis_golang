@@ -1,0 +1,131 @@
+# Sorrowful Sound of Flute (Q363), the villagers and the beer: a character at cond 1 asks Aldo (cond 2), then
+# Ranspo, Holvas, Poitan and Opix, takes the beer, and gives it to Barbado. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q363_sorrowful_sound_of_flute_neighbors.golden
+character Flute 15
+quest Q363_SorrowfulSoundOfFlute <cond>=1 <state>=STARTED
+script quest.Q363_SorrowfulSoundOfFlute
+item 4318 4319 4320 4420
+page default/30956.htm
+page villagemaster/30595.htm
+page default/30959.htm
+page warehouse/30057.htm
+page villagemaster/30594.htm
+page warehouse/30058.htm
+page trainer/30458.htm
+page script/quest/Q363_SorrowfulSoundOfFlute/
+npc nanarin 30956 Folk 10 0 0
+npc opix 30595 VillageMasterDwarf 20 0 0
+npc barbado 30959 Folk 30 0 0
+npc aldo 30057 WarehouseKeeper 40 0 0
+npc ranspo 30594 VillageMasterDwarf -10 0 0
+npc holvas 30058 WarehouseKeeper -20 0 0
+npc poitan 30458 Trainer -30 0 0
+
+action aldo
+action aldo
+  S ActionFailed
+  S NpcHtmlMessage obj=aldo item=0 page=warehouse/30057.htm
+  S ActionFailed
+bypass npc_{aldo}_Quest
+  S QuestList 363:0x80000003
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=aldo item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30057-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 2
+  rows Q363_SorrowfulSoundOfFlute <cond>=2 <state>=STARTED
+action ranspo
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30594-01.htm
+  S ActionFailed
+  S ActionFailed
+action holvas
+action holvas
+  S ActionFailed
+  S NpcHtmlMessage obj=holvas item=0 page=warehouse/30058.htm
+  S ActionFailed
+bypass npc_{holvas}_Quest
+  S NpcHtmlMessage obj=holvas item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30058-01.htm
+  S ActionFailed
+  S ActionFailed
+action poitan
+action poitan
+  S ActionFailed
+  S NpcHtmlMessage obj=poitan item=0 page=trainer/30458.htm
+  S ActionFailed
+bypass npc_{poitan}_Quest
+  S NpcHtmlMessage obj=poitan item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30458-01.htm
+  S ActionFailed
+  S ActionFailed
+action opix
+action opix
+  S ActionFailed
+  S NpcHtmlMessage obj=opix item=0 page=villagemaster/30595.htm
+  S ActionFailed
+bypass npc_{opix}_Quest
+  S NpcHtmlMessage obj=opix item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30595-01.htm
+  S ActionFailed
+  S ActionFailed
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q363_SorrowfulSoundOfFlute 30956-07.htm
+  S QuestList 363:0x80000007
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4320
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-07.htm
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 3
+  rows Q363_SorrowfulSoundOfFlute <cond>=3 <state>=STARTED
+  items 4320=1
+action barbado
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S QuestList 363:0x8000000f
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4320
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30959-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 4
+  rows Q363_SorrowfulSoundOfFlute <cond>=4 <state>=STARTED
+  items 4320=0
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30959-03.htm
+  S ActionFailed
+  S ActionFailed
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q363_SorrowfulSoundOfFlute
+  state Q363_SorrowfulSoundOfFlute -
+  rows Q363_SorrowfulSoundOfFlute -

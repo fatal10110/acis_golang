@@ -1,0 +1,30 @@
+# Jovial Accordion (Q364), level 14: Barbado turns the character away. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q364_jovial_accordion_low_level.golden
+character Accordion 14
+script quest.Q364_JovialAccordion
+item 57 4321 4322 4323 4324 4421
+page default/30959.htm
+page default/30957.htm
+page merchant/30060.htm
+page guard/30075.htm
+page default/30961.htm
+page default/30960.htm
+page script/quest/Q364_JovialAccordion/
+npc barbado 30959 Folk 10 0 0
+npc swan 30957 Folk 20 0 0
+npc sabrin 30060 Merchant 30 0 0
+npc xaber 30075 Guard -10 0 0
+npc clothchest 30961 Folk -20 0 0
+npc beerchest 30960 Folk -30 0 0
+
+action barbado
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q364_JovialAccordion/30959-00.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q364_JovialAccordion -
