@@ -24,6 +24,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q344"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q345"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q347"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q351"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q352"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q353"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q354"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q355"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q356"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q357"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q358"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -58,14 +66,14 @@ func quests301Up() script.Catalog {
 		"quest.Q345_MethodToRaiseTheDead":              q345.New,
 		"quest.Q347_GoGetTheCalculator":                q347.New,
 		"quest.Q348_AnArrogantSearch":                  nil,
-		"quest.Q351_BlackSwan":                         nil,
-		"quest.Q352_HelpRoodRaiseANewPet":              nil,
-		"quest.Q353_PowerOfDarkness":                   nil,
-		"quest.Q354_ConquestOfAlligatorIsland":         nil,
-		"quest.Q355_FamilyHonor":                       nil,
-		"quest.Q356_DigUpTheSeaOfSpores":               nil,
-		"quest.Q357_WarehouseKeepersAmbition":          nil,
-		"quest.Q358_IllegitimateChildOfAGoddess":       nil,
+		"quest.Q351_BlackSwan":                         q351.New,
+		"quest.Q352_HelpRoodRaiseANewPet":              q352.New,
+		"quest.Q353_PowerOfDarkness":                   q353.New,
+		"quest.Q354_ConquestOfAlligatorIsland":         q354.New,
+		"quest.Q355_FamilyHonor":                       q355.New,
+		"quest.Q356_DigUpTheSeaOfSpores":               q356.New,
+		"quest.Q357_WarehouseKeepersAmbition":          q357.New,
+		"quest.Q358_IllegitimateChildOfAGoddess":       q358.New,
 		"quest.Q359_ForSleeplessDeadmen":               nil,
 		"quest.Q362_BardsMandolin":                     nil,
 		"quest.Q363_SorrowfulSoundOfFlute":             nil,
