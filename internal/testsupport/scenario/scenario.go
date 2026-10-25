@@ -63,7 +63,9 @@
 //	roll <role> <draw>                        optional: every combat draw of the NPC is that draw (n-1 for a draw of
 //	                                          [0, n) it is not inside): its skill landing rolls, as its hit and
 //	                                          critical rolls; with 0 every skill it casts lands (a landing rate is at
-//	                                          least 1), with 99 none does (at most 99)
+//	                                          least 1), with 99 none does (at most 99), and every blow lands (a hit
+//	                                          rate is at least 300 of 1000). Role player pins the character's, set
+//	                                          each time it enters the world
 //	territory <name> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>
 //	                                          optional: an npcmaker territory, the box between those offsets from where the
 //	                                          character first enters the world

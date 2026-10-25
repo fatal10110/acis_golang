@@ -3,7 +3,7 @@
 # sees it and wants to petrify the ally (Raid Curse, 4515); the Varka recruit, whose side the ally
 # is not allied with, wants nothing. The footman then petrifies the ally. Each soldier lists the
 # curse, which a scenario monster needs to cast it. The cast of a summon is in
-# tests/quest/alliance_support_test.go.
+# tests/quest/alliance_support_test.go. The footman's combat draws are pinned so the curse lands.
 # Expectations are derived from the reference source (onSeeSpell).
 character Ally 40
 standing 1
@@ -11,6 +11,7 @@ skill 75 1
 script script.feature.KetraOrcSupport
 script script.feature.VarkaSilenosSupport
 npc footman 21324 Monster 40 0 0 skill DEBUFF 4515 1
+roll footman 0
 npc recruit 21350 Monster -40 0 0 skill DEBUFF 4515 1
 
 cast footman 75

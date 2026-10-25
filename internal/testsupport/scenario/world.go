@@ -94,7 +94,7 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 		if len(args) != 2 {
 			return fmt.Errorf("roll <role> <draw>")
 		}
-		if !roles[args[0]] {
+		if args[0] != "player" && !roles[args[0]] {
 			return fmt.Errorf("roll: no NPC line above names role %q", args[0])
 		}
 		if _, dup := sc.Rolls[args[0]]; dup {

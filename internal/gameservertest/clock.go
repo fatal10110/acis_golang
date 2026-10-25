@@ -171,8 +171,12 @@ func (s *Server) awaitEnterWorld(c *testsupport.ScriptedClient) {
 }
 
 // catchUpTimeout bounds the wall time the server may take to handle frames
-// a client already wrote.
-const catchUpTimeout = 5 * time.Second
+// a client already wrote, and the persistence lanes to run their jobs. It
+// only stops a server that will never catch up from hanging the test: a
+// frame is handled in milliseconds, but a machine running every suite at
+// once can hold the process back for seconds, so, like enterWorldTimeout,
+// the bound is generous.
+const catchUpTimeout = 30 * time.Second
 
 // catchUp waits until the server has handled every frame a client wrote,
 // the actor queues have run everything posted and the persistence lanes the
