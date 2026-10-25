@@ -72,5 +72,11 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 			"OnAttacked":     {"NPC.TopDesireTarget"},
 			"OnClanAttacked": {"NPC.TopDesireTarget"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSummonPC.WarriorCastSummonPC": {
+			"OnAttacked": {"NPC.MeetsHPMPDisabledConditions"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSummonPC.WarriorCastSummonPCAggressive": {
+			"OnAttacked": {"NPC.MeetsHPMPDisabledConditions"},
+		},
 	}
 }
