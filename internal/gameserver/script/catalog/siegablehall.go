@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/banditstronghold"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/devastatedcastle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/wildbeastreserve"
 )
 
@@ -38,7 +39,7 @@ func siegableHall() script.Catalog {
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":                      hall.Nurka1,
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2":                      hall.Nurka2,
 		"script.siegablehall.BanditStronghold":                                          banditstronghold.New,
-		"script.siegablehall.DevastatedCastle":                                          nil,
+		"script.siegablehall.DevastatedCastle":                                          devastatedcastle.New,
 		"script.siegablehall.FortressOfResistance":                                      nil,
 		"script.siegablehall.FortressOfTheDead":                                         nil,
 		"script.siegablehall.RainbowSpringsChateau":                                     nil,

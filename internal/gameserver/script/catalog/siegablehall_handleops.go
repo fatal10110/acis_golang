@@ -28,5 +28,9 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2": {
 			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
+		"script.siegablehall.DevastatedCastle": {
+			"OnTimer":            {"NPC.CleanAllHate", "NPC.RandomizeAttack"},
+			"OnUseSkillFinished": {"NPC.CleanAllHate"},
+		},
 	}
 }
