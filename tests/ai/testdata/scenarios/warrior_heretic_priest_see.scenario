@@ -1,0 +1,30 @@
+# WarriorHereticPriestAggressive (22142, its shipped skills), every draw 0: its see-creature hook
+# for a cleric (15) in a party of two, more than its party_members (none set here: 0), with no
+# teleport point set (each 0). Seeing the cleric 100 away it wants its second physical special
+# (4573) on it held in place, then, on a draw under 33 for a cleric, its hold magic (4047) held
+# and its second physical special again, and to attack it, weight 200; it starts the special at
+# once. On the next draw under 33 it sends the cleric to its first teleport point, 0,0,0: the
+# teleport goes out once the priest's task is done, after the packets the hook sent.
+# tests/ai/warrior_heretic_priest_test.go checks each weight the hook adds, and
+# tests/pets/heretic_priest_summon_test.go the summon sent after its owner.
+character Hunter 20
+class 15
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive
+npc priest 22142 Monster 1000 0 0 skill PHYSICAL_SPECIAL 4032 9 skill PHYSICAL_SPECIAL2 4573 9 skill HOLD_MAGIC 4047 9
+member Mate 20 -1500 0 0
+
+approach priest
+  S MagicSkillUse caster=priest target=player skill=4573-9 hit=2510 reuse=19821 success=0
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=0,0,0 fast=0
+  desires priest attack(player)=200 cast(player,4047)=1000000 cast(player,4573)=1000000
+  at player -10 -20 -30

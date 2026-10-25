@@ -51,6 +51,10 @@ func aiIndividual1HandleOps() map[string]script.HandleOps {
 			"OnAttacked":     {"NPC.TopDesireTarget"},
 			"OnClanAttacked": {"NPC.TopDesireTarget"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive": {
+			"OnAttacked":     {"NPC.RemoveAttackDesire", "NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.RemoveAttackDesire", "NPC.TopDesireTarget"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorUseBowNotFleeAggressive": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 		},
