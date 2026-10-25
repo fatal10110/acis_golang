@@ -218,6 +218,10 @@ func (h *Hall) ArmStart(d time.Duration) { h.s.ArmStart(d) }
 // ArmEnd arms the siege's end after d, as the siege step armed last.
 func (h *Hall) ArmEnd(d time.Duration) { h.s.ArmEnd(d) }
 
+// PreviouslyOwned reports whether a clan owned the hall as the
+// registrations of its siege closed.
+func (h *Hall) PreviouslyOwned() bool { return h.s.PreviouslyOwned() }
+
 // SetMissionAccomplished records whether a clan won the siege; the base
 // end then gives the hall to the winner.
 func (h *Hall) SetMissionAccomplished(v bool) { h.s.SetMissionAccomplished(v) }
