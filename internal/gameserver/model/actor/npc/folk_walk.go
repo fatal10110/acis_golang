@@ -186,10 +186,11 @@ func (m *folkMotion) IntentionMovesToTarget() bool {
 // CanSee reports whether the NPC has line of sight to target.
 func (m *folkMotion) CanSee(target attackable.Combatant) bool { return m.canSee(target) }
 
-// MovementDisabled reports a template that cannot move, a dead NPC or a
-// teleport under way; nothing else immobilizes a civilian NPC.
+// MovementDisabled reports a template that cannot move, a paralyzed or
+// dead NPC, or a teleport under way; nothing else immobilizes a civilian
+// NPC's walk.
 func (m *folkMotion) MovementDisabled() bool {
-	return !m.Instance.Template.CanMove || m.Dead() || m.teleporting.Load()
+	return !m.Instance.Template.CanMove || m.Paralyzed() || m.Dead() || m.teleporting.Load()
 }
 
 // GeoPathFailCount reports the NPC's failed-pathfinding streak.

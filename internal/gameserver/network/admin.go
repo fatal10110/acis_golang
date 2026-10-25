@@ -40,6 +40,7 @@ var adminCommands = map[string]adminCommand{
 	"admin_atmosphere":   (*GameClientLink).adminAtmosphere,
 	"admin_hide":         (*GameClientLink).adminHide,
 	"admin_invul":        (*GameClientLink).adminInvul,
+	"admin_para":         (*GameClientLink).adminPara,
 	"admin_skill":        (*GameClientLink).adminSkill,
 	"admin_clan_skill":   (*GameClientLink).adminClanSkill,
 	"admin_pledge":       (*GameClientLink).adminPledge,

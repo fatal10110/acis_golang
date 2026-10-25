@@ -16,8 +16,18 @@ import (
 // EffectList returns the buffs and debuffs the NPC holds.
 func (f *Folk) EffectList() *effect.List { return f.effects }
 
-// Paralyzed reports whether an effect paralyzes the NPC.
-func (f *Folk) Paralyzed() bool { return f.effects.IsAffected(effect.FlagParalyzed) }
+// Paralyzed reports whether the NPC is paralyzed, by its transient lock
+// (SetParalyzed) or by an effect. No paralyzing effect lands on a civilian
+// NPC, so in practice only the lock holds one.
+func (f *Folk) Paralyzed() bool {
+	return f.paralyzed.Load() || f.effects.IsAffected(effect.FlagParalyzed)
+}
+
+// SetParalyzed sets or clears the NPC's transient paralysis lock and
+// reports whether it changed. While it holds, the NPC neither moves,
+// attacks, acts on its desires nor uses a skill while any of its skills
+// waits for its reuse.
+func (f *Folk) SetParalyzed(v bool) bool { return f.paralyzed.CompareAndSwap(!v, v) }
 
 // Afraid reports whether an effect fears the NPC.
 func (f *Folk) Afraid() bool { return f.effects.IsAffected(effect.FlagFear) }

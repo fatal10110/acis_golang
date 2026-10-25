@@ -465,12 +465,12 @@ func (f *Folk) cancelFollow() {
 }
 
 // denyAIAction reports a state in which the NPC's AI does nothing: a
-// teleport under way, or death. The stun, sleep, paralyze, fear and
+// teleport under way, death or paralysis. The stun, sleep, fear and
 // hold-until-attacked states never hold here: folkAdmits keeps every
 // effect but a plain buff or debuff off the NPC, and those carry no such
 // flag.
 func (f *Folk) denyAIAction() bool {
-	return f.AlikeDead() || (f.motion != nil && f.motion.teleporting.Load())
+	return f.AlikeDead() || f.Paralyzed() || (f.motion != nil && f.motion.teleporting.Load())
 }
 
 // outOfReach reports whether target stands at castRange plus both bodies,
@@ -636,8 +636,23 @@ func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 // clan call.
 func (f *Folk) ConsumeHP(amount float64) { f.loseHP(amount, f, modelskill.Ref{}, false) }
 
-// SkillDisabled reports whether key is still waiting for its reuse delay.
+// SkillDisabled reports whether f may not use the skill of reuse key key.
+// With no skill waiting for its reuse, it may. Otherwise a paralysis locks
+// every skill, and failing that key's own reuse wait decides; an expired
+// wait is forgotten as it is read.
 func (f *Folk) SkillDisabled(key int32) bool {
+	f.cast.skillMu.Lock()
+	tracked := len(f.cast.disabledSkills) > 0
+	f.cast.skillMu.Unlock()
+	if !tracked {
+		return false
+	}
+	// The lock is read before key's own wait, whose check forgets an
+	// expired wait: an expired wait still tracked leaves the lock in force.
+	// The effect list's lock is taken with skillMu released.
+	if f.Paralyzed() {
+		return true
+	}
 	f.cast.skillMu.Lock()
 	defer f.cast.skillMu.Unlock()
 	expiresAt, ok := f.cast.disabledSkills[key]

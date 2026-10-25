@@ -413,9 +413,20 @@ func (f *Folk) location() location.Location {
 	return location.Location{X: x, Y: y, Z: z}
 }
 
-// AttackDisabled reports whether f cannot start a swing: it is dead. No
-// effect that holds a creature lands on a civilian NPC.
-func (f *Folk) AttackDisabled() bool { return f.AlikeDead() }
+// AttackDisabled reports whether f cannot start a swing: it is dead or
+// paralyzed. No other effect that holds a creature lands on a civilian NPC.
+func (f *Folk) AttackDisabled() bool { return f.AlikeDead() || f.Paralyzed() }
+
+// Think takes one more step of f's current intention, as a lock on its
+// actions lifting does. Call it on f's queue; a dead NPC does nothing.
+func (f *Folk) Think() {
+	if f.Dead() {
+		return
+	}
+	f.cast.brain.Lock()
+	defer f.cast.brain.Unlock()
+	f.thinkCurrent()
+}
 
 // InAttackRange reports whether target is within f's physical reach.
 func (f *Folk) InAttackRange(target attackable.Combatant) bool {
