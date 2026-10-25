@@ -74,13 +74,20 @@ const rb6Spawnlist = `<?xml version="1.0" encoding="utf-8"?>
 // rb6Skills are the skills the batch's bosses cast beside the raid boss
 // fixture skills: Type 3's physical special, Type 4's two ranged debuffs
 // around itself and its DD magic, the ranged DD magic of Type 2 and Sirra,
-// and Sirra's three debuffs.
+// and Sirra's three debuffs. Type 4's first debuff and Sirra's third carry
+// an effect of their own stack, which a test lands to close their gates.
 func rb6Skills() []modelskill.Definition {
 	return append(rbSkills(),
 		ind1Skill(rb5RangeDD, 600, false), ind1Skill(rb6PhysicalB, 600, false),
-		ind1Skill(rb6Debuff, 0, true), ind1Skill(rb6DebuffAnother, 0, true), ind1Skill(rb6DDMagic, 600, false),
-		ind1Skill(rb6SirraDebuff1, 0, true), ind1Skill(rb6SirraDebuff2, 0, true), ind1Skill(rb6SirraDebuff3, 600, false),
+		rb6Stacked(ind1Skill(rb6Debuff, 0, true), "rb6_debuff"), ind1Skill(rb6DebuffAnother, 0, true), ind1Skill(rb6DDMagic, 600, false),
+		ind1Skill(rb6SirraDebuff1, 0, true), ind1Skill(rb6SirraDebuff2, 0, true), rb6Stacked(ind1Skill(rb6SirraDebuff3, 600, false), "rb6_sirra_debuff3"),
 	)
+}
+
+// rb6Stacked gives d one 60 s effect of stack.
+func rb6Stacked(d modelskill.Definition, stack string) modelskill.Definition {
+	d.Effects = []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: stack, StackOrder: 1}}
+	return d
 }
 
 // bootRaid6 boots the batch beside templates and a listener, every NPC
@@ -218,6 +225,49 @@ func TestRaidBossType4DebuffsAroundItself(t *testing.T) {
 	w.setTop(t, boss, w.charOf(t))
 	w.hit(t, privates[0], 10)
 	w.wantCasts(t, "after a hit by its top desire target", boss, map[modelskill.ID]ind1Cast{rb6DDMagic: {me, 1000000}})
+}
+
+// TestRaidBossType4DebuffGates ports the gates of RaidBossType4's
+// debuffs, the boss 100 from the character, a hit on a private by the
+// character, its top desire target another listener. A draw of 1 in 2 and
+// 0 in 5 wants only the other debuff (and the DD magic on 0 in 75); 0 in 2
+// and 1 in 5 only the first, with no DD magic on 1 in 75. A top desire
+// target 300 from the boss leaves only the DD magic. The first debuff's
+// effect held by the top desire target, then by the character, closes that
+// debuff alone, without its draw.
+func TestRaidBossType4DebuffGates(t *testing.T) {
+	t.Parallel()
+	skills := map[npc.SkillType]modelskill.ID{
+		npc.SkillTypeSelfRangeDebuffA: rb6Debuff, npc.SkillTypeSelfRangeDebuffAnotherA: rb6DebuffAnother, npc.SkillTypeDDMagicA: rb6DDMagic,
+	}
+	w := bootRaid6(t, raidBoot{}, rb5Leader(rb6Type4ID, 20, skills), rb5PrivateTemplate())
+	w.draws.set(1)
+	boss := w.spawn(t, rb6Type4ID, 100, 0)
+	privates := privatesOf(t, boss, 2)
+	near := w.spawn(t, rb5ListenerID, 200, 0)
+	other := w.spawn(t, rb5ListenerID, 200, 50)
+	far := w.spawn(t, rb5ListenerID, 400, 0)
+	me, self := w.player.ObjectID(), boss.ObjectID()
+	hitWith := func(top *npc.Hostile, draws ...int) {
+		w.setTop(t, boss, script.NPCOf(top))
+		w.draws.set(1, draws...)
+		w.hit(t, privates[0], 10)
+	}
+
+	hitWith(near, 1, 0, 0)
+	w.wantCasts(t, "on draws 1, 0, 0", boss, map[modelskill.ID]ind1Cast{rb6DebuffAnother: {self, 1000000}, rb6DDMagic: {me, 1000000}})
+	hitWith(near, 0, 1, 1)
+	w.wantCasts(t, "on draws 0, 1, 1", boss, map[modelskill.ID]ind1Cast{rb6Debuff: {self, 1000000}})
+	hitWith(far, 0, 0, 0)
+	w.wantCasts(t, "with the top desire target 300 away", boss, map[modelskill.ID]ind1Cast{rb6DDMagic: {me, 1000000}})
+
+	held := modelskill.Ref{ID: rb6Debuff, Level: 1}
+	w.ind5dLand(t, held, script.NPCOf(near))
+	hitWith(near, 0, 0)
+	w.wantCasts(t, "with the top desire target holding the first debuff", boss, map[modelskill.ID]ind1Cast{rb6DebuffAnother: {self, 1000000}, rb6DDMagic: {me, 1000000}})
+	w.ind5dLand(t, held, w.charOf(t))
+	hitWith(other, 0, 0)
+	w.wantCasts(t, "with the character holding the first debuff", boss, map[modelskill.ID]ind1Cast{rb6DebuffAnother: {self, 1000000}, rb6DDMagic: {me, 1000000}})
 }
 
 // TestAnaisAttacksWhatItSeesInItsTerritory ports Anais's see-creature hook:
@@ -384,16 +434,26 @@ func TestIceFairySirraLeavesOnItsClock(t *testing.T) {
 }
 
 // TestIceFairySirraFollowsTheQueensPhases ports IceFairySirra's event 11036
-// and see-creature hooks. Phase 1 wants its first debuff on itself, phase 2
-// its second, each at 1000000. Phase 3 has it look around: it wants its
-// third debuff on the Ice Queen's guard beside it, which holds none, and
-// to attack the character in its territory at 200. Phase 0 ends it.
+// and see-creature hooks, with the Ice Queen's guard beside it. Phase 1
+// wants its first debuff on itself, phase 2 its second, each at 1000000;
+// seeing the guard in phase 2 wants nothing of it. Phase 3 has it look
+// around: it wants its third debuff on the guard, which holds none, and to
+// attack the character in its territory at 200. Seen again holding the
+// third debuff, the guard draws nothing. Phase 0 ends it.
 func TestIceFairySirraFollowsTheQueensPhases(t *testing.T) {
 	t.Parallel()
 	w := bootRaid6(t, raidBoot{}, rb5Boss(rb6SirraID, nil), rb5PrivateTemplate(), rb5Boss(rb6QueenGuardID, nil))
 	w.draws.set(1)
 	sirra := w.spawn(t, rb6SirraID, 100, 0)
+	guard := w.spawn(t, rb6QueenGuardID, 200, 0)
 	self := sirra.ObjectID()
+	// look runs Sirra's look around half a minute after its last one, its
+	// desires dropped first.
+	look := func() {
+		w.srv.Advance(t, 30*time.Second)
+		w.clearDesires(t, sirra)
+		w.onQueue(t, sirra, func() { script.NPCOf(sirra).LookNeighbor() })
+	}
 
 	w.sendEvent(t, sirra, 11036, 1, 0)
 	if got := ind1Slot(sirra, script.SlotIntAI0); got != 1 {
@@ -403,9 +463,9 @@ func TestIceFairySirraFollowsTheQueensPhases(t *testing.T) {
 	w.clearDesires(t, sirra)
 	w.sendEvent(t, sirra, 11036, 2, 0)
 	w.wantCasts(t, "in phase 2", sirra, map[modelskill.ID]ind1Cast{rb6SirraDebuff2: {self, 1000000}})
+	look()
+	w.wantCasts(t, "seeing the guard in phase 2", sirra, nil)
 
-	guard := w.spawn(t, rb6QueenGuardID, 200, 0)
-	w.clearDesires(t, sirra)
 	w.srv.Advance(t, 30*time.Second)
 	w.clearDesires(t, sirra)
 	w.sendEvent(t, sirra, 11036, 3, 0)
@@ -416,6 +476,11 @@ func TestIceFairySirraFollowsTheQueensPhases(t *testing.T) {
 	if d, ok := attackOn(sirra, w.player); !ok || d.Weight != 200 {
 		t.Fatalf("attack desire on the character seen in phase 3 = %+v (%v), want 200", d, ok)
 	}
+
+	w.ind5dLand(t, modelskill.Ref{ID: rb6SirraDebuff3, Level: 1}, script.NPCOf(guard))
+	look()
+	w.wantCasts(t, "seeing the guard holding the third debuff in phase 3", sirra, nil)
+
 	w.sendEvent(t, sirra, 11036, 0, 0)
 	if got := ind1Slot(sirra, script.SlotIntAI0); got != 0 {
 		t.Fatalf("i_ai0 after phase 0 = %d, want 0", got)
