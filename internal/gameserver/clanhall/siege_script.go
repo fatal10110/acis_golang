@@ -173,6 +173,25 @@ func (s *HallSiege) Announce(m siege.Message) {
 	s.hs.decide(func(fx *siegeEffects) { s.hs.announceLocked(fx, m) })
 }
 
+// TellClans tells m to the members in the world of each of clanIDs still a
+// clan, clan by clan.
+func (s *HallSiege) TellClans(clanIDs []int32, m siege.Message) {
+	s.hs.decide(func(fx *siegeEffects) {
+		if n := s.hs.siegeNotify; n != nil {
+			clans := s.hs.resolveClans(clanIDs)
+			fx.add(func() { n.TellClans(clans, m) })
+		}
+	})
+}
+
+// MinClanLevel is the clan level the hall sieges ask of a clan
+// (ChSiegeClanMinLevel).
+func (s *HallSiege) MinClanLevel() int {
+	s.hs.mu.Lock()
+	defer s.hs.mu.Unlock()
+	return s.hs.siegeCfg.MinClanLevel
+}
+
 // ArmPrepare arms the registrations' close an hour before the siege's date,
 // as the step armed last.
 func (s *HallSiege) ArmPrepare() {

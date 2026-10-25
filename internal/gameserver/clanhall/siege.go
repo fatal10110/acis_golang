@@ -135,6 +135,9 @@ type SiegeNotifier interface {
 	// revives, each closes, and its HP is set to its maximum, or to half of
 	// it when weak.
 	RespawnDoors(gates []string, weak bool)
+	// TellClans sends m to the members in the world of each of clans, clan
+	// by clan.
+	TellClans(clans []*clan.Clan, m siege.Message)
 	// FlagPvP puts every player standing in field on the pvp flag, as
 	// fighting outside a combat zone does, but for those standing in hall
 	// hallID's grounds of another clan than ownerID: the step banished
@@ -577,14 +580,17 @@ func (hs *Halls) AddRainbowDecrees(clanID int32, count int) {
 	})
 }
 
-// RemoveRainbowDecrees drops, and stores, the decrees clanID handed in.
-func (hs *Halls) RemoveRainbowDecrees(clanID int32) {
+// RemoveRainbowDecrees drops, and stores, the decrees clanID handed in,
+// and returns them; false when it handed in none.
+func (hs *Halls) RemoveRainbowDecrees(clanID int32) (int, bool) {
 	hs.siegeMu.Lock()
 	defer hs.siegeMu.Unlock()
+	count, ok := hs.decrees[clanID]
 	delete(hs.decrees, clanID)
 	hs.writeSiege("delete rainbow springs decree", RainbowSprings, func(ctx context.Context, st SiegeStore) error {
 		return st.DeleteRainbowDecree(ctx, clanID)
 	})
+	return count, ok
 }
 
 // ClearRainbowDecrees drops, and stores, every clan's decrees.
