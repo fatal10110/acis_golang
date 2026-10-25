@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/agitwarrior"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/guard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/royalrush"
@@ -10,11 +11,11 @@ import (
 // aiIndividual8 is the catalog of batch 8 of 8 of the individual NPC behaviors (#193).
 func aiIndividual8() script.Catalog {
 	return script.Catalog{
-		"script.ai.individual.AgitWarrior.AgitWarrior":                                             nil,
-		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitThief":                               nil,
-		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWarriorFlee":                         nil,
-		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWizardFlee":                          nil,
-		"script.ai.individual.AgitWarrior.AgitWizard":                                              nil,
+		"script.ai.individual.AgitWarrior.AgitWarrior":                                             agitwarrior.Warrior,
+		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitThief":                               agitwarrior.Thief,
+		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWarriorFlee":                         agitwarrior.WarriorFlee,
+		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWizardFlee":                          agitwarrior.WizardFlee,
+		"script.ai.individual.AgitWarrior.AgitWizard":                                              agitwarrior.Wizard,
 		"script.ai.individual.AltarDoorController":                                                 individual.AltarDoorController,
 		"script.ai.individual.AreadataSwitch":                                                      individual.AreadataSwitch,
 		"script.ai.individual.Corpse":                                                              individual.Corpse,
