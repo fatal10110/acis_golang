@@ -1,5 +1,5 @@
 # Lidia's Heart (Q023), played by a level 64 character who completed Tragedy in von
-# Hellmann's Forest (Q022, registered from the reference manifest so its row loads):
+# Hellmann's Forest (Q022, registered so its row loads):
 # Innocentin starts it with the map and the silver key; the broken bookshelf gives the
 # hairpin, then the diary; Innocentin's long talk stops at cond 5 ("No, I haven't read it"),
 # reading the diary's last help page marks it read, and the talk goes on to cond 6; the tombstone
@@ -11,7 +11,7 @@
 trace internal/gameserver/script/testdata/oracle/scenarios/q023_lidias_heart.golden
 character Lidia 64
 quest Q022_TragedyInVonHellmannForest <state>=COMPLETED
-stub quest.Q022_TragedyInVonHellmannForest
+script quest.Q022_TragedyInVonHellmannForest
 script quest.Q023_LidiasHeart
 item 7063 7064 7148 7149 7150
 page villagemaster/31328.htm

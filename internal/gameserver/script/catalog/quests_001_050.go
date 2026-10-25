@@ -21,6 +21,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q018"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q019"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q020"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q021"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q022"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q027"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q028"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q029"
@@ -67,8 +69,8 @@ func quests001To050() script.Catalog {
 		"quest.Q018_MeetingWithTheGoldenRam":          q018.New,
 		"quest.Q019_GoToThePastureland":               q019.New,
 		"quest.Q020_BringUpWithLove":                  q020.New,
-		"quest.Q021_HiddenTruth":                      nil,
-		"quest.Q022_TragedyInVonHellmannForest":       nil,
+		"quest.Q021_HiddenTruth":                      q021.New,
+		"quest.Q022_TragedyInVonHellmannForest":       q022.New,
 		"quest.Q024_InhabitantsOfTheForestOfTheDead":  nil,
 		"quest.Q025_HidingBehindTheTruth":             nil,
 		"quest.Q027_ChestCaughtWithABaitOfWind":       q027.New,

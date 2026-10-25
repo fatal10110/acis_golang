@@ -1,0 +1,198 @@
+# Tragedy in von Hellmann Forest (Q022) from cond 11, the red jewel held, at level 64: the ghost
+# of the adventurer takes it (cond 12); the well gives the sealed report box (cond 13); the
+# ghost opens it (cond 14); Innocentin takes the report box (cond 15), then tells the rest
+# (cond 16), and the quest completes. Expectations come from the reference trace
+# (Q022_TragedyInVonHellmannForest.onTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/q022_tragedy_in_von_hellmann_forest_report.golden
+character Report 64
+quest Q021_HiddenTruth <state>=COMPLETED
+quest Q022_TragedyInVonHellmannForest <state>=STARTED <cond>=11
+hold 7145 1
+script quest.Q021_HiddenTruth
+script quest.Q022_TragedyInVonHellmannForest
+item 7145 7146 7147
+page villagemaster/31334.htm
+page villagemaster/31328.htm
+page default/31527.htm
+page default/31529.htm
+page script/quest/Q022_TragedyInVonHellmannForest/
+npc tifaren 31334 VillageMasterDElf 10 0 0
+npc innocentin 31328 VillageMasterPriest -10 0 0
+npc adventurer 31529 Folk 0 -10 0
+npc well 31527 Folk 20 20 0
+
+action well
+action well
+  S ActionFailed
+  S NpcHtmlMessage obj=well item=0 page=default/31527.htm
+  S ActionFailed
+bypass npc_{well}_Quest
+  S NpcHtmlMessage obj=well item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31527-03.htm
+  S ActionFailed
+  S ActionFailed
+action adventurer
+action adventurer
+  S ActionFailed
+  S NpcHtmlMessage obj=adventurer item=0 page=default/31529.htm
+  S ActionFailed
+bypass npc_{adventurer}_Quest
+  S QuestList 21:0x00000000 22:0x80000fff
+  S ExShowQuestMark quest=22
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7145
+  S NpcHtmlMessage obj=adventurer item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31529-17.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q022_TragedyInVonHellmannForest | <cond> | 12
+  items 7145=0
+  rows Q022_TragedyInVonHellmannForest <cond>=12 <state>=STARTED
+action adventurer
+  S ActionFailed
+  S NpcHtmlMessage obj=adventurer item=0 page=default/31529.htm
+  S ActionFailed
+bypass npc_{adventurer}_Quest
+  S NpcHtmlMessage obj=adventurer item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31529-17.htm
+  S ActionFailed
+  S ActionFailed
+action well
+action well
+  S ActionFailed
+  S NpcHtmlMessage obj=well item=0 page=default/31527.htm
+  S ActionFailed
+bypass npc_{well}_Quest
+  S QuestList 21:0x00000000 22:0x80001fff
+  S ExShowQuestMark quest=22
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7146
+  S NpcHtmlMessage obj=well item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31527-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q022_TragedyInVonHellmannForest | <cond> | 13
+  items 7146=1
+  rows Q022_TragedyInVonHellmannForest <cond>=13 <state>=STARTED
+action well
+  S ActionFailed
+  S NpcHtmlMessage obj=well item=0 page=default/31527.htm
+  S ActionFailed
+bypass npc_{well}_Quest
+  S NpcHtmlMessage obj=well item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31527-05.htm
+  S ActionFailed
+  S ActionFailed
+action adventurer
+action adventurer
+  S ActionFailed
+  S NpcHtmlMessage obj=adventurer item=0 page=default/31529.htm
+  S ActionFailed
+bypass npc_{adventurer}_Quest
+  S QuestList 21:0x00000000 22:0x80003fff
+  S ExShowQuestMark quest=22
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7146
+  S SystemMessage id=54 3:7147
+  S NpcHtmlMessage obj=adventurer item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31529-18.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q022_TragedyInVonHellmannForest | <cond> | 14
+  items 7146=0 7147=1
+  rows Q022_TragedyInVonHellmannForest <cond>=14 <state>=STARTED
+action adventurer
+  S ActionFailed
+  S NpcHtmlMessage obj=adventurer item=0 page=default/31529.htm
+  S ActionFailed
+bypass npc_{adventurer}_Quest
+  S NpcHtmlMessage obj=adventurer item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31529-19.htm
+  S ActionFailed
+  S ActionFailed
+
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 html="<html><body><a action=\"bypass -h npc_{innocentin}_Quest Q021_HiddenTruth\">[Hidden Truth (Done)]</a><br><a action=\"bypass -h npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest\">[Tragedy in von Hellmann Forest (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-13.htm
+  S QuestList 21:0x00000000 22:0x80007fff
+  S ExShowQuestMark quest=22
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7147
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-13.htm
+  S ActionFailed
+  Q upsert Q022_TragedyInVonHellmannForest | <cond> | 15
+  items 7147=0
+  rows Q022_TragedyInVonHellmannForest <cond>=15 <state>=STARTED
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 html="<html><body><a action=\"bypass -h npc_{innocentin}_Quest Q021_HiddenTruth\">[Hidden Truth (Done)]</a><br><a action=\"bypass -h npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest\">[Tragedy in von Hellmann Forest (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-14.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-15.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-15.htm
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-16.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-16.htm
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-17.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-17.htm
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-18.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-18.htm
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-19.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-19.htm
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-20.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-20.htm
+  S ActionFailed
+bypass Quest Q022_TragedyInVonHellmannForest 31328-21.htm
+  S QuestList 21:0x00000000 22:0x8000ffff
+  S ExShowQuestMark quest=22
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-21.htm
+  S ActionFailed
+  Q upsert Q022_TragedyInVonHellmannForest | <cond> | 16
+  rows Q022_TragedyInVonHellmannForest <cond>=16 <state>=STARTED
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 html="<html><body><a action=\"bypass -h npc_{innocentin}_Quest Q021_HiddenTruth\">[Hidden Truth (Done)]</a><br><a action=\"bypass -h npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest\">[Tragedy in von Hellmann Forest (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest
+  S QuestList 21:0x00000000 22:0x00000000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-22.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q022_TragedyInVonHellmannForest | <state> | COMPLETED
+  Q delete-except-state Q022_TragedyInVonHellmannForest
+  state Q022_TragedyInVonHellmannForest COMPLETED
+  rows Q022_TragedyInVonHellmannForest <state>=COMPLETED
+
+relog
+  state Q022_TragedyInVonHellmannForest COMPLETED
+  rows Q022_TragedyInVonHellmannForest <state>=COMPLETED
+action tifaren
+action tifaren
+  S ActionFailed
+  S NpcHtmlMessage obj=tifaren item=0 page=villagemaster/31334.htm
+  S ActionFailed
+bypass npc_{tifaren}_Quest
+  S NpcHtmlMessage obj=tifaren item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

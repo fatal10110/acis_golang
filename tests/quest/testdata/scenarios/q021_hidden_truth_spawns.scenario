@@ -1,0 +1,111 @@
+# Hidden Truth (Q021) at cond 3: the tombstone wakes the duke's ghost, one at a time, and
+# another once it leaves after 300 s; the duke's talk calls his page (end_walk 0), finds it
+# walking on a second talk, and once its walk has ended moves the quest to cond 4 himself.
+# Expectations come from the reference trace (Q021_HiddenTruth.onTalk, onAdvEvent, onDecayed,
+# Quest.addSpawn).
+trace internal/gameserver/script/testdata/oracle/scenarios/q021_hidden_truth_spawns.golden
+character Walker 63
+quest Q021_HiddenTruth <state>=STARTED <cond>=3
+script quest.Q021_HiddenTruth
+page default/31523.htm
+page default/31524.htm
+page script/quest/Q021_HiddenTruth/
+npc tombstone 31523 Folk -10 0 0
+npc duke 31524 Folk 0 10 0
+npc page 31525 Folk 0 -10 0
+
+# The tombstone wakes the duke's ghost; while it stands, no other; once it leaves, another.
+action tombstone
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31523.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-02.htm
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-02.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-03.htm
+  S PlaySound type=0 file=SkillSound5.horror_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-03.htm
+  S ActionFailed
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31523.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-02.htm
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-02.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-03.htm
+  S PlaySound type=0 file=SkillSound5.horror_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-04.htm
+  S ActionFailed
+advance 301s
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31523.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-02.htm
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-02.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-03.htm
+  S PlaySound type=0 file=SkillSound5.horror_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-03.htm
+  S ActionFailed
+
+# The duke's talk calls the page; a second talk finds it walking.
+action duke
+action duke
+  S ActionFailed
+  S NpcHtmlMessage obj=duke item=0 page=default/31524.htm
+  S ActionFailed
+bypass npc_{duke}_Quest
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | end_walk | 0
+  rows Q021_HiddenTruth <cond>=3 <state>=STARTED end_walk=0
+action duke
+  S ActionFailed
+  S NpcHtmlMessage obj=duke item=0 page=default/31524.htm
+  S ActionFailed
+bypass npc_{duke}_Quest
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-07a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Its walk ends; the duke moves the quest to cond 4.
+advance 10s
+  Q upsert Q021_HiddenTruth | end_walk | 1
+  rows Q021_HiddenTruth <cond>=3 <state>=STARTED end_walk=1
+action duke
+  S ActionFailed
+  S NpcHtmlMessage obj=duke item=0 page=default/31524.htm
+  S ActionFailed
+bypass npc_{duke}_Quest
+  S QuestList 21:0x8000000f
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-07b.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 4
+  rows Q021_HiddenTruth <cond>=4 <state>=STARTED end_walk=1
+action duke
+  S ActionFailed
+  S NpcHtmlMessage obj=duke item=0 page=default/31524.htm
+  S ActionFailed
+bypass npc_{duke}_Quest
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-07b.htm
+  S ActionFailed
+  S ActionFailed

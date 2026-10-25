@@ -1,0 +1,32 @@
+# Tragedy in von Hellmann Forest (Q022) at cond 16 below level 64: Innocentin's last page is
+# the low-level one, and the quest completes all the same. Expectations come from the reference
+# trace (Q022_TragedyInVonHellmannForest.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q022_tragedy_in_von_hellmann_forest_low_level.golden
+character Late 63
+quest Q021_HiddenTruth <state>=COMPLETED
+quest Q022_TragedyInVonHellmannForest <state>=STARTED <cond>=16
+script quest.Q021_HiddenTruth
+script quest.Q022_TragedyInVonHellmannForest
+page villagemaster/31328.htm
+page script/quest/Q022_TragedyInVonHellmannForest/
+npc innocentin 31328 VillageMasterPriest -10 0 0
+
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 html="<html><body><a action=\"bypass -h npc_{innocentin}_Quest Q021_HiddenTruth\">[Hidden Truth (Done)]</a><br><a action=\"bypass -h npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest\">[Tragedy in von Hellmann Forest (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest
+  S QuestList 21:0x00000000 22:0x00000000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q022_TragedyInVonHellmannForest/31328-23.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q022_TragedyInVonHellmannForest | <state> | COMPLETED
+  Q delete-except-state Q022_TragedyInVonHellmannForest
+  state Q022_TragedyInVonHellmannForest COMPLETED
+  rows Q022_TragedyInVonHellmannForest <state>=COMPLETED
