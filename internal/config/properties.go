@@ -281,10 +281,11 @@ func (p *Properties) Int64(key string, def int64) (int64, error) {
 	return def, nil
 }
 
-// Float64 returns a float64 property or def when key is missing.
+// Float64 returns a float64 property or def when key is missing. The value
+// follows the parseDouble literal grammar.
 func (p *Properties) Float64(key string, def float64) (float64, error) {
 	if value, ok := p.Lookup(key); ok {
-		n, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		n, err := parseDouble(value)
 		if err != nil {
 			return 0, fmt.Errorf("parse %s as float64: %w", key, err)
 		}
@@ -353,13 +354,14 @@ func (p *Properties) Int64s(key string, def []int64) ([]int64, error) {
 	return def, nil
 }
 
-// Float64s returns a float64 slice split with DefaultDelimiters, or def when key is missing.
+// Float64s returns a float64 slice split with DefaultDelimiters, or def when
+// key is missing. Each element follows the parseDouble literal grammar.
 func (p *Properties) Float64s(key string, def []float64) ([]float64, error) {
 	if value, ok := p.Lookup(key); ok {
 		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]float64, len(parts))
 		for i, part := range parts {
-			n, err := strconv.ParseFloat(part, 64)
+			n, err := parseDouble(part)
 			if err != nil {
 				return nil, fmt.Errorf("parse %s[%d] as float64: %w", key, i, err)
 			}
