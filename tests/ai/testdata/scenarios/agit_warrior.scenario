@@ -1,0 +1,38 @@
+# AgitWarrior (35428, an Oel Mahum Berserker) and AgitWizard (35430, an Oel Mahum Leader), every
+# draw 0, the character leading a clan the NPCs (of no clan) do not stand for. A fixture monster
+# has 440 hit points. The NPCs spawn parked and no AI tick runs, so neither notices the character,
+# there before them; the character's siege golem, called after them, enters their sight, and each
+# wants to attack the player acting through it, the character, by 200 (the first step shows it).
+# A hit of 23 from the character adds 23 / 440 / 0.05 * 100 = 104.54545454545455, uncut, to that
+# 200, and the berserker's strike (4032, a draw under 10) or the leader's aura burn (4077, always:
+# a draw under 100), weight 1000000. A hit of the golem counts 10 per twentieth (22 / 440 / 0.05 *
+# 10 = 10), on the golem, with another strike; a hit of another NPC, which no player acts through,
+# adds nothing.
+# The same-clan sparing and the civilian beasts (35618-35622) are covered by
+# tests/ai/agit_warrior_test.go: the format spawns no NPC for a clan, nor hits a civilian.
+character Hunter 20
+clan 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.AgitWarrior.AgitWarrior
+script script.ai.individual.AgitWarrior.AgitWizard
+npc berserker 35428 Monster 100 0 0 skill DD_MAGIC 4032 6
+npc leader 35430 Monster -100 0 0 skill DD_MAGIC 4077 6
+summon golem 14737
+
+advance 1ms
+  desires berserker attack(player)=200
+  desires leader attack(player)=200
+
+hit berserker 23
+  desires berserker attack(player)=304.54545454545456 cast(player,4032,move)=1000000
+
+hit leader 23
+  desires leader attack(player)=304.54545454545456 cast(player,4077,move)=1000000
+
+hit berserker 22 by golem
+  desires berserker attack(player)=304.54545454545456 cast(player,4032,move)=1000000 attack(golem)=10 cast(golem,4032,move)=1000000
+
+hit berserker 22 by leader
+  desires berserker attack(player)=304.54545454545456 cast(player,4032,move)=1000000 attack(golem)=10 cast(golem,4032,move)=1000000
+
