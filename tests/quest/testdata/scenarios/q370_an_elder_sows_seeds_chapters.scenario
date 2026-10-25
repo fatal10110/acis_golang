@@ -1,0 +1,44 @@
+# An Elder Sows Seeds (Q370): a character holding the four chapters trades them at Casian for 3600 adena
+# and leaves the quest. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q370_an_elder_sows_seeds_chapters.golden
+character Seeds 28
+quest Q370_AnElderSowsSeeds <cond>=1 <state>=STARTED
+hold 5917 1
+hold 5918 1
+hold 5919 1
+hold 5920 1
+script quest.Q370_AnElderSowsSeeds
+item 57 5916 5917 5918 5919 5920
+page default/30612.htm
+page script/quest/Q370_AnElderSowsSeeds/
+npc casian 30612 Folk 10 0 0
+
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q370_AnElderSowsSeeds 30612-6.htm
+  S SystemMessage id=302 3:5917
+  S SystemMessage id=302 3:5918
+  S SystemMessage id=302 3:5919
+  S SystemMessage id=302 3:5920
+  S SystemMessage id=52 6:3600
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-8.htm
+  S ActionFailed
+  items 5917=0 5918=0 5919=0 5920=0 57=3600
+bypass Quest Q370_AnElderSowsSeeds 30612-9.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-9.htm
+  S ActionFailed
+  Q delete-quest Q370_AnElderSowsSeeds
+  state Q370_AnElderSowsSeeds -
+  rows Q370_AnElderSowsSeeds -
+relog
+  rows Q370_AnElderSowsSeeds -
+  items 57=3600

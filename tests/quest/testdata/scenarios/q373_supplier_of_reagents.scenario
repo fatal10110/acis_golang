@@ -1,0 +1,72 @@
+# Supplier of Reagents (Q373): a level 57 character accepts at Wesley, who lends the stone and the manual, kills a
+# Crendion (the roll pinned to succeed) and asks Wesley and the Urn about it; then relog. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q373_supplier_of_reagents.golden
+character Reagents 57
+random always 0
+script quest.Q373_SupplierOfReagents
+item 57 5904 6317 6007 6008 6009 6010 6011 6012 6013 6014 6015 6016 6017 6018 6019 6020 6021 6022 6023 6024 6025 6026 6027 6028 6029 6030 6031 6032 6033 6034 6320
+page merchant/30166.htm
+page default/31149.htm
+page script/quest/Q373_SupplierOfReagents/
+npc wesley 30166 Merchant 10 0 0
+npc urn 31149 Folk -10 0 0
+npc crendion 20813 Monster 40 0 0
+npc hames 21115 Monster 50 0 0
+npc guardianshaman 21066 Monster 60 0 0
+npc maid 20822 Monster 70 0 0
+npc guardian 21061 Monster 80 0 0
+npc wyrm 21111 Monster 90 0 0
+npc tribe 20828 Monster 100 0 0
+
+action wesley
+action wesley
+  S ActionFailed
+  S NpcHtmlMessage obj=wesley item=0 page=merchant/30166.htm
+  S ActionFailed
+bypass npc_{wesley}_Quest
+  S NpcHtmlMessage obj=wesley item=0 page=script/quest/Q373_SupplierOfReagents/30166-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q373_SupplierOfReagents 30166-04.htm
+  S QuestList 373:0x80000001
+  S ExShowQuestMark quest=373
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:5904
+  S SystemMessage id=54 3:6317
+  S NpcHtmlMessage obj=wesley item=0 page=script/quest/Q373_SupplierOfReagents/30166-04.htm
+  S ActionFailed
+  Q upsert Q373_SupplierOfReagents | <state> | STARTED
+  Q upsert Q373_SupplierOfReagents | <cond> | 1
+  rows Q373_SupplierOfReagents <cond>=1 <state>=STARTED
+  state Q373_SupplierOfReagents STARTED
+  items 5904=1 6317=1
+kill crendion
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:6014
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 6014=1
+action wesley
+  S ActionFailed
+  S NpcHtmlMessage obj=wesley item=0 page=merchant/30166.htm
+  S ActionFailed
+action wesley
+  S ActionFailed
+  S NpcHtmlMessage obj=wesley item=0 page=merchant/30166.htm
+  S ActionFailed
+bypass npc_{wesley}_Quest
+  S NpcHtmlMessage obj=wesley item=0 page=script/quest/Q373_SupplierOfReagents/30166-05.htm
+  S ActionFailed
+  S ActionFailed
+action urn
+action urn
+  S ActionFailed
+  S NpcHtmlMessage obj=urn item=0 page=default/31149.htm
+  S ActionFailed
+bypass npc_{urn}_Quest
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-01.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q373_SupplierOfReagents <cond>=1 <state>=STARTED
+  items 5904=1 6317=1 6014=1
