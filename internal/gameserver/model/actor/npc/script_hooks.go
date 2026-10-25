@@ -38,9 +38,10 @@ type ScriptHooks interface {
 	// member called. caller and called are each a *Hostile or a *Folk, and
 	// are the same NPC for the caller's call to itself.
 	ClanAttacked(caller, called, attacker attackable.Combatant, damage int32, sk skill.Ref)
-	// HostilePartyDied runs called's party-died hooks: caller, a member of
-	// called's party or called itself, has just died.
-	HostilePartyDied(caller PartyMember, called *Hostile)
+	// PartyDied runs called's party-died hooks: caller, a member of
+	// called's party or called itself, has just died. caller and called are
+	// each a hostile or a civilian NPC.
+	PartyDied(caller, called PartyMember)
 	// ClanDied runs called's clan-died hooks: caller, killed by killer,
 	// told its clan member called. caller and called are each a *Hostile
 	// or a *Folk.

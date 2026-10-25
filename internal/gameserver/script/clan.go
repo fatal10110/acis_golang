@@ -34,15 +34,15 @@ func (r *Registry) ClanAttacked(caller, called, attacker attackable.Combatant, d
 	}
 }
 
-// HostilePartyDied runs the party-died hook of every script bound to
-// called's template, in list order: caller, of called's party, has just
-// died. caller is a hostile or a civilian NPC.
-func (r *Registry) HostilePartyDied(caller npc.PartyMember, called *npc.Hostile) {
+// PartyDied runs the party-died hook of every script bound to called's
+// template, in list order: caller, of called's party, has just died.
+// caller and called are each a hostile or a civilian NPC.
+func (r *Registry) PartyDied(caller, called npc.PartyMember) {
 	list := r.scripts(int32(called.NpcID()), EventPartyDied)
 	if len(list) == 0 {
 		return
 	}
-	e := PartyDied{Caller: NPCOf(caller), Called: NewNPC(called)}
+	e := PartyDied{Caller: NPCOf(caller), Called: NPCOf(called)}
 	for _, s := range list {
 		r.run(s, hookPartyDied, func() { s.Hooks.PartyDied(s, e) })
 	}

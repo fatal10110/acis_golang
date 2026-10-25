@@ -7,18 +7,18 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// teleportSummon is a script's ordinary teleport of actor to at, on its
-// queue: the summon stops what it was doing and drops its target, lands on
-// the ground at at unless at lies in water, its observers see the jump with
-// its fade, it leaves the world grid and re-enters it at the landing point,
-// follows its owner again, and the NPCs around the landing that see it
-// notice it. A summon in a teleport already, or gone from the world, is
-// left as it is.
-func (l *GameClientLink) teleportSummon(actor *summon.Actor, at location.Location) {
+// teleportSummon is a script's ordinary teleport of actor to where j lands
+// (move.Land), on its queue: the summon stops what it was doing and drops
+// its target, lands on the ground unless the landing lies in water, its
+// observers see the jump with its fade, it leaves the world grid and
+// re-enters it at the landing point, follows its owner again, and the NPCs
+// around the landing that see it notice it. A summon in a teleport
+// already, or gone from the world, is left as it is.
+func (l *GameClientLink) teleportSummon(actor *summon.Actor, j location.Jump) {
 	if l.world == nil || !actor.Spawned() {
 		return
 	}
-	target := l.landing(location.Jump{To: at}, l.inWater)
+	target := l.landing(j, l.inWater)
 	owner, _ := l.currentSummonOwner(actor)
 	if l.jumpSummon(owner, actor, target) {
 		npc.ForceSeeCreature(l.world, actor)
