@@ -320,7 +320,11 @@ type TeleportRequested struct {
 
 // InstantTeleportRequested reports a jump of a player or a summon to where
 // Jump lands, keeping it in its region, shown without the teleport fade.
-type InstantTeleportRequested struct{ Jump location.Jump }
+// OwnQueue is as for TeleportRequested (always false for a summon).
+type InstantTeleportRequested struct {
+	Jump     location.Jump
+	OwnQueue bool
+}
 
 // RecallRequested reports a recall skill sending the character to the
 // place Destination names, resolved for the character where it stands.

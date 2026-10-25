@@ -283,7 +283,8 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	dropPostureQueuedIntentions(live)
 	l.broadcastLiveWaitType(live, stand)
 	if !stand {
-		live.NotifyTutorial(player.TutorialSat)
+		// The sit request runs on live's queue.
+		live.NotifyTutorialOnQueue(player.TutorialSat)
 	}
 	return true
 }

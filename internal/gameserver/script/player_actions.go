@@ -44,12 +44,13 @@ func (p *Player) HasAtLeastOneItem(itemIDs ...int32) bool {
 // TeleportTo moves the player to at, up to offset away on each axis. From
 // a hook running on the player's own queue (its talk, quest window or
 // quest event, its item use, a timer whose home queue is the player's,
-// After) the teleport runs inside the call: its packets go out before what
-// the rest of the hook sends, and the rest of the hook reads the new
-// position. From any
-// other queue (an NPC's hook, another player's) it runs on the player's own
-// queue once the calling task is done, and the rest of the hook still reads
-// the old position.
+// After, and the tutorial events its own requests, entry, sit request and
+// pickup raise) the teleport runs inside the call: its packets go out
+// before what the rest of the hook sends, and the rest of the hook reads
+// the new position. From any other queue (an NPC's hook, another player's,
+// the death hook, the tutorial events a death, a level-up or an HP loss
+// raise) it runs on the player's own queue once the calling task is done,
+// and the rest of the hook still reads the old position.
 func (p *Player) TeleportTo(at Place, offset int) {
 	loc := at.loc()
 	c := p.character()
@@ -77,9 +78,12 @@ func (p *Player) After(d time.Duration, fn func()) {
 
 // CallSkill makes caster use ref on target: everyone watching caster sees
 // the cast, and the skill's effects land on target with no cast time, cost,
-// reuse or target check. The cast runs on caster's own queue once the
-// calling task is done, whatever queue the hook runs on: the rest of the
-// hook still reads the state from before the cast.
+// reuse or target check. From a hook on caster's own queue (as for
+// TeleportTo of Player) the cast runs inside the call: its packets go out
+// before what the rest of the hook sends, and the rest of the hook reads the
+// state after it. From any other queue it runs on caster's own queue once
+// the calling task is done, and the rest of the hook still reads the state
+// from before the cast.
 func (s *Script) CallSkill(caster, target *Player, ref skill.Ref) {
 	caster.character().CallSkill(target.ObjectID(), ref)
 }
