@@ -1,12 +1,9 @@
 # Pavel's Research (Q120), the west weather master's cast: the character plays cond 19 to 22 as in
 # q120_pavels_research_finish, and the riddles' last bypass asks the west weather master to cast
 # Quest Trap - Power Shot (5073, level 5) at it (onAdvEvent, 32044-17.htm); it casts within the next
-# three AI ticks. Expectations before the ticks replay the reference trace of
-# q120_pavels_research_finish. The ticks are derived from the reference source and from a probe run
-# with them, where the reference casts on the second tick (#4074). This scenario has no trace: the
-# probe cannot play the ticks without changing the traces of later scenarios, and its NPC casts with
-# the shipped template's casting stats (hit 1796 ms) where the Go runner's fixture NPC gives hit
-# 2356 (#4074).
+# three AI ticks; the reference casts on the second. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q120_pavels_research_west_cast.golden
 character Researcher 50
 quest Q114_ResurrectionOfAnOldManager <state>=COMPLETED
 quest Q120_PavelsResearch <cond>=19 <state>=STARTED talk=0 talk1=0
