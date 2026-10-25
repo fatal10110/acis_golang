@@ -41,6 +41,18 @@ func aiIndividual1HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproachRevivalAggressive": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.LastAttacker"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3Aggressive": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.LastAttacker"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3Revived": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.LastAttacker"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSelfRangeDDMagicAggressive": {
 			"OnAttacked":         {"NPC.TopDesireTarget"},
 			"OnClanAttacked":     {"NPC.TopDesireTarget"},

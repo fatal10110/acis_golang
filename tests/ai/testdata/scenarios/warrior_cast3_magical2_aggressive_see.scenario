@@ -1,0 +1,18 @@
+# WarriorCast3SkillsMagical2Aggressive (18001, level 60, its shipped DD magics and debuff), every
+# draw 0. Settled past its first 7 s and wandering in its territory, it sees the character 300
+# away: it wants both DD magics (4039, 4002) and its debuff (4035) on the character, weight
+# 1000000 each, and to attack the character, weight 200.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2Aggressive
+npc bat 18001 Monster 3000 0 0 skill DD_MAGIC1 4039 6 skill DD_MAGIC2 4002 6 skill DEBUFF 4035 6
+
+tick x9
+approach bat 300
+  S MagicSkillUse caster=bat target=player skill=4039-6 hit=10571 reuse=21142 success=0
+  desires bat attack(player)=200 cast(player,4039,move)=1000000 cast(player,4002,move)=1000000 cast(player,4035,move)=1000000 wander()=5

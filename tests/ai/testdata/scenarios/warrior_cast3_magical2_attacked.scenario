@@ -1,0 +1,18 @@
+# WarriorCast3SkillsMagical2 (20411, Scavenger Bat, level 18, its shipped DD magics and debuff),
+# every draw 0, 300 away from the character. Its first hit finds it hating no one, so it only
+# takes the Warrior's hate; the second, by the character it now hates most from farther than
+# 100, also wants both DD magics (4001, 4002) and its debuff (4038) on the character, weight
+# 1000000 each.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2
+npc bat 20411 Monster 300 0 0 skill DD_MAGIC1 4001 1 skill DD_MAGIC2 4002 1 skill DEBUFF 4038 2
+
+hit bat 80
+  desires bat attack(player)=1000
+hit bat 80
+  desires bat attack(player)=2000 cast(player,4001,move)=1000000 cast(player,4002,move)=1000000 cast(player,4038,move)=1000000
