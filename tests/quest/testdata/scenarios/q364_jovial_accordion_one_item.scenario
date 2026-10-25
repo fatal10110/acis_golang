@@ -1,0 +1,99 @@
+# Jovial Accordion (Q364), one item: the beer is stolen and the clothes are not (draws true, false); Swan sends
+# the character back to Barbado without the 100 adena. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q364_jovial_accordion_one_item.golden
+character Accordion 15
+quest Q364_JovialAccordion <cond>=2 <state>=STARTED items=0
+hold 4323 1
+hold 4324 1
+random 0 1
+script quest.Q364_JovialAccordion
+item 57 4321 4322 4323 4324 4421
+page default/30959.htm
+page default/30957.htm
+page merchant/30060.htm
+page guard/30075.htm
+page default/30961.htm
+page default/30960.htm
+page script/quest/Q364_JovialAccordion/
+npc barbado 30959 Folk 10 0 0
+npc swan 30957 Folk 20 0 0
+npc sabrin 30060 Merchant 30 0 0
+npc xaber 30075 Guard -10 0 0
+npc clothchest 30961 Folk -20 0 0
+npc beerchest 30960 Folk -30 0 0
+
+action beerchest
+action beerchest
+  S ActionFailed
+  S NpcHtmlMessage obj=beerchest item=0 page=default/30960.htm
+  S ActionFailed
+bypass npc_{beerchest}_Quest
+  S NpcHtmlMessage obj=beerchest item=0 page=script/quest/Q364_JovialAccordion/30960-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q364_JovialAccordion 30960-04.htm
+  S SystemMessage id=302 3:4324
+  S SystemMessage id=54 3:4321
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=beerchest item=0 page=script/quest/Q364_JovialAccordion/30960-02.htm
+  S ActionFailed
+  items 4324=0 4321=1
+action clothchest
+action clothchest
+  S ActionFailed
+  S NpcHtmlMessage obj=clothchest item=0 page=default/30961.htm
+  S ActionFailed
+bypass npc_{clothchest}_Quest
+  S NpcHtmlMessage obj=clothchest item=0 page=script/quest/Q364_JovialAccordion/30961-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q364_JovialAccordion 30961-04.htm
+  S SystemMessage id=302 3:4323
+  S NpcHtmlMessage obj=clothchest item=0 page=script/quest/Q364_JovialAccordion/30961-04.htm
+  S ActionFailed
+  items 4323=0 4322=0
+action sabrin
+action sabrin
+  S ActionFailed
+  S NpcHtmlMessage obj=sabrin item=0 page=merchant/30060.htm
+  S ActionFailed
+bypass npc_{sabrin}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4321
+  S NpcHtmlMessage obj=sabrin item=0 page=script/quest/Q364_JovialAccordion/30060-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q364_JovialAccordion | items | 1
+  items 4321=0
+action swan
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S QuestList 364:0x80000007
+  S ExShowQuestMark quest=364
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q364_JovialAccordion/30957-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q364_JovialAccordion | <cond> | 3
+  rows Q364_JovialAccordion <cond>=3 <state>=STARTED items=1
+  items 57=0
+action barbado
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S SystemMessage id=54 3:4421
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q364_JovialAccordion/30959-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q364_JovialAccordion
+  items 4421=1
+  state Q364_JovialAccordion -
+  rows Q364_JovialAccordion -

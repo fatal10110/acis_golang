@@ -1,0 +1,26 @@
+# Bard's Mandolin (Q362), level 14: Swan turns the character away. Expectations replay the reference trace
+# of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q362_bards_mandolin_low_level.golden
+character Mandolin 14
+script quest.Q362_BardsMandolin
+item 57 4316 4317 4410
+page default/30957.htm
+page default/30956.htm
+page default/30958.htm
+page merchant/30837.htm
+page script/quest/Q362_BardsMandolin/
+npc swan 30957 Folk 10 0 0
+npc nanarin 30956 Folk 20 0 0
+npc galion 30958 Folk 30 0 0
+npc woodrow 30837 Merchant -10 0 0
+
+action swan
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q362_BardsMandolin/30957-2.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q362_BardsMandolin -
