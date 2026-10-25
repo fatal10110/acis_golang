@@ -465,8 +465,9 @@ func TestFrintezzaPlaysHisLastSong(t *testing.T) {
 }
 
 // TestFrintezzaDies runs arg1 8 at stage 5: 7.5 s later he dies by his own
-// hand. Dying (the hook runs 3 s after the death), he gives up memo key 4, seals the tomb, sets his db value 0
-// and runs maker event 1001 on frintessa_teleportcuve.
+// hand. Dying (the hook runs 3 s after the death), he gives up memo key
+// 4, seals the tomb, sets his db value 0 and runs maker event 1001 on
+// frintessa_teleportcuve.
 func TestFrintezzaDies(t *testing.T) {
 	t.Parallel()
 	w, f := bootFrintezzaFighting(t)

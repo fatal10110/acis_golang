@@ -300,14 +300,17 @@ func TestFrintezzaSealsTheTomb(t *testing.T) {
 // TestFrintezzaResumesHisStage runs the created hook from a row restored
 // at each stage. At 1 he runs maker event 1001 on frintessa_2515_m01 and
 // leaves the doors be. At 2 he runs maker event 1000 there and, 10 minutes
-// later, jumps to his hall facing 16384 with every door closed. At 3 and 5
+// later, jumps to his hall facing 16384 with every door closed. At 3 to 7
 // he closes every door, leaves his organ dummy at the hall facing 16384,
 // runs maker event 1000 and plays the stage's song: at 3 the plain music
 // (5006 level 1, screen text 1000527) after five missed draws; at 5 the
 // healing song (5007 level 1, 1000522) on a draw of 1999 of 2000. A second
 // later, his timer 3000 plays the fight song of the stage: at 5 its
 // healing odds are 2 in 10000, so a draw of 2 then 1999 is the song of
-// power (5007 level 3, 1000523).
+// power (5007 level 3, 1000523). At 4 both songs are the plain music; at 6
+// a draw of 1499 heals, then 1 and 1499 play power (healing odds 1); at 7
+// draws of 0 and 1499 play power, then 0, 9999 and 624 the psycho song
+// (5007 level 5, 1000525).
 func TestFrintezzaResumesHisStage(t *testing.T) {
 	t.Parallel()
 	t.Run("1", func(t *testing.T) {
@@ -349,6 +352,9 @@ func TestFrintezzaResumesHisStage(t *testing.T) {
 	}{
 		{3, []int{0, 0, 0, 0, 0}, "5006-1", []int{0, 0, 0, 0, 0}, "5006-1", 1000527},
 		{5, []int{1999}, "5007-1", []int{2, 1999}, "5007-3", 1000523},
+		{4, []int{0, 0, 0, 0, 0}, "5006-1", []int{0, 0, 0, 0, 0}, "5006-1", 1000527},
+		{6, []int{1499}, "5007-1", []int{1, 1499}, "5007-3", 1000523},
+		{7, []int{0, 1499}, "5007-3", []int{0, 9999, 624}, "5007-5", 1000525},
 	} {
 		t.Run(fmt.Sprint(tc.value), func(t *testing.T) {
 			t.Parallel()
