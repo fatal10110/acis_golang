@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/queenant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/sailren"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/sirra"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/zaken"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
@@ -231,6 +232,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.boss.sailren.SailrenDummy":             sailren.SailrenDummy,
 	"script.ai.boss.sailren.StatueOfShilen":           sailren.StatueOfShilen,
 	"script.ai.boss.sirra.FreyaDeacon":                sirra.FreyaDeacon,
+	"script.ai.boss.zaken.Zaken":                      zaken.Zaken,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
