@@ -170,6 +170,13 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplash":       warrior.CastSplash,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit":   warrior.Agit02DoomTrooperAgit,
 
+	// The summon, lab clan and heal casters.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSummonPC.WarriorCastSummonPC":                                                         warrior.CastSummonPC,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchantLabClan1.WarriorCastingEnchantLabClan1":                                     warrior.CastingEnchantLabClan1,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchantLabClan1.WarriorCastingEnchantLabClan2.WarriorCastingEnchantLabClan2":       warrior.CastingEnchantLabClan2,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchantLabClan1.WarriorCastingEnchantLabClan2.WarriorPhysicalSpecialLabAggressive": warrior.PhysicalSpecialLabAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingHeal.WarriorCastingHeal":                                                           warrior.CastingHeal,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                                 monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                   monsterbehavior.WizardBehavior,
