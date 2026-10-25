@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/banditstronghold"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/wildbeastreserve"
 )
 
 // siegableHall is the catalog of the siegable clan hall scripts and behaviors (#3502).
@@ -41,6 +42,6 @@ func siegableHall() script.Catalog {
 		"script.siegablehall.FortressOfResistance":                                      nil,
 		"script.siegablehall.FortressOfTheDead":                                         nil,
 		"script.siegablehall.RainbowSpringsChateau":                                     nil,
-		"script.siegablehall.WildBeastReserve":                                          nil,
+		"script.siegablehall.WildBeastReserve":                                          wildbeastreserve.New,
 	}
 }
