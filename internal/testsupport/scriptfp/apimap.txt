@@ -265,7 +265,7 @@ Quest.callSkill script.Script.CallSkill
 Quest.newQuestState script.Script.NewQuestState
 QuestState.isCompleted script.QuestState.IsCompleted
 SkillTable.FrequentSkill.getSkill inline
-ThreadPool.schedule script.Player.After
+ThreadPool.schedule script.Player.After,script.Hall.Schedule
 World.getNpc script.Script.WorldNPC
 WorldObject.getActingPlayer script.ActingPlayer
 
@@ -690,7 +690,7 @@ Quest.addPartyDied inline
 # hall on the clan handle (FlagWar.registerClan).
 Clan.getClanHallId script.Player.ClanHallID,script.ClanHandle.ClanHallID
 Clan.getLeader inline
-ClanMember.getPlayerInstance script.Player.ClanLeader
+ClanMember.getPlayerInstance script.Player.ClanLeader,script.ClanHandle.ClanLeader
 
 # Script-facing API freeze, finishing lane (#3748). A script neither logs
 # nor holds a database connection: the domain operation it calls reads,
@@ -858,7 +858,9 @@ CreatureStatus.setHp script.NPC.SetHP
 # behaviors and the two quests reading hall siege state run them (script.Hall,
 # bound by Script.BindHallSiege), the clans they read, the NPC clan id and the
 # clan-bound spawn. A hall getter the Go handle folds in is inline;
-# ReleaseAttackers folds the end of a siege's attacker loop.
+# ReleaseAttackers folds the end of a siege's attacker loop. A hall's
+# message to every player is Announce, to the members of chosen clans
+# TellClans (Rainbow Springs).
 Clan.getClanId script.ClanHandle.ID
 Clan.getDissolvingExpiryTime script.ClanHandle.DissolvingExpiry
 Clan.getLeaderId script.ClanHandle.LeaderID
@@ -910,7 +912,7 @@ SiegableHall.updateSiegeStatus script.Hall.SetSiegeStatus
 SiegeZone.setActive script.Hall.SetBattlefieldActive
 Spawn.new script.Spawner.SpawnForClan
 Spawn.setLoc inline
-SystemMessage.addFortId script.Hall.Announce
+SystemMessage.addFortId script.Hall.Announce,script.Hall.TellClans
 SystemMessage.addString script.Hall.Announce
 World.toAllOnlinePlayers script.Hall.Announce
 WorldObject.forEachKnownTypeInRadius script.NPC.PlayersInRadius
@@ -924,10 +926,14 @@ ZoneType.getKnownTypeInside script.Hall.PlayersInside
 # Go name Creature.teleportTo already has.
 SpawnLocation.setHeading script.NPC.SetHeading
 
-# Siegable-hall rows, exempt from the freeze. Their only callers are the
-# Rainbow Springs hall script; each takes its Go name with the port of the
-# script making it (#3502).
-Player.stopAllEffects exempt
-Summon.unSummon exempt
-ThreadPool.execute exempt
-ZoneType.getCreatures exempt
+# Siegable-hall rows, exempt from the freeze, named by the Rainbow Springs
+# hall script, their only caller (#3502). The arena entry strips a member's
+# effects on the player handle and dismisses its summon through a function
+# of the summon's handle; its pool tasks, the game's end run at once among
+# them, are steps armed on the hall handle (Hall.Schedule, also the second
+# Go name of ThreadPool.schedule); the players on the hall's battlefield are
+# read on the hall handle.
+Player.stopAllEffects script.Player.StopAllEffects
+Summon.unSummon script.Unsummon
+ThreadPool.execute script.Hall.Schedule
+ZoneType.getCreatures script.Hall.PlayersOnBattlefield

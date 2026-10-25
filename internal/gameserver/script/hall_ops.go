@@ -21,6 +21,8 @@ import (
 type Hall struct {
 	s   *clanhall.HallSiege
 	env *Env
+	// sc is the script the handle was made for.
+	sc *Script
 }
 
 // HallSpawn names one of a hall's spawn lists.
@@ -76,7 +78,7 @@ func (s *Script) SiegableHall(id int32) *Hall {
 	if !ok {
 		return nil
 	}
-	return &Hall{s: hs, env: s.env}
+	return &Hall{s: hs, env: s.env, sc: s}
 }
 
 // HallOf returns the siegable clan hall the NPC serves, nil for none: the

@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/devastatedcastle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/fortressofresistance"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/fortressofthedead"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/rainbowspringschateau"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/wildbeastreserve"
 )
 
@@ -44,7 +45,7 @@ func siegableHall() script.Catalog {
 		"script.siegablehall.DevastatedCastle":                                          devastatedcastle.New,
 		"script.siegablehall.FortressOfResistance":                                      fortressofresistance.New,
 		"script.siegablehall.FortressOfTheDead":                                         fortressofthedead.New,
-		"script.siegablehall.RainbowSpringsChateau":                                     nil,
+		"script.siegablehall.RainbowSpringsChateau":                                     rainbowspringschateau.New,
 		"script.siegablehall.WildBeastReserve":                                          wildbeastreserve.New,
 	}
 }
