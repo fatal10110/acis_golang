@@ -1,0 +1,23 @@
+# Conquest of Alligator Island (Q354), refused: a level 37 character is too young for Kluck, and
+# the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q354_conquest_of_alligator_island_low_level.golden
+character Kluck 37
+script quest.Q354_ConquestOfAlligatorIsland
+item 57 5863 5864 5915
+page warehouse/30895.htm
+page script/quest/Q354_ConquestOfAlligatorIsland/
+npc kluck 30895 WarehouseKeeper 10 0 0
+npc crokian 20804 Monster 40 0 0
+
+# Kluck: too young.
+action kluck
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+bypass npc_{kluck}_Quest
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q354_ConquestOfAlligatorIsland CREATED
+  rows Q354_ConquestOfAlligatorIsland -

@@ -1,0 +1,78 @@
+# Dig Up the Sea of Spores (Q356): a level 43 character accepts at Gauen through his pages; he
+# waits for spores; a rotting tree gives a herb spore (every roll pinned to succeed) and he still
+# waits; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q356_dig_up_the_sea_of_spores.golden
+character Gauen 43
+random always 0
+script quest.Q356_DigUpTheSeaOfSpores
+item 57 5865 5866
+page trainer/30717.htm
+page script/quest/Q356_DigUpTheSeaOfSpores/
+npc gauen 30717 Trainer 10 0 0
+npc tree 20558 Monster 40 0 0
+npc zombie 20562 Monster -40 0 0
+
+# Gauen: accept through 30717-03, 04 and 05.
+action gauen
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q356_DigUpTheSeaOfSpores 30717-03.htm
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-03.htm
+  S ActionFailed
+bypass Quest Q356_DigUpTheSeaOfSpores 30717-04.htm
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-04.htm
+  S ActionFailed
+bypass Quest Q356_DigUpTheSeaOfSpores 30717-05.htm
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-05.htm
+  S ActionFailed
+bypass Quest Q356_DigUpTheSeaOfSpores 30717-06.htm
+  S QuestList 356:0x80000001
+  S ExShowQuestMark quest=356
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-06.htm
+  S ActionFailed
+  Q upsert Q356_DigUpTheSeaOfSpores | <state> | STARTED
+  Q upsert Q356_DigUpTheSeaOfSpores | <cond> | 1
+  rows Q356_DigUpTheSeaOfSpores <cond>=1 <state>=STARTED
+  state Q356_DigUpTheSeaOfSpores STARTED
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# A rotting tree: a herb spore.
+kill tree
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5866
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5866=1
+  rows Q356_DigUpTheSeaOfSpores <cond>=1 <state>=STARTED
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-07.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q356_DigUpTheSeaOfSpores <cond>=1 <state>=STARTED
+  items 5866=1

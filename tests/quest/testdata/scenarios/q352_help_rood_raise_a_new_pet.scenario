@@ -1,0 +1,107 @@
+# Help Rood Raise a New Pet (Q352): a level 39 character accepts at Rood through his pages; Rood
+# has no eggs to buy; two Lienriks give an egg each (every roll pinned to the first egg); Rood buys
+# them; then the character quits at Rood and the quest ends; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q352_help_rood_raise_a_new_pet.golden
+character Rood 39
+random always 0
+script quest.Q352_HelpRoodRaiseANewPet
+item 57 5860 5861
+page merchant/31067.htm
+page script/quest/Q352_HelpRoodRaiseANewPet/
+npc rood 31067 Merchant 10 0 0
+npc lienrik 20786 Monster 40 0 0
+
+# Rood: accept through 31067-02 and 03.
+action rood
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+bypass npc_{rood}_Quest
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q352_HelpRoodRaiseANewPet 31067-02.htm
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-02.htm
+  S ActionFailed
+bypass Quest Q352_HelpRoodRaiseANewPet 31067-03.htm
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-03.htm
+  S ActionFailed
+bypass Quest Q352_HelpRoodRaiseANewPet 31067-04.htm
+  S QuestList 352:0x80000001
+  S ExShowQuestMark quest=352
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-04.htm
+  S ActionFailed
+  Q upsert Q352_HelpRoodRaiseANewPet | <state> | STARTED
+  Q upsert Q352_HelpRoodRaiseANewPet | <cond> | 1
+  rows Q352_HelpRoodRaiseANewPet <cond>=1 <state>=STARTED
+  state Q352_HelpRoodRaiseANewPet STARTED
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+bypass npc_{rood}_Quest
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two Lienriks: an egg each.
+kill lienrik x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5860
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5860
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5860=2
+
+# Rood buys the eggs.
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+bypass npc_{rood}_Quest
+  S SystemMessage id=301 3:5860 6:2
+  S SystemMessage id=52 6:2068
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 5860=0 57=2068
+bypass Quest Q352_HelpRoodRaiseANewPet 31067-07.htm
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-07.htm
+  S ActionFailed
+
+# Rood: the character quits.
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+bypass npc_{rood}_Quest
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q352_HelpRoodRaiseANewPet 31067-09.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-09.htm
+  S ActionFailed
+  Q delete-quest Q352_HelpRoodRaiseANewPet
+  state Q352_HelpRoodRaiseANewPet -
+  rows Q352_HelpRoodRaiseANewPet -
+relog
+  rows Q352_HelpRoodRaiseANewPet -
+  items 57=2068
