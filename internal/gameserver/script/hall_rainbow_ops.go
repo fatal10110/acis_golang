@@ -2,6 +2,7 @@ package script
 
 import (
 	"slices"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -36,6 +37,10 @@ func (h *Hall) RemoveDecrees(clanID int32) (int, bool) {
 	return h.env.Halls.RemoveRainbowDecrees(clanID)
 }
 
+// DropDecrees drops the Rainbow Springs war decrees clanID handed in,
+// keeping their stored row until the decrees are cleared.
+func (h *Hall) DropDecrees(clanID int32) { h.env.Halls.ForgetRainbowDecrees(clanID) }
+
 // ClearDecrees drops, and stores, every clan's Rainbow Springs war decrees.
 func (h *Hall) ClearDecrees() { h.env.Halls.ClearRainbowDecrees() }
 
@@ -53,6 +58,31 @@ func (h *Hall) DecreeEntries() []IntMapEntry[int] {
 		walk.Set(id, decrees[id])
 	}
 	return walk.Entries()
+}
+
+// HallTask is a step a hall script armed to run later (Hall.Schedule).
+type HallTask struct {
+	t *sim.Timer
+}
+
+// Cancel stops the step unless it has run already. A nil task does
+// nothing.
+func (t *HallTask) Cancel() {
+	if t != nil && t.t != nil {
+		t.t.Stop()
+	}
+}
+
+// Schedule runs fn once d has passed, on the halls' queue, as one
+// invocation of the script the handle was made for: a panic aborts it and
+// is logged, as a hook's is. Before the halls start nothing is armed and
+// fn never runs. It returns the step, which Cancel stops.
+func (h *Hall) Schedule(d time.Duration, fn func()) *HallTask {
+	run := fn
+	if sc := h.sc; sc != nil {
+		run = func() { sc.runHall("task", fn) }
+	}
+	return &HallTask{t: h.s.After(d, run)}
 }
 
 // PlayersOnBattlefield returns the players standing on the hall siege's

@@ -19,13 +19,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/rainbowspringschateau"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
@@ -52,7 +55,12 @@ const (
 	rainbowCaretaker       = 35603
 	rainbowCleaner         = 35600
 	rainbowGourd           = 35588
-	rainbowDecree          = 8034
+	// rainbowGourd2 is the second arena's gourd.
+	rainbowGourd2 = 35589
+	// rainbowServitor is the servitor a party member calls before the
+	// entry.
+	rainbowServitor = 14001
+	rainbowDecree   = 8034
 
 	// The clans of the Rainbow Springs scenarios: the Attacker leads
 	// Springers.
@@ -96,6 +104,7 @@ const rainbowSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 	<npcmaker name="godard06_2414_01" territory="rainbow_post" spawnTime="agit_defend_warfare_start(62)" maximumNpcs="4">
 		<ai type="default_maker"/>
 		<npc id="35588" pos="151557;-126987;-2224;0" total="1" respawn="2hour"/>
+		<npc id="35589" pos="153135;-125425;-2224;0" total="1" respawn="2hour"/>
 	</npcmaker>
 </list>`
 
@@ -165,7 +174,11 @@ func bootRainbow(t *testing.T, s rainbowSetup) *rainbowWorld {
 	zones.Add(grounds)
 	var templates []*npc.Template
 	kinds := map[int32]script.NPCKind{}
-	for _, id := range []int{rainbowMessenger, rainbowCaretaker, rainbowCleaner, rainbowGourd} {
+	templates = append(templates, &npc.Template{
+		ID: rainbowServitor, TemplateID: rainbowServitor, Type: "Servitor", Name: "Bath Servant", Level: 20,
+		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 10, CollisionHeight: 20,
+	})
+	for _, id := range []int{rainbowMessenger, rainbowCaretaker, rainbowCleaner, rainbowGourd, rainbowGourd2} {
 		templates = append(templates, &npc.Template{
 			ID: id, TemplateID: id, Type: "Folk", Name: "Rainbow " + strconv.Itoa(id), Level: 1, HPMax: 1000,
 			AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 10,
@@ -423,6 +436,45 @@ func (w *rainbowWorld) invite(t *testing.T, c *testsupport.ScriptedClient, name 
 	drainFrames(t, w.c)
 }
 
+// buffAndSummon lands a buff on the member id and has it call a servitor.
+func (w *rainbowWorld) buffAndSummon(t *testing.T, id int32) *player.Character {
+	t.Helper()
+	obj, ok := w.srv.State.Player(id)
+	if !ok {
+		t.Fatalf("player %#x is not in the world", id)
+	}
+	c, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("player %#x = %T, want an online character", id, obj)
+	}
+	onPlayerQueue(t, w.srv, id, func() {
+		e, err := effect.New(effect.Skill{ID: 1040, Level: 1, SkillType: "BUFF"}, skill.EffectTemplate{Name: "Buff", Time: 1200, Icon: true})
+		if err != nil {
+			t.Errorf("effect.New: %v", err)
+			return
+		}
+		e.Effector, e.Effected = c, c
+		c.EffectList().Add(e)
+		c.SummonServitor(skill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: rainbowServitor, SummonTotalLifeTime: 1_200_000})
+	})
+	w.srv.AdvanceUntil(t, "the servitor is in the world", func() bool {
+		_, ok := w.srv.State.Summon(id)
+		return ok
+	})
+	var effects int
+	onPlayerQueue(t, w.srv, id, func() { effects = len(c.EffectList().All()) })
+	if effects != 1 {
+		t.Fatalf("the member holds %d effects after the buff, want 1", effects)
+	}
+	return c
+}
+
+// advanceTo lets the driven clock run to at, in Unix milliseconds.
+func (w *rainbowWorld) advanceTo(t *testing.T, at int64) {
+	t.Helper()
+	w.srv.Advance(t, time.Duration(at-w.srv.Halls.Now())*time.Millisecond)
+}
+
 // registrationEnd writes date as the messenger names the registrations'
 // deadline: year-month-day hour:minutes, on a 12-hour clock with no zero
 // padding but the minutes'.
@@ -516,10 +568,12 @@ func sameDecrees(a, b map[int32]int) bool {
 // Springers, Bathers, Soakers and Waders are chosen, in that order, and
 // attack; Leavers is dropped and Fifth's leader, in the world, is told its
 // registration failed; Springers' members are told the registrations
-// ended and they are registered. The caretaker opens; it refuses the
-// Attacker leading no party (game_manager005) and a member who does not
-// lead (004), and lets the Attacker's party of five Springers into the
-// first arena, answering with the link's own name. The countdown runs to
+// ended and they are registered; Leavers' stored row stays until the
+// clear. The caretaker opens; it refuses the Attacker leading no party
+// (game_manager005) and a member who does not lead (004), and lets the
+// Attacker's party of five Springers into the first arena, answering with
+// the link's own name: the member who held a buff and a servitor loses the
+// buff, is shown its emptied effects, and its servitor leaves the world. The countdown runs to
 // the start an hour later: Springers is told the game began, and the
 // caretaker tells the players around it; the arena's gourd stands. The
 // Attacker breaking its arena's gourd ends the game as a draw: the gourd
@@ -564,8 +618,8 @@ func TestRainbowSpringsSiegeRunsTheGame(t *testing.T) {
 	if got := sysMsgIDs(t, drainFrames(t, w.c)); !slices.Equal(got, []string{"1823", "1824"}) {
 		t.Fatalf("the Attacker got %v, want CLANHALL_WAR_REGISTRATION_PERIOD_ENDED, REGISTERED_FOR_CLANHALL_WAR", got)
 	}
-	if got := w.storedDecrees(t); got[springersClanID] != 9 || got[fifthClanID] != 1 {
-		t.Fatalf("stored decrees after the choice = %v, want Springers' and Fifth's kept", got)
+	if got := w.storedDecrees(t); got[springersClanID] != 9 || got[fifthClanID] != 1 || got[leaversClanID] != 4 {
+		t.Fatalf("stored decrees after the choice = %v, want every row kept, Leavers' too, until the clear", got)
 	}
 
 	wantRainbowPage(t, "caretaker after the choice", w.talk(t, w.c, caretaker), "game_manager001.htm")
@@ -575,6 +629,9 @@ func TestRainbowSpringsSiegeRunsTheGame(t *testing.T) {
 	for i, m := range members {
 		w.invite(t, clients[i], m.name)
 	}
+	buffed := w.buffAndSummon(t, members[0].id)
+	drainFrames(t, clients[0])
+	drainFrames(t, w.c)
 	frames := w.link(t, w.c, "portToArena")
 	if got := sysMsgParams(t, frames); !slices.ContainsFunc(got, func(p []string) bool { return slices.Contains(p, "portToArena") }) {
 		t.Fatalf("arena entry answered %v, want the link's name as a message", got)
@@ -592,6 +649,17 @@ func TestRainbowSpringsSiegeRunsTheGame(t *testing.T) {
 		if x, y, _ := w.srv.PlayerPosition(t, id); abs(x-rainbowArena1.X) > 50 || abs(y-rainbowArena1.Y) > 50 {
 			t.Fatalf("party member %#x at %d,%d after the entry, want the first arena %v", id, x, y, rainbowArena1)
 		}
+	}
+	var effects int
+	onPlayerQueue(t, w.srv, members[0].id, func() { effects = len(buffed.EffectList().All()) })
+	if effects != 0 {
+		t.Fatalf("the buffed member holds %d effects after the entry, want none", effects)
+	}
+	if _, ok := firstOpcode(drainFrames(t, clients[0]), serverpackets.OpcodeAbnormalStatusUpdate); !ok {
+		t.Fatal("the buffed member was not shown its emptied effects")
+	}
+	if _, ok := w.srv.State.Summon(members[0].id); ok {
+		t.Fatal("the member's servitor is still in the world after the entry")
 	}
 	for _, c := range clients {
 		drainFrames(t, c)
@@ -693,5 +761,64 @@ func TestRainbowSpringsSiegeCalledOffWithOneClan(t *testing.T) {
 	}
 	if owner := w.hallOwner(t); owner != 0 {
 		t.Fatalf("hall owner after the call-off = %#x, want none", owner)
+	}
+}
+
+// TestRainbowSpringsGameRunsOutOfTime runs a Rainbow Springs game between
+// Springers and Bathers that no one wins. A player of Springers, the first
+// clan chosen, breaking the second arena's gourd ends nothing. The game
+// ends as a draw two minutes before the siege's length runs out, 58
+// minutes after its start and not a millisecond sooner: Springers is told,
+// the gourds leave, the hall's maker places its four cleaners, the
+// registrations open for the next date and every registration is dropped.
+func TestRainbowSpringsGameRunsOutOfTime(t *testing.T) {
+	t.Parallel()
+	w := bootRainbow(t, rainbowSetup{date: 2 * time.Hour, decrees: map[int32]int{springersClanID: 9, bathersClanID: 5}})
+	date := w.siege.Date()
+	w.advanceTo(t, date)
+	w.srv.Advance(t, 0)
+	start := date + time.Hour.Milliseconds()
+	w.advanceTo(t, start)
+	w.srv.Advance(t, 0)
+	if !w.siege.InProgress() {
+		t.Fatal("the game did not start")
+	}
+	drainFrames(t, w.c)
+
+	second := w.npcOf(t, rainbowGourd2)
+	w.srv.RunScript(t, w.objID, "RainbowSpringsChateau", func(s *script.Script, p *script.Player) {
+		s.SiegableHall(rainbowHall).SetMiniGameWinner(script.NPCOf(second), p)
+	})
+	w.srv.Advance(t, 0)
+	if !w.siege.InProgress() {
+		t.Fatal("breaking another clan's gourd ended the game")
+	}
+	if got := sysMsgIDs(t, drainFrames(t, w.c)); len(got) != 0 {
+		t.Fatalf("breaking another clan's gourd sent %v, want nothing", got)
+	}
+
+	end := start + (58 * time.Minute).Milliseconds()
+	w.advanceTo(t, end-1)
+	if !w.siege.InProgress() || len(w.npcsOf(rainbowCleaner)) != 0 {
+		t.Fatal("the game ended before its time ran out")
+	}
+	w.advanceTo(t, end)
+	if got := sysMsgIDs(t, drainFrames(t, w.c)); !slices.Equal(got, []string{"856 62"}) {
+		t.Fatalf("the time-out sent the Attacker %v, want SIEGE_S1_DRAW", got)
+	}
+	if w.siege.Status() != siege.StatusRegistrationOpened {
+		t.Fatalf("status after the time-out = %v, want registration opened", w.siege.Status())
+	}
+	if got := len(w.npcsOf(rainbowGourd)) + len(w.npcsOf(rainbowGourd2)); got != 0 {
+		t.Fatalf("gourds after the time-out = %d, want none", got)
+	}
+	if got := len(w.npcsOf(rainbowCleaner)); got != 4 {
+		t.Fatalf("cleaners after the time-out = %d, want 4", got)
+	}
+	if got := w.storedDecrees(t); len(got) != 0 {
+		t.Fatalf("stored decrees after the time-out = %v, want none", got)
+	}
+	if next := w.siege.Date(); next <= date {
+		t.Fatalf("next siege date %d, want after %d", next, date)
 	}
 }

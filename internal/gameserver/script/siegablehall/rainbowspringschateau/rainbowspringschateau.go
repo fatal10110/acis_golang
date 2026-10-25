@@ -53,25 +53,20 @@ const (
 	defendSpawnTime    = "agit_defend_warfare_start"
 )
 
-// The script's delayed steps: the choice of the clans, the game's start
-// and end, the end the hall's siege or the mini game asks for, the players'
-// trip to town after it, and the countdown to the start.
+// The script's delayed steps.
 const (
-	timerFinalAttackers    = "rainbow-final-attackers"
-	timerSiegeStart        = "rainbow-siege-start"
-	timerSiegeEnd          = "rainbow-siege-end"
-	timerEndNow            = "rainbow-end-now"
-	timerTeleportOut       = "rainbow-teleport-out"
-	timerRegistrationEnded = "rainbow-registration-ended"
-	timerMinutes           = "rainbow-minutes-"
-	timerSeconds           = "rainbow-seconds-"
-
 	// siegeEndMargin is how long before the siege's length runs out the
 	// game ends.
 	siegeEndMargin = 120000 * time.Millisecond
 	// teleportOutDelay is how long after the game's end the players left
 	// on the battlefield go to town.
 	teleportOutDelay = 120000 * time.Millisecond
+
+	// taskNextSiege is the next step of the siege's cycle armed: the
+	// choice of the clans or the game's start; taskSiegeEnd the game's end
+	// as its time runs out.
+	taskNextSiege = iota
+	taskSiegeEnd
 )
 
 // The links the messenger and the caretaker answer.
@@ -105,11 +100,13 @@ type chateau struct {
 	// registrationEnds is the registrations' deadline the messenger names,
 	// in Unix milliseconds; 0 until set.
 	registrationEnds *script.IntCell
+	// tasks are the steps armed last, by kind (taskNextSiege, taskSiegeEnd).
+	tasks *script.MapCell[int, *script.HallTask]
 }
 
 // New returns the Rainbow Springs Chateau's hall script.
 func New() script.Script {
-	c := &chateau{accepted: &script.ListCell[int32]{}, caretaker: &script.NPCCell{}, registrationEnds: &script.IntCell{}}
+	c := &chateau{accepted: &script.ListCell[int32]{}, caretaker: &script.NPCCell{}, registrationEnds: &script.IntCell{}, tasks: &script.MapCell[int, *script.HallTask]{}}
 	base := script.Hooks{}.Named("ClanHallSiege")
 	return script.Script{
 		Dir: "siegablehall",
@@ -125,7 +122,6 @@ func New() script.Script {
 			},
 			OnFirstTalk: c.firstTalk,
 			OnEvent:     c.event,
-			OnTimer:     c.timer,
 		}),
 	}
 }
@@ -136,9 +132,9 @@ func New() script.Script {
 func (c *chateau) bindHall(s *script.Script) {
 	h := s.BindHallSiege(rainbowSprings, script.HallSiegeHooks{
 		Start: func(*script.Hall, script.HallBase) {},
-		End: func(*script.Hall, script.HallBase) {
-			s.CancelTimer(timerSiegeEnd, nil, nil)
-			s.StartTimer(timerEndNow, nil, nil, 0)
+		End: func(h *script.Hall, _ script.HallBase) {
+			c.cancel(taskSiegeEnd)
+			h.Schedule(0, func() { c.siegeEnd(s, h) })
 		},
 		SpawnNPCs:      func(*script.Hall) { c.spawnNPCs(s) },
 		UnspawnNPCs:    func(*script.Hall) {},
@@ -152,7 +148,19 @@ func (c *chateau) bindHall(s *script.Script) {
 	// restored, so the date lies ahead.
 	if delay := h.SiegeDate().Sub(s.Now()); delay >= 0 {
 		c.registrationEnds.Set(int(h.SiegeDate().UnixMilli()))
-		s.StartTimer(timerFinalAttackers, nil, nil, delay)
+		c.arm(taskNextSiege, h, delay, func() { c.setFinalAttackers(s, h) })
+	}
+}
+
+// arm arms fn after d as the step of kind armed last.
+func (c *chateau) arm(kind int, h *script.Hall, d time.Duration, fn func()) {
+	c.tasks.Set(kind, h.Schedule(d, fn))
+}
+
+// cancel cancels the step of kind armed last.
+func (c *chateau) cancel(kind int) {
+	if t, ok := c.tasks.Delete(kind); ok {
+		t.Cancel()
 	}
 }
 
@@ -202,7 +210,7 @@ func (c *chateau) event(s *script.Script, e script.Event) string {
 		case eventRegister:
 			html = register(s, h, p)
 		case eventCancel:
-			html = c.cancel(s, h, p)
+			html = c.cancelRegistration(s, h, p)
 		}
 	case caretaker:
 		if e.Name == eventPortToArena {
@@ -243,9 +251,9 @@ func register(s *script.Script, h *script.Hall, p *script.Player) string {
 	return "messenger_yetti009.htm"
 }
 
-// cancel cancels the registration of the clan of p, its leader, while the
+// cancelRegistration cancels the registration of the clan of p, its leader, while the
 // registrations are open, giving back half its decrees.
-func (c *chateau) cancel(s *script.Script, h *script.Hall, p *script.Player) string {
+func (c *chateau) cancelRegistration(s *script.Script, h *script.Hall, p *script.Player) string {
 	html := eventCancel
 	if !p.IsClanLeader() {
 		return "messenger_yetti010.htm"
@@ -318,36 +326,6 @@ func (c *chateau) portToArena(s *script.Script, h *script.Hall, p *script.Player
 	return html
 }
 
-// timer runs the script's delayed steps.
-func (c *chateau) timer(s *script.Script, e script.Timer) string {
-	h := s.SiegableHall(rainbowSprings)
-	if h == nil {
-		return ""
-	}
-	switch {
-	case e.Name == timerFinalAttackers:
-		c.setFinalAttackers(s, h)
-	case e.Name == timerSiegeStart:
-		c.siegeStart(s, h)
-	case e.Name == timerSiegeEnd, e.Name == timerEndNow:
-		c.siegeEnd(s, h)
-	case e.Name == timerTeleportOut:
-		for _, p := range h.PlayersOnBattlefield() {
-			p.TeleportToTown()
-		}
-	case e.Name == timerRegistrationEnded:
-		c.tell(h, false, script.SiegeMessage{ID: msgRegistrationPeriodEnded})
-		c.tell(h, false, script.SiegeMessage{ID: msgRegisteredForClanHallWar})
-	case strings.HasPrefix(e.Name, timerMinutes):
-		mins, _ := strconv.ParseInt(strings.TrimPrefix(e.Name, timerMinutes), 10, 32)
-		c.tell(h, false, script.SiegeMessage{ID: msgClanHallWarBeginsMinutes, Number: int32(mins), HasNumber: true})
-	case strings.HasPrefix(e.Name, timerSeconds):
-		secs, _ := strconv.ParseInt(strings.TrimPrefix(e.Name, timerSeconds), 10, 32)
-		c.tell(h, false, script.SiegeMessage{ID: msgClanHallWarBeginsSeconds, Number: int32(secs), HasNumber: true})
-	}
-	return ""
-}
-
 // setFinalAttackers chooses the clans that play: the owner, then the clans
 // that handed in the most decrees, four clans in all; the leader of each
 // clan left over is told it failed. With two clans or more the game starts
@@ -372,15 +350,15 @@ func (c *chateau) setFinalAttackers(s *script.Script, h *script.Hall) {
 			continue
 		}
 		if clan == nil || clan.DissolvingExpiry() > 0 {
-			h.RemoveDecrees(clanID)
+			h.DropDecrees(clanID)
 		} else {
 			c.accepted.Add(clan.ID())
 		}
 	}
 	if c.accepted.Len() >= 2 {
-		scheduleAnnouncements(s, waitTime)
-		cancelNextSiege(s)
-		s.StartTimer(timerSiegeStart, nil, nil, waitTime)
+		c.scheduleAnnouncements(h, waitTime)
+		c.cancel(taskNextSiege)
+		c.arm(taskNextSiege, h, waitTime, func() { c.siegeStart(s, h) })
 		h.SetSiegeStatus(script.SiegeRegistrationOver)
 		h.ClearAttackers()
 		for _, clanID := range c.accepted.Items() {
@@ -389,8 +367,8 @@ func (c *chateau) setFinalAttackers(s *script.Script, h *script.Hall) {
 		return
 	}
 	h.UpdateNextSiege()
-	cancelNextSiege(s)
-	s.StartTimer(timerFinalAttackers, nil, nil, h.SiegeDate().Sub(s.Now()))
+	c.cancel(taskNextSiege)
+	c.arm(taskNextSiege, h, h.SiegeDate().Sub(s.Now()), func() { c.setFinalAttackers(s, h) })
 	h.SetSiegeStatus(script.SiegeRegistrationOpened)
 	h.ClearAttackers()
 	c.tell(h, true, script.SiegeMessage{ID: msgRegistrationPeriodEnded})
@@ -413,7 +391,7 @@ func (c *chateau) siegeStart(s *script.Script, h *script.Hall) {
 	}
 	c.tell(h, false, script.SiegeMessage{ID: msgSiegeBegun, CastleID: int(rainbowSprings)})
 	h.SetSiegeStatus(script.SiegeInProgress)
-	s.StartTimer(timerSiegeEnd, nil, nil, h.SiegeLength()-siegeEndMargin)
+	c.arm(taskSiegeEnd, h, h.SiegeLength()-siegeEndMargin, func() { c.siegeEnd(s, h) })
 	c.spawnNPCs(s)
 }
 
@@ -437,14 +415,18 @@ func (c *chateau) siegeEnd(s *script.Script, h *script.Hall) {
 	}
 	s.Spawner().StopSpawnTime(defendSpawnTime, "62")
 	h.UpdateNextSiege()
-	cancelNextSiege(s)
-	s.StartTimer(timerFinalAttackers, nil, nil, h.SiegeDate().Sub(s.Now()))
+	c.cancel(taskNextSiege)
+	c.arm(taskNextSiege, h, h.SiegeDate().Sub(s.Now()), func() { c.setFinalAttackers(s, h) })
 	h.SetSiegeStatus(script.SiegeRegistrationOpened)
 	h.ClearAttackers()
 	c.registrationEnds.Set(int(h.SiegeDate().UnixMilli()))
 	h.ClearDecrees()
 	c.accepted.Clear()
-	s.StartTimer(timerTeleportOut, nil, nil, teleportOutDelay)
+	h.Schedule(teleportOutDelay, func() {
+		for _, p := range h.PlayersOnBattlefield() {
+			p.TeleportToTown()
+		}
+	})
 }
 
 // miniGameWinner ends the game once a player of a chosen clan broke the
@@ -462,28 +444,28 @@ func (c *chateau) miniGameWinner(s *script.Script, h *script.Hall, gourd *script
 		return
 	}
 	if gourd.NpcID() == arenaGourds[index] {
-		s.CancelTimer(timerSiegeEnd, nil, nil)
-		s.StartTimer(timerEndNow, nil, nil, 0)
+		c.cancel(taskSiegeEnd)
+		h.Schedule(0, func() { c.siegeEnd(s, h) })
 	}
 }
 
 // scheduleAnnouncements counts down the game's start, due after delay, to
 // the chosen clans.
-func scheduleAnnouncements(s *script.Script, delay time.Duration) {
-	s.StartTimer(timerRegistrationEnded, nil, nil, delay-time.Duration(3600*1000)*time.Millisecond)
+func (c *chateau) scheduleAnnouncements(h *script.Hall, delay time.Duration) {
+	h.Schedule(delay-time.Duration(3600*1000)*time.Millisecond, func() {
+		c.tell(h, false, script.SiegeMessage{ID: msgRegistrationPeriodEnded})
+		c.tell(h, false, script.SiegeMessage{ID: msgRegisteredForClanHallWar})
+	})
 	for _, mins := range []int{50, 40, 30, 20, 10, 5, 3, 2, 1} {
-		s.StartTimer(timerMinutes+strconv.Itoa(mins), nil, nil, delay-time.Duration(mins*60*1000)*time.Millisecond)
+		h.Schedule(delay-time.Duration(mins*60*1000)*time.Millisecond, func() {
+			c.tell(h, false, script.SiegeMessage{ID: msgClanHallWarBeginsMinutes, Number: int32(mins), HasNumber: true})
+		})
 	}
 	for _, secs := range []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1} {
-		s.StartTimer(timerSeconds+strconv.Itoa(secs), nil, nil, delay-time.Duration(secs*1000)*time.Millisecond)
+		h.Schedule(delay-time.Duration(secs*1000)*time.Millisecond, func() {
+			c.tell(h, false, script.SiegeMessage{ID: msgClanHallWarBeginsSeconds, Number: int32(secs), HasNumber: true})
+		})
 	}
-}
-
-// cancelNextSiege cancels the next step of the siege's cycle: the choice of
-// the clans or the game's start.
-func cancelNextSiege(s *script.Script) {
-	s.CancelTimer(timerFinalAttackers, nil, nil)
-	s.CancelTimer(timerSiegeStart, nil, nil)
 }
 
 // tell sends m to the members in the world of the chosen clans, the owner

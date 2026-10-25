@@ -72,7 +72,7 @@ call ClanHallSiege.cancelSiegeTask classes 4 sites 9 go script.Hall.CancelSiegeT
 call ClanHallSiege.endSiege classes 3 sites 3 go script.Hall.EndSiege
 call ClanHallSiege.getAttackerClans classes 5 sites 9 go script.Hall.Attackers
 call ClanHallSiege.unspawnNpcs classes 1 sites 1 go inline
-call ClanMember.getPlayerInstance classes 2 sites 2 go script.Player.ClanLeader
+call ClanMember.getPlayerInstance classes 2 sites 2 go script.Player.ClanLeader,script.ClanHandle.ClanLeader
 call ClanTable.getClan classes 7 sites 22 go script.Script.Clan
 call ClanTable.getClans classes 2 sites 2 go inline
 call ClanTable.getInstance classes 10 sites 25 go inline
@@ -583,8 +583,8 @@ call SystemMessage.addFortId classes 2 sites 11 go script.Hall.Announce,script.H
 call SystemMessage.addNumber classes 5 sites 7 go script.Player.SystemMessageNumbers
 call SystemMessage.addString classes 1 sites 2 go script.Hall.Announce
 call SystemMessage.getSystemMessage classes 5 sites 26 go inline
-call ThreadPool.execute classes 1 sites 2 go script.Script.StartTimer
-call ThreadPool.schedule classes 16 sites 39 go script.Player.After
+call ThreadPool.execute classes 1 sites 2 go script.Hall.Schedule
+call ThreadPool.schedule classes 16 sites 39 go script.Player.After,script.Hall.Schedule
 call ThreadPool.scheduleAtFixedRate classes 3 sites 3 go spawn.Group.Every
 call TutorialEvent.ce47Loc classes 1 sites 1 go inline
 call TutorialEvent.ce8Htm classes 1 sites 2 go inline

@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // SiegeBase is a hall siege as a step override of its script runs it: the
@@ -182,6 +183,18 @@ func (s *HallSiege) TellClans(clanIDs []int32, m siege.Message) {
 			fx.add(func() { n.TellClans(clans, m) })
 		}
 	})
+}
+
+// After runs fn on the halls' queue once d has passed and returns its
+// timer, which Stop cancels; nil, running nothing, before the halls start.
+func (s *HallSiege) After(d time.Duration, fn func()) *sim.Timer {
+	s.hs.mu.Lock()
+	q := s.hs.queue
+	s.hs.mu.Unlock()
+	if q == nil {
+		return nil
+	}
+	return q.After(max(d, 0), fn)
 }
 
 // MinClanLevel is the clan level the hall sieges ask of a clan

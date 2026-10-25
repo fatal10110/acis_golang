@@ -265,7 +265,7 @@ Quest.callSkill script.Script.CallSkill
 Quest.newQuestState script.Script.NewQuestState
 QuestState.isCompleted script.QuestState.IsCompleted
 SkillTable.FrequentSkill.getSkill inline
-ThreadPool.schedule script.Player.After
+ThreadPool.schedule script.Player.After,script.Hall.Schedule
 World.getNpc script.Script.WorldNPC
 WorldObject.getActingPlayer script.ActingPlayer
 
@@ -690,7 +690,7 @@ Quest.addPartyDied inline
 # hall on the clan handle (FlagWar.registerClan).
 Clan.getClanHallId script.Player.ClanHallID,script.ClanHandle.ClanHallID
 Clan.getLeader inline
-ClanMember.getPlayerInstance script.Player.ClanLeader
+ClanMember.getPlayerInstance script.Player.ClanLeader,script.ClanHandle.ClanLeader
 
 # Script-facing API freeze, finishing lane (#3748). A script neither logs
 # nor holds a database connection: the domain operation it calls reads,
@@ -929,10 +929,11 @@ SpawnLocation.setHeading script.NPC.SetHeading
 # Siegable-hall rows, exempt from the freeze, named by the Rainbow Springs
 # hall script, their only caller (#3502). The arena entry strips a member's
 # effects on the player handle and dismisses its summon through a function
-# of the summon's handle; the game's end, a task the reference runs at once
-# on the pool, is a script timer due at once; the players on the hall's
-# battlefield are read on the hall handle.
+# of the summon's handle; its pool tasks, the game's end run at once among
+# them, are steps armed on the hall handle (Hall.Schedule, also the second
+# Go name of ThreadPool.schedule); the players on the hall's battlefield are
+# read on the hall handle.
 Player.stopAllEffects script.Player.StopAllEffects
 Summon.unSummon script.Unsummon
-ThreadPool.execute script.Script.StartTimer
+ThreadPool.execute script.Hall.Schedule
 ZoneType.getCreatures script.Hall.PlayersOnBattlefield

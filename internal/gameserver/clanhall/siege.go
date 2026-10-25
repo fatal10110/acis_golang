@@ -593,6 +593,14 @@ func (hs *Halls) RemoveRainbowDecrees(clanID int32) (int, bool) {
 	return count, ok
 }
 
+// ForgetRainbowDecrees drops the decrees clanID handed in, keeping their
+// stored row until the decrees are cleared.
+func (hs *Halls) ForgetRainbowDecrees(clanID int32) {
+	hs.siegeMu.Lock()
+	defer hs.siegeMu.Unlock()
+	delete(hs.decrees, clanID)
+}
+
 // ClearRainbowDecrees drops, and stores, every clan's decrees.
 func (hs *Halls) ClearRainbowDecrees() {
 	hs.siegeMu.Lock()

@@ -15,9 +15,7 @@ import (
 // (Hall.TellClans); it clears the attackers through their list
 // (getAttackerClans), the port through Hall.ClearAttackers. It keeps the
 // decrees in SQL of its own and logs; the port's hall runtime stores them,
-// and nothing is logged. Its delayed steps are pool tasks, which the port
-// runs as script timers of its own names, a countdown's naming its number,
-// parsed back as a 32-bit int, and its timer hook. Its party's member list
+// and nothing is logged. Its party's member list
 // matches the name of the Quest party helper the port does not call. It
 // writes the deadline's hour on a 12-hour clock (Calendar.HOUR), the port
 // as the hour modulo 12. The port panics where the reference reads a maker
@@ -32,9 +30,6 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		`string "INSERT INTO rainbowsprings_attacker_list VALUES (?,?)"`, `string "SELECT * FROM rainbowsprings_attacker_list"`,
 		`string "clanId"`, `string "war_decrees_count"`,
 		`string "No date was set for Rainbow Springs Chateau siege. Siege is canceled."`,
-		"call ThreadPool.schedule", "call Quest.cancelQuestTimer", "hook onTimer none", "number 32",
-		`string "rainbow-end-now"`, `string "rainbow-final-attackers"`, `string "rainbow-minutes-"`, `string "rainbow-registration-ended"`,
-		`string "rainbow-seconds-"`, `string "rainbow-siege-end"`, `string "rainbow-siege-start"`, `string "rainbow-teleport-out"`,
 		"call Quest.getPartyMembers",
 		"number 12",
 		`string "rainbowspringschateau: no npcmaker "`,
