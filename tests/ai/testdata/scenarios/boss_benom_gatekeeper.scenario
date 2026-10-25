@@ -1,0 +1,27 @@
+# The Dungeon Gatekeeper of Rune castle (35506), out of a siege: the character, whose clan is
+# registered to attack Rune castle (8) before its siege starts, talks to it: it greets with its page
+# (onFirstTalk); the page's link (onTalk) finds the castle's siege not fought and sends the
+# character into Benom's dungeon: the teleport aborts what the character was doing (five
+# ActionFailed) and lands it there, and the link's empty answer releases the client. Expectations are derived from the reference source
+# (DungeonTeleporter.java 38-55).
+character Hunter 20
+clan 5
+siege 8 attacker
+script script.ai.individual.DefaultNpc
+script script.ai.boss.benom.DungeonTeleporter
+page doormen/35506.htm
+npc gatekeeper 35506 CastleDoorman 60 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=doormen/35506.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest DungeonTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=12589,-49044,-3008 fast=0
+  S ActionFailed
