@@ -54,7 +54,7 @@ func aiIndividual2() script.Catalog {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecialStoneAggressive":                                       warrior.PhysicalSpecialStoneAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecialStrongAggressive":                                      warrior.PhysicalSpecialStrongAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecialVelociraptor":                                          warrior.PhysicalSpecialVelociraptor,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorSaintTransform":                                                       nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorSaintTransform":                                                       warrior.SaintTransform,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorUsePowershotAggressive":                                               warrior.UsePowershotAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.ZakenPrivatePirateZombie":                                                    warrior.ZakenPrivatePirateZombie,
 	}
