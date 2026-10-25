@@ -1,0 +1,51 @@
+# Orfen (29014), a level 1 grand boss standing 500 from the level 1 character, hit for 10 at a
+# time. A hit from 300 to 1000 away pulls the character on a draw under 10 of 100: a draw of 100
+# names it in one of three lines (under 33, under 66, the rest), the character is teleported to
+# where Orfen stands, once Orfen's task is done, and Orfen wants its paralysis (4063) on it, which
+# it starts at once the first time. The hit also adds damage / max MP (1000) / 0.05 * 10000,
+# truncated (1999), to its attack desire. A relog after each pull lets the character, which never
+# sends Appearing here, be hit at again. A hit from within 300 draws only the area paralysis
+# chance (19, under 20: its area paralysis 4064 aimed at itself, which the area skill refuses); one
+# from 1000 away draws the pull chance first (0) and is still not pulled, then the area chance
+# (99). Every listed draw must be drawn, so the draws show each branch taken.
+character Hunter 1
+random 0 0 9 33 0 66 19 20 0 99
+script script.ai.individual.DefaultNpc
+script script.ai.boss.orfen.Orfen
+npc orfen 29014 GrandBoss 500 0 0 skill HOLD_MAGIC 4063 1 skill DD_MAGIC 4064 1
+
+hit orfen 10
+  S NpcSay obj=orfen type=0 npc=1029014 text="Hunter. Stop kidding yourself about your own powerlessness!"
+  S MagicSkillUse caster=orfen target=player skill=4063-1 hit=4757 reuse=0 success=0
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=510,20,30 fast=0
+  desires orfen attack(player)=1999 cast(player,4063,move)=1000000
+relog
+jump orfen 1000 0 0
+hit orfen 10
+  S NpcSay obj=orfen type=0 npc=1029014 text="Hunter. I'll make you feel what true fear is!"
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=1010,20,30 fast=0
+relog
+jump orfen 1500 0 0
+hit orfen 10
+  S NpcSay obj=orfen type=0 npc=1029014 text="You're really stupid to have challenged me. Hunter! Get ready!"
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=1510,20,30 fast=0
+relog
+hit orfen 10
+hit orfen 10
+jump orfen 2500 0 0
+hit orfen 10
