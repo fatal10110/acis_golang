@@ -232,6 +232,7 @@ type options struct {
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
 	wantChars              int
+	objectIDStart          int32
 	enchantRoll            func() float64
 	recipes                *recipe.Table
 	hennas                 *henna.Table
@@ -793,6 +794,11 @@ func WithSummonItems(items *item.SummonItemTable) Option {
 // WithWantChars asserts how many characters CharSelectInfo reports after the
 // handshake.
 func WithWantChars(n int) Option { return func(o *options) { o.wantChars = n } }
+
+// WithObjectIDsAfter makes the object id sequence hand out the ids after
+// start (default: after 100), so a suite can keep its objects' ids out of
+// the range of the small numbers a page or packet carries.
+func WithObjectIDsAfter(start int32) Option { return func(o *options) { o.objectIDStart = start } }
 
 // WithEnchantConfig sets the players.properties scroll-of-enchant rates and
 // limits; without it the shipped defaults apply.
@@ -2031,7 +2037,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if itemTemplates == nil {
 		itemTemplates = ItemTemplates()
 	}
-	ids := newSequentialIDs(100)
+	idStart := o.objectIDStart
+	if idStart == 0 {
+		idStart = 100
+	}
+	ids := newSequentialIDs(idStart)
 	ids.reserveStored(t, db)
 	var worldObjects *gamemanager.WorldObjects
 	var doors *doorHarness

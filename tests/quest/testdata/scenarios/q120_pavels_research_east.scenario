@@ -200,6 +200,7 @@ bypass Quest Q120_PavelsResearch w2_2
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-05.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=17 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32043-06.htm
   S QuestList 114:0x00000000 120:0x8003ffff
   S ExShowQuestMark quest=120
@@ -209,6 +210,7 @@ bypass Quest Q120_PavelsResearch 32043-06.htm
   Q upsert Q120_PavelsResearch | <cond> | 18
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
+  rows Q120_PavelsResearch <cond>=18 <state>=STARTED talk=0 talk1=0
 bypass Quest Q120_PavelsResearch 32043-11.htm
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-11.htm
   S ActionFailed
@@ -235,6 +237,7 @@ bypass Quest Q120_PavelsResearch 32043-20.htm
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-20.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk | 1
+  rows Q120_PavelsResearch <cond>=18 <state>=STARTED talk=1 talk1=0
 bypass Quest Q120_PavelsResearch 32043-15.htm
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-15.htm
   S ActionFailed
