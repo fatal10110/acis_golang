@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import net.sf.l2j.commons.mmocore.ProbeWire;
@@ -50,9 +52,11 @@ import net.sf.l2j.gameserver.enums.actors.Sex;
 import net.sf.l2j.gameserver.idfactory.IdFactory;
 import net.sf.l2j.gameserver.model.World;
 import net.sf.l2j.gameserver.model.WorldObject;
+import net.sf.l2j.gameserver.model.WorldRegion;
 import net.sf.l2j.gameserver.model.actor.Npc;
 import net.sf.l2j.gameserver.model.actor.Player;
 import net.sf.l2j.gameserver.model.actor.container.player.SubClass;
+import net.sf.l2j.gameserver.model.actor.instance.Folk;
 import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
@@ -74,7 +78,15 @@ import net.sf.l2j.gameserver.network.clientpackets.RequestTutorialQuestionMark;
 import net.sf.l2j.gameserver.scripting.Quest;
 import net.sf.l2j.gameserver.scripting.QuestState;
 import net.sf.l2j.gameserver.taskmanager.AiTaskManager;
+import net.sf.l2j.gameserver.taskmanager.AttackStanceTaskManager;
+import net.sf.l2j.gameserver.taskmanager.DecayTaskManager;
 import net.sf.l2j.gameserver.taskmanager.GameTimeTaskManager;
+import net.sf.l2j.gameserver.taskmanager.ItemInstanceTaskManager;
+import net.sf.l2j.gameserver.taskmanager.ItemsOnGroundTaskManager;
+import net.sf.l2j.gameserver.taskmanager.PvpFlagTaskManager;
+import net.sf.l2j.gameserver.taskmanager.ShadowItemTaskManager;
+import net.sf.l2j.gameserver.taskmanager.WalkerTaskManager;
+import net.sf.l2j.gameserver.taskmanager.WaterTaskManager;
 
 /**
  * Quest scenario traces: each scenario file of the Go quest suite whose {@code trace} line names
@@ -85,8 +97,10 @@ import net.sf.l2j.gameserver.taskmanager.GameTimeTaskManager;
  * spawns each NPC line's NPC at its offset from the player, who stands where the Go fixture
  * character enters the world. The hold, equip, standing, pk, cabal and festival lines are seeded
  * as the Go runner seeds them. The NPCs keep only the bindings of the scenario's script and stub
- * lines, as the Go runner registers no other script. A monster the scenario kills or hits is made the Go runner's
- * fixture monster: level 1, 1000 HP, no experience, SP, drops, skills, minions or aggression.
+ * lines, as the Go runner registers no other script. Every NPC line's NPC has the casting stats of the Go runner's
+ * fixture NPC (WIT and DEX 0, its base attack speed), and a monster the scenario kills or hits is made the Go runner's
+ * fixture monster: level 1, 1000 HP, no experience, SP, drops, skills, minions or aggression. The templates get their
+ * own values back once the scenario is over.
  * <p>
  * The character, item, quest, memo and subclass rows the scenario writes are kept (see the probe's
  * connection pool), so a relog stores the character at its logout and restores it from them.
@@ -150,6 +164,8 @@ final class ScenarioTrace
 	private final List<String> _unread = new ArrayList<>();
 	/** The NPC templates' own script bindings, kept while the scenario's replace them. */
 	private final Map<NpcTemplate, Map<EventHandler, List<Quest>>> _bindings = new HashMap<>();
+	/** The template fields the scenario changed, each with the value it had, in the order they changed. */
+	private final List<Altered> _altered = new ArrayList<>();
 	private String _trace;
 	private String _character;
 	private int _level;
@@ -179,6 +195,11 @@ final class ScenarioTrace
 	private boolean _muted;
 
 	private record NpcLine(String role, int id, String type, int dx, int dy, int dz)
+	{
+	}
+
+	/** A field of target the scenario changed, and the value it had before. */
+	private record Altered(Field field, Object target, Object value)
 	{
 	}
 
@@ -287,6 +308,35 @@ final class ScenarioTrace
 			set(IdFactory.class, f, "_freeIds", used.clone());
 			set(IdFactory.class, f, "_freeIdCount", new AtomicInteger(free));
 			set(IdFactory.class, f, "_nextFreeId", new AtomicInteger(next));
+			// Every region's object map starts the scenario fresh, holding what stood there before
+			// the first scenario, in object id order. A map keeps the capacity an earlier scenario grew
+			// it to, and its iteration order (the order a character entering the world is shown what
+			// stands around it) follows that capacity.
+			for (WorldRegion[] column : World.getInstance().getWorldRegions())
+			{
+				for (WorldRegion region : column)
+				{
+					final Map<Integer, WorldObject> objects = new ConcurrentHashMap<>();
+					region.getObjects().stream().sorted(Comparator.comparingInt(WorldObject::getObjectId)).forEach(o -> objects.put(o.getObjectId(), o));
+					set(WorldRegion.class, region, "_objects", objects);
+				}
+			}
+		}
+
+		/** The task managers' registries of creatures and items: maps keyed by them, or sets. */
+		private static List<Object> taskRegistries() throws Exception
+		{
+			return List.of(
+				field(AttackStanceTaskManager.class, AttackStanceTaskManager.getInstance(), "_creatures"),
+				field(DecayTaskManager.class, DecayTaskManager.getInstance(), "_creatures"),
+				field(AiTaskManager.class, AiTaskManager.getInstance(), "_npcs"),
+				field(WalkerTaskManager.class, WalkerTaskManager.getInstance(), "_walkers"),
+				field(PvpFlagTaskManager.class, PvpFlagTaskManager.getInstance(), "_players"),
+				field(WaterTaskManager.class, WaterTaskManager.getInstance(), "_players"),
+				field(GameTimeTaskManager.class, GameTimeTaskManager.getInstance(), "_players"),
+				field(ItemsOnGroundTaskManager.class, ItemsOnGroundTaskManager.getInstance(), "_items"),
+				field(ItemInstanceTaskManager.class, ItemInstanceTaskManager.getInstance(), "_items"),
+				field(ShadowItemTaskManager.class, ShadowItemTaskManager.getInstance(), "_shadowItems"));
 		}
 
 		/** Whether id is one a scenario drew. */
@@ -299,7 +349,7 @@ final class ScenarioTrace
 		 * Removes from the world every object of an id the scenario drew, wherever it stands (an NPC
 		 * a script spawned away from the player), and drops the registry entries keyed by one (the
 		 * clan, its siege registrations and castle, the character's Seven Signs sign-up and raid
-		 * points). Fails on an object still in the
+		 * points, the task managers' creatures and items). Fails on an object still in the
 		 * world: the next scenario's object of that id would not enter it.
 		 */
 		@SuppressWarnings("unchecked")
@@ -326,6 +376,11 @@ final class ScenarioTrace
 			}
 			((Map<Integer, ?>) field(SevenSignsManager.class, SevenSignsManager.getInstance(), "_playersData")).keySet().removeIf(this::drawn);
 			((Map<Integer, ?>) field(RaidPointManager.class, RaidPointManager.getInstance(), "_entries")).keySet().removeIf(this::drawn);
+			// A world object equals any other of its id, so a task manager's entry the scenario left
+			// would stand for the next scenario's object of that id: the attack stance a cast leaves on
+			// its caster and its target shows the next NPC of that id in combat.
+			for (Object registry : taskRegistries())
+				(registry instanceof Map<?, ?> m ? m.keySet() : (Set<?>) registry).removeIf(o -> o instanceof WorldObject w && drawn(w.getObjectId()));
 			final List<String> kept = new ArrayList<>();
 			for (WorldObject o : World.getInstance().getObjects())
 				if (drawn(o.getObjectId()))
@@ -631,8 +686,10 @@ final class ScenarioTrace
 					fought.add(s[1]);
 			for (NpcLine n : _npcs.values())
 			{
+				final NpcTemplate template = NpcData.getInstance().getTemplate(n.id());
+				casting(template, n.type());
 				if (fought.contains(n.role()))
-					fixture(NpcData.getInstance().getTemplate(n.id()), n.type());
+					fixture(template, n.type());
 				spawn(n);
 			}
 			ThreadPool.advance(0);
@@ -671,7 +728,7 @@ final class ScenarioTrace
 		}
 	}
 
-	/** Gives the NPC templates their own script bindings back. */
+	/** Gives the NPC templates their own script bindings and the values the scenario changed back. */
 	private void restore() throws Exception
 	{
 		final Field events = NpcTemplate.class.getDeclaredField("_questEvents");
@@ -679,24 +736,65 @@ final class ScenarioTrace
 		for (Map.Entry<NpcTemplate, Map<EventHandler, List<Quest>>> e : _bindings.entrySet())
 			events.set(e.getKey(), e.getValue());
 		_bindings.clear();
+		for (int i = _altered.size() - 1; i >= 0; i--)
+		{
+			final Altered a = _altered.get(i);
+			a.field().set(a.target(), a.value());
+		}
+		_altered.clear();
+	}
+
+	/** Sets a field of target until the scenario is over (see {@link #restore}). */
+	private void alter(Class<?> owner, Object target, String field, Object value) throws Exception
+	{
+		final Field f = owner.getDeclaredField(field);
+		f.setAccessible(true);
+		_altered.add(new Altered(f, target, f.get(target)));
+		f.set(target, value);
+	}
+
+	/**
+	 * Gives template the casting stats of the Go runner's fixture NPC of the NPC line's type, which
+	 * every NPC line's NPC has there: WIT and DEX 0, and a base attack speed of 253 for a civilian
+	 * kind, 300 for any other. A cast's hit time and reuse delay follow them.
+	 */
+	private void casting(NpcTemplate template, String type) throws Exception
+	{
+		alter(CreatureTemplate.class, template, "_baseWIT", 0);
+		alter(CreatureTemplate.class, template, "_baseDEX", 0);
+		alter(CreatureTemplate.class, template, "_basePAtkSpd", civilian(type) ? 253. : 300.);
+	}
+
+	/**
+	 * Whether the Go runner's fixture NPC of type is its civilian one: the kinds whose instance class
+	 * is a Folk, and the siege towers and flag, less the Christmas tree.
+	 */
+	private static boolean civilian(String type) throws Exception
+	{
+		return switch (type)
+		{
+			case "FlameTower", "LifeTower", "SiegeFlag" -> true;
+			case "ChristmasTree" -> false;
+			default -> Folk.class.isAssignableFrom(Class.forName("net.sf.l2j.gameserver.model.actor.instance." + type));
+		};
 	}
 
 	/**
 	 * Makes template the Go runner's fixture monster of the NPC line's type (the instance class a
 	 * spawn builds), keeping its script bindings.
 	 */
-	private static void fixture(NpcTemplate template, String type) throws Exception
+	private void fixture(NpcTemplate template, String type) throws Exception
 	{
-		set(NpcTemplate.class, template, "_type", type);
-		set(NpcTemplate.class, template, "_level", (byte) 1);
-		set(NpcTemplate.class, template, "_exp", 0.);
-		set(NpcTemplate.class, template, "_sp", 0.);
-		set(NpcTemplate.class, template, "_aggroRange", 0);
-		set(NpcTemplate.class, template, "_categories", Collections.emptyList());
-		set(NpcTemplate.class, template, "_privateData", Collections.emptyList());
-		set(NpcTemplate.class, template, "_passives", Collections.emptyList());
-		set(NpcTemplate.class, template, "_skills", new EnumMap<>(NpcSkillType.class));
-		set(CreatureTemplate.class, template, "_baseHpMax", 1000.);
+		alter(NpcTemplate.class, template, "_type", type);
+		alter(NpcTemplate.class, template, "_level", (byte) 1);
+		alter(NpcTemplate.class, template, "_exp", 0.);
+		alter(NpcTemplate.class, template, "_sp", 0.);
+		alter(NpcTemplate.class, template, "_aggroRange", 0);
+		alter(NpcTemplate.class, template, "_categories", Collections.emptyList());
+		alter(NpcTemplate.class, template, "_privateData", Collections.emptyList());
+		alter(NpcTemplate.class, template, "_passives", Collections.emptyList());
+		alter(NpcTemplate.class, template, "_skills", new EnumMap<>(NpcSkillType.class));
+		alter(CreatureTemplate.class, template, "_baseHpMax", 1000.);
 	}
 
 	private static void set(Class<?> owner, Object target, String field, Object value) throws Exception

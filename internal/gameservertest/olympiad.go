@@ -60,9 +60,8 @@ type olympiadWindow struct {
 }
 
 // WithOlympiadCompetition starts the Olympiad calendar at boot, before any
-// player is online, inside a competition window that closes between
-// remaining minus a minute and remaining later. remaining stays under two
-// hours.
+// player is online, inside a competition window that closes remaining
+// later, at any wall time. remaining stays under two hours.
 func WithOlympiadCompetition(remaining time.Duration) Option {
 	return func(o *options) { o.olympiadWindow = &olympiadWindow{competition: true, remaining: remaining} }
 }
@@ -75,21 +74,36 @@ func WithOlympiadValidation() Option {
 
 // config is the Olympiad configuration putting now in w: the default one,
 // its daily window moved to open two hours after now, for an hour, for a
-// validation period, or to have opened so that a two-hour window closes
-// w.remaining after now, to the minute, for a competition. A nil w keeps
-// the default.
+// validation period, or to have opened earlier today and to close
+// w.remaining after now, for a competition. A nil w keeps the default.
+//
+// The calendar rebuilds the day's window from its start hour and minute on
+// now's date, and yesterday's as that minus a fixed day, so a competition
+// window opened before midnight ends an hour off across a daylight saving
+// change. Opening it today, at the latest minute whose rebuilt time is not
+// after now, keeps its end where it is asked for; the minute is moved back
+// only while now's own minute rebuilds to its later occurrence in a
+// repeated hour.
 func (w *olympiadWindow) config(now time.Time) olympiad.Config {
 	cfg := olympiad.DefaultConfig()
 	if w == nil {
 		return cfg
 	}
-	length := time.Hour
-	start := now.Add(2 * time.Hour)
-	if w.competition {
-		length = 2 * time.Hour
-		start = now.Add(w.remaining - length)
+	if !w.competition {
+		start := now.Add(2 * time.Hour)
+		cfg.StartHour, cfg.StartMinute = start.Hour(), start.Minute()
+		cfg.CompetitionMillis = time.Hour.Milliseconds()
+		return cfg
+	}
+	y, m, d := now.Date()
+	rebuilt := func(t time.Time) time.Time {
+		return time.Date(y, m, d, t.Hour(), t.Minute(), 0, 0, now.Location())
+	}
+	start := now
+	for rebuilt(start).After(now) {
+		start = start.Add(-time.Minute)
 	}
 	cfg.StartHour, cfg.StartMinute = start.Hour(), start.Minute()
-	cfg.CompetitionMillis = length.Milliseconds()
+	cfg.CompetitionMillis = now.Add(w.remaining).Sub(rebuilt(start)).Milliseconds()
 	return cfg
 }
