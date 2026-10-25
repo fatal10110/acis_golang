@@ -47,14 +47,16 @@ func bumpFlag(n *script.NPC) {
 // and is brought back to the retreat point when it left its territory.
 // Leaving its territory drops its fight and sends it to the retreat point
 // while it rests, otherwise to a lair. A hit under half its HP sends it to
-// rest at the retreat point, dropping its fight. A hit, or a spell it
-// sees, from a player more than 8 levels above it makes it want a curse on
-// that player, and a strider rider free of its slow gets the slow. A
+// rest at the retreat point, dropping its fight. A hit from a player more
+// than 8 levels above it makes it want a curse on that player, and a
+// strider rider free of its slow gets the slow; a spell it sees cast by
+// such a player makes it want a mute on the caster and nothing else. A
 // player or summon hitting it from 300 to 1000 away is pulled to it one
 // time in 10, named in a line and wanted paralyzed; otherwise it may want
 // its area paralysis. A spell adding hate that it sees cast from within
-// 1000 pulls the caster to it one time in 5 the same way. It hates by the damage it takes
-// and by the hits on its party and clan. Dying, it plays its death music.
+// 1000 pulls the caster to it one time in 5 the same way. It hates by the
+// damage it takes and by the hits on its party and clan. Dying, it plays
+// its death music.
 func Orfen() script.Script {
 	base := warrior.PartyLeaderWarriorAggressiveHooks()
 	return script.Script{Dir: "ai/boss/orfen", Behavior: true, NPCs: []int32{29014}, Hooks: base.With(script.Hooks{
