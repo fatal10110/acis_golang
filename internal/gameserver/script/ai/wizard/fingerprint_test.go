@@ -17,7 +17,10 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 	// PartyLeaderWizardSaintAggressive's sight check measures the creature
 	// from itself against 40, always under it; the port keeps only the draw.
 	// DoormanOfDrain's do-nothing desire keeps the literal in the package.
-	var exempt []string
+	// WizardHereticPriestAggressive counts a party through
+	// Player.PartyMembers, the Go name it shares with the quest helper
+	// Quest.getPartyMembers, which no class here calls.
+	exempt := []string{"call Quest.getPartyMembers"}
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
@@ -48,6 +51,10 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardDDMagic2Hold",
 		"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardShortSelfRange",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.RoyalRushWizardClanBuff",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.RoyalRushWizardRangeDebuff",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)
