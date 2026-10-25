@@ -1,0 +1,20 @@
+# Hidden Truth (Q021) below level 63: the mysterious wizard turns the character away and the
+# quest stays created. Expectations come from the reference trace (Q021_HiddenTruth.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q021_hidden_truth_low_level.golden
+character Early 62
+script quest.Q021_HiddenTruth
+page default/31522.htm
+page script/quest/Q021_HiddenTruth/
+npc wizard 31522 Folk 10 0 0
+
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q021_HiddenTruth/31522-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q021_HiddenTruth CREATED
+  rows Q021_HiddenTruth -

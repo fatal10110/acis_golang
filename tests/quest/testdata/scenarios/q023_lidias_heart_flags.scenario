@@ -7,7 +7,7 @@ trace internal/gameserver/script/testdata/oracle/scenarios/q023_lidias_heart_fla
 character Lidia 64
 quest Q022_TragedyInVonHellmannForest <state>=COMPLETED
 quest Q023_LidiasHeart <cond>=4 <state>=STARTED
-stub quest.Q022_TragedyInVonHellmannForest
+script quest.Q022_TragedyInVonHellmannForest
 script quest.Q023_LidiasHeart
 item 7063 7064 7148 7149 7150
 page villagemaster/31328.htm

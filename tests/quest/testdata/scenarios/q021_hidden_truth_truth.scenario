@@ -1,0 +1,35 @@
+# Hidden Truth (Q021) at cond 4 with the truth learned: the bookshelf's talk moves the quest
+# to cond 5 by itself, forgetting end_walk and truth. Expectations come from the reference trace
+# (Q021_HiddenTruth.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q021_hidden_truth_truth.golden
+character Reader 63
+quest Q021_HiddenTruth <state>=STARTED <cond>=4 end_walk=1 truth=1
+script quest.Q021_HiddenTruth
+page default/31526.htm
+page script/quest/Q021_HiddenTruth/
+npc bookshelf 31526 Folk 20 20 0
+
+action bookshelf
+action bookshelf
+  S ActionFailed
+  S NpcHtmlMessage obj=bookshelf item=0 page=default/31526.htm
+  S ActionFailed
+bypass npc_{bookshelf}_Quest
+  S QuestList 21:0x8000001f
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 5
+  Q delete-var Q021_HiddenTruth | end_walk
+  Q delete-var Q021_HiddenTruth | truth
+  rows Q021_HiddenTruth <cond>=5 <state>=STARTED
+action bookshelf
+  S ActionFailed
+  S NpcHtmlMessage obj=bookshelf item=0 page=default/31526.htm
+  S ActionFailed
+bypass npc_{bookshelf}_Quest
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-11.htm
+  S ActionFailed
+  S ActionFailed
