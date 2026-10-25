@@ -90,10 +90,19 @@ func expandPackets(lines []string, pages map[string]string) ([]string, error) {
 // "<bound>:<value>".
 type traceStep struct {
 	client string
-	sent   []string
+	tasks  []traceTask
 	stmts  []string
 	memos  []string
 	draws  []string
+}
+
+// traceTask is the rendered packets one task of a trace sent, in the
+// reference's order: the client packet's (or probe action's) own run, or a
+// tick's. own reports a client packet's own run, which runs on the player's
+// own queue.
+type traceTask struct {
+	sent []string
+	own  bool
 }
 
 var (
@@ -261,10 +270,9 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 		var task []string
 		own := strings.HasPrefix(r.client, "C ")
 		endTask := func() {
-			if !own {
-				task = deferTeleports(task)
+			if len(task) > 0 {
+				step.tasks = append(step.tasks, traceTask{sent: task, own: own})
 			}
-			step.sent = append(step.sent, task...)
 			task, own = nil, false
 		}
 		for _, line := range r.lines {
@@ -307,30 +315,86 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	return steps, npcObjs, nil
 }
 
-// deferTeleports moves each teleport of the player among task, the
-// rendered packets one task of the trace sent, to the end of task, with the
-// ActionFailed lines right before it (its aborts'): a script's teleport of
-// a player from a hook on another queue runs on the player's queue once the
+// stepPackets joins the rendered packets of tasks, the tasks one step of
+// the trace ran, in the order the Go run sends them. A script's teleport of
+// the player, or its cast with the player as caster, from a hook on
+// another queue than the player's runs on the player's queue once the
 // hook's task is done, so the packets the rest of the hook sends go out
-// before the teleport's (script engine plan, section 9, item 4). A client
-// packet's own run is on the player's queue, where the teleport runs inside
-// the call, so its task is not deferred.
-func deferTeleports(task []string) []string {
-	var rest, teleports []string
-	for _, line := range task {
-		if !strings.HasPrefix(line, "TeleportToLocation obj=player ") {
-			rest = append(rest, line)
-			continue
+// before it (script engine plan, section 9, item 4); from a hook on the
+// player's own queue it runs inside the call, as in the reference. queues
+// names, in order, the queue of each task that teleports or casts with the
+// player ("own" or "other", the step's queue line); nil leaves a client
+// packet's own run on the player's queue and every other task on another.
+func stepPackets(tasks []traceTask, queues []string) ([]string, error) {
+	moving := 0
+	for _, t := range tasks {
+		if slices.ContainsFunc(t.sent, movesPlayer) {
+			moving++
 		}
-		start := len(rest)
-		for start > 0 && rest[start-1] == "ActionFailed" {
-			start--
-		}
-		teleports = append(teleports, rest[start:]...)
-		teleports = append(teleports, line)
-		rest = rest[:start]
 	}
-	return append(rest, teleports...)
+	if queues != nil && len(queues) != moving {
+		return nil, fmt.Errorf("the queue line names %d tasks, the trace has %d that teleport the player or make it cast", len(queues), moving)
+	}
+	var sent []string
+	for _, t := range tasks {
+		lines := t.sent
+		if slices.ContainsFunc(lines, movesPlayer) {
+			own := t.own
+			if queues != nil {
+				own, queues = queues[0] == "own", queues[1:]
+			}
+			if !own {
+				lines = deferPlayerActions(lines)
+			}
+		}
+		sent = append(sent, lines...)
+	}
+	return sent, nil
+}
+
+// movesPlayer reports whether a rendered packet is a script's teleport of
+// the player or its cast with the player as caster.
+func movesPlayer(line string) bool {
+	return isPlayerTeleport(line) || strings.HasPrefix(line, "MagicSkillUse caster=player ")
+}
+
+func isPlayerTeleport(line string) bool {
+	return strings.HasPrefix(line, "TeleportToLocation obj=player ")
+}
+
+// deferPlayerActions moves each teleport of the player among task, the
+// rendered packets of a task whose hook ran on another queue than the
+// player's, to the end of task, with the ActionFailed lines right before it
+// (its aborts'), and each cast with the player as caster with the teleport
+// that follows it (the skill's, after its aborts), in their order.
+func deferPlayerActions(task []string) []string {
+	var rest, moved []string
+	for i := 0; i < len(task); i++ {
+		line := task[i]
+		switch {
+		case isPlayerTeleport(line):
+			start := len(rest)
+			for start > 0 && rest[start-1] == "ActionFailed" {
+				start--
+			}
+			moved = append(moved, rest[start:]...)
+			moved = append(moved, line)
+			rest = rest[:start]
+		case strings.HasPrefix(line, "MagicSkillUse caster=player "):
+			end := i + 1
+			for end < len(task) && task[end] == "ActionFailed" {
+				end++
+			}
+			if end == len(task) || !isPlayerTeleport(task[end]) {
+				end = i
+			}
+			moved = append(moved, task[i:end+1]...)
+			i = end
+		default:
+			rest = append(rest, line)
+		}
+	}
+	return append(rest, moved...)
 }
 
 // checkTrace requires the scenario's steps to replay the trace: the same
@@ -358,7 +422,7 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]s
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", where, err)
 		}
-		ts := traceStep{client: steps[next].client}
+		var ts traceStep
 		for j, client := range clients {
 			if next+j >= len(steps) {
 				return nil, fmt.Errorf("%s: the trace ends after %d of its %d client packets", where, j, len(clients))
@@ -367,18 +431,22 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]s
 			if client != s.client {
 				return nil, fmt.Errorf("%s: the step sends %q", where, client)
 			}
-			ts.sent = append(ts.sent, s.sent...)
+			ts.tasks = append(ts.tasks, s.tasks...)
 			ts.stmts = append(ts.stmts, s.stmts...)
 			ts.memos = append(ts.memos, s.memos...)
 			ts.draws = append(ts.draws, s.draws...)
 		}
 		next += len(clients)
+		sent, err := stepPackets(ts.tasks, st.Queues)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", where, err)
+		}
 		if st.Verb != "relog" {
 			want, err := expandPackets(st.Packets, pages)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", where, err)
 			}
-			if d := FirstDiff("packet", want, ts.sent); d != "" {
+			if d := FirstDiff("packet", want, sent); d != "" {
 				return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 			}
 		}

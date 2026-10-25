@@ -147,6 +147,8 @@
 //	  Q <statement>        the character_quests statements of the step, in order: kind quest | params
 //	  M set <var> | <value>  a character_memo write of the step: the player memo var set to value;
 //	  M unset <var>          or deleted. The M lines are the step's memo writes, in order
+//	  queue <own|other> ...  a traced step: the queue whose hook teleported the character, or made it cast,
+//	                         in each task of the trace's step that does, in order (see the trace header below)
 //	  items <id>=<n> ...   the character's count of each item after the step
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them
 //	  state <quest> <status> | -            the quest's state in memory after the step
@@ -192,14 +194,23 @@
 // those steps' S, Q and M lines (a relog's packets excepted, as in the run);
 // a read, and a statement on another table than character_quests and
 // character_memo, is not compared, an unknown write on one of them fails.
-// A script's teleport of the character from a hook on another queue goes
-// out once the hook's task is done, after the packets the rest of the hook
-// sends (script engine plan, section 9, item 4), where the reference sends
-// it inside the call: outside a client packet's own run, which runs on the
-// character's queue and teleports inside the call as the reference does,
-// the comparison moves each of the trace's TeleportToLocation lines of the
-// character, with the ActionFailed lines right before it (its aborts'), to
-// the end of the packets its task sent.
+// A script's teleport of the character, or its cast with the character as
+// caster, from a hook on another queue than the character's goes out once
+// the hook's task is done, after the packets the rest of the hook sends
+// (script engine plan, section 9, item 4), where the reference sends it
+// inside the call; from a hook on the character's own queue (its talk, a
+// timer whose home queue is the character's, an After closure, ...) it runs
+// inside the call as the reference does. For a task of another queue the
+// comparison moves each of the trace's TeleportToLocation lines of the
+// character, with the ActionFailed lines right before it (its aborts'), and
+// each MagicSkillUse line whose caster is the character, with its
+// ActionFailed lines and TeleportToLocation of the character right after it
+// (its skill's teleport), to the end of the packets that task sent. The trace
+// does not say which queue a task's hook ran on: a client packet's own run
+// is the character's queue, every other task (a tick's, a kill's, an
+// advance's, ...) another, unless the step's queue line names the queue of
+// each of its tasks that teleport the character or make it cast, in the
+// trace's order.
 // The script draws the trace pins (needing a random line) must be those the
 // run's same steps draw: the same bounds, in order. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
@@ -354,7 +365,11 @@ type Step struct {
 	Packets    []string
 	Statements []string
 	Memos      []string
-	Checks     []Check
+	// Queues is the queue line: "own" or "other" for each task of the
+	// traced step that teleports the character or makes it cast, in order;
+	// nil without one.
+	Queues []string
+	Checks []Check
 }
 
 // String is the step as the file writes it.
@@ -867,6 +882,15 @@ func (s *Step) expect(n int, line string) error {
 			return err
 		}
 		s.Memos = append(s.Memos, rest)
+	case "queue":
+		if s.Queues != nil {
+			return fmt.Errorf("a second queue line")
+		}
+		queues := strings.Fields(rest)
+		if len(queues) == 0 || slices.ContainsFunc(queues, func(q string) bool { return q != "own" && q != "other" }) {
+			return fmt.Errorf("queue %q is not own or other, one per task", rest)
+		}
+		s.Queues = queues
 	case "items", "rows", "state", "hate", "desires", "at":
 		args := strings.Fields(rest)
 		if err := checkCheck(kind, args); err != nil {
