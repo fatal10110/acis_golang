@@ -1,7 +1,8 @@
 # AgitWarriorFlee (35429, Oel Mahum Scouts), AgitThief (35432) and AgitWizardFlee (35431), all
 # walking. A fixture monster has 440 hit points; the attacked hooks read the hit points from
-# before the hit. Each saw the character on the first AI tick: attack by 200. Above half its hit
-# points a hit adds its weight (100 per twentieth) cut to a whole number; above 30% it does so on
+# before the hit. Each notices the character on the first AI tick: attack by 200, which the hits
+# add to. Above half its hit points a hit adds its weight (100 per twentieth) cut to a whole
+# number, so the scout's first hit of 23 makes 200 + int(104.5...) = 304; above 30% it does so on
 # a draw under 90 (0) and else (95) breaks off: it drops every attack desire and, 5 s on, timer
 # 3001 makes it fight again; at 30% or less it breaks off for good. Broken off, a hit makes it
 # want to flee the character by its drift range (200), weight 10000; the thief also drops its
