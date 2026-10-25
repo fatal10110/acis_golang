@@ -1,0 +1,20 @@
+# To Lead and Be Led (Q118), no academy: Pinter has no quest for a level 19 character with neither a
+# sponsor nor an apprentice. The sponsor branches are the Boot tests of tests/quest/q118_academy_test.go (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q118_to_lead_and_be_led_no_sponsor.golden
+character Pupil 19
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
