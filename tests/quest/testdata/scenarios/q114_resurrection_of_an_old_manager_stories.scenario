@@ -54,6 +54,7 @@ bypass Quest Q114_ResurrectionOfAnOldManager 32047-03.htm
   S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-03.htm
   S ActionFailed
   Q upsert Q114_ResurrectionOfAnOldManager | talk1 | 1
+  rows Q114_ResurrectionOfAnOldManager <cond>=2 <state>=STARTED talk=1 talk1=1
 bypass Quest Q114_ResurrectionOfAnOldManager 32047-01.htm
   S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-04.htm
   S ActionFailed

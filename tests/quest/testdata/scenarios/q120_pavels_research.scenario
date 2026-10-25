@@ -336,6 +336,7 @@ bypass Quest Q120_PavelsResearch w1_2
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-05.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=10 <flags>=-2147482629 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32042-06.htm
   S QuestList 114:0x00000000 120:0x800007fb
   S ExShowQuestMark quest=120
@@ -346,6 +347,7 @@ bypass Quest Q120_PavelsResearch 32042-06.htm
   Q upsert Q120_PavelsResearch | <cond> | 11
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
+  rows Q120_PavelsResearch <cond>=11 <flags>=-2147481605 <state>=STARTED talk=0 talk1=0
 bypass Quest Q120_PavelsResearch 32042-07.htm
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-07.htm
   S ActionFailed
@@ -366,6 +368,7 @@ bypass Quest Q120_PavelsResearch 32042-11.htm
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-11.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk | 1
+  rows Q120_PavelsResearch <cond>=11 <flags>=-2147481605 <state>=STARTED talk=1 talk1=0
 bypass Quest Q120_PavelsResearch 32042-10.htm
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-10.htm
   S ActionFailed
@@ -373,6 +376,7 @@ bypass Quest Q120_PavelsResearch 32042-12.htm
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-12.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=11 <flags>=-2147481605 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32042-10.htm
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-10.htm
   S ActionFailed
@@ -380,6 +384,7 @@ bypass Quest Q120_PavelsResearch 32042-13.htm
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-13.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk2 | 1
+  rows Q120_PavelsResearch <cond>=11 <flags>=-2147481605 <state>=STARTED talk=1 talk1=1 talk2=1
 bypass Quest Q120_PavelsResearch 32042-10.htm
   S NpcHtmlMessage obj=north item=0 page=script/quest/Q120_PavelsResearch/32042-14.htm
   S ActionFailed
@@ -402,6 +407,7 @@ bypass Quest Q120_PavelsResearch 32042-15.htm
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
   Q upsert Q120_PavelsResearch | talk2 | 0
+  rows Q120_PavelsResearch <cond>=12 <flags>=-2147479557 <state>=STARTED talk=0 talk1=0 talk2=0
 action north
   S ActionFailed
   S NpcHtmlMessage obj=north item=0 page=default/32042.htm
