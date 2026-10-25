@@ -45,6 +45,12 @@ var individual6 = []struct {
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.RoyalRushWizardClanBuff", RoyalRushClanBuff},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.RoyalRushWizardRangeDebuff", RoyalRushRangeDebuff},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2", DDMagic2},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffCurseStoneAggressive", CastClanBuffCurseStoneAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffRangeCurse", CastClanBuffRangeCurse},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffRangeDDCurseStoneAggressive", CastClanBuffRangeDDCurseStoneAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive", DDMagic2Aggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive", DDMagic2DispellAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHallDDMagic2Aggressive", HallDDMagic2Aggressive},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway", FiendArcherRunAway},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive", HereticPriestAggressive},
 }
@@ -136,8 +142,8 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual6View(t, path, ours, sc)
-	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10 {
-		t.Fatalf("reference folds = %d entries, want 972", got)
+	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10+49*10 {
+		t.Fatalf("reference folds = %d entries, want 1462", got)
 	}
 
 	for _, c := range individual6 {
