@@ -24,11 +24,20 @@ func (f *Folk) InTerritory() bool {
 // is dropped (see folkMotion.TeleportTo). One that cannot move keeps
 // target's height.
 func (f *Folk) TeleportTo(target location.Location) {
+	f.TeleportJump(location.Jump{To: target})
+}
+
+// TeleportJump is TeleportTo aimed where j lands: an NPC that can move
+// stops, on a scattered jump, at the last point the geodata lets a
+// straight walk from j.To toward j.Toward reach, before the landing is
+// grounded; one that cannot move lands on j.To.
+func (f *Folk) TeleportJump(j location.Jump) {
 	f.abortAll()
 	if f.motion != nil {
-		f.motion.TeleportTo(target)
+		f.motion.teleport(j)
 		return
 	}
+	target := j.To
 	f.emit(event.Teleported{To: target})
 	f.zones.leave()
 	if f.world != nil {

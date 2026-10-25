@@ -315,12 +315,12 @@ func (s *summonSink) Emit(ev event.Event) {
 		if q := actor.Queue(); q != nil {
 			q.Post(func() { l.instantTeleportSummon(actor, j) })
 		}
-	case event.TeleportRequested:
+	case event.SummonTeleportRequested:
 		// A script asks it from any queue: the teleport runs on the
 		// summon's own queue.
-		at := location.Location{X: e.X, Y: e.Y, Z: e.Z}
+		j := e.Jump
 		if q := actor.Queue(); q != nil {
-			q.Post(func() { l.teleportSummon(actor, at) })
+			q.Post(func() { l.teleportSummon(actor, j) })
 		}
 	case event.Unsummoning:
 		if actor.OwnerLeft() {

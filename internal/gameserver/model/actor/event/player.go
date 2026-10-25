@@ -308,14 +308,20 @@ type SummonConfirmRequested struct {
 	Timeout    time.Duration
 }
 
-// TeleportRequested reports a discontinuous relocation of a player or a
-// summon to (X, Y, Z) within Radius (always 0 for a summon). OwnQueue
-// marks a request raised on the character's own queue, which moves it
-// inside the call; any other runs on that queue once the raising task is
-// done.
+// TeleportRequested reports a discontinuous relocation of a player to
+// (X, Y, Z) within Radius. OwnQueue marks a request raised on the
+// character's own queue, which moves it inside the call; any other runs on
+// that queue once the raising task is done.
 type TeleportRequested struct {
 	X, Y, Z, Radius int
 	OwnQueue        bool
+}
+
+// SummonTeleportRequested reports an ordinary teleport of a summon to
+// where Jump lands. It runs on the summon's queue once the raising task is
+// done.
+type SummonTeleportRequested struct {
+	Jump location.Jump
 }
 
 // InstantTeleportRequested reports a jump of a player or a summon to where
@@ -363,62 +369,63 @@ type ChargeMessage struct {
 // ChargesChanged reports that the Force/Soul charge count changed.
 type ChargesChanged struct{}
 
-func (VitalsChanged) event()          {}
-func (ActionsStopRequested) event()   {}
-func (IdleRequested) event()          {}
-func (ThinkRequested) event()         {}
-func (BowDrawn) event()               {}
-func (StanceChanged) event()          {}
-func (FakeDeathRevived) event()       {}
-func (PostureSettled) event()         {}
-func (DeathSettled) event()           {}
-func (EffectIconsChanged) event()     {}
-func (PositionCorrected) event()      {}
-func (WeightPenaltyChanged) event()   {}
-func (UserInfoChanged) event()        {}
-func (RunSpeedChanged) event()        {}
-func (EffectsStripped) event()        {}
-func (StatsModified) event()          {}
-func (GradePenaltyChanged) event()    {}
-func (DeathPenaltyChanged) event()    {}
-func (ExpSPGained) event()            {}
-func (ExpSPLost) event()              {}
-func (SPChanged) event()              {}
-func (KarmaChanged) event()           {}
-func (LevelChanged) event()           {}
-func (LeveledUp) event()              {}
-func (ShortBuff) event()              {}
-func (RegenMax) event()               {}
-func (EffectRemovedLackHP) event()    {}
-func (EffectRemovedLackMP) event()    {}
-func (RelaxHPFull) event()            {}
-func (Restored) event()               {}
-func (SpoilResult) event()            {}
-func (OverHit) event()                {}
-func (ServitorVanished) event()       {}
-func (ShieldBlocked) event()          {}
-func (EffectEnded) event()            {}
-func (EffectFelt) event()             {}
-func (AttackFailed) event()           {}
-func (SkillResisted) event()          {}
-func (MagicResisted) event()          {}
-func (DamageReceived) event()         {}
-func (ServitorDamageShared) event()   {}
-func (SkillDamageDealt) event()       {}
-func (HerbConsumed) event()           {}
-func (ItemObtained) event()           {}
-func (AttackRequested) event()        {}
-func (FleeRequested) event()          {}
-func (Retargeted) event()             {}
-func (SummonConfirmRequested) event() {}
-func (TeleportRequested) event()      {}
-func (RecallRequested) event()        {}
-func (Relocated) event()              {}
-func (PvPFlagged) event()             {}
-func (RelationChanged) event()        {}
-func (PKKarmaGained) event()          {}
-func (ChargeMessage) event()          {}
-func (ChargesChanged) event()         {}
+func (VitalsChanged) event()           {}
+func (ActionsStopRequested) event()    {}
+func (IdleRequested) event()           {}
+func (ThinkRequested) event()          {}
+func (BowDrawn) event()                {}
+func (StanceChanged) event()           {}
+func (FakeDeathRevived) event()        {}
+func (PostureSettled) event()          {}
+func (DeathSettled) event()            {}
+func (EffectIconsChanged) event()      {}
+func (PositionCorrected) event()       {}
+func (WeightPenaltyChanged) event()    {}
+func (UserInfoChanged) event()         {}
+func (RunSpeedChanged) event()         {}
+func (EffectsStripped) event()         {}
+func (StatsModified) event()           {}
+func (GradePenaltyChanged) event()     {}
+func (DeathPenaltyChanged) event()     {}
+func (ExpSPGained) event()             {}
+func (ExpSPLost) event()               {}
+func (SPChanged) event()               {}
+func (KarmaChanged) event()            {}
+func (LevelChanged) event()            {}
+func (LeveledUp) event()               {}
+func (ShortBuff) event()               {}
+func (RegenMax) event()                {}
+func (EffectRemovedLackHP) event()     {}
+func (EffectRemovedLackMP) event()     {}
+func (RelaxHPFull) event()             {}
+func (Restored) event()                {}
+func (SpoilResult) event()             {}
+func (OverHit) event()                 {}
+func (ServitorVanished) event()        {}
+func (ShieldBlocked) event()           {}
+func (EffectEnded) event()             {}
+func (EffectFelt) event()              {}
+func (AttackFailed) event()            {}
+func (SkillResisted) event()           {}
+func (MagicResisted) event()           {}
+func (DamageReceived) event()          {}
+func (ServitorDamageShared) event()    {}
+func (SkillDamageDealt) event()        {}
+func (HerbConsumed) event()            {}
+func (ItemObtained) event()            {}
+func (AttackRequested) event()         {}
+func (FleeRequested) event()           {}
+func (Retargeted) event()              {}
+func (SummonConfirmRequested) event()  {}
+func (TeleportRequested) event()       {}
+func (SummonTeleportRequested) event() {}
+func (RecallRequested) event()         {}
+func (Relocated) event()               {}
+func (PvPFlagged) event()              {}
+func (RelationChanged) event()         {}
+func (PKKarmaGained) event()           {}
+func (ChargeMessage) event()           {}
+func (ChargesChanged) event()          {}
 
 // PetSummonRequested reports a SUMMON_CREATURE cast with a pet collar;
 // ControlItem is the collar's item instance.

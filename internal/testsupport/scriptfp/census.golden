@@ -117,7 +117,7 @@ call Creature.sendPacket classes 1 sites 2 go inline
 call Creature.setInvul classes 1 sites 1 go script.NPC.SetInvul
 call Creature.setRunning classes 1 sites 1 go script.NPC.SetRunningQuietly
 call Creature.setShowSummonAnimation classes 1 sites 1 go inline
-call Creature.teleportTo classes 50 sites 111 go TeleportTo
+call Creature.teleportTo classes 50 sites 111 go TeleportTo,TeleportNear
 call CreatureAttack.canAttack classes 3 sites 4 go script.NPC.CanAttack
 call CreatureAttack.isAttackingNow classes 1 sites 1 go script.NPC.AttackingNow
 call CreatureAttack.stop classes 3 sites 4 go script.NPC.StopAttack
@@ -285,7 +285,7 @@ call Npc.setScriptValue classes 17 sites 37 go script.NPC.SetScriptValue
 call Npc.setWalkOrRun classes 5 sites 6 go script.NPC.SetRunning
 call Npc.showChatWindow classes 4 sites 4 go script.NPC.ShowChatWindow
 call Npc.showTeleportWindow classes 5 sites 7 go script.NPC.ShowTeleportWindow
-call Npc.teleportTo classes 16 sites 35 go TeleportTo
+call Npc.teleportTo classes 16 sites 35 go TeleportTo,TeleportNear
 call NpcAI.addAttackDesire classes 182 sites 460 go AddAttackDesire
 call NpcAI.addAttackDesireHold classes 17 sites 69 go AddAttackDesireHold
 call NpcAI.addCastDesire classes 317 sites 1172 go AddCastDesire
@@ -424,7 +424,7 @@ call Quest.addUseSkillFinished classes 2 sites 2 go inline
 call Quest.addZoneEnter classes 1 sites 1 go inline
 call Quest.broadcastScriptEvent classes 40 sites 66 go script.Script.BroadcastScriptEvent
 call Quest.broadcastScriptEventEx classes 13 sites 34 go script.Script.BroadcastScriptEventEx
-call Quest.callSkill classes 2 sites 3 go script.Script.CallSkill
+call Quest.callSkill classes 2 sites 3 go script.Script.CallSkill,script.NPC.CallSkill
 call Quest.cancelQuestTimer classes 1 sites 1 go script.Script.CancelTimer
 call Quest.cancelQuestTimers classes 7 sites 10 go script.Script.CancelTimers
 call Quest.checkClanLeaderCondition classes 2 sites 3 go script.Script.CheckClanLeaderCondition
