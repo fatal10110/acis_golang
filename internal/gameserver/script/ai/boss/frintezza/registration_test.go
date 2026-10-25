@@ -22,6 +22,7 @@ var chain = []struct {
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.boss.frintezza.FollowerOfFrintezza", FollowerOfFrintezza},
+	{"script.ai.boss.frintezza.FollowerOfFrintezzaTransform", FollowerOfFrintezzaTransform},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -145,14 +146,17 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	// FollowerOfFrintezza: eight events on 29046.
-	if got := len(want.folds); got != 8 {
-		t.Fatalf("reference folds = %d entries, want 8", got)
+	// FollowerOfFrintezza: eight events on 29046; its transform: seven on
+	// 29047.
+	if got := len(want.folds); got != 15 {
+		t.Fatalf("reference folds = %d entries, want 15", got)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	if !r.Behaves(29046) {
-		t.Error("Behaves(29046) = false, want a behavior bound")
+	for _, id := range []int32{29046, 29047} {
+		if !r.Behaves(id) {
+			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
+		}
 	}
 }

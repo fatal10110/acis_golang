@@ -501,7 +501,7 @@ func doAttack(s *script.Script, n *script.NPC) {
 	case 6:
 		switch {
 		case n.Int(script.SlotIntAI2) > 0:
-			dash(n, c2)
+			dash(n, c2, dashVer2(), dashAllVer2())
 		case n.HPRatio() > 0.5:
 			// One time in five it would charge from its no-charge
 			// territory; it does nothing then.
@@ -509,7 +509,7 @@ func doAttack(s *script.Script, n *script.NPC) {
 				switch {
 				case s.Rnd(10000) < 500:
 					n.SetInt(script.SlotIntAI2, 1)
-					dash(n, c2)
+					dash(n, c2, dashVer2(), dashAllVer2())
 				case s.Rnd(10000) < 500:
 					n.AddCastDesireUnchecked(c2, antiGravity(), 10000)
 				case s.Rnd(10000) < 500:
@@ -523,7 +523,7 @@ func doAttack(s *script.Script, n *script.NPC) {
 				switch {
 				case s.Rnd(10000) < 1500:
 					n.SetInt(script.SlotIntAI2, 1)
-					dash(n, c2)
+					dash(n, c2, dashVer2(), dashAllVer2())
 				case s.Rnd(10000) < 1500:
 					n.AddCastDesireUnchecked(c2, antiGravity(), 10000)
 				case s.Rnd(10000) < 1000:
@@ -536,15 +536,15 @@ func doAttack(s *script.Script, n *script.NPC) {
 	}
 }
 
-// dash runs n's dash chain on c: the first two steps dash at c, the third
-// dashes at every creature around it and ends the chain.
-func dash(n *script.NPC, c script.Creature) {
+// dash runs n's dash chain on c: the first two steps dash at c with step,
+// the third dashes at every creature around it with all and ends the chain.
+func dash(n *script.NPC, c script.Creature, step, all skill.Ref) {
 	switch ai2 := n.Int(script.SlotIntAI2); {
 	case ai2 > 0 && ai2 < 3:
-		n.AddCastDesireUnchecked(c, dashVer2(), 10000)
+		n.AddCastDesireUnchecked(c, step, 10000)
 		n.SetInt(script.SlotIntAI2, ai2+1)
 	case ai2 == 3:
-		n.AddCastDesireUnchecked(c, dashAllVer2(), 10000)
+		n.AddCastDesireUnchecked(c, all, 10000)
 		n.SetInt(script.SlotIntAI2, 0)
 	default:
 		n.SetInt(script.SlotIntAI2, 0)

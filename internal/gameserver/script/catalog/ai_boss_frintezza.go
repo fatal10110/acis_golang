@@ -13,7 +13,7 @@ func aiBossFrintezza() script.Catalog {
 		"script.ai.boss.frintezza.EvilateB":                     nil,
 		"script.ai.boss.frintezza.FollowerDummy":                nil,
 		"script.ai.boss.frintezza.FollowerOfFrintezza":          frintezza.FollowerOfFrintezza,
-		"script.ai.boss.frintezza.FollowerOfFrintezzaTransform": nil,
+		"script.ai.boss.frintezza.FollowerOfFrintezzaTransform": frintezza.FollowerOfFrintezzaTransform,
 		"script.ai.boss.frintezza.Frintezza":                    nil,
 		"script.ai.boss.frintezza.FrintezzaSeeker":              nil,
 		"script.ai.boss.frintezza.FrintezzaTeleporter":          nil,
