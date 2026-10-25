@@ -20,6 +20,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q336"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q338"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q341"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q343"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q344"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q345"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q347"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -49,10 +53,10 @@ func quests301Up() script.Catalog {
 		"quest.Q338_AlligatorHunter":                   q338.New,
 		"quest.Q340_SubjugationOfLizardmen":            nil,
 		"quest.Q341_HuntingForWildBeasts":              q341.New,
-		"quest.Q343_UnderTheShadowOfTheIvoryTower":     nil,
-		"quest.Q344_1000YearsTheEndOfLamentation":      nil,
-		"quest.Q345_MethodToRaiseTheDead":              nil,
-		"quest.Q347_GoGetTheCalculator":                nil,
+		"quest.Q343_UnderTheShadowOfTheIvoryTower":     q343.New,
+		"quest.Q344_1000YearsTheEndOfLamentation":      q344.New,
+		"quest.Q345_MethodToRaiseTheDead":              q345.New,
+		"quest.Q347_GoGetTheCalculator":                q347.New,
 		"quest.Q348_AnArrogantSearch":                  nil,
 		"quest.Q351_BlackSwan":                         nil,
 		"quest.Q352_HelpRoodRaiseANewPet":              nil,

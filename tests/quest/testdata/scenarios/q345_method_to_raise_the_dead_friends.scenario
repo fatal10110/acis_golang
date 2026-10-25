@@ -1,0 +1,80 @@
+# Method to Raise the Dead (Q345), Dorothy's friends: at cond 3 with the powder, the five bones
+# and 3 bone pieces, the medium jar rolls 0 (cond 6); Dorothy pays 5390 plus 70 a piece and three
+# bills, and the quest ends; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q345_method_to_raise_the_dead_friends.golden
+character Dorothy 35
+quest Q345_MethodToRaiseTheDead <cond>=3 <state>=STARTED
+hold 4281 1
+hold 4274 1
+hold 4275 1
+hold 4276 1
+hold 4277 1
+hold 4278 1
+hold 4280 3
+random 0
+script quest.Q345_MethodToRaiseTheDead
+item 57 4274 4275 4276 4277 4278 4280 4281 4310 3456
+page default/30970.htm
+page trainer/30912.htm
+page default/30973.htm
+page default/30971.htm
+page script/quest/Q345_MethodToRaiseTheDead/
+npc dorothy 30970 Folk 10 0 0
+npc xenovia 30912 Trainer -10 0 0
+npc jar 30973 Folk 0 10 0
+npc orpheus 30971 Folk 0 -10 0
+
+# The medium jar: cond 6.
+action jar
+action jar
+  S ActionFailed
+  S NpcHtmlMessage obj=jar item=0 page=default/30973.htm
+  S ActionFailed
+bypass npc_{jar}_Quest
+  S NpcHtmlMessage obj=jar item=0 page=script/quest/Q345_MethodToRaiseTheDead/30973-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30973-04.htm
+  S QuestList 345:0x80000027
+  S ExShowQuestMark quest=345
+  S SystemMessage id=302 3:4281
+  S SystemMessage id=302 3:4274
+  S SystemMessage id=302 3:4275
+  S SystemMessage id=302 3:4276
+  S SystemMessage id=302 3:4277
+  S SystemMessage id=302 3:4278
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jar item=0 page=script/quest/Q345_MethodToRaiseTheDead/30973-02a.htm
+  S ActionFailed
+  Q upsert Q345_MethodToRaiseTheDead | <flags> | -2147483609
+  Q upsert Q345_MethodToRaiseTheDead | <cond> | 6
+  items 4274=0 4278=0 4281=0 4280=3
+  rows Q345_MethodToRaiseTheDead <cond>=6 <flags>=-2147483609 <state>=STARTED
+bypass Quest Q345_MethodToRaiseTheDead 30973-03a.htm
+  S NpcHtmlMessage obj=jar item=0 page=script/quest/Q345_MethodToRaiseTheDead/30973-03a.htm
+  S ActionFailed
+
+# Dorothy: 5390 + 3 x 70 and three bills.
+action dorothy
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S SystemMessage id=301 3:4280 6:3
+  S SystemMessage id=52 6:5600
+  S SystemMessage id=53 3:4310 6:3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q345_MethodToRaiseTheDead
+  items 57=5600 4280=0 4310=3
+  state Q345_MethodToRaiseTheDead -
+  rows Q345_MethodToRaiseTheDead -
+
+relog
+  rows Q345_MethodToRaiseTheDead -
+  items 57=5600 4310=3
