@@ -81,7 +81,16 @@ func rb6Skills() []modelskill.Definition {
 		ind1Skill(rb5RangeDD, 600, false), ind1Skill(rb6PhysicalB, 600, false),
 		rb6Stacked(ind1Skill(rb6Debuff, 0, true), "rb6_debuff"), ind1Skill(rb6DebuffAnother, 0, true), ind1Skill(rb6DDMagic, 600, false),
 		ind1Skill(rb6SirraDebuff1, 0, true), ind1Skill(rb6SirraDebuff2, 0, true), rb6Stacked(ind1Skill(rb6SirraDebuff3, 600, false), "rb6_sirra_debuff3"),
+		rb6SirraDebuff3Order0(),
 	)
+}
+
+// rb6SirraDebuff3Order0 is a level 2 of Sirra's third debuff whose effect
+// stacks at order 0: a guard holding it holds the debuff at level 0.
+func rb6SirraDebuff3Order0() modelskill.Definition {
+	d := rb6Stacked(ind1Skill(rb6SirraDebuff3, 600, false), "rb6_sirra_debuff3")
+	d.Level, d.Effects[0].StackOrder = 2, 0
+	return d
 }
 
 // rb6Stacked gives d one 60 s effect of stack.
@@ -439,7 +448,8 @@ func TestIceFairySirraLeavesOnItsClock(t *testing.T) {
 // seeing the guard in phase 2 wants nothing of it. Phase 3 has it look
 // around: it wants its third debuff on the guard, which holds none, and to
 // attack the character in its territory at 200. Seen again holding the
-// third debuff, the guard draws nothing. Phase 0 ends it.
+// third debuff at level 0, the guard still draws it; at level 1, nothing.
+// Phase 0 ends it.
 func TestIceFairySirraFollowsTheQueensPhases(t *testing.T) {
 	t.Parallel()
 	w := bootRaid6(t, raidBoot{}, rb5Boss(rb6SirraID, nil), rb5PrivateTemplate(), rb5Boss(rb6QueenGuardID, nil))
@@ -477,9 +487,12 @@ func TestIceFairySirraFollowsTheQueensPhases(t *testing.T) {
 		t.Fatalf("attack desire on the character seen in phase 3 = %+v (%v), want 200", d, ok)
 	}
 
+	w.ind5dLand(t, modelskill.Ref{ID: rb6SirraDebuff3, Level: 2}, script.NPCOf(guard))
+	look()
+	w.wantCasts(t, "seeing the guard holding the third debuff at level 0 in phase 3", sirra, map[modelskill.ID]ind1Cast{rb6SirraDebuff3: {guard.ObjectID(), 1000000}})
 	w.ind5dLand(t, modelskill.Ref{ID: rb6SirraDebuff3, Level: 1}, script.NPCOf(guard))
 	look()
-	w.wantCasts(t, "seeing the guard holding the third debuff in phase 3", sirra, nil)
+	w.wantCasts(t, "seeing the guard holding the third debuff at level 1 in phase 3", sirra, nil)
 
 	w.sendEvent(t, sirra, 11036, 0, 0)
 	if got := ind1Slot(sirra, script.SlotIntAI0); got != 0 {
