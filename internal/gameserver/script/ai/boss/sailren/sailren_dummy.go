@@ -16,13 +16,6 @@ const dir = "ai/boss/sailren"
 // the party of the last player it saw in one.
 const slotLeader = script.SlotIntAI0
 
-// The two production skills the dummy casts on itself through the
-// cutscene.
-var (
-	production  = skill.Ref{ID: 5090, Level: 1}
-	production2 = skill.Ref{ID: 5091, Level: 1}
-)
-
 // SailrenDummy is the invisible NPC that stages Sailren's nest. It keeps
 // the leader of the party of the last player it saw in one. Script event
 // 11044 starts the cutscene 180006 ms later: six production casts on
@@ -46,11 +39,11 @@ func SailrenDummy() script.Script {
 			case strings.EqualFold(name, "1001"), strings.EqualFold(name, "1002"), strings.EqualFold(name, "1003"), strings.EqualFold(name, "1004"):
 				n.ClearDesires()
 
-				n.AddCastDesire(n, production, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5090, Level: 1}, 1000000)
 			case strings.EqualFold(name, "1005"), strings.EqualFold(name, "1006"):
 				n.ClearDesires()
 
-				n.AddCastDesire(n, production2, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5091, Level: 1}, 1000000)
 			case strings.EqualFold(name, "2000"):
 				n.SpecialCamera(script.CameraShot{Distance: 100, Yaw: 180, Pitch: 30, Time: 3000, Duration: 20000, Turn: 0, Rise: 50, Widescreen: 1, Unknown: 0})
 
@@ -79,17 +72,17 @@ func SailrenDummy() script.Script {
 				s.BroadcastScriptEventEx(n, 11055, n.Int(slotLeader), 0, 1000)
 			case strings.EqualFold(name, "3001"):
 				n.SpecialCamera(script.CameraShot{Distance: 60, Yaw: 110, Pitch: 30, Time: 4000, Duration: 20000, Turn: 0, Rise: 65, Widescreen: 1, Unknown: 0})
-				n.AddCastDesire(n, production, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5090, Level: 1}, 1000000)
 				s.StartTimer("1001", n, nil, 3400*time.Millisecond)
-				n.AddCastDesire(n, production, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5090, Level: 1}, 1000000)
 				s.StartTimer("1002", n, nil, 6800*time.Millisecond)
-				n.AddCastDesire(n, production, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5090, Level: 1}, 1000000)
 				s.StartTimer("1003", n, nil, 10000*time.Millisecond)
-				n.AddCastDesire(n, production, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5090, Level: 1}, 1000000)
 				s.StartTimer("1004", n, nil, 13200*time.Millisecond)
-				n.AddCastDesire(n, production2, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5091, Level: 1}, 1000000)
 				s.StartTimer("1005", n, nil, 16500*time.Millisecond)
-				n.AddCastDesire(n, production2, 1000000)
+				n.AddCastDesire(n, skill.Ref{ID: 5091, Level: 1}, 1000000)
 				s.StartTimer("1006", n, nil, 23500*time.Millisecond)
 				s.StartTimer("2000", n, nil, 4100*time.Millisecond)
 			}
