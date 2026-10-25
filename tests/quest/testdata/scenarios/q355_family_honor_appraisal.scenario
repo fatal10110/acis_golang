@@ -1,0 +1,128 @@
+# Family Honor (Q355), appraisals: at cond 1 holding four works of Berona, a troop leader's roll
+# of 50 gives a fifth; Patrin appraises the five, one per appraisal roll: nothing, a replica, an
+# original, a forgery and a prototype; Galibredo then has no bust to buy and keeps the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q355_family_honor_appraisal.golden
+character Galibredo 36
+quest Q355_FamilyHonor <cond>=1 <state>=STARTED
+hold 4350 4
+random 0 50 0 0 20 40 60 80
+script quest.Q355_FamilyHonor
+item 57 4252 4350 4351 4352 4353 4354
+page merchant/30181.htm
+page default/30929.htm
+page script/quest/Q355_FamilyHonor/
+npc galibredo 30181 Merchant 10 0 0
+npc patrin 30929 Folk -10 0 0
+npc orc 20767 Monster 40 0 0
+
+# A work of Berona.
+kill orc
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4350
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4252=0 4350=5
+
+# Patrin: five appraisals.
+action patrin
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+bypass npc_{patrin}_Quest
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q355_FamilyHonor 30929-7.htm
+  S SystemMessage id=302 3:4350
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-2.htm
+  S ActionFailed
+  items 4350=4
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+bypass npc_{patrin}_Quest
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q355_FamilyHonor 30929-7.htm
+  S SystemMessage id=302 3:4350
+  S SystemMessage id=54 3:4353
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-3.htm
+  S ActionFailed
+  items 4350=3 4353=1
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+bypass npc_{patrin}_Quest
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q355_FamilyHonor 30929-7.htm
+  S SystemMessage id=302 3:4350
+  S SystemMessage id=54 3:4352
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-4.htm
+  S ActionFailed
+  items 4350=2 4352=1
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+bypass npc_{patrin}_Quest
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q355_FamilyHonor 30929-7.htm
+  S SystemMessage id=302 3:4350
+  S SystemMessage id=54 3:4354
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-5.htm
+  S ActionFailed
+  items 4350=1 4354=1
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+bypass npc_{patrin}_Quest
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q355_FamilyHonor 30929-7.htm
+  S SystemMessage id=302 3:4350
+  S SystemMessage id=54 3:4351
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q355_FamilyHonor/30929-6.htm
+  S ActionFailed
+  items 4350=0 4351=1
+
+# Galibredo: no bust.
+action galibredo
+action galibredo
+  S ActionFailed
+  S NpcHtmlMessage obj=galibredo item=0 page=merchant/30181.htm
+  S ActionFailed
+bypass npc_{galibredo}_Quest
+  S NpcHtmlMessage obj=galibredo item=0 page=script/quest/Q355_FamilyHonor/30181-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q355_FamilyHonor 30181-4b.htm
+  S NpcHtmlMessage obj=galibredo item=0 page=script/quest/Q355_FamilyHonor/30181-4b.htm
+  S ActionFailed
+  items 57=0
+  rows Q355_FamilyHonor <cond>=1 <state>=STARTED

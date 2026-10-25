@@ -1,0 +1,39 @@
+# Help Rood Raise a New Pet (Q352), the second egg: a Lienrik's roll of 45 gives the second egg and
+# one of 99 nothing; Rood buys the second egg alone. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q352_help_rood_raise_a_new_pet_eggs.golden
+character Rood 39
+quest Q352_HelpRoodRaiseANewPet <cond>=1 <state>=STARTED
+random 45 0 99
+script quest.Q352_HelpRoodRaiseANewPet
+item 57 5860 5861
+page merchant/31067.htm
+page script/quest/Q352_HelpRoodRaiseANewPet/
+npc rood 31067 Merchant 10 0 0
+npc lienrik 20786 Monster 40 0 0
+
+# The second egg, then nothing.
+kill lienrik
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5861
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5861=1
+kill lienrik
+  S SystemMessage id=95 1:0 1:0
+  items 5860=0 5861=1
+
+# Rood buys the second egg.
+action rood
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+bypass npc_{rood}_Quest
+  S SystemMessage id=302 3:5861
+  S SystemMessage id=52 6:3025
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-08.htm
+  S ActionFailed
+  S ActionFailed
+  items 5861=0 57=3025
+bypass Quest Q352_HelpRoodRaiseANewPet 31067-10.htm
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-10.htm
+  S ActionFailed

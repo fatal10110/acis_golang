@@ -1,0 +1,27 @@
+# Black Swan (Q351), refused: a level 31 character is too young for Gosta, and the quest is not
+# started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q351_black_swan_low_level.golden
+character Swan 31
+script quest.Q351_BlackSwan
+item 57 4296 4297 4298 4310
+page guard/30916.htm
+page default/30969.htm
+page villagemaster/30897.htm
+page script/quest/Q351_BlackSwan/
+npc gosta 30916 Guard 10 0 0
+npc iason 30969 Folk -10 0 0
+npc roman 30897 VillageMasterDwarf 0 10 0
+npc lizard 20784 Monster 40 0 0
+
+# Gosta: too young.
+action gosta
+action gosta
+  S ActionFailed
+  S NpcHtmlMessage obj=gosta item=0 page=guard/30916.htm
+  S ActionFailed
+bypass npc_{gosta}_Quest
+  S NpcHtmlMessage obj=gosta item=0 page=script/quest/Q351_BlackSwan/30916-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q351_BlackSwan CREATED
+  rows Q351_BlackSwan -
