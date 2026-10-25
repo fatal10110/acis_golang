@@ -301,7 +301,14 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 		return
 	}
 
-	attackTime := time.Duration(formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))) * time.Millisecond
+	attackMillis := formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))
+	attackTime := time.Duration(attackMillis) * time.Millisecond
+	// A melee swing lands half way through the attack time and finishes as
+	// long again after its landing; a dual swing halves that step once more,
+	// landing its hits a step apart. Each step is whole milliseconds,
+	// rounded down.
+	step := time.Duration(attackMillis/2) * time.Millisecond
+	finishAt := 2 * step
 	c.actor.SetHeadingTo(target)
 	attackType := c.actor.AttackType()
 
@@ -310,10 +317,12 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 	var bowReuse time.Duration
 	switch attackType {
 	case item.WeaponDual, item.WeaponDualFist:
+		step = time.Duration(attackMillis/2/2) * time.Millisecond
+		finishAt = 3 * step
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
 		landings = []scheduledHit{
-			{hits: hits[:1], delay: attackTime / 2},
-			{hits: hits[1:], delay: attackTime},
+			{hits: hits[:1], delay: step},
+			{hits: hits[1:], delay: 2 * step},
 		}
 	case item.WeaponBow:
 		if c.player != nil {
@@ -322,6 +331,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 		c.actor.ConsumeBowMP()
 		hits = []Hit{c.makeHit(target, false)}
 		landings = []scheduledHit{{hits: hits, delay: attackTime}}
+		finishAt = attackTime
 		bowReuse = c.scaledBowReuse()
 	case item.WeaponPole:
 		hits = []Hit{c.makeHit(target, false)}
@@ -354,13 +364,13 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 				hits = append(hits, c.makeHit(candidate, false))
 			})
 		}
-		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
+		landings = []scheduledHit{{hits: hits, delay: step}}
 	default:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
+		landings = []scheduledHit{{hits: hits, delay: step}}
 	}
 
-	c.start(target, attackType, attackTime, landings, bowReuse)
+	c.start(target, attackType, finishAt, landings, bowReuse)
 	if attackType == item.WeaponBow && c.player != nil {
 		c.player.NotifyBowDraw(int(attackTime/time.Millisecond) + int(bowReuse/time.Millisecond))
 	}
@@ -398,7 +408,9 @@ type scheduledHit struct {
 	delay time.Duration
 }
 
-func (c *Controller) start(target attackable.Combatant, weapon item.WeaponType, attackTime time.Duration, hits []scheduledHit, bowReuse time.Duration) {
+// start arms the swing: its hit groups land at their delays and the swing
+// finishes at finishAt, both counted from now.
+func (c *Controller) start(target attackable.Combatant, weapon item.WeaponType, finishAt time.Duration, hits []scheduledHit, bowReuse time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -409,13 +421,9 @@ func (c *Controller) start(target attackable.Combatant, weapon item.WeaponType, 
 	c.bowCooling = weapon == item.WeaponBow
 	c.inHitAnimation = true
 
-	finishAt := attackTime
 	finish := func() { c.finishAttack(seq, target) }
 	if weapon == item.WeaponBow {
 		finish = func() { c.finishBow(seq, target, bowReuse) }
-	}
-	if weapon == item.WeaponDual || weapon == item.WeaponDualFist {
-		finishAt = attackTime * 3 / 2
 	}
 	if len(hits) == 0 {
 		c.scheduleLocked(finishAt, finish)
