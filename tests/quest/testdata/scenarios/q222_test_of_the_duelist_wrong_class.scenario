@@ -1,0 +1,22 @@
+# Test of the Duelist (Q222), refused: a level 39 Human Knight is not of the classes the test is
+# open to, and Kaien turns it away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q222_test_of_the_duelist_wrong_class.golden
+character Paladin 39
+class 4
+script quest.Q222_TestOfTheDuelist
+item 2762 2763 2764 2765 2766 2767 2768 2769 2770 2771 2772 2773 2774 2775 2776 2777 2778 2779 2780 2781 2782 2783 7562
+page default/30623.htm
+page script/quest/Q222_TestOfTheDuelist/
+npc kaien 30623 Folk 10 0 0
+
+action kaien
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q222_TestOfTheDuelist CREATED
+  rows Q222_TestOfTheDuelist -
