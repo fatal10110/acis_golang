@@ -1,0 +1,30 @@
+# StatueOfShilen (32109), talked to by a player in no party: its first page, then the entry
+# answers statue_of_shilen002.htm (no party), and its story pages follow their links.
+# Expectations are derived from the reference source (StatueOfShilen.java 47-112). The open,
+# busy and entry branches (script events 11041 to 11050 through its npcmaker, the zone entry,
+# the teleports and the maker events) are in tests/ai/boss_sailren_test.go: the format sends no
+# script event and declares no npcmaker of its own type.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.boss.sailren.StatueOfShilen
+page default/32109.htm
+page script/ai/boss/sailren/StatueOfShilen/
+npc statue 32109 Folk 60 0 0
+
+action statue
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass Quest StatueOfShilen enter
+  S NpcHtmlMessage obj=statue item=0 page=script/ai/boss/sailren/StatueOfShilen/statue_of_shilen002.htm
+  S ActionFailed
+bypass Quest StatueOfShilen battle_prep
+  S NpcHtmlMessage obj=statue item=0 page=script/ai/boss/sailren/StatueOfShilen/statue_of_shilen002a.htm
+  S ActionFailed
+bypass Quest StatueOfShilen enter_details
+  S NpcHtmlMessage obj=statue item=0 page=script/ai/boss/sailren/StatueOfShilen/statue_of_shilen003a.htm
+  S ActionFailed
+bypass Quest StatueOfShilen learn_more
+  S NpcHtmlMessage obj=statue item=0 page=script/ai/boss/sailren/StatueOfShilen/statue_of_shilen004a.htm
+  S ActionFailed
