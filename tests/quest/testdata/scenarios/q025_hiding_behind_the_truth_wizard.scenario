@@ -1,0 +1,86 @@
+# Hiding Behind the Truth (Q025) ended by the Mysterious Wizard: Agripel sends the player to him
+# (cond 18), while the maid has nothing more to say. Expectations come from the reference trace
+# (Q025_HidingBehindTheTruth.onAdvEvent, onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q025_hiding_behind_the_truth_wizard.golden
+character Seeker 66
+quest Q025_HidingBehindTheTruth <cond>=16 <state>=STARTED state=22
+hold 7063 1
+script quest.Q025_HidingBehindTheTruth
+item 874 905 936 7063
+page default/31348.htm
+page default/31522.htm
+page default/31532.htm
+page script/quest/Q025_HidingBehindTheTruth/
+npc agripel 31348 Folk 10 0 0
+npc wizard 31522 Folk -10 0 0
+npc maid 31532 Folk 0 10 0
+
+action agripel
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-17.htm
+  S QuestList 25:0x8002ffff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-17.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 24
+  Q upsert Q025_HidingBehindTheTruth | <flags> | -2147287041
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 18
+  rows Q025_HidingBehindTheTruth <cond>=18 <flags>=-2147287041 <state>=STARTED state=24
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-19.htm
+  S ActionFailed
+  S ActionFailed
+action maid
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-24.htm
+  S ActionFailed
+  S ActionFailed
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31522-16.htm
+  S SystemMessage id=302 3:7063
+  S SystemMessage id=54 3:874
+  S SystemMessage id=54 3:936
+  S SystemMessage id=45 1:1607062
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 25:0x00000000
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-16.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | <state> | COMPLETED
+  Q delete-except-state Q025_HidingBehindTheTruth
+  rows Q025_HidingBehindTheTruth <state>=COMPLETED
+  items 874=1 905=0 936=1 7063=0
+  state Q025_HidingBehindTheTruth COMPLETED
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog

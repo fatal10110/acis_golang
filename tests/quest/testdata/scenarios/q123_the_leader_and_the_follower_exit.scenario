@@ -1,0 +1,41 @@
+# The Leader and the Follower (Q123), no sponsor to hunt with: a level 19 character on cond 1 with nine bloods
+# is sent back to the lizardmen, and its kill with no sponsor drops the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_exit.golden
+character Pupil 19
+quest Q123_TheLeaderAndTheFollower <cond>=1 <state>=STARTED state=1
+hold 8549 9
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+npc lizard 27321 Monster 40 0 0
+
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-04.htm
+  S ActionFailed
+  S ActionFailed
+kill lizard
+  S SystemMessage id=95 1:0 1:0
+  S QuestList
+  S SystemMessage id=301 3:8549 6:9
+  Q delete-quest Q123_TheLeaderAndTheFollower
+  rows Q123_TheLeaderAndTheFollower -
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
