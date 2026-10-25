@@ -12,9 +12,11 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"script.ai.boss.frintezza.FollowerOfFrintezza",
 		"script.ai.boss.frintezza.FollowerOfFrintezzaTransform",
-		// The transform's HP stages 30022 and 30023 sit behind its 75%
-		// threshold in first-match chains, so they are never reported.
-	}, "number 30022", "number 30023")
+		"script.ai.boss.frintezza.Frintezza",
+		// Frintezza's on-screen song names are named constants in the
+		// reference, numbers in Go.
+	}, "number 1000522", "number 1000523", "number 1000524",
+		"number 1000525", "number 1000526", "number 1000527")
 	if err != nil {
 		t.Fatal(err)
 	}
