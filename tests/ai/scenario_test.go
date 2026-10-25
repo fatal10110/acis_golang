@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/royalrush"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/siegeguard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/wizard"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
 )
 
@@ -92,6 +93,9 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive":                  warrior.Cast2SkillsApproachAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorTimerBomb":                                      warrior.TimerBomb,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive":                        warrior.HereticPriestAggressive,
+	"script.ai.individual.Monster.WizardBase.WizardBase":                                                     wizard.Base,
+	"script.ai.individual.Monster.WizardBase.Wizard.Wizard":                                                  wizard.Wizard,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive":                           wizard.HereticPriestAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive":                   warrior.Aggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":                              warrior.Medusa,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproach": warrior.Cast3SkillsApproach,
