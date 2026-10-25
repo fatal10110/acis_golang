@@ -1,0 +1,45 @@
+# The Other Side of Truth (Q115), the piece already held: a level 53 character on cond 10 holding a
+# piece of the tablet finishes the quest at Rafforty's second answer.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q115_the_other_side_of_truth_tablet.golden
+character Seeker 53
+quest Q115_TheOtherSideOfTruth <cond>=10 <state>=STARTED
+hold 8081 1
+script quest.Q115_TheOtherSideOfTruth
+item 57 8079 8080 8081 8082
+page default/32018.htm
+page default/32020.htm
+page default/32021.htm
+page default/32022.htm
+page default/32077.htm
+page default/32078.htm
+page default/32079.htm
+page script/quest/Q115_TheOtherSideOfTruth/
+npc rafforty 32020 Folk 10 0 0
+npc misa 32018 Folk 0 10 0
+npc kierre 32022 Folk -10 0 0
+npc s1 32021 Folk 0 -10 0
+npc s2 32077 Folk 20 0 0
+npc s3 32078 Folk 0 20 0
+npc s4 32079 Folk -20 0 0
+
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-24.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-28.htm
+  S SystemMessage id=302 3:8081
+  S SystemMessage id=52 6:60040
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 115:0x00000000
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-26.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <state> | COMPLETED
+  Q delete-except-state Q115_TheOtherSideOfTruth
+  items 57=60040 8081=0
+  rows Q115_TheOtherSideOfTruth <state>=COMPLETED
