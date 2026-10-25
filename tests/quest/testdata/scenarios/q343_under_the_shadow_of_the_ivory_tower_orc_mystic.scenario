@@ -1,0 +1,29 @@
+# Under the Shadow of the Ivory Tower (Q343), refused: a level 40 orc mystic is an orc for Cema,
+# and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q343_under_the_shadow_of_the_ivory_tower_orc_mystic.golden
+character Mystic 40
+class 49
+script quest.Q343_UnderTheShadowOfTheIvoryTower
+item 57 4364 4365 103 118 316 630 736 885 917 951 955 2510 2511
+page merchant/30834.htm
+page trainer/30835.htm
+page default/30934.htm
+page default/30935.htm
+page script/quest/Q343_UnderTheShadowOfTheIvoryTower/
+npc cema 30834 Merchant 10 0 0
+npc icarus 30835 Trainer -10 0 0
+npc marsha 30934 Folk 0 10 0
+npc trumpin 30935 Folk 0 -10 0
+
+# Cema: refused.
+action cema
+action cema
+  S ActionFailed
+  S NpcHtmlMessage obj=cema item=0 page=merchant/30834.htm
+  S ActionFailed
+bypass npc_{cema}_Quest
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q343_UnderTheShadowOfTheIvoryTower CREATED
+  rows Q343_UnderTheShadowOfTheIvoryTower -

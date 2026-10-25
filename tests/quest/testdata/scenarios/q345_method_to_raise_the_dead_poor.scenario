@@ -1,0 +1,52 @@
+# Method to Raise the Dead (Q345), short of everything: at cond 2 with 999 adena Xenovia keeps
+# the powder and her page; with no bone piece Orpheus keeps his first refusal, for both of his
+# bypasses. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q345_method_to_raise_the_dead_poor.golden
+character Dorothy 35
+quest Q345_MethodToRaiseTheDead <cond>=2 <state>=STARTED
+hold 57 999
+script quest.Q345_MethodToRaiseTheDead
+item 57 4274 4275 4276 4277 4278 4280 4281 4310 3456
+page default/30970.htm
+page trainer/30912.htm
+page default/30973.htm
+page default/30971.htm
+page script/quest/Q345_MethodToRaiseTheDead/
+npc dorothy 30970 Folk 10 0 0
+npc xenovia 30912 Trainer -10 0 0
+npc jar 30973 Folk 0 10 0
+npc orpheus 30971 Folk 0 -10 0
+
+# Xenovia: 999 adena is not enough.
+action xenovia
+action xenovia
+  S ActionFailed
+  S NpcHtmlMessage obj=xenovia item=0 page=trainer/30912.htm
+  S ActionFailed
+bypass npc_{xenovia}_Quest
+  S NpcHtmlMessage obj=xenovia item=0 page=script/quest/Q345_MethodToRaiseTheDead/30912-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30912-02.htm
+  S NpcHtmlMessage obj=xenovia item=0 page=script/quest/Q345_MethodToRaiseTheDead/30912-02.htm
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30912-04.htm
+  S NpcHtmlMessage obj=xenovia item=0 page=script/quest/Q345_MethodToRaiseTheDead/30912-04.htm
+  S ActionFailed
+  items 57=999 4281=0
+  rows Q345_MethodToRaiseTheDead <cond>=2 <state>=STARTED
+
+# Orpheus: no piece.
+action orpheus
+action orpheus
+  S ActionFailed
+  S NpcHtmlMessage obj=orpheus item=0 page=default/30971.htm
+  S ActionFailed
+bypass npc_{orpheus}_Quest
+  S NpcHtmlMessage obj=orpheus item=0 page=script/quest/Q345_MethodToRaiseTheDead/30971-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30971-02a.htm
+  S NpcHtmlMessage obj=orpheus item=0 page=script/quest/Q345_MethodToRaiseTheDead/30971-02a.htm
+  S ActionFailed
+  items 57=999

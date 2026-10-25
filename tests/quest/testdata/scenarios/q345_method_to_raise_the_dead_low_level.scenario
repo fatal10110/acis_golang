@@ -1,0 +1,28 @@
+# Method to Raise the Dead (Q345), refused: a level 34 character is too young for Dorothy, and
+# the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q345_method_to_raise_the_dead_low_level.golden
+character Dorothy 34
+script quest.Q345_MethodToRaiseTheDead
+item 57 4274 4275 4276 4277 4278 4280 4281 4310 3456
+page default/30970.htm
+page trainer/30912.htm
+page default/30973.htm
+page default/30971.htm
+page script/quest/Q345_MethodToRaiseTheDead/
+npc dorothy 30970 Folk 10 0 0
+npc xenovia 30912 Trainer -10 0 0
+npc jar 30973 Folk 0 10 0
+npc orpheus 30971 Folk 0 -10 0
+
+# Dorothy: too young.
+action dorothy
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q345_MethodToRaiseTheDead CREATED
+  rows Q345_MethodToRaiseTheDead -
