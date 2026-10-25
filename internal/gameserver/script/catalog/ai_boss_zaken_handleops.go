@@ -7,5 +7,13 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiBossZakenHandleOps holds, per script of ai_boss_zaken.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiBossZakenHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.boss.zaken.Zaken": {
+			"OnAttacked":    {"NPC.TopDesireTarget"},
+			"OnPartyDied":   {"Spawner.ScheduleRespawn"},
+			"OnSeeCreature": {"NPC.TopDesireTarget"},
+			"OnSeeSpell":    {"NPC.TopDesireTarget"},
+			"OnTimer":       {"NPC.TopDesireTarget"},
+		},
+	}
 }
