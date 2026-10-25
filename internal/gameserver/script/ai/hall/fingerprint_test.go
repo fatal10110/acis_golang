@@ -41,6 +41,7 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.siegablehall.Agit01Stand1.Agit01Stand1",
 		"script.ai.siegablehall.Agit01Stand1.Agit01Stand2",
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1",
+		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2",
 	},
 		"number 1000275", "number 1000276", "number 1000277", "number 1000278", "number 1000279", "number 1000280",
 		"number 1010624", "number 1010627", "number 1010625", "number 1010636", "number 1010637", "number 1010638",

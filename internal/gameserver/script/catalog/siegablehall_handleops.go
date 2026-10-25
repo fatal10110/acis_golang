@@ -25,5 +25,8 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 		"script.ai.siegablehall.AzitWateringTreasureBox": {
 			"OnMyDying": {"NPC.DropItem"},
 		},
+		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2": {
+			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+		},
 	}
 }
