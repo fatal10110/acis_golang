@@ -1,0 +1,19 @@
+# IceFairySirra (29056), killed by the character: after the raid's success message and sound,
+# its dying hook runs maker script event 10025 on schuttgart13_npc2314_1m1 and
+# schuttgart13_npc2314_3m1, which the scenario world does not declare, so nothing follows. Its
+# 34.5 minute clock, the Ice Queen's phases (event 11036), the party countdown (event 11040)
+# and its maker events are in tests/ai/raid_boss6_test.go: the format declares no npcmaker,
+# sends no script event and shows no party screen message.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.IceFairySirra
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType2
+npc sirra 29056 RaidBoss 300 0 0
+
+kill sirra
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0

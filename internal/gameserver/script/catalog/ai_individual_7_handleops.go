@@ -94,6 +94,13 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnSeeSpell": {"NPC.TopDesireTarget"},
 			"OnTimer":    {"NPC.HateList", "NPC.RandomizeAttack"},
 		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.IceFairySirra": {
+			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty": {
 			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
 			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
@@ -102,6 +109,27 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnTimer":         {"NPC.RandomizeAttack"},
 		},
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType2": {
+			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3": {
+			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3AnaisAggressive": {
+			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.HateList", "NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4": {
 			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
 			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
 			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
