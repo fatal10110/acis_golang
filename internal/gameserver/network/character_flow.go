@@ -435,8 +435,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	}
 
 	// The tutorial quest hears of the entry last, ahead of the closing
-	// ActionFailed.
-	live.NotifyTutorial(player.TutorialEnterWorld)
+	// ActionFailed, as a hook on live's queue, which runs the entry.
+	live.NotifyTutorialOnQueue(player.TutorialEnterWorld)
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }
