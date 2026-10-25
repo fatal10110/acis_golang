@@ -211,6 +211,9 @@ func (c *Controller) InHitAnimation() bool {
 
 // CanAttack reports whether target may be physically attacked now. It is a
 // silent query; RefuseAttack is the think-time form that tells the player.
+// A swing in flight or a bow reuse does not refuse it: a think checks
+// AttackingNow and BowCoolingDown itself before the gate, and a script asks
+// it mid-fight.
 func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	ok, _ := c.check(target)
 	return ok
@@ -264,12 +267,6 @@ func (c *Controller) gateAllows(target attackable.Combatant) (bool, event.Attack
 		return false, 0
 	}
 	if c.actor.AttackDisabled() {
-		return false, 0
-	}
-	c.mu.RLock()
-	busy := c.attacking || c.bowCooling
-	c.mu.RUnlock()
-	if busy {
 		return false, 0
 	}
 	if c.actor.MovementDisabled() && !c.actor.InAttackRange(target) {

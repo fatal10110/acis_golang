@@ -25,6 +25,13 @@ const (
 // the founder, bound to DoormanOfDrain, and the founder's Siege Golem.
 func drainSummonWorld(t *testing.T) (*clanWorld, *npc.Hostile, attackable.Combatant, *summon.Actor) {
 	t.Helper()
+	return drainSummonWorldWith(t, nil, wizard.DoormanOfDrain)
+}
+
+// drainSummonWorldWith is drainSummonWorld with tune, when set, applied to
+// the gatekeeper's template and behavior bound in DoormanOfDrain's place.
+func drainSummonWorldWith(t *testing.T, tune func(*npc.Template), behavior func() script.Script) (*clanWorld, *npc.Hostile, attackable.Combatant, *summon.Actor) {
+	t.Helper()
 	form, err := zone.NewCuboid(gateWorldAt.X-1000, gateWorldAt.X+1000, gateWorldAt.Y-1000, gateWorldAt.Y+1000,
 		gateWorldAt.Z-1000, gateWorldAt.Z+1000)
 	if err != nil {
@@ -35,18 +42,22 @@ func drainSummonWorld(t *testing.T) (*clanWorld, *npc.Hostile, attackable.Combat
 	zones := zone.NewIndex()
 	zones.Add(field)
 	const path = "script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain"
+	doorman := &npc.Template{
+		ID: drainDoormanID, TemplateID: drainDoormanID, Type: "Monster", Name: "Gatekeeper Zombie", Level: 40, HPMax: 1000,
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true, CollisionRadius: 8, CollisionHeight: 20,
+		AggroRange: 1000,
+	}
+	if tune != nil {
+		tune(doorman)
+	}
 	w := gateWorld(t,
 		gameservertest.WithZones(zones),
-		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{siegeSummonTemplate(gateGolemNPCID, "Siege Golem"), {
-			ID: drainDoormanID, TemplateID: drainDoormanID, Type: "Monster", Name: "Gatekeeper Zombie", Level: 40, HPMax: 1000,
-			AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true, CollisionRadius: 8, CollisionHeight: 20,
-			AggroRange: 1000,
-		}})),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{siegeSummonTemplate(gateGolemNPCID, "Siege Golem"), doorman})),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNpcSpawns(nil),
 		gameservertest.WithAITask(),
 		gameservertest.WithNPCScripts(map[int32]script.NPCKind{drainDoormanID: script.KindHostile},
-			[]script.Listing{{Path: path}}, script.Catalog{path: wizard.DoormanOfDrain}),
+			[]script.Listing{{Path: path}}, script.Catalog{path: behavior}),
 	)
 	golem := callSiegeSummon(t, w, w.leaderID, gateGolemNPCID)
 	n, err := w.srv.NpcSpawns.AddSpawn(drainDoormanID, gateWorldAt.X+100, gateWorldAt.Y, gateWorldAt.Z, 0, false, 0)
@@ -111,8 +122,7 @@ func wantsOwner(t *testing.T, h *npc.Hostile, founder attackable.Combatant) {
 // TestDoormanOfDrainTurnsOnTheOwnerOfASummonItsSpellOutlives runs
 // DoormanOfDrain's skill-finished hook: a cast at the founder's Siege Golem
 // ending on the golem dead turns it on the founder. Its attack-finished
-// branch shares the answer; a killing swing raises no attack-finished hook
-// yet (#4114).
+// branch shares the answer (TestDoormanOfDrainTurnsOnTheOwnerOfASummonItsSwingKills).
 func TestDoormanOfDrainTurnsOnTheOwnerOfASummonItsSpellOutlives(t *testing.T) {
 	t.Parallel()
 	w, h, founder, golem := drainSummonWorld(t)
