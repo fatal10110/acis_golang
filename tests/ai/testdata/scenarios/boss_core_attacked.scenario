@@ -1,0 +1,16 @@
+# Core (29006), a level 1 grand boss hit by the level 1 character, every draw 0. Its first hit
+# makes it speak its two opening lines (1000001, 1000002); the next one, on a draw of 0 in 100,
+# its taunt (1000003). The character is not more than 8 levels above it: no skill desire.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.core.Core
+npc core 29006 GrandBoss 100 0 0
+
+hit core 10
+  S NpcSay obj=core type=0 npc=1029006 text="A non-permitted target has been discovered."
+  S NpcSay obj=core type=0 npc=1029006 text="Intruder removal system initiated."
+  desires core -
+hit core 10
+  S NpcSay obj=core type=0 npc=1029006 text="Removing intruders."
+  desires core -

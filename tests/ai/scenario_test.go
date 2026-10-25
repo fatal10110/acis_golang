@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/agitwarrior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/core"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
@@ -187,6 +188,9 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.RaidBossType1Aggressive": raid.BossType1Aggressive,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty":                                                 raid.BossParty,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType2":                                                 raid.BossType2,
+
+	// The grand bosses.
+	"script.ai.boss.core.Core": core.Core,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
