@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -267,8 +268,8 @@ func tutorialJumpFrames(frames [][]byte) []string {
 }
 
 // TestTutorialEventsOfThePlayersOwnActionsRunOnItsQueue: the tutorial
-// events a player's own entry, tutorial request, pickup and sit request
-// raise run on its own queue, so the tutorial hook's jump of that player
+// events a player's own entry, tutorial request, pickup, sit request and
+// store opening raise run on its own queue, so the tutorial hook's jump of that player
 // runs inside the call, as in the reference: the hook reads the new
 // position, and the jump goes out before the question mark the hook shows
 // next.
@@ -283,6 +284,7 @@ func TestTutorialEventsOfThePlayersOwnActionsRunOnItsQueue(t *testing.T) {
 	)
 	objID := srv.SoleObjectID(t)
 	insertJournal(t, srv.DB, journalRow{objID, tutorial, questlog.KeyState, val("STARTED")})
+	potions := srv.GiveItem(t, objID, opsStoreItemID, 5)
 	c := srv.Client
 	inOrder := []string{"TeleportToLocation", "TutorialShowQuestionMark"}
 	expect := func(what, name string, frames [][]byte) {
@@ -318,4 +320,48 @@ func TestTutorialEventsOfThePlayersOwnActionsRunOnItsQueue(t *testing.T) {
 	srv.Advance(t, 250*time.Millisecond)
 	c.Send(encodeTutorialSit())
 	expect("sit request", "CE8388608", srv.ReadQueued(t, c))
+
+	// Once standing again, opening a sell store seats the player.
+	srv.Advance(t, 3*time.Second)
+	c.Send(encodeOpsStand())
+	srv.Advance(t, 3*time.Second)
+	srv.ReadQueued(t, c)
+	c.Send(encodeOpsActionUse(opsActionPrivateStoreSell))
+	srv.ReadQueued(t, c)
+	c.Send(encodeOpsStoreListSell(potions, 5, 100))
+	expect("store opening", "CE8388608", srv.ReadQueued(t, c))
+}
+
+func encodeOpsStand() []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeWaitType)
+	w.WriteInt32(1)
+	return w.Bytes()
+}
+
+const (
+	// opsActionPrivateStoreSell is the RequestActionUse id of the sell
+	// store set-up.
+	opsActionPrivateStoreSell = 10
+	// opsStoreItemID is a plain stackable item the sell store lists.
+	opsStoreItemID = 20
+)
+
+func encodeOpsActionUse(actionID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestActionUse)
+	w.WriteInt32(actionID)
+	w.WriteInt32(0)
+	w.WriteUint8(0)
+	return w.Bytes()
+}
+
+// encodeOpsStoreListSell lists count of the item objectID at price in a
+// sell store, sold separately.
+func encodeOpsStoreListSell(objectID, count, price int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeSetPrivateStoreListSell)
+	w.WriteInt32(0)
+	w.WriteInt32(1)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	w.WriteInt32(price)
+	return w.Bytes()
 }

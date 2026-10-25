@@ -381,7 +381,9 @@ func (l *GameClientLink) openStore(live *livePlayer, operate privatestore.Operat
 	if live.move != nil {
 		live.move.Stop()
 	}
-	live.Character.Sit()
+	// The store's set-up runs on live's queue: the tutorial hears of the
+	// seat as a hook on that queue.
+	live.RunOnOwnQueue(func() { live.Character.Sit() })
 	live.SetOperateType(operate)
 	l.broadcastCharacterInfo(live)
 	l.broadcastLiveFrame(live, title)

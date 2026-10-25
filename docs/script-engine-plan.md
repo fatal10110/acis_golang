@@ -361,10 +361,11 @@ where the reference asks an NPC to walk a route (A13).
    still posts. The marked hooks: the player's talk, quest window and quest event, its item
    use, a timer whose home queue is the player's, `Player.After`, and the tutorial events the
    player's own actions raise on its queue (its tutorial requests, its entry, its sit request,
-   its own pickup of adena or a blue gemstone). Not marked, as they run on the goroutine of the
-   damage, kill or reward (an attacker's queue, an effect's tick): the death hook, and the
-   tutorial events a death, a level-up, an HP loss or the restored HP of a selection raise, a
-   seat a store or an effect forces, and a pickup by the player's pet. A summon's instant teleport always runs on the summon's queue: no hook runs there.
+   the seat of its store opening, its own pickup of adena or a blue gemstone). Not marked, as
+   they run on the goroutine of the damage, kill, reward or effect (an attacker's queue, an
+   effect's tick): the death hook, and the tutorial events a death, a level-up, an HP loss or
+   the restored HP of a selection raise, a seat an effect forces, and a pickup by the player's
+   pet. A summon's instant teleport always runs on the summon's queue: no hook runs there.
    An NPC's instant teleport, hostile or civilian, stays inline.
 5. Journal rows the server never writes load leniently. Only a hand-edited or migrated
    `character_quests` row reaches either case.
