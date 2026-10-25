@@ -283,3 +283,32 @@ func TestQ025TriolsPawnAnswersOnlyItsPlayer(t *testing.T) {
 		t.Fatalf("%d pawns after the mate's hits, want 1", n)
 	}
 }
+
+// TestQ025OnlyABookshelfWakesThePawn: the gem box's event sent through the
+// tombstone wakes no pawn and shows nothing, and leaves the tombstone free
+// to raise the coffin.
+func TestQ025OnlyABookshelfWakesThePawn(t *testing.T) {
+	t.Parallel()
+	w := q025World(t, q025CoffinAt, map[string]string{"<cond>": "11", "state": "11"}, map[string][]string{
+		"31531-01.htm": {"3153x-07.htm", "31531-02.htm"},
+		"31531-02.htm": nil,
+		"3153x-07.htm": nil,
+	}, "tombstone", q025Tombstone)
+	if got := w.talk(t, "tombstone"); !shows(got, "31531-01.htm") {
+		t.Fatalf("tombstone: got %q, want 31531-01.htm", got)
+	}
+	if got := w.send(t, encodeBypass("Quest "+q025Name+" 3153x-07.htm")); len(got) != 0 {
+		t.Fatalf("the box's event through the tombstone: got %q, want nothing", got)
+	}
+	if n := len(npcsOf(w.srv, q025Pawn)); n != 0 {
+		t.Fatalf("%d pawns after the event through the tombstone, want 0", n)
+	}
+	if rows := questRows(t, w.srv, w.player, q025Name); rows["<cond>"] != "11" {
+		t.Fatalf("rows %v after the event through the tombstone, want cond 11", rows)
+	}
+	w.talk(t, "tombstone")
+	w.send(t, encodeBypass("Quest "+q025Name+" 31531-02.htm"))
+	if n := len(npcsOf(w.srv, q025Coffin)); n != 1 {
+		t.Fatalf("%d coffins after the raise, want 1", n)
+	}
+}

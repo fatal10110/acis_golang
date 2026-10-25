@@ -64,16 +64,18 @@ const (
 	sayPawnFlees  = 2551
 )
 
-// triolSpawn is where the broken bookshelf of id bookshelf wakes Triol's pawn.
-func triolSpawn(bookshelf int32) script.Loc {
+// triolSpawn is where the broken bookshelf of id bookshelf wakes Triol's
+// pawn; false for any other NPC.
+func triolSpawn(bookshelf int32) (script.Loc, bool) {
 	switch bookshelf {
 	case brokenBookshelf1:
-		return script.Loc{X: 47142, Y: -35941, Z: -1623, Heading: 0}
+		return script.Loc{X: 47142, Y: -35941, Z: -1623, Heading: 0}, true
 	case brokenBookshelf2:
-		return script.Loc{X: 50055, Y: -47020, Z: -3396, Heading: 0}
-	default:
-		return script.Loc{X: 59712, Y: -47568, Z: -2720, Heading: 0}
+		return script.Loc{X: 50055, Y: -47020, Z: -3396, Heading: 0}, true
+	case brokenBookshelf3:
+		return script.Loc{X: 59712, Y: -47568, Z: -2720, Heading: 0}, true
 	}
+	return script.Loc{}, false
 }
 
 // coffinSpawn is where the tombstone raises the coffin.
@@ -186,7 +188,13 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	case strings.EqualFold(e.Name, "3153x-07.htm"):
 		if !p.HasItem(suspiciousTotemDoll3) {
 			if minions := e.NPC.Minions(); len(minions) == 0 {
-				pawn := s.Spawner().CreateOnePrivateEx(e.NPC, triolPawn, triolSpawn(e.NPC.NpcID()), 120000*time.Millisecond, script.Params{})
+				// Only a bookshelf wakes the pawn: through any other NPC the
+				// event ends here, with nothing shown.
+				at, ok := triolSpawn(e.NPC.NpcID())
+				if !ok {
+					return ""
+				}
+				pawn := s.Spawner().CreateOnePrivateEx(e.NPC, triolPawn, at, 120000*time.Millisecond, script.Params{})
 				pawn.Say(script.NpcString(sayPawnCalled, p.Name()))
 				pawn.SetScriptValue(p.ObjectID())
 
