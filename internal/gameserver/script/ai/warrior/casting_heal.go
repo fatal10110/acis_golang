@@ -52,3 +52,29 @@ func CastingHealAggressive() script.Script {
 		},
 	})}
 }
+
+// CastingHealSleep is WarriorCastingHealSleep: a WarriorCastingHeal that,
+// on a draw under 33, wants its sleep magic on a player or summon hitting
+// it that it does not hate most, and on the attacker of a clan member when
+// it hates that attacker most.
+func CastingHealSleep() script.Script {
+	base := castingHealHooks()
+	return script.Script{Dir: castingHealDir, Behavior: true, NPCs: []int32{21664, 21687, 21710, 21733, 21756, 21779}, Hooks: base.With(script.Hooks{
+		OnAttacked: func(s *script.Script, e script.Attacked) {
+			n, attacker := e.NPC, e.Attacker
+			if attacker.Playable() {
+				if mostHated := n.MostHated(); !script.Same(mostHated, attacker) && s.Rnd(100) < 33 {
+					castByType(n, attacker, npc.SkillTypeMagicSleep)
+				}
+			}
+			base.Attacked(s, e)
+		},
+		OnClanAttacked: func(s *script.Script, e script.ClanAttacked) {
+			called, attacker := e.Called, e.Attacker
+			if mostHated := called.MostHated(); mostHated != nil && script.Same(mostHated, attacker) && s.Rnd(100) < 33 {
+				castByType(called, attacker, npc.SkillTypeMagicSleep)
+			}
+			base.ClanAttacked(s, e)
+		},
+	})}
+}
