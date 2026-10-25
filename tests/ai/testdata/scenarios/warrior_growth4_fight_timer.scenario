@@ -1,0 +1,25 @@
+# WarriorGrowthStep4Aggressive (21468, Alpen Kookaburra, level 1 here, its shipped DD magic and
+# physical special), every draw 0, appearing with no feeder. It sees the character 300 away and
+# wants to attack it, weight 200. Its first hit starts its 5 s fight timer and, the character its
+# top desire target, wants its physical special (4600, an aura, so on itself), which the next tick
+# casts. Still fighting when the timer ticks, it wants its DD magic (4589) on the character, which
+# holds none of its effect, weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep4Aggressive
+npc kook 21468 Monster 3000 0 0 skill DD_MAGIC 4589 6 skill PHYSICAL_SPECIAL 4600 6
+
+tick x9
+approach kook 300
+  desires kook attack(player)=200 wander()=5
+hit kook 80
+  desires kook attack(player)=1200 cast(kook,4600,move)=1000000 wander()=5
+tick
+  S MagicSkillUse caster=kook target=kook skill=4600-6 hit=2378 reuse=7928 success=0
+  desires kook attack(player)=1200 cast(kook,4600,move)=1000000 wander()=5
+advance 5s
+  desires kook attack(player)=1200 cast(player,4589,move)=1000000 wander()=5
