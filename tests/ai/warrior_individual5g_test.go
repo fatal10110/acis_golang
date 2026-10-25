@@ -208,7 +208,8 @@ func TestCastingHealSleepSleepsWhoItDoesNotHateMost(t *testing.T) {
 // TestCorpseGhostDDMagicBuffsAndCastsFromAfar ports
 // WarriorCorpseGhostDDMagic's created, timer, attacked and clan-attacked
 // hooks, every draw 0. It wants its self buff on itself as it spawns, and
-// at its 10 s timer while it lacks the buff. The hit that makes the
+// at its 10 s timer while it lacks the buff; not at the timer while it
+// holds the buff, nor while it attacks. The hit that makes the
 // character its most hated wants no damage magic; the next, from 300,
 // wants it on the character, weight 1000000; one from 80 does not. A
 // settled clan member wants it on the character 300 away at a hit on its
@@ -222,6 +223,11 @@ func TestCorpseGhostDDMagicBuffsAndCastsFromAfar(t *testing.T) {
 	w.ind5dClear(t, n)
 	w.srv.Advance(t, 10*time.Second)
 	ind5bWantCast(t, "at its first timer", n, ind5gSelfBuff, n.ObjectID())
+	held := w.spawn(t, ind5gGhostID, 300, 600)
+	w.ind5dLand(t, modelskill.Ref{ID: ind5gSelfBuff, Level: 1}, script.NPCOf(held))
+	w.ind5dClear(t, held)
+	w.srv.Advance(t, 10*time.Second)
+	ind5bNoCast(t, "at a timer while it holds the buff", held, ind5gSelfBuff)
 
 	w.ind5dClear(t, n)
 	w.hit(t, n, 1)
@@ -232,6 +238,13 @@ func TestCorpseGhostDDMagicBuffsAndCastsFromAfar(t *testing.T) {
 	w.moveCharacter(t, n, -80, 0)
 	w.hit(t, n, 1)
 	ind5bNoCast(t, "a hit from 80", n, ind5gDDMagic)
+	w.ticks(t, 1)
+	if got := n.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("setup: intention %v after the hits, want attack", got)
+	}
+	w.ind5dClear(t, n)
+	w.srv.Advance(t, 10*time.Second)
+	ind5bNoCast(t, "a timer while it attacks", n, ind5gSelfBuff)
 
 	victim := w.spawn(t, ind5gGhostClanID, 0, 1000)
 	member := w.spawn(t, ind5gGhostClanID, 300, 1000)
@@ -459,6 +472,13 @@ func TestCorpseZombieDDMagicCastsAtItsTopTarget(t *testing.T) {
 	w.moveCharacter(t, n, -80, 0)
 	w.hit(t, n, 1)
 	ind5bNoCast(t, "a hit from 80", n, ind5gDDMagic)
+	w.ticks(t, 1)
+	if got := n.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("setup: intention %v after the hits, want attack", got)
+	}
+	w.ind5dClear(t, n)
+	w.srv.Advance(t, 10*time.Second)
+	ind5bNoCast(t, "a timer while it attacks", n, ind5gSelfBuff)
 
 	victim := w.spawn(t, ind5gDDClanID, 0, 1000)
 	member := w.spawn(t, ind5gDDClanID, 300, 1000)
