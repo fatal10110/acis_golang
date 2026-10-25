@@ -1,0 +1,646 @@
+# Test of the Searcher (Q225), a second class-change test for rogues, elven scouts, assassins and
+# scavengers, played by a level 39 Scavenger who already holds most of each trophy count (the kills
+# below bring each to its count), every script roll pinned to 1 (every drop lands): Luther starts
+# it and pays the level 39 set's Dimensional Diamonds; Alex's warrant for Leirynn; ten Delu totems
+# of the lizardman shamans (each first hit by a holder of Leirynn's first order calls a Neer
+# bodyguard, which this scenario leaves standing); chief Kalkis's fang and the strange map; Alex's
+# letter for Borys, whose wine catalog sends the traveller to Tyra; ten red spore dusts of the
+# giant fungi for Tyra's Malrukian wine; Borys's old order for Jax; the torn map pieces of the road
+# scavengers and hangman trees for Solt's and Makel's maps, which Jax combines; the tree gives the
+# rusted key and calls the strong wooden chest (this scenario opens the chest of its npc line,
+# whose bypass removes the called one); Alex takes the twenty gold bars for his recommendation;
+# Luther gives the Mark of Searcher; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q225_test_of_the_searcher.golden
+character Searcher 39
+class 54
+random always 1
+hold 2787 8
+hold 2797 8
+hold 2801 3
+hold 2802 3
+script quest.Q225_TestOfTheSearcher
+item 2784 2785 2786 2787 2788 2789 2790 2791 2792 2793 2794 2795 2796 2797 2798 2799 2800 2801 2802 2803 2804 2805 2806 2807 2808 2809 7562
+page trainer/30690.htm
+page guard/30291.htm
+page default/30728.htm
+page default/30729.htm
+page merchant/30420.htm
+page default/30730.htm
+page default/30627.htm
+page default/30628.htm
+page script/quest/Q225_TestOfTheSearcher/
+npc luther 30690 Trainer 10 0 0
+npc alex 30291 Guard -10 0 0
+npc leirynn 30728 Folk 0 10 0
+npc borys 30729 Folk 0 -10 0
+npc tyra 30420 Merchant 10 10 0
+npc jax 30730 Folk -10 10 0
+npc tree 30627 Folk 10 -10 0
+npc chest 30628 Folk -10 -10 0
+npc deluShaman 20781 Monster 40 0 0
+npc kalkis 27093 Monster -40 0 0
+npc neer 27092 Monster 0 40 0
+npc fungus 20555 Monster 0 -40 0
+npc scavenger 20551 Monster 40 40 0
+npc hangman 20144 Monster -40 40 0
+
+# Luther: a Scavenger of level 39 may start; the first test of the set pays the diamonds.
+action luther
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+bypass npc_{luther}_Quest
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30690-05.htm
+  S QuestList 225:0x80000001
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2784
+  S SystemMessage id=53 3:7562 6:82
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-05a.htm
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <state> | STARTED
+  Q upsert Q225_TestOfTheSearcher | <cond> | 1
+  M set secondClassChange39 | true
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=1
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+bypass npc_{luther}_Quest
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Alex takes Luther's letter and gives his warrant.
+action alex
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S QuestList 225:0x80000003
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2784
+  S SystemMessage id=54 3:2785
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 2
+bypass Quest Q225_TestOfTheSearcher 30291-01t.htm
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-01t.htm
+  S ActionFailed
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=2
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Leirynn takes the warrant and gives her first order.
+action leirynn
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+bypass npc_{leirynn}_Quest
+  S QuestList 225:0x80000007
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2785
+  S SystemMessage id=54 3:2786
+  S NpcHtmlMessage obj=leirynn item=0 page=script/quest/Q225_TestOfTheSearcher/30728-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 3
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=3
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+bypass npc_{leirynn}_Quest
+  S NpcHtmlMessage obj=leirynn item=0 page=script/quest/Q225_TestOfTheSearcher/30728-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# The shamans' last two totems bring cond 4; Leirynn takes them for her second order.
+kill deluShaman x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2787
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2787
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 225:0x8000000f
+  S ExShowQuestMark quest=225
+  Q upsert Q225_TestOfTheSearcher | <cond> | 4
+  items 2787=10
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=4
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+bypass npc_{leirynn}_Quest
+  S QuestList 225:0x8000001f
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2787 6:10
+  S SystemMessage id=302 3:2786
+  S SystemMessage id=54 3:2788
+  S NpcHtmlMessage obj=leirynn item=0 page=script/quest/Q225_TestOfTheSearcher/30728-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 5
+  items 2786=0 2787=0 2788=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=5
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+bypass npc_{leirynn}_Quest
+  S NpcHtmlMessage obj=leirynn item=0 page=script/quest/Q225_TestOfTheSearcher/30728-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Chief Kalkis gives his fang and the strange map; Leirynn takes the fang for her report.
+kill kalkis
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 225:0x8000003f
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2789
+  S SystemMessage id=54 3:2791
+  Q upsert Q225_TestOfTheSearcher | <cond> | 6
+  items 2789=1 2791=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=6
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+bypass npc_{leirynn}_Quest
+  S QuestList 225:0x8000007f
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2789
+  S SystemMessage id=302 3:2788
+  S SystemMessage id=54 3:2790
+  S NpcHtmlMessage obj=leirynn item=0 page=script/quest/Q225_TestOfTheSearcher/30728-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 7
+  items 2788=0 2789=0 2790=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=7
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+action leirynn
+  S ActionFailed
+  S NpcHtmlMessage obj=leirynn item=0 page=default/30728.htm
+  S ActionFailed
+bypass npc_{leirynn}_Quest
+  S NpcHtmlMessage obj=leirynn item=0 page=script/quest/Q225_TestOfTheSearcher/30728-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Alex reads the report and the strange map: his letter, his order and Lambert's map.
+action alex
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30291-05.htm
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-05.htm
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30291-06.htm
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-06.htm
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30291-07.htm
+  S QuestList 225:0x800000ff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2790
+  S SystemMessage id=302 3:2791
+  S SystemMessage id=54 3:2793
+  S SystemMessage id=54 3:2794
+  S SystemMessage id=54 3:2792
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-07.htm
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 8
+  items 2790=0 2791=0 2792=1 2793=1 2794=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=8
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Borys takes Alex's letter and gives the wine catalog; Tyra takes it for her contract.
+action borys
+action borys
+  S ActionFailed
+  S NpcHtmlMessage obj=borys item=0 page=default/30729.htm
+  S ActionFailed
+bypass npc_{borys}_Quest
+  S QuestList 225:0x800001ff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2793
+  S SystemMessage id=54 3:2795
+  S NpcHtmlMessage obj=borys item=0 page=script/quest/Q225_TestOfTheSearcher/30729-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 9
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=9
+action borys
+  S ActionFailed
+  S NpcHtmlMessage obj=borys item=0 page=default/30729.htm
+  S ActionFailed
+action borys
+  S ActionFailed
+  S NpcHtmlMessage obj=borys item=0 page=default/30729.htm
+  S ActionFailed
+bypass npc_{borys}_Quest
+  S NpcHtmlMessage obj=borys item=0 page=script/quest/Q225_TestOfTheSearcher/30729-02.htm
+  S ActionFailed
+  S ActionFailed
+action tyra
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q225_TestOfTheSearcher/30420-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30420-01a.htm
+  S QuestList 225:0x800003ff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2795
+  S SystemMessage id=54 3:2796
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q225_TestOfTheSearcher/30420-01a.htm
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 10
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=10
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q225_TestOfTheSearcher/30420-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# The fungi's last two red spore dusts bring cond 11; Tyra takes them for the Malrukian wine.
+kill fungus x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2797
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2797
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 225:0x800007ff
+  S ExShowQuestMark quest=225
+  Q upsert Q225_TestOfTheSearcher | <cond> | 11
+  items 2797=10
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=11
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S QuestList 225:0x80000fff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2797 6:10
+  S SystemMessage id=302 3:2796
+  S SystemMessage id=54 3:2798
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q225_TestOfTheSearcher/30420-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 12
+  items 2796=0 2797=0 2798=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=12
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q225_TestOfTheSearcher/30420-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Borys takes the wine and the catalog for his old order; Jax takes it for his diary.
+action borys
+action borys
+  S ActionFailed
+  S NpcHtmlMessage obj=borys item=0 page=default/30729.htm
+  S ActionFailed
+bypass npc_{borys}_Quest
+  S QuestList 225:0x80001fff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2798
+  S SystemMessage id=54 3:2799
+  S NpcHtmlMessage obj=borys item=0 page=script/quest/Q225_TestOfTheSearcher/30729-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 13
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=13
+action borys
+  S ActionFailed
+  S NpcHtmlMessage obj=borys item=0 page=default/30729.htm
+  S ActionFailed
+action borys
+  S ActionFailed
+  S NpcHtmlMessage obj=borys item=0 page=default/30729.htm
+  S ActionFailed
+bypass npc_{borys}_Quest
+  S NpcHtmlMessage obj=borys item=0 page=script/quest/Q225_TestOfTheSearcher/30729-04.htm
+  S ActionFailed
+  S ActionFailed
+action jax
+action jax
+  S ActionFailed
+  S NpcHtmlMessage obj=jax item=0 page=default/30730.htm
+  S ActionFailed
+bypass npc_{jax}_Quest
+  S NpcHtmlMessage obj=jax item=0 page=script/quest/Q225_TestOfTheSearcher/30730-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30730-01a.htm
+  S NpcHtmlMessage obj=jax item=0 page=script/quest/Q225_TestOfTheSearcher/30730-01a.htm
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30730-01b.htm
+  S NpcHtmlMessage obj=jax item=0 page=script/quest/Q225_TestOfTheSearcher/30730-01b.htm
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30730-01c.htm
+  S NpcHtmlMessage obj=jax item=0 page=script/quest/Q225_TestOfTheSearcher/30730-01c.htm
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30730-01d.htm
+  S QuestList 225:0x80003fff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2799
+  S SystemMessage id=54 3:2800
+  S NpcHtmlMessage obj=jax item=0 page=script/quest/Q225_TestOfTheSearcher/30730-01d.htm
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 14
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=14
+action jax
+  S ActionFailed
+  S NpcHtmlMessage obj=jax item=0 page=default/30730.htm
+  S ActionFailed
+action jax
+  S ActionFailed
+  S NpcHtmlMessage obj=jax item=0 page=default/30730.htm
+  S ActionFailed
+bypass npc_{jax}_Quest
+  S NpcHtmlMessage obj=jax item=0 page=script/quest/Q225_TestOfTheSearcher/30730-02.htm
+  S ActionFailed
+  S ActionFailed
+action alex
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# The fourth torn piece of each kind makes its map; the second map brings cond 15.
+kill scavenger
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2801
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2801 6:4
+  S SystemMessage id=54 3:2803
+  items 2801=0 2803=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=14
+kill hangman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2802
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2802 6:4
+  S SystemMessage id=54 3:2804
+  S QuestList 225:0x80007fff
+  S ExShowQuestMark quest=225
+  Q upsert Q225_TestOfTheSearcher | <cond> | 15
+  items 2802=0 2804=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=15
+
+# Jax combines the maps; the tree gives the rusted key and calls the chest.
+action jax
+action jax
+  S ActionFailed
+  S NpcHtmlMessage obj=jax item=0 page=default/30730.htm
+  S ActionFailed
+bypass npc_{jax}_Quest
+  S QuestList 225:0x8000ffff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2792
+  S SystemMessage id=302 3:2804
+  S SystemMessage id=302 3:2800
+  S SystemMessage id=302 3:2803
+  S SystemMessage id=54 3:2805
+  S NpcHtmlMessage obj=jax item=0 page=script/quest/Q225_TestOfTheSearcher/30730-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 16
+  items 2792=0 2800=0 2803=0 2804=0 2805=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=16
+action tree
+action tree
+  S ActionFailed
+  S NpcHtmlMessage obj=tree item=0 page=default/30627.htm
+  S ActionFailed
+bypass npc_{tree}_Quest
+  S NpcHtmlMessage obj=tree item=0 page=script/quest/Q225_TestOfTheSearcher/30627-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30627-01a.htm
+  S QuestList 225:0x8001ffff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2806
+  S NpcHtmlMessage obj=tree item=0 page=script/quest/Q225_TestOfTheSearcher/30627-01a.htm
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 17
+  items 2806=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=17
+action alex
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-10.htm
+  S ActionFailed
+  S ActionFailed
+
+# The chest takes the rusted key and gives twenty gold bars.
+action chest
+action chest
+  S ActionFailed
+  S NpcHtmlMessage obj=chest item=0 page=default/30628.htm
+  S ActionFailed
+bypass npc_{chest}_Quest
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q225_TestOfTheSearcher/30628-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30628-01a.htm
+  S QuestList 225:0x8003ffff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2806
+  S SystemMessage id=53 3:2807 6:20
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q225_TestOfTheSearcher/30628-01a.htm
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 18
+  items 2806=0 2807=20
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=18
+
+# Alex takes the gold bars, his order and the combined map for his recommendation.
+action alex
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S QuestList 225:0x8007ffff
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2794
+  S SystemMessage id=302 3:2805
+  S SystemMessage id=301 3:2807 6:20
+  S SystemMessage id=54 3:2808
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-11.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <cond> | 19
+  items 2794=0 2805=0 2807=0 2808=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=19
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q225_TestOfTheSearcher/30291-12.htm
+  S ActionFailed
+  S ActionFailed
+
+# Luther gives the Mark of Searcher.
+action luther
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+bypass npc_{luther}_Quest
+  S SystemMessage id=302 3:2808
+  S SystemMessage id=54 3:2809
+  S SystemMessage id=95 1:37831 1:18750
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 225:0x00000000
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <state> | COMPLETED
+  Q delete-except-state Q225_TestOfTheSearcher
+  items 2808=0 2809=1
+  state Q225_TestOfTheSearcher COMPLETED
+  rows Q225_TestOfTheSearcher <state>=COMPLETED
+relog
+  items 2809=1
+  state Q225_TestOfTheSearcher COMPLETED
+  rows Q225_TestOfTheSearcher <state>=COMPLETED
+action luther
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+bypass npc_{luther}_Quest
+  S NpcHtmlMessage obj=luther item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

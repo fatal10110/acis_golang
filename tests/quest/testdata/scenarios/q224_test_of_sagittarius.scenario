@@ -1,0 +1,472 @@
+# Test of Sagittarius (Q224), a second class-change test for rogues, elven scouts and assassins,
+# played by a level 39 Assassin who already holds most of each rune count (the kills below bring
+# each to ten), every script roll pinned to 1 (every drop lands, no Leto lizardman's blood calls
+# Kadesh): Bernard starts it and pays the level 39 set's Dimensional Diamonds; Hamil reads
+# Bernard's introduction and sends the traveller to Sir Aron Tanford; ten hunter runes of the ants
+# for Hamil's second letter; Vokian sends it to the Breka orcs, whose tenth rune brings the
+# talisman of the snake; Vokian takes the talisman; Hamil's third letter for Gauen; the four parts
+# of the bow (stakato chitin, reinforced bowstring, mithril clip, manashen horn) for Gauen's
+# Crescent Moon bow; Hamil sends it to the Leto lizardmen, whose kills give their blood; then
+# relog. Kadesh and the finish are q224_test_of_sagittarius_kadesh. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q224_test_of_sagittarius.golden
+character Sagittarius 39
+class 35
+random always 1
+hold 3298 8
+hold 3299 8
+script quest.Q224_TestOfSagittarius
+item 17 3028 3293 3294 3295 3296 3297 3298 3299 3300 3301 3302 3303 3304 3305 3306 7562
+page default/30702.htm
+page default/30626.htm
+page default/30653.htm
+page trainer/30514.htm
+page trainer/30717.htm
+page script/quest/Q224_TestOfSagittarius/
+npc bernard 30702 Folk 10 0 0
+npc hamil 30626 Folk -10 0 0
+npc aron 30653 Folk 0 10 0
+npc vokian 30514 Trainer 0 -10 0
+npc gauen 30717 Trainer 10 10 0
+npc ant 20079 Monster 40 0 0
+npc antleader 20090 Monster -40 0 0
+npc shaman 20269 Monster 0 40 0
+npc overlord 20270 Monster 0 -40 0
+npc stakato 20230 Monster 40 40 0
+npc spider 20233 Monster -40 40 0
+npc scavenger 20551 Monster 40 -40 0
+npc gargoyle 20563 Monster -40 -40 0
+npc lizardman 20577 Monster 60 0 0
+npc lizoverlord 20582 Monster -60 0 0
+
+# Bernard: an Assassin of level 39 may start; the first test of the set pays the diamonds.
+action bernard
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q224_TestOfSagittarius/30702-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30702-04.htm
+  S QuestList 224:0x80000001
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3294
+  S SystemMessage id=53 3:7562 6:96
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q224_TestOfSagittarius/30702-04a.htm
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <state> | STARTED
+  Q upsert Q224_TestOfSagittarius | <cond> | 1
+  M set secondClassChange39 | true
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=1
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q224_TestOfSagittarius/30702-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Hamil reads Bernard's introduction and sends the traveller to Sir Aron Tanford.
+action hamil
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30626-02.htm
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-02.htm
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30626-03.htm
+  S QuestList 224:0x80000003
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3294
+  S SystemMessage id=54 3:3295
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-03.htm
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 2
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=2
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sir Aron Tanford takes Hamil's first letter.
+action aron
+action aron
+  S ActionFailed
+  S NpcHtmlMessage obj=aron item=0 page=default/30653.htm
+  S ActionFailed
+bypass npc_{aron}_Quest
+  S NpcHtmlMessage obj=aron item=0 page=script/quest/Q224_TestOfSagittarius/30653-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30653-02.htm
+  S QuestList 224:0x80000007
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3295
+  S NpcHtmlMessage obj=aron item=0 page=script/quest/Q224_TestOfSagittarius/30653-02.htm
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 3
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=3
+action aron
+  S ActionFailed
+  S NpcHtmlMessage obj=aron item=0 page=default/30653.htm
+  S ActionFailed
+action aron
+  S ActionFailed
+  S NpcHtmlMessage obj=aron item=0 page=default/30653.htm
+  S ActionFailed
+bypass npc_{aron}_Quest
+  S NpcHtmlMessage obj=aron item=0 page=script/quest/Q224_TestOfSagittarius/30653-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# The ants' last two hunter runes bring cond 4; Hamil takes the ten for his second letter.
+kill ant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3298
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill antleader
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3298
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 224:0x8000000f
+  S ExShowQuestMark quest=224
+  Q upsert Q224_TestOfSagittarius | <cond> | 4
+  items 3298=10
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=4
+action hamil
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30626-06.htm
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-06.htm
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30626-07.htm
+  S QuestList 224:0x8000001f
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3298 6:10
+  S SystemMessage id=54 3:3296
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-07.htm
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 5
+  items 3296=1 3298=0
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=5
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Vokian takes the second letter and sends the traveller to the Breka orcs.
+action vokian
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+bypass npc_{vokian}_Quest
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q224_TestOfSagittarius/30514-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30514-02.htm
+  S QuestList 224:0x8000003f
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3296
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q224_TestOfSagittarius/30514-02.htm
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 6
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=6
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+bypass npc_{vokian}_Quest
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q224_TestOfSagittarius/30514-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# The orcs' last two runes bring the talisman of the snake (cond 7); Vokian takes it.
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3299
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill overlord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3299
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 224:0x8000007f
+  S ExShowQuestMark quest=224
+  S SystemMessage id=54 3:3301
+  Q upsert Q224_TestOfSagittarius | <cond> | 7
+  items 3299=10 3301=1
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=7
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+bypass npc_{vokian}_Quest
+  S QuestList 224:0x800000ff
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3301
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q224_TestOfSagittarius/30514-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 8
+  items 3301=0
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=8
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+bypass npc_{vokian}_Quest
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q224_TestOfSagittarius/30514-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Hamil takes the ten runes for his third letter; Gauen takes it.
+action hamil
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S QuestList 224:0x800001ff
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3299 6:10
+  S SystemMessage id=54 3:3297
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 9
+  items 3297=1 3299=0
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=9
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-10.htm
+  S ActionFailed
+  S ActionFailed
+action gauen
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S QuestList 224:0x800003ff
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3297
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q224_TestOfSagittarius/30717-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 10
+  items 3297=0
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=10
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q224_TestOfSagittarius/30717-03.htm
+  S ActionFailed
+  S ActionFailed
+action aron
+action aron
+  S ActionFailed
+  S NpcHtmlMessage obj=aron item=0 page=default/30653.htm
+  S ActionFailed
+bypass npc_{aron}_Quest
+  S NpcHtmlMessage obj=aron item=0 page=script/quest/Q224_TestOfSagittarius/30653-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# The four parts of the bow; the last brings cond 11, and Gauen makes the bow.
+kill stakato
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3303
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3304
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill scavenger
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3302
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill gargoyle
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3305
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 224:0x800007ff
+  S ExShowQuestMark quest=224
+  Q upsert Q224_TestOfSagittarius | <cond> | 11
+  items 3302=1 3303=1 3304=1 3305=1
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=11
+action gauen
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S QuestList 224:0x80000fff
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3305
+  S SystemMessage id=302 3:3302
+  S SystemMessage id=302 3:3304
+  S SystemMessage id=302 3:3303
+  S SystemMessage id=54 3:3028
+  S SystemMessage id=53 3:17 6:10
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q224_TestOfSagittarius/30717-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 12
+  items 17=10 3028=1 3302=0 3303=0 3304=0 3305=0
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=12
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q224_TestOfSagittarius/30717-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Hamil sends the traveller to the Leto lizardmen; their kills give their blood.
+action hamil
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S QuestList 224:0x80001fff
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-11.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <cond> | 13
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=13
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-12.htm
+  S ActionFailed
+  S ActionFailed
+kill lizardman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3306
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill lizoverlord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3306
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3306=2
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=13
+action bernard
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q224_TestOfSagittarius/30702-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The test survives a relog.
+relog
+  items 3028=1 3306=2 7562=96
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=13
+action hamil
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-12.htm
+  S ActionFailed
+  S ActionFailed

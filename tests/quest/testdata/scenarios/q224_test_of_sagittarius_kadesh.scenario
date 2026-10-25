@@ -1,0 +1,93 @@
+# Test of Sagittarius (Q224), its end: a level 39 Rogue at cond 13, wearing the Crescent Moon bow
+# Gauen made and holding thirty Leto lizardman's blood, every script roll pinned to 1: a lizardman
+# kill gives one more blood (thirty-one is no call of Kadesh); Kadesh slain with the bow in hand
+# gives the talisman of Kadesh (cond 14); Hamil takes the blood, the bow and the talisman for the
+# Mark of Sagittarius; then relog, and Bernard has nothing more. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q224_test_of_sagittarius_kadesh.golden
+character Sagittarius 39
+class 7
+random always 1
+quest Q224_TestOfSagittarius <state>=STARTED <cond>=13
+equip 3028
+hold 3306 30
+script quest.Q224_TestOfSagittarius
+item 17 3028 3293 3294 3295 3296 3297 3298 3299 3300 3301 3302 3303 3304 3305 3306 7562
+page default/30702.htm
+page default/30626.htm
+page default/30653.htm
+page trainer/30514.htm
+page trainer/30717.htm
+page script/quest/Q224_TestOfSagittarius/
+npc bernard 30702 Folk 10 0 0
+npc hamil 30626 Folk -10 0 0
+npc lizardman 20577 Monster 60 0 0
+npc kadesh 27090 Monster 40 0 0
+
+action hamil
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-12.htm
+  S ActionFailed
+  S ActionFailed
+kill lizardman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3306
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3306=31
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=13
+
+# Kadesh falls to the Crescent Moon bow.
+kill kadesh
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 224:0x80003fff
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3300
+  Q upsert Q224_TestOfSagittarius | <cond> | 14
+  items 3300=1
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=14
+
+# Hamil gives the Mark of Sagittarius.
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+action hamil
+  S ActionFailed
+  S NpcHtmlMessage obj=hamil item=0 page=default/30626.htm
+  S ActionFailed
+bypass npc_{hamil}_Quest
+  S SystemMessage id=301 3:3306 6:31
+  S SystemMessage id=302 3:3028
+  S SystemMessage id=302 3:3300
+  S SystemMessage id=54 3:3293
+  S SystemMessage id=95 1:54726 1:20250
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 224:0x00000000
+  S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-13.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <state> | COMPLETED
+  Q delete-except-state Q224_TestOfSagittarius
+  items 3028=0 3293=1 3300=0 3306=0
+  state Q224_TestOfSagittarius COMPLETED
+  rows Q224_TestOfSagittarius <state>=COMPLETED
+relog
+  items 3293=1
+  state Q224_TestOfSagittarius COMPLETED
+  rows Q224_TestOfSagittarius <state>=COMPLETED
+action bernard
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
