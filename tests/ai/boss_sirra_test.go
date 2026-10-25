@@ -249,6 +249,15 @@ func bootSirra(t *testing.T, hemocytes int32, opts ...gameservertest.Option) *si
 // Silver Hemocytes.
 func (w *sirraWorld) join(t *testing.T, account, name string, hemocytes int32) sailrenMate {
 	t.Helper()
+	m := w.login(t, account, name, hemocytes)
+	w.invite(t, name, m)
+	return m
+}
+
+// login brings the character name, of account, into the world beside the
+// character, in no party, holding hemocytes Silver Hemocytes.
+func (w *sirraWorld) login(t *testing.T, account, name string, hemocytes int32) sailrenMate {
+	t.Helper()
 	m := sailrenMate{id: w.srv.SeedCharacterFor(t, account, name, 20, 0).ObjectID()}
 	if hemocytes > 0 {
 		w.srv.GiveItem(t, m.id, sirraHemocyte, hemocytes)
@@ -266,20 +275,28 @@ func (w *sirraWorld) join(t *testing.T, account, name string, hemocytes int32) s
 	m.c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
 	w.srv.ReadQueued(t, m.c)
 	w.srv.ReadQueued(t, w.srv.Client)
+	return m
+}
 
+// invite brings m, the character name, into the party the character leads.
+func (w *sirraWorld) invite(t *testing.T, name string, m sailrenMate) {
+	t.Helper()
+	members := make(chan int, 2)
+	count := func() int {
+		if !w.srv.PlayerQueue(t, w.player.ObjectID()).Post(func() { members <- len(script.PlayerOf(w.player).PartyMembers()) }) {
+			t.Fatal("the character's queue is closed")
+		}
+		return <-members
+	}
+	before := count()
 	w.srv.Client.Send(encodeJoinParty(name))
 	w.srv.ReadQueued(t, m.c)
 	m.c.Send(encodeAnswerJoinParty(1))
 	w.srv.ReadQueued(t, m.c)
 	w.srv.ReadQueued(t, w.srv.Client)
-	members := make(chan int, 1)
-	if !w.srv.PlayerQueue(t, w.player.ObjectID()).Post(func() { members <- len(script.PlayerOf(w.player).PartyMembers()) }) {
-		t.Fatal("the character's queue is closed")
+	if after := count(); after < 2 || after <= before {
+		t.Fatalf("the character's party has %d members after %s accepted, %d before", after, name, before)
 	}
-	if <-members < 2 {
-		t.Fatalf("the character leads no party after %s accepted", name)
-	}
-	return m
 }
 
 // place teleports the online player id to at and lets its client appear
@@ -460,28 +477,33 @@ func TestFreyaDeaconTurnsAwayTheUnready(t *testing.T) {
 // TestFreyaDeaconLetsThePartyIn ports the entry (phases 1 to 3): the leader
 // pays 10 Silver Hemocytes per member, the party is told so for 100 s, the
 // leader receives three of item 8379 and the 05 page, and the deacon
-// shouts. Busy, it answers the party with 002 and anyone else with 01. Two
-// minutes later the memo's creature hears 10027 and both barriers close;
-// 5 s later the party is told the gate opens, every member within 1000 may
-// enter the three garden zones and is teleported in, and the boss maker
-// runs 11040 with the leader. Event 10005 then runs 10025 on the keeper
+// shouts. Busy, it answers the party's talk with 002 and an entry with 01.
+// Two minutes later the memo's creature hears 10027 and both barriers
+// close; 5 s later the party is told the gate opens, every member within
+// 1000 may enter the three garden zones and is teleported in (Third, gone
+// 1149 away, is not), and the boss maker runs 11040 with the leader. Event 10005 then runs 10025 on the keeper
 // maker, tells the party it is over, sends 11039 to the NPCs within 8000
 // and opens both barriers, and the deacon is free again.
 func TestFreyaDeaconLetsThePartyIn(t *testing.T) {
 	w := bootSirra(t, 10)
 	c := w.srv.Client
 	mate := w.join(t, "mate", "Mate", 10)
+	third := w.join(t, "third", "Third", 10)
 	deacon := soleBaiumNPC(t, w.baiumWorld, sirraDeaconID)
-	roles := map[int32]string{w.player.ObjectID(): "player", mate.id: "mate", deacon.ObjectID(): "deacon"}
+	roles := map[int32]string{w.player.ObjectID(): "player", mate.id: "mate", third.id: "third", deacon.ObjectID(): "deacon"}
 
+	w.wantFirstPage(t, mate.c, "freya_deacon001.htm")
 	w.wantFirstPage(t, c, "freya_deacon001.htm")
 	w.srv.ReadQueued(t, mate.c)
+	w.srv.ReadQueued(t, third.c)
 	wantSirraFrames(t, "enter", w.bypass(t, c, "enter"), roles,
 		"S SystemMessage id=301 3:8057 6:10", screen(1121000, 100000), "S SystemMessage id=53 3:8379 6:3", shout(1121005),
 		sirraPage("freya_deacon_q0656_05.htm"), "S ActionFailed")
-	wantSirraFrames(t, "enter, Mate", w.srv.ReadQueued(t, mate.c), roles,
-		"S SystemMessage id=301 3:8057 6:10", screen(1121000, 100000), shout(1121005))
-	for _, id := range []int32{w.player.ObjectID(), mate.id} {
+	for _, m := range []sailrenMate{mate, third} {
+		wantSirraFrames(t, "enter, "+roles[m.id], w.srv.ReadQueued(t, m.c), roles,
+			"S SystemMessage id=301 3:8057 6:10", screen(1121000, 100000), shout(1121005))
+	}
+	for _, id := range []int32{w.player.ObjectID(), mate.id, third.id} {
 		if got := w.srv.PlayerItemCount(t, id, sirraHemocyte); got != 0 {
 			t.Fatalf("player %d holds %d Silver Hemocytes after the entry, want 0", id, got)
 		}
@@ -489,15 +511,18 @@ func TestFreyaDeaconLetsThePartyIn(t *testing.T) {
 	if got := w.srv.PlayerItemCount(t, w.player.ObjectID(), sirraReward); got != 3 {
 		t.Fatalf("the leader holds %d of item 8379, want 3", got)
 	}
-	if got, want := w.deaconMemory(t), fmt.Sprintf("leader=%d busy=1 third=0 count=2 entrant=true", w.player.ObjectID()); got != want {
+	if got, want := w.deaconMemory(t), fmt.Sprintf("leader=%d busy=1 third=0 count=3 entrant=true", w.player.ObjectID()); got != want {
 		t.Fatalf("the deacon's memory = %s, want %s", got, want)
 	}
+	wantSirraFrames(t, "Mate enters while busy", w.bypass(t, mate.c, "enter"), roles, sirraPage("freya_deacon_q0656_01.htm"), "S ActionFailed")
 
 	w.wantFirstPage(t, c, "freya_deacon002.htm")
 	wantSirraFrames(t, "link_07", w.bypass(t, c, "link_07"), roles, sirraPage("freya_deacon_q0656_07.htm"), "S ActionFailed")
 	wantSirraFrames(t, "link_08", w.bypass(t, c, "link_08"), roles, sirraPage("freya_deacon_q0656_08.htm"), "S ActionFailed")
 	w.wantFirstPage(t, mate.c, "freya_deacon002.htm")
-	wantSirraFrames(t, "enter while busy", w.bypass(t, c, "enter"), roles)
+	far := location.Location{X: 116600, Y: sirraAtDeacon.Y, Z: sirraAtDeacon.Z}
+	w.place(t, third.id, third.c, far)
+	w.srv.ReadQueued(t, c)
 	w.srv.ReadQueued(t, mate.c)
 
 	w.advance(t, 119*time.Second)
@@ -507,6 +532,7 @@ func TestFreyaDeaconLetsThePartyIn(t *testing.T) {
 	w.log.expect(t, "two minutes after the entry", "memo heard 10027 0 0")
 	w.wantBarriers(t, "two minutes after the entry", false)
 	w.srv.ReadQueued(t, mate.c)
+	w.srv.ReadQueued(t, third.c)
 
 	frames := w.advance(t, 5*time.Second)
 	w.log.expect(t, "the gate", fmt.Sprintf("maker schuttgart13_mb2314_05m1 11040 %d 0", w.player.ObjectID()))
@@ -514,6 +540,11 @@ func TestFreyaDeaconLetsThePartyIn(t *testing.T) {
 		screen(1121001, 10000), "S TeleportToLocation obj=player loc=113533,-126159,-3488 fast=0")
 	wantSirraFrames(t, "the gate, Mate", noReleases(ownTeleports(w.srv.ReadQueued(t, mate.c), mate.id)), roles,
 		screen(1121001, 10000), "S TeleportToLocation obj=mate loc=113533,-126159,-3488 fast=0")
+	wantSirraFrames(t, "the gate, Third", noReleases(ownTeleports(w.srv.ReadQueued(t, third.c), third.id)), roles,
+		screen(1121001, 10000))
+	if x, y, z := w.srv.PlayerPosition(t, third.id); x != far.X || y != far.Y || z != far.Z {
+		t.Fatalf("Third stands at %d,%d,%d after the gate, want %v", x, y, z, far)
+	}
 	want := []int32{w.player.ObjectID(), mate.id}
 	slices.Sort(want)
 	for i, z := range w.zones {
@@ -539,7 +570,7 @@ func TestFreyaDeaconLetsThePartyIn(t *testing.T) {
 	w.log.expect(t, "10005", "maker schuttgart13_npc2314_3m1 10025 0 0", "memo heard 11039 0 0")
 	wantSirraFrames(t, "10005", w.srv.ReadQueued(t, c), roles, screen(1121003, 10000))
 	w.wantBarriers(t, "10005", true)
-	if got, want := w.deaconMemory(t), "leader=0 busy=0 third=0 count=2 entrant=false"; got != want {
+	if got, want := w.deaconMemory(t), "leader=0 busy=0 third=0 count=3 entrant=false"; got != want {
 		t.Fatalf("the deacon's memory after 10005 = %s, want %s", got, want)
 	}
 	w.place(t, w.player.ObjectID(), c, sirraAtDeacon)
@@ -549,7 +580,7 @@ func TestFreyaDeaconLetsThePartyIn(t *testing.T) {
 // TestFreyaDeaconTurnsAwayAGrownParty ports the gate's refusal (phases 1
 // and 2): a party that grew after it paid is not let in; the deacon shouts,
 // opens both barriers and is free again, and the boss maker runs nothing.
-// A member who left the party's side is never let in either.
+// Before Third joins, the deacon, busy, answers its talk with 01.
 func TestFreyaDeaconTurnsAwayAGrownParty(t *testing.T) {
 	w := bootSirra(t, 10)
 	c := w.srv.Client
@@ -558,8 +589,10 @@ func TestFreyaDeaconTurnsAwayAGrownParty(t *testing.T) {
 	roles := map[int32]string{w.player.ObjectID(): "player", mate.id: "mate", deacon.ObjectID(): "deacon"}
 	w.wantFirstPage(t, c, "freya_deacon001.htm")
 	w.bypass(t, c, "enter")
-	third := w.join(t, "third", "Third", 0)
+	third := w.login(t, "third", "Third", 0)
 	roles[third.id] = "third"
+	w.wantFirstPage(t, third.c, "freya_deacon_q0656_01.htm")
+	w.invite(t, "Third", third)
 	w.wantFirstPage(t, third.c, "freya_deacon002.htm")
 	w.srv.ReadQueued(t, c)
 
