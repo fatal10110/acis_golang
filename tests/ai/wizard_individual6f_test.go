@@ -628,3 +628,30 @@ func TestWizardHereticPriestWalksHomeFromOutside(t *testing.T) {
 		})
 	}
 }
+
+// TestWizardHereticPriestSeesShortOfMP ports the see-creature hook's
+// free-to-move short range answer when the priest cannot pay for the
+// magic: a settled priest (Hold 0, aggro range 0, so it may not attack the
+// character on its own) seeing the character 100 away gives up its spells
+// and still wants to attack it, weight 1000, closing in. This answer alone
+// skips the automatic attack check.
+func TestWizardHereticPriestSeesShortOfMP(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual6f(t, raidBoot{}, i6fPriest(nil, false))
+	h := w.i6fArmed(t, i6fPriestID, 1500, 0, wShortDDID)
+	me := w.player.ObjectID()
+	w.ticks(t, 9)
+	w.onQueue(t, h, func() { h.AI().Desires().Clear() })
+	(&ind1World{warriorWorld: w.warriorWorld}).setClass(t, w.player, 1)
+	w.srv.ReadQueued(t, w.srv.Client)
+
+	w.i6fLookAt(t, h)
+	if got := h.Scratch().Int(npc.IntAI0); got != 1 {
+		t.Fatalf("priest short of MP int slot 0 = %d, want 1 (spells given up)", got)
+	}
+	d, ok := desire(h, actorai.IntentionAttack)
+	if !ok || d.Weight != 1000 || d.FinalTarget.ObjectID() != me || !d.MoveToTarget {
+		t.Fatalf("priest short of MP attack desire = %+v (%v), want weight 1000 on the character closing in", d, ok)
+	}
+	i6fWantCasts(t, "after it saw the character", h, nil)
+}
