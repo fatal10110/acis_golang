@@ -1,0 +1,19 @@
+# The Queen Ant (29001), a level 1 grand boss placed by an npcmaker whose territory holds her
+# but not where the level 1 character enters the world, every draw 0: she sends nobody away as
+# she appears. The character steps 100 in front of her, inside her territory, and hits her for
+# a twentieth of her 440 HP: not more than 8 levels above her, not riding, with no skill, 100
+# away (under 250, a draw under 5), she wants her self cast 4017 from where she stands, and to
+# attack the character from where she stands by 22 / 440 / 0.05 * 22 * her weight point 10 *
+# 1000. She starts the self cast at once; her top desire target, herself, fails her automatic
+# attack check, and dropping her hate of herself leaves the attack desire.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAnt
+territory nest 150 -200 900 200 -100 100
+npc queen 29001 GrandBoss 700 0 0 maker nest skill BUFF 4017 1 skill DD_MAGIC 4018 1 skill DD_MAGIC_A 4019 1 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+
+approach queen
+hit queen 22
+  S MagicSkillUse caster=queen target=queen skill=4017-1 hit=1717 reuse=0 success=0
+  desires queen cast(queen,4017)=1000000 attack(player)=220000
