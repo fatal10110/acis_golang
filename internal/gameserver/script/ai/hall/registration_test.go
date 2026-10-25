@@ -14,6 +14,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// watering is the game managers' shared values of the chain.
+var watering = NewWateringGame()
+
 // chain is the behavior chain down to the hall behaviors of this package,
 // in scripts.xml order, with the Go constructor of each.
 var chain = []struct {
@@ -40,14 +43,18 @@ var chain = []struct {
 	{"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer2", PartisanHealer2},
 	{"script.ai.siegablehall.Agit01Stand1.Agit01Stand1", Stand1},
 	{"script.ai.siegablehall.Agit01Stand1.Agit01Stand2", Stand2},
-	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager", func() script.Script { return GameManager(NewWateringGame()) }},
+	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager", func() script.Script { return GameManager(watering) }},
+	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle1", func() script.Script { return Circle1(watering) }},
+	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle2", func() script.Script { return Circle2(watering) }},
+	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle3", func() script.Script { return Circle3(watering) }},
+	{"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle4", func() script.Script { return Circle4(watering) }},
 	{"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1", Nurka1},
 }
 
 // folkIDs are the chain's civilian NPCs, as the datapack types them: the
-// Rainbow Springs gourds, enraged yeti and sweeper. Every other id is a
-// monster.
-var folkIDs = []int32{35588, 35589, 35590, 35591, 35592, 35600}
+// Rainbow Springs gourds, enraged yeti, game managers and sweeper. Every
+// other id is a monster.
+var folkIDs = []int32{35588, 35589, 35590, 35591, 35592, 35596, 35597, 35598, 35599, 35600}
 
 // manifestView is what the reference manifest records of the chain: per
 // script its kind and bind lines, and the folded per-(npc, event) lists
@@ -139,7 +146,10 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // each, the mimic's on 1, the magical mimic's on 2, the sweeper's on 4, the
 // treasure box's on 3, the three soldiers' on 4 each, the second sorcerer's
 // on 4, the healer's on 1, the escort healer's on 3, the three standing
-// guards' on 4 each, the escort guards' on 6 each and Nurka's on 4.
+// guards' on 4 each, the escort guards' on 6 each, Nurka's on 4, the first
+// and fourth circle managers' on 4 each, the second and third's on 6 each,
+// and the first circle manager's talk and first talk, with the fourth
+// circle manager's, held by the fourth circle.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -181,13 +191,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 2+5+5+4+3+3+5+10+4*2+1+2+4+3+3*4+4+1+3+3*4+2*6+4, len(want.folds); got != wantFolds {
+	if wantFolds, got := 2+5+5+4+3+3+5+10+4*2+1+2+4+3+3*4+4+1+3+3*4+2*6+4+4+6+6+4+2*2, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{35373, 35408, 35410, 35409, 35630, 35631, 35629, 35592, 35588, 35589, 35590, 35591, 35593, 35594, 35600, 35595, 35372, 35379, 35381, 35380, 35369, 35376, 35370, 35371, 35374, 35377, 35378, 35368} {
+	for _, id := range []int32{35373, 35408, 35410, 35409, 35630, 35631, 35629, 35592, 35588, 35589, 35590, 35591, 35593, 35594, 35600, 35595, 35372, 35379, 35381, 35380, 35369, 35376, 35370, 35371, 35374, 35377, 35378, 35368, 35596, 35597, 35598, 35599} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

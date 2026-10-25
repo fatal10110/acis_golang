@@ -11,8 +11,8 @@ import (
 // shouts and lines by their NpcString constants and Dietrich's healer and
 // buffer classes by their class id constants; the port writes their ids
 // (30, the Elven Elder's, is a literal of the reference already). The game
-// manager's slowing area name is never read (its area is left out), and
-// its party reads (Player.PartyMembers) share their name with the quest
+// managers' slowing area names are never read (their area is left out),
+// and the party reads (Player.PartyMembers) share their name with the quest
 // helper.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
@@ -33,6 +33,10 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2",
 		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1",
 		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager",
+		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle1",
+		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle2",
+		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle3",
+		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle4",
 		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer2",
 		"script.ai.siegablehall.Agit01Stand1.Agit01Stand1",
 		"script.ai.siegablehall.Agit01Stand1.Agit01Stand2",
@@ -42,7 +46,8 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"number 1010624", "number 1010627", "number 1010625", "number 1010636", "number 1010637", "number 1010638",
 		"number 1800023", "number 1010639",
 		"number 1010628", "number 1010633", "number 1010634", "number 1010635", "number 1010640", "number 1010641",
-		"string \"azit_watering_game_manager_default\"", "call Quest.getPartyMembers",
+		"string \"azit_watering_game_manager_default\"",
+		"string \"rainbow_slow_1\"", "string \"rainbow_slow_2\"", "string \"rainbow_slow_3\"", "string \"rainbow_slow_4\"", "call Quest.getPartyMembers",
 		"number 16", "number 43", "number 51", "number 52",
 	)
 	if err != nil {
