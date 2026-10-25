@@ -57,6 +57,7 @@ bypass Quest Q120_PavelsResearch 32046-35.htm
   S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-35.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | <cond> | 20
+  rows Q120_PavelsResearch <cond>=20 <state>=STARTED talk=0 talk1=0
 
 # The west weather master: a wrong answer first, then both right.
 action west
@@ -87,10 +88,12 @@ bypass Quest Q120_PavelsResearch w3_1
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-04.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk | 1
+  rows Q120_PavelsResearch <cond>=20 <state>=STARTED talk=1 talk1=0
 bypass Quest Q120_PavelsResearch w3_2
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-05.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=20 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32044-06.htm
   S QuestList 114:0x00000000 120:0x801fffff
   S ExShowQuestMark quest=120
@@ -101,6 +104,7 @@ bypass Quest Q120_PavelsResearch 32044-06.htm
   Q upsert Q120_PavelsResearch | <cond> | 21
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
+  rows Q120_PavelsResearch <cond>=21 <state>=STARTED talk=0 talk1=0
 action west
   S ActionFailed
   S NpcHtmlMessage obj=west item=0 page=default/32042.htm
@@ -119,6 +123,7 @@ bypass Quest Q120_PavelsResearch 32044-09.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-09.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk | 1
+  rows Q120_PavelsResearch <cond>=21 <state>=STARTED talk=1 talk1=0
 bypass Quest Q120_PavelsResearch 32044-08.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-08.htm
   S ActionFailed
@@ -126,6 +131,7 @@ bypass Quest Q120_PavelsResearch 32044-10.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-10.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | talk1 | 1
+  rows Q120_PavelsResearch <cond>=21 <state>=STARTED talk=1 talk1=1
 bypass Quest Q120_PavelsResearch 32044-08.htm
   S NpcHtmlMessage obj=west item=0 page=script/quest/Q120_PavelsResearch/32044-11.htm
   S ActionFailed
@@ -154,6 +160,7 @@ bypass Quest Q120_PavelsResearch 32044-17.htm
   Q upsert Q120_PavelsResearch | <cond> | 22
   Q upsert Q120_PavelsResearch | talk | 0
   Q upsert Q120_PavelsResearch | talk1 | 0
+  rows Q120_PavelsResearch <cond>=22 <state>=STARTED talk=0 talk1=0
 
 # The stones give the heart of Atlanta.
 action stones
@@ -178,6 +185,7 @@ bypass Quest Q120_PavelsResearch 32046-38.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | <cond> | 23
   items 8291=1
+  rows Q120_PavelsResearch <cond>=23 <state>=STARTED talk=0 talk1=0
 
 # Wendy takes it and gives her necklace.
 action wendy
@@ -214,6 +222,7 @@ bypass Quest Q120_PavelsResearch 32047-26.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | <cond> | 24
   items 8291=0
+  rows Q120_PavelsResearch <cond>=24 <state>=STARTED talk=0 talk1=0
 action wendy
   S ActionFailed
   S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
@@ -250,6 +259,7 @@ bypass Quest Q120_PavelsResearch 32047-32.htm
   S ActionFailed
   Q upsert Q120_PavelsResearch | <cond> | 25
   items 8292=1
+  rows Q120_PavelsResearch <cond>=25 <state>=STARTED talk=0 talk1=0
 
 # Yumi takes the necklace for the earring.
 action yumi

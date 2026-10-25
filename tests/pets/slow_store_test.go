@@ -53,7 +53,7 @@ func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
 	}
 
 	h.srv.Settle(t)
-	if lines := h.srv.SlowTaskLogs(); len(lines) != 0 {
+	if lines := h.srv.SlowTaskLogs(slowStoreDelay); len(lines) != 0 {
 		t.Fatalf("queue task blocked on the pets table: %v", lines)
 	}
 	if state := h.savedPetState(t); state.Name != "Fenrir" {

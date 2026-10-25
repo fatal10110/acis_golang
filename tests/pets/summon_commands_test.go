@@ -181,8 +181,9 @@ func TestUnsummonShortcutDismissesServitor(t *testing.T) {
 		t.Fatalf("spawn burst carried no servitor PetInfo for %d", servitor.ObjectID())
 	}
 
-	// Despawn sends PetDelete before it clears the object registry; the
-	// harness read returns only once the server has finished the request.
+	// Despawn sends PetDelete before it clears the object registry, so the
+	// registry check waits for the despawn to finish: on the real pool the
+	// client can read PetDelete while the despawn is still running.
 	c.Send(encodeRequestActionUse(petUnsummonAction, false))
 	frames := readUntilOpcode(t, c, serverpackets.OpcodePetDelete, "PetDelete")
 	if got := wire.NewReader(frames[len(frames)-1][1:]).ReadInt32(); got != 1 {
@@ -191,9 +192,10 @@ func TestUnsummonShortcutDismissesServitor(t *testing.T) {
 	if _, ok := srv.State.Summon(ownerID); ok {
 		t.Fatal("owner still has an active summon after unsummon")
 	}
-	if _, ok := srv.State.Object(servitor.ObjectID()); ok {
-		t.Fatalf("servitor %d still in the object registry after unsummon", servitor.ObjectID())
-	}
+	srv.AdvanceUntil(t, "servitor out of the object registry", func() bool {
+		_, ok := srv.State.Object(servitor.ObjectID())
+		return !ok
+	})
 }
 
 func encodeRequestMagicSkillUse(skillID int32) []byte {

@@ -1,8 +1,7 @@
 # Help the Son! (Q044), refused: a level 23 character, one short of the quest's level, is turned
 # away by Lundy and the quest is not started.
-# Not traced (#4105): the starter's page lists multisell 101, the Go run's player object id, which
-# the Go render names {player}. Played with its trace line, the reference trace matched every step;
-# the starter's page lines below are that page with 101 written as {player}.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q044_help_the_son_low_level.golden
 character Helper 23
 script quest.Q044_HelpTheSon
 item 168 7552 7553 7585
@@ -13,7 +12,7 @@ npc lundy 30827 Merchant 10 0 0
 action lundy
 action lundy
   S ActionFailed
-  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S NpcHtmlMessage obj=lundy item=0 page=merchant/30827.htm
   S ActionFailed
 bypass npc_{lundy}_Quest
   S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-00a.htm
