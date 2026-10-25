@@ -227,7 +227,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 // decimal integer; a missing or other character panics, so the invocation
 // aborts.
 func number(event string, from, to int) int32 {
-	n, err := strconv.Atoi(event[from:to])
+	n, err := strconv.ParseInt(event[from:to], 10, 32)
 	if err != nil {
 		panic(err)
 	}
