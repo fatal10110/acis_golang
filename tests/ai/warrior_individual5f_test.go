@@ -487,3 +487,108 @@ func TestCastingHealAggressiveAttacksOnSight(t *testing.T) {
 	t.Parallel()
 	ind5fAttacksOnSight(t, ind5fHealAggrID)
 }
+
+// ind5fPulled hits h from where the character stands and waits until the
+// summon magic that hit wants pulls the character onto h, returning the
+// frames the character saw.
+func (w *ind1World) ind5fPulled(t *testing.T, h *npc.Hostile) [][]byte {
+	t.Helper()
+	me := w.player.ObjectID()
+	w.hit(t, h, 1)
+	ind5bWantCast(t, "a hit from 350", h, ind5fSummon, me)
+	var frames [][]byte
+	w.srv.AdvanceUntil(t, "the character jumps onto the NPC", func() bool {
+		frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+		x, _, _ := w.srv.PlayerPosition(t, me)
+		nx, _, _ := h.Position()
+		return x == nx
+	})
+	return append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+}
+
+// ind5fNoStrike fails when h wants, or within three AI cycles casts, its
+// physical special skill.
+func (w *ind1World) ind5fNoStrike(t *testing.T, when string, h *npc.Hostile, frames [][]byte) {
+	t.Helper()
+	ind5bNoCast(t, when, h, ind5fStrike)
+	frames = append(frames, w.ticks(t, 3)...)
+	frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+	if got := castsOf(frames, h, ind5fStrike); len(got) != 0 {
+		t.Fatalf("%s: physical special MagicSkillUse targets = %v, want none", when, got)
+	}
+}
+
+// TestCastSummonPCStrikesOnADrawUnder33 ports the draw of
+// WarriorCastSummonPC's skill-finished strike: every draw 33, the pull
+// still happens (33 is under the summon's 50), but no physical special
+// follows it.
+func TestCastSummonPCStrikesOnADrawUnder33(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual5f(t, ind5fTemplate(ind5fSummonID))
+	n := w.spawn(t, ind5fSummonID, 350, 0)
+	w.draws.set(33)
+	frames := w.ind5fPulled(t, n)
+	w.ind5fNoStrike(t, "the pull, draw 33", n, frames)
+}
+
+// TestCastSummonPCStrikesOnlyItsMostHated ports the target check of
+// WarriorCastSummonPC's skill-finished strike: made to hate a decoy most
+// while its summon magic is under way, every draw 0, the pull still
+// happens but no physical special follows it.
+func TestCastSummonPCStrikesOnlyItsMostHated(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual5f(t, ind5fTemplate(ind5fSummonID))
+	me := w.player.ObjectID()
+	n := w.spawn(t, ind5fSummonID, 350, 0)
+	w.hit(t, n, 1)
+	ind5bWantCast(t, "a hit from 350", n, ind5fSummon, me)
+	var frames [][]byte
+	w.srv.AdvanceUntil(t, "the summon magic starts", func() bool {
+		frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+		return len(castsOf(frames, n, ind5fSummon)) > 0
+	})
+	w.ind5dDecoy(t, n)
+	w.srv.AdvanceUntil(t, "the character jumps onto the NPC", func() bool {
+		frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+		x, _, _ := w.srv.PlayerPosition(t, me)
+		nx, _, _ := n.Position()
+		return x == nx
+	})
+	w.ind5fNoStrike(t, "the pull, hating a decoy most", n, frames)
+}
+
+// TestCastSummonPCPullsOnlyOnASuccessfulCast ports the success check of
+// WarriorCastSummonPC's skill-finished hook: its summon magic stopped
+// mid-cast, every draw 0, pulls no one, so the character sees no
+// TeleportToLocation and stays where it is, and i_ai1 stays set; the hook
+// still runs, wanting its physical special skill on the character it
+// hates most.
+func TestCastSummonPCPullsOnlyOnASuccessfulCast(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual5f(t, ind5fTemplate(ind5fSummonID))
+	me := w.player.ObjectID()
+	n := w.spawn(t, ind5fSummonID, 350, 0)
+	w.hit(t, n, 1)
+	ind5bWantCast(t, "a hit from 350", n, ind5fSummon, me)
+	var frames [][]byte
+	w.srv.AdvanceUntil(t, "the summon magic starts", func() bool {
+		frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+		return len(castsOf(frames, n, ind5fSummon)) > 0
+	})
+	x, y, _ := w.srv.PlayerPosition(t, me)
+	w.onQueue(t, n, func() {
+		n.AI().Desires().Clear()
+		n.StopCast()
+	})
+	ind5bWantCast(t, "the stopped summon magic", n, ind5fStrike, me)
+	frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+	if got := len(framesOf(frames, serverpackets.OpcodeTeleportToLocation, me)); got != 0 {
+		t.Fatalf("TeleportToLocation frames of the character = %d, want none", got)
+	}
+	if ax, ay, _ := w.srv.PlayerPosition(t, me); ax != x || ay != y {
+		t.Fatalf("character at %d,%d after the stopped cast, want still at %d,%d", ax, ay, x, y)
+	}
+	if got := ind1Slot(n, script.SlotIntAI1); got != 1 {
+		t.Fatalf("i_ai1 after the stopped cast = %d, want 1", got)
+	}
+}
