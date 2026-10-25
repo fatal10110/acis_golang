@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/siegablehall/devastatedcastle"
@@ -73,7 +75,7 @@ type devastatedWorld struct {
 	field  *zone.Siege
 }
 
-func bootDevastated(t *testing.T) *devastatedWorld {
+func bootDevastated(t *testing.T, rivals ...castleRival) *devastatedWorld {
 	t.Helper()
 	datapack.Require(t)
 	halls, err := gamexml.LoadClanHalls(datapack.Path(t, "data", "xml", "clanHalls.xml"))
@@ -112,7 +114,8 @@ func bootDevastated(t *testing.T) *devastatedWorld {
 		gameservertest.WithNPCScripts(kinds, []script.Listing{{Path: devastatedScript}}, script.Catalog{devastatedScript: devastatedcastle.New}),
 		gameservertest.WithScriptRand(func(int) int { return 4 }),
 		gameservertest.WithLog(zerolog.New(zerolog.NewTestWriter(t)).Level(zerolog.WarnLevel)),
-		gameservertest.WithClanSeed(func(db *sql.DB) { seedDevastated(t, db) }),
+		seedCastleRivals(t, rivals),
+		gameservertest.WithClanSeed(func(db *sql.DB) { seedDevastated(t, db, rivals) }),
 	)
 	if !w.srv.DrivesClock() {
 		t.Skip("the hall siege steps run on the driven clock")
@@ -133,17 +136,67 @@ func bootDevastated(t *testing.T) *devastatedWorld {
 	return w
 }
 
-// seedDevastated puts the Attacker in Besiegers, which is registered on
-// the free hall's siege, and the clan Holders beside it.
-func seedDevastated(t *testing.T, db *sql.DB) {
+// outsidersClanID is a clan registered on no siege.
+const outsidersClanID int32 = 0x7f000403
+
+// castleRival is a character besides the Attacker, of clan clan.
+type castleRival struct {
+	id            int32
+	account, name string
+	clan          int32
+}
+
+// seedCastleRivals stores each of rivals.
+func seedCastleRivals(t *testing.T, rivals []castleRival) gameservertest.Option {
+	return gameservertest.WithSeed(func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		tmpl, ok := gameservertest.Templates(t).Get(0)
+		if !ok {
+			t.Fatal("missing test class template")
+		}
+		for _, r := range rivals {
+			ch, err := player.NewCharacter(r.id, tmpl, r.account, r.name, 1, 0, 0, player.SexMale)
+			if err != nil {
+				t.Fatalf("seed %s: %v", r.name, err)
+			}
+			ch.CharLevel = 40
+			if err := chars.Create(context.Background(), ch); err != nil {
+				t.Fatalf("seed %s: %v", r.name, err)
+			}
+		}
+	})
+}
+
+// rival brings rival r into the world, on the battlefield.
+func (w *devastatedWorld) rival(t *testing.T, r castleRival) attackable.Combatant {
 	t.Helper()
-	for _, q := range []string{
+	c := w.srv.DialClient(t, r.account, 1)
+	startInWorld(t, c)
+	drainFrames(t, c)
+	drainFrames(t, w.c)
+	obj, ok := w.srv.State.Object(r.id)
+	if !ok {
+		t.Fatalf("%s is not in the world", r.name)
+	}
+	return obj.(attackable.Combatant)
+}
+
+// seedDevastated puts the Attacker in Besiegers; Besiegers and Holders are
+// registered on the free hall's siege, Outsiders on none.
+func seedDevastated(t *testing.T, db *sql.DB, rivals []castleRival) {
+	t.Helper()
+	stmts := []string{
 		"UPDATE characters SET clanid = " + strconv.Itoa(int(besiegersClanID)) + " WHERE char_name = 'Attacker'",
 		"INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id) SELECT " + strconv.Itoa(int(besiegersClanID)) + ", 'Besiegers', 5, obj_Id FROM characters WHERE char_name = 'Attacker'",
 		"INSERT INTO clan_data (clan_id, clan_name, clan_level) VALUES (" + strconv.Itoa(int(holdersClanID)) + ", 'Holders', 5)",
+		"INSERT INTO clan_data (clan_id, clan_name, clan_level) VALUES (" + strconv.Itoa(int(outsidersClanID)) + ", 'Outsiders', 5)",
 		"INSERT INTO clanhall (id, ownerId, paidUntil, paid, endDate) VALUES (34, 0, " + strconv.Itoa(hallPaidUntil) + ", 1, " + strconv.FormatInt(time.Now().Add(7*24*time.Hour).UnixMilli(), 10) + ")",
 		"INSERT INTO clanhall_siege_attackers (clanhall_id, attacker_id) VALUES (34, " + strconv.Itoa(int(besiegersClanID)) + ")",
-	} {
+		"INSERT INTO clanhall_siege_attackers (clanhall_id, attacker_id) VALUES (34, " + strconv.Itoa(int(holdersClanID)) + ")",
+	}
+	for _, r := range rivals {
+		stmts = append(stmts, "UPDATE characters SET clanid = "+strconv.Itoa(int(r.clan))+" WHERE obj_Id = "+strconv.Itoa(int(r.id)))
+	}
+	for _, q := range stmts {
 		if _, err := db.ExecContext(context.Background(), q); err != nil {
 			t.Fatalf("seed: %s: %v", q, err)
 		}
@@ -259,8 +312,8 @@ func TestDevastatedCastleSiegeWonByGustavsBane(t *testing.T) {
 	if owner := w.hallOwner(t); owner != int64(besiegersClanID) {
 		t.Fatalf("hall row owner = %#x, want Besiegers", owner)
 	}
-	if got := w.defenders()[castleGustavID]; len(got) != 0 {
-		t.Fatalf("Gustavs left after the siege = %d", len(got))
+	if got := w.defenders(); len(got) != 0 {
+		t.Fatalf("defenders left after the siege: %d kinds", len(got))
 	}
 }
 
@@ -285,8 +338,8 @@ func TestDevastatedCastleSiegeTimeOutForgetsTheDamage(t *testing.T) {
 	if owner := w.hallOwner(t); owner != 0 {
 		t.Fatalf("hall row owner after a draw = %#x, want none", owner)
 	}
-	if got := w.defenders(); len(got[castleGustavID]) != 0 {
-		t.Fatalf("Gustavs left after the time-out = %d", len(got[castleGustavID]))
+	if got := w.defenders(); len(got) != 0 {
+		t.Fatalf("defenders left after the time-out: %d kinds", len(got))
 	}
 
 	if !w.siege.AddAttacker(besiegersClanID) {
@@ -299,5 +352,37 @@ func TestDevastatedCastleSiegeTimeOutForgetsTheDamage(t *testing.T) {
 	}
 	if _, ok := w.srv.Halls.ByOwner(besiegersClanID); ok {
 		t.Fatal("Besiegers owns the hall on the last siege's damage")
+	}
+	if got := w.defenders(); len(got) != 0 {
+		t.Fatalf("defenders left after the second siege: %d kinds", len(got))
+	}
+}
+
+// TestDevastatedCastleGoesToTheMostDamage has three clans hit Gustav:
+// Besiegers first for 50, Holders for 80, and Outsiders, registered on no
+// siege, for 500. Gustav's death, by Besiegers' hand, gives the hall to
+// Holders: the most damage among the attacking clans, Outsiders' hits not
+// counted.
+func TestDevastatedCastleGoesToTheMostDamage(t *testing.T) {
+	t.Parallel()
+	rival := castleRival{0x7f000501, "player2", "Rival", holdersClanID}
+	stranger := castleRival{0x7f000502, "player3", "Stranger", outsidersClanID}
+	w := bootDevastated(t, rival, stranger)
+	holder, outsider := w.rival(t, rival), w.rival(t, stranger)
+	w.start(t)
+	gustav := w.gustav(t)
+	w.hit(t, gustav, 50, w.player)
+	w.hit(t, gustav, 80, holder)
+	w.hit(t, gustav, 500, outsider)
+
+	frames := w.kill(t, gustav, true)
+	if got := sysMsgParams(t, frames); !slices.EqualFunc(got, [][]string{{"855", "Holders", "34"}, {"843", "34"}, {"284"}}, slices.Equal) {
+		t.Fatalf("end notices = %v, want S1_CLAN_DEFEATED_S2 for Holders, SIEGE_OF_S1_FINISHED", got)
+	}
+	if id, ok := w.srv.Halls.ByOwner(holdersClanID); !ok || id != devastatedCastle {
+		t.Fatal("Holders does not own the Devastated Castle")
+	}
+	if owner := w.hallOwner(t); owner != int64(holdersClanID) {
+		t.Fatalf("hall row owner = %#x, want Holders", owner)
 	}
 }
