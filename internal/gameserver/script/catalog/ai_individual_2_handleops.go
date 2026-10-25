@@ -76,5 +76,14 @@ func aiIndividual2HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecialSpoilAggressive": {
 			"OnSeeCreature": {"NPC.TopDesireTarget"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecialVelociraptor": {
+			"OnSeeCreature": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorUsePowershotAggressive": {
+			"OnSeeCreature": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.ZakenPrivatePirateZombie": {
+			"OnSeeCreature": {"NPC.TopDesireTarget"},
+		},
 	}
 }
