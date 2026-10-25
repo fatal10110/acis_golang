@@ -1,0 +1,72 @@
+# Legacy of Insolence (Q372): a level 59 character accepts at Walderal, kills a Hallate's monster (the roll pinned
+# to succeed) for a parchment, asks Walderal again and goes on to the second step; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q372_legacy_of_insolence.golden
+character Insolence 59
+random always 0
+script quest.Q372_LegacyOfInsolence
+item 57 5966 5967 5968 5969 5972 5973 5974 5975 5976 5977 5978 5979 5980 5981 5982 5983 5984 5985 5986 5987 5988 5989 5990 5991 5992 5993 5994 5995 5996 5997 5998 5999 6000 6001 5368 5370 5380 5382 5392 5394 5404 5406 5426 5428 5430 5432 5496 5497 5502 5503 5508 5509 5514 5515 5525 5526 5527 5528
+page warehouse/30844.htm
+page merchant/30839.htm
+page default/30929.htm
+page default/31001.htm
+page trainer/30855.htm
+page script/quest/Q372_LegacyOfInsolence/
+npc walderal 30844 WarehouseKeeper 10 0 0
+npc holly 30839 Merchant -10 0 0
+npc patrin 30929 Folk 20 0 0
+npc claudia 31001 Folk -20 0 0
+npc desmond 30855 Trainer 30 0 0
+npc beast 20817 Monster 40 0 0
+
+action walderal
+action walderal
+  S ActionFailed
+  S NpcHtmlMessage obj=walderal item=0 page=warehouse/30844.htm
+  S ActionFailed
+bypass npc_{walderal}_Quest
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q372_LegacyOfInsolence 30844-03.htm
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-03.htm
+  S ActionFailed
+bypass Quest Q372_LegacyOfInsolence 30844-04.htm
+  S QuestList 372:0x80000001
+  S ExShowQuestMark quest=372
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-04.htm
+  S ActionFailed
+  Q upsert Q372_LegacyOfInsolence | <state> | STARTED
+  Q upsert Q372_LegacyOfInsolence | <cond> | 1
+  rows Q372_LegacyOfInsolence <cond>=1 <state>=STARTED
+  state Q372_LegacyOfInsolence STARTED
+kill beast
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5966=1
+action walderal
+  S ActionFailed
+  S NpcHtmlMessage obj=walderal item=0 page=warehouse/30844.htm
+  S ActionFailed
+action walderal
+  S ActionFailed
+  S NpcHtmlMessage obj=walderal item=0 page=warehouse/30844.htm
+  S ActionFailed
+bypass npc_{walderal}_Quest
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q372_LegacyOfInsolence 30844-05b.htm
+  S QuestList 372:0x80000003
+  S ExShowQuestMark quest=372
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-05b.htm
+  S ActionFailed
+  Q upsert Q372_LegacyOfInsolence | <cond> | 2
+  rows Q372_LegacyOfInsolence <cond>=2 <state>=STARTED
+  state Q372_LegacyOfInsolence STARTED
+relog
+  rows Q372_LegacyOfInsolence <cond>=2 <state>=STARTED
+  items 5966=1

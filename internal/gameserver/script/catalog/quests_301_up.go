@@ -40,6 +40,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q367"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q368"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q369"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q370"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q371"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q372"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q373"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -91,10 +95,10 @@ func quests301Up() script.Catalog {
 		"quest.Q367_ElectrifyingRecharge":              q367.New,
 		"quest.Q368_TrespassingIntoTheSacredArea":      q368.New,
 		"quest.Q369_CollectorOfJewels":                 q369.New,
-		"quest.Q370_AnElderSowsSeeds":                  nil,
-		"quest.Q371_ShriekOfGhosts":                    nil,
-		"quest.Q372_LegacyOfInsolence":                 nil,
-		"quest.Q373_SupplierOfReagents":                nil,
+		"quest.Q370_AnElderSowsSeeds":                  q370.New,
+		"quest.Q371_ShriekOfGhosts":                    q371.New,
+		"quest.Q372_LegacyOfInsolence":                 q372.New,
+		"quest.Q373_SupplierOfReagents":                q373.New,
 		"quest.Q374_WhisperOfDreams_Part1":             nil,
 		"quest.Q375_WhisperOfDreams_Part2":             nil,
 		"quest.Q376_ExplorationOfTheGiantsCave_Part1":  nil,
