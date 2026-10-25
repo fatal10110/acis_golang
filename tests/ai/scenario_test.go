@@ -91,6 +91,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                                               warrior.Warrior,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive":                  warrior.Cast2SkillsApproachAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorTimerBomb":                                      warrior.TimerBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive":                        warrior.HereticPriestAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive":                   warrior.Aggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":                              warrior.Medusa,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproach": warrior.Cast3SkillsApproach,

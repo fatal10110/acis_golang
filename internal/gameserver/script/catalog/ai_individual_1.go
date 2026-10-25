@@ -53,7 +53,7 @@ func aiIndividual1() script.Catalog {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep2":                                       nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep3Aggressive":                             nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep4Aggressive":                             nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive":                                         nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive":                                         warrior.HereticPriestAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.AncientEgg":                                                 nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.PrimevalPlant":                                              nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.RoyalRushWarriorPhysicalSpecial1Hold":                       nil,
