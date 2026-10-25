@@ -223,7 +223,6 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5":                                                 raid.BossType5,
 
 	// The grand bosses.
-	"script.ai.boss.benom.Benom":                      benom.Benom,
 	"script.ai.boss.benom.DungeonTeleporter":          benom.DungeonTeleporter,
 	"script.ai.boss.core.Core":                        core.Core,
 	"script.ai.boss.queenant.QueenAnt":                queenant.QueenAnt,

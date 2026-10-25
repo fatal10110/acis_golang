@@ -8,7 +8,7 @@ import (
 // aiBossBenom is the catalog of the Benom behaviors (#204).
 func aiBossBenom() script.Catalog {
 	return script.Catalog{
-		"script.ai.boss.benom.Benom":             benom.Benom,
+		"script.ai.boss.benom.Benom":             nil,
 		"script.ai.boss.benom.DungeonTeleporter": benom.DungeonTeleporter,
 	}
 }

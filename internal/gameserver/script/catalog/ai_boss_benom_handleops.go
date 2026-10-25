@@ -7,12 +7,5 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiBossBenomHandleOps holds, per script of ai_boss_benom.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiBossBenomHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{
-		"script.ai.boss.benom.Benom": {
-			"OnAttacked":         {"NPC.InsideZone", "NPC.TopDesireTarget"},
-			"OnSeeSpell":         {"NPC.TopDesireTarget"},
-			"OnTimer":            {"NPC.CleanAllHate", "NPC.RandomizeAttack"},
-			"OnUseSkillFinished": {"NPC.CleanAllHate"},
-		},
-	}
+	return map[string]script.HandleOps{}
 }
