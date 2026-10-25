@@ -32,5 +32,8 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 			"OnTimer":            {"NPC.CleanAllHate", "NPC.RandomizeAttack"},
 			"OnUseSkillFinished": {"NPC.CleanAllHate"},
 		},
+		"script.siegablehall.FortressOfTheDead": {
+			"OnAttacked": {"NPC.CleanAllHate"},
+		},
 	}
 }
