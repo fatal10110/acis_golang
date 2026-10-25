@@ -1,0 +1,28 @@
+# Go Get the Calculator (Q347), refused: a level 11 character is too young for Brunon, and the
+# quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q347_go_get_the_calculator_low_level.golden
+character Calculator 11
+script quest.Q347_GoGetTheCalculator
+item 57 4285 4286 4393
+page trainer/30526.htm
+page trainer/30527.htm
+page default/30532.htm
+page default/30533.htm
+page script/quest/Q347_GoGetTheCalculator/
+npc brunon 30526 Trainer 10 0 0
+npc silvera 30527 Trainer -10 0 0
+npc spiron 30532 Folk 0 10 0
+npc balanki 30533 Folk 0 -10 0
+
+# Brunon: too young.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q347_GoGetTheCalculator CREATED
+  rows Q347_GoGetTheCalculator -

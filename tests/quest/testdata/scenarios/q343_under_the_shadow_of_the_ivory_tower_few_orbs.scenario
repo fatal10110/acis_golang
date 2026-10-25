@@ -1,0 +1,35 @@
+# Under the Shadow of the Ivory Tower (Q343), few orbs: with 9 orbs Marsha refuses her game.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q343_under_the_shadow_of_the_ivory_tower_few_orbs.golden
+character Mystic 40
+class 10
+quest Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=1
+hold 4364 9
+script quest.Q343_UnderTheShadowOfTheIvoryTower
+item 57 4364 4365 103 118 316 630 736 885 917 951 955 2510 2511
+page merchant/30834.htm
+page trainer/30835.htm
+page default/30934.htm
+page default/30935.htm
+page script/quest/Q343_UnderTheShadowOfTheIvoryTower/
+npc cema 30834 Merchant 10 0 0
+npc icarus 30835 Trainer -10 0 0
+npc marsha 30934 Folk 0 10 0
+npc trumpin 30935 Folk 0 -10 0
+
+# Marsha: not enough orbs.
+action marsha
+action marsha
+  S ActionFailed
+  S NpcHtmlMessage obj=marsha item=0 page=default/30934.htm
+  S ActionFailed
+bypass npc_{marsha}_Quest
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-05.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-06.htm
+  S ActionFailed
+  items 4364=9
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=1

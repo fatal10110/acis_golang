@@ -1,0 +1,82 @@
+# Go Get the Calculator (Q347), Spiron first: at cond 1 with 99 adena Balanki keeps his page and
+# changes nothing; Spiron moves the quest to cond 3; holding a calculator, Brunon pays 1000 adena
+# for it instead of the real one and the quest ends; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q347_go_get_the_calculator_spiron_first.golden
+character Calculator 12
+quest Q347_GoGetTheCalculator <cond>=1 <state>=STARTED
+hold 57 99
+hold 4285 1
+script quest.Q347_GoGetTheCalculator
+item 57 4285 4286 4393
+page trainer/30526.htm
+page trainer/30527.htm
+page default/30532.htm
+page default/30533.htm
+page script/quest/Q347_GoGetTheCalculator/
+npc brunon 30526 Trainer 10 0 0
+npc silvera 30527 Trainer -10 0 0
+npc spiron 30532 Folk 0 10 0
+npc balanki 30533 Folk 0 -10 0
+
+# Balanki: 99 adena is not enough.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q347_GoGetTheCalculator/30533-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30533-03.htm
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q347_GoGetTheCalculator/30533-03.htm
+  S ActionFailed
+  items 57=99
+  rows Q347_GoGetTheCalculator <cond>=1 <state>=STARTED
+
+# Spiron: cond 3.
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q347_GoGetTheCalculator/30532-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30532-02.htm
+  S QuestList 347:0x80000005
+  S ExShowQuestMark quest=347
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q347_GoGetTheCalculator/30532-02.htm
+  S ActionFailed
+  Q upsert Q347_GoGetTheCalculator | <flags> | -2147483643
+  Q upsert Q347_GoGetTheCalculator | <cond> | 3
+  rows Q347_GoGetTheCalculator <cond>=3 <flags>=-2147483643 <state>=STARTED
+
+# Brunon: 1000 adena for the calculator.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30526-09.htm
+  S SystemMessage id=302 3:4285
+  S SystemMessage id=52 6:1000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-09.htm
+  S ActionFailed
+  Q delete-quest Q347_GoGetTheCalculator
+  items 4285=0 4393=0 57=1099
+  state Q347_GoGetTheCalculator -
+  rows Q347_GoGetTheCalculator -
+
+relog
+  rows Q347_GoGetTheCalculator -
+  items 57=1099

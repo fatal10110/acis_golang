@@ -1,0 +1,131 @@
+# Under the Shadow of the Ivory Tower (Q343), Marsha's game: Marsha's later talk resets
+# memoState; five rounds of 10 orbs: a hint between two cards (rolls 30, 2, boolean 0: card 2)
+# and the second guess loses; no hint (rolls 60, 0: card 0) and the first guess pays 10; the
+# first card with no page of its own (rolls 10, 0) and the second guess pays 20; a hint (rolls
+# 20, 1, boolean 1: card 2) and the first guess pays 20; no hint (rolls 99, 2) and the third
+# guess pays 10. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q343_under_the_shadow_of_the_ivory_tower_marsha.golden
+character Mystic 40
+class 10
+quest Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=2 memoStateEx=1
+hold 4364 30
+random 30 2 0 60 0 10 0 20 1 1 99 2
+script quest.Q343_UnderTheShadowOfTheIvoryTower
+item 57 4364 4365 103 118 316 630 736 885 917 951 955 2510 2511
+page merchant/30834.htm
+page trainer/30835.htm
+page default/30934.htm
+page default/30935.htm
+page script/quest/Q343_UnderTheShadowOfTheIvoryTower/
+npc cema 30834 Merchant 10 0 0
+npc icarus 30835 Trainer -10 0 0
+npc marsha 30934 Folk 0 10 0
+npc trumpin 30935 Folk 0 -10 0
+
+# Marsha: a later talk.
+action marsha
+action marsha
+  S ActionFailed
+  S NpcHtmlMessage obj=marsha item=0 page=default/30934.htm
+  S ActionFailed
+bypass npc_{marsha}_Quest
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=1
+
+# Round 1: card 2, the second guess loses.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-05.htm
+  S SystemMessage id=301 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-07.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-08a.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-09c.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 2
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoStateEx | 5
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=2 memoStateEx=5 param1=2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-12a.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-12c.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  items 4364=20
+
+# Round 2: card 0, the first guess pays 10.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-05.htm
+  S SystemMessage id=301 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-07.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-08a.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-10.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-11a.htm
+  S SystemMessage id=53 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-11a.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 4
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  items 4364=20
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=5 param1=4
+
+# Round 3: card 0 with the event page, the second guess pays 20.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-05.htm
+  S SystemMessage id=301 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-07.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-08a.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-08a.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoStateEx | 9
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-12a.htm
+  S SystemMessage id=53 3:4364 6:20
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-12a.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 4
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  items 4364=30
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=9 param1=4
+
+# Round 4: card 2, the first guess pays 20.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-05.htm
+  S SystemMessage id=301 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-07.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-08a.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-08a.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 2
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoStateEx | 13
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-11a.htm
+  S SystemMessage id=53 3:4364 6:20
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-11c.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 4
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  items 4364=40
+
+# Round 5: card 2, the third guess pays 10.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-05.htm
+  S SystemMessage id=301 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-07.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-08a.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-10.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-13a.htm
+  S SystemMessage id=53 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-13c.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 4
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  items 4364=40
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=13 param1=4
