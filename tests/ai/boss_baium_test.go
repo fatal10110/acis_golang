@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	actorai "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -30,12 +32,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Baium, its archangels, its stone and the cube it leaves.
+// Baium, its archangels, its stone, the cube it leaves, the Angelic Vortex
+// up to its lair and the Blooded Fabric the vortex takes.
 const (
 	baiumID          = int32(29020)
 	baiumArchangelID = int32(29021)
 	baiumStoneID     = int32(29025)
 	baiumCubeID      = int32(31842)
+	baiumVortexID    = int32(31862)
+	bloodedFabric    = int32(4295)
 )
 
 // baiumHidden is where Baium's spawn places it, outside its lair; baiumLair
@@ -48,7 +53,7 @@ var (
 )
 
 // baiumSpawnlist is the shipped lair territory and Baium's npcmaker, with
-// Baium spawning at pos.
+// Baium spawning at pos, and the Angelic Vortex beside the character.
 const baiumSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 <list>
 	<territory name="23_18_baium_npc" minZ="10036" maxZ="10836">
@@ -65,50 +70,40 @@ const baiumSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 		<ai type="default_maker"/>
 		<npc id="29020" pos="%s" total="1" respawn="168hour" respawnRand="48hour" dbName="baium" dbSaving="DEATH_TIME;PARAMETERS;POS"/>
 	</npcmaker>
+	<npcmaker name="baium_vortex" territory="23_18_baium_npc" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="31862" pos="115940;17420;10107;0" total="1" respawn="60sec"/>
+	</npcmaker>
 </list>`
 
-// baiumTalks records the global memo key "2" each talk to the stone or the
-// cube finds, as an object id or -1.
-type baiumTalks chan int
-
-// stoneAndCube stands in for the stone's and the cube's own scripts, not
-// ported here: a talk to either records what memo key "2" holds; a talk to
-// the stone then wakes the NPC the key names with script event 10025 from
-// the talker, as the stone does, and deletes it.
-func (talks baiumTalks) stoneAndCube() script.Script {
-	return script.Script{Bind: script.Bindings{script.EventFirstTalk: {baiumStoneID, baiumCubeID}}, Hooks: script.Hooks{
-		OnFirstTalk: func(s *script.Script, e script.FirstTalk) string {
-			memo := s.GlobalMemo().Int("2", -1)
-			talks <- memo
-			if e.NPC.NpcID() == baiumStoneID && memo != -1 {
-				if c, ok := s.GlobalMemo().Creature("2").(*script.NPC); ok {
-					s.SendScriptEvent(c, 10025, e.Player.ObjectID(), 0)
-				}
-				e.NPC.DeleteMe()
-			}
-			return ""
-		},
-	}}
+// baiumPages are the pages the stone and the vortex answer, each naming
+// itself, with the links of the shipped pages: the stone's wake and the
+// vortex's entry.
+func baiumPages() map[string]string {
+	pages := map[string]string{
+		"default/29025.htm": `<html><body>29025<a action="bypass -h npc_%objectId%_Quest BaiumStone">Wake Baium</a></body></html>`,
+	}
+	for i := range 6 {
+		name := fmt.Sprintf("31862-%02d.htm", i)
+		pages["script/ai/boss/baium/BaiumAngelicVortex/"+name] = "<html><body>" + name + "</body></html>"
+	}
+	pages["script/ai/boss/baium/BaiumAngelicVortex/31862-00.htm"] = `<html><body>31862-00.htm<a action="bypass -h Quest BaiumAngelicVortex enter">Go</a></body></html>`
+	return pages
 }
 
-// take returns the memo the settled talk found; it fails when no talk ran
-// its hook.
-func (talks baiumTalks) take(t *testing.T) int {
-	t.Helper()
-	select {
-	case memo := <-talks:
-		return memo
-	default:
-		t.Fatal("the talk ran no first-talk hook")
-		return 0
-	}
+// baiumItems is the fixture catalog with the Blooded Fabric.
+func baiumItems() *item.Table {
+	return item.NewTable(append(gameservertest.ItemTemplates().All(), &item.Template{
+		ID: bloodedFabric, Name: "Blooded Fabric", Kind: item.KindEtcItem, Duration: -1, Stackable: true,
+		Dropable: true, Tradable: true, Destroyable: true, Depositable: true, EtcItem: &item.EtcItemDetail{},
+	}))
 }
 
 // baiumSkills are the skills Baium casts, as fixture definitions it can
 // always pay for.
 func baiumSkills() *modelskill.Table {
 	var defs []modelskill.Definition
-	for _, id := range []modelskill.ID{4127, 4128, 4129, 4130, 4131, 4135, 4136, 4258} {
+	for _, id := range []modelskill.ID{4127, 4128, 4129, 4130, 4131, 4132, 4133, 4135, 4136, 4258} {
 		defs = append(defs, modelskill.Definition{
 			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "BUFF", CastRange: 600, HitTime: 500, StaticHitTime: true, StaticReuse: true,
@@ -130,9 +125,17 @@ type baiumWorld struct {
 func (w *baiumWorld) now() time.Time { return w.start.Add(time.Duration(w.elapsed.Load())) }
 
 // bootBaium boots Baium's lair with Baium spawning at pos, backed by the
-// spawn_data table, every script draw 0, and the character entering the
-// world inside the lair.
-func bootBaium(t *testing.T, pos string, talks baiumTalks) *baiumWorld {
+// spawn_data table, every script draw 0, the Baium scripts as scripts.xml
+// lists them, and the character entering the world inside the lair. opts
+// are added last.
+func bootBaium(t *testing.T, pos string, opts ...gameservertest.Option) *baiumWorld {
+	t.Helper()
+	return bootBaiumHolding(t, pos, 0, opts...)
+}
+
+// bootBaiumHolding is bootBaium with the character holding fabrics Blooded
+// Fabrics as it enters the world.
+func bootBaiumHolding(t *testing.T, pos string, fabrics int32, opts ...gameservertest.Option) *baiumWorld {
 	t.Helper()
 	w := &baiumWorld{start: time.Now()}
 	dir := t.TempDir()
@@ -150,21 +153,31 @@ func bootBaium(t *testing.T, pos string, talks baiumTalks) *baiumWorld {
 	angel.Name = "Archangel"
 	kinds := map[int32]script.NPCKind{
 		baiumID: script.KindHostile, baiumArchangelID: script.KindHostile, baiumStoneID: script.KindFolk, baiumCubeID: script.KindFolk,
+		baiumVortexID: script.KindFolk,
 	}
-	list := []script.Listing{{Path: "script.ai.individual.DefaultNpc"}, {Path: "script.ai.boss.baium.Baium"}, {Path: "test.BaiumStoneAndCube"}}
+	list := []script.Listing{
+		{Path: "script.ai.individual.DefaultNpc"},
+		{Path: "script.ai.boss.baium.Archangel"},
+		{Path: "script.ai.boss.baium.Baium"},
+		{Path: "script.ai.boss.baium.BaiumAngelicVortex"},
+		{Path: "script.ai.boss.baium.BaiumStone"},
+	}
 	catalog := script.Catalog{
-		"script.ai.individual.DefaultNpc": defaultnpc.New,
-		"script.ai.boss.baium.Baium":      baium.Baium,
-		"test.BaiumStoneAndCube":          talks.stoneAndCube,
+		"script.ai.individual.DefaultNpc":         defaultnpc.New,
+		"script.ai.boss.baium.Archangel":          baium.Archangel,
+		"script.ai.boss.baium.Baium":              baium.Baium,
+		"script.ai.boss.baium.BaiumAngelicVortex": baium.BaiumAngelicVortex,
+		"script.ai.boss.baium.BaiumStone":         baium.BaiumStone,
 	}
 	class := gameservertest.ClassTemplate()
 	class.Spawns = []location.Location{baiumCharacter}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Hunter", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithClassTemplate(class),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{
 			boss, angel, gameservertest.FolkTemplate("Folk", int(baiumStoneID)), gameservertest.FolkTemplate("Folk", int(baiumCubeID)),
+			gameservertest.FolkTemplate("Folk", int(baiumVortexID)),
 		})),
 		gameservertest.WithNpcSpawns(spawns),
 		gameservertest.WithSpawnData(),
@@ -174,7 +187,12 @@ func bootBaium(t *testing.T, pos string, talks baiumTalks) *baiumWorld {
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 		gameservertest.WithGameClockNow(w.now),
-	)
+		gameservertest.WithHTMLPages(baiumPages()),
+		gameservertest.WithItemTemplates(baiumItems()),
+	}, opts...)...)
+	if fabrics > 0 {
+		srv.GiveItem(t, srv.SoleObjectID(t), bloodedFabric, fabrics)
+	}
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {
@@ -331,15 +349,36 @@ func wantArchangels(t *testing.T, w *baiumWorld) {
 	}
 }
 
+// talkToStone opens the stone's page and asks it to wake Baium, and
+// returns the frames of the wake.
+func (w *baiumWorld) talkToStone(t *testing.T, stone attackable.Combatant) [][]byte {
+	t.Helper()
+	if got := baiumPageNames(w.talkTo(t, stone)); len(got) == 0 || slices.ContainsFunc(got, func(p string) bool { return p != "29025" }) {
+		t.Fatalf("the stone's pages = %q, want its own", got)
+	}
+	w.srv.Client.Send(encodeManagerBypass(fmt.Sprintf("npc_%d_Quest BaiumStone", stone.ObjectID())))
+	w.srv.Settle(t)
+	return w.srv.ReadQueued(t, w.srv.Client)
+}
+
+// baiumPageNames returns the page each NpcHtmlMessage among frames shows,
+// by the name the fixture page carries.
+func baiumPageNames(frames [][]byte) []string {
+	var out []string
+	for _, text := range managerHTML(frames) {
+		text = strings.TrimPrefix(text, "<html><body>")
+		name, _, _ := strings.Cut(text, "<")
+		out = append(out, name)
+	}
+	return out
+}
+
 // wakeBaium talks to the stone, which wakes Baium in its lair, and returns
 // Baium.
-func wakeBaium(t *testing.T, w *baiumWorld, talks baiumTalks) attackable.Combatant {
+func wakeBaium(t *testing.T, w *baiumWorld) attackable.Combatant {
 	t.Helper()
 	boss := soleBaiumNPC(t, w, baiumID)
-	w.talkTo(t, soleBaiumNPC(t, w, baiumStoneID))
-	if got := talks.take(t); got != int(boss.ObjectID()) {
-		t.Fatalf("memo key 2 at the stone = %d, want Baium %d", got, boss.ObjectID())
-	}
+	w.talkToStone(t, soleBaiumNPC(t, w, baiumStoneID))
 	if n := len(baiumNPCs(w, baiumStoneID)); n != 0 {
 		t.Fatalf("%d stones after the wake, want none", n)
 	}
@@ -357,8 +396,7 @@ func wakeBaium(t *testing.T, w *baiumWorld, talks baiumTalks) attackable.Combata
 // screen message). 8 s later its five archangels appear, and the db value
 // 1 is saved.
 func TestBaiumSleepsAndWakes(t *testing.T) {
-	talks := make(baiumTalks, 4)
-	w := bootBaium(t, "-105200;-253104;-15264;0", talks)
+	w := bootBaium(t, "-105200;-253104;-15264;0")
 	boss := soleBaiumNPC(t, w, baiumID)
 	if got, want := placeOf(boss), fmt.Sprintf("%d,%d,%d heading 0", baiumHidden.X, baiumHidden.Y, baiumHidden.Z); got != want {
 		t.Fatalf("Baium stands at %s, want %s", got, want)
@@ -370,7 +408,7 @@ func TestBaiumSleepsAndWakes(t *testing.T) {
 		t.Fatalf("%d archangels before the wake, want none", n)
 	}
 
-	wakeBaium(t, w, talks)
+	wakeBaium(t, w)
 	if got, want := placeOf(boss), fmt.Sprintf("%d,%d,%d heading -25348", baiumLair.X, baiumLair.Y, baiumLair.Z); got != want {
 		t.Fatalf("woken Baium stands at %s, want %s", got, want)
 	}
@@ -412,9 +450,8 @@ func TestBaiumSleepsAndWakes(t *testing.T) {
 // off on each axis), teleports back out of its lair and leaves a new stone
 // at 116026,17435,10107, facing -25348. The db value 0 is saved.
 func TestBaiumSleepsAfterThirtyQuietMinutes(t *testing.T) {
-	talks := make(baiumTalks, 4)
-	w := bootBaium(t, "-105200;-253104;-15264;0", talks)
-	boss := wakeBaium(t, w, talks)
+	w := bootBaium(t, "-105200;-253104;-15264;0")
+	boss := wakeBaium(t, w)
 	roles := map[int32]string{boss.ObjectID(): "baium", w.player.ObjectID(): "player"}
 	w.advance(t, 18800*time.Millisecond)
 	w.appear(t)
@@ -454,8 +491,7 @@ func TestBaiumSleepsAfterThirtyQuietMinutes(t *testing.T) {
 // no stone, stores db value 1 and calls its five archangels 5 s later. The
 // db value 1 is saved.
 func TestBaiumResumesInsideItsLair(t *testing.T) {
-	talks := make(baiumTalks, 4)
-	w := bootBaium(t, "116033;17447;10107;0", talks)
+	w := bootBaium(t, "116033;17447;10107;0")
 	if n := len(baiumNPCs(w, baiumStoneID)); n != 0 {
 		t.Fatalf("%d stones, want none", n)
 	}
@@ -480,8 +516,7 @@ func TestBaiumResumesInsideItsLair(t *testing.T) {
 // wanted with 1000000, and its draw of 70 in 100 drops the target's points
 // to 500.
 func TestBaiumRanksWhatItSees(t *testing.T) {
-	talks := make(baiumTalks, 4)
-	w := bootBaium(t, "116033;17447;10107;0", talks)
+	w := bootBaium(t, "116033;17447;10107;0")
 	w.advance(t, 5*time.Second)
 	boss := soleBaiumNPC(t, w, baiumID).(*npc.Hostile)
 	handle := script.NPCOf(boss)
@@ -492,10 +527,19 @@ func TestBaiumRanksWhatItSees(t *testing.T) {
 		}
 		w.ticks(t, 1)
 	}
-	if got := handle.Slot(npc.CreatureQuest0); got == nil || got.ObjectID() != w.player.ObjectID() {
-		t.Fatalf("Baium's first target = %v, want the character", got)
+	// Baium also ranks the archangels it sees, so the character's slot
+	// among the three is the order of its looks.
+	pts := -1
+	for i, who := range []script.CreatureSlot{npc.CreatureQuest0, npc.CreatureQuest1, npc.CreatureQuest2} {
+		if got := handle.Slot(who); got != nil && got.ObjectID() == w.player.ObjectID() {
+			pts = i
+		}
 	}
-	if got := handle.Int(npc.IntQuest0); got != 1000 {
+	if pts < 0 {
+		t.Fatal("Baium ranks no slot for the character")
+	}
+	ptsSlot := []script.IntSlot{npc.IntQuest0, npc.IntQuest1, npc.IntQuest2}[pts]
+	if got := handle.Int(ptsSlot); got != 1000 {
 		t.Fatalf("the character's points = %d, want 1000", got)
 	}
 	if _, ok := desire(boss, actorai.IntentionCast); ok {
@@ -510,17 +554,17 @@ func TestBaiumRanksWhatItSees(t *testing.T) {
 	if !ok || d.Skill.ID != 4128 || d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
 		t.Fatalf("Baium's cast desire = %+v (%v), want 4128 at the character with 1000000", d, ok)
 	}
-	if got := handle.Int(npc.IntQuest0); got != 500 {
+	if got := handle.Int(ptsSlot); got != 500 {
 		t.Fatalf("the character's points after the cast = %d, want 500", got)
 	}
 }
 
 // TestBaiumDeathLeavesTheCube ports Baium's death (phase 5): dying, it
 // leaves the teleport cube at 115017,15549,10090, plays BS01_D and clears
-// global memo key 2, which a talk to the cube then finds empty.
+// global memo key 2, so the Angelic Vortex then finds no Baium: its entry
+// answers 31862-04.htm.
 func TestBaiumDeathLeavesTheCube(t *testing.T) {
-	talks := make(baiumTalks, 4)
-	w := bootBaium(t, "116033;17447;10107;0", talks)
+	w := bootBaium(t, "116033;17447;10107;0")
 	boss := soleBaiumNPC(t, w, baiumID).(*npc.Hostile)
 	roles := map[int32]string{boss.ObjectID(): "baium", w.player.ObjectID(): "player"}
 
@@ -533,10 +577,8 @@ func TestBaiumDeathLeavesTheCube(t *testing.T) {
 	if got, want := placeOf(cube), "115017,15549,10090 heading 0"; got != want {
 		t.Fatalf("the cube stands at %s, want %s", got, want)
 	}
-	w.talkTo(t, cube)
-	w.advance(t, 30*time.Second)
-	if got := talks.take(t); got != -1 {
-		t.Fatalf("memo key 2 after the death = %d, want none (-1)", got)
+	if got := baiumPageNames(w.enterVortex(t)); !slices.Equal(got, []string{"31862-04.htm"}) {
+		t.Fatalf("the vortex's entry after the death = %q, want 31862-04.htm", got)
 	}
 }
 
@@ -548,8 +590,7 @@ func TestBaiumDeathLeavesTheCube(t *testing.T) {
 // 21, finds the gap to its own 6 over 3/10 of their sum, drops its flag to
 // 0 and sets both counts back to 1.
 func TestBaiumWeighsItsPartysDamage(t *testing.T) {
-	talks := make(baiumTalks, 4)
-	w := bootBaium(t, "116033;17447;10107;0", talks)
+	w := bootBaium(t, "116033;17447;10107;0")
 	w.advance(t, 5*time.Second)
 	boss := soleBaiumNPC(t, w, baiumID).(*npc.Hostile)
 	handle := script.NPCOf(boss)

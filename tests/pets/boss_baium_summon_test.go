@@ -11,6 +11,7 @@ import (
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorai "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -54,8 +55,9 @@ const baiumLairSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 // TestBaiumCallsTheSummonItSawWhenItsWakerIsGone (Baium.java onTimer
 // 2005: with its waker gone from the world it calls the creature it saw
 // first, _c_ai1, through Creature.teleportTo, which a summon is): the
-// owner's wolf is the creature Baium saw first, and the stone wakes Baium
-// for a waker no longer in the world. 18.8 s after the wake Baium says its
+// owner's talk to the stone wakes Baium, and the test then names the
+// owner's wolf as the creature Baium saw first and a waker no longer in
+// the world as its waker. 18.8 s after the wake Baium says its
 // line 22937, and the owner sees one ordinary TeleportToLocation of the
 // wolf beside it, to 115910,17337,10105; the wolf stands there, the owner
 // stays where it was, and Baium wants to cast 4136 at the wolf with
@@ -78,23 +80,6 @@ func TestBaiumCallsTheSummonItSawWhenItsWakerIsGone(t *testing.T) {
 		ID: 4136, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		SkillType: "BUFF", CastRange: 600, HitTime: 500, StaticHitTime: true, StaticReuse: true,
 	}
-	summons := make(chan script.Creature, 1)
-	stone := func() script.Script {
-		// The stone's own script is not ported here: a talk to it wakes the
-		// NPC global memo key "2" names with script event 10025, from a
-		// waker gone from the world, and deletes it. It hands the test the
-		// talker's summon handle.
-		return script.Script{Bind: script.Bindings{script.EventFirstTalk: {baiumStoneID}}, Hooks: script.Hooks{
-			OnFirstTalk: func(s *script.Script, e script.FirstTalk) string {
-				summons <- e.Player.ActiveSummon()
-				if c, ok := s.GlobalMemo().Creature("2").(*script.NPC); ok {
-					s.SendScriptEvent(c, 10025, baiumGoneWaker, 0)
-				}
-				e.NPC.DeleteMe()
-				return ""
-			},
-		}}
-	}
 	class := gameservertest.ClassTemplate()
 	class.Spawns = []location.Location{{X: 115960, Y: 17400, Z: 10107}}
 	w := bootOwnerWithCollarOpts(t, []gameservertest.Option{
@@ -110,12 +95,15 @@ func TestBaiumCallsTheSummonItSawWhenItsWakerIsGone(t *testing.T) {
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{baiumID: script.KindHostile, baiumStoneID: script.KindFolk},
-			[]script.Listing{{Path: "script.ai.individual.DefaultNpc"}, {Path: "script.ai.boss.baium.Baium"}, {Path: "test.BaiumStone"}},
+			[]script.Listing{{Path: "script.ai.individual.DefaultNpc"}, {Path: "script.ai.boss.baium.Baium"}, {Path: "script.ai.boss.baium.BaiumStone"}},
 			script.Catalog{
 				"script.ai.individual.DefaultNpc": defaultnpc.New,
 				"script.ai.boss.baium.Baium":      baium.Baium,
-				"test.BaiumStone":                 stone,
+				"script.ai.boss.baium.BaiumStone": baium.BaiumStone,
 			}),
+		gameservertest.WithHTMLPages(map[string]string{
+			"default/29025.htm": `<html><body><a action="bypass -h npc_%objectId%_Quest BaiumStone">Wake Baium</a></body></html>`,
+		}),
 	})
 	wolf, _ := w.spawnWolf(t)
 	drainUntilQuiet(t, w.client)
@@ -142,23 +130,36 @@ func TestBaiumCallsTheSummonItSawWhenItsWakerIsGone(t *testing.T) {
 		w.client.Send(encodeAction(stoneNPC.ObjectID(), int32(sx), int32(sy), int32(sz), false))
 		w.srv.Settle(t)
 	}
-	var handle script.Creature
-	select {
-	case handle = <-summons:
-	default:
-		t.Fatal("the talk to the stone ran no first-talk hook")
+	w.client.Send(encodeBypass(fmt.Sprintf("npc_%d_Quest BaiumStone", stoneNPC.ObjectID())))
+	w.srv.Settle(t)
+	if !stoneNPC.Decayed() {
+		t.Fatal("the stone is still in the world after the wake")
 	}
+	owner, ok := w.srv.State.Object(w.ownerID)
+	if !ok {
+		t.Fatal("the owner is not in the world")
+	}
+	var handle script.Creature
+	done := make(chan struct{})
+	if !w.srv.PlayerQueue(t, w.ownerID).Post(func() {
+		defer close(done)
+		handle = script.PlayerOf(owner.(attackable.Combatant)).ActiveSummon()
+	}) {
+		t.Fatal("the owner's queue is closed")
+	}
+	<-done
 	if handle == nil || handle.ObjectID() != wolf.ObjectID() {
-		t.Fatalf("the talker's summon handle = %v, want the wolf %d", handle, wolf.ObjectID())
+		t.Fatalf("the owner's summon handle = %v, want the wolf %d", handle, wolf.ObjectID())
 	}
 	// Baium saw the wolf first: its see-creature hook keeps the last
 	// creature told within its first 10 s, and the order the owner and its
 	// wolf are told in is not pinned, so the test names the wolf on its
-	// queue.
-	done := make(chan struct{})
+	// queue, and a waker gone from the world.
+	done = make(chan struct{})
 	if !baiumNPC.Queue().Post(func() {
 		defer close(done)
 		script.NPCOf(baiumNPC).SetSlot(script.SlotCreature1, handle)
+		script.NPCOf(baiumNPC).SetInt(script.SlotParam1, baiumGoneWaker)
 	}) {
 		t.Fatal("Baium's queue is closed")
 	}
