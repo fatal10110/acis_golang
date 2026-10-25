@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -565,4 +566,66 @@ func TestWizardHallDDMagic2AggressiveStrikesClerics(t *testing.T) {
 		t.Fatalf("wander desire after a cleric's buff = %+v, want dropped", d)
 	}
 	i6fWantCasts(t, "a cleric's buff", h, map[modelskill.ID]i6fCast{wLongDDID: {me, 1000000, false}})
+}
+
+// TestWizardCurseStonesPetrifyAlliedCasters runs the see-spell hooks of
+// WizardCastClanBuffCurseStoneAggressive and
+// WizardCastClanBuffRangeDDCurseStoneAggressive for a Ketra stone that sees
+// the character cast a self buff. A buff with aggro points cast by a
+// character with no alliance, or one without aggro points cast by a Ketra
+// ally, wants no petrify; a buff with aggro points cast by a Ketra ally
+// wants the caster petrified (4515, weight 1000000).
+func TestWizardCurseStonesPetrifyAlliedCasters(t *testing.T) {
+	t.Parallel()
+	for _, id := range []int32{i6gCurseStoneID, i6gRangeDDID} {
+		t.Run(strconv.Itoa(int(id)), func(t *testing.T) {
+			t.Parallel()
+			db := sqltest.SharedDB(t)
+			buff := func(id modelskill.ID, aggro int) modelskill.Definition {
+				return modelskill.Definition{
+					ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+					SkillType: "BUFF", HitTime: 500, StaticHitTime: true, StaticReuse: true, AggroPoints: aggro,
+				}
+			}
+			defs := []modelskill.Definition{buff(plwAggroBuff, 100), buff(plwPlainBuff, 0)}
+			table := modelskill.NewTable(append([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}}, defs...))
+			w := bootIndividual6g(t, raidBoot{
+				opts: []gameservertest.Option{
+					gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), table, gamesql.NewCharacterSkillStore(db))),
+					gameservertest.WithScriptSkills(defs...),
+				},
+				ready: func(srv *gameservertest.Server, objID int32) {
+					for _, d := range defs {
+						if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, int(d.ID), 1); err != nil {
+							t.Fatalf("seed skill %d: %v", d.ID, err)
+						}
+					}
+				},
+			}, i6gFaction(i6gTemplate(id, nil)))
+			ch := i6bCharacter(t, w)
+			h := w.i6gArmed(t, id, 150, 0)
+
+			for _, row := range []struct {
+				standing int
+				skill    modelskill.ID
+			}{{0, plwAggroBuff}, {1, plwPlainBuff}} {
+				ch.SetVarkaKetraAlliance(row.standing)
+				castOwnSkill(w.warriorWorld, row.skill)
+				w.srv.Advance(t, 2*time.Second)
+				w.srv.ReadQueued(t, w.srv.Client)
+				if d, ok := castDesireOf(h, petrifyID); ok {
+					t.Fatalf("standing %d, buff %d: the stone wants %+v, want no petrify", row.standing, row.skill, d)
+				}
+			}
+			castOwnSkill(w.warriorWorld, plwAggroBuff)
+			w.srv.AdvanceUntil(t, "the petrify desire", func() bool {
+				_, ok := castDesireOf(h, petrifyID)
+				return ok
+			})
+			if !i6bCastWeighs(h, petrifyID, w.player.ObjectID(), 1000000) {
+				d, _ := castDesireOf(h, petrifyID)
+				t.Fatalf("petrify desire = %+v, want on the caster, weight 1000000", d)
+			}
+		})
+	}
 }
