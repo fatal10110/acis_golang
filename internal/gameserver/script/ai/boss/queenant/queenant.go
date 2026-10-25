@@ -1,10 +1,10 @@
 package queenant
 
 import (
-	"math"
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
@@ -107,7 +107,7 @@ func QueenAnt() script.Script {
 				}
 
 				damage := float64(e.Damage)
-				n.AddAttackDesireHold(attacker, float64(saturatedInt(damage/float64(n.MaxHP())/0.05*damage*float64(n.Int(script.SlotWeightPoint))*1000)))
+				n.AddAttackDesireHold(attacker, float64(commons.TruncInt32Sat(damage/float64(n.MaxHP())/0.05*damage*float64(n.Int(script.SlotWeightPoint))*1000)))
 
 				if top := n.TopDesireTarget(); top != nil && !n.CanAutoAttack(top) {
 					n.StopHate(top)
@@ -131,7 +131,7 @@ func QueenAnt() script.Script {
 				}
 
 				damage := float64(e.Damage)
-				called.AddAttackDesireHold(target, float64(saturatedInt(damage/float64(called.MaxHP())/0.05*damage*float64(caller.Int(script.SlotWeightPoint))*1000)))
+				called.AddAttackDesireHold(target, float64(commons.TruncInt32Sat(damage/float64(called.MaxHP())/0.05*damage*float64(caller.Int(script.SlotWeightPoint))*1000)))
 			}
 		},
 		OnClanAttacked: func(s *script.Script, e script.ClanAttacked) {
@@ -150,7 +150,7 @@ func QueenAnt() script.Script {
 					called.AddCastDesireHold(called, skill.Ref{ID: 4017, Level: 1}, 1000000)
 				}
 
-				called.AddAttackDesireHold(attacker, float64(saturatedInt(float64(e.Damage)/float64(called.MaxHP())/0.05*500)))
+				called.AddAttackDesireHold(attacker, float64(commons.TruncInt32Sat(float64(e.Damage)/float64(called.MaxHP())/0.05*500)))
 			}
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {
@@ -173,18 +173,4 @@ func QueenAnt() script.Script {
 			e.NPC.PlayMusic("BS02_D")
 		},
 	})}
-}
-
-// saturatedInt converts f to an int32 as a cast of a double to an int
-// does: rounded toward zero, clamped to the int32 range, NaN to 0.
-func saturatedInt(f float64) int32 {
-	switch {
-	case math.IsNaN(f):
-		return 0
-	case f >= math.MaxInt32:
-		return math.MaxInt32
-	case f <= math.MinInt32:
-		return math.MinInt32
-	}
-	return int32(f)
 }
