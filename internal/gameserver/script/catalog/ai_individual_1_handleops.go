@@ -63,6 +63,23 @@ func aiIndividual1HandleOps() map[string]script.HandleOps {
 			"OnAttacked":     {"NPC.TopDesireTarget"},
 			"OnClanAttacked": {"NPC.TopDesireTarget"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.FarmGrowthStep": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep2": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep3Aggressive": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep4Aggressive": {
+			"OnAttacked":     {"NPC.TopDesireTarget"},
+			"OnClanAttacked": {"NPC.TopDesireTarget"},
+			"OnTimer":        {"NPC.TopDesireTarget"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive": {
 			"OnAttacked":     {"NPC.RemoveAttackDesire", "NPC.TopDesireTarget"},
 			"OnClanAttacked": {"NPC.RemoveAttackDesire", "NPC.TopDesireTarget"},

@@ -2,6 +2,7 @@ package warrior
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
@@ -59,4 +60,23 @@ func Cast3SkillsMagical4Hooks() script.Hooks {
 			base.ClanAttacked(s, e)
 		},
 	}).Named("WarriorCast3SkillsMagical4")
+}
+
+// Cast3SkillsMagical4Revived is WarriorCast3SkillsMagical4Revived: a
+// WarriorCast3SkillsMagical4 that, called with spawn parameters 1000 and
+// a creature, stuns and attacks that creature as it appears.
+func Cast3SkillsMagical4Revived() script.Script {
+	base := Cast3SkillsMagical4Hooks()
+	return script.Script{Dir: cast3Magical4Dir, Behavior: true, NPCs: []int32{21206}, Hooks: base.With(script.Hooks{
+		OnCreated: func(s *script.Script, e script.Created) {
+			n := e.NPC
+			if n.Int(script.SlotParam1) == 1000 {
+				if c0 := s.Object(n.Int(script.SlotParam2)); c0 != nil {
+					n.AddCastDesire(c0, skill.Ref{ID: 4663, Level: 1}, 10000)
+					n.AddAttackDesire(c0, 500)
+				}
+			}
+			base.Created(s, e)
+		},
+	})}
 }
