@@ -19,7 +19,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -27,6 +29,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/antharas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/rs/zerolog"
 )
@@ -49,9 +52,10 @@ var (
 	antharasCharacter = location.Location{X: 183500, Y: 114835, Z: -7678}
 )
 
-// antharasSpawnlist is the shipped lair territory and Antharas's npcmaker
-// with its GM_ID 1, placing it at antharasHome and respawning it after
-// the given time.
+// antharasSpawnlist is the shipped lair territory and Antharas's two
+// npcmakers: its database-tracked one, with its GM_ID 1, placing it at
+// antharasHome and respawning it after the given time, and the exit cubes'
+// one, which spawns nothing until the first one's last NPC leaves.
 const antharasSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 <list>
 	<territory name="antaras_2521_01" minZ="-7712" maxZ="-6212">
@@ -64,12 +68,20 @@ const antharasSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 		<node x="173003" y="114720"/>
 	</territory>
 	<npcmaker name="antaras_2521_01" territory="antaras_2521_01" maximumNpcs="89">
-		<ai type="default_maker"/>
+		<ai type="default_use_db_maker">
+			<set name="maker_name" val="antaras_2521_02"/>
+		</ai>
 		<npc id="29066" pos="184500;114835;-7678;0" total="1" respawn="%s" respawnRand="0sec" dbName="antaras_min" dbSaving="DEATH_TIME;PARAMETERS;POS">
 			<ai>
 				<set name="GM_ID" val="1"/>
 			</ai>
 		</npc>
+	</npcmaker>
+	<npcmaker name="antaras_2521_02" territory="antaras_2521_01" maximumNpcs="20">
+		<ai type="default_maker">
+			<set name="on_start_spawn" val="0"/>
+		</ai>
+		<npc id="31859" pos="177615;114941;-7709;0" total="20" respawn="no"/>
 	</npcmaker>
 </list>`
 
@@ -92,6 +104,13 @@ func antharasSkills() *modelskill.Table {
 // at antharasCharacter. The world is a baiumWorld: the same character and
 // in-game clock.
 func bootAntharas(t *testing.T, row *spawn.State, respawn string) *baiumWorld {
+	t.Helper()
+	return bootAntharasWith(t, row, respawn, nil, nil)
+}
+
+// bootAntharasWith is bootAntharas with extra boot options and a ready step
+// run before the character enters the world.
+func bootAntharasWith(t *testing.T, row *spawn.State, respawn string, extra []gameservertest.Option, ready func(*gameservertest.Server, int32)) *baiumWorld {
 	t.Helper()
 	if row != nil {
 		if err := gamesql.NewSpawnStore(sqltest.SharedDB(t)).SaveStates(context.Background(), map[string]*spawn.State{antharasRow: row}); err != nil {
@@ -125,7 +144,7 @@ func bootAntharas(t *testing.T, row *spawn.State, respawn string) *baiumWorld {
 	}
 	class := gameservertest.ClassTemplate()
 	class.Spawns = []location.Location{antharasCharacter}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Hunter", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithClassTemplate(class),
@@ -138,7 +157,10 @@ func bootAntharas(t *testing.T, row *spawn.State, respawn string) *baiumWorld {
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 		gameservertest.WithGameClockNow(w.now),
-	)
+	}, extra...)...)
+	if ready != nil {
+		ready(srv, srv.SoleObjectID(t))
+	}
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {
@@ -283,15 +305,16 @@ func TestAntharasSleepsDiesAndComesBack(t *testing.T) {
 		t.Fatalf("%d cubes 900 s after the death, want none", n)
 	}
 
-	// The fixture's respawn timers never fire on their own: the test decays
-	// the corpse, then fires the respawn its spawn armed.
+	// No decay task runs in the fixture, nor does its respawn task tick: the
+	// test decays the corpse, and its maker (default_use_db_maker) clears
+	// the spawn's loaded mark and arms the spawn's respawn, keyed by its
+	// dbName, which the test then fires.
 	w.onQueue(t, boss, func() { boss.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(boss.ObjectID())) })
-	const slot = antharasRow // a database-tracked spawn's slot is keyed by its dbName
-	if !w.srv.NpcRespawns.Tracked(slot) {
-		t.Fatal("Antharas's decay armed no respawn")
-	}
 	w.srv.ReadQueued(t, w.srv.Client)
-	w.srv.NpcSpawns.Respawn(slot)
+	if !w.srv.NpcRespawns.Tracked(antharasRow) {
+		t.Fatal("Antharas's maker armed no respawn")
+	}
+	w.srv.NpcSpawns.Respawn(antharasRow)
 	w.srv.Settle(t)
 	frames := w.srv.ReadQueued(t, w.srv.Client)
 	again := soleBaiumNPC(t, w, antharasID)
@@ -358,9 +381,23 @@ func TestAntharasResumesItsMoveIn(t *testing.T) {
 // 3 s later 700/13/0 over 6 s, 10 s later 3700/0/-3 with its two social
 // desires, 0.2 s later 1100/0/-3 over 22 s, 10.8 s later 1100/0/-3 over
 // 0.3 s, and it stores 3: it wants its buff 4125 on itself with 4000000
-// and to wander, and the db value 3 is saved.
+// and to wander, and the db value 3 is saved. With a hero within 4000 the
+// last shot is followed by its screen message 1000520 for 3 s; with none,
+// by nothing.
 func TestAntharasAwakens(t *testing.T) {
+	for _, hero := range []bool{false, true} {
+		t.Run(fmt.Sprintf("hero=%v", hero), func(t *testing.T) { antharasAwakens(t, hero) })
+	}
+}
+
+// antharasAwakens runs TestAntharasAwakens with the character a hero or
+// not.
+func antharasAwakens(t *testing.T, hero bool) {
 	w := bootAntharas(t, nil, "1hour")
+	if hero {
+		w.srv.RunQuest(t, w.player.ObjectID(), antharasDirector, func(_ *script.Quests, c *player.Character, _ *script.Script) { c.SetHero(true) })
+		w.srv.ReadQueued(t, w.srv.Client)
+	}
 	boss := soleBaiumNPC(t, w, antharasID).(*npc.Hostile)
 	handle := script.NPCOf(boss)
 	roles := map[int32]string{boss.ObjectID(): "antharas", w.player.ObjectID(): "player"}
@@ -412,10 +449,12 @@ func TestAntharasAwakens(t *testing.T) {
 	if got := handle.DBValue(); got != 2 {
 		t.Fatalf("db value before the last shot = %d, want 2", got)
 	}
-	frames := w.advance(t, 10800*time.Millisecond)
-	if got := antharasFrames(t, frames, roles); len(got) == 0 || got[0] != "S SpecialCamera obj=antharas shot=1100,0,-3,300,7000,0,0,0,0" {
-		t.Fatalf("+10.8 s frames = %q, want the last shot first", got)
+	last := []string{"S SpecialCamera obj=antharas shot=1100,0,-3,300,7000,0,0,0,0"}
+	if hero {
+		text, _ := npcstring.Text(1000520)
+		last = append(last, "S ExShowScreenMessage "+text+"@3000")
 	}
+	wantAntharasFrames(t, "+10.8 s", w.advance(t, 10800*time.Millisecond), roles, last...)
 	if got := handle.DBValue(); got != 3 {
 		t.Fatalf("db value after the last shot = %d, want 3", got)
 	}
@@ -556,6 +595,69 @@ func TestAntharasRanksItsAttackers(t *testing.T) {
 	}
 	if got, want := antharasCasts(boss, roles), []string{"4107@antharas=1e+06", "4108@hitter=1e+06"}; !slices.Equal(got, want) {
 		t.Fatalf("Antharas's cast desires after the monster's hit = %q, want %q", got, want)
+	}
+}
+
+// antharasBoltID is a damaging spell the character knows.
+const antharasBoltID = modelskill.ID(1177)
+
+// TestAntharasRanksSpellDamage ports the ranking of a spell's damage
+// (phase 4), every draw 0, at db value 1, where no cast follows the rank.
+// At full HP a spell of damage d ranks the character first with
+// trunc(d/150*1000); under 1/4 of its HP a second spell of damage d2
+// raises it to trunc(d2/30*1000) when d2/30*1000 + 1000, unrounded, beats
+// the standing.
+func TestAntharasRanksSpellDamage(t *testing.T) {
+	bolt := modelskill.Definition{
+		ID: antharasBoltID, Level: 1, Activation: modelskill.ActivationActive,
+		Target: modelskill.TargetOne, Offensive: true, Magic: true, SkillType: "MDAM",
+		CastRange: 1500, HitTime: 500, StaticHitTime: true, StaticReuse: true, Power: 40,
+	}
+	db := sqltest.SharedDB(t)
+	table := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}, bolt})
+	w := bootAntharasWith(t, antharasLiveRow(1), "1hour", []gameservertest.Option{
+		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), table, gamesql.NewCharacterSkillStore(db))),
+		gameservertest.WithScriptSkills(bolt),
+	}, func(srv *gameservertest.Server, objID int32) {
+		if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, int(antharasBoltID), 1); err != nil {
+			t.Fatalf("seed the spell: %v", err)
+		}
+	})
+	boss := soleBaiumNPC(t, w, antharasID).(*npc.Hostile)
+	handle := script.NPCOf(boss)
+	for range 2 {
+		w.srv.Client.Send(encodeFolkAction(boss.ObjectID(), w.at))
+		w.srv.Settle(t)
+	}
+	w.srv.ReadQueued(t, w.srv.Client)
+
+	cast := func() int {
+		t.Helper()
+		before := boss.CurrentHP()
+		w.castFrames(t, antharasBoltID)
+		d := before - boss.CurrentHP()
+		if d <= 0 {
+			t.Fatalf("the spell did %d damage, want some", d)
+		}
+		return d
+	}
+	d := cast()
+	if got := handle.Slot(script.SlotCreature2); got == nil || got.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("Antharas's first target = %v, want the character", got)
+	}
+	if got, want := handle.Int(script.SlotIntAI2), int32(float64(d)/150.0*1000); got != want {
+		t.Fatalf("the character's points after a spell of %d at full HP = %d, want %d", d, got, want)
+	}
+
+	w.onQueue(t, boss, func() { boss.SetCurrentHP(boss.MaxHP() / 5) })
+	standing := handle.Int(script.SlotIntAI2)
+	d2 := cast()
+	want := standing
+	if exact := float64(d2) / 30.0 * 1000; exact+1000 > float64(standing) {
+		want = int32(exact)
+	}
+	if got := handle.Int(script.SlotIntAI2); got != want {
+		t.Fatalf("the character's points after a spell of %d under 1/4 HP, from %d = %d, want %d", d2, standing, got, want)
 	}
 }
 
