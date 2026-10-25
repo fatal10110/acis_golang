@@ -1,0 +1,17 @@
+# Riba Iren (29018), a level 1 monster (440 HP), hit by a level 10 character, more than 8 levels
+# above it: each hit makes it want its curse (4515) on the character at 1000000. A hit landing
+# while it stands under half its HP, read before the hit's damage, also makes it want Orfen Heal
+# (4516) on itself at 1000000: the hit of 300 finds it whole, the next one under a third. It
+# draws nothing and adds no attack desire of its own.
+character Hunter 10
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.orfen.OrfenPrivateRibaIren
+npc riba 29018 Monster 100 0 0 skill DEBUFF 4515 1 skill HEAL 4516 1
+
+hit riba 10
+  desires riba cast(player,4515,move)=1000000
+hit riba 300
+  desires riba cast(player,4515,move)=2000000
+hit riba 10
+  desires riba cast(player,4515,move)=3000000 cast(riba,4516,move)=1000000
