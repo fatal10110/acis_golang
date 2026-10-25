@@ -7,5 +7,13 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiBossQueenAntHandleOps holds, per script of ai_boss_queenant.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiBossQueenAntHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.boss.queenant.QueenAnt": {
+			"OnAttacked":  {"NPC.CanAutoAttack", "NPC.TopDesireTarget"},
+			"OnPartyDied": {"Spawner.ScheduleRespawn"},
+		},
+		"script.ai.boss.queenant.QueenAntPrivateNurseAnt": {
+			"OnPartyAttacked": {"NPC.TopDesireTarget"},
+		},
+	}
 }

@@ -1,0 +1,20 @@
+# The Queen Ant (29001), a level 1 grand boss in her npcmaker's territory, hit by the level 10
+# character 100 in front of her, every draw 0: more than 8 levels above her, it makes her want
+# her curse 4515 on it and drop her hate of it; then, as for any playable, her self cast 4017
+# and the attack by the damage. The curse, instant, lands on the character at once (aborting
+# its action twice); the character, her top desire target now and beyond her aggro range, fails
+# her automatic attack check, so she drops her hate of it again, and the attack desire with it.
+character Hunter 10
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAnt
+territory nest 150 -200 900 200 -100 100
+npc queen 29001 GrandBoss 700 0 0 maker nest skill BUFF 4017 1 skill DD_MAGIC 4018 1 skill DD_MAGIC_A 4019 1 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+
+approach queen
+hit queen 22
+  S MagicSkillUse caster=queen target=player skill=4515-1 hit=0 reuse=0 success=0
+  S ActionFailed
+  S ActionFailed
+  S SystemMessage id=110 4:4515,1
+  desires queen cast(player,4515,move)=1000000 cast(queen,4017)=1000000

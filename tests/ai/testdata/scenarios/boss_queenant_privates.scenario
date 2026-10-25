@@ -1,0 +1,24 @@
+# The Queen Ant's larva (29002) and nurse ant (29003), each level 1 and with no master, beside
+# the level 10 character, every draw 0. A spell they see it cast, more than 8 levels above
+# them, makes each want its silence 4215 on it; its hit on each makes that one want its curse
+# 4515 on it (the nurse also drops its hate of it).
+character Hunter 10
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAntPrivateAntLarva
+script script.ai.boss.queenant.QueenAntPrivateNurseAnt
+npc larva 29002 Monster 250 0 0 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+npc nurse 29003 Monster 250 100 0 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+npc wolf 20120 Monster 150 0 0
+
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires larva cast(player,4215,move)=1000000
+  desires nurse cast(player,4215,move)=1000000
+hit larva 22
+  desires larva cast(player,4215,move)=1000000 cast(player,4515,move)=1000000
+hit nurse 22
+  desires nurse cast(player,4215,move)=1000000 cast(player,4515,move)=1000000

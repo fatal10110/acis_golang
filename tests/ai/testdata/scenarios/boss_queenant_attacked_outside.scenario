@@ -1,0 +1,14 @@
+# The Queen Ant (29001), a level 1 grand boss 400 from the level 1 character, out of the 200 of
+# her territory, every draw 0. Its hit from outside her territory sends her back to her nest at
+# -21610, 181594, -5734 forgetting her targets; then, far over 500 away, a draw under 10 makes
+# her want strike 4019 on it from where she stands, and the attack by the damage, but the
+# character is beyond her knowledge there, so she holds neither desire after the step.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAnt
+npc queen 29001 GrandBoss 400 0 0 skill BUFF 4017 1 skill DD_MAGIC 4018 1 skill DD_MAGIC_A 4019 1 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+
+hit queen 22
+  desires queen -
+  at queen -21620 181574 -5764
