@@ -865,6 +865,9 @@ func (r *run) enterWorld(t *testing.T) [][]byte {
 	frames := r.readThrough(t, serverpackets.OpcodeCharSelected)
 	r.srv.Client.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
 	frames = append(frames, r.srv.ReadQueued(t, r.srv.Client)...)
+	if draw, ok := r.sc.Rolls["player"]; ok {
+		r.pinPlayerRoll(t, draw)
+	}
 	r.spawnNPCs(t)
 	return frames
 }

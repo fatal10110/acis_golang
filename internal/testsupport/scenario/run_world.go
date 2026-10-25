@@ -234,6 +234,20 @@ func (r *run) npcQueue(t *testing.T, role string) (attackable.Combatant, func(fu
 	return nil, nil
 }
 
+// pinPlayerRoll makes every combat draw of the character draw, n-1 for a
+// draw of [0, n) it is not inside, set on the character's queue.
+func (r *run) pinPlayerRoll(t *testing.T, draw int) {
+	t.Helper()
+	r.onPlayer(t, func(p attackable.Combatant) {
+		pinned, ok := p.(interface{ SetRollSource(func(int) int) })
+		if !ok {
+			t.Errorf("%s: the character (%T) has no combat random source", r.sc.Name, p)
+			return
+		}
+		pinned.SetRollSource(func(n int) int { return min(draw, n-1) })
+	})
+}
+
 // pinRoll makes every combat draw of role's NPC draw, n-1 for a draw of
 // [0, n) it is not inside, set on the NPC's own queue.
 func (r *run) pinRoll(t *testing.T, role string, draw int) {
