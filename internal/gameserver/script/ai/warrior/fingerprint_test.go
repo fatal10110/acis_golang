@@ -15,9 +15,11 @@ var npcStrings = []int{1000286, 1000287, 1000288, 1000290, 1000291, 1000292, 100
 // classes: literals, engine calls and hook shapes. The panic of a berserker
 // whose template lists no fury skill stands for the reference's null
 // dereference; the tyrannosaurus's failed capture message is a named
-// constant in the reference, a number in Go.
+// constant in the reference, a number in Go. The heretic priest counts a
+// party through Player.PartyMembers, the Go name it shares with the quest
+// helper Quest.getPartyMembers, which no class here calls.
 func TestMatchesReferenceFingerprints(t *testing.T) {
-	exempt := []string{`string "warrior: a berserker's template lists no fury skill"`, "number 2002"}
+	exempt := []string{`string "warrior: a berserker's template lists no fury skill"`, "number 2002", "call Quest.getPartyMembers"}
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
@@ -103,6 +105,7 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsMagicalRevived",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.ZakenPrivateValeMaster",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorUseBowNotFleeAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.CorePrivateWarriorAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagic",
