@@ -109,6 +109,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2StoneAggressive": warrior.Cast3SkillsMagical2StoneAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3":                warrior.Cast3SkillsMagical3,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical4.WarriorCast3SkillsMagical4":                warrior.Cast3SkillsMagical4,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep4Aggressive":                           warrior.WarriorGrowthStep4Aggressive,
 	"script.ai.individual.Monster.WarriorBase.WarriorBase":                                                                  warrior.Base,
 	"script.ai.individual.Monster.WarriorHero":                                                                              monster.WarriorHero,
 	"script.ai.individual.Guard.Guard":                                                                                      guard.Guard,
