@@ -7,5 +7,9 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiBossAntharasHandleOps holds, per script of ai_boss_antharas.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiBossAntharasHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.boss.antharas.Antharas": {
+			"OnCreated": {"NPC.Earthquake"},
+		},
+	}
 }
