@@ -218,6 +218,8 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3":                                                 raid.BossType3,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3AnaisAggressive":                                  raid.BossType3AnaisAggressive,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4":                                                 raid.BossType4,
+	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive":                                raid.BossType4AndreasAggressive,
+	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5":                                                 raid.BossType5,
 
 	// The grand bosses.
 	"script.ai.boss.core.Core":                        core.Core,
