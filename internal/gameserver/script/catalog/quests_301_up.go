@@ -32,6 +32,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q356"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q357"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q358"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q359"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q362"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q363"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q364"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q366"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q367"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q368"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q369"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -74,15 +82,15 @@ func quests301Up() script.Catalog {
 		"quest.Q356_DigUpTheSeaOfSpores":               q356.New,
 		"quest.Q357_WarehouseKeepersAmbition":          q357.New,
 		"quest.Q358_IllegitimateChildOfAGoddess":       q358.New,
-		"quest.Q359_ForSleeplessDeadmen":               nil,
-		"quest.Q362_BardsMandolin":                     nil,
-		"quest.Q363_SorrowfulSoundOfFlute":             nil,
-		"quest.Q364_JovialAccordion":                   nil,
+		"quest.Q359_ForSleeplessDeadmen":               q359.New,
+		"quest.Q362_BardsMandolin":                     q362.New,
+		"quest.Q363_SorrowfulSoundOfFlute":             q363.New,
+		"quest.Q364_JovialAccordion":                   q364.New,
 		"quest.Q365_DevilsLegacy":                      nil,
-		"quest.Q366_SilverHairedShaman":                nil,
-		"quest.Q367_ElectrifyingRecharge":              nil,
-		"quest.Q368_TrespassingIntoTheSacredArea":      nil,
-		"quest.Q369_CollectorOfJewels":                 nil,
+		"quest.Q366_SilverHairedShaman":                q366.New,
+		"quest.Q367_ElectrifyingRecharge":              q367.New,
+		"quest.Q368_TrespassingIntoTheSacredArea":      q368.New,
+		"quest.Q369_CollectorOfJewels":                 q369.New,
 		"quest.Q370_AnElderSowsSeeds":                  nil,
 		"quest.Q371_ShriekOfGhosts":                    nil,
 		"quest.Q372_LegacyOfInsolence":                 nil,
