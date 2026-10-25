@@ -1,0 +1,122 @@
+# Inhabitants of the Forest of the Dead (Q024) from Dorian's start to his silver cross: the flowers
+# for Lidia's tombstone, Dorian's story. Expectations come from the reference trace
+# (Q024_InhabitantsOfTheForestOfTheDead.onAdvEvent, onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q024_inhabitants_of_the_forest_of_the_dead.golden
+character Mourner 65
+quest Q023_LidiasHeart <state>=COMPLETED
+script quest.Q023_LidiasHeart
+script quest.Q024_InhabitantsOfTheForestOfTheDead
+item 7152 7153
+page default/31389.htm
+page default/31531.htm
+page script/quest/Q024_InhabitantsOfTheForestOfTheDead/
+npc dorian 31389 Folk 10 0 0
+npc tombstone 31531 Folk 0 10 0
+
+# Dorian gives the flowers for Lidia's tombstone.
+action dorian
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-03.htm
+  S QuestList 23:0x00000000 24:0x80000001
+  S ExShowQuestMark quest=24
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7152
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-03.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <state> | STARTED
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 1
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 1
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=1 <state>=STARTED state=1
+  items 7152=1
+  state Q024_InhabitantsOfTheForestOfTheDead STARTED
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# The tombstone takes them.
+action tombstone
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31531.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S PlaySound type=0 file=AmdSound.d_wind_loot_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31531-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31531-02.htm
+  S QuestList 23:0x00000000 24:0x80000003
+  S ExShowQuestMark quest=24
+  S SystemMessage id=302 3:7152
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31531-02.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 2
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 2
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=2 <state>=STARTED state=2
+  items 7152=0
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31531.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31531-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Dorian's story, and the silver cross.
+action dorian
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-08.htm
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-08.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 3
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=2 <state>=STARTED state=3
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-10.htm
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-10.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-11.htm
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-11.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-12.htm
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-12.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-13.htm
+  S QuestList 23:0x00000000 24:0x80000007
+  S ExShowQuestMark quest=24
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7153
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-13.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 3
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 4
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=3 <state>=STARTED state=4
+  items 7153=1
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-14.htm
+  S ActionFailed
+  S ActionFailed
+relog

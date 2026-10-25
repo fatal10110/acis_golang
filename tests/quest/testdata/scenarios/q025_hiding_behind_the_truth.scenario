@@ -1,0 +1,254 @@
+# Hiding Behind the Truth (Q025) from Benedict's start to Triol's pawn: Agripel's gemstone key,
+# the Mysterious Wizard's errand, the three broken bookshelves, the last one opened holding the
+# gem box, which wakes the pawn far away (cond 7); while it stands, the box answers that it is the
+# player's own. Expectations come from the reference trace (Q025_HidingBehindTheTruth.onAdvEvent,
+# onTalk, Quest.createOnePrivateEx). The pawn line gives the server the pawn's template; that pawn
+# stands out of sight.
+trace internal/gameserver/script/testdata/oracle/scenarios/q025_hiding_behind_the_truth.golden
+character Seeker 66
+quest Q024_InhabitantsOfTheForestOfTheDead <state>=COMPLETED
+hold 7156 1
+hold 7063 1
+script quest.Q024_InhabitantsOfTheForestOfTheDead
+script quest.Q025_HidingBehindTheTruth
+item 7063 7156 7157
+page default/31348.htm
+page default/31349.htm
+page default/31522.htm
+page default/31533.htm
+page default/31534.htm
+page default/31535.htm
+page script/quest/Q025_HidingBehindTheTruth/
+npc benedict 31349 Folk 10 0 0
+npc agripel 31348 Folk -10 0 0
+npc wizard 31522 Folk 0 10 0
+npc shelf1 31533 Folk 0 -10 0
+npc shelf2 31534 Folk 20 20 0
+npc shelf3 31535 Folk -20 -20 0
+npc pawn 27218 Monster 3000 0 0
+
+# Benedict starts the quest; the player still holds the totem doll.
+action benedict
+action benedict
+  S ActionFailed
+  S NpcHtmlMessage obj=benedict item=0 page=default/31349.htm
+  S ActionFailed
+bypass npc_{benedict}_Quest
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31349-03.htm
+  S QuestList 24:0x00000000 25:0x80000001
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-03.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | <state> | STARTED
+  Q upsert Q025_HidingBehindTheTruth | state | 1
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 1
+  rows Q025_HidingBehindTheTruth <cond>=1 <state>=STARTED state=1
+  state Q025_HidingBehindTheTruth STARTED
+bypass Quest Q025_HidingBehindTheTruth 31349-04.htm
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-04.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31349-06.htm
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-06.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31349-07.htm
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-07.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31349-10.htm
+  S QuestList 24:0x00000000 25:0x80000009
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-10.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 2
+  Q upsert Q025_HidingBehindTheTruth | <flags> | -2147483639
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 4
+  rows Q025_HidingBehindTheTruth <cond>=4 <flags>=-2147483639 <state>=STARTED state=2
+action benedict
+  S ActionFailed
+  S NpcHtmlMessage obj=benedict item=0 page=default/31349.htm
+  S ActionFailed
+bypass npc_{benedict}_Quest
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-10.htm
+  S ActionFailed
+  S ActionFailed
+
+# Agripel takes the doll and gives the gemstone key.
+action agripel
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-02.htm
+  S SystemMessage id=302 3:7156
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-02.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 3
+  rows Q025_HidingBehindTheTruth <cond>=4 <flags>=-2147483639 <state>=STARTED state=3
+  items 7156=0
+bypass Quest Q025_HidingBehindTheTruth 31348-04.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-04.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-05.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-05.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-06.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-06.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-07.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-07.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-08.htm
+  S QuestList 24:0x00000000 25:0x80000019
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7157
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-08.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 6
+  Q upsert Q025_HidingBehindTheTruth | <flags> | -2147483623
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 5
+  rows Q025_HidingBehindTheTruth <cond>=5 <flags>=-2147483623 <state>=STARTED state=6
+  items 7157=1
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-08a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The Mysterious Wizard sends the player to the bookshelves.
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 html="<html><body><a action=\"bypass -h npc_{wizard}_Quest Q024_InhabitantsOfTheForestOfTheDead\">[Inhabitants of the Forest of the Dead (Done)]</a><br><a action=\"bypass -h npc_{wizard}_Quest Q025_HidingBehindTheTruth\">[Hiding Behind the Truth (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{wizard}_Quest Q025_HidingBehindTheTruth
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31522-04.htm
+  S QuestList 24:0x00000000 25:0x80000039
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-04.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 7
+  Q upsert Q025_HidingBehindTheTruth | <flags> | -2147483591
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 6
+  rows Q025_HidingBehindTheTruth <cond>=6 <flags>=-2147483591 <state>=STARTED state=7
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 html="<html><body><a action=\"bypass -h npc_{wizard}_Quest Q024_InhabitantsOfTheForestOfTheDead\">[Inhabitants of the Forest of the Dead (Done)]</a><br><a action=\"bypass -h npc_{wizard}_Quest Q025_HidingBehindTheTruth\">[Hiding Behind the Truth (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{wizard}_Quest Q025_HidingBehindTheTruth
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# The bookshelves, one by one; the last holds the gem box.
+action shelf1
+action shelf1
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf1 item=0 page=default/31533.htm
+  S ActionFailed
+bypass npc_{shelf1}_Quest
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 3153x-05.htm
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-03.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | 31533 | 1
+  rows Q025_HidingBehindTheTruth 31533=1 <cond>=6 <flags>=-2147483591 <state>=STARTED state=7
+action shelf1
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf1 item=0 page=default/31533.htm
+  S ActionFailed
+bypass npc_{shelf1}_Quest
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-03.htm
+  S ActionFailed
+  S ActionFailed
+action shelf2
+action shelf2
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf2 item=0 page=default/31534.htm
+  S ActionFailed
+bypass npc_{shelf2}_Quest
+  S NpcHtmlMessage obj=shelf2 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 3153x-05.htm
+  S NpcHtmlMessage obj=shelf2 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-03.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | 31534 | 1
+  rows Q025_HidingBehindTheTruth 31533=1 31534=1 <cond>=6 <flags>=-2147483591 <state>=STARTED state=7
+action shelf3
+action shelf3
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf3 item=0 page=default/31535.htm
+  S ActionFailed
+bypass npc_{shelf3}_Quest
+  S NpcHtmlMessage obj=shelf3 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 3153x-05.htm
+  S PlaySound type=0 file=AmdSound.dd_horror_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=shelf3 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-05.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | 31535 | 1
+  Q delete-var Q025_HidingBehindTheTruth | 31533
+  Q delete-var Q025_HidingBehindTheTruth | 31534
+  Q delete-var Q025_HidingBehindTheTruth | 31535
+  Q upsert Q025_HidingBehindTheTruth | bookshelf | 31535
+  Q upsert Q025_HidingBehindTheTruth | state | 8
+  rows Q025_HidingBehindTheTruth <cond>=6 <flags>=-2147483591 <state>=STARTED bookshelf=31535 state=8
+
+# The box wakes Triol's pawn; while it stands, it is the player's own.
+bypass Quest Q025_HidingBehindTheTruth 3153x-07.htm
+  S QuestList 24:0x00000000 25:0x80000079
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=shelf3 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-07.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | <flags> | -2147483527
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 7
+  rows Q025_HidingBehindTheTruth <cond>=7 <flags>=-2147483527 <state>=STARTED bookshelf=31535 state=8
+action shelf3
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf3 item=0 page=default/31535.htm
+  S ActionFailed
+bypass npc_{shelf3}_Quest
+  S NpcHtmlMessage obj=shelf3 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 3153x-07.htm
+  S NpcHtmlMessage obj=shelf3 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-08.htm
+  S ActionFailed
+action shelf1
+action shelf1
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf1 item=0 page=default/31533.htm
+  S ActionFailed
+bypass npc_{shelf1}_Quest
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-03.htm
+  S ActionFailed
+  S ActionFailed
+relog

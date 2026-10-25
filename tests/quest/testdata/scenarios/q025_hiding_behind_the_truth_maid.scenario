@@ -1,0 +1,411 @@
+# Hiding Behind the Truth (Q025) from the totem doll Triol's pawn left to the maid's end: the
+# contract, the maid's fright, the coffin the tombstone raises far away and the dress in a
+# coffin, the maid's sorrow, the Mysterious Wizard's and Agripel's story. Expectations come from
+# the reference trace (Q025_HidingBehindTheTruth.onAdvEvent, onTalk, onFirstTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q025_hiding_behind_the_truth_maid.golden
+character Seeker 66
+quest Q025_HidingBehindTheTruth <cond>=8 <state>=STARTED bookshelf=31533 state=8
+hold 7063 1
+hold 7157 1
+hold 7158 1
+script quest.Q025_HidingBehindTheTruth
+item 874 905 936 7063 7066 7155 7157 7158
+page default/31348.htm
+page default/31522.htm
+page default/31531.htm
+page default/31532.htm
+page default/31533.htm
+page default/31536.htm
+page script/quest/Q025_HidingBehindTheTruth/
+npc shelf1 31533 Folk 10 0 0
+npc wizard 31522 Folk -10 0 0
+npc maid 31532 Folk 0 10 0
+npc tombstone 31531 Folk 0 -10 0
+npc coffin 31536 Folk 20 20 0
+npc agripel 31348 Folk -20 -20 0
+
+# The gem box gives the contract for the key.
+action shelf1
+action shelf1
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf1 item=0 page=default/31533.htm
+  S ActionFailed
+bypass npc_{shelf1}_Quest
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 3153x-07.htm
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-10.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 3153x-11.htm
+  S QuestList 25:0x800001ff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7157
+  S SystemMessage id=54 3:7066
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-11.htm
+  S ActionFailed
+  Q delete-var Q025_HidingBehindTheTruth | bookshelf
+  Q upsert Q025_HidingBehindTheTruth | state | 9
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 9
+  rows Q025_HidingBehindTheTruth <cond>=9 <state>=STARTED state=9
+  items 7157=0 7066=1
+action shelf1
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf1 item=0 page=default/31533.htm
+  S ActionFailed
+bypass npc_{shelf1}_Quest
+  S NpcHtmlMessage obj=shelf1 item=0 page=script/quest/Q025_HidingBehindTheTruth/3153x-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# The Mysterious Wizard sees the contract.
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S QuestList 25:0x800003ff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 10
+  rows Q025_HidingBehindTheTruth <cond>=10 <state>=STARTED state=9
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# The maid takes it, then is frightened.
+action maid
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-02.htm
+  S SystemMessage id=302 3:7066
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-02.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 10
+  rows Q025_HidingBehindTheTruth <cond>=10 <state>=STARTED state=10
+  items 7066=0
+bypass Quest Q025_HidingBehindTheTruth 31532-04.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-04.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-05.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-05.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-06.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-06.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-07.htm
+  S QuestList 25:0x800007ff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=SkillSound5.horror_01 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-07.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 11
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 11
+  rows Q025_HidingBehindTheTruth <cond>=11 <state>=STARTED state=11
+action maid
+  S ActionFailed
+  S PlaySound type=0 file=SkillSound5.horror_01 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-08.htm
+  S ActionFailed
+
+# The tombstone raises the coffin, one at a time.
+action tombstone
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31531.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q025_HidingBehindTheTruth/31531-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31531-02.htm
+  S QuestList 25:0x80000fff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q025_HidingBehindTheTruth/31531-02.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 12
+  rows Q025_HidingBehindTheTruth <cond>=12 <state>=STARTED state=11
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31531.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q025_HidingBehindTheTruth/31531-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# The dress in a coffin.
+action coffin
+action coffin
+  S ActionFailed
+  S NpcHtmlMessage obj=coffin item=0 page=default/31536.htm
+  S ActionFailed
+bypass npc_{coffin}_Quest
+  S QuestList 25:0x80001fff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7155
+  S ActionFailed
+  S NpcHtmlMessage obj=coffin item=0 page=script/quest/Q025_HidingBehindTheTruth/31536-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 12
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 13
+  rows Q025_HidingBehindTheTruth <cond>=13 <state>=STARTED state=12
+  items 7155=1
+
+# The maid's sorrow.
+action maid
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S QuestList 25:0x80003fff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7155
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | sorrow | 4
+  Q upsert Q025_HidingBehindTheTruth | state | 13
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 14
+  rows Q025_HidingBehindTheTruth <cond>=14 <state>=STARTED sorrow=4 state=13
+  items 7155=0
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S PlaySound type=0 file=ChrSound.FDElf_Cry bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-10.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-12.htm
+  S PlaySound type=0 file=ChrSound.FDElf_Cry bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-11.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | sorrow | 3
+  rows Q025_HidingBehindTheTruth <cond>=14 <state>=STARTED sorrow=3 state=13
+bypass Quest Q025_HidingBehindTheTruth 31532-12.htm
+  S PlaySound type=0 file=ChrSound.FDElf_Cry bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-11.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | sorrow | 2
+  rows Q025_HidingBehindTheTruth <cond>=14 <state>=STARTED sorrow=2 state=13
+bypass Quest Q025_HidingBehindTheTruth 31532-12.htm
+  S PlaySound type=0 file=ChrSound.FDElf_Cry bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-11.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | sorrow | 1
+  rows Q025_HidingBehindTheTruth <cond>=14 <state>=STARTED sorrow=1 state=13
+bypass Quest Q025_HidingBehindTheTruth 31532-12.htm
+  S PlaySound type=0 file=ChrSound.FDElf_Cry bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-11.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | sorrow | 0
+  rows Q025_HidingBehindTheTruth <cond>=14 <state>=STARTED sorrow=0 state=13
+bypass Quest Q025_HidingBehindTheTruth 31532-12.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-12.htm
+  S ActionFailed
+  Q delete-var Q025_HidingBehindTheTruth | sorrow
+  Q upsert Q025_HidingBehindTheTruth | state | 14
+  rows Q025_HidingBehindTheTruth <cond>=14 <state>=STARTED state=14
+bypass Quest Q025_HidingBehindTheTruth 31532-14.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-14.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-15.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-15.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-16.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-16.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-17.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-17.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 15
+  rows Q025_HidingBehindTheTruth <cond>=14 <state>=STARTED state=15
+bypass Quest Q025_HidingBehindTheTruth 31532-19.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-19.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-20.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-20.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-21.htm
+  S QuestList 25:0x80007fff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-21.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 16
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 15
+  rows Q025_HidingBehindTheTruth <cond>=15 <state>=STARTED state=16
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-21.htm
+  S ActionFailed
+  S ActionFailed
+
+# The Mysterious Wizard's story.
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-06a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31522-07.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-07.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31522-08.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-08.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31522-09.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-09.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31522-10.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-10.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 19
+  rows Q025_HidingBehindTheTruth <cond>=15 <state>=STARTED state=19
+bypass Quest Q025_HidingBehindTheTruth 31522-11.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-11.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31522-13.htm
+  S QuestList 25:0x8000ffff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-13.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 20
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 16
+  rows Q025_HidingBehindTheTruth <cond>=16 <state>=STARTED state=20
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-14.htm
+  S ActionFailed
+  S ActionFailed
+
+# Agripel takes the doll; his story sends the player back to the maid.
+action agripel
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-10.htm
+  S SystemMessage id=302 3:7158
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-10.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 21
+  rows Q025_HidingBehindTheTruth <cond>=16 <state>=STARTED state=21
+  items 7158=0
+bypass Quest Q025_HidingBehindTheTruth 31348-11.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-11.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-12.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-12.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-13.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-13.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 22
+  rows Q025_HidingBehindTheTruth <cond>=16 <state>=STARTED state=22
+bypass Quest Q025_HidingBehindTheTruth 31348-14.htm
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-14.htm
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31348-16.htm
+  S QuestList 25:0x8001ffff
+  S ExShowQuestMark quest=25
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-16.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | state | 23
+  Q upsert Q025_HidingBehindTheTruth | <cond> | 17
+  rows Q025_HidingBehindTheTruth <cond>=17 <state>=STARTED state=23
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q025_HidingBehindTheTruth/31348-18.htm
+  S ActionFailed
+  S ActionFailed
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q025_HidingBehindTheTruth/31522-15a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The maid's end.
+action maid
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-23.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q025_HidingBehindTheTruth 31532-25.htm
+  S SystemMessage id=302 3:7063
+  S SystemMessage id=54 3:874
+  S SystemMessage id=53 3:905 6:2
+  S SystemMessage id=45 1:1607062
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 25:0x00000000
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q025_HidingBehindTheTruth/31532-25.htm
+  S ActionFailed
+  Q upsert Q025_HidingBehindTheTruth | <state> | COMPLETED
+  Q delete-except-state Q025_HidingBehindTheTruth
+  rows Q025_HidingBehindTheTruth <state>=COMPLETED
+  items 874=1 905=2 936=0 7063=0
+  state Q025_HidingBehindTheTruth COMPLETED
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
