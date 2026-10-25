@@ -23,6 +23,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q020"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q021"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q022"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q024"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q025"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q027"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q028"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q029"
@@ -71,8 +73,8 @@ func quests001To050() script.Catalog {
 		"quest.Q020_BringUpWithLove":                  q020.New,
 		"quest.Q021_HiddenTruth":                      q021.New,
 		"quest.Q022_TragedyInVonHellmannForest":       q022.New,
-		"quest.Q024_InhabitantsOfTheForestOfTheDead":  nil,
-		"quest.Q025_HidingBehindTheTruth":             nil,
+		"quest.Q024_InhabitantsOfTheForestOfTheDead":  q024.New,
+		"quest.Q025_HidingBehindTheTruth":             q025.New,
 		"quest.Q027_ChestCaughtWithABaitOfWind":       q027.New,
 		"quest.Q028_ChestCaughtWithABaitOfIcyAir":     q028.New,
 		"quest.Q029_ChestCaughtWithABaitOfEarth":      q029.New,

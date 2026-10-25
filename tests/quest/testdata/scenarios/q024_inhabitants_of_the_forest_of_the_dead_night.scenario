@@ -1,0 +1,24 @@
+# Inhabitants of the Forest of the Dead (Q024) at cond 3: night Dorian, out of sight at first,
+# sees the player step up and breaks the silver cross (cond 4) with his line. Expectations come
+# from the reference trace (Q024_InhabitantsOfTheForestOfTheDead.onSeeCreature).
+trace internal/gameserver/script/testdata/oracle/scenarios/q024_inhabitants_of_the_forest_of_the_dead_night.golden
+character Mourner 65
+quest Q024_InhabitantsOfTheForestOfTheDead <cond>=3 <state>=STARTED state=4
+hold 7153 1
+script quest.Q024_InhabitantsOfTheForestOfTheDead
+item 7153 7154
+npc night 25332 Monster 3000 0 0
+
+tick
+approach night
+  S QuestList 24:0x8000000f
+  S ExShowQuestMark quest=24
+  S SystemMessage id=302 3:7153
+  S SystemMessage id=54 3:7154
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=night type=0 npc=1025332 text="That sign!"
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 4
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=4 <state>=STARTED state=4
+  items 7153=0 7154=1
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=4 <state>=STARTED state=4
+tick
