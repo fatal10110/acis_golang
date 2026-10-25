@@ -366,7 +366,9 @@ func isPlayerTeleport(line string) bool {
 // rendered packets of a task whose hook ran on another queue than the
 // player's, to the end of task, with the ActionFailed lines right before it
 // (its aborts'), and each cast with the player as caster with the teleport
-// that follows it (the skill's, after its aborts), in their order.
+// that follows it (the skill's, after its aborts), in their order. A cast's
+// other effect packets (a system message) stay in place, though the Go run
+// sends them after the cast (#4172).
 func deferPlayerActions(task []string) []string {
 	var rest, moved []string
 	for i := 0; i < len(task); i++ {
