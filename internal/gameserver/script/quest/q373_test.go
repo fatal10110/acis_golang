@@ -8,9 +8,10 @@ import (
 )
 
 // TestQ373MatchesReferenceFingerprints compares the package with the reference
-// class: literals, engine calls and hook shapes.
+// class: literals, engine calls and hook shapes. The port parses the event
+// number with a 32-bit size where the reference parses without a literal.
 func TestQ373MatchesReferenceFingerprints(t *testing.T) {
-	problems, err := scriptfp.Check("q373", []string{"quest.Q373_SupplierOfReagents"})
+	problems, err := scriptfp.Check("q373", []string{"quest.Q373_SupplierOfReagents"}, "number 32")
 	if err != nil {
 		t.Fatal(err)
 	}
