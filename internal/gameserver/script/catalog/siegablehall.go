@@ -35,7 +35,7 @@ func siegableHall() script.Catalog {
 		"script.ai.siegablehall.AzitWateringRecycleCan":                                 hall.RecycleCan,
 		"script.ai.siegablehall.AzitWateringTreasureBox":                                hall.TreasureBox,
 		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":                      hall.Nurka1,
-		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2":                      nil,
+		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2":                      hall.Nurka2,
 		"script.siegablehall.BanditStronghold":                                          banditstronghold.New,
 		"script.siegablehall.DevastatedCastle":                                          nil,
 		"script.siegablehall.FortressOfResistance":                                      nil,
