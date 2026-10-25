@@ -24,6 +24,7 @@ var chain = []struct {
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.individual.Monster.MonsterAI", monster.New},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossStandard", BossStandard},
+	{"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon", Gordon},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossAloneSummonPrivate", BossAloneSummonPrivate},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon", BossForTeleportDungeon},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1", BossType1},
@@ -162,14 +163,14 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	}
 	// RaidPrivateStandard, RaidBossType1 (25512 aside), RaidBossAloneSummonPrivate,
 	// RaidBossForTeleportDungeon (4 events on 6 ids, dying on 6), Sailren,
-	// DrChaosGiganticGolem, FreyaRoyalGuard, RaidBossType2.
-	if wantFolds, got := 95*6+38*4+6+(4*6+6)+7+7+6+34*6, len(want.folds); got != wantFolds {
+	// DrChaosGiganticGolem, FreyaRoyalGuard, RaidBossType2, Gordon (7 events on 29095).
+	if wantFolds, got := 95*6+38*4+6+(4*6+6)+7+7+6+34*6+7, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{25006, 25526, 29097, 25019, 25163, 29036, 29040, 25333, 25338, 29065, 25512, 29060, 25286, 29030} {
+	for _, id := range []int32{25006, 25526, 29097, 25019, 25163, 29036, 29040, 25333, 25338, 29065, 25512, 29060, 25286, 29030, 29095} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

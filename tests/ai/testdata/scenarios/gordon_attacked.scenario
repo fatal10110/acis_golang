@@ -1,0 +1,18 @@
+# Gordon (29095), level 1 like the character, is hit for 10 by the character, who carries
+# Akamanah (8689): it wants to attack the character at 10 per point of damage, 100, before
+# RaidBossStandard adds 10 / (1 + 7) * 20000. A servitor's hit, which ends Gordon's attacked
+# hook at its question, is in tests/ai/raid_gordon_test.go: a fixture NPC is level 1, which
+# leaves a summon line's level 60 siege golem over-levelled, so RaidBossStandard would want
+# nothing of it either.
+character Hunter 1
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1
+item 8689
+hold 8689 1
+npc gordon 29095 RaidBoss 100 0 0
+
+hit gordon 10
+  desires gordon move_route()=10 attack(player)=25100
