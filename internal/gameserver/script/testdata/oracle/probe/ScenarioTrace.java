@@ -4,7 +4,10 @@ import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -225,11 +228,23 @@ final class ScenarioTrace
 		return loaded;
 	}
 
-	static void run(File scenarios, File out, Map<NpcTemplate, Map<EventHandler, List<Quest>>> loaded) throws Exception
+	/**
+	 * Plays every scenario of {@code scenarios}, or, when {@code only} is not blank, the ones whose
+	 * file name matches one of its comma-separated globs. A trace depends on its scenario alone,
+	 * so playing a subset writes the same traces as a full run.
+	 */
+	static void run(File scenarios, String only, File out, Map<NpcTemplate, Map<EventHandler, List<Quest>>> loaded) throws Exception
 	{
-		final File[] files = scenarios.listFiles((d, n) -> n.endsWith(".scenario"));
+		final List<PathMatcher> globs = new ArrayList<>();
+		for (String g : only.split(","))
+			if (!g.isBlank())
+				globs.add(FileSystems.getDefault().getPathMatcher("glob:" + g.strip()));
+		final File[] files = scenarios.listFiles((d, n) -> n.endsWith(".scenario")
+			&& (globs.isEmpty() || globs.stream().anyMatch(m -> m.matches(Path.of(n)))));
 		if (files == null)
 			throw new IllegalStateException("no scenario directory " + scenarios);
+		if (files.length == 0 && !globs.isEmpty())
+			throw new IllegalStateException("no scenario matches PROBE_ONLY=" + only);
 		Arrays.sort(files);
 		// What loads from the database on first use is loaded before the first scenario, else its
 		// query (and the runners' ids) would be in whichever scenario came first: the events the
