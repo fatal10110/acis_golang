@@ -1,0 +1,18 @@
+# RaidBossType3AnaisAggressive (29096, Anais), level 1 like the level 1 character, standing
+# in its territory, is hit for 22: it stays where it is, and RaidBossStandard wants to attack
+# the character at 22 / (1 + 7) * 20000. Its see-creature hook, its return home out of its
+# territory (hit, idle, a cast ended, a hit on its party) and the 1 s timer that drops its
+# attack desires and hate are in tests/ai/raid_boss6_test.go: the format moves no NPC out of
+# its territory and places no template privates.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3AnaisAggressive
+npc anais 29096 RaidBoss 100 0 0
+
+hit anais 22
+  desires anais attack(player)=55000

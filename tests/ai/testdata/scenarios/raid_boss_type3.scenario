@@ -1,0 +1,27 @@
+# RaidBossType3 (25269), level 1 like the level 1 character, is hit for 22. RaidBossStandard
+# wants to attack the character at 22 / (1 + 7) * 20000, which makes it the boss's top desire
+# target; the hit, one on its party too, then reaches the party-attacked hook, which on a draw
+# of 0 in 15 wants its physical special (PHYSICAL_SPECIAL_B, 4728) on the character, its top
+# desire target, at 1000000. Seeing the character cast Ultimate Debuff (4694) on a monster
+# beside it, on another draw of 0 it wants the special again, adding 1000000. A hit on a
+# private, a spell by another than its top desire target and a hit with no top desire target
+# are in tests/ai/raid_boss6_test.go: the format places no template privates and sets no top
+# desire target. The character's combat draws are pinned so the debuff lands.
+character Hunter 1
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3
+npc boss 25269 RaidBoss 250 0 0 skill PHYSICAL_SPECIAL_B 4728 8
+npc wolf 20120 Monster 150 0 0
+
+hit boss 22
+  desires boss attack(player)=55000 cast(player,4728,move)=1000000
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires boss attack(player)=55000 cast(player,4728,move)=2000000

@@ -26,8 +26,12 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1Aggressive.FreyaRoyalGuard",
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty",
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType2",
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.IceFairySirra",
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3",
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3AnaisAggressive",
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4",
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard",
-	}, "number 1010582", "number 1010583", "call WorldObject.getObjectId", "call Quest.getPartyMembers")
+	}, "number 1010582", "number 1010583", "number 1010643", "number 1121002", "call WorldObject.getObjectId", "call Quest.getPartyMembers")
 	if err != nil {
 		t.Fatal(err)
 	}
