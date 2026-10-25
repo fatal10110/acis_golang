@@ -1,0 +1,35 @@
+# Test of the Searcher (Q225), started by a level 39 Rogue: Luther shows the rogue's page and
+# starts the test with the level 39 set's Dimensional Diamonds. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q225_test_of_the_searcher_rogue.golden
+character Rogue 39
+class 7
+script quest.Q225_TestOfTheSearcher
+item 2784 2785 2786 2787 2788 2789 2790 2791 2792 2793 2794 2795 2796 2797 2798 2799 2800 2801 2802 2803 2804 2805 2806 2807 2808 2809 7562
+page trainer/30690.htm
+page script/quest/Q225_TestOfTheSearcher/
+npc luther 30690 Trainer 10 0 0
+
+action luther
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+bypass npc_{luther}_Quest
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30690-05.htm
+  S QuestList 225:0x80000001
+  S ExShowQuestMark quest=225
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2784
+  S SystemMessage id=53 3:7562 6:96
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-05a.htm
+  S ActionFailed
+  Q upsert Q225_TestOfTheSearcher | <state> | STARTED
+  Q upsert Q225_TestOfTheSearcher | <cond> | 1
+  M set secondClassChange39 | true
+  items 2784=1
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=1
