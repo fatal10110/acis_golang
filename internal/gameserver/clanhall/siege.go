@@ -69,7 +69,8 @@ type SiegeScript struct {
 	// Prepare, Start and End, when set, run in place of the base steps:
 	// the registrations' close (after delay, the siege's start is due),
 	// the start and the end. The timers, Instant and End run them, one
-	// step at a time; base runs the base steps as their part.
+	// step at a time, End only while the siege is fought; base runs the
+	// base steps as their part.
 	Prepare func(base SiegeBase, delay time.Duration)
 	Start   func(base SiegeBase)
 	End     func(base SiegeBase)
