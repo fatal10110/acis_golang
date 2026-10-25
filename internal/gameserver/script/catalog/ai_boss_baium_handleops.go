@@ -7,5 +7,9 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiBossBaiumHandleOps holds, per script of ai_boss_baium.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiBossBaiumHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.boss.baium.Baium": {
+			"OnTimer": {"NPC.Earthquake"},
+		},
+	}
 }
