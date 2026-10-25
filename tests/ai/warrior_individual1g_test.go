@@ -474,3 +474,104 @@ func TestWarriorGrowthStep3GrowsByItsFeedersOccupation(t *testing.T) {
 	w.srv.Advance(t, time.Second)
 	w.ind1gGrown(t, n, farmTwoID, ind1gFood1)
 }
+
+// TestGrowthBeastsAnswerTheirClan ports the clan-attacked hooks of
+// FarmGrowthStep, WarriorGrowthStep2 and WarriorGrowthStep4Aggressive,
+// every draw 0. A clan member hit by the character finds the beast 100
+// away. Past its first 7 s and fighting the character as its top desire
+// target, a calf wants its blast on itself and its physical special on the
+// character, weight 1000000 each; the grown beasts want the physical
+// special only. Fresh, or fighting another, none wants anything.
+func TestGrowthBeastsAnswerTheirClan(t *testing.T) {
+	t.Parallel()
+	for _, row := range []struct {
+		name    string
+		id      int32
+		settled bool
+		decoy   bool
+		blast   bool
+		strike  bool
+	}{
+		{"calf", farmID, true, false, true, true},
+		{"calf fresh", farmID, false, false, false, false},
+		{"calf fighting another", farmID, true, true, false, false},
+		{"grown once", growth2ID, true, false, false, true},
+		{"grown once fighting another", growth2ID, true, true, false, false},
+		{"fully grown", growth4ID, true, false, false, true},
+		{"fully grown fresh", growth4ID, false, false, false, false},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			w := bootIndividual1g(t, ind1fTemplate(row.id))
+			me := w.player.ObjectID()
+			n := w.spawn(t, row.id, 100, 0)
+			v := w.spawn(t, unboundID, 0, 100)
+			if row.settled {
+				w.ticks(t, 8)
+				if n.LifeTime() <= 7 {
+					t.Fatalf("setup: life time %d, want past 7", n.LifeTime())
+				}
+			}
+			if row.decoy {
+				w.setTop(t, n, script.NPCOf(w.spawn(t, unboundID, 100, 200)))
+			} else {
+				w.setTop(t, n, script.PlayerOf(w.player))
+			}
+			w.hit(t, v, 10)
+			want := map[modelskill.ID]ind1Cast{}
+			if row.blast {
+				want[ind1cBlastID] = ind1Cast{n.ObjectID(), 1000000}
+			}
+			if row.strike {
+				want[ind1cSpecialID] = ind1Cast{me, 1000000}
+			}
+			w.wantCasts(t, "after the hit on its clan", n, want)
+		})
+	}
+}
+
+// TestWarriorGrowthStep4StandsDownOutOfAFight ports
+// WarriorGrowthStep4Aggressive's timer out of a fight. Fed by an NPC far
+// from the character, it starts its 5 s timer (i_ai1 1) and fights no one;
+// the tick clears i_ai1 and i_ai2 and wants no DD magic.
+func TestWarriorGrowthStep4StandsDownOutOfAFight(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual1g(t, ind1fTemplate(growth4ID))
+	n := w.spawn(t, growth4ID, 3000, 0)
+	other := w.spawn(t, unboundID, 3000, 100)
+	w.ind1gFeed(t, n, other, ind1gFood1)
+	if got := ind1Slot(n, script.SlotIntAI1); got != 1 {
+		t.Fatalf("i_ai1 after the hit = %d, want 1", got)
+	}
+	w.onQueue(t, n, func() { script.NPCOf(n).SetInt(script.SlotIntAI2, 1) })
+	w.srv.Advance(t, 5*time.Second)
+	if i := n.AI().CurrentIntention(); i == actorai.IntentionAttack || i == actorai.IntentionCast {
+		t.Fatalf("setup: intention = %v, want out of a fight", i)
+	}
+	if a1, a2 := ind1Slot(n, script.SlotIntAI1), ind1Slot(n, script.SlotIntAI2); a1 != 0 || a2 != 0 {
+		t.Fatalf("i_ai1, i_ai2 after the tick = %d, %d, want 0, 0", a1, a2)
+	}
+	ind5bNoCast(t, "the tick out of a fight", n, ind1eDDID)
+}
+
+// TestWarriorGrowthStep3AttacksPlayablesOnSight ports
+// WarriorGrowthStep3Aggressive's see-creature hook: settled with no feeder
+// and no self buff, it turns on the character it sees 300 away, weight 200, and not on a
+// monster beside it.
+func TestWarriorGrowthStep3AttacksPlayablesOnSight(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual1g(t, ind1fTemplate(growth3ID))
+	w.draws.set(50) // no self buff as it appears
+	n := w.ind1fSettledAtWander(t, growth3ID)
+	w.draws.set(0)
+	other := w.spawn(t, unboundID, 1500, 100)
+	w.ticks(t, 1)
+	if got := n.AggroHate(other); got != 0 {
+		t.Fatalf("hate of the monster it sees = %v, want none", got)
+	}
+	w.moveCharacter(t, n, 300, 0)
+	w.ticks(t, 1)
+	if got := n.AggroHate(w.player); got != 200 {
+		t.Fatalf("hate of the character it sees = %v, want 200", got)
+	}
+}
