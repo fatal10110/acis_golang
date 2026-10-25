@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q022"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -51,7 +54,7 @@ func q022World(t *testing.T, at [3]int, cond int, pages map[string][]string, hol
 		}
 	},
 		x1Items([]int32{q022Skull, q022GreenJewel, q022RedJewel}),
-		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{gameservertest.FolkTemplate("Folk", q022Priest), proofMonster(q022Soul)})),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{gameservertest.FolkTemplate("Folk", q022Priest), proofMonster(q022Soul), deathServitorTemplate()})),
 		gameservertest.WithNpcSpawns(nil),
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{q022Tifaren: script.KindFolk, q022Priest: script.KindFolk, q022Well: script.KindFolk, q022Soul: script.KindHostile},
@@ -139,10 +142,30 @@ func soulWorld(t *testing.T) (*dialogWorld, *npc.Hostile) {
 	return w, hostileNPC(t, w.srv, soul)
 }
 
+// q022SummonServitor summons the player's servitor, through the quest's
+// script since the world registers no other, and returns it once it is in
+// the world.
+func q022SummonServitor(t *testing.T, w *dialogWorld) *summon.Actor {
+	t.Helper()
+	w.srv.RunQuest(t, w.player, q022Name, func(_ *script.Quests, c *player.Character, _ *script.Script) {
+		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: deathServitorID, SummonTotalLifeTime: 1_200_000})
+	})
+	var servitor *summon.Actor
+	w.srv.AdvanceUntil(t, "the servitor is in the world", func() bool {
+		obj, ok := w.srv.State.Summon(w.player)
+		if ok {
+			servitor, ok = obj.(*summon.Actor)
+		}
+		return ok
+	})
+	w.srv.ReadQueued(t, w.srv.Client)
+	return servitor
+}
+
 // TestQ022SoulOfTheWellHeldTwentySeconds: the player's hit on the soul of
 // the well at cond 10 starts twenty seconds, after which the green jewel
-// turns red (cond 11). A soul killed before then stops them, and frees the
-// well, which wakes another.
+// turns red (cond 11). A servitor's hit starts nothing. A soul killed before
+// then stops them, and frees the well, which wakes another.
 func TestQ022SoulOfTheWellHeldTwentySeconds(t *testing.T) {
 	t.Parallel()
 	t.Run("held", func(t *testing.T) {
@@ -160,6 +183,19 @@ func TestQ022SoulOfTheWellHeldTwentySeconds(t *testing.T) {
 		}
 		if g, r := w.srv.PlayerItemCount(t, w.player, q022GreenJewel), w.srv.PlayerItemCount(t, w.player, q022RedJewel); g != 0 || r != 1 {
 			t.Fatalf("green %d red %d after twenty seconds, want 0 and 1", g, r)
+		}
+	})
+	t.Run("servitor", func(t *testing.T) {
+		t.Parallel()
+		w, soul := soulWorld(t)
+		servitor := q022SummonServitor(t, w)
+		onPlayerQueue(t, w.srv, w.player, func() { soul.TakeDamage(10, servitor) })
+		w.advance(t, 20*time.Second)
+		if rows := questRows(t, w.srv, w.player, q022Name); rows["<cond>"] != "10" {
+			t.Fatalf("rows %v twenty seconds after the servitor's hit, want cond 10", rows)
+		}
+		if g := w.srv.PlayerItemCount(t, w.player, q022GreenJewel); g != 1 {
+			t.Fatalf("green %d after the servitor's hit, want 1", g)
 		}
 	})
 	t.Run("killed", func(t *testing.T) {
