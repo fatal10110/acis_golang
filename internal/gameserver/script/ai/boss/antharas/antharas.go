@@ -32,15 +32,6 @@ func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
 		[3]script.CreatureSlot{script.SlotCreature2, script.SlotCreature3, script.SlotCreature4}
 }
 
-// The places Antharas uses: where its move-in starts and ends, where its
-// reset sends the players of its lair, and where it waits out of the lair.
-var (
-	lairEntry = script.Loc{X: 185452, Y: 114835, Z: -8221}
-	lairStage = script.Loc{X: 181911, Y: 114835, Z: -7678}
-	exitPoint = script.Loc{X: 80464, Y: 152294, Z: -3534}
-	hidePoint = script.Loc{X: -105200, Y: -253104, Z: -15264}
-)
-
 // memoKey is the global memo key under which Antharas leaves its object id
 // while it lives: its GM_ID spawn parameter.
 func memoKey(n *script.NPC) string { return strconv.Itoa(int(n.IntParam("GM_ID"))) }
@@ -48,8 +39,8 @@ func memoKey(n *script.NPC) string { return strconv.Itoa(int(n.IntParam("GM_ID")
 // moveIn teleports Antharas to its lair's entry and sends it walking to
 // its stage with its music.
 func moveIn(n *script.NPC) {
-	n.TeleportTo(lairEntry)
-	n.AddMoveToDesire(lairStage, 100000)
+	n.TeleportTo(script.Loc{X: 185452, Y: 114835, Z: -8221})
+	n.AddMoveToDesire(script.Loc{X: 181911, Y: 114835, Z: -7678}, 100000)
 	n.PlayMusic("BS02_A")
 }
 
@@ -176,8 +167,8 @@ func Antharas() script.Script {
 				if s.ElapsedTicks(n.Int(slotLastHit)) > 15*60 {
 					n.SetDBValue(0)
 					n.RemoveAllDesire()
-					s.TeleportPlayersInTerritory(n, exitPoint, 100)
-					n.TeleportTo(hidePoint)
+					s.TeleportPlayersInTerritory(n, script.Loc{X: 80464, Y: 152294, Z: -3534}, 100)
+					n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
 
 					n.SetInt(script.SlotIntAI2, 0)
 					n.SetInt(script.SlotIntAI3, 0)
@@ -223,7 +214,7 @@ func Antharas() script.Script {
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			n, attacker, damage := e.NPC, e.Attacker, e.Damage
 			if n.DBValue() == 0 && !n.Dead() {
-				s.TeleportPlayersInTerritory(n, exitPoint, 100)
+				s.TeleportPlayersInTerritory(n, script.Loc{X: 80464, Y: 152294, Z: -3534}, 100)
 			}
 
 			n.SetInt(slotLastHit, s.CurrentTick())
