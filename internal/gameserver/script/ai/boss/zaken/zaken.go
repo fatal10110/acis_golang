@@ -178,10 +178,9 @@ func Zaken() script.Script {
 				script.TeleportTo(c, randomRoomPoint(s))
 				n.StopHate(c)
 			case skill.Ref{ID: 4217, Level: 1}:
-				// The reference reads where each creature it sent landed,
-				// its teleport done inside the call; here a creature lands
-				// once this task is done, so a creature sent by this cast
-				// is measured at the point drawn for it.
+				// Each creature this cast sent is measured where it lands:
+				// at the point drawn for it, as its teleport only runs
+				// once this task is done.
 				landing := randomRoomPoint(s)
 				script.TeleportTo(c, landing)
 				n.StopHate(c)
@@ -224,10 +223,9 @@ func Zaken() script.Script {
 		OnPartyDied: func(s *script.Script, e script.PartyDied) {
 			caller, called := e.Caller, e.Called
 			if !script.Same(called, caller) {
-				// The way the private would face at Zaken's place. The
-				// reference moves the private there, its corpse long
-				// decayed, just before the respawn, which places it at its
-				// own point all the same: the move is never seen.
+				// The way the private would face at Zaken's place; its
+				// respawn places it at its own point, facing its own way,
+				// so the heading is drawn and never used.
 				s.Rnd(360)
 
 				s.Spawner().ScheduleRespawn(caller, time.Duration(30+s.Rnd(60))*1000*time.Millisecond)
