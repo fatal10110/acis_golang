@@ -155,14 +155,15 @@ func bootFestival(t *testing.T, seats []seat, blueStones int32, minPlayers int) 
 }
 
 // festivalSetup is a festival fixture: its seats, the blue stones its
-// first seat holds, the party minimum, the pages (festivalPages when nil)
-// and the scores seeded over cycle 1's blank ones.
+// first seat holds, the party minimum, the pages (festivalPages when nil),
+// the scores seeded over cycle 1's blank ones and any further options.
 type festivalSetup struct {
 	seats      []seat
 	blueStones int32
 	minPlayers int
 	pages      map[string]string
 	scores     []festival.Score
+	extra      []gameservertest.Option
 }
 
 func bootFestivalWith(t *testing.T, s festivalSetup) *festivalRun {
@@ -181,7 +182,7 @@ func bootFestivalWith(t *testing.T, s festivalSetup) *festivalRun {
 		pages = festivalPages()
 	}
 	seats := s.seats
-	srv := gameservertest.Boot(t, []gameservertest.Option{
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter(seats[0].name, seats[0].level, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithFestivalConfig(cfg),
@@ -194,7 +195,7 @@ func bootFestivalWith(t *testing.T, s festivalSetup) *festivalRun {
 		gameservertest.WithZones(zones),
 		gameservertest.WithReuseDelays(3*time.Second, 0),
 		gameservertest.WithFestivalSeed(festivalScores(t, s.scores)),
-	}...)
+	}, s.extra...)...)
 	leader := srv.SoleObjectID(t)
 	if s.blueStones > 0 {
 		srv.GiveItem(t, leader, blueStoneID, s.blueStones)
