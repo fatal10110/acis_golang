@@ -28,6 +28,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q124"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q125"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q126"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q127"
 )
 
 // quests101To150 is the catalog of quests 101 to 150 (#180).
@@ -59,6 +60,6 @@ func quests101To150() script.Catalog {
 		"quest.Q124_MeetingTheElroki":           q124.New,
 		"quest.Q125_TheNameOfEvil_1":            q125.New,
 		"quest.Q126_TheNameOfEvil_2":            q126.New,
-		"quest.Q127_KamaelAWindowToTheFuture":   nil,
+		"quest.Q127_KamaelAWindowToTheFuture":   q127.New,
 	}
 }
