@@ -1,0 +1,60 @@
+# To Lead and Be Led (Q118), the finish: a level 19 character whose sponsor paid for the robe set
+# (cond 6) is sent after the King of the Araneid (cond 7), and with eight legs gets the helm and the
+# robe set; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q118_to_lead_and_be_led_finish.golden
+character Pupil 19
+quest Q118_ToLeadAndBeLed <cond>=6 <state>=STARTED state=3 stateEx=3
+hold 8063 8
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S QuestList 118:0x8000007f
+  S ExShowQuestMark quest=118
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-15.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q118_ToLeadAndBeLed | <cond> | 7
+  Q upsert Q118_ToLeadAndBeLed | state | 4
+  rows Q118_ToLeadAndBeLed <cond>=7 <state>=STARTED state=4 stateEx=3
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S SystemMessage id=301 3:8063 6:8
+  S SystemMessage id=54 3:7850
+  S SystemMessage id=54 3:7857
+  S SystemMessage id=54 3:7858
+  S SystemMessage id=54 3:7859
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 118:0x00000000
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-17.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q118_ToLeadAndBeLed | <state> | COMPLETED
+  Q delete-except-state Q118_ToLeadAndBeLed
+  items 8063=0 7850=1 7857=1 7858=1 7859=1 7851=0
+  rows Q118_ToLeadAndBeLed <state>=COMPLETED
+
+# Relog.
+relog
+  rows Q118_ToLeadAndBeLed <state>=COMPLETED
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

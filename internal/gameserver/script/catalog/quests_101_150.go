@@ -16,8 +16,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q112"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q113"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q114"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q115"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q116"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q117"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q118"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q119"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q120"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q121"
@@ -44,10 +46,10 @@ func quests101To150() script.Catalog {
 		"quest.Q112_WalkOfFate":                 q112.New,
 		"quest.Q113_StatusOfTheBeaconTower":     q113.New,
 		"quest.Q114_ResurrectionOfAnOldManager": q114.New,
-		"quest.Q115_TheOtherSideOfTruth":        nil,
+		"quest.Q115_TheOtherSideOfTruth":        q115.New,
 		"quest.Q116_BeyondTheHillsOfWinter":     q116.New,
 		"quest.Q117_TheOceanOfDistantStars":     q117.New,
-		"quest.Q118_ToLeadAndBeLed":             nil,
+		"quest.Q118_ToLeadAndBeLed":             q118.New,
 		"quest.Q119_LastImperialPrince":         q119.New,
 		"quest.Q120_PavelsResearch":             q120.New,
 		"quest.Q121_PavelTheGiant":              q121.New,
