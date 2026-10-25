@@ -492,3 +492,67 @@ func TestHereticPriestWalksHomeFromOutside(t *testing.T) {
 		})
 	}
 }
+
+// TestHereticPriestHeldDropsAFarTopForItsClanAttacker ports the third
+// branch of the priest's clan-attacked hook, every draw 0: a freshly
+// spawned priest holding its ground (Hold 1, life time 7 or less) whose
+// top desire target is another creature farther than 500 drops its attack
+// desire on that creature and wants its second physical special, held in
+// place, on its clan member's attacker 300 away. With that creature at
+// exactly 500 it keeps its desire and casts nothing. Either way it wants
+// to attack the attacker from where it stands, weight 100.
+func TestHereticPriestHeldDropsAFarTopForItsClanAttacker(t *testing.T) {
+	t.Parallel()
+	for _, row := range []struct {
+		dx   int
+		drop bool
+	}{{700, true}, {500, false}} {
+		t.Run(fmt.Sprintf("top %d away", row.dx), func(t *testing.T) {
+			t.Parallel()
+			w := bootHereticPriest(t, raidBoot{}, hpTemplate(npc.AIParams{"Hold": "1"}, false), warriorTemplate(plwListenerID, nil))
+			caller := w.spawn(t, hpPriestID, 1500, 0)
+			called := w.spawn(t, hpPriestID, 1500, 300)
+			far := w.spawn(t, plwListenerID, 1500+row.dx, 300)
+			me := w.player.ObjectID()
+			if got := script.NPCOf(called).LifeTime(); got > 7 {
+				t.Fatalf("setup: called priest life time = %d, want 7 or less", got)
+			}
+			w.onQueue(t, called, func() {
+				n := script.NPCOf(called)
+				called.AI().Desires().Clear()
+				n.AddAttackDesireHold(script.NPCOf(far), 50)
+				n.SetTopDesireTarget(script.NPCOf(far))
+			})
+			w.moveNear(t, w.player, called, 300)
+
+			w.hit(t, caller, 10)
+			want := map[modelskill.ID]ind1Cast{}
+			if row.drop {
+				want[hpSpecial2ID] = ind1Cast{me, 1000000}
+			}
+			w.wantCasts(t, "after the hit on its clan member", called, want)
+			hpWantHeld(t, "after the hit on its clan member", called, true)
+			var onFar, onMe *actorai.Desire
+			for _, d := range called.AI().Desires().Snapshot() {
+				if d.Kind != actorai.IntentionAttack || d.FinalTarget == nil {
+					continue
+				}
+				switch d.FinalTarget.ObjectID() {
+				case far.ObjectID():
+					onFar = &d
+				case me:
+					onMe = &d
+				}
+			}
+			if row.drop && onFar != nil {
+				t.Errorf("attack desire on the far top = %+v, want it dropped", *onFar)
+			}
+			if !row.drop && (onFar == nil || onFar.Weight != 50) {
+				t.Errorf("attack desire on the top at 500 = %+v, want it kept at 50", onFar)
+			}
+			if onMe == nil || onMe.Weight != 100 || onMe.MoveToTarget {
+				t.Errorf("attack desire on the attacker = %+v, want weight 100 held in place", onMe)
+			}
+		})
+	}
+}
