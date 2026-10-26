@@ -93,6 +93,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q632"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q633"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q634"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q637"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q638"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q639"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q640"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q641"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q642"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q643"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q644"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
 
@@ -221,14 +229,14 @@ func quests301Up() script.Catalog {
 		"quest.Q633_InTheForgottenVillage":             q633.New,
 		"quest.Q634_InSearchOfFragmentsOfDimension":    q634.New,
 		"quest.Q635_InTheDimensionalRift":              nil,
-		"quest.Q637_ThroughTheGateOnceMore":            nil,
-		"quest.Q638_SeekersOfTheHolyGrail":             nil,
-		"quest.Q639_GuardiansOfTheHolyGrail":           nil,
-		"quest.Q640_TheZeroHour":                       nil,
-		"quest.Q641_AttackSailren":                     nil,
-		"quest.Q642_APowerfulPrimevalCreature":         nil,
-		"quest.Q643_RiseAndFallOfTheElrokiTribe":       nil,
-		"quest.Q644_GraveRobberAnnihilation":           nil,
+		"quest.Q637_ThroughTheGateOnceMore":            q637.New,
+		"quest.Q638_SeekersOfTheHolyGrail":             q638.New,
+		"quest.Q639_GuardiansOfTheHolyGrail":           q639.New,
+		"quest.Q640_TheZeroHour":                       q640.New,
+		"quest.Q641_AttackSailren":                     q641.New,
+		"quest.Q642_APowerfulPrimevalCreature":         q642.New,
+		"quest.Q643_RiseAndFallOfTheElrokiTribe":       q643.New,
+		"quest.Q644_GraveRobberAnnihilation":           q644.New,
 		"quest.Q645_GhostsOfBatur":                     nil,
 		"quest.Q647_InfluxOfMachines":                  nil,
 		"quest.Q648_AnIceMerchantsDream":               nil,

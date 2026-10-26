@@ -1,0 +1,20 @@
+# Attack Sailren! (Q641): a level 77 character that did not do The Name of Evil, Part 2 is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q641_attack_sailren_not_ready.golden
+character Hero 77
+script quest.Q126_TheNameOfEvil_2
+script quest.Q641_AttackSailren
+item 8782 8784
+page default/32109.htm
+page script/quest/Q641_AttackSailren/
+npc statue 32109 Folk 10 0 0
+
+action statue
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q641_AttackSailren/32109-2.htm
+  S ActionFailed
+  S ActionFailed

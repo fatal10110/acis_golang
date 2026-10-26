@@ -1,0 +1,45 @@
+# Rise and Fall of the Elroki Tribe (Q643): a level 75 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q643_rise_and_fall_of_the_elroki_tribe_accept.golden
+character Hero 75
+script quest.Q643_RiseAndFallOfTheElrokiTribe
+item 8776 57 8712 8713 8714 8715 8716 8717 8718 8719 8720 8721 8722
+page merchant/32106.htm
+page default/32117.htm
+page script/quest/Q643_RiseAndFallOfTheElrokiTribe/
+npc singsing 32106 Merchant 10 0 0
+npc karakawei 32117 Folk 20 0 0
+
+action singsing
+action singsing
+  S ActionFailed
+  S NpcHtmlMessage obj=singsing item=0 page=merchant/32106.htm
+  S ActionFailed
+bypass npc_{singsing}_Quest
+  S NpcHtmlMessage obj=singsing item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32106-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q643_RiseAndFallOfTheElrokiTribe 32106-02.htm
+  S NpcHtmlMessage obj=singsing item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32106-02.htm
+  S ActionFailed
+bypass Quest Q643_RiseAndFallOfTheElrokiTribe 32106-03.htm
+  S QuestList 643:0x80000001
+  S ExShowQuestMark quest=643
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=singsing item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32106-03.htm
+  S ActionFailed
+  Q upsert Q643_RiseAndFallOfTheElrokiTribe | <state> | STARTED
+  Q upsert Q643_RiseAndFallOfTheElrokiTribe | <cond> | 1
+  rows Q643_RiseAndFallOfTheElrokiTribe <cond>=1 <state>=STARTED
+  state Q643_RiseAndFallOfTheElrokiTribe STARTED
+action singsing
+  S ActionFailed
+  S NpcHtmlMessage obj=singsing item=0 page=merchant/32106.htm
+  S ActionFailed
+bypass npc_{singsing}_Quest
+  S NpcHtmlMessage obj=singsing item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32106-05.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q643_RiseAndFallOfTheElrokiTribe <cond>=1 <state>=STARTED
+  state Q643_RiseAndFallOfTheElrokiTribe STARTED

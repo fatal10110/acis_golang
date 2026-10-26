@@ -1,0 +1,30 @@
+# The Zero Hour (Q640): twelve fangs pay a scroll.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q640_the_zero_hour_reward_first.golden
+character Hero 66
+quest Q640_TheZeroHour <cond>=1 <state>=STARTED
+hold 8085 12
+script quest.Q640_TheZeroHour
+item 8085 4042 4043 4044 1887 1888 1889 5550 1890 1893
+page default/31554.htm
+page script/quest/Q640_TheZeroHour/
+npc kahman 31554 Folk 10 0 0
+
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=default/31554.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q640_TheZeroHour/31554-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q640_TheZeroHour 31554-05.htm
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q640_TheZeroHour/31554-05.htm
+  S ActionFailed
+bypass Quest Q640_TheZeroHour 0
+  S SystemMessage id=301 3:8085 6:12
+  S SystemMessage id=54 3:4042
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q640_TheZeroHour/31554-09.htm
+  S ActionFailed
+  items 8085=0 4042=1

@@ -1,0 +1,30 @@
+# Seekers of the Holy Grail (Q638): the character ends the quest and keeps its totems.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q638_seekers_of_the_holy_grail_quit.golden
+character Hero 73
+quest Q638_SeekersOfTheHolyGrail <cond>=1 <state>=STARTED
+hold 8068 30
+script quest.Q638_SeekersOfTheHolyGrail
+item 8068 959 960 57
+page villagemaster/31328.htm
+page script/quest/Q638_SeekersOfTheHolyGrail/
+npc innocentin 31328 VillageMasterPriest 10 0 0
+
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q638_SeekersOfTheHolyGrail/31328-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q638_SeekersOfTheHolyGrail 31328-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=301 3:8068 6:30
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q638_SeekersOfTheHolyGrail/31328-06.htm
+  S ActionFailed
+  Q delete-quest Q638_SeekersOfTheHolyGrail
+  rows Q638_SeekersOfTheHolyGrail -
+  state Q638_SeekersOfTheHolyGrail -
