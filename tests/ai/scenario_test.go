@@ -241,6 +241,7 @@ var scenarioScripts = script.Catalog{
 
 	// The grand bosses.
 	"script.ai.boss.antharas.HeartOfWarding":          antharas.HeartOfWarding,
+	"script.ai.boss.benom.Benom":                      benom.Benom,
 	"script.ai.boss.benom.DungeonTeleporter":          benom.DungeonTeleporter,
 	"script.ai.boss.core.Core":                        core.Core,
 	"script.ai.boss.drchaos.DoctorChaosNpc":           drchaos.DoctorChaosNpc,

@@ -1,0 +1,19 @@
+# Benom (29054), a level 1 raid boss standing 400 from the level 1 character, with no siege event
+# since it appeared, hit for 22 (a twentieth of its 440 HP) twice. Each hit adds
+# 22 / 440 / 0.05 * 2000 = 2000 to its attack desire on the character. Outside a siege it draws no
+# cancel chance: from over 300 away it draws its magic chance (1 in 250), then its physical special
+# chance (1 in 250). The first hit draws 0 and 0: it wants its magic (4994) and its physical special
+# (4993) on the character; the second draws 1 and 1, adding neither. Expectations are derived from
+# the reference source (Benom.java 104-123).
+character Hunter 1
+random 0 0 1 1
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.boss.benom.Benom
+npc benom 29054 RaidBoss 400 0 0 skill PHYSICAL_SPECIAL 4993 1 skill DD_MAGIC 4994 1
+
+hit benom 22
+  desires benom attack(player)=2000 cast(player,4994,move)=1000000 cast(player,4993,move)=1000000
+hit benom 22
+  desires benom attack(player)=4000 cast(player,4994,move)=1000000 cast(player,4993,move)=1000000
