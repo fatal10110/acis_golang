@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q330"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q331"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q333"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q334"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q336"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q338"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q341"
@@ -134,7 +135,7 @@ func quests301Up() script.Catalog {
 		"quest.Q330_AdeptOfTaste":                      q330.New,
 		"quest.Q331_ArrowOfVengeance":                  q331.New,
 		"quest.Q333_HuntOfTheBlackLion":                q333.New,
-		"quest.Q334_TheWishingPotion":                  nil,
+		"quest.Q334_TheWishingPotion":                  q334.New,
 		"quest.Q335_SongOfTheHunter":                   nil,
 		"quest.Q336_CoinsOfMagic":                      q336.New,
 		"quest.Q337_AudienceWithTheLandDragon":         nil,

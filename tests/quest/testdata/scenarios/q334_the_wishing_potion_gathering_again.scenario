@@ -1,0 +1,80 @@
+# The Wishing Potion (Q334), the road again at cond 5: a started character with Matild's orb and
+# no potion asks Matild for the recipes again (page 12, then 30738-15a gives page 15 and both
+# recipes), holds seven ingredients, and kills the glass jaguar: the first drop roll misses
+# (999999 of 1000000 against a chance of 100000), the second gives the eighth ingredient, which
+# completes them and moves the quest back to cond 4 (Matild now shows page 09). Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q334_the_wishing_potion_gathering_again.golden
+character Seeker 30
+quest Q334_TheWishingPotion <state>=STARTED <cond>=5
+hold 3682 1
+hold 3684 1
+hold 3685 1
+hold 3687 1
+hold 3688 1
+hold 3689 1
+hold 3690 1
+hold 3691 1
+random 999999 0
+script quest.Q334_TheWishingPotion
+item 3680 3681 3682 3684 3685 3686 3687 3688 3689 3690 3691
+page default/30738.htm
+page script/quest/Q334_TheWishingPotion/
+npc matild 30738 Folk 10 0 0
+npc jaguar 20250 Monster 0 40 0
+
+# Matild knows the orb, and the recipes can be had again.
+action matild
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-15a.htm
+  S SystemMessage id=54 3:3680
+  S SystemMessage id=54 3:3681
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-15.htm
+  S ActionFailed
+  items 3680=1 3681=1
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# The jaguar: a miss, then the eye.
+kill jaguar
+  S SystemMessage id=95 1:0 1:0
+  items 3686=0
+kill jaguar
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3686
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 334:0x8000000f
+  S ExShowQuestMark quest=334
+  Q upsert Q334_TheWishingPotion | <cond> | 4
+  items 3686=1
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-09.htm
+  S ActionFailed
+  S ActionFailed
+  state Q334_TheWishingPotion STARTED
+  rows Q334_TheWishingPotion <cond>=4 <state>=STARTED
