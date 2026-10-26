@@ -1,0 +1,106 @@
+# Get a Pet (Q419), a wrong answer among the ten restarts the quiz. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q419_get_a_pet_quiz_fail.golden
+character Fighter 15
+quest Q419_GetAPet <cond>=1 <state>=STARTED progress=7
+hold 3417 1
+random 5 11 0 9 3 7 1 5 2 3
+script quest.Q419_GetAPet
+item 3417 3418 3419 3420 3421 3422 3423 3424 3425 3426 3427 2375
+page merchant/30731.htm
+page gatekeeper/30256.htm
+page guard/30072.htm
+page merchant/30091.htm
+page script/quest/Q419_GetAPet/
+npc martin 30731 Merchant 10 0 0
+npc bella 30256 Gatekeeper -20 0 0
+npc metty 30072 Guard 30 0 0
+npc ellie 30091 Merchant -40 0 0
+npc fang 20103 Monster 40 0 0
+npc kasha 20476 Monster 50 0 0
+
+action martin
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+bypass npc_{martin}_Quest
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-13.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q419_GetAPet test
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-25.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | answers | 0
+  Q upsert Q419_GetAPet | quiz | 20 21 22 23 24 25 26 27 28 29 30 31 32 33
+  Q upsert Q419_GetAPet | quiz | 20 21 22 23 24 33 26 27 28 29 30 31 32
+bypass Quest Q419_GetAPet wrong
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-31.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | wrong | 1
+  Q upsert Q419_GetAPet | quiz | 20 21 22 23 24 33 26 27 28 29 30 32
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-20.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 1
+  Q upsert Q419_GetAPet | quiz | 32 21 22 23 24 33 26 27 28 29 30
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-29.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 2
+  Q upsert Q419_GetAPet | quiz | 32 21 22 23 24 33 26 27 28 30
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-23.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 3
+  Q upsert Q419_GetAPet | quiz | 32 21 22 30 24 33 26 27 28
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-27.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 4
+  Q upsert Q419_GetAPet | quiz | 32 21 22 30 24 33 26 28
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-21.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 5
+  Q upsert Q419_GetAPet | quiz | 32 28 22 30 24 33 26
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-33.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 6
+  Q upsert Q419_GetAPet | quiz | 32 28 22 30 24 26
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-22.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 7
+  Q upsert Q419_GetAPet | quiz | 32 28 26 30 24
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-30.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 8
+  Q upsert Q419_GetAPet | quiz | 32 28 26 24
+bypass Quest Q419_GetAPet right
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-14.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | correct | 9
+  Q delete-var Q419_GetAPet | progress
+  # UNKNOWN KIND delete-var
+  Q delete-var Q419_GetAPet | answers
+  # UNKNOWN KIND delete-var
+  Q delete-var Q419_GetAPet | quiz
+  # UNKNOWN KIND delete-var
+  Q delete-var Q419_GetAPet | wrong
+  # UNKNOWN KIND delete-var
+  Q delete-var Q419_GetAPet | correct
+  # UNKNOWN KIND delete-var
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+bypass npc_{martin}_Quest
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-16.htm
+  S ActionFailed
+  S ActionFailed
