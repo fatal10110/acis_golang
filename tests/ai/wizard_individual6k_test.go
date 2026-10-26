@@ -75,6 +75,13 @@ func individual6kScripts() ([]script.Listing, script.Catalog) {
 // casting i6kSkills, every draw the current value of the world's draw.
 func bootIndividual6k(t *testing.T, templates ...*npc.Template) *individual6World {
 	t.Helper()
+	return bootIndividual6kWith(t, i6kDefs(), false, templates...)
+}
+
+// bootIndividual6kWith is bootIndividual6k with defs the NPCs' skills and,
+// when scripted, the skills the scripts read effects from.
+func bootIndividual6kWith(t *testing.T, defs []modelskill.Definition, scripted bool, templates ...*npc.Template) *individual6World {
+	t.Helper()
 	list, catalog := individual6kScripts()
 	kinds := map[int32]script.NPCKind{}
 	for _, tmpl := range templates {
@@ -84,8 +91,11 @@ func bootIndividual6k(t *testing.T, templates ...*npc.Template) *individual6Worl
 	extra := raidBoot{opts: []gameservertest.Option{
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 		gameservertest.WithScriptRand(func(n int) int { return min(int(draw.Load()), n-1) }),
-		gameservertest.WithNpcSpawnSkills(i6kSkills()),
+		gameservertest.WithNpcSpawnSkills(modelskill.NewTable(defs)),
 	}}
+	if scripted {
+		extra.opts = append(extra.opts, gameservertest.WithScriptSkills(defs...))
+	}
 	return &individual6World{warriorWorld: bootRaid(t, extra, templates...), draw: draw}
 }
 
@@ -103,6 +113,19 @@ func i6kTemplate(id int32, ai npc.AIParams) *npc.Template {
 // magics and self buffs, each costing nothing, or 100000 MP for the costly
 // ones.
 func i6kSkills(costly ...modelskill.ID) *modelskill.Table {
+	return modelskill.NewTable(i6kDefs(costly...))
+}
+
+// i6kHeldDefs are i6kDefs with the self buff landing a 60 s effect on
+// its caster.
+func i6kHeldDefs() []modelskill.Definition {
+	defs := i6kDefs()
+	defs[0].Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "i6k_self", StackOrder: 1}}
+	return defs
+}
+
+// i6kDefs are the definitions of i6kSkills, the self buff first.
+func i6kDefs(costly ...modelskill.ID) []modelskill.Definition {
 	defs := []modelskill.Definition{npcSkill(i6hSelfBuff, 1, false), npcSkill(i6kBuff, 1, false), npcSkill(i6kTeleport, 1, false)}
 	for _, id := range []modelskill.ID{wLongDDID, wShortDDID, i6gDebuff, i6kFiend} {
 		defs = append(defs, harmlessSkill(id))
@@ -114,7 +137,7 @@ func i6kSkills(costly ...modelskill.ID) *modelskill.Table {
 			}
 		}
 	}
-	return modelskill.NewTable(defs)
+	return defs
 }
 
 // i6kArmed spawns an NPC of id dx, dy from the character, its skills
@@ -284,6 +307,78 @@ func TestWizardFiendArcherSelfBuffBuffsItself(t *testing.T) {
 	if got := i6cAttackWeight(seer, me); got != 200 {
 		t.Fatalf("attack desire on the character it saw = %v, want 200", got)
 	}
+}
+
+// TestWizardFiendArcherSelfBuffHoldingItsBuff runs
+// WizardFiendArcherSelfBuff's attacked hook through its aggressive child
+// once the self buff it cast as it appeared landed on it: a hit by the
+// character wants only its parent's fiend archer skill on the character,
+// weight 1000000, no self buff again.
+func TestWizardFiendArcherSelfBuffHoldingItsBuff(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual6kWith(t, i6kHeldDefs(), true, i6kTemplate(i6kFiendSelfAggID, nil))
+	h := w.spawn(t, i6kFiendSelfAggID, 1500, 0)
+	w.srv.InstallNPCCastSeam(t, h, modelskill.NewTable(i6kHeldDefs()))
+	w.i6kSelfBuffDone(t, h)
+	var held int
+	w.onQueue(t, h, func() { held = len(h.EffectList().All()) })
+	if held == 0 {
+		t.Fatal("setup: the archer holds no effect of its self buff")
+	}
+
+	w.hit(t, h, 10)
+	i6fWantCasts(t, "holding its buff", h, map[modelskill.ID]i6fCast{i6kFiend: {w.player.ObjectID(), 1000000, false}})
+}
+
+// TestWizardFiendArcherSelfBuffAggressiveSeesAnNPC runs
+// WizardFiendArcherSelfBuffAggressive's see-creature hook for an NPC its
+// look finds beside it, while it neither attacks nor casts: the NPC holds
+// none of the buff's effect, so it wants its self buff on itself, weight
+// 1000000, and, the NPC no playable, neither attacks nor hates it.
+func TestWizardFiendArcherSelfBuffAggressiveSeesAnNPC(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual6k(t, i6kTemplate(i6kFiendSelfAggID, nil), warriorTemplate(i6eMateID, nil))
+	h := w.i6kArmed(t, i6kFiendSelfAggID, 1500, 0)
+	w.i6kSelfBuffDone(t, h)
+	mate := w.spawn(t, i6eMateID, 1600, 0)
+
+	var hate float64
+	w.onQueue(t, h, func() { h.LookNeighbor(); hate = h.AI().Hates().Hate(mate) })
+	w.srv.Settle(t)
+	i6fWantCasts(t, "seeing an NPC", h, map[modelskill.ID]i6fCast{i6hSelfBuff: {h.ObjectID(), 1000000, false}})
+	if got := i6cAttackWeight(h, mate.ObjectID()); got != 0 {
+		t.Fatalf("attack desire on the NPC it saw = %v, want none", got)
+	}
+	if hate != 0 {
+		t.Fatalf("hate of the NPC it saw = %v, want none", hate)
+	}
+}
+
+// TestWizardSaintBasicAttacksOnceItGaveUp runs WizardSaintBasic's
+// skill-finished hook for a saint that gave up its spells during its cast:
+// the end of the cast wants to attack its most hated, the character,
+// weight 1000, and no cast.
+func TestWizardSaintBasicAttacksOnceItGaveUp(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual6k(t, i6kTemplate(i6kSaintPlainID, nil))
+	w.draw.Store(33)
+	h := w.i6kArmed(t, i6kSaintPlainID, 300, 0)
+	w.i6eSettled(t, h)
+	w.hit(t, h, 10)
+	for i := 0; h.AI().CurrentIntention() != actorai.IntentionCast; i++ {
+		if i == 5 {
+			t.Fatal("setup: the saint does not cast")
+		}
+		w.ticks(t, 1)
+	}
+	w.onQueue(t, h, func() { h.Scratch().SetInt(npc.IntAI0, 1); h.AI().Desires().Clear() })
+
+	w.srv.Advance(t, time.Second)
+	w.srv.Settle(t)
+	if got := i6cAttackWeight(h, w.player.ObjectID()); got != 1000 {
+		t.Fatalf("attack desire on the character after the cast = %v, want 1000", got)
+	}
+	i6fWantCasts(t, "after the cast", h, nil)
 }
 
 // TestWizardSaintBasicStrikesAndDebuffs runs WizardSaintBasic's created,
