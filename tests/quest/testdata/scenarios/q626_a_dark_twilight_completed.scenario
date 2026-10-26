@@ -1,0 +1,20 @@
+# A Dark Twilight (Q626): a completed quest answers that it is completed.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q626_a_dark_twilight_completed.golden
+character Hero 60
+quest Q626_ADarkTwilight <state>=COMPLETED
+script quest.Q626_ADarkTwilight
+item 7169 57
+page default/31517.htm
+page script/quest/Q626_ADarkTwilight/
+npc hierarch 31517 Folk 10 0 0
+
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

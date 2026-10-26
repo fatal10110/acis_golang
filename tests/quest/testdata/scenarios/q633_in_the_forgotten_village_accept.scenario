@@ -1,0 +1,40 @@
+# In the Forgotten Village (Q633): a level 65 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q633_in_the_forgotten_village_accept.golden
+character Hero 65
+script quest.Q633_InTheForgottenVillage
+item 7544 7545 57
+page default/31388.htm
+page script/quest/Q633_InTheForgottenVillage/
+npc mina 31388 Folk 10 0 0
+
+action mina
+action mina
+  S ActionFailed
+  S NpcHtmlMessage obj=mina item=0 page=default/31388.htm
+  S ActionFailed
+bypass npc_{mina}_Quest
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q633_InTheForgottenVillage 31388-04.htm
+  S QuestList 633:0x80000001
+  S ExShowQuestMark quest=633
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-04.htm
+  S ActionFailed
+  Q upsert Q633_InTheForgottenVillage | <state> | STARTED
+  Q upsert Q633_InTheForgottenVillage | <cond> | 1
+  rows Q633_InTheForgottenVillage <cond>=1 <state>=STARTED
+  state Q633_InTheForgottenVillage STARTED
+action mina
+  S ActionFailed
+  S NpcHtmlMessage obj=mina item=0 page=default/31388.htm
+  S ActionFailed
+bypass npc_{mina}_Quest
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-06.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q633_InTheForgottenVillage <cond>=1 <state>=STARTED
+  state Q633_InTheForgottenVillage STARTED

@@ -1,0 +1,30 @@
+# In the Forgotten Village (Q633): the character gives the quest up and loses its bones.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q633_in_the_forgotten_village_quit.golden
+character Hero 65
+quest Q633_InTheForgottenVillage <cond>=2 <state>=STARTED
+hold 7544 200
+script quest.Q633_InTheForgottenVillage
+item 7544 7545 57
+page default/31388.htm
+page script/quest/Q633_InTheForgottenVillage/
+npc mina 31388 Folk 10 0 0
+
+action mina
+action mina
+  S ActionFailed
+  S NpcHtmlMessage obj=mina item=0 page=default/31388.htm
+  S ActionFailed
+bypass npc_{mina}_Quest
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q633_InTheForgottenVillage 31388-10.htm
+  S SystemMessage id=301 3:7544 6:200
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-10.htm
+  S ActionFailed
+  Q delete-quest Q633_InTheForgottenVillage
+  rows Q633_InTheForgottenVillage -
+  state Q633_InTheForgottenVillage -

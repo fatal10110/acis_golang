@@ -1,0 +1,26 @@
+# Delicious Top Choice Meat (Q631): a character at cond 2 short of the meat goes back to cond 1 when it talks.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q631_delicious_top_choice_meat_short_talk.golden
+character Hero 65
+quest Q631_DeliciousTopChoiceMeat <cond>=2 <state>=STARTED
+hold 7546 119
+script quest.Q631_DeliciousTopChoiceMeat
+item 7546 4039 4040 4041 4042 4043 4044
+page default/31537.htm
+page script/quest/Q631_DeliciousTopChoiceMeat/
+npc tunatun 31537 Folk 10 0 0
+
+action tunatun
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S QuestList 631:0x80000001
+  S ExShowQuestMark quest=631
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q631_DeliciousTopChoiceMeat/31537-03a.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q631_DeliciousTopChoiceMeat | <cond> | 1
+  rows Q631_DeliciousTopChoiceMeat <cond>=1 <state>=STARTED
+  state Q631_DeliciousTopChoiceMeat STARTED

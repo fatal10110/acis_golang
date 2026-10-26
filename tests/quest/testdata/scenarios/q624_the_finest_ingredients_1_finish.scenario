@@ -1,0 +1,37 @@
+# The Finest Ingredients - Part 1 (Q624): Jeremy takes the fifty of each and pays an ice crystal and a soy sauce jar; the quest ends.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q624_the_finest_ingredients_1_finish.golden
+character Hero 73
+quest Q624_TheFinestIngredients_Part1 <cond>=2 <state>=STARTED
+hold 7202 50
+hold 7203 50
+hold 7204 50
+script quest.Q624_TheFinestIngredients_Part1
+item 7202 7203 7204 7080 7205
+page default/31521.htm
+page script/quest/Q624_TheFinestIngredients_Part1/
+npc jeremy 31521 Folk 10 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q624_TheFinestIngredients_Part1/31521-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q624_TheFinestIngredients_Part1 31521-05.htm
+  S SystemMessage id=301 3:7202 6:50
+  S SystemMessage id=301 3:7203 6:50
+  S SystemMessage id=301 3:7204 6:50
+  S SystemMessage id=54 3:7080
+  S SystemMessage id=54 3:7205
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q624_TheFinestIngredients_Part1/31521-05.htm
+  S ActionFailed
+  Q delete-quest Q624_TheFinestIngredients_Part1
+  rows Q624_TheFinestIngredients_Part1 -
+  state Q624_TheFinestIngredients_Part1 -
+  items 7080=1 7205=1
