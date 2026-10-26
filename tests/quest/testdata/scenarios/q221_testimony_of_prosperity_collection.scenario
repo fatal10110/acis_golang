@@ -1,0 +1,148 @@
+# Testimony Of Prosperity (Q221), handing in: a level 38 Scavenger at cond 1 with the five receipts and the other three goods exchanges them with Lockirin for the
+# account book (cond 2), relogs, takes Parman's letter (cond 4), and every helper now says the traveller has moved on.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q221_testimony_of_prosperity_collection.golden
+character Dwarf 38
+class 54
+quest Q221_TestimonyOfProsperity <state>=STARTED <cond>=1
+hold 3239 1
+hold 3246 1
+hold 3258 1
+hold 3259 1
+hold 3260 1
+hold 3261 1
+hold 3262 1
+hold 3242 1
+hold 3243 1
+hold 3244 1
+script quest.Q221_TestimonyOfProsperity
+item 3023 3030 3238 3239 3240 3241 3242 3243 3244 3245 3246 3247 3248 3249 3250 3251 3252 3253 3254 3255 3256 3257 3258 3259 3260 3261 3262 3263 3264 3265 3266 3267 3268 3269 3270 3271 3272 3273 3274 3275 3428 1867 57 7562
+page warehouse/30104.htm
+page default/30531.htm
+page default/30597.htm
+page warehouse/30005.htm
+page default/30368.htm
+page guard/30466.htm
+page default/30620.htm
+page script/quest/Q221_TestimonyOfProsperity/
+npc parman 30104 WarehouseKeeper 10 0 0
+npc lockirin 30531 Folk -10 0 0
+npc piotur 30597 Folk -20 0 0
+npc wilford 30005 WarehouseKeeper -30 0 0
+npc lilith 30368 Folk -40 0 0
+npc bright 30466 Guard 10 10 0
+npc emily 30620 Folk -10 10 0
+
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S SystemMessage id=302 3:3246
+  S SystemMessage id=302 3:3258
+  S SystemMessage id=302 3:3259
+  S SystemMessage id=302 3:3260
+  S SystemMessage id=302 3:3261
+  S SystemMessage id=302 3:3262
+  S SystemMessage id=54 3:3241
+  S QuestList 221:0x80000003
+  S ExShowQuestMark quest=221
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q221_TestimonyOfProsperity | <cond> | 2
+  state Q221_TestimonyOfProsperity STARTED
+  rows Q221_TestimonyOfProsperity <cond>=2 <state>=STARTED
+  items 3241=1 3246=0 3258=0 3259=0 3260=0 3261=0 3262=0
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-06.htm
+  S ActionFailed
+  S ActionFailed
+relog
+action parman
+action parman
+  S ActionFailed
+  S NpcHtmlMessage obj=parman item=0 page=warehouse/30104.htm
+  S ActionFailed
+bypass npc_{parman}_Quest
+  S NpcHtmlMessage obj=parman item=0 page=script/quest/Q221_TestimonyOfProsperity/30104-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30104-07.htm
+  S SystemMessage id=302 3:3242
+  S SystemMessage id=302 3:3243
+  S SystemMessage id=302 3:3244
+  S SystemMessage id=302 3:3241
+  S SystemMessage id=302 3:3239
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 221:0x8000000b
+  S ExShowQuestMark quest=221
+  S SystemMessage id=54 3:3269
+  S SystemMessage id=54 3:3240
+  S NpcHtmlMessage obj=parman item=0 page=script/quest/Q221_TestimonyOfProsperity/30104-08.htm
+  S ActionFailed
+  Q upsert Q221_TestimonyOfProsperity | <flags> | -2147483637
+  Q upsert Q221_TestimonyOfProsperity | <cond> | 4
+  state Q221_TestimonyOfProsperity STARTED
+  rows Q221_TestimonyOfProsperity <cond>=4 <flags>=-2147483637 <state>=STARTED
+  items 3269=1 3240=1
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-07.htm
+  S ActionFailed
+  S ActionFailed
+action piotur
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q221_TestimonyOfProsperity/30597-04.htm
+  S ActionFailed
+  S ActionFailed
+action wilford
+action wilford
+  S ActionFailed
+  S NpcHtmlMessage obj=wilford item=0 page=warehouse/30005.htm
+  S ActionFailed
+bypass npc_{wilford}_Quest
+  S NpcHtmlMessage obj=wilford item=0 page=script/quest/Q221_TestimonyOfProsperity/30005-07.htm
+  S ActionFailed
+  S ActionFailed
+action lilith
+action lilith
+  S ActionFailed
+  S NpcHtmlMessage obj=lilith item=0 page=default/30368.htm
+  S ActionFailed
+bypass npc_{lilith}_Quest
+  S NpcHtmlMessage obj=lilith item=0 page=script/quest/Q221_TestimonyOfProsperity/30368-05.htm
+  S ActionFailed
+  S ActionFailed
+action bright
+action bright
+  S ActionFailed
+  S NpcHtmlMessage obj=bright item=0 page=guard/30466.htm
+  S ActionFailed
+bypass npc_{bright}_Quest
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-08.htm
+  S ActionFailed
+  S ActionFailed
+action emily
+action emily
+  S ActionFailed
+  S NpcHtmlMessage obj=emily item=0 page=default/30620.htm
+  S ActionFailed
+bypass npc_{emily}_Quest
+  S NpcHtmlMessage obj=emily item=0 page=script/quest/Q221_TestimonyOfProsperity/30620-05.htm
+  S ActionFailed
+  S ActionFailed
