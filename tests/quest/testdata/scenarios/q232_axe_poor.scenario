@@ -1,0 +1,73 @@
+# Test of the Lord (Q232), Tantus's charm without the arrows, and Jakal asked for the blade with no adena.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q232_axe_poor.golden
+character Shaman 39
+class 50
+quest Q232_TestOfTheLord <state>=STARTED <cond>=1
+random always 0
+hold 1341 999
+hold 3391 1
+script quest.Q232_TestOfTheLord
+item 1341 3390 3391 3392 3393 3394 3395 3396 3397 3398 3399 3400 3401 3402 3403 3404 3405 3406 3407 3408 3409 3410 3411 3412 3413 3414 3415 3416 7562
+page default/30567.htm
+page merchant/30558.htm
+page script/quest/Q232_TestOfTheLord/
+npc tantus 30567 Folk 10 0 0
+npc jakal 30558 Merchant 20 0 0
+
+action jakal
+action jakal
+  S ActionFailed
+  S NpcHtmlMessage obj=jakal item=0 page=merchant/30558.htm
+  S ActionFailed
+bypass npc_{jakal}_Quest
+  S NpcHtmlMessage obj=jakal item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action tantus
+action tantus
+  S ActionFailed
+  S NpcHtmlMessage obj=tantus item=0 page=default/30567.htm
+  S ActionFailed
+bypass npc_{tantus}_Quest
+  S NpcHtmlMessage obj=tantus item=0 page=script/quest/Q232_TestOfTheLord/30567-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30567-02.htm
+  S SystemMessage id=54 3:3393
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tantus item=0 page=script/quest/Q232_TestOfTheLord/30567-02.htm
+  S ActionFailed
+action tantus
+  S ActionFailed
+  S NpcHtmlMessage obj=tantus item=0 page=default/30567.htm
+  S ActionFailed
+action tantus
+  S ActionFailed
+  S NpcHtmlMessage obj=tantus item=0 page=default/30567.htm
+  S ActionFailed
+bypass npc_{tantus}_Quest
+  S NpcHtmlMessage obj=tantus item=0 page=script/quest/Q232_TestOfTheLord/30567-03.htm
+  S ActionFailed
+  S ActionFailed
+action jakal
+action jakal
+  S ActionFailed
+  S NpcHtmlMessage obj=jakal item=0 page=merchant/30558.htm
+  S ActionFailed
+bypass npc_{jakal}_Quest
+  S NpcHtmlMessage obj=jakal item=0 page=script/quest/Q232_TestOfTheLord/30558-03.htm
+  S ActionFailed
+  S ActionFailed
+action tantus
+action tantus
+  S ActionFailed
+  S NpcHtmlMessage obj=tantus item=0 page=default/30567.htm
+  S ActionFailed
+bypass npc_{tantus}_Quest
+  S NpcHtmlMessage obj=tantus item=0 page=script/quest/Q232_TestOfTheLord/30567-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 3393=1 1341=999
+  state Q232_TestOfTheLord STARTED
+  rows Q232_TestOfTheLord <cond>=1 <state>=STARTED
