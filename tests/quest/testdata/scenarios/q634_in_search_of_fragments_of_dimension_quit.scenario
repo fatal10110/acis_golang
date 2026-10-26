@@ -1,0 +1,32 @@
+# In Search of Fragments of Dimension (Q634): the character ends the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q634_in_search_of_fragments_of_dimension_quit.golden
+character Hero 20
+quest Q634_InSearchOfFragmentsOfDimension <cond>=1 <state>=STARTED
+hold 7079 7
+script quest.Q634_InSearchOfFragmentsOfDimension
+item 7079
+page default/31494.htm
+page default/31507.htm
+page script/quest/Q634_InSearchOfFragmentsOfDimension/
+npc gate1 31494 Folk 10 0 0
+npc gate14 31507 Folk 20 0 0
+
+action gate1
+action gate1
+  S ActionFailed
+  S NpcHtmlMessage obj=gate1 item=0 page=default/31507.htm
+  S ActionFailed
+bypass npc_{gate1}_Quest Q634_InSearchOfFragmentsOfDimension
+  S NpcHtmlMessage obj=gate1 item=0 page=script/quest/Q634_InSearchOfFragmentsOfDimension/03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q634_InSearchOfFragmentsOfDimension 05.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=gate1 item=0 page=script/quest/Q634_InSearchOfFragmentsOfDimension/05.htm
+  S ActionFailed
+  Q delete-quest Q634_InSearchOfFragmentsOfDimension
+  rows Q634_InSearchOfFragmentsOfDimension -
+  state Q634_InSearchOfFragmentsOfDimension -
+  items 7079=7

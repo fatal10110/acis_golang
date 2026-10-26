@@ -1,0 +1,19 @@
+# Necromancer's Request (Q632): a level 62 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q632_necromancers_request_low_level.golden
+character Hero 62
+script quest.Q632_NecromancersRequest
+item 7542 7543 57
+page default/31522.htm
+page script/quest/Q632_NecromancersRequest/
+npc wizard 31522 Folk 10 0 0
+
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q632_NecromancersRequest/31522-01.htm
+  S ActionFailed
+  S ActionFailed

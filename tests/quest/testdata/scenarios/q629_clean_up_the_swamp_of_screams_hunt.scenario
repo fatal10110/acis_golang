@@ -1,0 +1,34 @@
+# Clean up the Swamp of Screams (Q629): a monster drops a talon of Stakato only for a draw under its own chance, and no more once a hundred are held; Pierce's chat window offers no Quest link, so the quest's dialog is out of the client's reach.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q629_clean_up_the_swamp_of_screams_hunt.golden
+character Hero 66
+quest Q629_CleanUpTheSwampOfScreams <cond>=1 <state>=STARTED
+hold 7246 1
+hold 7250 98
+random 0 0 0 746000 0 0 0
+script quest.Q629_CleanUpTheSwampOfScreams
+item 7246 7247 7250 7251
+page default/31553.htm
+page script/quest/Q629_CleanUpTheSwampOfScreams/
+npc pierce 31553 Folk 10 0 0
+npc m1 21508 Monster 40 0 0
+npc m2 21512 Monster 50 0 0
+npc m3 21517 Monster 60 0 0
+npc m4 21509 Monster 70 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7250
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7246=1 7250=99
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 7246=1 7250=99
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7250
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 7246=1 7250=100
+kill m4
+  S SystemMessage id=95 1:0 1:0
+  items 7246=1 7250=100
