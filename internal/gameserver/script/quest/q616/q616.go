@@ -68,7 +68,7 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 	}
 	p := e.Player
 	switch {
-	// Asefa.
+	// Udan Mardui.
 	case strings.EqualFold(e.Name, "31379-04.htm"):
 		if p.HasItem(redTotem) {
 			st.SetStatus(questlog.StatusStarted)
@@ -86,7 +86,7 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 		} else {
 			htmltext = "31379-09.htm"
 		}
-	// Varka's Holy Altar.
+	// Ketra's Holy Altar.
 	case strings.EqualFold(e.Name, "31558-02.htm"):
 		switch {
 		case !p.HasItem(redTotem):
