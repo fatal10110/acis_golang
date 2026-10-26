@@ -22,7 +22,7 @@ import (
 // change between two reads.
 type DropRules interface {
 	// PartyRange is the distance a player must stand strictly within, from
-	// the NPC, to pass a quest-state check.
+	// the NPC, to pass a quest-state check or Script.InPartyRange.
 	PartyRange() int
 	// MultipleItemDrop reports whether a non-stackable item counted above
 	// one is given as that many instances rather than as one.
