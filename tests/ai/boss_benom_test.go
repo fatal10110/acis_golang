@@ -287,12 +287,17 @@ func TestBenomSiegeMovesItToItsThrone(t *testing.T) {
 // character, it wants to attack it at 200 and, on a draw of 0 of 3, marks
 // it. A hit draws its cancel chance (0 of 625): it wants its cancel on
 // itself, unchecked; the cast done, Benom, the cancel's target, is sent to
-// the point drawn (2 of 12). Under a third of its HP, a hit draws its range
-// cancel chance after the cancel's (99, then 0), then from over 300 its
-// magic chance and its physical special chance (99 each); the range cancel
-// done, Benom is sent to the point drawn (1 of 12), where the marked
-// character stands within 250 of it: Benom is sent away again (1 of 12)
-// and its hate of the character drops; its marks are cleared. Its Instant
+// the point drawn (2 of 12) after two draws of 3 while it casts (99 each),
+// scattered by the point's offset of 100: the x
+// offset drawn first, then the y one, each of 201 (150 and 30 land it 50
+// east and 70 north of the point). Under a third of its HP, a hit draws its
+// range cancel chance after the cancel's (99, then 0), then from over 300
+// its magic chance and its physical special chance (99 each); the range
+// cancel done, Benom is sent to the point drawn (1 of 12), scattered (180
+// and 20: 80 east, 80 north), where the marked character stands within 250
+// of it: Benom is sent away again (1 of 12, scattered by 0 and 200: 100
+// west, 100 south) and its hate of the character drops; its marks are
+// cleared. Its Instant
 // Move then brings it back to where it stood 5 s after the siege moved it,
 // dropping its hate.
 func TestBenomCancelsAfterASiege(t *testing.T) {
@@ -320,9 +325,10 @@ func TestBenomCancelsAfterASiege(t *testing.T) {
 	w.draws.set(99, 0, 99)
 	w.hit(t, h, 22)
 	w.wantCasts(t, "after the hit, draw 0 of 625", h, map[modelskill.ID]ind1Cast{benomCancel: {self, 1000000}})
-	w.draws.set(2)
+	w.draws.set(99, 99, 99, 2, 150, 30)
 	w.castQueued(t, h)
-	wantBenomAt(t, "after its cancel, draw 2 of 12", h, benomPoint2)
+	wantBenomAt(t, "after its cancel, draws 2 of 12, then 150 and 30 of 201", h,
+		location.Location{X: benomPoint2.X + 50, Y: benomPoint2.Y - 70})
 
 	w.place(t, location.Location{X: benomPoint1.X - 100, Y: benomPoint1.Y, Z: benomPoint1.Z})
 	w.setHPShare(t, h, 0.3)
@@ -332,9 +338,10 @@ func TestBenomCancelsAfterASiege(t *testing.T) {
 	if got := h.AggroHate(w.player); got <= 0 {
 		t.Fatalf("hate of the character before the range cancel = %v, want some", got)
 	}
-	w.draws.set(1)
+	w.draws.set(99, 1, 180, 20, 1, 0, 200)
 	w.castQueued(t, h)
-	wantBenomAt(t, "after its range cancel, draws 1 and 1 of 12", h, benomPoint1)
+	wantBenomAt(t, "after its range cancel, sent away twice to point 1 of 12", h,
+		location.Location{X: benomPoint1.X - 100, Y: benomPoint1.Y + 100})
 	if got := h.AggroHate(w.player); got != 0 {
 		t.Fatalf("hate of the character after the range cancel = %v, want none", got)
 	}

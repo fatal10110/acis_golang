@@ -43,17 +43,12 @@ func targetTeleports() []script.Loc {
 	}
 }
 
-// sendAway teleports c to one of the target points drawn at random. A
-// player lands scattered around it by the point's heading; any other
-// creature lands on the point itself (#4210).
+// sendAway teleports c to one of the target points drawn at random,
+// scattered around it by the point's heading.
 func sendAway(s *script.Script, c script.Creature) {
 	points := targetTeleports()
 	loc := points[s.Rnd(len(points))]
-	if p, ok := c.(*script.Player); ok {
-		p.TeleportTo(loc, loc.Heading)
-		return
-	}
-	script.TeleportTo(c, loc)
+	s.TeleportNear(c, loc, loc.Heading)
 }
 
 // castByType has n want the skill its template lists under t on target at
