@@ -65,6 +65,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q406"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q407"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q408"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q410"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q411"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q412"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q413"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -142,10 +146,10 @@ func quests301Up() script.Catalog {
 		"quest.Q407_PathToAnElvenScout":                q407.New,
 		"quest.Q408_PathToAnElvenWizard":               q408.New,
 		"quest.Q409_PathToAnElvenOracle":               nil,
-		"quest.Q410_PathToAPalusKnight":                nil,
-		"quest.Q411_PathToAnAssassin":                  nil,
-		"quest.Q412_PathToADarkWizard":                 nil,
-		"quest.Q413_PathToAShillienOracle":             nil,
+		"quest.Q410_PathToAPalusKnight":                q410.New,
+		"quest.Q411_PathToAnAssassin":                  q411.New,
+		"quest.Q412_PathToADarkWizard":                 q412.New,
+		"quest.Q413_PathToAShillienOracle":             q413.New,
 		"quest.Q414_PathToAnOrcRaider":                 nil,
 		"quest.Q415_PathToAMonk":                       nil,
 		"quest.Q416_PathToAnOrcShaman":                 nil,

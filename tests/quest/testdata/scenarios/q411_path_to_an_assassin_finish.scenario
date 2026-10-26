@@ -1,0 +1,49 @@
+# Path to an Assassin (Q411), level 19 with the recommendation: Triskel gives the Iron Heart; then relog and the quest starts over, refused for the Iron Heart. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q411_path_to_an_assassin_finish.golden
+character Fighter 19
+class 31
+quest Q411_PathToAnAssassin <cond>=7 <state>=STARTED
+hold 1251 1
+script quest.Q411_PathToAnAssassin
+item 1245 1246 1247 1248 1250 1251 1252
+page default/30416.htm
+page default/30419.htm
+page guard/30382.htm
+page script/quest/Q411_PathToAnAssassin/
+npc triskel 30416 Folk 10 0 0
+npc arkenia 30419 Folk -10 0 0
+npc leikan 30382 Guard 20 0 0
+npc molar 20369 Monster 40 0 0
+npc tears 27036 Monster 50 0 0
+
+action triskel
+action triskel
+  S ActionFailed
+  S NpcHtmlMessage obj=triskel item=0 page=default/30416.htm
+  S ActionFailed
+bypass npc_{triskel}_Quest
+  S SystemMessage id=302 3:1251
+  S SystemMessage id=54 3:1252
+  S SystemMessage id=95 1:3200 1:3930
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=triskel item=0 page=script/quest/Q411_PathToAnAssassin/30416-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q411_PathToAnAssassin
+  items 1251=0 1252=1
+  rows Q411_PathToAnAssassin -
+  state Q411_PathToAnAssassin -
+relog
+action triskel
+action triskel
+  S ActionFailed
+  S NpcHtmlMessage obj=triskel item=0 page=default/30416.htm
+  S ActionFailed
+bypass npc_{triskel}_Quest
+  S NpcHtmlMessage obj=triskel item=0 page=script/quest/Q411_PathToAnAssassin/30416-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q411_PathToAnAssassin 30416-05.htm
+  S NpcHtmlMessage obj=triskel item=0 page=script/quest/Q411_PathToAnAssassin/30416-04.htm
+  S ActionFailed
