@@ -166,8 +166,31 @@ func ind5iDenRunner(t *testing.T) (*ind1World, *npc.Hostile) {
 	return w, live[0]
 }
 
+// ind5iSetCharacterHP sets the character's HP to ratio of its maximum, on
+// its queue.
+func (w *ind1World) ind5iSetCharacterHP(t *testing.T, ratio float64) {
+	t.Helper()
+	pc, ok := w.player.(interface {
+		SetHP(float64)
+		MaxHPValue() float64
+	})
+	if !ok {
+		t.Fatalf("setup: the character %T cannot set its HP", w.player)
+	}
+	done := make(chan struct{})
+	if !w.srv.PlayerQueue(t, w.player.ObjectID()).Post(func() {
+		defer close(done)
+		pc.SetHP(pc.MaxHPValue() * ratio)
+	}) {
+		t.Fatal("the character's queue is closed")
+	}
+	<-done
+	w.srv.Settle(t)
+}
+
 // ind5iFlee checks the runner lets its first hit pass and does not run at
-// 60% HP or on a draw of 10, then, at 45% HP with its desires dropped, a
+// 60% HP, on a draw of 10, at exactly 33% HP or for a character at
+// exactly 25% HP, then, at 45% HP with its desires dropped, a
 // hit on a draw of 0 makes it shout the line of draw line, keep the
 // character in c_ai0 and run to its flee point, weight 100000000.
 func (w *ind1World) ind5iFlee(t *testing.T, h *npc.Hostile, line int) {
@@ -192,6 +215,25 @@ func (w *ind1World) ind5iFlee(t *testing.T, h *npc.Hostile, line int) {
 	if got := ind1Slot(h, script.SlotIntAI0); got != 0 {
 		t.Fatalf("i_ai0 after a hit on a draw of 10 = %d, want 0", got)
 	}
+	// Its hooks see its HP before the hit lands.
+	w.ind5hSetHP(t, h, 0.33)
+	if r := script.NPCOf(h).HPRatio(); r != 0.33 {
+		t.Fatalf("setup: runner HP ratio = %v, want 0.33", r)
+	}
+	w.draws.set(99, 0)
+	w.hit(t, h, 1)
+	if got := ind1Slot(h, script.SlotIntAI0); got != 0 {
+		t.Fatalf("i_ai0 after a hit at 33%% HP = %d, want 0", got)
+	}
+	w.ind5iSetCharacterHP(t, 0.25)
+	w.ind5hSetHP(t, h, 0.45)
+	w.draws.set(99, 0)
+	w.hit(t, h, 1)
+	if got := ind1Slot(h, script.SlotIntAI0); got != 0 {
+		t.Fatalf("i_ai0 after a hit from a character at 25%% HP = %d, want 0", got)
+	}
+	w.ind5iSetCharacterHP(t, 1)
+	w.ind5hSetHP(t, h, 0.45)
 	w.ind5dClear(t, h)
 	w.srv.ReadQueued(t, w.srv.Client)
 	w.draws.set(99, 0, line)
@@ -300,6 +342,98 @@ func TestRunAwayToClanHealedGivesUpTheRun(t *testing.T) {
 	got := h.AI().Desires().Snapshot()
 	if len(got) != 1 || got[0].Kind != actorai.IntentionMoveTo || got[0].Weight != 50 || got[0].Location.X != home.X || got[0].Location.Y != home.Y {
 		t.Fatalf("healed runner desires = %+v, want only its spawn point %d,%d with weight 50", got, home.X, home.Y)
+	}
+}
+
+// ind5iDetour drops h's desires and walks it to a point off its course,
+// once the AI turns from its fight to the walk.
+func (w *ind1World) ind5iDetour(t *testing.T, h *npc.Hostile) {
+	t.Helper()
+	w.ind5dClear(t, h)
+	w.onQueue(t, h, func() { script.NPCOf(h).AddMoveToDesire(script.Loc{X: 140, Y: 220, Z: 30}, 200000000) })
+	for i := 0; h.AI().CurrentIntention() != actorai.IntentionMoveTo; i++ {
+		if i == 8 {
+			t.Fatalf("the detour never started: %v", h.AI().CurrentIntention())
+		}
+		cycle(t, w.srv)
+	}
+	w.ind5hWalk(t, h)
+}
+
+// TestRunAwayToClanWalksOnAfterADetour ports WarriorRunAwayToClan's
+// move-finished hook for walks that end elsewhere. Running, a walk ending
+// off its flee point wants the flee point again, weight 100000000, and
+// keeps it running, with no call to its kin; it then runs on and arrives.
+// On its way home, a walk ending off its spawn point keeps it on its way
+// home with no wander, weight 1000; a walk home then ends the run.
+func TestRunAwayToClanWalksOnAfterADetour(t *testing.T) {
+	t.Parallel()
+	w, h := ind5iDenRunner(t)
+	home := script.NPCOf(h).SpawnLocation()
+	w.ind5iFlee(t, h, 0)
+	w.heard.take()
+
+	w.ind5iDetour(t, h)
+	if got := ind1Slot(h, script.SlotIntAI0); got != 1 {
+		t.Fatalf("runner i_ai0 after a detour = %d, want 1 (running)", got)
+	}
+	if d, ok := desire(h, actorai.IntentionMoveTo); !ok || d.Weight != 100000000 || d.Location.X != 240 || d.Location.Y != 20 || d.Location.Z != 30 {
+		t.Fatalf("running move desire after a detour = %+v (%v), want 240,20,30 with weight 100000000", d, ok)
+	}
+	if got := w.heard.take(); len(got) != 0 {
+		t.Fatalf("events heard after a detour = %q, want none", got)
+	}
+	w.ind5iArrive(t, h)
+
+	w.srv.Advance(t, 15*time.Second)
+	if got := ind1Slot(h, script.SlotIntAI0); got != 3 {
+		t.Fatalf("runner i_ai0 after its timer = %d, want 3 (on its way home)", got)
+	}
+	w.ind5iDetour(t, h)
+	if got := ind1Slot(h, script.SlotIntAI0); got != 3 {
+		t.Fatalf("runner i_ai0 after a detour home = %d, want 3 kept", got)
+	}
+	if d, ok := desire(h, actorai.IntentionWander); ok && d.Weight == 1000 {
+		t.Fatalf("runner off its spawn point wander desire = %+v, want none of weight 1000", d)
+	}
+	w.onQueue(t, h, func() { script.NPCOf(h).AddMoveToDesire(home, 1000000) })
+	w.ind5hWalk(t, h)
+	if got := ind1Slot(h, script.SlotIntAI0); got != 0 {
+		t.Fatalf("runner i_ai0 back home = %d, want 0", got)
+	}
+}
+
+// TestRunAwayToClanTimerWaitsOutAFight runs the 2001 timer of a runner at
+// its flee point that attacks: it changes nothing, so the run neither ends
+// nor heads home.
+func TestRunAwayToClanTimerWaitsOutAFight(t *testing.T) {
+	t.Parallel()
+	w, h := ind5iDenRunner(t)
+	w.ind5iFlee(t, h, 0)
+	w.ind5iArrive(t, h)
+	w.srv.Advance(t, 14900*time.Millisecond)
+	w.onQueue(t, h, func() {
+		sn := script.NPCOf(h)
+		sn.AddAttackDesire(sn.Slot(script.SlotCreature0), 1000000)
+	})
+	for i := 0; script.NPCOf(h).Intention() != script.IntentionAttack; i++ {
+		if i == 5 {
+			t.Fatal("the runner never turned to attack")
+		}
+		cycle(t, w.srv)
+	}
+	w.srv.Advance(t, 100*time.Millisecond)
+	if in := script.NPCOf(h).Intention(); in != script.IntentionAttack {
+		t.Fatalf("setup: runner intention when its timer fired = %v, want attack", in)
+	}
+	if got := ind1Slot(h, script.SlotIntAI0); got != 2 {
+		t.Fatalf("runner i_ai0 after its timer while attacking = %d, want 2 kept", got)
+	}
+	if d, ok := desire(h, actorai.IntentionMoveTo); ok {
+		t.Fatalf("runner move desire after its timer while attacking = %+v, want none", d)
+	}
+	if d, ok := desire(h, actorai.IntentionWander); !ok || d.Weight != 50 {
+		t.Fatalf("runner wander desire after its timer while attacking = %+v (%v), want its weight 50 kept", d, ok)
 	}
 }
 
