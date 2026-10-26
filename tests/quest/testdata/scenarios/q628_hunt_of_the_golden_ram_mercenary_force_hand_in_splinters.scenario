@@ -1,0 +1,44 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): a hundred splinters of Stakato chitin are traded for the badge of a recruit.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_hand_in_splinters.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=1 <state>=STARTED
+hold 7248 100
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31554.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc kahman 31554 Folk 10 0 0
+
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=default/31554.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 31554-03a.htm
+  S QuestList 628:0x80000003
+  S ExShowQuestMark quest=628
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7248 6:100
+  S SystemMessage id=54 3:7246
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-04.htm
+  S ActionFailed
+  Q upsert Q628_HuntOfTheGoldenRamMercenaryForce | <cond> | 2
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+  items 7248=0 7246=1
+advance 1s
+bypass npc_{kahman}_Quest
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+relog
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+  items 7248=0 7246=1
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-09.htm
+  S ActionFailed
