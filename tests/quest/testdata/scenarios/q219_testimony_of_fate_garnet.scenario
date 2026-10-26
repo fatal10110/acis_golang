@@ -1,0 +1,266 @@
+# Testimony Of Fate (Q219), last part: a level 38 Palus Knight at cond 16 holding the Palus charm and Thifiell's letter, and 9 of
+# each skull, takes the letter to Arkenia; Bloody Pixy, once asked for a garnet, trades 10 of each skull for the red fairy dust; the Blight
+# Treant, asked for a seed, trades it and a leaf the Black Willow Lurker drops for the sap; Arkenia turns the dust and the sap into her
+# letter; then relog, and Thifiell gives the Mark of Fate (the character is a dark elf of the first class change) and, once the quest is
+# over, says so. Every script roll is pinned to 1, so every drop lands.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q219_testimony_of_fate_garnet.golden
+character Scholar 38
+class 32
+random always 1
+quest Q219_TestimonyOfFate <state>=STARTED <cond>=16
+hold 3190 1
+hold 3191 1
+hold 3194 9
+hold 3195 9
+hold 3196 9
+hold 3197 9
+script quest.Q219_TestimonyOfFate
+item 3172 3173 3174 3175 3176 3177 3178 3179 3180 3181 3182 3183 3184 3185 3186 3187 3188 3189 3190 3191 3192 3193 3194 3195 3196 3197 3198 3199 3200 3201 3202 7562
+page default/30419.htm
+page default/31845.htm
+page default/31850.htm
+page villagemaster/30358.htm
+page script/quest/Q219_TestimonyOfFate/
+npc arkenia 30419 Folk -20 10 0
+npc pixy 31845 FriendlyMonster -10 10 0
+npc treant 31850 FriendlyMonster 0 10 0
+npc thifiell 30358 VillageMasterDElf 10 10 0
+npc grandis 20554 Monster -60 0 0
+npc leto 20582 Monster -70 0 0
+npc breka 20270 Monster -80 0 0
+npc karul 20600 Monster -90 0 0
+npc lurker 27079 Monster -100 0 0
+
+action arkenia
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q219_TestimonyOfFate/30419-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30419-02.htm
+  S QuestList 219:0x8001ffff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3191
+  S SystemMessage id=54 3:3192
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q219_TestimonyOfFate/30419-02.htm
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 17
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=17 <state>=STARTED
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q219_TestimonyOfFate/30419-03.htm
+  S ActionFailed
+  S ActionFailed
+action pixy
+action pixy
+  S ActionFailed
+  S NpcHtmlMessage obj=pixy item=0 page=default/31845.htm
+  S ActionFailed
+bypass npc_{pixy}_Quest
+  S NpcHtmlMessage obj=pixy item=0 page=script/quest/Q219_TestimonyOfFate/31845-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 31845-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3193
+  S NpcHtmlMessage obj=pixy item=0 page=script/quest/Q219_TestimonyOfFate/31845-02.htm
+  S ActionFailed
+action pixy
+  S ActionFailed
+  S NpcHtmlMessage obj=pixy item=0 page=default/31845.htm
+  S ActionFailed
+action pixy
+  S ActionFailed
+  S NpcHtmlMessage obj=pixy item=0 page=default/31845.htm
+  S ActionFailed
+bypass npc_{pixy}_Quest
+  S NpcHtmlMessage obj=pixy item=0 page=script/quest/Q219_TestimonyOfFate/31845-03.htm
+  S ActionFailed
+  S ActionFailed
+kill grandis
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3194
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill leto
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3197
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill breka
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3196
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill karul
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3195
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+action pixy
+  S ActionFailed
+  S NpcHtmlMessage obj=pixy item=0 page=default/31845.htm
+  S ActionFailed
+action pixy
+  S ActionFailed
+  S NpcHtmlMessage obj=pixy item=0 page=default/31845.htm
+  S ActionFailed
+bypass npc_{pixy}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3196 6:10
+  S SystemMessage id=301 3:3194 6:10
+  S SystemMessage id=301 3:3195 6:10
+  S SystemMessage id=301 3:3197 6:10
+  S SystemMessage id=302 3:3193
+  S SystemMessage id=54 3:3198
+  S NpcHtmlMessage obj=pixy item=0 page=script/quest/Q219_TestimonyOfFate/31845-04.htm
+  S ActionFailed
+  S ActionFailed
+action pixy
+  S ActionFailed
+  S NpcHtmlMessage obj=pixy item=0 page=default/31845.htm
+  S ActionFailed
+action pixy
+  S ActionFailed
+  S NpcHtmlMessage obj=pixy item=0 page=default/31845.htm
+  S ActionFailed
+bypass npc_{pixy}_Quest
+  S NpcHtmlMessage obj=pixy item=0 page=script/quest/Q219_TestimonyOfFate/31845-05.htm
+  S ActionFailed
+  S ActionFailed
+action treant
+action treant
+  S ActionFailed
+  S NpcHtmlMessage obj=treant item=0 page=default/31850.htm
+  S ActionFailed
+bypass npc_{treant}_Quest
+  S NpcHtmlMessage obj=treant item=0 page=script/quest/Q219_TestimonyOfFate/31850-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 31850-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3199
+  S NpcHtmlMessage obj=treant item=0 page=script/quest/Q219_TestimonyOfFate/31850-02.htm
+  S ActionFailed
+action treant
+  S ActionFailed
+  S NpcHtmlMessage obj=treant item=0 page=default/31850.htm
+  S ActionFailed
+action treant
+  S ActionFailed
+  S NpcHtmlMessage obj=treant item=0 page=default/31850.htm
+  S ActionFailed
+bypass npc_{treant}_Quest
+  S NpcHtmlMessage obj=treant item=0 page=script/quest/Q219_TestimonyOfFate/31850-03.htm
+  S ActionFailed
+  S ActionFailed
+kill lurker
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3200
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+action treant
+  S ActionFailed
+  S NpcHtmlMessage obj=treant item=0 page=default/31850.htm
+  S ActionFailed
+action treant
+  S ActionFailed
+  S NpcHtmlMessage obj=treant item=0 page=default/31850.htm
+  S ActionFailed
+bypass npc_{treant}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3200
+  S SystemMessage id=302 3:3199
+  S SystemMessage id=54 3:3201
+  S NpcHtmlMessage obj=treant item=0 page=script/quest/Q219_TestimonyOfFate/31850-04.htm
+  S ActionFailed
+  S ActionFailed
+action treant
+  S ActionFailed
+  S NpcHtmlMessage obj=treant item=0 page=default/31850.htm
+  S ActionFailed
+action treant
+  S ActionFailed
+  S NpcHtmlMessage obj=treant item=0 page=default/31850.htm
+  S ActionFailed
+bypass npc_{treant}_Quest
+  S NpcHtmlMessage obj=treant item=0 page=script/quest/Q219_TestimonyOfFate/31850-05.htm
+  S ActionFailed
+  S ActionFailed
+action arkenia
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q219_TestimonyOfFate/30419-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30419-05.htm
+  S QuestList 219:0x8003ffff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3192
+  S SystemMessage id=302 3:3201
+  S SystemMessage id=302 3:3198
+  S SystemMessage id=54 3:3202
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q219_TestimonyOfFate/30419-05.htm
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 18
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=18 <state>=STARTED
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q219_TestimonyOfFate/30419-06.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=18 <state>=STARTED
+action thifiell
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S SystemMessage id=302 3:3190
+  S SystemMessage id=302 3:3202
+  S SystemMessage id=54 3:3172
+  S SystemMessage id=95 1:68183 1:1750
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 219:0x00000000
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q219_TestimonyOfFate/30358-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <state> | COMPLETED
+  Q delete-except-state Q219_TestimonyOfFate
+  state Q219_TestimonyOfFate COMPLETED
+  rows Q219_TestimonyOfFate <state>=COMPLETED
+  items 3172=1
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
