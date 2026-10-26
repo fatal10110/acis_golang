@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
 const runAwayPhysicalSpecialDir = "ai/individual/Monster/WarriorBase/Warrior/WarriorRunAwayPhysicalSpecial"
@@ -27,6 +28,21 @@ const runAwayPhysicalSpecialDir = "ai/individual/Monster/WarriorBase/Warrior/War
 // on its way; Creature0 is the creature it last fought.
 func RunAwayPhysicalSpecial() script.Script {
 	return script.Script{Dir: runAwayPhysicalSpecialDir, Behavior: true, NPCs: []int32{21508, 21510, 21511, 21513, 21515, 21516}, Hooks: runAwayPhysicalSpecialHooks()}
+}
+
+// RunAwayPhysicalSpecialAggressive is
+// WarriorRunAwayPhysicalSpecialAggressive: a WarriorRunAwayPhysicalSpecial
+// that attacks the players and summons it sees, its parents' look left
+// out.
+func RunAwayPhysicalSpecialAggressive() script.Script {
+	base := runAwayPhysicalSpecialHooks()
+	return script.Script{Dir: "ai/individual/Monster/WarriorBase/Warrior/WarriorRunAwayPhysicalSpecialAggressive", Behavior: true, Hooks: base.With(script.Hooks{
+		OnSeeCreature: func(s *script.Script, e script.SeeCreature) {
+			if e.Creature.Playable() {
+				defaultnpc.TryToAttack(s, e.NPC, e.Creature)
+			}
+		},
+	})}
 }
 
 // runAwayPhysicalSpecialHooks are WarriorRunAwayPhysicalSpecial's hooks,

@@ -208,6 +208,16 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPriest.WarriorPriestAggressive":                                           warrior.PriestAggressive,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecial":                     warrior.RunAwayPhysicalSpecial,
 
+	// The aggressive runner, the runners to their clan and the slowing Warriors.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecialAggressive": warrior.RunAwayPhysicalSpecialAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayToClan.WarriorRunAwayToClan":                             warrior.RunAwayToClan,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayToClan.WarriorRunAwayToClanAggressive":                   warrior.RunAwayToClanAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType":                                       warrior.SlowType,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType1":                                      warrior.SlowType1,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType1Aggressive":                            warrior.SlowType1Aggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType2":                                      warrior.SlowType2,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType2Aggressive":                            warrior.SlowType2Aggressive,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                                 monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                   monsterbehavior.WizardBehavior,

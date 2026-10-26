@@ -1,0 +1,17 @@
+# WarriorSlowType1 (20101, its shipped slowing magic), every draw 0, 100 away from the
+# character. Its first hit, while it hates no one yet, wants no slowing magic; the second, from
+# within 200, wants it (4247) on the character it now hates most, weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType1
+npc slower 20101 Monster 100 0 0 skill DD_MAGIC_SLOW 4247 1
+
+hit slower 21
+  desires slower attack(player)=262.5
+hit slower 21
+  desires slower attack(player)=525 cast(player,4247,move)=1000000
