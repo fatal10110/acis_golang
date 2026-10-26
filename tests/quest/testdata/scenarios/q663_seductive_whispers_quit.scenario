@@ -1,0 +1,30 @@
+# Seductive Whispers (Q663), the character quits the quest and loses its beads. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_quit.golden
+character Gambler 50
+quest Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=14
+hold 8766 2
+script quest.Q663_SeductiveWhispers
+item 8766 57
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-05a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-30.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=301 3:8766 6:2
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-30.htm
+  S ActionFailed
+  Q delete-quest Q663_SeductiveWhispers
+  items 8766=0
+  rows Q663_SeductiveWhispers -
+  state Q663_SeductiveWhispers -

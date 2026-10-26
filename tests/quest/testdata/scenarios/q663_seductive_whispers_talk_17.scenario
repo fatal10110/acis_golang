@@ -1,0 +1,26 @@
+# Seductive Whispers (Q663), the top prize of a game is paid when its winner talks. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_talk_17.golden
+character Gambler 50
+quest Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=77
+script quest.Q663_SeductiveWhispers
+item 8766 57 729 730
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S SystemMessage id=52 6:2384000
+  S SystemMessage id=54 3:729
+  S SystemMessage id=54 3:730
+  S SystemMessage id=54 3:730
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-17.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=2384000 729=1 730=2
+  rows Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=77
+  state Q663_SeductiveWhispers STARTED
