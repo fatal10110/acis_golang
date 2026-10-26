@@ -1,0 +1,20 @@
+# Defeat the Elrokian Raiders! (Q688): a level 74 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q688_defeat_the_elrokian_raiders_low_level.golden
+character Hero 74
+script quest.Q688_DefeatTheElrokianRaiders
+item 8785 57
+page merchant/32105.htm
+page script/quest/Q688_DefeatTheElrokianRaiders/
+npc dinn 32105 Merchant 10 0 0
+npc elroki 22214 Monster 40 0 0
+
+action dinn
+action dinn
+  S ActionFailed
+  S NpcHtmlMessage obj=dinn item=0 page=merchant/32105.htm
+  S ActionFailed
+bypass npc_{dinn}_Quest
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-00.htm
+  S ActionFailed
+  S ActionFailed

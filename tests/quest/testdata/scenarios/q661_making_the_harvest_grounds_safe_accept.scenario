@@ -1,0 +1,43 @@
+# Making the Harvest Grounds Safe (Q661): a level 21 character accepts at Norman, finds no item on a later visit and keeps the quest through a relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q661_making_the_harvest_grounds_safe_accept.golden
+character Hero 21
+script quest.Q661_MakingTheHarvestGroundsSafe
+item 8283 8284 8285 57
+page warehouse/30210.htm
+page script/quest/Q661_MakingTheHarvestGroundsSafe/
+npc norman 30210 WarehouseKeeper 10 0 0
+npc bee 21095 Monster 40 0 0
+npc gem 21096 Monster 50 0 0
+npc talon 21097 Monster 60 0 0
+
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q661_MakingTheHarvestGroundsSafe/30210-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q661_MakingTheHarvestGroundsSafe 30210-02.htm
+  S QuestList 661:0x80000001
+  S ExShowQuestMark quest=661
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q661_MakingTheHarvestGroundsSafe/30210-02.htm
+  S ActionFailed
+  Q upsert Q661_MakingTheHarvestGroundsSafe | <state> | STARTED
+  Q upsert Q661_MakingTheHarvestGroundsSafe | <cond> | 1
+  rows Q661_MakingTheHarvestGroundsSafe <cond>=1 <state>=STARTED
+  state Q661_MakingTheHarvestGroundsSafe STARTED
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q661_MakingTheHarvestGroundsSafe/30210-05.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q661_MakingTheHarvestGroundsSafe <cond>=1 <state>=STARTED
+  state Q661_MakingTheHarvestGroundsSafe STARTED

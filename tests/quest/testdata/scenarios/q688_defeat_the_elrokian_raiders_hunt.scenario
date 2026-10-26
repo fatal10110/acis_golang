@@ -1,0 +1,20 @@
+# Defeat the Elrokian Raiders! (Q688): the necklace drops to the party member picked (draw 0 of 1) for a roll under 500000: the first roll misses.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q688_defeat_the_elrokian_raiders_hunt.golden
+character Hero 75
+quest Q688_DefeatTheElrokianRaiders <cond>=1 <state>=STARTED
+random 0 500000 0 0
+script quest.Q688_DefeatTheElrokianRaiders
+item 8785 57
+page merchant/32105.htm
+page script/quest/Q688_DefeatTheElrokianRaiders/
+npc dinn 32105 Merchant 10 0 0
+npc elroki 22214 Monster 40 0 0
+
+kill elroki
+  S SystemMessage id=95 1:0 1:0
+kill elroki
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8785
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8785=1

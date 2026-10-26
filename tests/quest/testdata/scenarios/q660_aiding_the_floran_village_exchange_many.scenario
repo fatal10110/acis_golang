@@ -1,0 +1,43 @@
+# Aiding the Floran Village (Q660): forty-five held items are paid 100 adena each and the 9000 bonus; the character then asks about the swaps.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q660_aiding_the_floran_village_exchange_many.golden
+character Hero 30
+quest Q660_AidingTheFloranVillage <cond>=2 <state>=STARTED
+hold 8074 30
+hold 8075 10
+hold 8076 5
+script quest.Q660_AidingTheFloranVillage
+item 8074 8075 8076 57 955 956
+page default/30608.htm
+page guard/30291.htm
+page script/quest/Q660_AidingTheFloranVillage/
+npc maria 30608 Folk 10 0 0
+npc alex 30291 Guard -10 0 0
+npc watchman 21102 Monster 40 0 0
+npc golem 21103 Monster 50 0 0
+npc supplier 21104 Monster 60 0 0
+npc agent 21105 Monster 70 0 0
+npc seer 21106 Monster 80 0 0
+npc commander 21107 Monster 90 0 0
+npc shaman 20781 Monster 100 0 0
+
+action alex
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q660_AidingTheFloranVillage/30291-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q660_AidingTheFloranVillage 30291-05.htm
+  S SystemMessage id=301 3:8075 6:10
+  S SystemMessage id=301 3:8076 6:5
+  S SystemMessage id=301 3:8074 6:30
+  S SystemMessage id=52 6:13500
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q660_AidingTheFloranVillage/30291-05.htm
+  S ActionFailed
+  items 8074=0 8075=0 8076=0 57=13500
+bypass Quest Q660_AidingTheFloranVillage 30291-07.htm
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q660_AidingTheFloranVillage/30291-07.htm
+  S ActionFailed
