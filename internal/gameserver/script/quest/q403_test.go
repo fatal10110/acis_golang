@@ -8,8 +8,8 @@ import (
 )
 
 // TestQ403MatchesReferenceFingerprints compares the package with the reference
-// class: literals, engine calls and hook shapes. The NpcString ids of the bandit's two lines and the
-// class id of the rogue are named constants in the reference.
+// class: literals, engine calls and hook shapes. The NpcString ids of the bandit's two lines and the class
+// id of the rogue are named constants in the reference.
 func TestQ403MatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check("q403", []string{"quest.Q403_PathToARogue"}, "number 40306", "number 40307", "number 7")
 	if err != nil {

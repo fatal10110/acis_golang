@@ -8,8 +8,9 @@ import (
 )
 
 // TestQ386MatchesReferenceFingerprints compares the package with the reference
-// class: literals, engine calls and hook shapes. The reference reads the lines of the board from a shared constant, which the port holds inline, and
-// sizes its chance map; the port names the variable a pick finds missing.
+// class: literals, engine calls and hook shapes. The reference reads the lines of the board from a shared
+// constant, which the port holds inline, and sizes its chance map; the port
+// names the variable a pick finds missing.
 func TestQ386MatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check("q386", []string{"quest.Q386_StolenDignity"}, "number 26", "number 5", "number 6", "number 7", "number 8", `string "q386: no variable "`)
 	if err != nil {
