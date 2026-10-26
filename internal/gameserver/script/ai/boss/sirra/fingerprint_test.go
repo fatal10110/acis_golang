@@ -17,6 +17,7 @@ import (
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"script.ai.boss.sirra.FreyaDeacon",
+		"script.ai.boss.sirra.SculptureGarden",
 	},
 		"number 1118", "number 1121000", "number 1121001", "number 1121003", "number 1121004", "number 1121005", "number 1121007",
 		"call NpcHtmlMessage.setFile", "call Quest.getPartyMembers")
