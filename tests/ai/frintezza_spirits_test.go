@@ -395,7 +395,8 @@ func TestPortraitSpiritPressesAHeldPlayer(t *testing.T) {
 // which reads arg1 whatever the event id: 20000 drops every desire and
 // casts the bomb on itself, the spirit decaying once it lands; 40000 takes
 // it out of the world; 50000 sets ai slot 4 and drops every desire, after
-// which a hit draws no press; another arg1 changes nothing.
+// which the idle spirit takes up no wander of its own and a hit draws no
+// press; another arg1 changes nothing.
 func TestPortraitSpiritScriptEvents(t *testing.T) {
 	t.Parallel()
 	for _, id := range fsSpiritIDs {
@@ -439,6 +440,10 @@ func TestPortraitSpiritScriptEvents(t *testing.T) {
 			}
 			if got := h.AI().Desires().Snapshot(); len(got) != 0 {
 				t.Fatalf("desires after arg1 50000 = %+v, want none", got)
+			}
+			w.ticks(t, 3)
+			if d, ok := desire(h, actorai.IntentionWander); ok {
+				t.Fatalf("idle with no desire, the spirit wants to wander: %+v", d)
 			}
 			w.hit(t, h, 1)
 			wantNoPress(t, "calmed, hit", h)
