@@ -1,0 +1,124 @@
+# Testimony Of Prosperity (Q221), Bright's list: a level 38 Scavenger at cond 1 kills a mandragora sprout before it holds the list (no petal), takes the list from
+# Bright, kills a sprout, a blossom and an ant for the last petals and moss, hands them in for the bouquet and has Emily make the recipe. Every script roll is pinned to 1.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q221_testimony_of_prosperity_mandragora.golden
+character Dwarf 38
+class 54
+random always 1
+quest Q221_TestimonyOfProsperity <state>=STARTED <cond>=1
+hold 3239 1
+hold 3265 18
+hold 3266 9
+script quest.Q221_TestimonyOfProsperity
+item 3023 3030 3238 3239 3240 3241 3242 3243 3244 3245 3246 3247 3248 3249 3250 3251 3252 3253 3254 3255 3256 3257 3258 3259 3260 3261 3262 3263 3264 3265 3266 3267 3268 3269 3270 3271 3272 3273 3274 3275 3428 1867 57 7562
+page guard/30466.htm
+page default/30620.htm
+page script/quest/Q221_TestimonyOfProsperity/
+npc bright 30466 Guard 10 0 0
+npc emily 30620 Folk -10 0 0
+npc sprout 20223 Monster -80 0 0
+npc blossom 20156 Monster -90 0 0
+npc ant 20228 Monster -100 0 0
+
+kill sprout
+  S SystemMessage id=95 1:0 1:0
+  items 3265=18
+action bright
+action bright
+  S ActionFailed
+  S NpcHtmlMessage obj=bright item=0 page=guard/30466.htm
+  S ActionFailed
+bypass npc_{bright}_Quest
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30466-02.htm
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-02.htm
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30466-03.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3264
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-03.htm
+  S ActionFailed
+  items 3264=1
+action bright
+  S ActionFailed
+  S NpcHtmlMessage obj=bright item=0 page=guard/30466.htm
+  S ActionFailed
+bypass npc_{bright}_Quest
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-04.htm
+  S ActionFailed
+  S ActionFailed
+kill sprout
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3265
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3265=19
+kill blossom
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3265
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3265=20
+kill ant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3266
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3266=10
+action bright
+  S ActionFailed
+  S NpcHtmlMessage obj=bright item=0 page=guard/30466.htm
+  S ActionFailed
+bypass npc_{bright}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3264
+  S SystemMessage id=301 3:3266 6:10
+  S SystemMessage id=301 3:3265 6:20
+  S SystemMessage id=54 3:3267
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 3267=1 3264=0 3265=0 3266=0
+action bright
+  S ActionFailed
+  S NpcHtmlMessage obj=bright item=0 page=guard/30466.htm
+  S ActionFailed
+bypass npc_{bright}_Quest
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-06.htm
+  S ActionFailed
+  S ActionFailed
+action emily
+action emily
+  S ActionFailed
+  S NpcHtmlMessage obj=emily item=0 page=default/30620.htm
+  S ActionFailed
+bypass npc_{emily}_Quest
+  S NpcHtmlMessage obj=emily item=0 page=script/quest/Q221_TestimonyOfProsperity/30620-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30620-02.htm
+  S NpcHtmlMessage obj=emily item=0 page=script/quest/Q221_TestimonyOfProsperity/30620-02.htm
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30620-03.htm
+  S SystemMessage id=302 3:3267
+  S SystemMessage id=54 3:3243
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=emily item=0 page=script/quest/Q221_TestimonyOfProsperity/30620-03.htm
+  S ActionFailed
+  items 3243=1 3267=0
+action emily
+  S ActionFailed
+  S NpcHtmlMessage obj=emily item=0 page=default/30620.htm
+  S ActionFailed
+bypass npc_{emily}_Quest
+  S NpcHtmlMessage obj=emily item=0 page=script/quest/Q221_TestimonyOfProsperity/30620-04.htm
+  S ActionFailed
+  S ActionFailed
+action bright
+action bright
+  S ActionFailed
+  S NpcHtmlMessage obj=bright item=0 page=guard/30466.htm
+  S ActionFailed
+bypass npc_{bright}_Quest
+  S NpcHtmlMessage obj=bright item=0 page=script/quest/Q221_TestimonyOfProsperity/30466-07.htm
+  S ActionFailed
+  S ActionFailed

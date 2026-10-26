@@ -1,0 +1,45 @@
+# Testimony Of Prosperity (Q221), the trophies: a level 38 Scavenger at cond 7 holding 20 shells kills a toad lord and a marsh spider, whose last sac and
+# thorn complete the list (cond 8), and Nikola, told the key is missing, says so. Every script roll is pinned to 1.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q221_testimony_of_prosperity_trophies.golden
+character Dwarf 38
+class 54
+random always 1
+quest Q221_TestimonyOfProsperity <state>=STARTED <cond>=7
+hold 3240 1
+hold 3272 1
+hold 3023 1
+hold 3273 20
+hold 3274 9
+hold 3275 9
+script quest.Q221_TestimonyOfProsperity
+item 3023 3030 3238 3239 3240 3241 3242 3243 3244 3245 3246 3247 3248 3249 3250 3251 3252 3253 3254 3255 3256 3257 3258 3259 3260 3261 3262 3263 3264 3265 3266 3267 3268 3269 3270 3271 3272 3273 3274 3275 3428 1867 57 7562
+page default/30621.htm
+page script/quest/Q221_TestimonyOfProsperity/
+npc nikola 30621 Folk 10 0 0
+npc toad 20231 Monster -70 0 0
+npc spider 20233 Monster -80 0 0
+
+kill toad
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3274
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3274=10
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3275
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 221:0x800000ff
+  S ExShowQuestMark quest=221
+  Q upsert Q221_TestimonyOfProsperity | <cond> | 8
+  rows Q221_TestimonyOfProsperity <cond>=8 <state>=STARTED
+  items 3275=10
+action nikola
+action nikola
+  S ActionFailed
+  S NpcHtmlMessage obj=nikola item=0 page=default/30621.htm
+  S ActionFailed
+bypass npc_{nikola}_Quest
+  S NpcHtmlMessage obj=nikola item=0 page=script/quest/Q221_TestimonyOfProsperity/30621-07.htm
+  S ActionFailed
+  S ActionFailed
