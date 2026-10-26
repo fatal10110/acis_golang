@@ -9,7 +9,7 @@ import (
 
 // npcStrings are the NpcString ids the classes say: a named constant in the
 // reference, a number in Go.
-var npcStrings = []int{1000290, 1000291, 1000292, 1000294, 1000395, 1000396, 1000397, 1000398, 1000399, 1000400, 1000401, 1000402, 1000403, 1000404, 1000405, 1000406, 1000407, 1000408, 1000409, 1000410, 1000411, 1000412, 1000413, 1000414}
+var npcStrings = []int{1000290, 1000291, 1000292, 1000294, 1000395, 1000396, 1000397, 1000398, 1000399, 1000400, 1000401, 1000402, 1000403, 1000404, 1000405, 1000406, 1000407, 1000408, 1000409, 1000410, 1000411, 1000412, 1000413, 1000414, 10075, 10076, 10077, 10078}
 
 // TestMatchesReferenceFingerprints compares the package with the reference
 // classes: literals, engine calls and hook shapes.
@@ -20,7 +20,10 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 	// WizardHereticPriestAggressive counts a party through
 	// Player.PartyMembers, the Go name it shares with the quest helper
 	// Quest.getPartyMembers, which no class here calls.
-	exempt := []string{"call Quest.getPartyMembers"}
+	// WizardDDMagic2Solina names the occupations it greets by their class id
+	// constants; the port writes the ids (5, 30 and 90 are literals of the
+	// reference already).
+	exempt := []string{"call Quest.getPartyMembers", "number 16", "number 97", "number 105"}
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
@@ -64,6 +67,14 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardGrowth.WizardGrowthStep4Aggressive",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2Curse",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2CurseAggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Heal",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2HealAggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Solina",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHealer",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHealerAggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2Aggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagicCurse",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHallDDMagic2Aggressive",
