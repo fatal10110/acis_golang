@@ -4,6 +4,7 @@
 package q335
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -407,9 +408,12 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			s.PlaySound(p, script.SoundGiveUp)
 		}
 	case script.IsDigit(e.Name) && len(e.Name) == 4:
-		parsed, err := strconv.ParseInt(e.Name, 10, 32)
+		parsed, err := strconv.Atoi(e.Name)
+		if err != nil || parsed < 0 || parsed > math.MaxInt32 {
+			return ""
+		}
 		request := int32(parsed)
-		if _, ok := torRewardOf(request); err != nil || !ok {
+		if _, ok := torRewardOf(request); !ok {
 			// Only the requests of the menus are accepted: any other number
 			// would hand out an arbitrary item.
 			return ""
