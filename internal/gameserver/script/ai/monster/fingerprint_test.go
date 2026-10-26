@@ -31,6 +31,9 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.LV3Monster.LV3SongDance",
 		"script.ai.individual.Monster.LV3Monster.LV3Summoner",
 		"script.ai.individual.Monster.LV3Monster.LV3Wizard",
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold",
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive",
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)

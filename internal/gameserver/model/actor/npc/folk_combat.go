@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -45,6 +46,8 @@ type folkCombat struct {
 	// ground takes the items the NPC picks up out of the world; nil leaves
 	// them on the ground.
 	ground GroundTaker
+	// landing is FolkRuntime.Landing, set by Attach.
+	landing move.LandingGeo
 	// sight is what the NPC's tick scan has told its see-creature scripts
 	// about; seeDistance is its see range, zero for the shipped default.
 	sight       sight
@@ -126,6 +129,10 @@ type FolkRuntime struct {
 	// Ground takes the items the NPC picks up out of the world; nil leaves
 	// them on the ground.
 	Ground GroundTaker
+	// Landing is the geodata the teleports of an NPC with no movement land
+	// through (move.Land); nil lands them where they aim. An NPC that can
+	// move lands through its movement's geodata instead.
+	Landing move.LandingGeo
 	// SeeRange is the configured see range (DefaultSeeRange); zero keeps
 	// the shipped default.
 	SeeRange int
@@ -168,7 +175,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 		return errors.New("npc: folk runtime needs a queue")
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
-	f.scripts, f.remover, f.ground = rt.Scripts, rt.Remover, rt.Ground
+	f.scripts, f.remover, f.ground, f.landing = rt.Scripts, rt.Remover, rt.Ground, rt.Landing
 	f.seeDistance = rt.SeeRange
 	f.regenSettings = rt.Regen
 	if f.Tower() {

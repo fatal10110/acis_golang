@@ -1,0 +1,47 @@
+# Yoke of the Past (Q385), level 20: the character accepts at a gatekeeper of the Ziggurat, relogs, and is asked for scrolls. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q385_yoke_of_the_past_accept.golden
+character Yoke 20
+script quest.Q385_YokeOfThePast
+item 5902 5965
+page gatekeeper/31095.htm
+page script/quest/Q385_YokeOfThePast/
+npc gatekeeper 31095 DungeonGatekeeper 10 0 0
+npc small 21208 Monster 40 0 0
+npc big 21255 Monster 50 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=gatekeeper/31095.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q385_YokeOfThePast 03.htm
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/03.htm
+  S ActionFailed
+bypass Quest Q385_YokeOfThePast 04.htm
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/04.htm
+  S ActionFailed
+bypass Quest Q385_YokeOfThePast 05.htm
+  S QuestList 385:0x80000001
+  S ExShowQuestMark quest=385
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/05.htm
+  S ActionFailed
+  Q upsert Q385_YokeOfThePast | <state> | STARTED
+  Q upsert Q385_YokeOfThePast | <cond> | 1
+  rows Q385_YokeOfThePast <cond>=1 <state>=STARTED
+relog
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=gatekeeper/31095.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/08.htm
+  S ActionFailed
+  S ActionFailed

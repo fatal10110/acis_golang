@@ -201,8 +201,22 @@ func TestHallSiegeScriptStepOverrides(t *testing.T) {
 	if !w.siege.Instant() {
 		t.Fatal("no siege to close")
 	}
-	if steps, delays := rec.seen(); len(steps) != 4 || steps[3] != "prepare" || delays[3] != 0 {
+	// The close arms the start after 0: it runs on the siege's queue, not
+	// inside Instant, so the start may or may not have run yet.
+	if steps, delays := rec.seen(); len(steps) < 4 || steps[3] != "prepare" || delays[3] != 0 {
 		t.Fatalf("after Instant: steps %v, delays %v; want a prepare after 0", steps, delays)
+	}
+	w.srv.AdvanceUntil(t, "the start Instant armed", func() bool {
+		steps, _ := rec.seen()
+		return len(steps) >= 5
+	})
+	// The end cleared the attackers, so the base start finds none and
+	// opens the registrations again.
+	steps, delays := rec.seen()
+	if !slices.Equal(steps, []string{"prepare", "start", "end", "prepare", "start"}) ||
+		!slices.Equal(delays, []time.Duration{time.Hour, 0, 0, 0, 0}) || !w.siege.Registering() {
+		t.Fatalf("after Instant's start: steps %v, delays %v, registering %v; want the close after 0, then the start",
+			steps, delays, w.siege.Registering())
 	}
 }
 

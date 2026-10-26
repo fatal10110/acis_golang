@@ -165,9 +165,10 @@ func (n *NPC) SetHeading(heading int) {
 	h.SetHeading(heading)
 }
 
-// summonTeleporter is a summon an ordinary teleport moves.
-type summonTeleporter interface {
-	TeleportTo(target location.Location)
+// jumpTeleporter is a creature an ordinary teleport moves where a jump
+// lands: a hostile or a civilian NPC, or a summon.
+type jumpTeleporter interface {
+	TeleportJump(j location.Jump)
 }
 
 // TeleportTo makes c do its ordinary teleport to at, with no scatter: an
@@ -186,12 +187,33 @@ func TeleportTo(c Creature, at Place) {
 	case *Player:
 		h.TeleportTo(at, 0)
 	default:
-		s, ok := tracked(c).(summonTeleporter)
-		if !ok {
-			panic(fmt.Sprintf("script: the teleport of %T", tracked(c)))
-		}
-		s.TeleportTo(groundOf(at))
+		teleportJump(c, jumpTo(at))
 	}
+}
+
+// TeleportNear is c's TeleportTo aimed at a point up to offset away from at
+// on each axis. For an NPC or a summon the script random source draws the
+// x offset, then the y one, each in [-offset, offset], and c lands as far
+// as a straight walk from at toward that point gets on the geodata, then
+// on the ground there unless it lies in water; a player scatters as
+// TeleportTo of Player does with offset. An offset of 0 or less aims at at
+// itself.
+func (s *Script) TeleportNear(c Creature, at Place, offset int) {
+	if p, ok := c.(*Player); ok {
+		p.TeleportTo(at, offset)
+		return
+	}
+	teleportJump(c, s.scatter(at, offset))
+}
+
+// teleportJump makes c, an NPC or a summon, do its ordinary teleport to
+// where j lands; any other creature, or a handle on nothing, panics.
+func teleportJump(c Creature, j location.Jump) {
+	o, ok := tracked(c).(jumpTeleporter)
+	if !ok {
+		panic(fmt.Sprintf("script: the teleport of %T", tracked(c)))
+	}
+	o.TeleportJump(j)
 }
 
 // groundOf is the point of at, without its heading.
@@ -254,6 +276,13 @@ func (c *creature) InstantTeleportTo(at Place) { instantTeleport(c, jumpTo(at)) 
 // a straight walk from at toward that point gets on the geodata. An offset
 // of 0 or less aims at at itself.
 func (s *Script) InstantTeleportNear(c Creature, at Place, offset int) {
+	instantTeleport(c, s.scatter(at, offset))
+}
+
+// scatter is a jump to at aimed, for an offset above 0, at a point the
+// script random source draws up to offset away on each axis: the x offset
+// first, then the y one, each in [-offset, offset].
+func (s *Script) scatter(at Place, offset int) location.Jump {
 	j := jumpTo(at)
 	if offset > 0 {
 		dx := s.env.Rand(2*offset+1) - offset
@@ -261,7 +290,7 @@ func (s *Script) InstantTeleportNear(c Creature, at Place, offset int) {
 		j.Toward = location.Location{X: j.To.X + dx, Y: j.To.Y + dy, Z: j.To.Z}
 		j.Scattered = true
 	}
-	instantTeleport(c, j)
+	return j
 }
 
 // ClassTypeOf returns the teaching line of the class classID: fighter,

@@ -1,0 +1,42 @@
+# Yoke of the Past (Q385), level 20: two monsters drop scrolls and the gatekeeper turns them into blank scrolls and lets the character go. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q385_yoke_of_the_past_drops.golden
+character Yoke 20
+quest Q385_YokeOfThePast <cond>=1 <state>=STARTED
+random 0 0 0 0
+script quest.Q385_YokeOfThePast
+item 5902 5965
+page gatekeeper/31095.htm
+page script/quest/Q385_YokeOfThePast/
+npc gatekeeper 31095 DungeonGatekeeper 10 0 0
+npc small 21208 Monster 40 0 0
+npc big 21255 Monster 50 0 0
+
+kill small
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5902
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill big
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5902
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5902=2
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=gatekeeper/31095.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest
+  S ActionFailed
+  S SystemMessage id=301 3:5902 6:2
+  S SystemMessage id=53 3:5965 6:2
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q385_YokeOfThePast 10.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/10.htm
+  S ActionFailed
+  Q delete-quest Q385_YokeOfThePast
+  items 5902=0 5965=2
+  state Q385_YokeOfThePast -

@@ -38,7 +38,13 @@ var chain = []struct {
 	{"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3", BossType3},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3AnaisAggressive", BossType3AnaisAggressive},
 	{"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4", BossType4},
+	{"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive", BossType4AndreasAggressive},
+	{"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5", BossType5},
+	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateArcher", PrivateArcher},
+	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateFighter", PrivateFighter},
+	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer", PrivateHealer},
 	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard", PrivateStandard},
+	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard", PrivateWizard},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -128,7 +134,8 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // RaidBossType1Aggressive and RaidBossParty, which bind no NPC of their
 // own, and every folded per-(npc, event) list restricted to the chain's
 // scripts. 25512, which RaidBossType1 and DrChaosGiganticGolem both bind,
-// runs DrChaosGiganticGolem, listed later, on every event.
+// runs DrChaosGiganticGolem, listed later, on every event, and 29062, which
+// RaidBossType4 and RaidBossType4AndreasAggressive both bind, runs Andreas.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -143,11 +150,6 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := readView(t, "dump", bufio.NewScanner(strings.NewReader(dump.String())))
-	// 29062, which RaidBossType4 binds, runs RaidBossType4AndreasAggressive, a
-	// later child not in the chain, on every event in the reference: its fold
-	// names no chain script. TestUnportedAndreasKeepsItsIDOnTheStandIns covers
-	// it.
-	got.folds = slices.DeleteFunc(got.folds, func(f string) bool { return strings.Fields(f)[1] == "29062" })
 
 	path := filepath.Join("..", "..", "testdata", "oracle", "manifest.golden")
 	f, err := os.Open(path)
@@ -174,14 +176,16 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	// RaidBossForTeleportDungeon (4 events on 6 ids, dying on 6), Sailren,
 	// DrChaosGiganticGolem, FreyaRoyalGuard, RaidBossType2, Gordon (7 events on 29095),
 	// IceFairySirra (9 events on 29056), RaidBossType3 (29096 aside), RaidBossType3AnaisAggressive
-	// (9 events on 29096) and RaidBossType4 (29062 aside).
-	if wantFolds, got := 95*6+38*4+6+(4*6+6)+7+7+6+34*6+7+9+30*6+9+44*6, len(want.folds); got != wantFolds {
+	// (9 events on 29096), RaidBossType4 (29062 aside), RaidBossType4AndreasAggressive
+	// (11 events on 29062), RaidBossType5, RaidPrivateArcher, RaidPrivateFighter,
+	// RaidPrivateHealer (8 events on 48 ids) and RaidPrivateWizard (7 events on 54 ids).
+	if wantFolds, got := 95*6+38*4+6+(4*6+6)+7+7+6+34*6+7+9+30*6+9+44*6+11+54*6+30*7+101*6+48*8+54*7, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{25006, 25526, 29097, 25019, 25163, 29036, 29040, 25333, 25338, 29065, 25512, 29060, 25286, 29030, 29095, 29056, 25269, 29096, 25319} {
+	for _, id := range []int32{25006, 25526, 29097, 25019, 25163, 29036, 29040, 25333, 25338, 29065, 25512, 29060, 25286, 29030, 29095, 29056, 25269, 29096, 25319, 29062, 25109, 25005, 29098, 25003, 25332} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

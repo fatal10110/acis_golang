@@ -1,0 +1,23 @@
+# Test Of Magus (Q228), refused: a level 39 Warrior is turned away by Rukal (the test is for
+# wizards), and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q228_test_of_magus_wrong_class.golden
+character Warrior 39
+class 1
+script quest.Q228_TestOfMagus
+item 2840 2841 2842 2843 2844 2845 2846 2847 2848 2849 2850 2851 2852 2853 2854 2855 2856 2857 2858 2859 2860 2861 2862 2863 7562
+page default/30629.htm
+page script/quest/Q228_TestOfMagus/
+npc rukal 30629 Folk 10 0 0
+
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q228_TestOfMagus CREATED
+  rows Q228_TestOfMagus -

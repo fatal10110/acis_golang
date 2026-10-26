@@ -9,9 +9,7 @@ import (
 // TestMatchesReferenceFingerprints compares the package with the reference
 // classes: literals, engine calls and hook shapes. The reference names the
 // gigantic golem's lines by their NpcString constants, which the port
-// writes as ids; its camera shot takes the NPC's object id, which the NPC
-// handle's camera shot centres on itself, and Gordon reads a seen ground
-// item's object id from the see-item list's field; and Sailren's party read
+// writes as ids, and Sailren's party read
 // (Player.PartyMembers) shares its name with the quest helper.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
@@ -30,8 +28,14 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3",
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType3AnaisAggressive",
 		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4",
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive",
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5",
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard",
-	}, "number 1010582", "number 1010583", "number 1010643", "number 1121002", "call WorldObject.getObjectId", "call Quest.getPartyMembers")
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateArcher",
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateFighter",
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer",
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard",
+	}, "number 1010582", "number 1010583", "number 1010643", "number 1121002", "call Quest.getPartyMembers")
 	if err != nil {
 		t.Fatal(err)
 	}

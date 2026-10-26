@@ -1,0 +1,36 @@
+# Path to a Cleric (Q405), a level 19 human mystic with the Mark of Fate already is refused. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q405_path_to_a_cleric_has_mark.golden
+character Cleric 19
+class 10
+hold 1201 1
+script quest.Q405_PathToACleric
+item 1191 1192 1193 1194 1195 1196 1197 1198 1199 1200 1201
+page trainer/30022.htm
+page merchant/30253.htm
+page guard/30333.htm
+page trainer/30030.htm
+page default/30408.htm
+page default/30017.htm
+page script/quest/Q405_PathToACleric/
+npc zigaunt 30022 Trainer 10 0 0
+npc simplon 30253 Merchant -10 0 0
+npc praga 30333 Guard 20 0 0
+npc vivyan 30030 Trainer -20 0 0
+npc lionel 30408 Folk 30 0 0
+npc gallint 30017 Folk -30 0 0
+npc leader 20029 Monster 40 0 0
+npc zombie 20026 Monster 50 0 0
+
+action zigaunt
+  items 1201=1
+  rows Q405_PathToACleric -
+  state Q405_PathToACleric -
+action zigaunt
+  S ActionFailed
+  S NpcHtmlMessage obj=zigaunt item=0 page=trainer/30022.htm
+  S ActionFailed
+bypass npc_{zigaunt}_Quest
+  S NpcHtmlMessage obj=zigaunt item=0 page=script/quest/Q405_PathToACleric/30022-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q405_PathToACleric CREATED

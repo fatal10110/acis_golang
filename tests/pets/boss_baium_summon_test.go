@@ -167,8 +167,16 @@ func TestBaiumCallsTheSummonItSawWhenItsWakerIsGone(t *testing.T) {
 	drainFrames(t, w.client)
 	ox, oy, oz := w.srv.PlayerPosition(t, w.ownerID)
 
+	// The call comes 11.5 s + 7.3 s after the wake, from two chained
+	// timers; on the wall clock they can fire after the sleep, so the test
+	// reads on until Baium's line and the wolf's teleport have come.
 	w.srv.Advance(t, 18800*time.Millisecond)
-	frames := w.srv.ReadQueued(t, w.client)
+	var frames [][]byte
+	w.srv.AdvanceUntil(t, "Baium's call", func() bool {
+		frames = append(frames, w.srv.ReadQueued(t, w.client)...)
+		got, _ := teleports(frames, wolf.ObjectID())
+		return len(got) > 0 && slices.ContainsFunc(frames, func(f []byte) bool { return f[0] == serverpackets.OpcodeNpcSay })
+	})
 
 	says := 0
 	for _, f := range frames {

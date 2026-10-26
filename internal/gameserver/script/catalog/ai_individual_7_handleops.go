@@ -136,10 +136,61 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnSeeSpell":      {"NPC.TopDesireTarget"},
 			"OnTimer":         {"NPC.RandomizeAttack"},
 		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive": {
+			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.HateList", "NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5": {
+			"OnAttacked":      {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
 		"script.ai.individual.Monster.RaidBoss.RaidBossStandard": {
 			"OnAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
 			"OnSeeSpell": {"NPC.TopDesireTarget"},
 			"OnTimer":    {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateArcher": {
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateFighter": {
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer": {
+			"OnAttacked":      {"NPC.InsideZone"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard": {
+			"OnAttacked":      {"NPC.InsideZone"},
+			"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
+			"OnSeeSpell":      {"NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold": {
+			"OnAttacked":         {"NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.TopDesireTarget"},
+			"OnUseSkillFinished": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus": {
+			"OnAttacked":         {"NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.TopDesireTarget"},
+			"OnUseSkillFinished": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive": {
+			"OnAttacked":         {"NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.TopDesireTarget"},
+			"OnUseSkillFinished": {"NPC.TopDesireTarget"},
 		},
 	}
 }

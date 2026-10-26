@@ -21,6 +21,8 @@ import (
 type Hall struct {
 	s   *clanhall.HallSiege
 	env *Env
+	// sc is the script the handle was made for.
+	sc *Script
 }
 
 // HallSpawn names one of a hall's spawn lists.
@@ -76,7 +78,7 @@ func (s *Script) SiegableHall(id int32) *Hall {
 	if !ok {
 		return nil
 	}
-	return &Hall{s: hs, env: s.env}
+	return &Hall{s: hs, env: s.env, sc: s}
 }
 
 // HallOf returns the siegable clan hall the NPC serves, nil for none: the
@@ -217,6 +219,10 @@ func (h *Hall) ArmStart(d time.Duration) { h.s.ArmStart(d) }
 
 // ArmEnd arms the siege's end after d, as the siege step armed last.
 func (h *Hall) ArmEnd(d time.Duration) { h.s.ArmEnd(d) }
+
+// PreviouslyOwned reports whether a clan owned the hall as the
+// registrations of its siege closed.
+func (h *Hall) PreviouslyOwned() bool { return h.s.PreviouslyOwned() }
 
 // SetMissionAccomplished records whether a clan won the siege; the base
 // end then gives the hall to the winner.

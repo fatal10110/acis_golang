@@ -14,14 +14,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// chain is the behavior chain down to the Antharas behavior this package
-// ports, in scripts.xml order, with the Go constructor of each.
+// chain is the behavior chain down to the Antharas behavior, then the
+// Heart of Warding, in scripts.xml order, with the Go constructor of each.
 var chain = []struct {
 	path string
 	ctor func() script.Script
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.boss.antharas.Antharas", Antharas},
+	{"script.ai.boss.antharas.HeartOfWarding", HeartOfWarding},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -105,10 +106,11 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 
 // TestRegistrationMatchesReferenceManifest registers the chain's Go
 // scripts through the engine registry, with the engine's own seam gate and
-// Antharas (GrandBoss) hostile. None is refused, and the registry dump equals
-// the reference manifest for the chain: each script's kind and bind lines,
-// and every folded per-(npc, event) list restricted to the chain's
-// scripts: Antharas's three ids on its 8 events.
+// Antharas (GrandBoss) hostile and the Heart of Warding a folk. None is
+// refused, and the registry dump equals the reference manifest for the
+// chain: each script's kind and bind lines, and every folded per-(npc,
+// event) list restricted to the chain's scripts: Antharas's three ids on
+// its 8 events, the Heart on its created, first talk and talk.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -116,7 +118,12 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 		list[i] = script.Listing{Path: c.path}
 		catalog[c.path] = c.ctor
 	}
-	kindOf := func(int32) (script.NPCKind, bool) { return script.KindHostile, true }
+	kindOf := func(id int32) (script.NPCKind, bool) {
+		if id == heartID {
+			return script.KindFolk, true
+		}
+		return script.KindHostile, true
+	}
 	r := script.Build(list, catalog, script.Config{KindOf: kindOf, Log: zerolog.Nop()})
 	var dump strings.Builder
 	if err := r.Dump(&dump); err != nil {
@@ -145,8 +152,8 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 3*8, len(want.folds); got != wantFolds {
-		t.Fatalf("reference folds = %d entries, want %d: Antharas's three ids on 8 events", got, wantFolds)
+	if wantFolds, got := 3*8+3, len(want.folds); got != wantFolds {
+		t.Fatalf("reference folds = %d entries, want %d: Antharas's three ids on 8 events, the Heart on 3", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)

@@ -1,0 +1,66 @@
+# Sorrowful Sound of Flute (Q363), the clothes: a character at cond 2 takes the clothes instead of the flute;
+# Barbado is not pleased and the quest ends with the give up sound. Expectations replay the reference trace
+# of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q363_sorrowful_sound_of_flute_failure.golden
+character Flute 15
+quest Q363_SorrowfulSoundOfFlute <cond>=2 <state>=STARTED
+script quest.Q363_SorrowfulSoundOfFlute
+item 4318 4319 4320 4420
+page default/30956.htm
+page villagemaster/30595.htm
+page default/30959.htm
+page script/quest/Q363_SorrowfulSoundOfFlute/
+npc nanarin 30956 Folk 10 0 0
+npc opix 30595 VillageMasterDwarf 20 0 0
+npc barbado 30959 Folk 30 0 0
+
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-04.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q363_SorrowfulSoundOfFlute <cond>=2 <state>=STARTED
+bypass Quest Q363_SorrowfulSoundOfFlute 30956-05.htm
+  S QuestList 363:0x80000007
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4318
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-05.htm
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 3
+  rows Q363_SorrowfulSoundOfFlute <cond>=3 <state>=STARTED
+  items 4318=1
+action barbado
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S QuestList 363:0x8000000f
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4318
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30959-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 4
+  rows Q363_SorrowfulSoundOfFlute <cond>=4 <state>=STARTED
+  items 4318=0
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q363_SorrowfulSoundOfFlute
+  state Q363_SorrowfulSoundOfFlute -
+  rows Q363_SorrowfulSoundOfFlute -

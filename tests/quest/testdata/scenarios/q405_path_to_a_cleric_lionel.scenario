@@ -1,0 +1,140 @@
+# Path to a Cleric (Q405), level 19 with the second letter: Lionel gives his book, Gallint a certificate for it, and Lionel the covenant; Zigaunt gives the mark; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q405_path_to_a_cleric_lionel.golden
+character Cleric 19
+class 10
+quest Q405_PathToACleric <cond>=3 <state>=STARTED
+hold 1192 1
+script quest.Q405_PathToACleric
+item 1191 1192 1193 1194 1195 1196 1197 1198 1199 1200 1201
+page trainer/30022.htm
+page merchant/30253.htm
+page guard/30333.htm
+page trainer/30030.htm
+page default/30408.htm
+page default/30017.htm
+page script/quest/Q405_PathToACleric/
+npc zigaunt 30022 Trainer 10 0 0
+npc simplon 30253 Merchant -10 0 0
+npc praga 30333 Guard 20 0 0
+npc vivyan 30030 Trainer -20 0 0
+npc lionel 30408 Folk 30 0 0
+npc gallint 30017 Folk -30 0 0
+npc leader 20029 Monster 40 0 0
+npc zombie 20026 Monster 50 0 0
+
+action lionel
+  items 1192=1
+  rows Q405_PathToACleric <cond>=3 <state>=STARTED
+  state Q405_PathToACleric STARTED
+action lionel
+  S ActionFailed
+  S NpcHtmlMessage obj=lionel item=0 page=default/30408.htm
+  S ActionFailed
+bypass npc_{lionel}_Quest
+  S QuestList 405:0x8000000f
+  S ExShowQuestMark quest=405
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1193
+  S NpcHtmlMessage obj=lionel item=0 page=script/quest/Q405_PathToACleric/30408-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q405_PathToACleric | <cond> | 4
+  items 1193=1
+  rows Q405_PathToACleric <cond>=4 <state>=STARTED
+action lionel
+  S ActionFailed
+  S NpcHtmlMessage obj=lionel item=0 page=default/30408.htm
+  S ActionFailed
+bypass npc_{lionel}_Quest
+  S NpcHtmlMessage obj=lionel item=0 page=script/quest/Q405_PathToACleric/30408-03.htm
+  S ActionFailed
+  S ActionFailed
+action zigaunt
+action zigaunt
+  S ActionFailed
+  S NpcHtmlMessage obj=zigaunt item=0 page=trainer/30022.htm
+  S ActionFailed
+bypass npc_{zigaunt}_Quest
+  S NpcHtmlMessage obj=zigaunt item=0 page=script/quest/Q405_PathToACleric/30022-07.htm
+  S ActionFailed
+  S ActionFailed
+action gallint
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+bypass npc_{gallint}_Quest
+  S QuestList 405:0x8000001f
+  S ExShowQuestMark quest=405
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1193
+  S SystemMessage id=54 3:1197
+  S NpcHtmlMessage obj=gallint item=0 page=script/quest/Q405_PathToACleric/30017-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q405_PathToACleric | <cond> | 5
+  items 1193=0 1197=1
+  rows Q405_PathToACleric <cond>=5 <state>=STARTED
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+bypass npc_{gallint}_Quest
+  S NpcHtmlMessage obj=gallint item=0 page=script/quest/Q405_PathToACleric/30017-02.htm
+  S ActionFailed
+  S ActionFailed
+action lionel
+action lionel
+  S ActionFailed
+  S NpcHtmlMessage obj=lionel item=0 page=default/30408.htm
+  S ActionFailed
+bypass npc_{lionel}_Quest
+  S QuestList 405:0x8000003f
+  S ExShowQuestMark quest=405
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1197
+  S SystemMessage id=54 3:1200
+  S NpcHtmlMessage obj=lionel item=0 page=script/quest/Q405_PathToACleric/30408-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q405_PathToACleric | <cond> | 6
+  items 1197=0 1200=1
+  rows Q405_PathToACleric <cond>=6 <state>=STARTED
+action lionel
+  S ActionFailed
+  S NpcHtmlMessage obj=lionel item=0 page=default/30408.htm
+  S ActionFailed
+bypass npc_{lionel}_Quest
+  S NpcHtmlMessage obj=lionel item=0 page=script/quest/Q405_PathToACleric/30408-05.htm
+  S ActionFailed
+  S ActionFailed
+action zigaunt
+action zigaunt
+  S ActionFailed
+  S NpcHtmlMessage obj=zigaunt item=0 page=trainer/30022.htm
+  S ActionFailed
+bypass npc_{zigaunt}_Quest
+  S SystemMessage id=302 3:1192
+  S SystemMessage id=302 3:1200
+  S SystemMessage id=54 3:1201
+  S SystemMessage id=95 1:3200 1:5610
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=zigaunt item=0 page=script/quest/Q405_PathToACleric/30022-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q405_PathToACleric
+  items 1192=0 1200=0 1201=1
+  rows Q405_PathToACleric -
+  state Q405_PathToACleric -
+relog
+action zigaunt
+action zigaunt
+  S ActionFailed
+  S NpcHtmlMessage obj=zigaunt item=0 page=trainer/30022.htm
+  S ActionFailed
+bypass npc_{zigaunt}_Quest
+  S NpcHtmlMessage obj=zigaunt item=0 page=script/quest/Q405_PathToACleric/30022-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q405_PathToACleric CREATED
