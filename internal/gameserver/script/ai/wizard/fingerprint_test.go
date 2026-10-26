@@ -86,6 +86,14 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive",
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHallDDMagic2Aggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseVampireBasic.WizardCorpseVampireTeleport",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardGrowth.WizardGrowthStep2",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcher.WizardFiendArcher",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcher.WizardFiendArcherAggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcher.WizardFiendArcherSelfBuff",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcher.WizardFiendArcherSelfBuffAggressive",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintBasic",
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintBasicAggressive",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)

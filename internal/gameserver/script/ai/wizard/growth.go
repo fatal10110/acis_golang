@@ -134,6 +134,87 @@ func growIntoByOccupation(s *script.Script, n *script.NPC) bool {
 	return true
 }
 
+// growthAppear readies n, grown from a fed beast, as it appears: its
+// feeder (c_ai0) is the object its first spawn parameter names, hated by
+// 100, and its food (i_ai3) the skill its second names, with no feed
+// counted yet (i_ai2) and the growth open (i_ai4 1). It may want its self
+// buff on itself, on a draw under 33, and strikes its feeder by distance.
+func growthAppear(s *script.Script, n *script.NPC) {
+	n.SetInt(script.SlotIntAI4, 1)
+	n.SetSlot(script.SlotCreature0, s.Object(n.Int(script.SlotParam1)))
+	n.SetInt(script.SlotIntAI3, n.Int(script.SlotParam2))
+	if c0 := n.Slot(script.SlotCreature0); c0 != nil {
+		n.HateList().Add(c0, 100)
+	}
+	n.SetInt(script.SlotIntAI2, 0)
+	if s.Rnd(100) < 33 {
+		castByType(n, n, npc.SkillTypeSelfBuff, 1000000)
+	}
+	growthStrikeFeeder(n)
+}
+
+// growOnEvent makes n, told a grown beast appeared near it (event 10018),
+// grow into its last silhouette on a draw under 20 and leave the world. It
+// reports false when its feeder is gone, which ends the hook there.
+func growOnEvent(s *script.Script, e script.ScriptEvent) bool {
+	n := e.NPC
+	if e.EventID == 10018 && s.Rnd(100) < 20 {
+		c0 := n.Slot(script.SlotCreature0)
+		if c0 == nil {
+			return false
+		}
+		growInto(s, n, n.IntParam("silhouette_ex2"), c0)
+		n.DeleteMe()
+	}
+	return true
+}
+
+// GrowthStep2 is WizardGrowthStep2: a spellcasting beast grown once from a
+// fed one, hating its feeder as it appears and striking it by distance.
+// Fed by its feeder it may grow into one of its two silhouettes at even
+// odds, likelier with each feed. Told a grown beast appeared near it
+// (event 10018), it grows into its last silhouette one time in five.
+func GrowthStep2() script.Script {
+	base := ddMagic2Hooks()
+	return script.Script{Dir: growthDir, Behavior: true, NPCs: []int32{21453, 21455, 21457, 21459, 21472, 21474, 21476, 21478, 21491, 21493, 21495, 21497}, Hooks: base.With(script.Hooks{
+		OnCreated: func(s *script.Script, e script.Created) {
+			growthAppear(s, e.NPC)
+			base.Created(s, e)
+		},
+		OnAttacked: func(s *script.Script, e script.Attacked) {
+			if e.Skill.ID != 0 && int32(e.Skill.ID) == e.NPC.Int(script.SlotIntAI3) {
+				growthFed(s, e, 2014, 33)
+				return
+			}
+			base.Attacked(s, e)
+		},
+		OnTimer: func(s *script.Script, e script.Timer) string {
+			n := e.NPC
+			if strings.EqualFold(e.Name, "2001") && (n.Int(script.SlotIntAI4) == 1 || n.Int(script.SlotIntAI4) == 3) && !n.Dead() {
+				silhouette1 := n.IntParam("silhouette1")
+				silhouette2 := n.IntParam("silhouette2")
+				id := silhouette2
+				if s.Rnd(100) < 50 {
+					id = silhouette1
+				}
+				c0 := n.Slot(script.SlotCreature0)
+				if c0 == nil {
+					return ""
+				}
+				growInto(s, n, id, c0)
+				n.DeleteMe()
+			}
+			return base.Timer(s, e)
+		},
+		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
+			if !growOnEvent(s, e) {
+				return
+			}
+			base.ScriptEvent(s, e)
+		},
+	})}
+}
+
 // GrowthStep3Aggressive is WizardGrowthStep3Aggressive: a spellcasting
 // beast grown twice, hating its feeder as it appears and striking it by
 // distance, and striking the players and summons it sees. Fed by its
@@ -146,18 +227,7 @@ func GrowthStep3Aggressive() script.Script {
 	base := ddMagic2AggressiveHooks()
 	return script.Script{Dir: growthDir, Behavior: true, NPCs: []int32{21461, 21463, 21465, 21467, 21480, 21482, 21484, 21486, 21499, 21501, 21503, 21505}, Hooks: base.With(script.Hooks{
 		OnCreated: func(s *script.Script, e script.Created) {
-			n := e.NPC
-			n.SetInt(script.SlotIntAI4, 1)
-			n.SetSlot(script.SlotCreature0, s.Object(n.Int(script.SlotParam1)))
-			n.SetInt(script.SlotIntAI3, n.Int(script.SlotParam2))
-			if c0 := n.Slot(script.SlotCreature0); c0 != nil {
-				n.HateList().Add(c0, 100)
-			}
-			n.SetInt(script.SlotIntAI2, 0)
-			if s.Rnd(100) < 33 {
-				castByType(n, n, npc.SkillTypeSelfBuff, 1000000)
-			}
-			growthStrikeFeeder(n)
+			growthAppear(s, e.NPC)
 			base.Created(s, e)
 		},
 		OnAttacked: func(s *script.Script, e script.Attacked) {
@@ -178,14 +248,8 @@ func GrowthStep3Aggressive() script.Script {
 			return base.Timer(s, e)
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
-			n := e.NPC
-			if e.EventID == 10018 && s.Rnd(100) < 20 {
-				c0 := n.Slot(script.SlotCreature0)
-				if c0 == nil {
-					return
-				}
-				growInto(s, n, n.IntParam("silhouette_ex2"), c0)
-				n.DeleteMe()
+			if !growOnEvent(s, e) {
+				return
 			}
 			base.ScriptEvent(s, e)
 		},

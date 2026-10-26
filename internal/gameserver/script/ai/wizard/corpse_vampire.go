@@ -1,6 +1,9 @@
 package wizard
 
 import (
+	"strings"
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
@@ -154,6 +157,44 @@ func CorpseVampireRangeAggressive() script.Script {
 				hateList.AddDefault(c)
 				base.SeeCreature(s, e)
 			}
+		},
+	})}
+}
+
+// CorpseVampireTeleport is WizardCorpseVampireTeleport: a
+// WizardCorpseVampireBasic that looks around itself every 10 s and, settled
+// and not attacking, jumps to a playable it sees farther than 200, stopping
+// what it does and wanting its teleport effect on itself; in its territory
+// it then wants to attack the playable, weight 200.
+func CorpseVampireTeleport() script.Script {
+	base := corpseVampireBasicHooks()
+	return script.Script{Dir: corpseVampireDir, Behavior: true, NPCs: []int32{21588, 21589}, Hooks: base.With(script.Hooks{
+		OnCreated: func(s *script.Script, e script.Created) {
+			s.StartTimerAtFixedRate("3000", e.NPC, nil, 10000*time.Millisecond, 10000*time.Millisecond)
+			base.Created(s, e)
+		},
+		OnSeeCreature: func(s *script.Script, e script.SeeCreature) {
+			n, c := e.NPC, e.Creature
+			if !c.Playable() {
+				base.SeeCreature(s, e)
+				return
+			}
+			if n.Intention() != script.IntentionAttack && n.LifeTime() > 7 {
+				if n.Distance2D(c) > 200 {
+					n.AbortAll()
+					n.TeleportTo(c)
+					castByType(n, n, npc.SkillTypeTeleportEffect, 1000000)
+				}
+				if n.InMyTerritory() {
+					n.AddAttackDesire(c, 200)
+				}
+			}
+		},
+		OnTimer: func(s *script.Script, e script.Timer) string {
+			if strings.EqualFold(e.Name, "3000") {
+				e.NPC.LookNeighbor()
+			}
+			return base.Timer(s, e)
 		},
 	})}
 }
