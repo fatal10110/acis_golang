@@ -58,6 +58,14 @@ var individual6 = []struct {
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2Curse", HereticDDMagic2Curse},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2CurseAggressive", HereticDDMagic2CurseAggressive},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro", CorpseNecro},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroAggressive", CorpseNecroAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroSummon", CorpseNecroSummon},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroSummonAggressive", CorpseNecroSummonAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseVampireBasic.WizardCorpseVampireBasic", CorpseVampireBasic},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseVampireBasic.WizardCorpseVampireBasicAggressive", CorpseVampireBasicAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseVampireBasic.WizardCorpseVampireCurseAggressive", CorpseVampireCurseAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseVampireBasic.WizardCorpseVampireRange", CorpseVampireRange},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseVampireBasic.WizardCorpseVampireRangeAggressive", CorpseVampireRangeAggressive},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Heal", DDMagic2Heal},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2HealAggressive", DDMagic2HealAggressive},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Solina", DDMagic2Solina},
@@ -131,7 +139,10 @@ func readIndividual6View(t *testing.T, path string, ours map[string]bool, text *
 // its child (2 + 3 ids), the 10 of each id of WizardDDMagic2Heal, its two
 // children and WizardCorpseNecro (10 + 2 + 1 + 4 ids) and the 11 of each id
 // of WizardHealer, its child, WizardHereticDDMagic2Aggressive and
-// WizardHereticDDMagicCurse (2 + 1 + 2 + 1 ids) close the count.
+// WizardHereticDDMagicCurse (2 + 1 + 2 + 1 ids), and the 10 of each id of
+// WizardCorpseNecro's three children and WizardCorpseVampireBasic's
+// children (3 + 4 + 2 + 3 + 1 + 1 + 1 ids; WizardCorpseVampireBasicAggressive
+// binds none) close the count.
 func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, 0, len(chain)+len(individual6))
 	catalog := script.Catalog{}
@@ -162,8 +173,8 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual6View(t, path, ours, sc)
-	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10+49*10+45*10+5*11+17*10+6*11 {
-		t.Fatalf("reference folds = %d entries, want 2203", got)
+	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10+49*10+45*10+5*11+17*10+6*11+15*10 {
+		t.Fatalf("reference folds = %d entries, want 2353", got)
 	}
 
 	for _, c := range individual6 {
@@ -180,7 +191,7 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{22214, 21347, 21373, 21596, 21599, 21090, 22163, 22171, 22033, 22035, 22041, 22043, 21312, 21544, 21541, 21542, 21545, 20972, 21543, 21546, 21823, 22158, 22162, 22174, 22166, 22165, 22168, 22173, 35634, 18343, 22136, 22143, 22151, 20092, 18147, 18138, 21404, 18139, 18228} {
+	for _, id := range []int32{22214, 21347, 21373, 21596, 21599, 21090, 22163, 22171, 22033, 22035, 22041, 22043, 21312, 21544, 21541, 21542, 21545, 20972, 21543, 21546, 21823, 22158, 22162, 22174, 22166, 22165, 22168, 22173, 35634, 18343, 22136, 22143, 22151, 20092, 18147, 18138, 21404, 18139, 18228, 21581, 21563, 21559, 21576, 21585, 21591, 21586} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want its behavior bound", id)
 		}
