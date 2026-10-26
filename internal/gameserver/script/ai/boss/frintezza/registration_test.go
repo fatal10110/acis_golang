@@ -21,9 +21,15 @@ var chain = []struct {
 	ctor func() script.Script
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
+	{"script.ai.boss.frintezza.AlarmDevice", AlarmDevice},
+	{"script.ai.boss.frintezza.EvilateA", EvilateA},
+	{"script.ai.boss.frintezza.EvilateB", EvilateB},
+	{"script.ai.boss.frintezza.FollowerDummy", FollowerDummy},
 	{"script.ai.boss.frintezza.FollowerOfFrintezza", FollowerOfFrintezza},
 	{"script.ai.boss.frintezza.FollowerOfFrintezzaTransform", FollowerOfFrintezzaTransform},
 	{"script.ai.boss.frintezza.Frintezza", Frintezza},
+	{"script.ai.boss.frintezza.FrintezzaSeeker", FrintezzaSeeker},
+	{"script.ai.boss.frintezza.OrganDummy", OrganDummy},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -107,7 +113,8 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 
 // TestRegistrationMatchesReferenceManifest registers the chain's Go
 // scripts through the engine registry, with the engine's own seam gate and
-// every id a hostile NPC, as the follower is a grand boss. None is refused,
+// each id the kind its template has: the organ dummy, the follower's dummy
+// and the seeker are civilians, every other one is hostile. None is refused,
 // and the registry dump equals the reference manifest for the chain: each
 // script's kind and bind lines and every folded per-(npc, event) list
 // restricted to the chain's scripts.
@@ -118,8 +125,14 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 		list[i] = script.Listing{Path: c.path}
 		catalog[c.path] = c.ctor
 	}
-	hostile := func(int32) (script.NPCKind, bool) { return script.KindHostile, true }
-	r := script.Build(list, catalog, script.Config{KindOf: hostile, Log: zerolog.Nop()})
+	kindOf := func(id int32) (script.NPCKind, bool) {
+		switch id {
+		case 29052, 29053, 29059:
+			return script.KindFolk, true
+		}
+		return script.KindHostile, true
+	}
+	r := script.Build(list, catalog, script.Config{KindOf: kindOf, Log: zerolog.Nop()})
 	var dump strings.Builder
 	if err := r.Dump(&dump); err != nil {
 		t.Fatal(err)
@@ -148,14 +161,15 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 		}
 	}
 	// FollowerOfFrintezza: eight events on 29046; its transform: seven on
-	// 29047; Frintezza: six on 29045.
-	if got := len(want.folds); got != 21 {
-		t.Fatalf("reference folds = %d entries, want 21", got)
+	// 29047; Frintezza: six on 29045; the alarm, both portraits and the
+	// organ dummy three each; the seeker two; the follower's dummy one.
+	if got := len(want.folds); got != 36 {
+		t.Fatalf("reference folds = %d entries, want 36", got)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{29045, 29046, 29047} {
+	for _, id := range []int32{18328, 29045, 29046, 29047, 29048, 29049, 29052, 29053, 29059} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
