@@ -15,8 +15,14 @@ const corpseNecroDir = "ai/individual/Monster/WizardBase/Wizard/WizardDDMagic2/W
 // creature it remembers, its cancel lands on that creature, without its
 // parent's death line.
 func CorpseNecro() script.Script {
+	return script.Script{Dir: corpseNecroDir, Behavior: true, NPCs: []int32{21565, 21580, 21584, 21558}, Hooks: corpseNecroHooks()}
+}
+
+// corpseNecroHooks are CorpseNecro's hooks, which its children derive
+// theirs from.
+func corpseNecroHooks() script.Hooks {
 	base := ddMagic2Hooks()
-	return script.Script{Dir: corpseNecroDir, Behavior: true, NPCs: []int32{21565, 21580, 21584, 21558}, Hooks: base.With(script.Hooks{
+	return base.With(script.Hooks{
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			n, attacker := e.NPC, e.Attacker
 			if attacker.Playable() {
@@ -41,5 +47,5 @@ func CorpseNecro() script.Script {
 				}
 			}
 		},
-	})}
+	}).Named("WizardCorpseNecro")
 }
