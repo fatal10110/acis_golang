@@ -1,0 +1,20 @@
+# Testimony Of Glory (Q220), refused: a level 36 Orc Raider is told by Vokian to come back at level 37, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q220_testimony_of_glory_low_level.golden
+character Scholar 36
+class 45
+script quest.Q220_TestimonyOfGlory
+item 3203 3204 3205 3206 3207 3208 3209 3210 3211 3212 3213 3214 3215 3216 3217 3218 3219 3220 3221 3222 3223 3224 3225 3226 3227 3228 3229 3230 3231 3232 3233 3234 3235 3236 3237 7562
+page trainer/30514.htm
+page script/quest/Q220_TestimonyOfGlory/
+npc vokian 30514 Trainer -20 10 0
+
+action vokian
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+bypass npc_{vokian}_Quest
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q220_TestimonyOfGlory/30514-02.htm
+  S ActionFailed
+  S ActionFailed

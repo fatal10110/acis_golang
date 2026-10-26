@@ -1,0 +1,122 @@
+# Testimony Of Glory (Q220), the chiefs' trophies: a level 38 Orc Raider at cond 4 holding Chianta's order, Voltar's, Kepra's and Burai's gloves and the scepters of Vuku and Tunath
+# kills Pashika and Vultus (the second takes the glove back) and shows both heads to Voltar for the scepter of Breka, kills four Enku orc overlords and shows the
+# heads to Kepra for the scepter of Enku, kills two Makum bugbear thugs and shows the heads to Burai for the scepter of Turek, which completes the four and sets cond 5.
+# Every script roll is pinned to 1. The privates the chiefs call are not played here (a scenario cannot show a script-spawned NPC): a Boot test plays them.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q220_testimony_of_glory_chiefs.golden
+character Raider 38
+class 45
+random always 1
+quest Q220_TestimonyOfGlory <state>=STARTED <cond>=4
+hold 3210 1
+hold 3223 1
+hold 3225 1
+hold 3227 1
+hold 3213 1
+hold 3215 1
+script quest.Q220_TestimonyOfGlory
+item 3203 3204 3205 3206 3207 3208 3209 3210 3211 3212 3213 3214 3215 3216 3217 3218 3219 3220 3221 3222 3223 3224 3225 3226 3227 3228 3229 3230 3231 3232 3233 3234 3235 3236 3237 7562
+page default/30615.htm
+page default/30616.htm
+page default/30617.htm
+page script/quest/Q220_TestimonyOfGlory/
+npc voltar 30615 Folk -20 10 0
+npc kepra 30616 Folk -10 10 0
+npc burai 30617 Folk 0 10 0
+npc pashika 27080 Monster -60 0 0
+npc vultus 27081 Monster -70 0 0
+npc enku 27082 Monster -80 0 0
+npc makum 27083 Monster -90 0 0
+
+kill pashika
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3221
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3221=1 3223=1
+kill vultus
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3222
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3223
+  items 3222=1 3223=0
+action voltar
+action voltar
+  S ActionFailed
+  S NpcHtmlMessage obj=voltar item=0 page=default/30615.htm
+  S ActionFailed
+bypass npc_{voltar}_Quest
+  S SystemMessage id=302 3:3221
+  S SystemMessage id=302 3:3222
+  S SystemMessage id=54 3:3211
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=voltar item=0 page=script/quest/Q220_TestimonyOfGlory/30615-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 3211=1 3221=0 3222=0
+action voltar
+  S ActionFailed
+  S NpcHtmlMessage obj=voltar item=0 page=default/30615.htm
+  S ActionFailed
+action voltar
+  S ActionFailed
+  S NpcHtmlMessage obj=voltar item=0 page=default/30615.htm
+  S ActionFailed
+bypass npc_{voltar}_Quest
+  S NpcHtmlMessage obj=voltar item=0 page=script/quest/Q220_TestimonyOfGlory/30615-07.htm
+  S ActionFailed
+  S ActionFailed
+kill enku x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3224
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3224
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3224
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3224
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3225
+  items 3224=4 3225=0
+action kepra
+action kepra
+  S ActionFailed
+  S NpcHtmlMessage obj=kepra item=0 page=default/30616.htm
+  S ActionFailed
+bypass npc_{kepra}_Quest
+  S SystemMessage id=301 3:3224 6:4
+  S SystemMessage id=54 3:3212
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kepra item=0 page=script/quest/Q220_TestimonyOfGlory/30616-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 3212=1 3224=0
+kill makum x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3226
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3227
+  items 3226=2 3227=0
+action burai
+action burai
+  S ActionFailed
+  S NpcHtmlMessage obj=burai item=0 page=default/30617.htm
+  S ActionFailed
+bypass npc_{burai}_Quest
+  S SystemMessage id=301 3:3226 6:2
+  S SystemMessage id=54 3:3214
+  S QuestList 220:0x8000001f
+  S ExShowQuestMark quest=220
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q220_TestimonyOfGlory/30617-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q220_TestimonyOfGlory | <cond> | 5
+  state Q220_TestimonyOfGlory STARTED
+  rows Q220_TestimonyOfGlory <cond>=5 <state>=STARTED
+  items 3214=1 3226=0
