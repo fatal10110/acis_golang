@@ -18,8 +18,8 @@ func aiBossFrintezza() script.Catalog {
 		"script.ai.boss.frintezza.FrintezzaSeeker":              frintezza.FrintezzaSeeker,
 		"script.ai.boss.frintezza.FrintezzaTeleporter":          nil,
 		"script.ai.boss.frintezza.OrganDummy":                   frintezza.OrganDummy,
-		"script.ai.boss.frintezza.PortraitSpirit":               nil,
-		"script.ai.boss.frintezza.PortraitSpiritWinged":         nil,
-		"script.ai.boss.frintezza.UndeadBandmaster":             nil,
+		"script.ai.boss.frintezza.PortraitSpirit":               frintezza.PortraitSpirit,
+		"script.ai.boss.frintezza.PortraitSpiritWinged":         frintezza.PortraitSpiritWinged,
+		"script.ai.boss.frintezza.UndeadBandmaster":             frintezza.UndeadBandmaster,
 	}
 }
