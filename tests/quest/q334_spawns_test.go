@@ -149,7 +149,7 @@ func q334Kill(t *testing.T, w *dialogWorld, n *script.NPC) []string {
 	return w.render(t, w.srv.ReadQueued(t, w.srv.Client))
 }
 
-// q334Wishes asserts the quest variable key.
+// q334Row asserts the quest variable key.
 func q334Row(t *testing.T, w *dialogWorld, key, want string) {
 	t.Helper()
 	if got := questRows(t, w.srv, w.player, q334Name)[key]; got != want {

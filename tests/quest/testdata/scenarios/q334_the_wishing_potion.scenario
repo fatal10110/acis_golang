@@ -46,10 +46,10 @@ bypass Quest Q334_TheWishingPotion 30738-04.htm
   Q upsert Q334_TheWishingPotion | <cond> | 1
   state Q334_TheWishingPotion STARTED
   items 3678=1
+relog
+  rows Q334_TheWishingPotion <cond>=1 <state>=STARTED
+  state Q334_TheWishingPotion STARTED
 action matild
-  S ActionFailed
-  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
-  S ActionFailed
 action matild
   S ActionFailed
   S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
@@ -204,3 +204,6 @@ bypass Quest Q334_TheWishingPotion 30738-14.htm
   S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-13.htm
   S ActionFailed
   Q upsert Q334_TheWishingPotion | wish | 0
+relog
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED wish=0
+  state Q334_TheWishingPotion STARTED
