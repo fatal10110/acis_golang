@@ -89,9 +89,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q432"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q503"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q509"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q603"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q604"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q617"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q618"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q619"
@@ -99,6 +101,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q622"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q623"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q624"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q625"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q626"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q627"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q629"
@@ -220,11 +223,11 @@ func quests301Up() script.Catalog {
 		"quest.Q501_ProofOfClanAlliance":               nil,
 		"quest.Q503_PursuitOfClanAmbition":             q503.New,
 		"quest.Q504_CompetitionForTheBanditStronghold": q504.New,
-		"quest.Q509_TheClansPrestige":                  nil,
+		"quest.Q509_TheClansPrestige":                  q509.New,
 		"quest.Q601_WatchingEyes":                      q601.New,
 		"quest.Q602_ShadowOfLight":                     q602.New,
 		"quest.Q603_DaimonTheWhiteEyed_Part1":          q603.New,
-		"quest.Q604_DaimonTheWhiteEyed_Part2":          nil,
+		"quest.Q604_DaimonTheWhiteEyed_Part2":          q604.New,
 		"quest.Q605_AllianceWithKetraOrcs":             nil,
 		"quest.Q606_WarWithVarkaSilenos":               nil,
 		"quest.Q608_SlayTheEnemyCommander":             nil,
@@ -244,7 +247,7 @@ func quests301Up() script.Catalog {
 		"quest.Q622_SpecialtyLiquorDelivery":           q622.New,
 		"quest.Q623_TheFinestFood":                     q623.New,
 		"quest.Q624_TheFinestIngredients_Part1":        q624.New,
-		"quest.Q625_TheFinestIngredients_Part2":        nil,
+		"quest.Q625_TheFinestIngredients_Part2":        q625.New,
 		"quest.Q626_ADarkTwilight":                     q626.New,
 		"quest.Q627_HeartInSearchOfPower":              q627.New,
 		"quest.Q628_HuntOfTheGoldenRamMercenaryForce":  nil,

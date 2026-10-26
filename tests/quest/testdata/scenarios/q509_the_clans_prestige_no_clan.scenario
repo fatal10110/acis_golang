@@ -1,0 +1,19 @@
+# The Clan's Prestige (Q509), refused: a character with no clan is told only a clan leader may take the hunt.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q509_the_clans_prestige_no_clan.golden
+character Leader 40
+script quest.Q509_TheClansPrestige
+page villagemaster/31331.htm
+page script/quest/Q509_TheClansPrestige/
+npc valdis 31331 VillageMasterMystic 10 0 0
+
+action valdis
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q509_TheClansPrestige CREATED
