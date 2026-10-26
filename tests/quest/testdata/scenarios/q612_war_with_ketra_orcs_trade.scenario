@@ -1,0 +1,39 @@
+# War with Ketra Orcs (Q612), started with 150 Ketra molars: Ashas Varka Durai trades 100 of them for 20 Nepenthes Seeds
+# and, when the quest is dropped, takes the 50 left. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q612_war_with_ketra_orcs_trade.golden
+character Ally 74
+standing -1
+quest Q612_WarWithKetraOrcs <cond>=1 <state>=STARTED
+hold 7234 150
+script quest.Q612_WarWithKetraOrcs
+item 7234 7187
+page npcdefault.htm
+page script/quest/Q612_WarWithKetraOrcs/
+npc ashas 31377 Folk 10 0 0
+
+action ashas
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q612_WarWithKetraOrcs/31377-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q612_WarWithKetraOrcs 31377-07.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7234 6:100
+  S SystemMessage id=53 3:7187 6:20
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q612_WarWithKetraOrcs/31377-07.htm
+  S ActionFailed
+  items 7234=50 7187=20
+  rows Q612_WarWithKetraOrcs <cond>=1 <state>=STARTED
+bypass Quest Q612_WarWithKetraOrcs 31377-09.htm
+  S SystemMessage id=301 3:7234 6:50
+  S QuestList
+  Q delete-quest Q612_WarWithKetraOrcs
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q612_WarWithKetraOrcs/31377-09.htm
+  S ActionFailed
+  items 7234=0 7187=20
+  rows Q612_WarWithKetraOrcs -
+  state Q612_WarWithKetraOrcs -

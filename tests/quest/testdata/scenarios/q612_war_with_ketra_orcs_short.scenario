@@ -1,0 +1,26 @@
+# War with Ketra Orcs (Q612), started with 50 Ketra molars: Ashas Varka Durai refuses the trade of 100 molars. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q612_war_with_ketra_orcs_short.golden
+character Ally 74
+standing -1
+quest Q612_WarWithKetraOrcs <cond>=1 <state>=STARTED
+hold 7234 50
+script quest.Q612_WarWithKetraOrcs
+item 7234 7187
+page npcdefault.htm
+page script/quest/Q612_WarWithKetraOrcs/
+npc ashas 31377 Folk 10 0 0
+
+action ashas
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q612_WarWithKetraOrcs/31377-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q612_WarWithKetraOrcs 31377-07.htm
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q612_WarWithKetraOrcs/31377-08.htm
+  S ActionFailed
+  items 7234=50 7187=0

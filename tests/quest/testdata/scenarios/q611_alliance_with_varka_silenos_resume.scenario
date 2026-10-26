@@ -1,0 +1,37 @@
+# Alliance with Varka Silenos (Q611): a character that holds the level 3 mark from an earlier quest takes the quest back at its
+# stage 4, whatever its standing was. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q611_alliance_with_varka_silenos_resume.golden
+character Ally 74
+hold 7223 1
+script quest.Q611_AllianceWithVarkaSilenos
+item 7221 7222 7223 7224 7225 7226 7227 7228 7229 7230 7234
+page npcdefault.htm
+page script/quest/Q611_AllianceWithVarkaSilenos/
+npc naran 31378 Folk 10 0 0
+
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q611_AllianceWithVarkaSilenos 31378-03a.htm
+  Q upsert Q611_AllianceWithVarkaSilenos | <state> | STARTED
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q611_AllianceWithVarkaSilenos | <cond> | 4
+  S QuestList 611:0x8000000f
+  S ExShowQuestMark quest=611
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-06.htm
+  S ActionFailed
+  rows Q611_AllianceWithVarkaSilenos <cond>=4 <state>=STARTED
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-21.htm
+  S ActionFailed
+  S ActionFailed

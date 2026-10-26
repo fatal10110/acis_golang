@@ -1,0 +1,52 @@
+# Magical Power of Water, Part 2 (Q610): a level 75 character with the Green Totem is offered the quest by Asefa and takes it; the totem stays until the altar spends it.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q610_magical_power_of_water_part2_accept.golden
+character Hero 75
+hold 7238 1
+script quest.Q610_MagicalPowerOfWater_Part2
+item 7238 7239
+page npcdefault.htm
+page default/31560.htm
+page script/quest/Q610_MagicalPowerOfWater_Part2/
+npc asefa 31372 Folk 10 0 0
+npc altar 31560 Folk 20 0 0
+npc raid 25316 RaidBoss 40 0 0
+
+action asefa
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{asefa}_Quest
+  S NpcHtmlMessage obj=asefa item=0 page=script/quest/Q610_MagicalPowerOfWater_Part2/31372-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q610_MagicalPowerOfWater_Part2 CREATED
+bypass Quest Q610_MagicalPowerOfWater_Part2 31372-04.htm
+  S QuestList 610:0x80000001
+  S ExShowQuestMark quest=610
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=asefa item=0 page=script/quest/Q610_MagicalPowerOfWater_Part2/31372-04.htm
+  S ActionFailed
+  Q upsert Q610_MagicalPowerOfWater_Part2 | <state> | STARTED
+  Q upsert Q610_MagicalPowerOfWater_Part2 | <cond> | 1
+  rows Q610_MagicalPowerOfWater_Part2 <cond>=1 <state>=STARTED
+  state Q610_MagicalPowerOfWater_Part2 STARTED
+  items 7238=1
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{asefa}_Quest
+  S NpcHtmlMessage obj=asefa item=0 page=script/quest/Q610_MagicalPowerOfWater_Part2/31372-05.htm
+  S ActionFailed
+  S ActionFailed
+action altar
+action altar
+  S ActionFailed
+  S NpcHtmlMessage obj=altar item=0 page=default/31560.htm
+  S ActionFailed
+bypass npc_{altar}_Quest
+  S NpcHtmlMessage obj=altar item=0 page=script/quest/Q610_MagicalPowerOfWater_Part2/31560-01.htm
+  S ActionFailed
+  S ActionFailed

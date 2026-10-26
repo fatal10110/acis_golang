@@ -1,0 +1,37 @@
+# Alliance with Varka Silenos (Q611): a level 74 character with no alliance mark takes the quest from Naran and, with fewer than
+# 100 Ketra soldier badges, is told to hunt them. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q611_alliance_with_varka_silenos_accept.golden
+character Ally 74
+script quest.Q611_AllianceWithVarkaSilenos
+item 7221 7222 7223 7224 7225 7226 7227 7228 7229 7230 7234
+page npcdefault.htm
+page script/quest/Q611_AllianceWithVarkaSilenos/
+npc naran 31378 Folk 10 0 0
+
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q611_AllianceWithVarkaSilenos 31378-03a.htm
+  Q upsert Q611_AllianceWithVarkaSilenos | <state> | STARTED
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q611_AllianceWithVarkaSilenos | <cond> | 1
+  S QuestList 611:0x80000001
+  S ExShowQuestMark quest=611
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-03a.htm
+  S ActionFailed
+  rows Q611_AllianceWithVarkaSilenos <cond>=1 <state>=STARTED
+  state Q611_AllianceWithVarkaSilenos STARTED
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-03b.htm
+  S ActionFailed
+  S ActionFailed
