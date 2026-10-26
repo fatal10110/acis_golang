@@ -1,0 +1,527 @@
+# Test of the War Spirit (Q233), played by a level 39 Orc Shaman who already holds the trophies the
+# kills below do not give (part of the Tonar and Hermodt bones, nine of each of Orim's three
+# trophies, eleven Tamlin orc heads), every script roll pinned: Somak starts it and pays the level
+# 39 set's Dimensional Diamonds; Orim's contract and the three trophies make Braki's remains;
+# Racoy's totem, Vivyan's letter, Sarien's diagram and the noble ants' bones make Kiruna's; the
+# Leto lizardmen's bones make Tonar's through Pekiron; Manakia's totem and Medusa and Stenoa's
+# bones make Hermodt's; Somak takes the four remains for the vendetta totem, the Tamlin orcs'
+# heads complete it and Somak turns it into the second remains and the war spirit totem;
+# Ancestor Martankus takes them for the Mark of War Spirit; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q233_test_of_the_war_spirit.golden
+character Shaman 39
+class 50
+random 0 0 0 71 0 71 0 41 0 41 0 11 0 0 0 0 0 0 0 0 0 0 0 0
+hold 2884 9
+hold 2885 9
+hold 2886 9
+hold 2889 1
+hold 2890 1
+hold 2891 1
+hold 2897 1
+hold 2898 1
+hold 2881 11
+script quest.Q233_TestOfTheWarSpirit
+item 2879 2880 2881 2882 2883 2884 2885 2886 2887 2888 2889 2890 2891 2892 2893 2894 2895 2896 2897 2898 2899 2900 2901 2902 2903 2904 2905 2906 2907 2908 2909 2910 2911 2912 2913 2914 7562
+page trainer/30030.htm
+page trainer/30030-noskills.htm
+page trainer/30507.htm
+page trainer/30507-noskills.htm
+page trainer/30510.htm
+page trainer/30510-noskills.htm
+page trainer/30515.htm
+page trainer/30515-noskills.htm
+page trainer/30682.htm
+page trainer/30682-noskills.htm
+page merchant/30436.htm
+page default/30630.htm
+page default/30649.htm
+page script/quest/Q233_TestOfTheWarSpirit/
+npc somak 30510 Trainer 10 0 0
+npc orim 30630 Folk -10 0 0
+npc racoy 30507 Trainer 0 10 0
+npc vivyan 30030 Trainer 0 -10 0
+npc sarien 30436 Merchant 10 10 0
+npc pekiron 30682 Trainer -10 10 0
+npc manakia 30515 Trainer 10 -10 0
+npc martankus 30649 Folk -10 -10 0
+npc porta 20213 Monster 40 0 0
+npc excuro 20214 Monster -40 0 0
+npc mordeo 20215 Monster 0 40 0
+npc ant 20089 Monster 0 -40 0
+npc antleader 20090 Monster 40 40 0
+npc shaman 20581 Monster -40 40 0
+npc overlord 20582 Monster 40 -40 0
+npc medusa 20158 Monster -40 -40 0
+npc stenoa 27108 Monster 80 0 0
+npc tamlin 20601 Monster -80 0 0
+npc archer 20602 Monster 0 80 0
+
+# Somak: a level 39 Orc Shaman may start; the first test of the set pays the diamonds.
+action somak
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q233_TestOfTheWarSpirit CREATED
+bypass Quest Q233_TestOfTheWarSpirit 30510-05.htm
+  S QuestList 233:0x80000001
+  S ExShowQuestMark quest=233
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7562 6:92
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-05e.htm
+  S ActionFailed
+  Q upsert Q233_TestOfTheWarSpirit | <state> | STARTED
+  Q upsert Q233_TestOfTheWarSpirit | <cond> | 1
+  M set secondClassChange39 | true
+  state Q233_TestOfTheWarSpirit STARTED
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=1
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Orim: the contract, then the three trophies for Braki's remains.
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q233_TestOfTheWarSpirit/30630-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30630-02.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q233_TestOfTheWarSpirit/30630-02.htm
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30630-03.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q233_TestOfTheWarSpirit/30630-03.htm
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30630-04.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2883
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q233_TestOfTheWarSpirit/30630-04.htm
+  S ActionFailed
+  items 2883=1
+kill porta
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2884
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2884=10
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q233_TestOfTheWarSpirit/30630-05.htm
+  S ActionFailed
+  S ActionFailed
+kill excuro
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2885
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill mordeo
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2886
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2884=10 2885=10 2886=10
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S SystemMessage id=301 3:2885 6:10
+  S SystemMessage id=301 3:2886 6:10
+  S SystemMessage id=301 3:2884 6:10
+  S SystemMessage id=302 3:2883
+  S SystemMessage id=54 3:2887
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q233_TestOfTheWarSpirit/30630-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 2883=0 2884=0 2885=0 2886=0 2887=1
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=1
+
+# Racoy, Vivyan and Sarien: the totem, the letter and the diagram, then the noble ants' bones.
+action racoy
+action racoy
+  S ActionFailed
+  S NpcHtmlMessage obj=racoy item=0 page=trainer/30507.htm
+  S ActionFailed
+bypass npc_{racoy}_Quest
+  S NpcHtmlMessage obj=racoy item=0 page=script/quest/Q233_TestOfTheWarSpirit/30507-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30507-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2902
+  S NpcHtmlMessage obj=racoy item=0 page=script/quest/Q233_TestOfTheWarSpirit/30507-02.htm
+  S ActionFailed
+  items 2902=1
+action racoy
+  S ActionFailed
+  S NpcHtmlMessage obj=racoy item=0 page=trainer/30507.htm
+  S ActionFailed
+bypass npc_{racoy}_Quest
+  S NpcHtmlMessage obj=racoy item=0 page=script/quest/Q233_TestOfTheWarSpirit/30507-03.htm
+  S ActionFailed
+  S ActionFailed
+action vivyan
+action vivyan
+  S ActionFailed
+  S NpcHtmlMessage obj=vivyan item=0 page=trainer/30030.htm
+  S ActionFailed
+bypass npc_{vivyan}_Quest
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q233_TestOfTheWarSpirit/30030-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30030-02.htm
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q233_TestOfTheWarSpirit/30030-02.htm
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30030-03.htm
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q233_TestOfTheWarSpirit/30030-03.htm
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30030-04.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2903
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q233_TestOfTheWarSpirit/30030-04.htm
+  S ActionFailed
+  items 2903=1
+action vivyan
+  S ActionFailed
+  S NpcHtmlMessage obj=vivyan item=0 page=trainer/30030.htm
+  S ActionFailed
+bypass npc_{vivyan}_Quest
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q233_TestOfTheWarSpirit/30030-05.htm
+  S ActionFailed
+  S ActionFailed
+action sarien
+action sarien
+  S ActionFailed
+  S NpcHtmlMessage obj=sarien item=0 page=merchant/30436.htm
+  S ActionFailed
+bypass npc_{sarien}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2903
+  S SystemMessage id=54 3:2904
+  S NpcHtmlMessage obj=sarien item=0 page=script/quest/Q233_TestOfTheWarSpirit/30436-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 2903=0 2904=1
+action vivyan
+action vivyan
+  S ActionFailed
+  S NpcHtmlMessage obj=vivyan item=0 page=trainer/30030.htm
+  S ActionFailed
+bypass npc_{vivyan}_Quest
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q233_TestOfTheWarSpirit/30030-06.htm
+  S ActionFailed
+  S ActionFailed
+action racoy
+action racoy
+  S ActionFailed
+  S NpcHtmlMessage obj=racoy item=0 page=trainer/30507.htm
+  S ActionFailed
+bypass npc_{racoy}_Quest
+  S NpcHtmlMessage obj=racoy item=0 page=script/quest/Q233_TestOfTheWarSpirit/30507-05.htm
+  S ActionFailed
+  S ActionFailed
+kill ant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2909
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2909=1
+kill antleader
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2908
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2908=1
+kill ant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2907
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2907=1
+kill antleader
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2906
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2906=1
+kill ant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2905
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2905=1
+action racoy
+  S ActionFailed
+  S NpcHtmlMessage obj=racoy item=0 page=trainer/30507.htm
+  S ActionFailed
+action racoy
+  S ActionFailed
+  S NpcHtmlMessage obj=racoy item=0 page=trainer/30507.htm
+  S ActionFailed
+bypass npc_{racoy}_Quest
+  S SystemMessage id=302 3:2904
+  S SystemMessage id=302 3:2902
+  S SystemMessage id=302 3:2908
+  S SystemMessage id=302 3:2906
+  S SystemMessage id=302 3:2905
+  S SystemMessage id=302 3:2907
+  S SystemMessage id=302 3:2909
+  S SystemMessage id=54 3:2910
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=racoy item=0 page=script/quest/Q233_TestOfTheWarSpirit/30507-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 2902=0 2904=0 2905=0 2906=0 2907=0 2908=0 2909=0 2910=1
+
+# Pekiron: the totem, then the Leto lizardmen's bones for Tonar's remains.
+action pekiron
+action pekiron
+  S ActionFailed
+  S NpcHtmlMessage obj=pekiron item=0 page=trainer/30682.htm
+  S ActionFailed
+bypass npc_{pekiron}_Quest
+  S NpcHtmlMessage obj=pekiron item=0 page=script/quest/Q233_TestOfTheWarSpirit/30682-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30682-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2888
+  S NpcHtmlMessage obj=pekiron item=0 page=script/quest/Q233_TestOfTheWarSpirit/30682-02.htm
+  S ActionFailed
+  items 2888=1
+action pekiron
+  S ActionFailed
+  S NpcHtmlMessage obj=pekiron item=0 page=trainer/30682.htm
+  S ActionFailed
+bypass npc_{pekiron}_Quest
+  S NpcHtmlMessage obj=pekiron item=0 page=script/quest/Q233_TestOfTheWarSpirit/30682-03.htm
+  S ActionFailed
+  S ActionFailed
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2892
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2892=1
+kill overlord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2893
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2893=1
+action pekiron
+  S ActionFailed
+  S NpcHtmlMessage obj=pekiron item=0 page=trainer/30682.htm
+  S ActionFailed
+action pekiron
+  S ActionFailed
+  S NpcHtmlMessage obj=pekiron item=0 page=trainer/30682.htm
+  S ActionFailed
+bypass npc_{pekiron}_Quest
+  S SystemMessage id=302 3:2888
+  S SystemMessage id=302 3:2892
+  S SystemMessage id=302 3:2890
+  S SystemMessage id=302 3:2889
+  S SystemMessage id=302 3:2891
+  S SystemMessage id=302 3:2893
+  S SystemMessage id=54 3:2894
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pekiron item=0 page=script/quest/Q233_TestOfTheWarSpirit/30682-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 2888=0 2889=0 2890=0 2891=0 2892=0 2893=0 2894=1
+
+# Manakia: the totem, then Medusa's and Stenoa's bones for Hermodt's remains, the last of the four.
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q233_TestOfTheWarSpirit/30515-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30515-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2895
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q233_TestOfTheWarSpirit/30515-02.htm
+  S ActionFailed
+  items 2895=1
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q233_TestOfTheWarSpirit/30515-03.htm
+  S ActionFailed
+  S ActionFailed
+kill medusa
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2899
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2899=1
+kill medusa
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2900
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2900=1
+kill stenoa
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2896
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2896=1
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S SystemMessage id=302 3:2895
+  S SystemMessage id=302 3:2899
+  S SystemMessage id=302 3:2897
+  S SystemMessage id=302 3:2896
+  S SystemMessage id=302 3:2898
+  S SystemMessage id=302 3:2900
+  S SystemMessage id=54 3:2901
+  S QuestList 233:0x80000003
+  S ExShowQuestMark quest=233
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q233_TestOfTheWarSpirit/30515-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q233_TestOfTheWarSpirit | <cond> | 2
+  items 2895=0 2896=0 2897=0 2898=0 2899=0 2900=0 2901=1
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=2
+
+# Somak takes the four remains for the vendetta totem; the Tamlin orcs' heads complete it.
+action somak
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S QuestList 233:0x80000007
+  S ExShowQuestMark quest=233
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2887
+  S SystemMessage id=302 3:2901
+  S SystemMessage id=302 3:2910
+  S SystemMessage id=302 3:2894
+  S SystemMessage id=54 3:2880
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q233_TestOfTheWarSpirit | <cond> | 3
+  items 2887=0 2894=0 2901=0 2910=0 2880=1
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=3
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-08.htm
+  S ActionFailed
+  S ActionFailed
+kill tamlin
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 2881=12
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=3
+kill archer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2881
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 233:0x8000000f
+  S ExShowQuestMark quest=233
+  Q upsert Q233_TestOfTheWarSpirit | <cond> | 4
+  items 2881=13
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=4
+
+# Somak: the vendetta totem becomes the second remains and the war spirit totem.
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S QuestList 233:0x8000001f
+  S ExShowQuestMark quest=233
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2880
+  S SystemMessage id=54 3:2911
+  S SystemMessage id=54 3:2913
+  S SystemMessage id=54 3:2914
+  S SystemMessage id=54 3:2912
+  S SystemMessage id=54 3:2882
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q233_TestOfTheWarSpirit | <cond> | 5
+  items 2880=0 2882=1 2911=1 2912=1 2913=1 2914=1
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=5
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-10.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ancestor Martankus: the mark.
+action martankus
+action martankus
+  S ActionFailed
+  S NpcHtmlMessage obj=martankus item=0 page=default/30649.htm
+  S ActionFailed
+bypass npc_{martankus}_Quest
+  S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q233_TestOfTheWarSpirit/30649-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30649-02.htm
+  S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q233_TestOfTheWarSpirit/30649-02.htm
+  S ActionFailed
+bypass Quest Q233_TestOfTheWarSpirit 30649-03.htm
+  S SystemMessage id=301 3:2881 6:13
+  S SystemMessage id=302 3:2882
+  S SystemMessage id=302 3:2911
+  S SystemMessage id=302 3:2913
+  S SystemMessage id=302 3:2914
+  S SystemMessage id=302 3:2912
+  S SystemMessage id=54 3:2879
+  S SystemMessage id=95 1:63483 1:17500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 233:0x00000000
+  S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q233_TestOfTheWarSpirit/30649-03.htm
+  S ActionFailed
+  Q upsert Q233_TestOfTheWarSpirit | <state> | COMPLETED
+  Q delete-except-state Q233_TestOfTheWarSpirit
+  items 2879=1 2881=0 2882=0 2911=0 2912=0 2913=0 2914=0
+  state Q233_TestOfTheWarSpirit COMPLETED
+  rows Q233_TestOfTheWarSpirit <state>=COMPLETED
+relog
+  state Q233_TestOfTheWarSpirit COMPLETED
+  rows Q233_TestOfTheWarSpirit <state>=COMPLETED
+action somak
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
