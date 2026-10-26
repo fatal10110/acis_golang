@@ -376,14 +376,20 @@ func resetTomb(s *script.Script) {
 
 // notifyRemainingTime shows every stored party that leftMinutes are left,
 // for 10 s. A party is reached through the first of its stored members
-// still in a party with another of them; a party none of whose stored
-// members are still grouped together is told nothing.
+// still in a party with another of them, and the slot then takes that
+// party's current members so it follows the party's churn from step to
+// step; a party none of whose stored members are still grouped together
+// is told nothing.
 func (t *teleporter) notifyRemainingTime(leftMinutes int) {
 	text := script.NpcString(1010643, leftMinutes)
 	for _, slot := range t.parties {
-		if p := groupedMember(slot); p != nil {
-			p.ShowPartyScreenMessage(10000, text)
+		p := groupedMember(slot)
+		if p == nil {
+			continue
 		}
+		slot.Clear()
+		slot.Add(p.PartyMembers()...)
+		p.ShowPartyScreenMessage(10000, text)
 	}
 }
 

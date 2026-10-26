@@ -634,7 +634,10 @@ func TestFrintezzaTeleporterChannelRefusals(t *testing.T) {
 // Frintezza and his follower told 0, every maker told 1000, the doors
 // sealed. A channel of the four parties left enters again: its parties take
 // the first four slots, and the fifth keeps the party it held, which is
-// told every step twice; Frintezza reaching stage 2 ends the countdown.
+// told every step twice. A party keeps being told through its churn: a
+// newcomer joins, a step passes, one of the members it entered with
+// leaves, and the next step still reaches it. Frintezza reaching stage 2
+// ends the countdown.
 func TestFrintezzaTeleporterAdmitsAndCountsDown(t *testing.T) {
 	t.Parallel()
 	w := bootTeleporter(t, fztSetup{seats: 10})
@@ -705,24 +708,31 @@ func TestFrintezzaTeleporterAdmitsAndCountsDown(t *testing.T) {
 	w.srv.Settle(t)
 	w.quiet(t)
 
-	countdown := func(minutes int, wait time.Duration, told []int) {
+	// countdownTo advances wait and checks that seat i is shown the step
+	// told[i] times.
+	countdownTo := func(minutes int, wait time.Duration, told map[int]int) {
 		t.Helper()
 		w.srv.Advance(t, wait)
 		for i, p := range w.players {
 			screens := fztScreens(drainFrames(t, p.c))
-			want := 0
-			for _, j := range told {
-				if j == i/2 {
-					want++
-				}
-			}
-			if len(screens) != want {
+			if want := told[i]; len(screens) != want {
 				t.Fatalf("%d minutes: %s shown %d messages, want %d", minutes, p.name, len(screens), want)
 			}
 			for _, f := range screens {
 				requireScreenMessage(t, p.name, [][]byte{f}, fztRemaining(minutes), 10000)
 			}
 		}
+	}
+	// countdown is countdownTo with both seats of each pair in told told
+	// once per mention.
+	countdown := func(minutes int, wait time.Duration, told []int) {
+		t.Helper()
+		seats := map[int]int{}
+		for _, j := range told {
+			seats[2*j]++
+			seats[2*j+1]++
+		}
+		countdownTo(minutes, wait, seats)
 	}
 	steps := []struct {
 		minutes int
@@ -774,8 +784,17 @@ func TestFrintezzaTeleporterAdmitsAndCountsDown(t *testing.T) {
 	w.setMemo4(t, 1)
 	// Slots 0 to 3 hold the pairs 0, 2, 3, 4; slot 4 still holds pair 4.
 	countdown(30, 5*time.Minute, []int{0, 2, 3, 4, 4})
+	// Seat 3 joins the first party, and the step after reaches it whole.
+	w.invite(t, 0, 3, 0)
+	countdownTo(25, 5*time.Minute, map[int]int{0: 1, 1: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 2, 9: 2})
+	// Seat 1, one of the members it was stored with, leaves: the party
+	// lives on with seats 0 and 3 and is still told.
+	w.players[1].c.Send(encodeSingle(clientpackets.OpcodeRequestWithdrawParty))
+	w.srv.Settle(t)
+	w.quiet(t)
+	countdownTo(20, 5*time.Minute, map[int]int{0: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 2, 9: 2})
 	w.setMemo4(t, 2)
-	countdown(25, 5*time.Minute, nil)
+	countdown(15, 5*time.Minute, nil)
 	w.srv.Advance(t, 40*time.Minute)
 	if heard, makers := w.log.take(); len(heard)+len(makers) != 0 {
 		t.Fatalf("after the countdown ended: heard %q, makers %q, want nothing", heard, makers)
