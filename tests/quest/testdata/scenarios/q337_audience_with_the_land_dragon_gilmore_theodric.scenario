@@ -1,0 +1,51 @@
+# Audience with the Land Dragon (Q337), the herald is held: Gilmore sends the character for the third fragment, and Theodric asks for it. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_gilmore_theodric.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=3 <state>=STARTED
+hold 3890 1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page default/30754.htm
+page default/30755.htm
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc gilmore 30754 Folk 10 0 0
+npc theodric 30755 Folk 15 0 0
+
+action gilmore
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S QuestList 337:0x8000000f
+  S ExShowQuestMark quest=337
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30754-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q337_AudienceWithTheLandDragon | <cond> | 4
+  Q upsert Q337_AudienceWithTheLandDragon | drop7 | 1
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30754-04.htm
+  S ActionFailed
+  S ActionFailed
+action theodric
+action theodric
+  S ActionFailed
+  S NpcHtmlMessage obj=theodric item=0 page=default/30755.htm
+  S ActionFailed
+bypass npc_{theodric}_Quest
+  S NpcHtmlMessage obj=theodric item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30755-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 3890=1
+  rows Q337_AudienceWithTheLandDragon <cond>=4 <state>=STARTED drop7=1
+  state Q337_AudienceWithTheLandDragon STARTED

@@ -1,0 +1,19 @@
+# Audience with the Land Dragon (Q337), the cave monsters call no jewel while the third fragment is held, on a draw of 0. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_cave_no_call.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=4 <state>=STARTED drop7=1
+hold 3861 1
+random 0 0
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc maiden1 20134 Monster 40 0 0
+npc keeper2 20277 Monster 45 0 0
+
+kill maiden1
+  S SystemMessage id=95 1:0 1:0
+kill keeper2
+  S SystemMessage id=95 1:0 1:0
+  items 3861=1
+  rows Q337_AudienceWithTheLandDragon <cond>=4 <state>=STARTED drop7=1
+  state Q337_AudienceWithTheLandDragon STARTED
