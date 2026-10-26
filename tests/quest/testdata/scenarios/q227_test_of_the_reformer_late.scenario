@@ -63,7 +63,7 @@ bypass npc_{kakan}_Quest
   S ActionFailed
   state Q227_TestOfTheReformer STARTED
   rows Q227_TestOfTheReformer <cond>=14 <state>=STARTED
-# Nyakuri calls the pilgrim and the lizardman; the lizardman dies.
+# Nyakuri calls the pilgrim and the lizardman; the lizardman dies; then relog.
 action nyakuri
 action nyakuri
   S ActionFailed
@@ -92,10 +92,10 @@ kill krudel
   Q upsert Q227_TestOfTheReformer | <cond> | 16
   state Q227_TestOfTheReformer STARTED
   rows Q227_TestOfTheReformer <cond>=16 <state>=STARTED
+relog
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=16 <state>=STARTED
 action nyakuri
-  S ActionFailed
-  S NpcHtmlMessage obj=nyakuri item=0 page=default/30670.htm
-  S ActionFailed
 action nyakuri
   S ActionFailed
   S NpcHtmlMessage obj=nyakuri item=0 page=default/30670.htm

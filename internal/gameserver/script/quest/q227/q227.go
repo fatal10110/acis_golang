@@ -6,7 +6,6 @@
 package q227
 
 import (
-	"slices"
 	"strings"
 	"time"
 
@@ -83,9 +82,15 @@ const (
 	attackWeight = 2000
 )
 
-// allowedSkills are the skills that can hit the Crimson werewolf without
+// allowedSkill reports whether the skill can hit the Crimson werewolf without
 // making it leave.
-var allowedSkills = []skill.ID{1031, 1069, 1164, 1168, 1147, 1177, 1184, 1201, 1206}
+func allowedSkill(id skill.ID) bool {
+	switch id {
+	case 1031, 1069, 1164, 1168, 1147, 1177, 1184, 1201, 1206:
+		return true
+	}
+	return false
+}
 
 // quest holds the pilgrims, the inspector, the betrayer, the werewolf and the
 // lizardman the dialogs called, each shared by every player: one at a time,
@@ -392,7 +397,7 @@ func onAttacked(s *script.Script, e script.Attacked) {
 			e.NPC.SetScriptValue(1)
 		}
 	case crimsonWerewolf:
-		if cond == 12 && e.NPC.IsScriptValue(0) && !slices.Contains(allowedSkills, e.Skill.ID) {
+		if cond == 12 && e.NPC.IsScriptValue(0) && !allowedSkill(e.Skill.ID) {
 			e.NPC.SetScriptValue(1)
 			s.StartTimer("werewolf_despawn", e.NPC, nil, 1000*time.Millisecond)
 		}
