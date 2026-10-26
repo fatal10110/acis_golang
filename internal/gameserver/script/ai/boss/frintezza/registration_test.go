@@ -30,6 +30,9 @@ var chain = []struct {
 	{"script.ai.boss.frintezza.Frintezza", Frintezza},
 	{"script.ai.boss.frintezza.FrintezzaSeeker", FrintezzaSeeker},
 	{"script.ai.boss.frintezza.OrganDummy", OrganDummy},
+	{"script.ai.boss.frintezza.PortraitSpirit", PortraitSpirit},
+	{"script.ai.boss.frintezza.PortraitSpiritWinged", PortraitSpiritWinged},
+	{"script.ai.boss.frintezza.UndeadBandmaster", UndeadBandmaster},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -162,14 +165,15 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	}
 	// FollowerOfFrintezza: eight events on 29046; its transform: seven on
 	// 29047; Frintezza: six on 29045; the alarm, both portraits and the
-	// organ dummy three each; the seeker two; the follower's dummy one.
-	if got := len(want.folds); got != 36 {
-		t.Fatalf("reference folds = %d entries, want 36", got)
+	// organ dummy three each; the seeker two; the follower's dummy one;
+	// both portrait spirits six each; the bandmaster four.
+	if got := len(want.folds); got != 52 {
+		t.Fatalf("reference folds = %d entries, want 52", got)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{18328, 29045, 29046, 29047, 29048, 29049, 29052, 29053, 29059} {
+	for _, id := range []int32{18328, 18334, 29045, 29046, 29047, 29048, 29049, 29050, 29051, 29052, 29053, 29059} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

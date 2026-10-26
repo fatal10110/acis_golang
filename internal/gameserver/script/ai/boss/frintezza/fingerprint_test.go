@@ -19,10 +19,14 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.boss.frintezza.Frintezza",
 		"script.ai.boss.frintezza.FrintezzaSeeker",
 		"script.ai.boss.frintezza.OrganDummy",
+		"script.ai.boss.frintezza.PortraitSpirit",
+		"script.ai.boss.frintezza.PortraitSpiritWinged",
+		"script.ai.boss.frintezza.UndeadBandmaster",
 		// Frintezza's on-screen song names and the alarm's shouts are
 		// named constants in the reference, numbers in Go.
 	}, "number 1010630", "number 1010631", "number 1000522", "number 1000523", "number 1000524",
-		"number 1000525", "number 1000526", "number 1000527")
+		"number 1000525", "number 1000526", "number 1000527",
+		"number 1010644", "number 1010645", "number 1010646")
 	if err != nil {
 		t.Fatal(err)
 	}
