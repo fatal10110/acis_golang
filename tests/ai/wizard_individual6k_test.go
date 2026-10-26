@@ -313,7 +313,9 @@ func TestWizardFiendArcherSelfBuffBuffsItself(t *testing.T) {
 // WizardFiendArcherSelfBuff's attacked hook through its aggressive child
 // once the self buff it cast as it appeared landed on it: a hit by the
 // character wants only its parent's fiend archer skill on the character,
-// weight 1000000, no self buff again.
+// weight 1000000, no self buff again. Its aggressive child, holding none
+// of the buff's effect itself, seeing the character, who holds it, wants
+// no self buff and wants to attack the character, weight 200.
 func TestWizardFiendArcherSelfBuffHoldingItsBuff(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual6kWith(t, i6kHeldDefs(), true, i6kTemplate(i6kFiendSelfAggID, nil))
@@ -328,6 +330,25 @@ func TestWizardFiendArcherSelfBuffHoldingItsBuff(t *testing.T) {
 
 	w.hit(t, h, 10)
 	i6fWantCasts(t, "holding its buff", h, map[modelskill.ID]i6fCast{i6kFiend: {w.player.ObjectID(), 1000000, false}})
+
+	seer := w.spawn(t, i6kFiendSelfAggID, -1500, 0)
+	w.srv.InstallNPCCastSeam(t, seer, i6kSkills())
+	w.i6kSelfBuffDone(t, seer)
+	w.onQueue(t, seer, func() { held = len(seer.EffectList().All()) })
+	if held != 0 {
+		t.Fatalf("setup: the seeing archer holds %d effects, want none", held)
+	}
+	if !w.srv.RunScript(t, w.player.ObjectID(), "Ind1Director", func(s *script.Script, p *script.Player) {
+		s.ApplyEffects(modelskill.Ref{ID: i6hSelfBuff, Level: 1}, script.NPCOf(seer), p)
+	}) {
+		t.Fatal("landing the self buff on the character panicked")
+	}
+	w.srv.Settle(t)
+	w.i6kLookFrom(t, seer, -100)
+	i6fWantCasts(t, "seeing a character holding the buff", seer, nil)
+	if got := i6cAttackWeight(seer, w.player.ObjectID()); got != 200 {
+		t.Fatalf("attack desire on the character it saw = %v, want 200", got)
+	}
 }
 
 // TestWizardFiendArcherSelfBuffAggressiveSeesAnNPC runs
