@@ -1,0 +1,51 @@
+# Into The Flame (Q618): Hilda sends the player hunting at cond 1 and answers for each later cond.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q618_into_the_flame_hilda.golden
+character Hero 60
+quest Q618_IntoTheFlame <cond>=1 <state>=STARTED
+script quest.Q618_IntoTheFlame
+item 7265 7266 7267
+page default/31540.htm
+page trainer/31271.htm
+page script/quest/Q618_IntoTheFlame/
+npc klein 31540 Folk 10 0 0
+npc hilda 31271 Trainer 20 0 0
+
+action hilda
+action hilda
+  S ActionFailed
+  S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
+  S ActionFailed
+bypass npc_{hilda}_Quest
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q618_IntoTheFlame/31271-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q618_IntoTheFlame 31271-02.htm
+  S QuestList 618:0x80000003
+  S ExShowQuestMark quest=618
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q618_IntoTheFlame/31271-02.htm
+  S ActionFailed
+  Q upsert Q618_IntoTheFlame | <cond> | 2
+  rows Q618_IntoTheFlame <cond>=2 <state>=STARTED
+  state Q618_IntoTheFlame STARTED
+action hilda
+  S ActionFailed
+  S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
+  S ActionFailed
+bypass npc_{hilda}_Quest
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q618_IntoTheFlame/31271-03.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q618_IntoTheFlame <cond>=2 <state>=STARTED
+  state Q618_IntoTheFlame STARTED
+action klein
+action klein
+  S ActionFailed
+  S NpcHtmlMessage obj=klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{klein}_Quest
+  S NpcHtmlMessage obj=klein item=0 page=script/quest/Q618_IntoTheFlame/31540-03.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,44 @@
+# Specialty Liquor Delivery (Q622): a level 68 character accepts the quest and is given five bottles.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q622_specialty_liquor_delivery_accept.golden
+character Hero 68
+script quest.Q622_SpecialtyLiquorDelivery
+item 7197 7198 57 734 6847 6849 6851
+page default/31521.htm
+page default/31543.htm
+page script/quest/Q622_SpecialtyLiquorDelivery/
+npc jeremy 31521 Folk 10 0 0
+npc pulin 31543 Folk 20 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31521-02.htm
+  S QuestList 622:0x80000001
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7197 6:5
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-02.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <state> | STARTED
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 1
+  rows Q622_SpecialtyLiquorDelivery <cond>=1 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7197=5
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q622_SpecialtyLiquorDelivery <cond>=1 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED

@@ -1,0 +1,31 @@
+# Specialty Liquor Delivery (Q622): the last NPC pays the second recipe of the draw.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q622_specialty_liquor_delivery_finish_item.golden
+character Hero 68
+quest Q622_SpecialtyLiquorDelivery <cond>=7 <state>=STARTED
+random 0 1
+script quest.Q622_SpecialtyLiquorDelivery
+item 7197 7198 57 734 6847 6849 6851
+page warehouse/31267.htm
+page script/quest/Q622_SpecialtyLiquorDelivery/
+npc lietta 31267 WarehouseKeeper 10 0 0
+
+action lietta
+action lietta
+  S ActionFailed
+  S NpcHtmlMessage obj=lietta item=0 page=warehouse/31267.htm
+  S ActionFailed
+bypass npc_{lietta}_Quest
+  S NpcHtmlMessage obj=lietta item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31267-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31267-02.htm
+  S SystemMessage id=54 3:6849
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=lietta item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31267-02.htm
+  S ActionFailed
+  Q delete-quest Q622_SpecialtyLiquorDelivery
+  rows Q622_SpecialtyLiquorDelivery -
+  state Q622_SpecialtyLiquorDelivery -
+  items 57=0 734=0 6849=1
