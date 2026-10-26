@@ -1,7 +1,7 @@
 # Slay the Enemy Commander (Q608) for a level 75 Ketra ally of level 4 holding the level 4 alliance mark: Kadun Zu Ketra
 # offers the quest and the player takes it. Mos' death gives the head (cond 2, the middle sound first), and Kadun trades it
 # for the Totem of Wisdom and 10000 experience, ending the quest. Holding the totem he is no longer offered it. The head
-# going to every ally of the killer's party is in q608_flow_test.go. Expectations replay the reference trace of this
+# going to every ally of the killer's party is in varka_party_test.go. Expectations replay the reference trace of this
 # scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q608_slay_the_enemy_commander_ally.golden
 character Ally 75
