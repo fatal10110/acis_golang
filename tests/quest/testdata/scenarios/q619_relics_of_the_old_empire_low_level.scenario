@@ -1,0 +1,21 @@
+# Relics of the Old Empire (Q619), refused: a level 73 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q619_relics_of_the_old_empire_low_level.golden
+character Hero 73
+script quest.Q619_RelicsOfTheOldEmpire
+item 7254 7075 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page default/31538.htm
+page script/quest/Q619_RelicsOfTheOldEmpire/
+npc ghost 31538 Folk 10 0 0
+
+action ghost
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31538.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q619_RelicsOfTheOldEmpire/31538-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q619_RelicsOfTheOldEmpire CREATED
+  rows Q619_RelicsOfTheOldEmpire -

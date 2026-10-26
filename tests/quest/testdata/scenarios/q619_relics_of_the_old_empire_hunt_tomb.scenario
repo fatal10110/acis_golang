@@ -1,0 +1,32 @@
+# Relics of the Old Empire (Q619): an Imperial Tomb monster drops relic parts and then, one time in 30, an entrance pass.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q619_relics_of_the_old_empire_hunt_tomb.golden
+character Hero 74
+quest Q619_RelicsOfTheOldEmpire <cond>=1 <state>=STARTED
+random 0 309999 33332 0 310000 33333 0 899999 33333 0 900000 33333
+script quest.Q619_RelicsOfTheOldEmpire
+item 7254 7075 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page script/quest/Q619_RelicsOfTheOldEmpire/
+npc m1 21800 Monster 40 0 0
+npc m2 21434 Monster 50 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7254
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7075
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7254=1 7075=1
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 7254=1 7075=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:7254 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7254=3 7075=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7254
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7254=4 7075=1

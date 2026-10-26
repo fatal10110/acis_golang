@@ -1,0 +1,44 @@
+# Egg Delivery (Q621): a level 68 character accepts the quest and is given five eggs.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q621_egg_delivery_accept.golden
+character Hero 68
+script quest.Q621_EggDelivery
+item 7195 7196 57 734 6847 6849 6851
+page default/31521.htm
+page default/31543.htm
+page script/quest/Q621_EggDelivery/
+npc jeremy 31521 Folk 10 0 0
+npc pulin 31543 Folk 20 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q621_EggDelivery/31521-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q621_EggDelivery 31521-02.htm
+  S QuestList 621:0x80000001
+  S ExShowQuestMark quest=621
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7195 6:5
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q621_EggDelivery/31521-02.htm
+  S ActionFailed
+  Q upsert Q621_EggDelivery | <state> | STARTED
+  Q upsert Q621_EggDelivery | <cond> | 1
+  rows Q621_EggDelivery <cond>=1 <state>=STARTED
+  state Q621_EggDelivery STARTED
+  items 7195=5
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q621_EggDelivery/31521-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q621_EggDelivery <cond>=1 <state>=STARTED
+  state Q621_EggDelivery STARTED

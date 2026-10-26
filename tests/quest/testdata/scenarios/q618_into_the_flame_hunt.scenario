@@ -1,0 +1,61 @@
+# Into The Flame (Q618): at cond 2 each kill drops an ore only for a draw under 500000; the fiftieth ore moves the quest to cond 3, and Hilda turns the ore into a vacualite.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q618_into_the_flame_hunt.golden
+character Hero 60
+quest Q618_IntoTheFlame <cond>=2 <state>=STARTED
+hold 7265 48
+random 0 499999 0 500000 0 499999
+script quest.Q618_IntoTheFlame
+item 7265 7266 7267
+page trainer/31271.htm
+page script/quest/Q618_IntoTheFlame/
+npc hilda 31271 Trainer 10 0 0
+npc m1 21274 Monster 40 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7265
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7265=49
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 7265=49
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7265
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 618:0x80000007
+  S ExShowQuestMark quest=618
+  Q upsert Q618_IntoTheFlame | <cond> | 3
+  rows Q618_IntoTheFlame <cond>=3 <state>=STARTED
+  state Q618_IntoTheFlame STARTED
+  items 7265=50
+action hilda
+action hilda
+  S ActionFailed
+  S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
+  S ActionFailed
+bypass npc_{hilda}_Quest
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q618_IntoTheFlame/31271-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q618_IntoTheFlame 31271-05.htm
+  S QuestList 618:0x8000000f
+  S ExShowQuestMark quest=618
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7265 6:50
+  S SystemMessage id=54 3:7266
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q618_IntoTheFlame/31271-05.htm
+  S ActionFailed
+  Q upsert Q618_IntoTheFlame | <cond> | 4
+  rows Q618_IntoTheFlame <cond>=4 <state>=STARTED
+  state Q618_IntoTheFlame STARTED
+  items 7265=0 7266=1
+action hilda
+  S ActionFailed
+  S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
+  S ActionFailed
+bypass npc_{hilda}_Quest
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q618_IntoTheFlame/31271-06.htm
+  S ActionFailed
+  S ActionFailed
