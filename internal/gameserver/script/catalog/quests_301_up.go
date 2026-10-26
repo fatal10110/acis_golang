@@ -109,8 +109,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q654"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q659"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q660"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q661"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q662"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q663"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q688"
 )
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
@@ -256,10 +259,10 @@ func quests301Up() script.Catalog {
 		"quest.Q654_JourneyToASettlement":              q654.New,
 		"quest.Q655_AGrandPlanForTamingWildBeasts":     q655.New,
 		"quest.Q659_IdRatherBeCollectingFairyBreath":   q659.New,
-		"quest.Q660_AidingTheFloranVillage":            nil,
-		"quest.Q661_MakingTheHarvestGroundsSafe":       nil,
+		"quest.Q660_AidingTheFloranVillage":            q660.New,
+		"quest.Q661_MakingTheHarvestGroundsSafe":       q661.New,
 		"quest.Q662_AGameOfCards":                      q662.New,
 		"quest.Q663_SeductiveWhispers":                 q663.New,
-		"quest.Q688_DefeatTheElrokianRaiders":          nil,
+		"quest.Q688_DefeatTheElrokianRaiders":          q688.New,
 	}
 }

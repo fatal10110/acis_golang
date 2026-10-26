@@ -1,0 +1,32 @@
+# Making the Harvest Grounds Safe (Q661): each monster drops its item for a draw under the chance (500000): the first bee's roll misses.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q661_making_the_harvest_grounds_safe_hunt.golden
+character Hero 21
+quest Q661_MakingTheHarvestGroundsSafe <cond>=1 <state>=STARTED
+random 500000 0 0 0
+script quest.Q661_MakingTheHarvestGroundsSafe
+item 8283 8284 8285 57
+page warehouse/30210.htm
+page script/quest/Q661_MakingTheHarvestGroundsSafe/
+npc norman 30210 WarehouseKeeper 10 0 0
+npc bee 21095 Monster 40 0 0
+npc gem 21096 Monster 50 0 0
+npc talon 21097 Monster 60 0 0
+
+kill bee
+  S SystemMessage id=95 1:0 1:0
+kill bee
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8283
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8283=1
+kill gem
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8284
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8284=1
+kill talon
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8285
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8285=1
