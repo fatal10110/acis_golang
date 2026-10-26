@@ -232,6 +232,11 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4":                                                 raid.BossType4,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive":                                raid.BossType4AndreasAggressive,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5":                                                 raid.BossType5,
+	"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer":                                                        raid.PrivateHealer,
+	"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard":                                                        raid.PrivateWizard,
+	"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold":                                                monster.WarriorDDMagicHold,
+	"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive":         monster.WarriorDDMagicHoldAggressive,
+	"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus":             monster.ValakasPrivateLavasaurus,
 
 	// The grand bosses.
 	"script.ai.boss.antharas.HeartOfWarding":          antharas.HeartOfWarding,

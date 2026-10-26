@@ -34,6 +34,9 @@ var individual7 = []struct {
 	{"script.ai.individual.Monster.LV3Monster.LV3Summoner", LV3Summoner},
 	{"script.ai.individual.Monster.LV3Monster.LV3Wizard", LV3Wizard},
 	{"script.ai.individual.Monster.LV3Monster.LV3WizardPrivate", LV3WizardPrivate},
+	{"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold", WarriorDDMagicHold},
+	{"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus", ValakasPrivateLavasaurus},
+	{"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive", WarriorDDMagicHoldAggressive},
 }
 
 // individual7View is what a manifest-layout text records of the batch:
@@ -143,8 +146,9 @@ func TestIndividual7RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual7View(t, path, ours, sc)
-	if got := len(want.folds); got != 183 {
-		t.Fatalf("reference folds = %d entries, want 183", got)
+	// ValakasPrivateLavasaurus adds 6 events on 29029.
+	if got := len(want.folds); got != 183+6 {
+		t.Fatalf("reference folds = %d entries, want %d", got, 183+6)
 	}
 
 	for _, c := range individual7 {
