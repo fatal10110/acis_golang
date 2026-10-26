@@ -1,0 +1,21 @@
+# Seductive Whispers (Q663), a monster kill drops a spirit bead for a draw under its chance. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_drops.golden
+character Gambler 50
+quest Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1
+random 0 900000 0 100000
+script quest.Q663_SeductiveWhispers
+item 8766 57
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+npc m1 21010 Monster 40 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8766
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8766=1
+  rows Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1
+  state Q663_SeductiveWhispers STARTED

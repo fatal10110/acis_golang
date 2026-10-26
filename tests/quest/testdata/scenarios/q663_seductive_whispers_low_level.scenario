@@ -1,0 +1,20 @@
+# Seductive Whispers (Q663), level 49: a character below level 50 is refused. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_low_level.golden
+character Gambler 49
+script quest.Q663_SeductiveWhispers
+item 8766 57
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-02.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q663_SeductiveWhispers -
+  state Q663_SeductiveWhispers CREATED
