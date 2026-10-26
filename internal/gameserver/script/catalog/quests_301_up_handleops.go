@@ -11,5 +11,11 @@ func quests301UpHandleOps() map[string]script.HandleOps {
 		"quest.Q348_AnArrogantSearch": {
 			"OnAttacked": {"NPC.StopAttack"},
 		},
+		"quest.Q417_PathToBecomeAScavenger": {
+			"OnMyDying": {"NPC.ActualSpoiler"},
+		},
+		"quest.Q421_LittleWingsBigAdventure": {
+			"OnCreated": {"NPC.DisableCoreAI"},
+		},
 	}
 }
