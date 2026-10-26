@@ -1,0 +1,29 @@
+# Wild Maiden (Q653): Galibredo pays 2883 adena and the quest ends.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q653_wild_maiden_finish.golden
+character Recruit 36
+quest Q653_WildMaiden <cond>=1 <state>=STARTED
+script quest.Q653_WildMaiden
+item 736 57
+page merchant/30181.htm
+page script/quest/Q653_WildMaiden/
+npc galibredo 30181 Merchant 10 0 0
+
+action galibredo
+action galibredo
+  S ActionFailed
+  S NpcHtmlMessage obj=galibredo item=0 page=merchant/30181.htm
+  S ActionFailed
+bypass npc_{galibredo}_Quest
+  S SystemMessage id=52 6:2883
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=galibredo item=0 page=script/quest/Q653_WildMaiden/30181-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q653_WildMaiden
+  state Q653_WildMaiden -
+  rows Q653_WildMaiden -
+  items 57=2883
+relog
+  rows Q653_WildMaiden -

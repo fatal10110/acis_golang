@@ -1,0 +1,22 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): at cond 1 a swamp monster of the first kind drops a splinter, one of the second kind drops no needle.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_drops_cond1.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=1 <state>=STARTED
+random 0 0 0
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31554.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc kahman 31554 Folk 10 0 0
+npc m1 21508 Monster 40 0 0
+npc m2 21513 Monster 50 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7248
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7248=1 7249=0
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 7248=1 7249=0

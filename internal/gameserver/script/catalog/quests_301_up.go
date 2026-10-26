@@ -104,6 +104,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q625"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q626"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q627"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q628"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q629"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q631"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q632"
@@ -122,6 +123,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q648"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q649"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q650"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q652"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q653"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q654"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q659"
@@ -250,7 +253,7 @@ func quests301Up() script.Catalog {
 		"quest.Q625_TheFinestIngredients_Part2":        q625.New,
 		"quest.Q626_ADarkTwilight":                     q626.New,
 		"quest.Q627_HeartInSearchOfPower":              q627.New,
-		"quest.Q628_HuntOfTheGoldenRamMercenaryForce":  nil,
+		"quest.Q628_HuntOfTheGoldenRamMercenaryForce":  q628.New,
 		"quest.Q629_CleanUpTheSwampOfScreams":          q629.New,
 		"quest.Q631_DeliciousTopChoiceMeat":            q631.New,
 		"quest.Q632_NecromancersRequest":               q632.New,
@@ -270,8 +273,8 @@ func quests301Up() script.Catalog {
 		"quest.Q648_AnIceMerchantsDream":               q648.New,
 		"quest.Q649_ALooterAndARailroadMan":            q649.New,
 		"quest.Q650_ABrokenDream":                      q650.New,
-		"quest.Q652_AnAgedExAdventurer":                nil,
-		"quest.Q653_WildMaiden":                        nil,
+		"quest.Q652_AnAgedExAdventurer":                q652.New,
+		"quest.Q653_WildMaiden":                        q653.New,
 		"quest.Q654_JourneyToASettlement":              q654.New,
 		"quest.Q655_AGrandPlanForTamingWildBeasts":     q655.New,
 		"quest.Q659_IdRatherBeCollectingFairyBreath":   q659.New,
