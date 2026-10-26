@@ -1,0 +1,30 @@
+# Little Wing (Q420): a character who asked Cronos for the deluxe stone and made it is moved on by Byron.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_byron_swapped_deluxe.golden
+character Wing 35
+quest Q420_LittleWing <cond>=2 <state>=STARTED deluxestone=1
+hold 3817 1
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page guard/30711.htm
+page script/quest/Q420_LittleWing/
+npc byron 30711 Guard 10 0 0
+
+action byron
+action byron
+  S ActionFailed
+  S NpcHtmlMessage obj=byron item=0 page=guard/30711.htm
+  S ActionFailed
+bypass npc_{byron}_Quest
+  S QuestList 420:0x8000000b
+  S ExShowQuestMark quest=420
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=byron item=0 page=script/quest/Q420_LittleWing/30711-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q420_LittleWing | <flags> | -2147483637
+  Q upsert Q420_LittleWing | <cond> | 4
+  Q delete-var Q420_LittleWing | deluxestone
+
+  state Q420_LittleWing STARTED
+  rows Q420_LittleWing <cond>=4 <flags>=-2147483637 <state>=STARTED

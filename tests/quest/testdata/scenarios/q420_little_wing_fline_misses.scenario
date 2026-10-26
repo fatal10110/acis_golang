@@ -1,0 +1,15 @@
+# Little Wing (Q420): a roll of 30 leaves the deluxe stone with the character.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_fline_misses.golden
+character Wing 35
+quest Q420_LittleWing <cond>=4 <state>=STARTED
+hold 3817 1
+random 30
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page script/quest/Q420_LittleWing/
+npc fline 20599 Monster 10 0 0
+
+kill fline
+  S SystemMessage id=95 1:0 1:0
+  items 3817=1
