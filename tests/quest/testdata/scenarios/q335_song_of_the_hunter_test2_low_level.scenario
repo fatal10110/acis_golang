@@ -1,0 +1,20 @@
+# Song of the Hunter (Q335), level 44: Grey's second test below level 45: Grey sends the character away, whatever it holds. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_test2_low_level.golden
+character Hunter 44
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+hold 3692 1
+script quest.Q335_SongOfTheHunter
+item 3692
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-07.htm
+  S ActionFailed
+  S ActionFailed

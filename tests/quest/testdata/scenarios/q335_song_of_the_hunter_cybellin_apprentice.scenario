@@ -1,0 +1,18 @@
+# Song of the Hunter (Q335), level 35: Cybellin to an apprentice. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_cybellin_apprentice.golden
+character Hunter 35
+quest Q335_SongOfTheHunter <cond>=1 <state>=STARTED
+script quest.Q335_SongOfTheHunter
+page default/30746.htm
+page script/quest/Q335_SongOfTheHunter/
+npc cybellin 30746 Folk 10 0 0
+
+action cybellin
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+bypass npc_{cybellin}_Quest
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-01.htm
+  S ActionFailed
+  S ActionFailed

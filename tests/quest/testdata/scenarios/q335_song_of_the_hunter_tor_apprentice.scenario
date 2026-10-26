@@ -1,0 +1,18 @@
+# Song of the Hunter (Q335), level 35: Tor's first words to an apprentice. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_tor_apprentice.golden
+character Hunter 35
+quest Q335_SongOfTheHunter <cond>=1 <state>=STARTED
+script quest.Q335_SongOfTheHunter
+page default/30745.htm
+page script/quest/Q335_SongOfTheHunter/
+npc tor 30745 Folk 10 0 0
+
+action tor
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-01a.htm
+  S ActionFailed
+  S ActionFailed

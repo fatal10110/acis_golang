@@ -1,0 +1,12 @@
+# Song of the Hunter (Q335), level 45: Grey's second test not taken: a Timak orc warrior drops nothing and no roll is drawn. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_grey_drops_no_test.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+script quest.Q335_SongOfTheHunter
+item 3717
+page script/quest/Q335_SongOfTheHunter/
+npc m1 20586 Monster 40 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 3717=0

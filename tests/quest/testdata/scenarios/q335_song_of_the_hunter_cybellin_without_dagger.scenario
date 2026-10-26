@@ -1,0 +1,15 @@
+# Song of the Hunter (Q335), level 45: Cybellin's request: a lizardman killed without the dagger worn changes nothing. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_cybellin_without_dagger.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED cybellin=1
+hold 3697 1
+hold 3698 1
+hold 3471 1
+script quest.Q335_SongOfTheHunter
+item 3471 3697 3698
+page script/quest/Q335_SongOfTheHunter/
+npc m1 20578 Monster 40 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 3698=1
