@@ -512,12 +512,14 @@ func onTalk(s *script.Script, e script.Talk) string {
 // scepterEarned moves the quest to cond 5 when the traveller holds the other
 // four scepters, and only plays the item sound otherwise.
 func scepterEarned(s *script.Script, st *script.QuestState, p *script.Player, others ...int32) {
-	if p.HasItems(others...) {
-		st.SetCond(5)
-		s.PlaySound(p, script.SoundMiddle)
-		return
+	for _, id := range others {
+		if !p.HasItem(id) {
+			s.PlaySound(p, script.SoundItemGet)
+			return
+		}
 	}
-	s.PlaySound(p, script.SoundItemGet)
+	st.SetCond(5)
+	s.PlaySound(p, script.SoundMiddle)
 }
 
 // onAttacked makes the Ragna orcs and the Revenant of Tantos speak when a
