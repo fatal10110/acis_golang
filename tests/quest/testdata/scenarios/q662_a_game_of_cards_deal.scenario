@@ -1,0 +1,41 @@
+# A Game Of Cards (Q662), level 61: fifty gems buy the hand 1 2 3 4 5, and the talk shows it face down. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q662_a_game_of_cards_deal.golden
+character Gambler 61
+quest Q662_AGameOfCards <cond>=1 <state>=STARTED
+hold 8765 50
+random 0 1 2 3 4
+script quest.Q662_AGameOfCards
+item 8765 959 729 947 951 955 956 8868
+page villagemaster/30845.htm
+page script/quest/Q662_AGameOfCards/
+npc klump 30845 VillageMasterDwarf 10 0 0
+
+action klump
+action klump
+  S ActionFailed
+  S NpcHtmlMessage obj=klump item=0 page=villagemaster/30845.htm
+  S ActionFailed
+bypass npc_{klump}_Quest
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q662_AGameOfCards 30845-10.htm
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-10.htm
+  S ActionFailed
+bypass Quest Q662_AGameOfCards 30845-11.htm
+  S SystemMessage id=301 3:8765 6:50
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-11.htm
+  S ActionFailed
+  Q upsert Q662_AGameOfCards | state | 4030201
+  Q upsert Q662_AGameOfCards | stateEx | 5
+action klump
+  S ActionFailed
+  S NpcHtmlMessage obj=klump item=0 page=villagemaster/30845.htm
+  S ActionFailed
+bypass npc_{klump}_Quest
+  S NpcHtmlMessage obj=klump item=0 html="<html><body>Warehouse Chief Klump:<br>\nHey, I thought you were checking your cards! Where did you go? Your cards are untouched!<br>\nCheck all 5 of them and then show them to me.<br>\n<table border=\"1\" border color=\"white\" width=170><tr>\n<td align=\"center\" width=15><font color=\"ffff00\">?</font></td>\n<td align=\"center\" width=15><font color=\"ffff00\">?</font></td>\n<td align=\"center\" width=15><font color=\"ffff00\">?</font></td>\n<td align=\"center\" width=15><font color=\"ffff00\">?</font></td>\n<td align=\"center\" width=15><font color=\"ffff00\">?</font></td>\n</tr></table>\n<br>\n<a action=\"bypass -h Quest Q662_AGameOfCards First\">Put the first card face up.</a><br>\n<a action=\"bypass -h Quest Q662_AGameOfCards Second\">Put the second card face up.</a><br>\n<a action=\"bypass -h Quest Q662_AGameOfCards Third\">Put the third card face up.</a><br>\n<a action=\"bypass -h Quest Q662_AGameOfCards Fourth\">Put the fourth card face up.</a><br>\n<a action=\"bypass -h Quest Q662_AGameOfCards Fifth\">Put the fifth card face up.</a>\n</body></html>\n"
+  S ActionFailed
+  S ActionFailed
+  items 8765=0
+  rows Q662_AGameOfCards <cond>=1 <state>=STARTED state=4030201 stateEx=5
+  state Q662_AGameOfCards STARTED
