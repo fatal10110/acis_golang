@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/antharas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/benom"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/core"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/drchaos"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/orfen"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/queenant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/sailren"
@@ -242,6 +243,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.boss.antharas.HeartOfWarding":          antharas.HeartOfWarding,
 	"script.ai.boss.benom.DungeonTeleporter":          benom.DungeonTeleporter,
 	"script.ai.boss.core.Core":                        core.Core,
+	"script.ai.boss.drchaos.DoctorChaosNpc":           drchaos.DoctorChaosNpc,
 	"script.ai.boss.queenant.QueenAnt":                queenant.QueenAnt,
 	"script.ai.boss.queenant.QueenAntPrivateAntLarva": queenant.Larva,
 	"script.ai.boss.queenant.QueenAntPrivateNurseAnt": queenant.Nurse,
