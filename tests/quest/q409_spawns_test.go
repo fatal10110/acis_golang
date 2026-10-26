@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q409"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -179,7 +181,12 @@ func TestQ409FirstValidHitMakesTheLizardmanSpeakAndOnlyItsDeathCounts(t *testing
 			saysNone(t, "second hit", w.advance(t, 500*time.Millisecond))
 
 			if tc.invalid {
-				n.SetScriptValue(-1)
+				mate := q409Mate(t, w)
+				hit(t, w.srv, mate, h, 5)
+				w.advance(t, 500*time.Millisecond)
+				if v := n.ScriptValue(); v != -1 {
+					t.Fatalf("script value %d after another quest holder struck it, want -1", v)
+				}
 			}
 			killOnPlayerQueue(t, w.srv, w.player, h)
 			got := w.render(t, w.srv.ReadQueued(t, w.srv.Client))
@@ -194,6 +201,23 @@ func TestQ409FirstValidHitMakesTheLizardmanSpeakAndOnlyItsDeathCounts(t *testing
 			q409Items(t, w, q409Order, 1)
 		})
 	}
+}
+
+// q409Mate brings a second character whose quest is STARTED at cond 2 into
+// the world beside the first and returns its object id.
+func q409Mate(t *testing.T, w *dialogWorld) int32 {
+	t.Helper()
+	id := w.srv.SeedCharacterFor(t, "mate", "Mate", 19, 0).ID
+	insertJournal(t, w.srv.DB,
+		journalRow{id, q409Name, "<state>", val("STARTED")},
+		journalRow{id, q409Name, "<cond>", val("2")})
+	c := w.srv.DialClient(t, "mate", 1)
+	c.Send(encodeRequestGameStart(0))
+	readUntil(t, c, serverpackets.OpcodeCharSelected)
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	w.srv.ReadQueued(t, c)
+	w.srv.ReadQueued(t, w.srv.Client)
+	return id
 }
 
 // q409Items checks the count of an item the character holds.
