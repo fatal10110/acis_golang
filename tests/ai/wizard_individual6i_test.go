@@ -263,10 +263,13 @@ func TestWizardHealAndHereticAggressivesStrikeOnSight(t *testing.T) {
 
 // TestWizardDDMagic2SolinaGreetsAndReproachesLightBearers runs
 // WizardDDMagic2Solina's see-creature, attacked, created and no-desire
-// hooks. A bishop (class 16) it sees gets its first blessing (10075) on a
-// draw under 50, else the second (10076), with no spell, and goes on its
-// hate list; any other character it sees 100 away gets its short range DD
-// magic, weight 1000000, and goes on its hate list. Hit by a bishop it
+// hooks. A character of a light occupation (classes 5, 16, 30, 90, 97 and
+// 105) it sees gets its first blessing (10075) on a draw under 50, else
+// the second (10076), with no spell, and goes on its hate list; any other
+// character (classes 0, 17 and 98) it sees 100 away gets its short range DD
+// magic, weight 1000000, and one seen 300 away its long range one on a
+// draw of 79, its short range one on a draw of 80; each goes on its hate
+// list. Hit by a bishop it
 // says its first reproach (10077) on a draw under 50, else the second
 // (10078), once: the next hit says nothing. Created, and when it has
 // nothing left to do, both lines may come again (int slots 3 and 4 clear).
@@ -277,40 +280,69 @@ func TestWizardDDMagic2SolinaGreetsAndReproachesLightBearers(t *testing.T) {
 	me := w.player.ObjectID()
 	saysOf := func(frames [][]byte, h *npc.Hostile) []string { return says(frames, h.ObjectID()) }
 
-	iw.setClass(t, w.player, 16)
-	for _, c := range []struct {
-		draw int32
-		line int32
-	}{{0, 10075}, {50, 10076}} {
-		w.draw.Store(c.draw)
-		h := w.i6iArmed(t, i6iSolinaID, 1500, int(c.draw)*40)
+	// Every light occupation gets a blessing, the two lines by turns.
+	for i, class := range []int{5, 16, 30, 90, 97, 105} {
+		draw, line := int32(0), int32(10075)
+		if i%2 == 1 {
+			draw, line = 50, 10076
+		}
+		iw.setClass(t, w.player, class)
+		w.draw.Store(draw)
+		h := w.i6iArmed(t, i6iSolinaID, 1500, 0)
 		if got := []int32{h.Scratch().Int(npc.IntAI3), h.Scratch().Int(npc.IntAI4)}; !slices.Equal(got, []int32{0, 0}) {
 			t.Fatalf("int slots 3 and 4 as created = %v, want 0 0", got)
 		}
 		w.i6iClear(t, h)
-		if got := saysOf(w.i6fLookAt(t, h), h); !slices.Equal(got, []string{script.NpcString(c.line, "Hunter")}) {
-			t.Fatalf("draw %d: lines on seeing a bishop = %q, want the %d blessing", c.draw, got, c.line)
+		if got := saysOf(w.i6fLookAt(t, h), h); !slices.Equal(got, []string{script.NpcString(line, "Hunter")}) {
+			t.Fatalf("class %d, draw %d: lines on seeing it = %q, want the %d blessing", class, draw, got, line)
 		}
-		i6fWantCasts(t, "seeing a bishop", h, nil)
+		i6fWantCasts(t, "seeing a light occupation", h, nil)
 		if got := w.hateListOf(h); got <= 0 {
-			t.Fatalf("hate list entry of the bishop it saw = %v, want some", got)
+			t.Fatalf("class %d: hate list entry of the character it saw = %v, want some", class, got)
 		}
 		if got := h.Scratch().Int(npc.IntAI3); got != 1 {
-			t.Fatalf("int slot 3 after the blessing = %d, want 1", got)
+			t.Fatalf("class %d: int slot 3 after the blessing = %d, want 1", class, got)
 		}
 	}
 
+	// Any other occupation, seen 100 away, gets its short range DD magic.
 	w.draw.Store(0)
+	for _, class := range []int{0, 17, 98} {
+		iw.setClass(t, w.player, class)
+		h := w.i6iArmed(t, i6iSolinaID, -1500, 0)
+		w.i6iClear(t, h)
+		if got := saysOf(w.i6fLookAt(t, h), h); len(got) != 0 {
+			t.Fatalf("class %d: lines on seeing it = %q, want none", class, got)
+		}
+		i6fWantCasts(t, "seeing another occupation", h, map[modelskill.ID]i6fCast{wShortDDID: {me, 1000000, false}})
+		if got := w.hateListOf(h); got <= 0 {
+			t.Fatalf("class %d: hate list entry of the character it saw = %v, want some", class, got)
+		}
+	}
+
+	// Seen 300 away, its long range DD magic on a draw under 80, else its
+	// short range one.
 	iw.setClass(t, w.player, 0)
-	h := w.i6iArmed(t, i6iSolinaID, -1500, 0)
-	w.i6iClear(t, h)
-	if got := saysOf(w.i6fLookAt(t, h), h); len(got) != 0 {
-		t.Fatalf("lines on seeing a fighter = %q, want none", got)
+	for _, c := range []struct {
+		draw int32
+		want modelskill.ID
+	}{{79, wLongDDID}, {80, wShortDDID}} {
+		w.draw.Store(c.draw)
+		h := w.i6iArmed(t, i6iSolinaID, 1500, 0)
+		w.i6iClear(t, h)
+		w.i6fMoveNear(t, h, -300)
+		frames := w.ticks(t, 1)
+		w.srv.Settle(t)
+		frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
+		if got := saysOf(frames, h); len(got) != 0 {
+			t.Fatalf("draw %d: lines on seeing a fighter 300 away = %q, want none", c.draw, got)
+		}
+		i6fWantCasts(t, "seeing a fighter 300 away", h, map[modelskill.ID]i6fCast{c.want: {me, 1000000, false}})
+		if got := w.hateListOf(h); got <= 0 {
+			t.Fatalf("draw %d: hate list entry of the fighter it saw 300 away = %v, want some", c.draw, got)
+		}
 	}
-	i6fWantCasts(t, "seeing a fighter", h, map[modelskill.ID]i6fCast{wShortDDID: {me, 1000000, false}})
-	if got := w.hateListOf(h); got <= 0 {
-		t.Fatalf("hate list entry of the fighter it saw = %v, want some", got)
-	}
+	w.draw.Store(0)
 
 	iw.setClass(t, w.player, 16)
 	for _, c := range []struct {
