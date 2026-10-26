@@ -78,7 +78,7 @@ type q501World struct {
 // q501Boot boots the world with the leader's quest STARTED at cond, over the
 // quest's shipped pages. Every NPC the quest binds stands as a template of
 // the world's table, so the script may spawn it.
-func q501Boot(t *testing.T, leader bool, cond int, vars map[string]string, holds map[int32]int32) *q501World {
+func q501Boot(t *testing.T, leader bool, cond int, vars map[string]string, holds map[int32]int32, extra ...gameservertest.Option) *q501World {
 	t.Helper()
 	quest := q501.New()
 	var templates []*npc.Template
@@ -124,14 +124,14 @@ func q501Boot(t *testing.T, leader bool, cond int, vars map[string]string, holds
 		for id, count := range holds {
 			srv.GiveItem(t, objID, id, count)
 		}
-	},
+	}, append([]gameservertest.Option{
 		x1Items(append(quest.Items, 3874, 3889)),
 		clanSeed(t, seed...),
 		gameservertest.WithNPCs(npc.NewTable(templates)),
 		gameservertest.WithNpcSpawns(nil),
 		gameservertest.WithNPCScripts(kinds, []script.Listing{{Path: q501Path}}, script.Catalog{q501Path: q501.New}),
 		gameservertest.WithScriptRand(rolls.rand),
-	)
+	}, extra...)...)
 	w.roles[w.player] = "player"
 	return w
 }
