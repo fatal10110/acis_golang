@@ -1,0 +1,41 @@
+# An Ice Merchant's Dream (Q648): twenty-three silver crystals buy crafted leather.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q648_an_ice_merchants_dream_buy_silver.golden
+character Hero 53
+quest Q115_TheOtherSideOfTruth <state>=COMPLETED
+quest Q648_AnIceMerchantsDream <cond>=2 <state>=STARTED
+hold 8077 23
+script quest.Q115_TheOtherSideOfTruth
+script quest.Q648_AnIceMerchantsDream
+item 8077 1894
+page default/32020.htm
+page default/32023.htm
+page script/quest/Q648_AnIceMerchantsDream/
+npc rafforty 32020 Folk 10 0 0
+npc shelf 32023 Folk 20 0 0
+
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 html="<html><body><a action=\"bypass -h npc_{rafforty}_Quest Q115_TheOtherSideOfTruth\">[The Other Side of Truth (Done)]</a><br><a action=\"bypass -h npc_{rafforty}_Quest Q648_AnIceMerchantsDream\">[An Ice Merchant's Dream (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{rafforty}_Quest Q648_AnIceMerchantsDream
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q648_AnIceMerchantsDream 32020-13.htm
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-13.htm
+  S ActionFailed
+bypass Quest Q648_AnIceMerchantsDream 32020-16.htm
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-16.htm
+  S ActionFailed
+bypass Quest Q648_AnIceMerchantsDream 32020-17a.htm
+  S SystemMessage id=301 3:8077 6:23
+  S SystemMessage id=54 3:1894
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-17a.htm
+  S ActionFailed
+  items 8077=0 1894=1

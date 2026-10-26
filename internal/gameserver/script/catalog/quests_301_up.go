@@ -101,7 +101,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q642"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q643"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q644"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q645"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q647"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q648"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q649"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q650"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q654"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q659"
 )
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
@@ -237,16 +244,16 @@ func quests301Up() script.Catalog {
 		"quest.Q642_APowerfulPrimevalCreature":         q642.New,
 		"quest.Q643_RiseAndFallOfTheElrokiTribe":       q643.New,
 		"quest.Q644_GraveRobberAnnihilation":           q644.New,
-		"quest.Q645_GhostsOfBatur":                     nil,
-		"quest.Q647_InfluxOfMachines":                  nil,
-		"quest.Q648_AnIceMerchantsDream":               nil,
-		"quest.Q649_ALooterAndARailroadMan":            nil,
-		"quest.Q650_ABrokenDream":                      nil,
+		"quest.Q645_GhostsOfBatur":                     q645.New,
+		"quest.Q647_InfluxOfMachines":                  q647.New,
+		"quest.Q648_AnIceMerchantsDream":               q648.New,
+		"quest.Q649_ALooterAndARailroadMan":            q649.New,
+		"quest.Q650_ABrokenDream":                      q650.New,
 		"quest.Q652_AnAgedExAdventurer":                nil,
 		"quest.Q653_WildMaiden":                        nil,
-		"quest.Q654_JourneyToASettlement":              nil,
+		"quest.Q654_JourneyToASettlement":              q654.New,
 		"quest.Q655_AGrandPlanForTamingWildBeasts":     q655.New,
-		"quest.Q659_IdRatherBeCollectingFairyBreath":   nil,
+		"quest.Q659_IdRatherBeCollectingFairyBreath":   q659.New,
 		"quest.Q660_AidingTheFloranVillage":            nil,
 		"quest.Q661_MakingTheHarvestGroundsSafe":       nil,
 		"quest.Q662_AGameOfCards":                      nil,

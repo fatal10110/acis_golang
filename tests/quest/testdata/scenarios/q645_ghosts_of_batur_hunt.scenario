@@ -1,0 +1,34 @@
+# Ghosts of Batur (Q645): the goods drop for a draw under the chance; the hundred and eightieth moves the quest to cond 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q645_ghosts_of_batur_hunt.golden
+character Hero 23
+quest Q645_GhostsOfBatur <cond>=1 <state>=STARTED
+hold 8089 178
+random 0 750000 0 0 0 0
+script quest.Q645_GhostsOfBatur
+item 8089 1878 1879 1880 1881 1882 1883
+page default/32017.htm
+page script/quest/Q645_GhostsOfBatur/
+npc karuda 32017 Folk 10 0 0
+npc m1 22007 Monster 40 0 0
+npc m2 22009 Monster 50 0 0
+npc m3 22010 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 8089=178
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8089
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8089=179
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8089
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 645:0x80000003
+  S ExShowQuestMark quest=645
+  Q upsert Q645_GhostsOfBatur | <cond> | 2
+  items 8089=180
+  rows Q645_GhostsOfBatur <cond>=2 <state>=STARTED
+  state Q645_GhostsOfBatur STARTED

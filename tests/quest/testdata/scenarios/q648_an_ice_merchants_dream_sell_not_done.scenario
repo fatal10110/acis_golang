@@ -1,0 +1,36 @@
+# An Ice Merchant's Dream (Q648): the crystals are sold for adena by the page of a character that did not do The Other Side of Truth.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q648_an_ice_merchants_dream_sell_not_done.golden
+character Hero 53
+quest Q648_AnIceMerchantsDream <cond>=1 <state>=STARTED
+hold 8077 3
+hold 8078 2
+script quest.Q648_AnIceMerchantsDream
+item 8057 8077 8078 57
+page default/32020.htm
+page default/32023.htm
+page script/quest/Q648_AnIceMerchantsDream/
+npc rafforty 32020 Folk 10 0 0
+npc shelf 32023 Folk 20 0 0
+
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-10.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q648_AnIceMerchantsDream 32020-12.htm
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-12.htm
+  S ActionFailed
+bypass Quest Q648_AnIceMerchantsDream 32020-14.htm
+  S SystemMessage id=301 3:8078 6:2
+  S SystemMessage id=301 3:8077 6:3
+  S SystemMessage id=52 6:3300
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-14.htm
+  S ActionFailed
+  items 8077=0 8078=0 57=3300
+  rows Q648_AnIceMerchantsDream <cond>=1 <state>=STARTED
+  state Q648_AnIceMerchantsDream STARTED

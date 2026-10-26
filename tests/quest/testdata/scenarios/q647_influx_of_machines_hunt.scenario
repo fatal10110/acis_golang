@@ -1,0 +1,34 @@
+# Influx of Machines (Q647): the shards drop for a draw under the chance; the five hundredth moves the quest to cond 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q647_influx_of_machines_hunt.golden
+character Hero 46
+quest Q647_InfluxOfMachines <cond>=1 <state>=STARTED
+hold 8100 498
+random 0 300000 0 0 0 0
+script quest.Q647_InfluxOfMachines
+item 8100
+page default/32069.htm
+page script/quest/Q647_InfluxOfMachines/
+npc gutenhagen 32069 Folk 10 0 0
+npc m1 22052 Monster 40 0 0
+npc m2 22060 Monster 50 0 0
+npc m3 22078 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 8100=498
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8100
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8100=499
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8100
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 647:0x80000003
+  S ExShowQuestMark quest=647
+  Q upsert Q647_InfluxOfMachines | <cond> | 2
+  items 8100=500
+  rows Q647_InfluxOfMachines <cond>=2 <state>=STARTED
+  state Q647_InfluxOfMachines STARTED

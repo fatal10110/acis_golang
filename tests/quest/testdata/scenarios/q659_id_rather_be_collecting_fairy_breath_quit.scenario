@@ -1,0 +1,33 @@
+# I'd Rather Be Collecting Fairy Breath (Q659): the character ends the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q659_id_rather_be_collecting_fairy_breath_quit.golden
+character Hero 26
+quest Q659_IdRatherBeCollectingFairyBreath <cond>=1 <state>=STARTED
+hold 8286 3
+script quest.Q659_IdRatherBeCollectingFairyBreath
+item 8286 57
+page default/30634.htm
+page script/quest/Q659_IdRatherBeCollectingFairyBreath/
+npc galatea 30634 Folk 10 0 0
+
+action galatea
+action galatea
+  S ActionFailed
+  S NpcHtmlMessage obj=galatea item=0 page=default/30634.htm
+  S ActionFailed
+bypass npc_{galatea}_Quest
+  S NpcHtmlMessage obj=galatea item=0 page=script/quest/Q659_IdRatherBeCollectingFairyBreath/30634-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q659_IdRatherBeCollectingFairyBreath 30634-06.htm
+  S SystemMessage id=301 3:8286 6:3
+  S SystemMessage id=52 6:150
+  S NpcHtmlMessage obj=galatea item=0 page=script/quest/Q659_IdRatherBeCollectingFairyBreath/30634-06.htm
+  S ActionFailed
+bypass Quest Q659_IdRatherBeCollectingFairyBreath 30634-08.htm
+  S QuestList
+  S NpcHtmlMessage obj=galatea item=0 page=script/quest/Q659_IdRatherBeCollectingFairyBreath/30634-08.htm
+  S ActionFailed
+  Q delete-quest Q659_IdRatherBeCollectingFairyBreath
+  rows Q659_IdRatherBeCollectingFairyBreath -
+  state Q659_IdRatherBeCollectingFairyBreath -
