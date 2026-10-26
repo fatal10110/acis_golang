@@ -7,5 +7,9 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // quests301UpHandleOps holds, per script of quests_301_up.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func quests301UpHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"quest.Q348_AnArrogantSearch": {
+			"OnAttacked": {"NPC.StopAttack"},
+		},
+	}
 }

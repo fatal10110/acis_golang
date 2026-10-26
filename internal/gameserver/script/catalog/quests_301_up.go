@@ -27,6 +27,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q344"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q345"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q347"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q348"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q351"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q352"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q353"
@@ -148,7 +149,7 @@ func quests301Up() script.Catalog {
 		"quest.Q344_1000YearsTheEndOfLamentation":      q344.New,
 		"quest.Q345_MethodToRaiseTheDead":              q345.New,
 		"quest.Q347_GoGetTheCalculator":                q347.New,
-		"quest.Q348_AnArrogantSearch":                  nil,
+		"quest.Q348_AnArrogantSearch":                  q348.New,
 		"quest.Q351_BlackSwan":                         q351.New,
 		"quest.Q352_HelpRoodRaiseANewPet":              q352.New,
 		"quest.Q353_PowerOfDarkness":                   q353.New,
