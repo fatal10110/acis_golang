@@ -106,28 +106,7 @@ func hereticDDMagic2CurseHooks() script.Hooks {
 			base.ClanAttacked(s, e)
 		},
 		OnOutOfTerritory: hereticOutOfTerritory,
-		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
-			n := e.NPC
-			switch e.EventID {
-			case eventHelpCall, eventMasterTarget:
-				c0 := s.Object(e.Arg1)
-				if c0 == nil {
-					return
-				}
-				if e.EventID == eventHelpCall {
-					n.SetInt(script.SlotIntAI4, 1)
-				}
-				n.RemoveAllAttackDesire()
-				hallSpell(n, c0)
-				if c0.Playable() {
-					n.HateList().Add(c0, 200)
-				}
-			case eventWalkHome:
-				n.SetInt(script.SlotIntAI4, 0)
-				n.RemoveAllAttackDesire()
-				n.AddMoveToDesire(n.SpawnLocation(), 100)
-			}
-		},
+		OnScriptEvent:    hereticCallEvent,
 	}).Named("WizardHereticDDMagic2Curse")
 }
 
