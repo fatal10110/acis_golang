@@ -1,0 +1,26 @@
+# War with Varka Silenos (Q606), started with 50 Varka manes: Kadun Zu Ketra refuses the trade of 100 manes. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q606_war_with_varka_silenos_short.golden
+character Ally 74
+standing 1
+quest Q606_WarWithVarkaSilenos <cond>=1 <state>=STARTED
+hold 7233 50
+script quest.Q606_WarWithVarkaSilenos
+item 7233 7186
+page npcdefault.htm
+page script/quest/Q606_WarWithVarkaSilenos/
+npc kadun 31370 Folk 10 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q606_WarWithVarkaSilenos 31370-07.htm
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-08.htm
+  S ActionFailed
+  items 7233=50 7186=0

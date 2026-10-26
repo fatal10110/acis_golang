@@ -1,0 +1,32 @@
+# Alliance with Ketra Orcs (Q605) and War with Varka Silenos (Q606) both started: half the kills of a Varka warrior that
+# drops manes drop one instead of a badge. A soldier of 21350 drops a mane (draw true), a badge when the draw is false, and a
+# soldier of 21351, which drops no mane, a badge whatever the draw. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q605_alliance_with_ketra_orcs_mane.golden
+character Ally 74
+quest Q605_AllianceWithKetraOrcs <cond>=1 <state>=STARTED
+quest Q606_WarWithVarkaSilenos <cond>=1 <state>=STARTED
+random 0 0 0  0 1 0  0 0 0
+script quest.Q605_AllianceWithKetraOrcs
+script quest.Q606_WarWithVarkaSilenos
+item 7211 7212 7213 7214 7215 7216 7217 7218 7219 7220 7233
+page npcdefault.htm
+page script/quest/Q605_AllianceWithKetraOrcs/
+npc wahkan 31371 Folk 10 0 0
+npc soldier 21350 Monster 40 0 0
+npc soldier2 21351 Monster 40 0 0
+
+kill soldier
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7233
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7233=1 7216=0
+kill soldier
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7216
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7233=1 7216=1
+kill soldier2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7216
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7233=1 7216=2

@@ -1,0 +1,48 @@
+# Alliance with Ketra Orcs (Q605), stage 4: 300 soldier, 300 officer and 200 captain badges and the Totem of Valor buy the
+# fourth mark (cond 5). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q605_alliance_with_ketra_orcs_stage4.golden
+character Ally 74
+quest Q605_AllianceWithKetraOrcs <cond>=4 <state>=STARTED
+hold 7216 300
+hold 7217 300
+hold 7218 200
+hold 7219 1
+hold 7213 1
+script quest.Q605_AllianceWithKetraOrcs
+item 7211 7212 7213 7214 7215 7216 7217 7218 7219 7220 7233
+page npcdefault.htm
+page script/quest/Q605_AllianceWithKetraOrcs/
+npc wahkan 31371 Folk 10 0 0
+
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-22.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q605_AllianceWithKetraOrcs 31371-10-4.htm
+  Q upsert Q605_AllianceWithKetraOrcs | <cond> | 5
+  S QuestList 605:0x8000001f
+  S ExShowQuestMark quest=605
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7216 6:300
+  S SystemMessage id=301 3:7217 6:300
+  S SystemMessage id=301 3:7218 6:200
+  S SystemMessage id=302 3:7219
+  S SystemMessage id=302 3:7213
+  S SystemMessage id=54 3:7214
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-10-4.htm
+  S ActionFailed
+  items 7216=0 7217=0 7218=0 7219=0 7213=0 7214=1
+  rows Q605_AllianceWithKetraOrcs <cond>=5 <state>=STARTED
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-17.htm
+  S ActionFailed
+  S ActionFailed
