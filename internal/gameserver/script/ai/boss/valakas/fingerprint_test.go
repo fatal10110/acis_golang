@@ -7,10 +7,10 @@ import (
 )
 
 // TestMatchesReferenceFingerprints compares the package with the reference
-// class: literals, engine calls and hook shapes. The NpcString id Valakas
+// classes: literals, engine calls and hook shapes. The NpcString id Valakas
 // shows is a named constant in the reference, a number in Go.
 func TestMatchesReferenceFingerprints(t *testing.T) {
-	problems, err := scriptfp.Check(".", []string{"script.ai.boss.valakas.Valakas"}, "number 1000519")
+	problems, err := scriptfp.Check(".", []string{"script.ai.boss.valakas.HeartOfVolcano", "script.ai.boss.valakas.Valakas"}, "number 1000519")
 	if err != nil {
 		t.Fatal(err)
 	}

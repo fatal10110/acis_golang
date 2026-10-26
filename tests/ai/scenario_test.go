@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/queenant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/sailren"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/sirra"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/valakas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/zaken"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
@@ -258,6 +259,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.boss.queenant.QueenAnt":                queenant.QueenAnt,
 	"script.ai.boss.queenant.QueenAntPrivateAntLarva": queenant.Larva,
 	"script.ai.boss.queenant.QueenAntPrivateNurseAnt": queenant.Nurse,
+	"script.ai.boss.valakas.HeartOfVolcano":           valakas.HeartOfVolcano,
 	"script.ai.boss.orfen.Orfen":                      orfen.Orfen,
 	"script.ai.boss.orfen.OrfenPrivateRibaIren":       orfen.RibaIren,
 	"script.ai.boss.sailren.SailrenDummy":             sailren.SailrenDummy,
