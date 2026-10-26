@@ -1,0 +1,66 @@
+# Magical Power of Fire, part 1 (Q615): a level 74 Varka ally of level 2 is offered the quest by Naran and takes it;
+# Udan then sends him to the Asefa Box (cond 2) and, until Asefa's Eye has seen him, only repeats himself. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q615_magical_power_of_fire_part1_accept.golden
+character Ally 74
+standing -2
+script quest.Q615_MagicalPowerOfFire_Part1
+item 1661 7242 7243 7081
+page npcdefault.htm
+page default/31559.htm
+page script/quest/Q615_MagicalPowerOfFire_Part1/
+npc naran 31378 Folk 10 0 0
+npc udan 31379 Folk 20 0 0
+npc box 31559 Folk 30 0 0
+
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31378-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q615_MagicalPowerOfFire_Part1 31378-03.htm
+  Q upsert Q615_MagicalPowerOfFire_Part1 | <state> | STARTED
+  Q upsert Q615_MagicalPowerOfFire_Part1 | <cond> | 1
+  S QuestList 615:0x80000001
+  S ExShowQuestMark quest=615
+  Q upsert Q615_MagicalPowerOfFire_Part1 | spawned | 0
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31378-03.htm
+  S ActionFailed
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=1 <state>=STARTED spawned=0
+  state Q615_MagicalPowerOfFire_Part1 STARTED
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31378-04.htm
+  S ActionFailed
+  S ActionFailed
+action udan
+action udan
+  S ActionFailed
+  S NpcHtmlMessage obj=udan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{udan}_Quest
+  Q upsert Q615_MagicalPowerOfFire_Part1 | <cond> | 2
+  S QuestList 615:0x80000003
+  S ExShowQuestMark quest=615
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=udan item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31379-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=2 <state>=STARTED spawned=0
+action udan
+  S ActionFailed
+  S NpcHtmlMessage obj=udan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{udan}_Quest
+  S NpcHtmlMessage obj=udan item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31379-02.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=2 <state>=STARTED spawned=0

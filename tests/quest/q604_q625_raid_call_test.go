@@ -23,7 +23,8 @@ import (
 
 // The altar of Daimon (Q604_DaimonTheWhiteEyed_Part2 onAdvEvent "31541-02.htm"),
 // the Yeti's table (Q625_TheFinestIngredients_Part2 "31542-02.htm") and the
-// Varka's holy altar (Q610_MagicalPowerOfWater_Part2 "31560-02.htm") call a
+// Varka's holy altar (Q610_MagicalPowerOfWater_Part2 "31560-02.htm") and the
+// Ketra's holy altar (Q616_MagicalPowerOfFire_Part2 "31558-02.htm") call a
 // raid boss for 1200 s when the player holds the summon item: the boss
 // appears, says an NpcString, the altar leaves the world and the quest moves
 // to cond 2; while the boss stands the other altars refuse the call; when it

@@ -1,0 +1,64 @@
+# Magical Power of Fire, part 1 (Q615) at cond 2 with a Thief's Key: the theft at the Asefa Box takes the key and gives the
+# Stolen Red Totem (cond 3), and Udan trades it for the Red Totem and a Divine Stone, ending the quest. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q615_magical_power_of_fire_part1_steal.golden
+character Ally 74
+standing -2
+quest Q615_MagicalPowerOfFire_Part1 <cond>=2 spawned=0 <state>=STARTED
+hold 1661 1
+script quest.Q615_MagicalPowerOfFire_Part1
+item 1661 7242 7243 7081
+page npcdefault.htm
+page default/31559.htm
+page script/quest/Q615_MagicalPowerOfFire_Part1/
+npc naran 31378 Folk 10 0 0
+npc udan 31379 Folk 20 0 0
+npc box 31559 Folk 30 0 0
+
+action box
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/31559.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31559-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q615_MagicalPowerOfFire_Part1 31559-03.htm
+  Q upsert Q615_MagicalPowerOfFire_Part1 | <cond> | 3
+  S QuestList 615:0x80000007
+  S ExShowQuestMark quest=615
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1661
+  S SystemMessage id=54 3:7242
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31559-03.htm
+  S ActionFailed
+  items 1661=0 7242=1
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=3 <state>=STARTED spawned=0
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/31559.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31559-05.htm
+  S ActionFailed
+  S ActionFailed
+action udan
+action udan
+  S ActionFailed
+  S NpcHtmlMessage obj=udan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{udan}_Quest
+  S SystemMessage id=302 3:7242
+  S SystemMessage id=54 3:7243
+  S SystemMessage id=54 3:7081
+  Q delete-var Q615_MagicalPowerOfFire_Part1 | spawned
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  Q delete-quest Q615_MagicalPowerOfFire_Part1
+  S NpcHtmlMessage obj=udan item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31379-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 7242=0 7243=1 7081=1
+  rows Q615_MagicalPowerOfFire_Part1 -
+  state Q615_MagicalPowerOfFire_Part1 -
