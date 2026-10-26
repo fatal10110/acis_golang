@@ -1,0 +1,14 @@
+# WarriorRunAwayToClanAggressive (20211), every draw 0, far from the character. Seeing it, the
+# runner attacks the character, weight 200.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayToClan.WarriorRunAwayToClan
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayToClan.WarriorRunAwayToClanAggressive
+npc runner 20211 Monster 1500 0 0
+
+approach runner
+  desires runner attack(player)=200
