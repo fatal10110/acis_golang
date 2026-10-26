@@ -1,0 +1,53 @@
+# Attack Sailren! (Q641): a level 77 character that did The Name of Evil, Part 2 accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q641_attack_sailren_accept.golden
+character Hero 77
+quest Q126_TheNameOfEvil_2 <state>=COMPLETED
+script quest.Q126_TheNameOfEvil_2
+script quest.Q641_AttackSailren
+item 8782 8784
+page default/32109.htm
+page script/quest/Q641_AttackSailren/
+npc statue 32109 Folk 10 0 0
+
+action statue
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 html="<html><body><a action=\"bypass -h npc_{statue}_Quest Q126_TheNameOfEvil_2\">[The Name of Evil - 2 (Done)]</a><br><a action=\"bypass -h npc_{statue}_Quest Q641_AttackSailren\">[Attack Sailren!]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{statue}_Quest Q641_AttackSailren
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q641_AttackSailren/32109-1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q641_AttackSailren 32109-4.htm
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q641_AttackSailren/32109-4.htm
+  S ActionFailed
+bypass Quest Q641_AttackSailren 32109-5.htm
+  S QuestList 126:0x00000000 641:0x80000001
+  S ExShowQuestMark quest=641
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q641_AttackSailren/32109-5.htm
+  S ActionFailed
+  Q upsert Q641_AttackSailren | <state> | STARTED
+  Q upsert Q641_AttackSailren | <cond> | 1
+  rows Q641_AttackSailren <cond>=1 <state>=STARTED
+  state Q641_AttackSailren STARTED
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 html="<html><body><a action=\"bypass -h npc_{statue}_Quest Q126_TheNameOfEvil_2\">[The Name of Evil - 2 (Done)]</a><br><a action=\"bypass -h npc_{statue}_Quest Q641_AttackSailren\">[Attack Sailren! (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{statue}_Quest Q641_AttackSailren
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q641_AttackSailren/32109-5.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q641_AttackSailren <cond>=1 <state>=STARTED
+  state Q641_AttackSailren STARTED

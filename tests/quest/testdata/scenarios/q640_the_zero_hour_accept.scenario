@@ -1,0 +1,50 @@
+# The Zero Hour (Q640): a level 66 character that did In Search of the Nest accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q640_the_zero_hour_accept.golden
+character Hero 66
+quest Q109_InSearchOfTheNest <state>=COMPLETED
+script quest.Q109_InSearchOfTheNest
+script quest.Q640_TheZeroHour
+item 8085 4042 4043 4044 1887 1888 1889 5550 1890 1893
+page default/31554.htm
+page script/quest/Q640_TheZeroHour/
+npc kahman 31554 Folk 10 0 0
+
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=default/31554.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 html="<html><body><a action=\"bypass -h npc_{kahman}_Quest Q109_InSearchOfTheNest\">[In Search of the Nest (Done)]</a><br><a action=\"bypass -h npc_{kahman}_Quest Q640_TheZeroHour\">[The Zero Hour]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{kahman}_Quest Q640_TheZeroHour
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q640_TheZeroHour/31554-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q640_TheZeroHour 31554-02.htm
+  S QuestList 109:0x00000000 640:0x80000001
+  S ExShowQuestMark quest=640
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q640_TheZeroHour/31554-02.htm
+  S ActionFailed
+  Q upsert Q640_TheZeroHour | <state> | STARTED
+  Q upsert Q640_TheZeroHour | <cond> | 1
+  rows Q640_TheZeroHour <cond>=1 <state>=STARTED
+  state Q640_TheZeroHour STARTED
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=default/31554.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 html="<html><body><a action=\"bypass -h npc_{kahman}_Quest Q109_InSearchOfTheNest\">[In Search of the Nest (Done)]</a><br><a action=\"bypass -h npc_{kahman}_Quest Q640_TheZeroHour\">[The Zero Hour (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{kahman}_Quest Q640_TheZeroHour
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q640_TheZeroHour/31554-03.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q640_TheZeroHour <cond>=1 <state>=STARTED
+  state Q640_TheZeroHour STARTED
