@@ -1,0 +1,38 @@
+# Stolen Dignity (Q386), level 58, quest started: the character gives the quest up. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q386_stolen_dignity_giveup.golden
+character Pastime 58
+quest Q386_StolenDignity <cond>=1 <state>=STARTED
+script quest.Q386_StolenDignity
+item 6363 5529 5534 5536 8346
+page warehouse/30843.htm
+page script/quest/Q386_StolenDignity/
+npc romp 30843 WarehouseKeeper 10 0 0
+
+action romp
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED
+  state Q386_StolenDignity STARTED
+action romp
+  S ActionFailed
+  S NpcHtmlMessage obj=romp item=0 page=warehouse/30843.htm
+  S ActionFailed
+bypass npc_{romp}_Quest
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q386_StolenDignity 30843-08.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-08.htm
+  S ActionFailed
+  Q delete-quest Q386_StolenDignity
+  rows Q386_StolenDignity -
+  state Q386_StolenDignity -
+action romp
+  S ActionFailed
+  S NpcHtmlMessage obj=romp item=0 page=warehouse/30843.htm
+  S ActionFailed
+bypass npc_{romp}_Quest
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q386_StolenDignity CREATED

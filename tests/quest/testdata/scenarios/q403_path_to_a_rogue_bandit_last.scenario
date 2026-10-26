@@ -1,0 +1,71 @@
+# Path to a Rogue (Q403), level 19 with the dagger in hand and three stolen items: the Catseye Bandit speaks when first hit and when it dies, drops the last item, and Bezique gives the recommendation; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q403_path_to_a_rogue_bandit_last.golden
+character Rogue 19
+quest Q403_PathToARogue <cond>=5 <state>=STARTED
+hold 1181 1
+hold 1185 1
+hold 1187 1
+hold 1188 1
+hold 1189 1
+equip 1182
+random 0
+script quest.Q403_PathToARogue
+item 1180 1181 1182 1183 1184 1185 1186 1187 1188 1189 1190
+page guard/30379.htm
+page default/30425.htm
+page script/quest/Q403_PathToARogue/
+npc bezique 30379 Guard 10 0 0
+npc neti 30425 Folk -10 0 0
+npc skel 20035 Monster 40 0 0
+npc bandit 27038 Monster 50 0 0
+
+hit bandit 5
+  S NpcSay obj=bandit type=0 npc=1027038 text="You childish fool, do you think you can catch me?"
+  items 1181=1 1182=1 1185=1 1187=1 1188=1 1189=1
+  rows Q403_PathToARogue <cond>=5 <state>=STARTED
+  state Q403_PathToARogue STARTED
+kill bandit
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=bandit type=0 npc=1027038 text="I must do something about this shameful incident..."
+  S SystemMessage id=54 3:1186
+  S QuestList 403:0x8000003f
+  S ExShowQuestMark quest=403
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q403_PathToARogue | <cond> | 6
+  items 1186=1
+  rows Q403_PathToARogue <cond>=6 <state>=STARTED
+action bezique
+action bezique
+  S ActionFailed
+  S NpcHtmlMessage obj=bezique item=0 page=guard/30379.htm
+  S ActionFailed
+bypass npc_{bezique}_Quest
+  S SystemMessage id=302 3:1181
+  S SystemMessage id=302 3:1182
+  S SystemMessage id=302 3:1186
+  S SystemMessage id=302 3:1189
+  S SystemMessage id=302 3:1188
+  S SystemMessage id=302 3:1187
+  S SystemMessage id=54 3:1190
+  S SystemMessage id=95 1:3200 1:1500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:1185
+  S NpcHtmlMessage obj=bezique item=0 page=script/quest/Q403_PathToARogue/30379-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q403_PathToARogue
+  items 1181=0 1182=0 1185=0 1186=0 1187=0 1188=0 1189=0 1190=1
+  rows Q403_PathToARogue -
+  state Q403_PathToARogue -
+relog
+action bezique
+action bezique
+  S ActionFailed
+  S NpcHtmlMessage obj=bezique item=0 page=guard/30379.htm
+  S ActionFailed
+bypass npc_{bezique}_Quest
+  S NpcHtmlMessage obj=bezique item=0 page=script/quest/Q403_PathToARogue/30379-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q403_PathToARogue CREATED
