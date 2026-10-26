@@ -1,0 +1,23 @@
+# Magical Power of Water, part 1 (Q609): a level 74 Ketra ally of level 1 is turned away by Wahkan. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q609_magical_power_of_water_part1_low_alliance.golden
+character Ally 74
+standing 1
+script quest.Q609_MagicalPowerOfWater_Part1
+item 1661 7237 7238 7081
+page npcdefault.htm
+page default/31561.htm
+page script/quest/Q609_MagicalPowerOfWater_Part1/
+npc wahkan 31371 Folk 10 0 0
+npc asefa 31372 Folk 20 0 0
+npc box 31561 Folk 30 0 0
+
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q609_MagicalPowerOfWater_Part1/31371-02.htm
+  S ActionFailed
+  S ActionFailed

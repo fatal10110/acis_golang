@@ -1,0 +1,81 @@
+# Slay the Enemy Commander (Q608) for a level 75 Ketra ally of level 4 holding the level 4 alliance mark: Kadun Zu Ketra
+# offers the quest and the player takes it. Mos' death gives the head (cond 2, the middle sound first), and Kadun trades it
+# for the Totem of Wisdom and 10000 experience, ending the quest. Holding the totem he is no longer offered it. The head
+# going to every ally of the killer's party is in q608_flow_test.go. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q608_slay_the_enemy_commander_ally.golden
+character Ally 75
+standing 4
+hold 7214 1
+script quest.Q608_SlayTheEnemyCommander
+item 7236 7220 7214
+page npcdefault.htm
+page script/quest/Q608_SlayTheEnemyCommander/
+npc kadun 31370 Folk 10 0 0
+npc mos 25312 Monster 40 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q608_SlayTheEnemyCommander/31370-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q608_SlayTheEnemyCommander 31370-04.htm
+  Q upsert Q608_SlayTheEnemyCommander | <state> | STARTED
+  Q upsert Q608_SlayTheEnemyCommander | <cond> | 1
+  S QuestList 608:0x80000001
+  S ExShowQuestMark quest=608
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q608_SlayTheEnemyCommander/31370-04.htm
+  S ActionFailed
+  rows Q608_SlayTheEnemyCommander <cond>=1 <state>=STARTED
+  state Q608_SlayTheEnemyCommander STARTED
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q608_SlayTheEnemyCommander/31370-06.htm
+  S ActionFailed
+  S ActionFailed
+kill mos
+  S SystemMessage id=95 1:0 1:0
+  Q upsert Q608_SlayTheEnemyCommander | <cond> | 2
+  S QuestList 608:0x80000003
+  S ExShowQuestMark quest=608
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7236
+  rows Q608_SlayTheEnemyCommander <cond>=2 <state>=STARTED
+  items 7236=1
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q608_SlayTheEnemyCommander/31370-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q608_SlayTheEnemyCommander 31370-07.htm
+  S SystemMessage id=302 3:7236
+  S SystemMessage id=54 3:7220
+  S SystemMessage id=45 1:10000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  Q delete-quest Q608_SlayTheEnemyCommander
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q608_SlayTheEnemyCommander/31370-07.htm
+  S ActionFailed
+  items 7236=0 7220=1 7214=1
+  rows Q608_SlayTheEnemyCommander -
+  state Q608_SlayTheEnemyCommander -
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q608_SlayTheEnemyCommander/31370-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q608_SlayTheEnemyCommander CREATED

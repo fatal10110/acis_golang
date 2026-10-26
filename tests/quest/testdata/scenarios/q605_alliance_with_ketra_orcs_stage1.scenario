@@ -1,0 +1,39 @@
+# Alliance with Ketra Orcs (Q605), stage 1: 100 soldier badges buy the first mark (cond 2). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q605_alliance_with_ketra_orcs_stage1.golden
+character Ally 74
+quest Q605_AllianceWithKetraOrcs <cond>=1 <state>=STARTED
+hold 7216 100
+script quest.Q605_AllianceWithKetraOrcs
+item 7211 7212 7213 7214 7215 7216 7217 7218 7219 7220 7233
+page npcdefault.htm
+page script/quest/Q605_AllianceWithKetraOrcs/
+npc wahkan 31371 Folk 10 0 0
+
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q605_AllianceWithKetraOrcs 31371-10-1.htm
+  Q upsert Q605_AllianceWithKetraOrcs | <cond> | 2
+  S QuestList 605:0x80000003
+  S ExShowQuestMark quest=605
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7216 6:100
+  S SystemMessage id=54 3:7211
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-10-1.htm
+  S ActionFailed
+  items 7216=0 7211=1
+  rows Q605_AllianceWithKetraOrcs <cond>=2 <state>=STARTED
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-12.htm
+  S ActionFailed
+  S ActionFailed

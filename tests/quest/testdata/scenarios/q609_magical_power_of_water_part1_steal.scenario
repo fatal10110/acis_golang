@@ -1,0 +1,64 @@
+# Magical Power of Water, part 1 (Q609) at cond 2 with a Thief's Key: the theft at the Udan Box takes the key and gives the
+# Stolen Green Totem (cond 3), and Asefa trades it for the Green Totem and a Divine Stone, ending the quest. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q609_magical_power_of_water_part1_steal.golden
+character Ally 74
+standing 2
+quest Q609_MagicalPowerOfWater_Part1 <cond>=2 spawned=0 <state>=STARTED
+hold 1661 1
+script quest.Q609_MagicalPowerOfWater_Part1
+item 1661 7237 7238 7081
+page npcdefault.htm
+page default/31561.htm
+page script/quest/Q609_MagicalPowerOfWater_Part1/
+npc wahkan 31371 Folk 10 0 0
+npc asefa 31372 Folk 20 0 0
+npc box 31561 Folk 30 0 0
+
+action box
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/31561.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q609_MagicalPowerOfWater_Part1/31561-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q609_MagicalPowerOfWater_Part1 31561-03.htm
+  Q upsert Q609_MagicalPowerOfWater_Part1 | <cond> | 3
+  S QuestList 609:0x80000007
+  S ExShowQuestMark quest=609
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1661
+  S SystemMessage id=54 3:7237
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q609_MagicalPowerOfWater_Part1/31561-03.htm
+  S ActionFailed
+  items 1661=0 7237=1
+  rows Q609_MagicalPowerOfWater_Part1 <cond>=3 <state>=STARTED spawned=0
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/31561.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q609_MagicalPowerOfWater_Part1/31561-05.htm
+  S ActionFailed
+  S ActionFailed
+action asefa
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{asefa}_Quest
+  S SystemMessage id=302 3:7237
+  S SystemMessage id=54 3:7238
+  S SystemMessage id=54 3:7081
+  Q delete-var Q609_MagicalPowerOfWater_Part1 | spawned
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  Q delete-quest Q609_MagicalPowerOfWater_Part1
+  S NpcHtmlMessage obj=asefa item=0 page=script/quest/Q609_MagicalPowerOfWater_Part1/31372-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 7237=0 7238=1 7081=1
+  rows Q609_MagicalPowerOfWater_Part1 -
+  state Q609_MagicalPowerOfWater_Part1 -
