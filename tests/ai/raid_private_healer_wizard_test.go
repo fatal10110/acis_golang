@@ -206,7 +206,7 @@ func TestRaidPrivateHealerBuffsAndRunsAfterHealing(t *testing.T) {
 // at its own level, 20, the strike and the debuff once. Seeing the
 // character cast, the level 20 wizard wants the strike and the debuff at
 // 1000000, the level 1 wizard the raid curse beside them. On draws of 1
-// none of it. A hit on itself with its master alive wants nothing.
+// none of it.
 func TestRaidPrivateWizardStrikesAndCurses(t *testing.T) {
 	t.Parallel()
 	w := bootRhw(t, raidSpellBoot(t))
