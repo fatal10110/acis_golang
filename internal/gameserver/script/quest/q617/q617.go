@@ -134,7 +134,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.Exit(true)
 	case script.IsDigit(e.Name):
 		if e.Player.ItemCount(torch) >= 1200 {
-			id, err := strconv.Atoi(e.Name)
+			id, err := strconv.ParseInt(e.Name, 10, 32)
 			if err != nil {
 				panic(err)
 			}
