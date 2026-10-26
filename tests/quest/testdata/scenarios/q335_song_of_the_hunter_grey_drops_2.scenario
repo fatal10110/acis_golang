@@ -1,0 +1,15 @@
+# Song of the Hunter (Q335), level 45: Grey's second test: a Timak orc warrior drops a totem while the test runs, and none when it does not. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_grey_drops_2.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED grey2=1
+random 0
+script quest.Q335_SongOfTheHunter
+item 3717
+page script/quest/Q335_SongOfTheHunter/
+npc m1 20586 Monster 40 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3717
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3717=1
