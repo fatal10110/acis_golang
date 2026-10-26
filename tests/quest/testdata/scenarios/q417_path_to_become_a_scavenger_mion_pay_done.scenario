@@ -1,0 +1,53 @@
+# Path To Become A Scavenger (Q417), Mion collects the three payments and gives the letter for Toma. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q417_path_to_become_a_scavenger_mion_pay_done.golden
+character Scavenger 19
+class 53
+quest Q417_PathToBecomeAScavenger <cond>=3 <state>=STARTED id=50
+hold 1650 1
+hold 1651 1
+hold 1652 1
+script quest.Q417_PathToBecomeAScavenger
+item 1642 1643 1644 1645 1646 1647 1648 1649 1650 1651 1652 1653 1654 1655 1656 1657 8543
+page default/30524.htm
+page warehouse/30316.htm
+page merchant/30517.htm
+page merchant/30519.htm
+page villagemaster/30525.htm
+page default/30538.htm
+page default/30556.htm
+page default/30557.htm
+page villagemaster/31958.htm
+page script/quest/Q417_PathToBecomeAScavenger/
+npc pippi 30524 Folk 10 0 0
+npc raut 30316 WarehouseKeeper -20 0 0
+npc shari 30517 Merchant 30 0 0
+npc mion 30519 Merchant -40 0 0
+npc bronk 30525 VillageMasterDwarf 50 0 0
+npc zimenf 30538 Folk -60 0 0
+npc toma 30556 Folk 70 0 0
+npc torai 30557 Folk -80 0 0
+npc yasheni 31958 VillageMasterDwarf 90 0 0
+npc hbear 20777 Monster -100 0 0
+npc honey 27058 Monster 110 0 0
+npc hunter 20403 Monster -120 0 0
+npc plunder 20508 Monster 130 0 0
+
+action mion
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S QuestList 417:0x8000000f
+  S ExShowQuestMark quest=417
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1650
+  S SystemMessage id=302 3:1651
+  S SystemMessage id=302 3:1652
+  S SystemMessage id=54 3:1646
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q417_PathToBecomeAScavenger/30519-15.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q417_PathToBecomeAScavenger | <cond> | 4
+  items 1650=0 1651=0 1652=0 1646=1
+  rows Q417_PathToBecomeAScavenger <cond>=4 <state>=STARTED id=50
