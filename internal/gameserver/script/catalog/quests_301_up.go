@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q334"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q335"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q336"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q337"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q338"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q341"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q343"
@@ -139,7 +140,7 @@ func quests301Up() script.Catalog {
 		"quest.Q334_TheWishingPotion":                  q334.New,
 		"quest.Q335_SongOfTheHunter":                   q335.New,
 		"quest.Q336_CoinsOfMagic":                      q336.New,
-		"quest.Q337_AudienceWithTheLandDragon":         nil,
+		"quest.Q337_AudienceWithTheLandDragon":         q337.New,
 		"quest.Q338_AlligatorHunter":                   q338.New,
 		"quest.Q340_SubjugationOfLizardmen":            nil,
 		"quest.Q341_HuntingForWildBeasts":              q341.New,
