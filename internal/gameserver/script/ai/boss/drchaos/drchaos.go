@@ -14,13 +14,14 @@ const summonRaid = 25512
 // strangeMachineID is the machine Doctor Chaos works at.
 const strangeMachineID = 32032
 
-// Where Doctor Chaos walks, where the golem rises, and where the party and
-// Doctor Chaos land.
-var (
-	posMachine = script.Loc{X: 96320, Y: -110912, Z: -3360}
-	posRaid    = script.Loc{X: 94640, Y: -112496, Z: -3360}
-	posDoor    = script.Loc{X: 96016, Y: -110736, Z: -3376}
-)
+// posMachine is the spot by the machine Doctor Chaos walks to.
+func posMachine() script.Loc { return script.Loc{X: 96320, Y: -110912, Z: -3360} }
+
+// posRaid is where the golem rises.
+func posRaid() script.Loc { return script.Loc{X: 94640, Y: -112496, Z: -3360} }
+
+// posDoor is the door Doctor Chaos walks to once its cutscene runs.
+func posDoor() script.Loc { return script.Loc{X: 96016, Y: -110736, Z: -3376} }
 
 // Doctor Chaos's script memory: slotStarted is 1 once the cutscene began,
 // slotTalker the player who talked to it, slotMachine the machine it saw
@@ -53,7 +54,7 @@ func DoctorChaosNpc() script.Script {
 			n.SetSlot(slotMachine, nil)
 
 			if script.LocOf(n).Z == -15536 {
-				s.Spawner().CreateOnePrivateEx(n, summonRaid, posRaid, 0, script.Params{})
+				s.Spawner().CreateOnePrivateEx(n, summonRaid, posRaid(), 0, script.Params{})
 			}
 
 			base.Created(s, e)
@@ -71,10 +72,10 @@ func DoctorChaosNpc() script.Script {
 			switch {
 			case strings.EqualFold(name, "1001"):
 				n.LookNeighbor()
-				n.AddMoveToDesire(posMachine, 1000)
+				n.AddMoveToDesire(posMachine(), 1000)
 			case strings.EqualFold(name, "1002"):
 				n.SpecialCamera(script.CameraShot{Distance: 1, Yaw: -150, Pitch: 10, Time: 3000, Duration: 20000, Turn: 0, Rise: 0, Widescreen: 0, Unknown: 0})
-				n.AddMoveToDesire(posDoor, 1000)
+				n.AddMoveToDesire(posDoor(), 1000)
 			case strings.EqualFold(name, "2001"):
 				if talker, ok := n.Slot(slotTalker).(*script.Player); ok && n.Distance3D(talker) < 600 {
 					n.SetInt(slotStarted, 1)
@@ -95,7 +96,7 @@ func DoctorChaosNpc() script.Script {
 				}
 				n.AddSocialDesire(3, 5000, 1000000)
 			case strings.EqualFold(name, "3001"):
-				s.Spawner().CreateOnePrivateEx(n, summonRaid, posRaid, 0, script.Params{P1: 1000, P2: n.Slot(slotTalker).ObjectID(), P3: 0})
+				s.Spawner().CreateOnePrivateEx(n, summonRaid, posRaid(), 0, script.Params{P1: 1000, P2: n.Slot(slotTalker).ObjectID(), P3: 0})
 			}
 
 			return base.Timer(s, e)
@@ -112,10 +113,10 @@ func DoctorChaosNpc() script.Script {
 			switch {
 			case x == home.X && y == home.Y:
 				n.RemoveAllDesire()
-			case x == posMachine.X && y == posMachine.Y:
+			case x == posMachine().X && y == posMachine().Y:
 				n.AddAttackDesire(n.Slot(slotMachine), 10)
 				s.StartTimer("2001", n, nil, 3000*time.Millisecond)
-			case x == posDoor.X && y == posDoor.Y && n.Slot(slotTalker) != nil:
+			case x == posDoor().X && y == posDoor().Y && n.Slot(slotTalker) != nil:
 				n.Say(script.NpcString(1010580))
 
 				talker, _ := n.Slot(slotTalker).(*script.Player)
