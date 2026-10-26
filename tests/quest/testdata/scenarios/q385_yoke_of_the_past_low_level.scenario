@@ -1,0 +1,21 @@
+# Yoke of the Past (Q385), level 19: the gatekeeper turns the character away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q385_yoke_of_the_past_low_level.golden
+character Yoke 19
+script quest.Q385_YokeOfThePast
+item 5902 5965
+page gatekeeper/31095.htm
+page script/quest/Q385_YokeOfThePast/
+npc gatekeeper 31095 DungeonGatekeeper 10 0 0
+npc small 21208 Monster 40 0 0
+npc big 21255 Monster 50 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=gatekeeper/31095.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/quest/Q385_YokeOfThePast/02.htm
+  S ActionFailed
+  S ActionFailed

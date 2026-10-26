@@ -1,0 +1,57 @@
+# Warehouse Keeper's Pastime (Q384), level 40: a bet of ten wins three lines of the board 234567891 and the draw gives the coke. Untraced: the reference scrambles the board with an unseeded shuffle, so the random line pins the eight scramble draws (all 0 give the board 234567891) and the expected pages are the datapack pages filled by the reference algorithm.
+character Pastime 40
+quest Q384_WarehouseKeepersPastime <cond>=1 <state>=STARTED
+hold 5964 10
+random 0 0 0 0 0 0 0 0 0
+script quest.Q384_WarehouseKeepersPastime
+item 5964 1888 951 135
+page warehouse/30182.htm
+page villagemaster/30685.htm
+page script/quest/Q384_WarehouseKeepersPastime/
+npc cliff 30182 WarehouseKeeper 10 0 0
+npc baxt 30685 VillageMasterDwarf -10 0 0
+npc connabi 20947 Monster 40 0 0
+
+action cliff
+action cliff
+  S ActionFailed
+  S NpcHtmlMessage obj=cliff item=0 page=warehouse/30182.htm
+  S ActionFailed
+bypass npc_{cliff}_Quest
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q384_WarehouseKeepersPastime/30182-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q384_WarehouseKeepersPastime 30182-11.htm
+  S SystemMessage id=301 3:5964 6:10
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q384_WarehouseKeepersPastime/30182-11.htm
+  S ActionFailed
+  Q upsert Q384_WarehouseKeepersPastime | bet | 10
+  Q upsert Q384_WarehouseKeepersPastime | board | 234567891
+  items 5964=0
+  rows Q384_WarehouseKeepersPastime <cond>=1 <state>=STARTED bet=10 board=234567891
+bypass Quest Q384_WarehouseKeepersPastime select_1-2
+  S NpcHtmlMessage obj=cliff item=0 html="<html><body>Warehouse Freightman Cliff:<br>\nNow choose your second number.<br>\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-9\">9</a><br>\nYour current selection is shown below.<br>\n<table border=\"1\" border color=\"white\" width=100> \n\t<tr>\n\t\t<td align=\"center\">2</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr> \n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q384_WarehouseKeepersPastime | playerArray | 2
+bypass Quest Q384_WarehouseKeepersPastime select_2-3
+  S NpcHtmlMessage obj=cliff item=0 html="<html><body>Warehouse Freightman Cliff:<br>\nNow choose your third number.<br>\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-9\">9</a><br>\nYour current selection is shown below.<br>\n<table border=\"1\" border color=\"white\" width=100> \n\t<tr>\n\t\t<td align=\"center\">2</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">?</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr> \n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q384_WarehouseKeepersPastime | playerArray | 23
+bypass Quest Q384_WarehouseKeepersPastime select_2-4
+  S NpcHtmlMessage obj=cliff item=0 html="<html><body>Warehouse Freightman Cliff:<br>\nMake your fourth choice. Choose carefully.<br>\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-9\">9</a><br>\nYour current selection is shown below.<br>\n<table border=\"1\" border color=\"white\" width=100> \n\t<tr>\n\t\t<td align=\"center\">2</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">4</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr> \n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q384_WarehouseKeepersPastime | playerArray | 234
+bypass Quest Q384_WarehouseKeepersPastime select_2-5
+  S NpcHtmlMessage obj=cliff item=0 html="<html><body>Warehouse Freightman Cliff:<br>\nYou're almost done. Now, choose your fifth number carefully.<br>\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_2-9\">9</a><br>\nYour current selection is shown below.<br>\n<table border=\"1\" border color=\"white\" width=100> \n\t<tr>\n\t\t<td align=\"center\">2</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">4</td>\n\t</tr><tr>\n\t\t<td align=\"center\">5</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr> \n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q384_WarehouseKeepersPastime | playerArray | 2345
+bypass Quest Q384_WarehouseKeepersPastime select_2-6
+  S NpcHtmlMessage obj=cliff item=0 html="<html><body>Warehouse Freightman Cliff:<br>\nNow make your final choice.<br>\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q384_WarehouseKeepersPastime select_3-9\">9</a><br>\nYour current selection is shown below.<br>\n<table border=\"1\" border color=\"white\" width=100> \n\t<tr>\n\t\t<td align=\"center\">2</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">4</td>\n\t</tr><tr>\n\t\t<td align=\"center\">5</td>\n\t\t<td align=\"center\">6</td>\n\t\t<td align=\"center\">?</td>\n\t</tr><tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr> \n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q384_WarehouseKeepersPastime | playerArray | 23456
+bypass Quest Q384_WarehouseKeepersPastime select_3-8
+  S SystemMessage id=54 3:1888
+  S NpcHtmlMessage obj=cliff item=0 html="<html><body>Warehouse Freightman Cliff:<br>\nYou've created 3 lines! The red-colored numbers on the bingo panel below are the numbers you chose. As you can see, they formed 3 lines. Congratulations! As I promised, you shall be rewarded with an unclaimed item from my warehouse. Wait here...<br>\n.<br>\n.<br>\n.<br>\nPuff puff... it's very dusty. Here it is! Do you like it?<br>\n<table border=\"1\" border color=\"white\" width=100> \n\t<tr>\n\t\t<td align=\"center\"><font color=\"ff0000\">2</font></td>\n\t\t<td align=\"center\"><font color=\"ff0000\">3</font></td>\n\t\t<td align=\"center\"><font color=\"ff0000\">4</font></td>\n\t</tr><tr>\n\t\t<td align=\"center\"><font color=\"ff0000\">5</font></td>\n\t\t<td align=\"center\"><font color=\"ff0000\">6</font></td>\n\t\t<td align=\"center\"><font color=\"ffffff\">7</font></td>\n\t</tr><tr>\n\t\t<td align=\"center\"><font color=\"ff0000\">8</font></td>\n\t\t<td align=\"center\"><font color=\"ffffff\">9</font></td>\n\t\t<td align=\"center\"><font color=\"ffffff\">1</font></td>\n\t</tr> \n</table>\n</body></html>\n"
+  S ActionFailed
+  items 1888=1
+  rows Q384_WarehouseKeepersPastime <cond>=1 <state>=STARTED bet=10 board=234567891 playerArray=23456

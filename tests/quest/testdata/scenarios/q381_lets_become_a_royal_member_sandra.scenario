@@ -1,0 +1,73 @@
+# Let's Become a Royal Member! (Q381), level 55: Sandra gives the album for a golden clover coin of the chieftain. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q381_lets_become_a_royal_member_sandra.golden
+character Royal 55
+quest Q381_LetsBecomeARoyalMember <cond>=1 <state>=STARTED
+random 0
+script quest.Q381_LetsBecomeARoyalMember
+item 3813 5898 5899 5900 7569
+page warehouse/30232.htm
+page merchant/30090.htm
+page script/quest/Q381_LetsBecomeARoyalMember/
+npc sorint 30232 WarehouseKeeper 10 0 0
+npc sandra 30090 Merchant -10 0 0
+npc gargoyle 21018 Monster 40 0 0
+npc vegus 27316 Monster 50 0 0
+
+action sandra
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+bypass npc_{sandra}_Quest
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q381_LetsBecomeARoyalMember/30090-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q381_LetsBecomeARoyalMember 30090-02.htm
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q381_LetsBecomeARoyalMember/30090-02.htm
+  S ActionFailed
+  Q upsert Q381_LetsBecomeARoyalMember | aCond | 1
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+bypass npc_{sandra}_Quest
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q381_LetsBecomeARoyalMember/30090-03.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q381_LetsBecomeARoyalMember <cond>=1 <state>=STARTED aCond=1
+kill vegus
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7569
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 7569=1
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+bypass npc_{sandra}_Quest
+  S SystemMessage id=302 3:7569
+  S SystemMessage id=54 3:5900
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q381_LetsBecomeARoyalMember/30090-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 7569=0 5900=1
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+action sandra
+  S ActionFailed
+  S NpcHtmlMessage obj=sandra item=0 page=merchant/30090.htm
+  S ActionFailed
+bypass npc_{sandra}_Quest
+  S NpcHtmlMessage obj=sandra item=0 page=script/quest/Q381_LetsBecomeARoyalMember/30090-05.htm
+  S ActionFailed
+  S ActionFailed

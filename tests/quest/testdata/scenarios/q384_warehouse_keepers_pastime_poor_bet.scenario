@@ -1,0 +1,26 @@
+# Warehouse Keeper's Pastime (Q384), level 40: the character with fifty medals cannot bet a hundred. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q384_warehouse_keepers_pastime_poor_bet.golden
+character Pastime 40
+quest Q384_WarehouseKeepersPastime <cond>=1 <state>=STARTED
+hold 5964 50
+script quest.Q384_WarehouseKeepersPastime
+item 5964 1888 951 135
+page warehouse/30182.htm
+page villagemaster/30685.htm
+page script/quest/Q384_WarehouseKeepersPastime/
+npc cliff 30182 WarehouseKeeper 10 0 0
+npc baxt 30685 VillageMasterDwarf -10 0 0
+npc connabi 20947 Monster 40 0 0
+
+action cliff
+action cliff
+  S ActionFailed
+  S NpcHtmlMessage obj=cliff item=0 page=warehouse/30182.htm
+  S ActionFailed
+bypass npc_{cliff}_Quest
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q384_WarehouseKeepersPastime/30182-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q384_WarehouseKeepersPastime 30182-13.htm
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q384_WarehouseKeepersPastime/30182-12.htm
+  S ActionFailed

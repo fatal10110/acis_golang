@@ -50,6 +50,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q377"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q378"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q379"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q380"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q381"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q382"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q383"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q384"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q385"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -111,12 +117,12 @@ func quests301Up() script.Catalog {
 		"quest.Q377_ExplorationOfTheGiantsCave_Part2":  q377.New,
 		"quest.Q378_MagnificentFeast":                  q378.New,
 		"quest.Q379_FantasyWine":                       q379.New,
-		"quest.Q380_BringOutTheFlavorOfIngredients":    nil,
-		"quest.Q381_LetsBecomeARoyalMember":            nil,
-		"quest.Q382_KailsMagicCoin":                    nil,
-		"quest.Q383_SearchingForTreasure":              nil,
-		"quest.Q384_WarehouseKeepersPastime":           nil,
-		"quest.Q385_YokeOfThePast":                     nil,
+		"quest.Q380_BringOutTheFlavorOfIngredients":    q380.New,
+		"quest.Q381_LetsBecomeARoyalMember":            q381.New,
+		"quest.Q382_KailsMagicCoin":                    q382.New,
+		"quest.Q383_SearchingForTreasure":              q383.New,
+		"quest.Q384_WarehouseKeepersPastime":           q384.New,
+		"quest.Q385_YokeOfThePast":                     q385.New,
 		"quest.Q386_StolenDignity":                     nil,
 		"quest.Q401_PathToAWarrior":                    nil,
 		"quest.Q402_PathToAHumanKnight":                nil,
