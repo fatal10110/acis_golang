@@ -75,7 +75,7 @@ func shotRangeHooks() script.Hooks {
 func PhysicalSpecialShotNoRange() script.Script {
 	base := shotRangeHooks()
 	return script.Script{Dir: shotRangeDir, Behavior: true, NPCs: []int32{22066, 22067, 22068, 22069, 22070, 22071, 22072, 22073}, Hooks: base.With(script.Hooks{
-		// The reference leaves the area switch these hooks name undone.
+		// Both hooks only pass on to the parent; the areas they name are never switched.
 		OnCreated: func(s *script.Script, e script.Created) { base.Created(s, e) },
 		OnMyDying: func(s *script.Script, e script.MyDying) { base.MyDying(s, e) },
 	})}
