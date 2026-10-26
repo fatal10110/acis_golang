@@ -11,10 +11,12 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/raid"
 	"github.com/rs/zerolog"
 )
 
-// chain is the behavior chain down to the Benom behavior this package
+// chain is the behavior chain down to the Benom behaviors this package
 // ports, in scripts.xml order, with the Go constructor of each, and
 // whether this package ports it.
 var chain = []struct {
@@ -23,6 +25,9 @@ var chain = []struct {
 	ported bool
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New, false},
+	{"script.ai.individual.Monster.MonsterAI", monster.New, false},
+	{"script.ai.individual.Monster.RaidBoss.RaidBossStandard", raid.BossStandard, false},
+	{"script.ai.boss.benom.Benom", Benom, true},
 	{"script.ai.boss.benom.DungeonTeleporter", DungeonTeleporter, true},
 }
 
@@ -106,11 +111,12 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 }
 
 // TestRegistrationMatchesReferenceManifest registers the chain's Go
-// scripts through the engine registry, with the engine's own seam gate and
-// the gatekeeper a civilian (CastleDoorman). None is refused, and the
-// registry dump equals the reference manifest for the ported script: its
-// kind and bind lines, and every folded per-(npc, event) list restricted to
-// it: the gatekeeper's id on 4 events.
+// scripts through the engine registry, with the engine's own seam gate,
+// Benom a hostile and its gatekeeper a civilian (CastleDoorman). None is
+// refused, and the registry dump equals the reference manifest for the two
+// ported scripts: each one's kind and bind lines, and every folded
+// per-(npc, event) list restricted to them: Benom's id on 9 events and the
+// gatekeeper's on 4.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -118,7 +124,12 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 		list[i] = script.Listing{Path: c.path}
 		catalog[c.path] = c.ctor
 	}
-	kindOf := func(int32) (script.NPCKind, bool) { return script.KindFolk, true }
+	kindOf := func(id int32) (script.NPCKind, bool) {
+		if id == dungeonTeleporterID {
+			return script.KindFolk, true
+		}
+		return script.KindHostile, true
+	}
 	r := script.Build(list, catalog, script.Config{KindOf: kindOf, Log: zerolog.Nop()})
 	var dump strings.Builder
 	if err := r.Dump(&dump); err != nil {
@@ -150,13 +161,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 4, len(want.folds); got != wantFolds {
-		t.Fatalf("reference folds = %d entries, want %d events", got, wantFolds)
+	if wantFolds, got := 13, len(want.folds); got != wantFolds {
+		t.Fatalf("reference folds = %d entries, want %d: 9 + 4 events", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{dungeonTeleporterID} {
+	for _, id := range []int32{29054, dungeonTeleporterID} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
