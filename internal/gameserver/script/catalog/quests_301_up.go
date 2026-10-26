@@ -79,9 +79,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q414"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q415"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q416"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q417"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q418"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q419"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q420"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q421"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q426"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q431"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q432"
@@ -207,11 +209,11 @@ func quests301Up() script.Catalog {
 		"quest.Q414_PathToAnOrcRaider":                 q414.New,
 		"quest.Q415_PathToAMonk":                       q415.New,
 		"quest.Q416_PathToAnOrcShaman":                 q416.New,
-		"quest.Q417_PathToBecomeAScavenger":            nil,
+		"quest.Q417_PathToBecomeAScavenger":            q417.New,
 		"quest.Q418_PathToAnArtisan":                   q418.New,
 		"quest.Q419_GetAPet":                           q419.New,
 		"quest.Q420_LittleWing":                        q420.New,
-		"quest.Q421_LittleWingsBigAdventure":           nil,
+		"quest.Q421_LittleWingsBigAdventure":           q421.New,
 		"quest.Q426_QuestForFishingShot":               q426.New,
 		"quest.Q431_WeddingMarch":                      q431.New,
 		"quest.Q432_BirthdayPartySong":                 q432.New,

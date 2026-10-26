@@ -1,0 +1,18 @@
+# Little Wing's Big Adventure (Q421), A tree lets the player on the quest be, on a high draw. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q421_little_wings_big_adventure_tree_hit_quest_missed.golden
+character Wing 45
+quest Q421_LittleWingsBigAdventure <cond>=2 <state>=STARTED iCond=3 summonOid=777
+random 50
+script quest.Q421_LittleWingsBigAdventure
+item 3500 3501 3502 4325 4422 4423 4424
+page default/30610.htm
+page default/30747.htm
+page script/quest/Q421_LittleWingsBigAdventure/
+npc cronos 30610 Folk 10 0 0
+npc mimyu 30747 Folk -20 0 0
+npc wind 27185 Monster 30 0 0
+npc star 27186 Monster -40 0 0
+npc twilight 27187 Monster 50 0 0
+npc abyss 27188 Monster -60 0 0
+
+hit twilight 22
