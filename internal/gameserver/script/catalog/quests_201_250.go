@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q212"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q213"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q214"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q215"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q216"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q217"
@@ -27,7 +28,7 @@ func quests201To250() script.Catalog {
 	return script.Catalog{
 		"quest.Q212_TrialOfDuty":              q212.New,
 		"quest.Q213_TrialOfTheSeeker":         q213.New,
-		"quest.Q214_TrialOfTheScholar":        nil,
+		"quest.Q214_TrialOfTheScholar":        q214.New,
 		"quest.Q215_TrialOfThePilgrim":        q215.New,
 		"quest.Q216_TrialOfTheGuildsman":      q216.New,
 		"quest.Q217_TestimonyOfTrust":         q217.New,
