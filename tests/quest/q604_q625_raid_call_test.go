@@ -21,8 +21,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// The altar of Daimon (Q604_DaimonTheWhiteEyed_Part2 onAdvEvent "31541-02.htm")
-// and the Yeti's table (Q625_TheFinestIngredients_Part2 "31542-02.htm") call a
+// The altar of Daimon (Q604_DaimonTheWhiteEyed_Part2 onAdvEvent "31541-02.htm"),
+// the Yeti's table (Q625_TheFinestIngredients_Part2 "31542-02.htm") and the
+// Varka's holy altar (Q610_MagicalPowerOfWater_Part2 "31560-02.htm") call a
 // raid boss for 1200 s when the player holds the summon item: the boss
 // appears, says an NpcString, the altar leaves the world and the quest moves
 // to cond 2; while the boss stands the other altars refuse the call; when it
@@ -194,7 +195,7 @@ func altars(w *dialogWorld, rq raidQuest) int { return len(npcsOf(w.srv, int32(r
 // NpcString, then removes the altar; cond becomes 2 and the summon item goes.
 func TestRaidCallAppearsSaysAndTakesTheAltar(t *testing.T) {
 	t.Parallel()
-	for _, rq := range []raidQuest{q604Raid, q625Raid} {
+	for _, rq := range raidQuests {
 		t.Run(rq.name, func(t *testing.T) {
 			t.Parallel()
 			w := rq.boot(t, "1", 1)
@@ -236,7 +237,7 @@ func TestRaidCallAppearsSaysAndTakesTheAltar(t *testing.T) {
 // its own respawn being 36 hours.
 func TestRaidCallRefusedWhileTheRaidStands(t *testing.T) {
 	t.Parallel()
-	for _, rq := range []raidQuest{q604Raid, q625Raid} {
+	for _, rq := range raidQuests {
 		t.Run(rq.name, func(t *testing.T) {
 			t.Parallel()
 			w := rq.boot(t, "1", 2)
@@ -286,7 +287,7 @@ func TestRaidCallRefusedWhileTheRaidStands(t *testing.T) {
 // calls a new raid, and the altar the first call removed stays away.
 func TestRaidKilledMovesPlayerOnAndFreesTheCall(t *testing.T) {
 	t.Parallel()
-	for _, rq := range []raidQuest{q604Raid, q625Raid} {
+	for _, rq := range raidQuests {
 		t.Run(rq.name, func(t *testing.T) {
 			t.Parallel()
 			w := rq.boot(t, "1", 2)

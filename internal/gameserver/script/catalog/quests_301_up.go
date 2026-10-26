@@ -98,6 +98,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q606"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q608"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q609"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q610"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q611"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q612"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q613"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q617"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q618"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q619"
@@ -239,10 +243,10 @@ func quests301Up() script.Catalog {
 		"quest.Q606_WarWithVarkaSilenos":               q606.New,
 		"quest.Q608_SlayTheEnemyCommander":             q608.New,
 		"quest.Q609_MagicalPowerOfWater_Part1":         q609.New,
-		"quest.Q610_MagicalPowerOfWater_Part2":         nil,
-		"quest.Q611_AllianceWithVarkaSilenos":          nil,
-		"quest.Q612_WarWithKetraOrcs":                  nil,
-		"quest.Q613_ProveYourCourage":                  nil,
+		"quest.Q610_MagicalPowerOfWater_Part2":         q610.New,
+		"quest.Q611_AllianceWithVarkaSilenos":          q611.New,
+		"quest.Q612_WarWithKetraOrcs":                  q612.New,
+		"quest.Q613_ProveYourCourage":                  q613.New,
 		"quest.Q614_SlayTheEnemyCommander":             nil,
 		"quest.Q615_MagicalPowerOfFire_Part1":          nil,
 		"quest.Q616_MagicalPowerOfFire_Part2":          nil,
