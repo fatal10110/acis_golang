@@ -109,6 +109,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q654"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q659"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q662"
 )
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
@@ -256,7 +257,7 @@ func quests301Up() script.Catalog {
 		"quest.Q659_IdRatherBeCollectingFairyBreath":   q659.New,
 		"quest.Q660_AidingTheFloranVillage":            nil,
 		"quest.Q661_MakingTheHarvestGroundsSafe":       nil,
-		"quest.Q662_AGameOfCards":                      nil,
+		"quest.Q662_AGameOfCards":                      q662.New,
 		"quest.Q663_SeductiveWhispers":                 nil,
 		"quest.Q688_DefeatTheElrokianRaiders":          nil,
 	}
