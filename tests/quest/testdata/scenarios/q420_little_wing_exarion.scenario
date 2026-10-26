@@ -1,0 +1,86 @@
+# Little Wing (Q420): Exarion gives his scale; eggs of the Leto lizardman warriors come, which say a line while the twenty is not complete; twenty eggs end his task (cond 7).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_exarion.golden
+character Wing 35
+quest Q420_LittleWing <cond>=5 <state>=STARTED
+hold 3821 1
+hold 3823 17
+random always 0
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page default/30748.htm
+page script/quest/Q420_LittleWing/
+npc exarion 30748 Folk 10 0 0
+npc leto 20580 Monster -20 0 0
+
+action exarion
+action exarion
+  S ActionFailed
+  S NpcHtmlMessage obj=exarion item=0 page=default/30748.htm
+  S ActionFailed
+bypass npc_{exarion}_Quest
+  S NpcHtmlMessage obj=exarion item=0 page=script/quest/Q420_LittleWing/30748-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q420_LittleWing 30748-02.htm
+  S QuestList 420:0x8000003f
+  S ExShowQuestMark quest=420
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3821
+  S SystemMessage id=54 3:3822
+  S NpcHtmlMessage obj=exarion item=0 page=script/quest/Q420_LittleWing/30748-02.htm
+  S ActionFailed
+  Q upsert Q420_LittleWing | <cond> | 6
+  items 3822=1 3821=0
+  state Q420_LittleWing STARTED
+  rows Q420_LittleWing <cond>=6 <state>=STARTED
+action exarion
+  S ActionFailed
+  S NpcHtmlMessage obj=exarion item=0 page=default/30748.htm
+  S ActionFailed
+bypass npc_{exarion}_Quest
+  S NpcHtmlMessage obj=exarion item=0 page=script/quest/Q420_LittleWing/30748-03.htm
+  S ActionFailed
+  S ActionFailed
+kill leto
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3823
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=leto type=0 npc=1020580 text="If the eggs get taken, we're dead!"
+  items 3823=18
+kill leto
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3823
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=leto type=0 npc=1020580 text="If the eggs get taken, we're dead!"
+  items 3823=19
+kill leto
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3823
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3823=20
+action exarion
+  S ActionFailed
+  S NpcHtmlMessage obj=exarion item=0 page=default/30748.htm
+  S ActionFailed
+bypass npc_{exarion}_Quest
+  S QuestList 420:0x8000007f
+  S ExShowQuestMark quest=420
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3823 6:19
+  S SystemMessage id=302 3:3822
+  S NpcHtmlMessage obj=exarion item=0 page=script/quest/Q420_LittleWing/30748-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q420_LittleWing | <cond> | 7
+  items 3823=1 3822=0
+  state Q420_LittleWing STARTED
+  rows Q420_LittleWing <cond>=7 <state>=STARTED
+action exarion
+  S ActionFailed
+  S NpcHtmlMessage obj=exarion item=0 page=default/30748.htm
+  S ActionFailed
+bypass npc_{exarion}_Quest
+  S NpcHtmlMessage obj=exarion item=0 page=script/quest/Q420_LittleWing/30748-05.htm
+  S ActionFailed
+  S ActionFailed

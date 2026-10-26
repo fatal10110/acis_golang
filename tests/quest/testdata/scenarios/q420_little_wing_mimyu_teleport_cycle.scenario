@@ -1,0 +1,43 @@
+# Little Wing (Q420): Mimyu moves to the next of its three places every time it is talked to, whatever the quest state, so
+# every fourth talk lands on the first place again. The character has Mimyu jumped back next to it for each talk; the
+# reference trace does not show an NPC's position and plays no jump, so this scenario has no trace.
+character Wing 35
+script quest.Q420_LittleWing
+page default/30747.htm
+page script/quest/Q420_LittleWing/
+npc mimyu 30747 Folk 10 0 0
+
+action mimyu
+action mimyu
+  S ActionFailed
+  S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
+  S ActionFailed
+bypass npc_{mimyu}_Quest
+  S ActionFailed
+  S ActionFailed
+  at mimyu 108930 41595 -4673
+jump mimyu 10 0 0
+action mimyu
+action mimyu
+  S ActionFailed
+  S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
+  S ActionFailed
+bypass npc_{mimyu}_Quest
+  S ActionFailed
+  at mimyu 110385 41605 -4672
+jump mimyu 10 0 0
+action mimyu
+  S ActionFailed
+  S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
+  S ActionFailed
+bypass npc_{mimyu}_Quest
+  S ActionFailed
+  at mimyu 109806 40834 -4670
+jump mimyu 10 0 0
+action mimyu
+  S ActionFailed
+  S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
+  S ActionFailed
+bypass npc_{mimyu}_Quest
+  S ActionFailed
+  at mimyu 108930 41595 -4673

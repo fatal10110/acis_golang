@@ -1,0 +1,48 @@
+# Little Wing (Q420): at cond 1 Cronos asks; he writes the plain fairy stone list; with no stone made yet he sends the character back.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_cronos_plain.golden
+character Wing 35
+quest Q420_LittleWing <cond>=1 <state>=STARTED
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page default/30610.htm
+page script/quest/Q420_LittleWing/
+npc cronos 30610 Folk 10 0 0
+
+action cronos
+action cronos
+  S ActionFailed
+  S NpcHtmlMessage obj=cronos item=0 page=default/30610.htm
+  S ActionFailed
+bypass npc_{cronos}_Quest
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q420_LittleWing/30610-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q420_LittleWing 30610-02.htm
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q420_LittleWing/30610-02.htm
+  S ActionFailed
+bypass Quest Q420_LittleWing 30610-03.htm
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q420_LittleWing/30610-03.htm
+  S ActionFailed
+bypass Quest Q420_LittleWing 30610-04.htm
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q420_LittleWing/30610-04.htm
+  S ActionFailed
+bypass Quest Q420_LittleWing 30610-05.htm
+  S QuestList 420:0x80000003
+  S ExShowQuestMark quest=420
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3818
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q420_LittleWing/30610-06.htm
+  S ActionFailed
+  Q upsert Q420_LittleWing | <cond> | 2
+  items 3818=1
+  state Q420_LittleWing STARTED
+  rows Q420_LittleWing <cond>=2 <state>=STARTED
+action cronos
+  S ActionFailed
+  S NpcHtmlMessage obj=cronos item=0 page=default/30610.htm
+  S ActionFailed
+bypass npc_{cronos}_Quest
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q420_LittleWing/30610-07.htm
+  S ActionFailed
+  S ActionFailed

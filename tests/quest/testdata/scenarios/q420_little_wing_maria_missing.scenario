@@ -1,0 +1,27 @@
+# Little Wing (Q420): short of materials the plain list gets Maria's first page, on a talk and on the bypass.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_maria_missing.golden
+character Wing 35
+quest Q420_LittleWing <cond>=2 <state>=STARTED
+hold 3818 1
+hold 1870 10
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page default/30608.htm
+page script/quest/Q420_LittleWing/
+npc maria 30608 Folk 10 0 0
+
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q420_LittleWing/30608-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q420_LittleWing 30608-03.htm
+  items 3816=0 3818=1
+
+  state Q420_LittleWing STARTED
+  rows Q420_LittleWing <cond>=2 <state>=STARTED

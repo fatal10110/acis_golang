@@ -1,0 +1,22 @@
+# Little Wing (Q420): fewer than twenty eggs in all.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_mimyu_eggs_few.golden
+character Wing 35
+quest Q420_LittleWing <cond>=6 <state>=STARTED
+hold 3823 10
+hold 3825 9
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page default/30747.htm
+page script/quest/Q420_LittleWing/
+npc mimyu 30747 Folk 10 0 0
+
+action mimyu
+action mimyu
+  S ActionFailed
+  S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
+  S ActionFailed
+bypass npc_{mimyu}_Quest
+  S NpcHtmlMessage obj=mimyu item=0 page=script/quest/Q420_LittleWing/30747-09.htm
+  S ActionFailed
+  S ActionFailed

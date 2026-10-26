@@ -1,0 +1,41 @@
+# Little Wing (Q420): with fairy dust Mimyu offers the two ways; a wyvern Suzet egg and a roll of 60 give the star flute, and the dust stays.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_finish_dust_13.golden
+character Wing 35
+quest Q420_LittleWing <cond>=7 <state>=STARTED
+hold 3499 1
+hold 3829 1
+random 60
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page default/30747.htm
+page script/quest/Q420_LittleWing/
+npc mimyu 30747 Folk 10 0 0
+
+action mimyu
+action mimyu
+  S ActionFailed
+  S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
+  S ActionFailed
+bypass npc_{mimyu}_Quest
+  S NpcHtmlMessage obj=mimyu item=0 page=script/quest/Q420_LittleWing/30747-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q420_LittleWing 30747-12.htm
+  S NpcHtmlMessage obj=mimyu item=0 page=script/quest/Q420_LittleWing/30747-12.htm
+  S ActionFailed
+  items 3499=1 3829=1
+  state Q420_LittleWing STARTED
+  rows Q420_LittleWing <cond>=7 <state>=STARTED
+bypass Quest Q420_LittleWing 30747-13.htm
+  S SystemMessage id=302 3:3829
+  S SystemMessage id=54 3:3501
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=mimyu item=0 page=script/quest/Q420_LittleWing/30747-13.htm
+  S ActionFailed
+  Q delete-quest Q420_LittleWing
+  items 3829=0 3501=1 3499=1
+
+  state Q420_LittleWing -
+  rows Q420_LittleWing -
