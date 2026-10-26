@@ -9,9 +9,11 @@ import (
 
 // TestQ501MatchesReferenceFingerprints compares the package with the reference
 // class: literals, engine calls and hook shapes. The id of the chat line is a
-// named constant in the reference.
+// named constant in the reference. It walks the party through
+// Player.PartyMembers, the Go name it shares with the quest helper
+// Quest.getPartyMembers, which the class does not call.
 func TestQ501MatchesReferenceFingerprints(t *testing.T) {
-	problems, err := scriptfp.Check("q501", []string{"quest.Q501_ProofOfClanAlliance"}, "number 50110")
+	problems, err := scriptfp.Check("q501", []string{"quest.Q501_ProofOfClanAlliance"}, "number 50110", "call Quest.getPartyMembers")
 	if err != nil {
 		t.Fatal(err)
 	}

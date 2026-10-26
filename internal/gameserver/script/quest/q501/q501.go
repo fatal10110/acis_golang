@@ -63,26 +63,28 @@ const (
 )
 
 // boxesOfAthrea are the monsters that stand in the boxes' places.
-var boxesOfAthrea = []int32{27173, 27174, 27175, 27176, 27177}
+func boxesOfAthrea() []int32 { return []int32{27173, 27174, 27175, 27176, 27177} }
 
 // spawnList is where the boxes of Athrea are spawned.
-var spawnList = [...]script.Loc{
-	{X: 102273, Y: 103433, Z: -3512},
-	{X: 102190, Y: 103379, Z: -3524},
-	{X: 102107, Y: 103325, Z: -3533},
-	{X: 102024, Y: 103271, Z: -3500},
-	{X: 102327, Y: 103350, Z: -3511},
-	{X: 102244, Y: 103296, Z: -3518},
-	{X: 102161, Y: 103242, Z: -3529},
-	{X: 102078, Y: 103188, Z: -3500},
-	{X: 102381, Y: 103267, Z: -3538},
-	{X: 102298, Y: 103213, Z: -3532},
-	{X: 102215, Y: 103159, Z: -3520},
-	{X: 102132, Y: 103105, Z: -3513},
-	{X: 102435, Y: 103184, Z: -3515},
-	{X: 102352, Y: 103130, Z: -3522},
-	{X: 102269, Y: 103076, Z: -3533},
-	{X: 102186, Y: 103022, Z: -3541},
+func spawnList() []script.Loc {
+	return []script.Loc{
+		{X: 102273, Y: 103433, Z: -3512},
+		{X: 102190, Y: 103379, Z: -3524},
+		{X: 102107, Y: 103325, Z: -3533},
+		{X: 102024, Y: 103271, Z: -3500},
+		{X: 102327, Y: 103350, Z: -3511},
+		{X: 102244, Y: 103296, Z: -3518},
+		{X: 102161, Y: 103242, Z: -3529},
+		{X: 102078, Y: 103188, Z: -3500},
+		{X: 102381, Y: 103267, Z: -3538},
+		{X: 102298, Y: 103213, Z: -3532},
+		{X: 102215, Y: 103159, Z: -3520},
+		{X: 102132, Y: 103105, Z: -3513},
+		{X: 102435, Y: 103184, Z: -3515},
+		{X: 102352, Y: 103130, Z: -3522},
+		{X: 102269, Y: 103076, Z: -3533},
+		{X: 102186, Y: 103022, Z: -3541},
+	}
 }
 
 // quest holds the boxes of Athrea that stand in the world.
@@ -102,7 +104,7 @@ func New() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: {sirKristofRodemai, kalis, statueOfOffering, athrea},
 			script.EventTalked:     {sirKristofRodemai, kalis, statueOfOffering, athrea},
-			script.EventDecayed:    boxesOfAthrea,
+			script.EventDecayed:    boxesOfAthrea(),
 			script.EventMyDying: {
 				vanorSilenosShaman, haritLizardmanShaman, oelMahumWitchDoctor,
 				27173, 27174, 27175, 27176, 27177,
@@ -202,9 +204,11 @@ func sacrificed(lst *script.QuestState, p *script.Player) {
 // marks four of them, picked apart, as the clan's special boxes.
 func (q quest) spawnBoxes(s *script.Script, clanID int32) {
 	var special [4]int
+	places := spawnList()
+	boxes := boxesOfAthrea()
 	for {
 		for i := range special {
-			special[i] = s.Rnd(len(spawnList))
+			special[i] = s.Rnd(len(places))
 		}
 		if special[0] != special[1] && special[0] != special[2] && special[0] != special[3] &&
 			special[1] != special[2] && special[1] != special[3] && special[2] != special[3] {
@@ -212,8 +216,8 @@ func (q quest) spawnBoxes(s *script.Script, clanID int32) {
 		}
 	}
 
-	for i, at := range spawnList {
-		box := s.Spawner().AddSpawn(boxesOfAthrea[s.Rnd(len(boxesOfAthrea))], at, false, 300000*time.Millisecond)
+	for i, at := range places {
+		box := s.Spawner().AddSpawn(boxes[s.Rnd(len(boxes))], at, false, 300000*time.Millisecond)
 		if box == nil {
 			continue
 		}
