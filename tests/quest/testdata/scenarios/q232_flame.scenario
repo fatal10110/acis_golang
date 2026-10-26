@@ -101,9 +101,14 @@ bypass npc_{martankus}_Quest
   S ActionFailed
   S ActionFailed
   Q upsert Q232_TestOfTheLord | <cond> | 6
+  rows Q232_TestOfTheLord <cond>=6 <state>=STARTED
+  items 3416=1
 bypass Quest Q232_TestOfTheLord 30649-07.htm
   S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q232_TestOfTheLord/30649-07.htm
   S ActionFailed
+relog
+  rows Q232_TestOfTheLord <cond>=6 <state>=STARTED
+  items 3416=1
 action orc
 action orc
   S ActionFailed
