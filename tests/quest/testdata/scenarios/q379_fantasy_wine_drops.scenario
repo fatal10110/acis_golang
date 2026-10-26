@@ -1,0 +1,62 @@
+# Fantasy Wine (Q379), a character with 79 leaves and 99 stones kills a shaman, then a champion. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q379_fantasy_wine_drops.golden
+character Fantasy 20
+quest Q379_FantasyWine <cond>=1 <state>=STARTED
+hold 5893 79
+hold 5894 99
+random 0 0
+script quest.Q379_FantasyWine
+item 5893 5894 5956 5957 5958
+page guard/30074.htm
+page script/quest/Q379_FantasyWine/
+npc harlan 30074 Guard 10 0 0
+npc champion 20291 Monster 40 0 0
+npc shaman 20292 Monster 50 0 0
+
+action harlan
+action harlan
+  S ActionFailed
+  S NpcHtmlMessage obj=harlan item=0 page=guard/30074.htm
+  S ActionFailed
+bypass npc_{harlan}_Quest
+  S NpcHtmlMessage obj=harlan item=0 page=script/quest/Q379_FantasyWine/30074-4.htm
+  S ActionFailed
+  S ActionFailed
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5894
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 5893=79 5894=100
+action harlan
+  S ActionFailed
+  S NpcHtmlMessage obj=harlan item=0 page=guard/30074.htm
+  S ActionFailed
+action harlan
+  S ActionFailed
+  S NpcHtmlMessage obj=harlan item=0 page=guard/30074.htm
+  S ActionFailed
+bypass npc_{harlan}_Quest
+  S NpcHtmlMessage obj=harlan item=0 page=script/quest/Q379_FantasyWine/30074-4b.htm
+  S ActionFailed
+  S ActionFailed
+kill champion
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5893
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 379:0x80000003
+  S ExShowQuestMark quest=379
+  Q upsert Q379_FantasyWine | <cond> | 2
+  items 5893=80 5894=100
+  rows Q379_FantasyWine <cond>=2 <state>=STARTED
+action harlan
+  S ActionFailed
+  S NpcHtmlMessage obj=harlan item=0 page=guard/30074.htm
+  S ActionFailed
+action harlan
+  S ActionFailed
+  S NpcHtmlMessage obj=harlan item=0 page=guard/30074.htm
+  S ActionFailed
+bypass npc_{harlan}_Quest
+  S NpcHtmlMessage obj=harlan item=0 page=script/quest/Q379_FantasyWine/30074-5.htm
+  S ActionFailed
+  S ActionFailed

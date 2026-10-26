@@ -44,6 +44,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q371"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q372"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q373"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q374"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q375"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q376"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q377"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q378"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q379"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -99,12 +105,12 @@ func quests301Up() script.Catalog {
 		"quest.Q371_ShriekOfGhosts":                    q371.New,
 		"quest.Q372_LegacyOfInsolence":                 q372.New,
 		"quest.Q373_SupplierOfReagents":                q373.New,
-		"quest.Q374_WhisperOfDreams_Part1":             nil,
-		"quest.Q375_WhisperOfDreams_Part2":             nil,
-		"quest.Q376_ExplorationOfTheGiantsCave_Part1":  nil,
-		"quest.Q377_ExplorationOfTheGiantsCave_Part2":  nil,
-		"quest.Q378_MagnificentFeast":                  nil,
-		"quest.Q379_FantasyWine":                       nil,
+		"quest.Q374_WhisperOfDreams_Part1":             q374.New,
+		"quest.Q375_WhisperOfDreams_Part2":             q375.New,
+		"quest.Q376_ExplorationOfTheGiantsCave_Part1":  q376.New,
+		"quest.Q377_ExplorationOfTheGiantsCave_Part2":  q377.New,
+		"quest.Q378_MagnificentFeast":                  q378.New,
+		"quest.Q379_FantasyWine":                       q379.New,
 		"quest.Q380_BringOutTheFlavorOfIngredients":    nil,
 		"quest.Q381_LetsBecomeARoyalMember":            nil,
 		"quest.Q382_KailsMagicCoin":                    nil,

@@ -1,0 +1,20 @@
+# Fantasy Wine (Q379), level 19: Harlan turns the character away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q379_fantasy_wine_low_level.golden
+character Fantasy 19
+script quest.Q379_FantasyWine
+item 5893 5894 5956 5957 5958
+page guard/30074.htm
+page script/quest/Q379_FantasyWine/
+npc harlan 30074 Guard 10 0 0
+npc champion 20291 Monster 40 0 0
+npc shaman 20292 Monster 50 0 0
+
+action harlan
+action harlan
+  S ActionFailed
+  S NpcHtmlMessage obj=harlan item=0 page=guard/30074.htm
+  S ActionFailed
+bypass npc_{harlan}_Quest
+  S NpcHtmlMessage obj=harlan item=0 page=script/quest/Q379_FantasyWine/30074-0a.htm
+  S ActionFailed
+  S ActionFailed
