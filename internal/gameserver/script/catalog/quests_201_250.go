@@ -12,6 +12,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q223"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q224"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q225"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q226"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q228"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q241"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q242"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q246"
@@ -35,9 +37,9 @@ func quests201To250() script.Catalog {
 		"quest.Q223_TestOfTheChampion":        q223.New,
 		"quest.Q224_TestOfSagittarius":        q224.New,
 		"quest.Q225_TestOfTheSearcher":        q225.New,
-		"quest.Q226_TestOfTheHealer":          nil,
+		"quest.Q226_TestOfTheHealer":          q226.New,
 		"quest.Q227_TestOfTheReformer":        nil,
-		"quest.Q228_TestOfMagus":              nil,
+		"quest.Q228_TestOfMagus":              q228.New,
 		"quest.Q229_TestOfWitchcraft":         nil,
 		"quest.Q231_TestOfTheMaestro":         nil,
 		"quest.Q232_TestOfTheLord":            nil,
