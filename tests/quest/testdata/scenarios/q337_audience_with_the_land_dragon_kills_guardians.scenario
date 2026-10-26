@@ -1,0 +1,26 @@
+# Audience with the Land Dragon (Q337), the guardians of the second stage drop their fangs once, and the first stage monsters drop nothing at that stage. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_kills_guardians.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED drop5=1 drop6=1 drop1=1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc sacrifice 27171 Monster 40 0 0
+npc mara 27168 Monster 45 0 0
+npc musfel 27169 Monster 50 0 0
+
+kill sacrifice
+  S SystemMessage id=95 1:0 1:0
+kill mara
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3862
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill mara
+  S SystemMessage id=95 1:0 1:0
+kill musfel
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3863
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3862=1 3863=1 3857=0
+  rows Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED drop1=1 drop5=1 drop6=1
+  state Q337_AudienceWithTheLandDragon STARTED

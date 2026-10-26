@@ -1,0 +1,61 @@
+# Audience with the Land Dragon (Q337), the fragments are held without the fangs: Moke and Helton ask for them. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_guards_told.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED drop5=2 drop6=2
+hold 3859 1
+hold 3860 1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page villagemaster/30498.htm
+page trainer/30678.htm
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc moke 30498 VillageMasterDwarf 10 0 0
+npc helton 30678 Trainer 15 0 0
+
+action moke
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+bypass npc_{moke}_Quest
+  S NpcHtmlMessage obj=moke item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30498-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q337_AudienceWithTheLandDragon | drop5 | 1
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+bypass npc_{moke}_Quest
+  S NpcHtmlMessage obj=moke item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30498-02.htm
+  S ActionFailed
+  S ActionFailed
+action helton
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+bypass npc_{helton}_Quest
+  S NpcHtmlMessage obj=helton item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30678-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q337_AudienceWithTheLandDragon | drop6 | 1
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+bypass npc_{helton}_Quest
+  S NpcHtmlMessage obj=helton item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30678-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 3859=1 3860=1 3862=0 3863=0
+  rows Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED drop5=1 drop6=1
+  state Q337_AudienceWithTheLandDragon STARTED

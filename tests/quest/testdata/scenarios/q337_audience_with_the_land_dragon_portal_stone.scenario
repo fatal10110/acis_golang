@@ -1,0 +1,69 @@
+# Audience with the Land Dragon (Q337), the third fragment is held: Gilmore and Theodric tell it and Theodric trades the fragment and the herald for the portal stone. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_portal_stone.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=4 <state>=STARTED drop7=1
+hold 3890 1
+hold 3861 1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page default/30754.htm
+page default/30755.htm
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc gilmore 30754 Folk 10 0 0
+npc theodric 30755 Folk 15 0 0
+
+action gilmore
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30754-05.htm
+  S ActionFailed
+  S ActionFailed
+action theodric
+action theodric
+  S ActionFailed
+  S NpcHtmlMessage obj=theodric item=0 page=default/30755.htm
+  S ActionFailed
+bypass npc_{theodric}_Quest
+  S NpcHtmlMessage obj=theodric item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30755-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q337_AudienceWithTheLandDragon 30755-05.htm
+  S SystemMessage id=302 3:3861
+  S SystemMessage id=302 3:3890
+  S SystemMessage id=54 3:3865
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=theodric item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30755-05.htm
+  S ActionFailed
+  Q delete-quest Q337_AudienceWithTheLandDragon
+  items 3861=0 3890=0 3865=1
+  state Q337_AudienceWithTheLandDragon -
+  rows Q337_AudienceWithTheLandDragon -
+action theodric
+  S ActionFailed
+  S NpcHtmlMessage obj=theodric item=0 page=default/30755.htm
+  S ActionFailed
+action theodric
+  S ActionFailed
+  S NpcHtmlMessage obj=theodric item=0 page=default/30755.htm
+  S ActionFailed
+bypass npc_{theodric}_Quest
+  S NpcHtmlMessage obj=theodric item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+action theodric
+action theodric
+  S ActionFailed
+  S NpcHtmlMessage obj=theodric item=0 page=default/30755.htm
+  S ActionFailed
+bypass npc_{theodric}_Quest
+  S NpcHtmlMessage obj=theodric item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  items 3861=0 3890=0 3865=1
+  state Q337_AudienceWithTheLandDragon -
+  rows Q337_AudienceWithTheLandDragon -

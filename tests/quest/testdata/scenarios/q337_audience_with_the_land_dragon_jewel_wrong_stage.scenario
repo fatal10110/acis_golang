@@ -1,0 +1,17 @@
+# Audience with the Land Dragon (Q337), level 50 at the first stage: the first and third abyssal jewels give nothing and draw nothing when hit. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_jewel_wrong_stage.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop5=1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc jewel1 27165 Monster 40 0 0
+npc jewel3 27167 Monster 45 0 0
+
+hit jewel1 396
+hit jewel1 1
+hit jewel3 396
+hit jewel3 1
+  items 3859=0 3861=0
+  rows Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop5=1
+  state Q337_AudienceWithTheLandDragon STARTED
