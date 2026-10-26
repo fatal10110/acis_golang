@@ -56,6 +56,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q383"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q384"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q385"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q386"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q401"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q402"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q403"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
@@ -123,10 +127,10 @@ func quests301Up() script.Catalog {
 		"quest.Q383_SearchingForTreasure":              q383.New,
 		"quest.Q384_WarehouseKeepersPastime":           q384.New,
 		"quest.Q385_YokeOfThePast":                     q385.New,
-		"quest.Q386_StolenDignity":                     nil,
-		"quest.Q401_PathToAWarrior":                    nil,
-		"quest.Q402_PathToAHumanKnight":                nil,
-		"quest.Q403_PathToARogue":                      nil,
+		"quest.Q386_StolenDignity":                     q386.New,
+		"quest.Q401_PathToAWarrior":                    q401.New,
+		"quest.Q402_PathToAHumanKnight":                q402.New,
+		"quest.Q403_PathToARogue":                      q403.New,
 		"quest.Q404_PathToAHumanWizard":                nil,
 		"quest.Q405_PathToACleric":                     nil,
 		"quest.Q406_PathToAnElvenKnight":               nil,

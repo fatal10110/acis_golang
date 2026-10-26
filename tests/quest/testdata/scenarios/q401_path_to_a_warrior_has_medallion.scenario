@@ -1,0 +1,30 @@
+# Path to a Warrior (Q401), level 19 with the medallion already: Auron refuses. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q401_path_to_a_warrior_has_medallion.golden
+character Warrior 19
+hold 1145 1
+script quest.Q401_PathToAWarrior
+item 1138 1139 1140 1141 1142 1143 1144 1145
+page trainer/30010.htm
+page merchant/30253.htm
+page script/quest/Q401_PathToAWarrior/
+npc auron 30010 Trainer 10 0 0
+npc simplon 30253 Merchant -10 0 0
+npc skel 20035 Monster 40 0 0
+npc spider 20038 Monster 50 0 0
+
+action auron
+  items 1145=1
+  rows Q401_PathToAWarrior -
+  state Q401_PathToAWarrior -
+action auron
+  S ActionFailed
+  S NpcHtmlMessage obj=auron item=0 page=trainer/30010.htm
+  S ActionFailed
+bypass npc_{auron}_Quest
+  S NpcHtmlMessage obj=auron item=0 page=script/quest/Q401_PathToAWarrior/30010-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q401_PathToAWarrior CREATED
+bypass Quest Q401_PathToAWarrior 30010-05.htm
+  S NpcHtmlMessage obj=auron item=0 page=script/quest/Q401_PathToAWarrior/30010-04.htm
+  S ActionFailed
