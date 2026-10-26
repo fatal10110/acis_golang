@@ -60,11 +60,9 @@ const (
 )
 
 // The skills the trees cast.
-var (
-	curseSkill      = skill.Ref{ID: 4243, Level: 1}
-	flutesCurse     = skill.Ref{ID: 4167, Level: 1}
-	dryadRootOnPets = skill.Ref{ID: 1201, Level: 33}
-)
+func curseSkill() skill.Ref      { return skill.Ref{ID: 4243, Level: 1} }
+func flutesCurse() skill.Ref     { return skill.Ref{ID: 4167, Level: 1} }
+func dryadRootOnPets() skill.Ref { return skill.Ref{ID: 1201, Level: 33} }
 
 const (
 	castWeight   = 1000000
@@ -281,7 +279,7 @@ func onTalk(s *script.Script, e script.Talk) string {
 				}
 				// The registered flute is not the one held: the fairy curses.
 				htmltext = "30747-18.htm"
-				e.NPC.AddCastDesire(p, flutesCurse, castWeight)
+				e.NPC.AddCastDesire(p, flutesCurse(), castWeight)
 			}
 		}
 	}
@@ -297,14 +295,14 @@ func onAttacked(s *script.Script, e script.Attacked) {
 	if st == nil {
 		// The attacker is not on the quest: a hurt tree curses it.
 		if e.NPC.HPRatio() < 0.67 && s.Rnd(100) < 30 {
-			e.NPC.AddCastDesire(e.Attacker, curseSkill, castWeight)
+			e.NPC.AddCastDesire(e.Attacker, curseSkill(), castWeight)
 		}
 		return
 	}
 	if script.PetControlItemID(e.Attacker) == 0 {
 		// The attacker is the questing player, or a servitor: curse it.
 		if s.Rnd(100) < 30 {
-			e.NPC.AddCastDesire(e.Attacker, curseSkill, castWeight)
+			e.NPC.AddCastDesire(e.Attacker, curseSkill(), castWeight)
 		}
 		return
 	}
@@ -348,7 +346,7 @@ func onAttacked(s *script.Script, e script.Attacked) {
 
 	// The tree of the abyss roots the pet now and then.
 	if npcID == fairyTreeOfAbyss && s.Rnd(100) < 2 {
-		e.NPC.AddCastDesire(e.Attacker, dryadRootOnPets, castWeight)
+		e.NPC.AddCastDesire(e.Attacker, dryadRootOnPets(), castWeight)
 	}
 }
 
@@ -371,7 +369,7 @@ func onMyDying(s *script.Script, e script.MyDying) {
 			continue
 		}
 		if i == 0 {
-			ghost.AddCastDesire(e.Killer, curseSkill, castWeight)
+			ghost.AddCastDesire(e.Killer, curseSkill(), castWeight)
 		}
 		ghost.AddAttackDesire(e.Killer, attackWeight)
 	}
