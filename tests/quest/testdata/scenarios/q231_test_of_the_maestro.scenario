@@ -1,0 +1,324 @@
+# Test Of The Maestro (Q231), played by a level 39 Dwarven Artisan who already holds nine of each
+# antidote ingredient and Toma's broken teleport device (the kills below bring each ingredient to
+# its count; Toma's teleport has a scenario of its own): Lockirin starts it and pays the level 39
+# set's Dimensional Diamonds; Balanki sends the traveller to Croto for the paint of Kamuru, the
+# Evil Eye Lord gives the necklace, Croto trades them for the soldiers' letter and Balanki
+# recommends; Arin gives the paint of the teleport device, Toma swaps the repaired device for it
+# and Arin recommends; Filaur gives the architecture of Kruma, Lorain turns it into the antidote's
+# ingredients, the leech, wasp and spider complete them, Lorain makes the report and Filaur
+# recommends, the last recommendation; Lockirin takes the three recommendations for the Mark of
+# Maestro; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q231_test_of_the_maestro.golden
+character Artisan 39
+class 56
+hold 2876 9
+hold 2877 9
+hold 2878 9
+hold 2916 1
+script quest.Q231_TestOfTheMaestro
+item 2864 2865 2866 2867 2868 2869 2870 2871 2872 2873 2874 2875 2876 2877 2878 2916 7562
+page default/30531.htm
+page default/30533.htm
+page default/30671.htm
+page default/30536.htm
+page default/30556.htm
+page default/30535.htm
+page default/30673.htm
+page script/quest/Q231_TestOfTheMaestro/
+npc lockirin 30531 Folk 10 0 0
+npc balanki 30533 Folk -10 0 0
+npc croto 30671 Folk 0 10 0
+npc arin 30536 Folk 0 -10 0
+npc toma 30556 Folk 10 10 0
+npc filaur 30535 Folk -10 10 0
+npc lorain 30673 Folk 10 -10 0
+npc eyelord 27133 Monster 40 0 0
+npc leech 20225 Monster -40 0 0
+npc wasp 20229 Monster 0 40 0
+npc spider 20233 Monster 0 -40 0
+
+# Lockirin: a level 39 Artisan may start; the first test of the set pays the diamonds.
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q231_TestOfTheMaestro/30531-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q231_TestOfTheMaestro CREATED
+bypass Quest Q231_TestOfTheMaestro 30531-04.htm
+  S QuestList 231:0x80000001
+  S ExShowQuestMark quest=231
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7562 6:23
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q231_TestOfTheMaestro/30531-04a.htm
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | <state> | STARTED
+  Q upsert Q231_TestOfTheMaestro | <cond> | 1
+  M set secondClassChange39 | true
+  state Q231_TestOfTheMaestro STARTED
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1
+
+# Part 1: Balanki sends the traveller to Croto.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q231_TestOfTheMaestro/30533-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q231_TestOfTheMaestro 30533-02.htm
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q231_TestOfTheMaestro/30533-02.htm
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | bCond | 1
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=1
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q231_TestOfTheMaestro/30533-03.htm
+  S ActionFailed
+  S ActionFailed
+action croto
+action croto
+  S ActionFailed
+  S NpcHtmlMessage obj=croto item=0 page=default/30671.htm
+  S ActionFailed
+bypass npc_{croto}_Quest
+  S NpcHtmlMessage obj=croto item=0 page=script/quest/Q231_TestOfTheMaestro/30671-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q231_TestOfTheMaestro 30671-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2869
+  S NpcHtmlMessage obj=croto item=0 page=script/quest/Q231_TestOfTheMaestro/30671-02.htm
+  S ActionFailed
+  items 2869=1
+action croto
+  S ActionFailed
+  S NpcHtmlMessage obj=croto item=0 page=default/30671.htm
+  S ActionFailed
+bypass npc_{croto}_Quest
+  S NpcHtmlMessage obj=croto item=0 page=script/quest/Q231_TestOfTheMaestro/30671-03.htm
+  S ActionFailed
+  S ActionFailed
+kill eyelord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2870
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2870=1
+action croto
+  S ActionFailed
+  S NpcHtmlMessage obj=croto item=0 page=default/30671.htm
+  S ActionFailed
+bypass npc_{croto}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2870
+  S SystemMessage id=302 3:2869
+  S SystemMessage id=54 3:2868
+  S NpcHtmlMessage obj=croto item=0 page=script/quest/Q231_TestOfTheMaestro/30671-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | bCond | 2
+  items 2868=1 2869=0 2870=0
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=2
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S SystemMessage id=302 3:2868
+  S SystemMessage id=54 3:2864
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q231_TestOfTheMaestro/30533-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | bCond | 3
+  items 2864=1 2868=0
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=3
+
+# Part 2: Arin gives the paint, Toma repairs the device and Arin recommends.
+action arin
+action arin
+  S ActionFailed
+  S NpcHtmlMessage obj=arin item=0 page=default/30536.htm
+  S ActionFailed
+bypass npc_{arin}_Quest
+  S SystemMessage id=54 3:2871
+  S NpcHtmlMessage obj=arin item=0 page=script/quest/Q231_TestOfTheMaestro/30536-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | aCond | 1
+  items 2871=1
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=3 aCond=1
+action toma
+action toma
+  S ActionFailed
+  S NpcHtmlMessage obj=toma item=0 page=default/30556.htm
+  S ActionFailed
+bypass npc_{toma}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2916
+  S SystemMessage id=53 3:2872 6:5
+  S NpcHtmlMessage obj=toma item=0 page=script/quest/Q231_TestOfTheMaestro/30556-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | aCond | 2
+  items 2871=1 2916=0 2872=5
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=3 aCond=2
+action toma
+  S ActionFailed
+  S NpcHtmlMessage obj=toma item=0 page=default/30556.htm
+  S ActionFailed
+bypass npc_{toma}_Quest
+  S NpcHtmlMessage obj=toma item=0 page=script/quest/Q231_TestOfTheMaestro/30556-07.htm
+  S ActionFailed
+  S ActionFailed
+action arin
+action arin
+  S ActionFailed
+  S NpcHtmlMessage obj=arin item=0 page=default/30536.htm
+  S ActionFailed
+bypass npc_{arin}_Quest
+  S SystemMessage id=301 3:2872 6:5
+  S SystemMessage id=54 3:2866
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=arin item=0 page=script/quest/Q231_TestOfTheMaestro/30536-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | aCond | 3
+  items 2866=1 2872=0
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=3 aCond=3
+
+# Part 3: Filaur's architecture becomes the antidote's ingredients, which the leech, the wasp and
+# the spider complete; Lorain makes the report and Filaur recommends.
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2873
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q231_TestOfTheMaestro/30535-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | fCond | 1
+  items 2873=1
+action lorain
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2873
+  S SystemMessage id=54 3:2875
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q231_TestOfTheMaestro/30673-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 2873=0 2875=1
+kill leech
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2878
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2878=10
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q231_TestOfTheMaestro/30673-02.htm
+  S ActionFailed
+  S ActionFailed
+kill wasp
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2876
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2876=10
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2877
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2877=10
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q231_TestOfTheMaestro/30673-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q231_TestOfTheMaestro 30673-04.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2878 6:10
+  S SystemMessage id=302 3:2875
+  S SystemMessage id=301 3:2877 6:10
+  S SystemMessage id=301 3:2876 6:10
+  S SystemMessage id=54 3:2874
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q231_TestOfTheMaestro/30673-04.htm
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | fCond | 2
+  items 2874=1 2875=0 2876=0 2877=0 2878=0
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=3 aCond=3 fCond=2
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S SystemMessage id=302 3:2874
+  S SystemMessage id=54 3:2865
+  S QuestList 231:0x80000003
+  S ExShowQuestMark quest=231
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q231_TestOfTheMaestro/30535-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | fCond | 3
+  Q upsert Q231_TestOfTheMaestro | <cond> | 2
+  items 2865=1 2874=0
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=2 bCond=3 aCond=3 fCond=3
+
+# Lockirin takes the recommendations for the Mark of Maestro.
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S SystemMessage id=302 3:2866
+  S SystemMessage id=302 3:2864
+  S SystemMessage id=302 3:2865
+  S SystemMessage id=54 3:2867
+  S SystemMessage id=95 1:46000 1:5900
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 231:0x00000000
+  S SystemMessage id=302 3:2871
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q231_TestOfTheMaestro/30531-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | <state> | COMPLETED
+  Q delete-except-state Q231_TestOfTheMaestro
+  items 2867=1 2864=0 2865=0 2866=0
+  state Q231_TestOfTheMaestro COMPLETED
+  rows Q231_TestOfTheMaestro <state>=COMPLETED
+relog
+  state Q231_TestOfTheMaestro COMPLETED
+  rows Q231_TestOfTheMaestro <state>=COMPLETED
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

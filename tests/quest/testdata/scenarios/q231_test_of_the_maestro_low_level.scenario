@@ -1,0 +1,23 @@
+# Test Of The Maestro (Q231), refused: a level 38 Artisan is turned away by Lockirin, and the
+# quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q231_test_of_the_maestro_low_level.golden
+character Artisan 38
+class 56
+script quest.Q231_TestOfTheMaestro
+item 2864 2865 2866 2867 2868 2869 2870 2871 2872 2873 2874 2875 2876 2877 2878 2916 7562
+page default/30531.htm
+page script/quest/Q231_TestOfTheMaestro/
+npc lockirin 30531 Folk 10 0 0
+
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q231_TestOfTheMaestro/30531-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q231_TestOfTheMaestro CREATED
+  rows Q231_TestOfTheMaestro -

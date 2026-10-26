@@ -1,0 +1,44 @@
+# Test Of The Maestro (Q231), Toma's teleport: a level 39 Artisan on the second part holds the paint
+# of the teleport device; Toma explains the device and, once its button is pressed, takes the paint
+# for the broken device and teleports the traveller away (the King Bugbears he sets on it five
+# seconds later are not played here; a server test covers them).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q231_test_of_the_maestro_toma.golden
+character Artisan 39
+class 56
+quest Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=3 aCond=1
+hold 2871 1
+script quest.Q231_TestOfTheMaestro
+item 2864 2865 2866 2867 2868 2869 2870 2871 2872 2873 2874 2875 2876 2877 2878 2916 7562
+page default/30556.htm
+page script/quest/Q231_TestOfTheMaestro/
+npc toma 30556 Folk 10 0 0
+
+# Toma has no broken device to show, and wants the traveller to help.
+action toma
+action toma
+  S ActionFailed
+  S NpcHtmlMessage obj=toma item=0 page=default/30556.htm
+  S ActionFailed
+bypass npc_{toma}_Quest
+  S NpcHtmlMessage obj=toma item=0 page=script/quest/Q231_TestOfTheMaestro/30556-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 2871=1 2916=0
+bypass Quest Q231_TestOfTheMaestro 30556-02.htm
+  S NpcHtmlMessage obj=toma item=0 page=script/quest/Q231_TestOfTheMaestro/30556-02.htm
+  S ActionFailed
+bypass Quest Q231_TestOfTheMaestro 30556-05.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2871
+  S SystemMessage id=54 3:2916
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=140352,-194133,-3146 fast=0
+  S NpcHtmlMessage obj=toma item=0 page=script/quest/Q231_TestOfTheMaestro/30556-05.htm
+  S ActionFailed
+  items 2871=0 2916=1
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1 bCond=3 aCond=1
