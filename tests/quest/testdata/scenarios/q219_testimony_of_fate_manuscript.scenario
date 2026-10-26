@@ -1,0 +1,165 @@
+# Testimony Of Fate (Q219), second part: a level 38 Palus Knight at cond 11 with the second Alder skull takes it to Roa, who
+# writes the receipt; Norman turns the receipt into the manuscript; Kaira, who is told of it, makes a recommendation of it (the
+# character is level 38) which Thifiell takes for the Palus charm and his letter, and Arkenia is told of it.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q219_testimony_of_fate_manuscript.golden
+character Scholar 38
+class 32
+quest Q219_TestimonyOfFate <state>=STARTED <cond>=11
+hold 3185 1
+script quest.Q219_TestimonyOfFate
+item 3172 3173 3174 3175 3176 3177 3178 3179 3180 3181 3182 3183 3184 3185 3186 3187 3188 3189 3190 3191 3192 3193 3194 3195 3196 3197 3198 3199 3200 3201 3202 7562
+page default/30419.htm
+page trainer/30114.htm
+page trainer/30476.htm
+page villagemaster/30358.htm
+page warehouse/30210.htm
+page script/quest/Q219_TestimonyOfFate/
+npc roa 30114 Trainer -20 10 0
+npc norman 30210 WarehouseKeeper -10 10 0
+npc kaira 30476 Trainer 0 10 0
+npc thifiell 30358 VillageMasterDElf 10 10 0
+npc arkenia 30419 Folk 20 10 0
+
+action roa
+action roa
+  S ActionFailed
+  S NpcHtmlMessage obj=roa item=0 page=trainer/30114.htm
+  S ActionFailed
+bypass npc_{roa}_Quest
+  S NpcHtmlMessage obj=roa item=0 page=script/quest/Q219_TestimonyOfFate/30114-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=11 <state>=STARTED
+bypass Quest Q219_TestimonyOfFate 30114-02.htm
+  S NpcHtmlMessage obj=roa item=0 page=script/quest/Q219_TestimonyOfFate/30114-02.htm
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30114-03.htm
+  S NpcHtmlMessage obj=roa item=0 page=script/quest/Q219_TestimonyOfFate/30114-03.htm
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30114-04.htm
+  S QuestList 219:0x80000fff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3185
+  S SystemMessage id=54 3:3186
+  S NpcHtmlMessage obj=roa item=0 page=script/quest/Q219_TestimonyOfFate/30114-04.htm
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 12
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=12 <state>=STARTED
+action roa
+  S ActionFailed
+  S NpcHtmlMessage obj=roa item=0 page=trainer/30114.htm
+  S ActionFailed
+action roa
+  S ActionFailed
+  S NpcHtmlMessage obj=roa item=0 page=trainer/30114.htm
+  S ActionFailed
+bypass npc_{roa}_Quest
+  S NpcHtmlMessage obj=roa item=0 page=script/quest/Q219_TestimonyOfFate/30114-05.htm
+  S ActionFailed
+  S ActionFailed
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S QuestList 219:0x80001fff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3186
+  S SystemMessage id=54 3:3187
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q219_TestimonyOfFate/30210-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 13
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=13 <state>=STARTED
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q219_TestimonyOfFate/30210-02.htm
+  S ActionFailed
+  S ActionFailed
+action kaira
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30476-12.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 219:0x80005fff
+  S ExShowQuestMark quest=219
+  S SystemMessage id=302 3:3187
+  S SystemMessage id=54 3:3189
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-12.htm
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <flags> | -2147459073
+  Q upsert Q219_TestimonyOfFate | <cond> | 15
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=15 <flags>=-2147459073 <state>=STARTED
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-16.htm
+  S ActionFailed
+  S ActionFailed
+action thifiell
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S QuestList 219:0x8000dfff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3189
+  S SystemMessage id=54 3:3190
+  S SystemMessage id=54 3:3191
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q219_TestimonyOfFate/30358-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <flags> | -2147426305
+  Q upsert Q219_TestimonyOfFate | <cond> | 16
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=16 <flags>=-2147426305 <state>=STARTED
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q219_TestimonyOfFate/30358-02.htm
+  S ActionFailed
+  S ActionFailed
+action arkenia
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q219_TestimonyOfFate/30419-01.htm
+  S ActionFailed
+  S ActionFailed
