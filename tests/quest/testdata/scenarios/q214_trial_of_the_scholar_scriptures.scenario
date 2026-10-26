@@ -1,0 +1,499 @@
+# Trial Of The Scholar (Q214), last part, played by a level 36 Human Wizard at cond 23 who holds all but the last
+# of each of Casian's trophies (every script roll pinned to 1): Edroc, Raut and Triff pass on the letter,
+# the scripture and the liquor for the ring; Valkon's request and Maria's crystal give the second scripture
+# and the Grandis, holding Triff's ring, drops the third; Casian's list is filled by Medusa, the ghoul, the
+# fettered soul and the gargoyle; Cronos takes the scriptures for his symbol and Mirien takes the sigil and
+# the symbol for the Mark of Scholar; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q214_trial_of_the_scholar_scriptures.golden
+character Scholar 36
+class 11
+random always 1
+quest Q214_TrialOfTheScholar <state>=STARTED <cond>=23
+hold 2677 1
+hold 2691 1
+hold 2702 1
+hold 2703 1
+hold 2716 9
+hold 2717 11
+hold 2718 4
+hold 2719 4
+script quest.Q214_TrialOfTheScholar
+item 2674 2675 2676 2677 2678 2679 2680 2681 2682 2683 2684 2685 2686 2687 2688 2689 2690 2691 2692 2693 2694 2695 2696 2697 2698 2699 2700 2701 2702 2703 2704 2705 2706 2707 2708 2709 2710 2711 2713 2714 2715 2716 2717 2718 2719 2720 7562
+page trainer/30461.htm
+page warehouse/30103.htm
+page trainer/30111.htm
+page merchant/30230.htm
+page warehouse/30316.htm
+page trainer/30458.htm
+page default/30608.htm
+page default/30610.htm
+page default/30611.htm
+page default/30612.htm
+page script/quest/Q214_TrialOfTheScholar/
+npc mirien 30461 Trainer 10 0 0
+npc sylvain 30070 VillageMasterPriest -10 0 0
+npc lucas 30071 Guard 0 10 0
+npc valkon 30103 WarehouseKeeper 0 -10 0
+npc dieter 30111 Trainer 10 10 0
+npc jurek 30115 VillageMasterMystic -10 10 0
+npc edroc 30230 Merchant 10 -10 0
+npc raut 30316 WarehouseKeeper -10 -10 0
+npc poitan 30458 Trainer 20 0 0
+npc maria 30608 Folk -20 0 0
+npc creta 30609 Folk 0 20 0
+npc cronos 30610 Folk 0 -20 0
+npc triff 30611 Folk 20 20 0
+npc casian 30612 Folk -20 20 0
+npc medusa 20158 Monster -40 0 0
+npc ghoul 20201 Monster 0 40 0
+npc fettered 20552 Monster 40 -40 0
+npc grandis 20554 Monster -40 -40 0
+npc gargoyle 20567 Monster 60 0 0
+
+action edroc
+action edroc
+  S ActionFailed
+  S NpcHtmlMessage obj=edroc item=0 page=merchant/30230.htm
+  S ActionFailed
+bypass npc_{edroc}_Quest
+  S NpcHtmlMessage obj=edroc item=0 page=script/quest/Q214_TrialOfTheScholar/30230-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30230-02.htm
+  S QuestList 214:0x80ffffff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2702
+  S SystemMessage id=54 3:2704
+  S NpcHtmlMessage obj=edroc item=0 page=script/quest/Q214_TrialOfTheScholar/30230-02.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 24
+  items 2702=0 2704=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=24
+action edroc
+  S ActionFailed
+  S NpcHtmlMessage obj=edroc item=0 page=merchant/30230.htm
+  S ActionFailed
+bypass npc_{edroc}_Quest
+  S NpcHtmlMessage obj=edroc item=0 page=script/quest/Q214_TrialOfTheScholar/30230-03.htm
+  S ActionFailed
+  S ActionFailed
+action dieter
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q214_TrialOfTheScholar/30111-11.htm
+  S ActionFailed
+  S ActionFailed
+action raut
+action raut
+  S ActionFailed
+  S NpcHtmlMessage obj=raut item=0 page=warehouse/30316.htm
+  S ActionFailed
+bypass npc_{raut}_Quest
+  S NpcHtmlMessage obj=raut item=0 page=script/quest/Q214_TrialOfTheScholar/30316-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30316-02.htm
+  S QuestList 214:0x81ffffff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2704
+  S SystemMessage id=54 3:2706
+  S SystemMessage id=54 3:2713
+  S NpcHtmlMessage obj=raut item=0 page=script/quest/Q214_TrialOfTheScholar/30316-02.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 25
+  items 2704=0 2706=1 2713=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=25
+action raut
+  S ActionFailed
+  S NpcHtmlMessage obj=raut item=0 page=warehouse/30316.htm
+  S ActionFailed
+bypass npc_{raut}_Quest
+  S NpcHtmlMessage obj=raut item=0 page=script/quest/Q214_TrialOfTheScholar/30316-04.htm
+  S ActionFailed
+  S ActionFailed
+action triff
+action triff
+  S ActionFailed
+  S NpcHtmlMessage obj=triff item=0 page=default/30611.htm
+  S ActionFailed
+bypass npc_{triff}_Quest
+  S NpcHtmlMessage obj=triff item=0 page=script/quest/Q214_TrialOfTheScholar/30611-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30611-02.htm
+  S NpcHtmlMessage obj=triff item=0 page=script/quest/Q214_TrialOfTheScholar/30611-02.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30611-03.htm
+  S NpcHtmlMessage obj=triff item=0 page=script/quest/Q214_TrialOfTheScholar/30611-03.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30611-04.htm
+  S QuestList 214:0x83ffffff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2713
+  S SystemMessage id=54 3:2705
+  S NpcHtmlMessage obj=triff item=0 page=script/quest/Q214_TrialOfTheScholar/30611-04.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 26
+  items 2705=1 2713=0
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=26
+action triff
+  S ActionFailed
+  S NpcHtmlMessage obj=triff item=0 page=default/30611.htm
+  S ActionFailed
+bypass npc_{triff}_Quest
+  S NpcHtmlMessage obj=triff item=0 page=script/quest/Q214_TrialOfTheScholar/30611-05.htm
+  S ActionFailed
+  S ActionFailed
+action raut
+action raut
+  S ActionFailed
+  S NpcHtmlMessage obj=raut item=0 page=warehouse/30316.htm
+  S ActionFailed
+bypass npc_{raut}_Quest
+  S NpcHtmlMessage obj=raut item=0 page=script/quest/Q214_TrialOfTheScholar/30316-05.htm
+  S ActionFailed
+  S ActionFailed
+action edroc
+action edroc
+  S ActionFailed
+  S NpcHtmlMessage obj=edroc item=0 page=merchant/30230.htm
+  S ActionFailed
+bypass npc_{edroc}_Quest
+  S NpcHtmlMessage obj=edroc item=0 page=script/quest/Q214_TrialOfTheScholar/30230-04.htm
+  S ActionFailed
+  S ActionFailed
+action poitan
+action poitan
+  S ActionFailed
+  S NpcHtmlMessage obj=poitan item=0 page=trainer/30458.htm
+  S ActionFailed
+bypass npc_{poitan}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2711
+  S NpcHtmlMessage obj=poitan item=0 page=script/quest/Q214_TrialOfTheScholar/30458-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 2711=1
+action poitan
+  S ActionFailed
+  S NpcHtmlMessage obj=poitan item=0 page=trainer/30458.htm
+  S ActionFailed
+bypass npc_{poitan}_Quest
+  S NpcHtmlMessage obj=poitan item=0 page=script/quest/Q214_TrialOfTheScholar/30458-02.htm
+  S ActionFailed
+  S ActionFailed
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S QuestList 214:0x87ffffff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 27
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=27
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-01.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-17.htm
+  S ActionFailed
+  S ActionFailed
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q214_TrialOfTheScholar/30103-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30103-02.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q214_TrialOfTheScholar/30103-02.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30103-03.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q214_TrialOfTheScholar/30103-03.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30103-04.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2710
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q214_TrialOfTheScholar/30103-04.htm
+  S ActionFailed
+  items 2710=1
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q214_TrialOfTheScholar/30103-05.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2710
+  S SystemMessage id=54 3:2714
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-18.htm
+  S ActionFailed
+  S ActionFailed
+  items 2710=0 2714=1
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2714
+  S SystemMessage id=54 3:2707
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q214_TrialOfTheScholar/30103-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 2707=1 2714=0
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q214_TrialOfTheScholar/30103-07.htm
+  S ActionFailed
+  S ActionFailed
+action dieter
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q214_TrialOfTheScholar/30111-12.htm
+  S ActionFailed
+  S ActionFailed
+kill grandis
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2708
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2708=1
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30612-03.htm
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-03.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30612-04.htm
+  S QuestList 214:0x8fffffff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2715
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-04.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 28
+  items 2715=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=28
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-05.htm
+  S ActionFailed
+  S ActionFailed
+action poitan
+action poitan
+  S ActionFailed
+  S NpcHtmlMessage obj=poitan item=0 page=trainer/30458.htm
+  S ActionFailed
+bypass npc_{poitan}_Quest
+  S NpcHtmlMessage obj=poitan item=0 page=script/quest/Q214_TrialOfTheScholar/30458-03.htm
+  S ActionFailed
+  S ActionFailed
+kill medusa
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2717
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2717=12
+kill ghoul
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2716
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2716=10
+kill fettered
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2718
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2718=5
+kill gargoyle
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2719
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 214:0x9fffffff
+  S ExShowQuestMark quest=214
+  Q upsert Q214_TrialOfTheScholar | <cond> | 29
+  items 2719=5
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=29
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30612-07.htm
+  S QuestList 214:0xbfffffff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2715
+  S SystemMessage id=301 3:2719 6:5
+  S SystemMessage id=301 3:2718 6:5
+  S SystemMessage id=301 3:2716 6:10
+  S SystemMessage id=301 3:2717 6:12
+  S SystemMessage id=302 3:2711
+  S SystemMessage id=54 3:2709
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-07.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 30
+  items 2709=1 2711=0 2715=0 2716=0 2717=0 2718=0 2719=0
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=30
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q214_TrialOfTheScholar/30612-08.htm
+  S ActionFailed
+  S ActionFailed
+action poitan
+action poitan
+  S ActionFailed
+  S NpcHtmlMessage obj=poitan item=0 page=trainer/30458.htm
+  S ActionFailed
+bypass npc_{poitan}_Quest
+  S NpcHtmlMessage obj=poitan item=0 page=script/quest/Q214_TrialOfTheScholar/30458-04.htm
+  S ActionFailed
+  S ActionFailed
+action dieter
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q214_TrialOfTheScholar/30111-13.htm
+  S ActionFailed
+  S ActionFailed
+action cronos
+action cronos
+  S ActionFailed
+  S NpcHtmlMessage obj=cronos item=0 page=default/30610.htm
+  S ActionFailed
+bypass npc_{cronos}_Quest
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q214_TrialOfTheScholar/30610-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30610-13.htm
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q214_TrialOfTheScholar/30610-13.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30610-14.htm
+  S QuestList 214:0xffffffff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2691
+  S SystemMessage id=302 3:2703
+  S SystemMessage id=302 3:2706
+  S SystemMessage id=302 3:2707
+  S SystemMessage id=302 3:2708
+  S SystemMessage id=302 3:2709
+  S SystemMessage id=302 3:2705
+  S SystemMessage id=54 3:2720
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q214_TrialOfTheScholar/30610-14.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 31
+  items 2691=0 2703=0 2705=0 2706=0 2707=0 2708=0 2709=0 2720=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=31
+action cronos
+  S ActionFailed
+  S NpcHtmlMessage obj=cronos item=0 page=default/30610.htm
+  S ActionFailed
+bypass npc_{cronos}_Quest
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q214_TrialOfTheScholar/30610-15.htm
+  S ActionFailed
+  S ActionFailed
+action dieter
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q214_TrialOfTheScholar/30111-15.htm
+  S ActionFailed
+  S ActionFailed
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S SystemMessage id=302 3:2677
+  S SystemMessage id=302 3:2720
+  S SystemMessage id=54 3:2674
+  S SystemMessage id=95 1:80265 1:30000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 214:0x00000000
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-14.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <state> | COMPLETED
+  Q delete-except-state Q214_TrialOfTheScholar
+  items 2674=1 2677=0 2720=0
+  state Q214_TrialOfTheScholar COMPLETED
+  rows Q214_TrialOfTheScholar <state>=COMPLETED
+relog
+  state Q214_TrialOfTheScholar COMPLETED
+  rows Q214_TrialOfTheScholar <state>=COMPLETED
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

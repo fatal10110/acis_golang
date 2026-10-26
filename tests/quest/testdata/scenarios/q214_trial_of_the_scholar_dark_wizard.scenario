@@ -1,0 +1,89 @@
+# Trial Of The Scholar (Q214), the lowest level: a level 35 Dark Wizard may start, is paid the level 35
+# set's Dimensional Diamonds, and the quest survives a relog; Maria and Lucas, who have nothing for a
+# traveller who has not met them, say so, and Sylvain sends the traveller on.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q214_trial_of_the_scholar_dark_wizard.golden
+character Scholar 35
+class 39
+script quest.Q214_TrialOfTheScholar
+item 2674 2675 2676 2677 2678 2679 2680 2681 2682 2683 2684 2685 2686 2687 2688 2689 2690 2691 2692 2693 2694 2695 2696 2697 2698 2699 2700 2701 2702 2703 2704 2705 2706 2707 2708 2709 2710 2711 2713 2714 2715 2716 2717 2718 2719 2720 7562
+page trainer/30461.htm
+page villagemaster/30070.htm
+page guard/30071.htm
+page default/30608.htm
+page script/quest/Q214_TrialOfTheScholar/
+npc mirien 30461 Trainer 10 0 0
+npc sylvain 30070 VillageMasterPriest -10 0 0
+npc maria 30608 Folk -20 0 0
+npc lucas 30071 Guard 0 10 0
+
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30461-04.htm
+  S QuestList 214:0x80000001
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2675
+  S SystemMessage id=53 3:7562 6:168
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-04a.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <state> | STARTED
+  Q upsert Q214_TrialOfTheScholar | <cond> | 1
+  M set secondClassChange35 | true
+  items 2675=1 7562=168
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=1
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-05.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action lucas
+action lucas
+  S ActionFailed
+  S NpcHtmlMessage obj=lucas item=0 page=guard/30071.htm
+  S ActionFailed
+bypass npc_{lucas}_Quest
+  S NpcHtmlMessage obj=lucas item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=1
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-05.htm
+  S ActionFailed
+  S ActionFailed
+action sylvain
+action sylvain
+  S ActionFailed
+  S NpcHtmlMessage obj=sylvain item=0 page=villagemaster/30070.htm
+  S ActionFailed
+bypass npc_{sylvain}_Quest
+  S NpcHtmlMessage obj=sylvain item=0 page=script/quest/Q214_TrialOfTheScholar/30070-01.htm
+  S ActionFailed
+  S ActionFailed
