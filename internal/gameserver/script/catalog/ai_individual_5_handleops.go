@@ -99,5 +99,11 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorHereticCorpseZombiePhysicalSpecial": {
 			"OnTimer": {"Spawner.DecayMe"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayToClan.WarriorRunAwayToClan": {
+			"OnTimer": {"NPC.RemoveDesires"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayToClan.WarriorRunAwayToClanAggressive": {
+			"OnTimer": {"NPC.RemoveDesires"},
+		},
 	}
 }

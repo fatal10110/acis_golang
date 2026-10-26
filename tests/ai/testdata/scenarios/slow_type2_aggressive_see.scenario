@@ -1,0 +1,15 @@
+# WarriorSlowType2Aggressive (20996), every draw 0, far from the character. Seeing it in its first
+# AI cycles, it attacks the character, weight 200, and wants no slowing magic.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType2
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorSlowType.WarriorSlowType2Aggressive
+npc slower 20996 Monster 1500 0 0 skill DD_MAGIC_SLOW 4254 5
+
+approach slower
+  desires slower attack(player)=200
