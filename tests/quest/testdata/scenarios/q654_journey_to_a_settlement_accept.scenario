@@ -1,0 +1,71 @@
+# Journey to a Settlement (Q654): a level 74 character that did Last Imperial Prince accepts the quest and is sent for the skin.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q654_journey_to_a_settlement_accept.golden
+character Hero 74
+quest Q119_LastImperialPrince <state>=COMPLETED
+script quest.Q119_LastImperialPrince
+script quest.Q654_JourneyToASettlement
+item 8072 8073
+page default/31453.htm
+page script/quest/Q654_JourneyToASettlement/
+npc spirit 31453 Folk 10 0 0
+
+action spirit
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 html="<html><body><a action=\"bypass -h npc_{spirit}_Quest Q119_LastImperialPrince\">[Last Imperial Prince (Done)]</a><br><a action=\"bypass -h npc_{spirit}_Quest Q654_JourneyToASettlement\">[Journey to a Settlement]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{spirit}_Quest Q654_JourneyToASettlement
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q654_JourneyToASettlement/31453-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q654_JourneyToASettlement 31453-02.htm
+  S QuestList 119:0x00000000 654:0x80000001
+  S ExShowQuestMark quest=654
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q654_JourneyToASettlement/31453-02.htm
+  S ActionFailed
+  Q upsert Q654_JourneyToASettlement | <state> | STARTED
+  Q upsert Q654_JourneyToASettlement | <cond> | 1
+  rows Q654_JourneyToASettlement <cond>=1 <state>=STARTED
+  state Q654_JourneyToASettlement STARTED
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 html="<html><body><a action=\"bypass -h npc_{spirit}_Quest Q119_LastImperialPrince\">[Last Imperial Prince (Done)]</a><br><a action=\"bypass -h npc_{spirit}_Quest Q654_JourneyToASettlement\">[Journey to a Settlement (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{spirit}_Quest Q654_JourneyToASettlement
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q654_JourneyToASettlement/31453-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q654_JourneyToASettlement 31453-03.htm
+  S QuestList 119:0x00000000 654:0x80000003
+  S ExShowQuestMark quest=654
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q654_JourneyToASettlement/31453-03.htm
+  S ActionFailed
+  Q upsert Q654_JourneyToASettlement | <cond> | 2
+  rows Q654_JourneyToASettlement <cond>=2 <state>=STARTED
+  state Q654_JourneyToASettlement STARTED
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 html="<html><body><a action=\"bypass -h npc_{spirit}_Quest Q119_LastImperialPrince\">[Last Imperial Prince (Done)]</a><br><a action=\"bypass -h npc_{spirit}_Quest Q654_JourneyToASettlement\">[Journey to a Settlement (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{spirit}_Quest Q654_JourneyToASettlement
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q654_JourneyToASettlement/31453-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q654_JourneyToASettlement <cond>=2 <state>=STARTED
+  state Q654_JourneyToASettlement STARTED

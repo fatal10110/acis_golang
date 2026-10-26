@@ -1,0 +1,32 @@
+# A Looter and a Railroad Man (Q649): two hundred marks pay the adena.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q649_a_looter_and_a_railroad_man_finish.golden
+character Hero 30
+quest Q649_ALooterAndARailroadMan <cond>=2 <state>=STARTED
+hold 8099 200
+script quest.Q649_ALooterAndARailroadMan
+item 8099 57
+page default/32052.htm
+page script/quest/Q649_ALooterAndARailroadMan/
+npc obi 32052 Folk 10 0 0
+
+action obi
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q649_ALooterAndARailroadMan/32052-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q649_ALooterAndARailroadMan 32052-3.htm
+  S SystemMessage id=301 3:8099 6:200
+  S SystemMessage id=52 6:21698
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q649_ALooterAndARailroadMan/32052-3.htm
+  S ActionFailed
+  Q delete-quest Q649_ALooterAndARailroadMan
+  items 8099=0 57=21698
+  rows Q649_ALooterAndARailroadMan -
+  state Q649_ALooterAndARailroadMan -
