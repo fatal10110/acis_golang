@@ -123,7 +123,8 @@ func card(n int32) string {
 	case 25:
 		return script.NpcString(66325)
 	}
-	// Only the cards of the game are asked for; the text of no card is no text.
+	// Unreachable: stateEx is only ever 0 or a drawn card, and only drawn cards are asked
+	// for. Any other id is not an NpcString and panics, as an unknown card does.
 	return script.NpcString(0)
 }
 

@@ -1,0 +1,27 @@
+# Seductive Whispers (Q663), the card drawn for Wilbert equals the player's in the lost game: the game ends and the card of the player is forgotten. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_lose_pair.golden
+character Gambler 50
+quest Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=6 stateEx=14
+random 0 0
+script quest.Q663_SeductiveWhispers
+item 8766 57
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-19.htm
+  S NpcHtmlMessage obj=wilbert item=0 html="<html><body>Blacksmith Wilbert:<br>\nLet's see here... The card I took out is: <font color=\"LEVEL\"><font color=\"ff453d\"> Sun Card: 1 </font></font>.<br>\nThe cards on the table are:<br>\n<table border=\"0\" border color=\"white\" width=\"230\" height=\"60\">\n<tr><td width=\"80\" height=\"20\" align=\"center\">[Wilbert]</td><td width=\"150\" height=\"20\" align=\"center\">[ Gambler ]</td></tr>\n<tr><td width=\"80\" height=\"30\" align=\"center\"><font color=\"f00fff\"><font color=\"ff453d\"> Sun Card: 1 </font></font></td><td width=\"150\" height=\"30\" align=\"center\"><font color=\"f9911e\"><font color=\"ff453d\"> Sun Card: 4 </font></font></td></tr>\n</table><br>\n<br>\nLuck! Looks like I win. It was a good game, though, eh? If you'd like to play again, feel free to challenge me.<br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-21a.htm\">Challenge him again.</a>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 1
+  Q upsert Q663_SeductiveWhispers | stateEx | 0
+  rows Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1 stateEx=0
+  state Q663_SeductiveWhispers STARTED
