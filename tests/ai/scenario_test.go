@@ -198,6 +198,15 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagic":         warrior.CorpseZombieDDMagic,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecial": warrior.CorpseZombiePhysicalSpecial,
 
+	// The shooters, the priests and the runner.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRange":                 warrior.PhysicalSpecialShotRange,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotNoRange":               warrior.PhysicalSpecialShotNoRange,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRangeAggressive":       warrior.PhysicalSpecialShotRangeAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRangeDebuffAggressive": warrior.PhysicalSpecialShotRangeDebuffAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPriest.WarriorPriest":                                                     warrior.Priest,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPriest.WarriorPriestAggressive":                                           warrior.PriestAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecial":                     warrior.RunAwayPhysicalSpecial,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                                 monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                   monsterbehavior.WizardBehavior,
