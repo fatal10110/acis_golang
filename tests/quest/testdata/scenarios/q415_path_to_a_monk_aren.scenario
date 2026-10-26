@@ -1,0 +1,125 @@
+# Path to a Monk (Q415), bare-handed, the character takes the other way: Aren sends him for Kasha spider teeth and the horn of Baar Dre Vanul, and Moira gives the totem. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q415_path_to_a_monk_aren.golden
+character Fighter 19
+class 44
+quest Q415_PathToAMonk <cond>=8 <state>=STARTED
+hold 1603 1
+hold 1604 1
+random always 0
+script quest.Q415_PathToAMonk
+item 1593 1594 1595 1596 1597 1598 1599 1600 1601 1602 1603 1604 1605 1606 1607 1608 1609 1610 1611 1612 1613 1614 1615 8545 8546
+page default/30587.htm
+page default/30590.htm
+page trainer/30501.htm
+page default/30591.htm
+page default/32056.htm
+page trainer/31979.htm
+page script/quest/Q415_PathToAMonk/
+npc gantaki 30587 Folk 10 0 0
+npc rosheek 30590 Folk -20 0 0
+npc kasman 30501 Trainer 30 0 0
+npc toruku 30591 Folk -40 0 0
+npc aren 32056 Folk 50 0 0
+npc moira 31979 Trainer -60 0 0
+npc fist 20479 Monster 40 0 0
+npc blade 20478 Monster 50 0 0
+npc spider 20476 Monster 60 0 0
+npc salamander 20415 Monster 70 0 0
+npc lizard 20014 Monster 80 0 0
+npc orc 20017 Monster 90 0 0
+npc klizard 20024 Monster 100 0 0
+npc ratman 20359 Monster 110 0 0
+npc baar 21118 Monster 120 0 0
+
+bypass Quest Q415_PathToAMonk 30587-09b.htm
+action aren
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+bypass npc_{aren}_Quest
+  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q415_PathToAMonk 32056-03.htm
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+bypass npc_{aren}_Quest
+  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+kill spider x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+kill blade x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+bypass npc_{aren}_Quest
+  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+bypass npc_{aren}_Quest
+  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+kill baar
+  S SystemMessage id=95 1:0 1:0
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+bypass npc_{aren}_Quest
+  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q415_PathToAMonk 32056-08.htm
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+action aren
+  S ActionFailed
+  S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
+  S ActionFailed
+bypass npc_{aren}_Quest
+  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q415_PathToAMonk 31979-03.htm
