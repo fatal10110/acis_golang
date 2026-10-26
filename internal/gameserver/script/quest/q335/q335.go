@@ -407,14 +407,15 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			s.PlaySound(p, script.SoundGiveUp)
 		}
 	case script.IsDigit(e.Name) && len(e.Name) == 4:
-		request, err := strconv.Atoi(e.Name)
-		if _, ok := torRewardOf(int32(request)); err != nil || !ok {
+		parsed, err := strconv.ParseInt(e.Name, 10, 32)
+		request := int32(parsed)
+		if _, ok := torRewardOf(request); err != nil || !ok {
 			// Only the requests of the menus are accepted: any other number
 			// would hand out an arbitrary item.
 			return ""
 		}
-		setInt(st, "tor", int32(request))
-		s.GiveItems(p, int32(request), 1)
+		setInt(st, "tor", request)
+		s.GiveItems(p, request, 1)
 		htmltext = "30745-" + e.Name + ".htm"
 	// Cybellin
 	case strings.EqualFold(e.Name, "30746-03.htm"):
