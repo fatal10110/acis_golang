@@ -6,6 +6,7 @@
 package q628
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -105,7 +106,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			return ""
 		}
 		buffID, err := strconv.Atoi(e.Name)
-		if err != nil {
+		if err != nil || buffID > math.MaxInt32 {
 			return htmltext
 		}
 		if b, ok := buffs()[buffID]; ok {
