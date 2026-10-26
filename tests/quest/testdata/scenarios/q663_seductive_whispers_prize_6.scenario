@@ -1,0 +1,32 @@
+# Seductive Whispers (Q663), the prize of round 6 is taken. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_prize_6.golden
+character Gambler 50
+quest Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=67
+script quest.Q663_SeductiveWhispers
+item 8766 57 947 948
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 html="<html><body>Blacksmith Wilbert:<br>\nYou've won <font color=\"LEVEL\">7</font> in a row. Would you like to quit? Or do you want to keep playing?<br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-20.htm\">Continue the game.</a><br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-21.htm\">Quit the game and collect the prize.</a>\n</body></html>\n"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-21.htm
+  S SystemMessage id=52 6:1284000
+  S SystemMessage id=54 3:947
+  S SystemMessage id=54 3:948
+  S SystemMessage id=54 3:947
+  S SystemMessage id=54 3:948
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-21.htm
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 1
+  Q upsert Q663_SeductiveWhispers | stateEx | 0
+  items 57=1284000 947=2 948=2
+  rows Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1 stateEx=0
+  state Q663_SeductiveWhispers STARTED
