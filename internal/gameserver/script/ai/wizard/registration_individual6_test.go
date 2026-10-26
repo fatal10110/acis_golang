@@ -57,6 +57,14 @@ var individual6 = []struct {
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardGrowth.WizardGrowthStep4Aggressive", GrowthStep4Aggressive},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2Curse", HereticDDMagic2Curse},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2CurseAggressive", HereticDDMagic2CurseAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro", CorpseNecro},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Heal", DDMagic2Heal},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2HealAggressive", DDMagic2HealAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Solina", DDMagic2Solina},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHealer", Healer},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHealerAggressive", HealerAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagic2Aggressive", HereticDDMagic2Aggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHereticDDMagicCurse", HereticDDMagicCurse},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway", FiendArcherRunAway},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive", HereticPriestAggressive},
 }
@@ -120,7 +128,10 @@ func readIndividual6View(t *testing.T, path string, ours map[string]bool, text *
 // new classes share with other scripts. The 10 events of each id of
 // WizardDDMagic2Curse, its aggressive child and the two growth steps (13 +
 // 14 + 12 + 6 ids) and the 11 of each id of WizardHereticDDMagic2Curse and
-// its child (2 + 3 ids) close the count.
+// its child (2 + 3 ids), the 10 of each id of WizardDDMagic2Heal, its two
+// children and WizardCorpseNecro (10 + 2 + 1 + 4 ids) and the 11 of each id
+// of WizardHealer, its child, WizardHereticDDMagic2Aggressive and
+// WizardHereticDDMagicCurse (2 + 1 + 2 + 1 ids) close the count.
 func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, 0, len(chain)+len(individual6))
 	catalog := script.Catalog{}
@@ -151,8 +162,8 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual6View(t, path, ours, sc)
-	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10+49*10+45*10+5*11 {
-		t.Fatalf("reference folds = %d entries, want 1967", got)
+	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10+49*10+45*10+5*11+17*10+6*11 {
+		t.Fatalf("reference folds = %d entries, want 2203", got)
 	}
 
 	for _, c := range individual6 {
