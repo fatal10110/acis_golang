@@ -1,0 +1,50 @@
+# Path to a Monk (Q415), armed with a sword, the character breaks the monk's oath at the first kill and loses the quest. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q415_path_to_a_monk_wrong_weapon.golden
+character Fighter 19
+class 44
+quest Q415_PathToAMonk <cond>=2 <state>=STARTED
+hold 1594 1
+equip 1
+script quest.Q415_PathToAMonk
+item 1593 1594 1595 1596 1597 1598 1599 1600 1601 1602 1603 1604 1605 1606 1607 1608 1609 1610 1611 1612 1613 1614 1615 8545 8546 1
+page default/30587.htm
+page default/30590.htm
+page trainer/30501.htm
+page default/30591.htm
+page default/32056.htm
+page trainer/31979.htm
+page script/quest/Q415_PathToAMonk/
+npc gantaki 30587 Folk 10 0 0
+npc rosheek 30590 Folk -20 0 0
+npc kasman 30501 Trainer 30 0 0
+npc toruku 30591 Folk -40 0 0
+npc aren 32056 Folk 50 0 0
+npc moira 31979 Trainer -60 0 0
+npc fist 20479 Monster 40 0 0
+npc blade 20478 Monster 50 0 0
+npc spider 20476 Monster 60 0 0
+npc salamander 20415 Monster 70 0 0
+npc lizard 20014 Monster 80 0 0
+npc orc 20017 Monster 90 0 0
+npc klizard 20024 Monster 100 0 0
+npc ratman 20359 Monster 110 0 0
+npc baar 21118 Monster 120 0 0
+
+kill fist
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:1594
+  Q delete-quest Q415_PathToAMonk
+  items 1594=0
+  rows Q415_PathToAMonk -
+  state Q415_PathToAMonk -
+action rosheek
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+bypass npc_{rosheek}_Quest
+  S NpcHtmlMessage obj=rosheek item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
