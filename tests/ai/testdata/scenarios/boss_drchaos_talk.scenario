@@ -1,0 +1,18 @@
+# DoctorChaosNpc (32033), a civilian, talked to: it says NpcString 1010578 and releases the client
+# (the talk's leading ActionFailed, its line, the release); 2 s later it only sets off for its
+# machine, saying nothing. Its walks, the cutscene's lines, cameras and social action, the party
+# teleport and the golem it raises are in tests/ai/boss_drchaos_test.go, as the format renders no
+# civilian's desires, camera, social action or NPC walk. Expectations are derived from the
+# reference source (DoctorChaosNpc.java onFirstTalk, onTimer 1001).
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.boss.drchaos.DoctorChaosNpc
+npc chaos 32033 Folk 60 0 0 walks
+
+action chaos
+action chaos
+  S ActionFailed
+  S NpcSay obj=chaos type=0 npc=1032033 text="How dare you trespass into my territory! Have you no fear?"
+  S ActionFailed
+advance 2s
+tick
