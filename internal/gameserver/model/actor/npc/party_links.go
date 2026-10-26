@@ -346,25 +346,20 @@ func propagatePartyAttacked(caller PartyMember, target attackable.Combatant, dam
 // partyDied tells caller's party that caller has just died: caller itself,
 // then its master, then every private of the party but caller, dead ones
 // included. A dying master then lets its privates go: they no longer have
-// a master, while it keeps them as its privates. Only a hostile NPC's
-// party-died hooks run: none is raised on a civilian NPC.
+// a master, while it keeps them as its privates. The party-died hooks run
+// on hostile and civilian NPCs alike.
 func partyDied(hooks ScriptHooks, caller PartyMember) {
 	if !caller.inParty() {
 		return
 	}
 	if hooks != nil {
-		call := func(called PartyMember) {
-			if h, ok := called.(*Hostile); ok {
-				hooks.HostilePartyDied(caller, h)
-			}
-		}
-		call(caller)
+		hooks.PartyDied(caller, caller)
 		if master := caller.Master(); master != nil && !SameNPC(master, caller) {
-			call(master)
+			hooks.PartyDied(caller, master)
 		}
 		for _, minion := range caller.Minions() {
 			if !SameNPC(minion, caller) {
-				call(minion)
+				hooks.PartyDied(caller, minion)
 			}
 		}
 	}

@@ -1,0 +1,34 @@
+# Electrifying Recharge! (Q367), the plain dye: a character at cond 2 holding the final lamp gets the dye the draw 13
+# picks (4445). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q367_electrifying_recharge_dye.golden
+character Recharge 37
+quest Q367_ElectrifyingRecharge <cond>=2 <state>=STARTED
+hold 5879 1
+random 13
+script quest.Q367_ElectrifyingRecharge
+item 57 4445 4553 4554 4555 4556 4557 4558 4559 4560 4561 4562 4563 4564 5875 5876 5877 5878 5879 5880
+page default/30673.htm
+page script/quest/Q367_ElectrifyingRecharge/
+npc lorain 30673 Folk 10 0 0
+npc catherok 21035 Monster 40 0 0
+
+action lorain
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S QuestList 367:0x80000001
+  S ExShowQuestMark quest=367
+  S SystemMessage id=302 3:5879
+  S SystemMessage id=54 3:5875
+  S SystemMessage id=54 3:4445
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q367_ElectrifyingRecharge/30673-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q367_ElectrifyingRecharge | <cond> | 1
+  rows Q367_ElectrifyingRecharge <cond>=1 <state>=STARTED
+  items 5879=0 5875=1 4445=1
+bypass Quest Q367_ElectrifyingRecharge 30673-07.htm
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q367_ElectrifyingRecharge/30673-07.htm
+  S ActionFailed

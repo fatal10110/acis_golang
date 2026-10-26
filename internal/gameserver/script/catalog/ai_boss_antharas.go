@@ -9,6 +9,6 @@ import (
 func aiBossAntharas() script.Catalog {
 	return script.Catalog{
 		"script.ai.boss.antharas.Antharas":       antharas.Antharas,
-		"script.ai.boss.antharas.HeartOfWarding": nil,
+		"script.ai.boss.antharas.HeartOfWarding": antharas.HeartOfWarding,
 	}
 }

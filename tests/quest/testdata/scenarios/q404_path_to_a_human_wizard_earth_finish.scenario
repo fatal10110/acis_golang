@@ -1,0 +1,121 @@
+# Path to a Human Wizard (Q404), level 19 with the earring, the bangle and the necklace: the Earth Snake gives the coin, a red bear drops the soil, the Snake pays the ring and Parina the bead; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q404_path_to_a_human_wizard_earth_finish.golden
+character Wizard 19
+class 10
+quest Q404_PathToAHumanWizard <cond>=10 <state>=STARTED
+hold 1282 1
+hold 1285 1
+hold 1288 1
+random 0
+script quest.Q404_PathToAHumanWizard
+item 1280 1281 1282 1283 1284 1285 1286 1287 1288 1289 1290 1291 1292
+page default/30391.htm
+page default/30409.htm
+page default/30410.htm
+page default/30411.htm
+page default/30412.htm
+page default/30413.htm
+page script/quest/Q404_PathToAHumanWizard/
+npc parina 30391 Folk 10 0 0
+npc snake 30409 Folk -10 0 0
+npc lizardman 30410 Folk 20 0 0
+npc salamander 30411 Folk -20 0 0
+npc sylph 30412 Folk 30 0 0
+npc undine 30413 Folk -30 0 0
+npc bear 20021 Monster 40 0 0
+npc ratman 20359 Monster 50 0 0
+npc seer 27030 Monster 60 0 0
+
+action snake
+  items 1282=1 1285=1 1288=1
+  rows Q404_PathToAHumanWizard <cond>=10 <state>=STARTED
+  state Q404_PathToAHumanWizard STARTED
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S QuestList 404:0x800007ff
+  S ExShowQuestMark quest=404
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1289
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q404_PathToAHumanWizard/30409-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q404_PathToAHumanWizard | <cond> | 11
+  items 1289=1
+  rows Q404_PathToAHumanWizard <cond>=11 <state>=STARTED
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q404_PathToAHumanWizard/30409-02.htm
+  S ActionFailed
+  S ActionFailed
+kill bear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1290
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 404:0x80000fff
+  S ExShowQuestMark quest=404
+  Q upsert Q404_PathToAHumanWizard | <cond> | 12
+  items 1290=1
+  rows Q404_PathToAHumanWizard <cond>=12 <state>=STARTED
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S QuestList 404:0x80001fff
+  S ExShowQuestMark quest=404
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1290
+  S SystemMessage id=302 3:1289
+  S SystemMessage id=54 3:1291
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q404_PathToAHumanWizard/30409-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q404_PathToAHumanWizard | <cond> | 13
+  items 1289=0 1290=0 1291=1
+  rows Q404_PathToAHumanWizard <cond>=13 <state>=STARTED
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q404_PathToAHumanWizard/30409-04.htm
+  S ActionFailed
+  S ActionFailed
+action parina
+action parina
+  S ActionFailed
+  S NpcHtmlMessage obj=parina item=0 page=default/30391.htm
+  S ActionFailed
+bypass npc_{parina}_Quest
+  S SystemMessage id=302 3:1291
+  S SystemMessage id=302 3:1282
+  S SystemMessage id=302 3:1288
+  S SystemMessage id=302 3:1285
+  S SystemMessage id=54 3:1292
+  S SystemMessage id=95 1:3200 1:2020
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=parina item=0 page=script/quest/Q404_PathToAHumanWizard/30391-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q404_PathToAHumanWizard
+  items 1282=0 1285=0 1288=0 1291=0 1292=1
+  rows Q404_PathToAHumanWizard -
+  state Q404_PathToAHumanWizard -
+relog
+action parina
+action parina
+  S ActionFailed
+  S NpcHtmlMessage obj=parina item=0 page=default/30391.htm
+  S ActionFailed
+bypass npc_{parina}_Quest
+  S NpcHtmlMessage obj=parina item=0 page=script/quest/Q404_PathToAHumanWizard/30391-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q404_PathToAHumanWizard CREATED

@@ -100,6 +100,7 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 		Scripts:        s.Scripts,
 		Remover:        s.Remover,
 		Ground:         s.Ground,
+		Landing:        s.Geo,
 		SeeRange:       s.SeeRange,
 		Tower:          tower,
 		Regen:          s.Regen,

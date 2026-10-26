@@ -1,0 +1,36 @@
+# Birthday Party Song (Q432): a character with exactly fifty red crystals hands them in and gets
+# 25 items; the quest ends. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q432_birthday_party_song_finish.golden
+character Hero 35
+quest Q432_BirthdayPartySong <cond>=2 <state>=STARTED
+hold 7541 50
+script quest.Q432_BirthdayPartySong
+item 7541 7061
+page default/31043.htm
+page script/quest/Q432_BirthdayPartySong/
+npc octavia 31043 Folk 10 0 0
+npc golem 21103 Monster 40 0 0
+
+action octavia
+action octavia
+  S ActionFailed
+  S NpcHtmlMessage obj=octavia item=0 page=default/31043.htm
+  S ActionFailed
+bypass npc_{octavia}_Quest
+  S NpcHtmlMessage obj=octavia item=0 page=script/quest/Q432_BirthdayPartySong/31043-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q432_BirthdayPartySong 31043-06.htm
+  S SystemMessage id=301 3:7541 6:50
+  S SystemMessage id=53 3:7061 6:25
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=octavia item=0 page=script/quest/Q432_BirthdayPartySong/31043-05.htm
+  S ActionFailed
+  Q delete-quest Q432_BirthdayPartySong
+  items 7541=0 7061=25
+  state Q432_BirthdayPartySong -
+  rows Q432_BirthdayPartySong -
+relog
+  state Q432_BirthdayPartySong -
+  rows Q432_BirthdayPartySong -

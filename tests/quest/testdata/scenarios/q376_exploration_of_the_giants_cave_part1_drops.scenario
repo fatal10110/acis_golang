@@ -1,0 +1,37 @@
+# Exploration of the Giants' Cave, Part 1 (Q376), a character at the first step kills the four monsters. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q376_exploration_of_the_giants_cave_part1_drops.golden
+character Exploration 51
+quest Q376_ExplorationOfTheGiantsCave_Part1 <cond>=1 <state>=STARTED
+random 0 1999 25999 0 28000 0 0 0 31999
+script quest.Q376_ExplorationOfTheGiantsCave_Part1
+item 5890 5891 5892 5944 5937 5938 5939 5940 5941 5932 5933 5934 5935 5936 5922 5923 5924 5925 5926 5927 5928 5929 5930 5931 5346 5354 5332 5334 5416 5418 5424 5340
+page default/31147.htm
+page warehouse/30182.htm
+page script/quest/Q376_ExplorationOfTheGiantsCave_Part1/
+npc sobling 31147 Folk 10 0 0
+npc cliff 30182 WarehouseKeeper 20 0 0
+npc m47 20647 Monster 40 0 0
+npc m48 20648 Monster 50 0 0
+npc m49 20649 Monster 60 0 0
+npc m50 20650 Monster 70 0 0
+
+kill m47
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5890
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:5944
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5890=1 5944=1
+kill m48
+  S SystemMessage id=95 1:0 1:0
+  items 5890=1 5944=1
+kill m49
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5944
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5890=1 5944=2
+kill m50
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5944
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5890=1 5944=3

@@ -1,0 +1,27 @@
+# Path to a Shillien Oracle (Q413), a level 20 human fighter is turned away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q413_path_to_a_shillien_oracle_other_class.golden
+character Fighter 20
+script quest.Q413_PathToAShillienOracle
+item 1262 1263 1264 1265 1266 1267 1268 1269 1270
+page trainer/30330.htm
+page trainer/30375.htm
+page trainer/30377.htm
+page script/quest/Q413_PathToAShillienOracle/
+npc sidra 30330 Trainer 10 0 0
+npc adonius 30375 Trainer -10 0 0
+npc talbot 30377 Trainer 20 0 0
+npc rune 20776 Monster 40 0 0
+npc bones 20457 Monster 50 0 0
+
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q413_PathToAShillienOracle 30330-05.htm
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-03.htm
+  S ActionFailed

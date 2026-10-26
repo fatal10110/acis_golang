@@ -3,6 +3,7 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -23,13 +24,19 @@ func (h *Hostile) FlyTo(dest location.Location, flight modelskill.Flight) {
 // clears the geo-path fail streak: the next pathfinding attempt is from a
 // new cell, not a continuation of the stall that triggered recovery.
 func (h *Hostile) TeleportTo(target location.Location) {
+	h.TeleportJump(location.Jump{To: target})
+}
+
+// TeleportJump is TeleportTo aimed where j lands: a scattered jump stops at
+// the last point the geodata lets a straight walk from j.To toward
+// j.Toward reach, before the landing is grounded.
+func (h *Hostile) TeleportJump(j location.Jump) {
+	target := j.To
 	if h.Live != nil {
 		if !h.SetTeleporting(true) {
 			return
 		}
-		if h.inWater == nil || !h.inWater(target) {
-			target.Z = int(h.Move().Height(target.X, target.Y, target.Z))
-		}
+		target = move.Land(h.Move(), j, h.inWater)
 	}
 	h.brain.AbortAll()
 	h.emit(event.Teleported{To: target})

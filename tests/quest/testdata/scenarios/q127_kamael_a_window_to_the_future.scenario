@@ -1,0 +1,293 @@
+# Kamael: A Window to the Future (Q127): Dominic opens the quest, and Klaus has nothing to say while it
+# is only created; once accepted, Alder has nothing to say at cond 1. Klaus, Alder, Aklan, Oltlin
+# and Juris each give their mark through their pages (Klaus with his cond 2 page on a second talk), and
+# Rodemai plays the Kamael's story (cond 8) and then has her cond 8 page; then relog. Expectations replay
+# the reference trace of this scenario. The trace keeps the story's ExPlayScene, which the runner does not
+# compare; tests/quest/q127_scene_test.go pins it.
+trace internal/gameserver/script/testdata/oracle/scenarios/q127_kamael_a_window_to_the_future.golden
+character Kamael 20
+script quest.Q127_KamaelAWindowToTheFuture
+item 8939 8940 8941 8942 8943 8944
+page default/31350.htm
+page default/30756.htm
+page villagemaster/30187.htm
+page villagemaster/32092.htm
+page villagemaster/31288.htm
+page villagemaster/30862.htm
+page trainer/30113.htm
+page script/quest/Q127_KamaelAWindowToTheFuture/
+npc dominic 31350 Folk 10 0 0
+npc klaus 30187 VillageMasterFighter 20 0 0
+npc alder 32092 VillageMasterDwarf 30 0 0
+npc aklan 31288 VillageMasterOrc 0 10 0
+npc oltlin 30862 VillageMasterDElf 0 20 0
+npc juris 30113 Trainer 0 30 0
+npc rodemai 30756 Folk -10 0 0
+
+# Dominic opens the quest; Klaus has nothing to say while it is only created.
+action dominic
+action dominic
+  S ActionFailed
+  S NpcHtmlMessage obj=dominic item=0 page=default/31350.htm
+  S ActionFailed
+bypass npc_{dominic}_Quest
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31350-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q127_KamaelAWindowToTheFuture CREATED
+action klaus
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=villagemaster/30187.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Dominic: accept, with his mark.
+action dominic
+action dominic
+  S ActionFailed
+  S NpcHtmlMessage obj=dominic item=0 page=default/31350.htm
+  S ActionFailed
+bypass npc_{dominic}_Quest
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31350-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 31350-02.htm
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31350-02.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 31350-03.htm
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31350-03.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 31350-04.htm
+  S QuestList 127:0x80000001
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8939
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31350-04.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <state> | STARTED
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 1
+  state Q127_KamaelAWindowToTheFuture STARTED
+  rows Q127_KamaelAWindowToTheFuture <cond>=1 <state>=STARTED
+  items 8939=1
+
+# Alder has nothing to say at cond 1.
+action alder
+action alder
+  S ActionFailed
+  S NpcHtmlMessage obj=alder item=0 page=villagemaster/32092.htm
+  S ActionFailed
+bypass npc_{alder}_Quest
+  S NpcHtmlMessage obj=alder item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Klaus: cond 2 through his pages, his cond 2 page on a second talk, then the human mark.
+action klaus
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=villagemaster/30187.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30187-02.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-02.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30187-03.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-03.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30187-04.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-04.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30187-05.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-05.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30187-06.htm
+  S QuestList 127:0x80000003
+  S ExShowQuestMark quest=127
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-06.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 2
+  rows Q127_KamaelAWindowToTheFuture <cond>=2 <state>=STARTED
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=villagemaster/30187.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30187-07.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-07.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30187-08.htm
+  S QuestList 127:0x80000007
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8940
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30187-08.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 3
+  rows Q127_KamaelAWindowToTheFuture <cond>=3 <state>=STARTED
+  items 8940=1
+
+# Alder: the next mark.
+action alder
+action alder
+  S ActionFailed
+  S NpcHtmlMessage obj=alder item=0 page=villagemaster/32092.htm
+  S ActionFailed
+bypass npc_{alder}_Quest
+  S NpcHtmlMessage obj=alder item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/32092-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 32092-02.htm
+  S NpcHtmlMessage obj=alder item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/32092-02.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 32092-03.htm
+  S NpcHtmlMessage obj=alder item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/32092-03.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 32092-04.htm
+  S NpcHtmlMessage obj=alder item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/32092-04.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 32092-05.htm
+  S QuestList 127:0x8000000f
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8941
+  S NpcHtmlMessage obj=alder item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/32092-05.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 4
+  rows Q127_KamaelAWindowToTheFuture <cond>=4 <state>=STARTED
+  items 8941=1
+
+# Aklan: the next mark.
+action aklan
+action aklan
+  S ActionFailed
+  S NpcHtmlMessage obj=aklan item=0 page=villagemaster/31288.htm
+  S ActionFailed
+bypass npc_{aklan}_Quest
+  S NpcHtmlMessage obj=aklan item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31288-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 31288-02.htm
+  S NpcHtmlMessage obj=aklan item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31288-02.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 31288-03.htm
+  S NpcHtmlMessage obj=aklan item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31288-03.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 31288-04.htm
+  S QuestList 127:0x8000001f
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8944
+  S NpcHtmlMessage obj=aklan item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31288-04.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 5
+  rows Q127_KamaelAWindowToTheFuture <cond>=5 <state>=STARTED
+  items 8944=1
+
+# Oltlin: the next mark.
+action oltlin
+action oltlin
+  S ActionFailed
+  S NpcHtmlMessage obj=oltlin item=0 page=villagemaster/30862.htm
+  S ActionFailed
+bypass npc_{oltlin}_Quest
+  S NpcHtmlMessage obj=oltlin item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30862-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30862-02.htm
+  S NpcHtmlMessage obj=oltlin item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30862-02.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30862-03.htm
+  S NpcHtmlMessage obj=oltlin item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30862-03.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30862-04.htm
+  S QuestList 127:0x8000003f
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8943
+  S NpcHtmlMessage obj=oltlin item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30862-04.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 6
+  rows Q127_KamaelAWindowToTheFuture <cond>=6 <state>=STARTED
+  items 8943=1
+
+# Juris: the next mark.
+action juris
+action juris
+  S ActionFailed
+  S NpcHtmlMessage obj=juris item=0 page=trainer/30113.htm
+  S ActionFailed
+bypass npc_{juris}_Quest
+  S NpcHtmlMessage obj=juris item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30113-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30113-02.htm
+  S NpcHtmlMessage obj=juris item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30113-02.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30113-03.htm
+  S NpcHtmlMessage obj=juris item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30113-03.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30113-04.htm
+  S QuestList 127:0x8000007f
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8942
+  S NpcHtmlMessage obj=juris item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30113-04.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 7
+  rows Q127_KamaelAWindowToTheFuture <cond>=7 <state>=STARTED
+  items 8942=1
+
+# Rodemai: the Kamael's story, then her cond 8 page.
+action rodemai
+action rodemai
+  S ActionFailed
+  S NpcHtmlMessage obj=rodemai item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{rodemai}_Quest
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30756-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30756-02.htm
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30756-02.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30756-03.htm
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30756-03.htm
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture kamaelstory
+  S QuestList 127:0x800000ff
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 8
+  rows Q127_KamaelAWindowToTheFuture <cond>=8 <state>=STARTED
+action rodemai
+  S ActionFailed
+  S NpcHtmlMessage obj=rodemai item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{rodemai}_Quest
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30756-04.htm
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 8939=1 8940=1 8941=1 8942=1 8943=1 8944=1
+  state Q127_KamaelAWindowToTheFuture STARTED
+  rows Q127_KamaelAWindowToTheFuture <cond>=8 <state>=STARTED
+action rodemai
+action rodemai
+  S ActionFailed
+  S NpcHtmlMessage obj=rodemai item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{rodemai}_Quest
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30756-04.htm
+  S ActionFailed
+  S ActionFailed

@@ -96,5 +96,8 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnTimer":    {"Spawner.DecayMe"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorHereticCorpseZombiePhysicalSpecial": {
+			"OnTimer": {"Spawner.DecayMe"},
+		},
 	}
 }

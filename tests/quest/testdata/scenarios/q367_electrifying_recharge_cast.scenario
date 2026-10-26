@@ -1,0 +1,17 @@
+# Electrifying Recharge! (Q367), the Catherok's shock: a hit by a character at cond 1 makes the Catherok want
+# to cast Shock (4072, level 1), whatever the lamp draw (an aura skill: it casts on itself). The reference probe
+# plays no NPC skill line, so this scenario has no reference trace.
+character Recharge 37
+quest Q367_ElectrifyingRecharge <cond>=1 <state>=STARTED
+hold 5875 1
+random 0 5
+script quest.Q367_ElectrifyingRecharge
+item 57 5875
+page default/30673.htm
+page script/quest/Q367_ElectrifyingRecharge/
+npc lorain 30673 Folk 10 0 0
+npc catherok 21035 Monster 40 0 0 skill DEBUFF 4072 1
+
+hit catherok 10
+  items 5875=1
+  desires catherok attack(player)=125 cast(catherok,4072,move)=1000000

@@ -1,0 +1,57 @@
+# Path to a Human Knight (Q402), level 19: the character accepts at Sir Klaus Vasper, relogs, and is sent for the coins. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q402_path_to_a_human_knight_accept.golden
+character Knight 19
+script quest.Q402_PathToAHumanKnight
+item 1161 1162 1163 1164 1165 1166 1167 1168 1169 1170 1171 1172 1173 1174 1175 1176 1177 1178 1179 1271
+page default/30417.htm
+page guard/30332.htm
+page villagemaster/30289.htm
+page guard/30379.htm
+page villagemaster/30037.htm
+page guard/30039.htm
+page villagemaster/30031.htm
+page default/30653.htm
+page script/quest/Q402_PathToAHumanKnight/
+npc klaus 30417 Folk 10 0 0
+npc bathis 30332 Guard -10 0 0
+npc raymond 30289 VillageMasterPriest 20 0 0
+npc bezique 30379 Guard -20 0 0
+npc levian 30037 VillageMasterPriest 30 0 0
+npc gilbert 30039 Guard -30 0 0
+npc biotin 30031 VillageMasterPriest 15 10 0
+npc aaron 30653 Folk -15 10 0
+npc bugbear 20775 Monster 40 0 0
+npc priest 27024 Monster 45 0 0
+npc spider 20038 Monster 50 0 0
+npc lizard 20024 Monster 55 0 0
+npc giant 20103 Monster 60 0 0
+npc horror 20404 Monster 65 0 0
+
+action klaus
+  rows Q402_PathToAHumanKnight -
+  state Q402_PathToAHumanKnight -
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=default/30417.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q402_PathToAHumanKnight CREATED
+bypass Quest Q402_PathToAHumanKnight 30417-05.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-05.htm
+  S ActionFailed
+bypass Quest Q402_PathToAHumanKnight 30417-08.htm
+relog
+  state Q402_PathToAHumanKnight -
+action klaus
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=default/30417.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q402_PathToAHumanKnight CREATED

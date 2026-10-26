@@ -1,0 +1,81 @@
+# Test Of Magus (Q228), the trophies one short: a level 39 Human Wizard at cond 5 holds the four
+# charms and each trophy count a single piece short (19 dazzling drops, 4 flame crystals, 39 of
+# the wind trophies, 29 of the earth ones); each elemental tells the traveller to come back with
+# more and takes nothing.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q228_test_of_magus_short_of_items.golden
+character Magus 39
+class 11
+quest Q228_TestOfMagus <state>=STARTED <cond>=5
+hold 2860 1
+hold 2861 1
+hold 2862 1
+hold 2863 1
+hold 2848 19
+hold 2849 4
+hold 2850 19
+hold 2851 10
+hold 2852 10
+hold 2853 9
+hold 2854 10
+hold 2855 10
+script quest.Q228_TestOfMagus
+item 2840 2841 2842 2843 2844 2845 2846 2847 2848 2849 2850 2851 2852 2853 2854 2855 2856 2857 2858 2859 2860 2861 2862 2863 7562
+page default/30409.htm
+page default/30411.htm
+page default/30412.htm
+page default/30413.htm
+page script/quest/Q228_TestOfMagus/
+npc snake 30409 Folk 0 -10 0
+npc salamander 30411 Folk 10 10 0
+npc sylph 30412 Folk -10 10 0
+npc undine 30413 Folk 10 -10 0
+
+action undine
+action undine
+  S ActionFailed
+  S NpcHtmlMessage obj=undine item=0 page=default/30413.htm
+  S ActionFailed
+bypass npc_{undine}_Quest
+  S NpcHtmlMessage obj=undine item=0 page=script/quest/Q228_TestOfMagus/30413-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 2848=19 2862=1 2856=0
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action salamander
+action salamander
+  S ActionFailed
+  S NpcHtmlMessage obj=salamander item=0 page=default/30411.htm
+  S ActionFailed
+bypass npc_{salamander}_Quest
+  S NpcHtmlMessage obj=salamander item=0 page=script/quest/Q228_TestOfMagus/30411-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 2849=4 2860=1 2857=0
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action sylph
+action sylph
+  S ActionFailed
+  S NpcHtmlMessage obj=sylph item=0 page=default/30412.htm
+  S ActionFailed
+bypass npc_{sylph}_Quest
+  S NpcHtmlMessage obj=sylph item=0 page=script/quest/Q228_TestOfMagus/30412-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 2850=19 2861=1 2858=0
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action snake
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q228_TestOfMagus/30409-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 2853=9 2863=1 2859=0
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5

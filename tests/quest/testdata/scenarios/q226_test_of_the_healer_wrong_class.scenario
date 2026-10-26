@@ -1,0 +1,23 @@
+# Test of the Healer (Q226), refused: a level 39 Warrior is turned away by Bandellos (the test is
+# for knights, elven knights, clerics and elven oracles), and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q226_test_of_the_healer_wrong_class.golden
+character Warrior 39
+class 1
+script quest.Q226_TestOfTheHealer
+item 2810 2811 2812 2813 2814 2815 2816 2817 2818 2819 2820 57 7562
+page trainer/30473.htm
+page script/quest/Q226_TestOfTheHealer/
+npc bandellos 30473 Trainer 10 0 0
+
+action bandellos
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+bypass npc_{bandellos}_Quest
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q226_TestOfTheHealer CREATED
+  rows Q226_TestOfTheHealer -

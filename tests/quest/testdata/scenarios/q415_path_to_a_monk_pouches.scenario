@@ -1,0 +1,212 @@
+# Path to a Monk (Q415), bare-handed, the character fills the three leather pouches for Rosheek: the Kasha Bear, the Kasha Blade Spiders and the Scarlet Salamanders. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q415_path_to_a_monk_pouches.golden
+character Fighter 19
+class 44
+quest Q415_PathToAMonk <cond>=1 <state>=STARTED
+hold 1593 1
+script quest.Q415_PathToAMonk
+item 1593 1594 1595 1596 1597 1598 1599 1600 1601 1602 1603 1604 1605 1606 1607 1608 1609 1610 1611 1612 1613 1614 1615 8545 8546
+page default/30587.htm
+page default/30590.htm
+page trainer/30501.htm
+page default/30591.htm
+page default/32056.htm
+page trainer/31979.htm
+page script/quest/Q415_PathToAMonk/
+npc gantaki 30587 Folk 10 0 0
+npc rosheek 30590 Folk -20 0 0
+npc kasman 30501 Trainer 30 0 0
+npc toruku 30591 Folk -40 0 0
+npc aren 32056 Folk 50 0 0
+npc moira 31979 Trainer -60 0 0
+npc fist 20479 Monster 40 0 0
+npc blade 20478 Monster 50 0 0
+npc spider 20476 Monster 60 0 0
+npc salamander 20415 Monster 70 0 0
+npc lizard 20014 Monster 80 0 0
+npc orc 20017 Monster 90 0 0
+npc klizard 20024 Monster 100 0 0
+npc ratman 20359 Monster 110 0 0
+npc baar 21118 Monster 120 0 0
+
+action rosheek
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+bypass npc_{rosheek}_Quest
+  S QuestList 415:0x80000003
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1593
+  S SystemMessage id=54 3:1594
+  S NpcHtmlMessage obj=rosheek item=0 page=script/quest/Q415_PathToAMonk/30590-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 2
+  items 1593=0 1594=1
+  rows Q415_PathToAMonk <cond>=2 <state>=STARTED
+  state Q415_PathToAMonk STARTED
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+bypass npc_{rosheek}_Quest
+  S NpcHtmlMessage obj=rosheek item=0 page=script/quest/Q415_PathToAMonk/30590-02.htm
+  S ActionFailed
+  S ActionFailed
+kill fist x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1600
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1600
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1600
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1600
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1600
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 415:0x80000007
+  S ExShowQuestMark quest=415
+  S SystemMessage id=301 3:1600 6:5
+  S SystemMessage id=302 3:1594
+  S SystemMessage id=54 3:1597
+  Q upsert Q415_PathToAMonk | <cond> | 3
+  items 1594=0 1597=1 1600=0
+  rows Q415_PathToAMonk <cond>=3 <state>=STARTED
+  state Q415_PathToAMonk STARTED
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+bypass npc_{rosheek}_Quest
+  S QuestList 415:0x8000000f
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1597
+  S SystemMessage id=54 3:1595
+  S NpcHtmlMessage obj=rosheek item=0 page=script/quest/Q415_PathToAMonk/30590-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 4
+  items 1595=1 1597=0
+  rows Q415_PathToAMonk <cond>=4 <state>=STARTED
+  state Q415_PathToAMonk STARTED
+kill blade x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1601
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1601
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1601
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1601
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1601
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 415:0x8000001f
+  S ExShowQuestMark quest=415
+  S SystemMessage id=301 3:1601 6:5
+  S SystemMessage id=302 3:1595
+  S SystemMessage id=54 3:1598
+  Q upsert Q415_PathToAMonk | <cond> | 5
+  items 1595=0 1598=1 1601=0
+  rows Q415_PathToAMonk <cond>=5 <state>=STARTED
+  state Q415_PathToAMonk STARTED
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+bypass npc_{rosheek}_Quest
+  S QuestList 415:0x8000003f
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1598
+  S SystemMessage id=54 3:1596
+  S NpcHtmlMessage obj=rosheek item=0 page=script/quest/Q415_PathToAMonk/30590-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 6
+  items 1596=1 1598=0
+  rows Q415_PathToAMonk <cond>=6 <state>=STARTED
+  state Q415_PathToAMonk STARTED
+kill salamander x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1602
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1602
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1602
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1602
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1602
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 415:0x8000007f
+  S ExShowQuestMark quest=415
+  S SystemMessage id=301 3:1602 6:5
+  S SystemMessage id=302 3:1596
+  S SystemMessage id=54 3:1599
+  Q upsert Q415_PathToAMonk | <cond> | 7
+  items 1596=0 1599=1 1602=0
+  rows Q415_PathToAMonk <cond>=7 <state>=STARTED
+  state Q415_PathToAMonk STARTED
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+bypass npc_{rosheek}_Quest
+  S QuestList 415:0x800000ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1599
+  S SystemMessage id=54 3:1603
+  S SystemMessage id=54 3:1604
+  S NpcHtmlMessage obj=rosheek item=0 page=script/quest/Q415_PathToAMonk/30590-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 8
+  items 1599=0 1603=1 1604=1
+  rows Q415_PathToAMonk <cond>=8 <state>=STARTED
+  state Q415_PathToAMonk STARTED
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+action rosheek
+  S ActionFailed
+  S NpcHtmlMessage obj=rosheek item=0 page=default/30590.htm
+  S ActionFailed
+bypass npc_{rosheek}_Quest
+  S NpcHtmlMessage obj=rosheek item=0 page=script/quest/Q415_PathToAMonk/30590-08.htm
+  S ActionFailed
+  S ActionFailed

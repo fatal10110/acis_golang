@@ -1,0 +1,82 @@
+# Electrifying Recharge! (Q367), the broken lamp: a hit that draws 1 breaks the lamp the character holds; a
+# second one does not break it twice; Lorain mends it into the initial lamp, which the next hit charges. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q367_electrifying_recharge_broken.golden
+character Recharge 37
+random 0 1 0 1 0 0
+script quest.Q367_ElectrifyingRecharge
+item 57 4445 4553 4554 4555 4556 4557 4558 4559 4560 4561 4562 4563 4564 5875 5876 5877 5878 5879 5880
+page default/30673.htm
+page script/quest/Q367_ElectrifyingRecharge/
+npc lorain 30673 Folk 10 0 0
+npc catherok 21035 Monster 40 0 0
+
+action lorain
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q367_ElectrifyingRecharge/30673-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q367_ElectrifyingRecharge 30673-03.htm
+  S QuestList 367:0x80000001
+  S ExShowQuestMark quest=367
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:5875
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q367_ElectrifyingRecharge/30673-03.htm
+  S ActionFailed
+  Q upsert Q367_ElectrifyingRecharge | <state> | STARTED
+  Q upsert Q367_ElectrifyingRecharge | <cond> | 1
+  rows Q367_ElectrifyingRecharge <cond>=1 <state>=STARTED
+  items 5875=1
+hit catherok 10
+  S SystemMessage id=302 3:5875
+  S SystemMessage id=54 3:5880
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5875=0 5880=1
+hit catherok 10
+  items 5880=1
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S SystemMessage id=302 3:5880
+  S SystemMessage id=54 3:5875
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q367_ElectrifyingRecharge/30673-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 5880=0 5875=1
+hit catherok 10
+  S SystemMessage id=302 3:5875
+  S SystemMessage id=54 3:5876
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5875=0 5876=1
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q367_ElectrifyingRecharge/30673-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q367_ElectrifyingRecharge 30673-08.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:5876
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q367_ElectrifyingRecharge/30673-08.htm
+  S ActionFailed
+  Q delete-quest Q367_ElectrifyingRecharge
+  state Q367_ElectrifyingRecharge -
+  rows Q367_ElectrifyingRecharge -

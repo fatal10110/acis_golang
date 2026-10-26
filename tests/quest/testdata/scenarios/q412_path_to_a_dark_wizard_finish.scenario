@@ -1,0 +1,60 @@
+# Path to a Dark Wizard (Q412), level 19 with the four seeds: Varika gives the Jewel of Darkness; then relog and the quest starts over, refused for the Jewel. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q412_path_to_a_dark_wizard_finish.golden
+character Fighter 19
+class 38
+quest Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+hold 1253 1
+hold 1254 1
+hold 1255 1
+hold 1256 1
+script quest.Q412_PathToADarkWizard
+item 1253 1254 1255 1256 1257 1258 1259 1260 1261 1277 1278 1279
+page default/30421.htm
+page default/30415.htm
+page default/30418.htm
+page default/30419.htm
+page script/quest/Q412_PathToADarkWizard/
+npc varika 30421 Folk 10 0 0
+npc charkeren 30415 Folk -10 0 0
+npc annika 30418 Folk 20 0 0
+npc arkenia 30419 Folk -20 0 0
+npc remains 20015 Monster 40 0 0
+npc bone1 20022 Monster 45 0 0
+npc bone2 20517 Monster 50 0 0
+npc bone3 20518 Monster 55 0 0
+npc heart 20045 Monster 60 0 0
+
+action varika
+action varika
+  S ActionFailed
+  S NpcHtmlMessage obj=varika item=0 page=default/30421.htm
+  S ActionFailed
+bypass npc_{varika}_Quest
+  S SystemMessage id=302 3:1253
+  S SystemMessage id=302 3:1254
+  S SystemMessage id=302 3:1255
+  S SystemMessage id=302 3:1256
+  S SystemMessage id=54 3:1261
+  S SystemMessage id=95 1:3200 1:1650
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-16.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q412_PathToADarkWizard
+  items 1253=0 1254=0 1255=0 1256=0 1261=1
+  rows Q412_PathToADarkWizard -
+  state Q412_PathToADarkWizard -
+relog
+action varika
+action varika
+  S ActionFailed
+  S NpcHtmlMessage obj=varika item=0 page=default/30421.htm
+  S ActionFailed
+bypass npc_{varika}_Quest
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q412_PathToADarkWizard 30421-05.htm
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-04.htm
+  S ActionFailed

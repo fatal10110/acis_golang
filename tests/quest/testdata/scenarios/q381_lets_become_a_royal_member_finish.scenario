@@ -1,0 +1,50 @@
+# Let's Become a Royal Member! (Q381), level 55 with the album: the character gets the coin of the gargoyle and becomes a member. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q381_lets_become_a_royal_member_finish.golden
+character Royal 55
+quest Q381_LetsBecomeARoyalMember <cond>=1 <state>=STARTED
+hold 5900 1
+random 0
+script quest.Q381_LetsBecomeARoyalMember
+item 3813 5898 5899 5900 7569
+page warehouse/30232.htm
+page merchant/30090.htm
+page script/quest/Q381_LetsBecomeARoyalMember/
+npc sorint 30232 WarehouseKeeper 10 0 0
+npc sandra 30090 Merchant -10 0 0
+npc gargoyle 21018 Monster 40 0 0
+npc vegus 27316 Monster 50 0 0
+
+action sorint
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q381_LetsBecomeARoyalMember/30232-04.htm
+  S ActionFailed
+  S ActionFailed
+kill gargoyle
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5899
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 5899=1
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S SystemMessage id=302 3:5899
+  S SystemMessage id=302 3:5900
+  S SystemMessage id=54 3:5898
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q381_LetsBecomeARoyalMember/30232-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q381_LetsBecomeARoyalMember
+  items 5899=0 5900=0 5898=1
+  state Q381_LetsBecomeARoyalMember -

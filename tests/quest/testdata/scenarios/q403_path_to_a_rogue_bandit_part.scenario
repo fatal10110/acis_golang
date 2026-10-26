@@ -1,0 +1,33 @@
+# Path to a Rogue (Q403), level 19 with the dagger in hand: the Catseye Bandit drops one stolen item, and none the second time it drops the one already held. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q403_path_to_a_rogue_bandit_part.golden
+character Rogue 19
+quest Q403_PathToARogue <cond>=5 <state>=STARTED
+hold 1181 1
+hold 1185 1
+equip 1182
+random 2 2
+script quest.Q403_PathToARogue
+item 1180 1181 1182 1183 1184 1185 1186 1187 1188 1189 1190
+page guard/30379.htm
+page default/30425.htm
+page script/quest/Q403_PathToARogue/
+npc bezique 30379 Guard 10 0 0
+npc neti 30425 Folk -10 0 0
+npc skel 20035 Monster 40 0 0
+npc bandit 27038 Monster 50 0 0
+
+hit bandit 5
+  S NpcSay obj=bandit type=0 npc=1027038 text="You childish fool, do you think you can catch me?"
+  items 1181=1 1182=1 1185=1
+  rows Q403_PathToARogue <cond>=5 <state>=STARTED
+  state Q403_PathToARogue STARTED
+kill bandit
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=bandit type=0 npc=1027038 text="I must do something about this shameful incident..."
+  S SystemMessage id=54 3:1188
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1188=1
+kill bandit
+  S NpcSay obj=bandit type=0 npc=1027038 text="You childish fool, do you think you can catch me?"
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=bandit type=0 npc=1027038 text="I must do something about this shameful incident..."

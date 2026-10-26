@@ -1,0 +1,82 @@
+# Silver Haired Shaman (Q366): a level 48 character accepts at Dieter, kills a Sairon, a doll and a puppet
+# (every roll pinned to succeed), sells the hair and quits; then relog. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q366_silver_haired_shaman.golden
+character Shaman 48
+random always 0
+script quest.Q366_SilverHairedShaman
+item 57 5874
+page trainer/30111.htm
+page script/quest/Q366_SilverHairedShaman/
+npc dieter 30111 Trainer 10 0 0
+npc sairon 20986 Monster 40 0 0
+npc doll 20987 Monster 50 0 0
+npc puppet 20988 Monster 60 0 0
+
+action dieter
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q366_SilverHairedShaman/30111-1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q366_SilverHairedShaman 30111-2.htm
+  S QuestList 366:0x80000001
+  S ExShowQuestMark quest=366
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q366_SilverHairedShaman/30111-2.htm
+  S ActionFailed
+  Q upsert Q366_SilverHairedShaman | <state> | STARTED
+  Q upsert Q366_SilverHairedShaman | <cond> | 1
+  state Q366_SilverHairedShaman STARTED
+  rows Q366_SilverHairedShaman <cond>=1 <state>=STARTED
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q366_SilverHairedShaman/30111-3.htm
+  S ActionFailed
+  S ActionFailed
+kill sairon x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5874
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5874
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5874=2
+kill doll
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5874
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5874=3
+kill puppet
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5874
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5874=4
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S SystemMessage id=301 3:5874 6:4
+  S SystemMessage id=52 6:14070
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q366_SilverHairedShaman/30111-4.htm
+  S ActionFailed
+  S ActionFailed
+  items 5874=0 57=14070
+bypass Quest Q366_SilverHairedShaman 30111-6.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q366_SilverHairedShaman/30111-6.htm
+  S ActionFailed
+  Q delete-quest Q366_SilverHairedShaman
+  state Q366_SilverHairedShaman -
+  rows Q366_SilverHairedShaman -
+relog
+  rows Q366_SilverHairedShaman -
+  items 57=14070

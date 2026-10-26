@@ -9,12 +9,15 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/agitwarrior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/antharas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/benom"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/core"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/drchaos"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/orfen"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/queenant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/sailren"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/sirra"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/zaken"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
@@ -196,6 +199,15 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagic":         warrior.CorpseZombieDDMagic,
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecial": warrior.CorpseZombiePhysicalSpecial,
 
+	// The shooters, the priests and the runner.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRange":                 warrior.PhysicalSpecialShotRange,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotNoRange":               warrior.PhysicalSpecialShotNoRange,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRangeAggressive":       warrior.PhysicalSpecialShotRangeAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRangeDebuffAggressive": warrior.PhysicalSpecialShotRangeDebuffAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPriest.WarriorPriest":                                                     warrior.Priest,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPriest.WarriorPriestAggressive":                                           warrior.PriestAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecial":                     warrior.RunAwayPhysicalSpecial,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                                 monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                   monsterbehavior.WizardBehavior,
@@ -221,11 +233,18 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4":                                                 raid.BossType4,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive":                                raid.BossType4AndreasAggressive,
 	"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5":                                                 raid.BossType5,
+	"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer":                                                        raid.PrivateHealer,
+	"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard":                                                        raid.PrivateWizard,
+	"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold":                                                monster.WarriorDDMagicHold,
+	"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive":         monster.WarriorDDMagicHoldAggressive,
+	"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus":             monster.ValakasPrivateLavasaurus,
 
 	// The grand bosses.
+	"script.ai.boss.antharas.HeartOfWarding":          antharas.HeartOfWarding,
 	"script.ai.boss.benom.Benom":                      benom.Benom,
 	"script.ai.boss.benom.DungeonTeleporter":          benom.DungeonTeleporter,
 	"script.ai.boss.core.Core":                        core.Core,
+	"script.ai.boss.drchaos.DoctorChaosNpc":           drchaos.DoctorChaosNpc,
 	"script.ai.boss.queenant.QueenAnt":                queenant.QueenAnt,
 	"script.ai.boss.queenant.QueenAntPrivateAntLarva": queenant.Larva,
 	"script.ai.boss.queenant.QueenAntPrivateNurseAnt": queenant.Nurse,
@@ -234,6 +253,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.boss.sailren.SailrenDummy":             sailren.SailrenDummy,
 	"script.ai.boss.sailren.StatueOfShilen":           sailren.StatueOfShilen,
 	"script.ai.boss.sirra.FreyaDeacon":                sirra.FreyaDeacon,
+	"script.ai.boss.zaken.Zaken":                      zaken.Zaken,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios

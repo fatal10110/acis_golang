@@ -1,0 +1,59 @@
+# Quest for Fishing Shot (Q426): a character with no state of the quest is offered it by a member of
+# the fishing guild (the state is made as it talks, and written when it accepts), accepts, and is told
+# to hunt; the quest is kept through a relog and offered again by another member of the guild.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q426_quest_for_fishing_shot_accept.golden
+character Hero 20
+script quest.Q426_QuestForFishingShot
+item 7586
+page fisherman/31562.htm
+page fisherman/32007.htm
+page script/quest/Q426_QuestForFishingShot/
+npc klufe 31562 Fisherman 10 0 0
+npc galba 32007 Fisherman 20 0 0
+
+action klufe
+action klufe
+  S ActionFailed
+  S NpcHtmlMessage obj=klufe item=0 page=fisherman/31562.htm
+  S ActionFailed
+bypass npc_{klufe}_Quest
+  S NpcHtmlMessage obj=klufe item=0 page=script/quest/Q426_QuestForFishingShot/01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q426_QuestForFishingShot CREATED
+  rows Q426_QuestForFishingShot -
+bypass Quest Q426_QuestForFishingShot 03.htm
+  S QuestList 426:0x80000001
+  S ExShowQuestMark quest=426
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=klufe item=0 page=script/quest/Q426_QuestForFishingShot/03.htm
+  S ActionFailed
+  Q upsert Q426_QuestForFishingShot | <state> | STARTED
+  Q upsert Q426_QuestForFishingShot | <cond> | 1
+  rows Q426_QuestForFishingShot <cond>=1 <state>=STARTED
+  state Q426_QuestForFishingShot STARTED
+action klufe
+  S ActionFailed
+  S NpcHtmlMessage obj=klufe item=0 page=fisherman/31562.htm
+  S ActionFailed
+action klufe
+  S ActionFailed
+  S NpcHtmlMessage obj=klufe item=0 page=fisherman/31562.htm
+  S ActionFailed
+bypass npc_{klufe}_Quest
+  S NpcHtmlMessage obj=klufe item=0 page=script/quest/Q426_QuestForFishingShot/04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q426_QuestForFishingShot <cond>=1 <state>=STARTED
+  state Q426_QuestForFishingShot STARTED
+action galba
+action galba
+  S ActionFailed
+  S NpcHtmlMessage obj=galba item=0 page=fisherman/32007.htm
+  S ActionFailed
+bypass npc_{galba}_Quest
+  S NpcHtmlMessage obj=galba item=0 page=script/quest/Q426_QuestForFishingShot/04.htm
+  S ActionFailed
+  S ActionFailed

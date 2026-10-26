@@ -32,7 +32,53 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q356"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q357"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q358"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q359"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q362"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q363"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q364"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q366"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q367"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q368"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q369"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q370"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q371"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q372"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q373"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q374"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q375"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q376"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q377"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q378"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q379"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q380"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q381"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q382"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q383"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q384"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q385"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q386"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q401"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q402"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q403"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q404"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q405"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q406"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q407"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q408"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q410"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q411"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q412"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q413"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q415"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q418"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q419"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q426"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q431"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q432"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q603"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
 
@@ -74,63 +120,63 @@ func quests301Up() script.Catalog {
 		"quest.Q356_DigUpTheSeaOfSpores":               q356.New,
 		"quest.Q357_WarehouseKeepersAmbition":          q357.New,
 		"quest.Q358_IllegitimateChildOfAGoddess":       q358.New,
-		"quest.Q359_ForSleeplessDeadmen":               nil,
-		"quest.Q362_BardsMandolin":                     nil,
-		"quest.Q363_SorrowfulSoundOfFlute":             nil,
-		"quest.Q364_JovialAccordion":                   nil,
+		"quest.Q359_ForSleeplessDeadmen":               q359.New,
+		"quest.Q362_BardsMandolin":                     q362.New,
+		"quest.Q363_SorrowfulSoundOfFlute":             q363.New,
+		"quest.Q364_JovialAccordion":                   q364.New,
 		"quest.Q365_DevilsLegacy":                      nil,
-		"quest.Q366_SilverHairedShaman":                nil,
-		"quest.Q367_ElectrifyingRecharge":              nil,
-		"quest.Q368_TrespassingIntoTheSacredArea":      nil,
-		"quest.Q369_CollectorOfJewels":                 nil,
-		"quest.Q370_AnElderSowsSeeds":                  nil,
-		"quest.Q371_ShriekOfGhosts":                    nil,
-		"quest.Q372_LegacyOfInsolence":                 nil,
-		"quest.Q373_SupplierOfReagents":                nil,
-		"quest.Q374_WhisperOfDreams_Part1":             nil,
-		"quest.Q375_WhisperOfDreams_Part2":             nil,
-		"quest.Q376_ExplorationOfTheGiantsCave_Part1":  nil,
-		"quest.Q377_ExplorationOfTheGiantsCave_Part2":  nil,
-		"quest.Q378_MagnificentFeast":                  nil,
-		"quest.Q379_FantasyWine":                       nil,
-		"quest.Q380_BringOutTheFlavorOfIngredients":    nil,
-		"quest.Q381_LetsBecomeARoyalMember":            nil,
-		"quest.Q382_KailsMagicCoin":                    nil,
-		"quest.Q383_SearchingForTreasure":              nil,
-		"quest.Q384_WarehouseKeepersPastime":           nil,
-		"quest.Q385_YokeOfThePast":                     nil,
-		"quest.Q386_StolenDignity":                     nil,
-		"quest.Q401_PathToAWarrior":                    nil,
-		"quest.Q402_PathToAHumanKnight":                nil,
-		"quest.Q403_PathToARogue":                      nil,
-		"quest.Q404_PathToAHumanWizard":                nil,
-		"quest.Q405_PathToACleric":                     nil,
-		"quest.Q406_PathToAnElvenKnight":               nil,
-		"quest.Q407_PathToAnElvenScout":                nil,
-		"quest.Q408_PathToAnElvenWizard":               nil,
+		"quest.Q366_SilverHairedShaman":                q366.New,
+		"quest.Q367_ElectrifyingRecharge":              q367.New,
+		"quest.Q368_TrespassingIntoTheSacredArea":      q368.New,
+		"quest.Q369_CollectorOfJewels":                 q369.New,
+		"quest.Q370_AnElderSowsSeeds":                  q370.New,
+		"quest.Q371_ShriekOfGhosts":                    q371.New,
+		"quest.Q372_LegacyOfInsolence":                 q372.New,
+		"quest.Q373_SupplierOfReagents":                q373.New,
+		"quest.Q374_WhisperOfDreams_Part1":             q374.New,
+		"quest.Q375_WhisperOfDreams_Part2":             q375.New,
+		"quest.Q376_ExplorationOfTheGiantsCave_Part1":  q376.New,
+		"quest.Q377_ExplorationOfTheGiantsCave_Part2":  q377.New,
+		"quest.Q378_MagnificentFeast":                  q378.New,
+		"quest.Q379_FantasyWine":                       q379.New,
+		"quest.Q380_BringOutTheFlavorOfIngredients":    q380.New,
+		"quest.Q381_LetsBecomeARoyalMember":            q381.New,
+		"quest.Q382_KailsMagicCoin":                    q382.New,
+		"quest.Q383_SearchingForTreasure":              q383.New,
+		"quest.Q384_WarehouseKeepersPastime":           q384.New,
+		"quest.Q385_YokeOfThePast":                     q385.New,
+		"quest.Q386_StolenDignity":                     q386.New,
+		"quest.Q401_PathToAWarrior":                    q401.New,
+		"quest.Q402_PathToAHumanKnight":                q402.New,
+		"quest.Q403_PathToARogue":                      q403.New,
+		"quest.Q404_PathToAHumanWizard":                q404.New,
+		"quest.Q405_PathToACleric":                     q405.New,
+		"quest.Q406_PathToAnElvenKnight":               q406.New,
+		"quest.Q407_PathToAnElvenScout":                q407.New,
+		"quest.Q408_PathToAnElvenWizard":               q408.New,
 		"quest.Q409_PathToAnElvenOracle":               nil,
-		"quest.Q410_PathToAPalusKnight":                nil,
-		"quest.Q411_PathToAnAssassin":                  nil,
-		"quest.Q412_PathToADarkWizard":                 nil,
-		"quest.Q413_PathToAShillienOracle":             nil,
+		"quest.Q410_PathToAPalusKnight":                q410.New,
+		"quest.Q411_PathToAnAssassin":                  q411.New,
+		"quest.Q412_PathToADarkWizard":                 q412.New,
+		"quest.Q413_PathToAShillienOracle":             q413.New,
 		"quest.Q414_PathToAnOrcRaider":                 nil,
-		"quest.Q415_PathToAMonk":                       nil,
+		"quest.Q415_PathToAMonk":                       q415.New,
 		"quest.Q416_PathToAnOrcShaman":                 nil,
 		"quest.Q417_PathToBecomeAScavenger":            nil,
-		"quest.Q418_PathToAnArtisan":                   nil,
-		"quest.Q419_GetAPet":                           nil,
+		"quest.Q418_PathToAnArtisan":                   q418.New,
+		"quest.Q419_GetAPet":                           q419.New,
 		"quest.Q420_LittleWing":                        nil,
 		"quest.Q421_LittleWingsBigAdventure":           nil,
-		"quest.Q426_QuestForFishingShot":               nil,
-		"quest.Q431_WeddingMarch":                      nil,
-		"quest.Q432_BirthdayPartySong":                 nil,
+		"quest.Q426_QuestForFishingShot":               q426.New,
+		"quest.Q431_WeddingMarch":                      q431.New,
+		"quest.Q432_BirthdayPartySong":                 q432.New,
 		"quest.Q501_ProofOfClanAlliance":               nil,
 		"quest.Q503_PursuitOfClanAmbition":             nil,
 		"quest.Q504_CompetitionForTheBanditStronghold": q504.New,
 		"quest.Q509_TheClansPrestige":                  nil,
-		"quest.Q601_WatchingEyes":                      nil,
-		"quest.Q602_ShadowOfLight":                     nil,
-		"quest.Q603_DaimonTheWhiteEyed_Part1":          nil,
+		"quest.Q601_WatchingEyes":                      q601.New,
+		"quest.Q602_ShadowOfLight":                     q602.New,
+		"quest.Q603_DaimonTheWhiteEyed_Part1":          q603.New,
 		"quest.Q604_DaimonTheWhiteEyed_Part2":          nil,
 		"quest.Q605_AllianceWithKetraOrcs":             nil,
 		"quest.Q606_WarWithVarkaSilenos":               nil,

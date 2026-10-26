@@ -24,5 +24,5 @@ func HoldHooks() script.Hooks {
 				n.AddDoNothingDesire(40, 30)
 			}
 		},
-	})
+	}).Named("WarriorHold")
 }

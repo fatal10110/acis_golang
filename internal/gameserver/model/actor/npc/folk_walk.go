@@ -233,13 +233,16 @@ func (m *folkMotion) AddGeoPathFailCount() {
 // re-enters the world grid there, and its failed-pathfinding streak clears.
 // A teleport that starts while another is under way is dropped.
 func (m *folkMotion) TeleportTo(target location.Location) {
+	m.teleport(location.Jump{To: target})
+}
+
+// teleport is TeleportTo aimed where j lands (move.Land).
+func (m *folkMotion) teleport(j location.Jump) {
 	if !m.teleporting.CompareAndSwap(false, true) {
 		return
 	}
 	m.ctl.Stop()
-	if m.cfg.InWater == nil || !m.cfg.InWater(target) {
-		target.Z = int(m.move.Height(target.X, target.Y, target.Z))
-	}
+	target := move.Land(m.move, j, m.cfg.InWater)
 	m.emit(event.Teleported{To: target})
 	// The NPC leaves the zones around its old position while its observers
 	// there still know it, and enters those at target once it has landed.

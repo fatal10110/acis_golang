@@ -42,7 +42,9 @@ var chain = []struct {
 	{"script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType5", BossType5},
 	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateArcher", PrivateArcher},
 	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateFighter", PrivateFighter},
+	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer", PrivateHealer},
 	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard", PrivateStandard},
+	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard", PrivateWizard},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -175,8 +177,9 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	// DrChaosGiganticGolem, FreyaRoyalGuard, RaidBossType2, Gordon (7 events on 29095),
 	// IceFairySirra (9 events on 29056), RaidBossType3 (29096 aside), RaidBossType3AnaisAggressive
 	// (9 events on 29096), RaidBossType4 (29062 aside), RaidBossType4AndreasAggressive
-	// (11 events on 29062), RaidBossType5, RaidPrivateArcher and RaidPrivateFighter.
-	if wantFolds, got := 95*6+38*4+6+(4*6+6)+7+7+6+34*6+7+9+30*6+9+44*6+11+54*6+30*7+101*6, len(want.folds); got != wantFolds {
+	// (11 events on 29062), RaidBossType5, RaidPrivateArcher, RaidPrivateFighter,
+	// RaidPrivateHealer (8 events on 48 ids) and RaidPrivateWizard (7 events on 54 ids).
+	if wantFolds, got := 95*6+38*4+6+(4*6+6)+7+7+6+34*6+7+9+30*6+9+44*6+11+54*6+30*7+101*6+48*8+54*7, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {

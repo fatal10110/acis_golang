@@ -52,13 +52,13 @@ func kinds(ks ...NPCKind) kindSet {
 // Until then no script subscribing to it registers, so no script waits on a
 // hook that never fires.
 var raisedHooks = map[hook]kindSet{
-	// The attacks and deaths (attacked.go, clan.go). A civilian NPC can
-	// be in a party, but no script binds a party hook to one, so none is
-	// raised on it.
+	// The attacks and deaths (attacked.go, clan.go). A civilian NPC's
+	// party hears its death, but no script binds the party-attacked hook
+	// to a civilian NPC, so that one is not raised on it.
 	hookAttacked:      kinds(KindFolk, KindHostile),
 	hookPartyAttacked: kinds(KindHostile),
 	hookClanAttacked:  kinds(KindFolk, KindHostile),
-	hookPartyDied:     kinds(KindHostile),
+	hookPartyDied:     kinds(KindFolk, KindHostile),
 	hookClanDied:      kinds(KindFolk, KindHostile),
 	// The spawner and the NPC's death and decay (lifecycle.go).
 	hookCreated: kinds(KindFolk, KindHostile),

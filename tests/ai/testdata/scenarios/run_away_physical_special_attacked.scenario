@@ -1,0 +1,17 @@
+# WarriorRunAwayPhysicalSpecial (21508, its shipped skill), every draw 0, 100 away from the character,
+# its spawn naming no flee point. The hit that makes the character its most hated wants no physical
+# special; the second, by its most hated, wants its physical special (4643) on the character, weight
+# 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecial
+npc stakato 21508 Monster 100 0 0 skill PHYSICAL_SPECIAL 4643 6
+
+hit stakato 22
+  desires stakato attack(player)=275
+hit stakato 22
+  desires stakato attack(player)=550 cast(player,4643,move)=1000000

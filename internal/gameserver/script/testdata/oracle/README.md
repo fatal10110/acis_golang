@@ -197,7 +197,14 @@ workspace no variable is needed. The script builds the probe, runs it, copies th
 `.golden` files here, the scenario traces to `scenarios/` (replacing the directory) and the
 contract goldens to `internal/testsupport/scriptcontract/testdata/`; it needs Docker and nothing
 else; it reads the scenario files from `tests/quest/testdata/scenarios`. `PROBE_LOG=<file>` keeps the
-reference server's log. Build and run together take under half a minute.
+reference server's log.
+
+A full run plays every scenario with the reference's real bypass throttle, so it takes several
+minutes. `PROBE_ONLY=<globs>` (comma-separated file-name globs, for example
+`PROBE_ONLY='q359_*,q362_*'`) plays only the matching scenarios and replaces only their traces;
+the other goldens are regenerated as in a full run. Because a trace depends on its scenario alone,
+a subset run writes the same bytes a full run would. It never removes the trace of a deleted or
+renamed scenario: run without `PROBE_ONLY` for that.
 
 Committed outputs were generated from the reference at workspace commit
 `55ff8a4ec7e186d9816cd549246b4cf1f59c9f12` (the last change to `aCis_gameserver/java` and
