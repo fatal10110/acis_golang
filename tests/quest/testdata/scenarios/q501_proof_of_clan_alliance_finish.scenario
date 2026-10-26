@@ -1,0 +1,38 @@
+# Proof Of Clan Alliance (Q501): the leader hands the Voucher of Faith to Sir Kristof Rodemai for the Alliance Manifesto and
+# 120000 SP. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q501_proof_of_clan_alliance_finish.golden
+character Leader 40
+clan 3
+quest Q501_ProofOfClanAlliance <cond>=4 <state>=STARTED
+random always 0
+hold 3873 1
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page default/30757.htm
+page default/30759.htm
+page default/30758.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+npc statue 30757 Folk 20 0 0
+npc kalis 30759 Folk 30 0 0
+npc athrea 30758 Folk 40 0 0
+
+action kristof
+action kristof
+  S ActionFailed
+  S NpcHtmlMessage obj=kristof item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{kristof}_Quest
+  S SystemMessage id=331 1:120000
+  S SystemMessage id=302 3:3873
+  S SystemMessage id=54 3:3874
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kristof item=0 page=script/quest/Q501_ProofOfClanAlliance/30756-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q501_ProofOfClanAlliance
+  items 3873=0 3874=1
+  state Q501_ProofOfClanAlliance -
+  rows Q501_ProofOfClanAlliance -

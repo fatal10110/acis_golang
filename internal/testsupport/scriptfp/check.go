@@ -124,7 +124,7 @@ func check(ref map[string]Fingerprint, amap map[string]string, dir string, class
 		}
 		mappedHere := false
 		for r := range calls {
-			mappedHere = mappedHere || amap[r] == goName
+			mappedHere = mappedHere || sharesCall(amap[r], goName)
 		}
 		if !mappedHere {
 			add("call "+row, fmt.Sprintf("is not in the reference but the Go package calls %s", goName))
@@ -173,6 +173,21 @@ func callsAny(calls map[string]int, goNames string) bool {
 	for name := range strings.SplitSeq(goNames, ",") {
 		if calls[lastSegment(name)] > 0 {
 			return true
+		}
+	}
+	return false
+}
+
+// sharesCall reports whether the apimap.txt values a and b list a Go name
+// with the same last segment, the way callsAny matches calls. A helper call
+// and a call of an engine type's method that share that name are one call
+// to the scan.
+func sharesCall(a, b string) bool {
+	for x := range strings.SplitSeq(a, ",") {
+		for y := range strings.SplitSeq(b, ",") {
+			if lastSegment(x) == lastSegment(y) {
+				return true
+			}
 		}
 	}
 	return false

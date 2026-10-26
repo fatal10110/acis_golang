@@ -258,3 +258,18 @@ func TestParseAPIMapRejectsMalformedLines(t *testing.T) {
 		t.Errorf("parseAPIMap = %v, want %v", got, want)
 	}
 }
+
+func TestSharesCallMatchesTheLastSegment(t *testing.T) {
+	for _, tc := range []struct {
+		a, b string
+		want bool
+	}{
+		{"script.Player.PartyMembers", "script.Script.PartyMembers", true},
+		{"script.InRadius3D,script.Script.InPartyRange", "script.Script.InPartyRange", true},
+		{"script.GiveItems", "script.TakeItems", false},
+	} {
+		if got := sharesCall(tc.a, tc.b); got != tc.want {
+			t.Errorf("sharesCall(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
