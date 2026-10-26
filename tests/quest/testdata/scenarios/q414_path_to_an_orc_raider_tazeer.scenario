@@ -1,0 +1,125 @@
+# Path To An Orc Raider (Q414), the second report goes to Tazeer; the Timora Orc drops its head and Tazeer rewards. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q414_path_to_an_orc_raider_tazeer.golden
+character Fighter 19
+class 44
+quest Q414_PathToAnOrcRaider <cond>=2 <state>=STARTED
+hold 1579 1
+hold 1580 10
+random always 0
+script quest.Q414_PathToAnOrcRaider
+item 1578 1579 1580 1589 1590 1591 1592 8544
+page trainer/30570.htm
+page trainer/30501.htm
+page trainer/31978.htm
+page script/quest/Q414_PathToAnOrcRaider/
+npc karukia 30570 Trainer 10 0 0
+npc kasman 30501 Trainer -20 0 0
+npc tazeer 31978 Trainer 30 0 0
+npc raider 20320 Monster -40 0 0
+npc ratman 27045 Monster 50 0 0
+npc umbar 27054 Monster -60 0 0
+npc timora 27320 Monster 70 0 0
+
+action karukia
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+bypass npc_{karukia}_Quest
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q414_PathToAnOrcRaider 30570-07b.htm
+  S QuestList 414:0x80000013
+  S ExShowQuestMark quest=414
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1579
+  S SystemMessage id=301 3:1580 6:10
+  S SystemMessage id=54 3:1590
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-07b.htm
+  S ActionFailed
+  Q upsert Q414_PathToAnOrcRaider | <flags> | -2147483629
+  Q upsert Q414_PathToAnOrcRaider | <cond> | 5
+  items 1579=0 1580=0 1590=1
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=5 <flags>=-2147483629 <state>=STARTED
+action tazeer
+action tazeer
+  S ActionFailed
+  S NpcHtmlMessage obj=tazeer item=0 page=trainer/31978.htm
+  S ActionFailed
+bypass npc_{tazeer}_Quest
+  S NpcHtmlMessage obj=tazeer item=0 page=script/quest/Q414_PathToAnOrcRaider/31978-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q414_PathToAnOrcRaider 31978-02.htm
+  S NpcHtmlMessage obj=tazeer item=0 page=script/quest/Q414_PathToAnOrcRaider/31978-02.htm
+  S ActionFailed
+bypass Quest Q414_PathToAnOrcRaider 31978-03.htm
+  S QuestList 414:0x80000033
+  S ExShowQuestMark quest=414
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tazeer item=0 page=script/quest/Q414_PathToAnOrcRaider/31978-03.htm
+  S ActionFailed
+  Q upsert Q414_PathToAnOrcRaider | <flags> | -2147483597
+  Q upsert Q414_PathToAnOrcRaider | <cond> | 6
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=6 <flags>=-2147483597 <state>=STARTED
+action tazeer
+  S ActionFailed
+  S NpcHtmlMessage obj=tazeer item=0 page=trainer/31978.htm
+  S ActionFailed
+action tazeer
+  S ActionFailed
+  S NpcHtmlMessage obj=tazeer item=0 page=trainer/31978.htm
+  S ActionFailed
+bypass npc_{tazeer}_Quest
+  S NpcHtmlMessage obj=tazeer item=0 page=script/quest/Q414_PathToAnOrcRaider/31978-04.htm
+  S ActionFailed
+  S ActionFailed
+kill timora
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8544
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 414:0x80000073
+  S ExShowQuestMark quest=414
+  Q upsert Q414_PathToAnOrcRaider | <flags> | -2147483533
+  Q upsert Q414_PathToAnOrcRaider | <cond> | 7
+  items 8544=1
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=7 <flags>=-2147483533 <state>=STARTED
+action tazeer
+  S ActionFailed
+  S NpcHtmlMessage obj=tazeer item=0 page=trainer/31978.htm
+  S ActionFailed
+action tazeer
+  S ActionFailed
+  S NpcHtmlMessage obj=tazeer item=0 page=trainer/31978.htm
+  S ActionFailed
+bypass npc_{tazeer}_Quest
+  S SystemMessage id=302 3:1590
+  S SystemMessage id=302 3:8544
+  S SystemMessage id=54 3:1592
+  S SystemMessage id=95 1:3200 1:2360
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=tazeer item=0 page=script/quest/Q414_PathToAnOrcRaider/31978-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q414_PathToAnOrcRaider
+  items 1590=0 1592=1 8544=0
+  state Q414_PathToAnOrcRaider -
+  rows Q414_PathToAnOrcRaider -
+relog
+  items 1579=0 1580=0 1590=0 1592=1 8544=0
+  state Q414_PathToAnOrcRaider -
+  rows Q414_PathToAnOrcRaider -
+action tazeer
+action tazeer
+  S ActionFailed
+  S NpcHtmlMessage obj=tazeer item=0 page=trainer/31978.htm
+  S ActionFailed
+bypass npc_{tazeer}_Quest
+  S NpcHtmlMessage obj=tazeer item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,53 @@
+# Path To An Orc Raider (Q414), a level 19 orc fighter accepts at Karukia and gets the map; relog, and Karukia asks for the goblin dwelling. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q414_path_to_an_orc_raider_accept.golden
+character Fighter 19
+class 44
+script quest.Q414_PathToAnOrcRaider
+item 1578 1579 1580 1589 1590 1591 1592 8544
+page trainer/30570.htm
+page trainer/30501.htm
+page trainer/31978.htm
+page script/quest/Q414_PathToAnOrcRaider/
+npc karukia 30570 Trainer 10 0 0
+npc kasman 30501 Trainer -20 0 0
+npc tazeer 31978 Trainer 30 0 0
+npc raider 20320 Monster -40 0 0
+npc ratman 27045 Monster 50 0 0
+npc umbar 27054 Monster -60 0 0
+npc timora 27320 Monster 70 0 0
+
+action karukia
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+bypass npc_{karukia}_Quest
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q414_PathToAnOrcRaider 30570-05.htm
+  S QuestList 414:0x80000001
+  S ExShowQuestMark quest=414
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1579
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-05.htm
+  S ActionFailed
+  Q upsert Q414_PathToAnOrcRaider | <state> | STARTED
+  Q upsert Q414_PathToAnOrcRaider | <cond> | 1
+  items 1579=1
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=1 <state>=STARTED
+bypass Quest Q414_PathToAnOrcRaider 30570-06.htm
+relog
+  items 1579=1
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=1 <state>=STARTED
+action karukia
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+bypass npc_{karukia}_Quest
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-06.htm
+  S ActionFailed
+  S ActionFailed

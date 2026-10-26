@@ -1,0 +1,306 @@
+# Path To An Orc Shaman (Q416), the claw goes to the second path: Moira, Gandi and the Black Leopard that dies three times; Moira rewards. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q416_path_to_an_orc_shaman_gandi.golden
+character Mystic 19
+class 49
+quest Q416_PathToAnOrcShaman <cond>=4 <state>=STARTED
+hold 1622 1
+random 0 2
+script quest.Q416_PathToAnOrcShaman
+item 1616 1617 1618 1619 1620 1621 1622 1623 1624 1625 1626 1627 1628 1629 1630 1631
+page default/30585.htm
+page trainer/30502.htm
+page default/30592.htm
+page default/30593.htm
+page trainer/31979.htm
+page default/32057.htm
+page default/32090.htm
+page script/quest/Q416_PathToAnOrcShaman/
+npc tataru 30585 Folk 10 0 0
+npc umos 30502 Trainer -20 0 0
+npc hestui 30592 Folk 30 0 0
+npc duda 30593 Folk -40 0 0
+npc moira 31979 Trainer 50 0 0
+npc gandi 32057 Folk -60 0 0
+npc carcass 32090 Folk 70 0 0
+npc spider 20038 Monster -80 0 0
+npc tracker 20043 Monster 90 0 0
+npc grizzly 20335 Monster -100 0 0
+npc salamander 20415 Monster 110 0 0
+npc blade 20478 Monster -120 0 0
+npc bear 20479 Monster 130 0 0
+npc durka 27056 Monster -140 0 0
+npc leopard 27319 Monster 150 0 0
+
+action tataru
+action tataru
+  S ActionFailed
+  S NpcHtmlMessage obj=tataru item=0 page=default/30585.htm
+  S ActionFailed
+bypass npc_{tataru}_Quest
+  S NpcHtmlMessage obj=tataru item=0 page=script/quest/Q416_PathToAnOrcShaman/30585-10.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q416_PathToAnOrcShaman 30585-11a.htm
+  S NpcHtmlMessage obj=tataru item=0 page=script/quest/Q416_PathToAnOrcShaman/30585-11a.htm
+  S ActionFailed
+bypass Quest Q416_PathToAnOrcShaman 30585-11c.htm
+  S QuestList 416:0x8000080f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1622
+  S NpcHtmlMessage obj=tataru item=0 page=script/quest/Q416_PathToAnOrcShaman/30585-11c.htm
+  S ActionFailed
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2147481585
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 12
+  items 1622=0
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=12 <flags>=-2147481585 <state>=STARTED
+action tataru
+  S ActionFailed
+  S NpcHtmlMessage obj=tataru item=0 page=default/30585.htm
+  S ActionFailed
+action tataru
+  S ActionFailed
+  S NpcHtmlMessage obj=tataru item=0 page=default/30585.htm
+  S ActionFailed
+bypass npc_{tataru}_Quest
+  S NpcHtmlMessage obj=tataru item=0 page=script/quest/Q416_PathToAnOrcShaman/30585-11c.htm
+  S ActionFailed
+  S ActionFailed
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S QuestList 416:0x8000180f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q416_PathToAnOrcShaman/31979-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2147477489
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 13
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=13 <flags>=-2147477489 <state>=STARTED
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q416_PathToAnOrcShaman/31979-02.htm
+  S ActionFailed
+  S ActionFailed
+action gandi
+action gandi
+  S ActionFailed
+  S NpcHtmlMessage obj=gandi item=0 page=default/32057.htm
+  S ActionFailed
+bypass npc_{gandi}_Quest
+  S NpcHtmlMessage obj=gandi item=0 page=script/quest/Q416_PathToAnOrcShaman/32057-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q416_PathToAnOrcShaman 32057-02.htm
+  S QuestList 416:0x8000380f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gandi item=0 page=script/quest/Q416_PathToAnOrcShaman/32057-02.htm
+  S ActionFailed
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2147469297
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 14
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=14 <flags>=-2147469297 <state>=STARTED
+action gandi
+  S ActionFailed
+  S NpcHtmlMessage obj=gandi item=0 page=default/32057.htm
+  S ActionFailed
+action gandi
+  S ActionFailed
+  S NpcHtmlMessage obj=gandi item=0 page=default/32057.htm
+  S ActionFailed
+bypass npc_{gandi}_Quest
+  S NpcHtmlMessage obj=gandi item=0 page=script/quest/Q416_PathToAnOrcShaman/32057-03.htm
+  S ActionFailed
+  S ActionFailed
+action carcass
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+bypass npc_{carcass}_Quest
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-01a.htm
+  S ActionFailed
+  S ActionFailed
+kill leopard
+  S SystemMessage id=95 1:0 1:0
+  Q upsert Q416_PathToAnOrcShaman | leopard | 1
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=14 <flags>=-2147469297 <state>=STARTED leopard=1
+kill leopard
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 416:0x8000780f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=leopard type=0 npc=1027319 text="My dear friend of Mystic, who has gone on ahead of me!"
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2147452913
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 15
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=15 <flags>=-2147452913 <state>=STARTED leopard=1
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+bypass npc_{carcass}_Quest
+  S QuestList 416:0x8000f80f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2147420145
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 16
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=16 <flags>=-2147420145 <state>=STARTED leopard=1
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+bypass npc_{carcass}_Quest
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-01b.htm
+  S ActionFailed
+  S ActionFailed
+kill leopard
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 416:0x8001f80f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2147354609
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 17
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=17 <flags>=-2147354609 <state>=STARTED leopard=1
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+bypass npc_{carcass}_Quest
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q416_PathToAnOrcShaman 32090-03.htm
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-03.htm
+  S ActionFailed
+bypass Quest Q416_PathToAnOrcShaman 32090-04.htm
+  S QuestList 416:0x8003f80f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-04.htm
+  S ActionFailed
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2147223537
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 18
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=18 <flags>=-2147223537 <state>=STARTED leopard=1
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+bypass npc_{carcass}_Quest
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-05.htm
+  S ActionFailed
+  S ActionFailed
+kill leopard
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 416:0x8007f80f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2146961393
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 19
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=19 <flags>=-2146961393 <state>=STARTED leopard=1
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+action carcass
+  S ActionFailed
+  S NpcHtmlMessage obj=carcass item=0 page=default/32090.htm
+  S ActionFailed
+bypass npc_{carcass}_Quest
+  S QuestList 416:0x800ff80f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=carcass item=0 page=script/quest/Q416_PathToAnOrcShaman/32090-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2146437105
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 20
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=20 <flags>=-2146437105 <state>=STARTED leopard=1
+action gandi
+action gandi
+  S ActionFailed
+  S NpcHtmlMessage obj=gandi item=0 page=default/32057.htm
+  S ActionFailed
+bypass npc_{gandi}_Quest
+  S NpcHtmlMessage obj=gandi item=0 page=script/quest/Q416_PathToAnOrcShaman/32057-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q416_PathToAnOrcShaman 32057-05.htm
+  S QuestList 416:0x801ff80f
+  S ExShowQuestMark quest=416
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gandi item=0 page=script/quest/Q416_PathToAnOrcShaman/32057-05.htm
+  S ActionFailed
+  Q upsert Q416_PathToAnOrcShaman | <flags> | -2145388529
+  Q upsert Q416_PathToAnOrcShaman | <cond> | 21
+  state Q416_PathToAnOrcShaman STARTED
+  rows Q416_PathToAnOrcShaman <cond>=21 <flags>=-2145388529 <state>=STARTED leopard=1
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S SystemMessage id=54 3:1631
+  S SystemMessage id=95 1:3200 1:3250
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q416_PathToAnOrcShaman/31979-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q416_PathToAnOrcShaman
+  items 1631=1
+  state Q416_PathToAnOrcShaman -
+  rows Q416_PathToAnOrcShaman -
+relog
+  items 1622=0 1631=1
+  state Q416_PathToAnOrcShaman -
+  rows Q416_PathToAnOrcShaman -
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
