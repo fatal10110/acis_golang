@@ -1,0 +1,44 @@
+# Defeat the Elrokian Raiders! (Q688): a level 75 character reads Dinn's request, accepts, finds no necklace on a later visit and keeps the quest through a relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q688_defeat_the_elrokian_raiders_accept.golden
+character Hero 75
+script quest.Q688_DefeatTheElrokianRaiders
+item 8785 57
+page merchant/32105.htm
+page script/quest/Q688_DefeatTheElrokianRaiders/
+npc dinn 32105 Merchant 10 0 0
+npc elroki 22214 Monster 40 0 0
+
+action dinn
+action dinn
+  S ActionFailed
+  S NpcHtmlMessage obj=dinn item=0 page=merchant/32105.htm
+  S ActionFailed
+bypass npc_{dinn}_Quest
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q688_DefeatTheElrokianRaiders 32105-02.htm
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-02.htm
+  S ActionFailed
+bypass Quest Q688_DefeatTheElrokianRaiders 32105-03.htm
+  S QuestList 688:0x80000001
+  S ExShowQuestMark quest=688
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-03.htm
+  S ActionFailed
+  Q upsert Q688_DefeatTheElrokianRaiders | <state> | STARTED
+  Q upsert Q688_DefeatTheElrokianRaiders | <cond> | 1
+  rows Q688_DefeatTheElrokianRaiders <cond>=1 <state>=STARTED
+  state Q688_DefeatTheElrokianRaiders STARTED
+action dinn
+  S ActionFailed
+  S NpcHtmlMessage obj=dinn item=0 page=merchant/32105.htm
+  S ActionFailed
+bypass npc_{dinn}_Quest
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q688_DefeatTheElrokianRaiders <cond>=1 <state>=STARTED
+  state Q688_DefeatTheElrokianRaiders STARTED

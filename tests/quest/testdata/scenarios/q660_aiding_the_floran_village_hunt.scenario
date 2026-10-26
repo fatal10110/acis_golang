@@ -1,0 +1,58 @@
+# Aiding the Floran Village (Q660): each monster's item drops to the party member picked (draw 0 of 1) for a roll under its chance (watchman and seer 790000, golem 750000, the lizardmen 670000): the first roll misses.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q660_aiding_the_floran_village_hunt.golden
+character Hero 30
+quest Q660_AidingTheFloranVillage <cond>=2 <state>=STARTED
+random 0 790000 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+script quest.Q660_AidingTheFloranVillage
+item 8074 8075 8076 57 955 956
+page default/30608.htm
+page guard/30291.htm
+page script/quest/Q660_AidingTheFloranVillage/
+npc maria 30608 Folk 10 0 0
+npc alex 30291 Guard -10 0 0
+npc watchman 21102 Monster 40 0 0
+npc golem 21103 Monster 50 0 0
+npc supplier 21104 Monster 60 0 0
+npc agent 21105 Monster 70 0 0
+npc seer 21106 Monster 80 0 0
+npc commander 21107 Monster 90 0 0
+npc shaman 20781 Monster 100 0 0
+
+kill watchman
+  S SystemMessage id=95 1:0 1:0
+kill watchman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8074
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8074=1
+kill golem
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8075
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8075=1
+kill supplier
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8076
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8076=1
+kill agent
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8076
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8076=2
+kill seer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8074
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8074=2
+kill commander
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8076
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8076=3
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8076
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8076=4
