@@ -1,0 +1,26 @@
+# Wild Maiden (Q653): without the scroll the character is sent away and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q653_wild_maiden_no_scroll.golden
+character Recruit 36
+script quest.Q653_WildMaiden
+item 736 57
+page default/32013.htm
+page script/quest/Q653_WildMaiden/
+npc suki 32013 Folk 10 0 0
+
+action suki
+action suki
+  S ActionFailed
+  S NpcHtmlMessage obj=suki item=0 page=default/32013.htm
+  S ActionFailed
+bypass npc_{suki}_Quest
+  S NpcHtmlMessage obj=suki item=0 page=script/quest/Q653_WildMaiden/32013-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q653_WildMaiden 32013-03.htm
+  S NpcHtmlMessage obj=suki item=0 page=script/quest/Q653_WildMaiden/32013-03a.htm
+  S ActionFailed
+  state Q653_WildMaiden CREATED
+  rows Q653_WildMaiden -
+relog
+  rows Q653_WildMaiden -

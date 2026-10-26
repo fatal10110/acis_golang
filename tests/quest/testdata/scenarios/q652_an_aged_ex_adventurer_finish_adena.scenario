@@ -1,0 +1,28 @@
+# An Aged Ex-Adventurer (Q652): Sara pays 10000 adena for a draw of 50 or more.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q652_an_aged_ex_adventurer_finish_adena.golden
+character Recruit 46
+quest Q652_AnAgedExAdventurer <cond>=1 <state>=STARTED
+random 50
+script quest.Q652_AnAgedExAdventurer
+item 1464 956 57
+page merchant/30180.htm
+page script/quest/Q652_AnAgedExAdventurer/
+npc sara 30180 Merchant 10 0 0
+
+action sara
+action sara
+  S ActionFailed
+  S NpcHtmlMessage obj=sara item=0 page=merchant/30180.htm
+  S ActionFailed
+bypass npc_{sara}_Quest
+  S SystemMessage id=52 6:10000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=sara item=0 page=script/quest/Q652_AnAgedExAdventurer/30180-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q652_AnAgedExAdventurer
+  state Q652_AnAgedExAdventurer -
+  rows Q652_AnAgedExAdventurer -
+  items 57=10000 956=0
