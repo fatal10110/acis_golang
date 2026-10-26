@@ -1,0 +1,52 @@
+# Test of the Reformer (Q227), started: a level 39 Cleric is accepted by Pupina, who gives the
+# Book of Reform and the level 39 set of Dimensional Diamonds; the quest then answers the first
+# step, and Pupina refuses a second start while it is running.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q227_test_of_the_reformer_start.golden
+character Reformer 39
+class 15
+script quest.Q227_TestOfTheReformer
+item 2821 2822 2823 2824 2825 2826 2827 2828 2829 2830 2831 2832 2833 2834 2835 2836 2837 2838 2839 3037 7562
+page trainer/30118.htm
+page script/quest/Q227_TestOfTheReformer/
+npc pupina 30118 Trainer 10 0 0
+
+action pupina
+action pupina
+  S ActionFailed
+  S NpcHtmlMessage obj=pupina item=0 page=trainer/30118.htm
+  S ActionFailed
+bypass npc_{pupina}_Quest
+  S NpcHtmlMessage obj=pupina item=0 page=script/quest/Q227_TestOfTheReformer/30118-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer CREATED
+  rows Q227_TestOfTheReformer -
+bypass Quest Q227_TestOfTheReformer 30118-04.htm
+  S QuestList 227:0x80000001
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2822
+  S SystemMessage id=53 3:7562 6:60
+  S NpcHtmlMessage obj=pupina item=0 page=script/quest/Q227_TestOfTheReformer/30118-04b.htm
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <state> | STARTED
+  Q upsert Q227_TestOfTheReformer | <cond> | 1
+  M set secondClassChange39 | true
+  items 2822=1 7562=60
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=1 <state>=STARTED
+action pupina
+  S ActionFailed
+  S NpcHtmlMessage obj=pupina item=0 page=trainer/30118.htm
+  S ActionFailed
+action pupina
+  S ActionFailed
+  S NpcHtmlMessage obj=pupina item=0 page=trainer/30118.htm
+  S ActionFailed
+bypass npc_{pupina}_Quest
+  S NpcHtmlMessage obj=pupina item=0 page=script/quest/Q227_TestOfTheReformer/30118-04a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=1 <state>=STARTED

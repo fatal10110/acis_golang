@@ -1,0 +1,34 @@
+# Test of the Reformer (Q227), the Crimson werewolf hit: at cond 12 a hit that is no allowed
+# skill marks the werewolf, so its death moves nothing on.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q227_test_of_the_reformer_werewolf_leaves.golden
+character Reformer 39
+class 15
+quest Q227_TestOfTheReformer <state>=STARTED <cond>=12
+script quest.Q227_TestOfTheReformer
+item 2821 2822 2823 2824 2825 2826 2827 2828 2829 2830 2831 2832 2833 2834 2835 2836 2837 2838 2839 3037 7562
+page default/30669.htm
+page script/quest/Q227_TestOfTheReformer/
+npc kakan 30669 Folk 10 10 0
+npc werewolf 27131 Monster 0 40 0
+
+# A plain hit marks the werewolf.
+hit werewolf 22
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=12 <state>=STARTED
+# A marked werewolf that dies brings no cond 13.
+kill werewolf
+  S SystemMessage id=95 1:0 1:0
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=12 <state>=STARTED
+action kakan
+action kakan
+  S ActionFailed
+  S NpcHtmlMessage obj=kakan item=0 page=default/30669.htm
+  S ActionFailed
+bypass npc_{kakan}_Quest
+  S NpcHtmlMessage obj=kakan item=0 page=script/quest/Q227_TestOfTheReformer/30669-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=12 <state>=STARTED

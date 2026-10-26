@@ -1,0 +1,264 @@
+# Test of the Reformer (Q227), the late half, played by a level 39 Cleric at cond 13 who holds the
+# three greetings and Katari's letter (the Crimson werewolf of the half before needs an allowed skill
+# hit, which a traced scenario cannot play): Kakan gives his letter for one greeting; Nyakuri calls
+# the pilgrim and the Krudel lizardman, which dies; Ramus asks for the five bone fragments of the
+# skeletons and the horror; Sla gives the Mark of Reformer for the four letters.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q227_test_of_the_reformer_late.golden
+character Reformer 39
+class 15
+quest Q227_TestOfTheReformer <state>=STARTED <cond>=13
+hold 2825 3
+hold 2827 1
+script quest.Q227_TestOfTheReformer
+item 2821 2822 2823 2824 2825 2826 2827 2828 2829 2830 2831 2832 2833 2834 2835 2836 2837 2838 2839 3037 7562
+page default/30666.htm
+page default/30667.htm
+page default/30669.htm
+page default/30670.htm
+page default/30732.htm
+page script/quest/Q227_TestOfTheReformer/
+npc sla 30666 Folk -10 0 0
+npc ramus 30667 Folk 0 10 0
+npc kakan 30669 Folk 10 10 0
+npc nyakuri 30670 Folk -10 10 0
+npc pilgrim 30732 Folk 10 -10 0
+npc krudel 27132 Monster 0 -40 0
+npc horror 20404 Monster 40 40 0
+npc lord 20104 Monster -40 40 0
+npc marksman 20102 Monster 40 -40 0
+npc misery 20022 Monster -40 -40 0
+npc archer 20100 Monster 60 0 0
+
+# Kakan takes a greeting for his letter.
+action kakan
+action kakan
+  S ActionFailed
+  S NpcHtmlMessage obj=kakan item=0 page=default/30669.htm
+  S ActionFailed
+bypass npc_{kakan}_Quest
+  S QuestList 227:0x80003fff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2825
+  S SystemMessage id=54 3:3037
+  S NpcHtmlMessage obj=kakan item=0 page=script/quest/Q227_TestOfTheReformer/30669-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 14
+  items 2825=2 3037=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=14 <state>=STARTED
+action kakan
+  S ActionFailed
+  S NpcHtmlMessage obj=kakan item=0 page=default/30669.htm
+  S ActionFailed
+action kakan
+  S ActionFailed
+  S NpcHtmlMessage obj=kakan item=0 page=default/30669.htm
+  S ActionFailed
+bypass npc_{kakan}_Quest
+  S NpcHtmlMessage obj=kakan item=0 page=script/quest/Q227_TestOfTheReformer/30669-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=14 <state>=STARTED
+# Nyakuri calls the pilgrim and the lizardman; the lizardman dies; then relog.
+action nyakuri
+action nyakuri
+  S ActionFailed
+  S NpcHtmlMessage obj=nyakuri item=0 page=default/30670.htm
+  S ActionFailed
+bypass npc_{nyakuri}_Quest
+  S NpcHtmlMessage obj=nyakuri item=0 page=script/quest/Q227_TestOfTheReformer/30670-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=14 <state>=STARTED
+bypass Quest Q227_TestOfTheReformer 30670-03.htm
+  S QuestList 227:0x80007fff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=nyakuri item=0 page=script/quest/Q227_TestOfTheReformer/30670-03.htm
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 15
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=15 <state>=STARTED
+kill krudel
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 227:0x8000ffff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q227_TestOfTheReformer | <cond> | 16
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=16 <state>=STARTED
+relog
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=16 <state>=STARTED
+action nyakuri
+action nyakuri
+  S ActionFailed
+  S NpcHtmlMessage obj=nyakuri item=0 page=default/30670.htm
+  S ActionFailed
+bypass npc_{nyakuri}_Quest
+  S QuestList 227:0x8001ffff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2825
+  S SystemMessage id=54 3:2828
+  S NpcHtmlMessage obj=nyakuri item=0 page=script/quest/Q227_TestOfTheReformer/30670-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 17
+  items 2825=1 2828=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=17 <state>=STARTED
+action nyakuri
+  S ActionFailed
+  S NpcHtmlMessage obj=nyakuri item=0 page=default/30670.htm
+  S ActionFailed
+action nyakuri
+  S ActionFailed
+  S NpcHtmlMessage obj=nyakuri item=0 page=default/30670.htm
+  S ActionFailed
+bypass npc_{nyakuri}_Quest
+  S NpcHtmlMessage obj=nyakuri item=0 page=script/quest/Q227_TestOfTheReformer/30670-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=17 <state>=STARTED
+# Ramus asks for the bone fragments: a second kill of the same monster brings none.
+action ramus
+action ramus
+  S ActionFailed
+  S NpcHtmlMessage obj=ramus item=0 page=default/30667.htm
+  S ActionFailed
+bypass npc_{ramus}_Quest
+  S QuestList 227:0x8003ffff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2825
+  S SystemMessage id=54 3:2829
+  S NpcHtmlMessage obj=ramus item=0 page=script/quest/Q227_TestOfTheReformer/30667-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 18
+  items 2825=0 2829=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=18 <state>=STARTED
+action ramus
+  S ActionFailed
+  S NpcHtmlMessage obj=ramus item=0 page=default/30667.htm
+  S ActionFailed
+action ramus
+  S ActionFailed
+  S NpcHtmlMessage obj=ramus item=0 page=default/30667.htm
+  S ActionFailed
+bypass npc_{ramus}_Quest
+  S NpcHtmlMessage obj=ramus item=0 page=script/quest/Q227_TestOfTheReformer/30667-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=18 <state>=STARTED
+kill horror x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2834
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  items 2834=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=18 <state>=STARTED
+kill lord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2835
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 2835=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=18 <state>=STARTED
+kill marksman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2836
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 2836=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=18 <state>=STARTED
+kill misery
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2837
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 2837=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=18 <state>=STARTED
+kill archer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2838
+  S QuestList 227:0x8007ffff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q227_TestOfTheReformer | <cond> | 19
+  items 2834=1 2835=1 2836=1 2837=1 2838=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=19 <state>=STARTED
+# Ramus takes the fragments for his letter, and Sla pays the Mark of Reformer.
+action ramus
+  S ActionFailed
+  S NpcHtmlMessage obj=ramus item=0 page=default/30667.htm
+  S ActionFailed
+action ramus
+  S ActionFailed
+  S NpcHtmlMessage obj=ramus item=0 page=default/30667.htm
+  S ActionFailed
+bypass npc_{ramus}_Quest
+  S QuestList 227:0x800fffff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2834
+  S SystemMessage id=302 3:2835
+  S SystemMessage id=302 3:2836
+  S SystemMessage id=302 3:2837
+  S SystemMessage id=302 3:2838
+  S SystemMessage id=302 3:2829
+  S SystemMessage id=54 3:2830
+  S NpcHtmlMessage obj=ramus item=0 page=script/quest/Q227_TestOfTheReformer/30667-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 20
+  items 2834=0 2835=0 2836=0 2837=0 2838=0 2829=0 2830=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=20 <state>=STARTED
+action sla
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+bypass npc_{sla}_Quest
+  S SystemMessage id=302 3:2827
+  S SystemMessage id=302 3:3037
+  S SystemMessage id=302 3:2828
+  S SystemMessage id=302 3:2830
+  S SystemMessage id=54 3:2821
+  S SystemMessage id=95 1:164032 1:17500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 227:0x00000000
+  S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <state> | COMPLETED
+  Q delete-except-state Q227_TestOfTheReformer
+  items 2827=0 3037=0 2828=0 2830=0 2821=1
+  state Q227_TestOfTheReformer COMPLETED
+  rows Q227_TestOfTheReformer <state>=COMPLETED
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+bypass npc_{sla}_Quest
+  S NpcHtmlMessage obj=sla item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer COMPLETED
+  rows Q227_TestOfTheReformer <state>=COMPLETED

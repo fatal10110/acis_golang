@@ -1,0 +1,23 @@
+# Test of the Reformer (Q227), the Shillien Oracle: a level 40 Shillien Oracle is accepted by
+# Pupina as a Cleric is.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q227_test_of_the_reformer_oracle.golden
+character Reformer 40
+class 42
+script quest.Q227_TestOfTheReformer
+item 2821 2822 2823 2824 2825 2826 2827 2828 2829 2830 2831 2832 2833 2834 2835 2836 2837 2838 2839 3037 7562
+page trainer/30118.htm
+page script/quest/Q227_TestOfTheReformer/
+npc pupina 30118 Trainer 10 0 0
+
+action pupina
+action pupina
+  S ActionFailed
+  S NpcHtmlMessage obj=pupina item=0 page=trainer/30118.htm
+  S ActionFailed
+bypass npc_{pupina}_Quest
+  S NpcHtmlMessage obj=pupina item=0 page=script/quest/Q227_TestOfTheReformer/30118-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer CREATED
+  rows Q227_TestOfTheReformer -
