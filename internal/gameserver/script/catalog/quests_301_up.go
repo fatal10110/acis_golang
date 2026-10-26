@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q336"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q337"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q338"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q340"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q341"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q343"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q344"
@@ -40,6 +41,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q362"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q363"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q364"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q365"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q366"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q367"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q368"
@@ -69,6 +71,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q406"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q407"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q408"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q409"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q410"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q411"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q412"
@@ -143,7 +146,7 @@ func quests301Up() script.Catalog {
 		"quest.Q336_CoinsOfMagic":                      q336.New,
 		"quest.Q337_AudienceWithTheLandDragon":         q337.New,
 		"quest.Q338_AlligatorHunter":                   q338.New,
-		"quest.Q340_SubjugationOfLizardmen":            nil,
+		"quest.Q340_SubjugationOfLizardmen":            q340.New,
 		"quest.Q341_HuntingForWildBeasts":              q341.New,
 		"quest.Q343_UnderTheShadowOfTheIvoryTower":     q343.New,
 		"quest.Q344_1000YearsTheEndOfLamentation":      q344.New,
@@ -162,7 +165,7 @@ func quests301Up() script.Catalog {
 		"quest.Q362_BardsMandolin":                     q362.New,
 		"quest.Q363_SorrowfulSoundOfFlute":             q363.New,
 		"quest.Q364_JovialAccordion":                   q364.New,
-		"quest.Q365_DevilsLegacy":                      nil,
+		"quest.Q365_DevilsLegacy":                      q365.New,
 		"quest.Q366_SilverHairedShaman":                q366.New,
 		"quest.Q367_ElectrifyingRecharge":              q367.New,
 		"quest.Q368_TrespassingIntoTheSacredArea":      q368.New,
@@ -192,7 +195,7 @@ func quests301Up() script.Catalog {
 		"quest.Q406_PathToAnElvenKnight":               q406.New,
 		"quest.Q407_PathToAnElvenScout":                q407.New,
 		"quest.Q408_PathToAnElvenWizard":               q408.New,
-		"quest.Q409_PathToAnElvenOracle":               nil,
+		"quest.Q409_PathToAnElvenOracle":               q409.New,
 		"quest.Q410_PathToAPalusKnight":                q410.New,
 		"quest.Q411_PathToAnAssassin":                  q411.New,
 		"quest.Q412_PathToADarkWizard":                 q412.New,

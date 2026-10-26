@@ -1,0 +1,40 @@
+# Devil's Legacy (Q365), level 39: the character gives the quest up. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q365_devils_legacy_giveup.golden
+character Raider 39
+quest Q365_DevilsLegacy <cond>=1 <state>=STARTED
+script quest.Q365_DevilsLegacy
+item 57 5873 951 952 955 956 1868 1872 1879 1880 1881 1882 1884
+page warehouse/30095.htm
+page warehouse/30092.htm
+page script/quest/Q365_DevilsLegacy/
+npc randolf 30095 WarehouseKeeper 10 0 0
+npc collob 30092 WarehouseKeeper -10 0 0
+npc zombie 20836 Monster 40 0 0
+npc captain 21629 Monster 50 0 0
+
+action randolf
+action randolf
+  S ActionFailed
+  S NpcHtmlMessage obj=randolf item=0 page=warehouse/30095.htm
+  S ActionFailed
+bypass npc_{randolf}_Quest
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q365_DevilsLegacy 30095-06.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-06.htm
+  S ActionFailed
+  Q delete-quest Q365_DevilsLegacy
+  state Q365_DevilsLegacy -
+  rows Q365_DevilsLegacy -
+action randolf
+  S ActionFailed
+  S NpcHtmlMessage obj=randolf item=0 page=warehouse/30095.htm
+  S ActionFailed
+bypass npc_{randolf}_Quest
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-01.htm
+  S ActionFailed
+  S ActionFailed
