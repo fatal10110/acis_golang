@@ -1,0 +1,29 @@
+# Magical Power of Water, part 1 (Q609) at cond 2 without a Thief's Key: the theft at the Udan Box is refused. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q609_magical_power_of_water_part1_no_key.golden
+character Ally 74
+standing 2
+quest Q609_MagicalPowerOfWater_Part1 <cond>=2 spawned=0 <state>=STARTED
+script quest.Q609_MagicalPowerOfWater_Part1
+item 1661 7237 7238 7081
+page npcdefault.htm
+page default/31561.htm
+page script/quest/Q609_MagicalPowerOfWater_Part1/
+npc wahkan 31371 Folk 10 0 0
+npc asefa 31372 Folk 20 0 0
+npc box 31561 Folk 30 0 0
+
+action box
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/31561.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q609_MagicalPowerOfWater_Part1/31561-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q609_MagicalPowerOfWater_Part1 31561-03.htm
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q609_MagicalPowerOfWater_Part1/31561-02.htm
+  S ActionFailed
+  items 7237=0
+  rows Q609_MagicalPowerOfWater_Part1 <cond>=2 <state>=STARTED spawned=0
