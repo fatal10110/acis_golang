@@ -18,5 +18,16 @@ func aiBossFrintezzaHandleOps() map[string]script.HandleOps {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnTimer":    {"NPC.EquipItem"},
 		},
+		"script.ai.boss.frintezza.PortraitSpirit": {
+			"OnTimer":            {"NPC.TopDesireTarget"},
+			"OnUseSkillFinished": {"NPC.TopDesireTarget", "Spawner.DecayMe"},
+		},
+		"script.ai.boss.frintezza.PortraitSpiritWinged": {
+			"OnTimer":            {"NPC.TopDesireTarget"},
+			"OnUseSkillFinished": {"NPC.TopDesireTarget", "Spawner.DecayMe"},
+		},
+		"script.ai.boss.frintezza.UndeadBandmaster": {
+			"OnMyDying": {"NPC.DropItem"},
+		},
 	}
 }
