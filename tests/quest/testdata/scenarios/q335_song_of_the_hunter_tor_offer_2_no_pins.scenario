@@ -1,0 +1,74 @@
+# Song of the Hunter (Q335), level 45: Tor's second request list with no laurel leaf pin. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_tor_offer_2_no_pins.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=3 <state>=STARTED
+random 0 1 2 0 3
+script quest.Q335_SongOfTheHunter
+item 3748
+page default/30745.htm
+page script/quest/Q335_SongOfTheHunter/
+npc tor 30745 Folk 10 0 0
+
+action tor
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-03b.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-04.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-04.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter Tor_list_2
+  S NpcHtmlMessage obj=tor item=0 html="<html><body>Guild Member Tor:<br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3748\">C: 40 Rotted Tree Spores</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3749\">C: 40 Trisalim Venom Sacs</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3750\">C: 50 Totems of Taik Orc</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3754\">C: 40 Tempest Shards</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3751\">C: 40 Harit Barbed Necklaces</a><br>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | torOffer | 221712
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-03b.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-04.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-04.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter Tor_list_2
+  S NpcHtmlMessage obj=tor item=0 html="<html><body>Guild Member Tor:<br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3748\">C: 40 Rotted Tree Spores</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3749\">C: 40 Trisalim Venom Sacs</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3750\">C: 50 Totems of Taik Orc</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3754\">C: 40 Tempest Shards</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3751\">C: 40 Harit Barbed Necklaces</a><br>\n</body></html>\n"
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 3748
+  S SystemMessage id=54 3:3748
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-3748.htm
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | tor | 3748
+  items 3748=1
+  rows Q335_SongOfTheHunter <cond>=3 <state>=STARTED tor=3748 torOffer=221712
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-05a.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-05a.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-05b.htm
+  S SystemMessage id=302 3:3748
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-05b.htm
+  S ActionFailed
+  Q delete-var Q335_SongOfTheHunter | tor
+  items 3748=0

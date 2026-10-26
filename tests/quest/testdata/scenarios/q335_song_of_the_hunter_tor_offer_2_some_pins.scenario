@@ -1,0 +1,46 @@
+# Song of the Hunter (Q335), level 45: Tor's second request list with one laurel leaf pin and a request of class B. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_tor_offer_2_some_pins.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=3 <state>=STARTED
+hold 3694 1
+random 10 4 6 1 2 5
+script quest.Q335_SongOfTheHunter
+item 3694
+page default/30745.htm
+page script/quest/Q335_SongOfTheHunter/
+npc tor 30745 Folk 10 0 0
+
+action tor
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-03b.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-04.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-04.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter Tor_list_2
+  S NpcHtmlMessage obj=tor item=0 html="<html><body>Guild Member Tor:<br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3764\">B: 20 Unicorn Horns</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3754\">C: 40 Tempest Shards</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3749\">C: 40 Trisalim Venom Sacs</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3756\">C: 40 Satyr Manes</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3753\">C: 30 Skins of Farkran</a><br>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | torOffer | 360816
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-03b.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-04.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-04.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter Tor_list_2
+  S NpcHtmlMessage obj=tor item=0 html="<html><body>Guild Member Tor:<br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3748\">C: 40 Rotted Tree Spores</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3755\">C: 40 Tsunami Shards</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3749\">C: 40 Trisalim Venom Sacs</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3756\">C: 40 Satyr Manes</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3753\">C: 30 Skins of Farkran</a><br>\n</body></html>\n"
+  S ActionFailed

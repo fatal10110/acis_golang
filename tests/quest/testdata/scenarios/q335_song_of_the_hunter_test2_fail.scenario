@@ -1,0 +1,42 @@
+# Song of the Hunter (Q335), level 45: Grey's second test at level 45: the character takes the test but holds one of its requirements only. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_test2_fail.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+hold 3692 1
+hold 3717 20
+script quest.Q335_SongOfTheHunter
+item 3692 3696 3717
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30744-09.htm
+  S SystemMessage id=54 3:3696
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-09.htm
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | grey2 | 1
+  items 3696=1
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-11.htm
+  S ActionFailed
+  S ActionFailed
+  items 3692=1 3696=1 3717=20
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED grey2=1

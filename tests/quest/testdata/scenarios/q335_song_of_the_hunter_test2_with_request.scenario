@@ -1,0 +1,25 @@
+# Song of the Hunter (Q335), level 45: Grey's second test while Tor's request runs: Grey says to finish the request first. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_test2_with_request.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED tor=3727
+hold 3727 1
+script quest.Q335_SongOfTheHunter
+item 3696 3727
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30744-09.htm
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-09a.htm
+  S ActionFailed
+  items 3696=0
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED tor=3727

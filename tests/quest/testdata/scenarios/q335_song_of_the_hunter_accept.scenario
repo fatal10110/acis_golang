@@ -1,0 +1,44 @@
+# Song of the Hunter (Q335), level 35: Grey offers the quest, the character accepts, is given the first test and relogs. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_accept.golden
+character Hunter 35
+script quest.Q335_SongOfTheHunter
+item 3695
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q335_SongOfTheHunter CREATED
+bypass Quest Q335_SongOfTheHunter 30744-03.htm
+  S QuestList
+  S ExShowQuestMark quest=335
+  S SystemMessage id=54 3:3695
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-03.htm
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | <cond> | 1
+  Q upsert Q335_SongOfTheHunter | <state> | STARTED
+  state Q335_SongOfTheHunter STARTED
+  items 3695=1
+  rows Q335_SongOfTheHunter <cond>=1 <state>=STARTED
+relog
+  rows Q335_SongOfTheHunter <cond>=1 <state>=STARTED
+  state Q335_SongOfTheHunter STARTED
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 3695=1

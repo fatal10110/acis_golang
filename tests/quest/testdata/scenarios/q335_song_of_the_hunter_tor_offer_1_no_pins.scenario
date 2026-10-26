@@ -1,0 +1,74 @@
+# Song of the Hunter (Q335), level 45: Tor's first request list with no laurel leaf pin: a first draw of five equal replies is redrawn, then the offer is kept; the character takes the request of the first reply, and finds it waiting at Tor's. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_tor_offer_1_no_pins.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+random 0 0 0 0 0 0 1 2 3 4
+script quest.Q335_SongOfTheHunter
+item 3727
+page default/30745.htm
+page script/quest/Q335_SongOfTheHunter/
+npc tor 30745 Folk 10 0 0
+
+action tor
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-03a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-02.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-02.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter Tor_list_1
+  S NpcHtmlMessage obj=tor item=0 html="<html><body>Guild Member Tor:<br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3727\">C: 40 Totems of Kadesh</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3728\">C: 50 Jade Necklaces of Timak</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3729\">C: 50 Enchanted Golem Shards</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3730\">C: 30 Pieces Monster Eye Meat</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3731\">C: 40 Eggs of Dire Wyrm</a><br>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | torOffer | 274960
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-03a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-02.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-02.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter Tor_list_1
+  S NpcHtmlMessage obj=tor item=0 html="<html><body>Guild Member Tor:<br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3727\">C: 40 Totems of Kadesh</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3728\">C: 50 Jade Necklaces of Timak</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3729\">C: 50 Enchanted Golem Shards</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3730\">C: 30 Pieces Monster Eye Meat</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3731\">C: 40 Eggs of Dire Wyrm</a><br>\n</body></html>\n"
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 3727
+  S SystemMessage id=54 3:3727
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-3727.htm
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | tor | 3727
+  items 3727=1
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED tor=3727 torOffer=274960
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-05a.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-05a.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-05b.htm
+  S SystemMessage id=302 3:3727
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-05b.htm
+  S ActionFailed
+  Q delete-var Q335_SongOfTheHunter | tor
+  items 3727=0

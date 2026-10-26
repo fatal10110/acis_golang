@@ -1,0 +1,31 @@
+# Song of the Hunter (Q335), level 45: Tor's request of the first license completed: the request item and the collected items are taken, a laurel leaf pin and the adena are given. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_tor_payout_1.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED tor=3727 torOffer=16
+hold 3727 1
+hold 3769 40
+hold 3694 2
+script quest.Q335_SongOfTheHunter
+item 57 3694 3727 3769
+page default/30745.htm
+page script/quest/Q335_SongOfTheHunter/
+npc tor 30745 Folk 10 0 0
+
+action tor
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S SystemMessage id=302 3:3727
+  S SystemMessage id=301 3:3769 6:40
+  S SystemMessage id=54 3:3694
+  S SystemMessage id=52 6:2090
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-06a.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | tor | 0
+  Q upsert Q335_SongOfTheHunter | torOffer | 0
+  items 3727=0 3769=0 3694=3 57=2090
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED tor=0 torOffer=0
