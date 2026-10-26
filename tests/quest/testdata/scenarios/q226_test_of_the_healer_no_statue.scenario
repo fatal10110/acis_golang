@@ -1,0 +1,32 @@
+# Test of the Healer (Q226), the statue given away: a level 39 Cleric at cond 23 who no longer
+# holds the golden statue gets the Mark of Healer from Bandellos's greeting, with the smaller
+# reward.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q226_test_of_the_healer_no_statue.golden
+character Healer 39
+class 15
+quest Q226_TestOfTheHealer <state>=STARTED <cond>=23
+script quest.Q226_TestOfTheHealer
+item 2810 2811 2812 2813 2814 2815 2816 2817 2818 2819 2820 57 7562
+page trainer/30473.htm
+page script/quest/Q226_TestOfTheHealer/
+npc bandellos 30473 Trainer 10 0 0
+
+action bandellos
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+bypass npc_{bandellos}_Quest
+  S SystemMessage id=54 3:2820
+  S SystemMessage id=95 1:118304 1:26250
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 226:0x00000000
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <state> | COMPLETED
+  Q delete-except-state Q226_TestOfTheHealer
+  items 2813=0 2820=1
+  state Q226_TestOfTheHealer COMPLETED
+  rows Q226_TestOfTheHealer <state>=COMPLETED
