@@ -1,0 +1,38 @@
+# A Game Of Cards (Q662), level 61: the character quits the quest. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q662_a_game_of_cards_quit.golden
+character Gambler 61
+quest Q662_AGameOfCards <cond>=1 <state>=STARTED
+hold 8765 49
+script quest.Q662_AGameOfCards
+item 8765 959 729 947 951 955 956 8868
+page villagemaster/30845.htm
+page script/quest/Q662_AGameOfCards/
+npc klump 30845 VillageMasterDwarf 10 0 0
+
+action klump
+action klump
+  S ActionFailed
+  S NpcHtmlMessage obj=klump item=0 page=villagemaster/30845.htm
+  S ActionFailed
+bypass npc_{klump}_Quest
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q662_AGameOfCards 30845-07.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=301 3:8765 6:49
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-07.htm
+  S ActionFailed
+  Q delete-quest Q662_AGameOfCards
+action klump
+  S ActionFailed
+  S NpcHtmlMessage obj=klump item=0 page=villagemaster/30845.htm
+  S ActionFailed
+bypass npc_{klump}_Quest
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 8765=0
+  rows Q662_AGameOfCards -
+  state Q662_AGameOfCards CREATED
