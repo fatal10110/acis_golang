@@ -200,8 +200,14 @@ func CorpseZombiePhysicalSpecialAggressive() script.Script {
 // special skill the player it hates most when hit by that one, or its
 // clan's attacker while it does not fight.
 func CorpseZombiePhysicalSpecial() script.Script {
+	return script.Script{Dir: corpseZombieDir, Behavior: true, NPCs: []int32{21578, 21549, 21547, 21551, 21598, 21601}, Hooks: corpseZombiePhysicalSpecialHooks()}
+}
+
+// corpseZombiePhysicalSpecialHooks are WarriorCorpseZombiePhysicalSpecial's
+// hooks, which its children derive theirs from.
+func corpseZombiePhysicalSpecialHooks() script.Hooks {
 	base := corpseZombieHooks()
-	hooks := base.With(script.Hooks{
+	return base.With(script.Hooks{
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			n, attacker := e.NPC, e.Attacker
 			if attacker.Playable() {
@@ -218,6 +224,58 @@ func CorpseZombiePhysicalSpecial() script.Script {
 			}
 			base.ClanAttacked(s, e)
 		},
+	}).Named("WarriorCorpseZombiePhysicalSpecial")
+}
+
+// HereticCorpseZombiePhysicalSpecial is
+// WarriorHereticCorpseZombiePhysicalSpecial: a
+// WarriorCorpseZombiePhysicalSpecial that keeps to its territory until it
+// is drawn into a fight. Hit, or told of a hit on its clan, while neither
+// attacking nor casting, it gives up the territory (i_ai4); out of the
+// territory before that it drops its attack desires and walks back to its
+// spawn. Script events 10002 and 10033 turn it on the creature they name
+// (10033 also releases it from the territory), and 10035 sends it home
+// bound to the territory again.
+func HereticCorpseZombiePhysicalSpecial() script.Script {
+	base := corpseZombiePhysicalSpecialHooks()
+	hooks := base.With(script.Hooks{
+		OnCreated: func(s *script.Script, e script.Created) {
+			e.NPC.SetInt(script.SlotIntAI4, 0)
+			base.Created(s, e)
+		},
+		OnAttacked: func(s *script.Script, e script.Attacked) {
+			if hereticIdle(e.NPC) && e.NPC.Int(script.SlotIntAI4) == 0 {
+				e.NPC.SetInt(script.SlotIntAI4, 1)
+			}
+			base.Attacked(s, e)
+		},
+		OnClanAttacked: func(s *script.Script, e script.ClanAttacked) {
+			if hereticIdle(e.Called) && e.Called.Int(script.SlotIntAI4) == 0 {
+				e.Called.SetInt(script.SlotIntAI4, 1)
+			}
+			base.ClanAttacked(s, e)
+		},
+		OnOutOfTerritory: hereticOutOfTerritory,
+		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
+			n := e.NPC
+			switch e.EventID {
+			case 10033, 10002:
+				c0 := s.Object(e.Arg1)
+				if c0 == nil {
+					return
+				}
+				if e.EventID == 10033 {
+					n.SetInt(script.SlotIntAI4, 1)
+				}
+				n.RemoveAllAttackDesire()
+				if c0.Playable() {
+					n.AddAttackDesire(c0, 200)
+				}
+			case 10035:
+				n.SetInt(script.SlotIntAI4, 0)
+				hereticGoHome(n)
+			}
+		},
 	})
-	return script.Script{Dir: corpseZombieDir, Behavior: true, NPCs: []int32{21578, 21549, 21547, 21551, 21598, 21601}, Hooks: hooks}
+	return script.Script{Dir: corpseZombieDir, Behavior: true, NPCs: []int32{22140, 22149}, Hooks: hooks}
 }
