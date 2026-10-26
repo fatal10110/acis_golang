@@ -161,18 +161,23 @@ func Valakas() script.Script {
 				n.AddCastDesire(attacker, hinderStrider, 1000000)
 			}
 
+			// A hit that gave the attacker a new slot ranks it once more, on
+			// the standings it just changed, with the points of a spell at
+			// high HP: that second pass may move it to another slot, so it
+			// can hold two. A spell at high HP ranks it only once.
 			hp, maxHPf := n.HP(), float64(maxHP)
+			high := scaledPoints(float64(damage) / 150.0 * 1000)
 			switch {
 			case e.Skill.ID == 0:
-				rankInt(s, n, attacker, damage*1000)
+				settle(s, n, attacker, rank(s, n, attacker, points{stored: damage * 1000}), high)
 			case hp < (maxHPf*1.0)/4.0:
-				rankScaled(s, n, attacker, float64(damage)/30.0*1000)
+				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/30.0*1000)), high)
 			case hp < (maxHPf*2.0)/4.0:
-				rankScaled(s, n, attacker, float64(damage)/50.0*1000)
+				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/50.0*1000)), high)
 			case hp < (maxHPf*3.0)/4.0:
-				rankScaled(s, n, attacker, float64(damage)/100.0*1000)
+				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/100.0*1000)), high)
 			default:
-				rankScaled(s, n, attacker, float64(damage)/150.0*1000)
+				rank(s, n, attacker, high)
 			}
 
 			if n.DBValue() == 3 && idleOrWandering(n) {
@@ -382,22 +387,22 @@ func (p points) beats(cur int32) bool {
 	return p.stored+1000 > cur
 }
 
-// rankInt ranks c with points counted in whole numbers, as a plain hit and
-// a sighting are.
+// rankInt ranks c with points counted in whole numbers, as a sighting is.
 func rankInt(s *script.Script, n *script.NPC, c script.Creature, v int32) {
 	rank(s, n, c, points{stored: v})
 }
 
-// rankScaled ranks c with points scaled from a spell's damage, compared
+// scaledPoints are the points scaled from a spell's damage, compared
 // unrounded and stored truncated.
-func rankScaled(s *script.Script, n *script.NPC, c script.Creature, v float64) {
-	rank(s, n, c, points{stored: commons.TruncInt32Sat(v), exact: v, scaled: true})
+func scaledPoints(v float64) points {
+	return points{stored: commons.TruncInt32Sat(v), exact: v, scaled: true}
 }
 
 // rank weighs c with p among Valakas's three targets. A creature already
 // ranked keeps its slot, raised to p (plus a random share) when p beats its
-// standing; any other takes the weakest slot, a tie broken at random.
-func rank(s *script.Script, n *script.NPC, c script.Creature, p points) {
+// standing; any other takes the weakest slot, a tie broken at random. It
+// returns the slot it gave c, 2 to 4, or 0 when it gave none.
+func rank(s *script.Script, n *script.NPC, c script.Creature, p points) int {
 	pts, who := targetSlots()
 	q0, q1, q2 := n.Int(pts[0]), n.Int(pts[1]), n.Int(pts[2])
 	var i1 int
@@ -421,10 +426,18 @@ func rank(s *script.Script, n *script.NPC, c script.Creature, p points) {
 	case q0 < q1:
 		i1 = 2
 	}
+	return settle(s, n, c, i1, p)
+}
 
+// settle gives c slot i1 (2 to 4) with p, plus a random share, unless the
+// third slot stands lower: then c takes that one, a tie broken at random.
+// It returns the slot it gave c, or 0 when i1 names none.
+func settle(s *script.Script, n *script.NPC, c script.Creature, i1 int, p points) int {
+	pts, who := targetSlots()
+	q2 := n.Int(pts[2])
 	switch i1 {
 	case 2:
-		switch {
+		switch q0 := n.Int(pts[0]); {
 		case q0 > q2:
 			i1 = 4
 		case q0 == q2:
@@ -433,7 +446,7 @@ func rank(s *script.Script, n *script.NPC, c script.Creature, p points) {
 			i1 = 2
 		}
 	case 3:
-		switch {
+		switch q1 := n.Int(pts[1]); {
 		case q1 > q2:
 			i1 = 4
 		case q1 == q2:
@@ -447,7 +460,9 @@ func rank(s *script.Script, n *script.NPC, c script.Creature, p points) {
 	case 2, 3, 4:
 		n.SetInt(pts[i1-2], p.stored+int32(s.Rnd(3000)))
 		n.SetSlot(who[i1-2], c)
+		return i1
 	}
+	return 0
 }
 
 // pick returns a or b on an even draw.

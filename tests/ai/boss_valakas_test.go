@@ -478,7 +478,8 @@ func TestValakasResetsAfterFifteenQuietMinutes(t *testing.T) {
 // TestValakasRanksAndCastsAtItsAttacker ports the fight's ranking of a
 // plain hit and its skill choice (phase 4), before its AI first runs:
 // restored fighting at 3 and idle, a hit of 7 from the character, on its
-// ground 1000 due west, ranks it first with 7000 and, the percent draws 2,
+// ground 1000 due west, ranks it first with 7000, then once more as a spell
+// at high HP into the third slot with 46 and, the percent draws 2,
 // its cast drops it to 500 and, above 3/4 of its HP, wants its fear 4689 at
 // the character with 1000000 (its meteor chance there is 0).
 func TestValakasRanksAndCastsAtItsAttacker(t *testing.T) {
@@ -496,6 +497,15 @@ func TestValakasRanksAndCastsAtItsAttacker(t *testing.T) {
 	}
 	if got := handle.Int(npc.IntQuest2); got != 500 {
 		t.Fatalf("the character's points after its hit and the cast = %d, want 500", got)
+	}
+	// Its new slot made the hit rank it once more, as a spell at high HP:
+	// the third slot stood lower, so it holds that one too, with 7/150*1000
+	// truncated and a share of 0.
+	if got := handle.Slot(npc.CreatureQuest4); got == nil || got.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("Valakas's third target = %v, want the character", got)
+	}
+	if got := handle.Int(npc.IntQuest4); got != 46 {
+		t.Fatalf("the character's points in the third slot = %d, want 46", got)
 	}
 	if got, want := antharasCasts(boss, roles), []string{"4689@player=1e+06"}; !slices.Equal(got, want) {
 		t.Fatalf("Valakas's cast desires after the hit = %q, want %q", got, want)
