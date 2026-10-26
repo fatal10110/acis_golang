@@ -1,0 +1,25 @@
+# An Arrogant Search (Q348), level 60: the angels turn a white fabric to a blooded one on a lucky draw. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q348_an_arrogant_search_angels.golden
+character Dragoon 60
+quest Q348_AnArrogantSearch <cond>=26 <state>=STARTED points=0
+hold 4294 3
+random always 0
+script quest.Q348_AnArrogantSearch
+item 4287 4288 4289 4290 4291 4292 4293 4397 4398 4399 4294 4295 1831 1061
+page script/quest/Q348_AnArrogantSearch/
+npc sealangel 20860 Monster 40 0 0
+npc guardianangel 20859 Monster 45 0 0
+
+kill sealangel
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4294
+  S SystemMessage id=54 3:4295
+kill guardianangel
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4294
+  S SystemMessage id=54 3:4295
+  items 4294=1 4295=2
+  state Q348_AnArrogantSearch STARTED
+  rows Q348_AnArrogantSearch <cond>=26 <state>=STARTED points=0

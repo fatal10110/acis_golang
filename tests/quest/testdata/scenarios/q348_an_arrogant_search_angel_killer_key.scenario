@@ -1,0 +1,15 @@
+# An Arrogant Search (Q348), level 60: the angel killer leaves at the first hit of a character holding the first key. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q348_an_arrogant_search_angel_killer_key.golden
+character Dragoon 60
+quest Q348_AnArrogantSearch <cond>=18 <state>=STARTED points=0
+hold 4291 1
+script quest.Q348_AnArrogantSearch
+item 4287 4288 4289 4290 4291 4292 4293 4397 4398 4399 4294 4295 1831 1061
+page script/quest/Q348_AnArrogantSearch/
+npc angelkiller 27184 Monster 40 0 0
+
+hit angelkiller 5
+  S NpcSay obj=angelkiller type=0 npc=1027184 text="We don't have any further business to discuss... Have you searched the corpse for the key?"
+  items 4291=1
+  state Q348_AnArrogantSearch STARTED
+  rows Q348_AnArrogantSearch <cond>=18 <state>=STARTED points=0
