@@ -618,7 +618,7 @@ call WorldObject.getY classes 45 sites 133 go inline
 call WorldObject.getZ classes 50 sites 156 go inline
 call WorldObject.isBehind classes 1 sites 1 go script.NPC.Behind
 call WorldObject.isIn2DRadius classes 1 sites 2 go script.NPC.InRadius2D
-call WorldObject.isIn3DRadius classes 5 sites 7 go script.InRadius3D
+call WorldObject.isIn3DRadius classes 5 sites 7 go script.InRadius3D,script.Script.InPartyRange
 call WorldObject.isVisible classes 1 sites 1 go script.Player.Visible
 call WorldObject.setXYZ classes 1 sites 1 go script.NPC.SetXYZ
 call ZoneManager.getInstance classes 5 sites 7 go inline

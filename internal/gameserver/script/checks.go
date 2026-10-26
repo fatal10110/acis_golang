@@ -201,6 +201,14 @@ func (s *Script) inRange(c *player.Character, npc *NPC) bool {
 	return location.In3DRadius(x, y, z, nx, ny, nz, s.env.partyRange())
 }
 
+// InPartyRange reports whether c stands strictly within the party range of
+// npc, the range read at each call, so a //reload config between two calls
+// moves the boundary. A handle on nothing panics.
+func (s *Script) InPartyRange(c Creature, npc *NPC) bool {
+	a, b := locOf(c), locOf(npc)
+	return location.In3DRadius(a.X, a.Y, a.Z, b.X, b.Y, b.Z, s.env.partyRange())
+}
+
 // varIs reports whether the state's variable key is set and equals value,
 // ignoring case.
 func (qs *QuestState) varIs(key, value string) bool {

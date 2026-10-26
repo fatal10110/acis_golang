@@ -670,7 +670,7 @@ SoulCrystalData.getSoulCrystals item.SoulCrystalTable.Crystal
 SpoilState.isActualSpoiler script.NPC.ActualSpoiler
 Summon.getControlItemId script.PetControlItemID
 WorldObject.distance3D script.NPC.Distance3D
-WorldObject.isIn3DRadius script.InRadius3D
+WorldObject.isIn3DRadius script.InRadius3D,script.Script.InPartyRange
 # The NPC chat line a teleport dungeon NPC shouts to the players within a
 # radius of it is one call on the NPC handle (ShoutInRadius); a system
 # message a siegable-hall NPC sends to the players within a radius of it is
