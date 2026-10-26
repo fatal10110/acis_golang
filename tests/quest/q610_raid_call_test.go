@@ -12,4 +12,4 @@ var q610Raid = raidQuest{
 }
 
 // raidQuests are the quests whose altar calls a raid.
-var raidQuests = []raidQuest{q604Raid, q625Raid, q610Raid}
+var raidQuests = []raidQuest{q604Raid, q625Raid, q610Raid, q616Raid}

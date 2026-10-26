@@ -1,0 +1,26 @@
+# Magical Power of Fire, Part 2 (Q616): on cond 1 without the Red Totem the altar answers that the totem is missing.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q616_magical_power_of_fire_part2_altar_no_totem.golden
+character Hero 75
+quest Q616_MagicalPowerOfFire_Part2 <cond>=1 <state>=STARTED
+script quest.Q616_MagicalPowerOfFire_Part2
+item 7243 7244
+page npcdefault.htm
+page default/31558.htm
+page script/quest/Q616_MagicalPowerOfFire_Part2/
+npc udan 31379 Folk 10 0 0
+npc altar 31558 Folk 20 0 0
+npc raid 25306 RaidBoss 40 0 0
+
+action altar
+action altar
+  S ActionFailed
+  S NpcHtmlMessage obj=altar item=0 page=default/31558.htm
+  S ActionFailed
+bypass npc_{altar}_Quest
+  S NpcHtmlMessage obj=altar item=0 page=script/quest/Q616_MagicalPowerOfFire_Part2/31558-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q616_MagicalPowerOfFire_Part2 31558-02.htm
+  S NpcHtmlMessage obj=altar item=0 page=script/quest/Q616_MagicalPowerOfFire_Part2/31558-03.htm
+  S ActionFailed

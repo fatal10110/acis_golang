@@ -1,0 +1,29 @@
+# Magical Power of Fire, part 1 (Q615) at cond 2 without a Thief's Key: the theft at the Asefa Box is refused. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q615_magical_power_of_fire_part1_no_key.golden
+character Ally 74
+standing -2
+quest Q615_MagicalPowerOfFire_Part1 <cond>=2 spawned=0 <state>=STARTED
+script quest.Q615_MagicalPowerOfFire_Part1
+item 1661 7242 7243 7081
+page npcdefault.htm
+page default/31559.htm
+page script/quest/Q615_MagicalPowerOfFire_Part1/
+npc naran 31378 Folk 10 0 0
+npc udan 31379 Folk 20 0 0
+npc box 31559 Folk 30 0 0
+
+action box
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/31559.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31559-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q615_MagicalPowerOfFire_Part1 31559-03.htm
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31559-02.htm
+  S ActionFailed
+  items 7242=0
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=2 <state>=STARTED spawned=0

@@ -1,0 +1,43 @@
+# Magical Power of Fire, part 1 (Q615) after Asefa's Eye has seen the thief at cond 2 (the flag is set): the theft at the Udan
+# Box is refused, and Udan lets the thief try again by clearing the flag. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q615_magical_power_of_fire_part1_seen.golden
+character Ally 74
+standing -2
+quest Q615_MagicalPowerOfFire_Part1 <cond>=2 spawned=1 <state>=STARTED
+hold 1661 1
+script quest.Q615_MagicalPowerOfFire_Part1
+item 1661 7242 7243 7081
+page npcdefault.htm
+page default/31559.htm
+page script/quest/Q615_MagicalPowerOfFire_Part1/
+npc naran 31378 Folk 10 0 0
+npc udan 31379 Folk 20 0 0
+npc box 31559 Folk 30 0 0
+
+action box
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/31559.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31559-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q615_MagicalPowerOfFire_Part1 31559-03.htm
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31559-04.htm
+  S ActionFailed
+  items 1661=1 7242=0
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=2 <state>=STARTED spawned=1
+action udan
+action udan
+  S ActionFailed
+  S NpcHtmlMessage obj=udan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{udan}_Quest
+  Q upsert Q615_MagicalPowerOfFire_Part1 | spawned | 0
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=udan item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31379-03.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=2 <state>=STARTED spawned=0

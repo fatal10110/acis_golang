@@ -103,6 +103,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q611"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q612"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q613"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q614"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q615"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q616"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q617"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q618"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q619"
@@ -248,9 +251,9 @@ func quests301Up() script.Catalog {
 		"quest.Q611_AllianceWithVarkaSilenos":          q611.New,
 		"quest.Q612_WarWithKetraOrcs":                  q612.New,
 		"quest.Q613_ProveYourCourage":                  q613.New,
-		"quest.Q614_SlayTheEnemyCommander":             nil,
-		"quest.Q615_MagicalPowerOfFire_Part1":          nil,
-		"quest.Q616_MagicalPowerOfFire_Part2":          nil,
+		"quest.Q614_SlayTheEnemyCommander":             q614.New,
+		"quest.Q615_MagicalPowerOfFire_Part1":          q615.New,
+		"quest.Q616_MagicalPowerOfFire_Part2":          q616.New,
 		"quest.Q617_GatherTheFlames":                   q617.New,
 		"quest.Q618_IntoTheFlame":                      q618.New,
 		"quest.Q619_RelicsOfTheOldEmpire":              q619.New,
