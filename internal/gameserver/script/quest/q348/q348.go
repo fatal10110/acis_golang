@@ -81,12 +81,10 @@ const despawn = 600000 * time.Millisecond
 // marker is a spot the radar shows.
 type marker struct{ x, y, z int32 }
 
-var (
-	holyArk1Loc       = marker{-418, 44174, -3568}
-	holyArk2Loc       = marker{181472, 7158, -2725}
-	holyArk3Loc       = marker{50693, 158674, 376}
-	guardianCorpseLoc = marker{-2908, 44128, -2712}
-)
+func holyArk1Loc() marker       { return marker{-418, 44174, -3568} }
+func holyArk2Loc() marker       { return marker{181472, 7158, -2725} }
+func holyArk3Loc() marker       { return marker{50693, 158674, 376} }
+func guardianCorpseLoc() marker { return marker{-2908, 44128, -2712} }
 
 // quest holds the guardians the arks called, shared by every player: one of
 // each at a time, until it decays.
@@ -267,10 +265,10 @@ func (q quest) onTalk(s *script.Script, e script.Talk) string {
 					st.SetCond(17)
 					s.PlaySound(p, script.SoundMiddle)
 					s.TakeItems(p, hanellinFirstLetter, 1)
-					mark(p, guardianCorpseLoc)
+					mark(p, guardianCorpseLoc())
 				case !p.HasItem(firstKeyOfArk):
 					htmltext = "30144-03.htm"
-					mark(p, guardianCorpseLoc)
+					mark(p, guardianCorpseLoc())
 				default:
 					htmltext = "30144-04.htm"
 				}
@@ -285,10 +283,10 @@ func (q quest) onTalk(s *script.Script, e script.Talk) string {
 					st.SetCond(9)
 					s.PlaySound(p, script.SoundMiddle)
 					s.TakeItems(p, hanellinSecondLetter, 1)
-					mark(p, holyArk2Loc)
+					mark(p, holyArk2Loc())
 				case !p.HasItem(secondKeyOfArk):
 					htmltext = "31001-03.htm"
-					mark(p, holyArk2Loc)
+					mark(p, holyArk2Loc())
 				default:
 					htmltext = "31001-04.htm"
 				}
@@ -303,10 +301,10 @@ func (q quest) onTalk(s *script.Script, e script.Talk) string {
 					st.SetCond(13)
 					s.PlaySound(p, script.SoundMiddle)
 					s.TakeItems(p, hanellinThirdLetter, 1)
-					mark(p, holyArk3Loc)
+					mark(p, holyArk3Loc())
 				case !p.HasItem(thirdKeyOfArk):
 					htmltext = "30645-03.htm"
-					mark(p, holyArk3Loc)
+					mark(p, holyArk3Loc())
 				default:
 					htmltext = "30645-04.htm"
 				}
@@ -329,7 +327,7 @@ func (q quest) onTalk(s *script.Script, e script.Talk) string {
 					htmltext = "30980-02.htm"
 					s.GiveItems(p, firstKeyOfArk, 1)
 					s.PlaySound(p, script.SoundItemGet)
-					mark(p, holyArk1Loc)
+					mark(p, holyArk1Loc())
 					st.Unset("angelkiller")
 				}
 			}
@@ -567,7 +565,7 @@ func onAttacked(s *script.Script, e script.Attacked) {
 			st.SetCond(19)
 			setInt(st, "angelkiller", 1)
 			s.PlaySound(p, script.SoundMiddle)
-			mark(p, guardianCorpseLoc)
+			mark(p, guardianCorpseLoc())
 		}
 	case platinumTribeOverlord, platinumTribeShaman:
 		bloodFabric(s, p, st, npcID, 60, 70)
