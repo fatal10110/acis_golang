@@ -1,0 +1,108 @@
+# Path to a Warrior (Q401), level 19, quest started: Simplon takes the letter and sends the character for ten swords; the skeletons drop them, and Simplon trades them for the second sword and his letter, which Auron takes for the third sword. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q401_path_to_a_warrior_simplon.golden
+character Warrior 19
+quest Q401_PathToAWarrior <cond>=1 <state>=STARTED
+hold 1138 1
+hold 1140 9
+random 0
+script quest.Q401_PathToAWarrior
+item 1138 1139 1140 1141 1142 1143 1144 1145
+page trainer/30010.htm
+page merchant/30253.htm
+page script/quest/Q401_PathToAWarrior/
+npc auron 30010 Trainer 10 0 0
+npc simplon 30253 Merchant -10 0 0
+npc skel 20035 Monster 40 0 0
+npc spider 20038 Monster 50 0 0
+
+action simplon
+  items 1138=1 1140=9
+  rows Q401_PathToAWarrior <cond>=1 <state>=STARTED
+  state Q401_PathToAWarrior STARTED
+action simplon
+  S ActionFailed
+  S NpcHtmlMessage obj=simplon item=0 page=merchant/30253.htm
+  S ActionFailed
+bypass npc_{simplon}_Quest
+  S NpcHtmlMessage obj=simplon item=0 page=script/quest/Q401_PathToAWarrior/30253-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q401_PathToAWarrior 30253-02.htm
+  S QuestList 401:0x80000003
+  S ExShowQuestMark quest=401
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1138
+  S SystemMessage id=54 3:1139
+  S NpcHtmlMessage obj=simplon item=0 page=script/quest/Q401_PathToAWarrior/30253-02.htm
+  S ActionFailed
+  Q upsert Q401_PathToAWarrior | <cond> | 2
+  items 1138=0 1139=1
+  rows Q401_PathToAWarrior <cond>=2 <state>=STARTED
+action simplon
+  S ActionFailed
+  S NpcHtmlMessage obj=simplon item=0 page=merchant/30253.htm
+  S ActionFailed
+bypass npc_{simplon}_Quest
+  S NpcHtmlMessage obj=simplon item=0 page=script/quest/Q401_PathToAWarrior/30253-03b.htm
+  S ActionFailed
+  S ActionFailed
+kill skel
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1140
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 401:0x80000007
+  S ExShowQuestMark quest=401
+  Q upsert Q401_PathToAWarrior | <cond> | 3
+  items 1140=10
+  rows Q401_PathToAWarrior <cond>=3 <state>=STARTED
+action simplon
+  S ActionFailed
+  S NpcHtmlMessage obj=simplon item=0 page=merchant/30253.htm
+  S ActionFailed
+action simplon
+  S ActionFailed
+  S NpcHtmlMessage obj=simplon item=0 page=merchant/30253.htm
+  S ActionFailed
+bypass npc_{simplon}_Quest
+  S QuestList 401:0x8000000f
+  S ExShowQuestMark quest=401
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1140 6:10
+  S SystemMessage id=302 3:1139
+  S SystemMessage id=54 3:1141
+  S SystemMessage id=54 3:1143
+  S NpcHtmlMessage obj=simplon item=0 page=script/quest/Q401_PathToAWarrior/30253-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q401_PathToAWarrior | <cond> | 4
+  items 1139=0 1140=0 1141=1 1143=1
+  rows Q401_PathToAWarrior <cond>=4 <state>=STARTED
+action auron
+action auron
+  S ActionFailed
+  S NpcHtmlMessage obj=auron item=0 page=trainer/30010.htm
+  S ActionFailed
+bypass npc_{auron}_Quest
+  S NpcHtmlMessage obj=auron item=0 page=script/quest/Q401_PathToAWarrior/30010-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q401_PathToAWarrior 30010-11.htm
+  S QuestList 401:0x8000001f
+  S ExShowQuestMark quest=401
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1141
+  S SystemMessage id=302 3:1143
+  S SystemMessage id=54 3:1142
+  S NpcHtmlMessage obj=auron item=0 page=script/quest/Q401_PathToAWarrior/30010-11.htm
+  S ActionFailed
+  Q upsert Q401_PathToAWarrior | <cond> | 5
+  items 1141=0 1142=1 1143=0
+  rows Q401_PathToAWarrior <cond>=5 <state>=STARTED
+action auron
+  S ActionFailed
+  S NpcHtmlMessage obj=auron item=0 page=trainer/30010.htm
+  S ActionFailed
+bypass npc_{auron}_Quest
+  S NpcHtmlMessage obj=auron item=0 page=script/quest/Q401_PathToAWarrior/30010-12.htm
+  S ActionFailed
+  S ActionFailed
