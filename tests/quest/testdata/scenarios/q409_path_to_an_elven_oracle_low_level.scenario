@@ -1,0 +1,28 @@
+# Path to an Elven Oracle (Q409), an elven mystic of level 18: Manuel turns it away. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q409_path_to_an_elven_oracle_low_level.golden
+character Mystic 18
+class 25
+script quest.Q409_PathToAnElvenOracle
+item 1231 1232 1233 1234 1235 1236 1275
+page trainer/30293.htm
+page default/30424.htm
+page default/30428.htm
+page script/quest/Q409_PathToAnElvenOracle/
+npc manuel 30293 Trainer 10 0 0
+npc allana 30424 Folk -10 0 0
+npc perrin 30428 Folk 20 0 0
+npc warrior 27032 Monster 40 0 0
+npc scout 27033 Monster 50 0 0
+npc lizard 27034 Monster 60 0 0
+npc tamil 27035 Monster 70 0 0
+
+action manuel
+action manuel
+  S ActionFailed
+  S NpcHtmlMessage obj=manuel item=0 page=trainer/30293.htm
+  S ActionFailed
+bypass npc_{manuel}_Quest
+  S NpcHtmlMessage obj=manuel item=0 page=script/quest/Q409_PathToAnElvenOracle/30293-03.htm
+  S ActionFailed
+  S ActionFailed

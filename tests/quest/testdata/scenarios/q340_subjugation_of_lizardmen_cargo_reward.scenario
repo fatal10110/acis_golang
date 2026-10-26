@@ -1,0 +1,47 @@
+# Subjugation of Lizardmen (Q340), level 20 with 30 cargo: Weisz pays 4090 adena for it and the quest goes on. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q340_subjugation_of_lizardmen_cargo_reward.golden
+character Hunter 20
+quest Q340_SubjugationOfLizardmen <cond>=1 <state>=STARTED
+hold 4255 30
+script quest.Q340_SubjugationOfLizardmen
+item 57 4255 4256 4257 4258
+page guard/30385.htm
+page trainer/30375.htm
+page villagemaster/30037.htm
+page default/30989.htm
+page script/quest/Q340_SubjugationOfLizardmen/
+npc weisz 30385 Guard 10 0 0
+npc adonius 30375 Trainer -10 0 0
+npc levian 30037 VillageMasterPriest 20 0 0
+npc chest 30989 Folk -20 0 0
+npc cargo 20008 Monster 40 0 0
+npc relic 20024 Monster 50 0 0
+
+action weisz
+  items 4255=30
+action weisz
+  S ActionFailed
+  S NpcHtmlMessage obj=weisz item=0 page=guard/30385.htm
+  S ActionFailed
+bypass npc_{weisz}_Quest
+  S NpcHtmlMessage obj=weisz item=0 page=script/quest/Q340_SubjugationOfLizardmen/30385-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q340_SubjugationOfLizardmen 30385-08.htm
+  S NpcHtmlMessage obj=weisz item=0 page=script/quest/Q340_SubjugationOfLizardmen/30385-08.htm
+  S ActionFailed
+bypass Quest Q340_SubjugationOfLizardmen 30385-09.htm
+  S SystemMessage id=301 3:4255 6:30
+  S SystemMessage id=52 6:4090
+  S NpcHtmlMessage obj=weisz item=0 page=script/quest/Q340_SubjugationOfLizardmen/30385-09.htm
+  S ActionFailed
+  items 57=4090 4255=0
+action weisz
+  S ActionFailed
+  S NpcHtmlMessage obj=weisz item=0 page=guard/30385.htm
+  S ActionFailed
+bypass npc_{weisz}_Quest
+  S NpcHtmlMessage obj=weisz item=0 page=script/quest/Q340_SubjugationOfLizardmen/30385-05.htm
+  S ActionFailed
+  S ActionFailed

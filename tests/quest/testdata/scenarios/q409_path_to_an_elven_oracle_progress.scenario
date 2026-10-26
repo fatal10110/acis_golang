@@ -1,0 +1,143 @@
+# Path to an Elven Oracle (Q409), an elven mystic with the captain's order: Allana, Perrin (who calls Tamil), Tamil's necklace, Perrin and Allana again. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q409_path_to_an_elven_oracle_progress.golden
+character Mystic 19
+class 25
+quest Q409_PathToAnElvenOracle <cond>=3 <state>=STARTED
+hold 1231 1
+hold 1234 1
+script quest.Q409_PathToAnElvenOracle
+item 1231 1232 1233 1234 1235 1236 1275
+page trainer/30293.htm
+page default/30424.htm
+page default/30428.htm
+page script/quest/Q409_PathToAnElvenOracle/
+npc manuel 30293 Trainer 10 0 0
+npc allana 30424 Folk -10 0 0
+npc perrin 30428 Folk 20 0 0
+npc warrior 27032 Monster 40 0 0
+npc scout 27033 Monster 50 0 0
+npc lizard 27034 Monster 60 0 0
+npc tamil 27035 Monster 70 0 0
+
+action allana
+  items 1231=1 1234=1
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S QuestList 409:0x8000000f
+  S ExShowQuestMark quest=409
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1236
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q409_PathToAnElvenOracle | <cond> | 4
+  items 1231=1 1234=1 1236=1
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=4 <state>=STARTED
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-03.htm
+  S ActionFailed
+  S ActionFailed
+action perrin
+action perrin
+  S ActionFailed
+  S NpcHtmlMessage obj=perrin item=0 page=default/30428.htm
+  S ActionFailed
+bypass npc_{perrin}_Quest
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q409_PathToAnElvenOracle 30428-02.htm
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-02.htm
+  S ActionFailed
+bypass Quest Q409_PathToAnElvenOracle 30428-06.htm
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-06.htm
+  S ActionFailed
+action perrin
+  S ActionFailed
+  S NpcHtmlMessage obj=perrin item=0 page=default/30428.htm
+  S ActionFailed
+bypass npc_{perrin}_Quest
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-06.htm
+  S ActionFailed
+  S ActionFailed
+kill tamil
+  S NpcSay obj=tamil type=0 npc=1027035 text="As you wish, master!"
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 409:0x8000001f
+  S ExShowQuestMark quest=409
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1275
+  Q upsert Q409_PathToAnElvenOracle | <cond> | 5
+  items 1231=1 1234=1 1236=1 1275=1
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=5 <state>=STARTED
+action allana
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-06.htm
+  S ActionFailed
+  S ActionFailed
+action perrin
+action perrin
+  S ActionFailed
+  S NpcHtmlMessage obj=perrin item=0 page=default/30428.htm
+  S ActionFailed
+bypass npc_{perrin}_Quest
+  S QuestList 409:0x8000003f
+  S ExShowQuestMark quest=409
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1275
+  S SystemMessage id=54 3:1232
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q409_PathToAnElvenOracle | <cond> | 6
+  items 1231=1 1232=1 1234=1 1236=1 1275=0
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=6 <state>=STARTED
+action perrin
+  S ActionFailed
+  S NpcHtmlMessage obj=perrin item=0 page=default/30428.htm
+  S ActionFailed
+bypass npc_{perrin}_Quest
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-05.htm
+  S ActionFailed
+  S ActionFailed
+action allana
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S QuestList 409:0x8000007f
+  S ExShowQuestMark quest=409
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1236
+  S SystemMessage id=54 3:1233
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q409_PathToAnElvenOracle | <cond> | 7
+  items 1231=1 1232=1 1233=1 1234=1 1236=0 1275=0
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=7 <state>=STARTED
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-05.htm
+  S ActionFailed
+  S ActionFailed

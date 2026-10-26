@@ -1,0 +1,61 @@
+# Path to an Elven Oracle (Q409), an elven mystic at Allana: her miracle pages, then the lizardmen she calls; while they stand she says nothing. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q409_path_to_an_elven_oracle_allana.golden
+character Mystic 19
+class 25
+quest Q409_PathToAnElvenOracle <cond>=1 <state>=STARTED
+hold 1231 1
+script quest.Q409_PathToAnElvenOracle
+item 1231 1232 1233 1234 1235 1236 1275
+page trainer/30293.htm
+page default/30424.htm
+page default/30428.htm
+page script/quest/Q409_PathToAnElvenOracle/
+npc manuel 30293 Trainer 10 0 0
+npc allana 30424 Folk -10 0 0
+npc perrin 30428 Folk 20 0 0
+npc warrior 27032 Monster 40 0 0
+npc scout 27033 Monster 50 0 0
+npc lizard 27034 Monster 60 0 0
+npc tamil 27035 Monster 70 0 0
+
+action allana
+  items 1231=1
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q409_PathToAnElvenOracle 30424-07.htm
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-07.htm
+  S ActionFailed
+bypass Quest Q409_PathToAnElvenOracle 30424-08.htm
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q409_PathToAnElvenOracle/30424-08.htm
+  S ActionFailed
+bypass Quest Q409_PathToAnElvenOracle spawn_lizards
+  S QuestList 409:0x80000003
+  S ExShowQuestMark quest=409
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q409_PathToAnElvenOracle | <cond> | 2
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=2 <state>=STARTED
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S ActionFailed
+relog
+  items 1231=1
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=2 <state>=STARTED
+action allana
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S ActionFailed
