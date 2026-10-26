@@ -1,0 +1,27 @@
+# Daimon the White-Eyed, Part 1 (Q603): with four broken crystals the character is told to find the
+# fifth. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q603_daimon_the_white_eyed_part1_crystals_short.golden
+character Hero 75
+quest Q603_DaimonTheWhiteEyed_Part1 <cond>=6 <state>=STARTED
+hold 7191 4
+script quest.Q603_DaimonTheWhiteEyed_Part1
+item 7190 7191 7192
+page default/31683.htm
+page script/quest/Q603_DaimonTheWhiteEyed_Part1/
+npc eye 31683 Folk 10 0 0
+
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31683-06.htm
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-07.htm
+  S ActionFailed
+  items 7191=4
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=6 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED

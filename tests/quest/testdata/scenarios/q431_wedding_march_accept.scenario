@@ -1,0 +1,59 @@
+# Wedding March (Q431): a level 38 character is offered the quest by Kantabilon, accepts it,
+# is told to keep hunting, and keeps the quest through a relog. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q431_wedding_march_accept.golden
+character Hero 38
+script quest.Q431_WeddingMarch
+item 7540 7062
+page default/31042.htm
+page script/quest/Q431_WeddingMarch/
+npc kanta 31042 Folk 10 0 0
+npc lien 20786 Monster 40 0 0
+
+# Kantabilon offers the quest, then the character accepts.
+action kanta
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest
+  S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q431_WeddingMarch CREATED
+  rows Q431_WeddingMarch -
+bypass Quest Q431_WeddingMarch 31042-02.htm
+  S QuestList 431:0x80000001
+  S ExShowQuestMark quest=431
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-02.htm
+  S ActionFailed
+  Q upsert Q431_WeddingMarch | <state> | STARTED
+  Q upsert Q431_WeddingMarch | <cond> | 1
+  rows Q431_WeddingMarch <cond>=1 <state>=STARTED
+  state Q431_WeddingMarch STARTED
+# Asked again, Kantabilon asks for the crystals.
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest
+  S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-02.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q431_WeddingMarch <cond>=1 <state>=STARTED
+  state Q431_WeddingMarch STARTED
+action kanta
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest
+  S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-02.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,22 @@
+# Wedding March (Q431), refused: a level 37 character is too young for Kantabilon, and the quest
+# is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q431_wedding_march_low_level.golden
+character Singer 37
+script quest.Q431_WeddingMarch
+page default/31042.htm
+page script/quest/Q431_WeddingMarch/
+npc kanta 31042 Folk 10 0 0
+
+# Kantabilon: too young.
+action kanta
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest
+  S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-00.htm
+  S ActionFailed
+  S ActionFailed
+
+  state Q431_WeddingMarch CREATED
+  rows Q431_WeddingMarch -

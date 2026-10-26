@@ -1,0 +1,86 @@
+# Quest for Fishing Shot (Q426): a started character kills monsters of each table of the quest: a draw
+# up to the monster's chance gives one fluid more than its sure ones (the chance itself too), and a
+# monster of two tables answers by the first. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q426_quest_for_fishing_shot_hunt.golden
+character Hero 40
+quest Q426_QuestForFishingShot <cond>=1 <state>=STARTED
+random 0 45 0 46 0 650 0 651 0 420 0 111 0 0 0 935 0 116 0 0 0 400
+script quest.Q426_QuestForFishingShot
+item 7586
+page fisherman/31562.htm
+page fisherman/32007.htm
+page script/quest/Q426_QuestForFishingShot/
+npc klufe 31562 Fisherman 10 0 0
+npc galba 32007 Fisherman 20 0 0
+npc imp 20005 Monster 40 0 0
+npc dummy 21263 Monster 50 0 0
+npc gob 20579 Monster 60 0 0
+npc lizard 20655 Monster 70 0 0
+npc mob4 20815 Monster 80 0 0
+npc mob5 20828 Monster 90 0 0
+npc lord 20829 Monster 100 0 0
+npc shaman 21066 Monster 110 0 0
+npc tribe 21071 Monster 120 0 0
+
+# Each kill draws once: the sure fluids of the monster's table, and one more for a draw up to its chance.
+kill imp
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7586
+  items 7586=1
+kill imp
+  S SystemMessage id=95 1:0 1:0
+  items 7586=1
+kill dummy
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7586
+  items 7586=2
+kill dummy
+  S SystemMessage id=95 1:0 1:0
+  items 7586=2
+kill gob
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7586 6:2
+  items 7586=4
+kill lizard
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7586 6:2
+  items 7586=6
+kill mob4
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7586 6:4
+  items 7586=10
+kill mob5
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7586 6:5
+  items 7586=15
+kill lord
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7586 6:6
+  items 7586=21
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7586 6:6
+  items 7586=27
+kill tribe
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7586 6:13
+  items 7586=40
+action klufe
+action klufe
+  S ActionFailed
+  S NpcHtmlMessage obj=klufe item=0 page=fisherman/31562.htm
+  S ActionFailed
+bypass npc_{klufe}_Quest
+  S NpcHtmlMessage obj=klufe item=0 page=script/quest/Q426_QuestForFishingShot/05.htm
+  S ActionFailed
+  S ActionFailed
+  state Q426_QuestForFishingShot STARTED

@@ -1,0 +1,36 @@
+# Shadow of Light (Q602): the character hands in 100 eyes and the reward draw is 45: adena, three items and experience.
+# The quest ends. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q602_shadow_of_light_finish_item_c.golden
+character Hero 70
+quest Q602_ShadowOfLight <cond>=2 <state>=STARTED
+hold 7189 100
+random 45
+script quest.Q602_ShadowOfLight
+item 7189 6699 6698 6700 57
+page default/31683.htm
+page script/quest/Q602_ShadowOfLight/
+npc eye 31683 Folk 10 0 0
+npc buffalo 21299 Monster 40 0 0
+
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q602_ShadowOfLight/31683-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q602_ShadowOfLight 31683-05.htm
+  S SystemMessage id=301 3:7189 6:100
+  S SystemMessage id=52 6:40000
+  S SystemMessage id=53 3:6700 6:3
+  S SystemMessage id=95 1:150000 1:10000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q602_ShadowOfLight/31683-05.htm
+  S ActionFailed
+  Q delete-quest Q602_ShadowOfLight
+  items 7189=0 57=40000 6700=3
+  state Q602_ShadowOfLight -
+  rows Q602_ShadowOfLight -
