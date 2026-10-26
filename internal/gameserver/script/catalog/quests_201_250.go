@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q218"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q219"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q220"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q221"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q222"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q223"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q224"
@@ -37,7 +38,7 @@ func quests201To250() script.Catalog {
 		"quest.Q218_TestimonyOfLife":          q218.New,
 		"quest.Q219_TestimonyOfFate":          q219.New,
 		"quest.Q220_TestimonyOfGlory":         q220.New,
-		"quest.Q221_TestimonyOfProsperity":    nil,
+		"quest.Q221_TestimonyOfProsperity":    q221.New,
 		"quest.Q222_TestOfTheDuelist":         q222.New,
 		"quest.Q223_TestOfTheChampion":        q223.New,
 		"quest.Q224_TestOfSagittarius":        q224.New,
