@@ -1,0 +1,86 @@
+# Pursuit Of Clan Ambition (Q503), the last leg: the leader of a level 4 clan kills the Grave Guard
+# that calls the Grave Keymaster (a spawned NPC the Boot tests play), takes the sixth Imperial key from the Keymaster and opens a coffer
+# for the Scepter of Judgment, and hands it to Sir Gustav for the Seal of Aspiration and 250000 SP.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q503_pursuit_of_clan_ambition_finish.golden
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=10 killed=4 <state>=STARTED
+random always 0
+hold 3847 5
+script quest.Q503_PursuitOfClanAmbition
+item 3847 3869 3870
+page default/30760.htm
+page default/30868.htm
+page default/30765.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc gustav 30760 Folk 10 0 0
+npc eric 30868 Folk 20 0 0
+npc coffer 30765 Folk 30 0 0
+npc guard 20668 Monster 40 0 0
+npc keymaster 27179 Monster 50 0 0
+
+kill guard
+  S SystemMessage id=95 1:0 1:0
+  Q upsert Q503_PursuitOfClanAmbition | killed | 0
+  rows Q503_PursuitOfClanAmbition <cond>=10 <state>=STARTED killed=0
+kill keymaster
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3847
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3847=6
+action coffer
+action coffer
+  S ActionFailed
+  S NpcHtmlMessage obj=coffer item=0 page=default/30765.htm
+  S ActionFailed
+bypass npc_{coffer}_Quest
+  S NpcHtmlMessage obj=coffer item=0 page=script/quest/Q503_PursuitOfClanAmbition/30765-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30765-04.htm
+  S SystemMessage id=301 3:3847 6:6
+  S SystemMessage id=54 3:3869
+  S NpcHtmlMessage obj=coffer item=0 page=script/quest/Q503_PursuitOfClanAmbition/30765-04.htm
+  S ActionFailed
+  Q delete-var Q503_PursuitOfClanAmbition | killed
+  items 3847=0 3869=1
+  rows Q503_PursuitOfClanAmbition <cond>=10 <state>=STARTED
+action eric
+action eric
+  S ActionFailed
+  S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
+  S ActionFailed
+bypass npc_{eric}_Quest
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q503_PursuitOfClanAmbition/30868-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30868-10.htm
+  S QuestList 503:0x800007ff
+  S ExShowQuestMark quest=503
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q503_PursuitOfClanAmbition/30868-10.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 11
+  rows Q503_PursuitOfClanAmbition <cond>=11 <state>=STARTED
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-19.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-20.htm
+  S SystemMessage id=302 3:3869
+  S SystemMessage id=54 3:3870
+  S SystemMessage id=331 1:250000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-20.htm
+  S ActionFailed
+  Q delete-quest Q503_PursuitOfClanAmbition
+  items 3869=0 3870=1
+  state Q503_PursuitOfClanAmbition -
+  rows Q503_PursuitOfClanAmbition -

@@ -1,0 +1,169 @@
+# Pursuit Of Clan Ambition (Q503): the leader of a level 4 clan takes Sir Gustav's quest, Martien sends
+# the clan after the dwarf corpses' eggs (the corpses spawn NPCs, which a scenario cannot show: the Boot
+# tests play them), the leader brings the last eggs from the monsters and hands all forty to Martien,
+# and Sir Gustav gives the second letter. Each egg is an always-drop to the clan leader. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q503_pursuit_of_clan_ambition_eggs.golden
+character Leader 40
+clan 4
+random always 0
+hold 3839 8
+hold 3840 8
+hold 3841 8
+hold 3842 8
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3866 3867
+page default/30760.htm
+page default/30645.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc gustav 30760 Folk 10 0 0
+npc martien 30645 Folk -10 0 0
+npc thunder 20243 Monster 40 0 0
+npc drake 20137 Monster 50 0 0
+npc blitz 27178 Monster 60 0 0
+
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-05.htm
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-05.htm
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-06.htm
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-06.htm
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-08.htm
+  S QuestList 503:0x80000001
+  S ExShowQuestMark quest=503
+  S SystemMessage id=54 3:3866
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-08.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <state> | STARTED
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 1
+  items 3866=1
+  rows Q503_PursuitOfClanAmbition <cond>=1 <state>=STARTED
+  state Q503_PursuitOfClanAmbition STARTED
+action martien
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q503_PursuitOfClanAmbition/30645-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30645-03.htm
+  S QuestList 503:0x80000003
+  S ExShowQuestMark quest=503
+  S SystemMessage id=302 3:3866
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q503_PursuitOfClanAmbition/30645-03.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | 30761 | true
+  Q upsert Q503_PursuitOfClanAmbition | 30762 | true
+  Q upsert Q503_PursuitOfClanAmbition | 30763 | true
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 2
+  items 3866=0
+  rows Q503_PursuitOfClanAmbition 30761=true 30762=true 30763=true <cond>=2 <state>=STARTED
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q503_PursuitOfClanAmbition/30645-04.htm
+  S ActionFailed
+  S ActionFailed
+kill thunder x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3842
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3842
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3842=10
+kill drake x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3839
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3841
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3839
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3841
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3839=10 3841=10
+kill blitz x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3840
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3840
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3840=10
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S SystemMessage id=301 3:3839 6:10
+  S SystemMessage id=301 3:3840 6:10
+  S SystemMessage id=301 3:3841 6:10
+  S SystemMessage id=301 3:3842 6:10
+  S QuestList 503:0x80000007
+  S ExShowQuestMark quest=503
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q503_PursuitOfClanAmbition/30645-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 3
+  items 3839=0 3840=0 3841=0 3842=0
+  rows Q503_PursuitOfClanAmbition 30761=true 30762=true 30763=true <cond>=3 <state>=STARTED
+bypass Quest Q503_PursuitOfClanAmbition 30645-06.htm
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q503_PursuitOfClanAmbition/30645-06.htm
+  S ActionFailed
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-12.htm
+  S QuestList 503:0x8000000f
+  S ExShowQuestMark quest=503
+  S SystemMessage id=54 3:3867
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-12.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 4
+  items 3867=1
+  rows Q503_PursuitOfClanAmbition 30761=true 30762=true 30763=true <cond>=4 <state>=STARTED
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-13.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,178 @@
+# Pursuit Of Clan Ambition (Q503), the second leg: the leader of a level 4 clan trades Kusto's
+# brooch for the Black Anvil coin, takes the recipe from Balthazar, hunts the titan powerstones with
+# the lesser giants (each a drop to the clan leader that rolls once for the item), hands them in,
+# takes Sir Gustav's third letter, and Sir Eric Rodemai and Witch Cleo take the clan to the witches
+# (spawned NPCs, which a scenario cannot show: the Boot tests play them). Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q503_pursuit_of_clan_ambition_items.golden
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=4 <state>=STARTED
+random always 0
+hold 3843 1
+hold 3867 1
+hold 3844 10
+hold 3846 8
+script quest.Q503_PursuitOfClanAmbition
+item 3838 3843 3844 3846 3867 3868 3871
+page default/30760.htm
+page villagemaster/30512.htm
+page default/30764.htm
+page default/30868.htm
+page default/30766.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc gustav 30760 Folk 10 0 0
+npc kusto 30512 VillageMasterDwarf -10 0 0
+npc balthazar 30764 Folk -20 0 0
+npc eric 30868 Folk 20 0 0
+npc cleo 30766 Folk 30 0 0
+npc athrea 30758 Folk 70 0 0
+npc kalis 30759 Folk 80 0 0
+npc giant 20656 Monster 40 0 0
+
+action kusto
+action kusto
+  S ActionFailed
+  S NpcHtmlMessage obj=kusto item=0 page=villagemaster/30512.htm
+  S ActionFailed
+bypass npc_{kusto}_Quest
+  S NpcHtmlMessage obj=kusto item=0 page=script/quest/Q503_PursuitOfClanAmbition/30512-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30512-03.htm
+  S SystemMessage id=302 3:3843
+  S SystemMessage id=54 3:3871
+  S NpcHtmlMessage obj=kusto item=0 page=script/quest/Q503_PursuitOfClanAmbition/30512-03.htm
+  S ActionFailed
+  items 3843=0 3871=1
+action balthazar
+action balthazar
+  S ActionFailed
+  S NpcHtmlMessage obj=balthazar item=0 page=default/30764.htm
+  S ActionFailed
+bypass npc_{balthazar}_Quest
+  S NpcHtmlMessage obj=balthazar item=0 page=script/quest/Q503_PursuitOfClanAmbition/30764-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30764-05.htm
+  S NpcHtmlMessage obj=balthazar item=0 page=script/quest/Q503_PursuitOfClanAmbition/30764-05.htm
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30764-06.htm
+  S QuestList 503:0x8000001f
+  S ExShowQuestMark quest=503
+  S SystemMessage id=302 3:3867
+  S SystemMessage id=302 3:3871
+  S SystemMessage id=54 3:3838
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=balthazar item=0 page=script/quest/Q503_PursuitOfClanAmbition/30764-06.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 5
+  items 3867=0 3871=0 3838=1
+  rows Q503_PursuitOfClanAmbition <cond>=5 <state>=STARTED
+kill giant x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3846
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3846
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3846=10
+action balthazar
+  S ActionFailed
+  S NpcHtmlMessage obj=balthazar item=0 page=default/30764.htm
+  S ActionFailed
+action balthazar
+  S ActionFailed
+  S NpcHtmlMessage obj=balthazar item=0 page=default/30764.htm
+  S ActionFailed
+bypass npc_{balthazar}_Quest
+  S QuestList 503:0x8000003f
+  S ExShowQuestMark quest=503
+  S SystemMessage id=301 3:3844 6:10
+  S SystemMessage id=301 3:3846 6:10
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=balthazar item=0 page=script/quest/Q503_PursuitOfClanAmbition/30764-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 6
+  items 3844=0 3846=0
+  rows Q503_PursuitOfClanAmbition <cond>=6 <state>=STARTED
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-16.htm
+  S QuestList 503:0x8000007f
+  S ExShowQuestMark quest=503
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3868
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-16.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 7
+  items 3868=1
+  rows Q503_PursuitOfClanAmbition <cond>=7 <state>=STARTED
+action eric
+action eric
+  S ActionFailed
+  S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
+  S ActionFailed
+bypass npc_{eric}_Quest
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q503_PursuitOfClanAmbition/30868-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30868-03.htm
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q503_PursuitOfClanAmbition/30868-03.htm
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30868-04.htm
+  S QuestList 503:0x800000ff
+  S ExShowQuestMark quest=503
+  S SystemMessage id=302 3:3868
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q503_PursuitOfClanAmbition/30868-04.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 8
+  items 3868=0
+  rows Q503_PursuitOfClanAmbition <cond>=8 <state>=STARTED
+action cleo
+action cleo
+  S ActionFailed
+  S NpcHtmlMessage obj=cleo item=0 page=default/30766.htm
+  S ActionFailed
+bypass npc_{cleo}_Quest
+  S NpcHtmlMessage obj=cleo item=0 page=script/quest/Q503_PursuitOfClanAmbition/30766-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30766-03.htm
+  S NpcHtmlMessage obj=cleo item=0 page=script/quest/Q503_PursuitOfClanAmbition/30766-03.htm
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30766-04.htm
+  S NpcSay obj=cleo type=0 npc=1030766 text="Blood and honor!"
+  S QuestList 503:0x800001ff
+  S ExShowQuestMark quest=503
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=cleo item=0 page=script/quest/Q503_PursuitOfClanAmbition/30766-04.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 9
+  rows Q503_PursuitOfClanAmbition <cond>=9 <state>=STARTED
+action eric
+action eric
+  S ActionFailed
+  S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
+  S ActionFailed
+bypass npc_{eric}_Quest
+  S QuestList 503:0x800003ff
+  S ExShowQuestMark quest=503
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q503_PursuitOfClanAmbition/30868-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 10
+  rows Q503_PursuitOfClanAmbition <cond>=10 <state>=STARTED
+bypass Quest Q503_PursuitOfClanAmbition 30868-06a.htm
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q503_PursuitOfClanAmbition/30868-06a.htm
+  S ActionFailed

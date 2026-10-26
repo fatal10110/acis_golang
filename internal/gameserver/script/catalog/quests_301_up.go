@@ -85,6 +85,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q426"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q431"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q432"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q503"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
@@ -215,7 +216,7 @@ func quests301Up() script.Catalog {
 		"quest.Q431_WeddingMarch":                      q431.New,
 		"quest.Q432_BirthdayPartySong":                 q432.New,
 		"quest.Q501_ProofOfClanAlliance":               nil,
-		"quest.Q503_PursuitOfClanAmbition":             nil,
+		"quest.Q503_PursuitOfClanAmbition":             q503.New,
 		"quest.Q504_CompetitionForTheBanditStronghold": q504.New,
 		"quest.Q509_TheClansPrestige":                  nil,
 		"quest.Q601_WatchingEyes":                      q601.New,
