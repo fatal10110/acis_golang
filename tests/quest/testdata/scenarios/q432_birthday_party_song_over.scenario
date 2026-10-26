@@ -1,0 +1,28 @@
+# Birthday Party Song (Q432): the reward is for exactly fifty red crystals: with 51 the character gets
+# the page it asked for and nothing else. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q432_birthday_party_song_over.golden
+character Hero 35
+quest Q432_BirthdayPartySong <cond>=2 <state>=STARTED
+hold 7541 51
+script quest.Q432_BirthdayPartySong
+item 7541 7061
+page default/31043.htm
+page script/quest/Q432_BirthdayPartySong/
+npc octavia 31043 Folk 10 0 0
+npc golem 21103 Monster 40 0 0
+
+action octavia
+action octavia
+  S ActionFailed
+  S NpcHtmlMessage obj=octavia item=0 page=default/31043.htm
+  S ActionFailed
+bypass npc_{octavia}_Quest
+  S NpcHtmlMessage obj=octavia item=0 page=script/quest/Q432_BirthdayPartySong/31043-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q432_BirthdayPartySong 31043-06.htm
+  S NpcHtmlMessage obj=octavia item=0 page=script/quest/Q432_BirthdayPartySong/31043-06.htm
+  S ActionFailed
+  items 7541=51 7061=0
+  rows Q432_BirthdayPartySong <cond>=2 <state>=STARTED
+  state Q432_BirthdayPartySong STARTED

@@ -72,7 +72,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q415"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q418"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q419"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q426"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q431"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q432"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q603"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
 
@@ -161,16 +167,16 @@ func quests301Up() script.Catalog {
 		"quest.Q419_GetAPet":                           q419.New,
 		"quest.Q420_LittleWing":                        nil,
 		"quest.Q421_LittleWingsBigAdventure":           nil,
-		"quest.Q426_QuestForFishingShot":               nil,
-		"quest.Q431_WeddingMarch":                      nil,
-		"quest.Q432_BirthdayPartySong":                 nil,
+		"quest.Q426_QuestForFishingShot":               q426.New,
+		"quest.Q431_WeddingMarch":                      q431.New,
+		"quest.Q432_BirthdayPartySong":                 q432.New,
 		"quest.Q501_ProofOfClanAlliance":               nil,
 		"quest.Q503_PursuitOfClanAmbition":             nil,
 		"quest.Q504_CompetitionForTheBanditStronghold": q504.New,
 		"quest.Q509_TheClansPrestige":                  nil,
-		"quest.Q601_WatchingEyes":                      nil,
-		"quest.Q602_ShadowOfLight":                     nil,
-		"quest.Q603_DaimonTheWhiteEyed_Part1":          nil,
+		"quest.Q601_WatchingEyes":                      q601.New,
+		"quest.Q602_ShadowOfLight":                     q602.New,
+		"quest.Q603_DaimonTheWhiteEyed_Part1":          q603.New,
 		"quest.Q604_DaimonTheWhiteEyed_Part2":          nil,
 		"quest.Q605_AllianceWithKetraOrcs":             nil,
 		"quest.Q606_WarWithVarkaSilenos":               nil,

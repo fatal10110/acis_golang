@@ -1,0 +1,48 @@
+# Quest for Fishing Shot (Q426): a character holding sweet fluid is told so by the guild and ends the
+# quest, which takes the fluid with it; it can start again. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q426_quest_for_fishing_shot_finish.golden
+character Hero 40
+quest Q426_QuestForFishingShot <cond>=1 <state>=STARTED
+hold 7586 5
+script quest.Q426_QuestForFishingShot
+item 7586
+page fisherman/31562.htm
+page fisherman/32007.htm
+page script/quest/Q426_QuestForFishingShot/
+npc klufe 31562 Fisherman 10 0 0
+npc galba 32007 Fisherman 20 0 0
+
+action klufe
+action klufe
+  S ActionFailed
+  S NpcHtmlMessage obj=klufe item=0 page=fisherman/31562.htm
+  S ActionFailed
+bypass npc_{klufe}_Quest
+  S NpcHtmlMessage obj=klufe item=0 page=script/quest/Q426_QuestForFishingShot/05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q426_QuestForFishingShot 08.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=301 3:7586 6:5
+  S NpcHtmlMessage obj=klufe item=0 page=script/quest/Q426_QuestForFishingShot/08.htm
+  S ActionFailed
+  Q delete-quest Q426_QuestForFishingShot
+  items 7586=0
+  state Q426_QuestForFishingShot -
+  rows Q426_QuestForFishingShot -
+action klufe
+  S ActionFailed
+  S NpcHtmlMessage obj=klufe item=0 page=fisherman/31562.htm
+  S ActionFailed
+action klufe
+  S ActionFailed
+  S NpcHtmlMessage obj=klufe item=0 page=fisherman/31562.htm
+  S ActionFailed
+bypass npc_{klufe}_Quest
+  S NpcHtmlMessage obj=klufe item=0 page=script/quest/Q426_QuestForFishingShot/01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q426_QuestForFishingShot CREATED
+  rows Q426_QuestForFishingShot -
