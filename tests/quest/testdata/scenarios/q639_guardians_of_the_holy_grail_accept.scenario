@@ -1,0 +1,47 @@
+# Guardians of the Holy Grail (Q639): a level 73 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q639_guardians_of_the_holy_grail_accept.golden
+character Hero 73
+script quest.Q639_GuardiansOfTheHolyGrail
+item 8069 8070 8071 57 959 960
+page default/31350.htm
+page default/32008.htm
+page default/32028.htm
+page script/quest/Q639_GuardiansOfTheHolyGrail/
+npc dominic 31350 Folk 10 0 0
+npc gremory 32008 Folk 20 0 0
+npc grail 32028 Folk 30 0 0
+
+action dominic
+action dominic
+  S ActionFailed
+  S NpcHtmlMessage obj=dominic item=0 page=default/31350.htm
+  S ActionFailed
+bypass npc_{dominic}_Quest
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/31350-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 31350-03.htm
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/31350-03.htm
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 31350-04.htm
+  S QuestList 639:0x80000001
+  S ExShowQuestMark quest=639
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/31350-04.htm
+  S ActionFailed
+  Q upsert Q639_GuardiansOfTheHolyGrail | <state> | STARTED
+  Q upsert Q639_GuardiansOfTheHolyGrail | <cond> | 1
+  rows Q639_GuardiansOfTheHolyGrail <cond>=1 <state>=STARTED
+  state Q639_GuardiansOfTheHolyGrail STARTED
+action dominic
+  S ActionFailed
+  S NpcHtmlMessage obj=dominic item=0 page=default/31350.htm
+  S ActionFailed
+bypass npc_{dominic}_Quest
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/31350-06.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q639_GuardiansOfTheHolyGrail <cond>=1 <state>=STARTED
+  state Q639_GuardiansOfTheHolyGrail STARTED

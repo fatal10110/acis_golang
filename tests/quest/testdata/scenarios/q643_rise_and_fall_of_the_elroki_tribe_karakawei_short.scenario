@@ -1,0 +1,30 @@
+# Rise and Fall of the Elroki Tribe (Q643): fewer than three hundred bones pay nothing.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q643_rise_and_fall_of_the_elroki_tribe_karakawei_short.golden
+character Hero 75
+quest Q643_RiseAndFallOfTheElrokiTribe <cond>=1 <state>=STARTED
+hold 8776 299
+script quest.Q643_RiseAndFallOfTheElrokiTribe
+item 8776 57 8712 8713 8714 8715 8716 8717 8718 8719 8720 8721 8722
+page merchant/32106.htm
+page default/32117.htm
+page script/quest/Q643_RiseAndFallOfTheElrokiTribe/
+npc singsing 32106 Merchant 10 0 0
+npc karakawei 32117 Folk 20 0 0
+
+action karakawei
+action karakawei
+  S ActionFailed
+  S NpcHtmlMessage obj=karakawei item=0 page=default/32117.htm
+  S ActionFailed
+bypass npc_{karakawei}_Quest
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32117-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q643_RiseAndFallOfTheElrokiTribe 32117-02.htm
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32117-02.htm
+  S ActionFailed
+bypass Quest Q643_RiseAndFallOfTheElrokiTribe 32117-03.htm
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32117-04.htm
+  S ActionFailed
+  items 8776=299
