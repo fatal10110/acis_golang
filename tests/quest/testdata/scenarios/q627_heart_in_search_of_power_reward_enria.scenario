@@ -1,0 +1,38 @@
+# Heart in Search of Power (Q627): the gem pays the reward of the link enria.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q627_heart_in_search_of_power_reward_enria.golden
+character Hero 60
+quest Q627_HeartInSearchOfPower <cond>=4 <state>=STARTED
+hold 7172 1
+script quest.Q627_HeartInSearchOfPower
+item 7170 7171 7172 57 4041 4042 4043 4044
+page default/31518.htm
+page default/31519.htm
+page script/quest/Q627_HeartInSearchOfPower/
+npc necro 31518 Folk 10 0 0
+npc enfeux 31519 Folk 20 0 0
+
+action necro
+action necro
+  S ActionFailed
+  S NpcHtmlMessage obj=necro item=0 page=default/31518.htm
+  S ActionFailed
+bypass npc_{necro}_Quest
+  S NpcHtmlMessage obj=necro item=0 page=script/quest/Q627_HeartInSearchOfPower/31518-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q627_HeartInSearchOfPower 31518-06.htm
+  S NpcHtmlMessage obj=necro item=0 page=script/quest/Q627_HeartInSearchOfPower/31518-06.htm
+  S ActionFailed
+bypass Quest Q627_HeartInSearchOfPower enria
+  S SystemMessage id=302 3:7172
+  S SystemMessage id=53 3:4042 6:6
+  S SystemMessage id=52 6:13600
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=necro item=0 page=script/quest/Q627_HeartInSearchOfPower/31518-07.htm
+  S ActionFailed
+  Q delete-quest Q627_HeartInSearchOfPower
+  rows Q627_HeartInSearchOfPower -
+  state Q627_HeartInSearchOfPower -
+  items 57=13600 4042=6

@@ -1,0 +1,55 @@
+# A Dark Twilight (Q626): a monster drops a blood of Saint only for a draw under its own chance; the three hundredth moves the quest to cond 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q626_a_dark_twilight_hunt.golden
+character Hero 60
+quest Q626_ADarkTwilight <cond>=1 <state>=STARTED
+hold 7169 298
+random 0 0 0 739000 0 0
+script quest.Q626_ADarkTwilight
+item 7169 57
+page default/31517.htm
+page script/quest/Q626_ADarkTwilight/
+npc hierarch 31517 Folk 10 0 0
+npc m1 21520 Monster 40 0 0
+npc m2 21539 Monster 50 0 0
+npc m3 21658 Monster 60 0 0
+
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q626_ADarkTwilight/31517-05.htm
+  S ActionFailed
+  S ActionFailed
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7169=299
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 7169=299
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7169
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 626:0x80000003
+  S ExShowQuestMark quest=626
+  Q upsert Q626_ADarkTwilight | <cond> | 2
+  rows Q626_ADarkTwilight <cond>=2 <state>=STARTED
+  state Q626_ADarkTwilight STARTED
+  items 7169=300
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q626_ADarkTwilight/31517-04.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,42 @@
+# In the Forgotten Village (Q633): two hundred bones pay adena and experience, and the quest goes back to cond 1.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q633_in_the_forgotten_village_reward.golden
+character Hero 65
+quest Q633_InTheForgottenVillage <cond>=2 <state>=STARTED
+hold 7544 200
+script quest.Q633_InTheForgottenVillage
+item 7544 7545 57
+page default/31388.htm
+page script/quest/Q633_InTheForgottenVillage/
+npc mina 31388 Folk 10 0 0
+
+action mina
+action mina
+  S ActionFailed
+  S NpcHtmlMessage obj=mina item=0 page=default/31388.htm
+  S ActionFailed
+bypass npc_{mina}_Quest
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q633_InTheForgottenVillage 31388-09.htm
+  S SystemMessage id=301 3:7544 6:200
+  S SystemMessage id=52 6:25000
+  S SystemMessage id=45 1:305235
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 633:0x80000001
+  S ExShowQuestMark quest=633
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-08.htm
+  S ActionFailed
+  Q upsert Q633_InTheForgottenVillage | <cond> | 1
+  rows Q633_InTheForgottenVillage <cond>=1 <state>=STARTED
+  state Q633_InTheForgottenVillage STARTED
+  items 57=25000
+action mina
+  S ActionFailed
+  S NpcHtmlMessage obj=mina item=0 page=default/31388.htm
+  S ActionFailed
+bypass npc_{mina}_Quest
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-06.htm
+  S ActionFailed
+  S ActionFailed

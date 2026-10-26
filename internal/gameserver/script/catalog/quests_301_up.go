@@ -85,6 +85,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q621"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q622"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q623"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q624"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q626"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q627"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q629"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q631"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q632"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q633"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q634"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
 
@@ -202,16 +210,16 @@ func quests301Up() script.Catalog {
 		"quest.Q621_EggDelivery":                       q621.New,
 		"quest.Q622_SpecialtyLiquorDelivery":           q622.New,
 		"quest.Q623_TheFinestFood":                     q623.New,
-		"quest.Q624_TheFinestIngredients_Part1":        nil,
+		"quest.Q624_TheFinestIngredients_Part1":        q624.New,
 		"quest.Q625_TheFinestIngredients_Part2":        nil,
-		"quest.Q626_ADarkTwilight":                     nil,
-		"quest.Q627_HeartInSearchOfPower":              nil,
+		"quest.Q626_ADarkTwilight":                     q626.New,
+		"quest.Q627_HeartInSearchOfPower":              q627.New,
 		"quest.Q628_HuntOfTheGoldenRamMercenaryForce":  nil,
-		"quest.Q629_CleanUpTheSwampOfScreams":          nil,
-		"quest.Q631_DeliciousTopChoiceMeat":            nil,
-		"quest.Q632_NecromancersRequest":               nil,
-		"quest.Q633_InTheForgottenVillage":             nil,
-		"quest.Q634_InSearchOfFragmentsOfDimension":    nil,
+		"quest.Q629_CleanUpTheSwampOfScreams":          q629.New,
+		"quest.Q631_DeliciousTopChoiceMeat":            q631.New,
+		"quest.Q632_NecromancersRequest":               q632.New,
+		"quest.Q633_InTheForgottenVillage":             q633.New,
+		"quest.Q634_InSearchOfFragmentsOfDimension":    q634.New,
 		"quest.Q635_InTheDimensionalRift":              nil,
 		"quest.Q637_ThroughTheGateOnceMore":            nil,
 		"quest.Q638_SeekersOfTheHolyGrail":             nil,
