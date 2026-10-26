@@ -81,9 +81,9 @@ type teleporter struct {
 // to 8.
 func FrintezzaTeleporter() script.Script {
 	base := defaultnpc.New().Hooks
-	t := &teleporter{busy: &script.IntCell{}}
-	for i := range t.parties {
-		t.parties[i] = &script.ListCell[*script.Player]{}
+	t := &teleporter{
+		busy:    &script.IntCell{},
+		parties: [5]*script.ListCell[*script.Player]{{}, {}, {}, {}, {}},
 	}
 	return script.Script{
 		Dir: dir, Behavior: true, NPCs: []int32{32011},
@@ -327,7 +327,9 @@ func (t *teleporter) admit(s *script.Script, n *script.NPC, player *script.Playe
 
 	for i, party := range parties {
 		t.parties[i].Clear()
-		t.parties[i].Add(party...)
+		for _, member := range party {
+			t.parties[i].Add(member)
+		}
 
 		at := teleLoc(i)
 		for _, member := range party {
