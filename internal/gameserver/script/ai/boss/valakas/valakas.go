@@ -119,8 +119,8 @@ func Valakas() script.Script {
 			}
 
 			if s.Rnd(100) < 2 {
-				raisePrivates(s, n, attacker, firstPrivateSpots())
-				raisePrivates(s, n, attacker, secondPrivateSpots())
+				raisePrivates(s, n, attacker, script.Farthest(attacker, firstPrivateSpots(), 2))
+				raisePrivates(s, n, attacker, script.Farthest(attacker, secondPrivateSpots(), 2))
 			}
 
 			maxHP := n.MaxHP()
@@ -348,10 +348,9 @@ func Valakas() script.Script {
 }
 
 // raisePrivates raises a Lavasaurus Elder against attacker at the first of
-// the two spots picked from spots around it, and on an even draw a second
-// one at the other, each told who attacker is.
-func raisePrivates(s *script.Script, n *script.NPC, attacker script.Creature, spots []script.Loc) {
-	picked := script.Farthest(attacker, spots, 2)
+// the two spots picked, and on an even draw a second one at the other, each
+// told who attacker is.
+func raisePrivates(s *script.Script, n *script.NPC, attacker script.Creature, picked []script.Loc) {
 	if len(picked) == 0 {
 		return
 	}
