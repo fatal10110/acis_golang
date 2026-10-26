@@ -1,0 +1,59 @@
+# Path to an Elven Oracle (Q409), an elven mystic with the four items: Manuel gives the Leaf of the Oracle, experience and skill points; then relog. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q409_path_to_an_elven_oracle_finish.golden
+character Mystic 19
+class 25
+quest Q409_PathToAnElvenOracle <cond>=7 <state>=STARTED
+hold 1231 1
+hold 1232 1
+hold 1233 1
+hold 1234 1
+script quest.Q409_PathToAnElvenOracle
+item 1231 1232 1233 1234 1235 1236 1275
+page trainer/30293.htm
+page default/30424.htm
+page default/30428.htm
+page script/quest/Q409_PathToAnElvenOracle/
+npc manuel 30293 Trainer 10 0 0
+npc allana 30424 Folk -10 0 0
+npc perrin 30428 Folk 20 0 0
+npc warrior 27032 Monster 40 0 0
+npc scout 27033 Monster 50 0 0
+npc lizard 27034 Monster 60 0 0
+npc tamil 27035 Monster 70 0 0
+
+action manuel
+  items 1231=1 1232=1 1233=1 1234=1
+action manuel
+  S ActionFailed
+  S NpcHtmlMessage obj=manuel item=0 page=trainer/30293.htm
+  S ActionFailed
+bypass npc_{manuel}_Quest
+  S SystemMessage id=302 3:1233
+  S SystemMessage id=302 3:1231
+  S SystemMessage id=302 3:1234
+  S SystemMessage id=302 3:1232
+  S SystemMessage id=54 3:1235
+  S SystemMessage id=95 1:3200 1:1130
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=manuel item=0 page=script/quest/Q409_PathToAnElvenOracle/30293-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q409_PathToAnElvenOracle
+  items 1231=0 1232=0 1233=0 1234=0 1235=1
+  state Q409_PathToAnElvenOracle -
+  rows Q409_PathToAnElvenOracle -
+relog
+  items 1231=0 1232=0 1233=0 1234=0 1235=1
+  state Q409_PathToAnElvenOracle -
+  rows Q409_PathToAnElvenOracle -
+action manuel
+action manuel
+  S ActionFailed
+  S NpcHtmlMessage obj=manuel item=0 page=trainer/30293.htm
+  S ActionFailed
+bypass npc_{manuel}_Quest
+  S NpcHtmlMessage obj=manuel item=0 page=script/quest/Q409_PathToAnElvenOracle/30293-04.htm
+  S ActionFailed
+  S ActionFailed

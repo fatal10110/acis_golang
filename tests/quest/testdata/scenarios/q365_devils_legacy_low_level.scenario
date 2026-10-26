@@ -1,0 +1,23 @@
+# Devil's Legacy (Q365), level 38: Randolf turns the character away. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q365_devils_legacy_low_level.golden
+character Raider 38
+script quest.Q365_DevilsLegacy
+item 57 5873 951 952 955 956 1868 1872 1879 1880 1881 1882 1884
+page warehouse/30095.htm
+page warehouse/30092.htm
+page script/quest/Q365_DevilsLegacy/
+npc randolf 30095 WarehouseKeeper 10 0 0
+npc collob 30092 WarehouseKeeper -10 0 0
+npc zombie 20836 Monster 40 0 0
+npc captain 21629 Monster 50 0 0
+
+action randolf
+action randolf
+  S ActionFailed
+  S NpcHtmlMessage obj=randolf item=0 page=warehouse/30095.htm
+  S ActionFailed
+bypass npc_{randolf}_Quest
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-00.htm
+  S ActionFailed
+  S ActionFailed

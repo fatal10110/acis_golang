@@ -1,0 +1,29 @@
+# Devil's Legacy (Q365), level 39 with three chests: Randolf pays 400 for each and 19800 more. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q365_devils_legacy_sell.golden
+character Raider 39
+quest Q365_DevilsLegacy <cond>=1 <state>=STARTED
+hold 5873 3
+script quest.Q365_DevilsLegacy
+item 57 5873 951 952 955 956 1868 1872 1879 1880 1881 1882 1884
+page warehouse/30095.htm
+page warehouse/30092.htm
+page script/quest/Q365_DevilsLegacy/
+npc randolf 30095 WarehouseKeeper 10 0 0
+npc collob 30092 WarehouseKeeper -10 0 0
+npc zombie 20836 Monster 40 0 0
+npc captain 21629 Monster 50 0 0
+
+action randolf
+  items 5873=3
+action randolf
+  S ActionFailed
+  S NpcHtmlMessage obj=randolf item=0 page=warehouse/30095.htm
+  S ActionFailed
+bypass npc_{randolf}_Quest
+  S SystemMessage id=301 3:5873 6:3
+  S SystemMessage id=52 6:21000
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=21000 5873=0
