@@ -16,7 +16,7 @@ func aiBossFrintezza() script.Catalog {
 		"script.ai.boss.frintezza.FollowerOfFrintezzaTransform": frintezza.FollowerOfFrintezzaTransform,
 		"script.ai.boss.frintezza.Frintezza":                    frintezza.Frintezza,
 		"script.ai.boss.frintezza.FrintezzaSeeker":              frintezza.FrintezzaSeeker,
-		"script.ai.boss.frintezza.FrintezzaTeleporter":          nil,
+		"script.ai.boss.frintezza.FrintezzaTeleporter":          frintezza.FrintezzaTeleporter,
 		"script.ai.boss.frintezza.OrganDummy":                   frintezza.OrganDummy,
 		"script.ai.boss.frintezza.PortraitSpirit":               frintezza.PortraitSpirit,
 		"script.ai.boss.frintezza.PortraitSpiritWinged":         frintezza.PortraitSpiritWinged,
