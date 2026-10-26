@@ -1,0 +1,110 @@
+# Test of Witchcraft (Q229), finished: at the last step Iker, Evert and Vasper answer, and Orim takes the
+# amulet, the instructions, the key, the sword and the crystal, gives the Mark of Witchcraft with the experience
+# and skill points, and the quest is over.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q229_test_of_witchcraft_finish.golden
+character Witch 39
+class 11
+quest Q229_TestOfWitchcraft <state>=STARTED <cond>=10
+script quest.Q229_TestOfWitchcraft
+hold 3331 1
+hold 3324 1
+hold 3333 1
+hold 3029 1
+hold 3334 1
+item 3308 3309 3310 3311 3312 3313 3314 3315 3316 3317 3318 3319 3320 3321 3322 3323 3324 3325 3326 3327 3328 3329 3330 3331 3332 3333 3334 3335 3029 3307 7562
+page default/30630.htm
+page trainer/30110.htm
+page default/30633.htm
+page default/30417.htm
+page script/quest/Q229_TestOfWitchcraft/
+npc orim 30630 Folk 10 0 0
+npc iker 30110 Trainer -10 0 0
+npc evert 30633 Folk 0 10 0
+npc vasper 30417 Folk 0 -10 0
+
+action iker
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-10.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=10 <state>=STARTED
+action evert
+action evert
+  S ActionFailed
+  S NpcHtmlMessage obj=evert item=0 page=default/30633.htm
+  S ActionFailed
+bypass npc_{evert}_Quest
+  S NpcHtmlMessage obj=evert item=0 page=script/quest/Q229_TestOfWitchcraft/30633-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=10 <state>=STARTED
+action vasper
+action vasper
+  S ActionFailed
+  S NpcHtmlMessage obj=vasper item=0 page=default/30417.htm
+  S ActionFailed
+bypass npc_{vasper}_Quest
+  S NpcHtmlMessage obj=vasper item=0 page=script/quest/Q229_TestOfWitchcraft/30417-06.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=10 <state>=STARTED
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-19.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=10 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30630-20.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-20.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=10 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30630-21.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-21.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=10 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30630-22.htm
+  S SystemMessage id=302 3:3331
+  S SystemMessage id=302 3:3324
+  S SystemMessage id=302 3:3333
+  S SystemMessage id=302 3:3029
+  S SystemMessage id=302 3:3334
+  S SystemMessage id=54 3:3307
+  S SystemMessage id=95 1:139796 1:40000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 229:0x00000000
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-22.htm
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <state> | COMPLETED
+  Q delete-except-state Q229_TestOfWitchcraft
+  items 3331=0 3324=0 3333=0 3029=0 3334=0 3307=1
+  state Q229_TestOfWitchcraft COMPLETED
+  rows Q229_TestOfWitchcraft <state>=COMPLETED
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft COMPLETED
+  rows Q229_TestOfWitchcraft <state>=COMPLETED

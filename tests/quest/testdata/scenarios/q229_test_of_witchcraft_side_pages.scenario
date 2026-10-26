@@ -1,0 +1,90 @@
+# Test of Witchcraft (Q229), the gem NPCs once the gems are held: Lara, Kaira, Nestle and Leopold answer a
+# traveller at the fourth step, and the two Roderik and Endrigo are open to one who holds the third gem.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q229_test_of_witchcraft_side_pages.golden
+character Witch 39
+class 11
+quest Q229_TestOfWitchcraft <state>=STARTED <cond>=4 gem456=6
+script quest.Q229_TestOfWitchcraft
+hold 3319 1
+item 3308 3309 3310 3311 3312 3313 3314 3315 3316 3317 3318 3319 3320 3321 3322 3323 3324 3325 3326 3327 3328 3329 3330 3331 3332 3333 3334 3335 3029 3307 7562
+page merchant/30063.htm
+page trainer/30476.htm
+page merchant/30314.htm
+page default/30435.htm
+page default/30631.htm
+page default/30632.htm
+page script/quest/Q229_TestOfWitchcraft/
+npc lara 30063 Merchant 10 0 0
+npc kaira 30476 Trainer -10 0 0
+npc nestle 30314 Merchant 0 10 0
+npc leopold 30435 Folk 0 -10 0
+npc roderik 30631 Folk 10 10 0
+npc endrigo 30632 Folk -10 10 0
+
+action lara
+action lara
+  S ActionFailed
+  S NpcHtmlMessage obj=lara item=0 page=merchant/30063.htm
+  S ActionFailed
+bypass npc_{lara}_Quest
+  S NpcHtmlMessage obj=lara item=0 page=script/quest/Q229_TestOfWitchcraft/30063-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=4 <state>=STARTED gem456=6
+action kaira
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q229_TestOfWitchcraft/30476-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=4 <state>=STARTED gem456=6
+action nestle
+action nestle
+  S ActionFailed
+  S NpcHtmlMessage obj=nestle item=0 page=merchant/30314.htm
+  S ActionFailed
+bypass npc_{nestle}_Quest
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q229_TestOfWitchcraft/30314-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=4 <state>=STARTED gem456=6
+action leopold
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q229_TestOfWitchcraft/30435-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=4 <state>=STARTED gem456=6
+action roderik
+action roderik
+  S ActionFailed
+  S NpcHtmlMessage obj=roderik item=0 page=default/30631.htm
+  S ActionFailed
+bypass npc_{roderik}_Quest
+  S NpcHtmlMessage obj=roderik item=0 page=script/quest/Q229_TestOfWitchcraft/30631-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=4 <state>=STARTED gem456=6
+action endrigo
+action endrigo
+  S ActionFailed
+  S NpcHtmlMessage obj=endrigo item=0 page=default/30632.htm
+  S ActionFailed
+bypass npc_{endrigo}_Quest
+  S NpcHtmlMessage obj=endrigo item=0 page=script/quest/Q229_TestOfWitchcraft/30632-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=4 <state>=STARTED gem456=6
