@@ -9,6 +9,6 @@ import (
 func aiBossSirra() script.Catalog {
 	return script.Catalog{
 		"script.ai.boss.sirra.FreyaDeacon":     sirra.FreyaDeacon,
-		"script.ai.boss.sirra.SculptureGarden": nil,
+		"script.ai.boss.sirra.SculptureGarden": sirra.SculptureGarden,
 	}
 }

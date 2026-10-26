@@ -24,6 +24,7 @@ var chain = []struct {
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New, false},
 	{"script.ai.boss.sirra.FreyaDeacon", FreyaDeacon, true},
+	{"script.ai.boss.sirra.SculptureGarden", SculptureGarden, true},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -150,13 +151,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 4, len(want.folds); got != wantFolds {
+	if wantFolds, got := 7, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d events", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{32029} {
+	for _, id := range []int32{32029, 32030} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
