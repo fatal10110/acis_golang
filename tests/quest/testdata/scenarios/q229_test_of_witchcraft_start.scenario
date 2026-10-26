@@ -1,0 +1,61 @@
+# Test of Witchcraft (Q229), started: a level 39 Human Wizard reads the explanation, is accepted by Orim, who
+# gives the diagram and the level 39 set of Dimensional Diamonds; the quest then answers the first step.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q229_test_of_witchcraft_start.golden
+character Witch 39
+class 11
+script quest.Q229_TestOfWitchcraft
+item 3308 3309 3310 3311 3312 3313 3314 3315 3316 3317 3318 3319 3320 3321 3322 3323 3324 3325 3326 3327 3328 3329 3330 3331 3332 3333 3334 3335 3029 3307 7562
+page default/30630.htm
+page script/quest/Q229_TestOfWitchcraft/
+npc orim 30630 Folk 10 0 0
+
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft CREATED
+  rows Q229_TestOfWitchcraft -
+bypass Quest Q229_TestOfWitchcraft 30630-04.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-04.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft CREATED
+  rows Q229_TestOfWitchcraft -
+bypass Quest Q229_TestOfWitchcraft 30630-07.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-07.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft CREATED
+  rows Q229_TestOfWitchcraft -
+bypass Quest Q229_TestOfWitchcraft 30630-08.htm
+  S QuestList 229:0x80000001
+  S ExShowQuestMark quest=229
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3308
+  S SystemMessage id=53 3:7562 6:122
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-08a.htm
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <state> | STARTED
+  Q upsert Q229_TestOfWitchcraft | <cond> | 1
+  M set secondClassChange39 | true
+  items 3308=1 7562=122
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=1 <state>=STARTED
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-09.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=1 <state>=STARTED

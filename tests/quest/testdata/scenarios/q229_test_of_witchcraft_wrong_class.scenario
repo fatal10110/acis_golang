@@ -1,0 +1,23 @@
+# Test of Witchcraft (Q229), refused: a level 39 Cleric is told by Orim that the test is for Wizards, Knights
+# and Palus Knights, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q229_test_of_witchcraft_wrong_class.golden
+character Witch 39
+class 15
+script quest.Q229_TestOfWitchcraft
+item 3308 3309 3310 3311 3312 3313 3314 3315 3316 3317 3318 3319 3320 3321 3322 3323 3324 3325 3326 3327 3328 3329 3330 3331 3332 3333 3334 3335 3029 3307 7562
+page default/30630.htm
+page script/quest/Q229_TestOfWitchcraft/
+npc orim 30630 Folk 10 0 0
+
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft CREATED
+  rows Q229_TestOfWitchcraft -

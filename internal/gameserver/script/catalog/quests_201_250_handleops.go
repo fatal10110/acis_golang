@@ -14,5 +14,8 @@ func quests201To250HandleOps() map[string]script.HandleOps {
 		"quest.Q227_TestOfTheReformer": {
 			"OnTimer": {"NPC.StopAttack"},
 		},
+		"quest.Q229_TestOfWitchcraft": {
+			"OnTimer": {"NPC.StopAttack"},
+		},
 	}
 }
