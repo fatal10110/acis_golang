@@ -1,0 +1,149 @@
+# Test of the Lord (Q232), Hatos's charm, Sumari's letter, Somak's blade and ten Timak orc skulls make the sword into skull.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q232_skull.golden
+character Shaman 39
+class 50
+quest Q232_TestOfTheLord <state>=STARTED <cond>=1
+random always 0
+hold 3403 7
+hold 3391 1
+script quest.Q232_TestOfTheLord
+item 1341 3390 3391 3392 3393 3394 3395 3396 3397 3398 3399 3400 3401 3402 3403 3404 3405 3406 3407 3408 3409 3410 3411 3412 3413 3414 3415 3416 7562
+page default/30568.htm
+page default/30564.htm
+page trainer/30510.htm
+page trainer/30510-noskills.htm
+page script/quest/Q232_TestOfTheLord/
+npc hatos 30568 Folk 10 0 0
+npc sumari 30564 Folk 20 0 0
+npc somak 30510 Trainer 30 0 0
+npc m20583 20583 Monster 40 0 0
+npc m20586 20586 Monster 50 0 0
+npc m20587 20587 Monster 60 0 0
+
+action hatos
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q232_TestOfTheLord/30568-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30568-02.htm
+  S SystemMessage id=54 3:3394
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q232_TestOfTheLord/30568-02.htm
+  S ActionFailed
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q232_TestOfTheLord/30568-03.htm
+  S ActionFailed
+  S ActionFailed
+action sumari
+action sumari
+  S ActionFailed
+  S NpcHtmlMessage obj=sumari item=0 page=default/30564.htm
+  S ActionFailed
+bypass npc_{sumari}_Quest
+  S SystemMessage id=54 3:3401
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sumari item=0 page=script/quest/Q232_TestOfTheLord/30564-01.htm
+  S ActionFailed
+  S ActionFailed
+action somak
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S SystemMessage id=302 3:3401
+  S SystemMessage id=54 3:3402
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q232_TestOfTheLord/30510-01.htm
+  S ActionFailed
+  S ActionFailed
+action sumari
+action sumari
+  S ActionFailed
+  S NpcHtmlMessage obj=sumari item=0 page=default/30564.htm
+  S ActionFailed
+bypass npc_{sumari}_Quest
+  S NpcHtmlMessage obj=sumari item=0 page=script/quest/Q232_TestOfTheLord/30564-03.htm
+  S ActionFailed
+  S ActionFailed
+kill m20583
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3403
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill m20586
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3403
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill m20587
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3403
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+action somak
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q232_TestOfTheLord/30510-02.htm
+  S ActionFailed
+  S ActionFailed
+action hatos
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S SystemMessage id=302 3:3394
+  S SystemMessage id=302 3:3402
+  S SystemMessage id=301 3:3403 6:10
+  S SystemMessage id=54 3:3404
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q232_TestOfTheLord/30568-04.htm
+  S ActionFailed
+  S ActionFailed
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q232_TestOfTheLord/30568-05.htm
+  S ActionFailed
+  S ActionFailed
+action sumari
+action sumari
+  S ActionFailed
+  S NpcHtmlMessage obj=sumari item=0 page=default/30564.htm
+  S ActionFailed
+bypass npc_{sumari}_Quest
+  S NpcHtmlMessage obj=sumari item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action somak
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q232_TestOfTheLord/30510-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 3404=1 3394=0 3402=0 3401=0 3403=0
+  state Q232_TestOfTheLord STARTED
+  rows Q232_TestOfTheLord <cond>=1 <state>=STARTED
