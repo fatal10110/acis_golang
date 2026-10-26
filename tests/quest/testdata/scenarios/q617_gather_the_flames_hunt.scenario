@@ -1,0 +1,28 @@
+# Gather the Flames (Q617): each monster drops a torch only for a draw under its own chance.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q617_gather_the_flames_hunt.golden
+character Hero 74
+quest Q617_GatherTheFlames <cond>=1 <state>=STARTED
+random 0 479999 0 480000 0 689999 0 690000
+script quest.Q617_GatherTheFlames
+item 7264 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page script/quest/Q617_GatherTheFlames/
+npc m1 21376 Monster 40 0 0
+npc m2 21656 Monster 50 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7264
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7264=1
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 7264=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7264
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7264=2
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 7264=2

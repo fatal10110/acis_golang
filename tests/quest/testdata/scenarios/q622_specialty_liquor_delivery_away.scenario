@@ -1,0 +1,77 @@
+# Specialty Liquor Delivery (Q622): a villager that is not next in the chain is answered with the page of the stage.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q622_specialty_liquor_delivery_away.golden
+character Hero 68
+quest Q622_SpecialtyLiquorDelivery <cond>=3 <state>=STARTED
+hold 7197 3
+hold 7198 2
+script quest.Q622_SpecialtyLiquorDelivery
+item 7197 7198 57 734 6847 6849 6851
+page default/31521.htm
+page default/31543.htm
+page default/31544.htm
+page default/31545.htm
+page default/31546.htm
+page default/31547.htm
+page script/quest/Q622_SpecialtyLiquorDelivery/
+npc jeremy 31521 Folk 10 0 0
+npc pulin 31543 Folk 20 0 0
+npc naff 31544 Folk 30 0 0
+npc crocus 31545 Folk 40 0 0
+npc kuber 31546 Folk 50 0 0
+npc beolin 31547 Folk 60 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-04.htm
+  S ActionFailed
+  S ActionFailed
+action beolin
+action beolin
+  S ActionFailed
+  S NpcHtmlMessage obj=beolin item=0 page=default/31547.htm
+  S ActionFailed
+bypass npc_{beolin}_Quest
+  S NpcHtmlMessage obj=beolin item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31547-03.htm
+  S ActionFailed
+  S ActionFailed
+action kuber
+action kuber
+  S ActionFailed
+  S NpcHtmlMessage obj=kuber item=0 page=default/31546.htm
+  S ActionFailed
+bypass npc_{kuber}_Quest
+  S NpcHtmlMessage obj=kuber item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31546-03.htm
+  S ActionFailed
+  S ActionFailed
+action crocus
+action crocus
+  S ActionFailed
+  S NpcHtmlMessage obj=crocus item=0 page=default/31545.htm
+  S ActionFailed
+bypass npc_{crocus}_Quest
+  S NpcHtmlMessage obj=crocus item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31545-01.htm
+  S ActionFailed
+  S ActionFailed
+action naff
+action naff
+  S ActionFailed
+  S NpcHtmlMessage obj=naff item=0 page=default/31544.htm
+  S ActionFailed
+bypass npc_{naff}_Quest
+  S NpcHtmlMessage obj=naff item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action pulin
+action pulin
+  S ActionFailed
+  S NpcHtmlMessage obj=pulin item=0 page=default/31543.htm
+  S ActionFailed
+bypass npc_{pulin}_Quest
+  S NpcHtmlMessage obj=pulin item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -79,6 +79,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q603"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q617"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q618"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q619"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q621"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q622"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q623"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q655"
 )
 
@@ -189,13 +195,13 @@ func quests301Up() script.Catalog {
 		"quest.Q614_SlayTheEnemyCommander":             nil,
 		"quest.Q615_MagicalPowerOfFire_Part1":          nil,
 		"quest.Q616_MagicalPowerOfFire_Part2":          nil,
-		"quest.Q617_GatherTheFlames":                   nil,
-		"quest.Q618_IntoTheFlame":                      nil,
-		"quest.Q619_RelicsOfTheOldEmpire":              nil,
+		"quest.Q617_GatherTheFlames":                   q617.New,
+		"quest.Q618_IntoTheFlame":                      q618.New,
+		"quest.Q619_RelicsOfTheOldEmpire":              q619.New,
 		"quest.Q620_FourGoblets":                       nil,
-		"quest.Q621_EggDelivery":                       nil,
-		"quest.Q622_SpecialtyLiquorDelivery":           nil,
-		"quest.Q623_TheFinestFood":                     nil,
+		"quest.Q621_EggDelivery":                       q621.New,
+		"quest.Q622_SpecialtyLiquorDelivery":           q622.New,
+		"quest.Q623_TheFinestFood":                     q623.New,
 		"quest.Q624_TheFinestIngredients_Part1":        nil,
 		"quest.Q625_TheFinestIngredients_Part2":        nil,
 		"quest.Q626_ADarkTwilight":                     nil,

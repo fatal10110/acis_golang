@@ -1,0 +1,21 @@
+# Egg Delivery (Q621), refused: a level 67 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q621_egg_delivery_low_level.golden
+character Hero 67
+script quest.Q621_EggDelivery
+item 7195 7196 57 734 6847 6849 6851
+page default/31521.htm
+page script/quest/Q621_EggDelivery/
+npc jeremy 31521 Folk 10 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q621_EggDelivery/31521-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q621_EggDelivery CREATED
+  rows Q621_EggDelivery -

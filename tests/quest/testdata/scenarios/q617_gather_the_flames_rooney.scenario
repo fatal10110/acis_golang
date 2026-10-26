@@ -1,0 +1,49 @@
+# Gather the Flames (Q617): twelve hundred torches pay the recipe Rooney is asked for; with fewer the page says so.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q617_gather_the_flames_rooney.golden
+character Hero 74
+quest Q617_GatherTheFlames <cond>=1 <state>=STARTED
+hold 7264 2400
+script quest.Q617_GatherTheFlames
+item 7264 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page npcdefault.htm
+page script/quest/Q617_GatherTheFlames/
+npc rooney 32049 Folk 10 0 0
+
+action rooney
+action rooney
+  S ActionFailed
+  S NpcHtmlMessage obj=rooney item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{rooney}_Quest
+  S NpcHtmlMessage obj=rooney item=0 page=script/quest/Q617_GatherTheFlames/32049-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q617_GatherTheFlames 6881
+  S SystemMessage id=301 3:7264 6:1200
+  S SystemMessage id=54 3:6881
+  S NpcHtmlMessage obj=rooney item=0 page=script/quest/Q617_GatherTheFlames/32049-03.htm
+  S ActionFailed
+  items 7264=1200 6881=1
+action rooney
+  S ActionFailed
+  S NpcHtmlMessage obj=rooney item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{rooney}_Quest
+  S NpcHtmlMessage obj=rooney item=0 page=script/quest/Q617_GatherTheFlames/32049-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q617_GatherTheFlames 6883
+  S SystemMessage id=301 3:7264 6:1200
+  S SystemMessage id=54 3:6883
+  S NpcHtmlMessage obj=rooney item=0 page=script/quest/Q617_GatherTheFlames/32049-03.htm
+  S ActionFailed
+  items 7264=0 6881=1 6883=1
+action rooney
+  S ActionFailed
+  S NpcHtmlMessage obj=rooney item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{rooney}_Quest
+  S NpcHtmlMessage obj=rooney item=0 page=script/quest/Q617_GatherTheFlames/32049-02.htm
+  S ActionFailed
+  S ActionFailed
