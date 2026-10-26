@@ -1,0 +1,46 @@
+# Exploration of the Giants' Cave, Part 1 (Q376), level 51: the character accepts at Sobling, who gives the basic dictionary, relogs, and is asked for books. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q376_exploration_of_the_giants_cave_part1_accept.golden
+character Exploration 51
+script quest.Q376_ExplorationOfTheGiantsCave_Part1
+item 5890 5891 5892 5944 5937 5938 5939 5940 5941 5932 5933 5934 5935 5936 5922 5923 5924 5925 5926 5927 5928 5929 5930 5931 5346 5354 5332 5334 5416 5418 5424 5340
+page default/31147.htm
+page warehouse/30182.htm
+page script/quest/Q376_ExplorationOfTheGiantsCave_Part1/
+npc sobling 31147 Folk 10 0 0
+npc cliff 30182 WarehouseKeeper 20 0 0
+npc m47 20647 Monster 40 0 0
+npc m48 20648 Monster 50 0 0
+npc m49 20649 Monster 60 0 0
+npc m50 20650 Monster 70 0 0
+
+action sobling
+action sobling
+  S ActionFailed
+  S NpcHtmlMessage obj=sobling item=0 page=default/31147.htm
+  S ActionFailed
+bypass npc_{sobling}_Quest
+  S NpcHtmlMessage obj=sobling item=0 page=script/quest/Q376_ExplorationOfTheGiantsCave_Part1/31147-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q376_ExplorationOfTheGiantsCave_Part1 31147-03.htm
+  S QuestList 376:0x80000001
+  S ExShowQuestMark quest=376
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:5891
+  S NpcHtmlMessage obj=sobling item=0 page=script/quest/Q376_ExplorationOfTheGiantsCave_Part1/31147-03.htm
+  S ActionFailed
+  Q upsert Q376_ExplorationOfTheGiantsCave_Part1 | <state> | STARTED
+  Q upsert Q376_ExplorationOfTheGiantsCave_Part1 | <cond> | 1
+  items 5891=1
+  rows Q376_ExplorationOfTheGiantsCave_Part1 <cond>=1 <state>=STARTED
+relog
+  rows Q376_ExplorationOfTheGiantsCave_Part1 <cond>=1 <state>=STARTED
+action sobling
+action sobling
+  S ActionFailed
+  S NpcHtmlMessage obj=sobling item=0 page=default/31147.htm
+  S ActionFailed
+bypass npc_{sobling}_Quest
+  S NpcHtmlMessage obj=sobling item=0 page=script/quest/Q376_ExplorationOfTheGiantsCave_Part1/31147-05.htm
+  S ActionFailed
+  S ActionFailed
