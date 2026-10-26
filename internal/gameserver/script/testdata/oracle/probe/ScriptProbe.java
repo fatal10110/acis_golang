@@ -145,7 +145,7 @@ public final class ScriptProbe
 		final Map<NpcTemplate, Map<EventHandler, List<Quest>>> bindings = ScenarioTrace.snapshot();
 		QuestTrace.run(out);
 		ContractProbe.run(out);
-		ScenarioTrace.run(new File(System.getProperty("probe.scenarios")), out, bindings);
+		ScenarioTrace.run(new File(System.getProperty("probe.scenarios")), System.getProperty("probe.only", ""), out, bindings);
 	}
 
 	/**

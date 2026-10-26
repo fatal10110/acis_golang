@@ -1,0 +1,410 @@
+# Test Of Magus (Q228), a second class-change test for wizards, played by a level 39 Human Wizard
+# who already holds most of each trophy count (the kills below bring each to its count), every
+# script roll pinned to 1 (every drop lands): Rukal starts it and pays the level 39 set's
+# Dimensional Diamonds; Parina's letter for Casian, who gives the lilac charm; the three singing
+# flowers each give their golden seed once, crying out as they die; Rukal turns the seeds and the
+# charm into the score of elements; the elementals of water, fire, wind and earth each give their
+# charm, take their trophies for their tone, and the last tone sends the traveller back; Rukal
+# takes the score and the four tones for the Mark of Magus; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q228_test_of_magus.golden
+character Magus 39
+class 11
+random always 1
+hold 2848 19
+hold 2849 4
+hold 2850 19
+hold 2851 10
+hold 2852 10
+hold 2853 9
+hold 2854 10
+hold 2855 10
+script quest.Q228_TestOfMagus
+item 2840 2841 2842 2843 2844 2845 2846 2847 2848 2849 2850 2851 2852 2853 2854 2855 2856 2857 2858 2859 2860 2861 2862 2863 7562
+page default/30629.htm
+page default/30391.htm
+page default/30612.htm
+page default/30409.htm
+page default/30411.htm
+page default/30412.htm
+page default/30413.htm
+page script/quest/Q228_TestOfMagus/
+npc rukal 30629 Folk 10 0 0
+npc parina 30391 Folk -10 0 0
+npc casian 30612 Folk 0 10 0
+npc snake 30409 Folk 0 -10 0
+npc salamander 30411 Folk 10 10 0
+npc sylph 30412 Folk -10 10 0
+npc undine 30413 Folk 10 -10 0
+npc phantasm 27095 Monster 40 0 0
+npc nightmare 27096 Monster -40 0 0
+npc darkling 27097 Monster 0 40 0
+npc ghostfire 27098 Monster 0 -40 0
+npc stakato 20157 Monster 40 40 0
+npc harpy 20145 Monster -40 40 0
+npc monstereye 20564 Monster 40 -40 0
+
+
+# Rukal: a Human Wizard of level 39 may start; the first test of the set pays the diamonds.
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30629-04.htm
+  S QuestList 228:0x80000001
+  S ExShowQuestMark quest=228
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2841
+  S SystemMessage id=53 3:7562 6:122
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-04a.htm
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <state> | STARTED
+  Q upsert Q228_TestOfMagus | <cond> | 1
+  M set secondClassChange39 | true
+  items 2841=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=1
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Parina takes Rukal's letter and gives hers.
+action parina
+action parina
+  S ActionFailed
+  S NpcHtmlMessage obj=parina item=0 page=default/30391.htm
+  S ActionFailed
+bypass npc_{parina}_Quest
+  S NpcHtmlMessage obj=parina item=0 page=script/quest/Q228_TestOfMagus/30391-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30391-02.htm
+  S QuestList 228:0x80000003
+  S ExShowQuestMark quest=228
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2841
+  S SystemMessage id=54 3:2842
+  S NpcHtmlMessage obj=parina item=0 page=script/quest/Q228_TestOfMagus/30391-02.htm
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <cond> | 2
+  items 2841=0 2842=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=2
+
+# Casian takes Parina's letter and gives the lilac charm.
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q228_TestOfMagus/30612-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30612-02.htm
+  S QuestList 228:0x80000007
+  S ExShowQuestMark quest=228
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2842
+  S SystemMessage id=54 3:2843
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q228_TestOfMagus/30612-02.htm
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <cond> | 3
+  items 2842=0 2843=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=3
+
+# The three singing flowers each give a golden seed and cry out; the third brings cond 4.
+kill phantasm
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=phantasm type=0 npc=1027095 text="I am a tree of nothing... a tree... that knows where to return..."
+  S SystemMessage id=54 3:2844
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2844=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=3
+kill nightmare
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=nightmare type=0 npc=1027096 text="I am a creature that shows the truth of the place deep in my heart..."
+  S SystemMessage id=54 3:2845
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2845=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=3
+kill darkling
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=darkling type=0 npc=1027097 text="I am a mirror of darkness... a virtual image of darkness..."
+  S SystemMessage id=54 3:2846
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 228:0x8000000f
+  S ExShowQuestMark quest=228
+  Q upsert Q228_TestOfMagus | <cond> | 4
+  items 2846=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=4
+
+# Rukal takes the seeds and the charm for the score of elements.
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30629-09.htm
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-09.htm
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30629-10.htm
+  S QuestList 228:0x8000001f
+  S ExShowQuestMark quest=228
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2844
+  S SystemMessage id=302 3:2845
+  S SystemMessage id=302 3:2846
+  S SystemMessage id=302 3:2843
+  S SystemMessage id=54 3:2847
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-10.htm
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <cond> | 5
+  items 2844=0 2845=0 2846=0 2843=0 2847=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+
+# The water undine gives her charm; the marsh stakato's dazzling drop is her twentieth.
+action undine
+action undine
+  S ActionFailed
+  S NpcHtmlMessage obj=undine item=0 page=default/30413.htm
+  S ActionFailed
+bypass npc_{undine}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2862
+  S NpcHtmlMessage obj=undine item=0 page=script/quest/Q228_TestOfMagus/30413-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 2862=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+kill stakato
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2848
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2848=20
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action undine
+  S ActionFailed
+  S NpcHtmlMessage obj=undine item=0 page=default/30413.htm
+  S ActionFailed
+action undine
+  S ActionFailed
+  S NpcHtmlMessage obj=undine item=0 page=default/30413.htm
+  S ActionFailed
+bypass npc_{undine}_Quest
+  S SystemMessage id=301 3:2848 6:20
+  S SystemMessage id=302 3:2862
+  S SystemMessage id=54 3:2856
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=undine item=0 page=script/quest/Q228_TestOfMagus/30413-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 2848=0 2862=0 2856=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+
+# The flame salamander gives his charm; the ghost fire's crystal is his fifth.
+action salamander
+action salamander
+  S ActionFailed
+  S NpcHtmlMessage obj=salamander item=0 page=default/30411.htm
+  S ActionFailed
+bypass npc_{salamander}_Quest
+  S SystemMessage id=54 3:2860
+  S NpcHtmlMessage obj=salamander item=0 page=script/quest/Q228_TestOfMagus/30411-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 2860=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+kill ghostfire
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2849
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2849=5
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action salamander
+  S ActionFailed
+  S NpcHtmlMessage obj=salamander item=0 page=default/30411.htm
+  S ActionFailed
+action salamander
+  S ActionFailed
+  S NpcHtmlMessage obj=salamander item=0 page=default/30411.htm
+  S ActionFailed
+bypass npc_{salamander}_Quest
+  S SystemMessage id=301 3:2849 6:5
+  S SystemMessage id=302 3:2860
+  S SystemMessage id=54 3:2857
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=salamander item=0 page=script/quest/Q228_TestOfMagus/30411-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 2849=0 2860=0 2857=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+
+# The wind sylph's bypass gives her charm; the harpy's feather brings the three trophies to forty.
+action sylph
+action sylph
+  S ActionFailed
+  S NpcHtmlMessage obj=sylph item=0 page=default/30412.htm
+  S ActionFailed
+bypass npc_{sylph}_Quest
+  S NpcHtmlMessage obj=sylph item=0 page=script/quest/Q228_TestOfMagus/30412-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30412-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2861
+  S NpcHtmlMessage obj=sylph item=0 page=script/quest/Q228_TestOfMagus/30412-02.htm
+  S ActionFailed
+  items 2861=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+kill harpy
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2850
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2850=20
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action sylph
+  S ActionFailed
+  S NpcHtmlMessage obj=sylph item=0 page=default/30412.htm
+  S ActionFailed
+action sylph
+  S ActionFailed
+  S NpcHtmlMessage obj=sylph item=0 page=default/30412.htm
+  S ActionFailed
+bypass npc_{sylph}_Quest
+  S SystemMessage id=301 3:2850 6:20
+  S SystemMessage id=302 3:2861
+  S SystemMessage id=301 3:2852 6:10
+  S SystemMessage id=301 3:2851 6:10
+  S SystemMessage id=54 3:2858
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sylph item=0 page=script/quest/Q228_TestOfMagus/30412-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 2850=0 2851=0 2852=0 2861=0 2858=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+
+# The earth snake's bypasses give his charm; the enchanted monster eye's shell brings the three trophies to thirty; his tone is the last: cond 6.
+action snake
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q228_TestOfMagus/30409-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30409-02.htm
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q228_TestOfMagus/30409-02.htm
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30409-03.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2863
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q228_TestOfMagus/30409-03.htm
+  S ActionFailed
+  items 2863=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+kill monstereye
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2853
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2853=10
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S SystemMessage id=301 3:2855 6:10
+  S SystemMessage id=301 3:2853 6:10
+  S SystemMessage id=301 3:2854 6:10
+  S SystemMessage id=302 3:2863
+  S SystemMessage id=54 3:2859
+  S QuestList 228:0x8000003f
+  S ExShowQuestMark quest=228
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q228_TestOfMagus/30409-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <cond> | 6
+  items 2853=0 2854=0 2855=0 2863=0 2859=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=6
+
+# Rukal takes the score and the four tones for the Mark of Magus.
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S SystemMessage id=302 3:2847
+  S SystemMessage id=302 3:2859
+  S SystemMessage id=302 3:2857
+  S SystemMessage id=302 3:2856
+  S SystemMessage id=302 3:2858
+  S SystemMessage id=54 3:2840
+  S SystemMessage id=95 1:139039 1:40000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 228:0x00000000
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-12.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <state> | COMPLETED
+  Q delete-except-state Q228_TestOfMagus
+  items 2847=0 2856=0 2857=0 2858=0 2859=0 2840=1
+  state Q228_TestOfMagus COMPLETED
+  rows Q228_TestOfMagus <state>=COMPLETED
+relog
+  items 2840=1
+  state Q228_TestOfMagus COMPLETED
+  rows Q228_TestOfMagus <state>=COMPLETED
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  state Q228_TestOfMagus COMPLETED
+  rows Q228_TestOfMagus <state>=COMPLETED

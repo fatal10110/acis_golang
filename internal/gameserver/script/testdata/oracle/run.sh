@@ -7,6 +7,10 @@
 #   JAVA_TREE  reference server checkout (default: $ACIS_JAVA, else ../../../../../../aCis_gameserver
 #              resolved from the repository root's parent)
 #   DATAPACK   reference datapack checkout (default: $ACIS_DATAPACK, else the sibling aCis_datapack)
+#
+# PROBE_ONLY=<globs> plays only the scenarios whose file name matches one of the comma-separated
+# globs (for example PROBE_ONLY='q359_*,q362_*') and replaces only their traces; every other trace
+# stays as committed. Without it every scenario plays and the trace directory is replaced whole.
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -15,6 +19,7 @@ repo=$(cd "$here/../../../../.." && pwd)
 java_tree=${1:-${ACIS_JAVA:-$repo/../aCis_gameserver}}
 datapack=${2:-${ACIS_DATAPACK:-$repo/../aCis_datapack}}
 image=${PROBE_IMAGE:-eclipse-temurin:21-jdk-alpine}
+only=${PROBE_ONLY:-}
 
 for d in "$java_tree/java/net/sf/l2j" "$datapack/data/xml"; do
 	[ -d "$d" ] || { echo "missing $d (set ACIS_JAVA / ACIS_DATAPACK)" >&2; exit 1; }
@@ -69,12 +74,15 @@ docker run --rm --user "$(id -u):$(id -g)" \
 docker run --rm --user "$(id -u):$(id -g)" \
 	-v "$java_tree/lib:/reflib:ro" -v "$datapack/data:/work/run/data:ro" -v "$datapack/sql:/refsql:ro" -v "$work/geodata:/work/run/data/geodata:ro" \
 	-v "$repo/tests/quest/testdata/scenarios:/scenarios:ro" -v "$work:/work" -w /work/run \
-	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -Dprobe.scenarios=/scenarios -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
+	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -Dprobe.scenarios=/scenarios -Dprobe.only="$only" -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
 	2> "$work/probe.log" || { tail -40 "$work/probe.log" >&2; exit 1; }
 
 cp "$work"/out/*.golden "$here/"
 # The quest scenario traces replace the whole directory, so a trace whose scenario is gone goes too.
-rm -rf "$here/scenarios"
+# A PROBE_ONLY run replaces only the traces it played.
+if [ -z "$only" ]; then
+	rm -rf "$here/scenarios"
+fi
 mkdir -p "$here/scenarios"
 [ -z "$(ls "$work"/out/scenarios 2>/dev/null)" ] || cp "$work"/out/scenarios/*.golden "$here/scenarios/"
 contracts="$repo/internal/testsupport/scriptcontract/testdata"

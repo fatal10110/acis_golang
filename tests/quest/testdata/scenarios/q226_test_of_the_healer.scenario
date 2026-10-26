@@ -1,0 +1,608 @@
+# Test of the Healer (Q226), a second class-change test for knights, clerics and oracles, played
+# by a level 39 Cleric holding the 100000 adena Gupu asks (and more): Bandellos starts it and pays
+# the level 39 set's Dimensional Diamonds; Perrin sends the traveller to Tatoma (called by his
+# dialog, which this scenario leaves standing; the scenario's own Tatoma is the one slain);
+# Allana; Gupu takes the 100000 adena for Windy's picture, Windy swaps it for the pebbles and Gupu
+# for the golden statue; Sorius's order for Daurin, who calls the Leto lizardman leader; the
+# mysterious dark elf's three ambushes (assassins, snipers, wizards and a lord, each slain one of
+# its kind), the sentries' words, Kristina's letter for Sorius; then Bandellos takes the statue
+# for the Mark of Healer; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q226_test_of_the_healer.golden
+character Healer 39
+class 15
+hold 57 150000
+script quest.Q226_TestOfTheHealer
+item 2810 2811 2812 2813 2814 2815 2816 2817 2818 2819 2820 57 7562
+page trainer/30473.htm
+page trainer/30327.htm
+page default/30424.htm
+page default/30428.htm
+page default/30658.htm
+page default/30659.htm
+page default/30660.htm
+page default/30661.htm
+page default/30662.htm
+page default/30663.htm
+page default/30664.htm
+page default/30665.htm
+page default/30674.htm
+page script/quest/Q226_TestOfTheHealer/
+npc bandellos 30473 Trainer 10 0 0
+npc sorius 30327 Trainer -10 0 0
+npc allana 30424 Folk 0 10 0
+npc perrin 30428 Folk 0 -10 0
+npc gupu 30658 Folk 10 10 0
+npc orphan 30659 Folk -10 10 0
+npc windy 30660 Folk 10 -10 0
+npc darkelf 30661 Folk -10 -10 0
+npc piper 30662 Folk 20 0 0
+npc slein 30663 Folk -20 0 0
+npc kain 30664 Folk 0 20 0
+npc kristina 30665 Folk 0 -20 0
+npc daurin 30674 Folk 20 20 0
+npc tatoma 27134 Monster 40 0 0
+npc leader 27123 Monster -40 0 0
+npc assassin 27124 Monster 0 40 0
+npc sniper 27125 Monster 0 -40 0
+npc wizard 27126 Monster -40 40 0
+npc lord 27127 Monster 40 40 0
+
+
+# Bandellos: a Cleric of level 39 may start; the first test of the set pays the diamonds.
+action bandellos
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+bypass npc_{bandellos}_Quest
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30473-04.htm
+  S QuestList 226:0x80000001
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2810
+  S SystemMessage id=53 3:7562 6:60
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-04a.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <state> | STARTED
+  Q upsert Q226_TestOfTheHealer | <cond> | 1
+  M set secondClassChange39 | true
+  items 2810=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=1
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+bypass npc_{bandellos}_Quest
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Perrin: the first visit; his bypass sets cond 2 and calls Tatoma.
+action perrin
+action perrin
+  S ActionFailed
+  S NpcHtmlMessage obj=perrin item=0 page=default/30428.htm
+  S ActionFailed
+bypass npc_{perrin}_Quest
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q226_TestOfTheHealer/30428-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30428-02.htm
+  S QuestList 226:0x80000003
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q226_TestOfTheHealer/30428-02.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 2
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=2
+
+# Tatoma slain: cond 3; Perrin takes the report.
+kill tatoma
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 226:0x80000007
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q226_TestOfTheHealer | <cond> | 3
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=3
+action perrin
+  S ActionFailed
+  S NpcHtmlMessage obj=perrin item=0 page=default/30428.htm
+  S ActionFailed
+action perrin
+  S ActionFailed
+  S NpcHtmlMessage obj=perrin item=0 page=default/30428.htm
+  S ActionFailed
+bypass npc_{perrin}_Quest
+  S QuestList 226:0x8000000f
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2810
+  S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q226_TestOfTheHealer/30428-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 4
+  items 2810=0
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=4
+
+# Allana sends the traveller to Gupu.
+action allana
+action allana
+  S ActionFailed
+  S NpcHtmlMessage obj=allana item=0 page=default/30424.htm
+  S ActionFailed
+bypass npc_{allana}_Quest
+  S QuestList 226:0x8000001f
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=allana item=0 page=script/quest/Q226_TestOfTheHealer/30424-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 5
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=5
+
+# Gupu: twice the first page; the 100000 adena buy Windy's picture.
+action gupu
+action gupu
+  S ActionFailed
+  S NpcHtmlMessage obj=gupu item=0 page=default/30658.htm
+  S ActionFailed
+bypass npc_{gupu}_Quest
+  S QuestList 226:0x8000003f
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 6
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=6
+action gupu
+  S ActionFailed
+  S NpcHtmlMessage obj=gupu item=0 page=default/30658.htm
+  S ActionFailed
+action gupu
+  S ActionFailed
+  S NpcHtmlMessage obj=gupu item=0 page=default/30658.htm
+  S ActionFailed
+bypass npc_{gupu}_Quest
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30658-02.htm
+  S QuestList 226:0x8000007f
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:100000
+  S SystemMessage id=54 3:2812
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-02.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 7
+  items 57=50000 2812=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=7
+
+# Windy Shaoring swaps the picture for the pebbles.
+action windy
+action windy
+  S ActionFailed
+  S NpcHtmlMessage obj=windy item=0 page=default/30660.htm
+  S ActionFailed
+bypass npc_{windy}_Quest
+  S NpcHtmlMessage obj=windy item=0 page=script/quest/Q226_TestOfTheHealer/30660-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30660-02.htm
+  S NpcHtmlMessage obj=windy item=0 page=script/quest/Q226_TestOfTheHealer/30660-02.htm
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30660-03.htm
+  S QuestList 226:0x800000ff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2812
+  S SystemMessage id=54 3:2814
+  S NpcHtmlMessage obj=windy item=0 page=script/quest/Q226_TestOfTheHealer/30660-03.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 8
+  items 2812=0 2814=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=8
+action windy
+  S ActionFailed
+  S NpcHtmlMessage obj=windy item=0 page=default/30660.htm
+  S ActionFailed
+action windy
+  S ActionFailed
+  S NpcHtmlMessage obj=windy item=0 page=default/30660.htm
+  S ActionFailed
+bypass npc_{windy}_Quest
+  S NpcHtmlMessage obj=windy item=0 page=script/quest/Q226_TestOfTheHealer/30660-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gupu swaps the pebbles for the golden statue; his page sends the traveller on to Sorius.
+action gupu
+action gupu
+  S ActionFailed
+  S NpcHtmlMessage obj=gupu item=0 page=default/30658.htm
+  S ActionFailed
+bypass npc_{gupu}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2814
+  S SystemMessage id=54 3:2813
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 2814=0 2813=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=8
+bypass Quest Q226_TestOfTheHealer 30658-07.htm
+  S QuestList 226:0x800001ff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-07.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 9
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=9
+action gupu
+  S ActionFailed
+  S NpcHtmlMessage obj=gupu item=0 page=default/30658.htm
+  S ActionFailed
+action gupu
+  S ActionFailed
+  S NpcHtmlMessage obj=gupu item=0 page=default/30658.htm
+  S ActionFailed
+bypass npc_{gupu}_Quest
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sorius gives his order for Daurin.
+action sorius
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+bypass npc_{sorius}_Quest
+  S QuestList 226:0x800003ff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2815
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q226_TestOfTheHealer/30327-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 10
+  items 2815=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=10
+
+# Daurin takes the order and calls the Leto lizardman leader, which this scenario leaves standing.
+action daurin
+action daurin
+  S ActionFailed
+  S NpcHtmlMessage obj=daurin item=0 page=default/30674.htm
+  S ActionFailed
+bypass npc_{daurin}_Quest
+  S NpcHtmlMessage obj=daurin item=0 page=script/quest/Q226_TestOfTheHealer/30674-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30674-02.htm
+  S QuestList 226:0x800007ff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2815
+  S NpcHtmlMessage obj=daurin item=0 page=script/quest/Q226_TestOfTheHealer/30674-02.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 11
+  items 2815=0
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=11
+action daurin
+  S ActionFailed
+  S NpcHtmlMessage obj=daurin item=0 page=default/30674.htm
+  S ActionFailed
+action daurin
+  S ActionFailed
+  S NpcHtmlMessage obj=daurin item=0 page=default/30674.htm
+  S ActionFailed
+bypass npc_{daurin}_Quest
+  S NpcHtmlMessage obj=daurin item=0 page=script/quest/Q226_TestOfTheHealer/30674-02a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The leader slain brings the first secret letter; Daurin sends the traveller on.
+kill leader
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 226:0x80000fff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2816
+  Q upsert Q226_TestOfTheHealer | <cond> | 12
+  items 2816=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=12
+action daurin
+  S ActionFailed
+  S NpcHtmlMessage obj=daurin item=0 page=default/30674.htm
+  S ActionFailed
+action daurin
+  S ActionFailed
+  S NpcHtmlMessage obj=daurin item=0 page=default/30674.htm
+  S ActionFailed
+bypass npc_{daurin}_Quest
+  S QuestList 226:0x80001fff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=daurin item=0 page=script/quest/Q226_TestOfTheHealer/30674-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 13
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=13
+
+# Piper Longbow's page for the ambushes ahead.
+action piper
+action piper
+  S ActionFailed
+  S NpcHtmlMessage obj=piper item=0 page=default/30662.htm
+  S ActionFailed
+bypass npc_{piper}_Quest
+  S NpcHtmlMessage obj=piper item=0 page=script/quest/Q226_TestOfTheHealer/30662-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# The mysterious dark elf calls three assassins around the traveller, which this scenario leaves standing but one.
+action darkelf
+action darkelf
+  S ActionFailed
+  S NpcHtmlMessage obj=darkelf item=0 page=default/30661.htm
+  S ActionFailed
+bypass npc_{darkelf}_Quest
+  S QuestList 226:0x80003fff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 14
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=14
+kill assassin
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 226:0x80007fff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2817
+  Q upsert Q226_TestOfTheHealer | <cond> | 15
+  items 2817=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=15
+
+# Three snipers.
+action darkelf
+  S ActionFailed
+  S NpcHtmlMessage obj=darkelf item=0 page=default/30661.htm
+  S ActionFailed
+action darkelf
+  S ActionFailed
+  S NpcHtmlMessage obj=darkelf item=0 page=default/30661.htm
+  S ActionFailed
+bypass npc_{darkelf}_Quest
+  S QuestList 226:0x8000ffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 16
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=16
+kill sniper
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 226:0x8001ffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2818
+  Q upsert Q226_TestOfTheHealer | <cond> | 17
+  items 2818=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=17
+action slein
+action slein
+  S ActionFailed
+  S NpcHtmlMessage obj=slein item=0 page=default/30663.htm
+  S ActionFailed
+bypass npc_{slein}_Quest
+  S NpcHtmlMessage obj=slein item=0 page=script/quest/Q226_TestOfTheHealer/30663-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two wizards and a lord.
+action darkelf
+action darkelf
+  S ActionFailed
+  S NpcHtmlMessage obj=darkelf item=0 page=default/30661.htm
+  S ActionFailed
+bypass npc_{darkelf}_Quest
+  S QuestList 226:0x8003ffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 18
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=18
+kill lord
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 226:0x8007ffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2819
+  Q upsert Q226_TestOfTheHealer | <cond> | 19
+  items 2819=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=19
+action darkelf
+  S ActionFailed
+  S NpcHtmlMessage obj=darkelf item=0 page=default/30661.htm
+  S ActionFailed
+action darkelf
+  S ActionFailed
+  S NpcHtmlMessage obj=darkelf item=0 page=default/30661.htm
+  S ActionFailed
+bypass npc_{darkelf}_Quest
+  S QuestList 226:0x800fffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 20
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=20
+
+# The sentry's last word moves the traveller to Kristina.
+action kain
+action kain
+  S ActionFailed
+  S NpcHtmlMessage obj=kain item=0 page=default/30664.htm
+  S ActionFailed
+bypass npc_{kain}_Quest
+  S QuestList 226:0x801fffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kain item=0 page=script/quest/Q226_TestOfTheHealer/30664-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 21
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=21
+
+# Kristina takes the four secret letters for hers.
+action kristina
+action kristina
+  S ActionFailed
+  S NpcHtmlMessage obj=kristina item=0 page=default/30665.htm
+  S ActionFailed
+bypass npc_{kristina}_Quest
+  S NpcHtmlMessage obj=kristina item=0 page=script/quest/Q226_TestOfTheHealer/30665-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=21
+bypass Quest Q226_TestOfTheHealer 30665-02.htm
+  S QuestList 226:0x803fffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2816
+  S SystemMessage id=302 3:2817
+  S SystemMessage id=302 3:2818
+  S SystemMessage id=302 3:2819
+  S SystemMessage id=54 3:2811
+  S NpcHtmlMessage obj=kristina item=0 page=script/quest/Q226_TestOfTheHealer/30665-02.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 22
+  items 2816=0 2817=0 2818=0 2819=0 2811=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=22
+action kristina
+  S ActionFailed
+  S NpcHtmlMessage obj=kristina item=0 page=default/30665.htm
+  S ActionFailed
+action kristina
+  S ActionFailed
+  S NpcHtmlMessage obj=kristina item=0 page=default/30665.htm
+  S ActionFailed
+bypass npc_{kristina}_Quest
+  S NpcHtmlMessage obj=kristina item=0 page=script/quest/Q226_TestOfTheHealer/30665-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sorius takes Kristina's letter.
+action sorius
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+bypass npc_{sorius}_Quest
+  S QuestList 226:0x807fffff
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2811
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q226_TestOfTheHealer/30327-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <cond> | 23
+  items 2811=0
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=23
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+bypass npc_{sorius}_Quest
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q226_TestOfTheHealer/30327-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=23
+
+# Bandellos: the traveller holds the golden statue still, and may keep or give it.
+action bandellos
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+bypass npc_{bandellos}_Quest
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30473-08.htm
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-08.htm
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30473-09.htm
+  S SystemMessage id=302 3:2813
+  S SystemMessage id=54 3:2820
+  S SystemMessage id=95 1:134839 1:50000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 226:0x00000000
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-09.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <state> | COMPLETED
+  Q delete-except-state Q226_TestOfTheHealer
+  items 2813=0 2820=1
+  state Q226_TestOfTheHealer COMPLETED
+  rows Q226_TestOfTheHealer <state>=COMPLETED
+relog
+  items 2820=1
+  state Q226_TestOfTheHealer COMPLETED
+  rows Q226_TestOfTheHealer <state>=COMPLETED
+action bandellos
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+bypass npc_{bandellos}_Quest
+  S NpcHtmlMessage obj=bandellos item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  state Q226_TestOfTheHealer COMPLETED
+  rows Q226_TestOfTheHealer <state>=COMPLETED
