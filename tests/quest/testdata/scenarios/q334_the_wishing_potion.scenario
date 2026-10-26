@@ -1,0 +1,206 @@
+# The Wishing Potion (Q334), the potion's road: a level 30 character accepts at Matild, takes the
+# secret book from the tree keeper, trades it and the text for the two recipes, then gathers the
+# eight ingredients (every drop roll 0) and trades them for the wish potion and Matild's orb.
+# Matild's pages follow each stage; with the potion in hand she shows the wish pages 13 and 15
+# and gives the recipes again. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q334_the_wishing_potion.golden
+character Seeker 30
+random always 0
+script quest.Q334_TheWishingPotion
+item 57 3467 3678 3679 3680 3681 3682 3683 3684 3685 3686 3687 3688 3689 3690 3691
+page default/30738.htm
+page script/quest/Q334_TheWishingPotion/
+npc matild 30738 Folk 10 0 0
+npc tree 27139 Monster 0 40 0
+npc wind 20078 Monster 0 -40 0
+npc ant 20087 Monster 40 40 0
+npc silenos 20168 Monster 40 -40 0
+npc tyrant 20192 Monster -40 40 0
+npc basilisk 20199 Monster -40 -40 0
+npc horror 20227 Monster 80 0 0
+npc bugbear 20248 Monster -80 0 0
+npc jaguar 20250 Monster 0 80 0
+
+# Matild: a level 30 character may take the quest.
+action matild
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q334_TheWishingPotion CREATED
+bypass Quest Q334_TheWishingPotion 30738-03.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-03.htm
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-04.htm
+  S QuestList 334:0x80000001
+  S ExShowQuestMark quest=334
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3678
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-04.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | <state> | STARTED
+  Q upsert Q334_TheWishingPotion | <cond> | 1
+  state Q334_TheWishingPotion STARTED
+  items 3678=1
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The tree keeper drops the secret book.
+kill tree
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 334:0x80000003
+  S ExShowQuestMark quest=334
+  S SystemMessage id=54 3:3679
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q334_TheWishingPotion | <cond> | 2
+  items 3679=1
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-07.htm
+  S QuestList 334:0x80000007
+  S ExShowQuestMark quest=334
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3678
+  S SystemMessage id=302 3:3679
+  S SystemMessage id=54 3:3680
+  S SystemMessage id=54 3:3681
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-07.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | <cond> | 3
+  items 3678=0 3679=0 3680=1 3681=1
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# The eight ingredients, each once.
+kill wind
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3685
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill ant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3689
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill silenos
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3688
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill tyrant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3690
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill basilisk
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3684
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill horror
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3687
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3691
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-08.htm
+  S ActionFailed
+  S ActionFailed
+kill jaguar
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3686
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 334:0x8000000f
+  S ExShowQuestMark quest=334
+  Q upsert Q334_TheWishingPotion | <cond> | 4
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-10.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-10.htm
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-11.htm
+  S QuestList 334:0x8000001f
+  S ExShowQuestMark quest=334
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3680
+  S SystemMessage id=302 3:3681
+  S SystemMessage id=302 3:3684
+  S SystemMessage id=302 3:3685
+  S SystemMessage id=302 3:3686
+  S SystemMessage id=302 3:3687
+  S SystemMessage id=302 3:3688
+  S SystemMessage id=302 3:3689
+  S SystemMessage id=302 3:3690
+  S SystemMessage id=302 3:3691
+  S SystemMessage id=54 3:3467
+  S SystemMessage id=54 3:3682
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-11.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | <cond> | 5
+  items 3467=1 3682=1 3680=0 3681=0 3684=0
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-14.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-13.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 0
