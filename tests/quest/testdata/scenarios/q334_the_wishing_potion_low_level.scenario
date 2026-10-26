@@ -1,0 +1,21 @@
+# The Wishing Potion (Q334), refused: Matild sends a level 29 character away, and the quest is
+# not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q334_the_wishing_potion_low_level.golden
+character Recruit 29
+script quest.Q334_TheWishingPotion
+page default/30738.htm
+page script/quest/Q334_TheWishingPotion/
+npc matild 30738 Folk 10 0 0
+
+# Matild: level 30 and up only.
+action matild
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q334_TheWishingPotion CREATED
+  rows Q334_TheWishingPotion -
