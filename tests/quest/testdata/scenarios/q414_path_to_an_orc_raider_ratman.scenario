@@ -1,0 +1,114 @@
+# Path To An Orc Raider (Q414), the goblin tomb raider leader gives green blood, then calls the Kuruka Ratman Leader once the blood is too much; ten teeth, and Karukia sends the character after the betrayer Umbar. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q414_path_to_an_orc_raider_ratman.golden
+character Fighter 19
+class 44
+quest Q414_PathToAnOrcRaider <cond>=1 <state>=STARTED
+hold 1579 1
+random always 0
+script quest.Q414_PathToAnOrcRaider
+item 1578 1579 1580 1589 1590 1591 1592 8544
+page trainer/30570.htm
+page trainer/30501.htm
+page trainer/31978.htm
+page script/quest/Q414_PathToAnOrcRaider/
+npc karukia 30570 Trainer 10 0 0
+npc kasman 30501 Trainer -20 0 0
+npc tazeer 31978 Trainer 30 0 0
+npc raider 20320 Monster -40 0 0
+npc ratman 27045 Monster 50 0 0
+npc umbar 27054 Monster -60 0 0
+npc timora 27320 Monster 70 0 0
+
+kill raider
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1578
+  items 1578=1
+kill raider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:1578
+  items 1578=0
+kill ratman x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1580
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 414:0x80000003
+  S ExShowQuestMark quest=414
+  Q upsert Q414_PathToAnOrcRaider | <cond> | 2
+  items 1580=10
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=2 <state>=STARTED
+action karukia
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+bypass npc_{karukia}_Quest
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q414_PathToAnOrcRaider 30570-07a.htm
+  S QuestList 414:0x80000007
+  S ExShowQuestMark quest=414
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1579
+  S SystemMessage id=301 3:1580 6:10
+  S SystemMessage id=54 3:1589
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-07a.htm
+  S ActionFailed
+  Q upsert Q414_PathToAnOrcRaider | <cond> | 3
+  items 1579=0 1580=0 1589=1
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=3 <state>=STARTED
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+bypass npc_{karukia}_Quest
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-08.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  items 1578=0 1579=0 1580=0 1589=1
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=3 <state>=STARTED
+action karukia
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+bypass npc_{karukia}_Quest
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-08.htm
+  S ActionFailed
+  S ActionFailed

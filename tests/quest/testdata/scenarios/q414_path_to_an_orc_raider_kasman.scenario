@@ -1,0 +1,92 @@
+# Path To An Orc Raider (Q414), Umbar Orc drops the betrayer head on two kills of a character holding the first report; Kasman rewards. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q414_path_to_an_orc_raider_kasman.golden
+character Fighter 19
+class 44
+quest Q414_PathToAnOrcRaider <cond>=3 <state>=STARTED
+hold 1589 1
+random always 0
+script quest.Q414_PathToAnOrcRaider
+item 1578 1579 1580 1589 1590 1591 1592 8544
+page trainer/30570.htm
+page trainer/30501.htm
+page trainer/31978.htm
+page script/quest/Q414_PathToAnOrcRaider/
+npc karukia 30570 Trainer 10 0 0
+npc kasman 30501 Trainer -20 0 0
+npc tazeer 31978 Trainer 30 0 0
+npc raider 20320 Monster -40 0 0
+npc ratman 27045 Monster 50 0 0
+npc umbar 27054 Monster -60 0 0
+npc timora 27320 Monster 70 0 0
+
+action kasman
+action kasman
+  S ActionFailed
+  S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
+  S ActionFailed
+bypass npc_{kasman}_Quest
+  S NpcHtmlMessage obj=kasman item=0 page=script/quest/Q414_PathToAnOrcRaider/30501-01.htm
+  S ActionFailed
+  S ActionFailed
+kill umbar
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1591
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1591=1
+action kasman
+  S ActionFailed
+  S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
+  S ActionFailed
+action kasman
+  S ActionFailed
+  S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
+  S ActionFailed
+bypass npc_{kasman}_Quest
+  S NpcHtmlMessage obj=kasman item=0 page=script/quest/Q414_PathToAnOrcRaider/30501-02.htm
+  S ActionFailed
+  S ActionFailed
+kill umbar
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1591
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 414:0x8000000f
+  S ExShowQuestMark quest=414
+  Q upsert Q414_PathToAnOrcRaider | <cond> | 4
+  items 1591=2
+  state Q414_PathToAnOrcRaider STARTED
+  rows Q414_PathToAnOrcRaider <cond>=4 <state>=STARTED
+action kasman
+  S ActionFailed
+  S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
+  S ActionFailed
+action kasman
+  S ActionFailed
+  S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
+  S ActionFailed
+bypass npc_{kasman}_Quest
+  S SystemMessage id=302 3:1589
+  S SystemMessage id=301 3:1591 6:2
+  S SystemMessage id=54 3:1592
+  S SystemMessage id=95 1:3200 1:2360
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kasman item=0 page=script/quest/Q414_PathToAnOrcRaider/30501-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q414_PathToAnOrcRaider
+  items 1589=0 1591=0 1592=1
+  state Q414_PathToAnOrcRaider -
+  rows Q414_PathToAnOrcRaider -
+relog
+  items 1589=0 1591=0 1592=1
+  state Q414_PathToAnOrcRaider -
+  rows Q414_PathToAnOrcRaider -
+action kasman
+action kasman
+  S ActionFailed
+  S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
+  S ActionFailed
+bypass npc_{kasman}_Quest
+  S NpcHtmlMessage obj=kasman item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
