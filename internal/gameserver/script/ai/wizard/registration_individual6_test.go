@@ -83,6 +83,10 @@ var individual6 = []struct {
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive", HereticPriestAggressive},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintBasic", SaintBasic},
 	{"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintBasicAggressive", SaintBasicAggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintDDMagic2.WizardSaintDDMagic2", SaintDDMagic2},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintDDMagic2.WizardSaintRangeDDMagic2Aggressive", SaintRangeDDMagic2Aggressive},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintSelfRangeDDMagic.WizardSaintSelfRangeDDMagic", SaintSelfRangeDDMagic},
+	{"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintSelfRangeDDMagic.WizardSaintSelfRangeDDMagicAggressive", SaintSelfRangeDDMagicAggressive},
 }
 
 // readIndividual6View reads a manifest-layout text as the batch sees it:
@@ -154,7 +158,9 @@ func readIndividual6View(t *testing.T, path string, ours map[string]bool, text *
 // WizardGrowthStep2, WizardFiendArcherAggressive,
 // WizardFiendArcherSelfBuffAggressive, WizardSaintBasic and its child (2 +
 // 12 + 6 + 1 + 5 + 1 ids; WizardFiendArcher and WizardFiendArcherSelfBuff
-// bind none) close the count.
+// bind none), the 10 of each id of WizardSaintDDMagic2 and its child (2 + 2
+// ids) and the 11 of each id of WizardSaintSelfRangeDDMagic and its child
+// (1 + 2 ids) close the count.
 func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, 0, len(chain)+len(individual6))
 	catalog := script.Catalog{}
@@ -185,8 +191,8 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual6View(t, path, ours, sc)
-	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10+49*10+45*10+5*11+17*10+6*11+15*10+2*10+12*10+6*10+10+5*10+10 {
-		t.Fatalf("reference folds = %d entries, want 2623", got)
+	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11+3*10+2*10+4*10+4*10+2*11+6*9+3*9+35*9+46+2*10+49*10+45*10+5*11+17*10+6*11+15*10+2*10+12*10+6*10+10+5*10+10+4*10+1*11+2*11 {
+		t.Fatalf("reference folds = %d entries, want 2696", got)
 	}
 
 	for _, c := range individual6 {
@@ -203,7 +209,7 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{22214, 21347, 21373, 21596, 21599, 21090, 22163, 22171, 22033, 22035, 22041, 22043, 21312, 21544, 21541, 21542, 21545, 20972, 21543, 21546, 21823, 22158, 22162, 22174, 22166, 22165, 22168, 22173, 35634, 18343, 22136, 22143, 22151, 20092, 18147, 18138, 21404, 18139, 18228, 21581, 21563, 21559, 21576, 21585, 21591, 21586, 21588, 21453, 21497, 20819, 21388, 21521, 21526} {
+	for _, id := range []int32{22214, 21347, 21373, 21596, 21599, 21090, 22163, 22171, 22033, 22035, 22041, 22043, 21312, 21544, 21541, 21542, 21545, 20972, 21543, 21546, 21823, 22158, 22162, 22174, 22166, 22165, 22168, 22173, 35634, 18343, 22136, 22143, 22151, 20092, 18147, 18138, 21404, 18139, 18228, 21581, 21563, 21559, 21576, 21585, 21591, 21586, 21588, 21453, 21497, 20819, 21388, 21521, 21526, 21537, 21532, 21650, 21535} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want its behavior bound", id)
 		}

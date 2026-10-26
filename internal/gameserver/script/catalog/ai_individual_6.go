@@ -72,9 +72,9 @@ func aiIndividual6() script.Catalog {
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive":                                                      wizard.HereticPriestAggressive,
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintBasic":                                                  wizard.SaintBasic,
 		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintBasicAggressive":                                        wizard.SaintBasicAggressive,
-		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintDDMagic2.WizardSaintDDMagic2":                           nil,
-		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintDDMagic2.WizardSaintRangeDDMagic2Aggressive":            nil,
-		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintSelfRangeDDMagic.WizardSaintSelfRangeDDMagic":           nil,
-		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintSelfRangeDDMagic.WizardSaintSelfRangeDDMagicAggressive": nil,
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintDDMagic2.WizardSaintDDMagic2":                           wizard.SaintDDMagic2,
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintDDMagic2.WizardSaintRangeDDMagic2Aggressive":            wizard.SaintRangeDDMagic2Aggressive,
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintSelfRangeDDMagic.WizardSaintSelfRangeDDMagic":           wizard.SaintSelfRangeDDMagic,
+		"script.ai.individual.Monster.WizardBase.Wizard.WizardSaintBasic.WizardSaintSelfRangeDDMagic.WizardSaintSelfRangeDDMagicAggressive": wizard.SaintSelfRangeDDMagicAggressive,
 	}
 }
