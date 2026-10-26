@@ -1,0 +1,51 @@
+# Path to a Shillien Oracle (Q413), level 19 with both books: Sidra gives the Orb of Abyss; then relog and the quest starts over, refused for the Orb. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q413_path_to_a_shillien_oracle_finish.golden
+character Fighter 19
+class 38
+quest Q413_PathToAShillienOracle <cond>=7 <state>=STARTED
+hold 1265 1
+hold 1269 1
+script quest.Q413_PathToAShillienOracle
+item 1262 1263 1264 1265 1266 1267 1268 1269 1270
+page trainer/30330.htm
+page trainer/30375.htm
+page trainer/30377.htm
+page script/quest/Q413_PathToAShillienOracle/
+npc sidra 30330 Trainer 10 0 0
+npc adonius 30375 Trainer -10 0 0
+npc talbot 30377 Trainer 20 0 0
+npc rune 20776 Monster 40 0 0
+npc bones 20457 Monster 50 0 0
+
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S SystemMessage id=302 3:1269
+  S SystemMessage id=302 3:1265
+  S SystemMessage id=54 3:1270
+  S SystemMessage id=95 1:3200 1:3120
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q413_PathToAShillienOracle
+  items 1265=0 1269=0 1270=1
+  rows Q413_PathToAShillienOracle -
+  state Q413_PathToAShillienOracle -
+relog
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q413_PathToAShillienOracle 30330-05.htm
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-04.htm
+  S ActionFailed

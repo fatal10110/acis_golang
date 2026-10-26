@@ -1,0 +1,122 @@
+# Path to an Elven Wizard (Q408), level 19, quest started: Rosella gives the apple, a dryad elder drops nothing yet, Thalia trades it for the sap, the fifth gold leaf comes from a dryad elder (the first draw misses), and Thalia trades them for the aquamarine. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q408_path_to_an_elven_wizard_leaves.golden
+character Wizard 19
+class 25
+quest Q408_PathToAnElvenWizard <cond>=1 <state>=STARTED
+hold 1229 1
+hold 1223 4
+random 999999 0
+script quest.Q408_PathToAnElvenWizard
+item 1218 1219 1220 1221 1222 1223 1224 1225 1226 1229 1230 1272 1273 1274
+page default/30414.htm
+page trainer/30157.htm
+page default/30371.htm
+page default/30423.htm
+page script/quest/Q408_PathToAnElvenWizard/
+npc rosella 30414 Folk 10 0 0
+npc greenis 30157 Trainer -10 0 0
+npc thalia 30371 Folk 20 0 0
+npc northwind 30423 Folk -20 0 0
+npc sukar 20047 Monster 40 0 0
+npc dryad 20019 Monster 50 0 0
+npc spider 20466 Monster 60 0 0
+
+action rosella
+  items 1223=4 1229=1
+  rows Q408_PathToAnElvenWizard <cond>=1 <state>=STARTED
+  state Q408_PathToAnElvenWizard STARTED
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q408_PathToAnElvenWizard 30414-14.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1222
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-14.htm
+  S ActionFailed
+  items 1222=1
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-15.htm
+  S ActionFailed
+  S ActionFailed
+kill dryad
+  S SystemMessage id=95 1:0 1:0
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q408_PathToAnElvenWizard/30371-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q408_PathToAnElvenWizard 30371-02.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1222
+  S SystemMessage id=54 3:1273
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q408_PathToAnElvenWizard/30371-02.htm
+  S ActionFailed
+  items 1222=0 1273=1
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q408_PathToAnElvenWizard/30371-03.htm
+  S ActionFailed
+  S ActionFailed
+action rosella
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-16.htm
+  S ActionFailed
+  S ActionFailed
+kill dryad
+  S SystemMessage id=95 1:0 1:0
+kill dryad
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1223
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1223=5
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-26.htm
+  S ActionFailed
+  S ActionFailed
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1223 6:5
+  S SystemMessage id=302 3:1273
+  S SystemMessage id=54 3:1221
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q408_PathToAnElvenWizard/30371-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 1221=1 1223=0 1273=0
+action rosella
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-11.htm
+  S ActionFailed
+  S ActionFailed

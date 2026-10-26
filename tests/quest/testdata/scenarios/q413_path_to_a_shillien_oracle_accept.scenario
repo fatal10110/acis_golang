@@ -1,0 +1,59 @@
+# Path to a Shillien Oracle (Q413), a level 19 dark mystic accepts at Sidra and gets the letter; the pages after the acceptance read, then relog and Sidra asks for Talbot. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q413_path_to_a_shillien_oracle_accept.golden
+character Fighter 19
+class 38
+script quest.Q413_PathToAShillienOracle
+item 1262 1263 1264 1265 1266 1267 1268 1269 1270
+page trainer/30330.htm
+page trainer/30375.htm
+page trainer/30377.htm
+page script/quest/Q413_PathToAShillienOracle/
+npc sidra 30330 Trainer 10 0 0
+npc adonius 30375 Trainer -10 0 0
+npc talbot 30377 Trainer 20 0 0
+npc rune 20776 Monster 40 0 0
+npc bones 20457 Monster 50 0 0
+
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q413_PathToAShillienOracle 30330-05.htm
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-05.htm
+  S ActionFailed
+bypass Quest Q413_PathToAShillienOracle 30330-06.htm
+  S QuestList 413:0x80000001
+  S ExShowQuestMark quest=413
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1262
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-06.htm
+  S ActionFailed
+  Q upsert Q413_PathToAShillienOracle | <state> | STARTED
+  Q upsert Q413_PathToAShillienOracle | <cond> | 1
+  items 1262=1
+  rows Q413_PathToAShillienOracle <cond>=1 <state>=STARTED
+  state Q413_PathToAShillienOracle STARTED
+bypass Quest Q413_PathToAShillienOracle 30330-06a.htm
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-06a.htm
+  S ActionFailed
+bypass Quest Q413_PathToAShillienOracle 30330-06b.htm
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-06.htm
+  S ActionFailed
+bypass Quest Q413_PathToAShillienOracle 30330-06a.htm
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-06a.htm
+  S ActionFailed
+relog
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-07.htm
+  S ActionFailed
+  S ActionFailed
