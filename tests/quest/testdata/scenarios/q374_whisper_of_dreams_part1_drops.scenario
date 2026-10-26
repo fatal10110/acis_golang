@@ -1,0 +1,31 @@
+# Whisper of Dreams, Part 1 (Q374), a character at the first step kills a cave beast and a death wave, then a cave beast again for the sealed stone. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q374_whisper_of_dreams_part1_drops.golden
+character Whisper 56
+quest Q374_WhisperOfDreams_Part1 <cond>=1 <state>=STARTED condStone=1
+random 0 499999 0 1000 0 500000 0 5 0 0
+script quest.Q374_WhisperOfDreams_Part1
+item 57 5884 5885 5886 5887 5486 5487 5488 5485 5489
+page trainer/30515.htm
+page default/30557.htm
+page script/quest/Q374_WhisperOfDreams_Part1/
+npc manakia 30515 Trainer 10 0 0
+npc torai 30557 Folk 20 0 0
+npc beast 20620 Monster 40 0 0
+npc wave 20621 Monster 50 0 0
+
+kill beast
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5884
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5884=1 5885=0 5886=0
+kill wave
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5886
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q delete-var Q374_WhisperOfDreams_Part1 | condStone
+  items 5884=1 5885=0 5886=1
+kill beast
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5884
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5884=2 5885=0 5886=1

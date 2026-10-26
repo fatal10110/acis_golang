@@ -1,0 +1,37 @@
+# Path to a Human Wizard (Q404), a level 19 human mystic with the Bead of Season already is refused. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q404_path_to_a_human_wizard_has_bead.golden
+character Wizard 19
+class 10
+hold 1292 1
+script quest.Q404_PathToAHumanWizard
+item 1280 1281 1282 1283 1284 1285 1286 1287 1288 1289 1290 1291 1292
+page default/30391.htm
+page default/30409.htm
+page default/30410.htm
+page default/30411.htm
+page default/30412.htm
+page default/30413.htm
+page script/quest/Q404_PathToAHumanWizard/
+npc parina 30391 Folk 10 0 0
+npc snake 30409 Folk -10 0 0
+npc lizardman 30410 Folk 20 0 0
+npc salamander 30411 Folk -20 0 0
+npc sylph 30412 Folk 30 0 0
+npc undine 30413 Folk -30 0 0
+npc bear 20021 Monster 40 0 0
+npc ratman 20359 Monster 50 0 0
+npc seer 27030 Monster 60 0 0
+
+action parina
+  items 1292=1
+  rows Q404_PathToAHumanWizard -
+  state Q404_PathToAHumanWizard -
+action parina
+  S ActionFailed
+  S NpcHtmlMessage obj=parina item=0 page=default/30391.htm
+  S ActionFailed
+bypass npc_{parina}_Quest
+  S NpcHtmlMessage obj=parina item=0 page=script/quest/Q404_PathToAHumanWizard/30391-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q404_PathToAHumanWizard CREATED

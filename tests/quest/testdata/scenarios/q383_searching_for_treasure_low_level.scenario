@@ -1,0 +1,21 @@
+# Searching for Treasure (Q383), level 41 with a map: Espen turns the character away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q383_searching_for_treasure_low_level.golden
+character Treasure 41
+hold 5915 1
+script quest.Q383_SearchingForTreasure
+item 57 1661 5915 2450 4481 1337 4408
+page merchant/30890.htm
+page default/31148.htm
+page script/quest/Q383_SearchingForTreasure/
+npc espen 30890 Merchant 10 0 0
+npc chest 31148 Folk -10 0 0
+
+action espen
+action espen
+  S ActionFailed
+  S NpcHtmlMessage obj=espen item=0 page=merchant/30890.htm
+  S ActionFailed
+bypass npc_{espen}_Quest
+  S NpcHtmlMessage obj=espen item=0 page=script/quest/Q383_SearchingForTreasure/30890-01.htm
+  S ActionFailed
+  S ActionFailed

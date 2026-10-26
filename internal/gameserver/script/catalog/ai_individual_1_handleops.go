@@ -84,6 +84,9 @@ func aiIndividual1HandleOps() map[string]script.HandleOps {
 			"OnAttacked":     {"NPC.RemoveAttackDesire", "NPC.TopDesireTarget"},
 			"OnClanAttacked": {"NPC.RemoveAttackDesire", "NPC.TopDesireTarget"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.RoyalRushWarriorPhysicalSpecial1Hold": {
+			"OnAttacked": {"NPC.EquipItem", "NPC.SetEnchantEffect", "NPC.TopDesireTarget"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorUseBowNotFleeAggressive": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 		},

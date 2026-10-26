@@ -1,0 +1,160 @@
+# Path to a Shillien Oracle (Q413), level 19 with the letter: Talbot gives five blank sheets, each rune the monster drops takes one, and he trades the five runes for the books. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q413_path_to_a_shillien_oracle_talbot.golden
+character Fighter 19
+class 38
+quest Q413_PathToAShillienOracle <cond>=1 <state>=STARTED
+hold 1262 1
+script quest.Q413_PathToAShillienOracle
+item 1262 1263 1264 1265 1266 1267 1268 1269 1270
+page trainer/30330.htm
+page trainer/30375.htm
+page trainer/30377.htm
+page script/quest/Q413_PathToAShillienOracle/
+npc sidra 30330 Trainer 10 0 0
+npc adonius 30375 Trainer -10 0 0
+npc talbot 30377 Trainer 20 0 0
+npc rune 20776 Monster 40 0 0
+npc bones 20457 Monster 50 0 0
+
+action talbot
+action talbot
+  S ActionFailed
+  S NpcHtmlMessage obj=talbot item=0 page=trainer/30377.htm
+  S ActionFailed
+bypass npc_{talbot}_Quest
+  S NpcHtmlMessage obj=talbot item=0 page=script/quest/Q413_PathToAShillienOracle/30377-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q413_PathToAShillienOracle 30377-02.htm
+  S QuestList 413:0x80000003
+  S ExShowQuestMark quest=413
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1262
+  S SystemMessage id=53 3:1263 6:5
+  S NpcHtmlMessage obj=talbot item=0 page=script/quest/Q413_PathToAShillienOracle/30377-02.htm
+  S ActionFailed
+  Q upsert Q413_PathToAShillienOracle | <cond> | 2
+  items 1262=0 1263=5
+  rows Q413_PathToAShillienOracle <cond>=2 <state>=STARTED
+  state Q413_PathToAShillienOracle STARTED
+action talbot
+  S ActionFailed
+  S NpcHtmlMessage obj=talbot item=0 page=trainer/30377.htm
+  S ActionFailed
+bypass npc_{talbot}_Quest
+  S NpcHtmlMessage obj=talbot item=0 page=script/quest/Q413_PathToAShillienOracle/30377-03.htm
+  S ActionFailed
+  S ActionFailed
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-08.htm
+  S ActionFailed
+  S ActionFailed
+kill bones
+  S SystemMessage id=95 1:0 1:0
+  items 1263=5 1264=0
+  rows Q413_PathToAShillienOracle <cond>=2 <state>=STARTED
+  state Q413_PathToAShillienOracle STARTED
+kill rune
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:1263
+  S SystemMessage id=54 3:1264
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1263=4 1264=1
+  rows Q413_PathToAShillienOracle <cond>=2 <state>=STARTED
+  state Q413_PathToAShillienOracle STARTED
+action talbot
+action talbot
+  S ActionFailed
+  S NpcHtmlMessage obj=talbot item=0 page=trainer/30377.htm
+  S ActionFailed
+bypass npc_{talbot}_Quest
+  S NpcHtmlMessage obj=talbot item=0 page=script/quest/Q413_PathToAShillienOracle/30377-04.htm
+  S ActionFailed
+  S ActionFailed
+kill rune x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:1263
+  S SystemMessage id=54 3:1264
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:1263
+  S SystemMessage id=54 3:1264
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:1263
+  S SystemMessage id=54 3:1264
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:1263
+  S SystemMessage id=54 3:1264
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 413:0x80000007
+  S ExShowQuestMark quest=413
+  Q upsert Q413_PathToAShillienOracle | <cond> | 3
+  items 1263=0 1264=5
+  rows Q413_PathToAShillienOracle <cond>=3 <state>=STARTED
+  state Q413_PathToAShillienOracle STARTED
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-08.htm
+  S ActionFailed
+  S ActionFailed
+kill rune
+  S SystemMessage id=95 1:0 1:0
+  items 1264=5
+  rows Q413_PathToAShillienOracle <cond>=3 <state>=STARTED
+  state Q413_PathToAShillienOracle STARTED
+action talbot
+action talbot
+  S ActionFailed
+  S NpcHtmlMessage obj=talbot item=0 page=trainer/30377.htm
+  S ActionFailed
+bypass npc_{talbot}_Quest
+  S QuestList 413:0x8000000f
+  S ExShowQuestMark quest=413
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1264 6:5
+  S SystemMessage id=54 3:1265
+  S SystemMessage id=54 3:1266
+  S NpcHtmlMessage obj=talbot item=0 page=script/quest/Q413_PathToAShillienOracle/30377-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q413_PathToAShillienOracle | <cond> | 4
+  items 1264=0 1265=1 1266=1
+  rows Q413_PathToAShillienOracle <cond>=4 <state>=STARTED
+  state Q413_PathToAShillienOracle STARTED
+action talbot
+  S ActionFailed
+  S NpcHtmlMessage obj=talbot item=0 page=trainer/30377.htm
+  S ActionFailed
+bypass npc_{talbot}_Quest
+  S NpcHtmlMessage obj=talbot item=0 page=script/quest/Q413_PathToAShillienOracle/30377-06.htm
+  S ActionFailed
+  S ActionFailed
+action sidra
+action sidra
+  S ActionFailed
+  S NpcHtmlMessage obj=sidra item=0 page=trainer/30330.htm
+  S ActionFailed
+bypass npc_{sidra}_Quest
+  S NpcHtmlMessage obj=sidra item=0 page=script/quest/Q413_PathToAShillienOracle/30330-09.htm
+  S ActionFailed
+  S ActionFailed
+action adonius
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+bypass npc_{adonius}_Quest
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q413_PathToAShillienOracle/30375-01.htm
+  S ActionFailed
+  S ActionFailed

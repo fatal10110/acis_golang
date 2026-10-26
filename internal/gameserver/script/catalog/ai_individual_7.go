@@ -44,11 +44,11 @@ func aiIndividual7() script.Catalog {
 		"script.ai.individual.Monster.RaidBoss.RaidBossStandard":                                                            raid.BossStandard,
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateArcher":                                                        raid.PrivateArcher,
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateFighter":                                                       raid.PrivateFighter,
-		"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer":                                                        nil,
-		"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard":                                                        nil,
-		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold":                                                nil,
-		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus":             nil,
-		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive":         nil,
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer":                                                        raid.PrivateHealer,
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard":                                                        raid.PrivateWizard,
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold":                                                monster.WarriorDDMagicHold,
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus":             monster.ValakasPrivateLavasaurus,
+		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive":         monster.WarriorDDMagicHoldAggressive,
 		"script.ai.individual.Monster.WarriorHero":                                                                          monster.WarriorHero,
 	}
 }

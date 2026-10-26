@@ -1,0 +1,40 @@
+# Whisper of Dreams, Part 2 (Q375), a character with a hundred horns and skulls takes a recipe (draw 1) and ends the quest. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q375_whisper_of_dreams_part2_finish.golden
+character Whisper 60
+quest Q375_WhisperOfDreams_Part2 <cond>=1 <state>=STARTED
+hold 5888 100
+hold 5889 100
+random 1
+script quest.Q375_WhisperOfDreams_Part2
+item 57 5887 5888 5889 5348 5350 5352
+page trainer/30515.htm
+page script/quest/Q375_WhisperOfDreams_Part2/
+npc manakia 30515 Trainer 10 0 0
+npc karik 20629 Monster 40 0 0
+npc howler 20624 Monster 50 0 0
+
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:5888 6:100
+  S SystemMessage id=301 3:5889 6:100
+  S SystemMessage id=54 3:5350
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q375_WhisperOfDreams_Part2/30515-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 5888=0 5889=0 5348=0 5350=1 5352=0
+bypass Quest Q375_WhisperOfDreams_Part2 30515-07.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q375_WhisperOfDreams_Part2/30515-07.htm
+  S ActionFailed
+  Q delete-quest Q375_WhisperOfDreams_Part2
+  rows Q375_WhisperOfDreams_Part2 -
+  state Q375_WhisperOfDreams_Part2 -
+relog
+  rows Q375_WhisperOfDreams_Part2 -
+  state Q375_WhisperOfDreams_Part2 -

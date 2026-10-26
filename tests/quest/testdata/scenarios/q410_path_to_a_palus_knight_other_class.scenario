@@ -1,0 +1,26 @@
+# Path to a Palus Knight (Q410), a level 20 human fighter is turned away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q410_path_to_a_palus_knight_other_class.golden
+character Fighter 20
+script quest.Q410_PathToAPalusKnight
+item 1237 1238 1239 1240 1241 1242 1243 1244
+page trainer/30329.htm
+page default/30422.htm
+page script/quest/Q410_PathToAPalusKnight/
+npc virgil 30329 Trainer 10 0 0
+npc kalinta 30422 Folk -10 0 0
+npc spider 20038 Monster 40 0 0
+npc tracker 20043 Monster 50 0 0
+npc lycan 20049 Monster 60 0 0
+
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=trainer/30329.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q410_PathToAPalusKnight 30329-05.htm
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-03.htm
+  S ActionFailed

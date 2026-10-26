@@ -1,0 +1,82 @@
+# Legacy of Insolence (Q372): a character holding the genealogies and the epics trades them at Holly (the draw 95
+# gives adena) and Patrin (the draw 5 gives 5497), and finds Claudia and Desmond with nothing to take.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q372_legacy_of_insolence_scrolls.golden
+character Insolence 59
+quest Q372_LegacyOfInsolence <cond>=2 <state>=STARTED
+hold 5984 1
+hold 5985 1
+hold 5986 1
+hold 5987 1
+hold 5988 1
+hold 5979 1
+hold 5980 1
+hold 5981 1
+hold 5982 1
+hold 5983 1
+random 95 5
+script quest.Q372_LegacyOfInsolence
+item 57 5966 5967 5968 5969 5972 5973 5974 5975 5976 5977 5978 5979 5980 5981 5982 5983 5984 5985 5986 5987 5988 5989 5990 5991 5992 5993 5994 5995 5996 5997 5998 5999 6000 6001 5368 5370 5380 5382 5392 5394 5404 5406 5426 5428 5430 5432 5496 5497 5502 5503 5508 5509 5514 5515 5525 5526 5527 5528
+page warehouse/30844.htm
+page merchant/30839.htm
+page default/30929.htm
+page default/31001.htm
+page trainer/30855.htm
+page script/quest/Q372_LegacyOfInsolence/
+npc walderal 30844 WarehouseKeeper 10 0 0
+npc holly 30839 Merchant -10 0 0
+npc patrin 30929 Folk 20 0 0
+npc claudia 31001 Folk -20 0 0
+npc desmond 30855 Trainer 30 0 0
+npc beast 20817 Monster 40 0 0
+
+action holly
+action holly
+  S ActionFailed
+  S NpcHtmlMessage obj=holly item=0 page=merchant/30839.htm
+  S ActionFailed
+bypass npc_{holly}_Quest
+  S SystemMessage id=302 3:5984
+  S SystemMessage id=302 3:5985
+  S SystemMessage id=302 3:5986
+  S SystemMessage id=302 3:5987
+  S SystemMessage id=302 3:5988
+  S SystemMessage id=52 6:4000
+  S NpcHtmlMessage obj=holly item=0 page=script/quest/Q372_LegacyOfInsolence/30839-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 5984=0 5988=0 57=4000
+action patrin
+action patrin
+  S ActionFailed
+  S NpcHtmlMessage obj=patrin item=0 page=default/30929.htm
+  S ActionFailed
+bypass npc_{patrin}_Quest
+  S SystemMessage id=302 3:5979
+  S SystemMessage id=302 3:5980
+  S SystemMessage id=302 3:5981
+  S SystemMessage id=302 3:5982
+  S SystemMessage id=302 3:5983
+  S SystemMessage id=54 3:5497
+  S NpcHtmlMessage obj=patrin item=0 page=script/quest/Q372_LegacyOfInsolence/30929-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 5979=0 5983=0 5497=1
+action claudia
+action claudia
+  S ActionFailed
+  S NpcHtmlMessage obj=claudia item=0 page=default/31001.htm
+  S ActionFailed
+bypass npc_{claudia}_Quest
+  S NpcHtmlMessage obj=claudia item=0 page=script/quest/Q372_LegacyOfInsolence/31001-01.htm
+  S ActionFailed
+  S ActionFailed
+action desmond
+action desmond
+  S ActionFailed
+  S NpcHtmlMessage obj=desmond item=0 page=trainer/30855.htm
+  S ActionFailed
+bypass npc_{desmond}_Quest
+  S NpcHtmlMessage obj=desmond item=0 page=script/quest/Q372_LegacyOfInsolence/30855-01.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,54 @@
+# Supplier of Reagents (Q373): a character holding the stone, ten rotten bones and a blood root has the Urn mix
+# them at the lowest heat (the roll 0 succeeds), and tries the same mix again with nothing left. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q373_supplier_of_reagents_mix.golden
+character Reagents 57
+quest Q373_SupplierOfReagents <cond>=1 <state>=STARTED
+hold 5904 1
+hold 6014 10
+hold 6017 1
+random 0
+script quest.Q373_SupplierOfReagents
+item 57 5904 6317 6007 6008 6009 6010 6011 6012 6013 6014 6015 6016 6017 6018 6019 6020 6021 6022 6023 6024 6025 6026 6027 6028 6029 6030 6031 6032 6033 6034 6320
+page merchant/30166.htm
+page default/31149.htm
+page script/quest/Q373_SupplierOfReagents/
+npc wesley 30166 Merchant 10 0 0
+npc urn 31149 Folk -10 0 0
+
+action urn
+action urn
+  S ActionFailed
+  S NpcHtmlMessage obj=urn item=0 page=default/31149.htm
+  S ActionFailed
+bypass npc_{urn}_Quest
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q373_SupplierOfReagents 31149-02.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-02.htm
+  S ActionFailed
+bypass Quest Q373_SupplierOfReagents 31149-03-6014.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-03-6014.htm
+  S ActionFailed
+  Q upsert Q373_SupplierOfReagents | ingredient | 6014
+bypass Quest Q373_SupplierOfReagents 31149-05.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-05.htm
+  S ActionFailed
+bypass Quest Q373_SupplierOfReagents 31149-06-6017.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-06-6017.htm
+  S ActionFailed
+  Q upsert Q373_SupplierOfReagents | catalyst | 6017
+bypass Quest Q373_SupplierOfReagents 31149-09.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-09.htm
+  S ActionFailed
+bypass Quest Q373_SupplierOfReagents 31149-10-1.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-10-1.htm
+  S ActionFailed
+bypass Quest Q373_SupplierOfReagents 31149-12-1
+  S SystemMessage id=301 3:6014 6:10
+  S SystemMessage id=302 3:6017
+  S SystemMessage id=54 3:6024
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q373_SupplierOfReagents/31149-12-6024.htm
+  S ActionFailed
+  items 6014=0 6017=0 6024=1 5904=1

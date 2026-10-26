@@ -246,7 +246,7 @@ Quest.addCreated inline
 # The item check is on every creature handle: a player and a pet answer
 # from their inventories; a servitor, an NPC or a door has none and panics.
 ClassId.getLevel script.Player.ClassLevel
-Creature.teleportTo TeleportTo
+Creature.teleportTo TeleportTo,TeleportNear
 ItemContainer.hasAtLeastOneItem script.Creature.HasAtLeastOneItem
 MemoSet.unset script.QuestState.Unset
 NewbieBuff.getSkill inline
@@ -261,7 +261,7 @@ Player.isCursedWeaponEquipped script.Player.CursedWeaponEquipped
 Player.isNewbie script.Player.IsNewbie
 Quest.addFirstTalkId inline
 Quest.addMyDying inline
-Quest.callSkill script.Script.CallSkill
+Quest.callSkill script.Script.CallSkill,script.NPC.CallSkill
 Quest.newQuestState script.Script.NewQuestState
 QuestState.isCompleted script.QuestState.IsCompleted
 SkillTable.FrequentSkill.getSkill inline
@@ -565,7 +565,7 @@ Npc.getNeighborHero script.Script.NeighborHero
 Npc.isAISleeping script.NPC.AISleeping
 Npc.removeAllDesire script.NPC.RemoveAllDesire
 Npc.sendScriptEvent script.Script.SendScriptEvent
-Npc.teleportTo TeleportTo
+Npc.teleportTo TeleportTo,TeleportNear
 NpcAI.addCastDesireHold AddCastDesireHold
 NpcAI.getDesireQueue inline
 NpcMaker.deleteAll spawn.Group.DeleteAll
@@ -923,7 +923,8 @@ ZoneType.getKnownTypeInside script.Hall.PlayersInside
 # faces; a heading set on a copied position is a field of the script's Loc
 # (Zaken), so that port exempts the row. The ordinary teleport of any
 # creature handle, a summon's included, is script.TeleportTo, under the
-# Go name Creature.teleportTo already has.
+# Go name Creature.teleportTo already has; the one with a random offset is
+# script.Script.TeleportNear (#4210).
 SpawnLocation.setHeading script.NPC.SetHeading
 
 # Siegable-hall rows, exempt from the freeze, named by the Rainbow Springs

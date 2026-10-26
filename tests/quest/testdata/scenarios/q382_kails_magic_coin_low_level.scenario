@@ -1,0 +1,23 @@
+# Kail's Magic Coin (Q382), level 54 with a membership: Vergara turns the character away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q382_kails_magic_coin_low_level.golden
+character Magic 54
+hold 5898 1
+script quest.Q382_KailsMagicCoin
+item 5898 5961 5962 5963
+page villagemaster/30687.htm
+page script/quest/Q382_KailsMagicCoin/
+npc vergara 30687 VillageMasterDwarf 10 0 0
+npc orc 21017 Monster 40 0 0
+npc archer 21019 Monster 50 0 0
+npc shaman 21020 Monster 60 0 0
+npc captain 21022 Monster 70 0 0
+
+action vergara
+action vergara
+  S ActionFailed
+  S NpcHtmlMessage obj=vergara item=0 page=villagemaster/30687.htm
+  S ActionFailed
+bypass npc_{vergara}_Quest
+  S NpcHtmlMessage obj=vergara item=0 page=script/quest/Q382_KailsMagicCoin/30687-01.htm
+  S ActionFailed
+  S ActionFailed

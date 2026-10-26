@@ -1,0 +1,33 @@
+# Path to an Elven Scout (Q407), a level 20 elven scout is told it already is one. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q407_path_to_an_elven_scout_wrong_class.golden
+character Scout 20
+class 22
+script quest.Q407_PathToAnElvenScout
+item 1207 1208 1209 1210 1211 1212 1213 1214 1215 1216 1217 1293
+page trainer/30328.htm
+page guard/30337.htm
+page guard/30334.htm
+page default/30426.htm
+page script/quest/Q407_PathToAnElvenScout/
+npc reisa 30328 Trainer 10 0 0
+npc moretti 30337 Guard -10 0 0
+npc babenco 30334 Guard 20 0 0
+npc prias 30426 Folk -20 0 0
+npc patrol 20053 Monster 40 0 0
+npc sentry 27031 Monster 50 0 0
+
+action reisa
+  rows Q407_PathToAnElvenScout -
+  state Q407_PathToAnElvenScout -
+action reisa
+  S ActionFailed
+  S NpcHtmlMessage obj=reisa item=0 page=trainer/30328.htm
+  S ActionFailed
+bypass npc_{reisa}_Quest
+  S NpcHtmlMessage obj=reisa item=0 page=script/quest/Q407_PathToAnElvenScout/30328-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q407_PathToAnElvenScout CREATED
+bypass Quest Q407_PathToAnElvenScout 30328-05.htm
+  S NpcHtmlMessage obj=reisa item=0 page=script/quest/Q407_PathToAnElvenScout/30328-02a.htm
+  S ActionFailed

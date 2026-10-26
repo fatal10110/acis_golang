@@ -33,6 +33,8 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard",
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateArcher",
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateFighter",
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer",
+		"script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard",
 	}, "number 1010582", "number 1010583", "number 1010643", "number 1121002", "call Quest.getPartyMembers")
 	if err != nil {
 		t.Fatal(err)
