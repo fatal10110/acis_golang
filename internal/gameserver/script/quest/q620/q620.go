@@ -8,6 +8,7 @@ package q620
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -211,8 +212,8 @@ func halishaGoblet(npcID int32) (int32, bool) {
 }
 
 // isRecipeReward reports whether id is a recipe the relic parts buy.
-func isRecipeReward(id int) bool {
-	return slices.Contains([]int{6881, 6883, 6885, 6887, 6891, 6893, 6895, 6897, 6899, 7580}, id)
+func isRecipeReward(id int32) bool {
+	return slices.Contains([]int32{6881, 6883, 6885, 6887, 6891, 6893, 6895, 6897, 6899, 7580}, id)
 }
 
 // ids returns lo to hi, both included.
@@ -326,7 +327,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	case script.IsDigit(e.Name):
 		// A simple digit is a recipe asked for.
 		id, err := strconv.Atoi(e.Name)
-		if err != nil || !isRecipeReward(id) || p.ItemCount(brokenRelicPart) < brokenRelicsNeeded {
+		if err != nil || id < math.MinInt32 || id > math.MaxInt32 || !isRecipeReward(int32(id)) || p.ItemCount(brokenRelicPart) < brokenRelicsNeeded {
 			return ""
 		}
 		s.TakeItems(p, brokenRelicPart, brokenRelicsNeeded)
