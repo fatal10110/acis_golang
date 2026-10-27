@@ -59,6 +59,11 @@ docker run --rm --user "$(id -u):$(id -g)" \
 		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/" src/net/sf/l2j/gameserver/model/location/TeleportLocation.java
 		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/model/location/TeleportLocation.java)" = 1 ] \
 			|| { echo "teleport location calendar not found" >&2; exit 1; }
+		# The Four Sepulchers manager reads the minute and second of the probe wall clock, so what it
+		# announces does not depend on when the scenario ran.
+		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/g" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushNpc.java
+		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushNpc.java)" -ge 1 ] \
+			|| { echo "royal rush calendar not found" >&2; exit 1; }
 		# Every other wall clock read goes through the probe wall clock: the real one, except
 		# while a scenario trace plays (a virtual one, so its trace does not depend on when it ran).
 		find src -name "*.java" -exec sed -i "s/System\.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.wall()/g" {} +
@@ -78,8 +83,8 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 docker run --rm --user "$(id -u):$(id -g)" \
 	-v "$java_tree/lib:/reflib:ro" -v "$datapack/data:/work/run/data:ro" -v "$datapack/sql:/refsql:ro" -v "$work/geodata:/work/run/data/geodata:ro" \
-	-v "$repo/tests/quest/testdata/scenarios:/scenarios:ro" -v "$work:/work" -w /work/run \
-	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -Dprobe.scenarios=/scenarios -Dprobe.only="$only" -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
+	-v "$repo/tests/quest/testdata/scenarios:/scenarios:ro" -v "$repo/tests/ai/testdata/scenarios:/scenarios-ai:ro" -v "$work:/work" -w /work/run \
+	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -Dprobe.scenarios=/scenarios:/scenarios-ai -Dprobe.only="$only" -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
 	2> "$work/probe.log" || { tail -40 "$work/probe.log" >&2; exit 1; }
 
 cp "$work"/out/*.golden "$here/"

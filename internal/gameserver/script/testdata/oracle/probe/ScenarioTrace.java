@@ -1,5 +1,6 @@
 import java.io.File;
 import java.io.PrintWriter;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -39,6 +40,7 @@ import net.sf.l2j.gameserver.data.manager.LotteryManager;
 import net.sf.l2j.gameserver.data.manager.RaidPointManager;
 import net.sf.l2j.gameserver.data.manager.RelationManager;
 import net.sf.l2j.gameserver.data.manager.SevenSignsManager;
+import net.sf.l2j.gameserver.data.manager.SpawnManager;
 import net.sf.l2j.gameserver.data.manager.ClanHallManager;
 import net.sf.l2j.gameserver.data.sql.ClanTable;
 import net.sf.l2j.gameserver.data.sql.PlayerInfoTable;
@@ -66,11 +68,13 @@ import net.sf.l2j.gameserver.model.actor.instance.Monster;
 import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
+import net.sf.l2j.gameserver.model.memo.NpcMemo;
 import net.sf.l2j.gameserver.enums.SiegeStatus;
 import net.sf.l2j.gameserver.model.pledge.Clan;
 import net.sf.l2j.gameserver.model.residence.clanhall.ClanHall;
 import net.sf.l2j.gameserver.model.residence.clanhall.SiegableHall;
 import net.sf.l2j.gameserver.model.residence.castle.Castle;
+import net.sf.l2j.gameserver.model.spawn.ASpawn;
 import net.sf.l2j.gameserver.model.spawn.Spawn;
 import net.sf.l2j.gameserver.network.GameClient;
 import net.sf.l2j.gameserver.network.GameClient.GameClientState;
@@ -196,6 +200,8 @@ final class ScenarioTrace
 	/** The mate line of the clan's leader, when the character is not: name, level. */
 	private String[] _leader;
 	private int[] _draws;
+	/** The time of day the clock line starts the scenario at, in milliseconds since midnight. */
+	private long _clock;
 	private boolean _always;
 	private final List<int[]> _holds = new ArrayList<>();
 	private final List<Integer> _equips = new ArrayList<>();
@@ -223,7 +229,8 @@ final class ScenarioTrace
 	/** While true, packets and statements are not recorded: the probe's own setup. */
 	private boolean _muted;
 
-	private record NpcLine(String role, int id, String type, int dx, int dy, int dz)
+	/** An npc line: params holds the three spawn parameters the line gives (a number, an NPC role or character), null for none; ai the AI parameters of its ai option, which replace the template's as the Go runner's fixture template has only them, null for none. */
+	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai)
 	{
 	}
 
@@ -255,20 +262,26 @@ final class ScenarioTrace
 	}
 
 	/**
-	 * Plays every scenario of {@code scenarios}, or, when {@code only} is not blank, the ones whose
+	 * Plays every scenario of the {@code scenarios} directories, or, when {@code only} is not blank, the ones whose
 	 * file name matches one of its comma-separated globs. A trace depends on its scenario alone,
 	 * so playing a subset writes the same traces as a full run.
 	 */
-	static void run(File scenarios, String only, File out, Map<NpcTemplate, Map<EventHandler, List<Quest>>> loaded) throws Exception
+	static void run(File[] scenarios, String only, File out, Map<NpcTemplate, Map<EventHandler, List<Quest>>> loaded) throws Exception
 	{
 		final List<PathMatcher> globs = new ArrayList<>();
 		for (String g : only.split(","))
 			if (!g.isBlank())
 				globs.add(FileSystems.getDefault().getPathMatcher("glob:" + g.strip()));
-		final File[] files = scenarios.listFiles((d, n) -> n.endsWith(".scenario")
-			&& (globs.isEmpty() || globs.stream().anyMatch(m -> m.matches(Path.of(n)))));
-		if (files == null)
-			throw new IllegalStateException("no scenario directory " + scenarios);
+		final List<File> listed = new ArrayList<>();
+		for (File dir : scenarios)
+		{
+			final File[] in = dir.listFiles((d, n) -> n.endsWith(".scenario")
+				&& (globs.isEmpty() || globs.stream().anyMatch(m -> m.matches(Path.of(n)))));
+			if (in == null)
+				throw new IllegalStateException("no scenario directory " + dir);
+			listed.addAll(Arrays.asList(in));
+		}
+		final File[] files = listed.toArray(new File[0]);
 		if (files.length == 0 && !globs.isEmpty())
 			throw new IllegalStateException("no scenario matches PROBE_ONLY=" + only);
 		Arrays.sort(files);
@@ -308,8 +321,12 @@ final class ScenarioTrace
 		final Ids ids = Ids.take();
 		for (File f : files)
 		{
+			final List<String> text = Files.readAllLines(f.toPath(), StandardCharsets.UTF_8);
+			// A scenario without a trace line is not played, so its other lines are not the probe's to read.
+			if (text.stream().noneMatch(l -> l.startsWith("trace ")))
+				continue;
 			final ScenarioTrace t = new ScenarioTrace(f.getName());
-			t.parse(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8));
+			t.parse(text);
 			if (t._trace == null || !t._trace.startsWith(TRACED))
 				continue;
 			if (!t._unread.isEmpty())
@@ -322,10 +339,16 @@ final class ScenarioTrace
 			ids.restore();
 			Rnd.reseed(1);
 			if (t._draws != null)
-				Rnd.scriptCallers(t._draws, t._always, d -> t._lines.add("# draw " + d));
+				Rnd.scriptCallers(t._draws, t._always, d ->
+			{
+				// The draws of the probe's own setup (the NPC lines' spawns) are not a step's.
+				if (!t._muted)
+					t._lines.add("# draw " + d);
+			});
 			t.restrict(loaded);
 			ConnectionPool.keep(KEPT);
-			ProbeClock.virtual(WALL);
+			ProbeClock.virtual(WALL + t._clock);
+			set(GameTimeTaskManager.class, GameTimeTaskManager.getInstance(), "_startTime", WALL + t._clock);
 			set(GameTimeTaskManager.class, GameTimeTaskManager.getInstance(), "_time", GAME_TIME);
 			set(GameTimeTaskManager.class, GameTimeTaskManager.getInstance(), "_isNight", false);
 			final int[] festival = festival();
@@ -547,7 +570,8 @@ final class ScenarioTrace
 					_always = f[1].equals("always");
 					_draws = Arrays.stream(f, _always ? 2 : 1, f.length).mapToInt(Integer::parseInt).toArray();
 				}
-				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6])));
+				case "clock" -> _clock = clock(f[1]);
+				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f)));
 				case "script", "stub" -> _scripts.add(ScriptProbe.PKG + f[1]);
 				case "hold" -> _holds.add(new int[]
 				{
@@ -588,11 +612,47 @@ final class ScenarioTrace
 		}
 	}
 
+	/** Reads a clock line's hh:mm[:ss] as milliseconds since midnight. */
+	private static long clock(String time)
+	{
+		final String[] p = time.split(":");
+		return (Long.parseLong(p[0]) * 3600 + Long.parseLong(p[1]) * 60 + (p.length > 2 ? Long.parseLong(p[2]) : 0)) * 1000;
+	}
+
+	/** The AI parameters of an npc line's ai option (name=value pairs, comma-separated), null without one. */
+	private static Map<String, String> npcAi(String[] f)
+	{
+		for (int i = 7; i + 1 < f.length; i++)
+			if (f[i].equals("ai"))
+			{
+				final Map<String, String> ai = new LinkedHashMap<>();
+				for (String kv : f[i + 1].split(","))
+				{
+					final int eq = kv.indexOf('=');
+					ai.put(kv.substring(0, eq), kv.substring(eq + 1));
+				}
+				return ai;
+			}
+		return null;
+	}
+
+	/**
+	 * The three spawn parameters of an npc line's params option, null without one. The other options
+	 * (walks, maker, ...) are not read: the probe plays the shipped template.
+	 */
+	private static String[] npcParams(String[] f)
+	{
+		for (int i = 7; i + 3 < f.length; i++)
+			if (f[i].equals("params"))
+				return new String[] { f[i + 1], f[i + 2], f[i + 3] };
+		return null;
+	}
+
 	private static boolean isStep(String verb)
 	{
 		return switch (verb)
 		{
-			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus" -> true;
+			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event" -> true;
 			default -> false;
 		};
 	}
@@ -627,6 +687,7 @@ final class ScenarioTrace
 				case "hit" -> hit(s[1], Integer.parseInt(s[2]));
 				case "advance" -> advance(s[1]);
 				case "approach" -> approach(s[1]);
+				case "event" -> event(s[1], s[2], s[3], s[4]);
 				case "tick" ->
 				{
 					final int n = s.length > 1 ? Integer.parseInt(s[1].substring(1)) : 1;
@@ -904,6 +965,8 @@ final class ScenarioTrace
 			{
 				final NpcTemplate template = NpcData.getInstance().getTemplate(n.id());
 				casting(template, n.type());
+				if (n.ai() != null)
+					alter(NpcTemplate.class, template, "_aiParams", new NpcMemo(n.ai()));
 				if (fought.contains(n.role()))
 					fixture(template, n.type());
 				spawn(n);
@@ -1022,9 +1085,10 @@ final class ScenarioTrace
 
 	private Npc spawn(NpcLine n) throws Exception
 	{
-		final Spawn spawn = new Spawn(NpcData.getInstance().getTemplate(n.id()));
+		final NpcTemplate template = NpcData.getInstance().getTemplate(n.id());
+		final Spawn spawn = new Spawn(template);
 		spawn.setLoc(X + n.dx(), Y + n.dy(), Z + n.dz(), 0);
-		final Npc npc = spawn.doSpawn(false);
+		final Npc npc = n.params() == null ? spawn.doSpawn(false) : spawn(spawn, template, n.params());
 		// A spawn clears the spoil state, so each fresh monster of the role is marked after it.
 		if (_spoils.containsKey(n.role()))
 			((Monster) npc).getSpoilState().setSpoilerId(_spoils.get(n.role()) ? OTHER_SPOILER : _player.getObjectId());
@@ -1032,6 +1096,36 @@ final class ScenarioTrace
 		_spawnedNpcs.add(npc);
 		_lines.add("# npc " + n.role() + " " + npc.getNpcId() + " (object " + npc.getObjectId() + ")");
 		return npc;
+	}
+
+	/**
+	 * Spawns as {@code Spawn.doSpawn(false)} does, with the three spawn parameters set on the NPC
+	 * before it enters the world (as {@code MinionSpawn.doSpawn(boolean, int, int, int)} does), so
+	 * its created hook reads them.
+	 */
+	private Npc spawn(Spawn spawn, NpcTemplate template, String[] params) throws Exception
+	{
+		final Constructor<?> constructor = (Constructor<?>) field(ASpawn.class, spawn, "_constructor");
+		final Npc npc = (Npc) constructor.newInstance(IdFactory.getInstance().getNextId(), template);
+		npc._param1 = ref(params[0]);
+		npc._param2 = ref(params[1]);
+		npc._param3 = ref(params[2]);
+		npc.setSpawn(spawn);
+		npc.setShowSummonAnimation(false);
+		final Npc spawned = spawn.initializeAndSpawn(npc);
+		set(Spawn.class, spawn, "_npc", spawned);
+		SpawnManager.getInstance().addSpawn(spawn);
+		return spawned;
+	}
+
+	/** Resolves an NPC parameter or event argument: a number, the character or the NPC of a role. */
+	private int ref(String word)
+	{
+		if (word.equals("character"))
+			return _player.getObjectId();
+		if (word.matches("-?\\d+"))
+			return Integer.parseInt(word);
+		return npc(word).getObjectId();
 	}
 
 	private Npc npc(String role)
@@ -1061,6 +1155,15 @@ final class ScenarioTrace
 		// The dying hook runs 3 s after the death.
 		for (int i = 0; i < KILL_TICKS; i++)
 			tick();
+	}
+
+	/** Sends the NPC of role a script event, then runs what it queued now. */
+	private void event(String role, String id, String a1, String a2)
+	{
+		final Npc npc = npc(role);
+		_lines.add("# event " + npc.getNpcId() + " (object " + npc.getObjectId() + ") " + id + " " + a1 + " " + a2);
+		npc.sendScriptEvent(Integer.parseInt(id), ref(a1), ref(a2));
+		ThreadPool.advance(0);
 	}
 
 	private void hit(String role, int damage)

@@ -3,6 +3,7 @@
 # as the NPC lines' NPCs spawn, before the first step). A claim of the owner naming a later
 # game tick than the beast's own makes it leave; one of the same tick, or of another player,
 # does not.
+trace internal/gameserver/script/testdata/oracle/scenarios/warrior_pet_owner.golden
 character Hunter 20
 random 4 1
 script script.ai.individual.DefaultNpc

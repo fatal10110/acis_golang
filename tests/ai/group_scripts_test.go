@@ -92,7 +92,7 @@ func bootGroupScript(t *testing.T, path string, ctor func() script.Script, kinds
 	)
 }
 
-// npcInfoOf returns the object id and position of the one NpcInfo of the
+// npcInfoOf returns the object id and position of the NpcInfo pair (walking, then running) of the
 // template npcID among frames.
 func npcInfoOf(t *testing.T, frames [][]byte, npcID int32) (int32, location.Location) {
 	t.Helper()
@@ -112,8 +112,8 @@ func npcInfoOf(t *testing.T, frames [][]byte, npcID int32) (int32, location.Loca
 		obj, at = id, location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
 		found++
 	}
-	if found != 1 {
-		t.Fatalf("NpcInfo frames of NPC %d = %d, want 1", npcID, found)
+	if found != 2 {
+		t.Fatalf("NpcInfo frames of NPC %d = %d, want 2 (appears walking, then running)", npcID, found)
 	}
 	return obj, at
 }

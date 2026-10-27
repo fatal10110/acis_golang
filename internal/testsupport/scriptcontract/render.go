@@ -19,15 +19,16 @@ import (
 // ActionFailed, the tutorial window's packets (TutorialShowHtml,
 // TutorialShowQuestionMark, TutorialEnableClientEvent, TutorialCloseHtml),
 // RadarControl, DropItem, MagicSkillUse, NpcSay, TeleportToLocation,
-// SpecialCamera, SocialAction, NpcInfo and DeleteObject are decoded; any
-// other packet is an error, because the goldens write those with the reference
+// SpecialCamera, SocialAction, NpcInfo, DeleteObject, ChangeMoveType, Die,
+// ExPlayScene and Earthquake are decoded; any other packet is an error, because the goldens write those with the reference
 // class name and raw bytes.
 //
 // DropItem leaves out the dropped object's id and place, and MagicSkillUse
 // the caster's and the target's places: the world draws those (the object id
 // sequence, the drop scatter, where each creature stands), not the script.
 // NpcInfo keeps the NPC's object and template id only: its place, speeds,
-// equipment and name are the world's too.
+// equipment and name are the world's too. Earthquake leaves out its place
+// for the same reason.
 func Packet(payload []byte, roles map[int32]string) (string, error) {
 	if len(payload) == 0 {
 		return "", errors.New("empty packet")
@@ -142,11 +143,33 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 		obj := role(d.int32(), roles)
 		d.int32() // how the client removes it
 		out = "S DeleteObject obj=" + obj
+	case 0x2e:
+		obj := role(d.int32(), roles)
+		running, swimming := d.int32(), d.int32()
+		out = fmt.Sprintf("S ChangeMoveType obj=%s running=%d swimming=%d", obj, running, swimming)
+	case 0x06:
+		obj := role(d.int32(), roles)
+		var opts [6]int32
+		for i := range opts {
+			opts[i] = d.int32()
+		}
+		out = fmt.Sprintf("S Die obj=%s village=%d clanhall=%d castle=%d siegehq=%d sweep=%d fixed=%d",
+			obj, opts[0], opts[1], opts[2], opts[3], opts[4], opts[5])
+	case 0xc4:
+		d.int32()
+		d.int32()
+		d.int32() // the place is the world's
+		intensity, duration, npc := d.int32(), d.int32(), d.int32()
+		out = fmt.Sprintf("S Earthquake intensity=%d duration=%d npc=%d", intensity, duration, npc)
 	case 0xfe:
-		if sub := d.uint16(); sub != 0x1a {
+		switch sub := d.uint16(); sub {
+		case 0x1a:
+			out = fmt.Sprintf("S ExShowQuestMark quest=%d", d.int32())
+		case 0x5b:
+			out = "S ExPlayScene"
+		default:
 			return "", fmt.Errorf("extended packet 0x%04x is not rendered", sub)
 		}
-		out = fmt.Sprintf("S ExShowQuestMark quest=%d", d.int32())
 	default:
 		return "", fmt.Errorf("packet 0x%02x is not rendered", payload[0])
 	}

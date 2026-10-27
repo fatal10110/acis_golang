@@ -178,8 +178,8 @@ func TestPartyPrivateSpawnPrivateAggressiveMakesWayForTheSecretarysCall(t *testi
 		if cx, cy, _ := c.Position(); cx != px || cy != py {
 			t.Fatalf("called private at %d,%d, want the private's spot %d,%d", cx, cy, px, py)
 		}
-		if got := framesOf(frames, serverpackets.OpcodeNPCInfo, c.ObjectID()); len(got) != 1 {
-			t.Fatalf("NpcInfo frames of the called private = %d, want 1", len(got))
+		if got := framesOf(frames, serverpackets.OpcodeNPCInfo, c.ObjectID()); len(got) != 2 {
+			t.Fatalf("NpcInfo frames of the called private = %d, want 2 (appears walking, then running)", len(got))
 		}
 	}
 

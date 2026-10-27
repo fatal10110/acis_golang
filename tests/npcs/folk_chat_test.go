@@ -36,8 +36,15 @@ func TestFolkIsShownAsNotAttackableNpcInfo(t *testing.T) {
 	w := bootFolkWorld(t, nil)
 	f := w.srv.SpawnFolkNPCAt(t, folkTemplate("Merchant", merchantID), w.at)
 
-	frame, ok := firstOpcode(drainFrames(t, w.c), serverpackets.OpcodeNPCInfo)
-	if !ok {
+	// It appears walking and takes its run stance: its last NpcInfo is the
+	// running one.
+	var frame []byte
+	for _, f := range drainFrames(t, w.c) {
+		if f[0] == serverpackets.OpcodeNPCInfo {
+			frame = f
+		}
+	}
+	if frame == nil {
 		t.Fatal("spawned civilian NPC was not shown with NpcInfo")
 	}
 	r := wire.NewReader(frame[1:])

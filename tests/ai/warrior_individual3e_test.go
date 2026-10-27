@@ -274,8 +274,8 @@ func TestPartyLeaderCoupleCaptainGivesWayToItsSilhouette(t *testing.T) {
 	if p1, p2, p3 := ind1Slot(s, script.SlotParam1), ind1Slot(s, script.SlotParam2), ind1Slot(s, script.SlotParam3); p1 != 1000 || p2 != me || p3 != 0 {
 		t.Fatalf("silhouette spawn parameters = %d, %d, %d, want 1000, %d, 0", p1, p2, p3, me)
 	}
-	if got := framesOf(frames, serverpackets.OpcodeNPCInfo, s.ObjectID()); len(got) != 1 {
-		t.Fatalf("NpcInfo frames of the silhouette = %d, want 1", len(got))
+	if got := framesOf(frames, serverpackets.OpcodeNPCInfo, s.ObjectID()); len(got) != 2 {
+		t.Fatalf("NpcInfo frames of the silhouette = %d, want 2 (appears walking, then running)", len(got))
 	}
 	w.noPrivateRespawn(t, "after the silhouette came")
 }

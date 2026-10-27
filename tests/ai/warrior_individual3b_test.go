@@ -243,8 +243,8 @@ func TestPartyLeaderPhysicalSpecialSummonCallsItsSilhouette(t *testing.T) {
 	if p1, p2, p3 := ind1Slot(first, script.SlotParam1), ind1Slot(first, script.SlotParam2), ind1Slot(first, script.SlotParam3); p1 != 1000 || p2 != me || p3 != 0 {
 		t.Fatalf("silhouette spawn parameters = %d, %d, %d, want 1000, %d, 0", p1, p2, p3, me)
 	}
-	if got := framesOf(frames, serverpackets.OpcodeNPCInfo, first.ObjectID()); len(got) != 1 {
-		t.Fatalf("NpcInfo frames of the silhouette = %d, want 1", len(got))
+	if got := framesOf(frames, serverpackets.OpcodeNPCInfo, first.ObjectID()); len(got) != 2 {
+		t.Fatalf("NpcInfo frames of the silhouette = %d, want 2 (appears walking, then running)", len(got))
 	}
 	if a0, a1 := ind1Slot(n, script.SlotIntAI0), ind1Slot(n, script.SlotIntAI1); a0 != 1 || a1 != 1 {
 		t.Fatalf("i_ai0, i_ai1 after the first call = %d, %d, want 1, 1", a0, a1)
@@ -700,8 +700,8 @@ func TestPartyLeaderCannibaliAggressivaTransforms(t *testing.T) {
 	if p1, p2 := ind1Slot(transformed, script.SlotParam1), ind1Slot(transformed, script.SlotParam2); p1 != 1000 || p2 != me {
 		t.Fatalf("transformed spawn parameters = %d, %d, want 1000, %d (the last attacker)", p1, p2, me)
 	}
-	if got := framesOf(frames, serverpackets.OpcodeNPCInfo, transformed.ObjectID()); len(got) != 1 {
-		t.Fatalf("NpcInfo frames of the transformed cannibal = %d, want 1", len(got))
+	if got := framesOf(frames, serverpackets.OpcodeNPCInfo, transformed.ObjectID()); len(got) != 2 {
+		t.Fatalf("NpcInfo frames of the transformed cannibal = %d, want 2 (appears walking, then running)", len(got))
 	}
 }
 
