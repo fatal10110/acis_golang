@@ -1,7 +1,6 @@
 # The hunting grounds teleporters (HuntingGroundsTeleporter): a priest of dawn and a priestess of
-# dusk, asked by a character in no cabal, answer their own side's refusal (onTalk). A scenario
-# seeds no teleport list, so a cabal member's teleport window is in
-# tests/npcs/teleporters_210_test.go.
+# dusk, asked by a character in no cabal, answer their own side's refusal (onTalk). A cabal
+# member's teleport window is in hunting_grounds_teleporter_window*.scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/hunting_grounds_teleporter_refused.golden
 character Wanderer 20
 script script.teleport.HuntingGroundsTeleporter

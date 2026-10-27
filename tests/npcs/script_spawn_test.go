@@ -135,8 +135,8 @@ func deletedIn(frames [][]byte, objectID int32) bool {
 }
 
 // A script spawn of a monster or a civilian NPC returns a live handle and
-// the NPC appears to the player standing by: at the asked point, put on
-// the ground from 20 above it, facing the asked way.
+// the NPC appears to the player standing by: at the asked point, 20 above
+// the ground below it, facing the asked way.
 func TestScriptSpawnAppearsToNearbyPlayer(t *testing.T) {
 	t.Parallel()
 	w := bootScriptSpawns(t)
@@ -151,10 +151,10 @@ func TestScriptSpawnAppearsToNearbyPlayer(t *testing.T) {
 		if script.NPCOf(live).Decayed() {
 			t.Fatalf("npc %d reports gone at spawn", id)
 		}
-		// Ground below z: z-5; then the ground below 20 above that: z+10.
+		// The ground below z is z-5; the NPC stands 20 above it: z+15.
 		gx, gy, gz, heading := npcInfoAt(t, drainFrames(t, w.c), live.ObjectID())
-		if gx != int32(x) || gy != int32(y) || gz != int32(z+20-2*groundBelow) || heading != 1000 {
-			t.Fatalf("npc %d shown at %d,%d,%d heading %d; want %d,%d,%d heading 1000", id, gx, gy, gz, heading, x, y, z+20-2*groundBelow)
+		if gx != int32(x) || gy != int32(y) || gz != int32(z+20-groundBelow) || heading != 1000 {
+			t.Fatalf("npc %d shown at %d,%d,%d heading %d; want %d,%d,%d heading 1000", id, gx, gy, gz, heading, x, y, z+20-groundBelow)
 		}
 		rec, ok := w.srv.NpcSpawns.SpawnOf(live.ObjectID())
 		if !ok || !rec.Fixed || rec.MasterID != 0 {
@@ -194,8 +194,8 @@ func TestScriptSpawnRandomOffsetAndAtCreature(t *testing.T) {
 		if dx, dy := int(x)-px, int(y)-py; dx < -100 || dx > 100 || dy < -100 || dy > 100 {
 			t.Fatalf("wolf at %d,%d; want within 100 of %d,%d", x, y, px, py)
 		}
-		if z != int32(pz+20-2*groundBelow) || int(heading) != player.Heading() {
-			t.Fatalf("wolf at z %d heading %d; want z %d and the player's heading %d", z, heading, pz+20-2*groundBelow, player.Heading())
+		if z != int32(pz+20-groundBelow) || int(heading) != player.Heading() {
+			t.Fatalf("wolf at z %d heading %d; want z %d and the player's heading %d", z, heading, pz+20-groundBelow, player.Heading())
 		}
 		shown++
 	}

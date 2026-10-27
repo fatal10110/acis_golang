@@ -8,10 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -342,89 +340,4 @@ func liveCount(w *folkWorld, id int) int {
 		}
 	}
 	return n
-}
-
-// TestGatekeeperSpiritExitAfterRaidDeath: the dying hook runs three
-// seconds after Lilith or Anakim dies, as every dying hook does, and ten
-// seconds later, on a timer bound to no NPC, the exit spirit appears at the
-// raid boss's point; fifteen minutes later it is gone.
-func TestGatekeeperSpiritExitAfterRaidDeath(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		name string
-		boss int
-		want location.Location
-	}{
-		{name: "lilith", boss: tpLilith, want: location.Location{X: 184446, Y: -10112, Z: -5488}},
-		{name: "anakim", boss: tpAnakim, want: location.Location{X: 184466, Y: -13106, Z: -5488}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			w := bootTeleporters(t, teleporterSetup{})
-			boss := w.srv.SpawnHostileNPCTemplateAt(t, raidTemplate(tt.boss), location.Location{X: w.at.X + 40, Y: w.at.Y, Z: w.at.Z})
-			obj, ok := w.srv.State.Player(w.player)
-			if !ok {
-				t.Fatal("the character is not in the world")
-			}
-			p := obj.(attackable.Combatant)
-			done := make(chan struct{})
-			w.srv.PlayerQueue(t, w.player).Post(func() {
-				defer close(done)
-				boss.TakeDamage(boss.MaxHP()+1, p)
-			})
-			<-done
-			w.srv.Advance(t, 12900*time.Millisecond)
-			if n := liveCount(w, tpSpiritOut); n != 0 {
-				t.Fatalf("exit spirits before thirteen seconds = %d, want 0", n)
-			}
-			w.srv.Advance(t, 100*time.Millisecond)
-			if n := liveCount(w, tpSpiritOut); n != 1 {
-				t.Fatalf("exit spirits after thirteen seconds = %d, want 1", n)
-			}
-			exit := liveOf(t, w.srv, tpSpiritOut).(*npc.Folk)
-			x, y, _ := exit.Position()
-			if x != tt.want.X || y != tt.want.Y {
-				t.Fatalf("exit spirit at %d,%d, want %d,%d", x, y, tt.want.X, tt.want.Y)
-			}
-			w.srv.Advance(t, 15*time.Minute-time.Second)
-			if n := liveCount(w, tpSpiritOut); n != 1 {
-				t.Fatalf("exit spirits before fifteen minutes = %d, want 1", n)
-			}
-			w.srv.Advance(t, time.Second)
-			if n := liveCount(w, tpSpiritOut); n != 0 {
-				t.Fatalf("exit spirits after fifteen minutes = %d, want 0", n)
-			}
-		})
-	}
-}
-
-// TestHuntingGroundsTeleporterOpensWindowForCabalMember: a priest of either
-// side opens its standard teleport window for a player of either cabal.
-func TestHuntingGroundsTeleporterOpensWindowForCabalMember(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		name  string
-		kind  string
-		npcID int
-		cabal sevensigns.Cabal
-	}{
-		{name: "dawn priest", kind: "DawnPriest", npcID: tpDawnPriest, cabal: sevensigns.Dawn},
-		{name: "dusk priest", kind: "DuskPriest", npcID: tpDuskPriest, cabal: sevensigns.Dawn},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			spot := location.Location{X: -41567, Y: 209463, Z: -5080}
-			teleports := travel.TeleportTable{tt.npcID: {
-				{Location: spot, Description: "Necropolis of Sacrifice", Kind: travel.KindStandard, PriceID: int(item.AdenaID), PriceCount: 2000},
-			}}
-			w := bootTeleporters(t, teleporterSetup{cabal: tt.cabal, teleports: teleports})
-			priest := w.spawnFolk(t, folkTemplate(tt.kind, tt.npcID), 50)
-			w.openThrough(t, priest)
-			window := "<html><body>&$556;<br><br>" +
-				`<a action="bypass -h npc_` + strconv.Itoa(int(priest.ObjectID())) +
-				`_teleport 0" msg="811;Necropolis of Sacrifice">Necropolis of Sacrifice - 2000 &#57;</a><br1>` +
-				"</body></html>"
-			wantPage(t, w.bypass(t, npcCommand(priest, "Quest HuntingGroundsTeleporter")), priest, window, 1)
-		})
-	}
 }

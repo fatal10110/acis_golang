@@ -77,7 +77,7 @@ func parseMem(arg string) ([]MemSet, error) {
 	return out, nil
 }
 
-// npcStateOption reads an npc line's level, aggro, mem, privates or master
+// npcStateOption reads an npc line's level, aggro, mp, mem, privates or master
 // option at the head of args, returning what it left; ok is false when args
 // starts with none of them.
 func npcStateOption(n *NPC, args []string) (rest []string, ok bool, err error) {
@@ -97,6 +97,12 @@ func npcStateOption(n *NPC, args []string) (rest []string, ok bool, err error) {
 			return nil, true, fmt.Errorf("npc option aggro <range> of 1 or more, once")
 		}
 		n.Aggro = v
+	case "mp":
+		v, err := strconv.Atoi(args[1])
+		if n.HasMP || err != nil || v < 0 {
+			return nil, true, fmt.Errorf("npc option mp <n> of 0 or more, once")
+		}
+		n.MP, n.HasMP = v, true
 	case "mem":
 		if n.Mem != nil {
 			return nil, true, fmt.Errorf("npc option mem listed twice")
@@ -199,18 +205,50 @@ func parseHit(args []string) (hitArgs, error) {
 
 // stateVerbs are the steps that set or run an NPC's or the character's
 // state.
-var stateVerbs = []string{"hp", "die", "top", "land", "stance", "swing"}
+var stateVerbs = []string{"hp", "mp", "want", "die", "top", "land", "stance", "swing"}
 
-// checkStateStep validates the hp, die, top, land, stance and swing steps'
-// roles and numbers against the roles of the NPC lines and the summon line.
+// isCreature reports whether name is a creature a step or check may name: the
+// character (player), an npc line's NPC, the summon line's summon or a member
+// line's character.
+func (sc *Scenario) isCreature(name string, roles map[string]bool) bool {
+	return name == "player" || roles[name] || sc.summoned(name) || sc.isMember(name)
+}
+
+// isMember reports whether name is a member line's character.
+func (sc *Scenario) isMember(name string) bool {
+	return slices.ContainsFunc(sc.Members, func(m Member) bool { return m.Name == name })
+}
+
+// checkStateStep validates the hp, mp, want, die, top, land, stance and swing
+// steps' roles and numbers against the roles of the NPC lines, the summon line
+// and the member lines.
 func (sc *Scenario) checkStateStep(verb string, args []string, roles map[string]bool) error {
 	creature := func(what, name string) error {
-		if name != "player" && !roles[name] && !sc.summoned(name) {
-			return fmt.Errorf("%s %q: no npc line nor the summon line names it, and it is not player", what, name)
+		if !sc.isCreature(name, roles) {
+			return fmt.Errorf("%s %q: no npc, summon or member line names it, and it is not player", what, name)
 		}
 		return nil
 	}
 	switch verb {
+	case "mp":
+		if !roles[args[0]] {
+			return fmt.Errorf("mp: unknown role %q", args[0])
+		}
+		if v, err := strconv.Atoi(args[1]); err != nil || v < 0 {
+			return fmt.Errorf("mp %q is not a number of 0 or more", args[1])
+		}
+	case "want":
+		usage := fmt.Errorf("want <role> <creature> <weight> [hold]")
+		if !roles[args[0]] {
+			return fmt.Errorf("want: unknown role %q", args[0])
+		}
+		if w, err := strconv.ParseFloat(args[2], 64); err != nil || w <= 0 || (len(args) == 4 && args[3] != "hold") {
+			return usage
+		}
+		if args[1] == args[0] {
+			return fmt.Errorf("want: an NPC does not want to attack itself")
+		}
+		return creature("want creature", args[1])
 	case "hp":
 		if args[0] != "player" && !roles[args[0]] {
 			return fmt.Errorf("hp: unknown role %q", args[0])
@@ -261,13 +299,20 @@ func (sc *Scenario) checkStateStep(verb string, args []string, roles map[string]
 // stateChecks are the checks on an NPC's or the character's state: inworld
 // tells whether the NPC is still in the world (a corpse is, a deleted NPC is
 // not).
-var stateChecks = []string{"mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance"}
+var stateChecks = []string{"mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows"}
+
+// showsFields are the fields of an NpcInfo a shows check reads: the hands, the
+// chest and the weapon's glow (its enchant effect).
+var showsFields = []string{"rhand", "lhand", "chest", "glow"}
 
 // checkStateCheck validates a state check's arguments.
 func checkStateCheck(kind string, args []string) error {
 	usage := map[string]string{
 		"mem":      "mem <role> <slot>=<value> ...",
 		"hp":       "hp <role|player> <hp>",
+		"mp":       "mp <role> <mp>",
+		"reach":    "reach <role> <yes|no>",
+		"shows":    "shows <role> rhand=<id> | lhand=<id> | chest=<id> | glow=<n> ...",
 		"privates": "privates <role> <npc id>=<count>[:<p1>,<p2>,<p3>] ... | -",
 		"master":   "master <role> <role|->",
 		"top":      "top <role> <creature|->",
@@ -293,6 +338,25 @@ func checkStateCheck(kind string, args []string) error {
 		}
 		if v, err := strconv.Atoi(args[1]); err != nil || v < 0 {
 			return fmt.Errorf("hp %q is not a number of 0 or more", args[1])
+		}
+	case "mp":
+		if len(args) != 2 {
+			return bad
+		}
+		if v, err := strconv.Atoi(args[1]); err != nil || v < 0 {
+			return fmt.Errorf("mp %q is not a number of 0 or more", args[1])
+		}
+	case "shows":
+		if len(args) < 2 {
+			return bad
+		}
+		seen := map[string]bool{}
+		for _, a := range args[1:] {
+			k, v, ok := strings.Cut(a, "=")
+			if _, err := strconv.Atoi(v); !ok || err != nil || !slices.Contains(showsFields, k) || seen[k] {
+				return fmt.Errorf("shows %q is not once each of rhand|lhand|chest|glow=<n>", a)
+			}
+			seen[k] = true
 		}
 	case "privates":
 		if len(args) < 2 {
@@ -321,7 +385,7 @@ func checkStateCheck(kind string, args []string) error {
 		if _, err := skillRef(args[1], "1"); err != nil {
 			return err
 		}
-	case "dead", "inworld":
+	case "dead", "inworld", "reach":
 		if len(args) != 2 || (args[1] != "yes" && args[1] != "no") {
 			return bad
 		}
@@ -384,7 +448,7 @@ func (sc *Scenario) tracedState() string {
 	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
 		return slices.Contains(stateVerbs, st.Verb) || st.Random != nil || (st.Verb == "hit" && len(st.Args) >= 5)
 	}):
-		return "hp, die, top, land, stance or swing step, skill hit or random line in a step"
+		return "hp, mp, want, die, top, land, stance or swing step, skill hit or random line in a step"
 	}
 	return ""
 }
