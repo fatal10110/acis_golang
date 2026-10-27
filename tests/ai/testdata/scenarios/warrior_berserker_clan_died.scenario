@@ -1,0 +1,23 @@
+# WarriorBerserker (20086, MaxRoarCount 2, fury 4317): each death of another member of its clan makes
+# it want to cast its fury on itself, one level higher each time (1000000 a time), up to the
+# MaxRoarCount: the third death adds no level 3 fury. (The fury is wanted at once but the
+# parked berserker casts nothing while the steps run.)
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserker
+npc berserker 20086 Monster 700 0 0 ai MaxRoarCount=2 skill FURY 4317 1 clan ant_clan 500
+npc victim 20003 Monster 700 100 0 clan ant_clan 500
+
+kill victim
+  S SystemMessage id=95 1:0 1:0
+  desires berserker cast(berserker,4317:1,move)=1000000
+kill victim
+  S SystemMessage id=95 1:0 1:0
+  desires berserker cast(berserker,4317:1,move)=1000000 cast(berserker,4317:2,move)=1000000
+kill victim
+  S SystemMessage id=95 1:0 1:0
+  desires berserker cast(berserker,4317:1,move)=1000000 cast(berserker,4317:2,move)=1000000

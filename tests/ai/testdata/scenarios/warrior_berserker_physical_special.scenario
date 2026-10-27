@@ -1,0 +1,30 @@
+# WarriorBerserkerPhysicalSpecial (21410, level 80, every draw 0, MaxRoarCount 3): the first hit makes
+# the character its top desire target, so only the second wants its physical special (4073)
+# and its debuff (4047) on the character. A clan member that has settled (8 ticks past its
+# life time of 7) and is not attacking (the aggressive 21382, 700 away) wants both at the
+# first hit on its clan. A clan member's death, with a top desire target, adds its fury
+# (4317) and its self range strike (4599) on itself; the parent's clan-died hook runs after it
+# and counts a second roar, a fury of level 2 as well.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserker
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialAggressive
+npc victim 21410 Monster 700 0 0 level 80 ai MaxRoarCount=3 skill DEBUFF 4047 9 skill PHYSICAL_SPECIAL 4073 9 skill FURY 4317 1 skill SELF_RANGE_PHYSICAL_SPECIAL 4599 9 clan ant_clan 500
+npc member 21382 Monster 700 100 0 level 80 ai MaxRoarCount=3 skill DEBUFF 4037 2 skill PHYSICAL_SPECIAL 4584 9 skill FURY 4317 1 clan ant_clan 500
+npc dying 20003 Monster 700 -100 0 clan ant_clan 500
+
+tick x8
+hit victim 10
+  S MagicSkillUse caster=member target=player skill=4584-9 hit=2378 reuse=7928 success=0
+  desires member attack(player)=11 cast(player,4037,move)=1000000 cast(player,4584,move)=1000000 wander()=5
+hit victim 10
+  desires victim attack(player)=44.98850574712644 cast(player,4047,move)=1000000 cast(player,4073,move)=1000000 wander()=5
+kill dying
+  S SystemMessage id=95 1:0 1:0
+  desires victim attack(player)=550.9885057471264 cast(player,4047,move)=1000000 cast(player,4073,move)=1000000 cast(victim,4317:1,move)=1000000 cast(victim,4317:2,move)=1000000 cast(victim,4599,move)=1000000 wander()=5
+  mem victim i_ai1=2

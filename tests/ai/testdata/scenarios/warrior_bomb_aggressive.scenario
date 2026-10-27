@@ -1,0 +1,13 @@
+# WarriorBombAggressive (22128, level 78, strike 4614-8) wants to attack the character it sees (200).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBomb
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBombAggressive
+npc bomb 22128 Monster 150 0 0 level 78 skill SELF_RANGE_DD_MAGIC 4614 8
+
+tick x2
+  desires bomb attack(player)=200
