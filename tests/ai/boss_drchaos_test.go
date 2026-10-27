@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -174,8 +175,12 @@ func drChaosTalk(t *testing.T, w *warriorWorld, f *npc.Folk) [][]byte {
 }
 
 // drChaosToMachine runs the talk and the walk to the machine: the first
-// line, and 2 s later a walk to the machine.
-func drChaosToMachine(t *testing.T, w *warriorWorld, chaos *npc.Folk) {
+// line, and 2 s later a walk to the machine. With the machine in sight, the
+// arrival's attack on it takes the still queued walk up again on the
+// machine's spot: one zero-length MoveToLocation, arriving (and opening the
+// move-finished hook again) one move tick later, so the walk ends that long
+// after the arrival. It returns how long after the arrival the walk ended.
+func drChaosToMachine(t *testing.T, w *warriorWorld, chaos *npc.Folk, machineInSight bool) time.Duration {
 	t.Helper()
 	if got := drChaosSays(drChaosTalk(t, w, chaos), chaos); got != 1 {
 		t.Fatalf("lines at the talk = %d, want 1", got)
@@ -187,21 +192,38 @@ func drChaosToMachine(t *testing.T, w *warriorWorld, chaos *npc.Folk) {
 	}
 	drChaosAdvance(t, w, time.Millisecond)
 	drChaosSetOff(t, w, chaos)
-	drChaosWalk(t, w, chaos)
+	walk := drChaosWalk(t, w, chaos)
 	if x, y, _ := chaos.Position(); x != drChaosWork.X || y != drChaosWork.Y {
 		t.Fatalf("Doctor Chaos stopped at %d,%d, want its machine's %d,%d", x, y, drChaosWork.X, drChaosWork.Y)
 	}
 	if got := drChaosSays(frames, chaos); got != 0 {
 		t.Fatalf("lines before the walk = %d, want none", got)
 	}
+	inPlace := 0
+	for _, f := range framesOf(walk, serverpackets.OpcodeMoveToLocation, chaos.ObjectID()) {
+		if dest := moveDestination(f); dest.X == drChaosWork.X && dest.Y == drChaosWork.Y && dest == moveOrigin(f) {
+			inPlace++
+		}
+	}
+	if !machineInSight {
+		if inPlace != 0 {
+			t.Fatalf("zero-length moves at the machine's spot = %d, want none with no machine to strike", inPlace)
+		}
+		return 0
+	}
+	if inPlace != 1 {
+		t.Fatalf("zero-length moves at the machine's spot = %d, want the walk taken up again once", inPlace)
+	}
+	return move.PositionUpdateInterval
 }
 
 // drChaosCutscene runs the cutscene from Doctor Chaos's arrival at the
 // machine to its arrival at the door, the machine camera centred on
-// filmed, and returns the door's frames.
-func drChaosCutscene(t *testing.T, w *warriorWorld, chaos *npc.Folk, filmed int32) [][]byte {
+// filmed, and returns the door's frames. The walk to the machine ended
+// pastArrival after its arrival.
+func drChaosCutscene(t *testing.T, w *warriorWorld, chaos *npc.Folk, filmed int32, pastArrival time.Duration) [][]byte {
 	t.Helper()
-	if got := drChaosSays(drChaosAdvance(t, w, 3*time.Second), chaos); got != 1 {
+	if got := drChaosSays(drChaosAdvance(t, w, 3*time.Second-pastArrival), chaos); got != 1 {
 		t.Fatalf("lines 3 s after the arrival = %d, want the cutscene's 1", got)
 	}
 	frames := drChaosAdvance(t, w, 2*time.Second)
@@ -274,8 +296,8 @@ func TestDrChaosLeadsThePlayerToTheGolem(t *testing.T) {
 	machine := drChaosSpawn(t, w, drChaosMachineID, drChaosMachine)
 	chaos := drChaosSpawn(t, w, drChaosID, drChaosHome)
 
-	drChaosToMachine(t, w, chaos)
-	frames := drChaosCutscene(t, w, chaos, machine.ObjectID())
+	pastArrival := drChaosToMachine(t, w, chaos, true)
+	frames := drChaosCutscene(t, w, chaos, machine.ObjectID(), pastArrival)
 	if got := drChaosSays(frames, chaos); got != 1 {
 		t.Fatalf("lines at the door = %d, want 1", got)
 	}
@@ -300,8 +322,8 @@ func TestDrChaosSendsTheWholeParty(t *testing.T) {
 	w.joinMate(t)
 	chaos := drChaosSpawn(t, w, drChaosID, drChaosHome)
 
-	drChaosToMachine(t, w, chaos)
-	drChaosCutscene(t, w, chaos, chaos.ObjectID())
+	pastArrival := drChaosToMachine(t, w, chaos, false)
+	drChaosCutscene(t, w, chaos, chaos.ObjectID(), pastArrival)
 	w.srv.Settle(t)
 	players := 0
 	for _, obj := range w.srv.State.Objects() {
@@ -328,7 +350,7 @@ func TestDrChaosGoesHomeWithoutTheTalker(t *testing.T) {
 	drChaosSpawn(t, w, drChaosMachineID, drChaosMachine)
 	chaos := drChaosSpawn(t, w, drChaosID, drChaosHome)
 
-	drChaosToMachine(t, w, chaos)
+	drChaosToMachine(t, w, chaos, true)
 	w.instantTeleport(t, location.Location{X: drChaosWork.X + 600, Y: drChaosWork.Y, Z: drChaosWork.Z})
 	frames := drChaosAdvance(t, w, 3*time.Second)
 	frames = append(frames, drChaosSetOff(t, w, chaos)...)

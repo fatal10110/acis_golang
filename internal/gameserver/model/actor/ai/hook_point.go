@@ -16,9 +16,9 @@ const (
 	// HookSeeCreature opens the periodic cycle, before invalid desires are
 	// dropped and a desire is chosen.
 	HookSeeCreature
-	// HookMoveFinished is a walk ending at its destination, on arrival or on
-	// a walk step that finds the actor already there, before the walk's
-	// desire is dropped.
+	// HookMoveFinished is a walk ending at its destination, on arrival (a
+	// walk taken up on its own point is a zero-length move that arrives on
+	// the next move tick), before the walk's desire is dropped.
 	HookMoveFinished
 	// HookOutOfTerritory is the first arrival outside territory, before the
 	// stale-hate sweep is armed.

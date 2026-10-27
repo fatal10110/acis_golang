@@ -44,10 +44,10 @@ func startHostileAttack(t *testing.T, atkSpd, rightHand int) (*gameservertest.Se
 // whether its first attack is latched.
 type hostilePrelude func(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile)
 
-// walkInPlace runs a MOVE_TO desire to the monster's own position. It
-// finishes in the same cycle with no packet, and leaves a walk as the last
-// executed desire, so the next attack is not latched.
-func walkInPlace(t *testing.T, _ *gameservertest.Server, hostile *npc.Hostile) {
+// walkInPlace runs a MOVE_TO desire to the monster's own position: a
+// zero-length move that arrives on the next move tick. It leaves a walk as
+// the last executed desire, so the next attack is not latched.
+func walkInPlace(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile) {
 	t.Helper()
 	x, y, z := hostile.Position()
 	if !hostile.AI().AddMoveToDesire(location.Location{X: x, Y: y, Z: z}, 1) {
@@ -55,6 +55,13 @@ func walkInPlace(t *testing.T, _ *gameservertest.Server, hostile *npc.Hostile) {
 	}
 	if err := hostile.TickThink(); err != nil {
 		t.Fatalf("walk-in-place TickThink() error: %v", err)
+	}
+	if !hostile.Move().Moving() {
+		t.Fatal("walk in place not started, want a zero-length move")
+	}
+	srv.TickPositions()
+	if hostile.Move().Moving() {
+		t.Fatal("walk in place still moving after one move tick")
 	}
 	if got := hostile.AI().Desires().Len(); got != 0 {
 		t.Fatalf("queued desires after walking in place = %d, want 0", got)
