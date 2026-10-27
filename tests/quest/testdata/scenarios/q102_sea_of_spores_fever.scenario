@@ -256,6 +256,7 @@ bypass npc_{alberius}_Quest
   S SystemMessage id=53 3:4414 6:10
   S SystemMessage id=53 3:4415 6:10
   S SystemMessage id=53 3:4416 6:10
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 102:0x00000000
   S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-06.htm

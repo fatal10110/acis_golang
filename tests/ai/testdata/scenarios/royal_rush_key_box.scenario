@@ -15,5 +15,6 @@ action box
   S ActionFailed
   S SystemMessage id=54 3:7260
   S ActionFailed
+  S DeleteObject obj=box
   S ActionFailed
   items 7260=1

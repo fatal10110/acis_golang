@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -72,7 +73,7 @@ func TestSettleWaitsForWorkPostedToAQueueItAlreadyPassed(t *testing.T) {
 // for work, which a barrier posted after the arming task does not wait for.
 // Settle must not return before the timer's task has run.
 func TestSettleRunsATimerArmedAlreadyDue(t *testing.T) {
-	qs := startInline(t)
+	qs := startInline(t, time.Time{})
 	q := qs.NewQueue("caster")
 	for range 500 {
 		var fired atomic.Bool

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 )
 
 // Territory is one territory line: an npcmaker territory, the box between
@@ -157,8 +160,21 @@ func npcOptions(args []string, territories []Territory) (NPC, error) {
 				return NPC{}, fmt.Errorf("maker territory %q is no territory line above", name)
 			}
 			n.Maker, args = name, args[2:]
+		case args[0] == "ai" && n.AI == nil && len(args) >= 2:
+			n.AI = npc.AIParams{}
+			for _, kv := range strings.Split(args[1], ",") {
+				k, v, ok := strings.Cut(kv, "=")
+				if !ok || k == "" {
+					return NPC{}, fmt.Errorf("npc ai parameter %q is not <name>=<value>", kv)
+				}
+				n.AI[k] = v
+			}
+			args = args[2:]
+		case args[0] == "params" && n.Params == [3]string{} && len(args) >= 4:
+			copy(n.Params[:], args[1:4])
+			args = args[4:]
 		default:
-			return NPC{}, fmt.Errorf("npc option %q is not walks, maker <territory>, clan or skill", args[0])
+			return NPC{}, fmt.Errorf("npc option %q is not walks, maker <territory>, clan, skill, ai or params <p1> <p2> <p3>", args[0])
 		}
 	}
 	return n, nil

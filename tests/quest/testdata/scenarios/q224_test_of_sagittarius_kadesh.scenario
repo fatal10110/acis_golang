@@ -68,6 +68,7 @@ bypass npc_{hamil}_Quest
   S SystemMessage id=302 3:3300
   S SystemMessage id=54 3:3293
   S SystemMessage id=95 1:54726 1:20250
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 224:0x00000000
   S NpcHtmlMessage obj=hamil item=0 page=script/quest/Q224_TestOfSagittarius/30626-13.htm

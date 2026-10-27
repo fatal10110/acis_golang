@@ -85,6 +85,7 @@ bypass Quest Q229_TestOfWitchcraft 30630-22.htm
   S SystemMessage id=302 3:3334
   S SystemMessage id=54 3:3307
   S SystemMessage id=95 1:139796 1:40000
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 229:0x00000000
   S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-22.htm

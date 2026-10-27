@@ -53,6 +53,7 @@ bypass npc_{klaus}_Quest
   S SystemMessage id=302 3:1271
   S SystemMessage id=54 3:1161
   S SystemMessage id=95 1:3200 1:7260
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-12.htm

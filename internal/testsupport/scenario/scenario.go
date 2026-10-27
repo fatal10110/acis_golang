@@ -11,6 +11,10 @@
 // header comes first:
 //
 //	trace <path below the module root>        optional: the reference trace the first steps replay
+//	clock <hh:mm[:ss]>                        optional: the driven clock (the one an advance step moves, which the scripts'
+//	                                          Script.Now and game tick read) starts at that time of day (UTC) on
+//	                                          2026-01-01, so a script reading the minute finds a known one; without it
+//	                                          the clock starts at the wall time of the run
 //	character <name> <level>                  the character the client plays, with the experience its level starts at
 //	class <class id>                          optional: the character's class, and so its race (default 0, a human
 //	                                          fighter); every class then has a template with the fixture's
@@ -79,10 +83,15 @@
 //	    [walks] [maker <territory>]           the templates a script may spawn more NPCs of; walks, the template can move: a
 //	    [clan <name>[,<name>...] <range>]     civilian walks, a monster spawns moving and attacking (its spawn point its
 //	    [skill <type> <skill id> <level>]...  home); with maker, the NPC is an npcmaker's whose territory is that territory
-//	                                          line's (see below); clan, the template belongs to those clans, its clan
-//	                                          calls reaching that far (door_clan: a hit door's call reaches it); skill, the
+//	    [ai <name>=<value>[,...]]             line's (see below); clan, the template belongs to those clans, its clan
+//	    [params <p1> <p2> <p3>]               calls reaching that far (door_clan: a hit door's call reaches it); skill, the
 //	                                          template lists that shipped skill under that type (data/xml/npcs's
-//	                                          <skills> type, PASSIVE excepted), which its behaviors cast
+//	                                          <skills> type, PASSIVE excepted), which its behaviors cast; ai, the template's
+//	                                          AI parameters (<ai> tuning values), which only a scenario with no trace
+//	                                          line sets (a traced one plays the shipped template's); params, the three
+//	                                          spawn parameters a master gives a private it creates (a script's _param1 to
+//	                                          _param3), each a number, the word character (its object id), or the role of
+//	                                          an NPC line above (that NPC's object id, as it stands when this one spawns)
 //	spoil <role> [other]                      optional: the monster is spoiled, by the character or, with other, by another
 //	                                          player, as every fresh monster of that role stands: the one a line spawns and
 //	                                          each one a kill step replaces a dead one with
@@ -136,6 +145,10 @@
 //	                       the step is played by that mate, on its client: its packets are the S lines, and what
 //	                       the character was sent the `to player` lines
 //	enter <mate>           the mate is selected and enters the world (its EnterWorld burst is not compared)
+//	event <role> <event id> <arg1> <arg2>
+//	                       the NPC receives that script event, as a script's SendScriptEvent sends it, on the NPC's
+//	                       own queue; each argument is a number, the word character (its object id) or an NPC
+//	                       role (that NPC's object id)
 //	hallstatus <id> <registering|waiting|siege>
 //	                       the hall line's hall changes its siege status
 //	link <file>            a RequestLinkHtml
@@ -262,7 +275,24 @@
 // (and no as or enter step of a mate); nor
 // does the reference probe play a skill, door or summon line, an npc
 // line's clan or skill, a hit by another creature, an approach to a
-// distance, a cast, a jump or an away, so a traced scenario takes none.
+// distance, a cast, a jump or an away, a clock line, an npc line's ai or
+// params or an event step, so a traced scenario takes none.
+//
+// A step compares what a script does in the world: besides the dialog, the
+// quest and the item packets, the camera shots (SpecialCamera) and the
+// social animations (SocialAction) of the character, and of an NPC outside
+// a step of the client talking to it (an NPC answers a talk with a random
+// animation of its own), and the NPCs a script spawns and takes away. A
+// script-spawned NPC (one no npc line placed) renders as NpcInfo and
+// DeleteObject under the role of the one npc line of its template, and not
+// at all when no line (or several) has that template; an NpcInfo repeating
+// the one before it is compared once (the reference sends a spawned NPC's
+// twice), a run of DeleteObject lines in sorted order (the order a teleport
+// empties the character's view in is not a script's), and the DeleteObject
+// of an NPC a Die packet showed dead (its corpse's decay) not at all. The
+// character's teleports also delete the NPCs it leaves behind. A trace that
+// lists no npc line's object (the hand-made trace_*.golden files) shows no
+// NpcInfo or DeleteObject.
 //
 // Every NPC and the character hold an attack stance while they fight (the
 // behaviors read it), which nothing ends during a run. A fixture monster
@@ -290,7 +320,11 @@ type Scenario struct {
 	Name string
 	// Trace is the reference trace path below the module root, empty for
 	// none.
-	Trace     string
+	Trace string
+	// Clock is the clock line's time of day, the driven clock's start;
+	// HasClock tells a line was given.
+	Clock     time.Duration
+	HasClock  bool
 	Character string
 	Level     int
 	// Class is the character's class id: its base class.
@@ -422,6 +456,11 @@ type NPC struct {
 	// Skills are the template's skills by type, shipped skills it casts;
 	// nil for none.
 	Skills map[npc.SkillType]modelskill.Ref
+	// AI are the template's AI parameters, nil for none.
+	AI npc.AIParams
+	// Params are the three spawn parameters, each "" (0), a number, a role
+	// or character.
+	Params [3]string
 }
 
 // Step is one client action and what it must leave.
@@ -490,6 +529,7 @@ var argCount = map[string][2]int{
 	"restart":    {0, 0},
 	"enter":      {0, 1},
 	"hallstatus": {2, 2},
+	"event":      {4, 4},
 	"create":     {0, 0},
 }
 
@@ -745,6 +785,15 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			q.Vars = append(q.Vars, [2]string{k, v})
 		}
 		sc.Quests = append(sc.Quests, q)
+	case "clock":
+		if len(args) != 1 || sc.HasClock {
+			return fmt.Errorf("one clock line: clock <hh:mm[:ss]>")
+		}
+		d, err := parseClock(args[0])
+		if err != nil {
+			return err
+		}
+		sc.Clock, sc.HasClock = d, true
 	case "random":
 		if sc.Random != nil {
 			return fmt.Errorf("one random line")
@@ -820,6 +869,11 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		role := args[0]
 		if sc.named(role, roles) {
 			return fmt.Errorf("role %q named twice", role)
+		}
+		for _, p := range opts.Params {
+			if err := sc.checkObjectRef(p); err != nil {
+				return fmt.Errorf("npc %s params: %w", role, err)
+			}
 		}
 		roles[role] = true
 		opts.Role, opts.ID, opts.Type = role, int32(id), args[2]
@@ -967,12 +1021,21 @@ func (sc *Scenario) checkStep(verb string, args []string, roles map[string]bool)
 		return err
 	}
 	switch verb {
-	case "action", "kill", "approach", "look", "walk":
+	case "action", "kill", "approach", "look", "walk", "event":
 		if !roles[args[0]] {
 			return fmt.Errorf("unknown role %q", args[0])
 		}
 	}
 	switch verb {
+	case "event":
+		if _, err := strconv.ParseInt(args[1], 10, 32); err != nil {
+			return fmt.Errorf("event id %q: %w", args[1], err)
+		}
+		for _, a := range args[2:] {
+			if err := sc.checkObjectRef(a); err != nil {
+				return fmt.Errorf("event argument: %w", err)
+			}
+		}
 	case "hit":
 		if _, err := strconv.ParseInt(args[1], 10, 32); err != nil {
 			return fmt.Errorf("damage %q: %w", args[1], err)
@@ -1201,4 +1264,40 @@ func FirstDiff(what string, got, want []string) string {
 		}
 	}
 	return ""
+}
+
+// parseClock reads a clock line's hh:mm[:ss] as the time since midnight.
+func parseClock(s string) (time.Duration, error) {
+	parts := strings.Split(s, ":")
+	if len(parts) < 2 || len(parts) > 3 {
+		return 0, fmt.Errorf("clock %q is not hh:mm[:ss]", s)
+	}
+	var d time.Duration
+	for i, limit := range []int{24, 60, 60}[:len(parts)] {
+		v, err := strconv.Atoi(parts[i])
+		if err != nil || v < 0 || v >= limit {
+			return 0, fmt.Errorf("clock %q is not hh:mm[:ss]", s)
+		}
+		d += time.Duration(v) * []time.Duration{time.Hour, time.Minute, time.Second}[i]
+	}
+	return d, nil
+}
+
+// characterRef is the word an NPC parameter or event argument writes for
+// the character's object id.
+const characterRef = "character"
+
+// checkObjectRef checks an NPC parameter or event argument: empty (0), a
+// number, characterRef or the role of an NPC line above.
+func (sc *Scenario) checkObjectRef(ref string) error {
+	if ref == "" || ref == characterRef {
+		return nil
+	}
+	if _, err := strconv.ParseInt(ref, 10, 32); err == nil {
+		return nil
+	}
+	if !slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Role == ref }) {
+		return fmt.Errorf("%q is not a number, character or the role of an npc line above", ref)
+	}
+	return nil
 }

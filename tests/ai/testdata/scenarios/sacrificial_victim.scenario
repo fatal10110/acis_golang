@@ -1,0 +1,24 @@
+# SacrificialVictim (32038), a Ritual Offering: any script event but 3 does nothing. Event 3
+# makes it play its social action 1 on the AI tick ten seconds later and, five seconds after that, leave the
+# Ritual Sacrifice (22145) where it stood and leave the world; the sacrifice, standing out of
+# the character's sight as the line's own, is a fresh one the script spawns.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.SacrificialVictim
+npc offering 32038 Folk 100 0 0
+npc sacrifice 22145 Monster 5000 0 0
+
+event offering 2 0 0
+advance 20s
+tick x2
+
+event offering 3 0 0
+advance 9900ms
+advance 100ms
+tick
+  S SocialAction obj=offering action=1
+advance 4900ms
+advance 100ms
+  S NpcInfo obj=sacrifice npc=22145
+  S DeleteObject obj=offering
+advance 1m

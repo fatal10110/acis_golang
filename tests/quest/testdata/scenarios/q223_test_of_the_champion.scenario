@@ -485,6 +485,7 @@ bypass npc_{ascalon}_Quest
   S SystemMessage id=302 3:3286
   S SystemMessage id=54 3:3276
   S SystemMessage id=95 1:117454 1:25000
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 223:0x00000000
   S SystemMessage id=301 3:3291 6:99

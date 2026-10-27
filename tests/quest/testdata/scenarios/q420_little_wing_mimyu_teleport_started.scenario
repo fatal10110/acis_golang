@@ -16,5 +16,6 @@ action mimyu
   S ActionFailed
 bypass npc_{mimyu}_Quest
   S ActionFailed
+  S DeleteObject obj=mimyu
   S ActionFailed
   at mimyu 108930 41595 -4673

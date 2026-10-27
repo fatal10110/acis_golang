@@ -20,4 +20,5 @@ bypass npc_{orahochin}_Quest ElrokiTeleporter
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=4990,-1879,-3178 fast=0
+  S DeleteObject obj=orahochin
   S ActionFailed

@@ -63,6 +63,7 @@ kill shyslassys
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=54 3:2632
   S SystemMessage id=54 3:2631
+  S NpcInfo obj=chest npc=30647
   Q upsert Q211_TrialOfTheChallenger | <cond> | 2
   items 2631=1 2632=1
 
@@ -155,6 +156,7 @@ kill baraham
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 211:0x8000007f
   S ExShowQuestMark quest=211
+  S NpcInfo obj=raldo npc=30646
   Q upsert Q211_TrialOfTheChallenger | <cond> | 7
 
 # Raldo takes the eye.
@@ -213,6 +215,7 @@ kill succubus
   S QuestList 211:0x800003ff
   S ExShowQuestMark quest=211
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=raldo npc=30646
   Q upsert Q211_TrialOfTheChallenger | <cond> | 10
 
 # Raldo: the Mark of Challenger, experience and the finish; the key went to the chest,
@@ -225,6 +228,7 @@ action raldo
 bypass npc_{raldo}_Quest
   S SystemMessage id=54 3:2627
   S SystemMessage id=95 1:72394 1:11250
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 211:0x00000000
   S NpcHtmlMessage obj=raldo item=0 page=script/quest/Q211_TrialOfTheChallenger/30646-07.htm

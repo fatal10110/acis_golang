@@ -68,6 +68,7 @@ bypass npc_{sorius}_Quest
   S SystemMessage id=302 3:1276
   S SystemMessage id=54 3:1204
   S SystemMessage id=95 1:3200 1:2280
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q406_PathToAnElvenKnight/30327-10.htm

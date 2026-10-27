@@ -144,7 +144,7 @@ func (q *queues) pass(deadline <-chan time.Time) (barriers uint64, err error) {
 // that order of precedence, and stops it on cleanup.
 // Register it before anything whose cleanup still posts to queues (the
 // listener, whose connection handlers detach players on their queues).
-func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
+func startQueues(tb testing.TB, log zerolog.Logger, realPool bool, start time.Time) *queues {
 	tb.Helper()
 	mode := os.Getenv(SimExecutorEnv)
 	if realPool {
@@ -163,7 +163,7 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 		})
 		return &queues{newQueue: pool.NewQueue, passOfSuite: !realPool}
 	case "", "inline":
-		return startInline(tb)
+		return startInline(tb, start)
 	default:
 		tb.Fatalf("%s=%q: want pool or inline", SimExecutorEnv, mode)
 		return nil
@@ -174,8 +174,11 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 // only caller of Run and Advance. Connection goroutines post each frame's
 // work and wait for it, so the runner runs posted tasks on its own as soon as
 // Ready reports them; its clock moves only through the returned advance.
-func startInline(tb testing.TB) *queues {
-	inline := sim.NewInline(time.Now())
+func startInline(tb testing.TB, start time.Time) *queues {
+	if start.IsZero() {
+		start = time.Now()
+	}
+	inline := sim.NewInline(start)
 	type step struct {
 		d    time.Duration
 		then func()

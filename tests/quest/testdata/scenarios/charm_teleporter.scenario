@@ -36,5 +36,7 @@ bypass npc_{whirpy}_Quest CharmTeleporter
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=-80826,149775,-3043 fast=0
+  S DeleteObject obj=tamil
+  S DeleteObject obj=whirpy
   S ActionFailed
   items 1659=0

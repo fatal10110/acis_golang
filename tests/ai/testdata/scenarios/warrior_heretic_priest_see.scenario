@@ -26,5 +26,6 @@ approach priest
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=0,0,0 fast=0
+  S DeleteObject obj=priest
   desires priest attack(player)=200 cast(player,4047)=1000000 cast(player,4573)=1000000
   at player -10 -20 -30

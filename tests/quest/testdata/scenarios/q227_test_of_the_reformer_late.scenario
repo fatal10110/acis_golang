@@ -238,6 +238,7 @@ bypass npc_{sla}_Quest
   S SystemMessage id=302 3:2830
   S SystemMessage id=54 3:2821
   S SystemMessage id=95 1:164032 1:17500
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 227:0x00000000
   S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-07.htm

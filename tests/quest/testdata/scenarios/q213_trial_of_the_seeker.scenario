@@ -445,6 +445,7 @@ bypass npc_{dufner}_Quest
   S SystemMessage id=302 3:2672
   S SystemMessage id=54 3:2673
   S SystemMessage id=95 1:72126 1:11000
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 213:0x00000000
   S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-08.htm

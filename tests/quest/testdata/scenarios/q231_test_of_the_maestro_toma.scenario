@@ -38,6 +38,7 @@ bypass Quest Q231_TestOfTheMaestro 30556-05.htm
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=140352,-194133,-3146 fast=0
+  S DeleteObject obj=toma
   S NpcHtmlMessage obj=toma item=0 page=script/quest/Q231_TestOfTheMaestro/30556-05.htm
   S ActionFailed
   items 2871=0 2916=1

@@ -190,6 +190,7 @@ bypass Quest Q246_PossessorOfAPreciousSoul 30721-02.htm
   S SystemMessage id=302 3:7594
   S SystemMessage id=54 3:7679
   S SystemMessage id=45 1:719843
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 246:0x00000000
   S NpcHtmlMessage obj=ladd item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/30721-02.htm

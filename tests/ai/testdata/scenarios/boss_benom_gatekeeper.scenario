@@ -24,4 +24,5 @@ bypass npc_{gatekeeper}_Quest DungeonTeleporter
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=12589,-49044,-3008 fast=0
+  S DeleteObject obj=gatekeeper
   S ActionFailed

@@ -22,3 +22,11 @@ func (s *Server) RunCreated(tb testing.TB, n attackable.Combatant) {
 		tb.Fatalf("RunCreated: %T is not an NPC", n)
 	}
 }
+
+// ScriptEvent sends the NPC n the script event eventID with arg1 and arg2,
+// as a script's SendScriptEvent does: the hooks of the scripts bound to its
+// template run on the calling goroutine, so a caller that wants them on the
+// NPC's queue posts the call there.
+func (s *Server) ScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32) {
+	s.quests.registry.ScriptEvent(n, eventID, arg1, arg2)
+}

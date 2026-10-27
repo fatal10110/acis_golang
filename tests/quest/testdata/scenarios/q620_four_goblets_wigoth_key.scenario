@@ -27,6 +27,7 @@ bypass Quest Q620_FourGoblets 31452-06.htm
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=169592,-91006,-2912 fast=0
+  S DeleteObject obj=wigoth
   S NpcHtmlMessage obj=wigoth item=0 page=script/quest/Q620_FourGoblets/31452-06.htm
   S ActionFailed
   items 7260=0

@@ -66,6 +66,7 @@ bypass npc_{kakai}_Quest
   S SystemMessage id=302 3:3237
   S SystemMessage id=54 3:3203
   S SystemMessage id=95 1:91457 1:2500
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 220:0x00000000
   S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q220_TestimonyOfGlory/30565-02.htm

@@ -18,14 +18,16 @@ import (
 // NpcHtmlMessage, SystemMessage, PlaySound, ExShowQuestMark, QuestList,
 // ActionFailed, the tutorial window's packets (TutorialShowHtml,
 // TutorialShowQuestionMark, TutorialEnableClientEvent, TutorialCloseHtml),
-// RadarControl, DropItem, MagicSkillUse, NpcSay and TeleportToLocation are
-// decoded; any other
-// packet is an error, because the goldens write those with the reference
+// RadarControl, DropItem, MagicSkillUse, NpcSay, TeleportToLocation,
+// SpecialCamera, SocialAction, NpcInfo and DeleteObject are decoded; any
+// other packet is an error, because the goldens write those with the reference
 // class name and raw bytes.
 //
 // DropItem leaves out the dropped object's id and place, and MagicSkillUse
 // the caster's and the target's places: the world draws those (the object id
 // sequence, the drop scatter, where each creature stands), not the script.
+// NpcInfo keeps the NPC's object and template id only: its place, speeds,
+// equipment and name are the world's too.
 func Packet(payload []byte, roles map[int32]string) (string, error) {
 	if len(payload) == 0 {
 		return "", errors.New("empty packet")
@@ -119,6 +121,27 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 		obj := role(d.int32(), roles)
 		x, y, z := d.int32(), d.int32(), d.int32()
 		out = fmt.Sprintf("S TeleportToLocation obj=%s loc=%d,%d,%d fast=%d", obj, x, y, z, d.int32())
+	case 0xc7:
+		obj := role(d.int32(), roles)
+		var shot [9]int32
+		for i := range shot {
+			shot[i] = d.int32()
+		}
+		out = fmt.Sprintf("S SpecialCamera obj=%s distance=%d yaw=%d pitch=%d time=%d duration=%d turn=%d rise=%d widescreen=%d unknown=%d",
+			obj, shot[0], shot[1], shot[2], shot[3], shot[4], shot[5], shot[6], shot[7], shot[8])
+	case 0x2d:
+		obj := role(d.int32(), roles)
+		out = fmt.Sprintf("S SocialAction obj=%s action=%d", obj, d.int32())
+	case 0x16:
+		// The npc field is the client's NPC name id: 1000000 plus the
+		// template id.
+		obj, npcID := role(d.int32(), roles), d.int32()
+		out = fmt.Sprintf("S NpcInfo obj=%s npc=%d", obj, npcID-1000000)
+		d.b = nil
+	case 0x12:
+		obj := role(d.int32(), roles)
+		d.int32() // how the client removes it
+		out = "S DeleteObject obj=" + obj
 	case 0xfe:
 		if sub := d.uint16(); sub != 0x1a {
 			return "", fmt.Errorf("extended packet 0x%04x is not rendered", sub)
