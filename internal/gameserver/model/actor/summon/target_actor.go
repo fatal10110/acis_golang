@@ -4,6 +4,8 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -39,31 +41,17 @@ func (a *Actor) DuelID() int32 { return max(a.ownerDuelID(), 0) }
 
 // DuelTeam is the team colour a's owner shows, none without an owner.
 func (a *Actor) DuelTeam() int {
-	if owner, ok := a.currentOwner().(interface{ DuelTeam() int }); ok {
+	if owner := a.currentOwner(); owner != nil {
 		return owner.DuelTeam()
 	}
 	return 0
 }
 
-// socialOwner is the social standing a summon reads from its owner: the
-// party, clan and alliance predicates and the social rules judged for a
-// playable acting through it. A player owner always has it.
-type socialOwner interface {
-	IsInParty() bool
-	IsInSameParty(other skilltarget.Actor) bool
-	IsInSameClan(other skilltarget.Actor) bool
-	IsInSameAlly(other skilltarget.Actor) bool
-	HasClan() bool
-	CanCastOnPlayable(target skilltarget.Actor, skill *modelskill.Definition, ctrl, offensive, ownCast bool) bool
-	OffensiveCastAllowed(caster attackable.ArenaMember, target skilltarget.Actor, skill *modelskill.Definition, ctrl, mainTarget bool) bool
-	SocialWithoutForce(self attackable.ArenaMember, attacker skilltarget.Actor) (allowed, decided bool)
-}
-
-// social returns a's owner's social standing; ok is false without an
-// owner.
-func (a *Actor) social() (socialOwner, bool) {
-	owner, ok := a.currentOwner().(socialOwner)
-	return owner, ok
+// social returns a's owner, whose social standing a reads as its own; ok
+// is false without an owner.
+func (a *Actor) social() (Owner, bool) {
+	owner := a.currentOwner()
+	return owner, owner != nil
 }
 
 // IsInParty reports whether a's owner is in a party.
@@ -192,3 +180,24 @@ func actingPlayerID(c skilltarget.Actor) int32 {
 	}
 	return c.ObjectID()
 }
+
+// A summon is no chest, beast or manor monster, and its resurrection offer,
+// siege state and festival standing are its owner's, read through the
+// owner.
+func (a *Actor) Chest() bool                              { return false }
+func (a *Actor) Interacted() bool                         { return false }
+func (a *Actor) FeedableBeast() bool                      { return false }
+func (a *Actor) Seedable() bool                           { return false }
+func (a *Actor) SpawnLocation() (location.Location, bool) { return location.Location{}, false }
+func (a *Actor) ReviveOffer() (pending, forPet bool)      { return false, false }
+func (a *Actor) SiegeState() int32                        { return 0 }
+func (a *Actor) FestivalParticipant() bool                { return false }
+
+// A summon lists no attackers and answers no skill aggro; its reaction to
+// an attack is NotifyAttacked.
+func (a *Actor) RecordAttacker(attackable.Combatant)                       {}
+func (a *Actor) SkillAttacked(attackable.Combatant, modelskill.Definition) {}
+
+// SkillLevels is empty: a summon's chance procs are its effects' triggers
+// only.
+func (a *Actor) SkillLevels() player.SkillLevels { return nil }

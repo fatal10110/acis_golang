@@ -3,6 +3,7 @@ package petitem
 import (
 	"testing"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -11,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -575,4 +577,26 @@ func TestPetLevelConditionReadsIntegerLiterals(t *testing.T) {
 			t.Errorf("level=%q on a level 50 pet holds = %v, want %v", raw, got, want)
 		}
 	}
+}
+
+// The fake owner is in no duel, party, clan or alliance, does not see
+// invisible creatures, and leaves every social rule undecided.
+func (*pickupTestOwner) DuelID() int32                        { return 0 }
+func (*pickupTestOwner) DuelTeam() int                        { return 0 }
+func (*pickupTestOwner) SeesInvisible() bool                  { return false }
+func (*pickupTestOwner) IsInParty() bool                      { return false }
+func (*pickupTestOwner) IsInSameParty(skilltarget.Actor) bool { return false }
+func (*pickupTestOwner) IsInSameClan(skilltarget.Actor) bool  { return false }
+func (*pickupTestOwner) IsInSameAlly(skilltarget.Actor) bool  { return false }
+func (*pickupTestOwner) HasClan() bool                        { return false }
+func (*pickupTestOwner) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
+	return true
+}
+
+func (*pickupTestOwner) OffensiveCastAllowed(attackable.ArenaMember, skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
+	return true
+}
+
+func (*pickupTestOwner) SocialWithoutForce(attackable.ArenaMember, skilltarget.Actor) (allowed, decided bool) {
+	return false, false
 }

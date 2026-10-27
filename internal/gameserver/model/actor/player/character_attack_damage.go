@@ -10,6 +10,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
+var _ attack.Target = (*Character)(nil)
+
 // SetRollSource overrides MakeAttackHit's random source for deterministic
 // tests.
 func (c *Character) SetRollSource(f func(int) int) {
@@ -18,7 +20,7 @@ func (c *Character) SetRollSource(f func(int) int) {
 
 // MakeAttackHit resolves one physical attack result.
 func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	hit := attack.Hit{TargetID: target.ObjectID()}
 	// Folding this needs the world known-list to hand out formula operands.
 	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
 	// yields attackable.Combatant, narrowed from world.Tracked, and world

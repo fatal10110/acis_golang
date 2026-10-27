@@ -62,18 +62,6 @@ type TargetCast struct {
 	CtrlForces bool
 }
 
-// chestTarget is a chest a key may be used on.
-type chestTarget interface {
-	Chest() bool
-	Dead() bool
-	Interacted() bool
-}
-
-// feedableTarget is an NPC that can be a beast spice's target.
-type feedableTarget interface {
-	FeedableBeast() bool
-}
-
 // ResolveTargetCast decides a key, soul crystal or beast spice use by user
 // against the user's current target. Each item checks its target itself
 // before any of its skills reaches the cast pipeline.
@@ -102,7 +90,7 @@ func resolveKey(tmpl *modelitem.Template, user TargetCastUser, defs actorcast.De
 	if user.MovementDisabled() || user.MoveSpeed() == 0 {
 		return TargetCast{Handled: true, Refusal: TargetCastSilent}
 	}
-	chest, ok := user.Target().(chestTarget)
+	chest, ok := user.Target().(skilltarget.Actor)
 	if !ok || !chest.Chest() || chest.Dead() || chest.Interacted() {
 		return TargetCast{Handled: true, Refusal: TargetCastInvalidTarget}
 	}
@@ -137,7 +125,7 @@ func resolveSoulCrystal(tmpl *modelitem.Template, user TargetCastUser, defs acto
 // resolveBeastSpice casts the spice's first skill on a FeedableBeast
 // target.
 func resolveBeastSpice(tmpl *modelitem.Template, user TargetCastUser, defs actorcast.Definitions) TargetCast {
-	beast, ok := user.Target().(feedableTarget)
+	beast, ok := user.Target().(skilltarget.Actor)
 	if !ok || !beast.FeedableBeast() {
 		return TargetCast{Handled: true, Refusal: TargetCastInvalidTarget}
 	}

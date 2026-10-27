@@ -100,11 +100,37 @@ type PlayerActor interface {
 	// BroadcastStatus reports a change to the player's HP, MP or CP that its
 	// own writer left unreported.
 	BroadcastStatus()
+	// CursedWeaponEquipped and IsHero decide whether the player's landed
+	// hit empties a player target's CP.
+	CursedWeaponEquipped() bool
+	IsHero() bool
+}
+
+// Target is a creature, or a door's hit surface, as a physical hit lands
+// on it: the state the hit reads and the reactions it calls. A kind with no
+// such state or reaction gives the neutral answer at its implementation.
+type Target interface {
+	attackable.Combatant
+	// Invul reports an invulnerable target: it takes no reflected or
+	// cast-breaking hit, and the attacker reads its hit as blocked,
+	// Paralyzed telling it the target is petrified.
+	Invul() bool
+	Paralyzed() bool
+	// CalcStat and MaxHPValue size the damage the target reflects.
+	CalcStat(s stat.Stat, base float64) float64
+	MaxHPValue() float64
+	// BreakCastOnDamage rolls whether damage breaks the target's cast.
+	BreakCastOnDamage(damage float64)
+	// NotifyAttacked reports a damaging physical hit, or an offensive
+	// skill, from attacker reaching the target; NotifyEvaded a physical
+	// hit from attacker that missed it.
+	NotifyAttacked(attacker attackable.Combatant)
+	NotifyEvaded(attacker attackable.Combatant)
 }
 
 // Hit is one precomputed physical attack result.
 type Hit struct {
-	Target   attackable.Combatant
+	Target   Target
 	TargetID int32
 	Damage   int
 	Crit     bool
@@ -392,11 +418,11 @@ func (c *Controller) Stop() {
 	c.mu.Unlock()
 }
 
+// makeHit builds the hit on target. Every creature and door hit surface is
+// a Target; a hit on anything else has no target and is never delivered.
 func (c *Controller) makeHit(target attackable.Combatant, split bool) Hit {
 	hit := c.actor.MakeAttackHit(target, split)
-	if hit.Target == nil {
-		hit.Target = target
-	}
+	hit.Target, _ = target.(Target)
 	if hit.TargetID == 0 {
 		hit.TargetID = target.ObjectID()
 	}
@@ -526,16 +552,11 @@ func (c *Controller) swingHitTimer(groups []scheduledHit) func() {
 	}
 }
 
-// cursedHitParty is a player as the cursed-weapon hit rule reads it.
-type cursedHitParty interface {
-	CursedWeaponEquipped() bool
-	IsHero() bool
-}
-
-// cpBreakTarget is a player whose CP a cursed-weapon hit empties.
+// cpBreakTarget is a player whose CP a cursed-weapon hit empties. Only a
+// player holds CP, so the hit target is narrowed by kind here instead of
+// every hit target carrying CP state (an accepted kind narrowing, #2362).
 type cpBreakTarget interface {
-	cursedHitParty
-	Invul() bool
+	CursedWeaponEquipped() bool
 	SetCP(value float64)
 	BroadcastStatus()
 }
@@ -543,19 +564,15 @@ type cpBreakTarget interface {
 // breakCursedCP empties the CP of target, a player the player attacking
 // connected with, when the attacker holds a cursed weapon or is a hero
 // striking a holder, and reports the CP. An invulnerable target keeps it.
-func (c *Controller) breakCursedCP(target attackable.Combatant) {
-	if c.player == nil || target == nil || target.Kind() != actor.KindPlayer {
-		return
-	}
-	attacker, ok := c.actor.(cursedHitParty)
-	if !ok {
+func (c *Controller) breakCursedCP(target Target) {
+	if c.player == nil || target == nil || target.Kind() != actor.KindPlayer || target.Invul() {
 		return
 	}
 	victim, ok := target.(cpBreakTarget)
-	if !ok || victim.Invul() {
+	if !ok {
 		return
 	}
-	if attacker.CursedWeaponEquipped() || (attacker.IsHero() && victim.CursedWeaponEquipped()) {
+	if c.player.CursedWeaponEquipped() || (c.player.IsHero() && victim.CursedWeaponEquipped()) {
 		victim.SetCP(0)
 		victim.BroadcastStatus()
 	}
@@ -601,9 +618,8 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 		onHitTimer()
 	}
 	// The target hears of a miss before the attacker's feedback goes out.
-	target, reacts := hit.Target.(attackedTarget)
-	if hit.Miss && reacts {
-		target.NotifyEvaded(c.actor)
+	if hit.Miss {
+		hit.Target.NotifyEvaded(c.actor)
 	}
 	// The attacker's feedback goes out before the target takes the damage.
 	c.reportHit(hit)
@@ -611,9 +627,7 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 		return
 	}
 	c.emit(event.AttackStanceRequested{})
-	if reacts {
-		target.NotifyAttacked(c.actor)
-	}
+	hit.Target.NotifyAttacked(c.actor)
 	reflected := c.reflectedDamage(hit)
 	hit.Target.TakeDamage(hit.Damage, c.actor)
 	if c.playable != nil {
@@ -627,14 +641,6 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 	c.emit(event.HitLanded{Target: hit.Target, Crit: hit.Crit, Reflected: reflected > 0})
 }
 
-// reflectingTarget is the target state a landed hit reads to size the
-// damage the target reflects back on its attacker.
-type reflectingTarget interface {
-	Invul() bool
-	CalcStat(s stat.Stat, base float64) float64
-	MaxHPValue() float64
-}
-
 // reflectedDamage returns the share of hit's damage its target reflects
 // back on the attacker, capped at the target's max HP, read before the
 // target takes the hit. A bow hit and a hit on an invulnerable target
@@ -644,8 +650,8 @@ func (c *Controller) reflectedDamage(hit Hit) int {
 	if c.actor.AttackType() == item.WeaponBow {
 		return 0
 	}
-	target, ok := hit.Target.(reflectingTarget)
-	if !ok || target.Invul() {
+	target := hit.Target
+	if target.Invul() {
 		return 0
 	}
 	if hit.Target.RaidRelated() {
@@ -692,43 +698,15 @@ func (c *Controller) absorbDamage(hit Hit) {
 	}
 }
 
-// castBreakTarget is a hit target whose cast a landed hit may break.
-type castBreakTarget interface {
-	BreakCastOnDamage(damage float64)
-}
-
 // breakTargetCast rolls whether hit breaks its target's cast, once the
 // damage, the reflected damage and the absorbed HP have all applied. A
 // target the hit killed, a raid-related target and an invulnerable one
 // roll nothing.
 func breakTargetCast(hit Hit) {
-	target, ok := hit.Target.(castBreakTarget)
-	if !ok || hit.Target.AlikeDead() || hit.Target.RaidRelated() {
+	if hit.Target.AlikeDead() || hit.Target.RaidRelated() || hit.Target.Invul() {
 		return
 	}
-	if t, ok := hit.Target.(invulTarget); ok && t.Invul() {
-		return
-	}
-	target.BreakCastOnDamage(float64(hit.Damage))
-}
-
-// attackedTarget is a hit target whose AI reacts to the hit: players,
-// summons and hostile NPCs, which all enter their attack stance. A hostile
-// NPC's aggression runs from its damage path.
-type attackedTarget interface {
-	// NotifyAttacked reports a damaging physical hit, or an offensive
-	// skill, from attacker reaching the target.
-	NotifyAttacked(attacker attackable.Combatant)
-	// NotifyEvaded reports a physical hit from attacker that missed the
-	// target.
-	NotifyEvaded(attacker attackable.Combatant)
-}
-
-// invulTarget is the target state the attacker's damage feedback reads when
-// the hit resolves.
-type invulTarget interface {
-	Invul() bool
-	Paralyzed() bool
+	hit.Target.BreakCastOnDamage(float64(hit.Damage))
 }
 
 // reportHit emits the attacker's damage feedback for hit. NPCs report
@@ -745,9 +723,9 @@ func (c *Controller) reportHit(hit Hit) {
 		}
 	}
 	e := event.HitDealt{TargetID: hit.Target.ObjectID(), Damage: hit.Damage, Crit: hit.Crit, Miss: hit.Miss}
-	if t, ok := hit.Target.(invulTarget); ok && t.Invul() {
+	if hit.Target.Invul() {
 		e.Blocked = true
-		e.Petrified = t.Paralyzed()
+		e.Petrified = hit.Target.Paralyzed()
 	}
 	c.emit(e)
 }
