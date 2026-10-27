@@ -267,8 +267,8 @@ func (q quest) enterRoom(s *script.Script, e script.Event) string {
 			return fillName(s, "rift_watcher_03a.htm", member.Name())
 		}
 		if member.ItemCount(dimensionalFragment) < cost {
-			// A member put out by the rift (memo state 2) within the hour
-			// goes in again without the fragments.
+			// Memo state 2 with a slot 1 stamp under an hour old: the member
+			// goes in without the fragments.
 			since := s.MemoStateEx(member, questID, 1)
 			if s.MemoState(member, questID) != 2 || tick-since > 3600 {
 				return fillName(s, "rift_watcher_03.htm", member.Name())
