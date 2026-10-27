@@ -19,8 +19,9 @@ import (
 // Advance lets d pass for the actor queues. On the inline executor it first
 // lets the server catch up (see catchUp), then moves the Inline clock by d
 // and runs every timer and task that comes due, without waiting; on the
-// real pool it sleeps for d. Either way the
-// tasks posted by then have run when it returns.
+// real pool it sleeps for d, and skips the rest of the test when d is longer
+// than maxWallAdvance. Either way the tasks posted by then have run when it
+// returns.
 func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	tb.Helper()
 	if s.queues.advance != nil {
@@ -29,10 +30,18 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 		}
 		s.queues.advance(d)
 	} else {
+		if d > maxWallAdvance {
+			tb.Skipf("waiting %v on the wall clock; the driven clock covers the rest", d)
+		}
 		time.Sleep(d)
 	}
 	s.Settle(tb)
 }
+
+// maxWallAdvance is the longest single Advance a real-pool run sleeps out.
+// The real pool is there for real interleavings; a long timer's exact timing
+// is pinned on the driven clock, where waiting it out costs nothing.
+const maxWallAdvance = 30 * time.Second
 
 // DrivesClock reports whether the test moves the actor queues' clock (the
 // inline executor) rather than the wall clock doing it (the real pool).

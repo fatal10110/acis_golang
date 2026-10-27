@@ -42,6 +42,9 @@ jobs:
           - name: pool-combat-items
             cache: combat-items
             pool: ./tests/combat ./tests/items
+          - name: ai
+            cache: rest
+            pkgs: ./tests/ai
           - name: rest
             cache: rest
             pkgs: ./cmd/... ./internal/...
@@ -51,6 +54,12 @@ jobs:
           - name: pool-rest
             cache: rest
             pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
+    env:
+      # Single-goroutine checks that spend minutes type-checking sources or
+      # replaying path searches. The race detector finds nothing in them and
+      # slows them several times over, so `rest` runs them in their own step
+      # without it.
+      STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:
         image: mariadb:11
@@ -109,16 +118,21 @@ jobs:
           PKGS: ${{ matrix.shard.pkgs }}
         run: |
           if [ "$PKGS" = suites ]; then
-            PKGS="$(go list ./tests/... | grep -vE '/tests/(skills|pets|combat|items)$')"
+            PKGS="$(go list ./tests/... | grep -vE '/tests/(skills|pets|combat|items|ai)$')"
           fi
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          .github/scripts/gotest.sh -race $PKGS
+          .github/scripts/gotest.sh -race -skip "$STATIC_TESTS" $PKGS
+
+      - name: Test (static, no race)
+        if: matrix.shard.name == 'rest'
+        run: .github/scripts/gotest.sh -run "$STATIC_TESTS" ./cmd/gameserver ./internal/gameserver/geo/pathfind ./internal/provenance ./internal/config
 
       # Behavior suites run on sim.Inline with a test-driven clock by
       # default; this keeps their run on the real pool, with real
       # interleavings. On the wall clock most of a test is spent waiting out
       # cast, swing and stand-up times, so far more tests than GOMAXPROCS
-      # run at once.
+      # run at once. A single wait longer than 30 s skips the rest of its
+      # test (gameservertest's Server.Advance); the inline pass covers it.
       - name: Test (real pool)
         if: matrix.shard.pool
         env:
@@ -165,10 +179,36 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          # As in test: setup-go's go.sum-keyed cache is never refreshed.
+          cache: false
+
+      # golangci-lint-action keeps one cache entry per week and never updates
+      # it, so most runs re-analyze nearly every package. Keep the analysis
+      # cache per commit instead, saved by main like the test caches.
+      - name: Restore lint cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/golangci-lint
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: lint-${{ runner.os }}-${{ github.sha }}
+          restore-keys: lint-${{ runner.os }}-
 
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
+          skip-cache: true
+
+      - name: Save lint cache
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/golangci-lint
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: lint-${{ runner.os }}-${{ github.sha }}
 
   # Builds the Dockerfile, runs its binaries, and seeds the compose db from a
   # stub datapack and from the real aCis_datapack schema
