@@ -19,13 +19,7 @@ import (
 
 // pendingKeys are reference keys no reader takes yet. Each belongs to the
 // open issue that ports its consumer; the boot reports them as unsupported.
-var pendingKeys = map[string][]string{
-	"events.properties": {
-		// Dimensional Rift (Q635) and Q620: #184.
-		"AnakazelPortChance", "AutoJumpsDelayMin", "AutoJumpsDelayRnd", "CaptainCost", "CommanderCost", "HeroCost", "NeededPartyMembers",
-		"OfficerCost", "RecruitCost", "RiftMinPartySize", "SoldierCost",
-	},
-}
+var pendingKeys = map[string][]string{}
 
 // referenceKeys reads testdata/reference_keys.golden: the keys the
 // reference configuration loader reads, by file.

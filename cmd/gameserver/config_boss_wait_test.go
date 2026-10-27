@@ -68,7 +68,7 @@ func TestScriptEnvCarriesBossWaitTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 	waits := script.BossWaitTimes{Antharas: time.Minute, Valakas: 2 * time.Minute, Frintezza: 3 * time.Minute}
-	env, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{BossWaits: waits}, nil, nil, nil, nil, nil)
+	env, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{BossWaits: waits}, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("provideScriptEnv() error = %v", err)
 	}

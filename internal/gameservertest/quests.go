@@ -194,8 +194,9 @@ type questBoot struct {
 // item templates items and the link's page cache html, and the script
 // registry, whose own work (the dying hooks, and the timers bound to no NPC
 // or player queue) runs on engine. The scripts read the Seven Signs from
-// sevenSigns and the party range and multiple item drop rule from drops.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, o *options) *questBoot {
+// sevenSigns, the party range and multiple item drop rule from drops and
+// the event settings from events.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, events *script.EventBook, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
@@ -203,6 +204,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		Quests:     journals,
 		Rates:      script.Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1},
 		Drops:      drops,
+		Events:     events,
 		NewItemID:  ids.NextID,
 		Spawner:    script.NewSpawner(nil, o.log),
 		Rand:       rnd.Get,
