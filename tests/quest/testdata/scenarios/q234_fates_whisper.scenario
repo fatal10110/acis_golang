@@ -71,6 +71,8 @@ bypass npc_{reorin}_Quest
 kill cabrio
   S SystemMessage id=95 1:0 1:0
   S NpcInfo obj=coffer npc=31027
+  S ChangeMoveType obj=coffer running=1 swimming=0
+  S NpcInfo obj=coffer npc=31027
 action coffer
 action coffer
   S ActionFailed

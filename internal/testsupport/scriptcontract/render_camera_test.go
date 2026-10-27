@@ -26,6 +26,11 @@ func TestPacketRendersCameraSocialNpcInfoAndDelete(t *testing.T) {
 		// The reference trace's DeleteObject of the Fallen Unicorn.
 		{"DeleteObject", mustHex(t, "128d04001001000000"), "S DeleteObject obj=268436621"},
 		// The reference trace's NpcInfo of the Pure White Unicorn, cut after its template id: the rest is the world's.
+		// The reference trace's stance change of the Pure White Unicorn, and a Die of a monster.
+		{"ChangeMoveType", mustHex(t, "2e910400100100000000000000"), "S ChangeMoveType obj=268436625 running=1 swimming=0"},
+		{"Die", mustHex(t, "068f040010010000000000000000000000000000000000000000000000"), "S Die obj=268436623 village=1 clanhall=0 castle=0 siegehq=0 sweep=0 fixed=0"},
+		{"ExPlayScene", mustHex(t, "fe5b00"), "S ExPlayScene"},
+		{"Earthquake", mustHex(t, "c40100000002000000030000000400000005000000"+"01000000"), "S Earthquake intensity=4 duration=5 npc=1"},
 		{"NpcInfo", mustHex(t, "169204001043be0f0000000000280000001400000032000000"), "S NpcInfo obj=268436626 npc=31747"},
 	}
 	for _, c := range cases {
@@ -36,11 +41,15 @@ func TestPacketRendersCameraSocialNpcInfoAndDelete(t *testing.T) {
 		if got != c.want {
 			t.Errorf("%s = %s, want %s", c.name, got, c.want)
 		}
-		if _, err := Packet(c.payload[:3], roles); err == nil {
+		cut := c.payload[:3]
+		if len(c.payload) == 3 {
+			cut = c.payload[:2]
+		}
+		if _, err := Packet(cut, roles); err == nil {
 			t.Errorf("%s: Packet rendered a cut payload", c.name)
 		}
 	}
-	for _, name := range []string{"SpecialCamera", "SocialAction", "DeleteObject"} {
+	for _, name := range []string{"SpecialCamera", "SocialAction", "DeleteObject", "ChangeMoveType", "Die", "ExPlayScene", "Earthquake"} {
 		for _, c := range cases {
 			if c.name == name {
 				if _, err := Packet(append(append([]byte(nil), c.payload...), 0), roles); err == nil {

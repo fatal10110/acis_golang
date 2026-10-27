@@ -223,7 +223,12 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 		}
 	}
 
+	// An NPC enters the world walking, so the players who see it appear
+	// are shown it so, and then takes its run stance (ChangeMoveType, then
+	// its info again).
+	hostile.SetRunning(false)
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)
+	hostile.ForceRunStance()
 	hostile.EnterZones()
 	// A saved HP or MP below max regenerates one period from the spawn.
 	hostile.SettleRegen()

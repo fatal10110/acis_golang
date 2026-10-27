@@ -67,10 +67,7 @@ func npcInfoOf(t *testing.T, frames [][]byte, objectID int32) []byte {
 	var found []byte
 	for _, f := range frames {
 		if len(f) >= 5 && objectFrame(f, serverpackets.OpcodeNPCInfo, objectID) {
-			if found != nil {
-				t.Fatalf("two NpcInfo frames about %d", objectID)
-			}
-			found = f
+			found = f // the NPC's current view is its last one: it takes its run stance after it appears
 		}
 	}
 	if found == nil {

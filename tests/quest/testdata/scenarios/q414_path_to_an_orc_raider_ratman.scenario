@@ -28,6 +28,8 @@ kill raider
   S SystemMessage id=95 1:0 1:0
   S SystemMessage id=302 3:1578
   S NpcInfo obj=ratman npc=27045
+  S ChangeMoveType obj=ratman running=1 swimming=0
+  S NpcInfo obj=ratman npc=27045
   items 1578=0
 kill ratman x10
   S SystemMessage id=95 1:0 1:0

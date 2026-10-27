@@ -170,12 +170,13 @@ type makerWorld struct {
 	change func()
 }
 
-// shown returns the template ids of the NpcInfo frames among frames,
-// sorted.
+// shown returns the template ids of the NPCs the NpcInfo frames among frames
+// show appearing, sorted. The NpcInfo that follows a ChangeMoveType is the
+// same NPC's info again after it takes its run stance, not another NPC.
 func shown(frames [][]byte) []int {
 	var out []int
-	for _, frame := range frames {
-		if frame[0] != serverpackets.OpcodeNPCInfo {
+	for i, frame := range frames {
+		if frame[0] != serverpackets.OpcodeNPCInfo || (i > 0 && frames[i-1][0] == serverpackets.OpcodeChangeMoveType) {
 			continue
 		}
 		r := wire.NewReader(frame[1:])

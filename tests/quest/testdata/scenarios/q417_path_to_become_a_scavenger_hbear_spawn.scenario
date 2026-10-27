@@ -34,5 +34,7 @@ npc plunder 20508 Monster 130 0 0
 kill hbear
   S SystemMessage id=95 1:0 1:0
   S NpcInfo obj=honey npc=27058
+  S ChangeMoveType obj=honey running=1 swimming=0
+  S NpcInfo obj=honey npc=27058
   Q delete-var Q417_PathToBecomeAScavenger | step
   rows Q417_PathToBecomeAScavenger <cond>=5 <state>=STARTED

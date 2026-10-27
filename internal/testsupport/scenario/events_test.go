@@ -43,8 +43,6 @@ func TestParseRejectsBadClockParamsAndEvent(t *testing.T) {
 		{"ai pair", "character A 1\nnpc a 1 Folk 0 0 0 ai oops\nadvance 1s\n", "<name>=<value>"},
 		{"event role", "character A 1\nevent a 3 0 0\n", "unknown role"},
 		{"event id", "character A 1\nnpc a 1 Folk 0 0 0\nevent a x 0 0\n", "event id"},
-		{"traced clock", "trace x.golden\ncharacter A 1\nclock 01:00\nadvance 1s\n", "traced scenario takes no"},
-		{"traced event", "trace x.golden\ncharacter A 1\nnpc a 1 Folk 0 0 0\nevent a 3 0 0\n", "traced scenario takes no event step"},
 		{"event argument", "character A 1\nnpc a 1 Folk 0 0 0\nevent a 3 b 0\n", "npc line above"},
 	} {
 		if _, err := Parse("bad.scenario", []byte(c.text)); err == nil || !strings.Contains(err.Error(), c.want) {
@@ -71,6 +69,9 @@ func TestRendererComparesWhatAScriptDoes(t *testing.T) {
 	social := func(oid int32) []byte {
 		return []byte{serverpackets.OpcodeSocialAction, byte(oid), byte(oid >> 8), byte(oid >> 16), byte(oid >> 24), 3, 0, 0, 0}
 	}
+	stance := func(oid int32, running byte) []byte {
+		return []byte{serverpackets.OpcodeChangeMoveType, byte(oid), byte(oid >> 8), byte(oid >> 16), byte(oid >> 24), running, 0, 0, 0, 0, 0, 0, 0}
+	}
 	for _, c := range []struct {
 		name    string
 		payload []byte
@@ -78,7 +79,10 @@ func TestRendererComparesWhatAScriptDoes(t *testing.T) {
 		want    string
 	}{
 		{"placed NpcInfo", info(placed, 7), false, ""},
+		{"stance of a stranger", stance(spawned, 1), false, ""},
 		{"script-spawned NpcInfo", info(spawned, 7), false, "NpcInfo obj=pure npc=7"},
+		{"its stance", stance(spawned, 1), false, "ChangeMoveType obj=pure running=1 swimming=0"},
+		{"placed stance", stance(placed, 0), false, ""},
 		{"its DeleteObject", del(spawned), false, "DeleteObject obj=pure"},
 		{"placed DeleteObject", del(placed), false, "DeleteObject obj=unicorn"},
 		{"unnamed template", info(0x10000009, 8), false, ""},
@@ -94,16 +98,19 @@ func TestRendererComparesWhatAScriptDoes(t *testing.T) {
 			t.Errorf("%s: render = %q, %v, %v; want %q", c.name, got, ok, err, c.want)
 		}
 	}
-	// A corpse's decay is not compared; a repeated NpcInfo and the order of a run of DeleteObjects do not count.
+	// A corpse's decay is not compared; the order of a run of DeleteObjects do not count.
 	rd.render([]byte{serverpackets.OpcodeDie, 3, 0, 0, 0x10})
 	if _, ok, _ := rd.render(del(spawned)); ok {
 		t.Error("the DeleteObject of a dead NPC rendered")
 	}
+	// The reference shows a script-spawned NPC as NpcInfo, ChangeMoveType,
+	// NpcInfo: every line counts.
 	lines := appendRendered(nil, "NpcInfo obj=a npc=1")
+	lines = appendRendered(lines, "ChangeMoveType obj=a running=1 swimming=0")
 	lines = appendRendered(lines, "NpcInfo obj=a npc=1")
 	lines = appendRendered(lines, "DeleteObject obj=b")
 	lines = appendRendered(lines, "DeleteObject obj=a")
-	if got := strings.Join(lines, ","); got != "NpcInfo obj=a npc=1,DeleteObject obj=a,DeleteObject obj=b" {
+	if got := strings.Join(lines, ","); got != "NpcInfo obj=a npc=1,ChangeMoveType obj=a running=1 swimming=0,NpcInfo obj=a npc=1,DeleteObject obj=a,DeleteObject obj=b" {
 		t.Errorf("appendRendered = %s", got)
 	}
 }

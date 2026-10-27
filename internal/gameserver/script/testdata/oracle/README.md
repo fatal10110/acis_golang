@@ -70,8 +70,8 @@ until a contract scene uses them:
 
 ## Quest scenario traces
 
-`probe/ScenarioTrace.java` runs last, after the contract scenes. It plays every quest scenario
-file of `tests/quest/testdata/scenarios` whose `trace` line names a file under
+`probe/ScenarioTrace.java` runs last, after the contract scenes. It plays every scenario
+file of `tests/quest/testdata/scenarios` and `tests/ai/testdata/scenarios` whose `trace` line names a file under
 `oracle/scenarios/`, from the scenario file itself, and writes that file. Each scenario is set
 up the way the Go runner (`internal/testsupport/scenario`) sets it up, so the trace answers
 what the reference does in the scenario's own world:
@@ -142,7 +142,23 @@ what the reference does in the scenario's own world:
   a relog stores the character at its logout and restores it from the rows the run wrote, read
   back by the reference's own restore queries; a statement on a kept table the store cannot run
   fails the run;
-- the game time is noon of the first game day at each scenario's start;
+- the game time is noon of the first game day at each scenario's start; the wall clock starts
+  at 2026-01-01 00:00 UTC, or at the `clock` line's time of day on that day, and the game tick
+  (`GameTimeTaskManager`'s start time) is that instant, as the Go run's uptime is zero at its
+  clock start. The Four Sepulchers manager (RoyalRushNpc) reads its minute and second from the
+  probe wall clock;
+- a `params <p1> <p2> <p3>` option of an `npc` line is set on the NPC (`_param1` to `_param3`)
+  before it enters the world, so its created hook reads them, as a private's master gives them;
+  a value is a number, the character or the role of an NPC line above. An `ai <name>=<value>,...`
+  option replaces the NPC's template AI parameters with those alone (as the Go runner's fixture
+  template has only them) until the scenario is over. The other options of the line (`walks`,
+  ...) are not read: the probe plays the shipped template;
+- an `event <role> <id> <arg1> <arg2>` step sends the NPC of that role the script event
+  (`Npc.sendScriptEvent`) and runs what it queued now, without moving the virtual clock;
+- a client packet step is followed by 500 ms of virtual time (the `T 500` line) and a kill
+  by seven such ticks; the Go run settles the queues after a packet instead and moves its clock
+  only for a kill and an `advance` step, so a timer a script starts in a packet step needs an
+  explicit `advance` to line up (the Go step is shorter by the 500 ms);
 - every scenario draws its object ids from the same point: the id factory as the first scenario
   found it, after the boot, the quest traces and the contract scenes. Once a scenario is over,
   every world object of an id it drew is removed, wherever it stands, and so are the registry
@@ -224,7 +240,7 @@ Both default to the siblings of the repository root, so from the primary checkou
 workspace no variable is needed. The script builds the probe, runs it, copies the three
 `.golden` files here, the scenario traces to `scenarios/` (replacing the directory) and the
 contract goldens to `internal/testsupport/scriptcontract/testdata/`; it needs Docker and nothing
-else; it reads the scenario files from `tests/quest/testdata/scenarios`. `PROBE_LOG=<file>` keeps the
+else; it reads the scenario files from `tests/quest/testdata/scenarios` and `tests/ai/testdata/scenarios`. `PROBE_LOG=<file>` keeps the
 reference server's log.
 
 A full run plays every scenario with the reference's real bypass throttle, so it takes several
@@ -320,6 +336,8 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # npc <role> <npc id> (object <id>)   a scenario trace: the probe spawned the NPC line's NPC
 # approach <npc id> (object <id>)     a scenario trace: the player steps up to the NPC, one AI tick
 # tick                          a scenario trace: one run of the NPC AI task
+# event <npc id> (object <id>) <id> <arg1> <arg2>   a scenario trace: the NPC is sent a script event
+                                (the arguments as the scenario writes them)
 # live <npc id> <count>         a scenario trace: how many living NPCs of that template the world
                                 holds once the step is over (the step's live line)
 # spawned <npc id> <x>,<y> ...   a scenario trace: where the living NPCs of that template that

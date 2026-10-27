@@ -15,7 +15,13 @@ npc third 22048 Monster 3000 0 0
 
 hit summoner 10
   S NpcInfo obj=first npc=22045
+  S ChangeMoveType obj=first running=1 swimming=0
+  S NpcInfo obj=first npc=22045
   S NpcInfo obj=second npc=22047
+  S ChangeMoveType obj=second running=1 swimming=0
+  S NpcInfo obj=second npc=22047
+  S NpcInfo obj=third npc=22048
+  S ChangeMoveType obj=third running=1 swimming=0
   S NpcInfo obj=third npc=22048
   mem summoner i_ai1=1
 advance 1s

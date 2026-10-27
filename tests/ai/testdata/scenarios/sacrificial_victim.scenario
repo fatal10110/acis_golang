@@ -20,5 +20,7 @@ tick
 advance 4900ms
 advance 100ms
   S NpcInfo obj=sacrifice npc=22145
+  S ChangeMoveType obj=sacrifice running=1 swimming=0
+  S NpcInfo obj=sacrifice npc=22145
   S DeleteObject obj=offering
 advance 1m

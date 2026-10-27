@@ -19,8 +19,8 @@ import (
 // renders are the opcodes a step compares: the dialog's, the quest's, the
 // tutorial's and the item messages, the radar marks, the drops, the casts,
 // the NPC chat lines a script makes, the player's own teleports, the camera
-// shots, the social animations, and the appearing and leaving of the NPCs
-// a script spawns. The rest (selection, approach, movement, the deferred
+// shots, the social animations, the earthquakes, and the appearing, stance
+// changes, dying and leaving of the NPCs a script spawns. The rest (selection, approach, movement, the deferred
 // inventory and status updates) is not the script's.
 var renders = []byte{
 	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
@@ -30,7 +30,8 @@ var renders = []byte{
 	serverpackets.OpcodeRadarControl, serverpackets.OpcodeDropItem, serverpackets.OpcodeMagicSkillUse,
 	serverpackets.OpcodeNpcSay, serverpackets.OpcodeTeleportToLocation,
 	serverpackets.OpcodeSpecialCamera, serverpackets.OpcodeSocialAction,
-	serverpackets.OpcodeNPCInfo, serverpackets.OpcodeDeleteObject,
+	serverpackets.OpcodeNPCInfo, serverpackets.OpcodeDeleteObject, serverpackets.OpcodeChangeMoveType,
+	serverpackets.OpcodeDie, serverpackets.OpcodeEarthquake,
 }
 
 // renderer renders the server packets of one run or trace as S lines.
@@ -121,7 +122,7 @@ func (rd *renderer) render(payload []byte) (string, bool, error) {
 		if name, named := roles[obj]; !named || (name != "player" && rd.talk) {
 			return "", false, nil
 		}
-	case serverpackets.OpcodeNPCInfo, serverpackets.OpcodeDeleteObject:
+	case serverpackets.OpcodeNPCInfo, serverpackets.OpcodeDeleteObject, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeDie:
 		var named bool
 		if roles, named = rd.scripted(payload); !named {
 			return "", false, nil
@@ -137,15 +138,10 @@ func (rd *renderer) render(payload []byte) (string, bool, error) {
 	return strings.TrimPrefix(line, "S "), true, nil
 }
 
-// appendRendered appends line to lines, except an NpcInfo that repeats the
-// line before it: the reference shows a script-spawned NPC twice, once as
-// it appears and once more as it takes its move type (running), and the
-// run once; one is compared. A run of DeleteObject lines is kept sorted:
-// the order a teleport empties the character's view in is not the script's.
+// appendRendered appends line to lines. A run of DeleteObject lines is kept
+// sorted: the order a teleport empties the character's view in is not the
+// script's.
 func appendRendered(lines []string, line string) []string {
-	if n := len(lines); n > 0 && lines[n-1] == line && strings.HasPrefix(line, "NpcInfo ") {
-		return lines
-	}
 	lines = append(lines, line)
 	if strings.HasPrefix(line, "DeleteObject ") {
 		for i := len(lines) - 1; i > 0 && strings.HasPrefix(lines[i-1], "DeleteObject ") && lines[i-1] > lines[i]; i-- {
@@ -249,6 +245,7 @@ var (
 	tracePickup   = regexp.MustCompile(`^C Action item (\d+) \(object \d+\)$`)
 	traceKill     = regexp.MustCompile(`^# kill (\d+) \(object (\d+)\)$`)
 	traceHit      = regexp.MustCompile(`^# hit (\d+) \(object (\d+)\) (\d+)$`)
+	traceEvent    = regexp.MustCompile(`^# event (\d+) \(object (\d+)\) (\d+) (\S+) (\S+)$`)
 	traceAdvance  = regexp.MustCompile(`^# advance (\d+)$`)
 	traceHall     = regexp.MustCompile(`^# hallstatus (\d+) (registering|waiting|siege)$`)
 	traceApproach = regexp.MustCompile(`^# approach (\d+) \(object (\d+)\)$`)
@@ -356,6 +353,10 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			m := traceKill.FindStringSubmatch(line)
 			seen[atoi32(m[2])] = atoi32(m[1])
 			raw = append(raw, rawStep{client: "kill " + m[1]})
+		case traceEvent.MatchString(line):
+			m := traceEvent.FindStringSubmatch(line)
+			seen[atoi32(m[2])] = atoi32(m[1])
+			raw = append(raw, rawStep{client: "event " + strings.Join([]string{m[1], m[3], m[4], m[5]}, " ")})
 		case traceHit.MatchString(line):
 			m := traceHit.FindStringSubmatch(line)
 			seen[atoi32(m[2])] = atoi32(m[1])
@@ -727,6 +728,10 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 	case "approach":
 		if id, ok := npcID(st.Args[0]); ok {
 			return []string{fmt.Sprintf("approach %d", id)}, nil
+		}
+	case "event":
+		if id, ok := npcID(st.Args[0]); ok {
+			return []string{fmt.Sprintf("event %d %s %s %s", id, st.Args[1], st.Args[2], st.Args[3])}, nil
 		}
 	case "tick":
 		return slices.Repeat([]string{"tick"}, times(st.Args)), nil

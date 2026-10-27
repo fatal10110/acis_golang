@@ -94,6 +94,8 @@ kill marauder
   S SystemMessage id=95 1:0 1:0
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
   S NpcInfo obj=herod npc=27119
+  S ChangeMoveType obj=herod running=1 swimming=0
+  S NpcInfo obj=herod npc=27119
 
 # Sir Herod's spirit, slain sword in hand: the Knight's Tear.
 kill herod
@@ -197,6 +199,8 @@ kill hangman
   S QuestList 212:0x800000ff
   S ExShowQuestMark quest=212
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=talianus npc=30656
+  S ChangeMoveType obj=talianus running=1 swimming=0
   S NpcInfo obj=talianus npc=30656
   Q upsert Q212_TrialOfDuty | <cond> | 8
 

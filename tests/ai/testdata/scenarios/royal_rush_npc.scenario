@@ -4,6 +4,7 @@
 # 0. It reads the clock every second: at minute 50 it shouts that the entry closes (ShoutMsg 1),
 # at minute 55 the two closing lines; in the first 30 s of minute 54 it frees the sepulcher
 # (AVQuest0, not observable here).
+trace internal/gameserver/script/testdata/oracle/scenarios/royal_rush_npc.golden
 clock 00:49:57
 character Hunter 20
 script script.ai.individual.DefaultNpc

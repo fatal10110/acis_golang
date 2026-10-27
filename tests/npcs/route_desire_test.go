@@ -148,17 +148,24 @@ func testWalkersScript(t *testing.T, opts ...gameservertest.Option) {
 	w := bootRouteWorld(t, list, catalog, opts...)
 
 	scribe, frames := w.spawn(t, scribeID)
-	want := []byte{serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo}
+	// Every NPC appears walking and takes its run stance; the walkers
+	// script then puts the scribe back in walk stance.
+	want := []byte{serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo}
 	if got := npcOpcodes(frames); string(got) != string(want) {
-		t.Fatalf("scribe spawn frames = %#x, want NpcInfo, ChangeMoveType, NpcInfo", got)
+		t.Fatalf("scribe spawn frames = %#x, want NpcInfo, ChangeMoveType, NpcInfo, ChangeMoveType, NpcInfo", got)
 	}
-	if !npcInfoRunning(frames[0]) || moveTypeRunning(frames[1]) || npcInfoRunning(frames[2]) {
-		t.Fatalf("scribe shown running %v, then stance running %v, then running %v; want run, walk, walk",
-			npcInfoRunning(frames[0]), moveTypeRunning(frames[1]), npcInfoRunning(frames[2]))
+	if npcInfoRunning(frames[0]) || !moveTypeRunning(frames[1]) || !npcInfoRunning(frames[2]) || moveTypeRunning(frames[3]) || npcInfoRunning(frames[4]) {
+		t.Fatalf("scribe shown running %v, stance %v, running %v, stance %v, running %v; want walk, run, run, walk, walk",
+			npcInfoRunning(frames[0]), moveTypeRunning(frames[1]), npcInfoRunning(frames[2]), moveTypeRunning(frames[3]), npcInfoRunning(frames[4]))
 	}
 	porter, frames := w.spawn(t, porterID)
-	if got := npcOpcodes(frames); len(got) != 1 || got[0] != serverpackets.OpcodeNPCInfo || !npcInfoRunning(frames[0]) {
-		t.Fatalf("porter spawn frames = %#x, want one NpcInfo showing it running", got)
+	want = []byte{serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo}
+	if got := npcOpcodes(frames); string(got) != string(want) {
+		t.Fatalf("porter spawn frames = %#x, want NpcInfo, ChangeMoveType, NpcInfo", got)
+	}
+	if npcInfoRunning(frames[0]) || !moveTypeRunning(frames[1]) || !npcInfoRunning(frames[2]) {
+		t.Fatalf("porter shown running %v, stance %v, running %v; want walk, run, run",
+			npcInfoRunning(frames[0]), moveTypeRunning(frames[1]), npcInfoRunning(frames[2]))
 	}
 	stroller, frames := w.spawn(t, strollerID)
 	if dests, _ := legs(frames); len(dests) != 0 {

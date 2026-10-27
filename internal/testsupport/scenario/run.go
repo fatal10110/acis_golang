@@ -400,6 +400,11 @@ func (r *run) spawnNPCs(t *testing.T) {
 	r.srv.ReadQueued(t, r.srv.Client)
 	r.drainMembers(t)
 	r.drainMates(t)
+	// The draws the spawning made (a created hook's) are not a step's: the
+	// reference probe does not trace them either.
+	if _, bad := r.draws.take(); len(bad) > 0 {
+		t.Fatalf("%s: script random at spawn: %s", r.sc.Name, strings.Join(bad, "; "))
+	}
 }
 
 // scenarioClan is the object id of the clan a clan line seeds.

@@ -157,7 +157,12 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 		f.SetMaster(master)
 		master.AddMinion(f)
 	}
+	// An NPC enters the world walking, so the players who see it appear
+	// are shown it so, and then takes its run stance (ChangeMoveType, then
+	// its info again).
+	f.SetRunning(false)
 	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
+	f.SetRunStance(true)
 	f.EnterZones()
 	f.SettleRegen() // vitals below max regenerate one period from the spawn
 	if s.AI != nil {
