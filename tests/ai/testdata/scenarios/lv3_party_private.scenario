@@ -1,0 +1,25 @@
+# LV3PartyPrivateMonster (27261, level 76), raised as the private of a master: the character's hit
+# adds a tenth-scale attack desire (10 over level 76 + 7, times 10); a private spawned with no master
+# at all keeps no spawn parameters, so the character's hit leaves it out of the world; and when its
+# master dies, the private leaves too.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster
+npc owner 20003 Monster 600 0 0 params 0 character 0
+npc priv 27261 Monster 300 0 0 level 76 master owner
+npc lone 27261 Monster 300 300 0 level 76
+
+hit priv 10
+  desires priv attack(player)=35.9802847754655
+  inworld lone yes
+hit lone 10
+  S DeleteObject obj=lone
+  inworld lone no
+kill owner
+  S SystemMessage id=95 1:0 1:0
+  S DeleteObject obj=priv
+  inworld priv no
