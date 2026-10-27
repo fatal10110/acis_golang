@@ -19,9 +19,10 @@ import (
 // Advance lets d pass for the actor queues. On the inline executor it first
 // lets the server catch up (see catchUp), then moves the Inline clock by d
 // and runs every timer and task that comes due, without waiting; on the
-// real pool it sleeps for d, and skips the rest of the test when d is longer
-// than maxWallAdvance. Either way the tasks posted by then have run when it
-// returns.
+// real pool it sleeps for d, except that a suite's pool pass skips the rest
+// of the test when d is longer than maxWallAdvance (a test WithRealPool
+// pins has no inline pass, so it still sleeps). Either way the tasks posted
+// by then have run when it returns.
 func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	tb.Helper()
 	if s.queues.advance != nil {
@@ -30,7 +31,7 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 		}
 		s.queues.advance(d)
 	} else {
-		if d > maxWallAdvance {
+		if d > maxWallAdvance && s.queues.passOfSuite {
 			tb.Skipf("waiting %v on the wall clock; the driven clock covers the rest", d)
 		}
 		time.Sleep(d)

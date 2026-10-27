@@ -57,8 +57,8 @@ jobs:
     env:
       # Single-goroutine checks that spend minutes type-checking sources or
       # replaying path searches. The race detector finds nothing in them and
-      # slows them several times over, so `rest` runs them in their own step
-      # without it.
+      # slows them several times over, so the short pool-rest job runs them
+      # in their own step without it.
       STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:
@@ -124,7 +124,7 @@ jobs:
           .github/scripts/gotest.sh -race -skip "$STATIC_TESTS" $PKGS
 
       - name: Test (static, no race)
-        if: matrix.shard.name == 'rest'
+        if: matrix.shard.name == 'pool-rest'
         run: .github/scripts/gotest.sh -run "$STATIC_TESTS" ./cmd/gameserver ./internal/gameserver/geo/pathfind ./internal/provenance ./internal/config
 
       # Behavior suites run on sim.Inline with a test-driven clock by
