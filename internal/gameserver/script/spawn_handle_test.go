@@ -118,6 +118,8 @@ func (nopPopulation) DecayMe(*npc.Hostile) {}
 
 func (nopPopulation) MakerEvent(string, string, int, int) bool { return false }
 
+func (nopPopulation) HasMaker(string) bool { return false }
+
 func (nopPopulation) DoRespawn(npc.PartyMember) {}
 
 func (nopPopulation) DrawSpawnPoint(npc.PartyMember) (location.Location, int, bool) {

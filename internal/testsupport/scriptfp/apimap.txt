@@ -583,7 +583,7 @@ ScoreData.okMsg inline
 SpawnMaker.checkHasSpawnCondition spawn.Group.Held
 SpawnMaker.onMakerScriptEvent script.Spawner.SendMakerEvent
 SpawnManager.getInstance inline
-SpawnManager.getNpcMaker inline
+SpawnManager.getNpcMaker script.Spawner.HasMaker,script.Spawner.SendMakerEvent
 
 # Script-facing API freeze, player, creature and skill rows (#3748). A
 # binding is a field of the script (Bind, UsedItems, EnteredZones). The soul
@@ -777,7 +777,7 @@ CommandChannel.broadcastOnScreen script.Player.ShowChannelScreenMessage
 CommandChannel.getMembers script.Player.ChannelMembers
 CommandChannel.getParties script.Player.ChannelParties
 Party.broadcastOnScreen script.Player.ShowPartyScreenMessage
-Party.broadcastPacket script.Player.ShowPartyScreenMessage
+Party.broadcastPacket script.PartyCell.ShowScreenMessage
 Party.getCommandChannel inline
 
 # The Dimensional Rift room (#3802): the room cell a script builds with

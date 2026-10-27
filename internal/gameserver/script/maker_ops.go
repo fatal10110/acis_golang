@@ -21,3 +21,9 @@ func (n *NPC) MakerName() string {
 func (s *Spawner) SendMakerEvent(maker, name string, int1, int2 int) bool {
 	return s.population().MakerEvent(maker, name, int1, int2)
 }
+
+// HasMaker reports whether an npcmaker is named maker (case-insensitive),
+// running nothing on it (#4278).
+func (s *Spawner) HasMaker(maker string) bool {
+	return s.population().HasMaker(maker)
+}

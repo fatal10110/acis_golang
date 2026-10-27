@@ -52,12 +52,12 @@ func teleLoc(i int) script.Loc {
 }
 
 // teleporter is the state every Frintezza teleporter shares: a busy mark
-// nothing in the class raises (cleared on a reset), and the members of each
-// party it let in, kept per channel slot until a later entry with as many
-// parties replaces them.
+// nothing in the class raises (cleared on a reset), and each party it let
+// in, kept per channel slot until a later entry with as many parties
+// replaces it.
 type teleporter struct {
 	busy    *script.IntCell
-	parties [5]*script.ListCell[*script.Player]
+	parties [5]*script.PartyCell
 }
 
 // FrintezzaTeleporter (32011), the way into Frintezza's tomb. Created it
@@ -70,8 +70,8 @@ type teleporter struct {
 // party's spot and stripped of every Breaking Arrow and Dewdrop of
 // Destruction. Frintezza is then told 1 and, while his db
 // value stays under 2, the channel is told 35 minutes are left and counted
-// down at 30, 25, 20, 15, 10, 5, 4, 3, 2 and 1 minutes, each party told
-// through one of its stored members still grouped with another. A minute
+// down at 30, 25, 20, 15, 10, 5, 4, 3, 2 and 1 minutes, each party it let
+// in told as it stands then, a disbanded one telling no one. A minute
 // after the last notice, with Frintezza still under 2, it resets the tomb:
 // ai slot 0 cleared, players sent out to (150037, -57255, -2976), Frintezza
 // and his follower told 0, every maker told 1000 and the doors set. The
@@ -83,7 +83,7 @@ func FrintezzaTeleporter() script.Script {
 	base := defaultnpc.New().Hooks
 	t := &teleporter{
 		busy:    &script.IntCell{},
-		parties: [5]*script.ListCell[*script.Player]{{}, {}, {}, {}, {}},
+		parties: [5]*script.PartyCell{{}, {}, {}, {}, {}},
 	}
 	return script.Script{
 		Dir: dir, Behavior: true, NPCs: []int32{32011},
@@ -326,9 +326,10 @@ func (t *teleporter) admit(s *script.Script, n *script.NPC, player *script.Playe
 	frintezzaTomb := s.Zone(frintezzaTombZID)
 
 	for i, party := range parties {
-		t.parties[i].Clear()
-		for _, member := range party {
-			t.parties[i].Add(member)
+		// Every member of a party the channel lists is in the world, so
+		// the leader names it.
+		if len(party) > 0 {
+			t.parties[i].SetPartyOf(party[0])
 		}
 
 		at := teleLoc(i)
@@ -377,33 +378,11 @@ func resetTomb(s *script.Script) {
 }
 
 // notifyRemainingTime shows every stored party that leftMinutes are left,
-// for 10 s. A party is reached through the first of its stored members
-// still in a party with another of them, and the slot then takes that
-// party's current members so it follows the party's churn from step to
-// step; a party none of whose stored members are still grouped together
-// is told nothing.
+// for 10 s, to its members as they are now; a party since disbanded is told
+// nothing.
 func (t *teleporter) notifyRemainingTime(leftMinutes int) {
 	text := script.NpcString(1010643, leftMinutes)
 	for _, slot := range t.parties {
-		p := groupedMember(slot)
-		if p == nil {
-			continue
-		}
-		slot.Clear()
-		slot.Add(p.PartyMembers()...)
-		p.ShowPartyScreenMessage(10000, text)
+		slot.ShowScreenMessage(10000, text)
 	}
-}
-
-// groupedMember returns the first player of slot whose party holds another
-// player of slot, nil when there is none.
-func groupedMember(slot *script.ListCell[*script.Player]) *script.Player {
-	for _, p := range slot.Items() {
-		for _, m := range p.PartyMembers() {
-			if !script.Same(m, p) && slot.Index(m) >= 0 {
-				return p
-			}
-		}
-	}
-	return nil
 }

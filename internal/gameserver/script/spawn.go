@@ -24,6 +24,7 @@ type Population interface {
 	ScheduleRespawn(live *npc.Hostile, d time.Duration) error
 	DecayMe(live *npc.Hostile)
 	MakerEvent(maker, name string, int1, int2 int) bool
+	HasMaker(maker string) bool
 	DoRespawn(live npc.PartyMember)
 	DrawSpawnPoint(live npc.PartyMember) (at location.Location, heading int, ok bool)
 	SetRespawnDelay(live npc.PartyMember, d time.Duration) error
