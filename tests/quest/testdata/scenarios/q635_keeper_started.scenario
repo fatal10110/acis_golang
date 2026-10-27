@@ -1,0 +1,29 @@
+# In the Dimensional Rift (Q635): a character that has the quest asks a keeper again and is told so, and is sent in again. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q635_keeper_started.golden
+character Hero 20
+quest Q635_InTheDimensionalRift <cond>=1 <state>=STARTED
+hold 7079 1
+script quest.Q635_InTheDimensionalRift
+item 7079
+page default/31494.htm
+page script/quest/Q635_InTheDimensionalRift/
+npc keeper 31494 Folk 10 0 0
+
+action keeper
+action keeper
+  S ActionFailed
+  S NpcHtmlMessage obj=keeper item=0 page=default/31494.htm
+  S ActionFailed
+bypass npc_{keeper}_Quest Q635_InTheDimensionalRift
+  S NpcHtmlMessage obj=keeper item=0 page=script/quest/Q635_InTheDimensionalRift/dimension_keeper_04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q635_InTheDimensionalRift dimension_keeper_07.htm
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=-114796,-179334,-6752 fast=0
+  S NpcHtmlMessage obj=keeper item=0 page=script/quest/Q635_InTheDimensionalRift/dimension_keeper_07a.htm
+  S ActionFailed

@@ -1,0 +1,33 @@
+# In the Dimensional Rift (Q635): a character alone at a rift post is turned back at the party gate, and reads the other pages of the post. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q635_rift_post_solo.golden
+character Hero 20
+script quest.Q635_InTheDimensionalRift
+page script/quest/Q635_InTheDimensionalRift/
+npc post 31488 Folk 10 40 0
+
+action post
+action post
+  S ActionFailed
+  S NpcHtmlMessage obj=post item=0 page=script/quest/Q635_InTheDimensionalRift/rift_watcher_1001.htm
+  S ActionFailed
+bypass Quest Q635_InTheDimensionalRift rift_watcher_05.htm
+  S NpcHtmlMessage obj=post item=0 page=script/quest/Q635_InTheDimensionalRift/rift_watcher_01.htm
+  S ActionFailed
+action post
+  S ActionFailed
+  S NpcHtmlMessage obj=post item=0 page=script/quest/Q635_InTheDimensionalRift/rift_watcher_1001.htm
+  S ActionFailed
+action post
+  S ActionFailed
+  S NpcHtmlMessage obj=post item=0 page=script/quest/Q635_InTheDimensionalRift/rift_watcher_1001.htm
+  S ActionFailed
+bypass Quest Q635_InTheDimensionalRift rift_watcher_07.htm
+  S NpcHtmlMessage obj=post item=0 page=script/quest/Q635_InTheDimensionalRift/rift_watcher_07.htm
+  S ActionFailed
+action post
+  S ActionFailed
+  S NpcHtmlMessage obj=post item=0 page=script/quest/Q635_InTheDimensionalRift/rift_watcher_1001.htm
+  S ActionFailed
+bypass Quest Q635_InTheDimensionalRift rift_watcher_06.htm
+  S NpcHtmlMessage obj=post item=0 page=script/quest/Q635_InTheDimensionalRift/rift_watcher_06.htm
+  S ActionFailed
