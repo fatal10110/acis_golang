@@ -14,5 +14,7 @@ kill boss
   S SystemMessage id=54 3:7256
   S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S NpcInfo obj=wigoth npc=31452
+  S ChangeMoveType obj=wigoth running=1 swimming=0
+  S NpcInfo obj=wigoth npc=31452
   Q upsert Q620_FourGoblets | completed | true
   items 7256=1

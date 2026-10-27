@@ -94,6 +94,8 @@ advance 3s
   S ActionFailed
   S DeleteObject obj=fallen
   S NpcInfo obj=pure npc=31747
+  S ChangeMoveType obj=pure running=1 swimming=0
+  S NpcInfo obj=pure npc=31747
 
 # The Pure White Unicorn; three seconds later the one the script spawned leaves.
 action pure

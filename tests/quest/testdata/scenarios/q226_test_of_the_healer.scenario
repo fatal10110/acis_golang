@@ -375,6 +375,14 @@ bypass npc_{darkelf}_Quest
   S ExShowQuestMark quest=226
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
   S NpcInfo obj=assassin npc=27124
+  S ChangeMoveType obj=assassin running=1 swimming=0
+  S NpcInfo obj=assassin npc=27124
+  S NpcInfo obj=assassin npc=27124
+  S ChangeMoveType obj=assassin running=1 swimming=0
+  S NpcInfo obj=assassin npc=27124
+  S NpcInfo obj=assassin npc=27124
+  S ChangeMoveType obj=assassin running=1 swimming=0
+  S NpcInfo obj=assassin npc=27124
   S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-01.htm
   S ActionFailed
   S ActionFailed
@@ -405,6 +413,14 @@ bypass npc_{darkelf}_Quest
   S QuestList 226:0x8000ffff
   S ExShowQuestMark quest=226
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=sniper npc=27125
+  S ChangeMoveType obj=sniper running=1 swimming=0
+  S NpcInfo obj=sniper npc=27125
+  S NpcInfo obj=sniper npc=27125
+  S ChangeMoveType obj=sniper running=1 swimming=0
+  S NpcInfo obj=sniper npc=27125
+  S NpcInfo obj=sniper npc=27125
+  S ChangeMoveType obj=sniper running=1 swimming=0
   S NpcInfo obj=sniper npc=27125
   S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-02.htm
   S ActionFailed
@@ -443,6 +459,13 @@ bypass npc_{darkelf}_Quest
   S ExShowQuestMark quest=226
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
   S NpcInfo obj=wizard npc=27126
+  S ChangeMoveType obj=wizard running=1 swimming=0
+  S NpcInfo obj=wizard npc=27126
+  S NpcInfo obj=wizard npc=27126
+  S ChangeMoveType obj=wizard running=1 swimming=0
+  S NpcInfo obj=wizard npc=27126
+  S NpcInfo obj=lord npc=27127
+  S ChangeMoveType obj=lord running=1 swimming=0
   S NpcInfo obj=lord npc=27127
   S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-03.htm
   S ActionFailed

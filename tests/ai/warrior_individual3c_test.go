@@ -353,8 +353,8 @@ func TestFreyaSecretaryLeaderCallsHelpForAWoundedPrivate(t *testing.T) {
 		if p1, p2, p3 := ind1Slot(c, script.SlotParam1), ind1Slot(c, script.SlotParam2), ind1Slot(c, script.SlotParam3); p1 != 1000 || p2 != me || p3 != 0 {
 			t.Fatalf("called private spawn parameters = %d, %d, %d, want 1000, %d, 0", p1, p2, p3, me)
 		}
-		if got := framesOf(frames, serverpackets.OpcodeNPCInfo, c.ObjectID()); len(got) != 1 {
-			t.Fatalf("NpcInfo frames of the called private = %d, want 1", len(got))
+		if got := framesOf(frames, serverpackets.OpcodeNPCInfo, c.ObjectID()); len(got) != 2 {
+			t.Fatalf("NpcInfo frames of the called private = %d, want 2 (appears walking, then running)", len(got))
 		}
 	}
 

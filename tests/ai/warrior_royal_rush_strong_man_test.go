@@ -366,8 +366,8 @@ func TestRoyalRushStrongManLeavesAKeyBox(t *testing.T) {
 	if got := says(frames, n.ObjectID()); len(got) != 1 {
 		t.Fatalf("dying shouts = %q, want the Warrior's one", got)
 	}
-	if infos := framesOf(frames, serverpackets.OpcodeNPCInfo, box.ObjectID()); len(infos) != 1 {
-		t.Fatalf("NpcInfo frames of the Key Box = %d, want 1", len(infos))
+	if infos := framesOf(frames, serverpackets.OpcodeNPCInfo, box.ObjectID()); len(infos) != 2 {
+		t.Fatalf("NpcInfo frames of the Key Box = %d, want 2 (appears walking, then running)", len(infos))
 	}
 
 	w.onQueue(t, n, func() { n.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(n.ObjectID())) })

@@ -2,6 +2,7 @@
 # names; the five camera shots follow 1 s, 1.3 s, 1.6 s, 11 s and 16 s later, and six seconds
 # after the last the camera tells the NPCs near it the scene is over. An event 3 that names no
 # creature films the same shots.
+trace internal/gameserver/script/testdata/oracle/scenarios/triol_camera.golden
 character Hunter 20
 script script.ai.individual.DefaultNpc
 script script.ai.individual.TriolCamera

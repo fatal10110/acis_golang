@@ -267,6 +267,7 @@ bypass Quest Q127_KamaelAWindowToTheFuture kamaelstory
   S QuestList 127:0x800000ff
   S ExShowQuestMark quest=127
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S ExPlayScene
   Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 8
   rows Q127_KamaelAWindowToTheFuture <cond>=8 <state>=STARTED
 action rodemai

@@ -75,10 +75,11 @@ func TestRouteWalkerFolkWalksItsRoute(t *testing.T) {
 	f := w.spawnWalker(t, at, a, b)
 
 	// Reading only the frames the spawn sends keeps the driven clock where
-	// the walk started: the NPC shown running, its walk stance and info
-	// again as its created hook puts it in walk stance, then the walk.
-	frames := [][]byte{w.c.Read(), w.c.Read(), w.c.Read(), w.c.Read()}
-	want := []byte{serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo, serverpackets.OpcodeMoveToLocation}
+	// the walk started: the NPC shown as it appears, its run stance and info
+	// again, its walk stance and info again as its created hook puts it in
+	// walk stance, then the walk.
+	frames := [][]byte{w.c.Read(), w.c.Read(), w.c.Read(), w.c.Read(), w.c.Read(), w.c.Read()}
+	want := []byte{serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo, serverpackets.OpcodeMoveToLocation}
 	if got := opcodes(frames); string(got) != string(want) {
 		t.Fatalf("spawn frames = %#x, want %#x", got, want)
 	}
