@@ -267,8 +267,8 @@ func (q quest) enterRoom(s *script.Script, e script.Event) string {
 			return fillName(s, "rift_watcher_03a.htm", member.Name())
 		}
 		if member.ItemCount(dimensionalFragment) < cost {
-			// A member sent out of the rift in the last hour has its
-			// fragments back, and goes in again free.
+			// A member put out by the rift (memo state 2) within the hour
+			// goes in again without the fragments.
 			since := s.MemoStateEx(member, questID, 1)
 			if s.MemoState(member, questID) != 2 || tick-since > 3600 {
 				return fillName(s, "rift_watcher_03.htm", member.Name())
@@ -684,6 +684,11 @@ func watchRoom(s *script.Script, e script.Timer, room *script.RoomCell, roomInde
 func jump(s *script.Script, e script.Timer, rooms []*script.RoomCell, room0 *script.RoomCell, roomIndex int) {
 	npc := e.NPC
 	forget := func(p *script.Player) { s.SetMemoStateEx(p, questID, 1, -1) }
+	if !room0.Locked() {
+		// The party gave up or changed rooms since the quake: the room was
+		// emptied, and the jump has nobody left to move.
+		return
+	}
 	if room0.PartyChanged() {
 		ousted(s, npc, room0, forget)
 		return

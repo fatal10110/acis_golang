@@ -820,6 +820,61 @@ func TestQ635GuardianGivesUpAndChangesRoom(t *testing.T) {
 	}
 }
 
+// TestQ635QuakeThenLeaveDoesNothingMore: a party that gives up, or changes
+// room, after the room's quake is not touched by the jump five seconds on: it
+// stays where it went, and the emptied room can be entered again.
+func TestQ635QuakeThenLeaveDoesNothingMore(t *testing.T) {
+	t.Parallel()
+	for _, link := range []string{"GiveUpRift", "ChangeRiftRoom"} {
+		t.Run(link, func(t *testing.T) {
+			t.Parallel()
+			w := q635Boot(t, q635Spec{mates: 1, rules: q635JumpRules(0)})
+			w.rand.room.Store(5)
+			w.rand.anakazel.Store(50)
+			w.enter(t, "Leader")
+			guardian := w.guardian(t, 5).ObjectID()
+			w.roles[guardian] = "guardian"
+			for range 14 {
+				if quakes(w.tick(t)) {
+					break
+				}
+			}
+			events := []string{link}
+			if link == "GiveUpRift" {
+				events = []string{"tel_dungeon_npc_giveup.htm", link}
+			}
+			w.rand.free.Store(0)
+			w.talk(t, "Leader", guardian, events...)
+			w.arrive(t)
+			want := -1
+			if link == "ChangeRiftRoom" {
+				want = 0
+			}
+			w.step(t, 5*time.Second)
+			w.arrive(t)
+			for who := range w.ids {
+				if want == -1 && !w.out(t, who) {
+					t.Errorf("%s is back in the rift after the jump", who)
+				}
+				if want != -1 {
+					if r := w.roomOf(t, who); r != want {
+						t.Errorf("%s stands in room %d after the jump, want %d", who, r, want)
+					}
+				}
+			}
+			if want == -1 {
+				for who := range w.ids {
+					w.back(t, who)
+				}
+				w.enter(t, "Leader")
+				if r := w.roomOf(t, "Leader"); r != 5 {
+					t.Errorf("Leader stands in room %d on entering again, want the emptied room 5", r)
+				}
+			}
+		})
+	}
+}
+
 // TestQ635RiftWatcherSendsHome: the post's way out takes a character to
 // where its memo of the way in says, a town by its cabal; its oracle link
 // takes a cabal's character to the oracle while the competition lasts.
