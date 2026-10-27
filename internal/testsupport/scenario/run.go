@@ -594,12 +594,13 @@ func (r *run) spawn(t *testing.T, n NPC) {
 var clockEpoch = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // clockStart is where the driven clock starts: the clock line's time, else
-// the wall time of the run.
+// the start of the epoch day, so a scenario never depends on the time of day
+// it runs at.
 func (r *run) clockStart() time.Time {
 	if r.sc.HasClock {
 		return clockEpoch.Add(r.sc.Clock)
 	}
-	return time.Now()
+	return clockEpoch
 }
 
 // objectRef resolves an NPC parameter or event argument: a number, the
