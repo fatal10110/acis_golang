@@ -134,7 +134,7 @@ func (f *Freight) enterLocked(inst *item.Instance) {
 	}
 	inst.BindPersister(f.persist)
 	inst.EnterContainer(f.ownerID, f.location, locData, nowMillis())
-	f.items[inst.ObjectID] = inst
+	f.putLocked(inst)
 }
 
 // AddCreated creates count units of templateID per Container.AddCreated,

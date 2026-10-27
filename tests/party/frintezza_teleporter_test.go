@@ -628,16 +628,18 @@ func TestFrintezzaTeleporterChannelRefusals(t *testing.T) {
 // sent to the party's spot and stripped of every Breaking Arrow and
 // Dewdrop of Destruction, Frintezza told 1, and the whole channel shown
 // that 35 minutes are left. The teleporter then refuses anyone with 007.
-// Each party is told every countdown step through a member still grouped
-// with another; a party that broke up is told nothing. A minute after the
+// Each party it let in is told every countdown step, as it stands then; a
+// party that broke up is told nothing. A minute after the
 // last step the tomb resets: the players of its territory sent back out,
 // Frintezza and his follower told 0, every maker told 1000, the doors
 // sealed. A channel of the four parties left enters again: its parties take
 // the first four slots, and the fifth keeps the party it held, which is
 // told every step twice. A party keeps being told through its churn: a
 // newcomer joins, a step passes, one of the members it entered with
-// leaves, and the next step still reaches it. Frintezza reaching stage 2
-// ends the countdown.
+// leaves, and the next step still reaches it; it is still told after two
+// more join and the last member seen at a step but its leader leaves. A
+// party that disbands is told nothing even once its former members form a
+// new party. Frintezza reaching stage 2 ends the countdown (#4287).
 func TestFrintezzaTeleporterAdmitsAndCountsDown(t *testing.T) {
 	t.Parallel()
 	w := bootTeleporter(t, fztSetup{seats: 10})
@@ -793,8 +795,22 @@ func TestFrintezzaTeleporterAdmitsAndCountsDown(t *testing.T) {
 	w.srv.Settle(t)
 	w.quiet(t)
 	countdownTo(20, 5*time.Minute, map[int]int{0: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 2, 9: 2})
+	// Seats 1 and 2 join the first party and seat 3 leaves it: of the
+	// members it was told as, only its leader is left, and it is told whole.
+	w.invite(t, 0, 1, 0)
+	w.invite(t, 0, 2, 0)
+	w.players[3].c.Send(encodeSingle(clientpackets.OpcodeRequestWithdrawParty))
+	w.srv.Settle(t)
+	w.quiet(t)
+	// The fourth party breaks up and its two players form a new party,
+	// which is not the one let in.
+	w.players[7].c.Send(encodeSingle(clientpackets.OpcodeRequestWithdrawParty))
+	w.srv.Settle(t)
+	w.quiet(t)
+	w.invite(t, 6, 7, 0)
+	countdownTo(15, 5*time.Minute, map[int]int{0: 1, 1: 1, 2: 1, 4: 1, 5: 1, 8: 2, 9: 2})
 	w.setMemo4(t, 2)
-	countdown(15, 5*time.Minute, nil)
+	countdown(10, 5*time.Minute, nil)
 	w.srv.Advance(t, 40*time.Minute)
 	if heard, makers := w.log.take(); len(heard)+len(makers) != 0 {
 		t.Fatalf("after the countdown ended: heard %q, makers %q, want nothing", heard, makers)

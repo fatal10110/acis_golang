@@ -123,11 +123,11 @@ func (h Held) Transfer(objectID int32, count int, to Held, newObjectID int32) (M
 	var m Moved
 	switch {
 	case whole && stack == nil:
-		delete(h.inv.items, objectID)
+		h.inv.dropLocked(objectID)
 		to.inv.insertLocked(src)
 		m.Item = src
 	case whole:
-		delete(h.inv.items, objectID)
+		h.inv.dropLocked(objectID)
 		src.DestroyState()
 		m.FreedObjectID = objectID
 	default:

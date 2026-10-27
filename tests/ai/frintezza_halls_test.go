@@ -71,13 +71,17 @@ func fhDoors() []*door.Template {
 	return out
 }
 
-// fhSpawnlist declares the alarm's npcmakers, every one an empty probe.
-func fhSpawnlist() string {
+// fhSpawnlist declares the alarm's npcmakers but those in omit, every one
+// an empty probe.
+func fhSpawnlist(omit ...string) string {
 	out := `<?xml version="1.0" encoding="utf-8"?>
 <list>
 	<territory name="fh_hall" minZ="0" maxZ="100"><node x="-400" y="-400"/><node x="400" y="-400"/><node x="400" y="400"/><node x="-400" y="400"/></territory>
 `
 	for _, m := range fhAlarmMakers {
+		if slices.Contains(omit, m) {
+			continue
+		}
 		out += fmt.Sprintf("\t<npcmaker name=%q territory=\"fh_hall\" maximumNpcs=\"1\"><ai type=\"rb5_probe\"/></npcmaker>\n", m)
 	}
 	return out + "</list>"
@@ -101,11 +105,11 @@ var fhSpiritAt = [4]int{1500, 1600, 30, 3368}
 
 // bootTombHalls boots the character knowing fhSkills beside the alarm and the
 // portraits, the portraits naming fhSpiritAt, with draws as the script
-// draws.
-func bootTombHalls(t *testing.T, draws *ind1Draws) *frWorld {
+// draws and the alarm's npcmakers but those in omit.
+func bootTombHalls(t *testing.T, draws *ind1Draws, omit ...string) *frWorld {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "fh.xml"), []byte(fhSpawnlist()), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "fh.xml"), []byte(fhSpawnlist(omit...)), 0o644); err != nil {
 		t.Fatalf("write spawnlist: %v", err)
 	}
 	table, err := gamexml.LoadSpawnlist(dir, zerolog.Nop(), 1)
