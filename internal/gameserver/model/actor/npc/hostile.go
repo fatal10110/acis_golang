@@ -1244,7 +1244,7 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		// Count only a reachability miss as a path failure so the teleport
 		// recovery above still trips; a root expires on its own and must
 		// not burn fail count.
-		if !h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight) && !h.MovementDisabled() {
+		if !h.brain.AddMoveToPositionDesire(h.Instance.Home, h.Instance.SpawnHeading, siegeGuardHomeMoveWeight) && !h.MovementDisabled() {
 			h.AddGeoPathFailCount()
 		}
 		return true
