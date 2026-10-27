@@ -131,6 +131,8 @@ type Owner interface {
 	// shows.
 	DuelID() int32
 	DuelTeam() int
+	// OlympiadMode reports an owner fighting in the Olympiad.
+	OlympiadMode() bool
 	// SeesInvisible reports a game master owner, whose sight past
 	// invisibility its summon shares.
 	SeesInvisible() bool

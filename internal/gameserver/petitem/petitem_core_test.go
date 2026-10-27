@@ -583,6 +583,7 @@ func TestPetLevelConditionReadsIntegerLiterals(t *testing.T) {
 // invisible creatures, and leaves every social rule undecided.
 func (*pickupTestOwner) DuelID() int32                        { return 0 }
 func (*pickupTestOwner) DuelTeam() int                        { return 0 }
+func (*pickupTestOwner) OlympiadMode() bool                   { return false }
 func (*pickupTestOwner) SeesInvisible() bool                  { return false }
 func (*pickupTestOwner) IsInParty() bool                      { return false }
 func (*pickupTestOwner) IsInSameParty(skilltarget.Actor) bool { return false }

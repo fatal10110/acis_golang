@@ -91,12 +91,8 @@ func (a SummonActor) ActingPlayerInOlympiad() bool {
 	if a.Summon == nil {
 		return false
 	}
-	owner, ok := a.Summon.Owner()
-	if !ok {
-		return false
-	}
-	player, ok := owner.(interface{ OlympiadMode() bool })
-	return ok && player.OlympiadMode()
+	owner := a.Summon.SummonOwner()
+	return owner != nil && owner.OlympiadMode()
 }
 
 // SkillConditions evaluates def's <cond> clauses with the player as caster.

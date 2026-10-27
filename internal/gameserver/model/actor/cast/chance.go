@@ -277,6 +277,10 @@ func (p *ChanceProcs) fire(ownerObj any, ownerHit bool, targetObj any, events ch
 	if events == 0 {
 		return
 	}
+	// Either side of a hit may be a creature without chance procs (a door's
+	// hit surface), so the owner is narrowed here, once per hit side, rather
+	// than every hit participant carrying an effect list (an accepted kind
+	// narrowing, #2362).
 	owner, ok := ownerObj.(chanceOwner)
 	if !ok || owner.Dead() {
 		return

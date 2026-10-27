@@ -24,6 +24,7 @@ func (cursedOwner) Kind() actor.Kind             { return actor.KindPlayer }
 func (cursedOwner) InCombat() bool               { return false }
 func (cursedOwner) SetHeading(int)               {}
 func (o cursedOwner) CursedWeaponEquipped() bool { return o.cursed }
+func (o cursedOwner) OlympiadMode() bool         { return o.neutralPlayer.OlympiadMode() }
 
 // summonCaster is a summon casting for owner.
 type summonCaster struct {

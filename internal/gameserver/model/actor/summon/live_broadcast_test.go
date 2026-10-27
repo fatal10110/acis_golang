@@ -135,6 +135,7 @@ func (*fakeSummonOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool
 // invisible creatures, and leaves every social rule undecided.
 func (*fakeSummonOwner) DuelID() int32                        { return 0 }
 func (*fakeSummonOwner) DuelTeam() int                        { return 0 }
+func (*fakeSummonOwner) OlympiadMode() bool                   { return false }
 func (*fakeSummonOwner) SeesInvisible() bool                  { return false }
 func (*fakeSummonOwner) IsInParty() bool                      { return false }
 func (*fakeSummonOwner) IsInSameParty(skilltarget.Actor) bool { return false }
