@@ -1,6 +1,6 @@
 # The Leader and the Follower (Q123), the apprentice stands away: a sponsor whose apprentice stands 1500 away has no news of it.
-# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_academy_sponsor_far.golden
 character Pupil 19
 clan 3
 mate Chief 19 leader sponsor online

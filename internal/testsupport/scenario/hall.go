@@ -190,25 +190,23 @@ func (sc *Scenario) checkHalls() error {
 	}
 	if sc.Trace != "" {
 		for _, m := range sc.Mates {
-			if !m.Leader || m.Relation != "" || m.Online || len(m.Holds) > 0 {
-				return fmt.Errorf("a traced scenario takes only an offline mate that leads the clan (mate %s): the reference trace has one client", m.Name)
+			switch {
+			case !m.Leader:
+				return fmt.Errorf("a traced scenario takes only the mate that leads the clan (mate %s): the reference probe plays no other", m.Name)
+			case !m.Online && len(m.Holds) > 0:
+				return fmt.Errorf("a traced scenario takes a hold line of an online mate only (mate %s): the reference probe stores no items of a mate that enters later", m.Name)
 			}
 		}
 	}
 	for _, st := range sc.Steps {
 		switch {
 		case st.As != "":
-			if m, ok := sc.mate(st.As); !ok {
+			if _, ok := sc.mate(st.As); !ok {
 				return fmt.Errorf("%d: as %s: no mate line names it", st.Line, st.As)
-			} else if sc.Trace != "" {
-				return fmt.Errorf("%d: a traced scenario plays no step as %s", st.Line, m.Name)
 			}
 		case st.Verb == "enter" && len(st.Args) == 1:
 			if _, ok := sc.mate(st.Args[0]); !ok {
 				return fmt.Errorf("%d: enter %s: no mate line names it", st.Line, st.Args[0])
-			}
-			if sc.Trace != "" {
-				return fmt.Errorf("%d: a traced scenario enters no mate: the reference trace has one client", st.Line)
 			}
 		case st.Verb == "hallstatus":
 			if !slices.ContainsFunc(sc.Halls, func(h Hall) bool { return fmt.Sprint(h.ID) == st.Args[0] }) {

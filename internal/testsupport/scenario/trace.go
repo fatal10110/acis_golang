@@ -233,16 +233,19 @@ type traceStep struct {
 
 // traceTask is the rendered packets one task of a trace sent, in the
 // reference's order: the client packet's (or probe action's) own run, or a
-// tick's. own reports a client packet's own run, which runs on the player's
-// own queue.
+// tick's. sent are those sent to the player, mates those sent to each mate
+// by name. own reports a client packet's own run, which runs on the
+// player's own queue.
 type traceTask struct {
-	sent []string
-	own  bool
+	sent  []string
+	mates map[string][]string
+	own   bool
 }
 
 var (
-	traceAction   = regexp.MustCompile(`^C Action (\d+) \(object (\d+)\)$`)
+	traceAction   = regexp.MustCompile(`^C(?:@\S+)? Action (\d+) \(object (\d+)\)$`)
 	tracePickup   = regexp.MustCompile(`^C Action item (\d+) \(object \d+\)$`)
+	traceMate     = regexp.MustCompile(`^# mate (\S+) object (\d+)$`)
 	traceKill     = regexp.MustCompile(`^# kill (\d+) \(object (\d+)\)$`)
 	traceHit      = regexp.MustCompile(`^# hit (\d+) \(object (\d+)\) (\d+)$`)
 	traceEvent    = regexp.MustCompile(`^# event (\d+) \(object (\d+)\) (\d+) (\S+) (\S+)$`)
@@ -300,9 +303,21 @@ func traceStatement(line string) (stmt, memo string, err error) {
 	return "", "", fmt.Errorf("statement %q is not a memo write", sql)
 }
 
+// isClientLine reports whether a trace line is a client packet: the
+// player's (C) or a mate's (C@<mate>).
+func isClientLine(line string) bool {
+	return strings.HasPrefix(line, "C ") || strings.HasPrefix(line, "C@")
+}
+
+// mateOf returns the mate an S@<mate> line was sent to.
+func mateOf(line string) string {
+	name, _, _ := strings.Cut(strings.TrimPrefix(line, "S@"), " ")
+	return name
+}
+
 // readTrace reads a reference trace (format: the oracle directory's
-// README), naming the player "player" and each NPC by the role its spawn
-// line names, else by the scenario role of its NPC id.
+// README), naming the player "player", each mate by its name and each NPC
+// by the role its spawn line names, else by the scenario role of its NPC id.
 func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string]int32, err error) {
 	type rawStep struct {
 		client string
@@ -311,6 +326,7 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	var (
 		raw       []rawStep
 		playerObj int32
+		mateObjs  = map[string]int32{}
 	)
 	// seen pairs each NPC object of the trace with its NPC id; actioned
 	// holds those the client acted on, which a bypass can name; spawned
@@ -328,9 +344,15 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 				return nil, nil, fmt.Errorf("trace player object %q: %w", obj, err)
 			}
 			playerObj = int32(n)
+		case traceMate.MatchString(line):
+			m := traceMate.FindStringSubmatch(line)
+			if _, ok := sc.mate(m[1]); !ok {
+				return nil, nil, fmt.Errorf("trace line %q names no mate line of the scenario", line)
+			}
+			mateObjs[m[1]] = atoi32(m[2])
 		case tracePickup.MatchString(line):
 			raw = append(raw, rawStep{client: "pickup " + tracePickup.FindStringSubmatch(line)[1]})
-		case strings.HasPrefix(line, "C "):
+		case isClientLine(line):
 			if m := traceAction.FindStringSubmatch(line); m != nil {
 				seen[atoi32(m[2])] = atoi32(m[1])
 				actioned[atoi32(m[2])] = true
@@ -342,6 +364,8 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			raw = append(raw, rawStep{client: "approach " + m[1]})
 		case line == "# tick":
 			raw = append(raw, rawStep{client: "tick"})
+		case line == "# away":
+			raw = append(raw, rawStep{client: "away"})
 		case traceNPC.MatchString(line):
 			m := traceNPC.FindStringSubmatch(line)
 			if !slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Role == m[1] && n.ID == atoi32(m[2]) }) {
@@ -366,7 +390,7 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			raw = append(raw, rawStep{client: "hallstatus " + m[1] + " " + m[2]})
 		case traceAdvance.MatchString(line):
 			raw = append(raw, rawStep{client: "advance " + traceAdvance.FindStringSubmatch(line)[1]})
-		case (strings.HasPrefix(line, "S ") || strings.HasPrefix(line, "Q ") || strings.HasPrefix(line, "T ")) && len(raw) > 0:
+		case (strings.HasPrefix(line, "S ") || strings.HasPrefix(line, "S@") || strings.HasPrefix(line, "Q ") || strings.HasPrefix(line, "T ")) && len(raw) > 0:
 			// A T line ends the packets one task sent: the client
 			// packet's own run, then each tick's.
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
@@ -400,6 +424,9 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 		return nil, nil, err
 	}
 	roles := map[int32]string{playerObj: "player"}
+	for name, obj := range mateObjs {
+		roles[obj] = name
+	}
 	npcObjs = map[string]int32{}
 	for obj, id := range seen {
 		var named []string
@@ -432,17 +459,18 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	rd.off = len(spawned) == 0
 	for _, r := range raw {
 		step := traceStep{client: r.client}
-		rd.talk = strings.HasPrefix(r.client, "C ")
-		// task holds the rendered packets of the task running now; own
-		// reports that it is a client packet's own run, which runs on the
-		// player's own queue.
+		rd.talk = isClientLine(r.client)
+		// task holds the rendered packets the task running now sent to the
+		// player, mates those it sent to each mate; own reports that it is a
+		// client packet's own run, which runs on the player's own queue.
 		var task []string
-		own := strings.HasPrefix(r.client, "C ")
+		mates := map[string][]string{}
+		own := isClientLine(r.client)
 		endTask := func() {
-			if len(task) > 0 {
-				step.tasks = append(step.tasks, traceTask{sent: task, own: own})
+			if len(task) > 0 || len(mates) > 0 {
+				step.tasks = append(step.tasks, traceTask{sent: task, mates: mates, own: own})
 			}
-			task, own = nil, false
+			task, mates, own = nil, map[string][]string{}, false
 		}
 		for _, line := range r.lines {
 			if strings.HasPrefix(line, "T ") {
@@ -482,7 +510,12 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			if err != nil {
 				return nil, nil, fmt.Errorf("trace line %q: %w", line, err)
 			}
-			if ok {
+			switch {
+			case !ok:
+			case strings.HasPrefix(line, "S@"):
+				name := mateOf(line)
+				mates[name] = appendRendered(mates[name], rendered)
+			default:
 				task = appendRendered(task, rendered)
 			}
 		}
@@ -641,12 +674,8 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]s
 			return nil, fmt.Errorf("%s: %w", where, err)
 		}
 		if st.Verb != "relog" {
-			want, err := expandPackets(st.Packets, pages)
-			if err != nil {
+			if err := checkClients(st, sc, sent, ts.tasks, pages); err != nil {
 				return nil, fmt.Errorf("%s: %w", where, err)
-			}
-			if d := FirstDiff("packet", want, sent); d != "" {
-				return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 			}
 		}
 		if d := FirstDiff("statement", st.Statements, ts.stmts); d != "" {
@@ -673,6 +702,51 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]s
 		return nil, fmt.Errorf("the trace pins script draws and the scenario has no random line")
 	}
 	return draws, nil
+}
+
+// checkClients compares what each client was sent in a step with the
+// trace's: the step's own packets are those of the client that played it
+// (the mate of an as step, else the player), each to line those of that
+// character. sent is what the player was sent, tasks hold what each mate
+// was. A mate that enters the world in the step is sent its enter burst,
+// which neither the run nor the scenario compares.
+func checkClients(st Step, sc *Scenario, sent []string, tasks []traceTask, pages map[string]string) error {
+	actor := "player"
+	if st.As != "" {
+		actor = st.As
+	}
+	entering := ""
+	if st.Verb == "enter" && len(st.Args) == 1 {
+		entering = st.Args[0]
+	}
+	got := map[string][]string{"player": sent}
+	for _, t := range tasks {
+		for name, lines := range t.mates {
+			got[name] = append(got[name], lines...)
+		}
+	}
+	names := []string{"player"}
+	for _, m := range sc.Mates {
+		names = append(names, m.Name)
+	}
+	for _, name := range names {
+		if name == entering {
+			continue
+		}
+		scenarioLines := st.To[name]
+		label := "packet to " + name
+		if name == actor {
+			scenarioLines, label = st.Packets, "packet"
+		}
+		want, err := expandPackets(scenarioLines, pages)
+		if err != nil {
+			return err
+		}
+		if d := FirstDiff(label, want, got[name]); d != "" {
+			return fmt.Errorf("scenario %s (got: the scenario, want: the trace)", d)
+		}
+	}
+	return nil
 }
 
 // traceDrawDiff compares the script draws step i made, each
@@ -705,6 +779,16 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 		}
 		return 1
 	}
+	if st.As != "" {
+		// A mate's step is the same client packet, from the mate's client.
+		inner := st
+		inner.As = ""
+		lines, err := traceClients(inner, objs, sc)
+		for i, l := range lines {
+			lines[i] = "C@" + st.As + strings.TrimPrefix(l, "C")
+		}
+		return lines, err
+	}
 	enter := []string{"C RequestGameStart 0", "C EnterWorld"}
 	switch st.Verb {
 	case "action":
@@ -735,6 +819,8 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 		}
 	case "tick":
 		return slices.Repeat([]string{"tick"}, times(st.Args)), nil
+	case "away":
+		return []string{"away"}, nil
 	case "hallstatus":
 		return []string{"hallstatus " + st.Args[0] + " " + st.Args[1]}, nil
 	case "advance":
@@ -749,6 +835,10 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 	case "restart":
 		return []string{"C RequestRestart"}, nil
 	case "enter":
+		if len(st.Args) == 1 {
+			// A mate selects its character and enters the world: its client's pair.
+			return []string{"C@" + st.Args[0] + " RequestGameStart 0", "C@" + st.Args[0] + " EnterWorld"}, nil
+		}
 		return enter, nil
 	case "relog":
 		return append([]string{"C RequestRestart"}, enter...), nil

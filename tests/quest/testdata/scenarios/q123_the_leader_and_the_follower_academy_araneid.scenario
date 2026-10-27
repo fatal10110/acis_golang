@@ -1,6 +1,6 @@
 # The Leader and the Follower (Q123), the araneid leg needs the sponsor: at cond 7 the araneid drops no leg while the sponsor is out of the world, the quest kept; with the sponsor in the world beside, the eighth leg moves the quest to cond 8.
-# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_academy_araneid.golden
 character Pupil 19
 clan 3
 mate Chief 19 leader sponsor
