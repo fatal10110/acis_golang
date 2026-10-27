@@ -80,6 +80,7 @@ import net.sf.l2j.gameserver.network.clientpackets.RequestGameStart;
 import net.sf.l2j.gameserver.network.clientpackets.RequestLinkHtml;
 import net.sf.l2j.gameserver.network.clientpackets.RequestRestart;
 import net.sf.l2j.gameserver.network.clientpackets.RequestTutorialQuestionMark;
+import net.sf.l2j.gameserver.network.serverpackets.MonRaceInfo;
 import net.sf.l2j.gameserver.scripting.Quest;
 import net.sf.l2j.gameserver.scripting.QuestState;
 import net.sf.l2j.gameserver.taskmanager.AiTaskManager;
@@ -270,7 +271,8 @@ final class ScenarioTrace
 		countdown.invoke(derby);
 		// The countdown shuffles the runners with an unseeded Random; the order the probe traces must not
 		// depend on it. The runners go back in object id order (the chosen eight are the first eight, a
-		// view of the same list the race packet holds).
+		// view of the new list, as is the race packet, which is built again: sorting invalidates the
+		// view the countdown's packet holds).
 		final Field runnersField = DerbyTrackManager.class.getDeclaredField("_runners");
 		runnersField.setAccessible(true);
 		@SuppressWarnings("unchecked")
@@ -279,6 +281,12 @@ final class ScenarioTrace
 		final Field chosenField = DerbyTrackManager.class.getDeclaredField("_chosenRunners");
 		chosenField.setAccessible(true);
 		chosenField.set(derby, runners.subList(0, 8));
+		final Field codesField = DerbyTrackManager.class.getDeclaredField("CODES");
+		codesField.setAccessible(true);
+		final int[][] codes = (int[][]) codesField.get(null);
+		final Field packetField = DerbyTrackManager.class.getDeclaredField("_packet");
+		packetField.setAccessible(true);
+		packetField.set(derby, new MonRaceInfo(codes[0][0], codes[0][1], derby.getRunners(), derby.getSpeeds()));
 		LotteryManager.getInstance();
 		CoupleManager.getInstance();
 		if (Config.ALLOW_FISH_CHAMPIONSHIP)
