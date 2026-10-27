@@ -387,7 +387,7 @@ func TestQ334DemonsAnswerWishThree(t *testing.T) {
 		draws.queue(0)
 		q334Kill(t, w, q334Demon(t, w, q334Ramsebal))
 		q334Demon(t, w, q334King)
-		w.advance(t, 200*time.Second)
+		saysNone(t, "the king's despawn", w.advance(t, 200*time.Second))
 		if n := len(npcsOf(w.srv, q334King)); n != 0 {
 			t.Fatalf("%d kings after 200 s, want 0", n)
 		}
@@ -399,9 +399,11 @@ func TestQ334DemonsAnswerWishThree(t *testing.T) {
 		draws.queue(1)
 		q334Wish(t, w, 3)
 		q334Demon(t, w, q334Alexandr)
-		// The leaving words (33411, and 33409 then 33410 for the king) belong to a decayed
-		// hook that must see the NPC alive: #4256.
-		w.advance(t, 200*time.Second)
+		// The leaving words (33411, and 33409 then 33410 for the king) sit
+		// behind a "not dead" test in the decayed hook, and a demon leaving
+		// at its despawn time is already dead there: it leaves without a
+		// word (#4256).
+		saysNone(t, "the despawn", w.advance(t, 200*time.Second))
 		if n := len(npcsOf(w.srv, q334Alexandr)); n != 0 {
 			t.Fatalf("%d Alexandro after 200 s, want 0", n)
 		}
