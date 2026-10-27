@@ -22,12 +22,12 @@ func (l *GameClientLink) handleProtocolVersion(_ context.Context, cs *connState,
 	if !validProtocolRevision(req.Revision) {
 		return errDisconnect
 	}
-	if !session.SendFrame(serverpackets.FrameVersionCheck(cs.key, !l.noCipher)) {
+	if !session.SendFrame(serverpackets.FrameVersionCheck(cs.key, !l.flow.noCipher)) {
 		return errDisconnect
 	}
 	// The key is out; every later frame crosses encrypted: crypt
 	// starts only after VersionCheck.
-	if !l.noCipher {
+	if !l.flow.noCipher {
 		session.EnableCrypt()
 	}
 	return nil
