@@ -85,6 +85,7 @@ type q620World struct {
 	roles   map[int32]string
 	events  *q620Events
 	draws   *scriptDraws
+	boss    *zone.Boss
 }
 
 // q620Spec is how a world differs from the default: a party of four, each
@@ -155,8 +156,14 @@ func q620Boot(t *testing.T, spec q620Spec) *q620World {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The zone polices entry, so a member who walks in without the keeper's
+	// grant is ousted.
+	boss := zone.NewBoss(620, form)
+	boss.InvadeWindow = 10 * time.Minute
+	boss.OustLoc = location.Location{X: q620Sepulcher.X + 20000, Y: q620Sepulcher.Y, Z: q620Sepulcher.Z}
+	w.boss = boss
 	zones := zone.NewIndex()
-	zones.Add(zone.NewBoss(620, form))
+	zones.Add(boss)
 
 	items := append(q620.New().Items, q620Pass, q620Brooch, 7254, q620Goblet)
 	opts := []gameservertest.Option{
@@ -288,6 +295,22 @@ func (w *q620World) talk(t *testing.T, who string, obj int32, events ...string) 
 	return out
 }
 
+// arrive has every member take a step where he stands, which is when a
+// zone takes in who jumped into it.
+func (w *q620World) arrive(t *testing.T) {
+	t.Helper()
+	w.srv.Advance(t, time.Second)
+	for _, id := range w.ids {
+		x, y, z := w.srv.PlayerPosition(t, id)
+		from := location.Location{X: x, Y: y, Z: z}
+		w.clients[id].Send(encodeMoveBackwardToLocation(location.Location{X: x + 30, Y: y, Z: z}, from))
+	}
+	w.srv.Advance(t, 5*time.Second)
+	for _, c := range w.clients {
+		w.srv.ReadQueued(t, c)
+	}
+}
+
 // enter has who ask the keeper obj to let the party in, from its first
 // page, and returns the lines it got.
 func (w *q620World) enter(t *testing.T, who string, obj int32) []string {
@@ -390,7 +413,7 @@ func TestQ620KeeperTakesOnePartyAtATime(t *testing.T) {
 	got := w.enter(t, "Leader", keeper.ObjectID())
 	requireLine(t, got, htmlLine("keeper", keeperPage(t, "-08.htm")))
 
-	w.srv.Advance(t, 5*time.Second)
+	w.arrive(t)
 	for name, id := range w.ids {
 		x, y, _ := w.srv.PlayerPosition(t, id)
 		if dx, dy := x-q620Sepulcher.X, y-q620Sepulcher.Y; dx < -80 || dx > 80 || dy < -80 || dy > 80 {
@@ -438,6 +461,93 @@ func TestQ620KeeperTakesOnePartyAtATime(t *testing.T) {
 	})
 	got = w.enter(t, "Leader", keeper.ObjectID())
 	requireLine(t, got, htmlLine("keeper", keeperPage(t, "-08.htm")))
+}
+
+// TestQ620KeeperLeavesBehindWhoStandsFarOff: a member more than 1000 from the
+// keeper when Leader asks to enter is not taken: he keeps his pass, gets no
+// used grave pass, stays where he stands with his completed mark, while the
+// rest of the party goes in.
+func TestQ620KeeperLeavesBehindWhoStandsFarOff(t *testing.T) {
+	t.Parallel()
+	w := q620Boot(t, q620Spec{mates: 3})
+	keeper := w.folk(t, "keeper", q620Keeper)
+	w.toMinute(t, 56, 10)
+
+	far := location.Location{X: w.at.X, Y: w.at.Y + 1500, Z: w.at.Z}
+	w.srv.RunScript(t, w.ids["Mate2"], q620Name, func(_ *script.Script, p *script.Player) {
+		p.TeleportTo(script.Loc{X: far.X, Y: far.Y, Z: far.Z}, 0)
+	})
+	w.srv.Advance(t, time.Second)
+	w.clients[w.ids["Mate2"]].Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	w.srv.Settle(t)
+	if x, y, _ := w.srv.PlayerPosition(t, w.ids["Mate2"]); x != far.X || y != far.Y {
+		t.Fatalf("Mate2 stands at %d,%d, want the far spot %d,%d", x, y, far.X, far.Y)
+	}
+
+	got := w.enter(t, "Leader", keeper.ObjectID())
+	requireLine(t, got, htmlLine("keeper", keeperPage(t, "-08.htm")))
+	w.arrive(t)
+
+	id := w.ids["Mate2"]
+	// The step every member takes on arrival moves him 30 at most.
+	if x, y, _ := w.srv.PlayerPosition(t, id); x < far.X || x > far.X+30 || y != far.Y {
+		t.Errorf("Mate2 moved to %d,%d, want to stay at %d,%d", x, y, far.X, far.Y)
+	}
+	if n := w.srv.PlayerItemCount(t, id, q620Pass); n != 1 {
+		t.Errorf("Mate2 holds %d passes, want the one he had", n)
+	}
+	if n := w.srv.PlayerItemCount(t, id, q620UsedPass); n != 0 {
+		t.Errorf("Mate2 holds %d used grave passes, want 0", n)
+	}
+	if v := w.srv.QuestVars(t, id, q620Name)["completed"]; v != "true" {
+		t.Errorf("Mate2's completed = %q, want true", v)
+	}
+	for _, name := range []string{"Leader", "Mate1", "Mate3"} {
+		x, y, _ := w.srv.PlayerPosition(t, w.ids[name])
+		if dx, dy := x-q620Sepulcher.X, y-q620Sepulcher.Y; dx < -80 || dx > 80 || dy < -80 || dy > 80 {
+			t.Errorf("%s stands at %d,%d, want within 80 of the sepulcher", name, x, y)
+		}
+		if n := w.srv.PlayerItemCount(t, w.ids[name], q620UsedPass); n != 1 {
+			t.Errorf("%s holds %d used grave passes, want 1", name, n)
+		}
+	}
+}
+
+// TestQ620GatekeeperSpotOrder: the draw of the gatekeeper's three spots
+// orders the strong, middle and weak privates: 0 takes the spots in order,
+// with the weak one at the third spot's x and the second spot's y, 1 takes
+// the second, third and first, 2 the third, first and second.
+func TestQ620GatekeeperSpotOrder(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		draw int
+		want [3]location.Location // strong, middle, weak
+	}{
+		{0, [3]location.Location{{X: 3100, Y: 3100}, {X: 3200, Y: 3200}, {X: 3300, Y: 3200}}},
+		{1, [3]location.Location{{X: 3200, Y: 3200}, {X: 3300, Y: 3300}, {X: 3100, Y: 3100}}},
+		{2, [3]location.Location{{X: 3300, Y: 3300}, {X: 3100, Y: 3100}, {X: 3200, Y: 3200}}},
+	}
+	for _, c := range cases {
+		t.Run(strconv.Itoa(c.draw), func(t *testing.T) {
+			t.Parallel()
+			w := q620Boot(t, q620Spec{})
+			w.srv.SpawnHostileNPCTemplateAt(t, q620Template(q620Master, "Monster"), w.at)
+			w.toMinute(t, 20, 10)
+			gate := w.spawnGate(t, "gate", q620Gate, 0)
+			w.give(t, "Leader", q620Key, 1)
+			w.draws.queue(c.draw)
+			w.talk(t, "Leader", gate.ObjectID())
+			for i, id := range []int32{q620Strong, q620Middle, q620Weak} {
+				list := q620Combatants(w, id)
+				if len(list) != 1 {
+					t.Fatalf("privates %d = %d, want 1", id, len(list))
+				}
+				if x, y, _ := list[0].Position(); x != c.want[i].X || y != c.want[i].Y {
+					t.Errorf("private %d stands at %d,%d, want %d,%d", id, x, y, c.want[i].X, c.want[i].Y)
+				}
+			}
+		})
+	}
 }
 
 // spawnGate puts a hall gatekeeper of npcID under the master as one of its
