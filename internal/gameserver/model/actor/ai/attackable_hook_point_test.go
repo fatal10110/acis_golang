@@ -248,11 +248,13 @@ func TestHookPointMoveFinishedPrecedesDesireDrop(t *testing.T) {
 }
 
 // TestHookPointMoveFinishedAtDestination pins the move-finished point on a
-// walk step that finds the actor already at its destination.
+// walk step that finds the actor already at its destination: the step walks
+// a zero-length move with no point, and the point opens on its arrival.
 func TestHookPointMoveFinishedAtDestination(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
-	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	move := &recordingMove{}
+	brain := NewAttackable(owner, move, &recordingAttack{})
 	pastFirstCycle(t, brain)
 	owner.hooks.points = nil // the first cycle's see-creature point
 	here := location.Location{X: 100}
@@ -267,7 +269,12 @@ func TestHookPointMoveFinishedAtDestination(t *testing.T) {
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	assertHookPoints(t, owner, "on a walk at its destination", HookMoveFinished)
+	assertHookPoints(t, owner, "on a walk step at its destination")
+	if move.home != here {
+		t.Fatalf("MoveHome = %#v, want the zero-length move to %#v", move.home, here)
+	}
+	brain.Arrived()
+	assertHookPoints(t, owner, "on the zero-length walk's arrival", HookMoveFinished)
 	if got := brain.Desires().Len(); got != 0 {
 		t.Fatalf("queued desires after the walk = %d, want its desire dropped", got)
 	}

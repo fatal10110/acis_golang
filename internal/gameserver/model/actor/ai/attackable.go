@@ -1508,11 +1508,8 @@ func (a *Attackable) thinkMoveTo() {
 	if a.actor.MovementDisabled() {
 		return
 	}
-	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
-		a.atHookPoint(HookMoveFinished)
-		a.clearCurrentDesire()
-		return
-	}
+	// Standing on the point already still walks there: a zero-length move
+	// that arrives on the next move tick.
 	_ = a.move.MoveHome(a.current.loc)
 }
 
