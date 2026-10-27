@@ -35,8 +35,8 @@ func (l *GameClientLink) TakeGround(ground *grounditem.Item) {
 
 // despawnGround takes the claimed ground item out of the world.
 func (l *GameClientLink) despawnGround(ground *grounditem.Item) {
-	if l.groundItems != nil {
-		l.groundItems.Remove(ground)
+	if l.belongings.groundItems != nil {
+		l.belongings.groundItems.Remove(ground)
 	}
 	if l.world != nil {
 		l.world.Despawn(ground)

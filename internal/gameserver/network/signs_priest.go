@@ -47,7 +47,7 @@ func (l *GameClientLink) sevenSignsBypass(live *livePlayer, f *npc.Folk, command
 		l.log.Error().Err(reply.SignUpErr).Int32("object_id", live.ObjectID()).Msg("seven signs: insert sign-up")
 	}
 	if reply.Save {
-		state, itemInstances, taken := l.sevenSigns, l.itemInstances, reply.Taken
+		state, itemInstances, taken := l.sevenSigns, l.belongings.itemInstances, reply.Taken
 		l.queueRowWrite(live.ObjectID(), "seven signs: save after the priests' dialog", func(ctx context.Context, objectID int32) error {
 			// The stacks the command took from are written first, and a
 			// failure leaves the row to the next full save: the row never

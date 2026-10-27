@@ -2219,18 +2219,23 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	killRewards := gamemanager.NewKillRewardBook(fixtureKillRewards(o))
 	events := script.NewEventBook(fixtureEventRules(o))
 	gclConfig := network.GameClientLinkConfig{
-		Flow:             network.CharacterFlowConfig{Validator: validator, PlayerClock: playerClock, Autosave: autosave},
+		Flow: network.CharacterFlowConfig{Validator: validator, PlayerClock: playerClock, Autosave: autosave},
+		Belongings: network.BelongingsConfig{
+			Items:            items,
+			Shortcuts:        shortcuts,
+			Hennas:           hennas,
+			HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
+			RecipeBooks:      recipeBooks,
+			GroundItems:      groundItems,
+			InventoryUpdates: inventoryUpdates,
+			ItemInstances:    itemInstances,
+		},
 		KillRewards:      killRewards,
 		Events:           events,
 		Merchant:         shops,
 		Effects:          effectEnv,
 		LoginLink:        func() *network.LoginLink { return loginLink },
 		Roster:           roster,
-		Items:            items,
-		Shortcuts:        shortcuts,
-		Hennas:           hennas,
-		HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
-		RecipeBooks:      recipeBooks,
 		Subclasses:       subclasses,
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
 		Multisells:       o.multisells,
@@ -2258,14 +2263,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		PetStore:         petStore,
 		Geo:              bootGeo(o.geo),
 		IDs:              ids,
-		GroundItems:      groundItems,
 		Positions:        positions,
 		GameClock:        task.NewGameClock(time.Now),
 		PvPFlags:         task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
 		SevenSigns:       sevenSigns,
 		Festival:         fest,
-		InventoryUpdates: inventoryUpdates,
-		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
 		ItemWrites:       itemWrites,
 		PersistWait:      o.persistWait,
@@ -2361,8 +2363,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Subclasses = faultySubclassStore{SubclassStore: subclasses, fault: o.subclassFault}
 	}
 	if o.slowStores > 0 {
-		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
-		gclConfig.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
+		gclConfig.Belongings.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
+		gclConfig.Belongings.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
 		gclConfig.PetStore = slowPetStore{PetStore: petStore, delay: o.slowStores}
 	}
 	if o.petNameLookupErr != nil {

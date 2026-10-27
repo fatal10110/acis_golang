@@ -81,7 +81,7 @@ func (l *GameClientLink) petPickupForParty(owner *livePlayer, pet *summon.Actor,
 	}
 	looter, members := l.groundLooter(owner, st.TemplateID)
 	if looter == owner {
-		end := l.itemInstances.BeginOperationTaking([]int32{st.ObjectID}, petInv.OwnerID())
+		end := l.belongings.itemInstances.BeginOperationTaking([]int32{st.ObjectID}, petInv.OwnerID())
 		defer end()
 		persist, ok := petitem.StoreGround(petInv, ground)
 		if !ok {
@@ -122,7 +122,7 @@ func (l *GameClientLink) storeGroundWith(inv *itemcontainer.Inventory, ground *g
 	if inv == nil {
 		return false
 	}
-	end := l.itemInstances.BeginOperationTaking([]int32{ground.ObjectID()}, inv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperationTaking([]int32{ground.ObjectID()}, inv.OwnerID())
 	defer end()
 	res, failure := l.inventory.TakeGround(inv, &ground.Instance)
 	l.applyPersistActions(res.Persist)
@@ -132,7 +132,7 @@ func (l *GameClientLink) storeGroundWith(inv *itemcontainer.Inventory, ground *g
 // destroyGroundRow deletes the stored row of a ground item that is shared
 // out instead of carried.
 func (l *GameClientLink) destroyGroundRow(st item.InstanceState) {
-	end := l.itemInstances.BeginOperationTaking([]int32{st.ObjectID})
+	end := l.belongings.itemInstances.BeginOperationTaking([]int32{st.ObjectID})
 	defer end()
 	l.applyPersistActions([]invops.Persist{invops.Delete(st.OwnerID, st.ObjectID)})
 }
@@ -143,7 +143,7 @@ func (l *GameClientLink) destroyGroundRow(st item.InstanceState) {
 func (l *GameClientLink) takeGroundFromWorldByPet(owner *livePlayer, pet *summon.Actor, ground *grounditem.Item) {
 	l.broadcastGroundPickup(ground, pet.ObjectID())
 	tutorialPickedUp(owner, ground.ItemID())
-	l.groundItems.Remove(ground)
+	l.belongings.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	l.broadcastPetPickupAttention(owner, ground)
 }

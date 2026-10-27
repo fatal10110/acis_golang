@@ -320,7 +320,7 @@ func (l *GameClientLink) requestWarehouseDeposit(live *livePlayer, req clientpac
 	}
 	// A player with a trade open was refused above, so no open trade can
 	// stop the deposit between the fee and the moves.
-	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.Deposit(live.Inventory(), active.store, storeMoves(req.Items), l.itemHolder(live),
 		active.private, len(req.Items)*depositFeePerItem, active.fits)
@@ -342,7 +342,7 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 	if !ok || (active.clanID != 0 && !l.clanWithdrawGate(live, active)) {
 		return
 	}
-	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.Withdraw(active.store, live.Inventory(), storeMoves(req.Items))
 	if err != nil {
@@ -380,7 +380,7 @@ func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.
 		return
 	}
 	inv := live.Inventory()
-	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.SendPackage(inv, active.store, storeMoves(req.Items), l.itemHolder(live),
 		len(req.Items)*freight.Price, active.fits)
@@ -472,7 +472,7 @@ func (l *GameClientLink) accountPlayerInWorld(chars []*player.Character) (*liveP
 // restoreDepositedFreight reads the freight of the offline character id,
 // once its last session's saves have landed, or returns nil.
 func (l *GameClientLink) restoreDepositedFreight(ctx context.Context, id int32) *itemcontainer.Freight {
-	if l.items == nil {
+	if l.belongings.items == nil {
 		return nil
 	}
 	// A character still in the world writes its own freight.
@@ -487,7 +487,7 @@ func (l *GameClientLink) restoreDepositedFreight(ctx context.Context, id int32) 
 		l.log.Error().Err(err).Int32("object_id", id).Msg("enter world: wait for account character saves")
 		return nil
 	}
-	rows, err := l.items.ListByOwner(ctx, id)
+	rows, err := l.belongings.items.ListByOwner(ctx, id)
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", id).Msg("enter world: read account character freight")
 		return nil

@@ -24,7 +24,7 @@ func (e castleManorEffects) AddToClanWarehouse(clanID, itemID int32, count int) 
 		l.log.Error().Err(err).Int32("clan_id", clanID).Int32("item_id", itemID).Int("count", count).Msg("manor: restore clan warehouse for crops")
 		return
 	}
-	end := l.itemInstances.BeginOperation(clanID)
+	end := l.belongings.itemInstances.BeginOperation(clanID)
 	defer end()
 	id, err := l.nextObjectID()
 	if err != nil {

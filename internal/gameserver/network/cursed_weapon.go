@@ -63,7 +63,7 @@ func (l *GameClientLink) announceCursedRegion(id int, x, y, z int, itemID int32)
 // sky turns red, the ground around it shakes, and every player hears in
 // which region, killer's, it dropped.
 func (l *GameClientLink) DropCursedWeapon(killer *player.Character, dropperID int32, x, y, z int) {
-	if l == nil || l.cursed == nil || killer == nil || l.groundItems == nil {
+	if l == nil || l.cursed == nil || killer == nil || l.belongings.groundItems == nil {
 		return
 	}
 	itemID, ok := l.cursed.RollDrop(killer.Roll)
@@ -83,7 +83,7 @@ func (l *GameClientLink) DropCursedWeapon(killer *player.Character, dropperID in
 		at := l.geo.ValidLocation(x, y, z, tx, ty, tz)
 		tx, ty, tz = at.X, at.Y, at.Z
 	}
-	l.groundItems.Drop(ground, task.DropOptions{X: tx, Y: ty, Z: tz, DropperID: dropperID})
+	l.belongings.groundItems.Drop(ground, task.DropOptions{X: tx, Y: ty, Z: tz, DropperID: dropperID})
 	l.cursed.PlaceOnGround(itemID, ground.ObjectID(), location.Location{X: tx, Y: ty, Z: tz})
 	l.toAllPlayers(func() wire.Frame { return serverpackets.FrameExRedSky(cursedDropRedSky) })
 	l.toAllPlayers(func() wire.Frame {
@@ -257,7 +257,7 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 	if live.attack != nil {
 		live.attack.Stop()
 	}
-	if inv := live.Inventory(); inv != nil && l.inventory != nil && l.groundItems != nil {
+	if inv := live.Inventory(); inv != nil && l.inventory != nil && l.belongings.groundItems != nil {
 		if inst := inv.ItemByTemplateID(itemID); inst != nil {
 			if inst.Equipped() {
 				if changed := inv.UnequipItem(inst); len(changed) > 0 {
@@ -365,8 +365,8 @@ func (l *GameClientLink) removeCursedGroundItem(objectID int32) {
 	if !ok || !ground.Claim() {
 		return
 	}
-	if l.groundItems != nil {
-		l.groundItems.Remove(ground)
+	if l.belongings.groundItems != nil {
+		l.belongings.groundItems.Remove(ground)
 	}
 	l.world.Despawn(ground)
 }

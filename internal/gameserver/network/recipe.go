@@ -27,10 +27,10 @@ const (
 // loaded is skipped, and a failed read leaves the book empty; both are
 // logged.
 func (l *GameClientLink) restoreRecipeBook(ctx context.Context, c *player.Character) {
-	if l.recipeBooks == nil || c.SubclassActive() {
+	if l.belongings.recipeBooks == nil || c.SubclassActive() {
 		return
 	}
-	ids, err := l.recipeBooks.ListByOwner(ctx, c.ID)
+	ids, err := l.belongings.recipeBooks.ListByOwner(ctx, c.ID)
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: list recipe book")
 		return
@@ -91,10 +91,10 @@ func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.Reque
 	if removed {
 		l.deleteTargetShortcuts(live, shortcut.Recipe, int32(r.ID))
 	}
-	if removed && l.recipeBooks != nil {
+	if removed && l.belongings.recipeBooks != nil {
 		recipeID := r.ID
 		l.queueRowWrite(live.ObjectID(), "delete recipe", func(ctx context.Context, ownerID int32) error {
-			return l.recipeBooks.Delete(ctx, ownerID, recipeID)
+			return l.belongings.recipeBooks.Delete(ctx, ownerID, recipeID)
 		})
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1HasBeenDeleted, r.ItemID))
@@ -148,10 +148,10 @@ func (l *GameClientLink) useRecipeItem(live *livePlayer, inst *item.Instance, tm
 	if reg.Registered == nil {
 		return true
 	}
-	if reg.Stored && l.recipeBooks != nil {
+	if reg.Stored && l.belongings.recipeBooks != nil {
 		recipeID := reg.Registered.ID
 		l.queueRowWrite(live.ObjectID(), "store recipe", func(ctx context.Context, ownerID int32) error {
-			return l.recipeBooks.Insert(ctx, ownerID, recipeID)
+			return l.belongings.recipeBooks.Insert(ctx, ownerID, recipeID)
 		})
 	}
 	sendRecipeBook(live, reg.Registered.Dwarven)

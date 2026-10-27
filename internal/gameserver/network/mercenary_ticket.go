@@ -46,11 +46,11 @@ func (l *GameClientLink) castleTicketAt(itemID int32, x, y, z int) bool {
 // picked up, and gives every castle the tickets restored on its grounds at
 // boot.
 func (l *GameClientLink) wireCastleTickets() {
-	if l.groundItems == nil || l.sieges == nil {
+	if l.belongings.groundItems == nil || l.sieges == nil {
 		return
 	}
-	l.groundItems.SetKept(l.castleTicketAt)
-	l.groundItems.Each(func(ground *grounditem.Item) {
+	l.belongings.groundItems.SetKept(l.castleTicketAt)
+	l.belongings.groundItems.Each(func(ground *grounditem.Item) {
 		x, y, z := ground.Position()
 		c, ok := l.castleAt(x, y, z)
 		if !ok {
@@ -115,7 +115,7 @@ func (l *GameClientLink) useMercenaryTicket(live *livePlayer, inv *itemcontainer
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMercenariesTooCloseToPosition))
 		return true
 	}
-	if l.groundItems == nil {
+	if l.belongings.groundItems == nil {
 		return true
 	}
 	ground, ok := l.dropToGround(live, inv, inst.ObjectID, 1, x, y, z)

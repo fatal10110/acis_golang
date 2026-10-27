@@ -598,7 +598,7 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 // neither gets this far, since an augmented item is not
 // droppable and a quest item is ignored above.
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
-	if !liveItemOpsAllowed(live) || l.groundItems == nil {
+	if !liveItemOpsAllowed(live) || l.belongings.groundItems == nil {
 		return
 	}
 	inv := live.Inventory()
@@ -667,7 +667,7 @@ func (l *GameClientLink) dropToGround(live *livePlayer, inv *itemcontainer.Inven
 		return nil, false
 	}
 
-	l.groundItems.Drop(ground, task.DropOptions{
+	l.belongings.groundItems.Drop(ground, task.DropOptions{
 		X:             x,
 		Y:             y,
 		Z:             z,

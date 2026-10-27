@@ -46,7 +46,7 @@ func (l *GameClientLink) setEnchantLevel(gm, target *livePlayer, slot, level int
 	if inv == nil {
 		return
 	}
-	end := l.itemInstances.BeginOperation(inv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(inv.OwnerID())
 	result := l.enchanting.items.SetLevel(inv, slot, level)
 	l.applyPersistActions(result.Persist)
 	end()
