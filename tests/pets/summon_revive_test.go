@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/vitals"
 )
 
 // Reference: Pet.doRevive / doRevive(double) (Pet.java:269-294),
@@ -21,18 +22,35 @@ import (
 // (Servitor.java:109-128) and Summon.onDecay (Summon.java:193-199), aCis
 // revision in the outer repo.
 //
-// Expected values are worked by hand from those methods: a revive without a
-// Phoenix Blessing sets HP to int max HP * RESPAWN_RESTORE_HP (the test boot
-// uses 0.7), and a resurrection gives back Math.round((expBeforeDeath - exp)
-// * power / 100) of a pet's experience.
+// The exact HP and experience values come from the reference code itself
+// (internal/testsupport/vitals, whose testdata/oracle/run.sh runs the
+// reference Pet.restoreExp, PetStatus.getMaxHp and Creature.doRevive): a
+// revive without a Phoenix Blessing sets HP to int max HP *
+// RESPAWN_RESTORE_HP (the test boot uses 0.7), and a resurrection gives back
+// Math.round((expBeforeDeath - exp) * power / 100) of a pet's experience.
 
-// wolfLiveMaxHP is the wolf's max HP in whole points: its 400 base HP
-// raised by its CON 43 bonus. revivedWolfHP is a revived wolf's HP at the
-// boot's 0.7 respawn restore share of it.
-const (
-	wolfLiveMaxHP = 632
-	revivedWolfHP = 442.4
-)
+// wolfCON is the regen wolf's constitution: its 400 base HP is raised by the
+// CON 43 bonus.
+const wolfCON = 43
+
+// wolfLiveMaxHP is the wolf's max HP in whole points.
+func wolfLiveMaxHP(t *testing.T) int { return vitals.PetMaxHP(t, wolfMaxHP, wolfCON) }
+
+// revivedWolfHP is a revived wolf's HP at the boot's 0.7 respawn restore
+// share of its max HP.
+func revivedWolfHP(t *testing.T) float64 { return vitals.RevivedHP(t, wolfLiveMaxHP(t)) }
+
+// katRevivedHP is a revived Kat the Cat's HP: its 500 base HP under the CON
+// 21 bonus (a template that sets no CON has 21), at the 0.7 respawn restore
+// share.
+func katRevivedHP(t *testing.T) float64 { return vitals.RevivedHP(t, vitals.PetMaxHP(t, 500, 21)) }
+
+// wolfExpAfterRevive is a wolf's experience after a power-percent
+// resurrection of its experience at death, when it died holding before and
+// lost down to exp.
+func wolfExpAfterRevive(t *testing.T, before, exp int64, power float64) int64 {
+	return exp + vitals.PetExpRestored(t, before, exp, power)
+}
 
 // bootResurrectingPetOwner boots an owner with a wolf collar who knows the
 // power-100 resurrection, seeding the wolf's pets row at level 10 with exp
@@ -101,8 +119,8 @@ func TestOwnPetResurrectionRevivesIt(t *testing.T) {
 	if frameIndex(frames, serverpackets.OpcodeConfirmDlg, serverpackets.ConfirmDlgResurrectionRequest) >= 0 {
 		t.Fatal("owner was asked to confirm its own pet's resurrection")
 	}
-	if got := wolf.Exp(); got != 510 {
-		t.Fatalf("revived wolf exp = %d, want 510", got)
+	if got, want := wolf.Exp(), wolfExpAfterRevive(t, 510, 481, 100); got != want {
+		t.Fatalf("revived wolf exp = %d, want %d", got, want)
 	}
 	if got := wolf.Level(); got != wolfLevel {
 		t.Fatalf("revived wolf level = %d, want %d", got, wolfLevel)
@@ -110,8 +128,8 @@ func TestOwnPetResurrectionRevivesIt(t *testing.T) {
 	if got := h.liveCollarEnchant(t); got != wolfLevel {
 		t.Fatalf("collar enchant = %d, want %d back", got, wolfLevel)
 	}
-	if got := wolf.HP(); got != revivedWolfHP {
-		t.Fatalf("revived wolf HP = %v, want %v", got, revivedWolfHP)
+	if got := wolf.HP(); got != revivedWolfHP(t) {
+		t.Fatalf("revived wolf HP = %v, want %v", got, revivedWolfHP(t))
 	}
 	social, revive := frameIndex(frames, serverpackets.OpcodeSocialAction, wolf.ObjectID()), frameIndex(frames, serverpackets.OpcodeRevive, wolf.ObjectID())
 	if social < 0 || revive < 0 || social > revive {
@@ -192,11 +210,11 @@ func TestAcceptedPetOfferRevivesThePet(t *testing.T) {
 	if s.pet.Dead() {
 		t.Fatal("accepted offer left the pet dead")
 	}
-	if got := s.pet.Exp(); got != 697 {
-		t.Fatalf("revived pet exp = %d, want 697", got)
+	if got, want := s.pet.Exp(), wolfExpAfterRevive(t, 700, 671, 89); got != want {
+		t.Fatalf("revived pet exp = %d, want %d", got, want)
 	}
-	if got := s.pet.HP(); got != revivedWolfHP {
-		t.Fatalf("revived pet HP = %v, want %v", got, revivedWolfHP)
+	if got := s.pet.HP(); got != revivedWolfHP(t) {
+		t.Fatalf("revived pet HP = %v, want %v", got, revivedWolfHP(t))
 	}
 	if frameIndex(drainFrames(t, s.healer), serverpackets.OpcodeRevive, s.pet.ObjectID()) < 0 {
 		t.Fatal("healer never saw the pet revive")
@@ -236,11 +254,11 @@ func TestPhoenixBlessedPetRevivesAtFullHP(t *testing.T) {
 	if wolf.Dead() {
 		t.Fatal("accepted Phoenix Blessing offer left the pet dead")
 	}
-	if got := wolf.Exp(); got != 700 {
-		t.Fatalf("revived pet exp = %d, want 700", got)
+	if got, want := wolf.Exp(), wolfExpAfterRevive(t, 700, 671, 100); got != want {
+		t.Fatalf("revived pet exp = %d, want %d", got, want)
 	}
-	if got := wolf.HP(); got != wolfLiveMaxHP {
-		t.Fatalf("revived pet HP = %v, want full %d", got, wolfLiveMaxHP)
+	if got := wolf.HP(); got != float64(wolfLiveMaxHP(t)) {
+		t.Fatalf("revived pet HP = %v, want full %d", got, wolfLiveMaxHP(t))
 	}
 	if wolf.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
 		t.Fatal("revived pet kept its Phoenix Blessing")
@@ -273,10 +291,8 @@ func TestResurrectedServitorKeepsItsDecay(t *testing.T) {
 	if servitor.Dead() {
 		t.Fatal("resurrection left the servitor dead")
 	}
-	// Kat the Cat's live max HP is 410 whole points (its 500 base HP under
-	// the template's CON bonus), at the 0.7 respawn restore share.
-	if got := servitor.HP(); got != 287 {
-		t.Fatalf("revived servitor HP = %v, want 287", got)
+	if got, want := servitor.HP(), katRevivedHP(t); got != want {
+		t.Fatalf("revived servitor HP = %v, want %v", got, want)
 	}
 	if frameIndex(frames, serverpackets.OpcodeRevive, servitor.ObjectID()) < 0 {
 		t.Fatal("owner never saw the servitor revive")

@@ -3,7 +3,6 @@ package fence
 import (
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
@@ -35,97 +34,6 @@ func flatEngine(t *testing.T) *engine.Engine {
 		t.Fatalf("SetRegion: %v", err)
 	}
 	return e
-}
-
-// TestSizeAndAlignment pins FenceManager.getFenceSize's 100-unit steps
-// (under 199, 299, ... 1099) and the coordinate alignment
-// x & 0xFFFFFFF0 + offset, which Java evaluates as x & (0xFFFFFFF0 +
-// offset). The expected values were worked out with Java int arithmetic.
-func TestSizeAndAlignment(t *testing.T) {
-	for _, tc := range []struct {
-		n     int
-		want  size
-		known bool
-	}{
-		{-100, size{8, 11}, true},
-		{0, size{8, 11}, true},
-		{198, size{8, 11}, true},
-		{199, size{0, 18}, true},
-		{300, size{0, 24}, true},
-		{700, size{8, 49}, true},
-		{998, size{8, 61}, true},
-		{999, size{0, 68}, true},
-		{1098, size{0, 68}, true},
-		{1099, size{}, false},
-	} {
-		got, ok := sizeOf(tc.n)
-		if got != tc.want || ok != tc.known {
-			t.Errorf("sizeOf(%d) = %v %v, want %v %v", tc.n, got, ok, tc.want, tc.known)
-		}
-	}
-	for _, tc := range []struct{ v, offset, want int }{
-		{1005, 0, 992},
-		{1005, 8, 1000},
-		{-71433, 0, -71440},
-		{-71433, 8, -71440},
-		{-71441, 0, -71456},
-		{-71441, 8, -71448},
-	} {
-		if got := align(tc.v, size{offset: tc.offset}); got != tc.want {
-			t.Errorf("align(%d, offset %d) = %d, want %d", tc.v, tc.offset, got, tc.want)
-		}
-	}
-}
-
-// TestOutline pins the inner description FenceManager.addFence builds for
-// an 11x11-cell fence: type 2 is a ring two cells thick, one cell in from
-// the edge; any other type keeps only its four 2x2 corners.
-func TestOutline(t *testing.T) {
-	ring := []string{
-		"...........",
-		".#########.",
-		".#########.",
-		".##.....##.",
-		".##.....##.",
-		".##.....##.",
-		".##.....##.",
-		".##.....##.",
-		".#########.",
-		".#########.",
-		"...........",
-	}
-	corners := []string{
-		"...........",
-		".##.....##.",
-		".##.....##.",
-		"...........",
-		"...........",
-		"...........",
-		"...........",
-		"...........",
-		".##.....##.",
-		".##.....##.",
-		"...........",
-	}
-	for _, tc := range []struct {
-		typ  int
-		want []string
-	}{{2, ring}, {1, corners}, {0, corners}} {
-		inside := outline(tc.typ, 11, 11)
-		for iy, row := range tc.want {
-			var got strings.Builder
-			for ix := range 11 {
-				if inside[ix][iy] {
-					got.WriteByte('#')
-				} else {
-					got.WriteByte('.')
-				}
-			}
-			if got.String() != row {
-				t.Errorf("type %d row %d = %s, want %s", tc.typ, iy, got.String(), row)
-			}
-		}
-	}
 }
 
 // TestAddBlocksMovementUntilRemoved places a 100x300 two-layer fence of

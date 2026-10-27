@@ -2,7 +2,7 @@ package clan
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -72,38 +72,85 @@ func (cl *Clan) AttackerList() []int32 {
 	return hashSetOrder(cl.attackers)
 }
 
-// hashSetOrder lists ids in the order the client sees a clan's wars
-// right after boot: hash-bucket order of a table of 16 buckets doubled
-// whenever it is three quarters full, a bucket being the low bits of the
-// id folded with its high half, and ids sharing a bucket in ascending
-// order. It may drift from the expected order later in two ways, both
-// cosmetic (only the order of clans in the war window): the expected
+// hashSetOrder lists ids in the order the client sees a clan's wars right
+// after boot: the iteration order of a concurrent hash set filled in
+// ascending id order, as the stored rows are restored. Its table starts at
+// 16 buckets and doubles whenever it holds three quarters of its size; a
+// bucket chains its ids in insertion order, and a doubling reorders a
+// bucket's chain: the trailing run of ids that stay in the same half keeps
+// its place, and the ids before it are re-chained in reverse (see
+// growBuckets). It may drift from the expected order later in three ways,
+// all cosmetic (only the order of clans in the war window; tracked in
+// #4341): the expected
 // table never shrinks, so a clan that once held 12 or more wars keeps its
 // larger table after they end, where this recomputes the size from the
-// current count; and inside a bucket the expected order is insertion
-// order, which is ascending only for the rows restored at boot, while a
-// war declared later sorts here by id rather than after its bucket-mates.
+// current count; a war declared later sorts here by id rather than after
+// its bucket-mates; and a bucket crowded past eight ids, which the expected
+// table answers by growing early or by turning the bucket into a tree, is
+// not modeled.
 func hashSetOrder(ids map[int32]struct{}) []int32 {
-	buckets := uint32(16)
-	for len(ids) >= int(buckets-buckets/4) {
-		buckets *= 2
-	}
-	bucket := func(id int32) uint32 {
-		h := uint32(id)
-		return ((h ^ (h >> 16)) & 0x7fffffff) & (buckets - 1)
-	}
-	out := make([]int32, 0, len(ids))
+	sorted := make([]int32, 0, len(ids))
 	for id := range ids {
-		out = append(out, id)
+		sorted = append(sorted, id)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		bi, bj := bucket(out[i]), bucket(out[j])
-		if bi != bj {
-			return bi < bj
+	slices.Sort(sorted)
+
+	buckets := make([][]int32, 16)
+	for n, id := range sorted {
+		i := foldedHash(id) & uint32(len(buckets)-1)
+		buckets[i] = append(buckets[i], id)
+		for n+1 >= len(buckets)-len(buckets)/4 {
+			buckets = growBuckets(buckets)
 		}
-		return out[i] < out[j]
-	})
+	}
+	out := make([]int32, 0, len(sorted))
+	for _, chain := range buckets {
+		out = append(out, chain...)
+	}
 	return out
+}
+
+// foldedHash is an id's hash: the id folded with its high half.
+func foldedHash(id int32) uint32 {
+	h := uint32(id)
+	return h ^ h>>16
+}
+
+// growBuckets doubles the table. A chain splits by the id's next hash bit
+// into the bucket at the same index (low half) and the one n above (high
+// half): the chain's trailing run of ids sharing one bit moves as it is,
+// every id before that run is put in front of its half's chain one by one,
+// so those come out in reverse.
+func growBuckets(old [][]int32) [][]int32 {
+	n := len(old)
+	next := make([][]int32, 2*n)
+	for i, chain := range old {
+		if len(chain) == 0 {
+			continue
+		}
+		bit := func(id int32) bool { return foldedHash(id)&uint32(n) != 0 }
+		runBit, runStart := bit(chain[0]), 0
+		for j := 1; j < len(chain); j++ {
+			if b := bit(chain[j]); b != runBit {
+				runBit, runStart = b, j
+			}
+		}
+		var lo, hi []int32
+		for _, id := range chain[:runStart] {
+			if bit(id) {
+				hi = append([]int32{id}, hi...)
+			} else {
+				lo = append([]int32{id}, lo...)
+			}
+		}
+		if runBit {
+			hi = append(hi, chain[runStart:]...)
+		} else {
+			lo = append(lo, chain[runStart:]...)
+		}
+		next[i], next[i+n] = lo, hi
+	}
+	return next
 }
 
 // lockPair write-locks a and b, in id order so two clans acting on each

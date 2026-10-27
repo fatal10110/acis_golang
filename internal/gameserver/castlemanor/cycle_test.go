@@ -20,8 +20,8 @@ import (
 
 // Reference: CastleManorManager (constructor mode, scheduleModeChange,
 // changeMode, getManorCost, resetManorData, storeMe), SeedProduction and
-// CropProcure. Expected values are worked by hand from those methods, not
-// from the Go code under test.
+// CropProcure. Expected values are worked by hand from those methods (no
+// reference probe yet: #4341), not from the Go code under test.
 
 // The test manor: Gludio (1) is owned by lordsClan, led by lordsLeader;
 // Dion (2) has no owner. Neither castle is taxed, so seed income lands
