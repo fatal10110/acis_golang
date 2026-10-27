@@ -141,14 +141,6 @@ type Config struct {
 	// script timer whose NPC and player have no queue to run it on.
 	Queue *sim.Queue
 
-	// Claims holds, per scripts.xml path of a behavior that has no Go script
-	// yet, the (NPC, event) bindings it takes from the behaviors listed
-	// before it: its bindings that an earlier behavior binds too. Its
-	// registration would have removed those behaviors there, so while it is
-	// not registered the registry removes them; an NPC left with no behavior
-	// keeps its stand-ins.
-	Claims map[string]Bindings
-
 	// raises overrides raisedHooks; tests use it.
 	raises func(hook, NPCKind) bool
 }
@@ -173,8 +165,6 @@ type Registry struct {
 	// byName holds, per lower-cased name, the first registered script of
 	// that name in list order.
 	byName map[string]*Script
-	// behaves holds the NPC ids a behavior is bound to.
-	behaves map[int32]bool
 	// behaviors holds, per NPC id, the behaviors left on any of its event
 	// lists.
 	behaviors map[int32]map[*Script]bool
@@ -240,12 +230,9 @@ const (
 // For each (NPC, event) a behavior first removes any other behavior and a
 // script removes an earlier registration of itself; it is then appended,
 // except that first talk keeps a single script. So the last listed behavior wins and other
-// scripts accumulate in list order. A listed behavior with no script still
-// removes the behaviors listed before it from the bindings it claims
-// (Config.Claims), so an NPC they leave with no behavior keeps its stand-ins
-// until a behavior listed after binds it.
+// scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue}
 	r.timers = newTimers(r, cfg.Queue)
 	var w *world.State
 	if cfg.Env != nil {
@@ -267,7 +254,6 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		if !ok {
 			e.state = entryMissing
 			r.entries = append(r.entries, e)
-			r.hold(cfg.Claims[l.Path])
 			continue
 		}
 		s.path = l.Path
@@ -434,49 +420,9 @@ func (r *Registry) register(s *Script, bound Bindings) {
 		for _, id := range ids {
 			k := npcKey{id, ev}
 			r.npc[k] = registerOn(r.npc[k], s, ev)
-			if s.Behavior {
-				r.behaves[id] = true
-			}
 		}
 	}
 }
-
-// hold removes, from the (NPC, event) lists b names, every behavior listed
-// before a behavior with no script, as its registration would have.
-// An NPC left with no behavior on any event goes back to its stand-ins; a
-// behavior listed after binds it again.
-func (r *Registry) hold(b Bindings) {
-	for ev, ids := range b {
-		for _, id := range ids {
-			k := npcKey{id, ev}
-			if list := slices.DeleteFunc(r.npc[k], (*Script).isBehavior); len(list) > 0 {
-				r.npc[k] = list
-			} else {
-				delete(r.npc, k)
-			}
-		}
-	}
-	for _, ids := range b {
-		for _, id := range ids {
-			if r.behaves[id] && !r.behaviorBound(id) {
-				delete(r.behaves, id)
-			}
-		}
-	}
-}
-
-// behaviorBound reports whether a behavior is on any event list of the NPC
-// id npcID.
-func (r *Registry) behaviorBound(npcID int32) bool {
-	for ev := range npcEventCount {
-		if slices.ContainsFunc(r.npc[npcKey{npcID, ev}], (*Script).isBehavior) {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Script) isBehavior() bool { return s.Behavior }
 
 // registerOn returns list with s registered on it: a behavior removes any
 // behavior, any other script an earlier copy of itself; then s is appended
@@ -511,16 +457,9 @@ func (r *Registry) scripts(npcID int32, ev NPCEvent) []*Script {
 }
 
 // Behaves reports whether a behavior is bound to the NPC with id npcID, on
-// any event; a nil registry binds none. Until one is, the NPC keeps its
-// built-in stand-in reactions.
+// any event; a nil registry binds none.
 func (r *Registry) Behaves(npcID int32) bool {
-	return r != nil && r.behaves[npcID]
-}
-
-// ReactsToCreated reports whether a script, a behavior or not, reacts to
-// the creation of an NPC with id npcID; a nil registry binds none.
-func (r *Registry) ReactsToCreated(npcID int32) bool {
-	return len(r.scripts(npcID, EventCreated)) > 0
+	return r != nil && len(r.behaviors[npcID]) > 0
 }
 
 // behaviorOn reports whether s is a behavior left on any event list of the

@@ -80,7 +80,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	h.testOverhit(attacker, float64(dmg))
 	if dmg > 0 {
 		h.RecordAttacker(attacker)
-		h.registerHit(attacker, float64(dmg), false, skill.Ref{})
+		h.registerHit(attacker, float64(dmg), skill.Ref{})
 	}
 	if h.Invul() || !creature.CanDealDamage(attacker) {
 		return false

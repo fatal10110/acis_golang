@@ -80,7 +80,7 @@ func readUntilFrame(t *testing.T, c *scriptedClient, op byte, id int32, what str
 // home.
 func TestBrainArrivalOutsideTerritoryWalksHome(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithAITask(),
@@ -158,7 +158,7 @@ func assertMoveDestination(t *testing.T, frame []byte, want location.Location) {
 // see-creature point, never idle or walk the fighting monster.
 func TestBrainCyclesDuringAFight(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithAITask(),

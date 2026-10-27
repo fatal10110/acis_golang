@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -256,13 +255,12 @@ func shotParams() npc.AIParams {
 	return npc.AIParams{"SoulShot": "1", "SoulShotRate": "100"}
 }
 
-// TestAttackedHitGatesStandIns pins the hit path per NPC id, on both
-// executors. With a behavior bound, the attacked hook runs on the
-// attacker's queue before the HP change, and the built-in reactions stay
-// off: no attack desire from the hit's hate weight, no shot recharge, so
-// the player sees only the NPC's StatusUpdate. Without one they still run:
-// MagicSkillUse (the soulshot recharge) then StatusUpdate.
-func TestAttackedHitGatesStandIns(t *testing.T) {
+// TestAttackedHitRunsOnlyTheBoundBehavior pins the hit path per NPC id, on
+// both executors. With a behavior bound, the attacked hook runs on the
+// attacker's queue before the HP change. The hit itself queues no attack
+// desire and rolls no shot recharge, bound or not: both belong to the
+// behavior, so the player sees only the NPC's StatusUpdate.
+func TestAttackedHitRunsOnlyTheBoundBehavior(t *testing.T) {
 	t.Parallel()
 	const bound, unbound = int32(20030), int32(20050)
 	for _, exec := range []struct {
@@ -279,7 +277,7 @@ func TestAttackedHitGatesStandIns(t *testing.T) {
 			wantOps []byte
 		}{
 			{"bound", bound, true, []byte{serverpackets.OpcodeStatusUpdate}},
-			{"unbound", unbound, false, []byte{serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeStatusUpdate}},
+			{"unbound", unbound, false, []byte{serverpackets.OpcodeStatusUpdate}},
 		} {
 			t.Run(exec.name+"/"+tc.name, func(t *testing.T) {
 				t.Parallel()
@@ -312,12 +310,8 @@ func TestAttackedHitGatesStandIns(t *testing.T) {
 				if got := framesOf(srv.ReadQueued(t, c), h.ObjectID()); !slices.Equal(got, tc.wantOps) {
 					t.Fatalf("NPC frames = % x, want % x", got, tc.wantOps)
 				}
-				d, queued := h.AI().Desires().Peek()
-				if tc.hooked && queued {
-					t.Fatalf("bound NPC desire after the hit = %+v, want none: the hate weight is the behavior's", d)
-				}
-				if !tc.hooked && (!queued || d.Kind != ai.IntentionAttack || d.FinalTarget.ObjectID() != p.ObjectID()) {
-					t.Fatalf("unbound NPC desire after the hit = (%v, %+v), want an attack on the player", queued, d)
+				if d, queued := h.AI().Desires().Peek(); queued {
+					t.Fatalf("NPC desire after the hit = %+v, want none: the hate weight is the behavior's", d)
 				}
 			})
 		}
@@ -325,8 +319,8 @@ func TestAttackedHitGatesStandIns(t *testing.T) {
 }
 
 // TestPartyAssistGatedPerCalledNPC: the master's hit calls its party; a
-// bound minion gets its party-attacked hook and no built-in assist, an
-// unbound one the built-in assist.
+// bound minion gets its party-attacked hook, and neither minion gets an
+// assist the behavior did not queue.
 func TestPartyAssistGatedPerCalledNPC(t *testing.T) {
 	t.Parallel()
 	const master, boundMinion, unboundMinion = int32(20050), int32(20031), int32(20051)
@@ -356,14 +350,14 @@ func TestPartyAssistGatedPerCalledNPC(t *testing.T) {
 	if d, ok := b.AI().Desires().Peek(); ok {
 		t.Fatalf("bound minion desire = %+v, want none: the assist is the behavior's", d)
 	}
-	if d, ok := u.AI().Desires().Peek(); !ok || d.Kind != ai.IntentionAttack || d.FinalTarget.ObjectID() != p.ObjectID() || d.Weight != 30 {
-		t.Fatalf("unbound minion desire = (%v, %+v), want the built-in assist on the player at 30", ok, d)
+	if d, ok := u.AI().Desires().Peek(); ok {
+		t.Fatalf("unbound minion desire = %+v, want none: no behavior assists it", d)
 	}
 }
 
 // TestAggressionGatesHateWeight: an aggression effect on a bound NPC runs
-// its attacked hook with the power as the damage and queues no built-in
-// attack desire; an unbound NPC still queues one.
+// its attacked hook with the power as the damage; neither a bound nor an
+// unbound NPC queues an attack desire the behavior did not.
 func TestAggressionGatesHateWeight(t *testing.T) {
 	t.Parallel()
 	const bound, unbound = int32(20030), int32(20050)
@@ -388,14 +382,14 @@ func TestAggressionGatesHateWeight(t *testing.T) {
 	if d, ok := b.AI().Desires().Peek(); ok {
 		t.Fatalf("bound NPC desire = %+v, want none", d)
 	}
-	if d, ok := u.AI().Desires().Peek(); !ok || d.Kind != ai.IntentionAttack {
-		t.Fatalf("unbound NPC desire = (%v, %+v), want the built-in attack", ok, d)
+	if d, ok := u.AI().Desires().Peek(); ok {
+		t.Fatalf("unbound NPC desire = %+v, want none", d)
 	}
 }
 
 // TestAttackedFromADamageOverTimeTick: a skill's damage-over-time tick on
 // a bound NPC raises its attacked hook naming the skill, with the damage
-// truncated to an int, and queues no built-in attack desire.
+// truncated to an int; neither NPC queues an attack desire.
 func TestAttackedFromADamageOverTimeTick(t *testing.T) {
 	t.Parallel()
 	const bound, unbound = int32(20030), int32(20050)
@@ -424,7 +418,7 @@ func TestAttackedFromADamageOverTimeTick(t *testing.T) {
 	if d, ok := b.AI().Desires().Peek(); ok {
 		t.Fatalf("bound NPC desire = %+v, want none", d)
 	}
-	if d, ok := u.AI().Desires().Peek(); !ok || d.Kind != ai.IntentionAttack {
-		t.Fatalf("unbound NPC desire = (%v, %+v), want the built-in attack", ok, d)
+	if d, ok := u.AI().Desires().Peek(); ok {
+		t.Fatalf("unbound NPC desire = %+v, want none", d)
 	}
 }

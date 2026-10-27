@@ -153,14 +153,14 @@ func idleTemplate(id int32, params npc.AIParams) *npc.Template {
 	return tmpl
 }
 
-// TestNoDesireRunsBoundBehaviorsInsteadOfIdleStandIns pins the no-desire
+// TestNoDesireRunsOnlyBoundBehaviors pins the no-desire
 // dispatch per NPC id on the periodic AI cycle. An NPC with nothing to do,
 // hostile or civilian, runs its bound behavior's no-desire hook once per
 // cycle from its second one on, already in its walk stance and idle; what
-// the hook queues is what the NPC does next. A bound NPC queues no built-in
-// idle wander or escort follow; an unbound one still does. Both executors
-// run it: the hooks run on each NPC's own queue.
-func TestNoDesireRunsBoundBehaviorsInsteadOfIdleStandIns(t *testing.T) {
+// the hook queues is what the NPC does next. Nothing else queues an idle
+// wander or escort follow, so an NPC no behavior binds, private or not,
+// stays put. Both executors run it: the hooks run on each NPC's own queue.
+func TestNoDesireRunsOnlyBoundBehaviors(t *testing.T) {
 	t.Parallel()
 	for _, exec := range []struct {
 		name string
@@ -232,8 +232,8 @@ func noDesireScenario(t *testing.T, opts ...gameservertest.Option) {
 		"stander":   nil,
 		"boundPriv": nil,
 		"wanderer":  {Kind: ai.IntentionWander, Timer: 7, Weight: 9},
-		"unbound":   {Kind: ai.IntentionWander, Timer: 5, Weight: 5},
-		"freePriv":  {Kind: ai.IntentionFollow, FinalTarget: hostiles["master"]},
+		"unbound":   nil,
+		"freePriv":  nil,
 	} {
 		d, ok := hostiles[name].AI().Desires().Peek()
 		switch {

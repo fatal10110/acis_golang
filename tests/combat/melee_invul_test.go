@@ -80,7 +80,7 @@ func assertLandedDamagingHit(t *testing.T, frame []byte, targetID int32) int32 {
 // guard blocked a real hit rather than a miss or a zero-damage roll.
 func TestNonInvulnerablePlayerTakesMeleeDamage(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -113,7 +113,7 @@ func TestNonInvulnerablePlayerTakesMeleeDamage(t *testing.T) {
 // swing, only its damage).
 func TestInvulnerablePlayerTakesNoMeleeDamage(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -143,7 +143,7 @@ func TestInvulnerablePlayerTakesNoMeleeDamage(t *testing.T) {
 // real NPC auto-attack.
 func TestSpawnProtectedPlayerTakesNoMeleeDamage(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithRestartPoints(restartTable()),
@@ -187,7 +187,7 @@ func (a deniedDamageAttacker) ObjectID() int32   { return a.objID }
 // player up even though it deals no damage.
 func TestNoDamagePermissionAttackerStillWakesSeatedPlayer(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -221,7 +221,7 @@ func TestNoDamagePermissionAttackerStillWakesSeatedPlayer(t *testing.T) {
 // on the attacker.
 func TestInvulnerableHostileTakesNoMeleeDamage(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -252,7 +252,7 @@ func TestInvulnerableHostileTakesNoMeleeDamage(t *testing.T) {
 // above — the NPC still aggroes on the attacker.
 func TestAttackerWithoutDamagePermissionDealsNoMeleeDamage(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

@@ -98,10 +98,21 @@ func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn
 }
 
 // DeleteFixed removes the live NPC id at once, with no corpse, when it was
-// placed by SpawnFixed, and drops its spawn: it never comes back. It
-// reports false, removing nothing, for any other NPC. The removal runs on
-// the NPC's own queue.
+// placed by SpawnFixed, and drops its spawn: it never comes back. A
+// master's privates stay in the world. It reports false, removing nothing,
+// for any other NPC. The removal runs on the NPC's own queue.
 func (n *Npcs) DeleteFixed(id int32) bool {
+	return n.deleteFixed(id, false)
+}
+
+// DeleteFixedWithPrivates is DeleteFixed for a spawn deleted as a whole: a
+// master takes its privates with it first, as a maker deleting its entries
+// does.
+func (n *Npcs) DeleteFixedWithPrivates(id int32) bool {
+	return n.deleteFixed(id, true)
+}
+
+func (n *Npcs) deleteFixed(id int32, withPrivates bool) bool {
 	n.mu.Lock()
 	key, live := n.live[id]
 	slot := n.slot[key]
@@ -115,8 +126,14 @@ func (n *Npcs) DeleteFixed(id int32) bool {
 	}
 	switch a := obj.(type) {
 	case *npc.Hostile:
+		if withPrivates {
+			n.despawnMinions(a)
+		}
 		a.DeleteMe()
 	case *npc.Folk:
+		if withPrivates {
+			n.despawnMinions(a)
+		}
 		onQueue(a.Queue(), func() { n.RemoveFolk(a) })
 	default:
 		return false

@@ -19,20 +19,6 @@ const (
 	escortTeleportOffset = 10
 )
 
-// IdleFollowTarget returns this NPC's living master when it is a party
-// private that should escort while idle. An NPC a behavior is bound to has
-// none: its no-desire hooks decide whether it follows.
-func (h *Hostile) IdleFollowTarget() attackable.Combatant {
-	if h.behaves() || h.aiInt("Party_Type", 0) != 1 {
-		return nil
-	}
-	master := h.Master()
-	if master == nil || master.AlikeDead() {
-		return nil
-	}
-	return master
-}
-
 // ThinkFollow advances one escort or loose-follow step toward target.
 // clearDesire is true when the follow target is gone and the desire
 // should be dropped.

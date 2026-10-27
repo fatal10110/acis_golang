@@ -26,7 +26,7 @@ func TestNpcSpawnAppliesRaidMultipliersToRaidRelatedHostiles(t *testing.T) {
 <list>
 	<territory name="field" minZ="-10" maxZ="10"><node x="0" y="0"/><node x="100" y="0"/><node x="100" y="100"/><node x="0" y="100"/></territory>
 	<npcmaker name="boss" territory="field" maximumNpcs="1">
-		<npc id="1" total="1" pos="10;20;0;123"><privates><private id="2" weight="7" respawn="3sec"/><private id="3" weight="7" respawn="3sec"/></privates></npc>
+		<npc id="1" total="1" pos="10;20;0;123"/>
 	</npcmaker>
 	<npcmaker name="field" territory="field" maximumNpcs="1">
 		<npc id="4" total="1" pos="50;50;0;0"/>
@@ -40,12 +40,10 @@ func TestNpcSpawnAppliesRaidMultipliersToRaidRelatedHostiles(t *testing.T) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
 	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
-	partyAI := npc.AIParams{"Party_Type": "2"}
 	tmpl := func(id int, kind string) *npc.Template {
 		return &npc.Template{ID: id, TemplateID: id, Type: kind, Level: 11, PDef: 51, HPMax: 100, RunSpeed: 100}
 	}
 	boss := tmpl(1, "RaidBoss")
-	boss.AIParams = partyAI
 	npcs, err := NewNpcsWithMaxBuffsAmount(NewSpawns(table, nil), npc.NewTable([]*npc.Template{boss, tmpl(2, "Monster"), tmpl(3, "Guard"), tmpl(4, "Monster")}),
 		fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, 20, 30, 0,
@@ -54,6 +52,16 @@ func TestNpcSpawnAppliesRaidMultipliersToRaidRelatedHostiles(t *testing.T) {
 		t.Fatalf("NewNpcsWithMaxBuffsAmount() error: %v", err)
 	}
 	npcs.SpawnOnStart()
+	for _, obj := range state.Objects() {
+		if master, ok := obj.(*npc.Hostile); ok && master.NpcID() == 1 {
+			for _, id := range []int{2, 3} {
+				private, _ := npcs.templates.Get(id)
+				if _, err := npcs.createPrivate(master, private, nil, 0, 0, [3]int32{}, 3*time.Second); err != nil {
+					t.Fatalf("createPrivate(%d) error: %v", id, err)
+				}
+			}
+		}
+	}
 	pDef := map[bool]float64{true: 102, false: 51}
 	seen, raid := 0, 0
 	for _, obj := range state.Objects() {

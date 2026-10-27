@@ -136,7 +136,7 @@ func TestScriptCivilianMasterKeepsPrivates(t *testing.T) {
 		t.Fatal("a private of a civilian master is out of its territory")
 	}
 
-	if !w.srv.NpcSpawns.DeleteFixed(tablet.ObjectID()) {
+	if !w.srv.NpcSpawns.DeleteFixedWithPrivates(tablet.ObjectID()) {
 		t.Fatal("the master's spawn was not deleted")
 	}
 	w.srv.Settle(t)
@@ -171,7 +171,7 @@ func TestScriptHostileMasterKeepsCivilianPrivate(t *testing.T) {
 
 	tablet := w.spawner.CreateOnePrivateEx(master, spawnTabletID, script.Loc{X: w.at.X + 90, Y: w.at.Y, Z: w.at.Z}, 0, script.Params{})
 	assertPrivateOf(t, w, tablet, spawnedNPC(t, w, spawnTabletID).(*npc.Folk), wolf)
-	if !w.srv.NpcSpawns.DeleteFixed(wolf.ObjectID()) {
+	if !w.srv.NpcSpawns.DeleteFixedWithPrivates(wolf.ObjectID()) {
 		t.Fatal("the master's spawn was not deleted")
 	}
 	w.srv.Settle(t)

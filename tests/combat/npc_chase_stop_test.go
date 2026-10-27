@@ -31,7 +31,7 @@ func TestMonsterChaseStopsWithinAttackRange(t *testing.T) {
 	monster.Instance.Template.BaseAttackRange = attackRange
 	drainUntilQuiet(t, c)
 
-	monster.AddCombatDamageHate(player, 50)
+	monster.AddAttackDesire(player, 50)
 	if !monster.IsMoving() {
 		t.Fatal("monster did not start chasing the out-of-range player")
 	}

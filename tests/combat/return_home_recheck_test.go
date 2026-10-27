@@ -21,7 +21,7 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			srv := gameservertest.Boot(t,
+			srv := gameservertest.Boot(t, withWarriorBehavior(),
 				gameservertest.WithCharacter("Newbie", 5, 0),
 				gameservertest.WithWantChars(1),
 			)
@@ -87,7 +87,7 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 // teleport aborts the NPC's cast. The tick must finish and observers must see
 // the teleport.
 func TestReturnHomeRecoveryFromThinkLoop(t *testing.T) {
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -143,7 +143,7 @@ func TestReturnHomeRecoveryFromThinkLoop(t *testing.T) {
 // A teleport that starts while another is still in progress is dropped: no
 // frames, no movement, and the geo-path fail streak is left alone.
 func TestNPCTeleportDroppedWhileAnotherInProgress(t *testing.T) {
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

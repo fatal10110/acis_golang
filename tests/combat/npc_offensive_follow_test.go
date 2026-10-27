@@ -96,7 +96,7 @@ func TestHalishaChestNeverChasesOutOfRangePlayer(t *testing.T) {
 			if got := chest.MovementDisabled(); got == tt.chase {
 				t.Fatalf("MovementDisabled() = %v, want %v", got, !tt.chase)
 			}
-			chest.AddCombatDamageHate(player, 50)
+			chest.AddAttackDesire(player, 50)
 			if got := chest.AI().CurrentIntention(); got != ai.IntentionAttack {
 				t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionAttack)
 			}
@@ -149,7 +149,7 @@ func TestNPCClosesInOnUnseenTargetInReach(t *testing.T) {
 				drainUntilQuiet(t, c)
 			}
 
-			monster.AddCombatDamageHate(player, 50)
+			monster.AddAttackDesire(player, 50)
 
 			seen := npcActivity(t, srv, c, monster.ObjectID(), 2*time.Second)
 			seen.requireMoved(t, tt.move)

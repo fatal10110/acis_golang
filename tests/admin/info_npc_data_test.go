@@ -134,6 +134,7 @@ func bootDataAdmin(t *testing.T) (*gameservertest.Server, int32) {
 		gameservertest.WithSkills(skills),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{dataGrocer(), wolf, dataTree()})),
 		gameservertest.WithNpcSpawns(dataMakers(t)),
+		withPartyLeader(wolfID),
 		// In load order 18, 5, 3; the hash table of four lists lists them
 		// by slot: 18 (2), 3 (3), 5 (5).
 		gameservertest.WithBuyLists(

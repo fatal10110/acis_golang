@@ -20,7 +20,7 @@ import (
 // one wander timer after the promotion, not one after the sleep ends.
 func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

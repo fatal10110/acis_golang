@@ -14,7 +14,7 @@ import (
 // around its spawn point: a private stays one once its master is gone.
 func TestPrivateStaysAPrivateWhenItsMasterDies(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

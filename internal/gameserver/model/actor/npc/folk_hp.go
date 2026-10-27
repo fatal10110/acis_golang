@@ -88,7 +88,7 @@ func (f *Folk) SkillAttacked(caster attackable.Combatant, def modelskill.Definit
 	}
 	value := max(120, def.AggroPoints)
 	f.raiseAttacked(caster, int32(value), skillRef(def))
-	propagatePartyAttacked(f, caster, value, false, false)
+	propagatePartyAttacked(f, caster, value, false)
 }
 
 // raiseAttacked runs f's attacked hooks.
@@ -140,7 +140,7 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 		f.fight.aggro.AddDamage(attacker, amount, 0)
 		damage := commons.TruncInt32Sat(amount)
 		f.raiseAttacked(attacker, damage, sk)
-		propagatePartyAttacked(f, attacker, int(damage), false, true)
+		propagatePartyAttacked(f, attacker, int(damage), false)
 		raiseClanAttacked(f.scripts, f.world, f, attacker, damage, sk, clanAttackedByHit)
 	}
 	if f.Invul() || !creature.CanDealDamage(attacker) {
