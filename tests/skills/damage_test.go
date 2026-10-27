@@ -693,6 +693,7 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		withWarriorBehavior(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: 43, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -742,6 +743,7 @@ func TestPdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		withWarriorBehavior(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: 42, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -783,6 +785,7 @@ func TestMdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
+		withWarriorBehavior(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: 45, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
