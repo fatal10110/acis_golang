@@ -31,7 +31,9 @@ const (
 )
 
 // dataTemplateParams are the template AI parameters of dataGrocer, in the
-// order its <ai> block declares them.
+// order its <ai> block declares them. Each holds a number from
+// templateParamBase: the NPC reads its SoulShot and SpiritShot counts as
+// integers when it spawns, and a non-numeric count keeps it from spawning.
 var dataTemplateParams = []string{
 	"AttackRange", "IsAggressive", "MoveAroundSocial", "MoveAroundSocial1", "MoveAroundSocial2", "Skill02_Check_Dist",
 	"Skill02_Dist_Min", "SoulShot", "SoulShotRate", "SpiritShot", "SpiritShotRate",
@@ -42,7 +44,7 @@ var dataTemplateParams = []string{
 func dataGrocer() *npc.Template {
 	params := make(npc.AIParams, len(dataTemplateParams))
 	for i, k := range dataTemplateParams {
-		params[k] = "t" + strconv.Itoa(i)
+		params[k] = strconv.Itoa(templateParamBase + i)
 	}
 	return npc.NewTemplate(npc.Template{
 		ID: grocerID, TemplateID: grocerID, Type: "Merchant", Name: "Grocer Lector", Level: 20,
@@ -74,8 +76,15 @@ func dataTree() *npc.Template {
 	}
 }
 
+// The values of the template's and the spawn's AI parameters start at
+// these numbers, so that a page shows which memo a value came from.
+const (
+	templateParamBase = 100
+	spawnParamBase    = 200
+)
+
 // dataSpawnParams are the AI parameters the grocer's spawn declares, in
-// that order.
+// that order, each holding a number from spawnParamBase.
 var dataSpawnParams = []string{
 	"AttackRange", "IsAggressive", "MoveAroundSocial", "MoveAroundSocial1", "MoveAroundSocial2", "Skill02_Probablity",
 	"Skill02_Target", "Skill03_Target", "Skill03_Type", "SoulShot", "SoulShotRate", "SpiritShot", "SpiritShotRate",
@@ -88,7 +97,7 @@ func dataMakers(t *testing.T) *spawn.Table {
 	t.Helper()
 	var sets strings.Builder
 	for i, k := range dataSpawnParams {
-		sets.WriteString(`<set name="` + k + `" val="s` + strconv.Itoa(i) + `"/>`)
+		sets.WriteString(`<set name="` + k + `" val="` + strconv.Itoa(spawnParamBase+i) + `"/>`)
 	}
 	body := `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -161,14 +170,14 @@ func dataSpawned(t *testing.T, srv *gameservertest.Server, id int, maker string)
 	return out
 }
 
-// paramRows is one row per key of keys, its value named prefix plus the
-// key's place in declared.
-func paramRows(keys, declared []string, prefix string) string {
+// paramRows is one row per key of keys, its value base plus the key's
+// place in declared.
+func paramRows(keys, declared []string, base int) string {
 	var b strings.Builder
 	for _, k := range keys {
 		for i, d := range declared {
 			if d == k {
-				b.WriteString(`<font color="LEVEL">[` + k + `]</font> ` + prefix + strconv.Itoa(i) + "<br1>")
+				b.WriteString(`<font color="LEVEL">[` + k + `]</font> ` + strconv.Itoa(base+i) + "<br1>")
 			}
 		}
 	}
@@ -219,8 +228,8 @@ func TestAdminInfoNpcSkillShopAndParamPages(t *testing.T) {
 		"MoveAroundSocial", "Skill02_Probablity", "IsAggressive", "Skill03_Target", "SoulShot", "Skill02_Target",
 	}
 	templateTabs := strings.Replace(aiTabs(1), "[Template]", "[Template]</a>", 1)
-	assertInfoPage(t, gm, "info ai 1", defaultPage(t, templateTabs+paramRows(templateOrder, dataTemplateParams, "t")))
-	assertInfoPage(t, gm, "info ai 2", defaultPage(t, aiTabs(2)+paramRows(spawnOrder, dataSpawnParams, "s")))
+	assertInfoPage(t, gm, "info ai 1", defaultPage(t, templateTabs+paramRows(templateOrder, dataTemplateParams, templateParamBase)))
+	assertInfoPage(t, gm, "info ai 2", defaultPage(t, aiTabs(2)+paramRows(spawnOrder, dataSpawnParams, spawnParamBase)))
 
 	// A wolf: no skill, no buylist, no template parameter beyond its
 	// party type, and a spawn declaring none.
