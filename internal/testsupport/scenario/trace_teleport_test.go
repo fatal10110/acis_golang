@@ -83,8 +83,8 @@ func TestDeferPlayerActionsMovesThePlayersTeleportAndCastToTheEndOfItsTask(t *te
 		},
 		{"an NPC's cast", []string{npcCast, say}, []string{npcCast, say}},
 	} {
-		if got := deferPlayerActions(slices.Clone(tc.task)); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: deferPlayerActions = %q, want %q", tc.name, got, tc.want)
+		if got, err := deferPlayerActions(slices.Clone(tc.task), 0); err != nil || !slices.Equal(got, tc.want) {
+			t.Errorf("%s: deferPlayerActions = %q, %v, want %q", tc.name, got, err, tc.want)
 		}
 	}
 }
