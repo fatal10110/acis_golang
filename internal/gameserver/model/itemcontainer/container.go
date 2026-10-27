@@ -80,8 +80,9 @@ func cmpDesc(a, b int64) int {
 // doesn't load config itself. A player inventory takes its live limit from
 // its owner instead (Inventory.SetLimiter).
 //
-// mu guards the membership map. Mutable item fields are guarded by
-// item.Instance once an instance is visible outside construction/restore code.
+// mu guards the membership map and its template index. Mutable item fields
+// are guarded by item.Instance once an instance is visible outside
+// construction/restore code.
 type Container struct {
 	ownerID   int32
 	location  item.Location
@@ -89,20 +90,73 @@ type Container struct {
 
 	SlotLimit int
 
-	mu      sync.RWMutex
-	items   map[int32]*item.Instance
-	persist item.Persister
+	mu    sync.RWMutex
+	items map[int32]*item.Instance
+	// byTemplate indexes items by template id, so template lookups touch
+	// only that template's instances. A bucket is unordered: readers order
+	// it themselves, since entry times move after insertion. Only
+	// membership writes touch it (a template id never changes), and every
+	// one goes through putLocked, dropLocked or clearLocked.
+	byTemplate map[int32][]*item.Instance
+	persist    item.Persister
 }
 
 // NewContainer returns an empty container owned by ownerID, holding items
 // at location, resolving templates against templates.
 func NewContainer(ownerID int32, location item.Location, templates *item.Table) *Container {
 	return &Container{
-		ownerID:   ownerID,
-		location:  location,
-		templates: templates,
-		items:     make(map[int32]*item.Instance),
+		ownerID:    ownerID,
+		location:   location,
+		templates:  templates,
+		items:      make(map[int32]*item.Instance),
+		byTemplate: make(map[int32][]*item.Instance),
 	}
+}
+
+// putLocked makes inst the instance held under its object id. The caller
+// holds c.mu for writing.
+func (c *Container) putLocked(inst *item.Instance) {
+	if old, ok := c.items[inst.ObjectID]; ok {
+		if old == inst {
+			return
+		}
+		c.unindexLocked(old)
+	}
+	c.items[inst.ObjectID] = inst
+	c.byTemplate[inst.TemplateID] = append(c.byTemplate[inst.TemplateID], inst)
+}
+
+// dropLocked removes the instance held under objectID, if any. The caller
+// holds c.mu for writing.
+func (c *Container) dropLocked(objectID int32) {
+	inst, ok := c.items[objectID]
+	if !ok {
+		return
+	}
+	delete(c.items, objectID)
+	c.unindexLocked(inst)
+}
+
+func (c *Container) unindexLocked(inst *item.Instance) {
+	bucket := c.byTemplate[inst.TemplateID]
+	i := slices.Index(bucket, inst)
+	if i < 0 {
+		return
+	}
+	last := len(bucket) - 1
+	bucket[i] = bucket[last]
+	bucket[last] = nil
+	if last == 0 {
+		delete(c.byTemplate, inst.TemplateID)
+		return
+	}
+	c.byTemplate[inst.TemplateID] = bucket[:last]
+}
+
+// clearLocked empties the container. The caller holds c.mu for writing.
+func (c *Container) clearLocked() {
+	clear(c.items)
+	clear(c.byTemplate)
 }
 
 // NewContainerWithPersister returns an empty container whose items persist
@@ -175,25 +229,21 @@ func (c *Container) itemsLocked() []*item.Instance {
 }
 
 // HasItem reports whether the container holds any instance of templateID.
-// It answers from the first match rather than through ItemByTemplateID:
-// existence doesn't depend on which instance is found, and HasItems /
-// HasAnyItem / quest conditions call it per template id.
+// Quest conditions ask it per template id on every hit, so it answers from
+// the template index without looking at any instance.
 func (c *Container) HasItem(templateID int32) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	for _, inst := range c.items {
-		if inst.TemplateID == templateID {
-			return true
-		}
-	}
-	return false
+	return len(c.byTemplate[templateID]) > 0
 }
 
 // HasItems reports whether the container holds at least one instance of
 // every id in templateIDs.
 func (c *Container) HasItems(templateIDs ...int32) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, id := range templateIDs {
-		if !c.HasItem(id) {
+		if len(c.byTemplate[id]) == 0 {
 			return false
 		}
 	}
@@ -203,8 +253,10 @@ func (c *Container) HasItems(templateIDs ...int32) bool {
 // HasAnyItem reports whether the container holds at least one instance of
 // any id in templateIDs.
 func (c *Container) HasAnyItem(templateIDs ...int32) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, id := range templateIDs {
-		if c.HasItem(id) {
+		if len(c.byTemplate[id]) > 0 {
 			return true
 		}
 	}
@@ -216,12 +268,11 @@ func (c *Container) HasAnyItem(templateIDs ...int32) bool {
 func (c *Container) ItemsByTemplateID(templateID int32) []*item.Instance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	var out []*item.Instance
-	for _, inst := range c.items {
-		if inst.TemplateID == templateID {
-			out = append(out, inst)
-		}
+	bucket := c.byTemplate[templateID]
+	if len(bucket) == 0 {
+		return nil
 	}
+	out := slices.Clone(bucket)
 	sortContainerOrder(out)
 	return out
 }
@@ -242,10 +293,7 @@ func (c *Container) ItemByTemplateID(templateID int32) *item.Instance {
 // that only want one instance don't pay for a slice and a sort.
 func (c *Container) itemByTemplateIDLocked(templateID int32) *item.Instance {
 	var best orderedItem
-	for _, inst := range c.items {
-		if inst.TemplateID != templateID {
-			continue
-		}
+	for _, inst := range c.byTemplate[templateID] {
 		if cand := keyed(inst); best.inst == nil || byContainerOrder(cand, best) < 0 {
 			best = cand
 		}
@@ -273,10 +321,7 @@ func (c *Container) ItemCount(templateID int32, enchantLevel int, includeEquippe
 	defer c.mu.RUnlock()
 
 	count := 0
-	for _, inst := range c.items {
-		if inst.TemplateID != templateID {
-			continue
-		}
+	for _, inst := range c.byTemplate[templateID] {
 		st := inst.Snapshot()
 		if enchantLevel >= 0 && st.EnchantLevel != enchantLevel {
 			continue
@@ -337,7 +382,7 @@ func (c *Container) insertLocked(inst *item.Instance) {
 	// never unregisters an item.
 	inst.BindPersister(c.persist)
 	inst.EnterContainer(c.ownerID, c.location, 0, nowMillis())
-	c.items[inst.ObjectID] = inst
+	c.putLocked(inst)
 }
 
 // AddNew creates a new instance of templateID, using objectID as its
@@ -430,7 +475,7 @@ func (c *Container) Remove(inst *item.Instance) bool {
 	c.mu.Lock()
 	_, ok := c.items[inst.ObjectID]
 	if ok {
-		delete(c.items, inst.ObjectID)
+		c.dropLocked(inst.ObjectID)
 	}
 	c.mu.Unlock()
 	return ok
@@ -456,7 +501,7 @@ func (c *Container) DestroyItem(inst *item.Instance, count int) *item.Instance {
 		return nil
 	}
 	return destroyItemCore(inst, count, func(inst *item.Instance) bool {
-		delete(c.items, inst.ObjectID)
+		c.dropLocked(inst.ObjectID)
 		return true
 	}, nil)
 }
@@ -506,10 +551,10 @@ func (c *Container) DestroyAll(inst *item.Instance) *item.Instance {
 func (c *Container) DestroyAllItems() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for objectID, inst := range c.items {
-		delete(c.items, objectID)
+	for _, inst := range c.items {
 		inst.DestroyState()
 	}
+	c.clearLocked()
 }
 
 // Receiver is a container a transfer moves items into: a whole instance
@@ -585,7 +630,7 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, nextID 
 		count = st.Count
 	}
 	if st.Count == count && targetItem == nil {
-		delete(c.items, objectID)
+		c.dropLocked(objectID)
 		c.mu.Unlock()
 		// A stack target gained since the check absorbs src, whose id is
 		// then free.
@@ -602,7 +647,7 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, nextID 
 			return nil, 0, false, nil
 		}
 	} else {
-		delete(c.items, objectID)
+		c.dropLocked(objectID)
 		src.DestroyState()
 		freedObjectID, freed = objectID, true
 	}
@@ -623,7 +668,7 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, nextID 
 func (c *Container) Restore(items []*item.Instance) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	clear(c.items)
+	c.clearLocked()
 	restoredAt := nowMillis()
 	for _, inst := range items {
 		if inst == nil {
@@ -645,7 +690,7 @@ func (c *Container) Restore(items []*item.Instance) {
 				continue
 			}
 		}
-		c.items[inst.ObjectID] = inst
+		c.putLocked(inst)
 	}
 	for _, inst := range c.items {
 		inst.BindPersister(c.persist)

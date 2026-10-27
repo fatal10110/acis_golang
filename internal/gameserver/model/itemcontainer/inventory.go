@@ -361,7 +361,7 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
 
-	clear(inv.Container.items)
+	inv.Container.clearLocked()
 	clear(inv.paperdoll[:])
 	inv.wornMask = 0
 	inv.totalWeight = 0
@@ -389,30 +389,23 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		// fix-up nor an equip displacement schedules a redundant write of
 		// what was just read.
 		inst.EnterContainer(inv.OwnerID(), st.Location, st.LocationData, restoredAt)
-		merged := false
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if tmpl != nil && tmpl.Stackable {
-			for _, held := range inv.Container.items {
-				if held.TemplateID == inst.TemplateID {
-					// A stack merge is the exception: it changes two rows.
-					// Unwritten, the absorbed row survives to be merged in
-					// again on every later restore, so both the grown stack
-					// and the absorbed row's delete are scheduled here. The
-					// grown stack stays bound from here on, so a later row
-					// displacing it from its equip slot is written too.
-					held.BindPersister(inv.Container.persist)
-					inst.BindPersister(inv.Container.persist)
-					held.AddCount(st.Count)
-					inst.DestroyState()
-					merged = true
-					break
-				}
+			if held := inv.Container.itemByTemplateIDLocked(inst.TemplateID); held != nil {
+				// A stack merge is the exception: it changes two rows.
+				// Unwritten, the absorbed row survives to be merged in
+				// again on every later restore, so both the grown stack
+				// and the absorbed row's delete are scheduled here. The
+				// grown stack stays bound from here on, so a later row
+				// displacing it from its equip slot is written too.
+				held.BindPersister(inv.Container.persist)
+				inst.BindPersister(inv.Container.persist)
+				held.AddCount(st.Count)
+				inst.DestroyState()
+				continue
 			}
 		}
-		if merged {
-			continue
-		}
-		inv.Container.items[inst.ObjectID] = inst
+		inv.Container.putLocked(inst)
 
 		// totalWeight is deliberately left at 0 here: restoring only fills
 		// the item set, and carried weight is computed and reported solely by
@@ -520,10 +513,10 @@ func (inv *Inventory) DestroyAllItems() {
 	inv.Container.mu.Lock()
 	inv.mu.Lock()
 	instances := make([]*item.Instance, 0, len(inv.Container.items))
-	for objectID, inst := range inv.Container.items {
-		delete(inv.Container.items, objectID)
+	for _, inst := range inv.Container.items {
 		instances = append(instances, inst)
 	}
+	inv.Container.clearLocked()
 	clear(inv.paperdoll[:])
 	inv.wornMask = 0
 	inv.mu.Unlock()
