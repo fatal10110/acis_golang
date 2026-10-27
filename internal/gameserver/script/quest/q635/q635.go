@@ -488,12 +488,12 @@ func (q quest) roomOf(npc *script.NPC) (*script.RoomCell, []*script.RoomCell) {
 	return rooms[index], rooms
 }
 
-// eachMember runs fn for the members of the room as it took them that are
-// in the world.
-func eachMember(s *script.Script, room *script.RoomCell, fn func(p *script.Player)) {
+// forgetMembers sets slot 1 of the memo state to -1 for the members of the
+// room as it took them that are in the world.
+func forgetMembers(s *script.Script, room *script.RoomCell) {
 	for _, id := range room.MemberIDs() {
 		if p := s.WorldPlayer(id); p != nil {
-			fn(p)
+			s.SetMemoStateEx(p, questID, 1, -1)
 		}
 	}
 }
@@ -511,7 +511,7 @@ func (q quest) giveUp(s *script.Script, e script.Event) string {
 
 	oustPlayers(s, e.NPC)
 	makerEvent(s, e.NPC, "0")
-	eachMember(s, room, func(p *script.Player) { s.SetMemoStateEx(p, questID, 1, -1) })
+	forgetMembers(s, room)
 	room.Clear()
 	return ""
 }
@@ -612,8 +612,8 @@ func (q quest) onTimer(s *script.Script, e script.Timer) string {
 
 // ousted puts the party of the room out of the rift: its members get -1 in
 // the memo state slot, the room is emptied and its monsters leave.
-func ousted(s *script.Script, npc *script.NPC, room *script.RoomCell, memo func(p *script.Player)) {
-	eachMember(s, room, memo)
+func ousted(s *script.Script, npc *script.NPC, room *script.RoomCell) {
+	forgetMembers(s, room)
 	oustPlayers(s, npc)
 	makerEvent(s, npc, "0")
 	room.Clear()
@@ -673,7 +673,7 @@ func watchRoom(s *script.Script, e script.Timer, room *script.RoomCell, roomInde
 		return
 	}
 	if started+60*40 < tick {
-		ousted(s, npc, room, func(p *script.Player) { s.SetMemoStateEx(p, questID, 1, -1) })
+		ousted(s, npc, room)
 		return
 	}
 	s.StartTimer(timerRoomJump, npc, e.Player, 5000*time.Millisecond)
@@ -683,18 +683,17 @@ func watchRoom(s *script.Script, e script.Timer, room *script.RoomCell, roomInde
 // jump sends the party of a room on, to Anakazel or to another room.
 func jump(s *script.Script, e script.Timer, rooms []*script.RoomCell, room0 *script.RoomCell, roomIndex int) {
 	npc := e.NPC
-	forget := func(p *script.Player) { s.SetMemoStateEx(p, questID, 1, -1) }
 	if !room0.Locked() {
 		// The party gave up or changed rooms since the quake: the room was
 		// emptied, and the jump has nobody left to move.
 		return
 	}
 	if room0.PartyChanged() {
-		ousted(s, npc, room0, forget)
+		ousted(s, npc, room0)
 		return
 	}
 	if leader := room0.PartyLeader(); leader == nil || leader.Dead() || outside(npc, leader) {
-		ousted(s, npc, room0, forget)
+		ousted(s, npc, room0)
 		return
 	}
 	if roomIndex == anakazelRoom && npc.Int(script.SlotIntAI1) == 2 {
