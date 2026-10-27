@@ -104,16 +104,10 @@ func (f *Folk) act(d *ai.Desire) {
 	}
 }
 
-// thinkMoveTo is the walk step: f already standing on the point opens the
-// move-finished point and drops the desire of its current intention;
-// otherwise f, when it can act and move, walks there.
+// thinkMoveTo is the walk step: f, when it can act and move, walks to the
+// point. Standing on it already, f still walks there: a zero-length move
+// that arrives, and opens the move-finished point, on the next move tick.
 func (f *Folk) thinkMoveTo(d *ai.Desire) {
-	x, y, z := f.Position()
-	if (location.Location{X: x, Y: y, Z: z}) == d.Location {
-		f.atHookPoint(ai.HookMoveFinished)
-		f.clearCurrentDesire()
-		return
-	}
 	if f.denyAIAction() || f.motion == nil || f.MovementDisabled() {
 		return
 	}

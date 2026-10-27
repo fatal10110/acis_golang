@@ -8,9 +8,10 @@ import (
 )
 
 // ---- from attackable_wander_test.go ----
-// TestAttackableAIPromotesMoveToDesireAndKeepsItAtDestination pins
-// NpcAI.thinkMoveTo at the destination: the desire is dropped but MOVE_TO
-// stays current until desire selection idles it on the empty queue.
+// TestAttackableAIPromotesMoveToDesireAndKeepsItAtDestination pins the walk
+// step at the destination: standing on the point, the actor still walks
+// there (a zero-length move) and keeps the desire; the arrival drops it,
+// MOVE_TO stays current until desire selection idles it on the empty queue.
 func TestAttackableAIPromotesMoveToDesireAndKeepsItAtDestination(t *testing.T) {
 	owner := actor(1)
 	owner.x, owner.y, owner.z = 100, 0, 0
@@ -33,16 +34,21 @@ func TestAttackableAIPromotesMoveToDesireAndKeepsItAtDestination(t *testing.T) {
 	owner.x, owner.y, owner.z = home.X, home.Y, home.Z
 	move.home = location.Location{X: -1, Y: -1, Z: -1}
 	if err := brain.Think(); err != nil {
-		t.Fatalf("Think() after arrival error: %v", err)
+		t.Fatalf("Think() on the point error: %v", err)
 	}
+	if move.home != home {
+		t.Fatalf("MoveHome on the point = %#v, want the zero-length move to %#v", move.home, home)
+	}
+	if brain.Desires().Len() != 1 {
+		t.Fatalf("desires after Think on the point = %d, want the MOVE_TO desire kept until arrival", brain.Desires().Len())
+	}
+
+	brain.Arrived()
 	if got := brain.CurrentIntention(); got != IntentionMoveTo {
-		t.Fatalf("CurrentIntention() after arrival Think = %v, want %v kept", got, IntentionMoveTo)
+		t.Fatalf("CurrentIntention() after arrival = %v, want %v kept", got, IntentionMoveTo)
 	}
 	if brain.Desires().Len() != 0 {
-		t.Fatalf("desires after arrival Think = %d, want the MOVE_TO desire dropped", brain.Desires().Len())
-	}
-	if move.home == home {
-		t.Fatal("Think at the destination restarted MoveHome")
+		t.Fatalf("desires after arrival = %d, want the MOVE_TO desire dropped", brain.Desires().Len())
 	}
 	if err := tickThinkIdle(brain); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
@@ -122,7 +128,8 @@ func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionMoveTo)
 	}
 
-	// |ΔZ| > Desire.Equal's 30 so thinkMoveTo's fast path cannot idle.
+	// Arrival short of the destination: geodata snapped Z by more than
+	// Desire.Equal's 30.
 	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
 	brain.Arrived()
 	move.home = location.Location{X: -1, Y: -1, Z: -1}
@@ -139,8 +146,8 @@ func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 
 // TestAttackableAIArrivedShortThinkResumesMoveTo pins the reference THINK
 // on a MOVE_TO an arrival left short of its destination with no swing in
-// flight: AbstractAI.onEvtThink runs NpcAI.thinkMoveTo, which away from the
-// destination calls CreatureAI.thinkMoveTo and walks again. The desire-less
+// flight: AbstractAI.onEvtThink runs NpcAI.thinkMoveTo, which calls
+// CreatureAI.thinkMoveTo and walks again. The desire-less
 // walk is not idled first.
 func TestAttackableAIArrivedShortThinkResumesMoveTo(t *testing.T) {
 	owner := actor(1)
