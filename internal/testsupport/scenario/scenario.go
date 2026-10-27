@@ -125,6 +125,15 @@
 //	                                          battlefield the server then runs around where it enters the world; a
 //	                                          scenario with a summon line takes no relog or restart
 //
+// An npc line takes more options, in any order after the offsets: level <n>, the template's level (default 1);
+// aggro <range>, its aggro range (default none: a raid boss sees only as far as that); mem <slot>=<value>[,...],
+// the script memory slots its life starts with once its created hook ran (i_ai0 to i_ai4, i_quest0 to i_quest4,
+// flag, weight (the weight point) and value (the script value) take a number; c_ai0 to c_ai4 and c_quest0 to
+// c_quest4 take the character (player), the role of an NPC line above, or - for none); privates
+// <npc id>[:<weight>[:<respawn ms>]][,...], the privates its template lists, which a script's CreatePrivates
+// raises (each template needs an npc line of its own); master <role>, the NPC is raised as the private of the NPC
+// line above, as a master's script raises one.
+//
 // Each NPC line's NPC runs the created hooks of the scripts bound to it as
 // it appears, as the spawn pass runs them, and a civilian casts the shipped
 // skills (data/xml/skills) a script or dialog asks of it on a later AI
@@ -152,9 +161,26 @@
 //	hallstatus <id> <registering|waiting|siege>
 //	                       the hall line's hall changes its siege status
 //	link <file>            a RequestLinkHtml
-//	hit <role> <damage> [by <role>]
+//	hit <role> <damage> [by <role>] [skill <skill id> <level>]
 //	                       the character, or the creature by names (an npc line's NPC or the summon), lands a
-//	                       hit of that damage on the NPC or the door, on the attacker's queue
+//	                       hit of that damage on the NPC or the door, on the attacker's queue; with skill, the
+//	                       hit is that shipped skill's (the attacked hook reads its id, level and whether it is
+//	                       magic), and the scripts read the skill
+//	hp <role|player> <hp>  the NPC's or the character's hit points are set to that many (clamped to its maximum;
+//	                       a character at 0 is not dead: the die step kills it)
+//	die [<role>]           the character dies, killed by that NPC (none by default), on its own queue
+//	top <role> <creature|->
+//	                       the NPC's top desire target is set to the character (player), an npc line's NPC or the
+//	                       summon, or to nothing, as a script's SetTopDesireTarget does
+//	land <target> <skill id> <level> [by <creature>]
+//	                       the effects of that shipped skill land on the target (player, an npc line's NPC or the
+//	                       summon) from the creature by names (default: the target itself), on the target's
+//	                       queue, outside any cast, with the landing rolls of a cast's effects (roll pins them);
+//	                       time passes until the target holds one. A stun, a mute, a root or a hold lands so
+//	                       on an NPC
+//	stance <role> <on|off> the hostile NPC's attack stance is set or ended (the stance clock never ends one in a run)
+//	swing <role>           the AI ticks and the position ticks run, time passing, until the hostile NPC's swing
+//	                       is in flight (it attacks now), as a script's AttackingNow reads it
 //	kill <role> [xN]       the character lands a lethal hit on the NPC, N times; a dead NPC is replaced by a fresh one first
 //	advance <duration>     time passes, as time.ParseDuration reads it
 //	approach <role> [<distance>]
@@ -211,6 +237,22 @@
 //	                                        character first entered the world), nothing(<timer>), any other kind ()
 //	  at <role> <dx> <dy> <dz>              where the NPC, or the character (player), stands after the step, as an
 //	                                        offset from where the character first entered the world
+//	  mem <role> <slot>=<value> ...         the NPC's script memory slots after the step (see the npc line's mem)
+//	  hp <role|player> <hp>                 the hostile NPC's or the character's hit points after the step
+//	  dead <role|player> <yes|no>           whether the hostile NPC or the character is dead (a deleted NPC is)
+//	  inworld <role> <yes|no>               whether the NPC is still in the world: a killed one stays as a
+//	                                        corpse, a deleted one (a chest whose key broke) is gone
+//	  privates <role> <npc id>=<n> ... | -  the live privates of the NPC, by template (the privates of a master
+//	                                        line included), all of them
+//	  master <role> <role|->                the NPC's master, or - for none
+//	  top <role> <creature|->               the hostile NPC's top desire target
+//	  effect <role|player> <skill id> <held|none>
+//	                                        whether the NPC or the character holds an effect of that skill
+//	  stance <role> <on|off>                whether the hostile NPC holds an attack stance
+//	  random <draw> ... | random always <draw>
+//	                                        not a check but the step's own script draws, in place of the random
+//	                                        line's for this step alone (every one must be drawn); the random line's
+//	                                        resume at the next step, so a scenario draws differently per step
 //
 // A step other than create and enter acts in the world: a scenario starting
 // with create, or a restart, is followed by an enter before any of them. The
@@ -275,8 +317,10 @@
 // (and no as or enter step of a mate); nor
 // does the reference probe play a skill, door or summon line, an npc
 // line's clan or skill, a hit by another creature, an approach to a
-// distance, a cast, a jump or an away, a clock line, an npc line's ai or
-// params or an event step, so a traced scenario takes none.
+// distance, a cast, a jump or an away, a clock line, an npc line's ai,
+// params, level, aggro, mem, privates or master or an event, hp, die, top,
+// land, stance or swing step, a skill hit, or a step's own random line, so a
+// traced scenario takes none.
 //
 // A step compares what a script does in the world: besides the dialog, the
 // quest and the item packets, the camera shots (SpecialCamera) and the
@@ -426,6 +470,28 @@ type Spoil struct {
 	Other bool
 }
 
+// parseRandom reads a random line's arguments: <draw> ... or always <draw>.
+func parseRandom(args []string) (*Random, error) {
+	rd := &Random{}
+	if len(args) > 0 && args[0] == "always" {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("random always <draw>")
+		}
+		rd.Always, args = true, args[1:]
+	}
+	if len(args) == 0 {
+		return nil, fmt.Errorf("random <draw> ... | random always <draw>")
+	}
+	for _, a := range args {
+		v, err := strconv.Atoi(a)
+		if err != nil || v < 0 {
+			return nil, fmt.Errorf("draw %q is not a number of 0 or more", a)
+		}
+		rd.Draws = append(rd.Draws, v)
+	}
+	return rd, nil
+}
+
 // Random is the random line: the draws in order, or one draw always.
 type Random struct {
 	Draws  []int
@@ -461,6 +527,16 @@ type NPC struct {
 	// Params are the three spawn parameters, each "" (0), a number, a role
 	// or character.
 	Params [3]string
+	// Level is the template's level, 0 for the fixture's 1; Aggro its aggro
+	// range, 0 for none.
+	Level, Aggro int
+	// Mem are the script memory slots each life starts with, nil for none.
+	Mem []MemSet
+	// Privates are the template's privates, nil for none.
+	Privates []npc.PrivateEntry
+	// Master is the role of the NPC line above this NPC is raised as the
+	// private of, "" for none.
+	Master string
 }
 
 // Step is one client action and what it must leave.
@@ -486,6 +562,9 @@ type Step struct {
 	// that teleports the character or makes it cast, in order; nil without
 	// one.
 	Queues []string
+	// Random are the script draws this step draws instead of the random
+	// line's, nil for the random line's.
+	Random *Random
 	Checks []Check
 }
 
@@ -513,7 +592,7 @@ var argCount = map[string][2]int{
 	"action":     {1, 1},
 	"bypass":     {1, -1},
 	"link":       {1, 1},
-	"hit":        {2, 4},
+	"hit":        {2, 7},
 	"kill":       {1, 2},
 	"advance":    {1, 1},
 	"approach":   {1, 2},
@@ -531,6 +610,12 @@ var argCount = map[string][2]int{
 	"hallstatus": {2, 2},
 	"event":      {4, 4},
 	"create":     {0, 0},
+	"hp":         {2, 2},
+	"die":        {0, 1},
+	"top":        {2, 2},
+	"land":       {3, 5},
+	"stance":     {2, 2},
+	"swing":      {1, 1},
 }
 
 // Parse reads a scenario file.
@@ -616,7 +701,13 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if what := sc.tracedFight(); sc.Trace != "" && what != "" {
 		return nil, fmt.Errorf("%s: a traced scenario takes no %s", name, what)
 	}
+	if what := sc.tracedState(); sc.Trace != "" && what != "" {
+		return nil, fmt.Errorf("%s: a traced scenario takes no %s", name, what)
+	}
 	if err := sc.checkFightChecks(roles); err != nil {
+		return nil, fmt.Errorf("%s:%w", name, err)
+	}
+	if err := sc.checkStateRoles(roles); err != nil {
 		return nil, fmt.Errorf("%s:%w", name, err)
 	}
 	if err := sc.checkFlow(); err != nil {
@@ -798,22 +889,9 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		if sc.Random != nil {
 			return fmt.Errorf("one random line")
 		}
-		rd := &Random{}
-		if len(args) > 0 && args[0] == "always" {
-			if len(args) != 2 {
-				return fmt.Errorf("random always <draw>")
-			}
-			rd.Always, args = true, args[1:]
-		}
-		if len(args) == 0 {
-			return fmt.Errorf("random <draw> ... | random always <draw>")
-		}
-		for _, a := range args {
-			v, err := strconv.Atoi(a)
-			if err != nil || v < 0 {
-				return fmt.Errorf("draw %q is not a number of 0 or more", a)
-			}
-			rd.Draws = append(rd.Draws, v)
+		rd, err := parseRandom(args)
+		if err != nil {
+			return err
 		}
 		sc.Random = rd
 	case "script", "stub":
@@ -848,7 +926,7 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		sc.Pages = append(sc.Pages, args[0])
 	case "npc":
 		if len(args) < 6 {
-			return fmt.Errorf("npc <role> <npc id> <type> <dx> <dy> <dz> [walks] [maker <territory>]")
+			return fmt.Errorf("npc <role> <npc id> <type> <dx> <dy> <dz> [options]")
 		}
 		opts, err := npcOptions(args[6:], sc.Territories)
 		if err != nil {
@@ -876,6 +954,9 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			}
 		}
 		roles[role] = true
+		if err := sc.checkNPCState(opts, roles); err != nil {
+			return err
+		}
 		opts.Role, opts.ID, opts.Type = role, int32(id), args[2]
 		opts.DX, opts.DY, opts.DZ = offsets[0], offsets[1], offsets[2]
 		sc.NPCs = append(sc.NPCs, opts)
@@ -1020,6 +1101,9 @@ func (sc *Scenario) checkStep(verb string, args []string, roles map[string]bool)
 	if err := sc.checkFightStep(verb, args, roles); err != nil {
 		return err
 	}
+	if slices.Contains(stateVerbs, verb) {
+		return sc.checkStateStep(verb, args, roles)
+	}
 	switch verb {
 	case "action", "kill", "approach", "look", "walk", "event":
 		if !roles[args[0]] {
@@ -1120,7 +1204,16 @@ func (s *Step) expect(n int, line string) error {
 			return fmt.Errorf("queue %q is not own or other[+n], one per task", rest)
 		}
 		s.Queues = queues
-	case "items", "rows", "state", "hate", "desires", "at":
+	case "random":
+		if s.Random != nil {
+			return fmt.Errorf("a second random line in a step")
+		}
+		rd, err := parseRandom(strings.Fields(rest))
+		if err != nil {
+			return err
+		}
+		s.Random = rd
+	case "items", "rows", "state", "hate", "desires", "at", "mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance":
 		args := strings.Fields(rest)
 		if kind == "rows" {
 			var err error
@@ -1212,6 +1305,8 @@ func checkCheck(kind string, args []string) error {
 	switch kind {
 	case "hate", "desires", "at":
 		return checkFightCheck(kind, args)
+	case "mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance":
+		return checkStateCheck(kind, args)
 	case "items":
 		if len(args) == 0 {
 			return fmt.Errorf("items takes one or more <id>=<count>")

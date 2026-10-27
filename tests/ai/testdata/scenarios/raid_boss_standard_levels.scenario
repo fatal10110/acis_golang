@@ -1,0 +1,27 @@
+# RaidBossStandard (25019 Pan Dryad, level 11 here, and 25063 at level 12) beside the level 20
+# character, every draw 0: the character is more than 8 levels above the first boss, so the hit
+# on it makes it want its raid curse 4515 on the character and forget its hate of it (no attack
+# desire), and the spell the character casts makes it want its raid mute 4215 on it. The
+# second boss, only 8 levels below, fights it as any boss does.
+character Hunter 20
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1
+npc low 25019 RaidBoss 200 0 0 level 11 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+npc even 25019 RaidBoss -200 0 0 level 12 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+npc wolf 20120 Monster 150 100 0
+
+hit low 10
+  hate low 0
+  desires low cast(player,4515,move)=1000000
+hit even 10
+  hate even 10526.315789473683
+  desires even attack(player)=10526.315789473683
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires low cast(player,4515,move)=1000000 cast(player,4215,move)=1000000

@@ -1,0 +1,23 @@
+# WarriorRunAwayPhysicalSpecial (21508) running from the character (i_ai0 1), 200 away, every
+# draw 99. The hit that makes the character its most hated, with it holding no effect of skill
+# 1201's stack, leaves it running; once the skill lands on it (held), the next hit ends the run
+# (i_ai0 3) and drops its walk. The attack weight the held hit leaves is not pinned
+# here: tests/ai/warrior_individual5h_test.go asks only that there is one.
+character Hunter 20
+random always 99
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecial
+npc runner 21508 Monster 200 0 0 mem i_ai0=1 skill PHYSICAL_SPECIAL 4643 6
+roll runner 0
+
+hit runner 10
+  mem runner i_ai0=1 c_ai0=player
+  effect runner 1201 none
+  desires runner attack(player)=125
+land runner 1201 1
+  effect runner 1201 held
+hit runner 10
+  mem runner i_ai0=3

@@ -144,6 +144,9 @@ func npcOptions(args []string, territories []Territory) (NPC, error) {
 	var n NPC
 	for len(args) > 0 {
 		rest, ok, err := npcFightOption(&n, args)
+		if err == nil && !ok {
+			rest, ok, err = npcStateOption(&n, args)
+		}
 		if err != nil {
 			return NPC{}, err
 		}
@@ -174,7 +177,7 @@ func npcOptions(args []string, territories []Territory) (NPC, error) {
 			copy(n.Params[:], args[1:4])
 			args = args[4:]
 		default:
-			return NPC{}, fmt.Errorf("npc option %q is not walks, maker <territory>, clan, skill, ai or params <p1> <p2> <p3>", args[0])
+			return NPC{}, fmt.Errorf("npc option %q is not walks, maker <territory>, clan, skill, ai, params <p1> <p2> <p3>, level, aggro, mem, privates or master", args[0])
 		}
 	}
 	return n, nil

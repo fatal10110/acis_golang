@@ -147,17 +147,12 @@ func (sc *Scenario) checkFightStep(verb string, args []string, roles map[string]
 		if _, isDoor := sc.door(args[0]); !roles[args[0]] && !isDoor {
 			return fmt.Errorf("unknown role %q: no npc or door line names it", args[0])
 		}
-		switch len(args) {
-		case 2:
-		case 4:
-			if args[2] != "by" {
-				return fmt.Errorf("hit <role> <damage> [by <role>]")
-			}
-			if by := args[3]; by == args[0] || (!roles[by] && !sc.summoned(by)) {
-				return fmt.Errorf("hit by %q: no other npc line nor the summon line names it", by)
-			}
-		default:
-			return fmt.Errorf("hit <role> <damage> [by <role>]")
+		h, err := parseHit(args)
+		if err != nil {
+			return err
+		}
+		if h.by != "player" && (h.by == args[0] || (!roles[h.by] && !sc.summoned(h.by))) {
+			return fmt.Errorf("hit by %q: no other npc line nor the summon line names it", h.by)
 		}
 	case "cast":
 		if !roles[args[0]] {

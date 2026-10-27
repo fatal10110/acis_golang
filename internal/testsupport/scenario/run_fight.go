@@ -46,6 +46,7 @@ func (r *run) fightOptions(t *testing.T) []gameservertest.Option {
 		}
 	}
 	refs = append(refs, r.sc.Skills...)
+	refs = append(refs, r.sc.stepSkills()...)
 	var opts []gameservertest.Option
 	if len(refs) > 0 {
 		defs := make([]modelskill.Definition, 0, len(refs))
@@ -223,9 +224,11 @@ func (r *run) on(t *testing.T, role string, post func(func()) bool, fn func()) {
 func (r *run) hit(t *testing.T, args []string) {
 	t.Helper()
 	damage, _ := strconv.ParseInt(args[1], 10, 32)
-	by := "player"
-	if len(args) == 4 {
-		by = args[3]
+	hit, _ := parseHit(args)
+	by := hit.by
+	var def modelskill.Definition
+	if hit.hasSkill {
+		def = shippedSkill(t, hit.skill)
 	}
 	attacker, post := r.creature(t, by)
 	if d, ok := r.sc.door(args[0]); ok {
@@ -233,7 +236,7 @@ func (r *run) hit(t *testing.T, args []string) {
 		if !ok {
 			t.Fatalf("%s: door %s is not in the world", r.sc.Name, d.Role)
 		}
-		r.on(t, by, post, func() { obj.ReduceHP(float64(damage), attacker, modelskill.Definition{}) })
+		r.on(t, by, post, func() { obj.ReduceHP(float64(damage), attacker, def) })
 		r.srv.Settle(t)
 		return
 	}
@@ -241,7 +244,13 @@ func (r *run) hit(t *testing.T, args []string) {
 	if h == nil || h.AlikeDead() {
 		t.Fatalf("%s: NPC %s is not a live attackable", r.sc.Name, args[0])
 	}
-	r.on(t, by, post, func() { h.TakeDamage(int(damage), attacker) })
+	r.on(t, by, post, func() {
+		if hit.hasSkill {
+			h.ReduceHP(float64(damage), attacker, def)
+			return
+		}
+		h.TakeDamage(int(damage), attacker)
+	})
 	r.srv.Settle(t)
 }
 
