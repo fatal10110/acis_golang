@@ -21,7 +21,8 @@ import (
 // (Servitor.java:109-128) and Summon.onDecay (Summon.java:193-199), aCis
 // revision in the outer repo.
 //
-// Expected values are worked by hand from those methods: a revive without a
+// Expected values are worked by hand from those methods (no reference probe
+// yet: #4341): a revive without a
 // Phoenix Blessing sets HP to int max HP * RESPAWN_RESTORE_HP (the test boot
 // uses 0.7), and a resurrection gives back Math.round((expBeforeDeath - exp)
 // * power / 100) of a pet's experience.

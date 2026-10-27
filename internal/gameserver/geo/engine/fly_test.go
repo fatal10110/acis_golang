@@ -29,7 +29,7 @@ func flyEngine(t *testing.T) *Engine {
 	return e
 }
 
-// Expected values are traced by hand through GeoEngine.canFly and
+// (No reference probe yet: #4341.) Expected values are traced by hand through GeoEngine.canFly and
 // GeoEngine.getValidFlyLocation (GeoEngine.java:1386-1666) with an oheight
 // of 32, the corridor PlayerMove.calculatePath asks for: the line's height at
 // each crossed cell border is oz + (int)(mz * distance from the origin), the

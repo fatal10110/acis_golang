@@ -32,7 +32,8 @@ import (
 //   - Door.doRevive takes the template's open state back (re-adding a closed
 //     door's geodata), then Creature.doRevive sets HP to RespawnRestoreHP
 //     (0.7) of the maximum, broadcasting it, and broadcasts Revive.
-// Expected values below are worked from those formulas by hand.
+// Expected values below are worked from those formulas by hand (no reference
+// probe yet: #4341).
 
 const (
 	hpDoorID    = unlockDoorID
