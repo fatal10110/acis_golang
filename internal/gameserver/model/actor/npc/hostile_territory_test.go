@@ -3,6 +3,7 @@ package npc
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -301,6 +302,10 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 					if err := hostile.RunAI(); err != nil {
 						t.Fatalf("RunAI() error: %v", err)
 					}
+					if !slices.Equal(movement.locations, []location.Location{home}) || movement.home != (location.Location{}) {
+						t.Fatalf("walks = %v, MoveHome destination = %#v; want one path-finding walk to %#v", movement.locations, movement.home, home)
+					}
+					return
 				}
 				if movement.home != home {
 					t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)

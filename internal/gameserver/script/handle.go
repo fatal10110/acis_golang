@@ -292,6 +292,7 @@ func combatantOf(c Creature) attackable.Combatant {
 type brain interface {
 	AddCastDesire(target attackable.Combatant, ref skill.Ref, weight float64, checkConditions, moveToTarget bool)
 	AddMoveToDesire(loc location.Location, weight float64) bool
+	AddMoveToPositionDesire(loc location.Location, heading int, weight float64) bool
 	AddWanderDesire(timer int, weight float64)
 	AddDoNothingDesire(timer int, weight float64)
 	AddSocialDesire(id, timer int, weight float64)
@@ -375,10 +376,17 @@ func (n *NPC) AddDoNothingDesire(timer int, weight float64) {
 
 // AddMoveToDesire asks the NPC to walk to at. It is refused for an NPC that
 // cannot move, or when no straight walk from where it stands reaches at.
-// Once there, its move-finished hooks run, then the desire is dropped.
+// Once there, its move-finished hooks run, then the desire is dropped. A
+// creature's position or spawn point the NPC already stands on, facing its
+// heading, is reached without a walk.
 func (n *NPC) AddMoveToDesire(at Place, weight float64) {
 	l := at.loc()
-	n.mind().AddMoveToDesire(location.Location{X: l.X, Y: l.Y, Z: l.Z}, weight)
+	to := location.Location{X: l.X, Y: l.Y, Z: l.Z}
+	if l.standing {
+		n.mind().AddMoveToPositionDesire(to, l.Heading, weight)
+		return
+	}
+	n.mind().AddMoveToDesire(to, weight)
 }
 
 // AddFleeDesire asks the NPC to run distance away from target, counted from

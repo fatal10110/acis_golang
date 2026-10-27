@@ -146,9 +146,9 @@ func TestHookPointSeeCreatureOpensOnlyThePeriodicCycle(t *testing.T) {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	assertHookPoints(t, owner, "on the periodic cycle", HookSeeCreature)
-	if got := brain.CurrentIntention(); got != IntentionMoveTo || move.home != dest {
+	if got := brain.CurrentIntention(); got != IntentionMoveTo || move.moveTo != dest {
 		t.Fatalf("after a walk queued at the see-creature point: intention %v walking to %+v, want %v to %+v",
-			got, move.home, IntentionMoveTo, dest)
+			got, move.moveTo, IntentionMoveTo, dest)
 	}
 }
 
@@ -279,8 +279,8 @@ func TestHookPointMoveFinishedAtDestination(t *testing.T) {
 		t.Fatalf("RunAI() error: %v", err)
 	}
 	assertHookPoints(t, owner, "on a walk step at its destination")
-	if move.home != here {
-		t.Fatalf("MoveHome = %#v, want the zero-length move to %#v", move.home, here)
+	if move.moveTo != here {
+		t.Fatalf("MoveToLocation = %#v, want the zero-length move to %#v", move.moveTo, here)
 	}
 	brain.Arrived()
 	assertHookPoints(t, owner, "on the zero-length walk's arrival", HookMoveFinished)

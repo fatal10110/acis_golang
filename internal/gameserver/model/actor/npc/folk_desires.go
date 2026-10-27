@@ -18,11 +18,23 @@ const nothingDesireDecay = 0.5
 // straight geodata walk from where f stands reaches loc. Safe from any
 // goroutine.
 func (f *Folk) AddMoveToDesire(loc location.Location, weight float64) bool {
+	return f.addMoveToDesire(&ai.Desire{Kind: ai.IntentionMoveTo, Location: loc, Weight: weight})
+}
+
+// AddMoveToPositionDesire is AddMoveToDesire to a creature's position or
+// spawn point, facing heading: standing there, facing heading, f finishes
+// the walk without moving. Safe from any goroutine.
+func (f *Folk) AddMoveToPositionDesire(loc location.Location, heading int, weight float64) bool {
+	return f.addMoveToDesire(&ai.Desire{Kind: ai.IntentionMoveTo, Location: loc, Standing: true, Heading: heading, Weight: weight})
+}
+
+func (f *Folk) addMoveToDesire(d *ai.Desire) bool {
 	m := f.motion
-	if m == nil || f.MovementDisabled() || !m.ctl.CanMoveTo(loc) {
+	if m == nil || f.MovementDisabled() || !m.ctl.CanMoveTo(d.Location) {
 		return false
 	}
-	f.cast.desires.AddOrUpdate(&ai.Desire{Kind: ai.IntentionMoveTo, Location: loc, Weight: weight, QueuedAt: f.now()})
+	d.QueuedAt = f.now()
+	f.cast.desires.AddOrUpdate(d)
 	return true
 }
 
@@ -104,10 +116,18 @@ func (f *Folk) act(d *ai.Desire) {
 	}
 }
 
-// thinkMoveTo is the walk step: f, when it can act and move, walks to the
-// point. Standing on it already, f still walks there: a zero-length move
-// that arrives, and opens the move-finished point, on the next move tick.
+// thinkMoveTo is the walk step. Standing on a creature's position or spawn
+// point, facing its heading, f opens the move-finished point and drops the
+// desire of its current intention, whether or not it can act or move.
+// Otherwise f, when it can act and move, walks to the point. Standing on a
+// bare point already, f still walks there: a zero-length move that arrives,
+// and opens the move-finished point, on the next move tick.
 func (f *Folk) thinkMoveTo(d *ai.Desire) {
+	if d.Standing && f.location() == d.Location && f.Heading() == d.Heading {
+		f.atHookPoint(ai.HookMoveFinished)
+		f.clearCurrentDesire()
+		return
+	}
 	if f.denyAIAction() || f.motion == nil || f.MovementDisabled() {
 		return
 	}

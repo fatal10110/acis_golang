@@ -21,7 +21,7 @@ func (n *NPC) Race() npc.Race { return n.instance().Template.Race }
 // SpawnLocation returns where the NPC was spawned this life.
 func (n *NPC) SpawnLocation() Loc {
 	inst := n.instance()
-	return Loc{X: inst.Home.X, Y: inst.Home.Y, Z: inst.Home.Z, Heading: inst.SpawnHeading}
+	return Loc{X: inst.Home.X, Y: inst.Home.Y, Z: inst.Home.Z, Heading: inst.SpawnHeading, standing: true}
 }
 
 // ShowChatWindow opens on p the NPC's own chat window: the one it opens

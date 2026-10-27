@@ -28,8 +28,8 @@ func TestEventSelectionWaitsForFirstCycle(t *testing.T) {
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	if got := brain.CurrentIntention(); got != IntentionIdle || move.home != (location.Location{}) {
-		t.Fatalf("before the first cycle: intention %v, walk %v; want idle and no walk", got, move.home)
+	if got := brain.CurrentIntention(); got != IntentionIdle || move.moveTo != (location.Location{}) {
+		t.Fatalf("before the first cycle: intention %v, walk %v; want idle and no walk", got, move.moveTo)
 	}
 	if err := brain.TickThink(); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
@@ -40,8 +40,8 @@ func TestEventSelectionWaitsForFirstCycle(t *testing.T) {
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() after the first cycle error: %v", err)
 	}
-	if got := brain.CurrentIntention(); got != IntentionMoveTo || move.home != dest {
-		t.Fatalf("after the first cycle: intention %v, walk %v; want move_to toward %v", got, move.home, dest)
+	if got := brain.CurrentIntention(); got != IntentionMoveTo || move.moveTo != dest {
+		t.Fatalf("after the first cycle: intention %v, walk %v; want move_to toward %v", got, move.moveTo, dest)
 	}
 }
 
@@ -83,8 +83,8 @@ func TestCastEndBeforeFirstCycleTakesUpNoQueuedWalk(t *testing.T) {
 	if got := brain.CurrentIntention(); got != IntentionCast {
 		t.Fatalf("intention after the cast end = %v, want the cast kept", got)
 	}
-	if move.home != (location.Location{}) || cast.castCalls != 1 {
-		t.Fatalf("after the cast end: walk %v, casts %d; want no walk and no new cast", move.home, cast.castCalls)
+	if move.moveTo != (location.Location{}) || cast.castCalls != 1 {
+		t.Fatalf("after the cast end: walk %v, casts %d; want no walk and no new cast", move.moveTo, cast.castCalls)
 	}
 	if !brain.Desires().Has(&Desire{Kind: IntentionMoveTo, Location: location.Location{X: 300}}) {
 		t.Fatal("walk desire gone after the cast end, want it still queued")
@@ -100,8 +100,8 @@ func TestFinishedSwingBeforeFirstCycleStepsCurrentIntention(t *testing.T) {
 	if err := brain.AttackFinished(); err != nil {
 		t.Fatalf("AttackFinished() error: %v", err)
 	}
-	if got := brain.CurrentIntention(); got != IntentionCast || move.home != (location.Location{}) {
-		t.Fatalf("after the finished swing: intention %v, walk %v; want the cast kept and no walk", got, move.home)
+	if got := brain.CurrentIntention(); got != IntentionCast || move.moveTo != (location.Location{}) {
+		t.Fatalf("after the finished swing: intention %v, walk %v; want the cast kept and no walk", got, move.moveTo)
 	}
 	if cast.castCalls != 2 {
 		t.Fatalf("casts after the finished swing = %d, want the think's cast step", cast.castCalls)
