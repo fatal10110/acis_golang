@@ -82,7 +82,7 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingPetnameContainsInvalidChars))
 		return nil
 	}
-	if l.npcs == nil || l.petStore == nil {
+	if l.npcs == nil || l.summoning.store == nil {
 		return nil
 	}
 	// The npc-name collision (silent reject) is checked before the pets
@@ -90,7 +90,7 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 	if _, ok := l.npcs.GetByName(req.Name); ok {
 		return nil
 	}
-	store, ok := l.petStore.(petNameStore)
+	store, ok := l.summoning.store.(petNameStore)
 	if !ok {
 		return nil
 	}
@@ -137,7 +137,7 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 	// so an older copy cannot land after it. The rename does not wait for the write:
 	// the rename itself is in memory and the name is otherwise stored with
 	// the pet's next save, so a failed write is logged, not rolled back.
-	pets, log := l.petStore, l.log
+	pets, log := l.summoning.store, l.log
 	l.persist.Enqueue(itemObjectID, func() {
 		saveCtx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()

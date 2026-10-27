@@ -99,7 +99,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	if !ok {
 		return
 	}
-	summonItem, ok := link.summonItems.Item(tmpl.ID)
+	summonItem, ok := link.summoning.items.Item(tmpl.ID)
 	if !ok || summonItem.SummonType != summonItemTypePet {
 		return
 	}
@@ -114,7 +114,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// Such a write leaves no items behind under the collar: an unsummon and a
 	// decay hand every item to the owner, and a logout leaves a dead pet's
 	// items with its corpse, which keeps the owner's summon slot.
-	if state, hasSaved := link.queuedPets.latest(controlItem.ObjectID); hasSaved {
+	if state, hasSaved := link.summoning.queued.latest(controlItem.ObjectID); hasSaved {
 		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true, nil)
 		return
 	}
@@ -178,7 +178,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	if !link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
-		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
+		state, hasSaved, err := link.summoning.store.Get(restoreCtx, controlItem.ObjectID)
 		var items []*item.Instance
 		if err == nil {
 			items, err = link.petItemRows(restoreCtx, controlItem.ObjectID)
@@ -323,7 +323,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		SP:              state.SP,
 		ExpType:         levelStats.ExpType,
 		Growth:          npcTmpl.Pet,
-		Config:          nil, // set by newPet from link.petConfig
+		Config:          nil, // set by newPet from link.summoning.config
 		Inventory:       link.newPetInventory(live, controlItem.ObjectID, items),
 		Fed:             fed,
 		MaxMeal:         levelStats.MaxMeal,

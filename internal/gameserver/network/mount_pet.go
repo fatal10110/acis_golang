@@ -153,11 +153,11 @@ func petInMountReach(live *livePlayer, p *summon.Actor) bool {
 // of the pet it was called from, on the collar's persistence lane. A save
 // of that row still queued restores the pet with this meal.
 func (l *GameClientLink) storePetFood(itemObjectID int32, fed int) {
-	if l.petStore == nil {
+	if l.summoning.store == nil {
 		return
 	}
-	seq, queued := l.queuedPets.setFed(itemObjectID, fed)
-	store, log := l.petStore, l.log
+	seq, queued := l.summoning.queued.setFed(itemObjectID, fed)
+	store, log := l.summoning.store, l.log
 	l.persist.Enqueue(itemObjectID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
@@ -165,7 +165,7 @@ func (l *GameClientLink) storePetFood(itemObjectID int32, fed int) {
 			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("store pet food")
 		}
 		if queued {
-			l.queuedPets.written(itemObjectID, seq)
+			l.summoning.queued.written(itemObjectID, seq)
 		}
 	})
 }

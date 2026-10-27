@@ -43,14 +43,14 @@ var summonCreatureSkillRef = skillref.Ref{ID: 2046, Level: 1}
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
 func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance) bool {
-	if live == nil || inv == nil || inst == nil || l.summonItems == nil {
+	if live == nil || inv == nil || inst == nil || l.summoning.items == nil {
 		return false
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
 	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Handler != SummonItemsHandler {
 		return false
 	}
-	summonItem, ok := l.summonItems.Item(inst.TemplateID)
+	summonItem, ok := l.summoning.items.Item(inst.TemplateID)
 	if !ok {
 		return false
 	}
