@@ -12,6 +12,7 @@ import (
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -181,7 +182,7 @@ func (r *run) hostile(t *testing.T, role string) (*npc.Hostile, func(func()) boo
 	return h, h.Queue().Post
 }
 
-// state runs an hp, die, top, land, stance or swing step.
+// state runs an hp, mp, want, die, top, land, stance or swing step.
 func (r *run) state(t *testing.T, verb string, args []string) {
 	t.Helper()
 	switch verb {
@@ -193,6 +194,21 @@ func (r *run) state(t *testing.T, verb string, args []string) {
 		}
 		h, post := r.hostile(t, args[0])
 		r.on(t, args[0], post, func() { h.SetCurrentHP(v) })
+	case "mp":
+		v, _ := strconv.Atoi(args[1])
+		h, post := r.hostile(t, args[0])
+		r.on(t, args[0], post, func() { h.SetCurrentMP(v) })
+	case "want":
+		h, post := r.hostile(t, args[0])
+		target, _ := r.creature(t, args[1])
+		w, _ := strconv.ParseFloat(args[2], 64)
+		r.on(t, args[0], post, func() {
+			if len(args) == 4 {
+				h.AddAttackDesireHold(target, w)
+				return
+			}
+			h.AddAttackDesire(target, w)
+		})
 	case "die":
 		var killer attackable.Combatant
 		if len(args) == 1 {
@@ -333,6 +349,23 @@ func (r *run) stateCheck(t *testing.T, ck Check) string {
 			hp = r.liveNPC(t, role).CurrentHP()
 		}
 		return FirstDiff(role+" hp", []string{strconv.Itoa(hp)}, []string{ck.Args[1]})
+	case "mp":
+		return FirstDiff(role+" mp", []string{strconv.Itoa(r.liveNPC(t, role).CurrentMP())}, []string{ck.Args[1]})
+	case "reach":
+		h, post := r.hostile(t, role)
+		var top attackable.Combatant
+		var reach bool
+		r.on(t, role, post, func() {
+			if top = h.AI().TopDesireTarget(); top != nil {
+				reach = h.AI().CanAttack(top)
+			}
+		})
+		if top == nil {
+			return role + " reach: the NPC has no top desire target"
+		}
+		return FirstDiff(role+" reach of its top desire target", []string{yesNo(reach)}, []string{ck.Args[1]})
+	case "shows":
+		return r.shows(t, ck)
 	case "dead":
 		var dead bool
 		if role == "player" {
@@ -401,6 +434,27 @@ func (r *run) stateCheck(t *testing.T, ck Check) string {
 		return FirstDiff(fmt.Sprintf("%s effect of skill %d", role, id), []string{map[bool]string{true: "held", false: "none"}[held]}, []string{ck.Args[2]})
 	}
 	return strings.Join(ck.Args, " ")
+}
+
+// shows compares the fields of the NpcInfo role's NPC would be shown with that
+// a shows check lists: the hands, the chest and the weapon's glow.
+func (r *run) shows(t *testing.T, ck Check) string {
+	t.Helper()
+	role := ck.Args[0]
+	n, post := r.npcQueue(t, role)
+	v, ok := n.(interface{ NPCInfoSnapshot() npcinfo.Snapshot })
+	if !ok {
+		t.Fatalf("%s: NPC %s (%T) shows no NpcInfo", r.sc.Name, role, n)
+	}
+	var s npcinfo.Snapshot
+	r.on(t, role, post, func() { s = v.NPCInfoSnapshot() })
+	fields := map[string]int{"rhand": s.RightHand, "lhand": s.LeftHand, "chest": s.Chest, "glow": s.EnchantEffect}
+	var got []string
+	for _, a := range ck.Args[1:] {
+		k, _, _ := strings.Cut(a, "=")
+		got = append(got, k+"="+strconv.Itoa(fields[k]))
+	}
+	return FirstDiff(role+" appearance", got, ck.Args[1:])
 }
 
 // spawnParams renders the three spawn parameters a private was raised with,

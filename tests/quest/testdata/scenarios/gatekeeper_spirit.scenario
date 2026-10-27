@@ -5,6 +5,7 @@
 # sends nothing a scenario renders (onMyDying, onTimer): a live expectation counts it. The exit
 # line's own spirit stands there from the start, so one spirit is the count before the timer and
 # after the despawn, two while the script's stands; it despawns fifteen minutes after it appears.
+# Its place (a spawned expectation) is the raid boss's exit point.
 trace internal/gameserver/script/testdata/oracle/scenarios/gatekeeper_spirit.golden
 character Pilgrim 40
 script script.teleport.GatekeeperSpirit
@@ -25,9 +26,13 @@ kill lilith
   S SystemMessage id=1209
   S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
   live 31112 1
+  spawned 31112 -
 advance 10s
   live 31112 2
+  spawned 31112 184446,-10112
 advance 10m
   live 31112 2
+  spawned 31112 184446,-10112
 advance 6m
   live 31112 1
+  spawned 31112 -

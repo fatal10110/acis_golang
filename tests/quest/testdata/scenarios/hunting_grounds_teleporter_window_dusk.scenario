@@ -1,0 +1,22 @@
+# The hunting grounds teleporters (HuntingGroundsTeleporter): the priestess of dusk, asked by a character of its own
+# cabal (dusk), opens its standard teleport window of the shipped teleport list (the teleports line):
+# its one destination, the Necropolis of Sacrifice, at 5500 ancient adena, which the Seven Signs
+# raise by 60 percent for a character who is not the Gnosis seal owner's: 8800. The refusals of a
+# character in no cabal are in hunting_grounds_teleporter_refused.scenario. The Quest link of the
+# window is a link of the priest's own page, so only a priest of the character's cabal answers it.
+trace internal/gameserver/script/testdata/oracle/scenarios/hunting_grounds_teleporter_window_dusk.golden
+character Pilgrim 40
+cabal dusk avarice
+teleports
+script script.teleport.HuntingGroundsTeleporter
+page seven_signs/dusk_priest_1.htm
+npc priest 31085 DuskPriest 10 0 0
+
+action priest
+action priest
+  S ActionFailed
+  S ActionFailed
+  S NpcHtmlMessage obj=priest item=0 page=seven_signs/dusk_priest_1.htm
+bypass npc_{priest}_Quest HuntingGroundsTeleporter
+  S NpcHtmlMessage obj=priest item=0 html="<html><body>&$556;<br><br><a action=\"bypass -h npc_{priest}_teleport 0\" msg=\"811;Necropolis of Sacrifice\">Necropolis of Sacrifice - 8800 &#5575;</a><br1></body></html>"
+  S ActionFailed

@@ -321,6 +321,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	if r.sc.Random != nil || r.sc.usesRandomSteps() {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
 	}
+	if r.sc.Teleports {
+		opts = append(opts, r.teleportOptions(t)...)
+	}
 	if r.sc.LaysCursed() {
 		opts = append(opts, gameservertest.WithCursedWeapons(shippedCursedWeapons(t)))
 	}
@@ -555,6 +558,11 @@ func (r *run) seedHoldings(t *testing.T) {
 			t.Fatalf("seed standing and pk: %v", err)
 		}
 	}
+	if r.sc.Noble {
+		if _, err := r.srv.DB.ExecContext(ctx, "UPDATE characters SET nobless = 1 WHERE obj_Id = ?", r.player); err != nil {
+			t.Fatalf("seed noble: %v", err)
+		}
+	}
 	if r.sc.Cabal != sevensigns.NoCabal {
 		if err := r.srv.SevenSigns.SetPlayerInfo(ctx, r.player, r.sc.Cabal, r.sc.Seal); err != nil {
 			t.Fatalf("seed cabal: %v", err)
@@ -595,6 +603,10 @@ func (r *run) spawn(t *testing.T, n NPC) {
 	r.link(t, n)
 	r.srv.RunCreated(t, live)
 	r.setMemory(t, n)
+	if n.HasMP {
+		h, post := r.hostile(t, n.Role)
+		r.on(t, n.Role, post, func() { h.SetCurrentMP(n.MP) })
+	}
 }
 
 // clockEpoch is the day the clock line's time of day is on.
@@ -752,7 +764,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.hit(t, st.Args)
 	case "event":
 		r.event(t, st.Args)
-	case "hp", "die", "top", "land", "stance", "swing":
+	case "hp", "mp", "want", "die", "top", "land", "stance", "swing":
 		r.state(t, st.Verb, st.Args)
 	case "cast":
 		frames = r.cast(t, st.Args[0], st.Args[1])
@@ -897,6 +909,9 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if d := FirstDiff("live", r.lives(st.Lives), st.Lives); d != "" {
 		fail("%s", d)
 	}
+	if d := FirstDiff("spawned", r.spawns(st.Spawns), st.Spawns); d != "" {
+		fail("%s", d)
+	}
 	for _, ck := range st.Checks {
 		if d := r.check(t, ck); d != "" {
 			fail("%s (line %d)", d, ck.Line)
@@ -923,6 +938,39 @@ func (r *run) lives(want []string) []string {
 			count++
 		}
 		got = append(got, fmt.Sprintf("%s=%d", id, count))
+	}
+	return got
+}
+
+// spawns renders, for each spawned line of a step, the places of the NPCs of
+// that template standing alive that no npc line placed, as "<npc id>
+// <x>,<y> ..." sorted, "<npc id> -" for none.
+func (r *run) spawns(want []string) []string {
+	var got []string
+	for _, w := range want {
+		id, _, _ := strings.Cut(w, " ")
+		n, _ := strconv.Atoi(id)
+		var places []string
+		for _, obj := range r.srv.State.Objects() {
+			c, ok := obj.(interface{ Template() *npc.Template })
+			if !ok || c.Template().ID != n || r.rd.placed[obj.ObjectID()] {
+				continue
+			}
+			if d, ok := obj.(interface{ AlikeDead() bool }); ok && d.AlikeDead() {
+				continue
+			}
+			at, ok := obj.(interface{ Position() (int, int, int) })
+			if !ok {
+				continue
+			}
+			x, y, _ := at.Position()
+			places = append(places, fmt.Sprintf("%d,%d", x, y))
+		}
+		slices.Sort(places)
+		if len(places) == 0 {
+			places = []string{"-"}
+		}
+		got = append(got, id+" "+strings.Join(places, " "))
 	}
 	return got
 }

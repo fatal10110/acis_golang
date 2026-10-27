@@ -6,6 +6,7 @@
 trace internal/gameserver/script/testdata/oracle/scenarios/varka_support_ally_4.golden
 character Ally 40
 standing -4
+teleports
 hold 7224 1
 hold 7187 1
 script script.feature.VarkaSilenosSupport
@@ -45,6 +46,8 @@ action teranu
   S ActionFailed
   S NpcHtmlMessage obj=teranu item=0 page=script/feature/VarkaSilenosSupport/31383-2.htm
   S ActionFailed
+bypass Quest VarkaSilenosSupport Teleport
+  S NpcHtmlMessage obj=teranu item=0 html="<html><body>&$556;<br><br><a action=\"bypass -h npc_{teranu}_teleport 0\" msg=\"811;Goddard Castle Town\">Goddard Castle Town - 8000 &#57;</a><br1><a action=\"bypass -h npc_{teranu}_teleport 1\" msg=\"811;Rune Castle Town\">Rune Castle Town - 12000 &#57;</a><br1></body></html>"
 action hagos
 action hagos
   S ActionFailed

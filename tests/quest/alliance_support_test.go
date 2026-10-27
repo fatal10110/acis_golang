@@ -7,12 +7,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -41,8 +39,6 @@ const (
 	asefaID      = 31372
 	atanID       = 31373
 	jaffID       = 31374
-	kurfaID      = 31376
-	teranuID     = 31383
 	hornID       = 7186
 	footmanID    = 21324
 )
@@ -182,51 +178,6 @@ func TestAllianceSupportBlessingCast(t *testing.T) {
 
 // noQuestPage is the page a refused event answers.
 const noQuestPage = "<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
-
-// TestAllianceSupportTeleportWindows (onAdvEvent "Teleport"): the
-// gatekeeper of an ally of level 4 opens its standard destinations, the one
-// of an ally of level 5 its ally ones, and answers no page.
-func TestAllianceSupportTeleportWindows(t *testing.T) {
-	t.Parallel()
-	standard := location.Location{X: 43849, Y: -47877, Z: -792}
-	ally := location.Location{X: 164564, Y: -48145, Z: -3536}
-	list := []travel.Teleport{
-		{Location: standard, Description: "Rune Castle Town", Kind: travel.KindStandard, PriceID: int(item.AdenaID), PriceCount: 22000},
-		{Location: ally, Description: "Wall of Argos", Kind: travel.KindAlly, PriceID: int(item.AdenaID), PriceCount: 7000},
-	}
-	now := func() time.Time { return time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC) }
-	for _, tc := range []struct {
-		name     string
-		standing int
-		npcID    int
-		event    string
-		shows    string
-		hides    string
-	}{
-		{"ketra level 4", 4, kurfaID, "Quest KetraOrcSupport Teleport", "Rune Castle Town", "Wall of Argos"},
-		{"ketra level 5", 5, kurfaID, "Quest KetraOrcSupport Teleport", "Wall of Argos", "Rune Castle Town"},
-		{"varka level 4", -4, teranuID, "Quest VarkaSilenosSupport Teleport", "Rune Castle Town", "Wall of Argos"},
-		{"varka level 5", -5, teranuID, "Quest VarkaSilenosSupport Teleport", "Wall of Argos", "Rune Castle Town"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			w := bootSupport(t, tc.standing, nil,
-				gameservertest.WithTeleports(travel.TeleportTable{kurfaID: list, teranuID: list}, nil, false, now))
-			keeper := w.spawnFolk(t, "keeper", tc.npcID, 20, 0, 0)
-			w.firstTalk(t, keeper.ObjectID())
-			got := w.bypass(t, tc.event)
-			var windows []string
-			for _, l := range got {
-				if strings.HasPrefix(l, "S NpcHtmlMessage ") {
-					windows = append(windows, l)
-				}
-			}
-			if len(windows) != 1 || !strings.Contains(windows[0], tc.shows) || strings.Contains(windows[0], tc.hides) {
-				t.Fatalf("teleport answer = %q, want one window listing %q and not %q", got, tc.shows, tc.hides)
-			}
-		})
-	}
-}
 
 // TestAllianceSupportWarehouseWithdraw (onFirstTalk, onAdvEvent
 // "Withdraw"): the warehouse keeper of a Ketra ally of level 4 whose

@@ -1,0 +1,36 @@
+# The Noblesse teleporter (NoblesseTeleporter): a noblesse who follows a gatekeeper's Noblesse link
+# gets the Noblesse page, whose two links send an event the gatekeeper answers with its teleport
+# window of that type, from the shipped teleport list the teleports line gives: the Gate Pass
+# destinations at one pass each and the adena ones at 1000, each linked by its index among all
+# the gatekeeper's destinations. The refusal of a character who is no noblesse is in
+# noblesse_teleporter_refused.scenario; the trip itself is in tests/npcs/proof_features_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/noblesse_teleporter_windows.golden
+character Noble 40
+noble
+teleports
+script script.teleport.NoblesseTeleporter
+page gatekeeper/30080.htm
+page script/teleport/NoblesseTeleporter/
+npc gatekeeper 30080 Gatekeeper 10 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=gatekeeper/30080.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest NoblesseTeleporter
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/teleport/NoblesseTeleporter/noble.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest NoblesseTeleporter NOBLE_HUNTING_ZONE_PASS
+  S NpcHtmlMessage obj=gatekeeper item=0 html="<html><body>&$556;<br><br><a action=\"bypass -h npc_{gatekeeper}_teleport 14\" msg=\"811;Gludin Arena\">Gludin Arena - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 15\" msg=\"811;Giran Arena\">Giran Arena - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 16\" msg=\"811;Gorgon Flower Garden\">Gorgon Flower Garden - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 17\" msg=\"811;Antharas' Lair - 1st Level\">Antharas' Lair - 1st Level - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 18\" msg=\"811;Antharas' Lair - 2nd Level\">Antharas' Lair - 2nd Level - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 19\" msg=\"811;Antharas' Lair - Magic Force Field Bridge\">Antharas' Lair - Magic Force Field Bridge - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 20\" msg=\"811;The Heart of Antharas' Lair\">The Heart of Antharas' Lair - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 21\" msg=\"811;The Center of Dragon Valley\">The Center of Dragon Valley - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 22\" msg=\"811;Hardin's Private Academy\">Hardin's Private Academy - 1 &#6651;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 23\" msg=\"811;Coliseum\">Coliseum - 1 &#6651;</a><br1></body></html>"
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=gatekeeper/30080.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest NoblesseTeleporter
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/teleport/NoblesseTeleporter/noble.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest NoblesseTeleporter NOBLE_HUNTING_ZONE_ADENA
+  S NpcHtmlMessage obj=gatekeeper item=0 html="<html><body>&$556;<br><br><a action=\"bypass -h npc_{gatekeeper}_teleport 24\" msg=\"811;Gludin Arena\">Gludin Arena - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 25\" msg=\"811;Giran Arena\">Giran Arena - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 26\" msg=\"811;Gorgon Flower Garden\">Gorgon Flower Garden - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 27\" msg=\"811;Antharas' Lair - 1st Level\">Antharas' Lair - 1st Level - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 28\" msg=\"811;Antharas' Lair - 2nd Level\">Antharas' Lair - 2nd Level - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 29\" msg=\"811;Antharas' Lair - Magic Force Field Bridge\">Antharas' Lair - Magic Force Field Bridge - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 30\" msg=\"811;The Heart of Antharas' Lair\">The Heart of Antharas' Lair - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 31\" msg=\"811;The Center of Dragon Valley\">The Center of Dragon Valley - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 32\" msg=\"811;Hardin's Private Academy\">Hardin's Private Academy - 1000 &#57;</a><br1><a action=\"bypass -h npc_{gatekeeper}_teleport 33\" msg=\"811;Coliseum\">Coliseum - 1000 &#57;</a><br1></body></html>"

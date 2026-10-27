@@ -125,6 +125,8 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Chests.TreasureChest":                                                         warrior.TreasureChest,
 	"script.ai.individual.Monster.WarriorBase.Chests.TreasureChestMimic":                                                    warrior.TreasureChestMimic,
 	"script.ai.individual.Monster.WarriorHero":                                                                              monster.WarriorHero,
+	"script.ai.individual.Monster.LV3Monster.LV3Monster":                                                                    monster.LV3Monster,
+	"script.ai.individual.Monster.LV3Monster.LV3Orc":                                                                        monster.LV3Orc,
 	"script.ai.individual.Guard.Guard":                                                                                      guard.Guard,
 	"script.ai.individual.Guard.GuardFixed":                                                                                 guard.Fixed,
 	"script.ai.individual.Guard.GuardMoveAround":                                                                            guard.MoveAround,

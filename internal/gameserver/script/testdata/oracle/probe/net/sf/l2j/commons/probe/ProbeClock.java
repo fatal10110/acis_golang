@@ -68,6 +68,14 @@ public final class ProbeClock
 		return _set ? _now : wall();
 	}
 
+	/** The calendar of the probe wall clock: virtual while a scenario trace plays. */
+	public static Calendar wallCalendar()
+	{
+		final Calendar c = Calendar.getInstance();
+		c.setTimeInMillis(wall());
+		return c;
+	}
+
 	public static Calendar calendar()
 	{
 		if (!_set)
