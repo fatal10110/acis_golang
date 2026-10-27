@@ -59,6 +59,7 @@
 //	standing <n>                              optional: the character's Ketra/Varka alliance standing, 1 to 5 for a
 //	                                          Ketra ally of that level, -1 to -5 for a Varka one (default 0, none)
 //	pk <n>                                    optional: the character's PK count (default 0)
+//	noble                                     optional: the character is a noblesse
 //	cabal <dawn|dusk> <avarice|gnosis|strife> optional: the character is signed up for that Seven Signs cabal,
 //	                                          choosing that seal, with no stones turned in
 //	festival <dawn score> <dusk score>        optional: the Seven Signs festival scores the server restores; with no
@@ -71,6 +72,10 @@
 //	memo <var> <value>                        optional, one per variable: a character_memo row of the character before
 //	                                          it enters the world (a value is one blank-free field), which the memo
 //	                                          writes of a step then update or delete
+//	teleports                                 optional: the shipped gatekeeper teleport list (data/xml/teleports.xml) the
+//	                                          server offers, so an NPC line of a shipped gatekeeper id (31078, 30080)
+//	                                          opens its real window; prices are as in a run that is no weekend evening
+//	                                          and not free of charge
 //	random <draw> ...                         optional: the script random draws, in order; each must be inside
 //	                                          [0, n) of its call, and every one must be drawn
 //	random always <draw>                      optional: every script random draw is that one
@@ -120,13 +125,15 @@
 //	door <role> <door id> <dx> <dy> <dz>      optional: a fixture door of that id (a 16 by 16 gate of 600 HP, under no
 //	                                          siege: a hit takes none of its HP, but calls its door clan) standing at
 //	                                          that offset from where the character first enters the world
-//	summon <role> <npc id>                    optional: as it first enters the world, the character calls a siege summon
+//	summon <role> <npc id> [servitor <level>] optional: as it first enters the world, the character calls a siege summon
 //	                                          of a fixture template of that id, which stays on the active siege
-//	                                          battlefield the server then runs around where it enters the world; a
+//	                                          battlefield the server then runs around where it enters the world; with
+//	                                          servitor, a servitor (a pet) of that level instead, on no battlefield; a
 //	                                          scenario with a summon line takes no relog or restart
 //
 // An npc line takes more options, in any order after the offsets: level <n>, the template's level (default 1);
-// aggro <range>, its aggro range (default none: a raid boss sees only as far as that); mem <slot>=<value>[,...],
+// aggro <range>, its aggro range (default none: a raid boss sees only as far as that); mp <n>, the current MP
+// each of its lives starts with once its created hook ran (default its maximum, 1000); mem <slot>=<value>[,...],
 // the script memory slots its life starts with once its created hook ran (i_ai0 to i_ai4, i_quest0 to i_quest4,
 // flag, weight (the weight point) and value (the script value) take a number; c_ai0 to c_ai4 and c_quest0 to
 // c_quest4 take the character (player), the role of an NPC line above, or - for none); privates
@@ -162,16 +169,21 @@
 //	                       the hall line's hall changes its siege status
 //	link <file>            a RequestLinkHtml
 //	hit <role> <damage> [by <role>] [skill <skill id> <level>]
-//	                       the character, or the creature by names (an npc line's NPC or the summon), lands a
+//	                       the character, or the creature by names (an npc line's NPC, the summon or a member), lands a
 //	                       hit of that damage on the NPC or the door, on the attacker's queue; with skill, the
 //	                       hit is that shipped skill's (the attacked hook reads its id, level and whether it is
 //	                       magic), and the scripts read the skill
 //	hp <role|player> <hp>  the NPC's or the character's hit points are set to that many (clamped to its maximum;
 //	                       a character at 0 is not dead: the die step kills it, and an NPC at 0 stays alive)
+//	mp <role> <mp>         the hostile NPC's current MP is set to that many (clamped to its maximum)
+//	want <role> <creature> <weight> [hold]
+//	                       the hostile NPC is given an attack desire on the creature of that weight, as a
+//	                       script's AddAttackDesire does (with hold, AddAttackDesireHold: it holds its ground
+//	                       instead of walking to its target); a draw-pinned swing after it fights the creature
 //	die [<role>]           the character dies, killed by that NPC (none by default), on its own queue
 //	top <role> <creature|->
-//	                       the NPC's top desire target is set to the character (player), an npc line's NPC or the
-//	                       summon, or to nothing, as a script's SetTopDesireTarget does
+//	                       the NPC's top desire target is set to the character (player), an npc line's NPC, the
+//	                       summon or a member, or to nothing, as a script's SetTopDesireTarget does
 //	land <target> <skill id> <level> [by <creature>]
 //	                       the effects of that shipped skill land on the target (player, an npc line's NPC or the
 //	                       summon) from the creature by names (default: the target itself), on the target's
@@ -224,6 +236,11 @@
 //	  queue <own|other[+n]> ...  a traced step: the queue whose hook teleported the character, or made it cast,
 //	                         in each task of the trace's step that does, in order; other+n also names the n
 //	                         lines after each of the task's casts that go out with it (see the trace header below)
+//	  live <npc id> <n>    how many NPCs of that template stand alive in the world after the step
+//	  spawned <npc id> <x>,<y> ... | spawned <npc id> -
+//	                       where the NPCs of that template stand alive that no npc line placed (a script's
+//	                       spawns), as world x and y in any order; - for none. The height is left out: the
+//	                       reference trace runs without geodata, so its heights are not the ground's
 //	  items <id>=<n> ...   the character's count of each item after the step (items <mate> <id>=<n> ... a mate's)
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them (a value
 //	                                        with blanks is quoted: quiz="20 21")
@@ -234,11 +251,23 @@
 //	                                        each <kind>(<args>)=<weight>: attack(<creature>), follow(<creature>),
 //	                                        flee(<creature>,<distance>), cast(<creature>,<skill id>[,move]) (move: it
 //	                                        walks to its target), move_to(<dx>,<dy>,<dz>) (an offset from where the
-//	                                        character first entered the world), nothing(<timer>), any other kind ()
+//	                                        character first entered the world), nothing(<timer>), any other kind ().
+//	                                        A desire may be listed in full to pin more: cast(<creature>,<skill id>:<level>[,move])
+//	                                        pins the skill's level, attack(<creature>,hold) that the NPC holds its ground
+//	                                        (AddAttackDesireHold); a desire listed in the short form is compared without the
+//	                                        level or the marker
 //	  at <role> <dx> <dy> <dz>              where the NPC, or the character (player), stands after the step, as an
 //	                                        offset from where the character first entered the world
 //	  mem <role> <slot>=<value> ...         the NPC's script memory slots after the step (see the npc line's mem)
 //	  hp <role|player> <hp>                 the hostile NPC's or the character's hit points after the step
+//	  mp <role> <mp>                        the hostile NPC's current MP after the step
+//	  reach <role> <yes|no>                 whether the hostile NPC may attack its top desire target now (its canAttack:
+//	                                        a rooted or immobile NPC needs it within reach; the run fails if it has no top
+//	                                        desire target)
+//	  shows <role> rhand=<id> | lhand=<id> | chest=<id> | glow=<n> ...
+//	                                        the appearance an NpcInfo of the NPC would show, as it stands after the
+//	                                        step: the item ids in its hands and chest, and the weapon's glow (its
+//	                                        enchant effect); only the fields listed are compared
 //	  dead <role|player> <yes|no>           whether the hostile NPC or the character is dead (a deleted NPC is)
 //	  inworld <role> <yes|no>               whether the NPC is still in the world: a killed one stays as a
 //	                                        corpse, a deleted one (a chest whose key broke) is gone
@@ -321,7 +350,7 @@
 // does the reference probe play a skill, door or summon line, an npc
 // line's clan or skill, a hit by another creature, an approach to a
 // distance, a cast, a jump or an away, a clock line, an npc line's ai,
-// params, level, aggro, mem, privates or master or an event, hp, die, top,
+// params, level, aggro, mp, mem, privates or master or an event, hp, mp, want, die, top,
 // land, stance or swing step, a skill hit, or a step's own random line, so a
 // traced scenario takes none.
 //
@@ -415,6 +444,11 @@ type Scenario struct {
 	// Memos are the memo lines' character_memo rows, seeded before the
 	// character enters the world.
 	Memos []Memo
+	// Noble tells the noble line is there: the character is a noblesse.
+	Noble bool
+	// Teleports tells the teleports line is there: the shipped teleport
+	// list is offered.
+	Teleports bool
 	// Spoils are the spoil lines.
 	Spoils []Spoil
 	// Random is the script random source, nil for random draws.
@@ -533,6 +567,9 @@ type NPC struct {
 	// Level is the template's level, 0 for the fixture's 1; Aggro its aggro
 	// range, 0 for none.
 	Level, Aggro int
+	// MP is the NPC's current MP each life starts with, when HasMP.
+	MP    int
+	HasMP bool
 	// Mem are the script memory slots each life starts with, nil for none.
 	Mem []MemSet
 	// Privates are the template's privates, nil for none.
@@ -560,6 +597,10 @@ type Step struct {
 	// Lives are the live lines as "<npc id>=<count>": how many NPCs of that
 	// template stand alive in the world when the step is over.
 	Lives []string
+	// Spawns are the spawned lines as "<npc id> <x>,<y>,<z> ..." (the places
+	// sorted, "-" for none): where the NPCs of that template stand alive that
+	// no npc line placed, a script's spawns.
+	Spawns []string
 	// Queues is the queue line: "own", "other" or "other+n" (the n lines
 	// after each cast that go out with it) for each task of the traced step
 	// that teleports the character or makes it cast, in order; nil without
@@ -614,6 +655,8 @@ var argCount = map[string][2]int{
 	"event":      {4, 4},
 	"create":     {0, 0},
 	"hp":         {2, 2},
+	"mp":         {2, 2},
+	"want":       {3, 4},
 	"die":        {0, 1},
 	"top":        {2, 2},
 	"land":       {3, 5},
@@ -747,8 +790,8 @@ func (sc *Scenario) checkFlow() error {
 				return fail("a created character starts at level 1, not %d", sc.Level)
 			case sc.Class != 0 || sc.Subclass != 0 || sc.Clan >= 0 || len(sc.Quests) > 0 || len(sc.Memos) > 0:
 				return fail("a created character takes no class, subclass, clan, quest or memo line")
-			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Cabal != sevensigns.NoCabal:
-				return fail("a created character takes no hold, equip, standing, pk or cabal line")
+			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Noble || sc.Cabal != sevensigns.NoCabal:
+				return fail("a created character takes no hold, equip, standing, pk, noble or cabal line")
 			case len(sc.Members) > 0:
 				return fail("a created character takes no member line")
 			case len(sc.Mates) > 0 || len(sc.Halls) > 0:
@@ -907,8 +950,13 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			}
 		}
 		sc.Scripts = append(sc.Scripts, ScriptLine{Path: args[0], Stub: key == "stub"})
-	case "hold", "equip", "standing", "pk", "cabal", "festival", "sealowner", "memo":
+	case "hold", "equip", "standing", "pk", "noble", "cabal", "festival", "sealowner", "memo":
 		return sc.holdings(key, args)
+	case "teleports":
+		if len(args) != 0 || sc.Teleports {
+			return fmt.Errorf("one teleports line, with no argument")
+		}
+		sc.Teleports = true
 	case "spoil":
 		return sc.spoil(args, roles)
 	case "item":
@@ -1025,6 +1073,11 @@ func (sc *Scenario) holdings(key string, args []string) error {
 			return fmt.Errorf("pk count %q is not a number of 1 or more", args[0])
 		}
 		sc.PK = int(n)
+	case "noble":
+		if len(args) != 0 || sc.Noble {
+			return fmt.Errorf("one noble line, with no argument")
+		}
+		sc.Noble = true
 	case "cabal":
 		if len(args) != 2 || sc.Cabal != sevensigns.NoCabal {
 			return fmt.Errorf("one cabal line: cabal <dawn|dusk> <avarice|gnosis|strife>")
@@ -1198,6 +1251,12 @@ func (s *Step) expect(n int, line string) error {
 			return fmt.Errorf("live count %q is not a number of 0 or more", args[1])
 		}
 		s.Lives = append(s.Lives, args[0]+"="+args[1])
+	case "spawned":
+		spawn, err := parseSpawned(strings.Fields(rest))
+		if err != nil {
+			return err
+		}
+		s.Spawns = append(s.Spawns, spawn)
 	case "queue":
 		if s.Queues != nil {
 			return fmt.Errorf("a second queue line")
@@ -1216,7 +1275,7 @@ func (s *Step) expect(n int, line string) error {
 			return err
 		}
 		s.Random = rd
-	case "items", "rows", "state", "hate", "desires", "at", "mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance":
+	case "items", "rows", "state", "hate", "desires", "at", "mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows":
 		args := strings.Fields(rest)
 		if kind == "rows" {
 			var err error
@@ -1266,6 +1325,33 @@ func splitQuoted(line string) ([]string, error) {
 	return fields, nil
 }
 
+// parseSpawned reads a spawned line's <npc id> <x>,<y>,<z> ... | <npc id> -
+// into its normal form: the id, then the places sorted, or - for none.
+func parseSpawned(args []string) (string, error) {
+	usage := fmt.Errorf("spawned <npc id> <x>,<y> ... | spawned <npc id> -")
+	if len(args) < 2 {
+		return "", usage
+	}
+	if _, err := strconv.ParseInt(args[0], 10, 32); err != nil {
+		return "", fmt.Errorf("spawned npc id %q: %w", args[0], err)
+	}
+	if len(args) == 2 && args[1] == "-" {
+		return args[0] + " -", nil
+	}
+	places := slices.Clone(args[1:])
+	for _, p := range places {
+		xyz := strings.Split(p, ",")
+		if len(xyz) != 2 {
+			return "", usage
+		}
+		if _, err := ints(xyz); err != nil {
+			return "", fmt.Errorf("spawned place %q: %w", p, err)
+		}
+	}
+	slices.Sort(places)
+	return args[0] + " " + strings.Join(places, " "), nil
+}
+
 // queueTask reads one task of a queue line: whether its hook ran on the
 // character's own queue, and, for another queue's, how many lines after each
 // cast move with it (0 for the default rule). ok is false for anything else.
@@ -1308,7 +1394,7 @@ func checkCheck(kind string, args []string) error {
 	switch kind {
 	case "hate", "desires", "at":
 		return checkFightCheck(kind, args)
-	case "mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance":
+	case "mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows":
 		return checkStateCheck(kind, args)
 	case "items":
 		if len(args) == 0 {

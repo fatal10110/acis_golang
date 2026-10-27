@@ -80,7 +80,7 @@ func (r *run) fightOptions(t *testing.T) []gameservertest.Option {
 		}
 		opts = append(opts, gameservertest.WithDoors(tmpls...))
 	}
-	if r.sc.Summon != nil {
+	if r.sc.Summon != nil && !r.sc.Summon.Servitor {
 		at := fixtureSpawn()
 		form, err := zone.NewCuboid(at.X-battlefieldReach, at.X+battlefieldReach, at.Y-battlefieldReach, at.Y+battlefieldReach,
 			at.Z-battlefieldReach, at.Z+battlefieldReach)
@@ -106,8 +106,16 @@ const (
 	battlefieldReach = 3000
 )
 
-// summonTemplate is the summon line's fixture template: a siege summon.
+// summonTemplate is the summon line's fixture template: a siege summon, or a
+// servitor of the line's level.
 func summonTemplate(s *Summon) *npc.Template {
+	if s.Servitor {
+		return &npc.Template{
+			ID: int(s.ID), TemplateID: int(s.ID), Type: "Servitor", Name: "Servitor", Level: s.Level,
+			HPMax: 5000, MPMax: 100, AtkSpd: 300, RunSpeed: 60, WalkSpeed: 30,
+			CollisionRadius: 8, CollisionHeight: 20,
+		}
+	}
 	return &npc.Template{
 		ID: int(s.ID), TemplateID: int(s.ID), Type: "SiegeSummon", Name: "Siege Summon", Level: 60,
 		HPMax: 5000, MPMax: 100, AtkSpd: 300, RunSpeed: 60, WalkSpeed: 30,
@@ -140,7 +148,7 @@ func (r *run) seedSkills(t *testing.T) {
 // summon line's summon, as the character first enters the world.
 func (r *run) placeFight(t *testing.T) {
 	t.Helper()
-	if (len(r.sc.Doors) > 0 || r.sc.Summon != nil) && r.origin != fixtureSpawn() {
+	if (len(r.sc.Doors) > 0 || (r.sc.Summon != nil && !r.sc.Summon.Servitor)) && r.origin != fixtureSpawn() {
 		t.Fatalf("%s: the character entered the world at %v, not the fixture spawn %v the doors and the battlefield stand by", r.sc.Name, r.origin, fixtureSpawn())
 	}
 	for _, d := range r.sc.Doors {
@@ -184,25 +192,36 @@ func (r *run) callSummon(t *testing.T, s *Summon) {
 	r.roles[live.ObjectID()], r.objs[s.Role] = s.Role, live.ObjectID()
 }
 
-// creature returns role's creature: the character, an NPC line's NPC or
-// the summon line's summon, with the post of its queue.
+// creature returns role's creature: the character, a member line's
+// character, an NPC line's NPC or the summon line's summon, with the post of
+// its queue.
 func (r *run) creature(t *testing.T, role string) (attackable.Combatant, func(func()) bool) {
 	t.Helper()
 	switch {
 	case role == "player":
-		obj, ok := r.srv.State.Player(r.player)
-		if !ok {
-			t.Fatal("the character is not in the world")
-		}
-		p, ok := obj.(attackable.Combatant)
-		if !ok {
-			t.Fatalf("the character %T is not a combatant", obj)
-		}
-		return p, r.srv.PlayerQueue(t, r.player).Post
+		return r.characterOf(t, r.player)
 	case r.sc.summoned(role):
 		return r.summon, r.summon.Queue().Post
+	case r.sc.isMember(role):
+		i := slices.IndexFunc(r.sc.Members, func(m Member) bool { return m.Name == role })
+		return r.characterOf(t, r.members[i].obj)
 	}
 	return r.npcQueue(t, role)
+}
+
+// characterOf returns the character of an object id as a combatant, with the
+// post of its queue.
+func (r *run) characterOf(t *testing.T, id int32) (attackable.Combatant, func(func()) bool) {
+	t.Helper()
+	obj, ok := r.srv.State.Player(id)
+	if !ok {
+		t.Fatalf("%s: the character %d is not in the world", r.sc.Name, id)
+	}
+	p, ok := obj.(attackable.Combatant)
+	if !ok {
+		t.Fatalf("%s: the character %T is not a combatant", r.sc.Name, obj)
+	}
+	return p, r.srv.PlayerQueue(t, id).Post
 }
 
 // on runs fn on post's queue and waits for it.
@@ -382,13 +401,24 @@ func (r *run) fightCheck(t *testing.T, ck Check) string {
 		return FirstDiff(ck.Args[0]+" hate of "+of, []string{weight(h.AggroHate(c))}, []string{weight(want)})
 	case "desires":
 		h := r.liveNPC(t, ck.Args[0])
-		var got []string
-		for _, d := range h.AI().Desires().Snapshot() {
-			got = append(got, r.desire(d))
-		}
 		want := slices.Clone(ck.Args[1:])
 		if len(want) == 1 && want[0] == "-" {
 			want = nil
+		}
+		pool := map[string]int{}
+		for _, w := range want {
+			pool[w]++
+		}
+		var got []string
+		for _, d := range h.AI().Desires().Snapshot() {
+			// A desire is shown in full when the line lists it so, else in
+			// the short form that leaves out what the line did not ask.
+			line := r.renderDesire(d, true)
+			if pool[line] == 0 {
+				line = r.renderDesire(d, false)
+			}
+			pool[line]--
+			got = append(got, line)
 		}
 		slices.Sort(got)
 		slices.Sort(want)
@@ -421,21 +451,35 @@ func (r *run) liveNPC(t *testing.T, role string) *npc.Hostile {
 // back as it.
 func weight(w float64) string { return strconv.FormatFloat(w, 'f', -1, 64) }
 
-// desire renders a queued desire as <kind>(<args>)=<weight>: the args are
-// an attack's, follow's or flee's target (a flee's distance after it), a
+// desire renders a queued desire as <kind>(<args>)=<weight> in its short form.
+func (r *run) desire(d actorai.Desire) string { return r.renderDesire(d, false) }
+
+// renderDesire renders a queued desire as <kind>(<args>)=<weight>: the args
+// are an attack's, follow's or flee's target (a flee's distance after it), a
 // cast's target and skill id ("move" after them when the NPC walks to its
 // target), a move's destination as an offset from where the character
 // first entered the world, a do-nothing's timer, and none for any other
-// kind. A creature renders as its role, "?<object id>" for none.
-func (r *run) desire(d actorai.Desire) string {
+// kind. A creature renders as its role, "?<object id>" for none. In full, an
+// attack that holds its ground shows "hold" after its target and a cast its
+// skill level after its id as <id>:<level>.
+func (r *run) renderDesire(d actorai.Desire, full bool) string {
 	var args []string
 	switch d.Kind {
-	case actorai.IntentionAttack, actorai.IntentionFollow:
+	case actorai.IntentionAttack:
+		args = []string{r.named(d.FinalTarget)}
+		if full && !d.MoveToTarget {
+			args = append(args, "hold")
+		}
+	case actorai.IntentionFollow:
 		args = []string{r.named(d.FinalTarget)}
 	case actorai.IntentionFlee:
 		args = []string{r.named(d.FinalTarget), strconv.Itoa(d.Distance)}
 	case actorai.IntentionCast:
-		args = []string{r.named(d.FinalTarget), strconv.Itoa(int(d.Skill.ID))}
+		skill := strconv.Itoa(int(d.Skill.ID))
+		if full {
+			skill += ":" + strconv.Itoa(d.Skill.Level)
+		}
+		args = []string{r.named(d.FinalTarget), skill}
 		if d.MoveToTarget {
 			args = append(args, "move")
 		}

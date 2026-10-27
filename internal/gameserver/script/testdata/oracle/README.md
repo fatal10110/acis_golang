@@ -113,8 +113,9 @@ what the reference does in the scenario's own world:
   from the seeded generator, reseeded per scenario. A script draw past the listed values, or
   outside its bound, fails the run. Each pinned draw is a `# draw` line of the step that drew
   it; the Go run of the same step must draw the same bounds in the same order;
-- the hold, equip, standing, pk, cabal, festival, sealowner, memo and spoil lines are seeded as
+- the hold, equip, standing, pk, noble, cabal, festival, sealowner, memo and spoil lines are seeded as
   the Go runner seeds them (inventory items, a worn item, the Ketra/Varka standing, the PK count,
+  the noblesse status,
   the Seven Signs sign-up, the festival scores and the seal owners, both given back after the
   scenario, the player memo rows, and the spoiler of the monster of an NPC line: set after
   each spawn of it, as a spawn clears the spoil state, by the player or, with `other`, by an
@@ -123,6 +124,15 @@ what the reference does in the scenario's own world:
 - an indented `live <npc id> <count>` line under a step makes the probe write a `# live` line
   after the step, the number of living NPCs of that template in the world (what a script
   spawned and despawned included); the Go run counts the same;
+- an indented `spawned <npc id> <x>,<y> ...` line under a step makes the probe write a
+  `# spawned` line after the step: where the living NPCs of that template that no NPC line placed
+  (a script's spawns) stand, sorted, `-` for none; the Go run lists the same places. Only x and
+  y: the probe runs with every geodata region removed, so a height it traces is the one asked for,
+  not the ground's;
+- the `teleports` line gives the Go run the shipped gatekeeper teleport lists, which the probe
+  always loads; the half-price weekend hours of a standard window read the probe wall clock
+  (`ProbeClock.wallCalendar`, a Thursday while a scenario trace plays, as the Go run's clock start
+  is), so no window price depends on when the trace was written;
 - the first countdown of the Derby track has run before the first scenario, as it has a second
   after the server starts: a race manager (a DerbyTrackManagerNpc) sends and reads the race
   packet and the runners as it appears and decays, which are null before it;
@@ -312,6 +322,9 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # tick                          a scenario trace: one run of the NPC AI task
 # live <npc id> <count>         a scenario trace: how many living NPCs of that template the world
                                 holds once the step is over (the step's live line)
+# spawned <npc id> <x>,<y> ...   a scenario trace: where the living NPCs of that template that
+                                no NPC line placed stand once the step is over, sorted (the step's
+                                spawned line); - for none
 C Action item <item id> (object <id>)   a scenario trace: the pickup's action on the ground item
 ```
 

@@ -1,8 +1,7 @@
 # The Noblesse teleporter (NoblesseTeleporter): a gatekeeper's Noblesse link, followed by a
-# character who is no noblesse, answers the refusal page. A scenario seeds no noblesse status
-# and no teleport list, so the Noblesse page and its hunting-ground windows are in
-# tests/npcs/proof_features_test.go. Expectations are derived from the reference source
-# (NoblesseTeleporter.onTalk).
+# character who is no noblesse, answers the refusal page. The Noblesse page and its hunting-ground
+# windows are in noblesse_teleporter_windows.scenario. Expectations are derived from the reference
+# source (NoblesseTeleporter.onTalk).
 trace internal/gameserver/script/testdata/oracle/scenarios/noblesse_teleporter_refused.golden
 character Commoner 20
 script script.teleport.NoblesseTeleporter

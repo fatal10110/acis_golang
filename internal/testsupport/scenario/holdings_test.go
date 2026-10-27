@@ -88,10 +88,10 @@ func TestParseRejectsMalformedHoldingLines(t *testing.T) {
 }
 
 func TestParseRejectsHoldingsOnACreatedCharacter(t *testing.T) {
-	for _, line := range []string{"hold 57 1", "equip 1", "standing 1", "pk 1", "cabal dawn gnosis"} {
+	for _, line := range []string{"hold 57 1", "equip 1", "standing 1", "pk 1", "noble", "cabal dawn gnosis"} {
 		t.Run(line, func(t *testing.T) {
 			_, err := Parse("bad.scenario", []byte("character A 1\n"+line+"\ncreate\nenter\n"))
-			if err == nil || !strings.Contains(err.Error(), "no hold, equip, standing, pk or cabal line") {
+			if err == nil || !strings.Contains(err.Error(), "no hold, equip, standing, pk, noble or cabal line") {
 				t.Fatalf("err = %v", err)
 			}
 		})

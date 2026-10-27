@@ -18,11 +18,15 @@ type Door struct {
 	DX, DY, DZ int
 }
 
-// Summon is the summon line: the character's siege summon of a fixture
-// template of id, named Role.
+// Summon is the summon line: the character's siege summon, or its servitor
+// when Servitor, of a fixture template of id, named Role.
 type Summon struct {
 	Role string
 	ID   int32
+	// Servitor tells the summon is the character's servitor (a pet) of Level,
+	// not a siege summon.
+	Servitor bool
+	Level    int
 }
 
 // fight reads the skill, door and summon lines.
@@ -56,8 +60,9 @@ func (sc *Scenario) fight(key string, args []string, roles map[string]bool) erro
 		}
 		sc.Doors = append(sc.Doors, Door{Role: args[0], ID: n[0], DX: n[1], DY: n[2], DZ: n[3]})
 	case "summon":
-		if len(args) != 2 || sc.Summon != nil {
-			return fmt.Errorf("one summon line: summon <role> <npc id>")
+		usage := fmt.Errorf("one summon line: summon <role> <npc id> [servitor <level>]")
+		if (len(args) != 2 && len(args) != 4) || sc.Summon != nil || (len(args) == 4 && args[2] != "servitor") {
+			return usage
 		}
 		if sc.named(args[0], roles) {
 			return fmt.Errorf("role %q named twice", args[0])
@@ -66,7 +71,15 @@ func (sc *Scenario) fight(key string, args []string, roles map[string]bool) erro
 		if err != nil || id < 1 {
 			return fmt.Errorf("summon npc id %q is not a number of 1 or more", args[1])
 		}
-		sc.Summon = &Summon{Role: args[0], ID: int32(id)}
+		sum := &Summon{Role: args[0], ID: int32(id)}
+		if len(args) == 4 {
+			lv, err := strconv.Atoi(args[3])
+			if err != nil || lv < 1 {
+				return fmt.Errorf("servitor level %q is not a number of 1 or more", args[3])
+			}
+			sum.Servitor, sum.Level = true, lv
+		}
+		sc.Summon = sum
 	}
 	return nil
 }
@@ -151,8 +164,8 @@ func (sc *Scenario) checkFightStep(verb string, args []string, roles map[string]
 		if err != nil {
 			return err
 		}
-		if h.by != "player" && (h.by == args[0] || (!roles[h.by] && !sc.summoned(h.by))) {
-			return fmt.Errorf("hit by %q: no other npc line nor the summon line names it", h.by)
+		if h.by != "player" && (h.by == args[0] || !sc.isCreature(h.by, roles)) {
+			return fmt.Errorf("hit by %q: no other npc, summon or member line names it", h.by)
 		}
 	case "cast":
 		if !roles[args[0]] {
@@ -191,7 +204,7 @@ func (sc *Scenario) checkFightChecks(roles map[string]bool) error {
 			case "hate":
 				if !roles[ck.Args[0]] {
 					bad = ck.Args[0]
-				} else if len(ck.Args) == 3 && ck.Args[2] != "player" && !roles[ck.Args[2]] && !sc.summoned(ck.Args[2]) {
+				} else if len(ck.Args) == 3 && !sc.isCreature(ck.Args[2], roles) {
 					bad = ck.Args[2]
 				}
 			case "desires":

@@ -9,6 +9,7 @@
 trace internal/gameserver/script/testdata/oracle/scenarios/ketra_support_ally_5.golden
 character Ally 40
 standing 5
+teleports
 hold 7215 1
 hold 7186 6
 hold 7216 3
@@ -51,6 +52,8 @@ action kurfa
   S ActionFailed
   S NpcHtmlMessage obj=kurfa item=0 page=script/feature/KetraOrcSupport/31376-3.htm
   S ActionFailed
+bypass Quest KetraOrcSupport Teleport
+  S NpcHtmlMessage obj=kurfa item=0 html="<html><body>&$556;<br><br><a action=\"bypass -h npc_{kurfa}_teleport 2\" msg=\"811;Goddard Castle Town\">Goddard Castle Town - 4900 &#57;</a><br1><a action=\"bypass -h npc_{kurfa}_teleport 3\" msg=\"811;Rune Castle Town\">Rune Castle Town - 22000 &#57;</a><br1><a action=\"bypass -h npc_{kurfa}_teleport 4\" msg=\"811;Aden Castle Town\">Aden Castle Town - 21000 &#57;</a><br1><a action=\"bypass -h npc_{kurfa}_teleport 5\" msg=\"811;Wall of Argos\">Wall of Argos - 7000 &#57;</a><br1><a action=\"bypass -h npc_{kurfa}_teleport 6\" msg=\"811;Hot Springs\">Hot Springs - 6700 &#57;</a><br1></body></html>"
 action jaff
 action jaff
   S ActionFailed

@@ -54,6 +54,11 @@ docker run --rm --user "$(id -u):$(id -g)" \
 			src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java
 		[ "$(grep -c "ProbeClock.now()" src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java)" = 1 ] && [ "$(grep -c "ProbeClock.calendar()" src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java)" = 1 ] \
 			|| { echo "scheduled script clock not found" >&2; exit 1; }
+		# The half-price teleport hours read the calendar of the probe wall clock, so a gatekeeper window
+		# does not depend on when the scenario ran.
+		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/" src/net/sf/l2j/gameserver/model/location/TeleportLocation.java
+		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/model/location/TeleportLocation.java)" = 1 ] \
+			|| { echo "teleport location calendar not found" >&2; exit 1; }
 		# Every other wall clock read goes through the probe wall clock: the real one, except
 		# while a scenario trace plays (a virtual one, so its trace does not depend on when it ran).
 		find src -name "*.java" -exec sed -i "s/System\.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.wall()/g" {} +

@@ -201,6 +201,7 @@ final class ScenarioTrace
 	private final List<Integer> _equips = new ArrayList<>();
 	private int _standing;
 	private int _pk;
+	private boolean _noble;
 	private String[] _cabal;
 	private int[] _festival;
 	/** The sealowner lines: seal name, cabal name. */
@@ -211,6 +212,7 @@ final class ScenarioTrace
 	private final Map<String, Boolean> _spoils = new HashMap<>();
 	/** The live lines of each step, by the step's index: NPC id. */
 	private final Map<Integer, List<Integer>> _lives = new HashMap<>();
+	private final Map<Integer, List<Integer>> _spawns = new HashMap<>();
 
 	private GameClient _client;
 	private Player _player;
@@ -478,6 +480,12 @@ final class ScenarioTrace
 				_lives.computeIfAbsent(_steps.size() - 1, k -> new ArrayList<>()).add(Integer.parseInt(line.split("\\s+")[1]));
 				continue;
 			}
+			if (line.startsWith("spawned ") && (raw.startsWith(" ") || raw.startsWith("\t")) && !_steps.isEmpty())
+			{
+				// A step's expectation: where the NPCs of that template no npc line placed stand once it is over.
+				_spawns.computeIfAbsent(_steps.size() - 1, k -> new ArrayList<>()).add(Integer.parseInt(line.split("\\s+")[1]));
+				continue;
+			}
 			if (line.isEmpty() || line.startsWith("#") || raw.startsWith(" ") || raw.startsWith("\t"))
 				continue;
 			final String[] f = line.split("\\s+");
@@ -549,6 +557,7 @@ final class ScenarioTrace
 				case "equip" -> _equips.add(Integer.parseInt(f[1]));
 				case "standing" -> _standing = Integer.parseInt(f[1]);
 				case "pk" -> _pk = Integer.parseInt(f[1]);
+				case "noble" -> _noble = true;
 				case "cabal" -> _cabal = new String[]
 				{
 					f[1],
@@ -570,9 +579,9 @@ final class ScenarioTrace
 					f[2]
 				});
 				case "spoil" -> _spoils.put(f[1], f.length > 2);
-				case "item", "page" ->
+				case "item", "page", "teleports" ->
 				{
-					// The reference loads every item and page.
+					// The reference loads every item, page and teleport list.
 				}
 				default -> _unread.add(f[0]);
 			}
@@ -639,7 +648,16 @@ final class ScenarioTrace
 			}
 			for (int id : _lives.getOrDefault(index, List.of()))
 				_lines.add("# live " + id + " " + live(id));
+			for (int id : _spawns.getOrDefault(index, List.of()))
+				_lines.add("# spawned " + id + " " + spawned(id));
 		}
+	}
+
+	/** Where (x and y; the probe has no geodata, so its heights are not the ground's) the NPCs of the template that no npc line placed stand alive, sorted, or - for none. */
+	private String spawned(int npcId)
+	{
+		final List<String> at = World.getInstance().getObjects().stream().filter(o -> o instanceof Npc n && n.getNpcId() == npcId && !n.isDead() && !_spawnedNpcs.contains(o)).map(o -> o.getX() + "," + o.getY()).sorted().toList();
+		return at.isEmpty() ? "-" : String.join(" ", at);
 	}
 
 	/** How many NPCs of the template stand alive in the world. */
@@ -830,6 +848,8 @@ final class ScenarioTrace
 			player.setAllianceWithVarkaKetra(_standing);
 		if (_pk != 0)
 			player.setPkKills(_pk);
+		if (_noble)
+			player.setNoble(true, false);
 		if (_cabal != null)
 			SevenSignsManager.getInstance().setPlayerInfo(player.getObjectId(), CabalType.valueOf(_cabal[0].toUpperCase()), SealType.valueOf(_cabal[1].toUpperCase()));
 		if (_festival != null)
