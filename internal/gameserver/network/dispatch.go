@@ -71,6 +71,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/shutdown"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
@@ -294,6 +295,10 @@ type PlayerConfig struct {
 	// loot reads too, and the multiple item drop rule every item creation
 	// reads. Nil leaves the ones in force as they are.
 	KillRewards *manager.KillRewardSettings
+	// Events, when set, are the event settings the event quests read, put
+	// in force whole with the rest. Nil leaves the ones in force as they
+	// are.
+	Events *script.EventRules
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -391,6 +396,9 @@ type GameClientLink struct {
 	// killRewards holds the kill reward settings in force, shared with the
 	// kill rewards and the scripts; //reload config sets them whole.
 	killRewards *manager.KillRewardBook
+	// events holds the event settings in force, shared with the scripts;
+	// //reload config sets them whole.
+	events *script.EventBook
 	// playerConfigMu serializes the //reload config puts, so the settings
 	// and the rules and switches built from them come from one reload.
 	playerConfigMu   sync.Mutex
@@ -837,6 +845,10 @@ type GameClientLinkConfig struct {
 	// the kill rewards and the scripts read; nil gives the link its own,
 	// holding PlayerConfig.KillRewards or else the zero settings.
 	KillRewards *manager.KillRewardBook
+	// Events holds the event settings in force, the same book the scripts
+	// read; nil gives the link its own, holding PlayerConfig.Events or
+	// else the shipped settings.
+	Events *script.EventBook
 	// BossZones saves and restores who may enter the boss zones around a
 	// zone reload; nil keeps nobody's permission across one.
 	BossZones BossZoneStore
@@ -971,6 +983,13 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	if playerConfig.KillRewards != nil {
 		link.killRewards.Set(*playerConfig.KillRewards)
+	}
+	link.events = cfg.Events
+	if link.events == nil {
+		link.events = script.NewEventBook(script.DefaultEventRules())
+	}
+	if playerConfig.Events != nil {
+		link.events.Set(*playerConfig.Events)
 	}
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor

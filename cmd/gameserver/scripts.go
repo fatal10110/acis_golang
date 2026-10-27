@@ -261,7 +261,7 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // script reads, the Seven Signs state, the grand boss wait times, the doors
 // scripts open and close, the castles NPCs belong to with their sieges, and
 // the clan halls with the siegable halls' sieges, and the clans.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine, halls *clanhall.Halls, clans *clan.Service) (*script.Env, error) {
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine, halls *clanhall.Halls, clans *clan.Service, events *script.EventBook) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -283,6 +283,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Quests:       journals,
 		Rates:        rates,
 		Drops:        rewards.Settings,
+		Events:       events,
 		NewItemID:    ids.NextID,
 		Spawner:      spawner,
 		Rand:         rnd.Get,

@@ -137,8 +137,8 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 	}
 }
 
-// reloadPlayerConfig reads the server, hexid, players, NPC and geoengine
-// properties files anew, failing as boot would on a file or value it cannot
+// reloadPlayerConfig reads the server, hexid, players, NPC, geoengine and
+// events properties files anew, failing as boot would on a file or value it cannot
 // read, and returns the player settings read from them.
 //
 // Only the player settings take the reloaded values, the rules of the
@@ -146,7 +146,9 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 // multipliers the characters, summons, NPCs and doors read, and the kill
 // reward settings (drop and XP/SP rates, auto-loot, party XP, the party
 // range and the multiple item drop rule, shared by the kill rewards, party
-// loot, NPC hate randomization, the scripts and item creation) included.
+// loot, NPC hate randomization, the scripts and item creation) and the
+// event settings the event quests read (the Four Sepulchers party size and
+// the Dimensional Rift settings) included.
 // These keep their boot value, read once into what the boot built from
 // them:
 //   - the listener and login server addresses, the login registration
@@ -192,7 +194,12 @@ func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logge
 	if err != nil {
 		return network.PlayerConfig{}, err
 	}
+	events, err := loadEventRules(paths)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
 	settings := newPlayerConfig(cfg, gameplay, pvpOptions)
 	settings.KillRewards = &rewards
+	settings.Events = &events
 	return settings, nil
 }

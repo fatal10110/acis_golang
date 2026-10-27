@@ -213,6 +213,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideEffectEnv,
 			provideNPCRegen,
 			provideKillRewardConfig,
+			provideEventBook,
 			provideSpellbookPolicy,
 			provideNpcs,
 			provideScripts,

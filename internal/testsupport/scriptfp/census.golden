@@ -103,7 +103,7 @@ call Creature.getMove classes 10 sites 19 go inline
 call Creature.getParty classes 17 sites 26 go inline
 call Creature.getStatus classes 30 sites 53 go inline
 call Creature.getSummon classes 1 sites 12 go inline
-call Creature.instantTeleportTo classes 13 sites 22 go InstantTeleportTo
+call Creature.instantTeleportTo classes 13 sites 22 go InstantTeleportTo,InstantTeleportNear
 call Creature.isDead classes 78 sites 151 go Dead
 call Creature.isInCombat classes 10 sites 18 go script.NPC.InCombat
 call Creature.isInsideZone classes 10 sites 12 go script.NPC.InsideZone
