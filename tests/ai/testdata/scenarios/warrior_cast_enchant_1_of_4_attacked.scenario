@@ -16,3 +16,5 @@ hit caster 10
   mem caster i_ai0=2 i_ai1=1
   desires caster attack(player)=26.31578947368421 cast(caster,4091,move)=1000000
 hit caster 10
+  mem caster i_ai0=2 i_ai1=1
+  desires caster attack(player)=52.63157894736842 cast(caster,4091,move)=1000000
