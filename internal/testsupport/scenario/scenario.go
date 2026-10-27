@@ -44,6 +44,13 @@
 //	festival <dawn score> <dusk score>        optional: the Seven Signs festival scores the server restores; with no
 //	                                          stones turned in they are the cabals' scores, so the higher cabal is
 //	                                          winning and the other losing, neither on a tie (default 0 0)
+//	sealowner <avarice|gnosis|strife> <dawn|dusk>
+//	                                          optional, one per seal: the cabal that owns the seal in the Seven Signs
+//	                                          status the server restores (default none); the festival line makes a cabal
+//	                                          win
+//	memo <var> <value>                        optional, one per variable: a character_memo row of the character before
+//	                                          it enters the world (a value is one blank-free field), which the memo
+//	                                          writes of a step then update or delete
 //	random <draw> ...                         optional: the script random draws, in order; each must be inside
 //	                                          [0, n) of its call, and every one must be drawn
 //	random always <draw>                      optional: every script random draw is that one
@@ -60,6 +67,9 @@
 //	                                          calls reaching that far (door_clan: a hit door's call reaches it); skill, the
 //	                                          template lists that shipped skill under that type (data/xml/npcs's
 //	                                          <skills> type, PASSIVE excepted), which its behaviors cast
+//	spoil <role> [other]                      optional: the monster is spoiled, by the character or, with other, by another
+//	                                          player, as every fresh monster of that role stands: the one a line spawns and
+//	                                          each one a kill step replaces a dead one with
 //	skill <skill id> <level>                  optional: the character knows that shipped skill, which a cast step casts
 //	roll <role> <draw>                        optional: every combat draw of the NPC is that draw (n-1 for a draw of
 //	                                          [0, n) it is not inside): its skill landing rolls, as its hit and
@@ -287,6 +297,14 @@ type Scenario struct {
 	Seal  sevensigns.Seal
 	// Festival is the festival line's Dawn and Dusk scores, nil for none.
 	Festival *[2]int
+	// SealOwners are the sealowner lines' owners, in sevensigns.Seals
+	// order; NoCabal for a seal no line names.
+	SealOwners [3]sevensigns.Cabal
+	// Memos are the memo lines' character_memo rows, seeded before the
+	// character enters the world.
+	Memos []Memo
+	// Spoils are the spoil lines.
+	Spoils []Spoil
 	// Random is the script random source, nil for random draws.
 	Random  *Random
 	Scripts []ScriptLine
@@ -328,6 +346,19 @@ type QuestRows struct {
 type Hold struct {
 	Item  int32
 	Count int32
+}
+
+// Memo is one memo line: a character_memo row.
+type Memo struct {
+	Var   string
+	Value string
+}
+
+// Spoil is one spoil line: the monster of Role stands spoiled, by another
+// player when Other, else by the character.
+type Spoil struct {
+	Role  string
+	Other bool
 }
 
 // Random is the random line: the draws in order, or one draw always.
@@ -373,6 +404,9 @@ type Step struct {
 	Packets    []string
 	Statements []string
 	Memos      []string
+	// Lives are the live lines as "<npc id>=<count>": how many NPCs of that
+	// template stand alive in the world when the step is over.
+	Lives []string
 	// Queues is the queue line: "own", "other" or "other+n" (the n lines
 	// after each cast that go out with it) for each task of the traced step
 	// that teleports the character or makes it cast, in order; nil without
@@ -527,8 +561,8 @@ func (sc *Scenario) checkFlow() error {
 			switch {
 			case sc.Level != 1:
 				return fail("a created character starts at level 1, not %d", sc.Level)
-			case sc.Class != 0 || sc.Subclass != 0 || sc.Clan >= 0 || len(sc.Quests) > 0:
-				return fail("a created character takes no class, subclass, clan or quest line")
+			case sc.Class != 0 || sc.Subclass != 0 || sc.Clan >= 0 || len(sc.Quests) > 0 || len(sc.Memos) > 0:
+				return fail("a created character takes no class, subclass, clan, quest or memo line")
 			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Cabal != sevensigns.NoCabal:
 				return fail("a created character takes no hold, equip, standing, pk or cabal line")
 			case len(sc.Members) > 0:
@@ -687,8 +721,10 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			}
 		}
 		sc.Scripts = append(sc.Scripts, ScriptLine{Path: args[0], Stub: key == "stub"})
-	case "hold", "equip", "standing", "pk", "cabal", "festival":
+	case "hold", "equip", "standing", "pk", "cabal", "festival", "sealowner", "memo":
 		return sc.holdings(key, args)
+	case "spoil":
+		return sc.spoil(args, roles)
 	case "item":
 		if len(args) == 0 {
 			return fmt.Errorf("item takes one or more ids")
@@ -821,7 +857,51 @@ func (sc *Scenario) holdings(key string, args []string) error {
 			scores[i] = int(n)
 		}
 		sc.Festival = &scores
+	case "sealowner":
+		if len(args) != 2 {
+			return fmt.Errorf("sealowner <avarice|gnosis|strife> <dawn|dusk>")
+		}
+		seal, err := sevensigns.ParseSeal(strings.ToUpper(args[0]))
+		if err != nil || seal == sevensigns.NoSeal {
+			return fmt.Errorf("seal %q is not avarice, gnosis or strife", args[0])
+		}
+		owner, err := sevensigns.ParseCabal(strings.ToUpper(args[1]))
+		if err != nil || owner == sevensigns.NoCabal {
+			return fmt.Errorf("owner %q is not dawn or dusk", args[1])
+		}
+		i := slices.Index(sevensigns.Seals[:], seal)
+		if sc.SealOwners[i] != sevensigns.NoCabal {
+			return fmt.Errorf("seal %s owned twice", args[0])
+		}
+		sc.SealOwners[i] = owner
+	case "memo":
+		if len(args) != 2 {
+			return fmt.Errorf("memo <var> <value>")
+		}
+		for _, m := range sc.Memos {
+			if m.Var == args[0] {
+				return fmt.Errorf("memo %s seeded twice", args[0])
+			}
+		}
+		sc.Memos = append(sc.Memos, Memo{Var: args[0], Value: args[1]})
 	}
+	return nil
+}
+
+// spoil reads a spoil line: spoil <role> [other].
+func (sc *Scenario) spoil(args []string, roles map[string]bool) error {
+	if len(args) < 1 || len(args) > 2 || (len(args) == 2 && args[1] != "other") {
+		return fmt.Errorf("spoil <role> [other]")
+	}
+	if !roles[args[0]] {
+		return fmt.Errorf("spoil: unknown role %q (name its npc line first)", args[0])
+	}
+	for _, s := range sc.Spoils {
+		if s.Role == args[0] {
+			return fmt.Errorf("role %q spoiled twice", args[0])
+		}
+	}
+	sc.Spoils = append(sc.Spoils, Spoil{Role: args[0], Other: len(args) == 2})
 	return nil
 }
 
@@ -891,6 +971,18 @@ func (s *Step) expect(n int, line string) error {
 			return err
 		}
 		s.Memos = append(s.Memos, rest)
+	case "live":
+		args := strings.Fields(rest)
+		if len(args) != 2 {
+			return fmt.Errorf("live <npc id> <count>")
+		}
+		if _, err := strconv.ParseInt(args[0], 10, 32); err != nil {
+			return fmt.Errorf("live npc id %q: %w", args[0], err)
+		}
+		if n, err := strconv.Atoi(args[1]); err != nil || n < 0 {
+			return fmt.Errorf("live count %q is not a number of 0 or more", args[1])
+		}
+		s.Lives = append(s.Lives, args[0]+"="+args[1])
 	case "queue":
 		if s.Queues != nil {
 			return fmt.Errorf("a second queue line")

@@ -304,8 +304,8 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	if r.sc.LaysCursed() {
 		opts = append(opts, gameservertest.WithCursedWeapons(shippedCursedWeapons(t)))
 	}
-	if f := r.sc.Festival; f != nil {
-		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedFestival(t, store, f) }))
+	if r.sc.Festival != nil || r.sc.SealOwners != [3]sevensigns.Cabal{} {
+		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedSevenSigns(t, store, r.sc) }))
 	}
 	r.srv = gameservertest.Boot(t, opts...)
 	if r.sc.Creates() {
@@ -322,6 +322,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	// The journal and the experience are read when the character is
 	// selected.
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
+	seedMemos(t, r.srv.DB, r.player, r.sc.Memos)
 	seedExp(t, r.srv.DB, r.player, r.sc.Level)
 	r.seedSubclass(t)
 	r.seedHoldings(t)
@@ -455,18 +456,36 @@ func seedQuests(t *testing.T, db *sql.DB, obj int32, quests []QuestRows) {
 	}
 }
 
-// seedFestival writes the festival line's scores into the Seven Signs
-// status row the server restores.
-func seedFestival(t *testing.T, store *gamesql.SevenSignsStore, scores *[2]int) {
+// seedMemos stores the memo lines' character_memo rows of the character obj.
+func seedMemos(t *testing.T, db *sql.DB, obj int32, memos []Memo) {
+	t.Helper()
+	for _, m := range memos {
+		if _, err := db.ExecContext(context.Background(),
+			"INSERT INTO character_memo (charId,var,val) VALUES (?,?,?)", obj, m.Var, m.Value); err != nil {
+			t.Fatalf("seed memo %s=%s: %v", m.Var, m.Value, err)
+		}
+	}
+}
+
+// seedSevenSigns writes the festival line's scores and the sealowner lines'
+// owners into the Seven Signs status row the server restores.
+func seedSevenSigns(t *testing.T, store *gamesql.SevenSignsStore, sc *Scenario) {
 	t.Helper()
 	ctx := context.Background()
 	row, found, err := store.LoadStatus(ctx)
 	if err != nil || !found {
-		t.Fatalf("seed festival: load the status row: found=%v err=%v", found, err)
+		t.Fatalf("seed seven signs: load the status row: found=%v err=%v", found, err)
 	}
-	row.DawnFestivalScore, row.DuskFestivalScore = scores[0], scores[1]
+	if f := sc.Festival; f != nil {
+		row.DawnFestivalScore, row.DuskFestivalScore = f[0], f[1]
+	}
+	for i, owner := range sc.SealOwners {
+		if owner != sevensigns.NoCabal {
+			row.SealOwners[i] = owner
+		}
+	}
 	if err := store.SaveStatus(ctx, row); err != nil {
-		t.Fatalf("seed festival: %v", err)
+		t.Fatalf("seed seven signs: %v", err)
 	}
 }
 
@@ -540,10 +559,37 @@ func (r *run) spawn(t *testing.T, n NPC) {
 		r.live[n.Role], live = h, h
 	}
 	r.roles[live.ObjectID()], r.objs[n.Role] = n.Role, live.ObjectID()
+	r.spoil(t, n.Role)
 	if draw, ok := r.sc.Rolls[n.Role]; ok {
 		r.pinRoll(t, n.Role, draw)
 	}
 	r.srv.RunCreated(t, live)
+}
+
+// otherSpoiler is the object id of the other player a spoil line's other
+// names: nobody in the world.
+const otherSpoiler = 0x7fff0001
+
+// spoil marks the fresh monster of role as its spoil line says: a spawn
+// clears the spoil state, so each one is marked anew.
+func (r *run) spoil(t *testing.T, role string) {
+	t.Helper()
+	for _, s := range r.sc.Spoils {
+		if s.Role != role {
+			continue
+		}
+		h := r.live[role]
+		if h == nil {
+			t.Fatalf("%s: spoil %s: the NPC is not an attackable", r.sc.Name, role)
+		}
+		spoiler := r.player
+		if s.Other {
+			spoiler = otherSpoiler
+		}
+		if !h.SpoilPool().Mark(spoiler) {
+			t.Fatalf("%s: spoil %s: the NPC is already spoiled", r.sc.Name, role)
+		}
+	}
 }
 
 // template is the fixture template of n: a civilian one, undying like the
@@ -705,11 +751,37 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if d := FirstDiff("memo", memoLines(r.srv.TakeMemoWrites()), st.Memos); d != "" {
 		fail("%s", d)
 	}
+	if d := FirstDiff("live", r.lives(st.Lives), st.Lives); d != "" {
+		fail("%s", d)
+	}
 	for _, ck := range st.Checks {
 		if d := r.check(t, ck); d != "" {
 			fail("%s (line %d)", d, ck.Line)
 		}
 	}
+}
+
+// lives counts, for each live line of a step, the NPCs of that template
+// standing alive in the world, as "<npc id>=<count>".
+func (r *run) lives(want []string) []string {
+	var got []string
+	for _, w := range want {
+		id, _, _ := strings.Cut(w, "=")
+		n, _ := strconv.Atoi(id)
+		count := 0
+		for _, obj := range r.srv.State.Objects() {
+			c, ok := obj.(interface{ Template() *npc.Template })
+			if !ok || c.Template().ID != n {
+				continue
+			}
+			if d, ok := obj.(interface{ AlikeDead() bool }); ok && d.AlikeDead() {
+				continue
+			}
+			count++
+		}
+		got = append(got, fmt.Sprintf("%s=%d", id, count))
+	}
+	return got
 }
 
 // pickup sends an Action on the one ground item of template id, from where

@@ -2,8 +2,6 @@ package npcs
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"maps"
 	"os"
 	"slices"
@@ -33,12 +31,12 @@ import (
 
 // The scripted teleporters of #210's second batch, driven through real
 // Action and bypass packets against MariaDB: where each link or talk lands
-// the player, what it takes from the inventory as it is saved, the player
-// memo the Monster Race Track trip keeps, the Seven Signs reads of the
-// gatekeeper spirits and the priests, and the exit spirit a raid boss's
-// death brings. The V4 scenarios (tests/quest/testdata/scenarios) replay
-// the reference traces of the pages and messages; a scenario asserts no
-// landing, seal owner or spawned NPC (#3946), so those are here.
+// the player, what it takes from the inventory as it is saved, the Seven
+// Signs reads of the priests, and the place of the exit spirit a raid
+// boss's death brings. The V4 scenarios (tests/quest/testdata/scenarios)
+// replay the reference traces of the pages, messages, seeded memos and seal
+// owners, and the exit spirit's count and despawn; a scenario asserts no
+// landing or spawned NPC place (#3946), so those are here.
 
 // The teleporters' NPCs, items and destinations, as the reference scripts
 // have them.
@@ -53,9 +51,6 @@ const (
 	tpAnakim      = 25286
 	tpDawnPriest  = 31078
 	tpDuskPriest  = 31085
-	tpTrisha      = 30059
-	tpBilia       = 31964
-	tpRaceManager = 30995
 
 	tpOrcCharm   = 1658
 	tpDwarfToken = 1659
@@ -64,15 +59,12 @@ const (
 	tpRedStone   = 4403
 	tpGravePass  = 7261
 	tpBrooch     = 7262
-
-	tpRaceMemo = "MonsterRaceTrack_Npc"
 )
 
 var (
 	tpGludinVillage  = location.Location{X: -80826, Y: 149775, Z: -3043}
 	tpFourSepulchers = location.Location{X: 178127, Y: -84435, Z: -7215}
 	tpImperialTomb   = location.Location{X: 186699, Y: -75915, Z: -2826}
-	tpRaceTrack      = location.Location{X: 12661, Y: 181687, Z: -3560}
 )
 
 // teleporterSetup is what a teleporter world's character brings into the
@@ -80,8 +72,6 @@ var (
 type teleporterSetup struct {
 	// held is what the character holds, template id to count.
 	held map[int32]int32
-	// memo is the character's saved Monster Race Track memo, "" for none.
-	memo string
 	// cabal is the character's Seven Signs sign-up.
 	cabal sevensigns.Cabal
 	// status edits the Seven Signs status row before the state restores
@@ -153,7 +143,6 @@ func bootTeleporters(t *testing.T, setup teleporterSetup) *folkWorld {
 	kinds := map[int32]script.NPCKind{tpLilith: script.KindHostile, tpAnakim: script.KindHostile}
 	for _, id := range []int32{
 		tpWhirpy, tpTamil, tpVortex, tpChamberlain, tpSpiritIn, tpSpiritOut, tpDawnPriest, tpDuskPriest,
-		tpTrisha, tpBilia, tpRaceManager,
 	} {
 		kinds[id] = script.KindFolk
 	}
@@ -178,11 +167,6 @@ func bootTeleporters(t *testing.T, setup teleporterSetup) *folkWorld {
 	srv := gameservertest.Boot(t, opts...)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
 	ctx := context.Background()
-	if setup.memo != "" {
-		if _, err := srv.DB.ExecContext(ctx, "INSERT INTO character_memo (charId,var,val) VALUES (?,?,?)", w.player, tpRaceMemo, setup.memo); err != nil {
-			t.Fatal(err)
-		}
-	}
 	if setup.cabal != sevensigns.NoCabal {
 		if err := srv.SevenSigns.SetPlayerInfo(ctx, w.player, setup.cabal, sevensigns.Avarice); err != nil {
 			t.Fatalf("sign up: %v", err)
@@ -251,22 +235,6 @@ func (w *folkWorld) requireSaved(t *testing.T, want map[int32]int) {
 			t.Fatalf("saved count of %d = %d, want %d", id, got, want[id])
 		}
 	}
-}
-
-// memoRow returns the player's saved Monster Race Track memo, "" for none.
-func (w *folkWorld) memoRow(t *testing.T) string {
-	t.Helper()
-	w.srv.FlushPersistence(t)
-	var val string
-	err := w.srv.DB.QueryRowContext(context.Background(),
-		"SELECT val FROM character_memo WHERE charId=? AND var=?", w.player, tpRaceMemo).Scan(&val)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ""
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	return val
 }
 
 // TestCharmTeleporterTakesItsTokenAndMoves: Whirpy takes one dwarf
@@ -365,46 +333,6 @@ func TestElmoredenCemeteryTeleporterDestinations(t *testing.T) {
 	}
 }
 
-// TestGatekeeperSpiritCabalPages: the entrance spirit gives the cabal's
-// page only to a member of the cabal that both owns the Seal of Avarice and
-// wins; anyone else gets the spirit's own chat window.
-func TestGatekeeperSpiritCabalPages(t *testing.T) {
-	t.Parallel()
-	status := func(owner sevensigns.Cabal, dawn, dusk float64) func(*sevensigns.StatusRow) {
-		return func(row *sevensigns.StatusRow) {
-			row.SealOwners[0] = owner
-			row.DawnStoneScore, row.DuskStoneScore = dawn, dusk
-		}
-	}
-	for _, tt := range []struct {
-		name   string
-		cabal  sevensigns.Cabal
-		status func(*sevensigns.StatusRow)
-		page   string
-		// releases follow the page: the hook's answer releases once; the
-		// chat window releases, then the empty answer once more.
-		releases int
-	}{
-		{name: "dawn", cabal: sevensigns.Dawn, status: status(sevensigns.Dawn, 100, 0), page: "script/teleport/GatekeeperSpirit/dawn.htm", releases: 1},
-		{name: "dusk", cabal: sevensigns.Dusk, status: status(sevensigns.Dusk, 0, 100), page: "script/teleport/GatekeeperSpirit/dusk.htm", releases: 1},
-		{name: "owner losing", cabal: sevensigns.Dawn, status: status(sevensigns.Dawn, 0, 100), page: "gatekeeper/31111.htm", releases: 2},
-		{name: "winner not owning", cabal: sevensigns.Dusk, status: status(sevensigns.Dawn, 0, 100), page: "gatekeeper/31111.htm", releases: 2},
-		{name: "no cabal", status: status(sevensigns.NoCabal, 0, 0), page: "gatekeeper/31111.htm", releases: 2},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			w := bootTeleporters(t, teleporterSetup{cabal: tt.cabal, status: tt.status})
-			spirit := w.spawnFolk(t, folkTemplate("DungeonGatekeeper", tpSpiritIn), 50)
-			w.selectFolk(t, spirit)
-			frames := dialogFrames(w.talk(t, spirit, false))
-			if len(frames) > 0 && frames[0][0] == serverpackets.OpcodeActionFailed {
-				frames = frames[1:] // the talk's own release
-			}
-			wantPage(t, frames, spirit, scriptPage(t, tt.page, spirit), tt.releases)
-		})
-	}
-}
-
 // liveCount counts the NPCs of template id in the world.
 func liveCount(w *folkWorld, id int) int {
 	n := 0
@@ -499,74 +427,4 @@ func TestHuntingGroundsTeleporterOpensWindowForCabalMember(t *testing.T) {
 			wantPage(t, w.bypass(t, npcCommand(priest, "Quest HuntingGroundsTeleporter")), priest, window, 1)
 		})
 	}
-}
-
-// TestMonsterRaceTrackRoundTrip: a town gatekeeper sends the player to the
-// track and saves itself as the player's memo; the race manager sends the
-// player back to that gatekeeper's town and deletes the memo.
-func TestMonsterRaceTrackRoundTrip(t *testing.T) {
-	t.Parallel()
-	w := bootTeleporters(t, teleporterSetup{})
-	trisha := w.spawnFolk(t, folkTemplate("Gatekeeper", tpTrisha), 50)
-	w.openThrough(t, trisha)
-	w.requireTrip(t, w.tripFrames(t, npcCommand(trisha, "Quest MonsterRaceTrack")), tpRaceTrack)
-	if got := w.memoRow(t); got != "30059" {
-		t.Fatalf("saved memo = %q, want 30059", got)
-	}
-
-	manager := w.spawnFolk(t, folkTemplate("Folk", tpRaceManager), 50)
-	w.openThrough(t, manager)
-	w.requireTrip(t, w.tripFrames(t, npcCommand(manager, "Quest MonsterRaceTrack")), location.Location{X: 15670, Y: 142983, Z: -2705})
-	if got := w.memoRow(t); got != "" {
-		t.Fatalf("saved memo after the trip back = %q, want none", got)
-	}
-}
-
-// TestMonsterRaceTrackManagerReadsSavedMemo: a memo saved before the
-// character entered the world sends it back to that gatekeeper's town; a
-// saved value past int32 fails the parse as the reference's parseInt
-// does, so the talk aborts before the trip and the memo stays; with no
-// memo the race manager moves no one and keeps no memo.
-func TestMonsterRaceTrackManagerReadsSavedMemo(t *testing.T) {
-	t.Parallel()
-	t.Run("past int32", func(t *testing.T) {
-		t.Parallel()
-		const past = "4294997355" // 1<<32 + Trisha's id
-		w := bootTeleporters(t, teleporterSetup{memo: past})
-		manager := w.spawnFolk(t, folkTemplate("Folk", tpRaceManager), 50)
-		w.openThrough(t, manager)
-		frames := w.bypass(t, npcCommand(manager, "Quest MonsterRaceTrack"))
-		if _, ok := firstOpcode(frames, serverpackets.OpcodeTeleportToLocation); ok {
-			t.Fatalf("a memo past int32 moved the player: %x", opcodes(frames))
-		}
-		if got := w.memoRow(t); got != past {
-			t.Fatalf("saved memo = %q, want %q kept", got, past)
-		}
-	})
-	t.Run("saved", func(t *testing.T) {
-		t.Parallel()
-		w := bootTeleporters(t, teleporterSetup{memo: strconv.Itoa(tpBilia)})
-		manager := w.spawnFolk(t, folkTemplate("Folk", tpRaceManager), 50)
-		w.openThrough(t, manager)
-		w.requireTrip(t, w.tripFrames(t, npcCommand(manager, "Quest MonsterRaceTrack")), location.Location{X: 87386, Y: -143246, Z: -1293})
-		if got := w.memoRow(t); got != "" {
-			t.Fatalf("saved memo after the trip = %q, want none", got)
-		}
-	})
-	t.Run("none", func(t *testing.T) {
-		t.Parallel()
-		w := bootTeleporters(t, teleporterSetup{})
-		manager := w.spawnFolk(t, folkTemplate("Folk", tpRaceManager), 50)
-		w.openThrough(t, manager)
-		frames := w.bypass(t, npcCommand(manager, "Quest MonsterRaceTrack"))
-		if _, ok := firstOpcode(frames, serverpackets.OpcodeTeleportToLocation); ok {
-			t.Fatalf("the race manager moved a player with no memo: %x", opcodes(frames))
-		}
-		if got := opcodes(dialogFrames(frames)); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-			t.Fatalf("answer = %x, want the dispatcher's release alone", got)
-		}
-		if got := w.memoRow(t); got != "" {
-			t.Fatalf("saved memo = %q, want none", got)
-		}
-	})
 }

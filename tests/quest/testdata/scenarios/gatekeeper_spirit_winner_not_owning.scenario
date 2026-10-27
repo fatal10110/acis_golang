@@ -1,0 +1,18 @@
+# The entrance spirit (GatekeeperSpirit) of the Seven Signs dungeons: a member of the cabal that wins but does not own the Seal of Avarice gets the spirit's own chat window.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/gatekeeper_spirit_winner_not_owning.golden
+character Pilgrim 40
+cabal dusk avarice
+festival 0 100
+sealowner avarice dawn
+script script.teleport.GatekeeperSpirit
+page gatekeeper/31111.htm
+page script/teleport/GatekeeperSpirit/
+npc spirit 31111 DungeonGatekeeper 10 0 0
+
+action spirit
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=gatekeeper/31111.htm
+  S ActionFailed
+  S ActionFailed
