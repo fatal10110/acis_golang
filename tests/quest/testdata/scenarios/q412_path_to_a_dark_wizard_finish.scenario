@@ -36,6 +36,7 @@ bypass npc_{varika}_Quest
   S SystemMessage id=302 3:1256
   S SystemMessage id=54 3:1261
   S SystemMessage id=95 1:3200 1:1650
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-16.htm

@@ -374,6 +374,7 @@ bypass npc_{darkelf}_Quest
   S QuestList 226:0x80003fff
   S ExShowQuestMark quest=226
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=assassin npc=27124
   S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-01.htm
   S ActionFailed
   S ActionFailed
@@ -404,6 +405,7 @@ bypass npc_{darkelf}_Quest
   S QuestList 226:0x8000ffff
   S ExShowQuestMark quest=226
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=sniper npc=27125
   S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-02.htm
   S ActionFailed
   S ActionFailed
@@ -440,6 +442,8 @@ bypass npc_{darkelf}_Quest
   S QuestList 226:0x8003ffff
   S ExShowQuestMark quest=226
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=wizard npc=27126
+  S NpcInfo obj=lord npc=27127
   S NpcHtmlMessage obj=darkelf item=0 page=script/quest/Q226_TestOfTheHealer/30661-03.htm
   S ActionFailed
   S ActionFailed
@@ -582,6 +586,7 @@ bypass Quest Q226_TestOfTheHealer 30473-09.htm
   S SystemMessage id=302 3:2813
   S SystemMessage id=54 3:2820
   S SystemMessage id=95 1:134839 1:50000
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 226:0x00000000
   S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-09.htm

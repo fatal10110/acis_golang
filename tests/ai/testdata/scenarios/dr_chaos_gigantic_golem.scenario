@@ -16,4 +16,5 @@ npc golem 25512 RaidBoss 300 0 0
 kill golem
   S SystemMessage id=1209
   S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S SpecialCamera obj=golem distance=30 yaw=-200 pitch=20 time=6000 duration=8000 turn=0 rise=0 widescreen=0 unknown=0
   S NpcSay obj=golem type=0 npc=1025512 text="Urggh! You will pay dearly for this insult."

@@ -14,7 +14,7 @@ func TestRenderComparesThePlayersTeleportOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	line, ok, err := render(frame, map[int32]string{0x10000484: "player"})
+	line, ok, err := newRenderer(map[int32]string{0x10000484: "player"}).render(frame)
 	if err != nil || !ok || line != "TeleportToLocation obj=player loc=-18615,108298,-2556 fast=0" {
 		t.Fatalf("the player's teleport renders %q, %v, %v", line, ok, err)
 	}
@@ -23,7 +23,7 @@ func TestRenderComparesThePlayersTeleportOnly(t *testing.T) {
 		"an unknown's":   {},
 		"another role's": {0x10000485: "player"},
 	} {
-		if line, ok, err := render(frame, roles); ok || err != nil {
+		if line, ok, err := newRenderer(roles).render(frame); ok || err != nil {
 			t.Fatalf("%s teleport renders %q, %v, %v; want not compared", name, line, ok, err)
 		}
 	}

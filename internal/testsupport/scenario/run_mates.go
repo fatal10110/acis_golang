@@ -224,7 +224,7 @@ func (r *run) othersSent(t *testing.T, acting *testsupport.ScriptedClient) (map[
 			return nil
 		}
 		for _, f := range r.srv.ReadQueued(t, c) {
-			line, ok, err := render(f, r.roles)
+			line, ok, err := r.rd.render(f)
 			if err != nil {
 				return fmt.Errorf("frame %x sent to %s: %w", f, name, err)
 			}

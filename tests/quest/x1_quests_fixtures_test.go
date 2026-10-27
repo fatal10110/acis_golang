@@ -2,7 +2,6 @@ package quest
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"slices"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
@@ -117,8 +115,7 @@ func keep(got []string, prefixes ...string) []string {
 }
 
 // bypassAll sends command and renders every frame it is answered with,
-// deferred updates left out: a SocialAction as its actor and action, any
-// other packet the goldens do not render as its opcode.
+// deferred updates left out, any other packet the goldens do not render as its opcode.
 func (w *dialogWorld) bypassAll(t *testing.T, command string) []string {
 	t.Helper()
 	w.srv.Client.Send(encodeBypass(command))
@@ -129,11 +126,6 @@ func (w *dialogWorld) bypassAll(t *testing.T, command string) []string {
 		}
 		if line, err := scriptcontract.Packet(f, w.roles); err == nil {
 			out = append(out, line)
-			continue
-		}
-		if f[0] == serverpackets.OpcodeSocialAction && len(f) == 9 {
-			obj := int32(binary.LittleEndian.Uint32(f[1:]))
-			out = append(out, fmt.Sprintf("S SocialAction obj=%s action=%d", w.roles[obj], binary.LittleEndian.Uint32(f[5:])))
 			continue
 		}
 		out = append(out, fmt.Sprintf("S 0x%02x", f[0]))

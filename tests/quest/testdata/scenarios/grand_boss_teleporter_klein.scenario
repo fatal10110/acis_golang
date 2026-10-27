@@ -28,4 +28,5 @@ bypass Quest GrandBossTeleporter 31540
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=183813,-115157,-3303 fast=0
+  S DeleteObject obj=klein
   items 7267=0

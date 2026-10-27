@@ -153,6 +153,7 @@ action angel
   S ActionFailed
 bypass npc_{angel}_Quest
   S ActionFailed
+  S DeleteObject obj=angel
   S NpcHtmlMessage obj=angel item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31752-01.htm
   S ActionFailed
   S ActionFailed

@@ -37,6 +37,7 @@ bypass npc_{rosella}_Quest
   S SystemMessage id=302 3:1221
   S SystemMessage id=54 3:1230
   S SystemMessage id=95 1:3200 1:1890
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-24.htm

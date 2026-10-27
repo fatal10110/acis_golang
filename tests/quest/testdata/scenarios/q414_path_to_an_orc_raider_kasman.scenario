@@ -68,6 +68,7 @@ bypass npc_{kasman}_Quest
   S SystemMessage id=301 3:1591 6:2
   S SystemMessage id=54 3:1592
   S SystemMessage id=95 1:3200 1:2360
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=kasman item=0 page=script/quest/Q414_PathToAnOrcRaider/30501-03.htm

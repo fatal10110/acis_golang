@@ -59,6 +59,7 @@ bypass Quest Q409_PathToAnElvenOracle 30428-02.htm
   S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-02.htm
   S ActionFailed
 bypass Quest Q409_PathToAnElvenOracle 30428-06.htm
+  S NpcInfo obj=tamil npc=27035
   S NpcHtmlMessage obj=perrin item=0 page=script/quest/Q409_PathToAnElvenOracle/30428-06.htm
   S ActionFailed
 action perrin

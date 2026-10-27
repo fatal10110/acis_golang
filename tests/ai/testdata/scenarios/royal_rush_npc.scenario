@@ -1,0 +1,27 @@
+# RoyalRushNpc (31921), a Four Sepulchers manager, against the local clock (the clock line pins it
+# to 00:49:57 on the driven clock, which the advance steps move). Created, it places the five
+# lock NPCs its lock_* parameters name as its privates, at the sepulcher doors since lock_x1 is
+# 0. It reads the clock every second: at minute 50 it shouts that the entry closes (ShoutMsg 1),
+# at minute 55 the two closing lines; in the first 30 s of minute 54 it frees the sepulcher
+# (AVQuest0, not observable here).
+clock 00:49:57
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.RoyalRushNpc
+npc lock1 31925 Folk 5000 0 0
+npc lock2 31926 Folk 5000 0 0
+npc lock3 31927 Folk 5000 0 0
+npc lock4 31928 Folk 5000 0 0
+npc lock5 31929 Folk 5000 0 0
+npc manager 31921 Folk 100 0 0 ai lock_npc_id1=31925,lock_npc_id2=31926,lock_npc_id3=31927,lock_npc_id4=31928,lock_npc_id5=31929,ShoutMsg=1
+
+advance 2s
+  live 31925 2
+advance 1s
+  S NpcSay obj=manager type=1 npc=1031921 text="Game over. The teleport will appear momentarily."
+advance 5m
+  S NpcSay obj=manager type=1 npc=1031921 text="You may now enter the Sepulcher."
+  S NpcSay obj=manager type=1 npc=1031921 text="If you place your hand on the stone statue in front of each sepulcher, you will be able to enter."
+advance 5m
+advance 5m
+  S NpcSay obj=manager type=1 npc=1031921 text="Currently5minutes, have passed"

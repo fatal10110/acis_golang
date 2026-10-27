@@ -22,6 +22,7 @@ npc keymaster 27179 Monster 50 0 0
 
 kill guard
   S SystemMessage id=95 1:0 1:0
+  S NpcInfo obj=keymaster npc=27179
   Q upsert Q503_PursuitOfClanAmbition | killed | 0
   rows Q503_PursuitOfClanAmbition <cond>=10 <state>=STARTED killed=0
 kill keymaster

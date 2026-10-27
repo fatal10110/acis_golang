@@ -304,6 +304,7 @@ bypass npc_{kaien}_Quest
   S SystemMessage id=301 3:2783 6:3
   S SystemMessage id=54 3:2762
   S SystemMessage id=95 1:47015 1:20000
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 222:0x00000000
   S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-18.htm

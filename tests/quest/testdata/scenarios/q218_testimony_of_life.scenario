@@ -878,6 +878,7 @@ bypass npc_{cardien}_Quest
   S SystemMessage id=302 3:3142
   S SystemMessage id=54 3:3140
   S SystemMessage id=95 1:104591 1:11250
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 218:0x00000000
   S SystemMessage id=302 3:3026

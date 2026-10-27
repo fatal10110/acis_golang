@@ -179,6 +179,7 @@ kill spider
   S SystemMessage id=95 1:0 1:0
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=301 3:1629 6:8
+  S NpcInfo obj=durka npc=27056
   items 1629=0
 action umos
 action umos
@@ -243,6 +244,7 @@ bypass Quest Q416_PathToAnOrcShaman 30502-07.htm
   S SystemMessage id=302 3:1630
   S SystemMessage id=54 3:1631
   S SystemMessage id=95 1:3200 1:2600
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=umos item=0 page=script/quest/Q416_PathToAnOrcShaman/30502-07.htm

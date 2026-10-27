@@ -39,6 +39,9 @@ bypass Quest Q409_PathToAnElvenOracle spawn_lizards
   S QuestList 409:0x80000003
   S ExShowQuestMark quest=409
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=warrior npc=27032
+  S NpcInfo obj=scout npc=27033
+  S NpcInfo obj=lizard npc=27034
   Q upsert Q409_PathToAnElvenOracle | <cond> | 2
   state Q409_PathToAnElvenOracle STARTED
   rows Q409_PathToAnElvenOracle <cond>=2 <state>=STARTED

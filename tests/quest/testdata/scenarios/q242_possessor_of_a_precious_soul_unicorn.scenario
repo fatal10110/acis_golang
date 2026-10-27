@@ -59,6 +59,7 @@ bypass npc_{cornerstone}_Quest
   S ActionFailed
 bypass Quest Q242_PossessorOfAPreciousSoul 31748-03.htm
   S ActionFailed
+  S DeleteObject obj=cornerstone
   S SystemMessage id=302 3:7595
   S QuestList 242:0x800003ff
   S ExShowQuestMark quest=242
@@ -91,6 +92,8 @@ bypass npc_{fallen}_Quest
   S ActionFailed
 advance 3s
   S ActionFailed
+  S DeleteObject obj=fallen
+  S NpcInfo obj=pure npc=31747
 
 # The Pure White Unicorn; three seconds later the one the script spawned leaves.
 action pure
@@ -116,6 +119,7 @@ bypass npc_{pure}_Quest
   S ActionFailed
   S ActionFailed
 advance 3s
+  S DeleteObject obj=pure
 
 # Kassandra closes the quest with Caradine's letter.
 action kassandra
@@ -126,6 +130,7 @@ action kassandra
 bypass npc_{kassandra}_Quest
   S SystemMessage id=54 3:7678
   S SystemMessage id=45 1:455764
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 242:0x00000000
   S NpcHtmlMessage obj=kassandra item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31743-07.htm

@@ -95,9 +95,11 @@ type run struct {
 	// roles names object ids in rendered packets; objs and npcs are each
 	// role's current object id and NPC.
 	roles map[int32]string
-	objs  map[string]int32
-	npcs  map[string]NPC
-	live  map[string]*npc.Hostile
+	// rd renders the server packets of the steps.
+	rd   *renderer
+	objs map[string]int32
+	npcs map[string]NPC
+	live map[string]*npc.Hostile
 	// makers are the territory lines' npcmakers, built at the first world
 	// entry; grounds holds the ground lines' items' object ids.
 	makers  map[string]*spawn.Maker
@@ -191,6 +193,8 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 		sc: sc, pages: loadPages(t, sc.Pages), roles: map[int32]string{}, objs: map[string]int32{}, npcs: map[string]NPC{},
 		live: map[string]*npc.Hostile{}, makers: map[string]*spawn.Maker{}, grounds: map[int32]bool{},
 	}
+	r.rd = newRenderer(r.roles)
+	r.rd.nameTemplates(sc.NPCs)
 	r.draws.random = sc.Random
 	r.texts = pageTexts(t, r.pages)
 	items := sc.Items
@@ -272,6 +276,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		// A creature that attacks or is attacked holds an attack stance, which
 		// the behaviors read (in combat); nothing ends it during a run.
 		gameservertest.WithAttackStanceClock(time.Now),
+		gameservertest.WithDrivenClockStart(r.clockStart()),
 		gameservertest.WithLevels(scenarioLevels(t)),
 		// The NPC population, with no maker, over the scenario's templates:
 		// the scripts' spawner places NPCs through it.
@@ -318,6 +323,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedSevenSigns(t, store, r.sc) }))
 	}
 	r.srv = gameservertest.Boot(t, opts...)
+	if r.sc.HasClock && !r.srv.DrivesClock() {
+		t.Skipf("%s: the clock line needs the driven clock; the real pool runs on the wall clock", r.sc.Name)
+	}
 	if r.sc.Creates() {
 		return
 	}
@@ -573,12 +581,78 @@ func (r *run) spawn(t *testing.T, n NPC) {
 		r.srv.AI.Add(h)
 		r.live[n.Role], live = h, h
 	}
-	r.roles[live.ObjectID()], r.objs[n.Role] = n.Role, live.ObjectID()
+	r.roles[live.ObjectID()], r.objs[n.Role], r.rd.placed[live.ObjectID()] = n.Role, live.ObjectID(), true
 	r.spoil(t, n.Role)
 	if draw, ok := r.sc.Rolls[n.Role]; ok {
 		r.pinRoll(t, n.Role, draw)
 	}
+	r.setParams(t, live, n)
 	r.srv.RunCreated(t, live)
+}
+
+// clockEpoch is the day the clock line's time of day is on.
+var clockEpoch = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// clockStart is where the driven clock starts: the clock line's time, else
+// the start of the epoch day, so a scenario never depends on the time of day
+// it runs at.
+func (r *run) clockStart() time.Time {
+	if r.sc.HasClock {
+		return clockEpoch.Add(r.sc.Clock)
+	}
+	return clockEpoch
+}
+
+// objectRef resolves an NPC parameter or event argument: a number, the
+// character's object id or the object id of the NPC of a role.
+func (r *run) objectRef(t *testing.T, ref string) int32 {
+	t.Helper()
+	switch ref {
+	case "":
+		return 0
+	case characterRef:
+		return r.player
+	}
+	if v, err := strconv.ParseInt(ref, 10, 32); err == nil {
+		return int32(v)
+	}
+	if r.objs[ref] == 0 {
+		t.Fatalf("%s: %s is not in the world yet", r.sc.Name, ref)
+	}
+	return r.objs[ref]
+}
+
+// setParams gives the fresh NPC its line's spawn parameters, as the
+// private-creating master gives them before its created hook runs.
+func (r *run) setParams(t *testing.T, live attackable.Combatant, n NPC) {
+	t.Helper()
+	if n.Params == [3]string{} {
+		return
+	}
+	s, ok := live.(interface{ Scratch() *npc.Scratch })
+	if !ok {
+		t.Fatalf("%s: NPC %s (%T) keeps no script memory", r.sc.Name, n.Role, live)
+	}
+	for i, ref := range n.Params {
+		s.Scratch().SetInt(npc.IntParam1+npc.IntSlot(i), r.objectRef(t, ref))
+	}
+}
+
+// event sends the NPC of a role a script event on the NPC's own queue.
+func (r *run) event(t *testing.T, args []string) {
+	t.Helper()
+	id, _ := strconv.ParseInt(args[1], 10, 32)
+	a1, a2 := r.objectRef(t, args[2]), r.objectRef(t, args[3])
+	n, post := r.npcQueue(t, args[0])
+	done := make(chan struct{})
+	if !post(func() {
+		defer close(done)
+		r.srv.ScriptEvent(n, int32(id), a1, a2)
+	}) {
+		t.Fatalf("%s: NPC %s's queue is closed", r.sc.Name, args[0])
+	}
+	<-done
+	r.srv.Settle(t)
 }
 
 // otherSpoiler is the object id of the other player a spoil line's other
@@ -623,6 +697,9 @@ func template(n NPC) *npc.Template {
 		}
 	}
 	tmpl.Clans, tmpl.ClanRange = n.Clans, n.ClanRange
+	if n.AI != nil {
+		tmpl.AIParams = n.AI
+	}
 	if n.Skills != nil {
 		tmpl = npc.NewTemplate(*tmpl, npc.TemplateSkills{ByType: n.Skills})
 	}
@@ -636,6 +713,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		t.Fatalf("%s step %d (line %d) %q: %s", r.sc.Name, i+1, st.Line, st, fmt.Sprintf(format, args...))
 	}
 	c, actor := r.actor(t, st.As)
+	r.rd.talk = talkVerb(st.Verb)
 	// frames is what the step sent, when the verb reads it itself.
 	var frames [][]byte
 	switch st.Verb {
@@ -658,6 +736,8 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		c.Send(w.Bytes())
 	case "hit":
 		r.hit(t, st.Args)
+	case "event":
+		r.event(t, st.Args)
 	case "cast":
 		frames = r.cast(t, st.Args[0], st.Args[1])
 	case "jump":
@@ -767,15 +847,15 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		var got []string
 		for _, f := range frames {
 			if line, ok := r.groundDeleted(f); ok {
-				got = append(got, line)
+				got = appendRendered(got, line)
 				continue
 			}
-			line, ok, err := render(f, r.roles)
+			line, ok, err := r.rd.render(f)
 			if err != nil {
 				fail("frame %x: %v", f, err)
 			}
 			if ok {
-				got = append(got, line)
+				got = appendRendered(got, line)
 			}
 		}
 		want, err := expandPackets(st.Packets, r.texts)

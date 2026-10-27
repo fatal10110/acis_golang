@@ -43,6 +43,7 @@ bypass Quest Q417_PathToBecomeAScavenger 31958-02.htm
   S SystemMessage id=302 3:8543
   S SystemMessage id=54 3:1642
   S SystemMessage id=95 1:3200 1:7080
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=yasheni item=0 page=script/quest/Q417_PathToBecomeAScavenger/31958-02.htm

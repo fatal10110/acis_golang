@@ -504,6 +504,7 @@ bypass Quest Q233_TestOfTheWarSpirit 30649-03.htm
   S SystemMessage id=302 3:2912
   S SystemMessage id=54 3:2879
   S SystemMessage id=95 1:63483 1:17500
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 233:0x00000000
   S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q233_TestOfTheWarSpirit/30649-03.htm

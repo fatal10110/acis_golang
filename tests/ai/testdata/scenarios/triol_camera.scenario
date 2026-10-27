@@ -1,0 +1,22 @@
+# TriolCamera (13015): script event 3 plays BS04_A bound to the camera and keeps the creature it
+# names; the five camera shots follow 1 s, 1.3 s, 1.6 s, 11 s and 16 s later, and six seconds
+# after the last the camera tells the NPCs near it the scene is over. An event 3 that names no
+# creature films the same shots.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.TriolCamera
+npc camera 13015 Folk 100 0 0
+
+event camera 3 character 0
+  S PlaySound type=1 file=BS04_A bind=1 obj=camera loc=110,20,30 delay=0
+advance 1s
+  S SpecialCamera obj=camera distance=1500 yaw=88 pitch=89 time=0 duration=10000 turn=0 rise=110 widescreen=1 unknown=0
+advance 300ms
+  S SpecialCamera obj=camera distance=1500 yaw=88 pitch=89 time=0 duration=10000 turn=0 rise=110 widescreen=1 unknown=0
+advance 300ms
+  S SpecialCamera obj=camera distance=450 yaw=88 pitch=3 time=5500 duration=10000 turn=0 rise=350 widescreen=1 unknown=0
+advance 9400ms
+  S SpecialCamera obj=camera distance=500 yaw=88 pitch=4 time=5000 duration=10000 turn=0 rise=0 widescreen=1 unknown=0
+advance 5s
+  S SpecialCamera obj=camera distance=3000 yaw=88 pitch=4 time=6000 duration=6900 turn=0 rise=15 widescreen=1 unknown=0
+advance 6s
