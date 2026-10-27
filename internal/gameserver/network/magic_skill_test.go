@@ -242,7 +242,7 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	l := &GameClientLink{targets: skilltarget.NewRegistry(nil)}
+	l := newBareGameClientLink(t, GameClientLinkConfig{})
 	target, rejection := l.resolveMagicSkillTarget(live.Character, locked, modelskill.Definition{Target: modelskill.TargetUnlockable}, false)
 	if target != locked {
 		t.Fatalf("target = %T, want locked door", target)

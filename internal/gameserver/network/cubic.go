@@ -202,7 +202,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		skillID = skillIDs[0]
 		target, ok = actorcast.DecideLifeCubicTarget(owner, l.lifeCubicParty(live))
 	} else {
-		if l.attackStance == nil || !l.attackStance.InAttackStance(live) {
+		if l.combat.attackStance == nil || !l.combat.attackStance.InAttackStance(live) {
 			runtime.StopAction()
 			return
 		}
@@ -259,7 +259,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id, runtime) {
 			return
 		}
-		actorcast.ApplyCubicEffect(l.skillHandlers, live, def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
+		actorcast.ApplyCubicEffect(l.combat.skillHandlers, live, def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }

@@ -34,7 +34,7 @@ func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
 	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoRestart) {
 		return exitBlockNoRestartZone
 	}
-	if l.attackStance != nil && l.attackStance.InAttackStance(live) {
+	if l.combat.attackStance != nil && l.combat.attackStance.InAttackStance(live) {
 		return exitBlockAttackStance
 	}
 	if l.festival != nil && live.FestivalParticipant() && l.festival.Initialized() {

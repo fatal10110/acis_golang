@@ -1000,7 +1000,7 @@ func newDetachFilterFixture(t *testing.T) detachFilterFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gcl := &GameClientLink{world: state, pvpFlags: task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil), water: waterTask, log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{World: state, Combat: CombatConfig{PvPFlags: task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil)}, Water: waterTask, Log: zerolog.Nop()})
 	ownFrames, seenFrames := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, ownFrames)
 	observer := newTestLivePlayer(t, 2, seenFrames)
@@ -1011,7 +1011,7 @@ func newDetachFilterFixture(t *testing.T) detachFilterFixture {
 	waterTask.Add(live, time.Minute)
 	testsupport.ResetCapture(ownFrames, seenFrames)
 	water.gauges.Store(0)
-	return detachFilterFixture{live: live, observer: observer, ownFrames: ownFrames, seenFrames: seenFrames, pvpFlags: gcl.pvpFlags, water: water}
+	return detachFilterFixture{live: live, observer: observer, ownFrames: ownFrames, seenFrames: seenFrames, pvpFlags: gcl.combat.pvpFlags, water: water}
 }
 
 // effects reports the side effects ev had on this fixture: frames the player

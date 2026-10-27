@@ -56,7 +56,7 @@ func (l *GameClientLink) applyPlayerConfig(settings *PlayerConfig) {
 		l.events.Set(*settings.Events)
 	}
 	l.enchanting.items.SetConfig(enchantRates(settings))
-	l.skillHandlers.SetMagicFailures(settings.MagicFailures)
+	l.combat.skillHandlers.SetMagicFailures(settings.MagicFailures)
 	l.craft.SetEnabled(!settings.CraftingDisabled)
 	l.exchange.SetKeepMaintained(settings.KeepMaintainedIngredients)
 }

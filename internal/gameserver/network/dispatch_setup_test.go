@@ -236,7 +236,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		Positions:     task.NewPositionUpdates(state),
 		SevenSigns:    sevenSigns,
 		PlayerConfig:  playerConfig,
-		PetConfig:     petmodel.DefaultConfig(),
+		Summoning:     SummoningConfig{Config: petmodel.DefaultConfig()},
 		Queues:        queues,
 		Effects:       effect.Env{Activity: task.NewEffects()},
 		Log:           log,
