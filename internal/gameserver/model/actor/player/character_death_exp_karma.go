@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 // deathLossExemption reports whether a death inside a PvP zone costs no
@@ -191,11 +192,11 @@ func (c *Character) updateKarmaLoss(table *LevelTable, lostExp int64, hooks *pro
 		return
 	}
 	level, ok := table.Level(c.CharLevel)
-	if !ok || level.KarmaModifier == 0 {
+	if !ok {
 		return
 	}
 
-	karmaLost := int(float64(lostExp) / level.KarmaModifier / 15)
+	karmaLost := formulas.KarmaLoss(lostExp, level.KarmaModifier)
 	if karmaLost <= 0 {
 		return
 	}

@@ -1,3 +1,6 @@
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
 
 // Prints "<formula> <inputs...> = <result>" lines for the skill formulas the
@@ -609,6 +612,199 @@ public class FormulasProbe
 		return amount;
 	}
 
+	// ---- creature-level modifiers ----
+	
+	// The target's stat funcs behind the init-seeded lookups (the *_VULN
+	// stats, and <element>_RES through getDefenseElementValue) are one
+	// multiplier each: calcStat(stat, init) = init * mul.
+	static final String[] ELEMENTS = { "WIND", "FIRE", "WATER", "EARTH", "HOLY", "DARK", "VALAKAS" };
+	static final Map<String, Double> VULN_MUL = Map.of("BLEED_VULN", 0.91, "POISON_VULN", 0.83, "STUN_VULN", 0.5, "PARALYZE_VULN", 0.67, "ROOT_VULN", 0.59, "SLEEP_VULN", 0.47, "DERANGEMENT_VULN", 0.37, "DEBUFF_VULN", 0.29, "CANCEL_VULN", 1.13);
+	
+	static double vulnStat(String stat, double init)
+	{
+		return init * VULN_MUL.get(stat);
+	}
+	
+	// calcSkillVulnerability; elementRes is the target's <element>_RES
+	// multiplier.
+	static double skillVulnerability(String type, String element, double elementRes)
+	{
+		double multiplier = 1;
+		
+		if (!element.equals("NONE"))
+			multiplier *= Math.sqrt(elementalSkillModifier(element, elementRes));
+		
+		switch (type)
+		{
+			case "BLEED":
+				multiplier = vulnStat("BLEED_VULN", multiplier);
+				break;
+			case "POISON":
+				multiplier = vulnStat("POISON_VULN", multiplier);
+				break;
+			case "STUN":
+				multiplier = vulnStat("STUN_VULN", multiplier);
+				break;
+			case "PARALYZE":
+				multiplier = vulnStat("PARALYZE_VULN", multiplier);
+				break;
+			case "ROOT":
+				multiplier = vulnStat("ROOT_VULN", multiplier);
+				break;
+			case "SLEEP":
+				multiplier = vulnStat("SLEEP_VULN", multiplier);
+				break;
+			case "MUTE", "FEAR", "BETRAY", "AGGDEBUFF", "AGGREDUCE_CHAR", "ERASE", "CONFUSION":
+				multiplier = vulnStat("DERANGEMENT_VULN", multiplier);
+				break;
+			case "DEBUFF", "WEAKNESS":
+				multiplier = vulnStat("DEBUFF_VULN", multiplier);
+				break;
+			case "CANCEL":
+				multiplier = vulnStat("CANCEL_VULN", multiplier);
+				break;
+		}
+		return multiplier;
+	}
+	
+	// calcSkillStatModifier; con and men are the target's CON and MEN.
+	static double skillStatModifier(String type, boolean isMagic, int con, int men)
+	{
+		double multiplier = 1;
+		
+		switch (type)
+		{
+			case "STUN", "BLEED", "POISON":
+				multiplier = 2 - SQRT_CON_BONUS[con];
+				break;
+			case "SLEEP", "DEBUFF", "WEAKNESS", "ERASE", "ROOT", "MUTE", "FEAR", "BETRAY", "CONFUSION", "AGGREDUCE_CHAR", "PARALYZE":
+				if (isMagic)
+					multiplier = 2 - SQRT_MEN_BONUS[men];
+				break;
+		}
+		return Math.max(0, multiplier);
+	}
+	
+	// getLevelModifier
+	static double levelModifier(int levelDepend, int magicLevel, int attackerLevel, int targetLevel)
+	{
+		if (levelDepend == 0)
+			return 1;
+		
+		int delta = (magicLevel > 0 ? magicLevel : attackerLevel) + levelDepend - targetLevel;
+		return 1 + ((delta < 0 ? 0.01 : 0.005) * delta);
+	}
+	
+	// getMatkModifier; mAtk and mDef are the int getMAtk / getMDef.
+	static double matkModifier(boolean isMagic, boolean bss, int mAtkStat, int mDef)
+	{
+		double mAtkModifier = 1;
+		
+		if (isMagic)
+		{
+			final double mAtk = mAtkStat;
+			double val = mAtk;
+			if (bss)
+				val = mAtk * 4.0;
+			
+			mAtkModifier = (Math.sqrt(val) / mDef) * 11.0;
+		}
+		return mAtkModifier;
+	}
+	
+	// calcElementalPhysicalAttackModifier; atk[i] is the attacker's
+	// <element>_POWER (an add over getAttackElementValue's seed 0), res[i]
+	// the target's <element>_RES multiplier, both in ELEMENTS order.
+	static double elementalPhysicalAttackModifier(double[] atk, double[] res)
+	{
+		double elemMod = 1.;
+		for (int i = 0; i < ELEMENTS.length; i++)
+		{
+			final int traitAmount = (int) (0 + atk[i]);
+			if (traitAmount > 0)
+				elemMod *= 1. * res[i];
+		}
+		return elemMod;
+	}
+	
+	// calcElementalSkillModifier; getDefenseElementValue is
+	// calcStat(<element>_RES, 1.).
+	static double elementalSkillModifier(String element, double res)
+	{
+		if (element.equals("NONE"))
+			return 1.;
+		
+		return 1. * res;
+	}
+	
+	// calcSkillMastery: the value the Rnd.get(100.) draw must stay under.
+	static double skillMasteryRate(double skillPower, boolean isMage, int intStat, int str)
+	{
+		final double statMul = (isMage) ? INT_BONUS[intStat] : STR_BONUS[str];
+		
+		final double toReach = skillPower * statMul;
+		return toReach;
+	}
+	
+	// calcFallDam: the FALL stat's seed. The ENABLE_FALLING_DAMAGE and
+	// negative-height guards stay with the caller.
+	static double fallDamageBase(int fallHeight, int maxHp)
+	{
+		return fallHeight * maxHp / 1000.;
+	}
+	
+	// calculateKarmaLost; karmaModifier is the level's karmaModifier.
+	static int karmaLost(long exp, double karmaModifier)
+	{
+		return (int) (exp / karmaModifier / 15);
+	}
+	
+	// calculateKarmaGain
+	static int karmaGain(int pkCount, boolean isSummon)
+	{
+		int result = 14400;
+		if (pkCount < 100)
+			result = (int) (((((pkCount - 1) * 0.5) + 1) * 60) * 4);
+		else if (pkCount < 180)
+			result = (int) (((((pkCount + 1) * 0.125) + 37.5) * 60) * 4);
+		
+		if (isSummon)
+			result = ((pkCount & 3) + result) >> 2;
+		
+		return result;
+	}
+	
+	// HealSpsData: the entries of aCis_datapack data/xml/healSps.xml, in file
+	// order (absent attributes are 0).
+	record HealSps(int skillId, int skillLevel, int magicLevel, int correction, int neededMatk)
+	{
+	}
+	
+	static final List<HealSps> HEAL_SPS = List.of(new HealSps(0, 0, 1, 17, 6), new HealSps(0, 0, 7, 27, 20), new HealSps(0, 0, 14, 42, 30), new HealSps(0, 0, 35, 103, 120), new HealSps(0, 0, 40, 120, 180), new HealSps(0, 0, 44, 135, 230), new HealSps(0, 0, 48, 152, 280), new HealSps(0, 0, 52, 170, 350), new HealSps(0, 0, 56, 188, 430), new HealSps(0, 0, 58, 197, 470), new HealSps(0, 0, 60, 207, 520), new HealSps(0, 0, 62, 216, 560), new HealSps(0, 0, 64, 227, 605), new HealSps(0, 0, 66, 238, 650), new HealSps(0, 0, 68, 248, 700), new HealSps(0, 0, 70, 259, 750), new HealSps(0, 0, 72, 270, 800), new HealSps(0, 0, 74, 281, 850), new HealSps(1401, 11, 0, 286, 875), new HealSps(0, 0, 76, 292, 900), new HealSps(0, 0, 77, 298, 925), new HealSps(0, 0, 78, 305, 950), new HealSps(0, 0, 79, 310, 975), new HealSps(0, 0, 80, 316, 1000), new HealSps(0, 0, 81, 322, 1025), new HealSps(0, 0, 82, 328, 1050), new HealSps(0, 0, 83, 334, 1075), new HealSps(0, 0, 84, 340, 1100), new HealSps(0, 0, 85, 346, 1125));
+	
+	// HealSpsData.calculateHealSps for a skill of the given id, level and
+	// magic level.
+	static double calculateHealSps(int skillId, int skillLevel, int skillMagicLevel, int mAtk)
+	{
+		HealSps healSps = HEAL_SPS.stream().filter(h -> h.skillId() == skillId && h.skillLevel() == skillLevel).findFirst().orElse(null);
+		
+		if (healSps == null && skillMagicLevel > 0)
+			healSps = HEAL_SPS.stream().filter(h -> h.magicLevel() <= skillMagicLevel).max(Comparator.comparing(HealSps::magicLevel)).orElse(null);
+		
+		if (healSps == null)
+			return 0.;
+		
+		double amount = healSps.correction();
+		
+		final int mAtkDiff = healSps.neededMatk() - mAtk;
+		if (mAtkDiff <= 0)
+			return amount;
+		
+		amount -= (mAtkDiff / 2d);
+		
+		return amount;
+	}
+	
 	// ---- driver ----
 	
 	private static long _seed = 0x9E3779B97F4A7C15L;
@@ -858,5 +1054,91 @@ public class FormulasProbe
 			for (int[] lv : new int[][] { { 60, 60, 60 }, { 0, 40, 50 }, { 52, 60, 70 } })
 				for (int[] rolls : new int[][] { { 0, 0 }, { 29, 49 }, { 30, 50 }, { 49, 999 }, { 999, 29 }, { 999, 999 } })
 					p("lethalHit", lethalHit(chances[0], chances[1], lv[0], lv[1], lv[2], 1.0, rolls), chances[0], chances[1], lv[0], lv[1], lv[2], 1.0, rolls[0], rolls[1]);
+		
+		// ---- creature-level modifiers ----
+		final String[] types = { "BLEED", "POISON", "STUN", "PARALYZE", "ROOT", "SLEEP", "MUTE", "FEAR", "BETRAY", "AGGDEBUFF", "AGGREDUCE_CHAR", "ERASE", "CONFUSION", "DEBUFF", "WEAKNESS", "CANCEL", "MANADAM", "MDAM", "BUFF" };
+		for (String type : types)
+			for (boolean magic : BOOLS)
+				for (int[] cm : new int[][] { { 0, 0 }, { 10, 25 }, { 43, 25 }, { 30, 40 }, { 50, 60 }, { 70, 80 }, { 99, 99 } })
+					p("skillStatModifier", skillStatModifier(type, magic, cm[0], cm[1]), type, magic, cm[0], cm[1]);
+		final Object[][] elementRes = { { "NONE", 1.3 }, { "FIRE", 0.36 }, { "WATER", 1.0 }, { "WIND", 1.7 }, { "EARTH", 0.81 }, { "HOLY", 0.0 }, { "DARK", 1.21 }, { "VALAKAS", 0.5 } };
+		for (String type : types)
+			for (Object[] er : elementRes)
+				p("skillVulnerability", skillVulnerability(type, (String) er[0], (Double) er[1]), type, er[0], er[1]);
+		for (Object[] er : elementRes)
+			for (double res : new double[] { (Double) er[1], 0.36, 1.7 })
+				p("elementalSkillModifier", elementalSkillModifier((String) er[0], res), er[0], res);
+		for (int depend : new int[] { 0, 1, 2, 3 })
+			for (int mLevel : new int[] { 0, 40, 77 })
+				for (int attacker : new int[] { 1, 44, 80 })
+					for (int target : new int[] { 1, 40, 44, 85 })
+						p("levelModifier", levelModifier(depend, mLevel, attacker, target), depend, mLevel, attacker, target);
+		for (boolean magic : BOOLS)
+			for (boolean bss : BOOLS)
+				for (int mAtk : new int[] { 0, 1, 13, 53, 100, 1500, 3000 })
+					for (int mDef : new int[] { 1, 46, 85, 500 })
+						p("matkModifier", matkModifier(magic, bss, mAtk, mDef), magic, bss, mAtk, mDef);
+		for (int k = 0; k < 80; k++)
+		{
+			final double[] atk = new double[ELEMENTS.length], res = new double[ELEMENTS.length];
+			for (int e = 0; e < ELEMENTS.length; e++)
+			{
+				final int pick = (k == 0) ? 0 : i(0, 3);
+				atk[e] = (pick == 0) ? 0 : (pick == 1) ? d(0, 1) : (pick == 2) ? 1 : d(1, 60);
+				res[e] = d(0, 2);
+			}
+			p("elementalPhysicalAttackModifier", elementalPhysicalAttackModifier(atk, res), atk[0], atk[1], atk[2], atk[3], atk[4], atk[5], atk[6], res[0], res[1], res[2], res[3], res[4], res[5], res[6]);
+		}
+		
+		for (double power : new double[] { 0, 1, 2.5, 10, 33.3 })
+			for (boolean mage : BOOLS)
+				for (int intStat : new int[] { 1, 21, 40, 99 })
+					for (int str : new int[] { 1, 40, 60, 99 })
+						p("skillMasteryRate", skillMasteryRate(power, mage, intStat, str), power, mage, intStat, str);
+		for (int height : new int[] { 0, 1, 400, 999, 1000, 5000, 65535, 100000 })
+			for (int maxHp : new int[] { 1, 100, 3500, 30000, 50000 })
+				p("fallDamageBase", fallDamageBase(height, maxHp), height, maxHp);
+		for (long exp : new long[] { 0, 1, 14, 15, 1000, 123456, 9999999, 4200000000L, 400000000000L })
+			for (double mod : new double[] { 0.772184315, 1, 11.41901707, 30.5, 67.83 })
+				p("karmaLost", karmaLost(exp, mod), exp, mod);
+		for (int pk = 0; pk <= 200; pk++)
+			for (boolean summon : BOOLS)
+				p("karmaGain", karmaGain(pk, summon), pk, summon);
+		for (int pk : new int[] { 255, 1000, 65535 })
+			for (boolean summon : BOOLS)
+				p("karmaGain", karmaGain(pk, summon), pk, summon);
+		
+		for (int idx = 0; idx < HEAL_SPS.size(); idx++)
+		{
+			final HealSps h = HEAL_SPS.get(idx);
+			p("healSpsEntry", idx, h.skillId(), h.skillLevel(), h.magicLevel(), h.correction(), h.neededMatk());
+		}
+		for (int[] skill : new int[][] { { 1401, 11 }, { 1401, 10 }, { 0, 0 }, { 1011, 3 } })
+			for (int mLevel : new int[] { 0, 1, 6, 7, 13, 40, 75, 85, 90 })
+				for (int mAtk : new int[] { 0, 6, 100, 875, 900, 2000 })
+					p("healSps", calculateHealSps(skill[0], skill[1], mLevel, mAtk), skill[0], skill[1], mLevel, mAtk);
+		
+		// calcHealAmount with the correction from calculateHealSps:
+		// power, proficiency, static, mAtk, scaling, sps, bsps, then the
+		// skill id, level and magic level.
+		final Object[][] healVectors = { { 472.0, 0.0, false, 700, 1, false, false, 1011, 1, 74 }, { 472.0, 0.0, false, 700, 1, false, true, 1011, 1, 74 }, { 472.0, 0.0, false, 700, 1, true, false, 1011, 1, 74 }, { 472.0, 0.0, false, 700, 0, false, true, 1011, 1, 74 }, { 472.0, 0.0, false, 700, 0, true, false, 1011, 1, 74 }, { 204.0, 0.0, false, 1000, 1, false, true, 1011, 1, 35 }, { 204.0, 0.0, false, 1000, 1, true, false, 1011, 1, 35 }, { 204.0, 0.0, false, 1000, 2, true, false, 1011, 1, 35 }, { 204.0, 0.0, false, 1000, 2, false, true, 1011, 1, 35 }, { 1004.0, 0.0, false, 870, 1, false, true, 1401, 11, 0 }, { 30.0, 0.0, false, 50, 1, false, true, 1011, 1, 0 }, { 472.0, 0.0, false, 700, 1, true, true, 1011, 1, 74 }, { 100.0, 11.5, false, 37, 1, false, true, 1011, 1, 14 }, { 300.0, 7.0, true, 900, 1, false, true, 1011, 1, 74 } };
+		for (Object[] v : healVectors)
+			p("healAmountSps", healAmount((Double) v[0], (Double) v[1], (Boolean) v[2], (Integer) v[3], (Integer) v[4], (Boolean) v[5], (Boolean) v[6], calculateHealSps((Integer) v[7], (Integer) v[8], (Integer) v[9], (Integer) v[3])), v);
+		for (int k = 0; k < 60; k++)
+		{
+			final double power = (k % 5 == 0) ? 0 : d(0, 1000), add = (k % 3 == 0) ? 0 : d(0, 50);
+			final boolean isStatic = k % 9 == 0;
+			final int mAtk = i(1, 1500), scaling = i(0, 2), shot = i(0, 2), mLevel = i(0, 90);
+			final boolean special = k % 7 == 0;
+			final int id = special ? 1401 : 1011, level = special ? i(10, 11) : i(1, 12);
+			p("healAmountSps", healAmount(power, add, isStatic, mAtk, scaling, shot == 1, shot == 2, calculateHealSps(id, level, mLevel, mAtk)), power, add, isStatic, mAtk, scaling, shot == 1, shot == 2, id, level, mLevel);
+		}
+		
+		// The inputs the live-actor resolver tests hand to the formulas.
+		p("healAmount", healAmount(25, 11, false, 26, 0, false, false, 0), 25.0, 11.0, false, 26, 0, false, false, 0.0);
+		p("healAmount", healAmount(25, 11, true, 26, 0, false, false, 0), 25.0, 11.0, true, 26, 0, false, false, 0.0);
+		p("healAmount", healAmount(25, 11, false, 72, 1, false, false, 0), 25.0, 11.0, false, 72, 1, false, false, 0.0);
+		p("physicalAttackDamage", physicalAttackDamage(45, 5, false, false, 1.2, 1, 1, 1, 1, 1, 0, 0, 0, 0), 45.0, 5.0, false, false, 1.2, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0);
+		p("magicDamage", magicDamage(true, false, 46, 13, 40, false, false, false, 0, 1, 1), true, false, 46.0, 13.0, 40.0, false, false, false, 0, 1.0, 1.0);
 	}
 }

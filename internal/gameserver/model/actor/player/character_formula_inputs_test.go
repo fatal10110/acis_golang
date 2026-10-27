@@ -1,7 +1,6 @@
 package player
 
 import (
-	"math"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -29,6 +28,7 @@ func TestCharacterHealInputUsesMagicAttackAndHealProficiency(t *testing.T) {
 	if in.Power != 25 || in.Proficiency != 11 || in.Static || in.MAtk != int(c.MAtk()) {
 		t.Fatalf("HealInput() = %+v, want power 25, proficiency 11, M.Atk %d", in, int(c.MAtk()))
 	}
+	// skill/formulas/testdata/formulas.golden: healAmount 25.0 11.0 false 26 0 false false 0.0.
 	if amount, want := formulas.HealAmount(in), 41.099019513592786; !closeFloat(amount, want) {
 		t.Fatalf("HealAmount() = %v, want %v", amount, want)
 	}
@@ -41,7 +41,8 @@ func TestCharacterHealInputUsesMagicAttackAndHealProficiency(t *testing.T) {
 	if !ok || !static.Static {
 		t.Fatalf("HealInput(HEAL_STATIC) = %+v, %v, want static", static, ok)
 	}
-	if got, want := formulas.HealAmount(static), 25.0+11; !closeFloat(got, want) {
+	// skill/formulas/testdata/formulas.golden: healAmount 25.0 11.0 true 26 0 false false 0.0.
+	if got, want := formulas.HealAmount(static), 36.0; !closeFloat(got, want) {
 		t.Fatalf("HealAmount(HEAL_STATIC) = %v, want %v", got, want)
 	}
 
@@ -304,18 +305,20 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	if in.BaseChance != 50 {
 		t.Fatalf("BaseChance = %v, want 50", in.BaseChance)
 	}
+	// skill/formulas/testdata/formulas.golden: skillStatModifier STUN true 43 25.
 	if want := 0.7430194910023464; !closeFloat(in.StatModifier, want) {
 		t.Fatalf("StatModifier = %v, want %v", in.StatModifier, want)
 	}
 	if !closeFloat(in.VulnModifier, 0.5) {
 		t.Fatalf("VulnModifier = %v, want 0.5", in.VulnModifier)
 	}
-	// sqrt(M.Atk) / M.Def * 11 over the truncated stats: M.Atk 53.1441 -> 53,
-	// M.Def 85.12 -> 85.
-	if want := math.Sqrt(53) / 85 * 11; !closeFloat(in.MAtkModifier, want) {
+	// The modifier reads the truncated stats, M.Atk 53.1441 -> 53 and M.Def
+	// 85.12 -> 85: skill/formulas/testdata/formulas.golden: matkModifier true false 53 85.
+	if want := 0.9421318680245376; !closeFloat(in.MAtkModifier, want) {
 		t.Fatalf("MAtkModifier = %v, want %v", in.MAtkModifier, want)
 	}
-	if want := 1 + 0.01*float64(def.MagicLevel+def.LevelDepend-target.CharLevel); !closeFloat(in.LevelModifier, want) {
+	// skill/formulas/testdata/formulas.golden: levelModifier 2 40 1 44.
+	if want := 0.98; !closeFloat(in.LevelModifier, want) {
 		t.Fatalf("LevelModifier = %v, want %v", in.LevelModifier, want)
 	}
 }
@@ -385,9 +388,9 @@ func TestCharacterSkillSuccessInputFoldsElementalResistanceIntoVulnerability(t *
 		t.Fatal("SkillSuccessInput() ok = false")
 	}
 
-	// Java folds sqrt(elemental resistance) in as the vulnerability base
-	// before applying the stat-specific (here STUN) vulnerability on top:
-	// sqrt(0.36) * 0.5 = 0.3.
+	// sqrt(elemental resistance) is the vulnerability base the STUN
+	// vulnerability applies to; the probe's STUN_VULN multiplier is this
+	// fixture's 0.5: skill/formulas/testdata/formulas.golden: skillVulnerability STUN FIRE 0.36.
 	if want := 0.3; !closeFloat(in.VulnModifier, want) {
 		t.Fatalf("VulnModifier = %v, want %v", in.VulnModifier, want)
 	}
@@ -409,9 +412,8 @@ func TestCharacterManaDamageInputFoldsElementalResistanceIntoVulnerability(t *te
 	if !ok {
 		t.Fatal("ManaDamageInput() ok = false")
 	}
-	// MANADAM has no matching vulnerability case (see the STUN/POISON/...
-	// switch), so Java's calcSkillVulnerability returns the elemental base
-	// unchanged: sqrt(0.36) = 0.6.
+	// MANADAM has no vulnerability stat, so the elemental base stands:
+	// skill/formulas/testdata/formulas.golden: skillVulnerability MANADAM FIRE 0.36.
 	if want := 0.6; !closeFloat(mana.VulnMul, want) {
 		t.Fatalf("VulnMul = %v, want %v", mana.VulnMul, want)
 	}
@@ -437,6 +439,7 @@ func TestCharacterSkillSuccessInputFallsBackToSkillType(t *testing.T) {
 		t.Fatal("SkillSuccessInput() ok = false")
 	}
 
+	// skill/formulas/testdata/formulas.golden: skillStatModifier STUN true 43 25.
 	if want := 0.7430194910023464; !closeFloat(in.StatModifier, want) {
 		t.Fatalf("StatModifier = %v, want %v (STUN from the skill type)", in.StatModifier, want)
 	}

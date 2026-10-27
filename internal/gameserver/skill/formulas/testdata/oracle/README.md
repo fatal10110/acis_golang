@@ -16,7 +16,14 @@ overloads), `calcCubicSkillSuccess` (the magic attack modifier),
 `calcManaDam`, `calcMagicAffected`, `calcShldUse`, `calcSkillSuccess`,
 `calcRevivePower`, `calcSowSuccess`, `doorUnlock` (both branches),
 `chestUnlock`, `calcHealAmount`, `calcCrit(double)`, `calcMCrit`,
-`calcSkillReflect` and `calcLethalHit` (its tier order and draws);
+`calcSkillReflect`, `calcLethalHit` (its tier order and draws),
+`calcSkillVulnerability`, `calcSkillStatModifier`, `getLevelModifier`,
+`getMatkModifier`, `calcElementalPhysicalAttackModifier`,
+`calcElementalSkillModifier`, `calcSkillMastery`, `calcFallDam`,
+`calculateKarmaLost` and `calculateKarmaGain`;
+`HealSpsData.calculateHealSps` (`data/xml/HealSpsData.java`) over a copy
+of the `aCis_datapack/data/xml/healSps.xml` entries in file order (absent
+attributes are 0, as the record defaults them);
 `L2Skill.getPower(Creature)`; `Cancel.calcCancelSuccess`
 (`handler/skillhandlers/Cancel.java`); `EffectCancel.calcCancelSuccess` and
 `EffectCancelDebuff.calcCancelSuccess` with their callers' `(int)` casts
@@ -46,6 +53,29 @@ substitutions are:
 - The magic failure branch is split out (`magicFailure`: 0 none, 1 kept
   damage for a non-player caster, 2 halved, 3 set to 1) and `magicDamage`
   takes its outcome; PvP multipliers are 1 outside PvP.
+- The creature-level modifiers (`skillStatModifier`, `skillVulnerability`,
+  `elementalSkillModifier`, `levelModifier`, `matkModifier`,
+  `elementalPhysicalAttackModifier`) are replayed against the live-actor
+  resolvers by `TestModifiersMatchReferenceProbe`
+  (`model/actor/creature/formula_oracle_test.go`). Their stat lookups
+  model the target's and attacker's stat funcs as one func per stat: the
+  init-seeded `*_VULN` and `<element>_RES` stats multiply their seed (the
+  `*_VULN` multipliers are the fixed `VULN_MUL`, distinct per stat so the
+  result shows which stat applied), and `<element>_POWER` adds to its seed
+  0 before `getAttackElementValue`'s `(int)` cast.
+- `skillMasteryRate` returns the value the `Rnd.get(100.)` draw must stay
+  under; `fallDamageBase` returns the `FALL` stat's seed, and the
+  `ENABLE_FALLING_DAMAGE` and negative-height guards stay with the caller.
+  `karmaLost` takes the level's `karmaModifier`.
+- `healSpsEntry` rows print the copied heal table (the Go test builds its
+  table from them); `healSps` rows are lookups over it, and `healAmountSps`
+  rows run `calcHealAmount` with the correction the lookup returns for the
+  row's skill id, level and magic level. `TestHealSpsMatchesReferenceProbe`
+  (`data/xml`, needs the datapack) replays the `healSps` rows on the
+  shipped file as loaded.
+- The rows after "The inputs the live-actor resolver tests hand to the
+  formulas" pin the values the player and summon resolver tests compare
+  against.
 - Logging, system messages and the `Config.DEVELOPER` blocks are dropped.
 
 `Math.pow` results (`magicSuccessRate`, `skillPower`) are compared within 4
