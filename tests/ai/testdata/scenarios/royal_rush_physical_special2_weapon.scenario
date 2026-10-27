@@ -1,0 +1,25 @@
+# RoyalRushWarriorPhysicalSpecial2 (18168, Imperial Guard, level 81, WeaponID 5286), every draw 0
+# and its skills never landing: created, it holds no weapon and its i_ai0 is 0. Hit above half of its
+# hit points it draws nothing; hit below half it takes its weapon in hand, glowing at +15 (an NpcInfo
+# shows it), and sets i_ai0.
+character Hunter 20
+item 5286
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2
+npc guard 18168 Monster 50 0 0 level 81 skill PHYSICAL_SPECIAL2 4572 9 skill PHYSICAL_SPECIAL1 4573 9 ai WeaponID=5286
+roll guard 99
+
+advance 1s
+  mem guard i_ai0=0
+  shows guard rhand=0 glow=0
+hit guard 1
+  mem guard i_ai0=0
+  shows guard rhand=0 glow=0
+hp guard 200
+hit guard 1
+  mem guard i_ai0=1
+  shows guard rhand=5286 glow=15

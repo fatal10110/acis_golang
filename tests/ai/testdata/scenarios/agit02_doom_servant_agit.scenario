@@ -1,0 +1,23 @@
+# Agit02DoomServantAgit (35632, level 68), every draw 0: a clan member (lidia_clan, range 1000) told
+# of the hit on the servant wants to attack the character by the damage dealt. Its 3001 timer, first
+# after 1 s, takes it back home (a DeleteObject for the character, who is 2000 away) when it stands
+# out of its territory.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagicAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.Agit02DoomServantAgit
+npc servant 35632 Monster 300 0 0 level 68 skill DD_MAGIC 4034 6 clan lidia_clan 1000
+npc mate 35632 Monster 400 0 0 level 68 skill DD_MAGIC 4034 6 clan lidia_clan 1000
+
+tick x8
+hit servant 10
+  desires mate attack(player)=232.25454545454545
+jump servant 2000 0 0
+advance 2s
+  S DeleteObject obj=servant
+  at servant 300 0 0

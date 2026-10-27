@@ -1,0 +1,22 @@
+# WarriorCastSelfRangeDDMagicBuffAggressive (21390, level 80, buff 4030-3, self range DD 4072-9),
+# every draw 0: settled (8 AI ticks) it has cast its buff on itself and wants to attack the character
+# and the mate it sees (both within 200); a hit by a creature other than the one it fights makes it
+# want its self range magic on itself (4072), at 1000000 each time.
+character Hunter 20
+random always 0
+member Mate 20 100 0 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSelfRangeDDMagicBuffAggressive
+npc buffer 21390 Monster 150 0 0 level 80 aggro 1000 skill BUFF 4030 3 skill SELF_RANGE_DD_MAGIC 4072 9
+roll buffer 99
+
+tick x8
+  S MagicSkillUse caster=buffer target=buffer skill=4030-3 hit=6607 reuse=21142 success=0
+  desires buffer attack(Mate)=186.8 attack(player)=186.8 cast(buffer,4030,move)=1868000
+hit buffer 10
+  desires buffer attack(Mate)=186.8 attack(player)=198.29425287356324 cast(buffer,4030,move)=1868000 cast(buffer,4072,move)=1000000
+hit buffer 10 by Mate
+  desires buffer attack(Mate)=198.29425287356324 attack(player)=198.29425287356324 cast(buffer,4030,move)=1868000 cast(buffer,4072,move)=2000000

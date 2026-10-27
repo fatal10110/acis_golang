@@ -1,0 +1,21 @@
+# PartyLeaderPhysicalSpecialAggressive (20983, Binder, level 73, physical special 4073-7), every draw
+# 0: settled (8 AI ticks), a character it sees 300 away is struck once with the physical special (i_ai0
+# 1) and attacked at 200.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecial
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecialAggressive
+npc binder 20983 Monster 300 0 0 level 73 aggro 1000 skill PHYSICAL_SPECIAL 4073 7
+roll binder 99
+
+tick x8
+away
+approach binder 300
+  S MagicSkillUse caster=binder target=player skill=4073-7 hit=1321 reuse=7928 success=0
+  mem binder i_ai0=1
+  desires binder attack(player)=200 cast(player,4073,move)=1000000 wander()=5

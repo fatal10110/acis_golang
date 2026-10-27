@@ -1,0 +1,26 @@
+# CorePrivatePremo (29013, level 45, no skills of its own), every draw 0: a character more than 8 levels
+# above it (60 against 53) that hits it is cursed (4515-1) at weight 1000000, a mate of level 40
+# that hits it is not, and a level 60 caster of Ultimate Debuff (4694) on a monster beside it is
+# muted (4215-1) instead of the base see-spell reaction. The template lists both skills (the
+# shipped one lists neither) so the fixture loads them for the cast desires.
+character Hunter 60
+skill 4694 1
+roll player 0
+random always 0
+member Mate 40 -100 0 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo
+npc premo 29013 Monster 150 0 0 level 45 walks skill DEBUFF1 4515 1 skill DEBUFF2 4215 1
+npc wolf 20120 Monster 100 0 0
+
+hit premo 10 by Mate
+  desires premo -
+hit premo 10
+  desires premo cast(player,4515:1,move)=1000000
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires premo cast(player,4515:1,move)=1000000 cast(player,4215:1,move)=1000000
