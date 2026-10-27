@@ -20,7 +20,23 @@
 //	                                          up to the highest level), and plays it as it enters the world, as a
 //	                                          character that logged out on it: a relog keeps playing it. The
 //	                                          character line's level and the class line's class stay the base class's
-//	clan <level>                              optional: the character leads a clan of that level
+//	clan <level> [hall <id>]                  optional: the character leads a clan of that level, which owns that clan
+//	                                          hall (siegable or sold at auction) when hall says so; a mate line may lead it
+//	hall <id> <registering|waiting|siege> [date <unix ms>]
+//	                                          optional, one per hall: the server runs the shipped clan halls
+//	                                          (data/xml/clanHalls.xml) and the siegable hall's siege stands at that
+//	                                          status as it boots (registrations open, closed and waiting for the
+//	                                          battle, in progress), with the stored next siege date when date says so
+//	                                          (default: the server schedules the next siege itself); a hallstatus step
+//	                                          changes it
+//	mate <name> <level> [leader] [sponsor|apprentice] [online] [hold <item id> <count>]... [<dx> <dy> <dz>]
+//	                                          optional, with a clan line: a second character of the clan, of its own
+//	                                          account, that is the clan's leader (the character is then a plain
+//	                                          member), the character's academy sponsor or its apprentice, and holds
+//	                                          those items. It stays out of the world until an enter step names it,
+//	                                          or with online enters where the character first does, then stands at
+//	                                          that offset from the character (default 0 0 0); unlike a member it
+//	                                          joins no party. Its object id renders as its name
 //	siege <castle id> <owner|defender|attacker>
 //	                                          optional, with a clan line: the server runs the shipped castles
 //	                                          (data/xml/castles.xml) and their sieges, and the clan is registered
@@ -116,6 +132,12 @@
 //
 //	action <role>          an Action packet on the NPC: the first selects it, the next talks
 //	bypass <command>       a RequestBypassToServer; {role} stands for the NPC's object id
+//	as <mate> <action|bypass|link> ...
+//	                       the step is played by that mate, on its client: its packets are the S lines, and what
+//	                       the character was sent the `to player` lines
+//	enter <mate>           the mate is selected and enters the world (its EnterWorld burst is not compared)
+//	hallstatus <id> <registering|waiting|siege>
+//	                       the hall line's hall changes its siege status
 //	link <file>            a RequestLinkHtml
 //	hit <role> <damage> [by <role>]
 //	                       the character, or the creature by names (an npc line's NPC or the summon), lands a
@@ -155,13 +177,15 @@
 //
 //	  S <packet>           the packets of the step, in order, as scriptcontract.Packet renders them;
 //	                       "page=<path>" ends an NpcHtmlMessage whose text is that page, %objectId% filled in
+//	  to <name> <packet>   a packet another online character (player, or a mate) was sent in the step, rendered as an
+//	                       S line is; a character with no to line was sent none of the rendered packets
 //	  Q <statement>        the character_quests statements of the step, in order: kind quest | params
 //	  M set <var> | <value>  a character_memo write of the step: the player memo var set to value;
 //	  M unset <var>          or deleted. The M lines are the step's memo writes, in order
 //	  queue <own|other[+n]> ...  a traced step: the queue whose hook teleported the character, or made it cast,
 //	                         in each task of the trace's step that does, in order; other+n also names the n
 //	                         lines after each of the task's casts that go out with it (see the trace header below)
-//	  items <id>=<n> ...   the character's count of each item after the step
+//	  items <id>=<n> ...   the character's count of each item after the step (items <mate> <id>=<n> ... a mate's)
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them (a value
 //	                                        with blanks is quoted: quiz="20 21")
 //	  state <quest> <status> | -            the quest's state in memory after the step
@@ -233,7 +257,9 @@
 // run's same steps draw: the same bounds, in order. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
 // scenario itself (the oracle README). The trace format has no member,
-// ground or look, so a traced scenario takes no member or ground line; nor
+// ground or look, so a traced scenario takes no member or ground line, and
+// its one client takes no mate line but an offline mate that leads the clan
+// (and no as or enter step of a mate); nor
 // does the reference probe play a skill, door or summon line, an npc
 // line's clan or skill, a hit by another creature, an approach to a
 // distance, a cast, a jump or an away, so a traced scenario takes none.
@@ -275,6 +301,11 @@ type Scenario struct {
 	SubclassLevel int
 	// Clan is the level of the clan the character leads, -1 for none.
 	Clan int
+	// ClanHall is the id of the clan hall the clan owns, 0 for none. Halls
+	// are the hall lines and Mates the mate lines.
+	ClanHall int
+	Halls    []Hall
+	Mates    []Mate
 	// Siege is the siege line, nil for none.
 	Siege *Siege
 	// Quests are the character_quests rows seeded before the character
@@ -404,6 +435,10 @@ type Step struct {
 	Packets    []string
 	Statements []string
 	Memos      []string
+	// As is the mate that plays the step, empty for the character. To are
+	// the to lines' packets by the name of the character they were sent to.
+	As string
+	To map[string][]string
 	// Lives are the live lines as "<npc id>=<count>": how many NPCs of that
 	// template stand alive in the world when the step is over.
 	Lives []string
@@ -436,25 +471,26 @@ const maxStanding = 5
 
 // argCount is, per verb, the arguments it takes: min and max.
 var argCount = map[string][2]int{
-	"action":   {1, 1},
-	"bypass":   {1, -1},
-	"link":     {1, 1},
-	"hit":      {2, 4},
-	"kill":     {1, 2},
-	"advance":  {1, 1},
-	"approach": {1, 2},
-	"cast":     {2, 2},
-	"jump":     {4, 4},
-	"away":     {0, 0},
-	"pickup":   {1, 1},
-	"look":     {3, -1},
-	"walk":     {1, 1},
-	"mark":     {1, 1},
-	"tick":     {0, 1},
-	"relog":    {0, 0},
-	"restart":  {0, 0},
-	"enter":    {0, 0},
-	"create":   {0, 0},
+	"action":     {1, 1},
+	"bypass":     {1, -1},
+	"link":       {1, 1},
+	"hit":        {2, 4},
+	"kill":       {1, 2},
+	"advance":    {1, 1},
+	"approach":   {1, 2},
+	"cast":       {2, 2},
+	"jump":       {4, 4},
+	"away":       {0, 0},
+	"pickup":     {1, 1},
+	"look":       {3, -1},
+	"walk":       {1, 1},
+	"mark":       {1, 1},
+	"tick":       {0, 1},
+	"relog":      {0, 0},
+	"restart":    {0, 0},
+	"enter":      {0, 1},
+	"hallstatus": {2, 2},
+	"create":     {0, 0},
 }
 
 // Parse reads a scenario file.
@@ -483,7 +519,18 @@ func Parse(name string, data []byte) (*Scenario, error) {
 		}
 		fields := strings.Fields(line)
 		verb, args := fields[0], fields[1:]
-		if _, isStep := argCount[verb]; isStep || len(sc.Steps) > 0 {
+		as := ""
+		if verb == "as" {
+			// as <mate> <verb> ...: the step the verb names, played by the mate.
+			if len(args) < 2 || !slices.Contains([]string{"action", "bypass", "link"}, args[1]) {
+				return nil, fail("as <mate> <action|bypass|link> ...")
+			}
+			as = args[0]
+			line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(strings.TrimPrefix(line, "as")), as))
+			fields = strings.Fields(line)
+			verb, args = fields[0], fields[1:]
+		}
+		if _, isStep := argCount[verb]; isStep || as != "" || len(sc.Steps) > 0 {
 			c, ok := argCount[verb]
 			if !ok {
 				return nil, fail("unknown step %q", verb)
@@ -498,7 +545,7 @@ func Parse(name string, data []byte) (*Scenario, error) {
 				// The command keeps its own spacing.
 				args = []string{strings.TrimSpace(strings.TrimPrefix(line, verb))}
 			}
-			sc.Steps = append(sc.Steps, Step{Line: n, Verb: verb, Args: args})
+			sc.Steps = append(sc.Steps, Step{Line: n, Verb: verb, Args: args, As: as})
 			continue
 		}
 		if err := sc.header(verb, args, roles); err != nil {
@@ -519,6 +566,9 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	}
 	if sc.Subclass != 0 && sc.Subclass == sc.Class {
 		return nil, fmt.Errorf("%s: the subclass is the base class %d", name, sc.Class)
+	}
+	if err := sc.checkHalls(); err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 	if sc.Trace != "" && (len(sc.Members) > 0 || len(sc.Grounds) > 0) {
 		return nil, fmt.Errorf("%s: a traced scenario takes no member or ground line", name)
@@ -567,11 +617,20 @@ func (sc *Scenario) checkFlow() error {
 				return fail("a created character takes no hold, equip, standing, pk or cabal line")
 			case len(sc.Members) > 0:
 				return fail("a created character takes no member line")
+			case len(sc.Mates) > 0 || len(sc.Halls) > 0:
+				return fail("a created character takes no mate or hall line")
 			case len(sc.Skills) > 0 || len(sc.Doors) > 0 || sc.Summon != nil:
 				return fail("a created character takes no skill, door or summon line")
 			}
 			inWorld = false
 		case "enter":
+			if len(st.Args) == 1 {
+				// A mate enters the world beside the character in it.
+				if !inWorld {
+					return fail("enter %s needs the character in the world", st.Args[0])
+				}
+				break
+			}
 			if inWorld {
 				return fail("enter needs the character select: after create or restart")
 			}
@@ -651,14 +710,11 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		}
 		sc.Subclass, sc.SubclassLevel = id, level
 	case "clan":
-		if len(args) != 1 || sc.Clan >= 0 {
-			return fmt.Errorf("one clan line: clan <level>")
-		}
-		level, err := strconv.Atoi(args[0])
-		if err != nil || level < 0 || level > maxClanLevel {
-			return fmt.Errorf("clan level %q is not 0 to %d", args[0], maxClanLevel)
-		}
-		sc.Clan = level
+		return sc.clanLine(args)
+	case "hall":
+		return sc.hallLine(args)
+	case "mate":
+		return sc.mateLine(args, roles)
 	case "siege":
 		if len(args) != 2 || sc.Siege != nil {
 			return fmt.Errorf("one siege line: siege <castle id> <owner|defender|attacker>")
@@ -964,6 +1020,15 @@ func (s *Step) expect(n int, line string) error {
 	switch kind {
 	case "S":
 		s.Packets = append(s.Packets, rest)
+	case "to":
+		name, packet, ok := strings.Cut(rest, " ")
+		if !ok || packet == "" {
+			return fmt.Errorf("to <name> <packet>")
+		}
+		if s.To == nil {
+			s.To = map[string][]string{}
+		}
+		s.To[name] = append(s.To[name], packet)
 	case "Q":
 		s.Statements = append(s.Statements, rest)
 	case "M":
@@ -1087,6 +1152,10 @@ func checkCheck(kind string, args []string) error {
 	case "items":
 		if len(args) == 0 {
 			return fmt.Errorf("items takes one or more <id>=<count>")
+		}
+		if !strings.Contains(args[0], "=") && len(args) > 1 {
+			// A mate's count: items <mate> <id>=<n> ...
+			args = args[1:]
 		}
 		for _, a := range args {
 			id, count, ok := strings.Cut(a, "=")

@@ -1,0 +1,22 @@
+# Competition for the Bandit Stronghold (Q504), the amulet drop: a started leader's kill of a Tarlk Bugbear drops a Tarlk amulet (the draw 0 is under its chance).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q504_competition_amulet_drop.golden
+character Leader 40
+clan 4
+hall 35 waiting date 4102444800000
+quest Q504_CompetitionForTheBanditStronghold <state>=STARTED <cond>=1
+hold 4333 1
+random always 0
+script quest.Q504_CompetitionForTheBanditStronghold
+script script.siegablehall.BanditStronghold
+item 4332 4333 5009
+page script/quest/Q504_CompetitionForTheBanditStronghold/
+page script/siegablehall/BanditStronghold/
+npc messenger 35437 Folk 10 0 0
+npc bugbear 20570 Monster 40 0 0
+
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4332
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4332=1

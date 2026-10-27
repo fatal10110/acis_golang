@@ -1,0 +1,41 @@
+# Competition for the Bandit Stronghold (Q504), thirty amulets: a started leader with thirty amulets trades them and the certificate for the Trophy of Alliance; the trophy then turns the leader away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q504_competition_trophy.golden
+character Leader 40
+clan 4
+hall 35 waiting date 4102444800000
+quest Q504_CompetitionForTheBanditStronghold <state>=STARTED <cond>=1
+hold 4333 1
+hold 4332 30
+script quest.Q504_CompetitionForTheBanditStronghold
+script script.siegablehall.BanditStronghold
+item 4332 4333 5009
+page script/quest/Q504_CompetitionForTheBanditStronghold/
+page script/siegablehall/BanditStronghold/
+npc messenger 35437 Folk 10 0 0
+
+action messenger
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/BanditStronghold/azit_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S SystemMessage id=301 3:4332 6:30
+  S SystemMessage id=302 3:4333
+  S SystemMessage id=54 3:5009
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q504_CompetitionForTheBanditStronghold/35437-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q504_CompetitionForTheBanditStronghold
+  items 4332=0 4333=0 5009=1
+  state Q504_CompetitionForTheBanditStronghold -
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/BanditStronghold/azit_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q504_CompetitionForTheBanditStronghold/35437-07a.htm
+  S ActionFailed
+  S ActionFailed

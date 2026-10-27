@@ -1,0 +1,40 @@
+# A Grand Plan for Taming Wild Beasts (Q655), the start: the leader of a level 4 clan takes the quest (cond 1), and with no crystals yet is asked for them.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q655_beast_start.golden
+character Leader 40
+clan 4
+hall 63 waiting date 4102444800000
+script quest.Q655_AGrandPlanForTamingWildBeasts
+script script.siegablehall.WildBeastReserve
+item 8084 8293
+page script/quest/Q655_AGrandPlanForTamingWildBeasts/
+page script/siegablehall/WildBeastReserve/
+npc messenger 35627 Folk 10 0 0
+
+action messenger
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/WildBeastReserve/farm_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q655_AGrandPlanForTamingWildBeasts/35627-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q655_AGrandPlanForTamingWildBeasts CREATED
+bypass Quest Q655_AGrandPlanForTamingWildBeasts 35627-06.htm
+  S QuestList 655:0x80000001
+  S ExShowQuestMark quest=655
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q655_AGrandPlanForTamingWildBeasts/35627-06.htm
+  S ActionFailed
+  Q upsert Q655_AGrandPlanForTamingWildBeasts | <state> | STARTED
+  Q upsert Q655_AGrandPlanForTamingWildBeasts | <cond> | 1
+  state Q655_AGrandPlanForTamingWildBeasts STARTED
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/WildBeastReserve/farm_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q655_AGrandPlanForTamingWildBeasts/35627-08.htm
+  S ActionFailed
+  S ActionFailed

@@ -41,6 +41,7 @@ func (sc *Scenario) named(name string, roles map[string]bool) bool {
 	_, isDoor := sc.door(name)
 	return name == "player" || roles[name] || isDoor || sc.summoned(name) ||
 		slices.ContainsFunc(sc.Members, func(m Member) bool { return m.Name == name }) ||
+		slices.ContainsFunc(sc.Mates, func(m Mate) bool { return m.Name == name }) ||
 		slices.ContainsFunc(sc.Grounds, func(g Ground) bool { return g.Role == name })
 }
 

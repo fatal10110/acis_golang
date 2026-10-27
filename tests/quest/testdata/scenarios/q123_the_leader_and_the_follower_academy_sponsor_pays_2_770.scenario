@@ -1,0 +1,26 @@
+# The Leader and the Follower (Q123), the sponsor pays for the armor: the sponsor, in the world beside its apprentice with 770 D-grade crystals, pays for the set of stateEx 2, one crystal short, so the NPC refuses and takes nothing.
+# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor online hold 1458 770
+quest Q123_TheLeaderAndTheFollower <cond>=4 <state>=STARTED state=2 stateEx=2
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+
+as Chief action newyear
+as Chief action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+as Chief bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-08.htm
+  S ActionFailed
+  S ActionFailed
+as Chief bypass Quest Q123_TheLeaderAndTheFollower 31961-10.htm
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-11a.htm
+  S ActionFailed
+  items Chief 1458=770

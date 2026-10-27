@@ -1,0 +1,23 @@
+# To Lead and Be Led (Q118), the apprentice stands away: a sponsor whose apprentice stands 1500 away has no news of it.
+# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor online
+quest Q118_ToLeadAndBeLed <cond>=3 <state>=STARTED state=2 stateEx=1
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+away
+as Chief action pinter
+as Chief action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+as Chief bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-09.htm
+  S ActionFailed
+  S ActionFailed

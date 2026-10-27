@@ -1,0 +1,38 @@
+# To Lead and Be Led (Q118), the sponsor's view with the apprentice in the world: once the apprentice took the quest (state 1), Pinter tells its sponsor 30298-14.
+# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java onTalk, CREATED branch with getApprentice set)
+# and the clan mate lines of the scenario format (#4175).
+character Sponsor 40
+clan 3
+mate Kid 19 leader apprentice online
+script quest.Q118_ToLeadAndBeLed
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+as Kid action pinter
+as Kid action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+as Kid bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-01.htm
+  S ActionFailed
+  S ActionFailed
+as Kid bypass Quest Q118_ToLeadAndBeLed 30298-03.htm
+  S QuestList 118:0x80000001
+  S ExShowQuestMark quest=118
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-03.htm
+  S ActionFailed
+  Q upsert Q118_ToLeadAndBeLed | <state> | STARTED
+  Q upsert Q118_ToLeadAndBeLed | <cond> | 1
+  Q upsert Q118_ToLeadAndBeLed | state | 1
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-14.htm
+  S ActionFailed
+  S ActionFailed

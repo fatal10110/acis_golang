@@ -1,0 +1,33 @@
+# To Lead and Be Led (Q118), the chosen armor waits for the sponsor: with its armor set chosen (stateEx 1), an apprentice whose sponsor is out of the world is told to bring it; with the sponsor in the world beside it, the NPC names the price of its set.
+# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor
+quest Q118_ToLeadAndBeLed <cond>=3 <state>=STARTED state=2 stateEx=1
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-07.htm
+  S ActionFailed
+  S ActionFailed
+enter Chief
+  S SystemMessage id=304 0:"Chief"
+  S SystemMessage id=1758 0:"Chief"
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-06.htm
+  S ActionFailed
+  S ActionFailed

@@ -39,6 +39,7 @@ import net.sf.l2j.gameserver.data.manager.LotteryManager;
 import net.sf.l2j.gameserver.data.manager.RaidPointManager;
 import net.sf.l2j.gameserver.data.manager.RelationManager;
 import net.sf.l2j.gameserver.data.manager.SevenSignsManager;
+import net.sf.l2j.gameserver.data.manager.ClanHallManager;
 import net.sf.l2j.gameserver.data.sql.ClanTable;
 import net.sf.l2j.gameserver.data.sql.PlayerInfoTable;
 import net.sf.l2j.gameserver.data.xml.ItemData;
@@ -65,7 +66,10 @@ import net.sf.l2j.gameserver.model.actor.instance.Monster;
 import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
+import net.sf.l2j.gameserver.enums.SiegeStatus;
 import net.sf.l2j.gameserver.model.pledge.Clan;
+import net.sf.l2j.gameserver.model.residence.clanhall.ClanHall;
+import net.sf.l2j.gameserver.model.residence.clanhall.SiegableHall;
 import net.sf.l2j.gameserver.model.residence.castle.Castle;
 import net.sf.l2j.gameserver.model.spawn.Spawn;
 import net.sf.l2j.gameserver.network.GameClient;
@@ -184,6 +188,13 @@ final class ScenarioTrace
 	private int _clan = -1;
 	/** The siege line's castle id and side; null for none. */
 	private String[] _siege;
+	/** The clan line's hall: the clan hall the clan owns, 0 for none. */
+	private int _clanHall;
+	/** The hall lines: id, status, and the stored next siege date in milliseconds (0 for none). */
+	private final List<long[]> _halls = new ArrayList<>();
+	private final List<String> _hallStatuses = new ArrayList<>();
+	/** The mate line of the clan's leader, when the character is not: name, level. */
+	private String[] _leader;
 	private int[] _draws;
 	private boolean _always;
 	private final List<int[]> _holds = new ArrayList<>();
@@ -428,6 +439,16 @@ final class ScenarioTrace
 				if (drawn(castle.getOwnerId()))
 					castle.setOwnerId(0);
 			}
+			for (int id : HALL_OWNED)
+				ClanHallManager.getInstance().getClanHall(id).setOwnerId(0);
+			HALL_OWNED.clear();
+			for (Map.Entry<Integer, Long> e : HALL_DATES.entrySet())
+			{
+				final SiegableHall hall = ClanHallManager.getInstance().getSiegableHall(e.getKey());
+				hall.updateSiegeStatus(SiegeStatus.REGISTRATION_OPENED);
+				hall.setNextSiegeDate(e.getValue());
+			}
+			HALL_DATES.clear();
 			((Map<Integer, ?>) field(SevenSignsManager.class, SevenSignsManager.getInstance(), "_playersData")).keySet().removeIf(this::drawn);
 			((Map<Integer, ?>) field(RaidPointManager.class, RaidPointManager.getInstance(), "_entries")).keySet().removeIf(this::drawn);
 			// A world object equals any other of its id, so a task manager's entry the scenario left
@@ -481,7 +502,32 @@ final class ScenarioTrace
 					_subclass = Integer.parseInt(f[1]);
 					_subclassLevel = Integer.parseInt(f[2]);
 				}
-				case "clan" -> _clan = Integer.parseInt(f[1]);
+				case "clan" ->
+				{
+					_clan = Integer.parseInt(f[1]);
+					if (f.length > 3 && f[2].equals("hall"))
+						_clanHall = Integer.parseInt(f[3]);
+				}
+				case "hall" ->
+				{
+					_halls.add(new long[]
+					{
+						Integer.parseInt(f[1]),
+						f.length > 4 ? Long.parseLong(f[4]) : 0
+					});
+					_hallStatuses.add(f[2]);
+				}
+				case "mate" ->
+				{
+					// A traced scenario's only mate leads the clan and stays out of the world.
+					if (!Arrays.asList(f).contains("leader"))
+						_unread.add(f[0]);
+					_leader = new String[]
+					{
+						f[1],
+						f[2]
+					};
+				}
 				case "siege" -> _siege = new String[]
 				{
 					f[1],
@@ -537,7 +583,7 @@ final class ScenarioTrace
 	{
 		return switch (verb)
 		{
-			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create" -> true;
+			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus" -> true;
 			default -> false;
 		};
 	}
@@ -580,6 +626,7 @@ final class ScenarioTrace
 				}
 				case "pickup" -> pickup(Integer.parseInt(s[1]));
 				case "mark" -> mark(Integer.parseInt(s[1]));
+				case "hallstatus" -> hallStatus(Integer.parseInt(s[1]), s[2]);
 				case "relog" ->
 				{
 					restart();
@@ -627,15 +674,17 @@ final class ScenarioTrace
 
 		if (_clan >= 0)
 		{
-			final Clan clan = ClanTable.getInstance().createClan(player, CLAN);
-			if (clan == null)
-				throw new IllegalStateException(_name + ": the clan line's clan was not created");
+			final Clan clan = createClan(player);
 			clan.changeLevel(_clan);
 			if (_siege != null)
 				siege(clan);
+			if (_clanHall != 0)
+				owner(clan, _clanHall);
 		}
 		else if (_siege != null)
 			throw new IllegalStateException(_name + ": a siege line needs a clan line");
+		for (int i = 0; i < _halls.size(); i++)
+			hallStatus((int) _halls.get(i)[0], _hallStatuses.get(i), _halls.get(i)[1]);
 		for (String[] q : _quests)
 		{
 			final Quest quest = ScriptData.getInstance().getQuest(q[1]);
@@ -654,6 +703,69 @@ final class ScenarioTrace
 		holdings(player);
 		spawnNpcs();
 	}
+
+	/**
+	 * The clan line's clan, led by the character, or by the mate line's character when there is
+	 * one: a character in no client, so an offline leader, which the clan then lists the
+	 * character under as a plain member.
+	 */
+	private Clan createClan(Player player) throws Exception
+	{
+		if (_leader == null)
+		{
+			final Clan clan = ClanTable.getInstance().createClan(player, CLAN);
+			if (clan == null)
+				throw new IllegalStateException(_name + ": the clan line's clan was not created");
+			return clan;
+		}
+		final Player leader = Player.create(IdFactory.getInstance().getNextId(), PlayerData.getInstance().getTemplate(ClassId.VALUES[_class]), "mate", _leader[0], (byte) 0, (byte) 0, (byte) 0, Sex.MALE);
+		leader.getStatus().setLevel(Integer.parseInt(_leader[1]));
+		final Clan clan = ClanTable.getInstance().createClan(leader, CLAN);
+		if (clan == null)
+			throw new IllegalStateException(_name + ": the clan line's clan was not created");
+		clan.addClanMember(player);
+		return clan;
+	}
+
+	/** The hall lines of the halls a scenario touched, with the next siege date each had before. */
+	private static final Map<Integer, Long> HALL_DATES = new HashMap<>();
+
+	/** The hall line: where the siegable hall's siege stands, and the next siege date it stores. */
+	private void hallStatus(int id, String status) throws Exception
+	{
+		_lines.add("# hallstatus " + id + " " + status);
+		hallStatus(id, status, 0);
+	}
+
+	private void hallStatus(int id, String status, long date) throws Exception
+	{
+		final SiegableHall hall = ClanHallManager.getInstance().getSiegableHall(id);
+		if (hall == null)
+			throw new IllegalStateException(_name + ": no siegable hall " + id);
+		HALL_DATES.putIfAbsent(id, hall.getNextSiegeTime());
+		hall.updateSiegeStatus(switch (status)
+		{
+			case "registering" -> SiegeStatus.REGISTRATION_OPENED;
+			case "waiting" -> SiegeStatus.REGISTRATION_OVER;
+			case "siege" -> SiegeStatus.IN_PROGRESS;
+			default -> throw new IllegalStateException(_name + ": no hall status " + status);
+		});
+		if (date != 0)
+			hall.setNextSiegeDate(date);
+	}
+
+	/** The clan line's hall: the clan owns the clan hall, as the clan hall restore leaves a stored owner. */
+	private void owner(Clan clan, int id)
+	{
+		final ClanHall hall = ClanHallManager.getInstance().getClanHall(id);
+		if (hall == null)
+			throw new IllegalStateException(_name + ": no clan hall " + id);
+		HALL_OWNED.add(id);
+		hall.setOwnerId(clan.getClanId());
+		clan.setClanHallId(id);
+	}
+
+	private static final Set<Integer> HALL_OWNED = new HashSet<>();
 
 	/**
 	 * The subclass line's subclass, in slot 1 at its level, and played: the state the reference's
