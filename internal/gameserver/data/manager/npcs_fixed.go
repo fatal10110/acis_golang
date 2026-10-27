@@ -74,18 +74,13 @@ func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, erro
 // none, returning the NPC placed. Its created hooks have run by then; one may have deleted it
 // again.
 func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn time.Duration, summoner attackable.Combatant, castleID int, clanID int32) (attackable.Combatant, error) {
-	return n.spawnStandaloneAt(tmpl, location.Location{X: x, Y: y, Z: int(n.geo.Height(x, y, z))}, heading, respawn, summoner, castleID, clanID)
-}
-
-// spawnStandaloneAt is spawnStandalone at the exact point at, with no
-// snapping onto the ground.
-func (n *Npcs) spawnStandaloneAt(tmpl *npc.Template, at location.Location, heading int, respawn time.Duration, summoner attackable.Combatant, castleID int, clanID int32) (attackable.Combatant, error) {
 	if tmpl == nil {
 		return nil, ErrNotPlaceable
 	}
 	if probe := (&npc.Instance{Template: tmpl}); !npc.FolkKind(probe) && !npc.Attackable(probe) {
 		return nil, fmt.Errorf("%w: npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
 	}
+	at := location.Location{X: x, Y: y, Z: int(n.geo.Height(x, y, z))}
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
 	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: max(respawn, 0)}
 	n.mu.Lock()

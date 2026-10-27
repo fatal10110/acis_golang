@@ -124,9 +124,11 @@ what the reference does in the scenario's own world:
 - an indented `live <npc id> <count>` line under a step makes the probe write a `# live` line
   after the step, the number of living NPCs of that template in the world (what a script
   spawned and despawned included); the Go run counts the same;
-- an indented `spawned <npc id> <x>,<y>,<z> ...` line under a step makes the probe write a
+- an indented `spawned <npc id> <x>,<y> ...` line under a step makes the probe write a
   `# spawned` line after the step: where the living NPCs of that template that no NPC line placed
-  (a script's spawns) stand, sorted, `-` for none; the Go run lists the same places;
+  (a script's spawns) stand, sorted, `-` for none; the Go run lists the same places. Only x and
+  y: the probe runs with every geodata region removed, so a height it traces is the one asked for,
+  not the ground's;
 - the `teleports` line gives the Go run the shipped gatekeeper teleport lists, which the probe
   always loads; the half-price weekend hours of a standard window read the probe wall clock
   (`ProbeClock.wallCalendar`, a Thursday while a scenario trace plays, as the Go run's clock start
@@ -320,7 +322,7 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # tick                          a scenario trace: one run of the NPC AI task
 # live <npc id> <count>         a scenario trace: how many living NPCs of that template the world
                                 holds once the step is over (the step's live line)
-# spawned <npc id> <x>,<y>,<z> ...   a scenario trace: where the living NPCs of that template that
+# spawned <npc id> <x>,<y> ...   a scenario trace: where the living NPCs of that template that
                                 no NPC line placed stand once the step is over, sorted (the step's
                                 spawned line); - for none
 C Action item <item id> (object <id>)   a scenario trace: the pickup's action on the ground item

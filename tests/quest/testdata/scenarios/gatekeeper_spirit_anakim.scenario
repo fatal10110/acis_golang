@@ -19,10 +19,10 @@ kill anakim
   spawned 31112 -
 advance 10s
   live 31112 2
-  spawned 31112 184466,-13106,-5468
+  spawned 31112 184466,-13106
 advance 10m
   live 31112 2
-  spawned 31112 184466,-13106,-5468
+  spawned 31112 184466,-13106
 advance 6m
   live 31112 1
   spawned 31112 -

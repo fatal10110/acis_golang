@@ -944,7 +944,7 @@ func (r *run) lives(want []string) []string {
 
 // spawns renders, for each spawned line of a step, the places of the NPCs of
 // that template standing alive that no npc line placed, as "<npc id>
-// <x>,<y>,<z> ..." sorted, "<npc id> -" for none.
+// <x>,<y> ..." sorted, "<npc id> -" for none.
 func (r *run) spawns(want []string) []string {
 	var got []string
 	for _, w := range want {
@@ -963,8 +963,8 @@ func (r *run) spawns(want []string) []string {
 			if !ok {
 				continue
 			}
-			x, y, z := at.Position()
-			places = append(places, fmt.Sprintf("%d,%d,%d", x, y, z))
+			x, y, _ := at.Position()
+			places = append(places, fmt.Sprintf("%d,%d", x, y))
 		}
 		slices.Sort(places)
 		if len(places) == 0 {

@@ -653,10 +653,10 @@ final class ScenarioTrace
 		}
 	}
 
-	/** Where the NPCs of the template that no npc line placed stand alive, sorted, or - for none. */
+	/** Where (x and y; the probe has no geodata, so its heights are not the ground's) the NPCs of the template that no npc line placed stand alive, sorted, or - for none. */
 	private String spawned(int npcId)
 	{
-		final List<String> at = World.getInstance().getObjects().stream().filter(o -> o instanceof Npc n && n.getNpcId() == npcId && !n.isDead() && !_spawnedNpcs.contains(o)).map(o -> o.getX() + "," + o.getY() + "," + o.getZ()).sorted().toList();
+		final List<String> at = World.getInstance().getObjects().stream().filter(o -> o instanceof Npc n && n.getNpcId() == npcId && !n.isDead() && !_spawnedNpcs.contains(o)).map(o -> o.getX() + "," + o.getY()).sorted().toList();
 		return at.isEmpty() ? "-" : String.join(" ", at);
 	}
 

@@ -255,7 +255,7 @@ var (
 	traceNPC      = regexp.MustCompile(`^# npc (\S+) (\d+) \(object (\d+)\)$`)
 	traceDraw     = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
 	traceLive     = regexp.MustCompile(`^# live (\d+) (\d+)$`)
-	traceSpawned  = regexp.MustCompile(`^# spawned (\d+) (-|-?\d+,-?\d+,-?\d+( -?\d+,-?\d+,-?\d+)*)$`)
+	traceSpawned  = regexp.MustCompile(`^# spawned (\d+) (-|-?\d+,-?\d+( -?\d+,-?\d+)*)$`)
 )
 
 // probeTraces is the directory, below the module root, of the reference
@@ -379,7 +379,7 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		case strings.HasPrefix(line, "# spawned "):
 			if !traceSpawned.MatchString(line) {
-				return nil, nil, fmt.Errorf("trace line %q is not a spawned <npc id> <x>,<y>,<z> ... | -", line)
+				return nil, nil, fmt.Errorf("trace line %q is not a spawned <npc id> <x>,<y> ... | -", line)
 			}
 			if len(raw) == 0 {
 				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)

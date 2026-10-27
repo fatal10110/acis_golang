@@ -15,15 +15,15 @@ import (
 // offset may land from the point it asks for.
 const scriptSpawnScatter = 100
 
-// scriptSpawnLift is how far above the ground a script spawn stands: it is
-// not dropped back onto the ground.
+// scriptSpawnLift is how far above the ground a script spawn is dropped
+// onto the ground from.
 const scriptSpawnLift = 20
 
 // AddSpawn places one NPC of template npcID as a standalone spawn that
 // never respawns, as a script spawns one, and returns it. With scatter the
 // NPC stands up to 100 from (x, y) on each axis, at the point geodata
 // reaches from (x, y, z); without, at (x, y) on the ground below z. Either
-// way it stands 20 above that point, and stays there. A negative
+// way it is then put on the ground below 20 above that point. A negative
 // heading faces a random way. A positive despawn deletes the NPC once it
 // has passed, unless it has left the world by then.
 func (n *Npcs) AddSpawn(npcID int32, x, y, z, heading int, scatter bool, despawn time.Duration) (attackable.Combatant, error) {
@@ -39,10 +39,7 @@ func (n *Npcs) AddSpawn(npcID int32, x, y, z, heading int, scatter bool, despawn
 	} else {
 		z = int(n.geo.Height(x, y, z))
 	}
-	if heading < 0 {
-		heading = rnd.Get(65536)
-	}
-	live, err := n.spawnStandaloneAt(tmpl, location.Location{X: x, Y: y, Z: z + scriptSpawnLift}, heading, 0, nil, 0, 0)
+	live, err := n.placeStandalone(tmpl, x, y, z+scriptSpawnLift, heading, nil)
 	if err != nil {
 		return nil, err
 	}

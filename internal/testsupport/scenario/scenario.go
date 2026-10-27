@@ -237,9 +237,10 @@
 //	                         in each task of the trace's step that does, in order; other+n also names the n
 //	                         lines after each of the task's casts that go out with it (see the trace header below)
 //	  live <npc id> <n>    how many NPCs of that template stand alive in the world after the step
-//	  spawned <npc id> <x>,<y>,<z> ... | spawned <npc id> -
+//	  spawned <npc id> <x>,<y> ... | spawned <npc id> -
 //	                       where the NPCs of that template stand alive that no npc line placed (a script's
-//	                       spawns), as world coordinates, in any order; - for none
+//	                       spawns), as world x and y in any order; - for none. The height is left out: the
+//	                       reference trace runs without geodata, so its heights are not the ground's
 //	  items <id>=<n> ...   the character's count of each item after the step (items <mate> <id>=<n> ... a mate's)
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them (a value
 //	                                        with blanks is quoted: quiz="20 21")
@@ -1327,7 +1328,7 @@ func splitQuoted(line string) ([]string, error) {
 // parseSpawned reads a spawned line's <npc id> <x>,<y>,<z> ... | <npc id> -
 // into its normal form: the id, then the places sorted, or - for none.
 func parseSpawned(args []string) (string, error) {
-	usage := fmt.Errorf("spawned <npc id> <x>,<y>,<z> ... | spawned <npc id> -")
+	usage := fmt.Errorf("spawned <npc id> <x>,<y> ... | spawned <npc id> -")
 	if len(args) < 2 {
 		return "", usage
 	}
@@ -1340,7 +1341,7 @@ func parseSpawned(args []string) (string, error) {
 	places := slices.Clone(args[1:])
 	for _, p := range places {
 		xyz := strings.Split(p, ",")
-		if len(xyz) != 3 {
+		if len(xyz) != 2 {
 			return "", usage
 		}
 		if _, err := ints(xyz); err != nil {

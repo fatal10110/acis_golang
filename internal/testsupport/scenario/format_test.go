@@ -70,7 +70,7 @@ func TestParseRejectsBadFormatLines(t *testing.T) {
 		{"noble argument", head + "noble yes\nadvance 1s\n", "one noble line"},
 		{"teleports twice", head + "teleports\nteleports\nadvance 1s\n", "one teleports line"},
 		{"spawned arity", head + "advance 1s\n  spawned 5\n", "spawned <npc id>"},
-		{"spawned place", head + "advance 1s\n  spawned 5 1,2\n", "spawned <npc id>"},
+		{"spawned place", head + "advance 1s\n  spawned 5 1,2,3\n", "spawned <npc id>"},
 		{"traced mp", "trace x.golden\n" + head[:len("character A 1\nnpc a 1 Monster 0 0 0\n")] + "advance 1s\nmp a 5\n", "traced"},
 	} {
 		_, err := Parse("bad.scenario", []byte(c.text))
@@ -106,11 +106,11 @@ func TestDesireInFullPinsTheLevelAndTheHold(t *testing.T) {
 // TestParseNormalizesSpawnedLines: the places of a spawned line are sorted, so
 // the order a scenario lists them in does not matter.
 func TestParseNormalizesSpawnedLines(t *testing.T) {
-	sc, err := Parse("spawned.scenario", []byte("character A 1\nadvance 1s\n  spawned 31112 9,2,3 1,2,3\n  spawned 31112 -\n"))
+	sc, err := Parse("spawned.scenario", []byte("character A 1\nadvance 1s\n  spawned 31112 9,2 1,2\n  spawned 31112 -\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := sc.Steps[0].Spawns; len(got) != 2 || got[0] != "31112 1,2,3 9,2,3" || got[1] != "31112 -" {
+	if got := sc.Steps[0].Spawns; len(got) != 2 || got[0] != "31112 1,2 9,2" || got[1] != "31112 -" {
 		t.Fatalf("spawns = %q, want the places sorted and - kept", got)
 	}
 }
