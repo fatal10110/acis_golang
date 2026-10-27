@@ -105,7 +105,7 @@ func (r *run) setHalls(t *testing.T) {
 	t.Helper()
 	for _, h := range r.sc.Halls {
 		r.setHallStatus(t, h.ID, h.Status)
-		if hs, _ := r.srv.Halls.Siege(int32(h.ID)); h.Date > 0 && hs.Date() != h.Date {
+		if hs, _ := r.srv.Halls.Siege(hallID(h.ID)); h.Date > 0 && hs.Date() != h.Date {
 			t.Fatalf("%s: hall line: hall %d keeps next siege %d, want the stored %d", r.sc.Name, h.ID, hs.Date(), h.Date)
 		}
 	}
@@ -122,13 +122,19 @@ func (r *run) setHalls(t *testing.T) {
 	}
 }
 
+// hallID narrows a hall line's id to the server's; 0, which no hall has,
+// for one out of range.
+func hallID(id int) int32 {
+	if id < 1 || id > math.MaxInt32 {
+		return 0
+	}
+	return int32(id)
+}
+
 // setHallStatus puts hall id's siege at status.
 func (r *run) setHallStatus(t *testing.T, id int, status string) {
 	t.Helper()
-	if id < 0 || id > math.MaxInt32 {
-		t.Fatalf("%s: hall %d is no hall id", r.sc.Name, id)
-	}
-	hs, ok := r.srv.Halls.Siege(int32(id))
+	hs, ok := r.srv.Halls.Siege(hallID(id))
 	if !ok {
 		t.Fatalf("%s: hall %d has no siege: it is no siegable hall of the shipped data", r.sc.Name, id)
 	}
