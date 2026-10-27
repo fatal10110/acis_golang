@@ -154,21 +154,34 @@ func bootFestival(t *testing.T, seats []seat, blueStones int32, minPlayers int) 
 	return bootFestivalWith(t, festivalSetup{seats: seats, blueStones: blueStones, minPlayers: minPlayers})
 }
 
+// festivalStart is the instant festival fixtures boot at unless told
+// otherwise: a Wednesday noon, days away from the Seven Signs period end on
+// Monday 18:00, so every festival cycle a test runs can finish in time.
+var festivalStart = time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+
 // festivalSetup is a festival fixture: its seats, the blue stones its
 // first seat holds, the party minimum, the pages (festivalPages when nil),
-// the scores seeded over cycle 1's blank ones and any further options.
+// the scores seeded over cycle 1's blank ones, the instant it boots at
+// (festivalStart when zero) and any further options.
 type festivalSetup struct {
 	seats      []seat
 	blueStones int32
 	minPlayers int
 	pages      map[string]string
 	scores     []festival.Score
+	start      time.Time
 	extra      []gameservertest.Option
 }
 
+// bootFestivalWith boots s, the festival and the Seven Signs calendar both
+// running on the hand-fired clock.
 func bootFestivalWith(t *testing.T, s festivalSetup) *festivalRun {
 	t.Helper()
-	timers := &festivalTimers{now: time.Now()}
+	start := s.start
+	if start.IsZero() {
+		start = festivalStart
+	}
+	timers := &festivalTimers{now: start}
 	cfg := festival.DefaultConfig()
 	cfg.MinPlayers = s.minPlayers
 	oracle, err := zone.NewCuboid(-2000, 2000, -2000, 2000, -1000, 1000)
@@ -188,6 +201,7 @@ func bootFestivalWith(t *testing.T, s festivalSetup) *festivalRun {
 		gameservertest.WithFestivalConfig(cfg),
 		gameservertest.WithFestivalClock(timers.Now),
 		gameservertest.WithFestivalTimer(timers.after),
+		gameservertest.WithSevenSignsClock(timers.Now),
 		gameservertest.WithNPCs(festivalTemplates()),
 		gameservertest.WithNpcSpawns(nil),
 		gameservertest.WithItemTemplates(festivalItems()),
