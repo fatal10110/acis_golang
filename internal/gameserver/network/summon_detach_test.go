@@ -66,15 +66,15 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 		t.Fatal("missing summon item fixture")
 	}
 	instances := task.NewItemInstances(nil, testItemTemplates(), nil, nil, zerolog.Nop())
-	link := &GameClientLink{
-		itemInstances: instances,
-		world:         state,
-		npcs:          npc.NewTable([]*npc.Template{npcTmpl}),
-		summoning:     newSummoning(GameClientLinkConfig{SummonItems: summonItems}),
-		itemTemplates: testItemTemplates(),
-		ids:           &sequentialIDs{next: 9000},
-		log:           zerolog.Nop(),
-	}
+	link := newBareGameClientLink(t, GameClientLinkConfig{
+		ItemInstances: instances,
+		World:         state,
+		NPCs:          npc.NewTable([]*npc.Template{npcTmpl}),
+		SummonItems:   summonItems,
+		ItemTemplates: testItemTemplates(),
+		IDs:           &sequentialIDs{next: 9000},
+		Log:           zerolog.Nop(),
+	})
 
 	spawnFor := func(t *testing.T, id, collarObjectID int32, detach bool) (*livePlayer, bool) {
 		t.Helper()

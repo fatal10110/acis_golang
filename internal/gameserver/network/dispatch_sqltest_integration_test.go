@@ -84,7 +84,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	t.Cleanup(sevenSigns.Stop)
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl, err := NewGameClientLink(GameClientLinkConfig{
-		Validator:        validator,
+		Flow:             CharacterFlowConfig{Validator: validator, PlayerClock: playerClock},
 		LoginLink:        func() *LoginLink { return loginLink },
 		Roster:           roster,
 		Items:            items,
@@ -102,7 +102,6 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		IDs:              ids,
 		GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now),
 		Positions:        task.NewPositionUpdates(state),
-		PlayerClock:      playerClock,
 		SevenSigns:       sevenSigns,
 		InventoryUpdates: inventoryUpdates,
 		PlayerConfig:     PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, MaxBuffsAmount: 20},

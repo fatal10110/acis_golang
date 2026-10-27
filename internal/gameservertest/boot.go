@@ -2219,10 +2219,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	killRewards := gamemanager.NewKillRewardBook(fixtureKillRewards(o))
 	events := script.NewEventBook(fixtureEventRules(o))
 	gclConfig := network.GameClientLinkConfig{
+		Flow:             network.CharacterFlowConfig{Validator: validator, PlayerClock: playerClock, Autosave: autosave},
 		KillRewards:      killRewards,
 		Events:           events,
 		Merchant:         shops,
-		Validator:        validator,
 		Effects:          effectEnv,
 		LoginLink:        func() *network.LoginLink { return loginLink },
 		Roster:           roster,
@@ -2260,7 +2260,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		IDs:              ids,
 		GroundItems:      groundItems,
 		Positions:        positions,
-		PlayerClock:      playerClock,
 		GameClock:        task.NewGameClock(time.Now),
 		PvPFlags:         task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
 		SevenSigns:       sevenSigns,
@@ -2272,7 +2271,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		PersistWait:      o.persistWait,
 		Queues:           queues,
 		ShadowItems:      shadowItems,
-		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, Regen: o.regenMultipliers, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,

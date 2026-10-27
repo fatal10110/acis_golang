@@ -133,13 +133,13 @@ func (l *GameClientLink) settleWithLeftOwner(ownerID int32, online func(*livePla
 // selection gate runs it again as a held settle.
 func (l *GameClientLink) settleLeftOwnerPart(ownerID int32, online func(*livePlayer), offline func(), draining bool) {
 	retry := func() { l.settleLeftOwnerPart(ownerID, online, offline, true) }
-	owner, ok := l.selections.settle(ownerID, l.livePlayerByID, offline, retry, draining)
+	owner, ok := l.flow.selections.settle(ownerID, l.livePlayerByID, offline, retry, draining)
 	if !ok {
 		return
 	}
 	// A session found leaving settles offline instead: on its queue, as a
 	// settle arriving now; on a refused post, still in this settle's place.
-	leaving := func(draining bool) { l.selections.settle(ownerID, nil, offline, retry, draining) }
+	leaving := func(draining bool) { l.flow.selections.settle(ownerID, nil, offline, retry, draining) }
 	posted := postLive(owner, func() {
 		if owner.detached() {
 			leaving(false)

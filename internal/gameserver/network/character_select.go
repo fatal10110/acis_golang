@@ -34,8 +34,8 @@ const (
 // (selectingOwners), since the selection reads the rows such a settle writes.
 func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client *Client, chars []*player.Character, slot int32, c *player.Character) (*livePlayer, selectionOutcome) {
 	objectID := c.ObjectID()
-	l.selections.begin(objectID)
-	defer l.selections.end(objectID)
+	l.flow.selections.begin(objectID)
+	defer l.flow.selections.end(objectID)
 	// A previous session of this character has left the world, so every
 	// save it queued is on the lane. Wait for them, then read the row fresh:
 	// the character list may predate those saves, and selection restores the

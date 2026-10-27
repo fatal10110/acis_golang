@@ -159,9 +159,13 @@ func provideGameClientLink(
 	playerConfig := newPlayerConfig(cfg, gameplay, pvpOptions)
 	network.SetOutboundRejectLog(log)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
-		Validator:     validator,
+		Flow: network.CharacterFlowConfig{
+			Validator:   validator,
+			NoCipher:    !cfg.UseBlowfishCipher,
+			PlayerClock: playerClock,
+			Autosave:    autosave,
+		},
 		Effects:       effectEnv,
-		NoCipher:      !cfg.UseBlowfishCipher,
 		LoginLink:     links.get,
 		Roster:        roster,
 		Items:         items,
@@ -198,7 +202,6 @@ func provideGameClientLink(
 		PvPFlags:      pvpFlags,
 		Decay:         decay,
 		Positions:     positions,
-		PlayerClock:   playerClock,
 		GameClock:     gameClock,
 		SevenSigns:    sevenSigns,
 		Festival:      fest,
@@ -208,7 +211,6 @@ func provideGameClientLink(
 		RaidPoints:    raidPoints,
 		Water:         water,
 		ShadowItems:   shadowItems,
-		Autosave:      autosave,
 
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,

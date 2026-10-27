@@ -41,11 +41,11 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 	// closed ahead of the new player-auth request to the login server.
 	if l.clients != nil {
 		if evicted, replaced := l.clients.Take(req.LoginName, client); replaced {
-			l.validator.Resolve(req.LoginName, false)
+			l.flow.validator.Resolve(req.LoginName, false)
 			evicted.Session.Close()
 		}
 	}
-	ok, err := l.validator.Validate(ctx, client, req, loginLink)
+	ok, err := l.flow.validator.Validate(ctx, client, req, loginLink)
 	if l.clients != nil && (!ok || err != nil) {
 		l.clients.Release(req.LoginName, client)
 	}
@@ -329,13 +329,13 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
-	if l.playerClock != nil {
-		l.playerClock.Add(live)
+	if l.flow.playerClock != nil {
+		l.flow.playerClock.Add(live)
 	}
 	// Periodic autosave: first full-stat save 5 minutes after entering the
 	// world, then every 15 minutes while still online.
-	if l.autosave != nil {
-		l.autosave.Add(live)
+	if l.flow.autosave != nil {
+		l.flow.autosave.Add(live)
 	}
 
 	l.applyGMLoginModes(live)
@@ -385,8 +385,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(sevenSignsPeriodMessage(l.sevenSigns.CurrentPeriod())))
 	}
 	l.sendLoginAnnouncements(live)
-	if l.playerClock != nil && c.Race == player.RaceDarkElf {
-		l.playerClock.NotifyShadowSenseState(live)
+	if l.flow.playerClock != nil && c.Race == player.RaceDarkElf {
+		l.flow.playerClock.NotifyShadowSenseState(live)
 	}
 	client.Session.SendFrame(questListFrame(c))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))

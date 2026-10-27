@@ -130,7 +130,7 @@ func cubicOwnerOnClock(t *testing.T, link *GameClientLink, id int32, lifetime ti
 // path that stops them: no timer of a logged-out player's cubic runs.
 func TestCubicsStopOnDetachButNotOnTeleportHalt(t *testing.T) {
 	const lifetime = 10 * time.Second
-	link := &GameClientLink{log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 
 	halted, in := cubicOwnerOnClock(t, link, 1, lifetime)
 	sim.RunOwned(halted.Queue(), halted.Stop)

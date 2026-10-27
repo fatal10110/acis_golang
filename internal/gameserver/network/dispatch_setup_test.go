@@ -213,7 +213,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	}
 	queues := testQueues(t)
 	gcl, err := NewGameClientLink(GameClientLinkConfig{
-		Validator:        validator,
+		Flow:             CharacterFlowConfig{Validator: validator},
 		LoginLink:        loginLink,
 		Roster:           roster,
 		Items:            items,

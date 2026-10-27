@@ -130,7 +130,7 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 	<-entered // the autosave write is in flight on the lane
 
-	link := &GameClientLink{roster: roster, log: zerolog.Nop(), persist: worker}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Roster: roster, Persist: worker, Log: zerolog.Nop()})
 	sim.RunOwned(live.Queue(), func() { link.detachLivePlayer(live) })
 	if got := readAutosaveRow(t, db, 45).online; got != 1 {
 		t.Fatalf("online while the autosave write was held = %d, want 1 (detach's writes queued behind it)", got)
