@@ -18,6 +18,8 @@ kill araneid
   S SystemMessage id=95 1:0 1:0
   items 8063=7
 enter Chief
+  S SystemMessage id=304 0:"Chief"
+  S SystemMessage id=1758 0:"Chief"
 kill araneid
   S SystemMessage id=95 1:0 1:0
   S SystemMessage id=54 3:8063

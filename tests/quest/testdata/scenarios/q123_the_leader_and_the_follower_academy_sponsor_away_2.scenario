@@ -21,6 +21,8 @@ bypass npc_{newyear}_Quest
   S ActionFailed
   S ActionFailed
 enter Chief
+  S SystemMessage id=304 0:"Chief"
+  S SystemMessage id=1758 0:"Chief"
 action newyear
   S ActionFailed
   S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm

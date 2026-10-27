@@ -98,7 +98,8 @@ func (r *run) seedMateHolds(t *testing.T) {
 }
 
 // checkMates requires the server to have restored the clan as the mate
-// lines wrote it: the leader, and the academy links.
+// lines wrote it: the leader, and the academy links of the character and
+// of every mate.
 func (r *run) checkMates(t *testing.T) {
 	t.Helper()
 	if len(r.sc.Mates) == 0 {
@@ -115,11 +116,38 @@ func (r *run) checkMates(t *testing.T) {
 	if cl.LeaderID() != want {
 		t.Fatalf("%s: mate line: the clan is restored with leader %d, want %d", r.sc.Name, cl.LeaderID(), want)
 	}
+	wantLinks := map[int32][2]int32{} // object id -> sponsor, apprentice
+	for i, m := range r.sc.Mates {
+		switch m.Relation {
+		case "sponsor":
+			wantLinks[mateObject(i)] = [2]int32{0, r.player}
+			wantLinks[r.player] = [2]int32{mateObject(i), 0}
+		case "apprentice":
+			wantLinks[mateObject(i)] = [2]int32{r.player, 0}
+			wantLinks[r.player] = [2]int32{0, mateObject(i)}
+		}
+	}
+	objs := []int32{r.player}
+	for i := range r.sc.Mates {
+		objs = append(objs, mateObject(i))
+	}
+	for _, obj := range objs {
+		m, ok := cl.Member(obj)
+		if !ok {
+			t.Fatalf("%s: mate line: character %d is not a restored clan member", r.sc.Name, obj)
+		}
+		if want := wantLinks[obj]; m.Sponsor != want[0] || m.Apprentice != want[1] {
+			t.Fatalf("%s: mate line: character %d is restored with sponsor %d and apprentice %d, want %d and %d",
+				r.sc.Name, obj, m.Sponsor, m.Apprentice, want[0], want[1])
+		}
+	}
 }
 
 // enterMate logs the i-th mate line's character in on its own client and
 // enters it into the world, then puts it at its offset from where the
-// character first entered. What it was sent while entering is dropped.
+// character first entered. What the mate itself was sent while entering is
+// dropped; what the other clients were sent stays queued for the step to
+// compare.
 func (r *run) enterMate(t *testing.T, i int) {
 	t.Helper()
 	m := r.sc.Mates[i]
@@ -147,7 +175,6 @@ func (r *run) enterMate(t *testing.T, i int) {
 			t.Fatalf("%s: mate %s: %v", r.sc.Name, m.Name, err)
 		}
 	}
-	r.srv.ReadQueued(t, r.srv.Client)
 	r.mates[i].client = c
 }
 

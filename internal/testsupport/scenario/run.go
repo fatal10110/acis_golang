@@ -747,7 +747,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if d := traceDrawDiff(r.traceDraws, i, drawn); d != "" {
 		fail("%s (want: the trace's)", d)
 	}
-	if st.Verb != "relog" && !(st.Verb == "enter" && len(st.Args) == 1) {
+	if st.Verb != "relog" {
 		sentTo := map[string]bool{}
 		for name := range others {
 			sentTo[name] = true

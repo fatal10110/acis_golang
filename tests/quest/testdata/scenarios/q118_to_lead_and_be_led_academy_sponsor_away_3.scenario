@@ -21,6 +21,8 @@ bypass npc_{pinter}_Quest
   S ActionFailed
   S ActionFailed
 enter Chief
+  S SystemMessage id=304 0:"Chief"
+  S SystemMessage id=1758 0:"Chief"
 action pinter
   S ActionFailed
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm

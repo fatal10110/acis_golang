@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"database/sql"
+	"math"
 	"sync"
 	"testing"
 
@@ -124,6 +125,9 @@ func (r *run) setHalls(t *testing.T) {
 // setHallStatus puts hall id's siege at status.
 func (r *run) setHallStatus(t *testing.T, id int, status string) {
 	t.Helper()
+	if id < 0 || id > math.MaxInt32 {
+		t.Fatalf("%s: hall %d is no hall id", r.sc.Name, id)
+	}
 	hs, ok := r.srv.Halls.Siege(int32(id))
 	if !ok {
 		t.Fatalf("%s: hall %d has no siege: it is no siegable hall of the shipped data", r.sc.Name, id)
