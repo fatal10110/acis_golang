@@ -27,19 +27,16 @@ func TestSplitQuotedKeepsBlanksInsideQuotes(t *testing.T) {
 	}
 }
 
-// TestParseReadsAQuotedValueInRowsAndQuestLines: a quest variable holding a
-// list (Q419's quiz) is one <var>=<value> field once quoted.
-func TestParseReadsAQuotedValueInRowsAndQuestLines(t *testing.T) {
+// TestParseReadsAQuotedValueInRowsChecks: a quest variable holding a list
+// (Q419's quiz) is one <var>=<value> field once quoted in a rows check. Quest
+// seed lines are not quoted: the reference probe splits them on blanks.
+func TestParseReadsAQuotedValueInRowsChecks(t *testing.T) {
 	sc, err := Parse("quoted.scenario", []byte(`character A 1
-quest Q419 quiz="20 21 22" <state>=STARTED
 relog
   rows Q419 quiz="20 21" <state>=STARTED
 `))
 	if err != nil {
 		t.Fatal(err)
-	}
-	if got := sc.Quests[0].Vars; len(got) != 2 || got[0] != [2]string{"quiz", "20 21 22"} {
-		t.Fatalf("quest vars = %q", got)
 	}
 	ck := sc.Steps[0].Checks[0]
 	if want := []string{"Q419", "quiz=20 21", "<state>=STARTED"}; !slices.Equal(ck.Args, want) {

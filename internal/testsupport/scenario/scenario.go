@@ -27,8 +27,8 @@
 //	                                          on that side of the castle's siege before the character enters the
 //	                                          world; owner makes it the castle's owner, on its siege's owner side
 //	quest <quest> <var>=<value> ...           character_quests rows of the character before it enters the world,
-//	                                          one line per quest, as a rows check lists them (a value with blanks
-//	                                          is quoted: quiz="20 21")
+//	                                          one line per quest, as a rows check lists them (a value is one
+//	                                          blank-free field; only a rows check quotes a value with blanks)
 //	hold <item id> <count>                    optional: the character holds that many of the item before it enters
 //	                                          the world, as one stack (that many single items of a template that
 //	                                          does not stack); the template must be in the catalog (an item line or
@@ -448,12 +448,6 @@ func Parse(name string, data []byte) (*Scenario, error) {
 			continue
 		}
 		fields := strings.Fields(line)
-		if fields[0] == "quest" {
-			var err error
-			if fields, err = splitQuoted(line); err != nil {
-				return nil, fail("%v", err)
-			}
-		}
 		verb, args := fields[0], fields[1:]
 		if _, isStep := argCount[verb]; isStep || len(sc.Steps) > 0 {
 			c, ok := argCount[verb]
