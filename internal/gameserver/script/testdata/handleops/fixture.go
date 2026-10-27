@@ -46,7 +46,7 @@ func Field() script.Script {
 	}}}
 }
 
-var table = map[int]func(*script.NPC, uint8){1: func(n *script.NPC, _ uint8) { n.StopAttack() }}
+var table = map[int]func(*script.NPC, uint8){1: func(n *script.NPC, _ uint8) { n.CleanAllHate() }}
 
 // Map calls it through a package-level map element.
 func Map() script.Script {

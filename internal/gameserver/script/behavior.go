@@ -49,6 +49,7 @@ type fighter interface {
 	GeoPathFailCount() int
 	RemoveAllAttackDesire()
 	Kill(killer attackable.Combatant) bool
+	StopAttack()
 	HP() float64
 	MaxHP() int
 }
