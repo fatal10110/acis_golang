@@ -213,6 +213,7 @@ type options struct {
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
 	sevenSignsTimer        func(time.Duration, func()) *time.Timer
+	sevenSignsClock        func() time.Time
 	seedFestival           func(*gamesql.FestivalStore)
 	festivalClock          func() time.Time
 	festivalTimer          func(time.Duration, func()) *time.Timer
@@ -787,6 +788,12 @@ func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
 // afterFunc instead of a real timer, so a test can fire one at will.
 func WithSevenSignsTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
 	return func(o *options) { o.sevenSignsTimer = afterFunc }
+}
+
+// WithSevenSignsClock runs the Seven Signs calendar on now instead of the
+// wall clock, so the period end it reports follows a test's clock.
+func WithSevenSignsClock(now func() time.Time) Option {
+	return func(o *options) { o.sevenSignsClock = now }
 }
 
 // WithNPCs supplies the NPC template table wired into the link (and the
@@ -2107,7 +2114,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedSevenSigns != nil {
 		o.seedSevenSigns(sevenSignsStore)
 	}
-	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, time.Now, o.sevenSignsTimer)
+	sevenSignsClock := time.Now
+	if o.sevenSignsClock != nil {
+		sevenSignsClock = o.sevenSignsClock
+	}
+	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, sevenSignsClock, o.sevenSignsTimer)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
