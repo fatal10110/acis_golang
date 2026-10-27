@@ -68,6 +68,11 @@ func TestHostileMoveToOnItsOwnPointWalksAZeroLengthMove(t *testing.T) {
 			script.Catalog{"ai.MoveToOwnPoint": behavior},
 		),
 	)
+	// On the wall clock a walk's arrival timer and the move tick race within
+	// one interval, so which tick arrives is not pinned there.
+	if !srv.DrivesClock() {
+		t.Skip("pinning the arrival tick by tick needs the driven clock")
+	}
 	c := srv.Client
 	startInWorld(t, c)
 	x, y, z := srv.PlayerPosition(t, srv.SoleObjectID(t))

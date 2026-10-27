@@ -58,6 +58,11 @@ func TestFolkMoveToOnItsOwnPointWalksAZeroLengthMove(t *testing.T) {
 		return got
 	}
 	srv, at := bootFolkDesires(t, script.Catalog{"ai.FolkMoveToOwnPoint": behavior})
+	// On the wall clock a walk's arrival timer and the move tick race within
+	// one interval, so which tick arrives is not pinned there.
+	if !srv.DrivesClock() {
+		t.Skip("pinning the arrival tick by tick needs the driven clock")
+	}
 	f := srv.SpawnFolkNPCAt(t, folkFighterTemplate(folkPatrolID), location.Location{X: at.X + 40, Y: at.Y, Z: at.Z})
 	m := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", int(folkOfferingID)), location.Location{X: at.X + 200, Y: at.Y, Z: at.Z})
 	mu.Lock()
