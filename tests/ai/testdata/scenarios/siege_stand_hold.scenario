@@ -1,0 +1,15 @@
+# GludioStand (35079; GludioBowGuardStand binds its own ids), the standing guards of the Aden siege (clan
+# aden_siege_clan, 300): a guard that sees the character wants to attack it holding its ground
+# (200); a hit of 22, a twentieth of its fixture hit points, adds 100 from its attacked hook and 100
+# from its clan-attacked one (the call reaches the guard itself), held as well.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioStand.GludioBowGuardStand
+script script.ai.siegeguards.GludioStand.GludioStand
+npc stand 35079 SiegeGuard 150 0 0 walks clan aden_siege_clan 300
+
+approach stand
+  desires stand attack(player,hold)=200
+hit stand 22
+  desires stand attack(player,hold)=400

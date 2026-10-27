@@ -1,0 +1,18 @@
+# LV3Wizard (27250, level 76) raised for the character (spawn parameters 0, character, owner), every
+# draw 0: its created hook wants its summon mode on itself and raises LV3WizardPrivate (27253) at its
+# own position with the same parameters, whose created hook tells its master (event 1000 with its
+# own id), which wants to heal it with SUMMON_HEAL1 (draw under 50).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3Wizard
+script script.ai.individual.Monster.LV3Monster.LV3WizardPrivate
+npc owner 20003 Monster 600 0 0
+npc wizard 27250 Monster 300 0 0 level 76 skill SUMMON_MODE 4525 1 skill SUMMON_EFFECT 4526 1 skill SUMMON_HEAL1 4527 1 skill SUMMON_HEAL2 4528 1 params 0 character owner master owner privates 27253:1
+npc priv 27253 Monster 5000 0 0 level 76 skill SELF_RANGE_DD_MAGIC1 4529 1 skill SELF_RANGE_DD_MAGIC2 4530 1 skill SELF_RANGE_DD_MAGIC3 4531 1
+
+tick
+  desires wizard cast(?268435459,4527,move)=1000000 cast(wizard,4525,move)=1000000

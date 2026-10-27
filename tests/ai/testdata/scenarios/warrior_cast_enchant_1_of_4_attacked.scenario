@@ -1,0 +1,20 @@
+# WarriorCastEnchant1Of4 (22009, level 31, four self buffs 4089 to 4092): its creation draws which
+# buff it keeps (2: the third, SELF_BUFF3 4091). The first hit by the character, on a draw under 33 and
+# above half of its hit points, wants that buff on itself; a second hit does not, and IntAI1 counts
+# the chance spent.
+character Hunter 20
+random 2 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchant1Of4
+npc caster 22009 Monster 300 0 0 level 31 skill SELF_BUFF1 4089 1 skill SELF_BUFF2 4090 1 skill SELF_BUFF3 4091 1 skill SELF_BUFF4 4092 1
+
+hit caster 10
+  S MagicSkillUse caster=caster target=caster skill=4091-1 hit=1982 reuse=10571 success=0
+  mem caster i_ai0=2 i_ai1=1
+  desires caster attack(player)=26.31578947368421 cast(caster,4091,move)=1000000
+hit caster 10
+  mem caster i_ai0=2 i_ai1=1
+  desires caster attack(player)=52.63157894736842 cast(caster,4091,move)=1000000

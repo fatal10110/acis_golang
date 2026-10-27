@@ -1,0 +1,23 @@
+# RoyalRushBomb (18149, level 81, self range strike 4614-9, every draw 0): hit at full hit points
+# it wants nothing but to fight; hit once it is under 30 percent of them (DDMagicUseHpRate)
+# on a draw under 33 (SelfRangeDDMagicRate) it casts the strike on itself, and its
+# skill-finished hook takes it out of the world (deleted, not killed).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb
+npc bomb 18149 Monster 150 0 0 level 81 skill SELF_RANGE_DD_MAGIC 4614 9
+roll bomb 0
+
+hit bomb 10
+hp bomb 100
+  hp bomb 100
+hit bomb 10
+  desires bomb attack(player)=22.727272727272727 cast(bomb,4614,move)=1000000
+tick x2
+  S MagicSkillUse caster=bomb target=bomb skill=4614-9 hit=0 reuse=13214 success=0
+  S DeleteObject obj=bomb
+  inworld bomb no

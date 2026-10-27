@@ -1,0 +1,12 @@
+# GludioBowGuardStand (35012), a standing archer of the Aden siege (clan aden_siege_clan, 300): a hit
+# of 22, a twentieth of its fixture hit points, wants the character attacked, holding its ground,
+# 100 for its attacked hook and 50 for its clan-attacked one (the call reaches the archer itself).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioStand.GludioBowGuardStand
+script script.ai.siegeguards.GludioStand.GludioStand
+npc bow 35012 SiegeGuard 150 0 0 walks clan aden_siege_clan 300
+
+hit bow 22
+  desires bow attack(player,hold)=150
