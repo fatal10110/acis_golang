@@ -62,10 +62,10 @@ func (l *GameClientLink) clanWarehouse(clanID int32) (*itemcontainer.Container, 
 		return e.wh, nil
 	}
 	wh := itemcontainer.NewContainerWithPersister(clanID, item.LocationClanWarehouse, l.itemTemplates, l.itemPersister(clanID))
-	if l.items != nil {
+	if l.belongings.items != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), clanWarehouseRestoreTimeout)
 		defer cancel()
-		rows, err := l.items.ListByOwner(ctx, clanID)
+		rows, err := l.belongings.items.ListByOwner(ctx, clanID)
 		if err != nil {
 			return nil, err
 		}

@@ -383,18 +383,18 @@ func (l *GameClientLink) readClassRows(ctx context.Context, charID int32, index 
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: load skills")
 		}
 	}
-	if l.shortcuts != nil {
-		if rows.shortcuts, err = l.shortcuts.ListByOwner(ctx, charID, index); err != nil {
+	if l.belongings.shortcuts != nil {
+		if rows.shortcuts, err = l.belongings.shortcuts.ListByOwner(ctx, charID, index); err != nil {
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: list shortcuts")
 		}
 	}
-	if l.hennas != nil {
-		if rows.hennas, err = l.hennas.ListByOwner(ctx, charID, index); err != nil {
+	if l.belongings.hennas != nil {
+		if rows.hennas, err = l.belongings.hennas.ListByOwner(ctx, charID, index); err != nil {
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: list hennas")
 		}
 	}
-	if index == 0 && l.recipeBooks != nil {
-		if rows.recipes, err = l.recipeBooks.ListByOwner(ctx, charID); err != nil {
+	if index == 0 && l.belongings.recipeBooks != nil {
+		if rows.recipes, err = l.belongings.recipeBooks.ListByOwner(ctx, charID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: list recipe book")
 		}
 	}

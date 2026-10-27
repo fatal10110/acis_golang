@@ -38,7 +38,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	if live == nil {
 		return true
 	}
-	if l.world == nil || l.groundItems == nil || ground.Template == nil || ground.Count() <= 0 {
+	if l.world == nil || l.belongings.groundItems == nil || ground.Template == nil || ground.Count() <= 0 {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
@@ -97,7 +97,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		taken = true
 		live.SendFrame(serverpackets.FrameActionFailed())
 		l.broadcastGroundPickup(ground, live.ObjectID())
-		l.groundItems.Remove(ground)
+		l.belongings.groundItems.Remove(ground)
 		l.world.Despawn(ground)
 		// The herb is used before the pickup lock paralyzes the picker: a
 		// paralyzed character has every skill disabled, which would reject
@@ -129,7 +129,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	// has no rows to write. The ground item's row comes from outside the
 	// inventory, and may still be bound to the trade that gave it to its
 	// dropper, so the operation names it too.
-	end := l.itemInstances.BeginOperationTaking([]int32{picked.ObjectID}, inv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperationTaking([]int32{picked.ObjectID}, inv.OwnerID())
 	defer end()
 	res, failure := l.pickupGroundInto(inv, ground, live)
 	l.applyPersistActions(res.Persist)
@@ -201,7 +201,7 @@ func (l *GameClientLink) takeGroundFromWorld(live *livePlayer, ground *groundite
 	// live's own pickup runs on its queue: the tutorial hook runs as a
 	// hook on that queue.
 	live.RunOnOwnQueue(func() { tutorialPickedUp(live, ground.ItemID()) })
-	l.groundItems.Remove(ground)
+	l.belongings.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	// A cursed weapon is announced by its own activation instead.
 	if !l.isCursedWeapon(ground.ItemID()) {

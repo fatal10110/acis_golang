@@ -44,16 +44,15 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 	store := gamesql.NewItemStore(sqltest.SharedDB(t))
 	ids := &sequentialIDs{next: 1000}
 	link := &GameClientLink{
-		world:            state,
-		itemTemplates:    testItemTemplates(),
-		items:            store,
-		itemWrites:       persist.NewOrder(),
-		ids:              ids,
-		inventory:        invops.NewService(ids),
-		trades:           tradebook.NewBook(time.Now),
-		enchanting:       newEnchanting(GameClientLinkConfig{}),
-		inventoryUpdates: updates,
-		log:              zerolog.Nop(),
+		world:         state,
+		itemTemplates: testItemTemplates(),
+		itemWrites:    persist.NewOrder(),
+		ids:           ids,
+		inventory:     invops.NewService(ids),
+		trades:        tradebook.NewBook(time.Now),
+		enchanting:    newEnchanting(GameClientLinkConfig{}),
+		belongings:    newBelongings(BelongingsConfig{Items: store, InventoryUpdates: updates}),
+		log:           zerolog.Nop(),
 	}
 	return link, store, firstCap, secondCap, first, second
 }

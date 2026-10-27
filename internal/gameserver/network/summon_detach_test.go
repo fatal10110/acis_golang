@@ -67,7 +67,9 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 	}
 	instances := task.NewItemInstances(nil, testItemTemplates(), nil, nil, zerolog.Nop())
 	link := newBareGameClientLink(t, GameClientLinkConfig{
-		ItemInstances: instances,
+		Belongings: BelongingsConfig{
+			ItemInstances: instances,
+		},
 		World:         state,
 		NPCs:          npc.NewTable([]*npc.Template{npcTmpl}),
 		SummonItems:   summonItems,

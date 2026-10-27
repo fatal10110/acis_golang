@@ -140,14 +140,14 @@ func TestNonPlayerResurrectionRevivesOfflineOwnersPet(t *testing.T) {
 	if wolf.Dead() {
 		t.Fatal("monster's resurrection left the offline owner's pet dead")
 	}
-	if got := wolf.Exp(); got != 510 {
-		t.Fatalf("revived wolf exp = %d, want 510", got)
+	if got, want := wolf.Exp(), wolfExpAfterRevive(t, 510, 481, 100); got != want {
+		t.Fatalf("revived wolf exp = %d, want %d", got, want)
 	}
 	if got := wolf.Level(); got != wolfLevel {
 		t.Fatalf("revived wolf level = %d, want %d", got, wolfLevel)
 	}
-	if got := wolf.HP(); got != revivedWolfHP {
-		t.Fatalf("revived wolf HP = %v, want %v", got, revivedWolfHP)
+	if got := wolf.HP(); got != revivedWolfHP(t) {
+		t.Fatalf("revived wolf HP = %v, want %v", got, revivedWolfHP(t))
 	}
 	if frameIndex(drainFrames(t, o.observer), serverpackets.OpcodeRevive, wolf.ObjectID()) < 0 {
 		t.Fatal("observer never saw the offline owner's pet revive")

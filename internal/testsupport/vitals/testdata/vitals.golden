@@ -1,0 +1,54 @@
+damage 600 0.0:6 0.5:5 100.5:4 200.5:3 300.5:2 400.5:1 500.5:0
+damage 100000 0.0:6 41.5:5 16683.0:4 33366.0:3 50007.5:2 66690.5:1 83373.5:0
+period door 300000
+period other 3000
+regen 1.0 597.0 598.5:1 600.0:0
+regen 1.0 595.0 596.5:1 598.0:1 599.5:1 600.0:0
+regen 1.0 590.0 591.5:1 593.0:1 594.5:1 596.0:1 597.5:1 599.0:1 600.0:0
+regen 4.0 597.0 600.0:0
+regen 4.0 595.0 600.0:0
+regen 4.0 590.0 596.0:1 600.0:0
+revive 410 287.0
+revive 600 420.0
+revive 632 442.4
+revive 100000 70000.0
+petmaxhp 100 0 44
+petmaxhp 400 0 176
+petmaxhp 500 0 220
+petmaxhp 1000 0 440
+petmaxhp 100 21 82
+petmaxhp 400 21 328
+petmaxhp 500 21 410
+petmaxhp 1000 21 820
+petmaxhp 100 43 158
+petmaxhp 400 43 632
+petmaxhp 500 43 790
+petmaxhp 1000 43 1580
+petmaxhp 100 99 824
+petmaxhp 400 99 3296
+petmaxhp 500 99 4120
+petmaxhp 1000 99 8240
+petexp 510 481 0.0 0
+petexp 510 481 10.0 3
+petexp 510 481 50.0 15
+petexp 510 481 89.0 26
+petexp 510 481 90.0 26
+petexp 510 481 100.0 29
+petexp 700 671 0.0 0
+petexp 700 671 10.0 3
+petexp 700 671 50.0 15
+petexp 700 671 89.0 26
+petexp 700 671 90.0 26
+petexp 700 671 100.0 29
+petexp 1000 900 0.0 0
+petexp 1000 900 10.0 10
+petexp 1000 900 50.0 50
+petexp 1000 900 89.0 89
+petexp 1000 900 90.0 90
+petexp 1000 900 100.0 100
+petexp 0 0 0.0 0
+petexp 0 0 10.0 0
+petexp 0 0 50.0 0
+petexp 0 0 89.0 0
+petexp 0 0 90.0 0
+petexp 0 0 100.0 0

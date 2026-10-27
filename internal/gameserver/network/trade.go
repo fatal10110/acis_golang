@@ -362,7 +362,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 
 	status := tradebook.SettlementEmpty
 	if !session.Empty() {
-		end := l.itemInstances.BeginOperation(first.Inventory().OwnerID(), second.Inventory().OwnerID())
+		end := l.belongings.itemInstances.BeginOperation(first.Inventory().OwnerID(), second.Inventory().OwnerID())
 		defer end()
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),

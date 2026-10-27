@@ -338,7 +338,7 @@ func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemco
 }
 
 func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inventory, objectID int32, count int) {
-	if l.inventory == nil || l.groundItems == nil {
+	if l.inventory == nil || l.belongings.groundItems == nil {
 		return
 	}
 	res, ok, err := l.inventory.DropItem(inv, objectID, count)
@@ -355,7 +355,7 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 		return
 	}
 	x, y, z := actor.Position()
-	l.groundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z, DropperID: actor.ObjectID()})
+	l.belongings.groundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z, DropperID: actor.ObjectID()})
 }
 
 // flushItemPersistence releases inv's persistence dependency, so its items stop
@@ -385,10 +385,10 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 // changing it there turns a failed logout write into a missing inventory.
 func (l *GameClientLink) flushItemPersistence(inv persistedContainer) {
 	inv.ReleasePersistence()
-	if l.itemInstances == nil {
+	if l.belongings.itemInstances == nil {
 		return
 	}
-	itemInstances, log := l.itemInstances, l.log
+	itemInstances, log := l.belongings.itemInstances, l.log
 	l.persist.Enqueue(inv.OwnerID(), func() {
 		items := inv.Items()
 		if len(items) == 0 {
