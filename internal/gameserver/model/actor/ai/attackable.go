@@ -194,6 +194,10 @@ type intention struct {
 	ctrl bool
 	// loc is a walk's destination, or where a flee started.
 	loc location.Location
+	// standing and heading mark a walk's destination as a creature's
+	// position or spawn point (Desire.Standing).
+	standing bool
+	heading  int
 	// timer is a wander's chain period in seconds, or a social's hold in
 	// milliseconds.
 	timer int
@@ -496,15 +500,22 @@ const defaultRandomWalkRate = 30
 // one whose move controller reports the destination unreachable, drops the
 // request.
 func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool {
-	if a.actor.MovementDisabled() || !a.move.CanMoveTo(loc) {
+	return a.addMoveToDesire(&Desire{Kind: IntentionMoveTo, Location: loc, Weight: weight})
+}
+
+// AddMoveToPositionDesire is AddMoveToDesire to a creature's position or
+// spawn point, facing heading: standing there, facing heading, the actor
+// finishes the walk without moving.
+func (a *Attackable) AddMoveToPositionDesire(loc location.Location, heading int, weight float64) bool {
+	return a.addMoveToDesire(&Desire{Kind: IntentionMoveTo, Location: loc, Standing: true, Heading: heading, Weight: weight})
+}
+
+func (a *Attackable) addMoveToDesire(d *Desire) bool {
+	if a.actor.MovementDisabled() || !a.move.CanMoveTo(d.Location) {
 		return false
 	}
-	a.desires.AddOrUpdate(&Desire{
-		Kind:     IntentionMoveTo,
-		Location: loc,
-		Weight:   weight,
-		QueuedAt: a.now(),
-	})
+	d.QueuedAt = a.now()
+	a.desires.AddOrUpdate(d)
 	return true
 }
 
@@ -1173,7 +1184,7 @@ func (a *Attackable) nextToDo() (next intention, ok bool) {
 	case IntentionPickUp:
 		next = intention{kind: IntentionPickUp, itemObjectID: desire.ItemObjectID}
 	case IntentionMoveTo:
-		next = intention{kind: IntentionMoveTo, loc: desire.Location}
+		next = intention{kind: IntentionMoveTo, loc: desire.Location, standing: desire.Standing, heading: desire.Heading}
 	case IntentionMoveRoute:
 		next = intention{kind: IntentionMoveRoute, route: desire.RouteName}
 	default:
@@ -1421,16 +1432,32 @@ func (a *Attackable) thinkCast() error {
 	return nil
 }
 
+// thinkMoveTo is the walk step. Standing on a creature's position or spawn
+// point, facing its heading, the actor opens the move-finished point and
+// drops the desire, whether or not it can act or move. Otherwise an actor
+// that can act and move walks there with path-finding, and with no
+// teleport however many path-finding moves failed before. Standing on a
+// bare point already still walks there: a zero-length move that arrives on
+// the next move tick.
 func (a *Attackable) thinkMoveTo() {
+	if a.current.standing && a.standsOn(a.current.loc, a.current.heading) {
+		a.atHookPoint(HookMoveFinished)
+		a.clearCurrentDesire()
+		return
+	}
 	if a.actor.DenyAIAction() {
 		return
 	}
 	if a.actor.MovementDisabled() {
 		return
 	}
-	// Standing on the point already still walks there: a zero-length move
-	// that arrives on the next move tick.
-	_ = a.move.MoveHome(a.current.loc)
+	_, _ = a.move.MoveToLocation(a.current.loc)
+}
+
+// standsOn reports whether the actor stands on loc facing heading.
+func (a *Attackable) standsOn(loc location.Location, heading int) bool {
+	x, y, z := a.actor.Position()
+	return (location.Location{X: x, Y: y, Z: z}) == loc && a.actor.Heading() == heading
 }
 
 // Arrived drops the queued MOVE_TO, FLEE, or WANDER desire when movement

@@ -51,6 +51,11 @@ func (b *recordingBrain) AddMoveToDesire(loc location.Location, weight float64) 
 	return true
 }
 
+func (b *recordingBrain) AddMoveToPositionDesire(loc location.Location, heading int, weight float64) bool {
+	b.record("move-to %d,%d,%d heading %d %v", loc.X, loc.Y, loc.Z, heading, weight)
+	return true
+}
+
 func (b *recordingBrain) AddFleeDesire(target attackable.Combatant, distance int, weight float64) {
 	b.record("flee %v %d %v", id(target), distance, weight)
 }

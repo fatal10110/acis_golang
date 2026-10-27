@@ -221,7 +221,9 @@ type recordingMove struct {
 	followCalls   int
 	stopCount     int
 	home          location.Location
-	denyMove      bool
+	// moveTo is the last MoveToLocation destination.
+	moveTo   location.Location
+	denyMove bool
 	// outOfReach is what HoldOffensiveFollow reports; holdCalls counts it.
 	outOfReach bool
 	holdCalls  int
@@ -379,7 +381,11 @@ func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 	return true, nil
 }
 
-func (recordingMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (m *recordingMove) MoveToLocation(dest location.Location) (bool, error) {
+	m.moveTo = dest
+	return false, nil
+}
+
 func (recordingMove) MoveStraightToLocation(location.Location) (bool, error) {
 	return false, nil
 }

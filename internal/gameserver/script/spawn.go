@@ -88,6 +88,11 @@ type Place interface {
 // Loc is a point in the world and a heading.
 type Loc struct {
 	X, Y, Z, Heading int
+	// standing marks the place a creature stands, its position or spawn
+	// point, rather than a bare point: an NPC standing on it, facing
+	// Heading, finishes a walk there without moving. Two Locs that differ
+	// in it are not equal.
+	standing bool
 }
 
 func (l Loc) loc() Loc { return l }
@@ -107,7 +112,7 @@ func locOf(c Creature) Loc {
 		panic("script: the place of a handle on nothing")
 	}
 	x, y, z := at.Position()
-	return Loc{X: x, Y: y, Z: z, Heading: at.Heading()}
+	return Loc{X: x, Y: y, Z: z, Heading: at.Heading(), standing: true}
 }
 
 // Params are the three spawn parameters a private starts with.
