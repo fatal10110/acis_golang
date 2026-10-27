@@ -60,14 +60,18 @@ func newLandingLink(t *testing.T, adena int) (*GameClientLink, *landingFlusher) 
 		}
 	}
 	flusher := &landingFlusher{}
+	templates := testItemTemplates()
+	writes := persist.NewOrder()
 	link := &GameClientLink{
-		itemTemplates: testItemTemplates(),
-		items:         store,
-		itemWrites:    persist.NewOrder(),
-		ids:           &sequentialIDs{next: 9000},
-		log:           zerolog.Nop(),
+		itemTemplates: templates,
+		itemWrites:    writes,
+		belongings: newBelongings(BelongingsConfig{
+			Items:         store,
+			ItemInstances: task.NewItemInstances(flusher, templates, nil, writes, zerolog.Nop()),
+		}),
+		ids: &sequentialIDs{next: 9000},
+		log: zerolog.Nop(),
 	}
-	link.itemInstances = task.NewItemInstances(flusher, link.itemTemplates, nil, link.itemWrites, zerolog.Nop())
 	return link, flusher
 }
 

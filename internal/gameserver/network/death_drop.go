@@ -29,7 +29,7 @@ func (l *GameClientLink) dropItemsOnDeath(live *livePlayer, e event.DeathItemDro
 		return
 	}
 	inv := live.Inventory()
-	if inv == nil || l.inventory == nil || l.groundItems == nil {
+	if inv == nil || l.inventory == nil || l.belongings.groundItems == nil {
 		return
 	}
 	if e.Chance <= 0 || live.Roll(100) >= e.Chance {
@@ -107,7 +107,7 @@ func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inven
 		at := l.geo.ValidLocation(x, y, z, tx, ty, tz)
 		tx, ty, tz = at.X, at.Y, at.Z
 	}
-	l.groundItems.Drop(ground, task.DropOptions{
+	l.belongings.groundItems.Drop(ground, task.DropOptions{
 		X:             tx,
 		Y:             ty,
 		Z:             tz,

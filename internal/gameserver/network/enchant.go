@@ -65,7 +65,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	}
 
 	playerID := live.ObjectID()
-	end := l.itemInstances.BeginOperation(inv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
 	result, err := l.enchanting.items.EnchantItem(enchantflow.Request{
 		PlayerID: playerID,
@@ -267,7 +267,7 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // operation reads the row before this one changed it or after this write
 // bound and placed it, and then widens to the whole group.
 func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
-	if l.items == nil {
+	if l.belongings.items == nil {
 		return
 	}
 	// A row can be named twice — a stack that gives on one leg of a trade and
@@ -309,8 +309,8 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	// holds every row of the groups the write widened to, so it alone
 	// stands for them.
 	var carried task.BoundGroups
-	if l.itemInstances != nil {
-		widened, _ := l.itemInstances.Widen(order)
+	if l.belongings.itemInstances != nil {
+		widened, _ := l.belongings.itemInstances.Widen(order)
 		for _, bound := range widened {
 			row := rowAction{inst: bound.Inst, ownerID: bound.OwnerID, widened: true}
 			if bound.Inst == nil {
@@ -329,7 +329,7 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 				}
 				bound = append(bound, task.BoundRow{ObjectID: objectID, OwnerID: ownerID, Inst: row.inst})
 			}
-			carried = l.itemInstances.Bind(bound)
+			carried = l.belongings.itemInstances.Bind(bound)
 		}
 	}
 
@@ -360,12 +360,12 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 			owners = append(owners, row.ownerID)
 		}
 	}
-	instances := l.itemInstances
+	instances := l.belongings.itemInstances
 	l.queueItemWrite(reserved, func(keep []int32) error {
 		batch := keptRows(batch, keep)
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := l.items.WriteBatch(ctx, batch); err != nil {
+		if err := l.belongings.items.WriteBatch(ctx, batch); err != nil {
 			l.log.Error().Err(err).Int("saves", len(batch.Saves)).Int("deletes", len(batch.Deletes)).
 				Msg("write item rows")
 			return err

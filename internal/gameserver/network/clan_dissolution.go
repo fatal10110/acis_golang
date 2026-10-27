@@ -135,7 +135,7 @@ func (l *GameClientLink) destroyClanWarehouse(clanID int32) {
 		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("warehouse: restore dissolved clan warehouse")
 		return
 	}
-	end := l.itemInstances.BeginOperation(clanID)
+	end := l.belongings.itemInstances.BeginOperation(clanID)
 	defer end()
 	var persist []invops.Persist
 	for _, inst := range wh.Items() {

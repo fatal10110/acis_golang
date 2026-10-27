@@ -638,13 +638,13 @@ func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 // it. A row the owner no longer owns is left alone: the item has changed
 // hands since, and it is its new owner's now.
 func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
-	if l.items == nil || l.persist == nil {
+	if l.belongings.items == nil || l.persist == nil {
 		return
 	}
 	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) error {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if _, err := l.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
+		if _, err := l.belongings.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete offline item")
 			return err
 		}
@@ -656,13 +656,13 @@ func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 // offline player ownerID still owns it, on that owner's persistence lane,
 // where the rest of the owner's item writes run.
 func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant int) {
-	if l.items == nil || l.persist == nil {
+	if l.belongings.items == nil || l.persist == nil {
 		return
 	}
 	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) error {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if _, err := l.items.SetEnchantOwned(ctx, ownerID, objectID, enchant); err != nil {
+		if _, err := l.belongings.items.SetEnchantOwned(ctx, ownerID, objectID, enchant); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("set offline item enchant")
 			return err
 		}

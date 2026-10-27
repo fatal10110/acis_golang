@@ -67,7 +67,7 @@ func (l *GameClientLink) TakeAdena(clanID int32, adena int) (clanhall.Landing, b
 		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("clan hall: restore clan warehouse for a fee")
 		return nil, false
 	}
-	end := l.itemInstances.BeginOperation(clanID)
+	end := l.belongings.itemInstances.BeginOperation(clanID)
 	defer end()
 	if adena > wh.Adena() {
 		return nil, false
@@ -91,7 +91,7 @@ func (l *GameClientLink) ReturnAdena(clanID int32, adena int) clanhall.Landing {
 		l.log.Error().Err(err).Int32("clan_id", clanID).Int("adena", adena).Msg("clan hall: restore clan warehouse for a refund")
 		return nil
 	}
-	end := l.itemInstances.BeginOperation(clanID)
+	end := l.belongings.itemInstances.BeginOperation(clanID)
 	defer end()
 	adena = min(adena, math.MaxInt32-wh.Adena())
 	if adena <= 0 {
@@ -118,8 +118,8 @@ func (l *GameClientLink) ReturnAdena(clanID int32, adena int) clanhall.Landing {
 // place in its row's write order (task.ItemInstances.UpdateItems), or nil
 // without item persistence.
 func (l *GameClientLink) landItems(items ...*item.Instance) clanhall.Landing {
-	instances := l.itemInstances
-	if instances == nil || l.items == nil {
+	instances := l.belongings.itemInstances
+	if instances == nil || l.belongings.items == nil {
 		return nil
 	}
 	return func(ctx context.Context) error { return instances.UpdateItems(ctx, items) }

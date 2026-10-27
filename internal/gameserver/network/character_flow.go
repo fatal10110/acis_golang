@@ -64,7 +64,7 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	slots := make([]serverpackets.CharacterSlot, len(chars))
 	now := time.Now() // character select runs on the connection goroutine, off any actor queue
 	for i, c := range chars {
-		items, err := l.items.ListByOwner(ctx, c.ID)
+		items, err := l.belongings.items.ListByOwner(ctx, c.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -121,14 +121,14 @@ func (l *GameClientLink) restoreItemRows(ownerID int32, items []*item.Instance) 
 // the rows at the locations restored reports.
 func (l *GameClientLink) restoreRows(ownerID int32, items []*item.Instance, restored func(item.Location) bool) []*item.Instance {
 	var claimed map[int32]*item.Instance
-	if l.itemInstances != nil {
+	if l.belongings.itemInstances != nil {
 		ids := make([]int32, 0, len(items))
 		for _, inst := range items {
 			if inst != nil && restored(inst.Location) {
 				ids = append(ids, inst.ObjectID)
 			}
 		}
-		claimed = l.itemInstances.ClaimRestoredItems(ownerID, ids)
+		claimed = l.belongings.itemInstances.ClaimRestoredItems(ownerID, ids)
 	}
 
 	kept := items[:0]
@@ -139,7 +139,7 @@ func (l *GameClientLink) restoreRows(ownerID int32, items []*item.Instance, rest
 		}
 		if restored, ok := claimed[inst.ObjectID]; ok {
 			inst = restored
-		} else if l.itemInstances != nil && l.itemInstances.ContainsID(inst.ObjectID) {
+		} else if l.belongings.itemInstances != nil && l.belongings.itemInstances.ContainsID(inst.ObjectID) {
 			stale++
 			continue
 		}
@@ -187,10 +187,10 @@ func restoredItemLocation(loc item.Location) bool {
 
 // findHenna resolves a saved henna row's symbol.
 func (l *GameClientLink) findHenna(symbolID int) (henna.Henna, bool) {
-	if l.hennaTable == nil {
+	if l.belongings.hennaTable == nil {
 		return henna.Henna{}, false
 	}
-	return l.hennaTable.Find(symbolID)
+	return l.belongings.hennaTable.Find(symbolID)
 }
 
 // restoreSelected restores the character c a selection picked: its items,
@@ -205,7 +205,7 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 		l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 		return nil, false
 	}
-	items, err := l.items.ListByOwner(ctx, c.ID)
+	items, err := l.belongings.items.ListByOwner(ctx, c.ID)
 	if err != nil {
 		l.log.Error().Err(err).Msg("select character: list items")
 		return nil, false
@@ -238,8 +238,8 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 		c.MarkDead()
 	}
 	shortcuts := shortcut.Starter()
-	if l.shortcuts != nil {
-		restored, listErr := l.shortcuts.ListByOwner(ctx, c.ID, c.ClassIndex())
+	if l.belongings.shortcuts != nil {
+		restored, listErr := l.belongings.shortcuts.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
 			l.log.Error().Err(listErr).Msg("select character: list shortcuts")
 			shortcuts = nil
@@ -247,8 +247,8 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 			shortcuts = restored
 		}
 	}
-	if l.hennas != nil {
-		rows, listErr := l.hennas.ListByOwner(ctx, c.ID, c.ClassIndex())
+	if l.belongings.hennas != nil {
+		rows, listErr := l.belongings.hennas.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
 			l.log.Error().Err(listErr).Msg("select character: list hennas")
 		} else {
@@ -673,7 +673,7 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 }
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
-	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
+	delivery := &playerInventoryDelivery{updates: l.belongings.inventoryUpdates, character: c}
 	inv := itemcontainer.NewPlayerInventoryWithDelivery(c.ID, l.itemTemplates, delivery, l.itemPersister(c.ID))
 	inv.SetItemLog(l.itemLog, func() string { return c.CharacterName() })
 	inv.Restore(items)

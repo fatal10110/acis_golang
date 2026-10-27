@@ -130,7 +130,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 		return
 	}
 
-	end := l.itemInstances.BeginOperation(playerInv.OwnerID(), petInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(playerInv.OwnerID(), petInv.OwnerID())
 	defer end()
 	res, ok, err := l.summoning.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
 	if err != nil {
@@ -165,7 +165,7 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	// whether objectID resolves or the transfer subsequently fails.
 	l.cancelActiveEnchant(live)
 
-	end := l.itemInstances.BeginOperation(petInv.OwnerID(), playerInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(petInv.OwnerID(), playerInv.OwnerID())
 	defer end()
 	res, ok, err := l.summoning.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
 	if err != nil {
@@ -192,7 +192,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	if live == nil {
 		return
 	}
-	if l.world == nil || l.groundItems == nil {
+	if l.world == nil || l.belongings.groundItems == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -255,7 +255,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	// The ground item's row comes from outside the pet's inventory, and may
 	// still be bound to the trade that gave it to its dropper, so the
 	// operation names it too.
-	end := l.itemInstances.BeginOperationTaking([]int32{ground.Instance.ObjectID}, petInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperationTaking([]int32{ground.Instance.ObjectID}, petInv.OwnerID())
 	defer end()
 	var persist []invops.Persist
 	if !herb {
@@ -269,7 +269,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 
 	l.broadcastGroundPickup(ground, pet.ObjectID())
 	tutorialPickedUp(live, ground.ItemID())
-	l.groundItems.Remove(ground)
+	l.belongings.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	l.broadcastPetPickupAttention(live, ground)
 
@@ -336,7 +336,7 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	if !ok {
 		return
 	}
-	end := l.itemInstances.BeginOperation(petInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(petInv.OwnerID())
 	defer end()
 	res, failure := petitem.UseItem(pet, petInv, req.ObjectID, live == nil || live.AlikeDead())
 	switch failure {

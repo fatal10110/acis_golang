@@ -407,7 +407,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 // across its owner's logout, and a server restart must not lose them.
 func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, items []*item.Instance) *itemcontainer.Inventory {
 	inv := itemcontainer.NewPetInventoryWithDelivery(controlItemID, live.Inventory().Templates(), &petInventoryDelivery{
-		updates: l.inventoryUpdates,
+		updates: l.belongings.inventoryUpdates,
 		ownerID: live.ObjectID(),
 		state:   l.world,
 		log:     l.log,
@@ -426,10 +426,10 @@ func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, 
 
 // petItemRows reads the item rows saved under the collar controlItemID.
 func (l *GameClientLink) petItemRows(ctx context.Context, controlItemID int32) ([]*item.Instance, error) {
-	if l.items == nil {
+	if l.belongings.items == nil {
 		return nil, nil
 	}
-	return l.items.ListByOwner(ctx, controlItemID)
+	return l.belongings.items.ListByOwner(ctx, controlItemID)
 }
 
 // restoredPetItemLocation reports whether a row at loc is one a pet inventory

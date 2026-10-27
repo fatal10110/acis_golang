@@ -110,8 +110,6 @@ type hennaStore interface {
 	Delete(ctx context.Context, ownerID int32, classIndex, slot int) error
 }
 
-// recipeBookStore reads and writes the character_recipebook rows of one
-// player's recipe book.
 // subclassStore is the character_subclasses persistence a class change
 // writes. Satisfied by *sql.SubclassStore.
 type subclassStore interface {
@@ -119,6 +117,8 @@ type subclassStore interface {
 	Delete(ctx context.Context, charID int32, index int) error
 }
 
+// recipeBookStore reads and writes the character_recipebook rows of one
+// player's recipe book.
 type recipeBookStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]int, error)
 	Insert(ctx context.Context, ownerID int32, recipeID int) error
@@ -302,11 +302,6 @@ type GameClientLink struct {
 	clients       *ClientRegistry
 	loginLink     func() *LoginLink
 	roster        *manager.Roster
-	items         itemStore
-	shortcuts     shortcutStore
-	hennas        hennaStore
-	hennaTable    *henna.Table
-	recipeBooks   recipeBookStore
 	subclasses    subclassStore
 	craft         *craft.Service
 	merchant      *merchant.Service
@@ -329,7 +324,6 @@ type GameClientLink struct {
 	geo           move.Geo
 	zones         *zone.Index
 	ids           idAllocator
-	groundItems   groundItemDropper
 	attackStance  AttackStanceTracker
 	ai            AIRegistry
 	pvpFlags      *task.PvPFlags
@@ -345,13 +339,6 @@ type GameClientLink struct {
 	raidPoints    *raidpoint.Points
 	water         *task.Water
 	shadowItems   *task.ShadowItems
-	// inventoryUpdates batches InventoryUpdate packets for inventory
-	// changes the server makes on its own, outside a client request.
-	inventoryUpdates *task.InventoryUpdates
-	// itemInstances lazily persists item rows whose live state changed,
-	// so a mutation made outside a client request still reaches the
-	// items table.
-	itemInstances *task.ItemInstances
 	// persist runs this link's database writes for detached players, pets
 	// and containers on per-owner lanes.
 	persist *persist.Worker
@@ -399,6 +386,7 @@ type GameClientLink struct {
 	sieges           *siege.Engine
 	clanWarehouses   clanWarehouseBook
 	flow             characterFlow
+	belongings       belongings
 	enchanting       enchanting
 	summoning        summoning
 	targets          *skilltarget.Registry
@@ -535,14 +523,12 @@ type Queues interface {
 // GameClientLinkConfig contains the collaborators required by GameClientLink.
 type GameClientLinkConfig struct {
 	// Flow is what the character flow, from AuthLogin to detach, runs on.
-	Flow        CharacterFlowConfig
-	LoginLink   func() *LoginLink
-	Roster      *manager.Roster
-	Items       itemStore
-	Shortcuts   shortcutStore
-	Hennas      hennaStore
-	HennaTable  *henna.Table
-	RecipeBooks recipeBookStore
+	Flow CharacterFlowConfig
+	// Belongings is what characters own and carry: item, shortcut, henna
+	// and recipe book rows, ground items and inventory update tasks.
+	Belongings BelongingsConfig
+	LoginLink  func() *LoginLink
+	Roster     *manager.Roster
 	// Subclasses writes the subclass rows a village master's subclass
 	// commands add and replace.
 	Subclasses subclassStore
@@ -573,7 +559,6 @@ type GameClientLinkConfig struct {
 	Geo           move.Geo
 	Zones         *zone.Index
 	IDs           idAllocator
-	GroundItems   groundItemDropper
 	AttackStance  AttackStanceTracker
 	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
@@ -600,11 +585,6 @@ type GameClientLinkConfig struct {
 	SignsPriest *signspriest.Config
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
-	// InventoryUpdates batches InventoryUpdate packets for inventory
-	// changes the server makes on its own, outside a client request.
-	InventoryUpdates *task.InventoryUpdates
-	// ItemInstances lazily persists item rows whose live state changed.
-	ItemInstances *task.ItemInstances
 	// Persist runs detach, pet and container saves; nil writes inline.
 	Persist *persist.Worker
 	// ItemWrites orders one items row's writes; the item persistence task
@@ -844,11 +824,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		clients:       NewClientRegistry(),
 		loginLink:     cfg.LoginLink,
 		roster:        cfg.Roster,
-		items:         cfg.Items,
-		shortcuts:     cfg.Shortcuts,
-		hennas:        cfg.Hennas,
-		hennaTable:    cfg.HennaTable,
-		recipeBooks:   cfg.RecipeBooks,
 		subclasses:    cfg.Subclasses,
 		merchant:      cfg.Merchant,
 		templates:     cfg.Templates,
@@ -866,7 +841,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		geo:           cfg.Geo,
 		zones:         cfg.Zones,
 		ids:           cfg.IDs,
-		groundItems:   cfg.GroundItems,
 		attackStance:  cfg.AttackStance,
 		ai:            cfg.AI,
 		pvpFlags:      cfg.PvPFlags,
@@ -883,8 +857,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 
-		inventoryUpdates: cfg.InventoryUpdates,
-		itemInstances:    cfg.ItemInstances,
 		persist:          cfg.Persist,
 		itemWrites:       cfg.ItemWrites,
 		persistWait:      cfg.PersistWait,
@@ -916,6 +888,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		punishments:      cfg.Punishments,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
 		flow:             newCharacterFlow(cfg.Flow),
+		belongings:       newBelongings(cfg.Belongings),
 		enchanting:       newEnchanting(cfg),
 		summoning:        newSummoning(cfg),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
@@ -959,7 +932,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.recommendations = cfg.Recommendations
 	link.quests, link.scripts, link.journals = cfg.Quests, cfg.Scripts, cfg.Journals
 	link.memos = cfg.Memos
-	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
+	link.symbols = symbolmaker.NewService(cfg.Belongings.HennaTable, link.nextObjectID)
 	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
 	link.gatekeeper.SetCastleSieges(link.castleBesieged)
 	if cfg.SevenSigns != nil {
