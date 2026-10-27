@@ -557,9 +557,9 @@ func openHall(s *script.Script, gate *script.NPC, p *script.Player) string {
 		var order [3]script.Loc
 		switch s.Rnd(3) {
 		case 0:
-			order = [3]script.Loc{spot1, spot2, spot3}
 			// The third one stands at the second spot's y.
-			order[2].Y = spot2.Y
+			third := script.Loc{X: spot3.X, Y: spot2.Y, Z: spot3.Z, Heading: spot3.Heading}
+			order = [3]script.Loc{spot1, spot2, third}
 		case 1:
 			order = [3]script.Loc{spot2, spot3, spot1}
 		default:
