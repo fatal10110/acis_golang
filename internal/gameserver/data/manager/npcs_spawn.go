@@ -171,9 +171,6 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 
 	speed := tmpl.RunSpeed
-	if inst.WalkMode {
-		speed = tmpl.WalkSpeed
-	}
 	queue := n.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID))
 	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
 	if err != nil {

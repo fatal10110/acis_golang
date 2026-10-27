@@ -773,7 +773,8 @@ type RouteFolkSpawn struct {
 	Heading int
 	// Routes is the walker route data.
 	Routes route.WalkerRoutes
-	// WalkMode puts the NPC in walk stance.
+	// WalkMode puts the NPC in its walk stance as it spawns, as a walker
+	// behavior does for its walking ids.
 	WalkMode bool
 	// Geo is the geodata the NPC walks and teleports on; nil for the
 	// always-passable Geo.
@@ -810,7 +811,7 @@ func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	inst.Home, inst.HasHome, inst.WalkMode = spec.At, true, spec.WalkMode
+	inst.Home, inst.HasHome = spec.At, true
 	inst.SpawnHeading = spec.Heading
 	spawner := s.folkSpawner(walker, geo)
 	spawner.Skills = spec.Skills
@@ -818,7 +819,12 @@ func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}
-	// The AI task is driven by hand, so nothing else thinks for f yet.
+	// As a walker behavior's created hook does: the walk stance first,
+	// shown to the players around, then the route desire. The AI task is
+	// driven by hand, so nothing else thinks for f yet.
+	if spec.WalkMode {
+		f.SetRunStance(false)
+	}
 	if alias := spec.Template.Alias; alias != "" && walker.HasRoute(alias, alias) {
 		f.AddMoveRouteDesire(alias, routeFolkWeight)
 		f.StartRoute(alias)

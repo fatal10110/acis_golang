@@ -135,15 +135,16 @@ func TestRouteWalkerFolkDelayedNodeSpeaksAndWaits(t *testing.T) {
 	frames := readNpcFramesUntil(t, w.c, f, "social action at the delayed node", func(fr npcFrame) bool {
 		return fr.opcode == serverpackets.OpcodeSocialAction
 	})
-	want := []byte{serverpackets.OpcodeNPCInfo, serverpackets.OpcodeMoveToLocation, serverpackets.OpcodeNpcSay, serverpackets.OpcodeSocialAction}
+	// The walk stance its created hook takes is shown before the walk.
+	want := []byte{serverpackets.OpcodeNPCInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo, serverpackets.OpcodeMoveToLocation, serverpackets.OpcodeNpcSay, serverpackets.OpcodeSocialAction}
 	if got := npcOpcodes(frames); string(got) != string(want) {
 		t.Fatalf("frames about the walker = %#x, want %#x", got, want)
 	}
-	say := frames[2].body()
+	say := frames[4].body()
 	if sayType, npcID, text := say.ReadInt32(), say.ReadInt32(), say.ReadString(); sayType != serverpackets.SayTypeAll || npcID != 1_000_000+walkerID || text != "Where has he gone?" {
 		t.Fatalf("NpcSay = type %d npc %d %q, want type %d npc %d %q", sayType, npcID, text, serverpackets.SayTypeAll, 1_000_000+walkerID, "Where has he gone?")
 	}
-	if id := frames[3].body().ReadInt32(); id != 3 {
+	if id := frames[5].body().ReadInt32(); id != 3 {
 		t.Fatalf("SocialAction = %d, want the node's 3", id)
 	}
 	if folkAt(f) != a || f.IsMoving() {

@@ -248,6 +248,6 @@ func (w festivalWorld) Unspawn(n festival.NPC) {
 		return
 	}
 	if obj, ok := w.l.world.Object(n.ObjectID()); ok && obj == n {
-		npcs.DeleteFixed(n.ObjectID())
+		npcs.DeleteFixedWithPrivates(n.ObjectID())
 	}
 }

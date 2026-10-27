@@ -110,7 +110,7 @@ Why this shape:
 | Path → constructor | Go literal catalogs, `map[path]func() script.Script`, joined in `cmd/gameserver` |
 | Listed path with no Go script | logged at error level and skipped; completeness is a test |
 | Catalog entry not listed | never built |
-| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Four ids are bound by a behavior and a later-listed one: 25512, 29062 and 29096 on every event of the earlier one, 35596 on first talk and talk. A later one with no Go script still removes the earlier ones from the bindings it claims (`catalog.Claims`, checked against the manifest) |
+| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Four ids are bound by a behavior and a later-listed one: 25512, 29062 and 29096 on every event of the earlier one, 35596 on first talk and talk. |
 | Other scripts | accumulate in list order |
 | First talk | one slot: the first registered keeps it, except that a behavior replaces an earlier behavior. It fires only when exactly one script is bound |
 | Abnormal-status hook | dispatched over the see-spell list |
@@ -315,13 +315,15 @@ A nil NPC or player means "bound to none", never a wildcard.
 
 Until #3497 (M12), an NPC id with no bound behavior ran built-in stand-ins: idle wander and
 follow, `attackedHateWeight`, Warrior-style party assist, the shot-recharge roll, the walker
-alias rule and its walk-stance list, `Party_Type` 2 privates, and the master-decay
+alias rule and its walk-stance list (and the instance walk-stance flag), `Party_Type` 2 privates, and the master-decay
 `despawnMinions`. They were deleted, not relocated, together with their predicate and the
 behavior claims, once every scripted NPC id had its behavior and every scripted maker type its
 maker. An id no script binds now runs only the built-in attackable AI, as in the reference.
 
 - What stays is reference behavior, not a stand-in: a maker deleting its entries still
-  deletes each master's privates (the reference spawn's delete does), and a maker type string
+  deletes each master's privates, as does the festival's spawn delete (the reference spawn's
+  delete does; a GM `//delete` or a mercenary despawn deletes the master alone), and a maker type
+  string
   with no registered maker runs the default maker (the reference maker switch's `default:`
   case; `default_maker`, `random_spawn_treasurebox` and `random_maker` rely on it).
 - Boot checks keep it that way: the script and maker catalog tests fail on any listed script

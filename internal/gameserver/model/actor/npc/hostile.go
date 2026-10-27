@@ -291,7 +291,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	h.raidRelated.Store(h.RaidBoss())
 	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
 	h.health = creature.NewHealth(&h.hp)
-	h.running.Store(!inst.WalkMode)
+	h.running.Store(true)
 	h.brain = ai.NewAttackable(h, movement, attack)
 	var lookup skillDefinitions
 	if len(skills) > 0 {
