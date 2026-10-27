@@ -1,0 +1,21 @@
+# WarriorCast2DebuffsAggressive (21379, Tepra Scorpion, level 79, its debuffs 4117-8 and 4037-2), every
+# draw 0 and its skills never landing: the first hit arms its 2001 timer (i_ai1 1); a second hit by the
+# creature it hates most marks the next tick to cast nothing (i_ai2 1) and makes it want both its
+# debuffs on the attacker at 1000000. The timer then clears the mark and re-arms every 5 s.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive
+npc scorpion 21379 Monster 300 0 0 level 79 skill DEBUFF2 4037 2 skill DEBUFF1 4117 8 skill SELF_EXPLOSION 4614 8
+roll scorpion 99
+
+hit scorpion 10
+  mem scorpion i_ai1=1 i_ai2=0
+hit scorpion 10
+  mem scorpion i_ai1=1 i_ai2=1
+  desires scorpion attack(player)=23.25581395348837 cast(player,4037,move)=1000000 cast(player,4117,move)=1000000
+advance 5s
+  mem scorpion i_ai1=1 i_ai2=0

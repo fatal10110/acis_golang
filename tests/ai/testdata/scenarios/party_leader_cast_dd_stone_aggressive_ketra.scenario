@@ -1,0 +1,21 @@
+# PartyLeaderCastDDMagicStoneAggressive (21345, Ketra's Head Shaman, level 80), every draw 0, the
+# character a Ketra ally (standing 1): it is not attacked on sight, and its hit makes the shaman
+# want to petrify it (4515-1; 1000000 from its attacked hook and as much from its own clan call) and
+# stop hating it.
+character Hunter 20
+standing 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDD
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDDAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDDMagicStoneAggressive
+npc shaman 21345 Monster 150 0 0 level 80 aggro 1000 skill DD_MAGIC 4100 9 skill DEBUFF1 4515 1 clan ketra_orc_clan 300
+
+tick x2
+  desires shaman wander()=5
+hit shaman 10
+  desires shaman cast(player,4515,move)=2000000 wander()=5

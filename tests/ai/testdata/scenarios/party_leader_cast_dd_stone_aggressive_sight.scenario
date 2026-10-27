@@ -1,0 +1,16 @@
+# PartyLeaderCastDDMagicStoneAggressive (21345, Ketra's Head Shaman, level 80), every draw 0: a
+# character with no alliance is attacked on sight at 200.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDD
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDDAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCastDDMagicStoneAggressive
+npc shaman 21345 Monster 150 0 0 level 80 aggro 1000 skill DD_MAGIC 4100 9 skill DEBUFF1 4515 1 clan ketra_orc_clan 300
+
+tick x2
+  desires shaman attack(player)=200
