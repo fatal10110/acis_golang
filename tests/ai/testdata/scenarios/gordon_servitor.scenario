@@ -1,0 +1,17 @@
+# Gordon (29095), level 60, is hit for 10 by the character's level 20 servitor: a servitor holds no
+# inventory, so Gordon's attacked hook asks it for Zariche or Akamanah and ends there, and
+# RaidBossStandard, which would want to attack a playable attacker by its hit, never answers it:
+# Gordon wants nothing of the servitor. The character's own hit after it runs the whole chain.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Gordon
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1
+npc gordon 29095 RaidBoss 100 0 0 level 60
+summon pet 14001 servitor 20
+
+hit gordon 10 by pet
+  desires gordon move_route()=10
+hit gordon 10
+  desires gordon attack(player)=2985.0746268656712 move_route()=10
