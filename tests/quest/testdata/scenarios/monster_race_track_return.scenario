@@ -1,0 +1,25 @@
+# The Monster Race Track trip back (MonsterRaceTrack): a memo saved before the character entered
+# the world, by a town gatekeeper's trip (Bilia, 31964), sends the character through the race
+# manager (30995, a DerbyTrackManagerNpc) back to that gatekeeper's town, and the memo is deleted
+# (onTalk). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/monster_race_track_return.golden
+character Gambler 20
+memo MonsterRaceTrack_Npc 31964
+script script.teleport.MonsterRaceTrack
+page default/30995.htm
+npc manager 30995 DerbyTrackManagerNpc 10 0 0
+
+action manager
+action manager
+  S ActionFailed
+  S NpcHtmlMessage obj=manager item=0 page=default/30995.htm
+  S ActionFailed
+bypass npc_{manager}_Quest MonsterRaceTrack
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=87386,-143246,-1293 fast=0
+  S ActionFailed
+  M unset MonsterRaceTrack_Npc

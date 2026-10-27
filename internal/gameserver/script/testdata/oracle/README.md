@@ -104,10 +104,19 @@ what the reference does in the scenario's own world:
   from the seeded generator, reseeded per scenario. A script draw past the listed values, or
   outside its bound, fails the run. Each pinned draw is a `# draw` line of the step that drew
   it; the Go run of the same step must draw the same bounds in the same order;
-- the hold, equip, standing, pk, cabal and festival lines are seeded as the Go runner seeds
-  them (inventory items, a worn item, the Ketra/Varka standing, the PK count, the Seven Signs
-  sign-up, the festival scores, given back after the scenario); a traced scenario with a header
-  line the probe does not read fails the run;
+- the hold, equip, standing, pk, cabal, festival, sealowner, memo and spoil lines are seeded as
+  the Go runner seeds them (inventory items, a worn item, the Ketra/Varka standing, the PK count,
+  the Seven Signs sign-up, the festival scores and the seal owners, both given back after the
+  scenario, the player memo rows, and the spoiler of the monster of an NPC line: set after
+  each spawn of it, as a spawn clears the spoil state, by the player or, with `other`, by an
+  object id nobody holds); a traced scenario with a header line the probe does not read fails
+  the run;
+- an indented `live <npc id> <count>` line under a step makes the probe write a `# live` line
+  after the step, the number of living NPCs of that template in the world (what a script
+  spawned and despawned included); the Go run counts the same;
+- the first countdown of the Derby track has run before the first scenario, as it has a second
+  after the server starts: a race manager (a DerbyTrackManagerNpc) sends and reads the race
+  packet and the runners as it appears and decays, which are null before it;
 - every scenario's character has the same account (`scenario`) and a clan line's clan the same
   name (`Scenario`), since nothing of an earlier scenario is kept; its character, item, quest,
   memo and subclass rows are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
@@ -290,6 +299,8 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # npc <role> <npc id> (object <id>)   a scenario trace: the probe spawned the NPC line's NPC
 # approach <npc id> (object <id>)     a scenario trace: the player steps up to the NPC, one AI tick
 # tick                          a scenario trace: one run of the NPC AI task
+# live <npc id> <count>         a scenario trace: how many living NPCs of that template the world
+                                holds once the step is over (the step's live line)
 C Action item <item id> (object <id>)   a scenario trace: the pickup's action on the ground item
 ```
 

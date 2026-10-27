@@ -12,29 +12,23 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-// The kills of Path to Become a Scavenger (Q417_PathToBecomeAScavenger.onMyDying)
-// that a scenario cannot show: the honey jar and the beads only drop off a
-// monster the character spoiled (#4080 lacks the spoil seed), and the
-// honey bear a hunter bear calls stands where the hunter fell, for 300 s, which
-// a scenario cannot show either (#4020 item 5). These Boot tests pin the
-// spoil gate, the drop odds, the draw of the hunter bear's counter and the
-// honey bear's place and life; the scenarios play the dialogs and the items.
+// The kill of Path to Become a Scavenger (Q417_PathToBecomeAScavenger.onMyDying)
+// that a scenario cannot show: the honey bear a hunter bear calls stands where
+// the hunter fell (a scenario asserts no place of a spawned NPC). This Boot
+// test pins the draw of the hunter bear's counter and the honey bear's place
+// and life; the scenarios play the dialogs, the items, the spoiled honey
+// jars and beads (q417_*_spoiled*.scenario) and the called honey bear's count.
 const (
 	q417Name = "Q417_PathToBecomeAScavenger"
 	q417Path = "quest.Q417_PathToBecomeAScavenger"
 
-	q417HunterBear       = 20777
-	q417HoneyBear        = 27058
-	q417HunterTarantula  = 20403
-	q417PlunderTarantula = 20508
-	q417HoneyJar         = 1655
-	q417Bead             = 1656
+	q417HunterBear = 20777
+	q417HoneyBear  = 27058
 )
 
 // q417Kill boots a character with the journal rows, holding the items of held, spawns monster beside
-// it, optionally spoiled by the character, answers draws in order and has the
-// character kill it.
-func q417Kill(t *testing.T, monster int32, journal []journalRow, held map[int32]int32, spoiled bool, draws ...int) (*dialogWorld, *npc.Hostile) {
+// it, answers draws in order and has the character kill it.
+func q417Kill(t *testing.T, monster int32, journal []journalRow, held map[int32]int32, draws ...int) (*dialogWorld, *npc.Hostile) {
 	t.Helper()
 	d := &scriptDraws{}
 	d.queue(draws...)
@@ -65,81 +59,11 @@ func q417Kill(t *testing.T, monster int32, journal []journalRow, held map[int32]
 		gameservertest.WithScriptRand(d.rand),
 	)
 	h := w.srv.SpawnHostileNPCTemplateAt(t, proofMonster(int(monster)), location.Location{X: w.at.X + 40, Y: w.at.Y, Z: w.at.Z})
-	if spoiled && !h.SpoilPool().Mark(w.player) {
-		t.Fatal("a fresh monster is already spoiled")
-	}
 	killOnPlayerQueue(t, w.srv, w.player, h)
 	return w, h
 }
 
 func q417Cond(n int) journalRow { return journalRow{0, q417Name, "<cond>", val(strconv.Itoa(n))} }
-
-// TestQ417HoneyJarFollowsTheSpoiler: the honey bear drops its jar at cond 5
-// to the character that spoiled it, and the cond goes to 6; an unspoiled
-// bear, or another cond, gives nothing.
-func TestQ417HoneyJarFollowsTheSpoiler(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name     string
-		cond     int
-		held     int32
-		spoiled  bool
-		wantJar  int
-		wantCond string
-	}{
-		{"spoiled", 5, 0, true, 1, "5"},
-		{"the fifth jar", 5, 4, true, 5, "6"},
-		{"not spoiled", 5, 4, false, 4, "5"},
-		{"another cond", 6, 4, true, 4, "6"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			w, _ := q417Kill(t, q417HoneyBear, []journalRow{q417Cond(tc.cond)}, map[int32]int32{q417HoneyJar: tc.held}, tc.spoiled)
-			if n := w.srv.PlayerItemCount(t, w.player, q417HoneyJar); n != tc.wantJar {
-				t.Fatalf("honey jars held %d, want %d", n, tc.wantJar)
-			}
-			if got := w.srv.QuestVars(t, w.player, q417Name)["<cond>"]; got != tc.wantCond {
-				t.Fatalf("cond = %q, want %q", got, tc.wantCond)
-			}
-		})
-	}
-}
-
-// TestQ417BeadsFollowTheSpoilerAndTheDraw: a tarantula drops a bead at cond 7
-// to a spoiler by the draw against its own chance (333333 for the hunter,
-// 600000 for the plunderer, out of a million); twenty beads move the cond to
-// 8, and the nineteenth does not.
-func TestQ417BeadsFollowTheSpoilerAndTheDraw(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name     string
-		monster  int32
-		held     int32
-		spoiled  bool
-		draw     int
-		wantBead int
-		wantCond string
-	}{
-		{"hunter, low draw", q417HunterTarantula, 0, true, 0, 1, "7"},
-		{"hunter, draw at the chance", q417HunterTarantula, 0, true, 333333, 0, "7"},
-		{"hunter, draw above the chance", q417HunterTarantula, 0, true, 999999, 0, "7"},
-		{"plunderer, draw under its chance", q417PlunderTarantula, 0, true, 599999, 1, "7"},
-		{"plunderer, draw at its chance", q417PlunderTarantula, 0, true, 600000, 0, "7"},
-		{"not spoiled", q417PlunderTarantula, 0, false, 0, 0, "7"},
-		{"the twentieth bead", q417PlunderTarantula, 19, true, 0, 20, "8"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			w, _ := q417Kill(t, tc.monster, []journalRow{q417Cond(7)}, map[int32]int32{q417Bead: tc.held}, tc.spoiled, tc.draw)
-			if n := w.srv.PlayerItemCount(t, w.player, q417Bead); n != tc.wantBead {
-				t.Fatalf("beads held %d, want %d", n, tc.wantBead)
-			}
-			if got := w.srv.QuestVars(t, w.player, q417Name)["<cond>"]; got != tc.wantCond {
-				t.Fatalf("cond = %q, want %q", got, tc.wantCond)
-			}
-		})
-	}
-}
 
 // TestQ417HunterBearCountsThenCallsTheHoneyBear: a hunter bear at cond 5
 // counts one in "step" up to 20; past it the draw of 0 to 99 against
@@ -168,7 +92,7 @@ func TestQ417HunterBearCountsThenCallsTheHoneyBear(t *testing.T) {
 			if tc.step != "" {
 				journal = append(journal, journalRow{0, q417Name, "step", val(tc.step)})
 			}
-			w, h := q417Kill(t, q417HunterBear, journal, nil, false, tc.draw)
+			w, h := q417Kill(t, q417HunterBear, journal, nil, tc.draw)
 			vars := w.srv.QuestVars(t, w.player, q417Name)
 			if got := vars["step"]; got != tc.wantStep {
 				t.Fatalf("step = %q, want %q", got, tc.wantStep)

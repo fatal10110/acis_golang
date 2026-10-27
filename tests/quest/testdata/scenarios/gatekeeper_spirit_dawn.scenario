@@ -1,0 +1,17 @@
+# The entrance spirit (GatekeeperSpirit) of the Seven Signs dungeons: a member of the Dawn cabal, which owns the Seal of Avarice and wins, gets the Dawn page.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/gatekeeper_spirit_dawn.golden
+character Pilgrim 40
+cabal dawn avarice
+festival 100 0
+sealowner avarice dawn
+script script.teleport.GatekeeperSpirit
+page gatekeeper/31111.htm
+page script/teleport/GatekeeperSpirit/
+npc spirit 31111 DungeonGatekeeper 10 0 0
+
+action spirit
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=script/teleport/GatekeeperSpirit/dawn.htm
+  S ActionFailed

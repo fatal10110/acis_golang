@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -60,6 +61,7 @@ import net.sf.l2j.gameserver.model.actor.Npc;
 import net.sf.l2j.gameserver.model.actor.Player;
 import net.sf.l2j.gameserver.model.actor.container.player.SubClass;
 import net.sf.l2j.gameserver.model.actor.instance.Folk;
+import net.sf.l2j.gameserver.model.actor.instance.Monster;
 import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
@@ -124,6 +126,8 @@ final class ScenarioTrace
 
 	/** Virtual time passed after each client packet: one run of every 333 ms task. */
 	private static final long STEP = 500;
+	/** The object id of the other player a spoil line's other names: nobody in the world. */
+	private static final int OTHER_SPOILER = 0x7fff0001;
 
 	/** The kill wait of the Go runner: the dying hooks run 3 s after the death. */
 	private static final int KILL_TICKS = 7;
@@ -187,6 +191,14 @@ final class ScenarioTrace
 	private int _pk;
 	private String[] _cabal;
 	private int[] _festival;
+	/** The sealowner lines: seal name, cabal name. */
+	private final List<String[]> _sealOwners = new ArrayList<>();
+	/** The memo lines: variable, value. */
+	private final List<String[]> _memos = new ArrayList<>();
+	/** The spoil lines' roles, and whether the spoiler is another player. */
+	private final Map<String, Boolean> _spoils = new HashMap<>();
+	/** The live lines of each step, by the step's index: NPC id. */
+	private final Map<Integer, List<Integer>> _lives = new HashMap<>();
 
 	private GameClient _client;
 	private Player _player;
@@ -250,7 +262,11 @@ final class ScenarioTrace
 		// query (and the runners' ids) would be in whichever scenario came first: the events the
 		// reference loads at boot after the scripts, and the friend lists, which the reference loads
 		// when a first character enters or leaves the world.
-		DerbyTrackManager.getInstance();
+		// The track has run its first countdown, as it has a second after the server starts: its
+		// race packet and runners exist, which a race manager appearing or leaving sends and reads.
+		final Method countdown = DerbyTrackManager.class.getDeclaredMethod("countdown");
+		countdown.setAccessible(true);
+		countdown.invoke(DerbyTrackManager.getInstance());
 		LotteryManager.getInstance();
 		CoupleManager.getInstance();
 		if (Config.ALLOW_FISH_CHAMPIONSHIP)
@@ -280,6 +296,7 @@ final class ScenarioTrace
 			set(GameTimeTaskManager.class, GameTimeTaskManager.getInstance(), "_time", GAME_TIME);
 			set(GameTimeTaskManager.class, GameTimeTaskManager.getInstance(), "_isNight", false);
 			final int[] festival = festival();
+			final Map<SealType, CabalType> sealOwners = new EnumMap<>(SevenSignsManager.getInstance().getSealOwners());
 			final List<String> failures;
 			try
 			{
@@ -293,6 +310,8 @@ final class ScenarioTrace
 				failures = ConnectionPool.forget();
 				ProbeClock.real();
 				setFestival(festival);
+				SevenSignsManager.getInstance().getSealOwners().clear();
+				SevenSignsManager.getInstance().getSealOwners().putAll(sealOwners);
 			}
 			if (!failures.isEmpty())
 				throw new IllegalStateException(t._name + ": statements the probe store cannot run: " + failures);
@@ -412,6 +431,12 @@ final class ScenarioTrace
 		for (String raw : lines)
 		{
 			final String line = raw.strip();
+			if (line.startsWith("live ") && (raw.startsWith(" ") || raw.startsWith("\t")) && !_steps.isEmpty())
+			{
+				// A step's expectation: how many NPCs of that template stand once it is over.
+				_lives.computeIfAbsent(_steps.size() - 1, k -> new ArrayList<>()).add(Integer.parseInt(line.split("\\s+")[1]));
+				continue;
+			}
 			if (line.isEmpty() || line.startsWith("#") || raw.startsWith(" ") || raw.startsWith("\t"))
 				continue;
 			final String[] f = line.split("\\s+");
@@ -468,6 +493,17 @@ final class ScenarioTrace
 					Integer.parseInt(f[1]),
 					Integer.parseInt(f[2])
 				};
+				case "sealowner" -> _sealOwners.add(new String[]
+				{
+					f[1],
+					f[2]
+				});
+				case "memo" -> _memos.add(new String[]
+				{
+					f[1],
+					f[2]
+				});
+				case "spoil" -> _spoils.put(f[1], f.length > 2);
 				case "item", "page" ->
 				{
 					// The reference loads every item and page.
@@ -499,8 +535,9 @@ final class ScenarioTrace
 			seed();
 
 		record();
-		for (String[] s : _steps)
+		for (int index = 0; index < _steps.size(); index++)
 		{
+			final String[] s = _steps.get(index);
 			switch (s[0])
 			{
 				case "action" -> action(npc(s[1]));
@@ -533,7 +570,15 @@ final class ScenarioTrace
 				case "create" -> create();
 				default -> throw new IllegalStateException(_name + ": unknown step " + s[0]);
 			}
+			for (int id : _lives.getOrDefault(index, List.of()))
+				_lines.add("# live " + id + " " + live(id));
 		}
+	}
+
+	/** How many NPCs of the template stand alive in the world. */
+	private static long live(int npcId)
+	{
+		return World.getInstance().getObjects().stream().filter(o -> o instanceof Npc n && n.getNpcId() == npcId && !n.isDead()).count();
 	}
 
 	/**
@@ -584,6 +629,8 @@ final class ScenarioTrace
 				ConnectionPool.apply("INSERT INTO character_quests (charId,name,var,value) VALUES (?,?,?,?)", _objectId, q[1], q[i].substring(0, eq), q[i].substring(eq + 1));
 			}
 		}
+		for (String[] m : _memos)
+			player.getMemos().set(m[0], m[1]);
 		holdings(player);
 		spawnNpcs();
 	}
@@ -655,6 +702,8 @@ final class ScenarioTrace
 			SevenSignsManager.getInstance().setPlayerInfo(player.getObjectId(), CabalType.valueOf(_cabal[0].toUpperCase()), SealType.valueOf(_cabal[1].toUpperCase()));
 		if (_festival != null)
 			setFestival(_festival);
+		for (String[] o : _sealOwners)
+			SevenSignsManager.getInstance().getSealOwners().put(SealType.valueOf(o[0].toUpperCase()), CabalType.valueOf(o[1].toUpperCase()));
 	}
 
 	/** The festival scores the Seven Signs keep: dawn's, then dusk's. */
@@ -824,6 +873,9 @@ final class ScenarioTrace
 		final Spawn spawn = new Spawn(NpcData.getInstance().getTemplate(n.id()));
 		spawn.setLoc(X + n.dx(), Y + n.dy(), Z + n.dz(), 0);
 		final Npc npc = spawn.doSpawn(false);
+		// A spawn clears the spoil state, so each fresh monster of the role is marked after it.
+		if (_spoils.containsKey(n.role()))
+			((Monster) npc).getSpoilState().setSpoilerId(_spoils.get(n.role()) ? OTHER_SPOILER : _player.getObjectId());
 		_live.put(n.role(), npc);
 		_spawnedNpcs.add(npc);
 		_lines.add("# npc " + n.role() + " " + npc.getNpcId() + " (object " + npc.getObjectId() + ")");

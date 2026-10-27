@@ -1,0 +1,15 @@
+# Path To Become A Scavenger (Q417), a spoiled hunter tarantula drops no bead on a draw at its chance (333333 of a million). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q417_path_to_become_a_scavenger_tarantula_spoiled_hunter_at_chance.golden
+character Scavenger 19
+class 53
+quest Q417_PathToBecomeAScavenger <cond>=7 <state>=STARTED
+random 333333
+script quest.Q417_PathToBecomeAScavenger
+item 1655 1656
+npc hunter 20403 Monster 40 0 0
+spoil hunter
+
+kill hunter
+  S SystemMessage id=95 1:0 1:0
+  items 1656=0
+  rows Q417_PathToBecomeAScavenger <cond>=7 <state>=STARTED

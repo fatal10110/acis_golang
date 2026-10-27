@@ -94,6 +94,7 @@ type traceStep struct {
 	stmts  []string
 	memos  []string
 	draws  []string
+	lives  []string
 }
 
 // traceTask is the rendered packets one task of a trace sent, in the
@@ -114,6 +115,7 @@ var (
 	traceApproach = regexp.MustCompile(`^# approach (\d+) \(object (\d+)\)$`)
 	traceNPC      = regexp.MustCompile(`^# npc (\S+) (\d+) \(object (\d+)\)$`)
 	traceDraw     = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
+	traceLive     = regexp.MustCompile(`^# live (\d+) (\d+)$`)
 )
 
 // probeTraces is the directory, below the module root, of the reference
@@ -224,6 +226,14 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			// A T line ends the packets one task sent: the client
 			// packet's own run, then each tick's.
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
+		case strings.HasPrefix(line, "# live "):
+			if !traceLive.MatchString(line) {
+				return nil, nil, fmt.Errorf("trace line %q is not a live <npc id> <count>", line)
+			}
+			if len(raw) == 0 {
+				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
+			}
+			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		case strings.HasPrefix(line, "# draw "):
 			if !traceDraw.MatchString(line) {
 				return nil, nil, fmt.Errorf("trace line %q is not a draw <bound>:<value> <class>", line)
@@ -282,6 +292,10 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			}
 			if m := traceDraw.FindStringSubmatch(line); m != nil {
 				step.draws = append(step.draws, m[1])
+				continue
+			}
+			if m := traceLive.FindStringSubmatch(line); m != nil {
+				step.lives = append(step.lives, m[1]+"="+m[2])
 				continue
 			}
 			if strings.HasPrefix(line, "Q ") {
@@ -455,6 +469,7 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]s
 			ts.stmts = append(ts.stmts, s.stmts...)
 			ts.memos = append(ts.memos, s.memos...)
 			ts.draws = append(ts.draws, s.draws...)
+			ts.lives = append(ts.lives, s.lives...)
 		}
 		next += len(clients)
 		sent, err := stepPackets(ts.tasks, st.Queues)
@@ -474,6 +489,9 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]s
 			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		if d := FirstDiff("memo", st.Memos, ts.memos); d != "" {
+			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+		}
+		if d := FirstDiff("live", st.Lives, ts.lives); d != "" {
 			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		draws = append(draws, ts.draws)

@@ -1,0 +1,15 @@
+# The Monster Race Track (MonsterRaceTrack) with no memo saved: the race manager (30995, a
+# DerbyTrackManagerNpc) moves no one and keeps no memo (onTalk). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/monster_race_track_return_none.golden
+character Gambler 20
+script script.teleport.MonsterRaceTrack
+page default/30995.htm
+npc manager 30995 DerbyTrackManagerNpc 10 0 0
+
+action manager
+action manager
+  S ActionFailed
+  S NpcHtmlMessage obj=manager item=0 page=default/30995.htm
+  S ActionFailed
+bypass npc_{manager}_Quest MonsterRaceTrack
+  S ActionFailed
