@@ -80,7 +80,8 @@ func (cl *Clan) AttackerList() []int32 {
 // bucket's chain: the trailing run of ids that stay in the same half keeps
 // its place, and the ids before it are re-chained in reverse (see
 // growBuckets). It may drift from the expected order later in three ways,
-// all cosmetic (only the order of clans in the war window): the expected
+// all cosmetic (only the order of clans in the war window; tracked in
+// #4341): the expected
 // table never shrinks, so a clan that once held 12 or more wars keeps its
 // larger table after they end, where this recomputes the size from the
 // current count; a war declared later sorts here by id rather than after

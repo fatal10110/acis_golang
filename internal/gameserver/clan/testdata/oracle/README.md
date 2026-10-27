@@ -20,7 +20,7 @@ Line formats:
   doubling are crossed. Ascending insertion is how boot restores the stored rows. A later
   declared war inserts at the tail of its bucket in the reference, which the Go side does
   not model (see `hashSetOrder`'s comment); the probe does not cover that, nor buckets of
-  more than eight ids (tree bins and early growth).
+  more than eight ids (tree bins and early growth); the remaining drifts are tracked in #4341.
 - `sub <types, ascending> => <iteration order of the registry>`: every subset of the seven
   sub-unit types.
 
