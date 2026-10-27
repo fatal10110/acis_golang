@@ -118,12 +118,12 @@ func (a characterStatActor) ActiveSkillLevel(id int) (int, bool) {
 	return level, level > 0
 }
 
-// ActiveEffectLevel satisfies conditions.Actor.
-// A player is no NPC or door: target npcId and race_id conditions never
-// match it.
+// TargetID and RaceOrdinal satisfy conditions.Actor. A player is no NPC or
+// door: target npcId and race_id conditions never match it.
 func (characterStatActor) TargetID() (int, bool)    { return 0, false }
 func (characterStatActor) RaceOrdinal() (int, bool) { return 0, false }
 
+// ActiveEffectLevel satisfies conditions.Actor.
 func (a characterStatActor) ActiveEffectLevel(effectID int) (int, bool) {
 	if a.c.Live == nil {
 		return 0, false
