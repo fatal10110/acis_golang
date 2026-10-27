@@ -1,6 +1,7 @@
 # RamphoPrimeval (22199) with BroadCastReception 1: a shout-target script event (10016) naming the
-# character makes it forget what it wanted and be attacked by the character for 1000 damage, so
-# it wants to attack the character; an event naming no player does nothing but the base reaction.
+# character makes it be attacked by the character for 1000 damage, so it wants to attack the
+# character with the hate that call adds (the base reaction's 50 percent reset misses on draw 99);
+# an event naming no player does nothing.
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc
@@ -14,4 +15,5 @@ npc wolf 20120 Monster 200 0 0
 event rampho 10016 wolf 0
   desires rampho -
 event rampho 10016 character 0
-  desires rampho attack(player)=100
+  random always 99
+  desires rampho attack(player)=1149.4252873563219

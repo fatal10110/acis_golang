@@ -1,7 +1,7 @@
 # PartyLeaderCouplePhysicalSpecial (21432, Chakram Beetle, level 80, heal 4065-9, self buff 4341-1), every
 # draw 0: when its private dies within 100 of it (50 here), it wants its heal and its self buff on
 # itself (1000000 each) and drops its hate to attack only the creature it most wants to attack (1000).
-# A private dying 300 away changes nothing.
+# A private dying 300 away keeps the hate its kill added: no heal, no buff, no reset.
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc
