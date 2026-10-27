@@ -234,16 +234,16 @@ func (l *GameClientLink) awaitPersistence(conn *Conn, owners ...int32) error {
 // write of one pets row is keyed by that item, not by the player holding it,
 // so writes stay ordered when the collar changes hands.
 func (l *GameClientLink) savePet(actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
-	itemObjectID, state, write := savePet(l.petStore, actor, ownerInv, l.log)
+	itemObjectID, state, write := savePet(l.summoning.store, actor, ownerInv, l.log)
 	if write == nil {
 		return
 	}
-	seq := l.queuedPets.add(itemObjectID, state)
+	seq := l.summoning.queued.add(itemObjectID, state)
 	l.persist.Enqueue(itemObjectID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		write(ctx)
-		l.queuedPets.written(itemObjectID, seq)
+		l.summoning.queued.written(itemObjectID, seq)
 	})
 }
 

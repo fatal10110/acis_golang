@@ -44,7 +44,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
@@ -68,7 +67,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
-	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -125,14 +123,6 @@ type recipeBookStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]int, error)
 	Insert(ctx context.Context, ownerID int32, recipeID int) error
 	Delete(ctx context.Context, ownerID int32, recipeID int) error
-}
-
-// petStore is the narrow persistence surface a pet-collar restore needs:
-// the saved row for a collar's pet, if any (data/sql.PetStore.Get).
-type petStore interface {
-	Get(ctx context.Context, itemObjectID int32) (petmodel.State, bool, error)
-	Save(ctx context.Context, itemObjectID int32, state petmodel.State) error
-	SaveFed(ctx context.Context, itemObjectID int32, fed int) error
 }
 
 // AttackStanceTracker owns combat-stance membership. It is exported so the
@@ -336,9 +326,7 @@ type GameClientLink struct {
 	cursed        *cursedweapon.Manager // the cursed weapons' lifecycle; nil when disabled
 	world         *world.State
 	npcs          *npc.Table
-	summonItems   *item.SummonItemTable
 	doors         WorldDoors
-	petStore      petStore
 	geo           move.Geo
 	zones         *zone.Index
 	ids           idAllocator
@@ -346,23 +334,20 @@ type GameClientLink struct {
 	attackStance  AttackStanceTracker
 	ai            AIRegistry
 	pvpFlags      *task.PvPFlags
-	// decay removes a dead summon's corpse at its deadline; nil leaves
-	// summon corpses in the world.
-	decay       *task.Decay
-	effects     effect.Env
-	positions   *task.PositionUpdates
-	playerClock *task.PlayerClock
-	gameClock   *task.GameClock
-	shutdown    *shutdown.Countdown
-	loginStatus *LoginStatus
-	sevenSigns  *sevensigns.State
-	festival    *festival.Manager
-	olympiad    *olympiad.Olympiad
-	heroes      *hero.Manager
-	raidPoints  *raidpoint.Points
-	water       *task.Water
-	shadowItems *task.ShadowItems
-	autosave    *task.Autosave
+	effects       effect.Env
+	positions     *task.PositionUpdates
+	playerClock   *task.PlayerClock
+	gameClock     *task.GameClock
+	shutdown      *shutdown.Countdown
+	loginStatus   *LoginStatus
+	sevenSigns    *sevensigns.State
+	festival      *festival.Manager
+	olympiad      *olympiad.Olympiad
+	heroes        *hero.Manager
+	raidPoints    *raidpoint.Points
+	water         *task.Water
+	shadowItems   *task.ShadowItems
+	autosave      *task.Autosave
 	// inventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	inventoryUpdates *task.InventoryUpdates
@@ -379,7 +364,6 @@ type GameClientLink struct {
 	itemWrites   *persist.Order
 	persistWait  time.Duration
 	queues       Queues
-	queuedPets   queuedPets
 	selections   selectingOwners
 	restarts     *restart.Table
 	observers    *observer.Table
@@ -402,14 +386,12 @@ type GameClientLink struct {
 	// playerConfigMu serializes the //reload config puts, so the settings
 	// and the rules and switches built from them come from one reload.
 	playerConfigMu   sync.Mutex
-	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
 	disableRaidCurse bool
 	showNPCCrest     bool
 	showSummonCrest  bool
 	showNPCLevel     bool
 	wyvern           npc.WyvernRules
 	inventory        *invops.Service
-	petItems         *petitem.Service
 	trades           *tradebook.Book
 	parties          *partyRegistry
 	rooms            *roomRegistry
@@ -421,6 +403,7 @@ type GameClientLink struct {
 	sieges           *siege.Engine
 	clanWarehouses   clanWarehouseBook
 	enchanting       enchanting
+	summoning        summoning
 	targets          *skilltarget.Registry
 	skillHandlers    *handlerskill.Registry
 	chance           *actorcast.ChanceProcs
@@ -433,15 +416,9 @@ type GameClientLink struct {
 	// flood windows.
 	now func() time.Time
 
-	// petRoll is the random source of every pet called out; nil uses the
-	// summon default.
-	petRoll func(n int) int
 	// olympiadDraw is the random source of the Olympiad's draws and of the
 	// spot its competitors return to; nil uses the random source.
 	olympiadDraw func(n int) int
-	// petFeedPeriod is how often every pet called out eats; zero uses the
-	// summon default.
-	petFeedPeriod time.Duration
 
 	// fishing is the fish table and dice a cast line draws from; see
 	// fishing.go.
@@ -894,9 +871,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		cursed:        cfg.CursedRuntime,
 		world:         cfg.World,
 		npcs:          cfg.NPCs,
-		summonItems:   cfg.SummonItems,
 		doors:         cfg.Doors,
-		petStore:      cfg.PetStore,
 		geo:           cfg.Geo,
 		zones:         cfg.Zones,
 		ids:           cfg.IDs,
@@ -904,7 +879,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		attackStance:  cfg.AttackStance,
 		ai:            cfg.AI,
 		pvpFlags:      cfg.PvPFlags,
-		decay:         cfg.Decay,
 		effects:       cfg.Effects,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
@@ -935,17 +909,13 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		gmAudit:          cfg.GMAudit,
 		itemLog:          cfg.ItemLog,
 		chat:             cfg.Chat,
-		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,
 		showNPCCrest:     cfg.ShowNPCCrest,
 		showSummonCrest:  cfg.ShowSummonCrest,
 		showNPCLevel:     cfg.ShowNPCLevel,
 		wyvern:           wyvernRules(cfg.Wyvern),
-		petRoll:          cfg.PetRoll,
-		petFeedPeriod:    cfg.PetFeedPeriod,
 		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},
 		inventory:        invops.NewService(cfg.IDs),
-		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(cfg.TradeClock),
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
 		rooms:            partymatch.NewRegistry[*livePlayer](),
@@ -957,6 +927,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		punishments:      cfg.Punishments,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
 		enchanting:       newEnchanting(cfg),
+		summoning:        newSummoning(cfg),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{
 			Templates: cfg.NPCs,
@@ -1079,31 +1050,6 @@ func (l *GameClientLink) playerConfig() *PlayerConfig {
 		return settings
 	}
 	return &PlayerConfig{}
-}
-
-// newPet builds a pet with the shared effect, config and skill wiring. A live
-// pet inventory must be constructed with
-// itemcontainer.NewPetInventoryWithDelivery (delivery and persistence) before
-// calling this method; NewPetInventory has neither.
-func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
-	cfg.Effects = l.effects
-	cfg.Config = &l.petConfig
-	cfg.Settings = l.playerRules
-	if cfg.Roll == nil {
-		cfg.Roll = l.petRoll
-	}
-	if cfg.FeedPeriod == 0 {
-		cfg.FeedPeriod = l.petFeedPeriod
-	}
-	if cfg.SkillDefs == nil {
-		cfg.SkillDefs = l.skills
-	}
-	pet, err := summon.NewPet(cfg)
-	if err != nil {
-		return nil, err
-	}
-	pet.SetRaidCursesDisabled(l.disableRaidCurse)
-	return pet, nil
 }
 
 // nextObjectID allocates a new world object id.

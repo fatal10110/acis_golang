@@ -241,14 +241,14 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
 	case event.DeathSettled:
 		l.notifyOwnerOfSummonDeath(actor)
-		if l.decay != nil {
-			actor.SetCorpseDeadline(l.decay.Add(actor, actor.DecayDelay()))
+		if l.summoning.decay != nil {
+			actor.SetCorpseDeadline(l.summoning.decay.Add(actor, actor.DecayDelay()))
 		}
 	case event.Revived:
 		l.broadcastSummon(actor, func() wire.Frame { return serverpackets.FrameRevive(actor.ObjectID()) })
 	case event.DecayCanceled:
-		if l.decay != nil {
-			l.decay.Cancel(actor)
+		if l.summoning.decay != nil {
+			l.summoning.decay.Cancel(actor)
 		}
 	case event.PetCorpseDecayed, event.PetDeserted:
 		l.destroyDecayedPet(actor)
@@ -619,7 +619,7 @@ func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 			inv.DestroyByObjectID(itemObjectID, 1)
 		}
 	}
-	store, ok := l.petStore.(petRowDeleter)
+	store, ok := l.summoning.store.(petRowDeleter)
 	if !ok || l.persist == nil {
 		return
 	}

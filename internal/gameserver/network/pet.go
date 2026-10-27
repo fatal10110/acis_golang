@@ -97,7 +97,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if playerInv == nil {
 		return
 	}
-	switch failure := l.petItems.CheckGive(playerInv, petInv, pet, live, req.ObjectID, int(req.Count)); failure {
+	switch failure := l.summoning.petItems.CheckGive(playerInv, petInv, pet, live, req.ObjectID, int(req.Count)); failure {
 	case petitem.GiveNoop:
 		return
 	case petitem.GiveItemNotForPets:
@@ -132,7 +132,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 
 	end := l.itemInstances.BeginOperation(playerInv.OwnerID(), petInv.OwnerID())
 	defer end()
-	res, ok, err := l.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
+	res, ok, err := l.summoning.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
 		return
@@ -167,7 +167,7 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 
 	end := l.itemInstances.BeginOperation(petInv.OwnerID(), playerInv.OwnerID())
 	defer end()
-	res, ok, err := l.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
+	res, ok, err := l.summoning.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item from pet")
 		return

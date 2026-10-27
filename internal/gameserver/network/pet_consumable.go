@@ -100,7 +100,7 @@ func (l *GameClientLink) consumePetPotion(live *livePlayer, pet *summon.Actor, p
 // is the owner, or nil for a pet whose owner is not in the world, which
 // eats with no one to tell.
 func (l *GameClientLink) consumePetFood(live *livePlayer, pet *summon.Actor, petInv *itemcontainer.Inventory, inst *item.Instance) {
-	amount, ok := petFoodFeedAmount(l.skills, l.petConfig.FoodRate, inst.TemplateID)
+	amount, ok := petFoodFeedAmount(l.skills, l.summoning.config.FoodRate, inst.TemplateID)
 	if !ok {
 		return
 	}
