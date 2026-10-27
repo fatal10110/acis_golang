@@ -1,0 +1,33 @@
+# Four Goblets (Q620): the ghost of Wigoth notes four goblets. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q620_four_goblets_wigoth_four.golden
+character Hero 74
+quest Q620_FourGoblets <cond>=1 <state>=STARTED
+random always 0
+hold 7256 1
+hold 7257 1
+hold 7258 1
+hold 7259 1
+script quest.Q620_FourGoblets
+item 7254 7255 7256 7257 7258 7259 7260 7261 7262
+page default/31452.htm
+page script/quest/Q620_FourGoblets/
+npc wigoth 31452 Folk 10 0 0
+
+action wigoth
+action wigoth
+  S ActionFailed
+  S NpcHtmlMessage obj=wigoth item=0 page=default/31452.htm
+  S ActionFailed
+bypass npc_{wigoth}_Quest
+  S NpcHtmlMessage obj=wigoth item=0 page=script/quest/Q620_FourGoblets/31452-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31452-06.htm
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=169592,-91006,-2912 fast=0
+  S NpcHtmlMessage obj=wigoth item=0 page=script/quest/Q620_FourGoblets/31452-06.htm
+  S ActionFailed

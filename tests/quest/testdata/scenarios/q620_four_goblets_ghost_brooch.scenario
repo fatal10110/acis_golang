@@ -1,0 +1,43 @@
+# Four Goblets (Q620): a character that has the brooch is offered a recipe for its relic parts. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q620_four_goblets_ghost_brooch.golden
+character Hero 74
+quest Q620_FourGoblets <cond>=2 <state>=STARTED completed=true
+random always 0
+hold 7254 1000
+hold 7262 1
+script quest.Q620_FourGoblets
+item 57 1884 1888 6881 6714 6697 6899 7254 7255 7256 7257 7258 7259 7260 7261 7262
+page default/31454.htm
+page script/quest/Q620_FourGoblets/
+npc ghost 31454 Folk 10 0 0
+
+action ghost
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31454.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q620_FourGoblets/31454-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31454-16.htm
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q620_FourGoblets/31454-16.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 6899
+  S SystemMessage id=301 3:7254 6:1000
+  S SystemMessage id=54 3:6899
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q620_FourGoblets/31454-17.htm
+  S ActionFailed
+  items 7254=0 6899=1
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31454.htm
+  S ActionFailed
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31454.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q620_FourGoblets/31454-09.htm
+  S ActionFailed
+  S ActionFailed
