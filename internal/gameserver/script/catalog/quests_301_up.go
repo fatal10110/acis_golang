@@ -123,6 +123,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q632"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q633"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q634"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q635"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q637"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q638"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q639"
@@ -272,7 +273,7 @@ func quests301Up() script.Catalog {
 		"quest.Q632_NecromancersRequest":               q632.New,
 		"quest.Q633_InTheForgottenVillage":             q633.New,
 		"quest.Q634_InSearchOfFragmentsOfDimension":    q634.New,
-		"quest.Q635_InTheDimensionalRift":              nil,
+		"quest.Q635_InTheDimensionalRift":              q635.New,
 		"quest.Q637_ThroughTheGateOnceMore":            q637.New,
 		"quest.Q638_SeekersOfTheHolyGrail":             q638.New,
 		"quest.Q639_GuardiansOfTheHolyGrail":           q639.New,
