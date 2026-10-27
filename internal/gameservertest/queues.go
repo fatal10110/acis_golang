@@ -51,18 +51,63 @@ func (q *queues) NewQueue(id string) *sim.Queue {
 // shutdownDrainTimeout.
 var errUnsettled = errors.New("actor queues did not settle")
 
-// settle waits until every task posted so far to a still-open queue has run,
-// and until a closed queue's in-flight drain has returned. A task can close
-// its own queue and keep running (a corpse's decay closes the corpse's queue
-// partway through its despawn cleanup); its queue then refuses the barrier
-// post, but the rest of that task's work still has to land before settle
-// returns. One goroutine waits on every closed queue: a long test closes
-// many, and suites settle before every read.
+// settle waits until every task posted to a still-open queue has run, those
+// it posted in turn included, and until a closed queue's in-flight drain has
+// returned. A task can close its own queue and keep running (a corpse's decay
+// closes the corpse's queue partway through its despawn cleanup); its queue
+// then refuses the barrier post, but the rest of that task's work still has
+// to land before settle returns. One goroutine waits on every closed queue: a
+// long test closes many, and suites settle before every read.
+//
+// One pass posts a barrier to each queue in turn, so a task of a later queue
+// can post to a queue whose barrier already ran (a monster's reaction posting
+// the effect it casts onto the player's queue). On the inline executor a
+// timer armed already due (a cast that lands at once) fires only when the
+// runner next looks for work, which a barrier does not wait for. Settle
+// therefore runs the runner's due work around each pass, and repeats the pass
+// until one accepts nothing but its own barriers.
 func (q *queues) settle() error {
+	deadline := time.After(shutdownDrainTimeout)
+	for {
+		before := q.accepted()
+		q.runDue()
+		barriers, err := q.pass(deadline)
+		if err != nil {
+			return err
+		}
+		q.runDue()
+		if q.accepted()-before == barriers {
+			return nil
+		}
+	}
+}
+
+// runDue has the inline runner run the tasks posted and the timers already
+// due, without moving the clock. The pool runs them on its own.
+func (q *queues) runDue() {
+	if q.advance != nil {
+		q.advance(0)
+	}
+}
+
+// accepted sums what every queue created so far has accepted.
+func (q *queues) accepted() (total uint64) {
 	q.mu.Lock()
 	all := append([]*sim.Queue(nil), q.all...)
 	q.mu.Unlock()
-	deadline := time.After(shutdownDrainTimeout)
+	for _, queue := range all {
+		total += queue.Accepted()
+	}
+	return total
+}
+
+// pass posts one barrier to each queue created so far and waits for it, then
+// waits out the in-flight drains of the queues that refused it. It returns
+// how many barriers the queues accepted.
+func (q *queues) pass(deadline <-chan time.Time) (barriers uint64, err error) {
+	q.mu.Lock()
+	all := append([]*sim.Queue(nil), q.all...)
+	q.mu.Unlock()
 	var closed []*sim.Queue
 	for _, queue := range all {
 		done := make(chan struct{})
@@ -70,14 +115,15 @@ func (q *queues) settle() error {
 			closed = append(closed, queue)
 			continue
 		}
+		barriers++
 		select {
 		case <-done:
 		case <-deadline:
-			return errUnsettled
+			return barriers, errUnsettled
 		}
 	}
 	if len(closed) == 0 {
-		return nil
+		return barriers, nil
 	}
 	done := make(chan struct{})
 	go func() {
@@ -88,9 +134,9 @@ func (q *queues) settle() error {
 	}()
 	select {
 	case <-done:
-		return nil
+		return barriers, nil
 	case <-deadline:
-		return errUnsettled
+		return barriers, errUnsettled
 	}
 }
 

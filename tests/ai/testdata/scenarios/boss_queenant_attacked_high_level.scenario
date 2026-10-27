@@ -4,12 +4,15 @@
 # and the attack by the damage. The curse, instant, lands on the character at once (aborting
 # its action twice); the character, her top desire target now and beyond her aggro range, fails
 # her automatic attack check, so she drops her hate of it again, and the attack desire with it.
+# Her curse's landing roll is pinned to 0 (roll line): the landing rate is at most 99 of 100, so an
+# unpinned roll would leave the character unaffected one run in a hundred.
 character Hunter 10
 random always 0
 script script.ai.individual.DefaultNpc
 script script.ai.boss.queenant.QueenAnt
 territory nest 150 -200 900 200 -100 100
 npc queen 29001 GrandBoss 700 0 0 maker nest skill BUFF 4017 1 skill DD_MAGIC 4018 1 skill DD_MAGIC_A 4019 1 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+roll queen 0
 
 approach queen
 hit queen 22

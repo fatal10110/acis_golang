@@ -27,7 +27,8 @@
 //	                                          on that side of the castle's siege before the character enters the
 //	                                          world; owner makes it the castle's owner, on its siege's owner side
 //	quest <quest> <var>=<value> ...           character_quests rows of the character before it enters the world,
-//	                                          one line per quest, as a rows check lists them
+//	                                          one line per quest, as a rows check lists them (a value with blanks
+//	                                          is quoted: quiz="20 21")
 //	hold <item id> <count>                    optional: the character holds that many of the item before it enters
 //	                                          the world, as one stack (that many single items of a template that
 //	                                          does not stack); the template must be in the catalog (an item line or
@@ -147,10 +148,12 @@
 //	  Q <statement>        the character_quests statements of the step, in order: kind quest | params
 //	  M set <var> | <value>  a character_memo write of the step: the player memo var set to value;
 //	  M unset <var>          or deleted. The M lines are the step's memo writes, in order
-//	  queue <own|other> ...  a traced step: the queue whose hook teleported the character, or made it cast,
-//	                         in each task of the trace's step that does, in order (see the trace header below)
+//	  queue <own|other[+n]> ...  a traced step: the queue whose hook teleported the character, or made it cast,
+//	                         in each task of the trace's step that does, in order; other+n also names the n
+//	                         lines after each of the task's casts that go out with it (see the trace header below)
 //	  items <id>=<n> ...   the character's count of each item after the step
-//	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them
+//	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them (a value
+//	                                        with blanks is quoted: quiz="20 21")
 //	  state <quest> <status> | -            the quest's state in memory after the step
 //	  hate <role> <weight> [<creature>]     the NPC's hate of the character, or of that creature (an npc line's
 //	                                        NPC or the summon), after the step
@@ -210,7 +213,12 @@
 // is the character's queue, every other task (a tick's, a kill's, an
 // advance's, ...) another, unless the step's queue line names the queue of
 // each of its tasks that teleport the character or make it cast, in the
-// trace's order.
+// trace's order. The cast's own effect packets (a system message, an
+// effect's messages) go out with the cast in the Go run, which the trace
+// cannot tell from the hook's own: other+n in the queue line moves the n
+// lines right after each cast the task makes with the character as caster
+// along with it, in place of its ActionFailed lines and teleport, which then
+// count among the n.
 // The script draws the trace pins (needing a random line) must be those the
 // run's same steps draw: the same bounds, in order. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
@@ -365,9 +373,10 @@ type Step struct {
 	Packets    []string
 	Statements []string
 	Memos      []string
-	// Queues is the queue line: "own" or "other" for each task of the
-	// traced step that teleports the character or makes it cast, in order;
-	// nil without one.
+	// Queues is the queue line: "own", "other" or "other+n" (the n lines
+	// after each cast that go out with it) for each task of the traced step
+	// that teleports the character or makes it cast, in order; nil without
+	// one.
 	Queues []string
 	Checks []Check
 }
@@ -439,6 +448,12 @@ func Parse(name string, data []byte) (*Scenario, error) {
 			continue
 		}
 		fields := strings.Fields(line)
+		if fields[0] == "quest" {
+			var err error
+			if fields, err = splitQuoted(line); err != nil {
+				return nil, fail("%v", err)
+			}
+		}
 		verb, args := fields[0], fields[1:]
 		if _, isStep := argCount[verb]; isStep || len(sc.Steps) > 0 {
 			c, ok := argCount[verb]
@@ -887,12 +902,18 @@ func (s *Step) expect(n int, line string) error {
 			return fmt.Errorf("a second queue line")
 		}
 		queues := strings.Fields(rest)
-		if len(queues) == 0 || slices.ContainsFunc(queues, func(q string) bool { return q != "own" && q != "other" }) {
-			return fmt.Errorf("queue %q is not own or other, one per task", rest)
+		if len(queues) == 0 || slices.ContainsFunc(queues, func(q string) bool { _, _, ok := queueTask(q); return !ok }) {
+			return fmt.Errorf("queue %q is not own or other[+n], one per task", rest)
 		}
 		s.Queues = queues
 	case "items", "rows", "state", "hate", "desires", "at":
 		args := strings.Fields(rest)
+		if kind == "rows" {
+			var err error
+			if args, err = splitQuoted(rest); err != nil {
+				return err
+			}
+		}
 		if err := checkCheck(kind, args); err != nil {
 			return err
 		}
@@ -901,6 +922,60 @@ func (s *Step) expect(n int, line string) error {
 		return fmt.Errorf("unknown expectation %q", kind)
 	}
 	return nil
+}
+
+// splitQuoted splits line into fields on blanks, as strings.Fields does,
+// except that a double quote opens a stretch in which blanks stay in the
+// field; the quotes themselves are dropped, so quiz="20 21" is the one field
+// quiz=20 21. An unclosed quote is an error.
+func splitQuoted(line string) ([]string, error) {
+	var fields []string
+	var cur strings.Builder
+	inField, quoted := false, false
+	for _, r := range line {
+		switch {
+		case r == '"':
+			quoted, inField = !quoted, true
+		case !quoted && (r == ' ' || r == '\t'):
+			if inField {
+				fields = append(fields, cur.String())
+				cur.Reset()
+				inField = false
+			}
+		default:
+			cur.WriteRune(r)
+			inField = true
+		}
+	}
+	if quoted {
+		return nil, fmt.Errorf("unclosed quote in %q", line)
+	}
+	if inField {
+		fields = append(fields, cur.String())
+	}
+	return fields, nil
+}
+
+// queueTask reads one task of a queue line: whether its hook ran on the
+// character's own queue, and, for another queue's, how many lines after each
+// cast move with it (0 for the default rule). ok is false for anything else.
+func queueTask(task string) (own bool, effects int, ok bool) {
+	if task == "own" {
+		return true, 0, true
+	}
+	rest, found := strings.CutPrefix(task, "other")
+	if !found {
+		return false, 0, false
+	}
+	if rest == "" {
+		return false, 0, true
+	}
+	n, found := strings.CutPrefix(rest, "+")
+	effects, err := strconv.Atoi(n)
+	if !found || err != nil || effects < 1 || n != strconv.Itoa(effects) {
+		return false, 0, false
+	}
+	return false, effects, true
 }
 
 // checkMemo validates an M line: set <var> | <value> or unset <var>.

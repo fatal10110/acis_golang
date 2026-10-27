@@ -42,6 +42,7 @@ type Queue struct {
 	scheduled bool     // Pool only: q is in the run queue or being drained
 	backlog   bool     // Pool only: pending tasks crossed highWater and have not dropped back below it
 	closed    bool
+	accepted  uint64              // tasks and timer expiries the executor took from q, ever
 	timers    map[*Timer]struct{} // armed timers and tickers, cancelled by Close
 }
 
@@ -51,7 +52,25 @@ type Queue struct {
 func (q *Queue) Post(fn func()) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return !q.closed && q.exec.enqueue(q, fn)
+	return !q.closed && q.enqueue(fn)
+}
+
+// enqueue hands fn to the executor and counts it when taken. Callers hold q.mu.
+func (q *Queue) enqueue(fn func()) bool {
+	if !q.exec.enqueue(q, fn) {
+		return false
+	}
+	q.accepted++
+	return true
+}
+
+// Accepted counts the tasks and timer expiries q has taken since it was
+// created. A test harness compares it across a pass of barrier posts to tell
+// whether any task posted work meanwhile.
+func (q *Queue) Accepted() uint64 {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.accepted
 }
 
 // Now reads the clock q's timers run on: the wall clock on a Pool, the
@@ -167,7 +186,7 @@ func (t *Timer) fire() {
 	if t.queued {
 		return
 	}
-	if !q.exec.enqueue(q, t.run) {
+	if !q.enqueue(t.run) {
 		t.done = true
 		delete(q.timers, t)
 		t.ct.Stop()

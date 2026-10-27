@@ -2,11 +2,14 @@
 # above it: a hit of 10 makes it want its curse (4515) on the character at 1000000 beside the
 # attack desire of the damage, 10 / 1000 / 0.05 * 10000. On draws of 99 it neither pulls the
 # character nor wants its area paralysis.
+# Its curse's landing roll is pinned to 0 (roll line): the landing rate is at most 99 of 100, so an
+# unpinned roll would leave the character unaffected one run in a hundred.
 character Hunter 10
 random always 99
 script script.ai.individual.DefaultNpc
 script script.ai.boss.orfen.Orfen
 npc orfen 29014 GrandBoss 500 0 0 skill DEBUFF 4515 1 skill HOLD_MAGIC 4063 1 skill DD_MAGIC 4064 1
+roll orfen 0
 
 hit orfen 10
   S MagicSkillUse caster=orfen target=player skill=4515-1 hit=0 reuse=0 success=0
