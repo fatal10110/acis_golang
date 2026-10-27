@@ -1,9 +1,9 @@
-# Test Of Magus (Q228), refused: a level 39 Warrior is turned away by Rukal (the test is for
-# wizards), and the quest is not started.
+# Test Of Magus (Q228), refused: a level 39 Dark Mystic (class 38, the base class of the Dark
+# Wizard, not a wizard class itself) is turned away by Rukal, and the quest is not started.
 # Expectations replay the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q228_test_of_magus_wrong_class.golden
-character Warrior 39
-class 1
+character Mystic 39
+class 38
 script quest.Q228_TestOfMagus
 item 2840 2841 2842 2843 2844 2845 2846 2847 2848 2849 2850 2851 2852 2853 2854 2855 2856 2857 2858 2859 2860 2861 2862 2863 7562
 page default/30629.htm
