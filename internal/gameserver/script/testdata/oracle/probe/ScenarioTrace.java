@@ -100,7 +100,7 @@ import net.sf.l2j.gameserver.taskmanager.WaterTaskManager;
  * class, the subclass it plays, a led clan of the given level and its side of a castle's siege, quest rows, the script
  * draws of the random line) and
  * spawns each NPC line's NPC at its offset from the player, who stands where the Go fixture
- * character enters the world. The hold, equip, standing, pk, cabal and festival lines are seeded
+ * character enters the world. The hold, equip, standing, pk, cabal, festival, sealowner, memo and spoil lines are seeded
  * as the Go runner seeds them. The NPCs keep only the bindings of the scenario's script and stub
  * lines, as the Go runner registers no other script. Every NPC line's NPC has the casting stats of the Go runner's
  * fixture NPC (WIT and DEX 0, its base attack speed), and a monster the scenario kills or hits is made the Go runner's
@@ -266,7 +266,19 @@ final class ScenarioTrace
 		// race packet and runners exist, which a race manager appearing or leaving sends and reads.
 		final Method countdown = DerbyTrackManager.class.getDeclaredMethod("countdown");
 		countdown.setAccessible(true);
-		countdown.invoke(DerbyTrackManager.getInstance());
+		final DerbyTrackManager derby = DerbyTrackManager.getInstance();
+		countdown.invoke(derby);
+		// The countdown shuffles the runners with an unseeded Random; the order the probe traces must not
+		// depend on it. The runners go back in object id order (the chosen eight are the first eight, a
+		// view of the same list the race packet holds).
+		final Field runnersField = DerbyTrackManager.class.getDeclaredField("_runners");
+		runnersField.setAccessible(true);
+		@SuppressWarnings("unchecked")
+		final List<Npc> runners = (List<Npc>) runnersField.get(derby);
+		runners.sort(Comparator.comparingInt(Npc::getObjectId));
+		final Field chosenField = DerbyTrackManager.class.getDeclaredField("_chosenRunners");
+		chosenField.setAccessible(true);
+		chosenField.set(derby, runners.subList(0, 8));
 		LotteryManager.getInstance();
 		CoupleManager.getInstance();
 		if (Config.ALLOW_FISH_CHAMPIONSHIP)
@@ -676,7 +688,7 @@ final class ScenarioTrace
 			throw new IllegalStateException(_name + ": the siege line's clan is not on the " + side + " side");
 	}
 	
-	/** The hold, equip, standing, pk, cabal and festival lines, as the Go runner seeds them. */
+	/** The hold, equip, standing, pk, cabal, festival, sealowner, memo and spoil lines, as the Go runner seeds them. */
 	private void holdings(Player player) throws Exception
 	{
 		for (int[] h : _holds)
