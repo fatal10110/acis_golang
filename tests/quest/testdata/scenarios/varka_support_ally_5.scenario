@@ -13,7 +13,7 @@ hold 7225 1
 hold 7187 6
 hold 7226 3
 quest Q611_AllianceWithVarkaSilenos <state>=STARTED <cond>=1
-stub quest.Q611_AllianceWithVarkaSilenos
+script quest.Q611_AllianceWithVarkaSilenos
 script script.feature.VarkaSilenosSupport
 item 7225 7224 7187 7226
 page script/feature/VarkaSilenosSupport/

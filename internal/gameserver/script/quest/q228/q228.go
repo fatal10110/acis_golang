@@ -85,7 +85,7 @@ const (
 const (
 	classHumanWizard = 11
 	classElvenWizard = 26
-	classDarkWizard  = 38
+	classDarkWizard  = 39
 )
 
 // New returns the quest.

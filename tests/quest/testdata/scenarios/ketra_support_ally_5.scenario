@@ -13,7 +13,7 @@ hold 7215 1
 hold 7186 6
 hold 7216 3
 quest Q605_AllianceWithKetraOrcs <state>=STARTED <cond>=1
-stub quest.Q605_AllianceWithKetraOrcs
+script quest.Q605_AllianceWithKetraOrcs
 script script.feature.KetraOrcSupport
 item 7215 7214 7186 7216
 page script/feature/KetraOrcSupport/
