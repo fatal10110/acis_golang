@@ -18,12 +18,11 @@ import (
 )
 
 // The flows of Competition for the Bandit Stronghold (Q504) and A Grand
-// Plan for Taming Wild Beasts (Q655), which a scenario cannot play (#4125):
-// both read whether their siegable clan hall waits for its battle and print
-// its next siege date (Q504_CompetitionForTheBanditStronghold.onTalk,
-// Q655_AGrandPlanForTamingWildBeasts.onTalk, onAdvEvent). Each boots the
-// quest alone over its shipped pages and the shipped clan halls, the two
-// halls' next siege at hallContestSiegeAt.
+// Plan for Taming Wild Beasts (Q655) that the q504_* and q655_* scenarios do
+// not play: the Tarlk Bugbear's amulet drop (a kill on the player's queue),
+// and the Wild Beast messenger's start event once the hall no longer waits.
+// Each boots the quest alone over its shipped pages and the shipped clan
+// halls, the two halls' next siege at hallContestSiegeAt.
 
 const (
 	q504Name = "Q504_CompetitionForTheBanditStronghold"
@@ -42,8 +41,6 @@ const (
 	crystalOfPurity    = 8084
 	trainerLicense     = 8293
 
-	// moonstoneHall is a clan hall sold at auction.
-	moonstoneHall = 22
 	// hallContestClan is the clan of the setups; hallContestChief leads it
 	// when the Seeker does not.
 	hallContestClan  = 7101
@@ -154,13 +151,6 @@ func datedPage(t *testing.T, quest, file, placeholder string) string {
 	return "S NpcHtmlMessage obj=messenger item=0 html=" + scriptcontract.Quote(strings.ReplaceAll(page, placeholder, date))
 }
 
-// registerPage is the rendered Wild Beast Reserve registration menu shown
-// by the messenger.
-func registerPage(t *testing.T) string {
-	t.Helper()
-	return "S NpcHtmlMessage obj=messenger item=0 html=" + scriptcontract.Quote(datapackPage(t, beastFarmRegisterPage))
-}
-
 // give has the quest named quest give the player count of itemID.
 func (w *dialogWorld) give(t *testing.T, quest string, itemID, count int32) {
 	t.Helper()
@@ -172,49 +162,6 @@ func wantLine(t *testing.T, what string, got []string, want string) {
 	t.Helper()
 	if !slices.Contains(got, want) {
 		t.Fatalf("%s = %q, want %s", what, got, want)
-	}
-}
-
-// TestQ504MessengerWaitsForTheSiege: until the Bandit Stronghold waits for
-// its battle, the messenger answers even a qualifying leader with the next
-// siege's date.
-func TestQ504MessengerWaitsForTheSiege(t *testing.T) {
-	t.Parallel()
-	w := bootHallContest(t, q504Path, q504.New, banditMessenger, banditStronghold, hallContestSetup{clanLevel: 4}, false, nil)
-	wantLine(t, "the messenger before the registrations close", w.talk(t, "messenger"), datedPage(t, q504Name, "35437-09.htm", "%nextSiege%"))
-	if vars := w.srv.QuestVars(t, w.player, q504Name); vars["<state>"] != "CREATED" {
-		t.Fatalf("Q504 after the date page = %v, want created", vars)
-	}
-}
-
-// TestQ504MessengerGatesTheClan: while the hall waits for its battle, the
-// messenger turns away a player in no clan or a clan below level 4, a
-// member who does not lead, a leader whose clan has a hall and a leader
-// who holds the trophy.
-func TestQ504MessengerGatesTheClan(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name   string
-		setup  hallContestSetup
-		trophy bool
-		page   string
-	}{
-		{"no clan", hallContestSetup{}, false, "35437-04.htm"},
-		{"level 3 clan", hallContestSetup{clanLevel: 3}, false, "35437-04.htm"},
-		{"member", hallContestSetup{clanLevel: 4, member: true}, false, "35437-05.htm"},
-		{"hall owner", hallContestSetup{clanLevel: 4, hall: moonstoneHall}, false, "35437-10.htm"},
-		{"trophy", hallContestSetup{clanLevel: 4}, true, "35437-07a.htm"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			w := bootHallContest(t, q504Path, q504.New, banditMessenger, banditStronghold, tc.setup, true,
-				func(srv *gameservertest.Server, objID int32) {
-					if tc.trophy {
-						srv.GiveItem(t, objID, trophyOfAlliance, 1)
-					}
-				})
-			wantLine(t, tc.name, w.talk(t, "messenger"), w.page(t, "messenger", q504Name, tc.page))
-		})
 	}
 }
 
@@ -257,25 +204,6 @@ func TestQ504AmuletsForTheTrophy(t *testing.T) {
 	wantLine(t, "the trophy holder", w.talk(t, "messenger"), w.page(t, "messenger", q504Name, "35437-07a.htm"))
 }
 
-// TestQ504CertificateWithoutTheQuest: a leader with no started quest who
-// still holds a certificate has it, the amulets and any trophy taken.
-func TestQ504CertificateWithoutTheQuest(t *testing.T) {
-	t.Parallel()
-	w := bootHallContest(t, q504Path, q504.New, banditMessenger, banditStronghold, hallContestSetup{clanLevel: 4}, true,
-		func(srv *gameservertest.Server, objID int32) {
-			srv.GiveItem(t, objID, contestCertificate, 1)
-			srv.GiveItem(t, objID, tarlkAmulet, 5)
-		})
-	got := w.talk(t, "messenger")
-	wantLine(t, "the certificate", got, w.page(t, "messenger", q504Name, "35437-06.htm"))
-	wantLine(t, "the certificate", got, "S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0")
-	for _, id := range []int32{contestCertificate, tarlkAmulet} {
-		if c := w.srv.PlayerItemCount(t, w.player, id); c != 0 {
-			t.Errorf("item %d after the certificate page = %d, want 0", id, c)
-		}
-	}
-}
-
 // TestQ655MessengerWaitsForTheSiege: until the Wild Beast Reserve waits for
 // its battle, the messenger answers a clan's leader with the next siege's
 // date. The start's event, sent once the hall no longer waits, starts
@@ -299,87 +227,4 @@ func TestQ655MessengerWaitsForTheSiege(t *testing.T) {
 		w := bootHallContest(t, q655Path, q655.New, beastFarmMessenger, beastFarm, hallContestSetup{}, true, nil)
 		wantLine(t, "no clan", w.talk(t, "messenger"), "S NpcHtmlMessage obj=messenger item=0 html="+scriptcontract.Quote(script.NoQuestMsg()))
 	})
-}
-
-// TestQ655MessengerGatesTheClan: while the hall waits for its battle, a
-// leader of a level 4 clan with no hall is offered the quest, one of a
-// lower clan or one whose clan has a hall is turned away, a member of the
-// hall's owner gets the registration menu and any other member is turned
-// away.
-func TestQ655MessengerGatesTheClan(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name  string
-		setup hallContestSetup
-		page  string
-	}{
-		{"leader", hallContestSetup{clanLevel: 4}, "35627-01.htm"},
-		{"level 3 leader", hallContestSetup{clanLevel: 3}, "35627-03.htm"},
-		{"hall owner", hallContestSetup{clanLevel: 4, hall: moonstoneHall}, "35627-04.htm"},
-		{"owner's member", hallContestSetup{clanLevel: 4, member: true, hall: beastFarm}, ""},
-		{"member", hallContestSetup{clanLevel: 4, member: true}, "35627-05.htm"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			w := bootHallContest(t, q655Path, q655.New, beastFarmMessenger, beastFarm, tc.setup, true, nil)
-			want := registerPage(t)
-			if tc.page != "" {
-				want = w.page(t, "messenger", q655Name, tc.page)
-			}
-			wantLine(t, tc.name, w.talk(t, "messenger"), want)
-		})
-	}
-}
-
-// TestQ655LicenseForTheCrystals plays the quest for a level 4 clan's
-// leader while the hall waits for its battle: the start sets cond 1, the
-// tenth crystal's second step trades the crystals for the trainer license
-// (cond 3), whose page's registration question shows the registration
-// menu. Once the hall stops waiting the question answers with its own
-// page, its date placeholder unfilled (the reference fills the event
-// name), and the next talk aborts the quest, its items with it.
-func TestQ655LicenseForTheCrystals(t *testing.T) {
-	t.Parallel()
-	w := bootHallContest(t, q655Path, q655.New, beastFarmMessenger, beastFarm, hallContestSetup{clanLevel: 4}, true, nil)
-	wantLine(t, "the offer", w.talk(t, "messenger"), w.page(t, "messenger", q655Name, "35627-01.htm"))
-
-	got := w.send(t, encodeBypass("Quest "+q655Name+" 35627-06.htm"))
-	wantLine(t, "the start", got, w.page(t, "messenger", q655Name, "35627-06.htm"))
-	wantLine(t, "the start", got, "S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0")
-	if vars := w.srv.QuestVars(t, w.player, q655Name); vars["<state>"] != "STARTED" || vars["<cond>"] != "1" {
-		t.Fatalf("Q655 after the start = %v, want started at cond 1", vars)
-	}
-	wantLine(t, "no crystals", w.talk(t, "messenger"), w.page(t, "messenger", q655Name, "35627-08.htm"))
-
-	// The tamed beasts' tenth crystal moves the quest to its second step.
-	w.give(t, q655Name, crystalOfPurity, 10)
-	w.srv.RunScript(t, w.player, q655Name, func(s *script.Script, p *script.Player) {
-		s.QuestState(p, q655Name).SetCond(2)
-	})
-
-	got = w.talk(t, "messenger")
-	wantLine(t, "ten crystals", got, w.page(t, "messenger", q655Name, "35627-10.htm"))
-	wantLine(t, "ten crystals", got, "S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0")
-	if vars := w.srv.QuestVars(t, w.player, q655Name); vars["<cond>"] != "3" {
-		t.Fatalf("Q655 after the license = %v, want cond 3", vars)
-	}
-	for id, n := range map[int32]int{crystalOfPurity: 0, trainerLicense: 1} {
-		if c := w.srv.PlayerItemCount(t, w.player, id); c != n {
-			t.Errorf("item %d after the license = %d, want %d", id, c, n)
-		}
-	}
-	wantLine(t, "the license holder", w.talk(t, "messenger"), w.page(t, "messenger", q655Name, "35627-09.htm"))
-	wantLine(t, "the registration question", w.send(t, encodeBypass("Quest "+q655Name+" 35627-11.htm")), registerPage(t))
-
-	wantLine(t, "the license holder", w.talk(t, "messenger"), w.page(t, "messenger", q655Name, "35627-09.htm"))
-	hallSiegeOf(t, w, beastFarm).SetStatus(siege.StatusInProgress)
-	wantLine(t, "the registration question in the siege", w.send(t, encodeBypass("Quest "+q655Name+" 35627-11.htm")),
-		w.page(t, "messenger", q655Name, "35627-11.htm"))
-	wantLine(t, "the time out", w.talk(t, "messenger"), w.page(t, "messenger", q655Name, "35627-07.htm"))
-	if st := w.srv.QuestVars(t, w.player, q655Name); st["<state>"] == "STARTED" {
-		t.Fatalf("Q655 after the time out = %v, want it ended", st)
-	}
-	if c := w.srv.PlayerItemCount(t, w.player, trainerLicense); c != 0 {
-		t.Errorf("licenses after the time out = %d, want 0", c)
-	}
 }

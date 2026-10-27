@@ -46,9 +46,9 @@ func TestQ127StoryPlaysTheScene(t *testing.T) {
 	)
 	w.spawnFolk(t, "rodemai", q127Rodemai, 40, 0, 0)
 
-	wantQ118Page(t, "cond 7", w.talk(t, "rodemai"), "30756-01.htm")
-	wantQ118Page(t, "story 1", w.send(t, encodeBypass("Quest "+q127Name+" 30756-02.htm")), "30756-02.htm")
-	wantQ118Page(t, "story 2", w.send(t, encodeBypass("Quest "+q127Name+" 30756-03.htm")), "30756-03.htm")
+	wantPage(t, "cond 7", w.talk(t, "rodemai"), "30756-01.htm")
+	wantPage(t, "story 1", w.send(t, encodeBypass("Quest "+q127Name+" 30756-02.htm")), "30756-02.htm")
+	wantPage(t, "story 2", w.send(t, encodeBypass("Quest "+q127Name+" 30756-03.htm")), "30756-03.htm")
 
 	w.srv.Client.Send(encodeBypass("Quest " + q127Name + " kamaelstory"))
 	var got []string

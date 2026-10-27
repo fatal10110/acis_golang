@@ -1,0 +1,24 @@
+# Competition for the Bandit Stronghold (Q504), a plain member: a clan member who does not lead it is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q504_competition_not_leader.golden
+character Leader 40
+clan 4
+mate Chief 40 leader
+hall 35 waiting date 4102444800000
+script quest.Q504_CompetitionForTheBanditStronghold
+script script.siegablehall.BanditStronghold
+item 4332 4333 5009
+page script/quest/Q504_CompetitionForTheBanditStronghold/
+page script/siegablehall/BanditStronghold/
+npc messenger 35437 Folk 10 0 0
+
+action messenger
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/BanditStronghold/azit_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q504_CompetitionForTheBanditStronghold/35437-05.htm
+  S ActionFailed
+  S ActionFailed
+  state Q504_CompetitionForTheBanditStronghold CREATED

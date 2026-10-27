@@ -112,6 +112,7 @@ var (
 	traceKill     = regexp.MustCompile(`^# kill (\d+) \(object (\d+)\)$`)
 	traceHit      = regexp.MustCompile(`^# hit (\d+) \(object (\d+)\) (\d+)$`)
 	traceAdvance  = regexp.MustCompile(`^# advance (\d+)$`)
+	traceHall     = regexp.MustCompile(`^# hallstatus (\d+) (registering|waiting|siege)$`)
 	traceApproach = regexp.MustCompile(`^# approach (\d+) \(object (\d+)\)$`)
 	traceNPC      = regexp.MustCompile(`^# npc (\S+) (\d+) \(object (\d+)\)$`)
 	traceDraw     = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
@@ -220,6 +221,9 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			m := traceHit.FindStringSubmatch(line)
 			seen[atoi32(m[2])] = atoi32(m[1])
 			raw = append(raw, rawStep{client: "hit " + m[1] + " " + m[3]})
+		case traceHall.MatchString(line):
+			m := traceHall.FindStringSubmatch(line)
+			raw = append(raw, rawStep{client: "hallstatus " + m[1] + " " + m[2]})
 		case traceAdvance.MatchString(line):
 			raw = append(raw, rawStep{client: "advance " + traceAdvance.FindStringSubmatch(line)[1]})
 		case (strings.HasPrefix(line, "S ") || strings.HasPrefix(line, "Q ") || strings.HasPrefix(line, "T ")) && len(raw) > 0:
@@ -564,6 +568,8 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 		}
 	case "tick":
 		return slices.Repeat([]string{"tick"}, times(st.Args)), nil
+	case "hallstatus":
+		return []string{"hallstatus " + st.Args[0] + " " + st.Args[1]}, nil
 	case "advance":
 		d, _ := time.ParseDuration(st.Args[0])
 		return []string{"advance " + strconv.FormatInt(d.Milliseconds(), 10)}, nil

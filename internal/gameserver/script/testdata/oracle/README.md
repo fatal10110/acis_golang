@@ -85,6 +85,15 @@ what the reference does in the scenario's own world:
   castle's siege (the castles load at boot), or, for owner, makes it the castle's owner on its
   siege's owner side, as the reference's restores leave a stored registration or ownership; each
   quest line puts its rows in the player's quest state before anything is recorded;
+- a `clan <level> hall <id>` line makes the clan the owner of that clan hall (`setOwnerId` and
+  `Clan.setClanHallId`, as the clan hall restore leaves a stored owner); a `hall <id> <status>
+  [date <ms>]` line puts the siegable hall's siege at that status (registering, waiting for its
+  battle, in progress) and, with a date, its stored next siege date (the reference replaces a stored
+  past date at boot, so a scenario stores a future one); a `hallstatus <id> <status>` step changes
+  it. The halls a scenario touched are given back (status, date, owner) after it. A `mate <name>
+  <level> leader` line (the only mate a traced scenario takes) is the clan's leader, a character
+  with no client, so offline: it creates the clan and the player joins it as a plain member. The
+  other mate flags, `as` and `enter <mate>` need a second client the probe does not have;
 - each NPC line's NPC is spawned at its offset from the player. Every NPC template is bound to
   the scenario's script and stub lines only, from the bindings the script loader left (copied
   before the contract scenes change some), since the Go runner registers no other script:
@@ -294,6 +303,8 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # kill <npc id> (object <id>)   the probe kills a monster for the player
 # hit <npc id> (object <id>) <damage>   a scenario trace: the player lands a hit of that damage
 # advance <ms>                  a scenario trace: that much virtual time passes, in T ticks
+# hallstatus <id> <status>      a scenario trace: the siegable hall's siege changes to that status (registering,
+                                waiting, siege)
 # draw <bound>:<value> <class>  a scenario trace: a script draw the random line pinned, and the
                                 class that drew it
 # npc <role> <npc id> (object <id>)   a scenario trace: the probe spawned the NPC line's NPC

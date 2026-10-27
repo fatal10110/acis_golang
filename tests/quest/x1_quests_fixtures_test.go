@@ -140,3 +140,20 @@ func (w *dialogWorld) bypassAll(t *testing.T, command string) []string {
 	}
 	return out
 }
+
+// started is the rows of a started quest at cond with vars.
+func started(cond int, vars ...string) map[string]string {
+	m := map[string]string{"<state>": "STARTED", "<cond>": strconv.Itoa(cond)}
+	for i := 0; i+1 < len(vars); i += 2 {
+		m[vars[i]] = vars[i+1]
+	}
+	return m
+}
+
+// wantPage fails unless got shows the stand-in page file.
+func wantPage(t *testing.T, step string, got []string, file string) {
+	t.Helper()
+	if !shows(got, file) {
+		t.Fatalf("%s: got %q, want the page %s", step, got, file)
+	}
+}

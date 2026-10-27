@@ -1,5 +1,5 @@
 # The Leader and the Follower (Q123), no academy: Newyear has no quest for a level 19 character with neither a
-# sponsor nor an apprentice. The sponsor branches are the Boot tests of tests/quest/q123_academy_test.go (#4175).
+# sponsor nor an apprentice. The sponsor branches are the *_academy_* scenarios.
 # Expectations replay the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_no_sponsor.golden
 character Pupil 19

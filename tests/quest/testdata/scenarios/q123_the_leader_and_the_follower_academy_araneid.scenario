@@ -1,0 +1,28 @@
+# The Leader and the Follower (Q123), the araneid leg needs the sponsor: at cond 7 the araneid drops no leg while the sponsor is out of the world, the quest kept; with the sponsor in the world beside, the eighth leg moves the quest to cond 8.
+# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor
+quest Q123_TheLeaderAndTheFollower <cond>=7 <state>=STARTED state=4 stateEx=1
+hold 8550 7
+random always 0
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+npc araneid 27322 Monster 40 0 0
+
+kill araneid
+  S SystemMessage id=95 1:0 1:0
+  items 8550=7
+enter Chief
+kill araneid
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8550
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 123:0x800000ff
+  S ExShowQuestMark quest=123
+  Q upsert Q123_TheLeaderAndTheFollower | <cond> | 8
+  items 8550=8

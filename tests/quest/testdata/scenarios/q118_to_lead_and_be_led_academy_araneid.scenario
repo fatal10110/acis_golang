@@ -1,0 +1,28 @@
+# To Lead and Be Led (Q118), the araneid leg needs the sponsor: at cond 7 the araneid drops no leg while the sponsor is out of the world, the quest kept; with the sponsor in the world beside, the eighth leg moves the quest to cond 8.
+# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor
+quest Q118_ToLeadAndBeLed <cond>=7 <state>=STARTED state=4 stateEx=1
+hold 8063 7
+random always 0
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+npc araneid 20927 Monster 40 0 0
+
+kill araneid
+  S SystemMessage id=95 1:0 1:0
+  items 8063=7
+enter Chief
+kill araneid
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8063
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 118:0x800000ff
+  S ExShowQuestMark quest=118
+  Q upsert Q118_ToLeadAndBeLed | <cond> | 8
+  items 8063=8

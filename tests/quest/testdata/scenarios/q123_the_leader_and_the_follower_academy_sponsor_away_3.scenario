@@ -1,0 +1,31 @@
+# The Leader and the Follower (Q123), the chosen armor waits for the sponsor: with its armor set chosen (stateEx 3), an apprentice whose sponsor is out of the world is told to bring it; with the sponsor in the world beside it, the NPC names the price of its set.
+# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor
+quest Q123_TheLeaderAndTheFollower <cond>=5 <state>=STARTED state=2 stateEx=3
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-07.htm
+  S ActionFailed
+  S ActionFailed
+enter Chief
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-06e.htm
+  S ActionFailed
+  S ActionFailed

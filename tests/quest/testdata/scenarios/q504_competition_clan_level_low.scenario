@@ -1,0 +1,23 @@
+# Competition for the Bandit Stronghold (Q504), clan below level 4: the leader of a level 3 clan is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q504_competition_clan_level_low.golden
+character Leader 40
+clan 3
+hall 35 waiting date 4102444800000
+script quest.Q504_CompetitionForTheBanditStronghold
+script script.siegablehall.BanditStronghold
+item 4332 4333 5009
+page script/quest/Q504_CompetitionForTheBanditStronghold/
+page script/siegablehall/BanditStronghold/
+npc messenger 35437 Folk 10 0 0
+
+action messenger
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/BanditStronghold/azit_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q504_CompetitionForTheBanditStronghold/35437-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q504_CompetitionForTheBanditStronghold CREATED

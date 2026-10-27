@@ -1,0 +1,27 @@
+# The Leader and the Follower (Q123), lizardmen bleed for an apprentice: with a sponsor, even out of the world, a lizardman kill at cond 1 drops a blood on a roll under 700000 of 1000000 (700000 drops none, 699999 one), and the tenth blood moves the quest to cond 2.
+# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor
+quest Q123_TheLeaderAndTheFollower <cond>=1 <state>=STARTED state=1
+hold 8549 9
+random 700000 699999
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+npc lizard 27321 Monster 40 0 0
+
+kill lizard
+  S SystemMessage id=95 1:0 1:0
+  items 8549=9
+kill lizard
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8549
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 123:0x80000003
+  S ExShowQuestMark quest=123
+  Q upsert Q123_TheLeaderAndTheFollower | <cond> | 2
+  items 8549=10

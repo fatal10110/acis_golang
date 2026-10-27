@@ -1,0 +1,62 @@
+# To Lead and Be Led (Q118), the sponsor pays for the armor: the sponsor, in the world beside its apprentice with 772 D-grade crystals, pays for the set of stateEx 3 (it moves its apprentice to cond 6 with the sound played to the apprentice, then the apprentice moves on to cond 7 and the sponsor sees it).
+# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor online hold 1458 772
+quest Q118_ToLeadAndBeLed <cond>=5 <state>=STARTED state=2 stateEx=3
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+as Chief action pinter
+as Chief action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+as Chief bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-08.htm
+  S ActionFailed
+  S ActionFailed
+as Chief bypass Quest Q118_ToLeadAndBeLed 30298-10.htm
+  S SystemMessage id=301 3:1458 6:771
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-10.htm
+  S ActionFailed
+  to player QuestList 118:0x8000003f
+  to player ExShowQuestMark quest=118
+  to player PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q118_ToLeadAndBeLed | <cond> | 6
+  Q upsert Q118_ToLeadAndBeLed | state | 3
+as Chief action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+as Chief bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-12.htm
+  S ActionFailed
+  S ActionFailed
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S QuestList 118:0x8000007f
+  S ExShowQuestMark quest=118
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-15.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q118_ToLeadAndBeLed | <cond> | 7
+  Q upsert Q118_ToLeadAndBeLed | state | 4
+as Chief action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+as Chief bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-14.htm
+  S ActionFailed
+  S ActionFailed
+  items Chief 1458=1

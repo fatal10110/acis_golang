@@ -1,0 +1,62 @@
+# The Leader and the Follower (Q123), the sponsor pays for the armor: the sponsor, in the world beside its apprentice with 772 D-grade crystals, pays for the set of stateEx 3 (it moves its apprentice to cond 6 with the sound played to the apprentice, then the apprentice moves on to cond 7 and the sponsor sees it).
+# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
+# and the clan mate lines of the scenario format (#4175).
+character Pupil 19
+clan 3
+mate Chief 19 leader sponsor online hold 1458 772
+quest Q123_TheLeaderAndTheFollower <cond>=5 <state>=STARTED state=2 stateEx=3
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+
+as Chief action newyear
+as Chief action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+as Chief bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-08.htm
+  S ActionFailed
+  S ActionFailed
+as Chief bypass Quest Q123_TheLeaderAndTheFollower 31961-10.htm
+  S SystemMessage id=301 3:1458 6:771
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-10.htm
+  S ActionFailed
+  to player QuestList 123:0x8000003f
+  to player ExShowQuestMark quest=123
+  to player PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q123_TheLeaderAndTheFollower | <cond> | 6
+  Q upsert Q123_TheLeaderAndTheFollower | state | 3
+as Chief action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+as Chief bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-12.htm
+  S ActionFailed
+  S ActionFailed
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S QuestList 123:0x8000007f
+  S ExShowQuestMark quest=123
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-15.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q123_TheLeaderAndTheFollower | <cond> | 7
+  Q upsert Q123_TheLeaderAndTheFollower | state | 4
+as Chief action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+as Chief bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q123_TheLeaderAndTheFollower/31961-14.htm</body></html>"
+  S ActionFailed
+  S ActionFailed
+  items Chief 1458=1

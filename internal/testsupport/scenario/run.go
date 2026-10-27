@@ -104,6 +104,9 @@ type run struct {
 	grounds map[int32]bool
 	// members are the member lines' characters and their clients.
 	members []member
+	// mates are the mate lines' characters; a client is set once the mate
+	// entered the world.
+	mates []mateClient
 	// summon is the summon line's summon once called.
 	summon *summon.Actor
 	// items is the item catalog the server runs with.
@@ -287,13 +290,20 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	default:
 		opts = append(opts, gameservertest.WithCharacter(r.sc.Character, r.sc.Level, 0))
 	}
-	if r.sc.Clan >= 0 {
+	if r.sc.Clan >= 0 || r.sc.usesHalls() {
 		opts = append(opts, gameservertest.WithClanSeed(func(db *sql.DB) {
-			seedClan(t, db, r.sc.Character, r.sc.Clan)
+			if r.sc.Clan >= 0 {
+				seedClan(t, db, r.sc.Character, r.sc.Clan)
+				seedMates(t, db, r.sc)
+			}
 			if r.sc.Siege != nil {
 				seedSiege(t, db, r.sc.Siege)
 			}
+			seedHalls(t, db, r.sc)
 		}))
+	}
+	if r.sc.usesHalls() {
+		opts = append(opts, hallOptions(t)...)
 	}
 	if r.sc.Siege != nil {
 		opts = append(opts, siegeOptions(t)...)
@@ -319,6 +329,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		}
 	}
 	r.checkSiege(t)
+	r.checkMates(t)
+	r.setHalls(t)
+	r.seedMateHolds(t)
 	// The journal and the experience are read when the character is
 	// selected.
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
@@ -357,6 +370,7 @@ func (r *run) spawnNPCs(t *testing.T) {
 	x, y, z := r.srv.PlayerPosition(t, r.player)
 	r.origin = location.Location{X: x, Y: y, Z: z}
 	r.enterMembers(t)
+	r.enterOnlineMates(t)
 	for _, tr := range r.sc.Territories {
 		r.makers[tr.Name] = r.maker(t, tr)
 	}
@@ -369,6 +383,7 @@ func (r *run) spawnNPCs(t *testing.T) {
 	r.placeFight(t)
 	r.srv.ReadQueued(t, r.srv.Client)
 	r.drainMembers(t)
+	r.drainMates(t)
 }
 
 // scenarioClan is the object id of the clan a clan line seeds.
@@ -620,12 +635,12 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		t.Helper()
 		t.Fatalf("%s step %d (line %d) %q: %s", r.sc.Name, i+1, st.Line, st, fmt.Sprintf(format, args...))
 	}
-	c := r.srv.Client
+	c, actor := r.actor(t, st.As)
 	// frames is what the step sent, when the verb reads it itself.
 	var frames [][]byte
 	switch st.Verb {
 	case "action":
-		x, y, z := r.srv.PlayerPosition(t, r.player)
+		x, y, z := r.srv.PlayerPosition(t, actor)
 		w := wire.NewPacketWriter(clientpackets.OpcodeAction)
 		w.WriteInt32(r.objs[st.Args[0]])
 		w.WriteInt32(int32(x))
@@ -705,7 +720,14 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
 		frames = r.readThrough(t, serverpackets.OpcodeCharSelectInfo)
 	case "enter":
+		if len(st.Args) == 1 {
+			r.enterMate(t, r.mateIndex(t, st.Args[0]))
+			break
+		}
 		frames = r.enterWorld(t)
+	case "hallstatus":
+		id, _ := strconv.Atoi(st.Args[0])
+		r.setHallStatus(t, id, st.Args[1])
 	case "create":
 		c.Send(characterCreate(r.sc.Character))
 		frames = r.readThrough(t, serverpackets.OpcodeCharCreateOk)
@@ -714,6 +736,10 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	}
 	frames = append(frames, r.srv.ReadQueued(t, c)...)
 	r.drainMembers(t)
+	others, err := r.othersSent(t, c)
+	if err != nil {
+		fail("%v", err)
+	}
 	drawn, bad := r.draws.take()
 	if len(bad) > 0 {
 		fail("script random: %s", strings.Join(bad, "; "))
@@ -721,7 +747,23 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if d := traceDrawDiff(r.traceDraws, i, drawn); d != "" {
 		fail("%s (want: the trace's)", d)
 	}
-	if st.Verb != "relog" {
+	if st.Verb != "relog" && !(st.Verb == "enter" && len(st.Args) == 1) {
+		sentTo := map[string]bool{}
+		for name := range others {
+			sentTo[name] = true
+		}
+		for name := range st.To {
+			sentTo[name] = true
+		}
+		for name := range sentTo {
+			want, err := expandPackets(st.To[name], r.texts)
+			if err != nil {
+				fail("%v", err)
+			}
+			if d := FirstDiff("packet to "+name, others[name], want); d != "" {
+				fail("%s", d)
+			}
+		}
 		var got []string
 		for _, f := range frames {
 			if line, ok := r.groundDeleted(f); ok {
@@ -867,10 +909,14 @@ func (r *run) check(t *testing.T, ck Check) string {
 	switch ck.Kind {
 	case "items":
 		var got, want []string
-		for _, a := range ck.Args {
+		owner, args := r.player, ck.Args
+		if !strings.Contains(args[0], "=") {
+			owner, args = mateObject(r.mateIndex(t, args[0])), args[1:]
+		}
+		for _, a := range args {
 			id, count, _ := strings.Cut(a, "=")
 			n, _ := strconv.ParseInt(id, 10, 32)
-			got = append(got, fmt.Sprintf("%s=%d", id, r.srv.PlayerItemCount(t, r.player, int32(n))))
+			got = append(got, fmt.Sprintf("%s=%d", id, r.srv.PlayerItemCount(t, owner, int32(n))))
 			want = append(want, id+"="+count)
 		}
 		return FirstDiff("item", got, want)
