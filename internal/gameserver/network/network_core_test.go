@@ -64,11 +64,11 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 		t.Fatalf("set read deadline: %v", err)
 	}
 
-	gameLink := &GameClientLink{
-		log:       zerolog.Nop(),
-		noCipher:  true,
-		loginLink: func() *LoginLink { return nil },
-	}
+	gameLink := newBareGameClientLink(t, GameClientLinkConfig{
+		Flow:      CharacterFlowConfig{NoCipher: true},
+		LoginLink: func() *LoginLink { return nil },
+		Log:       zerolog.Nop(),
+	})
 	done := make(chan struct{})
 	go func() {
 		gameLink.Handle(context.Background(), conn)

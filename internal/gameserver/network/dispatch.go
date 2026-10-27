@@ -296,7 +296,6 @@ type PlayerConfig struct {
 // against the login server, character list/create/delete/restore, and
 // character select through to world entry.
 type GameClientLink struct {
-	validator *SessionValidator
 	// clients is the process-owned account-to-connection registry: a second
 	// AuthLogin for an account already claimed evicts the prior connection
 	// instead of being rejected.
@@ -336,7 +335,6 @@ type GameClientLink struct {
 	pvpFlags      *task.PvPFlags
 	effects       effect.Env
 	positions     *task.PositionUpdates
-	playerClock   *task.PlayerClock
 	gameClock     *task.GameClock
 	shutdown      *shutdown.Countdown
 	loginStatus   *LoginStatus
@@ -347,7 +345,6 @@ type GameClientLink struct {
 	raidPoints    *raidpoint.Points
 	water         *task.Water
 	shadowItems   *task.ShadowItems
-	autosave      *task.Autosave
 	// inventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	inventoryUpdates *task.InventoryUpdates
@@ -364,7 +361,6 @@ type GameClientLink struct {
 	itemWrites   *persist.Order
 	persistWait  time.Duration
 	queues       Queues
-	selections   selectingOwners
 	restarts     *restart.Table
 	observers    *observer.Table
 	clanHallData *hallmodel.Table
@@ -402,14 +398,13 @@ type GameClientLink struct {
 	castleManor      *castlemanor.Manager
 	sieges           *siege.Engine
 	clanWarehouses   clanWarehouseBook
+	flow             characterFlow
 	enchanting       enchanting
 	summoning        summoning
 	targets          *skilltarget.Registry
 	skillHandlers    *handlerskill.Registry
 	chance           *actorcast.ChanceProcs
 	log              zerolog.Logger
-
-	noCipher bool
 
 	// now supplies wall time for packet accounting; nil falls back to
 	// time.Now at the call site. Overridden in tests for deterministic
@@ -539,9 +534,8 @@ type Queues interface {
 
 // GameClientLinkConfig contains the collaborators required by GameClientLink.
 type GameClientLinkConfig struct {
-	Validator *SessionValidator
-	// NoCipher keeps game packets cleartext after VersionCheck.
-	NoCipher    bool
+	// Flow is what the character flow, from AuthLogin to detach, runs on.
+	Flow        CharacterFlowConfig
 	LoginLink   func() *LoginLink
 	Roster      *manager.Roster
 	Items       itemStore
@@ -587,10 +581,9 @@ type GameClientLinkConfig struct {
 	// places fences on no geodata.
 	Fences *fence.Manager
 	// Decay removes a dead summon's corpse once its decay delay has passed.
-	Decay       *task.Decay
-	Effects     effect.Env // Activity required: without it no effect expires
-	Positions   *task.PositionUpdates
-	PlayerClock *task.PlayerClock
+	Decay     *task.Decay
+	Effects   effect.Env // Activity required: without it no effect expires
+	Positions *task.PositionUpdates
 	// GameClock is the server's in-game clock; CharSelected reports its
 	// current minute of day. Nil is tolerated (tests) and reports 0.
 	GameClock *task.GameClock
@@ -607,7 +600,6 @@ type GameClientLinkConfig struct {
 	SignsPriest *signspriest.Config
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
-	Autosave    *task.Autosave
 	// InventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	InventoryUpdates *task.InventoryUpdates
@@ -849,7 +841,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		return nil, errors.New("network: GameClientLinkConfig.Effects.Activity is required")
 	}
 	link := &GameClientLink{
-		validator:     cfg.Validator,
 		clients:       NewClientRegistry(),
 		loginLink:     cfg.LoginLink,
 		roster:        cfg.Roster,
@@ -881,7 +872,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		pvpFlags:      cfg.PvPFlags,
 		effects:       cfg.Effects,
 		positions:     cfg.Positions,
-		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
 		shutdown:      cfg.Shutdown,
 		loginStatus:   cfg.LoginStatus,
@@ -892,7 +882,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		raidPoints:    cfg.RaidPoints,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
-		autosave:      cfg.Autosave,
 
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,
@@ -926,6 +915,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		characterEdits:   cfg.CharacterEdits,
 		punishments:      cfg.Punishments,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
+		flow:             newCharacterFlow(cfg.Flow),
 		enchanting:       newEnchanting(cfg),
 		summoning:        newSummoning(cfg),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
@@ -941,9 +931,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 
 			ManorCropRate: cfg.Manor.CropRate,
 		}),
-		log:      cfg.Log,
-		now:      cfg.Now,
-		noCipher: cfg.NoCipher,
+		log: cfg.Log,
+		now: cfg.Now,
 	}
 	playerConfig := cfg.PlayerConfig
 	link.playerSettings.Store(&playerConfig)
