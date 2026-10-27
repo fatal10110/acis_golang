@@ -323,8 +323,9 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 // before it (script engine plan, section 9, item 4); from a hook on the
 // player's own queue it runs inside the call, as in the reference. queues
 // names, in order, the queue of each task that teleports or casts with the
-// player ("own" or "other", the step's queue line); nil leaves a client
-// packet's own run on the player's queue and every other task on another.
+// player ("own", "other" or "other+n", the step's queue line); nil leaves a
+// client packet's own run on the player's queue and every other task on
+// another.
 func stepPackets(tasks []traceTask, queues []string) ([]string, error) {
 	moving := 0
 	for _, t := range tasks {
@@ -339,12 +340,16 @@ func stepPackets(tasks []traceTask, queues []string) ([]string, error) {
 	for _, t := range tasks {
 		lines := t.sent
 		if slices.ContainsFunc(lines, movesPlayer) {
-			own := t.own
+			own, effects := t.own, 0
 			if queues != nil {
-				own, queues = queues[0] == "own", queues[1:]
+				own, effects, _ = queueTask(queues[0])
+				queues = queues[1:]
 			}
 			if !own {
-				lines = deferPlayerActions(lines)
+				var err error
+				if lines, err = deferPlayerActions(lines, effects); err != nil {
+					return nil, err
+				}
 			}
 		}
 		sent = append(sent, lines...)
@@ -355,21 +360,27 @@ func stepPackets(tasks []traceTask, queues []string) ([]string, error) {
 // movesPlayer reports whether a rendered packet is a script's teleport of
 // the player or its cast with the player as caster.
 func movesPlayer(line string) bool {
-	return isPlayerTeleport(line) || strings.HasPrefix(line, "MagicSkillUse caster=player ")
+	return isPlayerTeleport(line) || isPlayerCast(line)
 }
 
 func isPlayerTeleport(line string) bool {
 	return strings.HasPrefix(line, "TeleportToLocation obj=player ")
 }
 
+func isPlayerCast(line string) bool {
+	return strings.HasPrefix(line, "MagicSkillUse caster=player ")
+}
+
 // deferPlayerActions moves each teleport of the player among task, the
 // rendered packets of a task whose hook ran on another queue than the
 // player's, to the end of task, with the ActionFailed lines right before it
-// (its aborts'), and each cast with the player as caster with the teleport
-// that follows it (the skill's, after its aborts), in their order. A cast's
-// other effect packets (a system message) stay in place, though the Go run
-// sends them after the cast (#4172).
-func deferPlayerActions(task []string) []string {
+// (its aborts'), and each cast with the player as caster with what the Go run
+// sends right after it, in their order. That is the teleport that follows it
+// (the skill's, after its aborts) or, when effects is above 0, exactly the
+// effects lines after the cast: the cast's effect packets, which the trace
+// does not tell from the hook's own, so the scenario counts them. A cast
+// followed by fewer lines than that is an error.
+func deferPlayerActions(task []string, effects int) ([]string, error) {
 	var rest, moved []string
 	for i := 0; i < len(task); i++ {
 		line := task[i]
@@ -382,13 +393,20 @@ func deferPlayerActions(task []string) []string {
 			moved = append(moved, rest[start:]...)
 			moved = append(moved, line)
 			rest = rest[:start]
-		case strings.HasPrefix(line, "MagicSkillUse caster=player "):
-			end := i + 1
-			for end < len(task) && task[end] == "ActionFailed" {
-				end++
-			}
-			if end == len(task) || !isPlayerTeleport(task[end]) {
-				end = i
+		case isPlayerCast(line):
+			var end int
+			if effects > 0 {
+				if end = i + effects; end >= len(task) {
+					return nil, fmt.Errorf("the queue line moves %d lines with the cast %q, the task has %d after it", effects, line, len(task)-i-1)
+				}
+			} else {
+				end = i + 1
+				for end < len(task) && task[end] == "ActionFailed" {
+					end++
+				}
+				if end == len(task) || !isPlayerTeleport(task[end]) {
+					end = i
+				}
 			}
 			moved = append(moved, task[i:end+1]...)
 			i = end
@@ -396,7 +414,7 @@ func deferPlayerActions(task []string) []string {
 			rest = append(rest, line)
 		}
 	}
-	return append(rest, moved...)
+	return append(rest, moved...), nil
 }
 
 // checkTrace requires the scenario's steps to replay the trace: the same
