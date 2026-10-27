@@ -32,6 +32,11 @@ jq -nrj --raw-input '
   | .Output
 ' "$events"
 
+# A real-pool run skips the rest of a test at a long wait (gameservertest's
+# Server.Advance); name each test it cut, which the filter above drops.
+jq -rj 'select(.Action == "output" and (.Output | contains("the driven clock covers the rest")))
+  | "cut on the wall clock: \(.Package) \(.Test)\(.Output | sub("^\\s+"; " "))"' "$events"
+
 echo
 echo "Slowest packages and tests:"
 go run ./cmd/testtiming -n 15 <"$events" || true

@@ -31,6 +31,9 @@ type queues struct {
 	inline      *sim.Inline
 	advance     func(d time.Duration)
 	advanceThen func(d time.Duration, then func())
+	// passOfSuite is set when SimExecutorEnv, not WithRealPool, put the
+	// test on the real pool: the suite's inline pass covers it too.
+	passOfSuite bool
 
 	mu  sync.Mutex
 	all []*sim.Queue
@@ -112,7 +115,7 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 				tb.Errorf("stop sim pool: %v", err)
 			}
 		})
-		return &queues{newQueue: pool.NewQueue}
+		return &queues{newQueue: pool.NewQueue, passOfSuite: !realPool}
 	case "", "inline":
 		return startInline(tb)
 	default:

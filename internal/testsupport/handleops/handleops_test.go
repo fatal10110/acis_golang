@@ -33,7 +33,7 @@ func TestScriptFollowsEveryCallShape(t *testing.T) {
 		{"Direct", map[string][]string{"OnAttacked": {"NPC.InCombat"}}},
 		{"LocalVar", map[string][]string{"OnAttacked": {"NPC.Rooted"}}},
 		{"Field", map[string][]string{"OnAttacked": {"NPC.MaxMP"}}},
-		{"Map", map[string][]string{"OnAttacked": {"NPC.StopAttack"}}},
+		{"Map", map[string][]string{"OnAttacked": {"NPC.CleanAllHate"}}},
 		{"Range", map[string][]string{"OnAttacked": {"NPC.Muted"}}},
 		{"Named", map[string][]string{"OnAttacked": {"NPC.PhysicalMuted"}}},
 		{"Returned", map[string][]string{"OnAttacked": {"NPC.InCombat"}}},

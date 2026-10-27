@@ -11,11 +11,5 @@ func quests201To250HandleOps() map[string]script.HandleOps {
 		"quest.Q216_TrialOfTheGuildsman": {
 			"OnMyDying": {"NPC.ActualSpoiler"},
 		},
-		"quest.Q227_TestOfTheReformer": {
-			"OnTimer": {"NPC.StopAttack"},
-		},
-		"quest.Q229_TestOfWitchcraft": {
-			"OnTimer": {"NPC.StopAttack"},
-		},
 	}
 }
