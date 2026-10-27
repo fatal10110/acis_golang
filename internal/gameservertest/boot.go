@@ -199,6 +199,7 @@ type options struct {
 	weightLimitMultiplier  float64
 	regenMultipliers       creature.RegenMultipliers
 	partyRange             int
+	eventRules             *script.EventRules
 	inventorySlots         player.InventorySlots
 	storageSlots           player.StorageSlots
 	freight                *network.FreightConfig
@@ -2176,8 +2177,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	buyListStore := gamesql.NewBuyListStore(db)
 	shops, stock := bootMerchant(t, o.merchant, buyListStore, persistWorker, ids, o.log)
 	killRewards := gamemanager.NewKillRewardBook(fixtureKillRewards(o))
+	events := script.NewEventBook(fixtureEventRules(o))
 	gclConfig := network.GameClientLinkConfig{
 		KillRewards:      killRewards,
+		Events:           events,
 		Merchant:         shops,
 		Validator:        validator,
 		Effects:          effectEnv,
@@ -2299,7 +2302,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, o)
+	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
 	quests.memos = &memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
 	gclConfig.Memos = quests.memos

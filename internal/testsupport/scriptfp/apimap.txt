@@ -293,7 +293,7 @@ Creature.getAllEffects inline
 Creature.getAttack inline
 Creature.getMove inline
 Creature.getStatus inline
-Creature.instantTeleportTo InstantTeleportTo
+Creature.instantTeleportTo InstantTeleportTo,InstantTeleportNear
 Creature.isDead Dead
 Creature.isParalyzed script.NPC.Paralyzed
 Creature.isStunned script.NPC.Stunned

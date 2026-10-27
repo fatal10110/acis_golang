@@ -124,6 +124,7 @@ func provideGameClientLink(
 	effectEnv effect.Env,
 	gameplay gameplayConfig,
 	rewards manager.KillRewardConfig,
+	events *script.EventBook,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	worker *persist.Worker,
@@ -283,6 +284,7 @@ func provideGameClientLink(
 
 		Reloads:     reloads,
 		KillRewards: rewards.Settings,
+		Events:      events,
 		BossZones:   bossZones,
 
 		Shutdown:    countdown,

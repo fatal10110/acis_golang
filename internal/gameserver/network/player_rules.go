@@ -42,7 +42,8 @@ func enchantRates(settings *PlayerConfig) enchantflow.Config {
 // applyPlayerConfig puts settings in force in place of the ones before: the
 // link's own reads, the rules of every character and summon, whether online
 // or still to come, the kill reward settings the kill rewards, party loot,
-// the scripts and every item creation read, and the switches the enchant,
+// the scripts and every item creation read, the event settings the event
+// quests read, and the switches the enchant,
 // skill, craft and multisell services read. Each group changes whole, so one action reads
 // one group's settings from before or after, never a mix.
 func (l *GameClientLink) applyPlayerConfig(settings *PlayerConfig) {
@@ -50,6 +51,9 @@ func (l *GameClientLink) applyPlayerConfig(settings *PlayerConfig) {
 	l.playerRules.Set(l.characterRules(settings))
 	if settings.KillRewards != nil {
 		l.killRewards.Set(*settings.KillRewards)
+	}
+	if settings.Events != nil {
+		l.events.Set(*settings.Events)
 	}
 	l.enchanting.items.SetConfig(enchantRates(settings))
 	l.skillHandlers.SetMagicFailures(settings.MagicFailures)

@@ -53,6 +53,9 @@ type Env struct {
 	// force, read at each use; nil reads a zero range and gives a
 	// non-stackable counted above one as one instance.
 	Drops DropRules
+	// Events holds the event settings in force, read at each use; nil
+	// reads the shipped ones.
+	Events *EventBook
 	// NewItemID allocates an item instance's object id.
 	NewItemID func() (int32, error)
 	// Spawner spawns the NPCs scripts place in the world.

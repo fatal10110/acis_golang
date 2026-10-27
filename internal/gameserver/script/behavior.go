@@ -289,6 +289,8 @@ type CreatureSlot = npc.CreatureSlot
 // The script memory slots a behavior reads and writes. Param1 to Param3
 // hold the spawn parameters a private started with; WeightPoint, 1 until a
 // script sets it, holds a private's weight point from its declaration.
+// AVQuest0 and AVQuest1 are the two a quest claims an NPC through with
+// CompareAndExchangeInt.
 const (
 	SlotIntAI0      = npc.IntAI0
 	SlotIntAI1      = npc.IntAI1
@@ -300,6 +302,8 @@ const (
 	SlotParam3      = npc.IntParam3
 	SlotFlag        = npc.IntFlag
 	SlotWeightPoint = npc.IntWeightPoint
+	SlotAVQuest0    = npc.IntAVQuest0
+	SlotAVQuest1    = npc.IntAVQuest1
 	SlotCreature0   = npc.CreatureAI0
 	SlotCreature1   = npc.CreatureAI1
 	SlotCreature2   = npc.CreatureAI2
@@ -312,6 +316,13 @@ func (n *NPC) Int(slot IntSlot) int32 { return n.scratch().Int(slot) }
 
 // SetInt stores v in slot of the NPC's script memory.
 func (n *NPC) SetInt(slot IntSlot, v int32) { n.scratch().SetInt(slot, v) }
+
+// CompareAndExchangeInt stores v in slot when it holds expected, in one
+// step no other reader or writer of the slot can come between, and returns
+// the value slot held before the call either way.
+func (n *NPC) CompareAndExchangeInt(slot IntSlot, expected, v int32) int32 {
+	return n.scratch().CompareAndExchangeInt(slot, expected, v)
+}
 
 // Slot returns the creature the NPC's script memory holds in slot, nil
 // for none. It is the creature stored, whatever became of it since.
