@@ -109,6 +109,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q617"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q618"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q619"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q620"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q621"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q622"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q623"
@@ -257,7 +258,7 @@ func quests301Up() script.Catalog {
 		"quest.Q617_GatherTheFlames":                   q617.New,
 		"quest.Q618_IntoTheFlame":                      q618.New,
 		"quest.Q619_RelicsOfTheOldEmpire":              q619.New,
-		"quest.Q620_FourGoblets":                       nil,
+		"quest.Q620_FourGoblets":                       q620.New,
 		"quest.Q621_EggDelivery":                       q621.New,
 		"quest.Q622_SpecialtyLiquorDelivery":           q622.New,
 		"quest.Q623_TheFinestFood":                     q623.New,

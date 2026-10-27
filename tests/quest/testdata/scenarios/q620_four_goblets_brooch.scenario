@@ -1,0 +1,77 @@
+# Four Goblets (Q620): a character who holds the antique brooch takes the quest at its second step, then gives it up. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q620_four_goblets_brooch.golden
+character Hero 74
+random always 0
+hold 7262 1
+script quest.Q620_FourGoblets
+item 7254 7255 7256 7257 7258 7259 7260 7261 7262
+page default/31453.htm
+page script/quest/Q620_FourGoblets/
+npc spirit 31453 Folk 10 0 0
+
+action spirit
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-02.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-02.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-03.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-03.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-04.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-04.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-05.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-05.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-06.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-06.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-07.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-07.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-08.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-08.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-09.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-09.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-10.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-10.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-11.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-11.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-13.htm
+  S QuestList 620:0x80000003
+  S ExShowQuestMark quest=620
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-19.htm
+  S ActionFailed
+  Q upsert Q620_FourGoblets | <state> | STARTED
+  Q upsert Q620_FourGoblets | <cond> | 2
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-17.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-18.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-18.htm
+  S ActionFailed
+  Q delete-quest Q620_FourGoblets
+  state Q620_FourGoblets -

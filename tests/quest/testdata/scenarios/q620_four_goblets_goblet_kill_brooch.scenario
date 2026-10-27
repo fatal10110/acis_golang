@@ -1,0 +1,16 @@
+# Four Goblets (Q620): a character that has the brooch gets no goblet. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q620_four_goblets_goblet_kill_brooch.golden
+character Hero 74
+quest Q620_FourGoblets <cond>=2 <state>=STARTED
+random always 0
+hold 7262 1
+script quest.Q620_FourGoblets
+item 7254 7255 7256 7257 7258 7259 7260 7261 7262
+page script/quest/Q620_FourGoblets/
+npc boss 25342 Monster 40 0 0
+npc wigoth 31452 Folk 90 0 0
+
+kill boss
+  S SystemMessage id=95 1:0 1:0
+  Q upsert Q620_FourGoblets | completed | true
+  items 7256=0
