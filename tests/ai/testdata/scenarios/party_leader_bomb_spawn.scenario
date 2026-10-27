@@ -1,0 +1,25 @@
+# PartyLeaderBombSpawn (21517, Needle Stakato Drone, level 74), every draw 0: created, i_ai0 0 and
+# weight point 10; the first player it sees makes it raise its privates and attack (i_ai0 1); event
+# 10000 naming a creature while it does not attack makes it want to attack it at 1000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderBombSpawn
+npc drone 21517 Monster 300 0 0 level 74 skill PHYSICAL_SPECIAL 4244 7 privates 20001:1
+npc wolf 20120 Monster 200 0 0
+npc minion 20001 Monster 5000 0 0
+
+advance 1s
+  mem drone i_ai0=0 weight=10
+event drone 10000 wolf 0
+  desires drone attack(wolf)=1000
+approach drone 250
+  S NpcInfo obj=minion npc=20001
+  S ChangeMoveType obj=minion running=1 swimming=0
+  S NpcInfo obj=minion npc=20001
+  mem drone i_ai0=1
+  privates drone 20001=1

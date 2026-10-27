@@ -1,0 +1,28 @@
+# RamphoPrimeval (22199, the Pterosaur, level 80, its shipped skills and tuning), every draw 0, its
+# skills never landing. Created, its memory is i_ai2 0 and i_ai3 1. A hit within 100 casts its long
+# range DD magic (5120) at once on the draw (it then waits out the skill's reuse). Hit below half of
+# its hit points (200 of 440), its skill chances double (i_ai3 2); hit below 30 percent, its self
+# buff (5087) is wanted, once (i_ai2 1). The tests/ai Boot tests pin the casts' weights and its
+# idle report (event 11049 then 11051 after 600 s) and see-spell hooks.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval
+npc rampho 22199 Monster 50 0 0 level 80 skill PHYSICAL_SPECIAL2 4244 10 skill PHYSICAL_SPECIAL1 5083 3 skill SELF_BUFF1 5087 1 skill LONG_RANGE_DD_MAGIC1 5120 1 ai BroadCastReception=1,LongRangeSkillDist=100,ProbLongRangeDDMagic1=15,ProbPhysicalSpecial1=10,ProbPhysicalSpecial2=15,ProbSelfBuff1=100,ag_type=1,mobile_type=0
+roll rampho 99
+
+advance 1s
+  mem rampho i_ai2=0 i_ai3=1
+hp rampho 300
+hit rampho 1
+  S MagicSkillUse caster=rampho target=player skill=5120-1 hit=1321 reuse=7928 success=0
+  mem rampho i_ai2=0 i_ai3=1
+hp rampho 200
+hit rampho 1
+  mem rampho i_ai2=0 i_ai3=2
+hp rampho 100
+hit rampho 1
+  mem rampho i_ai2=1 i_ai3=2

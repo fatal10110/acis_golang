@@ -1,0 +1,19 @@
+# WarriorCastDDMagicAggressive (21421, Ashuras, level 80, DD magic 4592-9), every draw 0: settled
+# (8 AI ticks), a character it sees 300 away is attacked at 200 and, not yet attacking, hit with its DD
+# magic from afar (1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagicAggressive
+npc ashura 21421 Monster 300 0 0 level 80 aggro 1000 skill DD_MAGIC 4592 9
+roll ashura 99
+
+tick x8
+away
+approach ashura 300
+  S MagicSkillUse caster=ashura target=player skill=4592-9 hit=10571 reuse=21142 success=0
+  desires ashura attack(player)=200 cast(player,4592,move)=1000000 wander()=5

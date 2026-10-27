@@ -1,0 +1,14 @@
+# WarriorAggressiveImmediate (27178, Blitz Wyrm, level 60): a character it sees within its territory is
+# attacked at weight 200 at once, with no aggressive time; a monster it sees is not.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate
+npc wyrm 27178 Monster 300 0 0 level 60 aggro 1000
+npc wolf 20120 Monster 100 0 0
+
+approach wyrm 250
+  desires wyrm attack(player)=200
