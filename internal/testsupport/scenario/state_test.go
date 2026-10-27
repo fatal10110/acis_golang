@@ -76,6 +76,7 @@ func TestParseRejectsBadStateLines(t *testing.T) {
 		{"swing role", head + "swing b\n", "unknown role"},
 		{"mem check", head + "advance 1s\n  mem a i_ai9=1\n", "is not <slot>=<value>"},
 		{"privates check", head + "advance 1s\n  privates a 2=0\n", "1 or more"},
+		{"privates params", head + "advance 1s\n  privates a 2=1:1,2\n", "<p1>,<p2>,<p3>"},
 		{"effect check", head + "advance 1s\n  effect a 4515 maybe\n", "effect <role|player>"},
 		{"check role", head + "advance 1s\n  master a b\n", "unknown role"},
 		{"step random twice", head + "advance 1s\n  random 1\n  random 2\n", "second random line"},

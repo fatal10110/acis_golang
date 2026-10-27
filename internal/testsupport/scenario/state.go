@@ -268,7 +268,7 @@ func checkStateCheck(kind string, args []string) error {
 	usage := map[string]string{
 		"mem":      "mem <role> <slot>=<value> ...",
 		"hp":       "hp <role|player> <hp>",
-		"privates": "privates <role> <npc id>=<count> ... | -",
+		"privates": "privates <role> <npc id>=<count>[:<p1>,<p2>,<p3>] ... | -",
 		"master":   "master <role> <role|->",
 		"top":      "top <role> <creature|->",
 		"effect":   "effect <role|player> <skill id> <held|none>",
@@ -303,10 +303,11 @@ func checkStateCheck(kind string, args []string) error {
 		}
 		for _, a := range args[1:] {
 			id, count, ok := strings.Cut(a, "=")
+			count, params, hasParams := strings.Cut(count, ":")
 			_, e1 := strconv.ParseInt(id, 10, 32)
 			c, e2 := strconv.Atoi(count)
-			if !ok || e1 != nil || e2 != nil || c < 1 {
-				return fmt.Errorf("private %q is not <npc id>=<count> of 1 or more", a)
+			if !ok || e1 != nil || e2 != nil || c < 1 || (hasParams && len(strings.Split(params, ",")) != 3) {
+				return fmt.Errorf("private %q is not <npc id>=<count>[:<p1>,<p2>,<p3>] of 1 or more", a)
 			}
 		}
 	case "master", "top":

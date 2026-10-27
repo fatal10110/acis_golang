@@ -167,7 +167,7 @@
 //	                       hit is that shipped skill's (the attacked hook reads its id, level and whether it is
 //	                       magic), and the scripts read the skill
 //	hp <role|player> <hp>  the NPC's or the character's hit points are set to that many (clamped to its maximum;
-//	                       a character at 0 is not dead: the die step kills it)
+//	                       a character at 0 is not dead: the die step kills it, and an NPC at 0 stays alive)
 //	die [<role>]           the character dies, killed by that NPC (none by default), on its own queue
 //	top <role> <creature|->
 //	                       the NPC's top desire target is set to the character (player), an npc line's NPC or the
@@ -243,7 +243,10 @@
 //	  inworld <role> <yes|no>               whether the NPC is still in the world: a killed one stays as a
 //	                                        corpse, a deleted one (a chest whose key broke) is gone
 //	  privates <role> <npc id>=<n> ... | -  the live privates of the NPC, by template (the privates of a master
-//	                                        line included), all of them
+//	                                        line included), all of them; <npc id>=<n>:<p1>,<p2>,<p3> counts
+//	                                        that template's privates by the three spawn parameters a script
+//	                                        raised them with (a number, or the role of the creature whose
+//	                                        object id it holds)
 //	  master <role> <role|->                the NPC's master, or - for none
 //	  top <role> <creature|->               the hostile NPC's top desire target
 //	  effect <role|player> <skill id> <held|none>

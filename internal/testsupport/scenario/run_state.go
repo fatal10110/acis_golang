@@ -360,20 +360,35 @@ func (r *run) stateCheck(t *testing.T, ck Check) string {
 		}
 		return FirstDiff(role+" master", []string{got}, []string{ck.Args[1]})
 	case "privates":
-		counts := map[int]int{}
+		want := slices.Clone(ck.Args[1:])
+		if len(want) == 1 && want[0] == "-" {
+			want = nil
+		}
+		withParams := map[string]bool{}
+		for _, w := range want {
+			if id, rest, ok := strings.Cut(w, "="); ok && strings.Contains(rest, ":") {
+				withParams[id] = true
+			}
+		}
+		counts := map[string]int{}
 		for _, m := range r.party(t, role).Minions() {
 			if dead, ok := m.(interface{ AlikeDead() bool }); ok && dead.AlikeDead() {
 				continue
 			}
-			counts[m.Template().ID]++
+			key := strconv.Itoa(m.Template().ID)
+			if withParams[key] {
+				key += ":" + r.spawnParams(t, m)
+			}
+			counts[key]++
 		}
 		var got []string
-		for id, n := range counts {
-			got = append(got, fmt.Sprintf("%d=%d", id, n))
-		}
-		want := slices.Clone(ck.Args[1:])
-		if len(want) == 1 && want[0] == "-" {
-			want = nil
+		for key, n := range counts {
+			id, params, _ := strings.Cut(key, ":")
+			entry := fmt.Sprintf("%s=%d", id, n)
+			if params != "" {
+				entry += ":" + params
+			}
+			got = append(got, entry)
 		}
 		slices.Sort(got)
 		slices.Sort(want)
@@ -386,4 +401,26 @@ func (r *run) stateCheck(t *testing.T, ck Check) string {
 		return FirstDiff(fmt.Sprintf("%s effect of skill %d", role, id), []string{map[bool]string{true: "held", false: "none"}[held]}, []string{ck.Args[2]})
 	}
 	return strings.Join(ck.Args, " ")
+}
+
+// spawnParams renders the three spawn parameters a private was raised with,
+// comma separated: the role of the creature a parameter holds the object id
+// of, else the number.
+func (r *run) spawnParams(t *testing.T, m any) string {
+	t.Helper()
+	holder, ok := m.(interface{ Scratch() *npc.Scratch })
+	if !ok {
+		t.Fatalf("%s: private %T keeps no script memory", r.sc.Name, m)
+	}
+	scratch := holder.Scratch()
+	out := make([]string, 3)
+	for i := range out {
+		v := scratch.Int(npc.IntParam1 + npc.IntSlot(i))
+		if role, ok := r.roles[v]; ok {
+			out[i] = role
+		} else {
+			out[i] = strconv.Itoa(int(v))
+		}
+	}
+	return strings.Join(out, ",")
 }

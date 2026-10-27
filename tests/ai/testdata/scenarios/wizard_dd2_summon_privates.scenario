@@ -1,0 +1,25 @@
+# PartyLeaderWizardDD2Summon (22033, silhouettes 22045, 22047 and 22048; the three far npc lines
+# only give the privates their templates), every draw
+# 0: its first hit raises the three silhouettes around it as its privates, each with the spawn
+# parameters 1000, the attacker, 0. A second hit raises no more.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2Summon
+npc summoner 22033 Monster 300 0 0 ai silhouette=22045,silhouette2=22047,silhouette3=22048
+npc first 22045 Monster 3000 0 0
+npc second 22047 Monster 3000 0 0
+npc third 22048 Monster 3000 0 0
+
+hit summoner 10
+  S NpcInfo obj=first npc=22045
+  S NpcInfo obj=second npc=22047
+  S NpcInfo obj=third npc=22048
+  mem summoner i_ai1=1
+advance 1s
+  privates summoner 22045=1:1000,player,0 22047=1:1000,player,0 22048=1:1000,player,0
+hit summoner 10
+advance 1s
+  privates summoner 22045=1:1000,player,0 22047=1:1000,player,0 22048=1:1000,player,0
