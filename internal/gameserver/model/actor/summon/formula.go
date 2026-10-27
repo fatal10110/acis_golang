@@ -756,6 +756,12 @@ func (a *Actor) ConsumeHP(amount float64) {
 	a.notifyDamage(a, amount)
 }
 
+// ReduceHPBySkillDOT applies a skill's damage-over-time tick: a summon
+// records no skill for it.
+func (a *Actor) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, _ modelskill.Ref) {
+	a.ReduceHPByDOT(amount, attacker, true)
+}
+
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
 // A lethal tick kills a. Any tick, a zero one included, interrupts the duel
 // of an attacker from outside the owner's duel.

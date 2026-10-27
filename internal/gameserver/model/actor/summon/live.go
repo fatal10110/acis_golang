@@ -121,6 +121,9 @@ type Owner interface {
 	// ClearReviveOffer closes the owner's pending resurrection offer, if
 	// any, as its revived pet does.
 	ClearReviveOffer()
+	// ReviveOffer reports whether the owner has a resurrection offer open,
+	// and whether it is for its pet.
+	ReviveOffer() (pending, forPet bool)
 	// InDuel reports whether the owner is in a duel.
 	InDuel() bool
 }

@@ -621,9 +621,14 @@ func counterattackObjectID(obj Actor) int32 {
 	return obj.ObjectID()
 }
 
+// actorName is the name a client message shows for obj: a door's, or a
+// creature's; a signet effect point has none.
 func actorName(obj Actor) string {
-	if target, ok := obj.(interface{ CharacterName() string }); ok {
-		return target.CharacterName()
+	if d, ok := asDoor(obj); ok {
+		return d.CharacterName()
+	}
+	if e, ok := asEffected(obj); ok {
+		return e.CharacterName()
 	}
 	return ""
 }

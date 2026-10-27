@@ -2,18 +2,6 @@ package conditions
 
 import "slices"
 
-// npcTarget and doorTarget are the two identifiable-by-id target shapes
-// TargetNpcID checks against — an NPC's condition view (keyed by its
-// template id) or a door's (keyed by its static door id).
-type (
-	npcTarget  interface{ NpcID() int }
-	doorTarget interface{ DoorID() int }
-)
-
-// raceTarget is an NPC target's template race ordinal, as
-// TargetRaceID needs it.
-type raceTarget interface{ RaceOrdinal() int }
-
 // TargetActiveSkillID requires the effected creature to know a skill of the
 // given id, at any level. A nil effected always fails.
 type TargetActiveSkillID struct{ SkillID int }
@@ -43,13 +31,11 @@ func (c TargetHpMinMax) Test(effector, effected Actor, skill Skill) bool {
 type TargetNpcID struct{ IDs []int }
 
 func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
-	if npc, ok := effected.(npcTarget); ok {
-		return slices.Contains(c.IDs, npc.NpcID())
+	if effected == nil {
+		return false
 	}
-	if door, ok := effected.(doorTarget); ok {
-		return slices.Contains(c.IDs, door.DoorID())
-	}
-	return false
+	id, ok := effected.TargetID()
+	return ok && slices.Contains(c.IDs, id)
 }
 
 // TargetRaceID requires the effected target to be an NPC whose template
@@ -57,9 +43,9 @@ func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
 type TargetRaceID struct{ IDs []int }
 
 func (c TargetRaceID) Test(effector, effected Actor, skill Skill) bool {
-	npc, ok := effected.(raceTarget)
-	if !ok {
+	if effected == nil {
 		return false
 	}
-	return slices.Contains(c.IDs, npc.RaceOrdinal())
+	race, ok := effected.RaceOrdinal()
+	return ok && slices.Contains(c.IDs, race)
 }

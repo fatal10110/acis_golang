@@ -88,11 +88,11 @@ func (a folkStatActor) ActiveSkillLevel(id int) (int, bool) {
 	return level, ok
 }
 
-// NpcID is the template id a target npcId condition matches.
-func (a folkStatActor) NpcID() int { return a.f.NpcID() }
+// TargetID is the template id a target npcId condition matches.
+func (a folkStatActor) TargetID() (int, bool) { return a.f.NpcID(), true }
 
 // RaceOrdinal is the template race a target race_id condition matches.
-func (a folkStatActor) RaceOrdinal() int { return int(a.f.Instance.Template.Race) }
+func (a folkStatActor) RaceOrdinal() (int, bool) { return int(a.f.Instance.Template.Race), true }
 
 func (a folkStatActor) ActiveEffectLevel(effectID int) (int, bool) {
 	return a.f.effects.ActiveBySkillID(effectID)

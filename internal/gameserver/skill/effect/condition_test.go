@@ -43,6 +43,8 @@ func (a fakeConditionActor) IsBehind(other conditions.Actor) bool    { return fa
 func (a fakeConditionActor) IsInFrontOf(other conditions.Actor) bool { return false }
 func (a fakeConditionActor) ActiveSkillLevel(id int) (int, bool)     { return 0, false }
 func (a fakeConditionActor) ActiveEffectLevel(id int) (int, bool)    { return 0, false }
+func (fakeConditionActor) TargetID() (int, bool)                     { return 0, false }
+func (fakeConditionActor) RaceOrdinal() (int, bool)                  { return 0, false }
 func (a fakeConditionActor) IsNight() bool                           { return a.night }
 func (a fakeConditionActor) IsSitting() bool                         { return false }
 func (a fakeConditionActor) IsInOlympiadMode() bool                  { return false }

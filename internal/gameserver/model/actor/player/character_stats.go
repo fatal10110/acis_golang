@@ -760,6 +760,12 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT b
 	c.reducePeriodicHP(amount, attacker, isDOT, false)
 }
 
+// ReduceHPBySkillDOT applies a skill's damage-over-time tick: a player
+// records no skill for it.
+func (c *Character) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, _ modelskill.Ref) {
+	c.ReduceHPByDOT(amount, attacker, true)
+}
+
 // ReduceHPByToggleUpkeep applies a toggle skill's own damage-over-time
 // upkeep tick. It is ReduceHPByDOT's real DOT tick, except the HP counts as
 // spent rather than taken in a hit: the wake-up side effects never run, so

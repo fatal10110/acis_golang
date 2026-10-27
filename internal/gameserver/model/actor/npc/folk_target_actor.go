@@ -2,6 +2,7 @@ package npc
 
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
@@ -56,21 +57,30 @@ func (f *Folk) EffectRangeInPeaceZone(_, _, _, _ int) bool { return false }
 func (f *Folk) GroundTarget() (x, y, z int)                { return 0, 0, 0 }
 func (f *Folk) MonsterKind() bool                          { return false }
 func (f *Folk) Unlockable() bool                           { return false }
-func (f *Folk) IsPet() bool                                { return false }
-func (f *Folk) Spoiled() bool                              { return false }
-func (f *Folk) Seeded() bool                               { return false }
-func (f *Folk) Summon() (skilltarget.Actor, bool)          { return nil, false }
-func (f *Folk) OlympiadMode() bool                         { return false }
-func (f *Folk) OlympiadStarted() bool                      { return false }
-func (f *Folk) IsInParty() bool                            { return false }
-func (f *Folk) PartyContains(skilltarget.Actor) bool       { return false }
-func (f *Folk) IsInSameParty(skilltarget.Actor) bool       { return false }
-func (f *Folk) IsInSameClan(skilltarget.Actor) bool        { return false }
-func (f *Folk) IsInSameAlly(skilltarget.Actor) bool        { return false }
-func (f *Folk) HasClan() bool                              { return false }
-func (f *Folk) DuelID() int32                              { return 0 }
-func (f *Folk) DuelTeam() int                              { return 0 }
-func (f *Folk) MageClass() bool                            { return false }
+func (f *Folk) Box() bool                                  { return false }
+func (f *Folk) Interacted() bool                           { return false }
+func (f *Folk) ClaimInteraction() bool                     { return false }
+
+// A civilian NPC keeps no aggro list: it holds no hate against anyone and
+// records none.
+func (f *Folk) AggroHate(attackable.Combatant) float64               { return 0 }
+func (f *Folk) AddDamageHate(attackable.Combatant, float64, float64) {}
+
+func (f *Folk) IsPet() bool                          { return false }
+func (f *Folk) Spoiled() bool                        { return false }
+func (f *Folk) Seeded() bool                         { return false }
+func (f *Folk) Summon() (skilltarget.Actor, bool)    { return nil, false }
+func (f *Folk) OlympiadMode() bool                   { return false }
+func (f *Folk) OlympiadStarted() bool                { return false }
+func (f *Folk) IsInParty() bool                      { return false }
+func (f *Folk) PartyContains(skilltarget.Actor) bool { return false }
+func (f *Folk) IsInSameParty(skilltarget.Actor) bool { return false }
+func (f *Folk) IsInSameClan(skilltarget.Actor) bool  { return false }
+func (f *Folk) IsInSameAlly(skilltarget.Actor) bool  { return false }
+func (f *Folk) HasClan() bool                        { return false }
+func (f *Folk) DuelID() int32                        { return 0 }
+func (f *Folk) DuelTeam() int                        { return 0 }
+func (f *Folk) MageClass() bool                      { return false }
 func (f *Folk) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
 	return true
 }

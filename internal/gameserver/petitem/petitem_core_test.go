@@ -553,6 +553,7 @@ func (*pickupTestOwner) Invul() bool                                { return fal
 func (*pickupTestOwner) HP() float64                                { return 0 }
 func (*pickupTestOwner) MaxHPValue() float64                        { return 0 }
 func (*pickupTestOwner) ClearReviveOffer()                          {}
+func (*pickupTestOwner) ReviveOffer() (bool, bool)                  { return false, false }
 func (*pickupTestOwner) InDuel() bool                               { return false }
 func (*pickupTestOwner) NoteServitorPvPAttack(attackable.Combatant) {}
 func (*pickupTestOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {

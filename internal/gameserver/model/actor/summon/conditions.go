@@ -103,6 +103,11 @@ func (s summonStatActor) ActiveSkillLevel(id int) (int, bool) {
 	return int(ref.Level), ok
 }
 
+// TargetID and RaceOrdinal satisfy conditions.Actor. A summon is no NPC or
+// door: target npcId and race_id conditions never match it.
+func (summonStatActor) TargetID() (int, bool)    { return 0, false }
+func (summonStatActor) RaceOrdinal() (int, bool) { return 0, false }
+
 // ActiveEffectLevel satisfies conditions.Actor.
 func (s summonStatActor) ActiveEffectLevel(effectID int) (int, bool) {
 	return s.a.EffectList().ActiveBySkillID(effectID)

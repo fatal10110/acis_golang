@@ -146,6 +146,12 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 	return true
 }
 
+// DeleteMe takes the NPC out of the world on its own queue, leaving no
+// corpse; see DeleteNow.
+func (f *Folk) DeleteMe() {
+	f.Queue().Post(f.DeleteNow)
+}
+
 // DeleteNow takes the NPC out of the world at once, leaving no corpse, on
 // the calling goroutine, and answers its spawn as for a decayed corpse: it
 // is out of the world when it returns. It does not wait for a task this

@@ -370,8 +370,8 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			return false
 		}
 		if float64(def.MPConsume) > mp.MPValue() {
-			if n, ok := caster.(lackMPNotifier); ok {
-				n.NotifyEffectRemovedDueLackMP(ef)
+			if p, ok := asPlayer(caster); ok {
+				p.NotifyEffectRemovedDueLackMP(ef)
 			}
 			return false
 		}
@@ -430,12 +430,6 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 type mpPayer interface {
 	MPValue() float64
 	ReduceMP(float64) float64
-}
-
-// lackMPNotifier is implemented by a caster told that its SignetMDam
-// effect ended because a tick could not pay its MP cost.
-type lackMPNotifier interface {
-	NotifyEffectRemovedDueLackMP(*effect.Effect)
 }
 
 // forEachSignetTarget calls fn for every living, non-peace-zone object

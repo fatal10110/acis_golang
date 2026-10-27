@@ -46,6 +46,14 @@ type Actor interface {
 
 	// IsNight reports whether it is currently night on this actor's server.
 	IsNight() bool
+
+	// TargetID is the id a target npcId condition matches: an NPC's
+	// template id or a door's static door id. ok is false for any other
+	// actor.
+	TargetID() (id int, ok bool)
+	// RaceOrdinal is an NPC's template race ordinal, as a target race_id
+	// condition matches it. ok is false for any other actor.
+	RaceOrdinal() (race int, ok bool)
 }
 
 // PlayerActor narrows Actor to the extra identity/state data only a

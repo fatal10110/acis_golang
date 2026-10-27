@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -259,12 +258,6 @@ func disableConfusion(cast Cast, target Creature, land landing) {
 	land.apply(cast, target)
 }
 
-// aggroHolder is a target whose threat table reports its hate against an
-// attacker.
-type aggroHolder interface {
-	AggroHate(attacker attackable.Combatant) float64
-}
-
 // disableAggReduce applies the skill's effects and subtracts from every
 // hate entry the target's threat table holds: a positive skill power
 // itself, otherwise how far the target's AGGRESSION stat, calculated for
@@ -281,8 +274,8 @@ func disableAggReduce(cast Cast, target Creature, land landing) {
 		return
 	}
 	var hate float64
-	if holder, ok := target.(aggroHolder); ok {
-		hate = holder.AggroHate(cast.Caster)
+	if n, ok := asNPC(target); ok {
+		hate = n.AggroHate(cast.Caster)
 	}
 	reduced := target.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).CalcStat(stat.Aggression, hate)
 	if diff := hate - reduced; diff > 0 {
