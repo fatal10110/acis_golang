@@ -78,12 +78,13 @@ func (t *table) add(f []string) (err error) {
 	}()
 	num := func(s string) float64 { return must(strconv.ParseFloat(s, 64)) }
 	whole := func(s string) int64 { return must(strconv.ParseInt(s, 10, 64)) }
+	atoi := func(s string) int { return must(strconv.Atoi(s)) }
 	switch f[0] {
 	case "damage":
-		max := int(whole(f[1]))
+		max := atoi(f[1])
 		for _, r := range f[2:] {
 			from, stage, _ := strings.Cut(r, ":")
-			t.damage[max] = append(t.damage[max], run{num(from), int(whole(stage))})
+			t.damage[max] = append(t.damage[max], run{num(from), atoi(stage)})
 		}
 	case "period":
 		t.period[f[1]] = time.Duration(whole(f[2])) * time.Millisecond
@@ -94,9 +95,9 @@ func (t *table) add(f []string) (err error) {
 			t.regen[key] = append(t.regen[key], Tick{HP: num(hp), Active: active == "1"})
 		}
 	case "revive":
-		t.revive[int(whole(f[1]))] = num(f[2])
+		t.revive[atoi(f[1])] = num(f[2])
 	case "petmaxhp":
-		t.petHP[[2]int{int(whole(f[1])), int(whole(f[2]))}] = int(whole(f[3]))
+		t.petHP[[2]int{atoi(f[1]), atoi(f[2])}] = atoi(f[3])
 	case "petexp":
 		t.petExp[petExpKey{whole(f[1]), whole(f[2]), num(f[3])}] = whole(f[4])
 	default:
