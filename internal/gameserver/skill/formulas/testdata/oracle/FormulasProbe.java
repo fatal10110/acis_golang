@@ -473,6 +473,75 @@ public class FormulasProbe
 		}
 	}
 	
+	// calcCrit(double): the attacker's critical rate against Rnd.get(1000).
+	static boolean crit(double rate, int roll)
+	{
+		return rate > roll;
+	}
+	
+	// calcMCrit: the attacker's magic critical rate against Rnd.get(1000).
+	static boolean mcrit(int mRate, int roll)
+	{
+		return mRate > roll;
+	}
+	
+	private static final byte MELEE_ATTACK_RANGE = 40;
+	private static final byte SKILL_REFLECT_FAILED = 0;
+	private static final byte SKILL_REFLECT_SUCCEED = 1;
+	
+	// calcSkillReflect: whether the SKILL_REFLECT_SUCCEED bit is set, with
+	// roll as the Rnd.get(100) draw. The SKILL_COUNTER bit (a target stat
+	// lookup on PDAM, BLOW and CHARGEDAM) is not part of the result.
+	static boolean skillReflect(boolean ignoreResists, boolean canBeReflected, boolean isMagic, int castRange, String skillType, double reflectChance, int roll)
+	{
+		if (ignoreResists || !canBeReflected)
+			return false;
+		
+		if (!isMagic && (castRange == -1 || castRange > MELEE_ATTACK_RANGE))
+			return false;
+		
+		byte reflect = SKILL_REFLECT_FAILED;
+		
+		switch (skillType)
+		{
+			case "BUFF", "REFLECT", "HEAL_PERCENT", "MANAHEAL_PERCENT", "HOT", "MPHOT", "AGGDEBUFF", "CONT":
+				return false;
+		}
+		
+		if (roll < reflectChance)
+			reflect |= SKILL_REFLECT_SUCCEED;
+		
+		return (reflect & SKILL_REFLECT_SUCCEED) != 0;
+	}
+	
+	// doorUnlock (UNLOCK_SPECIAL): the skill power against Rnd.get(100).
+	static boolean doorUnlockSpecial(double power, int roll)
+	{
+		return roll < power;
+	}
+	
+	private static int[] _rolls;
+	private static int _drawn;
+	
+	private static int rnd1000()
+	{
+		return _rolls[_drawn++];
+	}
+	
+	// calcLethalHit: the tier that lands (2 full, 1 half, 0 none) and the
+	// number of Rnd.get(1000) draws taken, drawing rolls in order.
+	static String lethalHit(int chance1, int chance2, int magiclvl, int attackerLevel, int targetLevel, double lethalMul, int[] rolls)
+	{
+		_rolls = rolls;
+		_drawn = 0;
+		int tier = 0;
+		if (chance2 > 0 && lethalRate(chance2, magiclvl, attackerLevel, targetLevel, lethalMul) > rnd1000())
+			tier = 2;
+		else if (chance1 > 0 && lethalRate(chance1, magiclvl, attackerLevel, targetLevel, lethalMul) > rnd1000())
+			tier = 1;
+		return tier + "/" + _drawn;
+	}
+	
 	// chestUnlock with the deluxe key: the chance compared with Rnd.get(100).
 	static int chestDeluxeRate(int level, int skillLevel, int skillId)
 	{
@@ -762,5 +831,32 @@ public class FormulasProbe
 			final int mAtk = i(1, 3000), scaling = i(0, 2), shot = i(0, 2);
 			p("healAmount", healAmount(power, add, isStatic, mAtk, scaling, shot == 1, shot == 2, corr), power, add, isStatic, mAtk, scaling, shot == 1, shot == 2, corr);
 		}
+		
+		final int[] critRolls = { 0, 1, 15, 16, 499, 500, 998, 999 };
+		for (double rate : new double[] { -1, 0, 0.5, 1, 15.3, 500, 999.9, 1000, 1500 })
+			for (int roll : critRolls)
+				p("crit", crit(rate, roll), rate, roll);
+		for (int rate : new int[] { -1, 0, 1, 16, 500, 999, 1000, 1500 })
+			for (int roll : critRolls)
+				p("mcrit", mcrit(rate, roll), rate, roll);
+		
+		final double[][] reflectRolls = { { 0, 0 }, { 30.5, 30 }, { 30.5, 31 }, { 100, 99 } };
+		for (boolean[] gate : new boolean[][] { { false, true }, { true, true }, { false, false } })
+			for (boolean magic : BOOLS)
+				for (int range : new int[] { -1, 40, 41, 600 })
+					for (double[] cr : reflectRolls)
+						p("skillReflect", skillReflect(gate[0], gate[1], magic, range, "DEBUFF", cr[0], (int) cr[1]), gate[0], gate[1], magic, range, "DEBUFF", cr[0], (int) cr[1]);
+		for (String type : new String[] { "BUFF", "REFLECT", "HEAL_PERCENT", "MANAHEAL_PERCENT", "HOT", "MPHOT", "AGGDEBUFF", "CONT", "PDAM", "BLOW", "CHARGEDAM", "DEBUFF", "MDAM" })
+			for (double[] cr : reflectRolls)
+				p("skillReflect", skillReflect(false, true, true, 600, type, cr[0], (int) cr[1]), false, true, true, 600, type, cr[0], (int) cr[1]);
+		
+		for (double power : new double[] { 0, 0.5, 1, 30, 50.5, 99, 100, 150 })
+			for (int roll : new int[] { 0, 1, 29, 30, 50, 51, 98, 99 })
+				p("doorUnlockSpecial", doorUnlockSpecial(power, roll), power, roll);
+		
+		for (int[] chances : new int[][] { { 0, 0 }, { 0, 5 }, { 5, 0 }, { 5, 3 }, { 15, 2 } })
+			for (int[] lv : new int[][] { { 60, 60, 60 }, { 0, 40, 50 }, { 52, 60, 70 } })
+				for (int[] rolls : new int[][] { { 0, 0 }, { 29, 49 }, { 30, 50 }, { 49, 999 }, { 999, 29 }, { 999, 999 } })
+					p("lethalHit", lethalHit(chances[0], chances[1], lv[0], lv[1], lv[2], 1.0, rolls), chances[0], chances[1], lv[0], lv[1], lv[2], 1.0, rolls[0], rolls[1]);
 	}
 }

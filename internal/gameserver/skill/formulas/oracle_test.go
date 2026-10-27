@@ -79,6 +79,26 @@ func (r oracleRow) wantString(got string) {
 	}
 }
 
+// checkRolls replays a roll predicate, got, at every draw in [0, bound) that
+// sits next to the row's reference threshold and at both ends of the range,
+// and requires it to agree with ref, the reference comparison of the draw
+// with that threshold.
+func (r oracleRow) checkRolls(pred string, bound int, ref func(threshold, roll float64) bool, got func(roll int) bool) {
+	threshold, err := strconv.ParseFloat(r.want, 64)
+	if err != nil {
+		r.t.Fatalf("line %d result: %v", r.line, err)
+	}
+	fl := int(math.Floor(threshold))
+	for _, roll := range []int{0, fl - 1, fl, fl + 1, fl + 2, bound - 1} {
+		if roll < 0 || roll >= bound {
+			continue
+		}
+		if g, w := got(roll), ref(threshold, float64(roll)); g != w {
+			r.t.Errorf("line %d %s(%s%v, roll %d) = %v, want %v", r.line, pred, r.name, r.args, roll, g, w)
+		}
+	}
+}
+
 // powULP bounds how far a math.Pow-based result may sit from the reference
 // (#4318).
 const powULP = 4
@@ -121,11 +141,15 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 		case "atkSpd":
 			r.wantString(strconv.Itoa(AtkSpd(r.b(0), r.n(1), r.n(2), r.f(3))))
 		case "hitRate":
-			r.wantString(strconv.Itoa(HitRate(r.n(0), r.n(1), r.n(2), r.b(3), r.b(4), r.b(5))))
+			rate := HitRate(r.n(0), r.n(1), r.n(2), r.b(3), r.b(4), r.b(5))
+			r.wantString(strconv.Itoa(rate))
+			r.checkRolls("Missed", 1000, func(th, roll float64) bool { return th < roll }, func(roll int) bool { return Missed(rate, roll) })
 		case "posMul":
 			r.wantFloat(PosMul(r.b(0), r.b(1), r.b(2)))
 		case "magicSuccessRate":
-			r.wantFloatULP(MagicSuccessRate(r.n(0), r.n(1), r.n(2), r.n(3), r.b(4)), powULP)
+			rate := MagicSuccessRate(r.n(0), r.n(1), r.n(2), r.n(3), r.b(4))
+			r.wantFloatULP(rate, powULP)
+			r.checkRolls("MagicSucceeds", 10000, func(th, roll float64) bool { return roll > th }, func(roll int) bool { return MagicSucceeds(rate, roll) })
 		case "physicalAttackDamage":
 			r.wantFloat(PhysicalAttackDamage(PhysicalAttackInput{
 				Defence: r.f(0), AttackPower: r.f(1), Crit: r.b(2), SoulShot: r.b(3),
@@ -141,19 +165,7 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 			}))
 		case "blowRate":
 			in := BlowRateInput{BaseRate: r.f(0), DexMul: r.f(1), BlowMul: r.f(2), Behind: r.b(3), Front: r.b(4), Backstab: r.b(5)}
-			threshold, err := strconv.ParseFloat(r.want, 64)
-			if err != nil {
-				t.Fatalf("line %d result: %v", line, err)
-			}
-			fl := int(math.Floor(threshold))
-			for _, roll := range []int{0, fl - 1, fl, fl + 1, 999} {
-				if roll < 0 || roll > 999 {
-					continue
-				}
-				if got, want := BlowSucceeds(in, roll), threshold > float64(roll); got != want {
-					t.Errorf("line %d BlowSucceeds(%+v, %d) = %v, want %v", line, in, roll, got, want)
-				}
-			}
+			r.checkRolls("BlowSucceeds", 1000, func(th, roll float64) bool { return th > roll }, func(roll int) bool { return BlowSucceeds(in, roll) })
 		case "blowDamage":
 			r.wantFloat(BlowDamage(BlowInput{
 				Defence: r.f(0), AttackPower: r.f(1), SkillPower: r.f(2), SoulShot: r.b(3), IsPvP: r.b(4),
@@ -161,7 +173,9 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 				CritVulnMul: r.f(10), DaggerVulnMul: r.f(11), CritDamageAddBase: r.f(12),
 			}))
 		case "lethalRate":
-			r.wantFloat(LethalRate(LethalInput{MagicLevel: r.n(1), AttackerLevel: r.n(2), TargetLevel: r.n(3), LethalMul: r.f(4)}, int(r.f(0))))
+			in, base := LethalInput{MagicLevel: r.n(1), AttackerLevel: r.n(2), TargetLevel: r.n(3), LethalMul: r.f(4)}, int(r.f(0))
+			r.wantFloat(LethalRate(in, base))
+			r.checkRolls("lethalSucceeds", 1000, func(th, roll float64) bool { return th > roll }, func(roll int) bool { return lethalSucceeds(in, base, roll) })
 		case "magicFailure":
 			r.wantString(strconv.Itoa(int(MagicFailureOutcome(r.b(0), r.b(1), r.b(2), r.b(3), r.n(4)))))
 		case "magicDamage":
@@ -184,13 +198,17 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 		case "shieldUse":
 			r.wantString(strconv.Itoa(int(ShieldUse(r.f(0), r.n(1), r.b(2), r.b(3), r.n(4), r.n(5)))))
 		case "skillSuccessRate":
-			r.wantFloat(SkillSuccessRate(SkillSuccessInput{
+			rate := SkillSuccessRate(SkillSuccessInput{
 				Shield: shield(r.b(0)), IgnoreResists: r.b(1), BaseChance: r.f(2), StatModifier: r.f(3), VulnModifier: r.f(4), MAtkModifier: r.f(5), LevelModifier: r.f(6),
-			}))
+			})
+			r.wantFloat(rate)
+			r.checkRolls("SkillSucceeds", 100, func(th, roll float64) bool { return roll < th }, func(roll int) bool { return SkillSucceeds(rate, roll) })
 		case "revivePower":
 			r.wantFloat(RevivePower(statbonus.WITBonus[r.n(0)], r.f(1)))
 		case "cancelRate":
-			r.wantFloat(CancelSuccessRate(r.n(0), r.n(1), r.f(2), r.f(3), r.n(4), r.n(5)))
+			rate := CancelSuccessRate(r.n(0), r.n(1), r.f(2), r.f(3), r.n(4), r.n(5))
+			r.wantFloat(rate)
+			r.checkRolls("CancelSucceeds", 100, func(th, roll float64) bool { return roll < th }, func(roll int) bool { return CancelSucceeds(rate, roll) })
 		case "effectCancelRate":
 			r.wantString(strconv.Itoa(EffectCancelSuccessRate(r.n(0), r.n(1), r.n(2), r.f(3), r.f(4))))
 		case "effectCancelDebuffRate":
@@ -200,7 +218,9 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 		case "sowRate":
 			r.wantString(strconv.Itoa(SowSuccessRate(r.n(0), r.n(1), r.n(2), r.b(3))))
 		case "doorUnlockRate":
-			r.wantString(strconv.Itoa(DoorUnlockRate(r.n(0))))
+			level := r.n(0)
+			r.wantString(strconv.Itoa(DoorUnlockRate(level)))
+			r.checkRolls("DoorUnlockSucceeds", 120, func(th, roll float64) bool { return roll < th }, func(roll int) bool { return DoorUnlockSucceeds(level, roll) })
 		case "chestDeluxeRate":
 			r.wantString(strconv.Itoa(ChestUnlockDeluxeKeyRate(r.n(0), r.n(1), r.n(2) == 2065)))
 		case "chestRate":
@@ -215,6 +235,29 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 				Power: r.f(0), Proficiency: r.f(1), Static: r.b(2), MAtk: r.n(3), Scaling: HealShotScaling(r.n(4)),
 				Spiritshot: r.b(5), BlessedSpiritshot: r.b(6), SpsCorrection: r.f(7),
 			}))
+		case "crit":
+			r.wantString(strconv.FormatBool(CritSucceeds(r.f(0), r.n(1))))
+		case "mcrit":
+			r.wantString(strconv.FormatBool(MCritSucceeds(r.n(0), r.n(1))))
+		case "skillReflect":
+			r.wantString(strconv.FormatBool(SkillReflects(SkillReflectInput{
+				IgnoreResists: r.b(0), CanBeReflected: r.b(1), Magic: r.b(2), CastRange: r.n(3), SkillType: r.args[4], ReflectChance: r.f(5),
+			}, r.n(6))))
+		case "doorUnlockSpecial":
+			r.wantString(strconv.FormatBool(DoorUnlockSpecialSucceeds(r.f(0), r.n(1))))
+		case "lethalHit":
+			rolls, draws := []int{r.n(6), r.n(7)}, 0
+			out := LethalHit(LethalInput{
+				Chance1: r.n(0), Chance2: r.n(1), MagicLevel: r.n(2), AttackerLevel: r.n(3), TargetLevel: r.n(4), LethalMul: r.f(5),
+			}, func(n int) int {
+				if n != 1000 || draws == len(rolls) {
+					t.Fatalf("line %d: LethalHit draw %d from [0, %d)", line, draws, n)
+				}
+				draws++
+				return rolls[draws-1]
+			})
+			tier := map[LethalOutcome]int{LethalNone: 0, LethalHalf: 1, LethalFull: 2}[out]
+			r.wantString(strconv.Itoa(tier) + "/" + strconv.Itoa(draws))
 		default:
 			t.Fatalf("line %d: unknown formula %q", line, r.name)
 		}
@@ -222,7 +265,7 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 	if err := sc.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if len(seen) != 31 {
-		t.Fatalf("golden covers %d formulas, want 31", len(seen))
+	if len(seen) != 36 {
+		t.Fatalf("golden covers %d formulas, want 36", len(seen))
 	}
 }

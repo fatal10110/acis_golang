@@ -14,8 +14,10 @@ tables (lines 49-117, unchanged) and the arithmetic of `calcCastBreak`,
 `calcBlowRate`, `calcBlowDamage`, `calcLethalRate`, `calcMagicDam` (both
 overloads), `calcCubicSkillSuccess` (the magic attack modifier),
 `calcManaDam`, `calcMagicAffected`, `calcShldUse`, `calcSkillSuccess`,
-`calcRevivePower`, `calcSowSuccess`, `doorUnlock`, `chestUnlock` and
-`calcHealAmount`; `L2Skill.getPower(Creature)`; `Cancel.calcCancelSuccess`
+`calcRevivePower`, `calcSowSuccess`, `doorUnlock` (both branches),
+`chestUnlock`, `calcHealAmount`, `calcCrit(double)`, `calcMCrit`,
+`calcSkillReflect` and `calcLethalHit` (its tier order and draws);
+`L2Skill.getPower(Creature)`; `Cancel.calcCancelSuccess`
 (`handler/skillhandlers/Cancel.java`); `EffectCancel.calcCancelSuccess` and
 `EffectCancelDebuff.calcCancelSuccess` with their callers' `(int)` casts
 (`skills/effects/`); and `Harvest.calcSuccess`
@@ -30,10 +32,17 @@ substitutions are:
   parameters already hold any shield defence the caller adds on
   `ShieldDefense.SUCCESS`; skill power parameters already hold any SoulShot
   boost; the blow critical-position multiplier is passed already halved.
-- `Rnd.get(n)` comparisons return the threshold instead of a boolean (the Go
-  test checks the Go roll predicate around each threshold), or take the
-  roll as a parameter (`castBreaks`, `shieldUse`); `Rnd.nextGaussian()` is a
-  parameter.
+- `Rnd.get(n)` comparisons return the threshold instead of a boolean, or
+  take the roll as a parameter (`castBreaks`, `shieldUse`, `crit`, `mcrit`,
+  `skillReflect`, `doorUnlockSpecial`); `lethalHit` takes its two draws in
+  order and prints `<tier>/<draws taken>`. For each threshold row the Go
+  test replays the matching roll predicate (`Missed`, `MagicSucceeds`,
+  `BlowSucceeds`, `lethalSucceeds`, `SkillSucceeds`, `CancelSucceeds`,
+  `DoorUnlockSucceeds`) at the draws next to the threshold and at both ends
+  of the draw range, against the reference comparison.
+  `Rnd.nextGaussian()` is a parameter.
+- `skillReflect` reports only the reflect bit; the counter bit is a target
+  stat lookup outside the formula.
 - The magic failure branch is split out (`magicFailure`: 0 none, 1 kept
   damage for a non-player caster, 2 halved, 3 set to 1) and `magicDamage`
   takes its outcome; PvP multipliers are 1 outside PvP.
