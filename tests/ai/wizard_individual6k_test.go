@@ -157,6 +157,19 @@ func (w *individual6World) i6kSettled(t *testing.T, hs ...*npc.Hostile) {
 	w.ticks(t, 1)
 }
 
+// i6kStayHome keeps h on its spawn point for the seconds a test advances:
+// the idle wander's first step has already started a walk to a random point
+// around home, which can end outside the territory the see-creature hooks
+// check, and the wander chain would start another. It stops the walk and
+// turns the chain's rolls off.
+func (w *individual6World) i6kStayHome(t *testing.T, h *npc.Hostile) {
+	t.Helper()
+	w.onQueue(t, h, func() {
+		h.AI().SetRandomWalkRate(0)
+		h.StopMove()
+	})
+}
+
 // i6kLookFrom moves the character dx in front of h and runs one AI cycle,
 // whose see-creature scan notices it.
 func (w *individual6World) i6kLookFrom(t *testing.T, h *npc.Hostile, dx int) {
@@ -569,18 +582,17 @@ func TestWizardCorpseVampireTeleportLooksAroundEvery10s(t *testing.T) {
 	me := w.player.ObjectID()
 	h := w.i6kArmed(t, i6kTeleportID, 1500, 0)
 	w.i6eSettled(t, h)
+	w.i6kStayHome(t, h)
 	w.i6fMoveNear(t, h, -100)
 	w.srv.Settle(t)
 	if got := i6cAttackWeight(h, me); got != 0 {
 		t.Fatalf("setup: attack desire before the look = %v, want none", got)
 	}
-	for i := 0; i6cAttackWeight(h, me) != 200; i++ {
-		if i == 10 {
-			t.Fatalf("attack desire 10 s on = %v, want 200 from the look", i6cAttackWeight(h, me))
-		}
-		w.srv.Advance(t, time.Second)
-		w.srv.Settle(t)
+	w.srv.Advance(t, 9*time.Second)
+	if got := i6cAttackWeight(h, me); got != 0 {
+		t.Fatalf("attack desire 9 s on = %v, want none before the look", got)
 	}
+	w.srv.AdvanceUntil(t, "the look's attack desire", func() bool { return i6cAttackWeight(h, me) == 200 })
 }
 
 // i6kGrowthAI are WizardGrowthStep2's AI parameters: a 1 s eating
