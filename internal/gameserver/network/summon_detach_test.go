@@ -72,7 +72,7 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 		},
 		World:         state,
 		NPCs:          npc.NewTable([]*npc.Template{npcTmpl}),
-		SummonItems:   summonItems,
+		Summoning:     SummoningConfig{Items: summonItems},
 		ItemTemplates: testItemTemplates(),
 		IDs:           &sequentialIDs{next: 9000},
 		Log:           zerolog.Nop(),

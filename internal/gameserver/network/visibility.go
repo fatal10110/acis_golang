@@ -384,7 +384,7 @@ func (l *GameClientLink) summonInCombat(a *summon.Actor) bool {
 	if !a.OwnerLeft() {
 		return a.InCombat()
 	}
-	return l != nil && l.attackStance != nil && l.attackStance.InAttackStance(a)
+	return l != nil && l.combat.attackStance != nil && l.combat.attackStance.InAttackStance(a)
 }
 
 // summonInfoSnapshot resolves the NpcInfo fields viewer sees for a summon it

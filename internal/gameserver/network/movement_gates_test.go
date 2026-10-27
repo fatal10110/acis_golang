@@ -18,7 +18,7 @@ func TestMoveLivePlayerRejectsBeyond9900Units(t *testing.T) {
 	live := newTestLivePlayer(t, 1, frames)
 	testsupport.ResetCapture(frames)
 
-	gcl := &GameClientLink{log: zerolog.Nop(), enchanting: newEnchanting(GameClientLinkConfig{})}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	origin := location.Location{X: 0, Y: 0, Z: 0}
 	target := location.Location{X: 10000, Y: 0, Z: 0} // 10000 > 9900 cap
 	gcl.moveLivePlayer(live, target, origin)
@@ -34,7 +34,7 @@ func TestMoveLivePlayerRejectsBeyond9900Units(t *testing.T) {
 func TestMoveLivePlayerCancelsEnchantBefore9900Reject(t *testing.T) {
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
-	gcl := &GameClientLink{log: zerolog.Nop(), enchanting: newEnchanting(GameClientLinkConfig{})}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	live.Character.Inventory().AddNew(955, 1, 600) // the selected scroll
 	if !gcl.enchanting.scrolls.Select(live.ObjectID(), 600) {
 		t.Fatal("Select returned false")
@@ -103,7 +103,7 @@ func TestMoveLivePlayerZeroSpeedKeepsActiveEnchant(t *testing.T) {
 		t.Fatalf("WeightPenalty() = %d, want 4 (fully overloaded)", got)
 	}
 
-	gcl := &GameClientLink{log: zerolog.Nop(), enchanting: newEnchanting(GameClientLinkConfig{})}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	if !gcl.enchanting.scrolls.Select(live.ObjectID(), 600) {
 		t.Fatal("Select returned false")
 	}

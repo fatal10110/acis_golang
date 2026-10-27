@@ -33,7 +33,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
@@ -42,10 +41,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
@@ -324,9 +321,6 @@ type GameClientLink struct {
 	geo           move.Geo
 	zones         *zone.Index
 	ids           idAllocator
-	attackStance  AttackStanceTracker
-	ai            AIRegistry
-	pvpFlags      *task.PvPFlags
 	effects       effect.Env
 	positions     *task.PositionUpdates
 	gameClock     *task.GameClock
@@ -389,9 +383,7 @@ type GameClientLink struct {
 	belongings       belongings
 	enchanting       enchanting
 	summoning        summoning
-	targets          *skilltarget.Registry
-	skillHandlers    *handlerskill.Registry
-	chance           *actorcast.ChanceProcs
+	combat           combat
 	log              zerolog.Logger
 
 	// now supplies wall time for packet accounting; nil falls back to
@@ -527,6 +519,16 @@ type GameClientLinkConfig struct {
 	// Belongings is what characters own and carry: item, shortcut, henna
 	// and recipe book rows, ground items and inventory update tasks.
 	Belongings BelongingsConfig
+	// Combat is what attacks, casts and PvP run on: attack stances, AI
+	// registrations, PvP flags and the spiritshot heal corrections.
+	Combat CombatConfig
+	// Summoning is what pets and servitors are called out with: summon
+	// items, pet rows and settings, their dice and feeding pace, and the
+	// corpse decay.
+	Summoning SummoningConfig
+	// Enchanting is what item enchants roll and grant: the enchant and
+	// skill-enchant dice and the armor sets.
+	Enchanting EnchantingConfig
 	LoginLink  func() *LoginLink
 	Roster     *manager.Roster
 	// Subclasses writes the subclass rows a village master's subclass
@@ -546,27 +548,17 @@ type GameClientLinkConfig struct {
 	Skills        *skillstate.Persistence
 	Spellbooks    modelskill.BookPolicy
 	SkillTrees    *modelskill.Trees
-	// HealSps holds the spiritshot heal corrections; nil gives a charged
-	// heal no correction term.
-	HealSps       *modelskill.HealSpsTable
 	CursedWeapons *entity.CursedWeaponTable
 	CursedRuntime *cursedweapon.Manager // the cursed weapons' lifecycle; nil when disabled
 	World         *world.State
 	NPCs          *npc.Table
-	SummonItems   *item.SummonItemTable
 	Doors         WorldDoors
-	PetStore      petStore
 	Geo           move.Geo
 	Zones         *zone.Index
 	IDs           idAllocator
-	AttackStance  AttackStanceTracker
-	AI            AIRegistry
-	PvPFlags      *task.PvPFlags
 	// Fences are the fences //spawnfence places; without them the link
 	// places fences on no geodata.
-	Fences *fence.Manager
-	// Decay removes a dead summon's corpse once its decay delay has passed.
-	Decay     *task.Decay
+	Fences    *fence.Manager
 	Effects   effect.Env // Activity required: without it no effect expires
 	Positions *task.PositionUpdates
 	// GameClock is the server's in-game clock; CharSelected reports its
@@ -614,7 +606,6 @@ type GameClientLinkConfig struct {
 	Levels       *player.LevelTable
 	Admin        *admin.Data
 	PlayerConfig PlayerConfig
-	PetConfig    petmodel.Config
 	// DisableRaidCurse is npcs.properties DisableRaidCurse: when true, raid
 	// petrification and anti-strider curses never apply.
 	DisableRaidCurse bool
@@ -669,27 +660,13 @@ type GameClientLinkConfig struct {
 	// Petitions holds the petitions players send the game masters; nil
 	// starts with none and refuses every new one.
 	Petitions *petition.Manager
-	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
-	// the random source. Behavior harnesses inject a deterministic roll.
-	EnchantRoll func() float64
-	// SkillEnchantRoll supplies skill-enchant dice rolls in [0,99]; nil
-	// falls back to the random source. Behavior harnesses inject a
-	// deterministic roll.
-	SkillEnchantRoll func() int
 	// CraftRoll supplies craft success rolls in [0,n); nil falls back to
 	// the random source.
 	CraftRoll func(n int) int
-	// PetRoll supplies the dice of every pet called out in [0,n), its
-	// hunger included; nil falls back to the random source.
-	PetRoll func(n int) int
 	// OlympiadDraw supplies the dice of the Olympiad's draws and of the
 	// spot its competitors return to in [0,n); nil falls back to the
 	// random source.
 	OlympiadDraw func(n int) int
-	// PetFeedPeriod is how often every pet called out eats; zero is the
-	// standard ten seconds. Harnesses lengthen it so a meal cannot land
-	// inside a timed exchange.
-	PetFeedPeriod time.Duration
 	// Fish is the loaded fish table a cast line draws its fish from; nil
 	// draws none, so every line comes back empty.
 	Fish *fish.Table
@@ -705,10 +682,6 @@ type GameClientLinkConfig struct {
 	// AugmentRoll draws the uniform ints a refine rolls, both ends
 	// inclusive; nil falls back to the random source.
 	AugmentRoll augmentation.Rand
-	// ArmorSets is the loaded armor set data whose +6 skill an armor
-	// enchant grants and revokes; nil grants none. The equip-time set
-	// skills come from the skill persistence's own table.
-	ArmorSets *armorset.Table
 	// Manor is what the seed and harvester items and the harvest read; the
 	// zero value turns the manor off.
 	Manor ManorConfig
@@ -841,9 +814,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		geo:           cfg.Geo,
 		zones:         cfg.Zones,
 		ids:           cfg.IDs,
-		attackStance:  cfg.AttackStance,
-		ai:            cfg.AI,
-		pvpFlags:      cfg.PvPFlags,
 		effects:       cfg.Effects,
 		positions:     cfg.Positions,
 		gameClock:     cfg.GameClock,
@@ -891,21 +861,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		belongings:       newBelongings(cfg.Belongings),
 		enchanting:       newEnchanting(cfg),
 		summoning:        newSummoning(cfg),
-		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
-		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{
-			Templates: cfg.NPCs,
-			IDs:       cfg.IDs,
-			World:     cfg.World,
-			NewSink:   EffectPointSinks(cfg.World),
-			Zones:     cfg.Zones,
-			Effects:   cfg.Effects,
-			Queues:    cfg.Queues,
-			Log:       cfg.Log,
-
-			ManorCropRate: cfg.Manor.CropRate,
-		}),
-		log: cfg.Log,
-		now: cfg.Now,
+		combat:           newCombat(cfg),
+		log:              cfg.Log,
+		now:              cfg.Now,
 	}
 	playerConfig := cfg.PlayerConfig
 	link.playerSettings.Store(&playerConfig)
@@ -993,10 +951,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		clans := link.clans
 		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })
 	}
-	link.skillHandlers.Register(takeCastleHandler{l: link})
-	link.skillHandlers.Register(siegeFlagHandler{l: link})
-	link.skillHandlers.Register(handlerskill.NewStriderSiegeAssault(link.siegeAssaultCheck))
-	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
+	link.combat.skillHandlers.Register(takeCastleHandler{l: link})
+	link.combat.skillHandlers.Register(siegeFlagHandler{l: link})
+	link.combat.skillHandlers.Register(handlerskill.NewStriderSiegeAssault(link.siegeAssaultCheck))
+	link.combat.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.combat.targets, Skills: link.combat.skillHandlers, Deliver: link.deliverChanceCast}
 	link.wireZones(link.zones)
 	link.wireCastleTickets()
 	link.olympiadDraw = cfg.OlympiadDraw

@@ -107,7 +107,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		Positions:     task.NewPositionUpdates(state),
 		SevenSigns:    sevenSigns,
 		PlayerConfig:  PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, MaxBuffsAmount: 20},
-		PetConfig:     petmodel.DefaultConfig(),
+		Summoning:     SummoningConfig{Config: petmodel.DefaultConfig()},
 		Queues:        testQueues(t),
 		Effects:       effect.Env{Activity: task.NewEffects()},
 		Log:           zerolog.Nop(),

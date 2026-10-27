@@ -297,7 +297,7 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 // broadcasts it in MagicSkillLaunched. ok is false when no set can be
 // resolved.
 func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorcast.Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
-	handler, ok := l.targets.Handler(def.Target)
+	handler, ok := l.combat.targets.Handler(def.Target)
 	if !ok {
 		return nil, false
 	}
@@ -510,7 +510,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 		return nil, skilltarget.CastRejectNone
 	}
 	selectedCreature, _ := selected.(skilltarget.Actor)
-	handler, ok := l.targets.Handler(def.Target)
+	handler, ok := l.combat.targets.Handler(def.Target)
 	if !ok {
 		return nil, skilltarget.CastRejectNone
 	}
@@ -973,7 +973,7 @@ func (l *GameClientLink) playerMessageSink(live *livePlayer, onStatus func()) sk
 // link's target and skill registries and its chance procs, all read-only
 // after construction and shared by every actor's queue.
 func (l *GameClientLink) castEffects() actorcast.EffectHandlers {
-	return actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers, Chance: l.chance}
+	return actorcast.EffectHandlers{Targets: l.combat.targets, Skills: l.combat.skillHandlers, Chance: l.combat.chance}
 }
 
 // frameSender sends frame to recipient's client.

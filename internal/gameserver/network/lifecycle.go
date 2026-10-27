@@ -118,7 +118,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.shadowItems != nil {
 		l.shadowItems.Remove(live.ObjectID())
 	}
-	if l.attackStance != nil {
+	if l.combat.attackStance != nil {
 		// Unconditional, alongside the other registry removals: the stance
 		// entry is dropped here, between the water and pvp-flag removals,
 		// whatever live.Stop left of the in-combat flag. Left behind, the
@@ -128,13 +128,13 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		// The removal is silent: observers of a player leaving the world
 		// get no AutoAttackStop, only its DeleteObject. A stance that
 		// expired while a dropped connection lingered sent its own.
-		l.attackStance.Remove(live)
+		l.combat.attackStance.Remove(live)
 	}
-	if l.pvpFlags != nil {
+	if l.combat.pvpFlags != nil {
 		// reset=false, as the disconnect cleanup requires: a
 		// disconnecting character's flag isn't persisted, so there's
 		// nothing to reset it to — just stop tracking it.
-		l.pvpFlags.Remove(live.Character, false)
+		l.combat.pvpFlags.Remove(live.Character, false)
 	}
 	if l.zones != nil && live.zoneActor != nil {
 		live.zoneActor.removeFrom(l.zones)

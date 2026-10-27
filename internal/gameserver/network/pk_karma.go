@@ -222,8 +222,8 @@ func (l *GameClientLink) applyPKKarmaSideEffects(live *livePlayer) {
 // that cannot be tested never leaves a fresh PKer flagged.
 func (l *GameClientLink) runPKKarmaSideEffects(live *livePlayer) {
 	l.unequipRestrictedItems(live)
-	if l.pvpFlags != nil {
-		l.pvpFlags.Remove(live.Character, true)
+	if l.combat.pvpFlags != nil {
+		l.combat.pvpFlags.Remove(live.Character, true)
 	}
 }
 
@@ -236,7 +236,7 @@ func (l *GameClientLink) runPKKarmaSideEffects(live *livePlayer) {
 // flags first and ends unflagged, a lethal skill flags after and ends
 // flagged.
 func (l *GameClientLink) applyPvPFlag(live *livePlayer, e event.PvPFlagged) {
-	if l.pvpFlags == nil {
+	if l.combat.pvpFlags == nil {
 		return
 	}
 	if e.ByServitor || !live.pvpChanges.empty() {
@@ -247,14 +247,14 @@ func (l *GameClientLink) applyPvPFlag(live *livePlayer, e event.PvPFlagged) {
 }
 
 func (l *GameClientLink) startPvPFlag(live *livePlayer, useFlaggedDuration bool) {
-	if l.pvpFlags == nil {
+	if l.combat.pvpFlags == nil {
 		return
 	}
 	if useFlaggedDuration {
-		l.pvpFlags.AddFlagged(live.Character)
+		l.combat.pvpFlags.AddFlagged(live.Character)
 		return
 	}
-	l.pvpFlags.AddNormal(live.Character)
+	l.combat.pvpFlags.AddNormal(live.Character)
 }
 
 // unequipRestrictedItems takes off, through the UseItem equip toggle, every

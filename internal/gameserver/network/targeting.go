@@ -989,8 +989,8 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	if l.attackStance != nil {
-		l.attackStance.Add(live)
+	if l.combat.attackStance != nil {
+		l.combat.attackStance.Add(live)
 	}
 	if !live.SetInCombat(true) {
 		return
@@ -1014,7 +1014,7 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 // it no longer runs.
 func (l *GameClientLink) stopLiveAttackStance(live *livePlayer) {
 	live.SetInCombat(false)
-	if l.attackStance == nil || !l.attackStance.Remove(live) {
+	if l.combat.attackStance == nil || !l.combat.attackStance.Remove(live) {
 		return
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -1032,13 +1032,13 @@ func (l *GameClientLink) stopLiveAttackStance(live *livePlayer) {
 // expiry ends it on actor (attackStanceEffects).
 func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 	if actor.OwnerLeft() {
-		if l.attackStance == nil {
+		if l.combat.attackStance == nil {
 			return
 		}
-		if !l.attackStance.InAttackStance(actor) {
+		if !l.combat.attackStance.InAttackStance(actor) {
 			l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
 		}
-		l.attackStance.Add(actor)
+		l.combat.attackStance.Add(actor)
 		// A hit that passed its Knows check as the summon's decay
 		// despawned it can get here after the despawn cleanup's Remove
 		// (leaveCorpseBehind), and its entry would outlive the summon,
@@ -1047,7 +1047,7 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 		// the cleanup or this check drops the entry.
 		if l.world != nil {
 			if obj, ok := l.world.Object(actor.ObjectID()); !ok || obj != world.Tracked(actor) {
-				l.attackStance.Remove(actor)
+				l.combat.attackStance.Remove(actor)
 			}
 		}
 		return
@@ -1056,8 +1056,8 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 	if !ok {
 		return
 	}
-	if l.attackStance != nil {
-		l.attackStance.Add(owner)
+	if l.combat.attackStance != nil {
+		l.combat.attackStance.Add(owner)
 	}
 	if !owner.SetInCombat(true) {
 		return

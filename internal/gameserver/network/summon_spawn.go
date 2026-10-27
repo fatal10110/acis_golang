@@ -654,10 +654,10 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIControll
 	// a summon that leaves the world inside this window cannot leave the AI
 	// task ticking a dead actor.
 	sink.onDespawn(brain.StartOffensiveFollowTicker(queue))
-	if l.ai != nil {
+	if l.combat.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
-		l.ai.Add(runner)
-		sink.onDespawn(func() { l.ai.Remove(runner) })
+		l.combat.ai.Add(runner)
+		sink.onDespawn(func() { l.combat.ai.Remove(runner) })
 	}
 	return aiController
 }

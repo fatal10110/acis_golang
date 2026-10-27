@@ -8,12 +8,28 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
+
+// EnchantingConfig holds the collaborators of item and skill enchants: their
+// dice and the armor sets an enchant can complete.
+type EnchantingConfig struct {
+	// Roll supplies enchant dice rolls in [0,1); nil falls back to the
+	// random source. Behavior harnesses inject a deterministic roll.
+	Roll func() float64
+	// SkillRoll supplies skill-enchant dice rolls in [0,99]; nil falls back
+	// to the random source. Behavior harnesses inject a deterministic roll.
+	SkillRoll func() int
+	// ArmorSets is the loaded armor set data whose +6 skill an armor
+	// enchant grants and revokes; nil grants none. The equip-time set
+	// skills come from the skill persistence's own table.
+	ArmorSets *armorset.Table
+}
 
 // enchanting is the enchant feature: the scroll each player has chosen,
 // the service that enchants an item with it, and the skill-enchant dice.
@@ -29,9 +45,9 @@ type enchanting struct {
 // dice; a nil roll draws from the random source.
 func newEnchanting(cfg GameClientLinkConfig) enchanting {
 	scrolls := enchantflow.NewState()
-	items := enchantflow.NewService(scrolls, cfg.IDs, cfg.EnchantRoll, enchantRates(&cfg.PlayerConfig))
-	items.SetArmorSets(cfg.ArmorSets)
-	skillRoll := cfg.SkillEnchantRoll
+	items := enchantflow.NewService(scrolls, cfg.IDs, cfg.Enchanting.Roll, enchantRates(&cfg.PlayerConfig))
+	items.SetArmorSets(cfg.Enchanting.ArmorSets)
+	skillRoll := cfg.Enchanting.SkillRoll
 	if skillRoll == nil {
 		skillRoll = func() int { return rnd.Get(100) }
 	}
