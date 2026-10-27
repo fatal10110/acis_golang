@@ -226,7 +226,7 @@ func TestWireSummonAIRemovesAIRunnerOnDespawn(t *testing.T) {
 	servitor := newTestServitor(t, owner)
 
 	registry := &recordingAIRegistry{}
-	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), Combat: CombatConfig{AI: registry}})
 	l.wireSummonAI(servitor)
 	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
 
@@ -253,7 +253,7 @@ func TestWireSummonAIRemovesAIRunnerOnDespawn(t *testing.T) {
 // writer of actor.world (live_helpers.go:59-68), so for the whole of
 // wireSummonAI the summon has no world: Unsummon takes despawn(nil) ->
 // state == nil -> return (live_lifecycle.go:163-168) and never reaches the
-// Despawned arm. The shared AI task, which l.ai.Add does publish early, only
+// Despawned arm. The shared AI task, which l.combat.ai.Add does publish early, only
 // posts Tick/TickThink onto the actor's queue (task/ai.go:78-105) and never
 // despawns, and regionActivity skips an unplaced actor anyway. If a later
 // change moves SpawnBesideOwner above wireSummonAI, this test starts failing
@@ -266,7 +266,7 @@ func TestWireSummonAIDespawnDuringRegistrationIsUnreachableInProduction(t *testi
 
 	registry := &recordingAIRegistry{}
 	registry.onAdd = func() { servitor.Unsummon() }
-	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), Combat: CombatConfig{AI: registry}})
 	l.wireSummonAI(servitor)
 
 	if len(registry.removed) != 0 {
@@ -298,7 +298,7 @@ func TestWireSummonAIRemovesAIRunnerWhenDespawnReentersRegistration(t *testing.T
 
 	registry := &recordingAIRegistry{}
 	registry.onAdd = func() { servitor.Unsummon() }
-	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), Combat: CombatConfig{AI: registry}})
 	l.wireSummonAI(servitor)
 
 	if len(registry.removed) != 1 {
@@ -315,7 +315,7 @@ func TestWireSummonAIRemovesAIRunnerWhenDespawnReentersRegistration(t *testing.T
 // escaping the loop would drop the rest permanently: a later
 // event.Despawned returns at the despawned guard, and the queue worker
 // recovers and keeps going, so nothing would surface the loss. With
-// wireSummonAI's registration order that lost cleanup is l.ai.Remove --
+// wireSummonAI's registration order that lost cleanup is l.combat.ai.Remove --
 // exactly the leak this type exists to prevent.
 func TestSummonSinkRunDespawnIsolatesAPanickingCleanup(t *testing.T) {
 	sink := &summonSink{link: &GameClientLink{log: zerolog.Nop()}}
@@ -361,7 +361,7 @@ func TestWireSummonAIRemovesAIRunnerWithOwnerQueue(t *testing.T) {
 	servitor := newTestServitor(t, owner)
 
 	registry := &recordingAIRegistry{}
-	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), Combat: CombatConfig{AI: registry}})
 	l.wireSummonAI(servitor)
 	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
 

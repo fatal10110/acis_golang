@@ -11,6 +11,24 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
+// SummoningConfig holds the collaborators of the summon feature: the summon
+// items, the pet rows and settings, the pets' dice and feeding pace, and the
+// corpse decay.
+type SummoningConfig struct {
+	Items  *item.SummonItemTable
+	Store  petStore
+	Config petmodel.Config
+	// Roll supplies the dice of every pet called out in [0,n), its hunger
+	// included; nil falls back to the random source.
+	Roll func(n int) int
+	// FeedPeriod is how often every pet called out eats; zero is the
+	// standard ten seconds. Harnesses lengthen it so a meal cannot land
+	// inside a timed exchange.
+	FeedPeriod time.Duration
+	// Decay removes a dead summon's corpse once its decay delay has passed.
+	Decay *task.Decay
+}
+
 // summoning is the summon feature: the summon items and pet rows, the pet
 // settings, dice and feeding pace every pet called out shares, the pet saves
 // still behind their lane, the pet inventory transfers and the corpse decay.
@@ -46,13 +64,13 @@ type petStore interface {
 // settings and dice.
 func newSummoning(cfg GameClientLinkConfig) summoning {
 	return summoning{
-		items:      cfg.SummonItems,
-		store:      cfg.PetStore,
-		config:     cfg.PetConfig,
-		roll:       cfg.PetRoll,
-		feedPeriod: cfg.PetFeedPeriod,
+		items:      cfg.Summoning.Items,
+		store:      cfg.Summoning.Store,
+		config:     cfg.Summoning.Config,
+		roll:       cfg.Summoning.Roll,
+		feedPeriod: cfg.Summoning.FeedPeriod,
 		petItems:   petitem.NewService(cfg.IDs),
-		decay:      cfg.Decay,
+		decay:      cfg.Summoning.Decay,
 	}
 }
 

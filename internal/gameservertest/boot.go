@@ -2230,6 +2230,23 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			InventoryUpdates: inventoryUpdates,
 			ItemInstances:    itemInstances,
 		},
+		Combat: network.CombatConfig{
+			PvPFlags: task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
+			HealSps:  o.healSps,
+		},
+		Summoning: network.SummoningConfig{
+			Items:      o.summonItems,
+			Store:      petStore,
+			Config:     petmodel.DefaultConfig(),
+			Roll:       o.petRoll,
+			FeedPeriod: o.petFeedPeriod,
+			Decay:      o.decay,
+		},
+		Enchanting: network.EnchantingConfig{
+			Roll:      o.enchantRoll,
+			SkillRoll: o.skillEnchantRoll,
+			ArmorSets: o.armorSets,
+		},
 		KillRewards:      killRewards,
 		Events:           events,
 		Merchant:         shops,
@@ -2242,9 +2259,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		CraftRoll:        o.craftRoll,
 		Fish:             o.fish,
 		FishingRoll:      o.fishingRoll,
-		PetRoll:          o.petRoll,
 		OlympiadDraw:     o.olympiadDraw,
-		PetFeedPeriod:    o.petFeedPeriod,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
@@ -2255,17 +2270,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
 		SkillTrees:       o.trees,
-		HealSps:          o.healSps,
 		CursedWeapons:    cursed,
 		World:            state,
 		NPCs:             o.npcs,
-		SummonItems:      o.summonItems,
-		PetStore:         petStore,
 		Geo:              bootGeo(o.geo),
 		IDs:              ids,
 		Positions:        positions,
 		GameClock:        task.NewGameClock(time.Now),
-		PvPFlags:         task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
 		SevenSigns:       sevenSigns,
 		Festival:         fest,
 		Persist:          persistWorker,
@@ -2286,9 +2297,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		TeleportClock:    o.teleportClock,
 		TradeClock:       o.tradeClock,
 		Zones:            o.zones,
-		PetConfig:        petmodel.DefaultConfig(),
-		EnchantRoll:      o.enchantRoll,
-		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
 		Admin:            o.admin,
 		GMAudit:          o.gmAudit,
@@ -2325,7 +2333,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.PlayerConfig.GMHeroAura = o.gmHeroAura
 	o.configKeys.apply(&gclConfig)
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
-	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
 	gclConfig.SchemeBuffer = o.schemeBuffer
 	gclConfig.Derby = derbyTrack
@@ -2365,13 +2372,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.slowStores > 0 {
 		gclConfig.Belongings.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
 		gclConfig.Belongings.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
-		gclConfig.PetStore = slowPetStore{PetStore: petStore, delay: o.slowStores}
+		gclConfig.Summoning.Store = slowPetStore{PetStore: petStore, delay: o.slowStores}
 	}
 	if o.petNameLookupErr != nil {
 		if o.slowStores > 0 {
 			t.Fatal("gameservertest: WithPetNameLookupError cannot be combined with WithSlowStores")
 		}
-		gclConfig.PetStore = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr}
+		gclConfig.Summoning.Store = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr}
 	}
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat
@@ -2391,16 +2398,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("WithAttackStance and WithAttackStanceTracker both set: they wire the same link collaborator")
 	}
 	if o.attackStanceTracker != nil {
-		gclConfig.AttackStance = o.attackStanceTracker
+		gclConfig.Combat.AttackStance = o.attackStanceTracker
 	} else if attackStance != nil {
-		gclConfig.AttackStance = attackStance
+		gclConfig.Combat.AttackStance = attackStance
 	}
 	if o.pvpFlags != nil {
-		gclConfig.PvPFlags = o.pvpFlags
+		gclConfig.Combat.PvPFlags = o.pvpFlags
 	}
-	gclConfig.Decay = o.decay
 	if ai != nil {
-		gclConfig.AI = ai
+		gclConfig.Combat.AI = ai
 	}
 	if worldObjects != nil {
 		gclConfig.Doors = worldObjects
@@ -2457,7 +2463,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
 			spawnStore: spawnStore, makerCatalog: o.makerCatalog, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
-			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
+			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.Combat.AttackStance, log: o.log, makers: o.npcSpawns,
 			dropRates: o.npcDropRates, partyRange: o.partyRange, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes,
 			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange, noSpawns: o.configKeys.noSpawns,
 		})
@@ -2719,8 +2725,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Effects:             taskEffects,
 		effectEnv:           effectEnv,
 		castEffects:         gcl.HostileCastEffects(),
-		folkSinks:           gcl.FolkSinks(state, gclConfig.AttackStance),
-		hostileSinks:        gcl.HostileSinks(state, gclConfig.AttackStance),
+		folkSinks:           gcl.FolkSinks(state, gclConfig.Combat.AttackStance),
+		hostileSinks:        gcl.HostileSinks(state, gclConfig.Combat.AttackStance),
 		guardedSiege:        gcl.GuardedSiege,
 		groundTaker:         gcl,
 		playerRules:         gcl.PlayerRules(),

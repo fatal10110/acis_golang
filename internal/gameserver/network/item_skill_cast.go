@@ -345,10 +345,10 @@ func (l *GameClientLink) attemptItemAICast(live *livePlayer, selected world.Trac
 // skillFinalTarget is the creature def would be cast on given selected,
 // before any cast condition is checked.
 func (l *GameClientLink) skillFinalTarget(live *livePlayer, selected world.Tracked, def modelskill.Definition) skilltarget.Actor {
-	if l.targets == nil {
+	if l.combat.targets == nil {
 		return nil
 	}
-	handler, ok := l.targets.Handler(def.Target)
+	handler, ok := l.combat.targets.Handler(def.Target)
 	if !ok {
 		return nil
 	}

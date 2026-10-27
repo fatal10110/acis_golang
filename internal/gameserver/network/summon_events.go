@@ -159,7 +159,7 @@ func (s *summonSink) Emit(ev event.Event) {
 		// the hit sends.
 		l.settleSummonOwnerPvPChanges(actor)
 	case event.HitLanded:
-		l.chance.AttackHit(actor, e)
+		l.combat.chance.AttackHit(actor, e)
 	case event.ShotsRechargeRequested:
 		// The summon's work runs on its owner's queue, which owns the
 		// owner's inventory and auto-use set.
@@ -405,11 +405,11 @@ func (s *summonSink) leaveCorpseBehind() {
 	actor.AdoptCorpseQueue(q)
 	s.moveWorkTo(q)
 	s.onDespawn(q.Close)
-	if l.attackStance != nil {
+	if l.combat.attackStance != nil {
 		// A corpse revived meanwhile is in a stance of its own
 		// (startSummonAttackStance), whose expiry the closed queue would
 		// never run.
-		s.onDespawn(func() { l.attackStance.Remove(actor) })
+		s.onDespawn(func() { l.combat.attackStance.Remove(actor) })
 	}
 }
 
