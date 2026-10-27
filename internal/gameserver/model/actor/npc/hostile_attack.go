@@ -17,6 +17,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
+var _ attack.Target = (*Hostile)(nil)
+
 // AttackDisabled reports whether this NPC is unable to start an attack:
 // dead, held by stun, sleep, paralysis, fear, or an immobile-until-attacked
 // effect, or with its core AI disabled. NPCs never fly. Teleporting gates
@@ -272,7 +274,7 @@ func (h *Hostile) Evasion() int { return hostileSkillStats{h: h}.Evasion() }
 // physical-damage formula. A target that can't exchange physical damage (no
 // formula stats) always misses.
 func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	hit := attack.Hit{TargetID: target.ObjectID()}
 
 	// Folding this needs the world known-list to hand out formula operands.
 	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)

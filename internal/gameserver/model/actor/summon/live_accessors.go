@@ -548,8 +548,8 @@ func (a *Actor) Knows(target attackable.Combatant) bool {
 // ownerSeesInvisible reports whether the summon's owner is a game master,
 // whose sight past invisibility the summon shares.
 func (a *Actor) ownerSeesInvisible() bool {
-	owner, ok := a.currentOwner().(interface{ SeesInvisible() bool })
-	return ok && owner.SeesInvisible()
+	owner := a.currentOwner()
+	return owner != nil && owner.SeesInvisible()
 }
 
 // OwnsOffensiveFollowTicker reports that summon AI already rechecks its

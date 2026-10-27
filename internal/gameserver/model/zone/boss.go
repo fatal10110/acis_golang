@@ -218,23 +218,3 @@ func (z *Boss) AllowedPlayers() []int32 {
 	}
 	return out
 }
-
-// OustAll throws every online player inside out via the Eject hook and
-// wipes all entry permissions. It returns the players it acted on.
-func (z *Boss) OustAll() []Actor {
-	players := z.playersInside(nil)
-	for _, a := range players {
-		p, ok := a.(Player)
-		if ok && !p.Online() {
-			continue
-		}
-		if z.Eject != nil {
-			z.Eject(a)
-		}
-	}
-	z.bmu.Lock()
-	z.allowed = make(map[int32]struct{})
-	z.deadlines = make(map[int32]time.Time)
-	z.bmu.Unlock()
-	return players
-}

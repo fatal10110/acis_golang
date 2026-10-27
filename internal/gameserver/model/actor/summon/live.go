@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -126,6 +127,26 @@ type Owner interface {
 	ReviveOffer() (pending, forPet bool)
 	// InDuel reports whether the owner is in a duel.
 	InDuel() bool
+	// DuelID is the owner's duel, 0 for none; DuelTeam the team colour it
+	// shows.
+	DuelID() int32
+	DuelTeam() int
+	// OlympiadMode reports an owner fighting in the Olympiad.
+	OlympiadMode() bool
+	// SeesInvisible reports a game master owner, whose sight past
+	// invisibility its summon shares.
+	SeesInvisible() bool
+	// The owner's social standing its summon reads as its own: the party,
+	// clan and alliance predicates and the social rules judged for a
+	// playable acting through it.
+	IsInParty() bool
+	IsInSameParty(other skilltarget.Actor) bool
+	IsInSameClan(other skilltarget.Actor) bool
+	IsInSameAlly(other skilltarget.Actor) bool
+	HasClan() bool
+	CanCastOnPlayable(target skilltarget.Actor, skill *modelskill.Definition, ctrl, offensive, ownCast bool) bool
+	OffensiveCastAllowed(caster attackable.ArenaMember, target skilltarget.Actor, skill *modelskill.Definition, ctrl, mainTarget bool) bool
+	SocialWithoutForce(self attackable.ArenaMember, attacker skilltarget.Actor) (allowed, decided bool)
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.

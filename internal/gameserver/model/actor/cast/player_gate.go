@@ -3,9 +3,8 @@ package cast
 import (
 	"errors"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -141,25 +140,19 @@ func outsideCasterDuel(caster *player.Character, target Target) bool {
 	if !caster.InDuel() {
 		return false
 	}
-	t, ok := target.(interface {
-		Kind() actor.Kind
-		Owner() (attackable.Combatant, bool)
-	})
+	t, ok := target.(skilltarget.Actor)
 	if !ok {
 		return false
 	}
-	var acting any = t
 	switch t.Kind() {
 	case actor.KindPlayer:
 	case actor.KindSummon:
-		owner, ok := t.Owner()
-		if !ok || owner == nil {
+		// A summon's duel is its owner's; an ownerless one is in none.
+		if owner, ok := t.Owner(); !ok || owner == nil {
 			return false
 		}
-		acting = owner
 	default:
 		return false
 	}
-	p, ok := acting.(interface{ DuelID() int32 })
-	return ok && p.DuelID() != caster.DuelID()
+	return t.DuelID() != caster.DuelID()
 }

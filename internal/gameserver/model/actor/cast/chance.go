@@ -9,7 +9,9 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
@@ -84,19 +86,24 @@ type chanceOwner interface {
 	Roll(n int) int
 	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int)
 	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32)
+	// SkillLevels are a player's known skills: its passive skills that
+	// carry a chanceType are chance procs too. Other creatures know none.
+	SkillLevels() player.SkillLevels
 }
+
+// The creatures that hold chance procs.
+var (
+	_ chanceOwner = (*player.Character)(nil)
+	_ chanceOwner = (*npc.Hostile)(nil)
+	_ chanceOwner = (*npc.Folk)(nil)
+	_ chanceOwner = (*summon.Actor)(nil)
+)
 
 // chanceCaster is the creature a triggered skill is cast by.
 type chanceCaster interface {
 	handlerskill.Creature
 	SkillDisabled(key int32) bool
 	DisableSkill(key int32, delay time.Duration)
-}
-
-// chanceSkillHolder is a player: its known passive skills that carry a
-// chanceType are chance procs too.
-type chanceSkillHolder interface {
-	SkillLevels() player.SkillLevels
 }
 
 // AttackHit runs the procs of hit, a physical hit of attacker that dealt
@@ -270,6 +277,10 @@ func (p *ChanceProcs) fire(ownerObj any, ownerHit bool, targetObj any, events ch
 	if events == 0 {
 		return
 	}
+	// Either side of a hit may be a creature without chance procs (a door's
+	// hit surface), so the owner is narrowed here, once per hit side, rather
+	// than every hit participant carrying an effect list (an accepted kind
+	// narrowing, #2362).
 	owner, ok := ownerObj.(chanceOwner)
 	if !ok || owner.Dead() {
 		return
@@ -301,12 +312,11 @@ func (p *ChanceProcs) rolls(owner chanceOwner, cond modelskill.ChanceCondition, 
 
 // chanceSkills returns owner's known passive chance skills, by skill id.
 func (p *ChanceProcs) chanceSkills(owner chanceOwner) []modelskill.Definition {
-	holder, ok := owner.(chanceSkillHolder)
-	if !ok || p.Definitions == nil {
+	if p.Definitions == nil {
 		return nil
 	}
 	var out []modelskill.Definition
-	for id, level := range holder.SkillLevels() {
+	for id, level := range owner.SkillLevels() {
 		def, ok := p.Definitions.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: level})
 		if ok && def.Activation == modelskill.ActivationPassive && def.ChanceType != "" {
 			out = append(out, def)

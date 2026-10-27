@@ -407,6 +407,10 @@ type timingPlayer struct {
 	drawMs       int
 }
 
+// A timing player holds no cursed weapon and is no hero.
+func (p *timingPlayer) CursedWeaponEquipped() bool { return false }
+func (p *timingPlayer) IsHero() bool               { return false }
+
 type curseTimingPlayer struct {
 	world.Presence
 	timingPlayer
@@ -473,7 +477,7 @@ func (a *timingActor) ForEachKnownHitTargetInRadius(radius int, fn func(attackab
 
 func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	a.events = append(a.events, "hit")
-	return Hit{Target: t, Damage: 1}
+	return Hit{Damage: 1}
 }
 func (a *timingActor) ConsumeBowMP() { a.events = append(a.events, "mp") }
 func (a *timingActor) CalcStat(s stat.Stat, base float64) float64 {
@@ -942,6 +946,12 @@ func (a *timingSummon) Owner() (attackable.Combatant, bool) {
 
 func (t *timingTarget) Invul() bool     { return t.invul }
 func (t *timingTarget) Paralyzed() bool { return t.paralyzed }
+
+// A plain timing target reflects nothing and ignores cast breaks and misses.
+func (t *timingTarget) CalcStat(_ stat.Stat, base float64) float64 { return base }
+func (t *timingTarget) MaxHPValue() float64                        { return 0 }
+func (t *timingTarget) BreakCastOnDamage(float64)                  {}
+func (t *timingTarget) NotifyEvaded(attackable.Combatant)          {}
 
 // reactingTarget is a hit target whose AI reacts to hits, as players and
 // summons do. log is shared with the attacker's sink so the test can read

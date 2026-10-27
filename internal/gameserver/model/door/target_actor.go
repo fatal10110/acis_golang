@@ -5,6 +5,7 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -66,3 +67,20 @@ func (o *Object) Seeded() bool                         { return false }
 // creature reports half its body: line of sight to a door ends at the
 // configured share of its full height above its Z.
 func (o *Object) CollisionHeight() float64 { return float64(o.height) / 2 }
+
+// A door is no chest, beast or manor monster, and holds no resurrection,
+// siege or festival standing of its own.
+func (o *Object) Chest() bool                              { return false }
+func (o *Object) Interacted() bool                         { return false }
+func (o *Object) FeedableBeast() bool                      { return false }
+func (o *Object) Seedable() bool                           { return false }
+func (o *Object) SpawnLocation() (location.Location, bool) { return location.Location{}, false }
+func (o *Object) ReviveOffer() (pending, forPet bool)      { return false, false }
+func (o *Object) InSiegeZone() bool                        { return false }
+func (o *Object) SiegeState() int32                        { return 0 }
+func (o *Object) FestivalParticipant() bool                { return false }
+
+// A door neither lists attackers nor reacts to an offensive skill.
+func (o *Object) RecordAttacker(attackable.Combatant)                       {}
+func (o *Object) NotifyAttacked(attackable.Combatant)                       {}
+func (o *Object) SkillAttacked(attackable.Combatant, modelskill.Definition) {}

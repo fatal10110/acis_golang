@@ -17,6 +17,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
+var _ attack.Target = (*Folk)(nil)
+
 var _ attack.CreatureActor = (*Folk)(nil)
 
 const (
@@ -471,7 +473,7 @@ func (f *Folk) BroadcastAttack(e event.Attack) { f.emit(e) }
 // roll, a critical roll and the physical damage. A target with no combat
 // stats is always missed.
 func (f *Folk) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	hit := attack.Hit{TargetID: target.ObjectID()}
 	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true

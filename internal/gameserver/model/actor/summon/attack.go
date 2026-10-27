@@ -19,6 +19,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+var _ attack.Target = (*Actor)(nil)
+
 // AttackDisabled reports whether this summon cannot start a physical attack:
 // dead, paralyzed, or held by stun, sleep, fear, or an immobile-until-attacked
 // effect. Unlike DenyAIAction, teleporting does not disable attacking; it
@@ -134,7 +136,7 @@ func (a *Actor) InPeaceZone() bool { return a.membership.has(zone.FlagPeace) }
 func (a *Actor) Evasion() int { return int(a.EvasionRate()) }
 
 func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	hit := attack.Hit{TargetID: target.ObjectID()}
 	// Folding this needs the world known-list to hand out formula operands.
 	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
 	// yields attackable.Combatant, narrowed from world.Tracked, and world

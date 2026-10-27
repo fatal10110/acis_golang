@@ -10,6 +10,7 @@ package doorhit
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -168,3 +169,11 @@ func (t Target) SkillSuccessInput(caster creature.FormulaActor, def modelskill.D
 
 // CounterSkillPhysical is 0: a door counters no skill.
 func (Target) CounterSkillPhysical() float64 { return 0 }
+
+var _ attack.Target = Target{}
+
+// A door is never petrified, holds no cast to break, and does not react to
+// a hit or a miss.
+func (Target) Paralyzed() bool                   { return false }
+func (Target) BreakCastOnDamage(float64)         {}
+func (Target) NotifyEvaded(attackable.Combatant) {}

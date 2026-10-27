@@ -3,6 +3,8 @@ package npc
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
@@ -84,3 +86,21 @@ func (f *Folk) MageClass() bool                      { return false }
 func (f *Folk) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
 	return true
 }
+
+// A folk NPC is no chest, beast or manor monster, and holds no
+// resurrection, siege or festival standing.
+func (f *Folk) Chest() bool                              { return false }
+func (f *Folk) FeedableBeast() bool                      { return false }
+func (f *Folk) Seedable() bool                           { return false }
+func (f *Folk) SpawnLocation() (location.Location, bool) { return location.Location{}, false }
+func (f *Folk) ReviveOffer() (pending, forPet bool)      { return false, false }
+func (f *Folk) InSiegeZone() bool                        { return false }
+func (f *Folk) SiegeState() int32                        { return 0 }
+func (f *Folk) FestivalParticipant() bool                { return false }
+
+// A folk NPC keeps no attacker list.
+func (f *Folk) RecordAttacker(attackable.Combatant) {}
+
+// SkillLevels is empty: an NPC's chance procs are its effects' triggers
+// only.
+func (f *Folk) SkillLevels() player.SkillLevels { return nil }
