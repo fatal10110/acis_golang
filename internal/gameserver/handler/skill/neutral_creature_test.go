@@ -3,9 +3,13 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // neutralCreature supplies neutral values for every Creature method except
@@ -48,6 +52,9 @@ func (neutralPlayer) Mounted() bool                                  { return fa
 func (neutralPlayer) OlympiadMode() bool                             { return false }
 func (neutralPlayer) ObserverMode() bool                             { return false }
 func (neutralPlayer) NoSummonFriendZone() bool                       { return false }
+func (neutralPlayer) AddExpAndSp(int64, int)                         {}
+func (neutralPlayer) ReviveRequest(player.Reviver, float64, bool)    {}
+func (neutralPlayer) NotifyEffectRemovedDueLackMP(*effect.Effect)    {}
 
 // neutralNPC adds the NPC-only cast surface on top of neutralCreature.
 type neutralNPC struct {
@@ -64,3 +71,28 @@ func (neutralNPC) SeedState() *npc.SeedState { return nil }
 
 // MonsterKind: the neutral NPC is no Monster.
 func (neutralNPC) MonsterKind() bool { return false }
+
+// The neutral NPC keeps no hate and is no chest.
+func (neutralNPC) AggroHate(attackable.Combatant) float64               { return 0 }
+func (neutralNPC) Unlockable() bool                                     { return false }
+func (neutralNPC) Box() bool                                            { return false }
+func (neutralNPC) Interacted() bool                                     { return false }
+func (neutralNPC) ClaimInteraction() bool                               { return false }
+func (neutralNPC) AddAttackDesire(attackable.Combatant, float64)        {}
+func (neutralNPC) AddDamageHate(attackable.Combatant, float64, float64) {}
+func (neutralNPC) DeleteMe()                                            {}
+
+// neutralSummon adds the summon-only cast surface on top of
+// neutralCreature: an ownerless servitor that ignores revives and grants.
+type neutralSummon struct {
+	neutralCreature
+}
+
+func (neutralSummon) Kind() actor.Kind                { return actor.KindSummon }
+func (neutralSummon) SiegeSummon() bool               { return false }
+func (neutralSummon) SummonOwner() summon.Owner       { return nil }
+func (neutralSummon) UnSummon(summon.Owner)           {}
+func (neutralSummon) IsPet() bool                     { return false }
+func (neutralSummon) AddExpAndSp(int64, int)          {}
+func (neutralSummon) ReviveRestoringExp(float64) bool { return false }
+func (neutralSummon) ResurrectOutright(float64)       {}

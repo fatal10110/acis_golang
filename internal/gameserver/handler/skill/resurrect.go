@@ -3,42 +3,11 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
-// reviveRequestTarget is a character that can be offered a resurrection,
-// for itself or for its pet.
-type reviveRequestTarget interface {
-	ObjectID() int32
-	ReviveRequest(reviver player.Reviver, power float64, isPet bool)
-}
-
-// petIdentity tells a pet from a servitor.
-type petIdentity interface {
-	IsPet() bool
-}
-
-// summonReviver is a summon a player caster's resurrection revives
-// outright.
-type summonReviver interface {
-	ReviveRestoringExp(power float64) bool
-}
-
-// outrightSummonReviver is a summon a non-player caster's resurrection
-// revives, on the summon's own queue.
-type outrightSummonReviver interface {
-	ResurrectOutright(power float64)
-}
-
-var (
-	_ reviveRequestTarget = (*player.Character)(nil)
-	_ player.Reviver      = (*player.Character)(nil)
-
-	_ summonReviver         = (*summon.Actor)(nil)
-	_ outrightSummonReviver = (*summon.Actor)(nil)
-)
+var _ player.Reviver = (*player.Character)(nil)
 
 type resurrectHandler struct{}
 
@@ -82,7 +51,7 @@ func offerRevives(cast Cast, reviver player.Reviver, power float64) {
 		}
 		switch obj.Kind() {
 		case actor.KindPlayer:
-			if target, ok := obj.(reviveRequestTarget); ok {
+			if target, ok := asPlayer(obj); ok {
 				target.ReviveRequest(reviver, power, false)
 			}
 		case actor.KindSummon:
@@ -94,24 +63,20 @@ func offerRevives(cast Cast, reviver player.Reviver, power float64) {
 // reviveOrOfferSummon revives a dead servitor or the caster's own dead pet,
 // and sends another player's dead pet's resurrection offer to its owner.
 func reviveOrOfferSummon(cast Cast, obj Actor, reviver player.Reviver, power float64) {
-	s, ok := obj.(Summon)
+	s, ok := asSummon(obj)
 	if !ok {
 		return
 	}
-	target, ok := obj.(summonReviver)
-	if !ok {
+	if !s.IsPet() {
+		s.ReviveRestoringExp(power)
 		return
 	}
-	if identity, ok := obj.(petIdentity); !ok || !identity.IsPet() {
-		target.ReviveRestoringExp(power)
-		return
-	}
-	owner, ok := s.SummonOwner().(reviveRequestTarget)
+	owner, ok := asPlayer(s.SummonOwner())
 	if !ok {
 		return
 	}
 	if owner.ObjectID() == cast.Caster.ObjectID() {
-		target.ReviveRestoringExp(power)
+		s.ReviveRestoringExp(power)
 		return
 	}
 	owner.ReviveRequest(reviver, power, true)
@@ -122,7 +87,7 @@ func reviveOrOfferSummon(cast Cast, obj Actor, reviver player.Reviver, power flo
 // offline included.
 func reviveTargets(cast Cast, power float64) {
 	for _, obj := range cast.Targets {
-		if s, ok := obj.(outrightSummonReviver); ok && obj.Kind() == actor.KindSummon {
+		if s, ok := asSummon(obj); ok {
 			s.ResurrectOutright(power)
 			continue
 		}

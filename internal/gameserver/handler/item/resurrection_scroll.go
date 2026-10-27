@@ -42,14 +42,9 @@ const (
 	ResurrectionScrollOwnerOfferOpen
 )
 
-// reviveOfferHolder is a player who may have a resurrection offer open.
-type reviveOfferHolder interface {
-	ReviveOffer() (pending, forPet bool)
-}
-
 // resurrectionPlayerTarget is a dead player a resurrection scroll checks.
 type resurrectionPlayerTarget interface {
-	reviveOfferHolder
+	ReviveOffer() (pending, forPet bool)
 	InSiegeZone() bool
 	SiegeState() int32
 	FestivalParticipant() bool
@@ -112,11 +107,7 @@ func deadPetRefusal(userID int32, owner summon.Owner) ResurrectionScrollRefusal 
 	if owner == nil || owner.ObjectID() == userID {
 		return ResurrectionScrollAllowed
 	}
-	holder, ok := owner.(reviveOfferHolder)
-	if !ok {
-		return ResurrectionScrollAllowed
-	}
-	if pending, forPet := holder.ReviveOffer(); pending {
+	if pending, forPet := owner.ReviveOffer(); pending {
 		if forPet {
 			return ResurrectionScrollAlreadyProposed
 		}

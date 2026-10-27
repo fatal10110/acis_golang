@@ -63,6 +63,10 @@ func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector Actor, isDOT b
 	t.events = append(t.events, fmt.Sprintf("dot:%g:%v", damage, effector))
 }
 
+func (t *liveEffectTarget) ReduceHPBySkillDOT(damage float64, effector Actor, _ modelskill.Ref) {
+	t.ReduceHPByDOT(damage, effector, true)
+}
+
 func (t *liveEffectTarget) ReduceHPByToggleUpkeep(damage float64, effector Actor) {
 	t.hp -= damage
 	t.events = append(t.events, fmt.Sprintf("upkeep:%g:%v", damage, effector))

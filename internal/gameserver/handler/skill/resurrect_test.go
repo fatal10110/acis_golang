@@ -101,6 +101,7 @@ func TestResurrectByNonPlayerRevivesOutright(t *testing.T) {
 // reviveFakeSummon records how a resurrection reached a summon.
 type reviveFakeSummon struct {
 	world.Presence
+	neutralSummon
 	fakeActor
 	outright []float64
 	direct   []float64

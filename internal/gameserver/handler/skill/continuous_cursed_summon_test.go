@@ -12,13 +12,17 @@ import (
 // method, which a field named Owner would shadow.
 type anyOwner = summon.Owner
 
-// cursedOwner is a summon owner as the BUFF gate reads it: only its cursed
-// weapon.
+// cursedOwner is a summon owner as the BUFF gate reads it: a player and
+// its cursed weapon.
 type cursedOwner struct {
 	anyOwner
+	neutralPlayer
 	cursed bool
 }
 
+func (cursedOwner) Kind() actor.Kind             { return actor.KindPlayer }
+func (cursedOwner) InCombat() bool               { return false }
+func (cursedOwner) SetHeading(int)               {}
 func (o cursedOwner) CursedWeaponEquipped() bool { return o.cursed }
 
 // summonCaster is a summon casting for owner.
@@ -27,10 +31,14 @@ type summonCaster struct {
 	owner summon.Owner
 }
 
-func (summonCaster) Kind() actor.Kind            { return actor.KindSummon }
-func (summonCaster) SiegeSummon() bool           { return false }
-func (s summonCaster) SummonOwner() summon.Owner { return s.owner }
-func (summonCaster) UnSummon(summon.Owner)       {}
+func (summonCaster) Kind() actor.Kind                { return actor.KindSummon }
+func (summonCaster) SiegeSummon() bool               { return false }
+func (s summonCaster) SummonOwner() summon.Owner     { return s.owner }
+func (summonCaster) UnSummon(summon.Owner)           {}
+func (summonCaster) IsPet() bool                     { return false }
+func (summonCaster) AddExpAndSp(int64, int)          {}
+func (summonCaster) ReviveRestoringExp(float64) bool { return false }
+func (summonCaster) ResurrectOutright(float64)       {}
 
 // TestContinuousBuffFromCursedHoldersSummon follows the BUFF gate's acting
 // player: a summon whose owner holds a cursed weapon buffs no one else, as

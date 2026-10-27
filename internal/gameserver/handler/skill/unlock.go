@@ -2,7 +2,6 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -61,11 +60,11 @@ func (unlockHandler) Use(cast Cast) {
 	}
 
 	target := cast.Targets[0]
-	if door, ok := target.(doorTarget); ok && target.Kind() == actor.KindDoor {
+	if door, ok := asDoor(target); ok {
 		useOnDoor(cast, door)
 		return
 	}
-	if chest, ok := target.(chestTarget); ok && chest.Unlockable() {
+	if chest, ok := asNPC(target); ok && chest.Unlockable() {
 		useOnChest(cast, chest)
 		return
 	}

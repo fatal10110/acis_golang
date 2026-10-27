@@ -39,6 +39,10 @@ type Actor interface {
 
 	HP() float64
 	ReduceHPByDOT(damage float64, effector Actor, isDOT bool)
+	// ReduceHPBySkillDOT applies a skill's damage-over-time tick. An NPC
+	// records the skill that dealt it; any other actor takes it as
+	// ReduceHPByDOT(damage, effector, true).
+	ReduceHPBySkillDOT(damage float64, effector Actor, sk modelskill.Ref)
 	MPValue() float64
 	// ReduceMP reports the amount actually removed.
 	ReduceMP(amount float64) float64

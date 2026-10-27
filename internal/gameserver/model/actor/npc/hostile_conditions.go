@@ -104,11 +104,11 @@ func (a hostileStatActor) ActiveSkillLevel(id int) (int, bool) {
 	return level, ok
 }
 
-// NpcID is the template id a target npcId condition matches.
-func (a hostileStatActor) NpcID() int { return a.h.NpcID() }
+// TargetID is the template id a target npcId condition matches.
+func (a hostileStatActor) TargetID() (int, bool) { return a.h.NpcID(), true }
 
 // RaceOrdinal is the template race a target race_id condition matches.
-func (a hostileStatActor) RaceOrdinal() int { return int(a.h.Instance.Template.Race) }
+func (a hostileStatActor) RaceOrdinal() (int, bool) { return int(a.h.Instance.Template.Race), true }
 
 // ActiveEffectLevel satisfies conditions.Actor.
 func (a hostileStatActor) ActiveEffectLevel(effectID int) (int, bool) {

@@ -130,6 +130,15 @@ type Player interface {
 	OlympiadMode() bool
 	ObserverMode() bool
 	NoSummonFriendZone() bool
+
+	// AddExpAndSp grants experience and SP.
+	AddExpAndSp(exp int64, sp int)
+	// ReviveRequest offers this player a resurrection, for itself or for
+	// its pet.
+	ReviveRequest(reviver player.Reviver, power float64, isPet bool)
+	// NotifyEffectRemovedDueLackMP tells this player its effect ended
+	// because a tick could not pay its MP cost.
+	NotifyEffectRemovedDueLackMP(*effect.Effect)
 }
 
 // NPC is the NPC-only cast participant surface.
@@ -145,6 +154,20 @@ type NPC interface {
 	// MonsterKind reports a Monster-family NPC, the only one sown or
 	// harvested.
 	MonsterKind() bool
+	// AggroHate is this NPC's hate against attacker; 0 for one that keeps
+	// no threat table.
+	AggroHate(attacker attackable.Combatant) float64
+
+	// Chest surface: Unlockable reports a chest an unlock skill may open,
+	// and only such an NPC is a box, claims an unlock attempt or is
+	// deleted by one.
+	Unlockable() bool
+	Box() bool
+	Interacted() bool
+	ClaimInteraction() bool
+	AddAttackDesire(attacker attackable.Combatant, hate float64)
+	AddDamageHate(attacker attackable.Combatant, damage, hate float64)
+	DeleteMe()
 }
 
 // Summon is the summon-only cast participant surface.
@@ -153,6 +176,15 @@ type Summon interface {
 	SiegeSummon() bool
 	SummonOwner() summon.Owner
 	UnSummon(owner summon.Owner)
+	// IsPet tells a pet from a servitor.
+	IsPet() bool
+	// AddExpAndSp grants a pet experience and SP.
+	AddExpAndSp(exp int64, sp int)
+	// ReviveRestoringExp revives this summon outright on a player's
+	// resurrection, restoring part of a pet's lost exp; ResurrectOutright
+	// does it for a non-player caster's, on the summon's own queue.
+	ReviveRestoringExp(power float64) bool
+	ResurrectOutright(power float64)
 }
 
 // asCreature returns a as a creature, or false for a cast participant that
@@ -215,6 +247,15 @@ func asNPC(a Actor) (NPC, bool) {
 	}
 	n, ok := a.(NPC)
 	return n, ok
+}
+
+// asSummon returns a as a summon, or false for any other kind.
+func asSummon(a Actor) (Summon, bool) {
+	if a == nil || a.Kind() != actor.KindSummon {
+		return nil, false
+	}
+	s, ok := a.(Summon)
+	return s, ok
 }
 
 // asEffected returns a as an effect target: every creature plus a signet
@@ -673,8 +714,7 @@ func cursed(a Actor) bool {
 // a summon's owner, wields a cursed weapon.
 func actingCursed(a Actor) bool {
 	if s, ok := a.(Summon); ok {
-		owner, ok := s.SummonOwner().(interface{ CursedWeaponEquipped() bool })
-		return ok && owner.CursedWeaponEquipped()
+		return cursed(s.SummonOwner())
 	}
 	return cursed(a)
 }
@@ -698,6 +738,7 @@ var (
 	_ NPC          = (*npc.Hostile)(nil)
 	_ Creature     = (*player.Character)(nil)
 	_ Creature     = (*npc.Hostile)(nil)
+	_ NPC          = (*npc.Folk)(nil)
 	_ Summon       = (*summon.Actor)(nil)
 	_ damageSummon = (*summon.Actor)(nil)
 )
