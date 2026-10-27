@@ -25,5 +25,6 @@ bypass Quest Q635_InTheDimensionalRift dimension_keeper_07.htm
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=-114796,-179334,-6752 fast=0
+  S DeleteObject obj=keeper
   S NpcHtmlMessage obj=keeper item=0 page=script/quest/Q635_InTheDimensionalRift/dimension_keeper_07a.htm
   S ActionFailed

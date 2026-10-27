@@ -93,6 +93,7 @@ bypass npc_{aron}_Quest
 kill marauder
   S SystemMessage id=95 1:0 1:0
   S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=herod npc=27119
 
 # Sir Herod's spirit, slain sword in hand: the Knight's Tear.
 kill herod
@@ -196,6 +197,7 @@ kill hangman
   S QuestList 212:0x800000ff
   S ExShowQuestMark quest=212
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=talianus npc=30656
   Q upsert Q212_TrialOfDuty | <cond> | 8
 
 # The spirit takes the mirror and the report, confesses and leaves; its leaving drops the
@@ -213,6 +215,7 @@ bypass npc_{talianus}_Quest
   S SystemMessage id=302 3:2639
   S SystemMessage id=54 3:2637
   S ActionFailed
+  S DeleteObject obj=talianus
   S NpcHtmlMessage obj=talianus item=0 page=script/quest/Q212_TrialOfDuty/30656-01.htm
   S ActionFailed
   S ActionFailed
@@ -249,6 +252,10 @@ bypass npc_{silvershadow}_Quest
   S ActionFailed
   S ActionFailed
   Q upsert Q212_TrialOfDuty | <cond> | 11
+
+# Two minutes after the spirit appeared, the script takes it away again.
+advance 80s
+  S DeleteObject obj=herod
 
 # Twenty Leto Lizardmen: the Militas articles.
 kill lizardman x20
@@ -441,6 +448,7 @@ bypass npc_{hannavalt}_Quest
   S SystemMessage id=302 3:2634
   S SystemMessage id=54 3:2633
   S SystemMessage id=95 1:79832 1:3750
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 212:0x00000000
   S SystemMessage id=302 3:3027

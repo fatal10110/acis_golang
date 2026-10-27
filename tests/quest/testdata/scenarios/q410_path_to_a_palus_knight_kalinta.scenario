@@ -132,6 +132,7 @@ bypass npc_{virgil}_Quest
   S SystemMessage id=302 3:1243
   S SystemMessage id=54 3:1244
   S SystemMessage id=95 1:3200 1:1500
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList
   S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-11.htm

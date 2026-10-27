@@ -13,4 +13,5 @@ advance 7s
 advance 1s
   S NpcSay obj=hero type=0 npc=1021260 text="On to immortal glory!"
 advance 7s
+  S DeleteObject obj=hero
 advance 30s

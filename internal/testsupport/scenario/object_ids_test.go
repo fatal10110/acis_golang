@@ -19,7 +19,7 @@ func TestPageNumbersAreNotRunObjectIDs(t *testing.T) {
 	if err := f.Err(); err != nil {
 		t.Fatal(err)
 	}
-	got, ok, err := render(f.Bytes()[2:], roles)
+	got, ok, err := newRenderer(roles).render(f.Bytes()[2:])
 	if err != nil || !ok {
 		t.Fatalf("render: %v %v", ok, err)
 	}

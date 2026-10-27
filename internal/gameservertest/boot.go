@@ -139,6 +139,7 @@ type options struct {
 	cursedWeapons          []*entity.CursedWeaponTable
 	cursedWeaponClock      func() time.Time
 	gameClockNow           func() time.Time
+	drivenStart            time.Time
 	karmaPlayerCanTeleport bool
 	awardPKKillPVPPoint    bool
 	karmaServiceGates      [3]bool
@@ -347,6 +348,15 @@ func WithCursedWeaponClock(now func() time.Time) Option {
 // suite can move the ticks along with Advance.
 func WithGameClockNow(now func() time.Time) Option {
 	return func(o *options) { o.gameClockNow = now }
+}
+
+// WithDrivenClockStart starts the clock Advance moves (the one the scripts'
+// Now reads) at start, and makes the in-game clock read it, so the uptime the
+// scripts count game ticks from moves with Advance too. Only the inline
+// executor has a driven clock: on the real pool both read the wall clock
+// (check DrivesClock). It replaces WithGameClockNow.
+func WithDrivenClockStart(start time.Time) Option {
+	return func(o *options) { o.drivenStart = start }
 }
 
 // WithKarmaTeleport sets the players.properties KarmaPlayerCanTeleport gate
@@ -2034,7 +2044,19 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
-	clock := task.NewGameClock(o.gameClockNow)
+	gameNow := o.gameClockNow
+	var drivenNow atomic.Pointer[func() time.Time]
+	if !o.drivenStart.IsZero() {
+		// The sim clock exists once the queues start: until then the
+		// clock reads its start.
+		gameNow = func() time.Time {
+			if f := drivenNow.Load(); f != nil {
+				return (*f)()
+			}
+			return o.drivenStart
+		}
+	}
+	clock := task.NewGameClock(gameNow)
 	playerClock, err := task.NewPlayerClock(clock, state, network.NewPlayerClockEffects(state))
 	if err != nil {
 		t.Fatalf("new player clock: %v", err)
@@ -2097,7 +2119,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Registered after the persistence worker and before the listener, so
 	// it stops once every connection has detached on its queue and before
 	// the worker drains.
-	queues := startQueues(t, o.log, o.realPool)
+	queues := startQueues(t, o.log, o.realPool, o.drivenStart)
+	if !o.drivenStart.IsZero() {
+		now := time.Now
+		if queues.inline != nil {
+			now = queues.inline.Now
+		}
+		drivenNow.Store(&now)
+	}
 	// Both writers of the items table share one ordering, as production does.
 	itemWrites := persist.NewOrder()
 	var itemFlusher task.ItemFlusher = gamesql.NewItemFlushStore(db)

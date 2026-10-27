@@ -34,6 +34,7 @@ bypass Quest Q247_PossessorOfAPreciousSoul 31745-04.htm
 bypass Quest Q247_PossessorOfAPreciousSoul 31745-05.htm
   S SystemMessage id=54 3:7694
   S SystemMessage id=45 1:93836
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 247:0x00000000
   S NpcHtmlMessage obj=lady item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31745-05.htm

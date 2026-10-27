@@ -164,6 +164,7 @@ bypass npc_{coffin}_Quest
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=54 3:7155
   S ActionFailed
+  S DeleteObject obj=coffin
   S NpcHtmlMessage obj=coffin item=0 page=script/quest/Q025_HidingBehindTheTruth/31536-01.htm
   S ActionFailed
   S ActionFailed

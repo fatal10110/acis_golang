@@ -18,9 +18,10 @@ import (
 
 // renders are the opcodes a step compares: the dialog's, the quest's, the
 // tutorial's and the item messages, the radar marks, the drops, the casts,
-// the NPC chat lines a script makes and the player's own teleports. The rest
-// (selection, approach, movement, NPC info, the deferred inventory and status
-// updates) is not the script's.
+// the NPC chat lines a script makes, the player's own teleports, the camera
+// shots, the social animations, and the appearing and leaving of the NPCs
+// a script spawns. The rest (selection, approach, movement, the deferred
+// inventory and status updates) is not the script's.
 var renders = []byte{
 	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
 	serverpackets.OpcodePlaySound, serverpackets.OpcodeQuestList, 0xfe,
@@ -28,19 +29,103 @@ var renders = []byte{
 	serverpackets.OpcodeTutorialEnableClientEvent, serverpackets.OpcodeTutorialCloseHTML,
 	serverpackets.OpcodeRadarControl, serverpackets.OpcodeDropItem, serverpackets.OpcodeMagicSkillUse,
 	serverpackets.OpcodeNpcSay, serverpackets.OpcodeTeleportToLocation,
+	serverpackets.OpcodeSpecialCamera, serverpackets.OpcodeSocialAction,
+	serverpackets.OpcodeNPCInfo, serverpackets.OpcodeDeleteObject,
 }
 
-// render renders a server packet payload as an S line, with roles naming
-// object ids; false for a packet a step does not compare. A
-// TeleportToLocation is compared only when it moves the player: where it
-// lands. Another creature's teleport is the world's.
-func render(payload []byte, roles map[int32]string) (string, bool, error) {
+// renderer renders the server packets of one run or trace as S lines.
+type renderer struct {
+	// roles names object ids.
+	roles map[int32]string
+	// placed holds the objects an npc line put in the world (a fresh one
+	// after each kill included): their appearing is the run's own, not a
+	// script's.
+	placed map[int32]bool
+	// byNPC names a template by the one npc line that has it: a NPC a
+	// script spawns of such a template renders under that role.
+	byNPC map[int32]string
+	// spawned names the script-spawned NPCs a NpcInfo has shown, by object
+	// id, so their DeleteObject renders too.
+	spawned map[int32]string
+	// dead holds the objects a Die packet has shown dead: their decay (a
+	// corpse's DeleteObject) follows the template's corpse time, which a
+	// fixture template does not share with the shipped one, so it is not
+	// compared.
+	dead map[int32]bool
+	// off turns the NpcInfo and DeleteObject rendering off: a trace that
+	// lists no npc line's object (an older, hand-made one) cannot tell the
+	// script-spawned NPCs from the world's.
+	off bool
+	// talk marks the packets of a step that is the client talking to an
+	// NPC, whose own animation (a random social action) is not the
+	// script's.
+	talk bool
+}
+
+// newRenderer returns a renderer naming objects by roles, with no NPC
+// placed and none named by template.
+func newRenderer(roles map[int32]string) *renderer {
+	return &renderer{roles: roles, placed: map[int32]bool{}, byNPC: map[int32]string{}, spawned: map[int32]string{}, dead: map[int32]bool{}}
+}
+
+// nameTemplates fills byNPC from the scenario's npc lines: a template two
+// lines share names none.
+func (rd *renderer) nameTemplates(npcs []NPC) {
+	dup := map[int32]bool{}
+	for _, n := range npcs {
+		if _, ok := rd.byNPC[n.ID]; ok {
+			dup[n.ID] = true
+		}
+		rd.byNPC[n.ID] = n.Role
+	}
+	for id := range dup {
+		delete(rd.byNPC, id)
+	}
+}
+
+// talkVerb reports whether a step of verb is the client talking to an NPC
+// (or entering the world): the NPC answers with a random animation.
+func talkVerb(verb string) bool {
+	switch verb {
+	case "action", "bypass", "link", "mark", "enter", "relog", "restart", "create":
+		return true
+	}
+	return false
+}
+
+// render renders a server packet payload as an S line; false for a packet a
+// step does not compare. A TeleportToLocation is compared only when it moves
+// the player: where it lands. Another creature's teleport is the world's. A
+// SocialAction is compared when the player's, or an NPC's outside a talk
+// step. An NpcInfo and a DeleteObject are compared for the NPCs a script
+// spawned (not the npc lines' own) that an npc line of the same template
+// names.
+func (rd *renderer) render(payload []byte) (string, bool, error) {
+	if len(payload) >= 5 && payload[0] == serverpackets.OpcodeDie {
+		rd.dead[int32(binary.LittleEndian.Uint32(payload[1:5]))] = true
+	}
 	if len(payload) == 0 || !slices.Contains(renders, payload[0]) {
 		return "", false, nil
 	}
-	if payload[0] == serverpackets.OpcodeTeleportToLocation &&
-		(len(payload) < 5 || roles[int32(binary.LittleEndian.Uint32(payload[1:5]))] != "player") {
-		return "", false, nil
+	roles := rd.roles
+	switch payload[0] {
+	case serverpackets.OpcodeTeleportToLocation:
+		if len(payload) < 5 || roles[int32(binary.LittleEndian.Uint32(payload[1:5]))] != "player" {
+			return "", false, nil
+		}
+	case serverpackets.OpcodeSocialAction:
+		if len(payload) < 5 {
+			return "", false, nil
+		}
+		obj := int32(binary.LittleEndian.Uint32(payload[1:5]))
+		if name, named := roles[obj]; !named || (name != "player" && rd.talk) {
+			return "", false, nil
+		}
+	case serverpackets.OpcodeNPCInfo, serverpackets.OpcodeDeleteObject:
+		var named bool
+		if roles, named = rd.scripted(payload); !named {
+			return "", false, nil
+		}
 	}
 	line, err := scriptcontract.Packet(payload, roles)
 	if err != nil {
@@ -51,6 +136,58 @@ func render(payload []byte, roles map[int32]string) (string, bool, error) {
 	}
 	return strings.TrimPrefix(line, "S "), true, nil
 }
+
+// appendRendered appends line to lines, except an NpcInfo that repeats the
+// line before it: the reference shows a script-spawned NPC twice, once as
+// it appears and once more as it takes its move type (running), and the
+// run once; one is compared. A run of DeleteObject lines is kept sorted:
+// the order a teleport empties the character's view in is not the script's.
+func appendRendered(lines []string, line string) []string {
+	if n := len(lines); n > 0 && lines[n-1] == line && strings.HasPrefix(line, "NpcInfo ") {
+		return lines
+	}
+	lines = append(lines, line)
+	if strings.HasPrefix(line, "DeleteObject ") {
+		for i := len(lines) - 1; i > 0 && strings.HasPrefix(lines[i-1], "DeleteObject ") && lines[i-1] > lines[i]; i-- {
+			lines[i-1], lines[i] = lines[i], lines[i-1]
+		}
+	}
+	return lines
+}
+
+// scripted decides whether an NpcInfo or a DeleteObject is a script-spawned
+// NPC's, naming it: false for an NPC an npc line placed and for a template
+// no npc line names. It returns the roles to render the packet with.
+func (rd *renderer) scripted(payload []byte) (map[int32]string, bool) {
+	if len(payload) < 5 {
+		return nil, false
+	}
+	obj := int32(binary.LittleEndian.Uint32(payload[1:5]))
+	if rd.off || (payload[0] == serverpackets.OpcodeDeleteObject && rd.dead[obj]) {
+		return nil, false
+	}
+	if rd.placed[obj] {
+		if payload[0] == serverpackets.OpcodeDeleteObject {
+			return rd.roles, true
+		}
+		return nil, false
+	}
+	name, ok := rd.spawned[obj]
+	if !ok {
+		if payload[0] != serverpackets.OpcodeNPCInfo || len(payload) < 9 {
+			return nil, false
+		}
+		name, ok = rd.byNPC[int32(binary.LittleEndian.Uint32(payload[5:9]))-npcNameBase]
+		if !ok {
+			return nil, false
+		}
+		rd.spawned[obj] = name
+	}
+	return map[int32]string{obj: name}, true
+}
+
+// npcNameBase is added to an NPC template id in the client's NPC name id.
+const npcNameBase = 1000000
 
 // expandPage replaces a trailing "page=<path>" of an NpcHtmlMessage or a
 // TutorialShowHtml line with the page's text, as the rendered packet writes
@@ -276,8 +413,15 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			npcObjs[named[0]] = obj
 		}
 	}
+	rd := newRenderer(roles)
+	for obj := range spawned {
+		rd.placed[obj] = true
+	}
+	rd.nameTemplates(sc.NPCs)
+	rd.off = len(spawned) == 0
 	for _, r := range raw {
 		step := traceStep{client: r.client}
+		rd.talk = strings.HasPrefix(r.client, "C ")
 		// task holds the rendered packets of the task running now; own
 		// reports that it is a client packet's own run, which runs on the
 		// player's own queue.
@@ -319,12 +463,12 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			if err != nil {
 				return nil, nil, fmt.Errorf("trace line %q: %w", line, err)
 			}
-			rendered, ok, err := render(payload, roles)
+			rendered, ok, err := rd.render(payload)
 			if err != nil {
 				return nil, nil, fmt.Errorf("trace line %q: %w", line, err)
 			}
 			if ok {
-				task = append(task, rendered)
+				task = appendRendered(task, rendered)
 			}
 		}
 		endTask()

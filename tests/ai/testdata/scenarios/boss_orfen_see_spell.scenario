@@ -23,6 +23,8 @@ cast wolf 4694
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=260,20,30 fast=0
+  S DeleteObject obj=orfen
+  S DeleteObject obj=wolf
   desires orfen cast(player,4063,move)=1000000
 relog
 cast wolf 4694
@@ -35,6 +37,8 @@ cast wolf 4694
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=260,20,30 fast=0
+  S DeleteObject obj=orfen
+  S DeleteObject obj=wolf
 relog
 cast wolf 4694
   S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
@@ -46,6 +50,8 @@ cast wolf 4694
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=260,20,30 fast=0
+  S DeleteObject obj=orfen
+  S DeleteObject obj=wolf
 relog
 cast wolf 4694
   S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
@@ -57,6 +63,8 @@ cast wolf 4694
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=260,20,30 fast=0
+  S DeleteObject obj=orfen
+  S DeleteObject obj=wolf
 relog
 cast wolf 4694
   S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0

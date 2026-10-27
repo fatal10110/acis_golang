@@ -1,0 +1,16 @@
+# WarriorPetForPC (16013), a tamed beast whose first spawn parameter names the character: it
+# keeps him as its owner and, on its 5 in 100 draw, names him in one of its five greetings (sent
+# as the NPC lines' NPCs spawn, before the first step). A claim of the owner naming a later
+# game tick than the beast's own makes it leave; one of the same tick, or of another player,
+# does not.
+character Hunter 20
+random 4 1
+script script.ai.individual.DefaultNpc
+script script.ai.individual.WarriorPetForPC
+npc beast 16013 Monster 40 0 0 params character 2188 0
+
+event beast 10022 character 0
+event beast 10022 77 5
+event beast 10022 character 1
+  S DeleteObject obj=beast
+  live 16013 0

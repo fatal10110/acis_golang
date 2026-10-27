@@ -23,6 +23,7 @@ hit orfen 10
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=510,20,30 fast=0
+  S DeleteObject obj=orfen
   desires orfen attack(player)=1999 cast(player,4063,move)=1000000
 relog
 jump orfen 1000 0 0
@@ -34,6 +35,7 @@ hit orfen 10
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=1010,20,30 fast=0
+  S DeleteObject obj=orfen
 relog
 jump orfen 1500 0 0
 hit orfen 10
@@ -44,6 +46,7 @@ hit orfen 10
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=1510,20,30 fast=0
+  S DeleteObject obj=orfen
 relog
 hit orfen 10
 hit orfen 10

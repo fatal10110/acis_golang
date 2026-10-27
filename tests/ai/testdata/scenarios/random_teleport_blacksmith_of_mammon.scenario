@@ -13,4 +13,5 @@ npc bom 31126 SignsPriest 100 0 0
 
 advance 29m59s
 advance 1s
+  S DeleteObject obj=bom
 advance 30m

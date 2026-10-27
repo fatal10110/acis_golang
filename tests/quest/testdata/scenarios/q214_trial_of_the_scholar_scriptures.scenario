@@ -475,6 +475,7 @@ bypass npc_{mirien}_Quest
   S SystemMessage id=302 3:2720
   S SystemMessage id=54 3:2674
   S SystemMessage id=95 1:80265 1:30000
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 214:0x00000000
   S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-14.htm

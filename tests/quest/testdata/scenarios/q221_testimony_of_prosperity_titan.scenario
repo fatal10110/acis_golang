@@ -185,6 +185,7 @@ bypass npc_{parman}_Quest
   S SystemMessage id=302 3:3240
   S SystemMessage id=54 3:3238
   S SystemMessage id=95 1:12969 1:1000
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 221:0x00000000
   S NpcHtmlMessage obj=parman item=0 page=script/quest/Q221_TestimonyOfProsperity/30104-13.htm

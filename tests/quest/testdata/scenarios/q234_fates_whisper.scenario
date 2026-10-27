@@ -70,6 +70,7 @@ bypass npc_{reorin}_Quest
   S ActionFailed
 kill cabrio
   S SystemMessage id=95 1:0 1:0
+  S NpcInfo obj=coffer npc=31027
 action coffer
 action coffer
   S ActionFailed

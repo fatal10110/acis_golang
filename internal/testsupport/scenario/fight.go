@@ -270,6 +270,10 @@ func (sc *Scenario) tracedFight() string {
 		return "skill, door or summon line"
 	case slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Clans != nil || n.Skills != nil }):
 		return "clan or skill option on an npc line"
+	case sc.HasClock || slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.AI != nil || n.Params != [3]string{} }):
+		return "clock line, or ai or params option on an npc line"
+	case slices.ContainsFunc(sc.Steps, func(st Step) bool { return st.Verb == "event" }):
+		return "event step"
 	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
 		return (st.Verb == "hit" && len(st.Args) == 4) || (st.Verb == "approach" && len(st.Args) == 2)
 	}):

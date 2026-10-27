@@ -23,3 +23,4 @@ bypass Quest CastleDefendTeleporter 0
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=-18123,109927,-2492 fast=0
+  S DeleteObject obj=gatekeeper

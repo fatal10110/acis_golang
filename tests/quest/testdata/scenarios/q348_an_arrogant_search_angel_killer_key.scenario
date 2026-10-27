@@ -10,6 +10,7 @@ npc angelkiller 27184 Monster 40 0 0
 
 hit angelkiller 5
   S NpcSay obj=angelkiller type=0 npc=1027184 text="We don't have any further business to discuss... Have you searched the corpse for the key?"
+  S DeleteObject obj=angelkiller
   items 4291=1
   state Q348_AnArrogantSearch STARTED
   rows Q348_AnArrogantSearch <cond>=18 <state>=STARTED points=0

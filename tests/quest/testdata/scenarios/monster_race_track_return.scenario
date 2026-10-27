@@ -21,5 +21,6 @@ bypass npc_{manager}_Quest MonsterRaceTrack
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=87386,-143246,-1293 fast=0
+  S DeleteObject obj=manager
   S ActionFailed
   M unset MonsterRaceTrack_Npc

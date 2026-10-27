@@ -23,4 +23,5 @@ bypass Quest ElmoredenCemeteryTeleporter IT
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=186699,-75915,-2826 fast=0
+  S DeleteObject obj=chamberlain
   items 7261=1

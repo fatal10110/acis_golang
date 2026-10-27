@@ -678,6 +678,7 @@ bypass Quest Q216_TrialOfTheGuildsman 30103-09a.htm
   S SystemMessage id=301 3:3139 6:7
   S SystemMessage id=54 3:3119
   S SystemMessage id=95 1:80993 1:12250
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 216:0x00000000
   S SystemMessage id=302 3:3024

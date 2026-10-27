@@ -148,9 +148,11 @@ bypass npc_{leirynn}_Quest
 
 # The shamans' last two totems bring cond 4; Leirynn takes them for her second order.
 kill deluShaman x2
+  S NpcInfo obj=neer npc=27092
   S SystemMessage id=95 1:0 1:0
   S SystemMessage id=54 3:2787
   S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcInfo obj=neer npc=27092
   S SystemMessage id=95 1:0 1:0
   S SystemMessage id=54 3:2787
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
@@ -621,6 +623,7 @@ bypass npc_{luther}_Quest
   S SystemMessage id=302 3:2808
   S SystemMessage id=54 3:2809
   S SystemMessage id=95 1:37831 1:18750
+  S SocialAction obj=player action=3
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
   S QuestList 225:0x00000000
   S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-08.htm

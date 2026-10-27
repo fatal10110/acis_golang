@@ -43,4 +43,7 @@ bypass npc_{mirror}_Quest PaganTeleporter
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=34962,-49758,-763 fast=0
+  S DeleteObject obj=chapel
+  S DeleteObject obj=mirror
+  S DeleteObject obj=temple
   S ActionFailed

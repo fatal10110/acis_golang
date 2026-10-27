@@ -20,5 +20,6 @@ bypass npc_{trisha}_Quest MonsterRaceTrack
   S ActionFailed
   S ActionFailed
   S TeleportToLocation obj=player loc=12661,181687,-3560 fast=0
+  S DeleteObject obj=trisha
   S ActionFailed
   M set MonsterRaceTrack_Npc | 30059

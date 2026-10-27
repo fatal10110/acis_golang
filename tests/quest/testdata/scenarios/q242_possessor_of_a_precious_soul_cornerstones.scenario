@@ -41,6 +41,7 @@ action angel
   S ActionFailed
 bypass npc_{angel}_Quest
   S ActionFailed
+  S DeleteObject obj=angel
   S QuestList 242:0x8000001f
   S ExShowQuestMark quest=242
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
@@ -187,6 +188,7 @@ bypass npc_{cornerstone}_Quest
   S ActionFailed
 bypass Quest Q242_PossessorOfAPreciousSoul 31748-03.htm
   S ActionFailed
+  S DeleteObject obj=cornerstone
   S SystemMessage id=302 3:7595
   S NpcHtmlMessage obj=cornerstone item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31748-03.htm
   S ActionFailed

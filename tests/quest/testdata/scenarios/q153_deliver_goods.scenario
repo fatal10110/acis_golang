@@ -125,6 +125,7 @@ bypass npc_{arnold}_Quest
   S SystemMessage id=302 3:1018
   S SystemMessage id=54 3:875
   S SystemMessage id=54 3:875
+  S SocialAction obj=player action=15
   S SystemMessage id=96
   S SystemMessage id=45 1:600
   S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
