@@ -1,6 +1,6 @@
 # To Lead and Be Led (Q118), lizardmen bleed for an apprentice: with a sponsor, even out of the world, a lizardman kill at cond 1 drops a blood on a roll under 700000 of 1000000 (700000 drops none, 699999 one), and the tenth blood moves the quest to cond 2.
-# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java, Quest.getSponsor and Quest.getApprentice)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q118_to_lead_and_be_led_academy_lizards.golden
 character Pupil 19
 clan 3
 mate Chief 19 leader sponsor

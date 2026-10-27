@@ -88,6 +88,7 @@ import net.sf.l2j.gameserver.network.clientpackets.RequestGameStart;
 import net.sf.l2j.gameserver.network.clientpackets.RequestLinkHtml;
 import net.sf.l2j.gameserver.network.clientpackets.RequestRestart;
 import net.sf.l2j.gameserver.network.clientpackets.RequestTutorialQuestionMark;
+import net.sf.l2j.gameserver.network.serverpackets.CharSelectInfo;
 import net.sf.l2j.gameserver.network.serverpackets.MonRaceInfo;
 import net.sf.l2j.gameserver.scripting.Quest;
 import net.sf.l2j.gameserver.scripting.QuestState;
@@ -144,6 +145,9 @@ final class ScenarioTrace
 	/** The account of every scenario's character: no row of an earlier scenario is kept. */
 	private static final String ACCOUNT = "scenario";
 
+	/** The account of a mate: no row of an earlier scenario is kept either. */
+	private static final String MATE_ACCOUNT = "mate";
+
 	/** The name of the clan a clan line creates: an earlier scenario's clan is gone. */
 	private static final String CLAN = "Scenario";
 
@@ -199,6 +203,14 @@ final class ScenarioTrace
 	private final List<String> _hallStatuses = new ArrayList<>();
 	/** The mate line of the clan's leader, when the character is not: name, level. */
 	private String[] _leader;
+	/** The mate line's relation to the character, sponsor or apprentice; null for neither. */
+	private String _mateRelation;
+	/** Whether the mate line says online: the mate is in the world, in a client of its own, from the start. */
+	private boolean _mateOnline;
+	/** The mate line's offset from where the character first enters the world. */
+	private final int[] _mateAt = new int[3];
+	/** The mate line's hold lines: item id, count. */
+	private final List<int[]> _mateHolds = new ArrayList<>();
 	private int[] _draws;
 	/** The time of day the clock line starts the scenario at, in milliseconds since midnight. */
 	private long _clock;
@@ -221,7 +233,18 @@ final class ScenarioTrace
 	private final Map<Integer, List<Integer>> _spawns = new HashMap<>();
 
 	private GameClient _client;
+	/** The client the step being played sends its packets from: the player's, or the mate's of an as step. */
+	private GameClient _actor;
+	/** The trace tag of the client that sends, "@" and the mate's name for the mate's, empty for the player's. */
+	private String _tag = "";
 	private Player _player;
+	/** The mate: the clan's leader, a character of its own that has a client once it is in the world. */
+	private Player _mate;
+	private GameClient _mateClient;
+	/** While true, the mate's own packets are not recorded: its enter burst, which the Go runner drops. */
+	private boolean _entering;
+	/** The mate's object id, kept across its entering the world. */
+	private int _mateObjectId;
 	/** The player's object id, kept across a relog. */
 	private int _objectId;
 	/** Whether the NPC lines' NPCs stand: once the character first entered the world. */
@@ -516,7 +539,7 @@ final class ScenarioTrace
 			{
 				steps = true;
 				// A bypass keeps its own spacing.
-				_steps.add(f[0].equals("bypass") ? new String[] { "bypass", line.substring("bypass".length()).strip() } : f);
+				_steps.add(f[0].equals("bypass") ? new String[] { "bypass", line.substring("bypass".length()).strip() } : asBypass(f, line));
 				continue;
 			}
 			switch (f[0])
@@ -550,7 +573,7 @@ final class ScenarioTrace
 				}
 				case "mate" ->
 				{
-					// A traced scenario's only mate leads the clan and stays out of the world.
+					// A traced scenario's only mate leads the clan.
 					if (!Arrays.asList(f).contains("leader"))
 						_unread.add(f[0]);
 					_leader = new String[]
@@ -558,6 +581,7 @@ final class ScenarioTrace
 						f[1],
 						f[2]
 					};
+					mateFlags(f);
 				}
 				case "siege" -> _siege = new String[]
 				{
@@ -648,11 +672,55 @@ final class ScenarioTrace
 		return null;
 	}
 
+	/** The mate line's flags: sponsor or apprentice, online, hold lines, and the offset. */
+	private void mateFlags(String[] f)
+	{
+		int i = 3;
+		for (; i < f.length; i++)
+		{
+			switch (f[i])
+			{
+				case "leader" ->
+				{
+				}
+				case "sponsor", "apprentice" -> _mateRelation = f[i];
+				case "online" -> _mateOnline = true;
+				case "hold" ->
+				{
+					_mateHolds.add(new int[]
+					{
+						Integer.parseInt(f[i + 1]),
+						Integer.parseInt(f[i + 2])
+					});
+					i += 2;
+				}
+				default ->
+				{
+					if (i + 2 != f.length - 1)
+						_unread.add(f[0]);
+					else
+						for (int k = 0; k < 3; k++)
+							_mateAt[k] = Integer.parseInt(f[i + k]);
+					return;
+				}
+			}
+		}
+	}
+
+	/** An as step of a bypass keeps the bypass's own spacing too. */
+	private static String[] asBypass(String[] f, String line)
+	{
+		if (!f[0].equals("as") || f.length < 4 || !f[2].equals("bypass"))
+			return f;
+		final int at = line.indexOf("bypass", line.indexOf(f[1]) + f[1].length());
+		return new String[] { "as", f[1], "bypass", line.substring(at + "bypass".length()).strip() };
+	}
+
 	private static boolean isStep(String verb)
 	{
 		return switch (verb)
 		{
-			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event" -> true;
+			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event", "as", "away" -> true;
 			default -> false;
 		};
 	}
@@ -663,6 +731,7 @@ final class ScenarioTrace
 		client.setAccountName(ACCOUNT);
 		client.setSessionId(new SessionKey(1, 2, 3, 4));
 		_client = client;
+		_actor = client;
 
 		if (!_steps.isEmpty() && _steps.get(0)[0].equals("create"))
 			client.setState(GameClientState.AUTHED);
@@ -675,9 +744,9 @@ final class ScenarioTrace
 			final String[] s = _steps.get(index);
 			switch (s[0])
 			{
-				case "action" -> action(npc(s[1]));
-				case "bypass" -> bypass(roles(s[1]));
-				case "link" -> link(s[1]);
+				case "action", "bypass", "link" -> client(s);
+				case "as" -> as(s);
+				case "away" -> away();
 				case "kill" ->
 				{
 					final int n = s.length > 2 ? Integer.parseInt(s[2].substring(1)) : 1;
@@ -703,7 +772,13 @@ final class ScenarioTrace
 					enter();
 				}
 				case "restart" -> restart();
-				case "enter" -> enter();
+				case "enter" ->
+				{
+					if (s.length > 1)
+						enterMate(s[1]);
+					else
+						enter();
+				}
 				case "create" -> create();
 				default -> throw new IllegalStateException(_name + ": unknown step " + s[0]);
 			}
@@ -711,6 +786,40 @@ final class ScenarioTrace
 				_lines.add("# live " + id + " " + live(id));
 			for (int id : _spawns.getOrDefault(index, List.of()))
 				_lines.add("# spawned " + id + " " + spawned(id));
+		}
+	}
+
+	/** An action, bypass or link step of the current actor. */
+	private void client(String[] s) throws Exception
+	{
+		switch (s[0])
+		{
+			case "action" -> action(npc(s[1]));
+			case "bypass" -> bypass(roles(s[1]));
+			default -> link(s[1]);
+		}
+	}
+
+	/** An as step: the mate sends the step's packet from its client. */
+	private void as(String[] s) throws Exception
+	{
+		if (_mate == null || !_mate.getName().equals(s[1]))
+			throw new IllegalStateException(_name + ": as " + s[1] + ": no mate line names it");
+		if (_mateClient == null)
+			throw new IllegalStateException(_name + ": as " + s[1] + ": the mate is not in the world");
+		final String[] step = Arrays.copyOfRange(s, 2, s.length);
+		if (!List.of("action", "bypass", "link").contains(step[0]))
+			throw new IllegalStateException(_name + ": as " + s[1] + ": the probe plays no " + step[0] + " step of a mate");
+		_actor = _mateClient;
+		_tag = "@" + s[1];
+		try
+		{
+			client(step);
+		}
+		finally
+		{
+			_actor = _client;
+			_tag = "";
 		}
 	}
 
@@ -759,6 +868,8 @@ final class ScenarioTrace
 				siege(clan);
 			if (_clanHall != 0)
 				owner(clan, _clanHall);
+			if (_mate != null)
+				mateTies(player);
 		}
 		else if (_siege != null)
 			throw new IllegalStateException(_name + ": a siege line needs a clan line");
@@ -780,6 +891,8 @@ final class ScenarioTrace
 		for (String[] m : _memos)
 			player.getMemos().set(m[0], m[1]);
 		holdings(player);
+		if (_mate != null && _mateOnline)
+			mateOnline();
 		spawnNpcs();
 	}
 
@@ -797,13 +910,126 @@ final class ScenarioTrace
 				throw new IllegalStateException(_name + ": the clan line's clan was not created");
 			return clan;
 		}
-		final Player leader = Player.create(IdFactory.getInstance().getNextId(), PlayerData.getInstance().getTemplate(ClassId.VALUES[_class]), "mate", _leader[0], (byte) 0, (byte) 0, (byte) 0, Sex.MALE);
+		final Player leader = Player.create(IdFactory.getInstance().getNextId(), PlayerData.getInstance().getTemplate(ClassId.VALUES[_class]), MATE_ACCOUNT, _leader[0], (byte) 0, (byte) 0, (byte) 0, Sex.MALE);
 		leader.getStatus().setLevel(Integer.parseInt(_leader[1]));
+		leader.getStatus().setMaxHpMp();
 		final Clan clan = ClanTable.getInstance().createClan(leader, CLAN);
 		if (clan == null)
 			throw new IllegalStateException(_name + ": the clan line's clan was not created");
 		clan.addClanMember(player);
+		_mate = leader;
+		_mateObjectId = leader.getObjectId();
 		return clan;
+	}
+
+	/**
+	 * The mate line's relation: the mate is the character's sponsor (the character its apprentice)
+	 * or its apprentice (the character its sponsor), on both sides. The mate is then stored where
+	 * the line puts it, so a mate that enters the world by an enter step restores as written.
+	 */
+	private void mateTies(Player player)
+	{
+		// A character that entered the world by the character select is in the world's players, where a
+		// login notice finds its sponsor or apprentice; the seeded character is added only for a mate that has a relation.
+		if (_mateRelation != null)
+			World.getInstance().addPlayer(player);
+		if ("sponsor".equals(_mateRelation))
+		{
+			player.setSponsor(_mate.getObjectId());
+			_mate.setApprentice(player.getObjectId());
+		}
+		else if ("apprentice".equals(_mateRelation))
+		{
+			player.setApprentice(_mate.getObjectId());
+			_mate.setSponsor(player.getObjectId());
+		}
+		_mate.setXYZ(X + _mateAt[0], Y + _mateAt[1], Z + _mateAt[2]);
+		if (_mateOnline)
+			return;
+		if (!_mateHolds.isEmpty())
+			throw new IllegalStateException(_name + ": the probe reads a mate's hold lines only for an online mate");
+		if (_steps.stream().anyMatch(s -> s[0].equals("enter") && s.length > 1))
+			_mate.store();
+	}
+
+	/** The online mate line's mate: in the world, in a client of its own, beside the character as the Go fixture's is. */
+	private void mateOnline() throws Exception
+	{
+		final GameClient client = mateClient();
+		client.setState(GameClientState.IN_GAME);
+		World.getInstance().addObject(_mate);
+		client.setPlayer(_mate);
+		_mate.setClient(client);
+		_mate.spawnMe(X + _mateAt[0], Y + _mateAt[1], Z + _mateAt[2]);
+		World.getInstance().addPlayer(_mate);
+		for (int[] h : _mateHolds)
+			hold(_mate, h);
+		_mateClient = client;
+	}
+
+	/** A client of the mate's own account. */
+	private static GameClient mateClient()
+	{
+		final GameClient client = new GameClient(null);
+		client.setAccountName(MATE_ACCOUNT);
+		client.setSessionId(new SessionKey(1, 2, 3, 4));
+		return client;
+	}
+
+	/**
+	 * An enter step of a mate: its client selects the stored character of slot 0 and enters the world,
+	 * as the character's own enter step does, so the clan's members and the mate's sponsor or apprentice
+	 * are told. The character select's list is sent unrecorded, as the login the Go runner skips.
+	 */
+	private void enterMate(String name) throws Exception
+	{
+		if (_mate == null || !_mate.getName().equals(name))
+			throw new IllegalStateException(_name + ": enter " + name + ": no mate line names it");
+		if (_mateClient != null)
+			throw new IllegalStateException(_name + ": enter " + name + ": the mate is in the world");
+		final GameClient client = mateClient();
+		client.setState(GameClientState.AUTHED);
+		final boolean muted = _muted;
+		_muted = true;
+		try
+		{
+			client.sendPacket(new CharSelectInfo(client.getAccountName(), client.getSessionId().playOkId1()));
+		}
+		finally
+		{
+			_muted = muted;
+		}
+		Arrays.fill(client.getFloodProtectors(), 0L);
+		_actor = client;
+		_tag = "@" + name;
+		_entering = true;
+		try
+		{
+			final ByteBuffer b = body(18);
+			b.putInt(0).putShort((short) 0).putInt(0).putInt(0).putInt(0);
+			receive("RequestGameStart 0", new RequestGameStart(), b);
+			receive("EnterWorld", new EnterWorld(), body(0));
+		}
+		finally
+		{
+			_entering = false;
+			_actor = _client;
+			_tag = "";
+		}
+		if (client.getPlayer() == null)
+			throw new IllegalStateException(_name + ": the mate did not enter the world");
+		_mateClient = client;
+		spawnNpcs();
+	}
+
+	/** The character moves 1500 behind where it entered the world, out of the NPCs' sight and the mate's reach, and one NPC AI tick runs. */
+	private void away()
+	{
+		_lines.add("# away");
+		_player.setXYZ(X - 1500, Y, Z);
+		_player.revalidateZone(true);
+		AiTaskManager.getInstance().run();
+		ThreadPool.advance(0);
 	}
 
 	/** The hall lines of the halls a scenario touched, with the next siege date each had before. */
@@ -887,17 +1113,21 @@ final class ScenarioTrace
 			throw new IllegalStateException(_name + ": the siege line's clan is not on the " + side + " side");
 	}
 	
+	/** The hold line h (item id, count): stackable items in one stack, others one by one. */
+	private static void hold(Player player, int[] h)
+	{
+		if (ItemData.getInstance().getTemplate(h[0]).isStackable())
+			player.getInventory().addItem(h[0], h[1]);
+		else
+			for (int i = 0; i < h[1]; i++)
+				player.getInventory().addItem(h[0], 1);
+	}
+
 	/** The hold, equip, standing, pk, cabal, festival, sealowner, memo and spoil lines, as the Go runner seeds them. */
 	private void holdings(Player player) throws Exception
 	{
 		for (int[] h : _holds)
-		{
-			if (ItemData.getInstance().getTemplate(h[0]).isStackable())
-				player.getInventory().addItem(h[0], h[1]);
-			else
-				for (int i = 0; i < h[1]; i++)
-					player.getInventory().addItem(h[0], 1);
-		}
+			hold(player, h);
 		for (int id : _equips)
 		{
 			final ItemInstance item = player.getInventory().addItem(id, 1);
@@ -1349,8 +1579,8 @@ final class ScenarioTrace
 
 	private void receive(String label, L2GameClientPacket packet, ByteBuffer b)
 	{
-		_lines.add("C " + label);
-		ProbeWire.receive(_client, packet, b.array());
+		_lines.add("C" + _tag + " " + label);
+		ProbeWire.receive(_actor, packet, b.array());
 		tick();
 	}
 
@@ -1364,8 +1594,12 @@ final class ScenarioTrace
 	{
 		ProbeWire.setSink((client, line) ->
 		{
-			if (client == _client && !_muted)
+			if (_muted)
+				return;
+			if (client == _client)
 				_lines.add("S " + line);
+			else if (!_entering && (client == _mateClient || client == _actor))
+				_lines.add("S@" + _leader[0] + " " + line);
 		});
 		ConnectionPool.setSink(sql ->
 		{
@@ -1403,6 +1637,10 @@ final class ScenarioTrace
 			item.decayMe();
 		if (_player != null)
 			_player.deleteMe();
+		if (_mateClient != null && _mateClient.getPlayer() != null)
+			_mateClient.getPlayer().deleteMe();
+		if (_mate != null)
+			PlayerInfoTable.getInstance().removePlayer(_mateObjectId);
 		PlayerInfoTable.getInstance().removePlayer(_objectId);
 		ThreadPool.cancelAll();
 	}
@@ -1414,6 +1652,8 @@ final class ScenarioTrace
 			w.println("# Quest scenario trace of the reference server: generated by run.sh, do not edit.");
 			w.println("# " + _name + ": every step of the scenario.");
 			w.printf("# player object %d; format: README.md in this directory.%n", _objectId);
+			if (_mateClient != null)
+				w.printf("# mate %s object %d%n", _leader[0], _mateObjectId);
 			for (String l : _lines)
 				w.println(l);
 		}

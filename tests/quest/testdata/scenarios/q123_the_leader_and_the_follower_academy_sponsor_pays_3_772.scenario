@@ -1,6 +1,6 @@
 # The Leader and the Follower (Q123), the sponsor pays for the armor: the sponsor, in the world beside its apprentice with 772 D-grade crystals, pays for the set of stateEx 3 (it moves its apprentice to cond 6 with the sound played to the apprentice, then the apprentice moves on to cond 7 and the sponsor sees it).
-# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_academy_sponsor_pays_3_772.golden
 character Pupil 19
 clan 3
 mate Chief 19 leader sponsor online hold 1458 772

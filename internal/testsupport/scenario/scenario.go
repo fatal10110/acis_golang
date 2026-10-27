@@ -345,11 +345,13 @@
 // oracle's scenarios directory is the reference probe's play of this
 // scenario itself (the oracle README). The trace format has no member,
 // ground or look, so a traced scenario takes no member or ground line, and
-// its one client takes no mate line but an offline mate that leads the clan
-// (and no as or enter step of a mate); nor
-// does the reference probe play a skill, door or summon line, an npc
+// the reference probe plays only the mate that leads the clan (online, or
+// offline until an enter step; a hold line only with online), with its
+// as and enter steps and the away step, each client's packets compared by
+// its tag in the trace (S@<mate>, C@<mate>; an untagged line is the
+// character's); nor does the reference probe play a skill, door or summon line, an npc
 // line's clan or skill, a hit by another creature, an approach to a
-// distance, a cast, a jump or an away, a clock line, an npc line's ai,
+// distance, a cast or a jump, a clock line, an npc line's ai,
 // params, level, aggro, mp, mem, privates or master or an event, hp, mp, want, die, top,
 // land, stance or swing step, a skill hit, or a step's own random line, so a
 // traced scenario takes none.

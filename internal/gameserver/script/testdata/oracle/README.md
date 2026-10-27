@@ -91,9 +91,16 @@ what the reference does in the scenario's own world:
   battle, in progress) and, with a date, its stored next siege date (the reference replaces a stored
   past date at boot, so a scenario stores a future one); a `hallstatus <id> <status>` step changes
   it. The halls a scenario touched are given back (status, date, owner) after it. A `mate <name>
-  <level> leader` line (the only mate a traced scenario takes) is the clan's leader, a character
-  with no client, so offline: it creates the clan and the player joins it as a plain member. The
-  other mate flags, `as` and `enter <mate>` need a second client the probe does not have;
+  <level> leader` line (the only mate a traced scenario takes) is the clan's leader: it creates the
+  clan and the player joins it as a plain member. Offline, it is a character with no client. With
+  `sponsor` or `apprentice` it is the player's sponsor or apprentice (the ids set on both sides); with
+  `online` (and `hold <item id> <count>` lines, an online mate only) it is in the world beside the
+  player, at its offset, in a client of its own (its own account, a `GameClient` of its own); an
+  `enter <mate>` step makes an offline mate select its stored character and enter the world on its
+  own client, so the clan's members and its sponsor or apprentice are told, as the reference does.
+  An `as <mate> <action|bypass|link>` step sends that packet from the mate's client. The
+  `away` step moves the player 1500 behind where it entered, out of every NPC's sight and the
+  mate's reach, and runs one NPC AI tick;
 - each NPC line's NPC is spawned at its offset from the player. Every NPC template is bound to
   the scenario's script and stub lines only, from the bindings the script loader left (copied
   before the contract scenes change some), since the Go runner registers no other script:
@@ -344,7 +351,18 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
                                 no NPC line placed stand once the step is over, sorted (the step's
                                 spawned line); - for none
 C Action item <item id> (object <id>)   a scenario trace: the pickup's action on the ground item
+# away                          a scenario trace: the player steps 1500 behind where it entered the world, one AI tick
+# mate <name> object <id>       a scenario trace with a mate that has a client: the mate's object id
+C@<mate> <client packet> <label>   a scenario trace: a client packet of the mate's client (an as step's, or the
+                                RequestGameStart and EnterWorld of an enter step)
+S@<mate> <packet class> <hex body>   a scenario trace: a server packet sent to the mate's client (its enter
+                                burst, which the Go runner drops, is not recorded)
 ```
+
+An untagged `C`, `S`, `T` or `Q` line is the player's (the main client), so a trace with no mate that
+has a client reads as it always did. A `Q` line is the statement of whoever sent the packet that ran
+it; a step's `S` lines are the player's and its `S@<mate>` lines the mate's, compared with the
+scenario's S lines (the client that played the step) and `to` lines (the others).
 
 The player and NPCs stand within interaction range of each other, so no movement is
 needed. Each quest uses its own player, created through the character-creation call

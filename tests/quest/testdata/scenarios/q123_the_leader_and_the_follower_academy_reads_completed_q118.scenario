@@ -1,6 +1,6 @@
 # The Leader and the Follower (Q123), reads the other academy quest: an apprentice that took the other academy quest (completed) is turned away with the page for it.
-# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_academy_reads_completed_q118.golden
 character Pupil 19
 clan 3
 mate Chief 19 leader sponsor

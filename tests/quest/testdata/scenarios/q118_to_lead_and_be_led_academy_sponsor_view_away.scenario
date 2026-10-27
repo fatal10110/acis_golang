@@ -1,6 +1,6 @@
 # To Lead and Be Led (Q118), the sponsor's view: a character whose academy apprentice is out of the world is told so by Pinter (30298-09).
-# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java onTalk, CREATED branch with getApprentice null)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q118_to_lead_and_be_led_academy_sponsor_view_away.golden
 character Sponsor 40
 clan 3
 mate Kid 10 leader apprentice

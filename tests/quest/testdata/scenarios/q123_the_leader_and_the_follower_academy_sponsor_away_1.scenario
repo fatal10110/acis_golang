@@ -1,6 +1,6 @@
 # The Leader and the Follower (Q123), the chosen armor waits for the sponsor: with its armor set chosen (stateEx 1), an apprentice whose sponsor is out of the world is told to bring it; with the sponsor in the world beside it, the NPC names the price of its set.
-# Expectations are derived from the reference source (Q123_TheLeaderAndTheFollower.java, Quest.getSponsor and Quest.getApprentice)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_academy_sponsor_away_1.golden
 character Pupil 19
 clan 3
 mate Chief 19 leader sponsor

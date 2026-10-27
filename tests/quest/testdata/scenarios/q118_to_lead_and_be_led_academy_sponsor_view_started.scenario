@@ -1,6 +1,6 @@
 # To Lead and Be Led (Q118), the sponsor's view with the apprentice in the world: once the apprentice took the quest (state 1), Pinter tells its sponsor 30298-14.
-# Expectations are derived from the reference source (Q118_ToLeadAndBeLed.java onTalk, CREATED branch with getApprentice set)
-# and the clan mate lines of the scenario format (#4175).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q118_to_lead_and_be_led_academy_sponsor_view_started.golden
 character Sponsor 40
 clan 3
 mate Kid 19 leader apprentice online
