@@ -133,6 +133,8 @@ type draws struct {
 	next   int
 	drawn  []string
 	bad    []string
+	// saved are the sources a step's own draws replaced.
+	saved []savedDraws
 }
 
 // draw is the script random source: the next listed draw, which must be
@@ -144,6 +146,9 @@ func (d *draws) draw(n int) int {
 	d.next++
 	var v int
 	switch {
+	case d.random == nil:
+		// No random line, and no draws of this step's own: the draw is random.
+		return anyDraw(n)
 	case d.random.Always:
 		v = d.random.Draws[0]
 	case i < len(d.random.Draws):
@@ -173,7 +178,7 @@ func (d *draws) take() (drawn, bad []string) {
 func (d *draws) unused() int {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.random.Always {
+	if d.random == nil || d.random.Always {
 		return 0
 	}
 	return max(len(d.random.Draws)-d.next, 0)
@@ -313,7 +318,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	if r.sc.Siege != nil {
 		opts = append(opts, siegeOptions(t)...)
 	}
-	if r.sc.Random != nil {
+	if r.sc.Random != nil || r.sc.usesRandomSteps() {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
 	}
 	if r.sc.LaysCursed() {
@@ -587,7 +592,9 @@ func (r *run) spawn(t *testing.T, n NPC) {
 		r.pinRoll(t, n.Role, draw)
 	}
 	r.setParams(t, live, n)
+	r.link(t, n)
 	r.srv.RunCreated(t, live)
+	r.setMemory(t, n)
 }
 
 // clockEpoch is the day the clock line's time of day is on.
@@ -696,6 +703,10 @@ func template(n NPC) *npc.Template {
 			CanMove: n.Walks,
 		}
 	}
+	if n.Level != 0 {
+		tmpl.Level = n.Level
+	}
+	tmpl.AggroRange, tmpl.Privates = n.Aggro, n.Privates
 	tmpl.Clans, tmpl.ClanRange = n.Clans, n.ClanRange
 	if n.AI != nil {
 		tmpl.AIParams = n.AI
@@ -714,6 +725,9 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	}
 	c, actor := r.actor(t, st.As)
 	r.rd.talk = talkVerb(st.Verb)
+	if st.Random != nil {
+		r.draws.push(st.Random)
+	}
 	// frames is what the step sent, when the verb reads it itself.
 	var frames [][]byte
 	switch st.Verb {
@@ -738,6 +752,8 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.hit(t, st.Args)
 	case "event":
 		r.event(t, st.Args)
+	case "hp", "die", "top", "land", "stance", "swing":
+		r.state(t, st.Verb, st.Args)
 	case "cast":
 		frames = r.cast(t, st.Args[0], st.Args[1])
 	case "jump":
@@ -823,6 +839,11 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	drawn, bad := r.draws.take()
 	if len(bad) > 0 {
 		fail("script random: %s", strings.Join(bad, "; "))
+	}
+	if st.Random != nil {
+		if n := r.draws.pop(); n > 0 {
+			fail("%d draws of the step's random line were never drawn", n)
+		}
 	}
 	if d := traceDrawDiff(r.traceDraws, i, drawn); d != "" {
 		fail("%s (want: the trace's)", d)
@@ -1013,6 +1034,8 @@ func (r *run) check(t *testing.T, ck Check) string {
 		return FirstDiff(quest+" state", []string{got}, []string{want})
 	case "hate", "desires", "at":
 		return r.fightCheck(t, ck)
+	case "mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance":
+		return r.stateCheck(t, ck)
 	}
 	return ""
 }
