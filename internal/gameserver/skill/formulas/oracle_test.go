@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
@@ -123,6 +124,20 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 	defer f.Close()
 
 	seen := map[string]int{}
+	// The healSpsEntry rows print the probe's spiritshot heal table before
+	// any lookup row reads it.
+	var healSpsEntries []modelskill.HealSps
+	var healSpsTable *modelskill.HealSpsTable
+	healSpsCorrection := func(r oracleRow, mAtk int) float64 {
+		if healSpsTable == nil {
+			table, err := modelskill.NewHealSpsTable(healSpsEntries)
+			if err != nil {
+				t.Fatal(err)
+			}
+			healSpsTable = table
+		}
+		return healSpsTable.Calculate(modelskill.ID(r.n(0)), r.n(1), r.n(2), mAtk)
+	}
 	sc := bufio.NewScanner(f)
 	for line := 1; sc.Scan(); line++ {
 		fields := strings.Fields(sc.Text())
@@ -258,6 +273,36 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 			})
 			tier := map[LethalOutcome]int{LethalNone: 0, LethalHalf: 1, LethalFull: 2}[out]
 			r.wantString(strconv.Itoa(tier) + "/" + strconv.Itoa(draws))
+		case "skillStatModifier", "skillVulnerability", "elementalSkillModifier", "levelModifier", "matkModifier", "elementalPhysicalAttackModifier":
+			// Replayed against the live-actor resolvers by
+			// model/actor/creature's TestModifiersMatchReferenceProbe.
+		case "skillMasteryRate":
+			r.wantFloat(SkillMasteryRate(r.f(0), r.b(1), r.n(2), r.n(3)))
+		case "fallDamageBase":
+			r.wantFloat(FallDamageBase(r.n(0), r.n(1)))
+		case "karmaLost":
+			exp, err := strconv.ParseInt(r.args[0], 10, 64)
+			if err != nil {
+				t.Fatalf("line %d arg 0: %v", line, err)
+			}
+			r.wantString(strconv.Itoa(KarmaLoss(exp, r.f(1))))
+		case "karmaGain":
+			r.wantString(strconv.Itoa(KarmaGain(r.n(0), r.b(1))))
+		case "healSpsEntry":
+			r.wantString(strconv.Itoa(len(healSpsEntries)))
+			healSpsEntries = append(healSpsEntries, modelskill.HealSps{
+				SkillID: modelskill.ID(r.n(0)), SkillLevel: r.n(1), MagicLevel: r.n(2), Correction: r.f(3), NeededMAtk: r.n(4),
+			})
+			healSpsTable = nil
+		case "healSps":
+			r.wantFloat(healSpsCorrection(r, r.n(3)))
+		case "healAmountSps":
+			mAtk := r.n(3)
+			r.wantFloat(HealAmount(HealInput{
+				Power: r.f(0), Proficiency: r.f(1), Static: r.b(2), MAtk: mAtk, Scaling: HealShotScaling(r.n(4)),
+				Spiritshot: r.b(5), BlessedSpiritshot: r.b(6),
+				SpsCorrection: healSpsCorrection(oracleRow{t: t, line: line, args: r.args[7:]}, mAtk),
+			}))
 		default:
 			t.Fatalf("line %d: unknown formula %q", line, r.name)
 		}
@@ -265,7 +310,7 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 	if err := sc.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if len(seen) != 36 {
-		t.Fatalf("golden covers %d formulas, want 36", len(seen))
+	if len(seen) != 49 {
+		t.Fatalf("golden covers %d formulas, want 49", len(seen))
 	}
 }

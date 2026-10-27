@@ -3,6 +3,7 @@ package player
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -30,9 +31,7 @@ func (c *Character) CheckFall(reportedZ int, ground, enabled bool, now time.Time
 	}
 
 	if enabled {
-		// Multiply as 32-bit integers before floating-point division.
-		base := float64(int32(deltaZ)*int32(c.MaxHPValue())) / 1000
-		damage = int(c.CalcStat(stat.Fall, base))
+		damage = int(c.CalcStat(stat.Fall, formulas.FallDamageBase(deltaZ, int(c.MaxHPValue()))))
 		if damage > 0 {
 			applied := min(float64(damage), c.HP()-1)
 			if applied > 0 {

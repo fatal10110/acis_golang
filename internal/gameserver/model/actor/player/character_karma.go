@@ -4,32 +4,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
-
-// pkKillKarmaPlateau is the karma gain once a killer's PK-kill count
-// reaches the formula's flat-rate ceiling (the karma formula's default
-// branch).
-const pkKillKarmaPlateau = 14400
-
-// calculateKarmaGain returns the karma a PK kill awards the killer, keyed
-// off pkCount. Gain ramps linearly below 100 kills, ramps more slowly from
-// 100 up to 180, then plateaus at pkKillKarmaPlateau. Killing a summon
-// awards about a quarter of that, with pkCount's two low bits added before
-// the division.
-func calculateKarmaGain(pkCount int, summon bool) int {
-	result := pkKillKarmaPlateau
-	switch {
-	case pkCount < 100:
-		result = int((((float64(pkCount-1) * 0.5) + 1) * 60) * 4)
-	case pkCount < 180:
-		result = int((((float64(pkCount+1) * 0.125) + 37.5) * 60) * 4)
-	}
-	if summon {
-		result = ((pkCount & 3) + result) >> 2
-	}
-	return result
-}
 
 // creditKill updates the standing of the player acting through killer
 // after it killed c, or c's summon when summonKill is set. A killer
@@ -72,7 +49,7 @@ func (c *Character) creditKill(killer attackable.Combatant, summonKill bool) {
 	if !summonKill {
 		pk.PKKills++
 	}
-	pk.KarmaPoints += calculateKarmaGain(pk.PKKills, summonKill)
+	pk.KarmaPoints += formulas.KarmaGain(pk.PKKills, summonKill)
 	karma := pk.KarmaPoints
 	pk.progressionMu.Unlock()
 	pk.publishPKKarma(karma)

@@ -114,6 +114,10 @@ func TestGoldenSummonStatPipelineCapture(t *testing.T) {
 	writeSummonGolden(t, "testdata/golden_stats.json", got)
 }
 
+// TestGoldenSummonStatPipelineParity pins the stat func pipeline to
+// testdata/golden_stats.json. The file is captured from this implementation
+// (TestGoldenSummonStatPipelineCapture), not reference output; a reference
+// stat-pipeline probe is #4328.
 func TestGoldenSummonStatPipelineParity(t *testing.T) {
 	want := readSummonGolden(t, "testdata/golden_stats.json")
 	got := goldenSummonScenarios(t)
@@ -340,7 +344,12 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 	if heal.Scaling != formulas.HealShotScalingMage {
 		t.Fatalf("summon HealInput scaling = %v, want mage", heal.Scaling)
 	}
-	wantHeal := 25.0 + 11 + math.Sqrt(float64(int(caster.MAtk())))
+	if heal.MAtk != 72 {
+		t.Fatalf("summon HealInput M.Atk = %d, want 72", heal.MAtk)
+	}
+	// skill/formulas/testdata/formulas.golden: healAmount 25.0 11.0 false 72
+	// 1 false false 0.0.
+	wantHeal := 44.48528137423857
 	if got := formulas.HealAmount(heal); !closeSummonFloat(got, wantHeal) {
 		t.Fatalf("HealAmount() = %v, want %v", got, wantHeal)
 	}

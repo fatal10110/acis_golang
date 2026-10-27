@@ -193,7 +193,9 @@ func TestCharacterBlowInputCarriesShieldDefense(t *testing.T) {
 	if in.Shield != formulas.ShieldSuccess {
 		t.Fatalf("BlowInput shield = %v, want ShieldSuccess", in.Shield)
 	}
-	if want := target.PDef() + target.CalcStat(stat.ShieldDefence, 0); !closeFloat(in.Defence, want) {
+	// P.Def 50 at level 1 finalizes to 45 (see TestCharacterStatsTruncate*),
+	// plus the shield defence Set to 30.
+	if want := 75.0; !closeFloat(in.Defence, want) {
 		t.Fatalf("BlowInput defence = %v, want %v", in.Defence, want)
 	}
 }
