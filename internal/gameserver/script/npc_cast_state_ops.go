@@ -22,8 +22,9 @@ func (n *NPC) PhysicalMuted() bool {
 func (n *NPC) AttackingNow() bool { return n.hostile("check its attack").AttackingNow() }
 
 // StopAttack aborts the NPC's attack in flight, its pending hit with it,
-// and clears its bow's reuse wait. Nothing is shown to anyone.
-func (n *NPC) StopAttack() { n.hostile("stop its attack").StopAttack() }
+// and clears its bow's reuse wait; a civilian NPC stops its swing as a
+// hostile one does. Nothing is shown to anyone.
+func (n *NPC) StopAttack() { n.fighter("stop its attack").StopAttack() }
 
 // MaxMP returns the NPC's maximum MP.
 func (n *NPC) MaxMP() int32 { return int32(n.hostile("read its mana").MaxMPValue()) }

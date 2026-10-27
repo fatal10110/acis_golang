@@ -8,9 +8,6 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // handle operations each of its hooks reaches.
 func quests301UpHandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
-		"quest.Q348_AnArrogantSearch": {
-			"OnAttacked": {"NPC.StopAttack"},
-		},
 		"quest.Q417_PathToBecomeAScavenger": {
 			"OnMyDying": {"NPC.ActualSpoiler"},
 		},

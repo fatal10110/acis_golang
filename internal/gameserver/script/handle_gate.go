@@ -47,7 +47,6 @@ var kindOps = map[string]kindSet{
 	"NPC.Rooted":                      hostileOnly,
 	"NPC.SetEnchantEffect":            hostileOnly,
 	"NPC.SetTopDesireTarget":          hostileOnly,
-	"NPC.StopAttack":                  hostileOnly,
 	"NPC.TopDesireTarget":             hostileOnly,
 	"Spawner.DecayMe":                 hostileOnly,
 	"Spawner.RespawnDelay":            hostileOnly,
