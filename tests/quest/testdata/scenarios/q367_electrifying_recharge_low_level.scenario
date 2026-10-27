@@ -20,4 +20,4 @@ bypass npc_{lorain}_Quest
   S ActionFailed
   rows Q367_ElectrifyingRecharge -
 hit catherok 10
-  desires catherok attack(player)=125
+  desires catherok -

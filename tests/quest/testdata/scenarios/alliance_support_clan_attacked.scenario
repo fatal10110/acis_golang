@@ -1,10 +1,11 @@
 # Two Ketra soldiers of one clan (KetraOrcSupport) and a Ketra ally of level 1: the ally hits the
 # footman, whose clan call reaches the grunt and itself, and each wants to petrify the ally (Raid
 # Curse, 4515): the footman by its attacked and its clan attacked hooks, the grunt by its clan
-# attacked hook alone. The footman forgets the hit; its attack desire stays. Each soldier lists
-# the curse, which a scenario monster needs to cast it; the cast itself is
-# alliance_support_see_spell.scenario (two casts of one AI tick have no fixed order).
-# Expectations are derived from the reference source (onAttacked, onClanAttacked).
+# attacked hook alone. The footman forgets the hit, and no behavior script is bound, so neither
+# soldier wants to attack the ally back. Each soldier lists the curse, which a scenario monster
+# needs to cast it; the cast itself is alliance_support_see_spell.scenario (two casts of one AI tick
+# have no fixed order). Expectations are derived from the reference source (onAttacked,
+# onClanAttacked).
 character Ally 40
 standing 1
 script script.feature.KetraOrcSupport
@@ -12,6 +13,6 @@ npc footman 21324 Monster 40 0 0 clan ketra_orc_clan 300 skill DEBUFF 4515 1
 npc grunt 21325 Monster 60 0 0 clan ketra_orc_clan 300 skill DEBUFF 4515 1
 
 hit footman 10
-  desires footman attack(player)=125 cast(player,4515,move)=2000000
+  desires footman cast(player,4515,move)=2000000
   desires grunt cast(player,4515,move)=1000000
   hate footman 0

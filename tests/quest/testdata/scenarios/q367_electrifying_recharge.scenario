@@ -46,7 +46,6 @@ hit catherok 10
   S SystemMessage id=54 3:5876
   S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   items 5875=0 5876=1
-  desires catherok attack(player)=125
 action lorain
   S ActionFailed
   S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
