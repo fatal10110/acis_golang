@@ -15,6 +15,16 @@ type hookRecorder struct {
 	at func(HookPoint)
 }
 
+// wanderOnNoDesire has owner's no-desire point queue brain a wander with
+// an empty queue, as a behavior's no-desire hook does.
+func wanderOnNoDesire(owner *fakeActor, brain *Attackable) {
+	owner.hooks.at = func(p HookPoint) {
+		if _, ok := brain.Desires().Peek(); p == HookNoDesire && !ok {
+			brain.AddWanderDesire(defaultWanderTimer, 5)
+		}
+	}
+}
+
 func (a *fakeActor) AtHookPoint(p HookPoint) {
 	a.hooks.points = append(a.hooks.points, p)
 	if a.hooks.at != nil {
@@ -39,11 +49,10 @@ func assertHookPoints(t *testing.T, owner *fakeActor, what string, want ...HookP
 }
 
 // TestHookPointNoDesireClosesTheIdle pins the no-desire point at the end of
-// the idle: after the abort, the walk stance and the switch to idle, before
-// the idle wander is queued, with the brain mutex released.
+// the idle: after the abort, the walk stance and the switch to idle, with
+// the brain mutex released. The idle queues nothing of its own.
 func TestHookPointNoDesireClosesTheIdle(t *testing.T) {
 	owner := actor(1)
-	owner.idleWander = true
 	move := &recordingMove{}
 	strike := &recordingAttack{}
 	brain := NewAttackable(owner, move, strike)
@@ -60,7 +69,7 @@ func TestHookPointNoDesireClosesTheIdle(t *testing.T) {
 			t.Fatalf("CurrentIntention() at the no-desire point = %v, want idle", got)
 		}
 		if got := brain.Desires().Len(); got != 0 {
-			t.Fatalf("queued desires at the no-desire point = %d, want the idle wander still unqueued", got)
+			t.Fatalf("queued desires at the no-desire point = %d, want none", got)
 		}
 	}
 
@@ -68,8 +77,8 @@ func TestHookPointNoDesireClosesTheIdle(t *testing.T) {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	assertHookPoints(t, owner, "after two cycles", HookSeeCreature, HookSeeCreature, HookNoDesire)
-	if !brain.Desires().Has(&Desire{Kind: IntentionWander}) {
-		t.Fatal("idle wander not queued after the no-desire point")
+	if got := brain.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires after the idle = %d, want none", got)
 	}
 }
 

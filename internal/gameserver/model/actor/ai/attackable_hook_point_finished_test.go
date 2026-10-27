@@ -8,7 +8,6 @@ import "testing"
 // with the brain mutex released, and no idle follow or wander is queued.
 func TestHookPointNoDesireOnIdleAttackFinished(t *testing.T) {
 	owner := actor(1)
-	owner.idleWander = true
 	move := &recordingMove{}
 	strike := &recordingAttack{}
 	brain := NewAttackable(owner, move, strike)

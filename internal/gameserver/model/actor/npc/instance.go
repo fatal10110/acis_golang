@@ -30,10 +30,6 @@ type Instance struct {
 	// far it strays from Home before it heads back: the configured drift
 	// range the spawn sets, the shipped 200 when not positive.
 	DriftRange int
-	// WalkMode forces walk stance (WalkSpeed, not RunSpeed) instead of the
-	// default run stance every other NPC spawns in (the walker ids that
-	// spawn walking).
-	WalkMode bool
 	// Maker is the spawning npc-maker group. InTerritory and idle wander
 	// use its polygon when this is set. A nil Maker keeps the home-offset
 	// walk unless the NPC is a private, which offsets from current position.

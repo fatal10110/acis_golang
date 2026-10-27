@@ -25,10 +25,10 @@ func TestScriptCatalogRejectsDuplicates(t *testing.T) {
 	}
 }
 
-// TestScriptCatalogCompleteness reports every scripts.xml path that has no
-// Go script yet, and fails on a catalog entry scripts.xml does not list:
-// it would never be built. A task the file lists only in a comment
-// (commentedTasks) is exempt.
+// TestScriptCatalogCompleteness fails on every scripts.xml path that has
+// no Go script, and on a catalog entry scripts.xml does not list: it would
+// never be built. A task the file lists only in a comment (commentedTasks)
+// is exempt.
 func TestScriptCatalogCompleteness(t *testing.T) {
 	list, err := gamexml.LoadScriptList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
 	if err != nil {
@@ -51,9 +51,8 @@ func TestScriptCatalogCompleteness(t *testing.T) {
 			t.Errorf("catalog entry %s is not listed in scripts.xml", path)
 		}
 	}
-	t.Logf("%d of %d listed scripts have no Go script yet", len(missing), len(list))
 	for _, path := range missing {
-		t.Logf("unported: %s", path)
+		t.Errorf("listed script %s has no Go script", path)
 	}
 }
 

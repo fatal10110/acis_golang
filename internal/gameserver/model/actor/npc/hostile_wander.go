@@ -14,24 +14,6 @@ const minWanderOffset = 10
 // before aiming at the current triangle's center.
 const randomWalkLoopLimit = 3
 
-// ShouldIdleWander reports whether an empty desire queue should become a
-// wander desire. An NPC a behavior is bound to never does: its no-desire
-// hooks decide. Otherwise hold-position kinds stay put. MovingAttack is not
-// a wander gate for the Warrior and Wizard scripts; only the
-// MonsterBehavior script's no-desire hook reads it. This kind rule stands
-// in for the unbound ids until their behaviors are ported (#2148).
-func (h *Hostile) ShouldIdleWander() bool {
-	if h.behaves() {
-		return false
-	}
-	switch hostileKind(h.Instance) {
-	case "Guard", "SiegeGuard", "Chest", "HalishaChest":
-		return false
-	default:
-		return true
-	}
-}
-
 // RealMoveSpeed is the stance-aware move speed used as the wander offset
 // basis (walk after thinkWander switches stance).
 func (h *Hostile) RealMoveSpeed() float64 {

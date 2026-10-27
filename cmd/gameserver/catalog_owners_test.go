@@ -24,7 +24,8 @@ const engineOwner = "engine"
 // scripts.xml listing) has exactly one owner, the catalogs of scripts.go or
 // one content catalog file, and no catalog holds a script the manifest does
 // not list, but for the tasks scripts.xml lists only in a comment
-// (commentedTasks). It logs the scripts not ported yet, by catalog file.
+// (commentedTasks). A script not ported (a nil constructor) fails it: no
+// NPC id is left without the behavior the reference binds to it.
 func TestScriptCatalogOwners(t *testing.T) {
 	sagas := thirdclass.NewFamily()
 	owned := map[string]script.Catalog{engineOwner: {}}
@@ -38,16 +39,16 @@ func TestScriptCatalogOwners(t *testing.T) {
 
 // TestMakerCatalogOwners: every npcmaker type the reference gives a maker of
 // its own has exactly one owner, the maker package or one content catalog
-// file, and no catalog holds another type. It logs the types not ported
-// yet, by catalog file.
+// file, and no catalog holds another type. A type not ported (a nil
+// constructor) fails it: no such type falls to the default maker.
 func TestMakerCatalogOwners(t *testing.T) {
 	owned := map[string]script.MakerCatalog{engineOwner: maker.Catalog()}
 	maps.Copy(owned, catalog.Makers())
 	checkOwners(t, "maker type", readMakerTypes(t), owned)
 }
 
-// checkOwners fails on every owner problem and logs, by owner, the keys
-// not ported yet (a nil constructor).
+// checkOwners fails on every owner problem and on every key not ported (a
+// nil constructor), by owner.
 func checkOwners[C ~map[string]func() T, T any](t *testing.T, what string, want []string, owned map[string]C) {
 	t.Helper()
 	for _, p := range ownerProblems(what, want, owned) {
@@ -64,10 +65,7 @@ func checkOwners[C ~map[string]func() T, T any](t *testing.T, what string, want 
 			continue
 		}
 		slices.Sort(unported)
-		t.Logf("%s: %d of %d not ported yet", name, len(unported), len(owned[name]))
-		for _, key := range unported {
-			t.Logf("  %s", key)
-		}
+		t.Errorf("%s: %d of %d not ported: %s", name, len(unported), len(owned[name]), strings.Join(unported, ", "))
 	}
 }
 

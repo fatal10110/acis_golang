@@ -29,11 +29,11 @@ func newMortalFolk(t *testing.T, objectID int32, decay *task.Decay) (*Folk, *eve
 	if err != nil {
 		t.Fatal(err)
 	}
-	inst.WalkMode = true
 	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.SetRunning(false)
 	rec := &event.Recorder{}
 	q := sim.NewInline(time.Unix(0, 0)).NewQueue("folk")
 	if err := f.Attach(FolkRuntime{Queue: q, Sink: rec, Decay: decay}); err != nil {

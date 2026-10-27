@@ -128,12 +128,29 @@ func spawnWalkerTestNPC(t *testing.T, routes route.WalkerRoutes) (*npc.Hostile, 
 	if !ok {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
+	walkAliasRoute(t, hostile)
 	return hostile, clock
 }
 
+// walkAliasRoute has hostile take up the route named after its alias, as
+// a behavior's route desire does: queued, then taken up by the AI.
+func walkAliasRoute(t *testing.T, hostile *npc.Hostile) {
+	t.Helper()
+	alias := hostile.Instance.Template.Alias
+	hostile.AI().AddMoveRouteDesire(alias, 1_000_000)
+	for range 3 {
+		if hostile.Move().Moving() {
+			return
+		}
+		if err := hostile.TickThink(); err != nil {
+			t.Fatalf("TickThink() error: %v", err)
+		}
+	}
+}
+
 // TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading pins issue #1940:
-// a spawned NPC whose template alias resolves in walkerRoutes.xml is
-// registered with task.Walker at spawn, and an arrival that lands exactly
+// a spawned NPC that takes up the route its template alias names in
+// walkerRoutes.xml is registered with task.Walker, and an arrival that lands exactly
 // back at the spawn point restores the spawn heading (NpcAI.onEvtArrived),
 // even after the NPC's heading changed in between. The spawn point is the
 // route's only node, which holds a pause, so no further leg turns it. The
@@ -368,6 +385,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	if !ok {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
+	walkAliasRoute(t, hostile)
 
 	// Let the route's initial move settle the NPC at routeNode.
 	advanceUntil(clock, func() bool { return !hostile.Move().Moving() && hostile.Move().Position() == routeNode })
@@ -400,82 +418,6 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	}
 	if hostile.Move().Moving() {
 		t.Fatal("Move().Moving() = true after leash return settled, want false (walker route re-issued a move)")
-	}
-}
-
-// TestWalkerWalkModeNPCsMoveAtWalkSpeed pins issue #2028: aCis Walkers.java
-// onCreated forces a specific WALKING_NPCS id subset into walk stance
-// (setWalkOrRun(false)) instead of every other NPC's default run stance, so
-// those ids must move at their template's WalkSpeed, not RunSpeed, while on
-// their route (and at all times — the reference never toggles an NPC back).
-func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
-	dir := t.TempDir()
-	writeSpawnFixture(t, filepath.Join(dir, "walkmode.xml"), `
-<list>
-	<territory name="field" minZ="-10" maxZ="10">
-		<node x="0" y="0"/>
-		<node x="1000" y="0"/>
-		<node x="1000" y="1000"/>
-		<node x="0" y="1000"/>
-	</territory>
-	<npcmaker name="maker" territory="field" maximumNpcs="1">
-		<npc id="31357" total="1" pos="100;200;0;0"/>
-	</npcmaker>
-</list>`)
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
-	if err != nil {
-		t.Fatalf("LoadSpawnlist() error: %v", err)
-	}
-	templates := npc.NewTable([]*npc.Template{{
-		ID:         31357,
-		TemplateID: 31357,
-		Type:       "Monster",
-		HPMax:      100,
-		RunSpeed:   200,
-		WalkSpeed:  50,
-		DEX:        30,
-	}})
-	spawns := NewSpawns(table, nil)
-
-	state := world.New()
-	ids := &sequentialIDs{}
-	decay, err := task.NewDecay(nopDecayEffects{}, time.Now)
-	if err != nil {
-		t.Fatalf("NewDecay() error: %v", err)
-	}
-	respawnTask, err := task.NewRespawn(nopRespawnEffects{}, time.Now)
-	if err != nil {
-		t.Fatalf("NewRespawn() error: %v", err)
-	}
-	ai := task.NewAI(state, zerolog.Nop())
-	positions := task.NewPositionUpdates(state)
-	items := item.NewTable(nil)
-	walker, err := task.NewWalker(nil, alwaysOpenPath{}, time.Now, state)
-	if err != nil {
-		t.Fatalf("NewWalker() error: %v", err)
-	}
-
-	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers()); err != nil {
-		t.Fatalf("NewNpcs() error: %v", err)
-	}
-
-	obj, ok := state.Object(1)
-	if !ok {
-		t.Fatal("spawned npc object id 1 not found")
-	}
-	hostile, ok := obj.(*npc.Hostile)
-	if !ok {
-		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
-	}
-
-	ev, err := hostile.Move().MoveToLocation(location.Location{X: 900, Y: 200, Z: 0})
-	if err != nil {
-		t.Fatalf("MoveToLocation() error: %v", err)
-	}
-	// WalkSpeed 50 through the RUN_SPEED stat's DEX 30 bonus of 1.1.
-	if got, want := ev.Speed, 55.0; got != want {
-		t.Fatalf("MoveToLocation() Speed = %v, want finalized WalkSpeed %v (RunSpeed leaked through for a WALKING_NPCS id)", got, want)
 	}
 }
 

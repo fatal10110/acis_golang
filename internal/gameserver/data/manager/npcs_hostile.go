@@ -357,49 +357,6 @@ func (r hostileRoute) Walk(name string) {
 // Leave takes the NPC off its route.
 func (r hostileRoute) Leave() { r.walker.LeaveRoute(r.ref) }
 
-// walkerWalkModeIDs are the walker template ids that spawn in walk stance
-// instead of every other NPC's default run stance. A stand-in for the
-// walker script: read only while routeStandIn holds for the id.
-var walkerWalkModeIDs = map[int32]bool{
-	31357: true, 31358: true, 31359: true, 31360: true, 31362: true,
-	31364: true, 31365: true, 31525: true, 32072: true, 32128: true,
-}
-
-// standInRouteWeight is the weight of the route desire the walker alias
-// rule queues for a civilian NPC: the walker script's.
-const standInRouteWeight = 1_000_000
-
-// routeStandIn reports whether the walker alias rule, and the walk stance
-// of walkerWalkModeIDs, still stand in for the NPC template id: no
-// behavior is bound to it and no script reacts to its creation, which is
-// where a script asks an NPC to walk its route. Once one does, the NPC
-// walks only the routes its scripts ask for.
-func routeStandIn(scripts npc.ScriptHooks, id int32) bool {
-	return scripts == nil || (!scripts.Behaves(id) && !scripts.ReactsToCreated(id))
-}
-
-// startWalkerRoute registers ref for route walking if inst's template alias
-// resolves in walkerRoutes.xml and the alias rule stands in for its id
-// (routeStandIn): every such NPC walks the route from the moment it
-// spawns, outside its desires; both the route name and its per-NPC key are
-// that alias. The caller must have
-// already placed ref's Hostile into world.State — Walker only ticks actors
-// it can find in-region, so calling this before the spawn lands is a
-// silent no-op forever, not a delayed start. Most templates have no alias,
-// or an alias with no route data — those are skipped silently via HasRoute.
-// Past that check StartRoute fails only on the first move; the route stays
-// registered and Walker's tick retries it, logging at Error if it keeps
-// failing.
-func startWalkerRoute(walker *task.Walker, ref *walkerActorRef, inst *npc.Instance, scripts npc.ScriptHooks, log zerolog.Logger) {
-	alias := inst.Template.Alias
-	if walker == nil || alias == "" || !walker.HasRoute(alias, alias) || !routeStandIn(scripts, int32(inst.Template.ID)) {
-		return
-	}
-	if err := walker.StartRoute(ref, alias, alias); err != nil {
-		log.Debug().Err(err).Str("alias", alias).Msg("npc: walker route first move failed, retrying on tick")
-	}
-}
-
 // deathRewards applies one victim's live death rewards at its position at
 // the moment of death, rather than a position fixed when it spawned —
 // hostile NPCs can move (offensive follow) between spawning and dying.

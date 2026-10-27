@@ -110,7 +110,7 @@ Why this shape:
 | Path → constructor | Go literal catalogs, `map[path]func() script.Script`, joined in `cmd/gameserver` |
 | Listed path with no Go script | logged at error level and skipped; completeness is a test |
 | Catalog entry not listed | never built |
-| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Four ids are bound by a behavior and a later-listed one: 25512, 29062 and 29096 on every event of the earlier one, 35596 on first talk and talk. A later one with no Go script still removes the earlier ones from the bindings it claims (`catalog.Claims`, checked against the manifest) |
+| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Four ids are bound by a behavior and a later-listed one: 25512, 29062 and 29096 on every event of the earlier one, 35596 on first talk and talk. |
 | Other scripts | accumulate in list order |
 | First talk | one slot: the first registered keeps it, except that a behavior replaces an earlier behavior. It fires only when exactly one script is bound |
 | Abnormal-status hook | dispatched over the see-spell list |
@@ -311,22 +311,23 @@ A nil NPC or player means "bound to none", never a wildcard.
 - Range checks are strict `<`, centre to centre. `party.InRange` (`<=` plus collision radii)
   is not reused.
 
-## 8. Existing stand-ins
+## 8. Stand-ins (deleted)
 
-Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A template
-switches to real behavior when its script registers. An id whose every behavior binding a later-listed,
-unported behavior claims keeps its stand-ins until that behavior is ported. The walker alias rule and its walk-stance list
-also step aside for an id whose creation any script reacts to: the walker script is a plain
-script in the reference manifest (`kind script`, not a behavior), and the created hook is
-where the reference asks an NPC to walk a route (A13).
+Until #3497 (M12), an NPC id with no bound behavior ran built-in stand-ins: idle wander and
+follow, `attackedHateWeight`, Warrior-style party assist, the shot-recharge roll, the walker
+alias rule and its walk-stance list (and the instance walk-stance flag), `Party_Type` 2 privates, and the master-decay
+`despawnMinions`. They were deleted, not relocated, together with their predicate and the
+behavior claims, once every scripted NPC id had its behavior and every scripted maker type its
+maker. An id no script binds now runs only the built-in attackable AI, as in the reference.
 
-- They are never extended. They are deleted in one PR (#3497, M12) once every scripted NPC id
-  has its behavior, including the siegable-hall behaviors of #3502 (M12), and every scripted
-  maker type has its maker (#211 to #214). No id is exempted, and M10's exit does not include
-  the deletion.
-- The list: idle wander and follow, `attackedHateWeight`, Warrior-style party assist, the
-  shot-recharge roll, the walker alias rule, `Party_Type` 2 privates, `despawnMinions`, and
-  default treatment of the scripted maker type strings (predicate: no maker registered).
+- What stays is reference behavior, not a stand-in: a maker deleting its entries still
+  deletes each master's privates, as does the festival's spawn delete (the reference spawn's
+  delete does; a GM `//delete` or a mercenary despawn deletes the master alone), and a maker type
+  string
+  with no registered maker runs the default maker (the reference maker switch's `default:`
+  case; `default_maker`, `random_spawn_treasurebox` and `random_maker` rely on it).
+- Boot checks keep it that way: the script and maker catalog tests fail on any listed script
+  or scripted maker type without its Go constructor.
 - A script cannot register until every seam it subscribes to, and every handle operation it
   calls, is implemented for the NPC kinds it is bound to (boot check and test). Handle
   operations are checked per hook: a hook raised for NPC events against the NPCs bound to
@@ -458,10 +459,10 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | A3 | Script spawn API: handle-returning spawn, privates from the template, timed despawn | A2 | #3484 (+#2081, #3306) |
 | A4 | Desires I: cast (with hold and conditions), follow, wander, do-nothing, attack variants | A0, A1 | #3485 |
 | A5 | Desires II: flee with its guard; social with the social-broadcast gate | A4 | #1804 |
-| A6 | Attacked from three sources and party attacked, per called NPC; gates the matching stand-ins | E1, A2 | #3486 |
+| A6 | Attacked from three sources and party attacked, per called NPC | E1, A2 | #3486 |
 | A7 | Clan attacked scan, party died, clan died, folk attacked | A6 | #1800 |
 | A8 | Skill finished, attack finished with target, see-spell, spelled, abnormal status | A6 | #3488 |
-| A9 | No-desire, move finished, out of territory, for hostile and folk; gates idle stand-ins | A4 | #3489 (+#2148, #2162, #2163, #2240) |
+| A9 | No-desire, move finished, out of territory, for hostile and folk | A4 | #3489 (+#2148, #2162, #2163, #2240) |
 | A10 | See-creature tick scan with its gates, look-neighbor throttle, re-fire after teleport | A9 | #3491 |
 | A11 | Behavior base plus the first Warrior chain: Warrior base, Warrior, WarriorAggressive (first cut-over: 514 ids, 299 + 215) | A1–A10, E6, E7, E8 script events, X4 | #3494 |
 | A12 | Rest of the behavior spine (20 classes, about 840 ids in total) | A10, A11 | #3495 (+#2162, #2163, #2240, #3306, #176) |

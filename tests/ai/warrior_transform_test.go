@@ -70,11 +70,10 @@ func TestWarriorTransformSuccessorOutlivesMaster(t *testing.T) {
 	}
 }
 
-// TestPrivatesLeaveOnlyWithAnUnboundMaster pins the stand-in gate on the
-// privates' despawn: an unbound master's private leaves the world with it,
-// as the built-in minion stand-in does, while a bound Warrior master's
-// private outlives it, as the reference's deleteMe leaves its privates.
-func TestPrivatesLeaveOnlyWithAnUnboundMaster(t *testing.T) {
+// TestPrivatesOutliveTheirMastersDeleteMe pins the privates' despawn: a
+// master's deleteMe leaves its privates in the world, whether a behavior
+// binds the master or not.
+func TestPrivatesOutliveTheirMastersDeleteMe(t *testing.T) {
 	t.Parallel()
 	const unboundPrivateID = int32(29991)
 	w := bootWarriors(t,
@@ -97,8 +96,8 @@ func TestPrivatesLeaveOnlyWithAnUnboundMaster(t *testing.T) {
 
 	w.deleteMe(t, unbound)
 	w.deleteMe(t, bound)
-	if !unboundPrivate.Decayed() {
-		t.Fatal("the unbound master's private stayed in the world")
+	if unboundPrivate.Decayed() {
+		t.Fatal("the unbound master's private left the world with it")
 	}
 	if boundPrivate.Decayed() {
 		t.Fatal("the bound master's private left the world with it")

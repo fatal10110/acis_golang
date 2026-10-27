@@ -284,7 +284,7 @@ func TestScriptPrivateFollowsMaster(t *testing.T) {
 	}
 
 	// Deleting the master's spawn deletes its private with it.
-	if !w.srv.NpcSpawns.DeleteFixed(boss.ObjectID()) {
+	if !w.srv.NpcSpawns.DeleteFixedWithPrivates(boss.ObjectID()) {
 		t.Fatal("the master's spawn was not deleted")
 	}
 	w.srv.Settle(t)

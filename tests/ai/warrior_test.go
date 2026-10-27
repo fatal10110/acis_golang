@@ -156,13 +156,11 @@ func (w *warriorWorld) ticks(t *testing.T, n int) [][]byte {
 	return frames
 }
 
-// TestWarriorAggressiveAttacksOnSight runs the first stand-in cut-over: a
-// WarriorAggressive NPC, with no aggressive time, wants to attack the
-// character it sees with weight 200, while an unbound monster beside it
-// ignores the character. A hit of 10 on a level 1 Warrior NPC adds the
-// Warrior formula's hate, damage / (level + 7) * 100, once: the built-in
-// attacked hate stays off for it, and still adds the same amount for the
-// unbound monster.
+// TestWarriorAggressiveAttacksOnSight: a WarriorAggressive NPC, with no
+// aggressive time, wants to attack the character it sees with weight 200,
+// while an unbound monster beside it ignores the character. A hit of 10 on
+// a level 1 Warrior NPC adds the Warrior formula's hate,
+// damage / (level + 7) * 100, once; the unbound monster gains no hate.
 func TestWarriorAggressiveAttacksOnSight(t *testing.T) {
 	t.Parallel()
 	w := bootWarriors(t, warriorTemplate(aggressiveID, nil), warriorTemplate(warriorID, nil), warriorTemplate(unboundID, nil))
@@ -183,12 +181,15 @@ func TestWarriorAggressiveAttacksOnSight(t *testing.T) {
 		}
 	}
 
+	// The hit itself records damage at zero hate; the 125 is the Warrior's
+	// attacked hook, so the NPC no behavior binds gains none.
 	w.hit(t, plain, 10)
 	w.hit(t, unbound, 10)
-	for _, h := range []*npc.Hostile{plain, unbound} {
-		if got := h.AggroHate(w.player); got != 125 {
-			t.Errorf("npc %d hate after a hit of 10 = %v, want 125", h.NpcID(), got)
-		}
+	if got := plain.AggroHate(w.player); got != 125 {
+		t.Errorf("Warrior hate after a hit of 10 = %v, want 125", got)
+	}
+	if got := unbound.AggroHate(w.player); got != 0 {
+		t.Errorf("unbound npc hate after a hit of 10 = %v, want 0", got)
 	}
 }
 

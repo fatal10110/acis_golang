@@ -72,7 +72,7 @@ func walkInPlace(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile)
 // monster gets its attack desire.
 func startHostileAttackAfter(t *testing.T, atkSpd, rightHand int, prelude hostilePrelude) (*gameservertest.Server, *npc.Hostile, attackable.Combatant, time.Duration) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

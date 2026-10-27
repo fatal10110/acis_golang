@@ -51,7 +51,7 @@ func removeHeldEffect(t *testing.T, target effectHolder, e *effect.Effect) {
 // its last executed desire is a wander.
 func spawnLatchMonster(t *testing.T) (*gameservertest.Server, *npc.Hostile, attackable.Combatant) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -138,7 +138,7 @@ func TestStunnedMonsterTakesLatchOnFirstPassAfterStun(t *testing.T) {
 // by event or periodic passes.
 func TestConfusedMonsterSelectsNoHeavierDesire(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, withWarriorBehavior(), gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	startInWorld(t, c)
 	px, py, pz := srv.PlayerPosition(t, srv.SoleObjectID(t))

@@ -202,8 +202,8 @@ func TestAttackableAIAttackInterruptsWander(t *testing.T) {
 func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fakeActor, time.Time, func(time.Time)) {
 	t.Helper()
 	owner := actor(1)
-	owner.idleWander = true
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	wanderOnNoDesire(owner, brain)
 	pastFirstCycle(t, brain)
 	brain.SetRandomWalkRate(100)
 	brain.roll = func(int) int { return 0 }

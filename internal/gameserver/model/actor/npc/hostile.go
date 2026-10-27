@@ -291,7 +291,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	h.raidRelated.Store(h.RaidBoss())
 	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
 	h.health = creature.NewHealth(&h.hp)
-	h.running.Store(!inst.WalkMode)
+	h.running.Store(true)
 	h.brain = ai.NewAttackable(h, movement, attack)
 	var lookup skillDefinitions
 	if len(skills) > 0 {
@@ -560,15 +560,6 @@ func (h *Hostile) AddAttackDesireHold(attacker attackable.Combatant, hate float6
 func (h *Hostile) RemoveAttackDesire(target attackable.Combatant) {
 	h.brain.StopAggroHate(target)
 	h.move.Stop()
-}
-
-// AddCombatDamageHate records attacker's combat damage against this NPC,
-// queuing its ATTACKED-event attack Desire at attackedHateWeight's
-// approximation of the per-script attacked-hate formula (see
-// ai.Attackable.AddCombatDamageHate). A hit adds it only for an NPC with no
-// bound behavior.
-func (h *Hostile) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
-	h.brain.AddCombatDamageHate(attacker, damage, h.attackedHateWeight(attacker, damage))
 }
 
 // AddHate records skill-cast hate against this NPC.

@@ -14,16 +14,6 @@ import (
 // goroutine, with no NPC lock held, except the dying ones, which only
 // schedule theirs.
 type ScriptHooks interface {
-	// Behaves reports whether a behavior is bound to the NPC template id.
-	// Such an NPC leaves its reactions to the behavior: the built-in
-	// attacked hate, party assist, shot recharge and idle follow and wander
-	// stay off.
-	Behaves(npcID int32) bool
-	// ReactsToCreated reports whether any script, a behavior or not,
-	// reacts to the creation of an NPC with template id npcID. Such an NPC
-	// walks only the routes its scripts ask for: the built-in walker route
-	// stays off.
-	ReactsToCreated(npcID int32) bool
 	// HostileAttacked runs h's attacked hooks: attacker attacked it for
 	// damage, with sk when a skill did it (the zero Ref otherwise).
 	HostileAttacked(h *Hostile, attacker attackable.Combatant, damage int32, sk skill.Ref)
@@ -116,11 +106,6 @@ type ScriptHooks interface {
 	ScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32)
 }
 
-// behaves reports whether a behavior is bound to h's template id.
-func (h *Hostile) behaves() bool {
-	return h.scripts != nil && h.scripts.Behaves(int32(h.NpcID()))
-}
-
 // raiseAttacked runs h's attacked hooks.
 func (h *Hostile) raiseAttacked(attacker attackable.Combatant, damage int32, sk skill.Ref) {
 	if h.scripts != nil {
@@ -129,15 +114,10 @@ func (h *Hostile) raiseAttacked(attacker attackable.Combatant, damage int32, sk 
 }
 
 // partyAttacked tells h that caller, its party member, was attacked by
-// target for damage: h's party-attacked hooks run, then, when no behavior
-// is bound to h, its built-in party assist. assist is false where the
-// attack has no built-in assist at all (a skill's attacked call).
-func (h *Hostile) partyAttacked(caller PartyMember, target attackable.Combatant, damage int, assist bool) {
+// target for damage: h's party-attacked hooks run.
+func (h *Hostile) partyAttacked(caller PartyMember, target attackable.Combatant, damage int) {
 	if h.scripts != nil {
 		h.scripts.HostilePartyAttacked(caller, h, target, int32(damage))
-	}
-	if assist && !h.behaves() {
-		h.reactPartyAttacked(caller, target, damage)
 	}
 }
 

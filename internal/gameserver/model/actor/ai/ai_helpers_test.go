@@ -78,7 +78,6 @@ type fakeActor struct {
 	returnHome      bool
 	returnHomeCalls int
 	moving          bool
-	idleWander      bool
 	moveSpeed       float64
 	wanderCalls     int
 	wanderOffset    int
@@ -146,7 +145,6 @@ func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target
 }
-func (a *fakeActor) ShouldIdleWander() bool       { return a.idleWander }
 func (a *fakeActor) ForceWalkStance()             { a.walkStanceCalls++ }
 func (a *fakeActor) ForceRunStance()              { a.runStanceCalls++ }
 func (a *fakeActor) RestoreSpawnHeadingIfAtHome() { a.headingRestores++ }
@@ -385,8 +383,6 @@ func (recordingMove) MoveToLocation(location.Location) (bool, error) { return fa
 func (recordingMove) MoveStraightToLocation(location.Location) (bool, error) {
 	return false, nil
 }
-
-func (*fakeActor) IdleFollowTarget() attackable.Combatant { return nil }
 
 func (*fakeActor) ThinkFollow(attackable.Combatant, bool) bool { return false }
 

@@ -6,11 +6,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
+// TestAttackableAIIdleQueuesWanderAndWalks: a wander the no-desire hook
+// queues on the idle is taken up on the next cycle and walks.
 func TestAttackableAIIdleQueuesWanderAndWalks(t *testing.T) {
 	owner := actor(1)
-	owner.idleWander = true
 	owner.moveSpeed = 40
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	wanderOnNoDesire(owner, ai)
 
 	if err := tickThinkIdle(ai); err != nil {
 		t.Fatalf("TickThink() error: %v", err)

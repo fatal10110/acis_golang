@@ -161,7 +161,7 @@ func folkAdmits(e *effect.Effect) bool {
 func (f *Folk) initCombat(mods []effect.Mod) {
 	f.effects = effect.NewList(f, effect.WithAdmission(folkAdmits))
 	f.maxBuffs.Store(maxBuffCount)
-	f.running.Store(!f.Instance.WalkMode)
+	f.running.Store(true)
 	f.AttachStatFuncs(effect.Attachable(mods, f.ConditionActor()))
 	f.hp = float64(f.MaxHP())
 	f.mp = math.Trunc(f.MaxMPValue())

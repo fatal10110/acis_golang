@@ -157,7 +157,7 @@ func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, m
 		MoveType:        moveType,
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
-		Running: !inst.WalkMode, SummonAnimation: 2, Name: name, Title: inst.Title(),
+		Running: true, SummonAnimation: 2, Name: name, Title: inst.Title(),
 	}
 }
 
@@ -169,7 +169,7 @@ func (d *Decoration) Kind() actor.Kind { return actor.KindNPC }
 type fixedStats struct {
 	maxHP, pAtkSpd, mAtkSpd          int
 	moveMultiplier, atkSpdMultiplier float64
-	// moveSpeed is the speed the NPC walks or runs at, by its stance.
+	// moveSpeed is the speed the NPC runs at.
 	moveSpeed float64
 	// template and mods are what every other stat is finalized from: the
 	// NPC's template and its passives' stat funcs.
@@ -192,12 +192,9 @@ func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, erro
 	fs.pAtkSpd = int(fs.calc(stat.PowerAttackSpeed, t.AtkSpd))
 	fs.mAtkSpd = int(fs.calc(stat.MagicAttackSpeed, magicAttackSpeedBase))
 	fs.atkSpdMultiplier = npcinfo.AttackSpeedMultiplier(fs.pAtkSpd, t.AtkSpd)
-	// The move speed over the base speed the stance picks, as a moving NPC
+	// The move speed over the run speed, as a moving NPC in its run stance
 	// computes it; 0 for an NPC whose base is 0.
 	base := int(t.RunSpeed)
-	if inst.WalkMode {
-		base = int(t.WalkSpeed)
-	}
 	if base != 0 {
 		speed := float32(fs.calc(stat.RunSpeed, float64(base)))
 		fs.moveMultiplier = float64(speed / float32(base))

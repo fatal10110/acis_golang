@@ -18,7 +18,7 @@ import (
 const (
 	scribeID      = 31357 // Leandro: a walker that walks its route
 	porterID      = 31356 // Remy: a walker that runs its route
-	strollerID    = 30500 // a civilian no script binds, whose alias names a route
+	strollerID    = 30500 // a civilian no script binds, though its alias names a route
 	patrolID      = 21301 // a monster a test behavior sends along its route
 	scribeAlias   = "scribe_leandro"
 	porterAlias   = "porter_remy"
@@ -136,8 +136,8 @@ func walkersList() ([]script.Listing, script.Catalog) {
 // ChangeMoveType then NpcInfo (Npc.setWalkOrRun), and neither moves until
 // its AI takes up the route desire on its second tick (NpcAI.runAI's first
 // tick acts on nothing); each then heads for its nearest node and, there,
-// walks on to the next. A civilian no script binds keeps the alias rule:
-// it walks its route from the moment it spawns.
+// walks on to the next. A route named after an alias moves nothing by
+// itself: a civilian no script binds stays where it spawned.
 func TestWalkersScriptSendsItsWalkersAlongTheirRoutes(t *testing.T) {
 	t.Parallel()
 	executors(t, testWalkersScript)
@@ -161,8 +161,8 @@ func testWalkersScript(t *testing.T, opts ...gameservertest.Option) {
 		t.Fatalf("porter spawn frames = %#x, want one NpcInfo showing it running", got)
 	}
 	stroller, frames := w.spawn(t, strollerID)
-	if dests, _ := legs(frames); len(dests) != 1 || dests[0] != w.a[strollerID] {
-		t.Fatalf("unbound stroller legs at spawn = %v, want one to its nearest node %v", dests, w.a[strollerID])
+	if dests, _ := legs(frames); len(dests) != 0 {
+		t.Fatalf("unbound stroller legs at spawn = %v, want none", dests)
 	}
 
 	s, p := scribe.(*npc.Folk), porter.(*npc.Folk)
@@ -195,8 +195,8 @@ func testWalkersScript(t *testing.T, opts ...gameservertest.Option) {
 	if len(dests) != 1 || dests[0] != w.b[scribeID] || origins[0] != w.a[scribeID] {
 		t.Fatalf("scribe legs at its first node = %v from %v, want one to %v", dests, origins, w.b[scribeID])
 	}
-	if !stroller.(*npc.Folk).IsMoving() && folkAt(stroller.(*npc.Folk)) == w.spawnAt[strollerID] {
-		t.Fatal("unbound stroller never left its spawn point")
+	if stroller.(*npc.Folk).IsMoving() || folkAt(stroller.(*npc.Folk)) != w.spawnAt[strollerID] {
+		t.Fatal("unbound stroller left its spawn point")
 	}
 }
 
