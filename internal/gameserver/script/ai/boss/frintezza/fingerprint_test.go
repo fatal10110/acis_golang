@@ -27,13 +27,11 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		// teleporter's countdown and overweight refusal are named constants
 		// in the reference, numbers in Go. The teleporter reads the channel
 		// leader through Player.ChannelLeader where the census records the
-		// group getter AbstractGroup.getLeader, and builds its countdown
-		// screen message through Player.ShowPartyScreenMessage, the party
-		// broadcast the census maps on its own row. It walks a party through
-		// Player.PartyMembers, the Go name it shares with the quest helper
-		// Quest.getPartyMembers, which no class here calls.
+		// group getter AbstractGroup.getLeader, and walks each entering
+		// party's members in the lists Player.ChannelParties returns where
+		// the census records Party.getMembers.
 	}, "number 1010643", "number 1118",
-		"call AbstractGroup.getLeader", "call ExShowScreenMessage.new", "call Quest.getPartyMembers",
+		"call AbstractGroup.getLeader", "call Party.getMembers",
 		"number 1010630", "number 1010631", "number 1000522", "number 1000523", "number 1000524",
 		"number 1000525", "number 1000526", "number 1000527",
 		"number 1010644", "number 1010645", "number 1010646")

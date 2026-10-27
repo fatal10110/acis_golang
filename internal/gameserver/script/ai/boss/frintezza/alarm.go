@@ -13,7 +13,7 @@ import (
 // captain, guard, patrol, five wizard and self-destruct makers, and
 // opening grave pathways 1 and 2 and the eight center walls; a miss runs
 // maker event 1001 on the slot's captain, self-destruct or guard maker.
-// The draw is made whether or not that maker exists (#4278).
+// With no such maker there is no draw, so the alarm stays active.
 func AlarmDevice() script.Script {
 	base := defaultnpc.New().Hooks
 	return script.Script{Dir: dir, Behavior: true, NPCs: []int32{18328}, Hooks: base.With(script.Hooks{
@@ -62,9 +62,13 @@ func AlarmDevice() script.Script {
 	})}
 }
 
-// alarmDraw draws against odds in 100: a hit returns 100, a miss runs maker
-// event 1001 on maker and returns 0.
+// alarmDraw draws against odds in 100 when maker exists: a hit returns 100,
+// a miss runs maker event 1001 on maker and returns 0. With no maker it
+// draws nothing and returns 0.
 func alarmDraw(s *script.Script, maker string, odds int) int {
+	if !s.Spawner().HasMaker(maker) {
+		return 0
+	}
 	if s.Rnd(100) < odds {
 		return 100
 	}

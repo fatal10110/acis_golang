@@ -579,6 +579,16 @@ func (n *Npcs) MakerEvent(maker, name string, int1, int2 int) bool {
 	return false
 }
 
+// HasMaker reports whether an npcmaker is named maker (case-insensitive).
+func (n *Npcs) HasMaker(maker string) bool {
+	for _, g := range n.currentGroups() {
+		if strings.EqualFold(g.def.Name, maker) {
+			return true
+		}
+	}
+	return false
+}
+
 // deleteLive deletes the live NPC id at once, with no corpse, on the
 // calling goroutine, without waiting for the NPC's own queue: its spawn
 // slot answers as for a decayed corpse.
