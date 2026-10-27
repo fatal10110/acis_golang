@@ -148,7 +148,7 @@ func TestRunSpeedDebuffSlowsChasingNPC(t *testing.T) {
 	hostile := srv.SpawnMovingHostileNPCTemplate(t, speedTestTemplate(), at, at)
 	drainUntilQuiet(t, c)
 
-	hostile.AddCombatDamageHate(player, 50)
+	hostile.AddAttackDesire(player, 50)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionAttack)
 	}

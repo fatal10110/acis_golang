@@ -14,8 +14,7 @@ import (
 
 // TestMakers3Bindings pins the maker each ported batch 3 type binds, by
 // constructor, and how many shipped npcmakers run it: two
-// frintessa_evilate_maker npcmakers and one of each other type. Only
-// sailren_maker is not ported yet.
+// frintessa_evilate_maker npcmakers and one of each other type.
 func TestMakers3Bindings(t *testing.T) {
 	dp := datapack.Require(t)
 	table, err := gamexml.LoadSpawnlist(filepath.Join(dp, "data", "xml", "spawnlist"), zerolog.Nop(), 1)

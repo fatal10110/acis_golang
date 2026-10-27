@@ -393,11 +393,11 @@ const partyDen = `<?xml version="1.0" encoding="utf-8"?>
 	</npcmaker>
 </list>`
 
-// TestBoundPartyLeaderSpawnsNoStandInPrivates pins the stand-in gate on the
-// spawn-list privates: a Party_Type 2 leader with a bound behavior gets
-// only the two privates its behavior creates from its spawn entry, not a
-// second pair from the built-in stand-in.
-func TestBoundPartyLeaderSpawnsNoStandInPrivates(t *testing.T) {
+// TestPartyLeaderSpawnsOnlyItsBehaviorsPrivates pins the spawn-list
+// privates: a Party_Type 2 leader with a bound behavior gets exactly the two
+// privates its behavior creates from its spawn entry; the spawn itself
+// creates none.
+func TestPartyLeaderSpawnsOnlyItsBehaviorsPrivates(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "den.xml"), []byte(partyDen), 0o644); err != nil {

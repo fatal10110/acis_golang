@@ -49,7 +49,7 @@ func spawnTemplates() *npc.Table {
 // spawnTemplates spawning makers (none when nil).
 func bootSpawnAdmin(t *testing.T, makers *spawn.Table) (*gameservertest.Server, int32) {
 	t.Helper()
-	srv, gmID := bootAdmin(t, adminLevel, gameservertest.WithNPCs(spawnTemplates()), gameservertest.WithNpcSpawns(makers))
+	srv, gmID := bootAdmin(t, adminLevel, gameservertest.WithNPCs(spawnTemplates()), gameservertest.WithNpcSpawns(makers), withPartyLeader(wolfID))
 	enterWorld(t, srv.Client)
 	return srv, gmID
 }

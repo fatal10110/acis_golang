@@ -22,11 +22,10 @@ import (
 // the AI task, each with the attack controller its attack desires swing
 // with. A civilian whose template alias names a walker route
 // (walkerRoutes.xml, keyed by that alias for both the route and the NPC)
-// is given movement and walks its route desires on the walker task; while
-// the walker alias rule stands in for its id (routeStandIn) it walks that
-// route from the moment it spawns. Every other one stands at its spawn
-// point; one whose template can move is given movement too, to walk toward
-// the target of an attack or cast desire and to flee and follow.
+// is given movement and walks its route desires on the walker task. Every
+// other one stands at its spawn point; one whose template can move is given
+// movement too, to walk toward the target of an attack or cast desire and to
+// flee and follow.
 type FolkSpawner struct {
 	State  *world.State
 	Walker *task.Walker
@@ -161,14 +160,6 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
 	f.EnterZones()
 	f.SettleRegen() // vitals below max regenerate one period from the spawn
-	// The AI and walker tasks only work actors already in the world grid;
-	// the alias rule's walk starts before the AI task holds the NPC.
-	if control != nil && routeStandIn(s.Scripts, int32(inst.Template.ID)) {
-		// The alias rule: the route desire the walker script would queue,
-		// with the walk started at once rather than on the AI's first act.
-		f.AddMoveRouteDesire(alias, standInRouteWeight)
-		f.StartRoute(alias)
-	}
 	if s.AI != nil {
 		s.AI.Add(f)
 	}

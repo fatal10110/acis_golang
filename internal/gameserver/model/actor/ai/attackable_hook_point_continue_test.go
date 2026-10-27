@@ -13,7 +13,6 @@ import (
 // wander is queued.
 func TestHookPointNoDesireOnIdleContinue(t *testing.T) {
 	owner := actor(1)
-	owner.idleWander = true
 	move := &recordingMove{}
 	strike := &recordingAttack{}
 	brain := NewAttackable(owner, move, strike)

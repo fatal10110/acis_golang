@@ -161,7 +161,7 @@ func TestBoxChestNeverSwingsBack(t *testing.T) {
 			if !ok {
 				t.Fatalf("world.Player(%d) = %T is not a combatant", objID, obj)
 			}
-			chest.AddCombatDamageHate(victim, 50)
+			chest.AddAttackDesire(victim, 50)
 
 			if !tt.swing {
 				assertNoAttackBy(t, srv, c, chest.ObjectID(), 3*time.Second, "box chest with hate")

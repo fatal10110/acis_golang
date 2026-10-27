@@ -93,9 +93,10 @@ func TestScriptPrivateOfPrivateOutlivesAskerDecay(t *testing.T) {
 }
 
 // A private its master's death let go creates a private of its own, which
-// joins its own set. The dead master's corpse decaying takes the first
-// private with it but not the new one, which keeps its spawn: at its own
-// decay it leaves the private that asked for it.
+// joins its own set. The dead master's corpse decaying takes neither with
+// it: a decay deletes no privates, only a spawn's delete does. The new one
+// keeps its spawn, and at its own decay it leaves the private that asked
+// for it.
 func TestScriptPrivateOfUnlinkedPrivateKeepsSpawnAtMasterDecay(t *testing.T) {
 	t.Parallel()
 	w := bootCivilianParty(t, &partyLog{})
@@ -119,8 +120,8 @@ func TestScriptPrivateOfUnlinkedPrivateKeepsSpawnAtMasterDecay(t *testing.T) {
 
 	onQueueOf(t, wolf, func() { wolf.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(wolf.ObjectID())) })
 	w.srv.Settle(t)
-	if !asker.Decayed() || knight.Decayed() {
-		t.Fatalf("first private gone %v, new private gone %v; want only the first", asker.Decayed(), knight.Decayed())
+	if asker.Decayed() || knight.Decayed() {
+		t.Fatalf("first private gone %v, new private gone %v; want both in the world", asker.Decayed(), knight.Decayed())
 	}
 	if rec, ok := w.srv.NpcSpawns.SpawnOf(pup.ObjectID()); !ok || rec.MasterID != tablet.ObjectID() {
 		t.Fatalf("new private's spawn = %+v (%v), want the first private's private", rec, ok)
@@ -138,9 +139,10 @@ func TestScriptPrivateOfUnlinkedPrivateKeepsSpawnAtMasterDecay(t *testing.T) {
 
 // A private's private sits in the top master's set, linked to the private
 // that asked for it. When the asking private, let go by the master's death,
-// becomes a master of its own and decays before the master's corpse, it takes
-// only its own set: the private it created earlier stays in the world and
-// keeps its spawn, which still names it.
+// becomes a master of its own and decays before the master's corpse, it
+// takes no private with it: the one it created since and the one it
+// created earlier stay in the world, and the earlier one keeps its spawn,
+// which still names it.
 func TestScriptPrivateInMasterSetKeepsSpawnAtAskerDecay(t *testing.T) {
 	t.Parallel()
 	w := bootCivilianParty(t, &partyLog{})
@@ -171,8 +173,8 @@ func TestScriptPrivateInMasterSetKeepsSpawnAtAskerDecay(t *testing.T) {
 	}
 	onQueueOf(t, tablet, func() { tablet.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(tablet.ObjectID())) })
 	w.srv.Settle(t)
-	if !asker.Decayed() || !clerkH.Decayed() || knight.Decayed() {
-		t.Fatalf("asking private gone %v, its own private gone %v, earlier private gone %v; want only the earlier one left",
+	if !asker.Decayed() || clerkH.Decayed() || knight.Decayed() {
+		t.Fatalf("asking private gone %v, its own private gone %v, earlier private gone %v; want only the asking one gone",
 			asker.Decayed(), clerkH.Decayed(), knight.Decayed())
 	}
 	if rec, ok := w.srv.NpcSpawns.SpawnOf(pup.ObjectID()); !ok || rec.MasterID != tablet.ObjectID() {

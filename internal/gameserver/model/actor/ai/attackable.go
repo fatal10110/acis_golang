@@ -53,13 +53,9 @@ type AttackableActor interface {
 	// observers still see the actor face its target.
 	BroadcastMoveToPawn(target attackable.Combatant)
 
-	// IdleFollowTarget is the master an escorting NPC follows when idle; nil
-	// when it escorts no one.
-	IdleFollowTarget() attackable.Combatant
 	// ThinkFollow runs one escort-follow step and reports whether the follow
 	// desire should be cleared.
 	ThinkFollow(target attackable.Combatant, lastWasFollow bool) (clearDesire bool)
-	ShouldIdleWander() bool
 	ForceWalkStance()
 	ForceRunStance()
 	RestoreSpawnHeadingIfAtHome()
@@ -440,28 +436,6 @@ func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate f
 	a.threats.AddDamage(attacker, damage, hate)
 }
 
-// AddCombatDamageHate records attacker's raw combat damage in the physical
-// threat table at zero hate weight — hate is never derived from damage
-// dealt here. weight is the ATTACKED-event attack Desire queued alongside
-// it, which feeds its own hate into the same threat table (see
-// addAttackDesireWithMove) — a separate attack-desire add made by the NPC's
-// assigned individual AI script when it is attacked (e.g. the Warrior
-// script).
-// That per-script formula lives in the domain layer (see
-// Hostile.attackedHateWeight), not here: this generic AI plumbing only
-// applies whatever weight it is given. When the threat table had no
-// most-hated attacker, the AI loop runs immediately so the first reaction
-// does not wait for the next tick.
-func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage, weight float64) {
-	_, hadMostHated := a.threats.MostHated()
-	a.threats.AddDamage(attacker, damage, 0)
-	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
-		return
-	}
-	a.addAttackDesire(attacker, weight)
-	a.thinkIfNoMostHated(hadMostHated)
-}
-
 // AddAttackDesire queues an attack intention that closes on the target.
 // When the threat table has no most-hated attacker, the AI loop runs
 // immediately so the first reaction does not wait for the next tick.
@@ -491,20 +465,6 @@ func (a *Attackable) queueAttackDesire(attacker attackable.Combatant, damage, ha
 	a.thinkIfNoMostHated(hadMostHated)
 }
 
-func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
-	a.addAttackDesireWithMove(attacker, hate, true)
-}
-
-// addAttackDesireWithMove queues the attack Desire and, since an attack
-// desire updates aggro by default (every public entry point here uses that
-// default; none use the no-aggro-update variant), feeds the same weight
-// into the physical threat table at zero extra damage — the paired
-// hate-list add.
-func (a *Attackable) addAttackDesireWithMove(attacker attackable.Combatant, hate float64, moveToTarget bool) {
-	a.queueAttackDesireOnly(attacker, hate, moveToTarget)
-	a.threats.AddDamage(attacker, 0, hate)
-}
-
 // addAttackDesireNoAggro queues the attack Desire without touching the
 // threat table — the hate-randomizing rebuild's own no-aggro-update desire
 // add — used
@@ -524,13 +484,8 @@ func (a *Attackable) queueAttackDesireOnly(attacker attackable.Combatant, hate f
 	})
 }
 
-const escortFollowWeight = 5
-
 // defaultWanderTimer is addWanderDesire's timer argument in seconds.
 const defaultWanderTimer = 5
-
-// defaultWanderWeight is addWanderDesire's weight argument.
-const defaultWanderWeight = 5
 
 // defaultRandomWalkRate is npcs.properties RandomWalkRate's shipped default.
 const defaultRandomWalkRate = 30
@@ -585,17 +540,6 @@ func (a *Attackable) idleStep(toIdle bool) {
 		a.setCurrent(intention{kind: IntentionIdle})
 	}
 	a.atHookPoint(HookNoDesire)
-}
-
-func (a *Attackable) queueIdleFollow() {
-	a.AddFollowDesire(a.actor.IdleFollowTarget(), escortFollowWeight)
-}
-
-func (a *Attackable) queueIdleWander() {
-	if !a.actor.ShouldIdleWander() {
-		return
-	}
-	a.AddWanderDesire(defaultWanderTimer, defaultWanderWeight)
 }
 
 func (a *Attackable) thinkFollow() error {
@@ -922,7 +866,7 @@ func (a *Attackable) think(mode thinkMode) error {
 			case held:
 				// The cycle's idle does not wait for a held selection,
 				// but only the selection switches to idle.
-				a.cycleIdle()
+				a.idleStep(false)
 				idled = true
 			case a.hasLatch():
 				idleAfterLatch = true
@@ -931,7 +875,7 @@ func (a *Attackable) think(mode thinkMode) error {
 				// the selection first; the cycle's own idle then runs
 				// again unless the first queued a desire, so the
 				// no-desire point opens twice.
-				a.idleAndRequeue()
+				a.thinkIdle()
 				if _, ok := a.desires.Peek(); !ok {
 					a.idleStep(false)
 				}
@@ -940,7 +884,7 @@ func (a *Attackable) think(mode thinkMode) error {
 				// Only the selection switches to idle: an idle actor
 				// stays so, and an out-of-control one, which selects
 				// nothing, keeps its intention for when control returns.
-				a.cycleIdle()
+				a.idleStep(false)
 				idled = true
 			}
 		}
@@ -958,7 +902,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	// intention, as its think does not go through desire selection.
 	if outOfControl && mode != thinkContinue {
 		if idleAfterLatch {
-			a.cycleIdle()
+			a.idleStep(false)
 			a.topDesireTarget = nil
 		}
 		if mode == thinkAttackFinished && notCasting {
@@ -980,7 +924,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	}
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
-			a.cycleIdle()
+			a.idleStep(false)
 			a.topDesireTarget = nil
 		}
 	}
@@ -1012,36 +956,12 @@ func (a *Attackable) selectionHeld() bool {
 
 // idleAfterFinishedAttack is the finished attack's think on an in-control
 // actor, after desire selection: an actor left idle runs the idle step
-// again, so the no-desire point opens, and queues no idle follow or wander.
+// again, so the no-desire point opens.
 // wasIdle reports that the actor was idle when the pass started or that the
 // selection's empty-queue idle idled it.
 func (a *Attackable) idleAfterFinishedAttack(mode thinkMode, wasIdle bool) {
 	if mode == thinkAttackFinished && wasIdle && a.current.kind == IntentionIdle {
 		a.thinkIdle()
-	}
-}
-
-// idleAndRequeue is the selection's empty-queue idle: abort everything, go
-// idle, and queue the idle stand-ins.
-func (a *Attackable) idleAndRequeue() {
-	a.thinkIdle()
-	a.queueIdleStandIns()
-}
-
-// cycleIdle is the periodic cycle's own empty-queue idle: abort everything
-// and queue the idle stand-ins, keeping the current intention.
-func (a *Attackable) cycleIdle() {
-	a.idleStep(false)
-	a.queueIdleStandIns()
-}
-
-// queueIdleStandIns queues, after the no-desire point, the idle follow,
-// else the idle wander: what an NPC no behavior is bound to does with
-// nothing to do. The actor refuses both when a behavior is bound to it.
-func (a *Attackable) queueIdleStandIns() {
-	a.queueIdleFollow()
-	if _, ok := a.desires.Peek(); !ok {
-		a.queueIdleWander()
 	}
 }
 
@@ -1163,7 +1083,7 @@ func (a *Attackable) idleOnEmptyQueue() bool {
 	if _, ok := a.desires.Peek(); ok {
 		return false
 	}
-	a.idleAndRequeue()
+	a.thinkIdle()
 	return true
 }
 

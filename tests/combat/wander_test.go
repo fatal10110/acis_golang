@@ -34,7 +34,7 @@ func tickThinkWander(t *testing.T, h interface{ TickThink() error }) {
 // home (offset = walk speed * 3) on each axis.
 func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -68,7 +68,7 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 // its own spawn point.
 func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -108,7 +108,7 @@ func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 // its current XY even when both actors are far from spawn home.
 func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -144,7 +144,7 @@ func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 // hate while its living master is in territory.
 func TestMinionOpeningHateUsesMasterTerritory(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -165,8 +165,8 @@ func TestMinionOpeningHateUsesMasterTerritory(t *testing.T) {
 	}
 }
 
-// TestGuardDoesNotIdleWander pins hold-position kinds: a Guard with an empty
-// desire queue stays idle instead of rolling a random walk.
+// TestGuardDoesNotIdleWander: a Guard no behavior binds, with an empty
+// desire queue, stays idle instead of rolling a random walk.
 func TestGuardDoesNotIdleWander(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -213,7 +213,7 @@ func TestIdleHostileWanderArrivedBlockedClearsDesire(t *testing.T) {
 
 func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -278,7 +278,7 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 // and is an offset sample, not the triangle-center fallback.
 func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -322,7 +322,7 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 // (55+65+60)/3, (15+15+28)/3.
 func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -356,7 +356,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 // it: walk stance, and the idle wander queued again.
 func TestMakerIdleWanderOutOfTerritoryKeepsWanderCurrent(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

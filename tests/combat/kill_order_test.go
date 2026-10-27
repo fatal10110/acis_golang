@@ -20,7 +20,7 @@ func (r *countedRewards) CalculateRewards(attackable.Combatant) { r.calls.Add(1)
 
 func TestHostileDieAppliesOnceUnderConcurrency(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, withWarriorBehavior(), gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	startInWorld(t, c)
 	hostile := srv.SpawnHostileNPC(t)
@@ -66,7 +66,7 @@ func TestHostileDieAppliesOnceUnderConcurrency(t *testing.T) {
 
 func TestMovingHostileDeathStopsBeforeFinalStatusAndDie(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, withWarriorBehavior(), gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	startInWorld(t, c)
 	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
@@ -124,7 +124,7 @@ func TestMovingHostileDeathStopsBeforeFinalStatusAndDie(t *testing.T) {
 
 func TestPlayerNonlethalSkillDamageSendsSelfStatus(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, withWarriorBehavior(), gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	startInWorld(t, c)
 	drainUntilQuiet(t, c)
@@ -168,7 +168,7 @@ func TestPlayerNonlethalSkillDamageSendsSelfStatus(t *testing.T) {
 // exp/SP reward, a post-reward StatusUpdate, and Die (AI DEAD).
 func TestLethalHitOrdersStatusRewardDie(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(combatPersistence(t, killSkillDefs())),
@@ -225,7 +225,7 @@ func TestLethalHitOrdersStatusRewardDie(t *testing.T) {
 
 func TestPlayerLethalSkillDamageSendsThreeStatusesBeforeDie(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, withWarriorBehavior(), gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	startInWorld(t, c)
 	drainUntilQuiet(t, c)

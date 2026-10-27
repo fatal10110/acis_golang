@@ -144,28 +144,3 @@ func TestHostileReduceHPWithUnboundedDamage(t *testing.T) {
 		t.Fatalf("HP after +Inf hit = %v dead=%v, want 0 and dead", got, target.Dead())
 	}
 }
-
-// TestUnboundedHitQueuesAFiniteAttackDesire pins the ATTACKED desire weight
-// on an NPC that survives a +Inf hit (here an invulnerable one): the
-// reference hands onAttacked the (int) damage, Integer.MAX_VALUE, so the
-// queued weight is MAX_VALUE/(level+7)*100, never +Inf.
-func TestUnboundedHitQueuesAFiniteAttackDesire(t *testing.T) {
-	h := newCombatHostile(t, 1, &Template{HPMax: 10000, MPMax: 50, Level: 20})
-	h.SetInvul(true)
-	attacker := &hostileTarget{id: 2, playable: true}
-	// h knows the attacker, so the selection its first attack desire runs
-	// keeps the desire.
-	state := spawnPartyWorld(t, h)
-	state.Spawn(attacker, 100, 0, 0, 0)
-
-	h.ReduceHP(math.Inf(1), attacker, skill.Definition{})
-
-	desire, ok := h.AI().Desires().Peek()
-	if !ok {
-		t.Fatal("Desires().Peek() ok = false, want the ATTACKED desire")
-	}
-	want := float64(math.MaxInt32) / (20 + 7) * 100
-	if desire.FinalTarget != attacker || desire.Weight != want {
-		t.Fatalf("desire = (%v, %v), want (%v, %v)", desire.FinalTarget, desire.Weight, attacker, want)
-	}
-}

@@ -27,12 +27,6 @@ func (n *Npcs) registerSlot(key string, g *makerGroup, i int, dbName string, tmp
 	n.mu.Unlock()
 }
 
-func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, master npc.PartyMember, tmpl *npc.Template) {
-	n.mu.Lock()
-	n.addSlotLocked(slotInfo{key: key, entry: entry, master: master, tmpl: tmpl, memory: newSlotMemory(entry, nil)})
-	n.mu.Unlock()
-}
-
 // spawnPersistedSlot declares the database-tracked slot key of entry i of
 // g and restores or freshly spawns its NPC. A spawn still dead with a
 // pending respawn deadline is not instantiated: only its respawn timer is
@@ -99,9 +93,6 @@ func (n *Npcs) spawnMaster(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	if live == nil {
 		return
 	}
-	if master, ok := live.(*npc.Hostile); ok && !master.Decayed() {
-		n.spawnPrivates(key, entry, master)
-	}
 	if g := slot.group; g != nil {
 		if slot.orphan {
 			n.mu.Lock()
@@ -152,7 +143,6 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	inst.HasHome = true
 	inst.DriftRange = n.aiConfig.DriftRange
 	inst.SpawnHeading = heading
-	inst.WalkMode = walkerWalkModeIDs[entry.NPCID] && routeStandIn(n.scripts, entry.NPCID)
 	n.mu.Lock()
 	info := n.slot[key]
 	n.mu.Unlock()
@@ -185,7 +175,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 		speed = tmpl.WalkSpeed
 	}
 	queue := n.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID))
-	hostile, walkerRef, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
+	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil
@@ -241,9 +231,6 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	// A saved HP or MP below max regenerates one period from the spawn.
 	hostile.SettleRegen()
 	n.ai.Add(hostile)
-	// Walker only ticks in-region actors — must run after Spawn placed this
-	// NPC in world.State, not before.
-	startWalkerRoute(n.walker, walkerRef, inst, n.scripts, n.log)
 
 	if !n.trackLive(key, id) {
 		n.deleteNpc(hostile)
@@ -296,30 +283,6 @@ func (n *Npcs) trackLive(key string, id int32) bool {
 	slot.liveID = id
 	n.slot[key] = slot
 	return true
-}
-
-// spawnPrivates is the stand-in for the privates a behavior creates: it
-// places master's spawn-list privates for a Party_Type 2 master no
-// behavior is bound to. A bound master's behavior creates its own.
-func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {
-	if n.scripts != nil && n.scripts.Behaves(int32(master.NpcID())) {
-		return
-	}
-	// The generic monster behavior creates spawn-list privates only for Party_Type 2.
-	if master.AIInt("Party_Type", 0) != 2 {
-		return
-	}
-	for i, private := range entry.Privates {
-		tmpl, ok := n.templates.Get(int(private.NPCID))
-		if !ok {
-			n.log.Warn().Int32("npc_id", private.NPCID).Msg("spawn: private template missing")
-			continue
-		}
-		privateEntry := spawn.Entry{NPCID: private.NPCID, RespawnDelay: private.RespawnDelay}
-		privateKey := fmt.Sprintf("%s/private/%d", key, i)
-		n.registerPrivateSlot(privateKey, privateEntry, master, tmpl)
-		n.instantiate(privateKey, privateEntry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
-	}
 }
 
 func (n *Npcs) privateSpawnLocation(master npc.PartyMember, tmpl *npc.Template) location.Location {

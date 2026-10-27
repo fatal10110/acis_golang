@@ -24,12 +24,6 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 
 	if obj, ok := n.state.Object(actorID); ok {
 		if m, ok := obj.(npc.PartyMember); ok {
-			// The privates leave with their master only while no behavior
-			// is bound to it: a behavior's privates outlive a master that
-			// decays or is deleted, as a transforming NPC's successor does.
-			if n.scripts == nil || !n.scripts.Behaves(int32(m.NpcID())) {
-				n.despawnMinions(m)
-			}
 			// A one-time private leaves its spawn master's minions, even
 			// when that master's death already unlinked it.
 			if master := m.SpawnMaster(); master != nil && slot.entry.RespawnDelay <= 0 {
@@ -239,13 +233,15 @@ func (n *Npcs) respawnSlot(key string) {
 	n.spawnFresh(key, slot.entry, tmpl, pos)
 }
 
-// despawnMinions takes master's minions out of the world with it, each
-// decayed on the calling goroutine without waiting for its own queue (the
-// npc package's off-queue delete contract), and drops their spawn slots,
-// those of the privates spawned for master that are not in the world, and
-// those of the gone privates spawned for one of them. A live private spawned
-// for any of them sits in another party's set and keeps its spawn. An NPC that is no master takes nothing: a linked
-// private's party privates are its master's.
+// despawnMinions takes master's minions out of the world as its spawn is
+// deleted (a fixed spawn's delete, a maker's), each decayed on the calling
+// goroutine without waiting for its own queue (the npc package's off-queue
+// delete contract), and drops their spawn slots, those of the privates
+// spawned for master that are not in the world, and those of the gone
+// privates spawned for one of them. A live private spawned for any of them
+// sits in another party's set and keeps its spawn. An NPC that is no master
+// takes nothing: a linked private's party privates are its master's. A
+// master's decay alone takes none of them.
 func (n *Npcs) despawnMinions(master npc.PartyMember) {
 	if !master.IsMaster() {
 		return

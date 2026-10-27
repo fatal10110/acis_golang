@@ -50,7 +50,7 @@ func landEffect(t *testing.T, target effectHolder, name string) {
 // answers ActionFailed, and the aborted cast never launches.
 func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(combatPersistence(t,
@@ -109,7 +109,7 @@ func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 // ends with a StopMove broadcast to observers before anything else.
 func TestStunStopsWalkingNPC(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -145,7 +145,7 @@ func TestStunStopsWalkingNPC(t *testing.T) {
 // ActionFailed, and the cast stop answers the last ActionFailed.
 func TestRemoveTargetStopsWalkingPlayer(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

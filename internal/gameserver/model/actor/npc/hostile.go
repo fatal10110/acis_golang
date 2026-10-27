@@ -562,15 +562,6 @@ func (h *Hostile) RemoveAttackDesire(target attackable.Combatant) {
 	h.move.Stop()
 }
 
-// AddCombatDamageHate records attacker's combat damage against this NPC,
-// queuing its ATTACKED-event attack Desire at attackedHateWeight's
-// approximation of the per-script attacked-hate formula (see
-// ai.Attackable.AddCombatDamageHate). A hit adds it only for an NPC with no
-// bound behavior.
-func (h *Hostile) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
-	h.brain.AddCombatDamageHate(attacker, damage, h.attackedHateWeight(attacker, damage))
-}
-
 // AddHate records skill-cast hate against this NPC.
 func (h *Hostile) AddHate(attacker attackable.Combatant, hate float64) {
 	h.brain.AddHate(attacker, hate)

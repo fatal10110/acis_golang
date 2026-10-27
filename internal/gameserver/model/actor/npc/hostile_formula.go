@@ -233,7 +233,7 @@ func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant, sk mod
 		amount = 0
 	}
 	h.testOverhit(attacker, amount)
-	h.registerHit(attacker, amount, false, sk)
+	h.registerHit(attacker, amount, sk)
 	if h.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
@@ -293,7 +293,7 @@ func (h *Hostile) reduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 	killer, _ := attacker.(attackable.Combatant)
 	creature.InterruptDuelOnNPCHit(killer)
 	h.testOverhit(killer, amount)
-	h.registerHit(killer, amount, true, sk)
+	h.registerHit(killer, amount, sk)
 	if h.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}

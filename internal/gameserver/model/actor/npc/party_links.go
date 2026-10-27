@@ -316,16 +316,15 @@ func SameNPC(a, b PartyMember) bool {
 // attacked by target for damage: caller itself, then its master when
 // alive, then every live private of the party. The private loop skips
 // caller unless includeSelfInMinionLoop, as an aggression effect's does
-// not. assist turns on the built-in party assist of the called NPCs that
-// have no bound behavior. Only a hostile NPC is called: no party hook is
-// raised on a civilian NPC, and it has no built-in assist.
-func propagatePartyAttacked(caller PartyMember, target attackable.Combatant, damage int, includeSelfInMinionLoop, assist bool) {
+// not. Only a hostile NPC is called: no party hook is raised on a civilian
+// NPC.
+func propagatePartyAttacked(caller PartyMember, target attackable.Combatant, damage int, includeSelfInMinionLoop bool) {
 	if !caller.inParty() {
 		return
 	}
 	call := func(called PartyMember) {
 		if h, ok := called.(*Hostile); ok {
-			h.partyAttacked(caller, target, damage, assist)
+			h.partyAttacked(caller, target, damage)
 		}
 	}
 	call(caller)
