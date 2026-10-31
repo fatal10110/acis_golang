@@ -21,7 +21,7 @@ import net.sf.l2j.gameserver.network.serverpackets.*;
  */
 public final class PacketProbe
 {
-	private static void emit(String name, SendablePacket<?> packet) throws Exception
+	static void emit(String name, SendablePacket<?> packet) throws Exception
 	{
 		System.out.println(name + " " + PacketBytes.hex(packet));
 	}
@@ -110,5 +110,8 @@ public final class PacketProbe
 		full.charmOfCourage = true;
 		full.deathPenaltyBuffLevel = 4;
 		emit("EtcStatusUpdate/all", new EtcStatusUpdate(full));
+
+		ProbeSimple.run();
+		ProbeWorld.run();
 	}
 }

@@ -9,11 +9,34 @@ import net.sf.l2j.gameserver.model.actor.status.BoatStatus;
 public class Creature extends WorldObject
 {
 	public String name;
+	public String title;
+	public boolean running;
+	public boolean inWater;
 	public BoatMove move;
 	public BoatStatus status;
 
 	public final String getName()
 	{
 		return name;
+	}
+
+	public final String getTitle()
+	{
+		return title;
+	}
+
+	public final boolean isRunning()
+	{
+		return running;
+	}
+
+	public final boolean isInWater()
+	{
+		return inWater;
+	}
+
+	public BoatMove getMove()
+	{
+		return move;
 	}
 }

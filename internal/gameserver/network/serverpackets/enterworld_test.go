@@ -3,10 +3,8 @@ package serverpackets
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -100,21 +98,6 @@ func TestFrameHennaInfo(t *testing.T) {
 	}
 }
 
-func TestFrameEtcStatusUpdate(t *testing.T) {
-	got := framePayload(t, FrameEtcStatusUpdate(EtcStatus{Charges: 3, Blocked: true, GradePenalty: true, DeathPenaltyLevel: 2}))
-	want := []byte{OpcodeEtcStatusUpdate}
-	want = appendD(want, 3)
-	want = appendD(want, 0)
-	want = appendD(want, 1)
-	want = appendD(want, 0)
-	want = appendD(want, 1)
-	want = appendD(want, 0)
-	want = appendD(want, 2)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameEtcStatusUpdate() = %x, want %x", got, want)
-	}
-}
-
 func TestFramePledgeSkillList(t *testing.T) {
 	got := framePayload(t, FramePledgeSkillList([]SkillListEntry{{ID: 370, Level: 2}}))
 	want := []byte{OpcodeExtended}
@@ -164,19 +147,6 @@ func TestFrameQuestList(t *testing.T) {
 func TestFrameQuestListRejectsOversizedCount(t *testing.T) {
 	if err := FrameQuestList(make([]QuestListEntry, 1<<16)).Err(); err == nil {
 		t.Fatal("FrameQuestList oversized count error = nil, want error")
-	}
-}
-
-func TestFrameFriendList(t *testing.T) {
-	got := framePayload(t, FrameFriendList([]FriendListEntry{{ObjectID: 11, Name: "Buddy", Online: true}}))
-	want := []byte{OpcodeFriendList}
-	want = appendD(want, 1)
-	want = appendD(want, 11)
-	want = append(want, encodeUTF16Z("Buddy")...)
-	want = appendD(want, 1)
-	want = appendD(want, 11)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameFriendList() = %x, want %x", got, want)
 	}
 }
 
@@ -233,16 +203,6 @@ func TestFrameShortCutRegisterItem(t *testing.T) {
 	}
 }
 
-func TestFrameShortCutDelete(t *testing.T) {
-	got := framePayload(t, FrameShortCutDelete(3, 1))
-	want := []byte{OpcodeShortCutDelete}
-	want = appendD(want, 15)
-	want = appendD(want, 0)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShortCutDelete() = %x, want %x", got, want)
-	}
-}
-
 func TestFrameDie(t *testing.T) {
 	got := framePayload(t, FrameDie(123, DieOptions{Castle: true}))
 	want := []byte{OpcodeDie}
@@ -255,31 +215,6 @@ func TestFrameDie(t *testing.T) {
 	want = appendD(want, 0)
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameDie() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameExMailArrived(t *testing.T) {
-	got := framePayload(t, FrameExMailArrived())
-	want := []byte{OpcodeExtended}
-	want = appendH(want, OpcodeExMailArrived)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExMailArrived() = %x, want %x", got, want)
-	}
-}
-
-func TestFramePlaySound(t *testing.T) {
-	got := framePayload(t, FramePlaySound("systemmsg_e.1233"))
-	want := []byte{OpcodePlaySound}
-	want = appendD(want, 0)
-	want = append(want, encodeUTF16Z("systemmsg_e.1233")...)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FramePlaySound() = %x, want %x", got, want)
 	}
 }
 
@@ -308,31 +243,6 @@ func TestFrameSkillCoolTime(t *testing.T) {
 }
 
 // ---- from exregenmax_test.go ----
-func TestFrameExSetCompassZoneCode(t *testing.T) {
-	got := framePayload(t, FrameExSetCompassZoneCode(0x0c))
-	want := []byte{0xfe, 0x32, 0x00, 0x0c, 0x00, 0x00, 0x00}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExSetCompassZoneCode() = %x, want %x", got, want)
-	}
-	r := wire.NewReader(got[3:])
-	if code := r.ReadInt32(); code != 0x0c || r.Err() != nil || r.Remaining() != 0 {
-		t.Fatalf("decoded compass code = %#x, err = %v, trailing = %d", code, r.Err(), r.Remaining())
-	}
-}
-
-func TestFrameExRegenMax(t *testing.T) {
-	got := framePayload(t, FrameExRegenMax(14, 2, 16))
-	want := []byte{OpcodeExtended}
-	want = binary.LittleEndian.AppendUint16(want, OpcodeExRegenMax)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 14)
-	want = binary.LittleEndian.AppendUint32(want, 2)
-	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(16*0.66))
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExRegenMax() = %x, want %x", got, want)
-	}
-}
-
 // ---- from ssqinfo_test.go ----
 func TestFrameSSQInfo(t *testing.T) {
 	got := framePayload(t, FrameSSQInfo())

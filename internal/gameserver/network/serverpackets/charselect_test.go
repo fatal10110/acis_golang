@@ -41,74 +41,9 @@ func TestFrameAuthLoginFail(t *testing.T) {
 }
 
 // ---- from charcreatefail_test.go ----
-func TestFrameCharCreateFail(t *testing.T) {
-	tests := []struct {
-		reason CharCreateFailReason
-		want   int32
-	}{
-		{CharCreateFailReasonCreationFailed, 0},
-		{CharCreateFailReasonTooManyCharacters, 1},
-		{CharCreateFailReasonNameAlreadyExists, 2},
-		{CharCreateFailReason16EngChars, 3},
-		{CharCreateFailReasonIncorrectName, 4},
-		{CharCreateFailReasonCreateNotAllowed, 5},
-		{CharCreateFailReasonChooseAnotherServer, 6},
-	}
-	for _, tt := range tests {
-		got := framePayload(t, FrameCharCreateFail(tt.reason))
-
-		want := []byte{OpcodeCharCreateFail}
-		want = binary.LittleEndian.AppendUint32(want, uint32(tt.want))
-
-		if !bytes.Equal(got, want) {
-			t.Errorf("FrameCharCreateFail(%v) = %x, want %x", tt.reason, got, want)
-		}
-	}
-}
-
 // ---- from charcreateok_test.go ----
-func TestFrameCharCreateOk(t *testing.T) {
-	got := framePayload(t, FrameCharCreateOk())
-
-	want := []byte{OpcodeCharCreateOk}
-	want = binary.LittleEndian.AppendUint32(want, 1)
-
-	if !bytes.Equal(got, want) {
-		t.Errorf("FrameCharCreateOk = %x, want %x", got, want)
-	}
-}
-
 // ---- from chardeletefail_test.go ----
-func TestFrameCharDeleteFail(t *testing.T) {
-	tests := []struct {
-		reason CharDeleteFailReason
-		want   int32
-	}{
-		{CharDeleteFailReasonDeletionFailed, 1},
-		{CharDeleteFailReasonClanMemberMayNotDelete, 2},
-		{CharDeleteFailReasonClanLeaderMayNotDelete, 3},
-	}
-	for _, tt := range tests {
-		got := framePayload(t, FrameCharDeleteFail(tt.reason))
-
-		want := []byte{OpcodeCharDeleteFail}
-		want = binary.LittleEndian.AppendUint32(want, uint32(tt.want))
-
-		if !bytes.Equal(got, want) {
-			t.Errorf("FrameCharDeleteFail(%v) = %x, want %x", tt.reason, got, want)
-		}
-	}
-}
-
 // ---- from chardeleteok_test.go ----
-func TestFrameCharDeleteOk(t *testing.T) {
-	got := framePayload(t, FrameCharDeleteOk())
-	want := []byte{OpcodeCharDeleteOk}
-	if !bytes.Equal(got, want) {
-		t.Errorf("FrameCharDeleteOk = %x, want %x", got, want)
-	}
-}
-
 // ---- from charselected_test.go ----
 func TestFrameCharSelected(t *testing.T) {
 	c := &player.Character{
@@ -356,41 +291,6 @@ func TestFrameNewCharacterSuccessErrorReturnsNoFrame(t *testing.T) {
 }
 
 // ---- from lifecycle_test.go ----
-func TestFrameRestartResponse(t *testing.T) {
-	tests := []struct {
-		name string
-		ok   bool
-		want []byte
-	}{
-		{"success", true, []byte{OpcodeRestartResponse, 1, 0, 0, 0}},
-		{"failure", false, []byte{OpcodeRestartResponse, 0, 0, 0, 0}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := framePayload(t, FrameRestartResponse(tt.ok))
-			if !bytes.Equal(got, tt.want) {
-				t.Fatalf("FrameRestartResponse(%v) = %x, want %x", tt.ok, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFrameLeaveWorld(t *testing.T) {
-	got := framePayload(t, FrameLeaveWorld())
-	want := []byte{OpcodeLeaveWorld}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameLeaveWorld() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameRevive(t *testing.T) {
-	got := framePayload(t, FrameRevive(100))
-	want := []byte{OpcodeRevive, 100, 0, 0, 0}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameRevive() = %x, want %x", got, want)
-	}
-}
-
 // ---- from newcharactersuccess_test.go ----
 func rootTemplate(id, str, dex, con, intl, wit, men int) *player.Template {
 	return &player.Template{

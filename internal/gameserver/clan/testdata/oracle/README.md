@@ -17,10 +17,15 @@ Line formats:
 
 - `war <ids, ascending> => <iteration order>`: war sets of 1 to 100 clans, with ids spread
   over 64 to 4 million values from `0x10000000`, so tables of 16 to 256 buckets and every
-  doubling are crossed. Ascending insertion is how boot restores the stored rows. A later
-  declared war inserts at the tail of its bucket in the reference, which the Go side does
-  not model (see `hashSetOrder`'s comment); the probe does not cover that, nor buckets of
-  more than eight ids (tree bins and early growth); the remaining drifts are tracked in #4341.
+  doubling are crossed. Ascending insertion is how boot restores the stored rows.
+- `ops <+offset|-offset, ...> => <iteration order>`: offsets from `0x10000000`. The first adds
+  ascend (the boot restore); later `+` are wars declared at runtime (random order, so a war
+  goes to the tail of its bucket) and `-` are wars ended (the table never shrinks). Strides of
+  16 to 4096 between the ids crowd buckets: past eight ids a bucket makes a table of fewer than
+  64 buckets grow early, and from 64 buckets it becomes a tree bucket (newest id first). The
+  probe stops removing once a tree bucket exists (read through reflection, hence
+  `--add-opens` in `run.sh`): a tree bucket that has shrunk turns back into a chain depending
+  on the shape of its tree, which `warSet` does not model (tracked in #4362).
 - `sub <types, ascending> => <iteration order of the registry>`: every subset of the seven
   sub-unit types.
 

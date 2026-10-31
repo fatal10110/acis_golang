@@ -105,8 +105,8 @@ func TestOwnPetResurrectionRevivesIt(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 	killPet(t, h, wolf)
 	drainUntilQuiet(t, observer)
-	if wolf.Exp() != 481 || wolf.Level() != wolfLevel-1 {
-		t.Fatalf("dead wolf exp %d level %d, want 481 at level %d", wolf.Exp(), wolf.Level(), wolfLevel-1)
+	if died := wolfDeath(t, 510); wolf.Exp() != died.After || wolf.Level() != died.Level {
+		t.Fatalf("dead wolf exp %d level %d, want %d at level %d", wolf.Exp(), wolf.Level(), died.After, died.Level)
 	}
 
 	castResurrection(t, h.srv, h.client, h.ownerID, wolf.ObjectID())
@@ -175,8 +175,8 @@ func newPartialRevivalScene(t *testing.T, extra ...gameservertest.Option) *petRe
 	drainUntilQuiet(t, s.healer)
 	killPet(t, h, wolf)
 	drainUntilQuiet(t, s.healer)
-	if got := wolf.Exp(); got != 671 {
-		t.Fatalf("dead wolf exp = %d, want 671", got)
+	if got, want := wolf.Exp(), wolfDeath(t, 700).After; got != want {
+		t.Fatalf("dead wolf exp = %d, want %d", got, want)
 	}
 	return s
 }
@@ -257,8 +257,8 @@ func TestPhoenixBlessedPetRevivesAtFullHP(t *testing.T) {
 	if got, want := wolf.Exp(), wolfExpAfterRevive(t, 700, 671, 100); got != want {
 		t.Fatalf("revived pet exp = %d, want %d", got, want)
 	}
-	if got := wolf.HP(); got != float64(wolfLiveMaxHP(t)) {
-		t.Fatalf("revived pet HP = %v, want full %d", got, wolfLiveMaxHP(t))
+	if wantHP, wantMP := vitals.PhoenixRevivedVitals(t, wolfLiveMaxHP(t), int(wolf.MaxMPValue())); wolf.HP() != wantHP || wolf.MPValue() != wantMP {
+		t.Fatalf("revived pet HP/MP = %v/%v, want full %v/%v", wolf.HP(), wolf.MPValue(), wantHP, wantMP)
 	}
 	if wolf.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
 		t.Fatal("revived pet kept its Phoenix Blessing")

@@ -1,7 +1,6 @@
 package clan
 
 import (
-	"math"
 	"slices"
 	"testing"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
+	"github.com/fatal10110/acis_golang/internal/testsupport/vitals"
 )
 
 // Reference: a castle's doors are the doors.xml doors its castles.xml
@@ -172,9 +172,11 @@ func gateFrames(t *testing.T, frames [][]byte, objectID int32) []gateFrame {
 	return out
 }
 
-// status is the DoorStatusUpdate of a closed door with hp left.
-func status(objectID int32, doorID int, hp, showHP int32) gateFrame {
-	damage := max(0, min(6, 6-int32(math.Ceil(float64(hp)/gateDoorHP*6))))
+// status is the DoorStatusUpdate of a closed door with hp left; its damage
+// stage is the reference's (testdata/vitals.golden).
+func status(t *testing.T, objectID int32, doorID int, hp, showHP int32) gateFrame {
+	t.Helper()
+	damage := int32(vitals.DoorStage(t, gateDoorHP, float64(hp)))
 	return gateFrame{
 		opcode: serverpackets.OpcodeDoorStatusUpdate, objectID: objectID, closed: 1, damage: damage, showHP: showHP,
 		doorID: int32(doorID), maxHP: gateDoorHP, hp: hp,
@@ -259,7 +261,7 @@ func TestSiegeGatesThroughSiege(t *testing.T) {
 		t.Fatal("Gludio's siege did not start")
 	}
 	frames = drainFrames(t, w.leader)
-	expectGateFrames(t, "gate at the siege's start", gateFrames(t, frames, gate.ObjectID()), status(gate.ObjectID(), gludioGateID, gateDoorHP, 1))
+	expectGateFrames(t, "gate at the siege's start", gateFrames(t, frames, gate.ObjectID()), status(t, gate.ObjectID(), gludioGateID, int32(vitals.RespawnedDoorHP(t, gateDoorHP, false, false)), 1))
 	expectGateFrames(t, "wall at the siege's start", gateFrames(t, frames, wall.ObjectID()))
 	drainFrames(t, w.member)
 
@@ -271,7 +273,7 @@ func TestSiegeGatesThroughSiege(t *testing.T) {
 	}
 
 	w.srv.HitDoor(t, gludioGateID, w.leaderID, 100)
-	expectGateFrames(t, "gate hit", gateFrames(t, drainFrames(t, w.leader), gate.ObjectID()), status(gate.ObjectID(), gludioGateID, 500, 1))
+	expectGateFrames(t, "gate hit", gateFrames(t, drainFrames(t, w.leader), gate.ObjectID()), status(t, gate.ObjectID(), gludioGateID, 500, 1))
 	drainFrames(t, w.member)
 
 	w.srv.HitDoor(t, gludioGateID, w.leaderID, 500)
@@ -294,6 +296,7 @@ func TestSiegeGatesThroughSiege(t *testing.T) {
 		t.Fatalf("attacker told the wall broke: %v", ids)
 	}
 
+	revived := int32(vitals.RevivedHP(t, gateDoorHP))
 	s.End()
 	if s.InProgress() {
 		t.Fatal("Gludio's siege still in progress after its end")
@@ -301,7 +304,7 @@ func TestSiegeGatesThroughSiege(t *testing.T) {
 	frames = drainFrames(t, w.leader)
 	for _, d := range []*door.Object{gate, wall} {
 		expectGateFrames(t, "door at the siege's end", gateFrames(t, frames, d.ObjectID()),
-			status(d.ObjectID(), d.DoorID(), 420, 0), revive(d.ObjectID()), status(d.ObjectID(), d.DoorID(), gateDoorHP, 0))
+			status(t, d.ObjectID(), d.DoorID(), revived, 0), revive(d.ObjectID()), status(t, d.ObjectID(), d.DoorID(), int32(vitals.RespawnedDoorHP(t, gateDoorHP, false, true)), 0))
 		if d.Dead() || d.Opened() || d.HP() != gateDoorHP {
 			t.Fatalf("door %d after the siege: dead %t, open %t, HP %d", d.DoorID(), d.Dead(), d.Opened(), d.HP())
 		}
@@ -334,13 +337,15 @@ func TestSiegeGatesAtMidVictory(t *testing.T) {
 	if _, ok := w.srv.Castles.SetOwner(s.Castle(), knights); !ok {
 		t.Fatal("Knights did not take Gludio")
 	}
+	weak := int32(vitals.RespawnedDoorHP(t, gateDoorHP, true, false))
+	revived := int32(vitals.RevivedHP(t, gateDoorHP))
 	s.MidVictory()
 	frames := drainFrames(t, w.leader)
 	expectGateFrames(t, "gate at mid-victory", gateFrames(t, frames, gate.ObjectID()),
-		status(gate.ObjectID(), gludioGateID, 550, 1), status(gate.ObjectID(), gludioGateID, gateDoorHP/2, 1))
+		status(t, gate.ObjectID(), gludioGateID, 550, 1), status(t, gate.ObjectID(), gludioGateID, weak, 1))
 	expectGateFrames(t, "wall at mid-victory", gateFrames(t, frames, wall.ObjectID()),
-		status(wall.ObjectID(), gludioWallID, 420, 1), revive(wall.ObjectID()), status(wall.ObjectID(), gludioWallID, gateDoorHP/2, 1))
-	if gate.Opened() || wall.Dead() || gate.HP() != gateDoorHP/2 || wall.HP() != gateDoorHP/2 {
+		status(t, wall.ObjectID(), gludioWallID, revived, 1), revive(wall.ObjectID()), status(t, wall.ObjectID(), gludioWallID, weak, 1))
+	if gate.Opened() || wall.Dead() || gate.HP() != int(weak) || wall.HP() != int(weak) {
 		t.Fatalf("after mid-victory gate open %t HP %d, wall dead %t HP %d", gate.Opened(), gate.HP(), wall.Dead(), wall.HP())
 	}
 }
@@ -367,5 +372,5 @@ func TestSiegeGatesAfterDoorReload(t *testing.T) {
 	}
 	drainFrames(t, w.leader)
 	w.srv.HitDoor(t, gludioGateID, w.leaderID, 100)
-	expectGateFrames(t, "reloaded gate hit", gateFrames(t, drainFrames(t, w.leader), gate.ObjectID()), status(gate.ObjectID(), gludioGateID, 500, 1))
+	expectGateFrames(t, "reloaded gate hit", gateFrames(t, drainFrames(t, w.leader), gate.ObjectID()), status(t, gate.ObjectID(), gludioGateID, 500, 1))
 }

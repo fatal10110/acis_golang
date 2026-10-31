@@ -20,8 +20,11 @@ import (
 
 // Reference: CastleManorManager (constructor mode, scheduleModeChange,
 // changeMode, getManorCost, resetManorData, storeMe), SeedProduction and
-// CropProcure. Expected values are worked by hand from those methods (no
-// reference probe yet: #4341), not from the Go code under test.
+// CropProcure. The mode, change-time, cost and rollover values come from
+// testdata/manor.golden, the reference's own code run by testdata/oracle
+// (manor_oracle_test.go replays it). The assertions here that pin a whole
+// day of the cycle, its saves and its effects, are worked by hand from those
+// methods.
 
 // The test manor: Gludio (1) is owned by lordsClan, led by lordsLeader;
 // Dion (2) has no owner. Neither castle is taxed, so seed income lands
@@ -154,8 +157,14 @@ func start(t *testing.T, start time.Time, treasury int64, store *memStore, roll 
 
 func startWith(t *testing.T, cfg Config, start time.Time, treasury int64, store *memStore, roll int) *harness {
 	t.Helper()
+	return startOver(t, cfg, testSeeds(), start, treasury, store, roll)
+}
+
+// startOver is startWith over a seed table.
+func startOver(t *testing.T, cfg Config, seeds *manor.Table, start time.Time, treasury int64, store *memStore, roll int) *harness {
+	t.Helper()
 	castles, clans := testCastles(t, treasury)
-	m := New(cfg, testSeeds(), castles, clans, store, nil, zerolog.Nop(), WithRoll(func(int) int { return roll }))
+	m := New(cfg, seeds, castles, clans, store, nil, zerolog.Nop(), WithRoll(func(int) int { return roll }))
 	if err := m.Restore(context.Background()); err != nil {
 		t.Fatal(err)
 	}

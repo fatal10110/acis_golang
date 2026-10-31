@@ -79,7 +79,7 @@ func (s *Service) PenaltyReport(c *player.Character, nowMs int64, sieges Sieges)
 	if cl.dissolvingExpiry > nowMs {
 		out = append(out, Penalty{PenaltyDissolving, cl.dissolvingExpiry})
 	}
-	if cl.allyID != 0 || len(cl.wars) > 0 || cl.castleID > 0 || cl.hallID > 0 || registered {
+	if cl.allyID != 0 || cl.wars.len() > 0 || cl.castleID > 0 || cl.hallID > 0 || registered {
 		out = append(out, Penalty{Kind: PenaltyNoDissolve})
 	}
 	return out

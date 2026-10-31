@@ -95,8 +95,8 @@ type Clan struct {
 	// wars are the clans this clan declared war on; attackers the clans
 	// that declared war on it; warPenalties when this clan may declare
 	// war again on a clan it stopped a war with, in epoch milliseconds.
-	wars         map[int32]struct{}
-	attackers    map[int32]struct{}
+	wars         warSet
+	attackers    warSet
 	warPenalties map[int32]int64
 	// headquarters is the siege headquarters the clan put up; nil for none.
 	headquarters Headquarters
@@ -111,8 +111,6 @@ func newClan(id int32, name string, leaderID int32) *Clan {
 		privileges:   map[int]int32{},
 		skills:       map[int]int{},
 		subunits:     map[int]*SubPledge{},
-		wars:         map[int32]struct{}{},
-		attackers:    map[int32]struct{}{},
 		warPenalties: map[int32]int64{},
 	}
 }
@@ -186,7 +184,7 @@ func (cl *Clan) infoLocked() Info {
 		DissolvingExpiry: cl.dissolvingExpiry,
 		AllyID:           cl.allyID, AllyName: cl.allyName, AllyCrestID: cl.allyCrestID,
 		AllyPenaltyExpiry: cl.allyPenaltyExpiry, AllyPenaltyType: cl.allyPenaltyType,
-		AtWar: len(cl.wars) > 0,
+		AtWar: cl.wars.len() > 0,
 	}
 	if leader, ok := cl.members[cl.leaderID]; ok {
 		info.LeaderName = leader.Name

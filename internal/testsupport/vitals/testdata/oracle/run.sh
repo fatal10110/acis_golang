@@ -17,7 +17,8 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 	for f in Config:$root/Config.java Formulas:$gs/skills/Formulas.java Status:$gs/model/actor/status/CreatureStatus.java \
 		Creature:$gs/model/actor/Creature.java Door:$gs/model/actor/instance/Door.java \
 		Func:$gs/skills/funcs/FuncMaxHpMul.java PetStatus:$gs/model/actor/status/PetStatus.java \
-		Pet:$gs/model/actor/instance/Pet.java Template:$gs/model/actor/template/CreatureTemplate.java; do
+		Pet:$gs/model/actor/instance/Pet.java Playable:$gs/model/actor/Playable.java \
+		Castle:$gs/model/residence/castle/Castle.java PlayableStatus:$gs/model/actor/status/PlayableStatus.java Template:$gs/model/actor/template/CreatureTemplate.java; do
 		tr -d "\r" < ${f#*:} > $out/src_${f%%:*}
 	done
 	method() { sed -n "/$2/,/^${tab}}\$/p" $out/src_$1; }
@@ -35,7 +36,13 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 	method Status "protected void doRegeneration()" > $out/regen
 	method PetStatus "public int getMaxHp()" > $out/petmaxhp
 	method Pet "public void restoreExp(double restorePercent)" > $out/restore
-	for k in config consts period baseregen revive damage maxhpmul hpratio sethp1 sethp getregen regen petmaxhp restore; do
+	method Pet "private void deathPenalty()" > $out/deathpenalty
+	method PlayableStatus "public boolean addExp(long value)" > $out/addexp
+	method Playable "public void doRevive()" > $out/playablerevive
+	method Castle "public void spawnDoors(boolean isDoorWeak)" > $out/spawndoors
+	method Status "public final void setMaxHp()" > $out/setmaxhp
+	method Status "public final void setMaxHpMp()" > $out/setmaxhpmp
+	for k in config consts period baseregen revive damage maxhpmul hpratio sethp1 sethp getregen regen petmaxhp restore deathpenalty addexp playablerevive spawndoors setmaxhp setmaxhpmp; do
 		[ "$(wc -l < $out/$k)" -ge 1 ] || { echo "block $k not found in the reference" >&2; exit 1; }
 	done
 	[ "$(wc -l < $out/config)" -eq 3 ] || { echo "config lines changed in the reference" >&2; exit 1; }
@@ -52,6 +59,12 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 	    -e "/@@GETREGEN@@/{r $out/getregen" -e "d}" \
 	    -e "/@@REGEN@@/{r $out/regen" -e "d}" \
 	    -e "/@@PETMAXHP@@/{r $out/petmaxhp" -e "d}" \
+	    -e "/@@PLAYABLEREVIVE@@/{r $out/playablerevive" -e "d}" \
+	    -e "/@@SPAWNDOORS@@/{r $out/spawndoors" -e "d}" \
+	    -e "/@@SETMAXHPMP@@/{r $out/setmaxhpmp" -e "d}" \
+	    -e "/@@SETMAXHP@@/{r $out/setmaxhp" -e "d}" \
+	    -e "/@@ADDEXP@@/{r $out/addexp" -e "d}" \
+	    -e "/@@DEATHPENALTY@@/{r $out/deathpenalty" -e "d}" \
 	    -e "/@@RESTORE@@/{r $out/restore" -e "d}" VitalsCopy.java.tmpl > $out/VitalsCopy.java
 	javac -nowarn -d $out $out/VitalsCopy.java VitalsProbe.java
 	java -cp $out VitalsProbe' > "$here/../vitals.golden"

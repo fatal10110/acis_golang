@@ -147,5 +147,189 @@ public final class VitalsProbe
 				System.out.println("petexp " + c[0] + " " + c[1] + " " + power + " " + (pet.exp - c[1]));
 			}
 		}
+
+		// HP and MP of a dead player or summon right after a revive: a plain one
+		// restores the share of the maximum, a phoenix-blessed one the maximum.
+		for (boolean phoenix : new boolean[]
+		{
+			false,
+			true
+		})
+		{
+			for (int[] max : new int[][]
+			{
+				{
+					410,
+					200
+				},
+				{
+					632,
+					97
+				},
+				{
+					1500,
+					3000
+				}
+			})
+			{
+				final VitalsCopy.Playable who = new VitalsCopy.Playable();
+				who._status.maxHp = max[0];
+				who._status.maxMp = max[1];
+				who.dead = true;
+				who.phoenixBlessed = phoenix;
+				who.doRevive();
+				System.out.println("playablerevive " + (phoenix ? 1 : 0) + " " + max[0] + " " + max[1] + " " + who._status._hp + " " + who._status._mp + " " + (who.phoenixBlessed ? 1 : 0));
+			}
+		}
+
+		// HP of the doors of a castle after its doors respawn, weak or not, from
+		// a standing or a dead door.
+		for (int max : new int[]
+		{
+			410,
+			600,
+			601
+		})
+		{
+			for (boolean weak : new boolean[]
+			{
+				false,
+				true
+			})
+			{
+				for (boolean dead : new boolean[]
+				{
+					false,
+					true
+				})
+				{
+					final VitalsCopy.Castle castle = new VitalsCopy.Castle();
+					final VitalsCopy.Door door = new VitalsCopy.Door();
+					door._status.maxHp = max;
+					door._status._hp = dead ? 0 : max / 3;
+					door.dead = dead;
+					castle._doors.add(door);
+					castle.spawnDoors(weak);
+					System.out.println("spawndoors " + max + " " + (weak ? 1 : 0) + " " + (dead ? 1 : 0) + " " + door._status._hp + " " + (door.dead ? 1 : 0));
+				}
+			}
+		}
+
+		// A pet that dies: level, the experience the levels before and after
+		// start at, its experience; the loss, the experience kept for a
+		// resurrection, and the experience and level afterwards.
+		final long[][] deaths =
+		{
+			{
+				10,
+				200,
+				500,
+				1000,
+				700
+			},
+			{
+				10,
+				200,
+				500,
+				1000,
+				510
+			},
+			{
+				10,
+				200,
+				500,
+				1000,
+				10
+			},
+			{
+				10,
+				200,
+				500,
+				1000,
+				500
+			},
+			{
+				10,
+				200,
+				500,
+				1000,
+				529
+			},
+			{
+				10,
+				200,
+				500,
+				1000,
+				530
+			},
+			{
+				10,
+				200,
+				500,
+				750,
+				600
+			},
+			{
+				10,
+				200,
+				500,
+				757,
+				600
+			},
+			{
+				44,
+				700000,
+				800000,
+				1000000,
+				900000
+			},
+			{
+				10,
+				900,
+				1000,
+				2500,
+				1500
+			},
+			{
+				1,
+				0,
+				0,
+				136,
+				100
+			},
+			{
+				1,
+				0,
+				0,
+				136,
+				5
+			},
+			{
+				99,
+				4900000,
+				5000000,
+				5200000,
+				5100000
+			},
+			{
+				79,
+				400000000,
+				480562077,
+				555934039,
+				490562077
+			}
+		};
+		for (long[] d : deaths)
+		{
+			final VitalsCopy.PetExp pet = new VitalsCopy.PetExp();
+			final int level = (int) d[0];
+			pet.level = level;
+			pet.expForLevel[level - 1] = d[1];
+			pet.expForLevel[level] = d[2];
+			pet.expForLevel[level + 1] = d[3];
+			pet.exp = d[4];
+			pet.die();
+			System.out.println("petdeath " + level + " " + d[1] + " " + d[2] + " " + d[3] + " " + d[4] + " " + (d[4] - pet.exp) + " " + pet._expBeforeDeath + " " + pet.exp + " " + pet.level);
+		}
 	}
 }

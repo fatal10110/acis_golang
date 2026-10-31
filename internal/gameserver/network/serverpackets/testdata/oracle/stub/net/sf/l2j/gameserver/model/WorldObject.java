@@ -1,5 +1,7 @@
 package net.sf.l2j.gameserver.model;
 
+import net.sf.l2j.gameserver.model.location.SpawnLocation;
+
 // Stand-in for the world object base: a plain value holder for the getters the
 // probed packets read.
 public class WorldObject
@@ -33,5 +35,10 @@ public class WorldObject
 	public final int getHeading()
 	{
 		return heading;
+	}
+
+	public final SpawnLocation getPosition()
+	{
+		return new SpawnLocation(x, y, z, heading);
 	}
 }
