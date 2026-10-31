@@ -1,0 +1,15 @@
+# RoyalRushWizardRangeDebuff (18139, level 81) beside a monster of its clan, every draw 0, with int slot 0
+# set (it gave up its spells): told of the character's hit on the monster, it wants no range debuff.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.RoyalRushWizardRangeDebuff
+npc wiz 18139 Monster 300 0 0 level 81 clan royal_rush_room 600 skill W_SHORT_RANGE_DD_MAGIC 4160 9 skill W_LONG_RANGE_DD_MAGIC 4563 9 skill W_RANGE_DEBUFF 4587 9 mem i_ai0=1
+npc guard 20001 Monster 150 150 0 clan royal_rush_room 600
+
+hit guard 22
+  desires wiz -

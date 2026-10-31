@@ -1,0 +1,26 @@
+# LV3Orc (27294, level 76, glowing at +10), raised for the character (spawn parameters character, character, owner),
+# every draw 0: it appears wanting its big body (4692-1) on itself and attacking the creature its first spawn
+# parameter named (200). Only a hit by skill 1245 while it is stunned (Shield Stun, 92) moves IntAI0 on (0 to 1,
+# dropping the glow): the same hit unstunned leaves both. The timer steps after the stun (it cannot be made to
+# end in a scenario) stay in the Boot test.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3Orc
+npc owner 20003 Monster 600 0 0
+npc orc 27294 Monster 300 0 0 level 76 skill PHYSICAL_SPECIAL3 4032 7 skill PHYSICAL_SPECIAL1 4032 8 skill PHYSICAL_SPECIAL2 4073 8 skill DEBUFF1 4544 1 skill DEBUFF2 4544 2 skill DEBUFF3 4544 3 skill BIG_BODY_SKILL 4692 1 skill NORMAL_BODY_SKILL 4693 1 params character character owner master owner
+roll orc 99
+
+tick
+  mem orc i_ai0=0
+  shows orc glow=10
+  desires orc attack(player)=200 cast(orc,4692,move)=1000000
+hit orc 1 skill 1245 1
+  mem orc i_ai0=0
+  shows orc glow=10
+land orc 92 1
+hit orc 1 skill 1245 1
+  mem orc i_ai0=1
+  shows orc glow=0

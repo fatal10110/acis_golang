@@ -1,0 +1,15 @@
+# PartyPrivateWizardDD2 (21542, level 1; its shipped magics), a private of a master, every draw 0: a hit of 10
+# by the character from 50 away wants its short range DD magic on the character, 1000000 from each of its
+# attacked hook and its party call (a hit on a private calls the party, itself included).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2
+npc master 20003 Monster 600 0 0
+npc dd2 21542 Monster 50 0 0 skill W_LONG_RANGE_DD_MAGIC 4158 6 skill W_SHORT_RANGE_DD_MAGIC 4561 6 master master
+
+hit dd2 10
+  desires dd2 cast(player,4561,move)=2000000
