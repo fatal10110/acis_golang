@@ -60,6 +60,9 @@
 //	                                          Ketra ally of that level, -1 to -5 for a Varka one (default 0, none)
 //	pk <n>                                    optional: the character's PK count (default 0)
 //	noble                                     optional: the character is a noblesse
+//	hero                                      optional: the character is a hero of the running era
+//	karma <n>                                 optional: the character's karma (default 0)
+//	warehouse <item id> <count>               optional, repeatable: what the private warehouse holds
 //	cabal <dawn|dusk> <avarice|gnosis|strife> optional: the character is signed up for that Seven Signs cabal,
 //	                                          choosing that seal, with no stones turned in
 //	festival <dawn score> <dusk score>        optional: the Seven Signs festival scores the server restores; with no
@@ -133,7 +136,8 @@
 //
 // An npc line takes more options, in any order after the offsets: level <n>, the template's level (default 1);
 // aggro <range>, its aggro range (default none: a raid boss sees only as far as that); mp <n>, the current MP
-// each of its lives starts with once its created hook ran (default its maximum, 1000); mem <slot>=<value>[,...],
+// each of its lives starts with once its created hook ran (default its maximum, 1000); a civilian's maximum
+// is that many instead (default none), so it casts the shipped skills it can pay for; mem <slot>=<value>[,...],
 // the script memory slots its life starts with once its created hook ran (i_ai0 to i_ai4, i_quest0 to i_quest4,
 // flag, weight (the weight point) and value (the script value) take a number; c_ai0 to c_ai4 and c_quest0 to
 // c_quest4 take the character (player), the role of an NPC line above, or - for none); privates
@@ -434,6 +438,13 @@ type Scenario struct {
 	Standing int
 	// PK is the character's PK count.
 	PK int
+	// Karma is the character's karma.
+	Karma int
+	// Warehouse is what the character's private warehouse holds.
+	Warehouse []Hold
+	// Hero tells the hero line is there: the character is a hero of the
+	// running era.
+	Hero bool
 	// Cabal is the cabal the character is signed up for choosing Seal,
 	// NoCabal for none.
 	Cabal sevensigns.Cabal
@@ -792,8 +803,8 @@ func (sc *Scenario) checkFlow() error {
 				return fail("a created character starts at level 1, not %d", sc.Level)
 			case sc.Class != 0 || sc.Subclass != 0 || sc.Clan >= 0 || len(sc.Quests) > 0 || len(sc.Memos) > 0:
 				return fail("a created character takes no class, subclass, clan, quest or memo line")
-			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Noble || sc.Cabal != sevensigns.NoCabal:
-				return fail("a created character takes no hold, equip, standing, pk, noble or cabal line")
+			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Karma != 0 || len(sc.Warehouse) > 0 || sc.Hero || sc.Noble || sc.Cabal != sevensigns.NoCabal:
+				return fail("a created character takes no hold, equip, standing, pk, karma, warehouse, hero, noble or cabal line")
 			case len(sc.Members) > 0:
 				return fail("a created character takes no member line")
 			case len(sc.Mates) > 0 || len(sc.Halls) > 0:
@@ -952,7 +963,7 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			}
 		}
 		sc.Scripts = append(sc.Scripts, ScriptLine{Path: args[0], Stub: key == "stub"})
-	case "hold", "equip", "standing", "pk", "noble", "cabal", "festival", "sealowner", "memo":
+	case "hold", "equip", "standing", "pk", "karma", "warehouse", "hero", "noble", "cabal", "festival", "sealowner", "memo":
 		return sc.holdings(key, args)
 	case "teleports":
 		if len(args) != 0 || sc.Teleports {
@@ -1024,7 +1035,8 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 }
 
 // holdings reads the lines of what the character holds and stands for:
-// hold, equip, standing, pk, cabal and festival.
+// hold, equip, standing, pk, karma, warehouse, hero, noble, cabal, festival,
+// sealowner and memo.
 func (sc *Scenario) holdings(key string, args []string) error {
 	switch key {
 	case "hold":
@@ -1075,6 +1087,38 @@ func (sc *Scenario) holdings(key string, args []string) error {
 			return fmt.Errorf("pk count %q is not a number of 1 or more", args[0])
 		}
 		sc.PK = int(n)
+	case "karma":
+		if len(args) != 1 || sc.Karma != 0 {
+			return fmt.Errorf("one karma line: karma <n>")
+		}
+		n, err := strconv.ParseInt(args[0], 10, 32)
+		if err != nil || n < 1 {
+			return fmt.Errorf("karma %q is not a number of 1 or more", args[0])
+		}
+		sc.Karma = int(n)
+	case "warehouse":
+		if len(args) != 2 {
+			return fmt.Errorf("warehouse <item id> <count>")
+		}
+		id, err := strconv.ParseInt(args[0], 10, 32)
+		if err != nil {
+			return fmt.Errorf("warehouse item %q: %w", args[0], err)
+		}
+		count, err := strconv.ParseInt(args[1], 10, 32)
+		if err != nil || count < 1 {
+			return fmt.Errorf("warehouse count %q is not a number of 1 or more", args[1])
+		}
+		for _, h := range sc.Warehouse {
+			if h.Item == int32(id) {
+				return fmt.Errorf("item %d warehoused twice", id)
+			}
+		}
+		sc.Warehouse = append(sc.Warehouse, Hold{Item: int32(id), Count: int32(count)})
+	case "hero":
+		if len(args) != 0 || sc.Hero {
+			return fmt.Errorf("one hero line, with no argument")
+		}
+		sc.Hero = true
 	case "noble":
 		if len(args) != 0 || sc.Noble {
 			return fmt.Errorf("one noble line, with no argument")

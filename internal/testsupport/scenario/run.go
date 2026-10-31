@@ -327,6 +327,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	if r.sc.LaysCursed() {
 		opts = append(opts, gameservertest.WithCursedWeapons(shippedCursedWeapons(t)))
 	}
+	if r.sc.Hero {
+		opts = append(opts, gameservertest.WithOlympiadSeed(func(db *sql.DB) { seedHero(t, db, r.sc.Character) }))
+	}
 	if r.sc.Festival != nil || r.sc.SealOwners != [3]sevensigns.Cabal{} {
 		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedSevenSigns(t, store, r.sc) }))
 	}
@@ -404,6 +407,16 @@ func (r *run) spawnNPCs(t *testing.T) {
 	// reference probe does not trace them either.
 	if _, bad := r.draws.take(); len(bad) > 0 {
 		t.Fatalf("%s: script random at spawn: %s", r.sc.Name, strings.Join(bad, "; "))
+	}
+}
+
+// seedHero makes the character an active hero of the running era, before
+// the server restores the heroes.
+func seedHero(t *testing.T, db *sql.DB, name string) {
+	t.Helper()
+	if _, err := db.ExecContext(context.Background(),
+		"INSERT INTO heroes (char_id, class_id, count, played, active) SELECT obj_Id, 88, 1, 1, 1 FROM characters WHERE char_name = ?", name); err != nil {
+		t.Fatalf("seed hero: %v", err)
 	}
 }
 
@@ -563,6 +576,30 @@ func (r *run) seedHoldings(t *testing.T) {
 			t.Fatalf("seed standing and pk: %v", err)
 		}
 	}
+	if r.sc.Karma != 0 {
+		if _, err := r.srv.DB.ExecContext(ctx, "UPDATE characters SET karma = ? WHERE obj_Id = ?", r.sc.Karma, r.player); err != nil {
+			t.Fatalf("seed karma: %v", err)
+		}
+	}
+	for _, h := range r.sc.Warehouse {
+		tmpl, ok := r.items.Get(h.Item)
+		if !ok {
+			t.Fatalf("%s: warehouse %d: no such template in the catalog; add an item line", r.sc.Name, h.Item)
+		}
+		// A non-stackable item is one row per piece, as the hold line.
+		stacks, count := h.Count, 1
+		if tmpl.Stackable {
+			stacks, count = 1, int(h.Count)
+		}
+		for range stacks {
+			inst := item.Instance{
+				ObjectID: r.srv.NewObjectID(), TemplateID: h.Item, OwnerID: r.player, Count: count, Location: item.LocationWarehouse,
+			}
+			if err := r.srv.Items.Create(ctx, r.player, inst); err != nil {
+				t.Fatalf("%s: warehouse %d: %v", r.sc.Name, h.Item, err)
+			}
+		}
+	}
 	if r.sc.Noble {
 		if _, err := r.srv.DB.ExecContext(ctx, "UPDATE characters SET nobless = 1 WHERE obj_Id = ?", r.player); err != nil {
 			t.Fatalf("seed noble: %v", err)
@@ -608,7 +645,7 @@ func (r *run) spawn(t *testing.T, n NPC) {
 	r.link(t, n)
 	r.srv.RunCreated(t, live)
 	r.setMemory(t, n)
-	if n.HasMP {
+	if n.HasMP && !npc.FolkKind(&npc.Instance{Template: tmpl}) {
 		h, post := r.hostile(t, n.Role)
 		r.on(t, n.Role, post, func() { h.SetCurrentMP(n.MP) })
 	}
@@ -713,6 +750,11 @@ func template(n NPC) *npc.Template {
 	tmpl := gameservertest.FolkTemplate(n.Type, int(n.ID))
 	if npc.FolkKind(&npc.Instance{Template: tmpl}) {
 		tmpl.CanMove = n.Walks
+		if n.HasMP {
+			// A civilian starts each life with its full MP: the mp option
+			// sizes it.
+			tmpl.MPMax = float64(n.MP)
+		}
 	} else {
 		tmpl = &npc.Template{
 			ID: int(n.ID), TemplateID: int(n.ID), Type: n.Type, Level: 1, HPMax: 1000, MPMax: 1000,

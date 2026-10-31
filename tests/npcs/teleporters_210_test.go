@@ -330,14 +330,3 @@ func TestElmoredenCemeteryTeleporterDestinations(t *testing.T) {
 		})
 	}
 }
-
-// liveCount counts the NPCs of template id in the world.
-func liveCount(w *folkWorld, id int) int {
-	n := 0
-	for _, obj := range w.srv.State.Objects() {
-		if f, ok := obj.(*npc.Folk); ok && f.Template().ID == id {
-			n++
-		}
-	}
-	return n
-}

@@ -110,7 +110,7 @@ import net.sf.l2j.gameserver.taskmanager.WaterTaskManager;
  * class, the subclass it plays, a led clan of the given level and its side of a castle's siege, quest rows, the script
  * draws of the random line) and
  * spawns each NPC line's NPC at its offset from the player, who stands where the Go fixture
- * character enters the world. The hold, equip, standing, pk, cabal, festival, sealowner, memo and spoil lines are seeded
+ * character enters the world. The hold, equip, standing, pk, karma, warehouse, hero, cabal, festival, sealowner, memo and spoil lines are seeded
  * as the Go runner seeds them. The NPCs keep only the bindings of the scenario's script and stub
  * lines, as the Go runner registers no other script. Every NPC line's NPC has the casting stats of the Go runner's
  * fixture NPC (WIT and DEX 0, its base attack speed), and a monster the scenario kills or hits is made the Go runner's
@@ -219,6 +219,10 @@ final class ScenarioTrace
 	private final List<Integer> _equips = new ArrayList<>();
 	private int _standing;
 	private int _pk;
+	private int _karma;
+	private boolean _hero;
+	/** The warehouse lines: item id, count. */
+	private final List<int[]> _warehouse = new ArrayList<>();
 	private boolean _noble;
 	private String[] _cabal;
 	private int[] _festival;
@@ -605,6 +609,13 @@ final class ScenarioTrace
 				case "equip" -> _equips.add(Integer.parseInt(f[1]));
 				case "standing" -> _standing = Integer.parseInt(f[1]);
 				case "pk" -> _pk = Integer.parseInt(f[1]);
+				case "karma" -> _karma = Integer.parseInt(f[1]);
+				case "hero" -> _hero = true;
+				case "warehouse" -> _warehouse.add(new int[]
+				{
+					Integer.parseInt(f[1]),
+					Integer.parseInt(f[2])
+				});
 				case "noble" -> _noble = true;
 				case "cabal" -> _cabal = new String[]
 				{
@@ -1139,6 +1150,16 @@ final class ScenarioTrace
 			player.setAllianceWithVarkaKetra(_standing);
 		if (_pk != 0)
 			player.setPkKills(_pk);
+		if (_karma != 0)
+			player.setKarma(_karma);
+		for (int[] h : _warehouse)
+			if (ItemData.getInstance().getTemplate(h[0]).isStackable())
+				player.getWarehouse().addItem(h[0], h[1]);
+			else
+				for (int i = 0; i < h[1]; i++)
+					player.getWarehouse().addItem(h[0], 1);
+		if (_hero)
+			player.setHero(true);
 		if (_noble)
 			player.setNoble(true, false);
 		if (_cabal != null)

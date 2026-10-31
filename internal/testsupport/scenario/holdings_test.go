@@ -14,6 +14,9 @@ hold 57 5000
 equip 1
 standing 3
 pk 12
+karma 100
+warehouse 7186 2
+hero
 cabal dusk gnosis
 festival 0 100
 tick
@@ -30,6 +33,9 @@ func TestParseReadsHoldingLines(t *testing.T) {
 	}
 	if !slices.Equal(sc.Equips, []int32{1}) || sc.Standing != 3 || sc.PK != 12 {
 		t.Fatalf("equips %v standing %d pk %d", sc.Equips, sc.Standing, sc.PK)
+	}
+	if sc.Karma != 100 || !sc.Hero || !slices.Equal(sc.Warehouse, []Hold{{Item: 7186, Count: 2}}) {
+		t.Fatalf("karma %d hero %v warehouse %+v", sc.Karma, sc.Hero, sc.Warehouse)
 	}
 	if sc.Cabal != sevensigns.Dusk || sc.Seal != sevensigns.Gnosis {
 		t.Fatalf("cabal %v seal %v", sc.Cabal, sc.Seal)
@@ -70,6 +76,13 @@ func TestParseRejectsMalformedHoldingLines(t *testing.T) {
 		{"standing twice", "standing 1\nstanding 2", "one standing line"},
 		{"pk zero", "pk 0", "is not a number of 1 or more"},
 		{"pk twice", "pk 1\npk 2", "one pk line"},
+		{"karma zero", "karma 0", "is not a number of 1 or more"},
+		{"karma twice", "karma 1\nkarma 2", "one karma line"},
+		{"warehouse without count", "warehouse 7186", "warehouse <item id> <count>"},
+		{"warehouse zero", "warehouse 7186 0", `warehouse count "0" is not a number of 1 or more`},
+		{"warehouse twice", "warehouse 7186 1\nwarehouse 7186 2", "item 7186 warehoused twice"},
+		{"hero twice", "hero\nhero", "one hero line"},
+		{"hero with an argument", "hero yes", "one hero line"},
 		{"cabal without seal", "cabal dawn", "one cabal line"},
 		{"cabal none", "cabal normal gnosis", `cabal "normal" is not dawn or dusk`},
 		{"seal none", "cabal dawn none", `seal "none" is not avarice, gnosis or strife`},
@@ -88,10 +101,10 @@ func TestParseRejectsMalformedHoldingLines(t *testing.T) {
 }
 
 func TestParseRejectsHoldingsOnACreatedCharacter(t *testing.T) {
-	for _, line := range []string{"hold 57 1", "equip 1", "standing 1", "pk 1", "noble", "cabal dawn gnosis"} {
+	for _, line := range []string{"hold 57 1", "equip 1", "standing 1", "pk 1", "karma 1", "warehouse 57 1", "hero", "noble", "cabal dawn gnosis"} {
 		t.Run(line, func(t *testing.T) {
 			_, err := Parse("bad.scenario", []byte("character A 1\n"+line+"\ncreate\nenter\n"))
-			if err == nil || !strings.Contains(err.Error(), "no hold, equip, standing, pk, noble or cabal line") {
+			if err == nil || !strings.Contains(err.Error(), "no hold, equip, standing, pk, karma, warehouse, hero, noble or cabal line") {
 				t.Fatalf("err = %v", err)
 			}
 		})

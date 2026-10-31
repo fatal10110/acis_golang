@@ -20,7 +20,7 @@ import (
 // tutorial's and the item messages, the radar marks, the drops, the casts,
 // the NPC chat lines a script makes, the player's own teleports, the camera
 // shots, the social animations, the earthquakes, and the appearing, stance
-// changes, dying and leaving of the NPCs a script spawns. The rest (selection, approach, movement, the deferred
+// changes, dying and leaving of the NPCs a script spawns, and the warehouse withdrawal list. The rest (selection, approach, movement, the deferred
 // inventory and status updates) is not the script's.
 var renders = []byte{
 	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
@@ -31,7 +31,7 @@ var renders = []byte{
 	serverpackets.OpcodeNpcSay, serverpackets.OpcodeTeleportToLocation,
 	serverpackets.OpcodeSpecialCamera, serverpackets.OpcodeSocialAction,
 	serverpackets.OpcodeNPCInfo, serverpackets.OpcodeDeleteObject, serverpackets.OpcodeChangeMoveType,
-	serverpackets.OpcodeDie, serverpackets.OpcodeEarthquake,
+	serverpackets.OpcodeDie, serverpackets.OpcodeEarthquake, serverpackets.OpcodeWarehouseWithdrawList,
 }
 
 // renderer renders the server packets of one run or trace as S lines.
