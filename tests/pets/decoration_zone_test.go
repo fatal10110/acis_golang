@@ -41,8 +41,8 @@ func assertMoveTypes(t *testing.T, when string, got []byte, want ...move.MoveTyp
 // TestDecorationJoinsTheZonesItStandsIn pins a placed Christmas Tree's zone
 // membership (a ChristmasTree is a Folk, so Creature.setRegion enters and
 // leaves its zones): placed in water it is the zone's occupant, and its
-// known players see its NpcInfo once on sight and once more, swimming, for
-// the crossing (WaterZone.java:28-39: NpcInfo, its move speed is not 0).
+// known players see its NpcInfo on sight, walking, again as it takes its
+// run stance, and once more, swimming, for the crossing (WaterZone.java:28-39: NpcInfo, its move speed is not 0).
 // Removed, it leaves the zone, showing its NpcInfo out of the water before
 // it goes (WaterZone.java:48-59).
 func TestDecorationJoinsTheZonesItStandsIn(t *testing.T) {
@@ -76,7 +76,7 @@ func TestDecorationJoinsTheZonesItStandsIn(t *testing.T) {
 	if !tree.InsideZone(zone.FlagWater) {
 		t.Fatal("tree placed in water is not in it")
 	}
-	assertMoveTypes(t, "placed in water", npcInfoMoveTypes(frames, tree.ObjectID()), move.MoveGround, move.MoveSwim)
+	assertMoveTypes(t, "placed in water", npcInfoMoveTypes(frames, tree.ObjectID()), move.MoveGround, move.MoveGround, move.MoveSwim)
 
 	tree.Despawn()
 	frames = drainFrames(t, h.client)

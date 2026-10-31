@@ -258,6 +258,8 @@ func (s *effectPointSink) Emit(ev event.Event) {
 		frame = frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
 	case event.SkillLaunched:
 		frame = frames.SkillLaunched(s.ep.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
+	case event.MoveTypeChanged:
+		frame = frames.ChangeMoveType(s.ep.ObjectID(), e.Running)
 	case event.NPCInfoChanged:
 		// A signet point's template serves no residence: its view carries
 		// no crest.
@@ -275,7 +277,8 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	})
 }
 
-// decorationSink shows one placed decoration's observers its view again.
+// decorationSink shows one placed decoration's observers its view again
+// and its stance changes.
 type decorationSink struct {
 	world *world.State
 	d     *npc.Decoration
@@ -283,10 +286,16 @@ type decorationSink struct {
 	link  *GameClientLink
 }
 
-// Emit sends every known observer the decoration's view ev asks for.
+// Emit sends every known observer the decoration's view or stance ev asks
+// for.
 func (s *decorationSink) Emit(ev event.Event) {
-	if e, ok := ev.(event.NPCInfoChanged); ok {
+	switch e := ev.(type) {
+	case event.NPCInfoChanged:
 		broadcastNPCView(s.link, &s.known, s.world, s.d, e.ServerObject)
+	case event.MoveTypeChanged:
+		broadcastKnown(&s.known, s.world, s.d, func() wire.Frame {
+			return serverpackets.NpcFrameBuilder{}.ChangeMoveType(s.d.ObjectID(), e.Running)
+		})
 	}
 }
 

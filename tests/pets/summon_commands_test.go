@@ -64,6 +64,8 @@ func TestDecorativeSummonSpawnsTreeAndBlocksDuplicate(t *testing.T) {
 
 	h.client.Send(encodeUseItem(treeKit, false))
 	assertFrameOpcode(t, mustRead(t, h.client, "tree NPCInfo"), serverpackets.OpcodeNPCInfo, "tree NPCInfo")
+	assertFrameOpcode(t, mustRead(t, h.client, "tree run stance"), serverpackets.OpcodeChangeMoveType, "tree ChangeMoveType")
+	assertFrameOpcode(t, mustRead(t, h.client, "tree running NPCInfo"), serverpackets.OpcodeNPCInfo, "tree running NPCInfo")
 	h.srv.InventoryUpdates.Tick()
 	assertFrameOpcode(t, mustRead(t, h.client, "kit consumption update"), serverpackets.OpcodeInventoryUpdate, "kit InventoryUpdate")
 	if got := h.ownerItemCount(t, treeKitID); got != 1 {

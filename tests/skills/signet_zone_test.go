@@ -31,8 +31,8 @@ func readNPCInfoMoveTypes(c *testsupport.ScriptedClient, objID int32) []byte {
 // TestSignetPointJoinsTheZonesItStandsIn pins a signet effect point's zone
 // membership (EffectPoint is an Npc, so Creature.setRegion enters and
 // leaves its zones): a point placed in water is the zone's occupant, and
-// its known players, shown its NpcInfo on sight, see it again, swimming,
-// for the crossing (WaterZone.java:28-39: NpcInfo, as the shipped point
+// its known players, shown its NpcInfo on sight and as it takes its run
+// stance, see it again, swimming, for the crossing (WaterZone.java:28-39: NpcInfo, as the shipped point
 // templates move at 20/50, not 0). Despawned when its signet ends, it leaves the zone,
 // showing its NpcInfo out of the water before it goes (WaterZone.java:48-59).
 func TestSignetPointJoinsTheZonesItStandsIn(t *testing.T) {
@@ -81,10 +81,10 @@ func TestSignetPointJoinsTheZonesItStandsIn(t *testing.T) {
 	if !point.InsideZone(zone.FlagWater) {
 		t.Fatal("signet point placed in water is not in it")
 	}
-	// The caster first comes to know the point, out of the water, then sees
-	// it again, swimming, for the crossing.
-	if got := readNPCInfoMoveTypes(c, point.ObjectID()); len(got) != 2 || got[0] != byte(move.MoveGround) || got[1] != byte(move.MoveSwim) {
-		t.Fatalf("NpcInfo move types of the point placed in the water = %v, want on the ground then swimming", got)
+	// The caster first comes to know the point, out of the water, sees it
+	// again as it takes its run stance, then, swimming, for the crossing.
+	if got := readNPCInfoMoveTypes(c, point.ObjectID()); len(got) != 3 || got[0] != byte(move.MoveGround) || got[1] != byte(move.MoveGround) || got[2] != byte(move.MoveSwim) {
+		t.Fatalf("NpcInfo move types of the point placed in the water = %v, want on the ground twice then swimming", got)
 	}
 
 	srv.Advance(t, 1100*time.Millisecond)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -35,6 +36,9 @@ type Decoration struct {
 	world *world.State
 	sink  event.Sink
 	zones *zoneMember
+	// running is its run stance, which Spawn sets under placeMu; observers
+	// read it from their own queues.
+	running atomic.Bool
 	// placeMu serializes Spawn and Despawn: the player placing the
 	// decoration and a GM deleting it run on different queues, and a
 	// deletion landing between the spawn and its zone entry would leave
@@ -79,16 +83,32 @@ func (d *Decoration) Attach(rt DecorationRuntime) {
 }
 
 // Spawn places the decoration in the world at (x, y, z) facing heading,
-// then enters the zones at its position. It is a no-op until Attach has
-// installed a world.
+// walking, so the players who see it appear are shown it so, then takes its
+// run stance and enters the zones at its position. It is a no-op until
+// Attach has installed a world.
 func (d *Decoration) Spawn(x, y, z, heading int) {
 	if d.world == nil {
 		return
 	}
 	d.placeMu.Lock()
 	defer d.placeMu.Unlock()
+	d.running.Store(false)
 	d.world.Spawn(d, x, y, z, heading)
+	takeRunStance(&d.running, d.stats, d.sink)
 	d.zones.enter()
+}
+
+// takeRunStance puts a walking fixed-stats NPC in its run stance and shows
+// its observers, through sink, the change: ChangeMoveType when it can move
+// at its run speed, then its info again.
+func takeRunStance(running *atomic.Bool, stats fixedStats, sink event.Sink) {
+	if !running.CompareAndSwap(false, true) || sink == nil {
+		return
+	}
+	if stats.moveSpeed != 0 {
+		sink.Emit(event.MoveTypeChanged{Running: true})
+	}
+	sink.Emit(event.NPCInfoChanged{})
 }
 
 // Despawn takes the decoration out of its zones, while its observers still
@@ -124,7 +144,7 @@ func (d *Decoration) ObjectID() int32 { return d.Instance.ObjectID }
 func (d *Decoration) CollisionRadius() float64 { return d.Instance.Template.CollisionRadius }
 
 func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
-	return fixedNPCInfoSnapshot(d.Instance, d.stats, &d.Presence, d.zones.moveType())
+	return fixedNPCInfoSnapshot(d.Instance, d.stats, &d.Presence, d.zones.moveType(), d.running.Load())
 }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
@@ -140,9 +160,14 @@ func (d *Decoration) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 }
 
 // fixedNPCInfoSnapshot is the client view of an NPC with fixed stats,
-// standing where p is and moving by moveType.
-func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, moveType int) npcinfo.Snapshot {
+// standing where p is, moving by moveType, in its run stance when running
+// and its walk stance otherwise.
+func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, moveType int, running bool) npcinfo.Snapshot {
 	t := inst.Template
+	moveMultiplier := stats.walkMoveMultiplier
+	if running {
+		moveMultiplier = stats.moveMultiplier
+	}
 	x, y, z := p.Position()
 	name := ""
 	if t.UsingServerSideName {
@@ -153,11 +178,11 @@ func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, m
 		X: x, Y: y, Z: z, Heading: p.Heading(),
 		MAtkSpd: stats.mAtkSpd, PAtkSpd: stats.pAtkSpd,
 		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
-		MoveMultiplier: stats.moveMultiplier, AtkSpdMultiplier: stats.atkSpdMultiplier,
+		MoveMultiplier: moveMultiplier, AtkSpdMultiplier: stats.atkSpdMultiplier,
 		MoveType:        moveType,
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
-		Running: true, SummonAnimation: 2, Name: name, Title: inst.Title(),
+		Running: running, SummonAnimation: 2, Name: name, Title: inst.Title(),
 	}
 }
 
@@ -169,6 +194,8 @@ func (d *Decoration) Kind() actor.Kind { return actor.KindNPC }
 type fixedStats struct {
 	maxHP, pAtkSpd, mAtkSpd          int
 	moveMultiplier, atkSpdMultiplier float64
+	// walkMoveMultiplier is moveMultiplier in the walk stance.
+	walkMoveMultiplier float64
 	// moveSpeed is the speed the NPC runs at.
 	moveSpeed float64
 	// template and mods are what every other stat is finalized from: the
@@ -192,15 +219,22 @@ func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, erro
 	fs.pAtkSpd = int(fs.calc(stat.PowerAttackSpeed, t.AtkSpd))
 	fs.mAtkSpd = int(fs.calc(stat.MagicAttackSpeed, magicAttackSpeedBase))
 	fs.atkSpdMultiplier = npcinfo.AttackSpeedMultiplier(fs.pAtkSpd, t.AtkSpd)
-	// The move speed over the run speed, as a moving NPC in its run stance
-	// computes it; 0 for an NPC whose base is 0.
-	base := int(t.RunSpeed)
-	if base != 0 {
-		speed := float32(fs.calc(stat.RunSpeed, float64(base)))
-		fs.moveMultiplier = float64(speed / float32(base))
-		fs.moveSpeed = float64(speed)
-	}
+	// The move speed over the stance's base speed, as a moving NPC computes
+	// it; 0 for a stance whose base is 0.
+	fs.moveSpeed, fs.moveMultiplier = fs.stanceSpeed(int(t.RunSpeed))
+	_, fs.walkMoveMultiplier = fs.stanceSpeed(int(t.WalkSpeed))
 	return fs, nil
+}
+
+// stanceSpeed is the move speed over the stance base speed base, narrowed
+// to float32 like the client-facing speed, and that speed over base; both
+// are 0 when base is 0.
+func (fs fixedStats) stanceSpeed(base int) (speed, multiplier float64) {
+	if base == 0 {
+		return 0, 0
+	}
+	s := float32(fs.calc(stat.RunSpeed, float64(base)))
+	return float64(s), float64(s / float32(base))
 }
 
 // calc finalizes base for s through the builtin stat funcs and the

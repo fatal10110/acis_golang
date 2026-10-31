@@ -60,8 +60,8 @@ func TestChristmasTreeClickAnswersActionFailed(t *testing.T) {
 }
 
 // TestDecorationNpcInfoCarriesItsFixedStats pins the speeds a placed
-// Christmas Tree is shown with. It is a civilian NPC spawned in the run
-// stance (Npc.onSpawn), so its NpcInfo carries the standard NPC stats:
+// Christmas Tree is shown with once it takes its run stance (Npc.onSpawn),
+// in its last spawn NpcInfo: the standard NPC stats,
 // C.Spd 333 times the WIT 20 bonus 1.0, P.Spd the template 300 times the
 // DEX 30 bonus 1.1, the running flag, the movement multiplier 60 * 1.1
 // over the run base 60 and the attack speed multiplier
@@ -70,8 +70,15 @@ func TestDecorationNpcInfoCarriesItsFixedStats(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: treeKitID, Count: 1})
 	h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))
-	frame := mustRead(t, h.client, "tree NPCInfo")
-	assertFrameOpcode(t, frame, serverpackets.OpcodeNPCInfo, "tree NPCInfo")
+	var frame []byte
+	for _, f := range drainFrames(t, h.client) {
+		if f[0] == serverpackets.OpcodeNPCInfo {
+			frame = f
+		}
+	}
+	if frame == nil {
+		t.Fatal("placing the tree showed no NpcInfo")
+	}
 
 	r := wire.NewReader(frame[1:])
 	for range 8 { // id, template, attackable, x, y, z, heading, 0

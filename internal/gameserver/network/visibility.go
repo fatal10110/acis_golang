@@ -108,7 +108,7 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 	case *npc.Decoration:
 		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 	case *npc.EffectPoint:
-		// A signet point never walks, and its casts are its own broadcasts,
+		// A signet point never moves, and its casts are its own broadcasts,
 		// not a cast in flight: it is shown with its NpcInfo alone.
 		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 	case *npc.Folk:

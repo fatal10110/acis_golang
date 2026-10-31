@@ -2,6 +2,7 @@ package npc
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -34,6 +35,9 @@ type EffectPoint struct {
 	stats fixedStats
 	// zones is its zone membership; SetZones gives it the zone index.
 	zones *zoneMember
+	// running is its run stance, which Spawn sets under placeMu; observers
+	// read it from their own queues.
+	running atomic.Bool
 	// placeMu serializes Spawn and Despawn: the caster spawning the point
 	// and its own queue removing it (its effect ending, //unspawnall) run
 	// on different queues, and a removal landing between the spawn and its
@@ -82,7 +86,7 @@ func (ep *EffectPoint) swimStateChanged(bool) {
 
 // NPCInfoSnapshot captures the point's client view.
 func (ep *EffectPoint) NPCInfoSnapshot() npcinfo.Snapshot {
-	return fixedNPCInfoSnapshot(ep.Instance, ep.stats, &ep.Presence, ep.zones.moveType())
+	return fixedNPCInfoSnapshot(ep.Instance, ep.stats, &ep.Presence, ep.zones.moveType(), ep.running.Load())
 }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
@@ -136,16 +140,19 @@ func (ep *EffectPoint) Attach(rt Runtime) {
 // Kind reports KindNPC.
 func (ep *EffectPoint) Kind() actor.Kind { return actor.KindNPC }
 
-// Spawn places the actor in the world at (x, y, z), facing heading, then
-// enters the zones at its position. It is a no-op until Attach has
-// installed a world.
+// Spawn places the actor in the world at (x, y, z), facing heading,
+// walking, so the players who see it appear are shown it so, then takes its
+// run stance and enters the zones at its position. It is a no-op until
+// Attach has installed a world.
 func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	if ep.world == nil {
 		return
 	}
 	ep.placeMu.Lock()
 	defer ep.placeMu.Unlock()
+	ep.running.Store(false)
 	ep.world.Spawn(ep, x, y, z, heading)
+	takeRunStance(&ep.running, ep.stats, ep.sink)
 	ep.zones.enter()
 }
 
