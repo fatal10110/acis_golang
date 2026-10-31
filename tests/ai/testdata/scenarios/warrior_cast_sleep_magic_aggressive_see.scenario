@@ -1,0 +1,16 @@
+# WarriorCastSleepMagicAggressive (20048, level 20, sleep 4046-2), every draw 0: a character it sees
+# 300 away is attacked (200); it casts nothing of its own on sight.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagicAggressive
+npc sleeper 20048 Monster 300 0 0 level 20 aggro 1000 skill SLEEP_MAGIC 4046 2
+roll sleeper 99
+
+away
+approach sleeper 300
+  desires sleeper attack(player)=200

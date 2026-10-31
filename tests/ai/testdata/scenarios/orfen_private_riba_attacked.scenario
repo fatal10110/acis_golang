@@ -1,0 +1,23 @@
+# OrfenPrivateRiba (29017, level 1), every draw 0: hit by the character (level 20, more than 8 above it), it
+# wants the raid curse on it (4515-1, 1000000) and neither hate nor an attack desire (its hook replaces its
+# parents'). Seeing the character cast Ultimate Debuff (4694) on a monster, it also wants the raid mute (4215-1)
+# on it.
+character Hunter 20
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.OrfenPrivateRiba
+npc riba 29017 Monster 100 0 0 level 1 skill DEBUFF 4515 1 skill DEBUFF2 4215 1
+npc wolf 20120 Monster 150 0 0
+
+hit riba 10
+  desires riba cast(player,4515,move)=1000000
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires riba cast(player,4215,move)=1000000 cast(player,4515,move)=1000000

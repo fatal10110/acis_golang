@@ -1,0 +1,17 @@
+# RaidPrivateWizard (25002, level 1) raised for a level 20 master, every draw 0: the character at
+# its master's level is not 8 levels over it, so a hit on a wizard has its fellow want the debuff (twice) and
+# the magic strike, and attack the character with the damage over its level plus 7 times 20000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard
+npc master 20003 Monster 400 0 0 level 20
+npc wizard1 25002 Monster 100 0 0 skill DD_MAGIC_A 4191 2 skill DEBUFF_A 4198 2 master master
+npc wizard2 25002 Monster -100 0 0 skill DD_MAGIC_A 4191 2 skill DEBUFF_A 4198 2 master master
+
+hit wizard1 16
+  S MagicSkillUse caster=wizard1 target=player skill=4198-2 hit=3303 reuse=0 success=0
+  S MagicSkillUse caster=wizard2 target=player skill=4198-2 hit=3303 reuse=0 success=0
+  desires wizard2 attack(player)=40000 cast(player,4191,move)=1000000 cast(player,4198,move)=2000000

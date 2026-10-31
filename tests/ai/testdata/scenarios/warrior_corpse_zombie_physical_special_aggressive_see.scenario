@@ -1,0 +1,18 @@
+# WarriorCorpseZombiePhysicalSpecialAggressive (21408, level 80), every draw 0: a character it sees 300 away is
+# attacked (200); its template does not teleport and the child adds no cast.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombie
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecialAggressive
+npc zombie 21408 Monster 300 0 0 level 80 aggro 1000 skill SELF_RANGE_DEBUFF 4036 9 skill PHYSICAL_SPECIAL 4579 9
+roll zombie 99
+
+tick x8
+away
+approach zombie 300
+  desires zombie attack(player)=200

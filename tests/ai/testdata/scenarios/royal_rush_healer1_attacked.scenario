@@ -1,0 +1,13 @@
+# RoyalRushHealer1 (18132, level 81, its shipped skills), every draw 0: a hit by the character wants its range
+# debuff (4640-9) on it (1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer1
+npc healer 18132 Monster 300 0 0 level 81 skill W_SELF_RANGE_DD_MAGIC 4569 9 skill W_RANGE_HEAL 4613 9 skill W_RANGE_DEBUFF 4640 9
+
+hit healer 10
+  desires healer cast(player,4640,move)=1000000
