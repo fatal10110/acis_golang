@@ -1,12 +1,15 @@
 # TriolCamera (13015): script event 3 plays BS04_A bound to the camera and keeps the creature it
 # names; the five camera shots follow 1 s, 1.3 s, 1.6 s, 11 s and 16 s later, and six seconds
-# after the last the camera tells the NPCs near it the scene is over. An event 3 that names no
-# creature films the same shots.
+# after the last the camera tells the NPCs near it the scene is over (event 4, naming the
+# creature); the trace has the Ritual Offering (32038), whose script answers none but its event
+# 3, hear it. An event 3 that names no creature films the same shots.
 trace internal/gameserver/script/testdata/oracle/scenarios/triol_camera.golden
 character Hunter 20
 script script.ai.individual.DefaultNpc
 script script.ai.individual.TriolCamera
+script script.ai.individual.SacrificialVictim
 npc camera 13015 Folk 100 0 0
+npc listener 32038 Folk 200 0 0
 
 event camera 3 character 0
   S PlaySound type=1 file=BS04_A bind=1 obj=camera loc=110,20,30 delay=0

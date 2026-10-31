@@ -32,7 +32,7 @@ S ActionFailed 25
 // replay theirs, and a player memo write is an M line, not a Q line.
 func TestCheckTraceReplaysKillsHitsAndAdvances(t *testing.T) {
 	sc := traceScenario(t, "random always 0\nkill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\n  M set Q260_OneTimeQuestFlag | true\nhit wolf 10\n  S ActionFailed\nadvance 1500ms\n  S ActionFailed\nrelog\n")
-	draws, err := checkTrace(sc, []byte(stepsTrace), nil)
+	draws, _, err := checkTrace(sc, []byte(stepsTrace), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestCheckTraceNamesADepartureOfAKillHitOrAdvance(t *testing.T) {
 		{"missing timer packet", "kill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\n  M set Q260_OneTimeQuestFlag | true\nhit wolf 10\n  S ActionFailed\nadvance 1500ms\n", "scenario packet 1 missing"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := checkTrace(traceScenario(t, tc.steps), []byte(stepsTrace), nil)
+			_, _, err := checkTrace(traceScenario(t, tc.steps), []byte(stepsTrace), nil)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("checkTrace error = %v, want one containing %q", err, tc.want)
 			}

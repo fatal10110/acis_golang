@@ -62,7 +62,7 @@ relog
 // the trace's restart, character select and enter world, whose packets are
 // not compared, an enter its character select and enter world.
 func TestCheckTraceReplaysEveryStepVerb(t *testing.T) {
-	if _, err := checkTrace(traceScenario(t, flowSteps), []byte(flowTrace), nil); err != nil {
+	if _, _, err := checkTrace(traceScenario(t, flowSteps), []byte(flowTrace), nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -78,7 +78,7 @@ func TestCheckTraceNamesADepartureOfACreatedCharacter(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			steps := strings.Replace(flowSteps, tc.from, tc.to, 1)
-			_, err := checkTrace(traceScenario(t, steps), []byte(flowTrace), nil)
+			_, _, err := checkTrace(traceScenario(t, steps), []byte(flowTrace), nil)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("checkTrace error = %v, want one containing %q", err, tc.want)
 			}
@@ -90,11 +90,11 @@ func TestCheckTraceNamesADepartureOfACreatedCharacter(t *testing.T) {
 // them all, while another trace may cover the first steps only.
 func TestCheckTraceRequiresAProbeTraceToCoverEveryStep(t *testing.T) {
 	sc := traceScenario(t, flowSteps+"advance 1s\n")
-	if _, err := checkTrace(sc, []byte(flowTrace), nil); err != nil {
+	if _, _, err := checkTrace(sc, []byte(flowTrace), nil); err != nil {
 		t.Fatalf("a trace of the first steps: %v", err)
 	}
 	sc.Trace = probeTraces + "flow.golden"
-	_, err := checkTrace(sc, []byte(flowTrace), nil)
+	_, _, err := checkTrace(sc, []byte(flowTrace), nil)
 	if want := `the trace ends before step 8 (line 18) "advance 1s"`; err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("checkTrace error = %v, want one containing %q", err, want)
 	}

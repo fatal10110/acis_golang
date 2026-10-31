@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import net.sf.l2j.commons.mmocore.ProbeWire;
 import net.sf.l2j.commons.probe.ProbeClock;
+import net.sf.l2j.commons.probe.ProbeHeard;
 import net.sf.l2j.commons.pool.ConnectionPool;
 import net.sf.l2j.commons.pool.ThreadPool;
 import net.sf.l2j.commons.random.Rnd;
@@ -372,6 +373,12 @@ final class ScenarioTrace
 				if (!t._muted)
 					t._lines.add("# draw " + d);
 			});
+			// The script events an NPC hears, from a script's send or broadcast, are the step's lines.
+			ProbeHeard.listen((npc, id, a1, a2) ->
+			{
+				if (!t._muted)
+					t._lines.add("# heard " + npc.getNpcId() + " (object " + npc.getObjectId() + ") " + id + " " + a1 + " " + a2);
+			});
 			t.restrict(loaded);
 			ConnectionPool.keep(KEPT);
 			ProbeClock.virtual(WALL + t._clock);
@@ -388,6 +395,7 @@ final class ScenarioTrace
 			finally
 			{
 				Rnd.endScriptCallers();
+				ProbeHeard.listen(null);
 				stop();
 				t.restore();
 				failures = ConnectionPool.forget();
@@ -1413,7 +1421,16 @@ final class ScenarioTrace
 	{
 		final Npc npc = npc(role);
 		_lines.add("# event " + npc.getNpcId() + " (object " + npc.getObjectId() + ") " + id + " " + a1 + " " + a2);
-		npc.sendScriptEvent(Integer.parseInt(id), ref(a1), ref(a2));
+		// The step's own delivery is its line; what a script sends in answer is heard.
+		ProbeHeard.own(npc);
+		try
+		{
+			npc.sendScriptEvent(Integer.parseInt(id), ref(a1), ref(a2));
+		}
+		finally
+		{
+			ProbeHeard.own(null);
+		}
 		ThreadPool.advance(0);
 	}
 

@@ -17,14 +17,14 @@ S ActionFailed 25
 // the scenario writes them.
 func TestCheckTraceReplaysAnEventStep(t *testing.T) {
 	sc := traceScenario(t, "event wolf 7 character 0\n  S ActionFailed\n")
-	if _, err := checkTrace(sc, []byte(eventTrace), nil); err != nil {
+	if _, _, err := checkTrace(sc, []byte(eventTrace), nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []struct{ name, step, want string }{
 		{"other id", "event wolf 8 character 0\n", `the step sends "event 20120 8 character 0"`},
 		{"other argument", "event wolf 7 0 0\n", `the step sends "event 20120 7 0 0"`},
 	} {
-		_, err := checkTrace(traceScenario(t, c.step+"  S ActionFailed\n"), []byte(eventTrace), nil)
+		_, _, err := checkTrace(traceScenario(t, c.step+"  S ActionFailed\n"), []byte(eventTrace), nil)
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: checkTrace error = %v, want one containing %q", c.name, err, c.want)
 		}

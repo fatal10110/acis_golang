@@ -345,7 +345,10 @@
 // along with it, in place of its ActionFailed lines and teleport, which then
 // count among the n.
 // The script draws the trace pins (needing a random line) must be those the
-// run's same steps draw: the same bounds, in order. A trace under the
+// run's same steps draw: the same bounds, in order. So must the script
+// events its NPCs hear from a script's send or broadcast (not the event
+// step's own): the same set in each step, the receiver and an argument that
+// is an object id named by role. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
 // scenario itself (the oracle README). The trace format has no member,
 // ground or look, so a traced scenario takes no member or ground line, and

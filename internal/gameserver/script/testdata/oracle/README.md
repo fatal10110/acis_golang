@@ -163,6 +163,14 @@ what the reference does in the scenario's own world:
   ...) are not read: the probe plays the shipped template;
 - an `event <role> <id> <arg1> <arg2>` step sends the NPC of that role the script event
   (`Npc.sendScriptEvent`) and runs what it queued now, without moving the virtual clock;
+- the script events an NPC hears from a script's send or broadcast (`Npc.sendScriptEvent`,
+  `Quest.broadcastScriptEvent`, `broadcastScriptEventEx`; the build routes the three delivery
+  loops through `ProbeHeard.deliver`) are `# heard` lines of the step that caused them, one per
+  quest that runs, whatever step or timer sent them. The event step's own delivery is its `# event`
+  line, not a heard one. The Go run compares them per step as a sorted set, the receiver and
+  an argument named by role: the order the NPCs around a broadcast hear it in follows each side's
+  known list. The maker script events (`onMakerScriptEvent`) are not traced: the probe builds no
+  NPC maker (#4337);
 - a client packet step is followed by 500 ms of virtual time (the `T 500` line) and a kill
   by seven such ticks; the Go run settles the queues after a packet instead and moves its clock
   only for a kill and an `advance` step, so a timer a script starts in a packet step needs an
@@ -346,6 +354,8 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # tick                          a scenario trace: one run of the NPC AI task
 # event <npc id> (object <id>) <id> <arg1> <arg2>   a scenario trace: the NPC is sent a script event
                                 (the arguments as the scenario writes them)
+# heard <npc id> (object <id>) <id> <arg1> <arg2>   a scenario trace: the NPC hears a script event a script
+                                sent or broadcast (the arguments as numbers; an object id is a role to the Go run)
 # live <npc id> <count>         a scenario trace: how many living NPCs of that template the world
                                 holds once the step is over (the step's live line)
 # spawned <npc id> <x>,<y> ...   a scenario trace: where the living NPCs of that template that

@@ -116,14 +116,14 @@ func TestCheckTraceDefersThePlayersTeleportOffItsQueue(t *testing.T) {
 		msg = "  S SystemMessage id=302 3:1659\n"
 	)
 	sc := traceScenario(t, "bypass Quest X 1\n"+af+tp+af+msg+af+tp)
-	if _, err := checkTrace(sc, []byte(teleportTrace), nil); err != nil {
+	if _, _, err := checkTrace(sc, []byte(teleportTrace), nil); err != nil {
 		t.Fatal(err)
 	}
 	for name, steps := range map[string]string{
 		"the talk's teleport deferred":  af + af + tp + msg + af + tp,
 		"the tick's in the reference's": af + tp + af + af + tp + msg,
 	} {
-		_, err := checkTrace(traceScenario(t, "bypass Quest X 1\n"+steps), []byte(teleportTrace), nil)
+		_, _, err := checkTrace(traceScenario(t, "bypass Quest X 1\n"+steps), []byte(teleportTrace), nil)
 		if err == nil || !strings.Contains(err.Error(), "scenario packet") {
 			t.Errorf("%s: checkTrace error = %v, want a packet difference", name, err)
 		}
@@ -191,14 +191,14 @@ func TestCheckTraceKeepsAnOwnQueueTicksTeleportInCall(t *testing.T) {
 		msg = "  S SystemMessage id=302 3:1659\n"
 	)
 	sc := traceScenario(t, "bypass Quest X 1\n  queue own own\n"+af+tp+af+af+tp+msg)
-	if _, err := checkTrace(sc, []byte(teleportTrace), nil); err != nil {
+	if _, _, err := checkTrace(sc, []byte(teleportTrace), nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ name, steps, want string }{
 		{"deferred anyway", "  queue own own\n" + af + tp + af + msg + af + tp, "scenario packet"},
 		{"one task named", "  queue own\n" + af + tp + af + af + tp + msg, "queue line names 1 tasks, the trace has 2"},
 	} {
-		_, err := checkTrace(traceScenario(t, "bypass Quest X 1\n"+tc.steps), []byte(teleportTrace), nil)
+		_, _, err := checkTrace(traceScenario(t, "bypass Quest X 1\n"+tc.steps), []byte(teleportTrace), nil)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: checkTrace error = %v, want %q", tc.name, err, tc.want)
 		}
