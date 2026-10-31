@@ -353,22 +353,22 @@ var scenarioScripts = script.Catalog{
 
 	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss2": warrior.RoyalRushRoomBoss2,
 	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss5": warrior.RoyalRushRoomBoss5,
-	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.OrfenPrivateRiba": warrior.OrfenPrivateRiba,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.OrfenPrivateRiba":     warrior.OrfenPrivateRiba,
 
 	"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardSaintAggressive": wizard.PartyLeaderSaintAggressive,
-	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard": wizard.PartyPrivate,
-	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2": wizard.PartyPrivateDD2,
-	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Curse": wizard.PartyPrivateDD2Curse,
-	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Heal": wizard.PartyPrivateDD2Heal,
+	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard":              wizard.PartyPrivate,
+	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2":           wizard.PartyPrivateDD2,
+	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Curse":      wizard.PartyPrivateDD2Curse,
+	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Heal":       wizard.PartyPrivateDD2Heal,
 
-	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardDDMagic2Hold": wizard.RoyalRushDDMagic2Hold,
-	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.RoyalRushWizardRangeDebuff": wizard.RoyalRushRangeDebuff,
-	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffRangeCurse": wizard.CastClanBuffRangeCurse,
-	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro": wizard.CorpseNecro,
+	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardDDMagic2Hold":                                  wizard.RoyalRushDDMagic2Hold,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.RoyalRushWizardRangeDebuff":                    wizard.RoyalRushRangeDebuff,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffRangeCurse":                  wizard.CastClanBuffRangeCurse,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro":           wizard.CorpseNecro,
 	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroAggressive": wizard.CorpseNecroAggressive,
-	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive": wizard.DDMagic2DispellAggressive,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive":               wizard.DDMagic2DispellAggressive,
 
-	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer1": wizard.RoyalRushHealer1,
+	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer1":              wizard.RoyalRushHealer1,
 	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardShortSelfRange": wizard.RoyalRushShortSelfRange,
 }
 
