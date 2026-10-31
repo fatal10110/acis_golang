@@ -519,7 +519,7 @@ apply}.go` ~15 optional ifaces → required on the actor type they consume. `att
 ### Verification (C)
 
 ```bash
-rg -n "\.\(interface\{" acis_golang/internal acis_golang/cmd --type go -g '!*_test.go'                    # expect 0 repo-wide (zone/form.go Vertices may remain: 1)
+rg -n "\.\(interface\{" acis_golang/internal acis_golang/cmd --type go -g '!*_test.go'                    # expect only the 4 sites commented `accepted:` (ReleaseID x3, zone/form.go Vertices); internal/testsupport harness asserts are test code
 rg -n "creature\.DeathActor|\.OwnerCombatant\(\)|\.ActingPlayer\(\)" acis_golang/internal --type go -g '!*_test.go'   # expect 0
 go -C acis_golang list -f '{{join .Imports "\n"}}' ./internal/gameserver/model/actor/attackable | rg internal   # only model/actor
 rg -c "^type [a-z][A-Za-z]* interface" acis_golang/internal/gameserver/model/actor -g '!*_test.go'          # expect ≤ 15 (from 52), each with a test double or ≥2 impls

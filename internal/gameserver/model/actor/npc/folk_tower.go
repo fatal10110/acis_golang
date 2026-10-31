@@ -211,9 +211,14 @@ func actingClanID(attacker skilltarget.Actor) (int32, bool) {
 	default:
 		return 0, false
 	}
-	member, ok := acting.(interface{ ClanID() int32 })
+	member, ok := acting.(clanPlayer)
 	if !ok {
 		return 0, false
 	}
 	return member.ClanID(), true
+}
+
+// clanPlayer is a player that tells its clan.
+type clanPlayer interface {
+	ClanID() int32
 }

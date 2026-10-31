@@ -102,8 +102,13 @@ func (p *Player) SiegeSummon() bool { return false }
 
 // SiegeSummon reports whether the creature is a siege summon.
 func (c *creature) SiegeSummon() bool {
-	s, ok := tracked(c).(interface{ SiegeSummon() bool })
+	s, ok := tracked(c).(siegeSummoner)
 	return ok && s.SiegeSummon()
+}
+
+// siegeSummoner is a creature that tells whether it is a siege summon.
+type siegeSummoner interface {
+	SiegeSummon() bool
 }
 
 func (c *creature) loc() Loc { return locOf(c) }
@@ -158,11 +163,16 @@ func (n *NPC) TeleportTo(at Place) {
 // sent: the players around keep the way they saw it face, and those that
 // next see it, as when it arrives from a teleport, see it face heading.
 func (n *NPC) SetHeading(heading int) {
-	h, ok := n.combatant().(interface{ SetHeading(int) })
+	h, ok := n.combatant().(headingSetter)
 	if !ok {
 		panic("script: the heading of a handle on nothing")
 	}
 	h.SetHeading(heading)
+}
+
+// headingSetter is a creature that turns where it stands.
+type headingSetter interface {
+	SetHeading(heading int)
 }
 
 // jumpTeleporter is a creature an ordinary teleport moves where a jump

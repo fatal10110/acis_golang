@@ -45,9 +45,7 @@ func (p *Player) HoldsWeapon() bool { return p.RightHandItemID() != 0 }
 // HoldsWeapon reports whether the creature holds an item in its right hand:
 // only a pet does, from its own inventory; a servitor holds none.
 func (c *creature) HoldsWeapon() bool {
-	pet, ok := tracked(c).(interface {
-		PetInventory() *itemcontainer.Inventory
-	})
+	pet, ok := tracked(c).(inventoryPet)
 	if !ok {
 		return false
 	}

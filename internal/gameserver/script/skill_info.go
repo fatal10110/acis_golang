@@ -94,20 +94,20 @@ func (k SkillInfo) Element() skill.Element { return k.def.Element }
 // Magic reports whether the skill is magic.
 func (k SkillInfo) Magic() bool { return k.def.Magic }
 
-// effectActor is c as an effect participant: a player's character, an
-// NPC or a summon as the world tracks it. A handle on nothing panics.
-func effectActor(c Creature) interface {
+// effectParticipant is a creature that gives and takes effects.
+type effectParticipant interface {
 	effect.Actor
 	skillhandler.Actor
-} {
+}
+
+// effectActor is c as an effect participant: a player's character, an
+// NPC or a summon as the world tracks it. A handle on nothing panics.
+func effectActor(c Creature) effectParticipant {
 	t := tracked(c)
 	if h, ok := t.(player.CharacterHolder); ok {
 		return h.PlayerCharacter()
 	}
-	a, ok := t.(interface {
-		effect.Actor
-		skillhandler.Actor
-	})
+	a, ok := t.(effectParticipant)
 	if !ok {
 		panic(fmt.Sprintf("script: effects of %T", t))
 	}

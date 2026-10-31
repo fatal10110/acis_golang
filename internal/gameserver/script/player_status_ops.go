@@ -64,7 +64,7 @@ func (p *Player) StartedQuests() int { return p.character().Quests().Started() }
 // weapon, its class's fists when that hand is empty; an NPC's template
 // weapon; WeaponNone for a creature that has no attack type.
 func AttackType(c Creature) item.WeaponType {
-	if a, ok := tracked(c).(interface{ AttackType() item.WeaponType }); ok {
+	if a, ok := tracked(c).(attackTyper); ok {
 		return a.AttackType()
 	}
 	if h, ok := tracked(c).(player.CharacterHolder); ok {
@@ -84,8 +84,18 @@ func Riding(c Creature) bool {
 // PetControlItemID returns the object id of the item that summons c, a
 // pet; 0 for a servitor and any other creature.
 func PetControlItemID(c Creature) int32 {
-	if s, ok := tracked(c).(interface{ ControlItemID() int32 }); ok {
+	if s, ok := tracked(c).(controlItemPet); ok {
 		return s.ControlItemID()
 	}
 	return 0
+}
+
+// attackTyper is a creature that tells the weapon type it attacks with.
+type attackTyper interface {
+	AttackType() item.WeaponType
+}
+
+// controlItemPet is a summon called up by an item: a pet.
+type controlItemPet interface {
+	ControlItemID() int32
 }
