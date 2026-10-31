@@ -19,4 +19,4 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 	done
 	sed -e "/@@SUBPLEDGES@@/{r $out/sub" -e "d}" -e "/@@ATWAR@@/{r $out/war" -e "d}" ClanCopy.java.tmpl > $out/ClanCopy.java
 	javac -nowarn -d $out $out/ClanCopy.java OrderProbe.java
-	java -cp $out OrderProbe' > "$here/../order.golden"
+	java --add-opens java.base/java.util.concurrent=ALL-UNNAMED -cp $out OrderProbe' > "$here/../order.golden"

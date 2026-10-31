@@ -37,13 +37,13 @@ func TestRestoreWarsAndSubunits(t *testing.T) {
 	knights, _ := table.Get(1)
 	rivals, _ := table.Get(2)
 	others, _ := table.Get(3)
-	if _, attacked := rivals.attackers[1]; !knights.AtWarWith(2) || !attacked || rivals.AtWarWith(1) {
+	if attacked := rivals.attackers.has(1); !knights.AtWarWith(2) || !attacked || rivals.AtWarWith(1) {
 		t.Fatal("stored war 1 -> 2 not restored from both sides")
 	}
 	if got := knights.WarList(); !slices.Equal(got, []int32{2}) {
 		t.Fatalf("Knights' war list = %v, want [2]", got)
 	}
-	if _, attacked := others.attackers[1]; knights.AtWarWith(3) || attacked {
+	if attacked := others.attackers.has(1); knights.AtWarWith(3) || attacked {
 		t.Fatal("penalty row restored as a war")
 	}
 	if knights.warPenalties[3] != nowMs+1 {
