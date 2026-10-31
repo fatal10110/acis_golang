@@ -24,7 +24,7 @@ const (
 // becomes a tree bucket, which lists its ids newest first and keeps the
 // order of its ids when the table doubles. A tree bucket that has shrunk
 // to a few ids turns back into a chain on removal, depending on the shape
-// of the tree; that is not modeled (#4341): the bucket stays a tree here
+// of the tree; that is not modeled (#4362): the bucket stays a tree here
 // until the table doubles with six or fewer ids left in it.
 //
 // The zero value is an empty set. It is not safe for concurrent use; the

@@ -25,7 +25,7 @@ Line formats:
   64 buckets grow early, and from 64 buckets it becomes a tree bucket (newest id first). The
   probe stops removing once a tree bucket exists (read through reflection, hence
   `--add-opens` in `run.sh`): a tree bucket that has shrunk turns back into a chain depending
-  on the shape of its tree, which `warSet` does not model (tracked in #4341).
+  on the shape of its tree, which `warSet` does not model (tracked in #4362).
 - `sub <types, ascending> => <iteration order of the registry>`: every subset of the seven
   sub-unit types.
 

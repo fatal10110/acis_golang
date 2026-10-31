@@ -1,0 +1,131 @@
+mode 0 0:MODIFIABLE
+mode 1 0:MODIFIABLE
+mode 2 0:MODIFIABLE
+mode 3 0:MODIFIABLE
+mode 4 0:MODIFIABLE
+mode 5 0:MODIFIABLE
+mode 6 0:MODIFIABLE 1:APPROVED
+mode 7 0:APPROVED
+mode 8 0:APPROVED
+mode 9 0:APPROVED
+mode 10 0:APPROVED
+mode 11 0:APPROVED
+mode 12 0:APPROVED
+mode 13 0:APPROVED
+mode 14 0:APPROVED
+mode 15 0:APPROVED
+mode 16 0:APPROVED
+mode 17 0:APPROVED
+mode 18 0:APPROVED
+mode 19 0:APPROVED
+mode 20 0:MAINTENANCE 6:MODIFIABLE
+mode 21 0:APPROVED 6:MODIFIABLE
+mode 22 0:APPROVED 6:MODIFIABLE
+mode 23 0:APPROVED 6:MODIFIABLE
+next MODIFIABLE 00:00:00.000 21600000
+next MODIFIABLE 05:00:30.250 3570000
+next MODIFIABLE 05:59:59.999 1000
+next MODIFIABLE 06:00:00.000 0
+next MODIFIABLE 06:00:00.250 0
+next MODIFIABLE 06:01:00.000 86340000
+next MODIFIABLE 12:30:15.500 62985000
+next MODIFIABLE 19:59:59.999 36001000
+next MODIFIABLE 20:00:00.000 36000000
+next MODIFIABLE 20:02:00.250 35880000
+next MODIFIABLE 20:06:00.250 35640000
+next MODIFIABLE 21:03:00.250 32220000
+next MODIFIABLE 23:59:59.999 21601000
+next MAINTENANCE 00:00:00.000 72360000
+next MAINTENANCE 05:00:30.250 54330000
+next MAINTENANCE 05:59:59.999 50761000
+next MAINTENANCE 06:00:00.000 50760000
+next MAINTENANCE 06:00:00.250 50760000
+next MAINTENANCE 06:01:00.000 50700000
+next MAINTENANCE 12:30:15.500 27345000
+next MAINTENANCE 19:59:59.999 361000
+next MAINTENANCE 20:00:00.000 360000
+next MAINTENANCE 20:02:00.250 240000
+next MAINTENANCE 20:06:00.250 0
+next MAINTENANCE 21:03:00.250 -3420000
+next MAINTENANCE 23:59:59.999 -14039000
+next APPROVED 00:00:00.000 72000000
+next APPROVED 05:00:30.250 53970000
+next APPROVED 05:59:59.999 50401000
+next APPROVED 06:00:00.000 50400000
+next APPROVED 06:00:00.250 50400000
+next APPROVED 06:01:00.000 50340000
+next APPROVED 12:30:15.500 26985000
+next APPROVED 19:59:59.999 1000
+next APPROVED 20:00:00.000 0
+next APPROVED 20:02:00.250 -120000
+next APPROVED 20:06:00.250 -360000
+next APPROVED 21:03:00.250 -3780000
+next APPROVED 23:59:59.999 -14399000
+cost | => 0
+cost 5x10| => 50
+cost none x7| => 1
+cost 5x10,none x7|30x100,100000x30000 => -1294964245
+cost 70000x40000| => -1494967296
+cost 2147483647x2|1x1 => -1
+cost |46341x46341 => -2147479015
+cost 9x9,8x8,none x1|3x3,4x4 => 171
+rollover 100/40/50+10/9/7 3049 0 => warehouse 5103:54,5098:1 income 2063 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 100/40/50+10/9/7 3049 89 => warehouse 5103:54,5098:1 income 2063 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 100/40/50+10/9/7 3049 90 => warehouse 5103:54 income 2063 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 100/40/50+10/9/7 3050 0 => warehouse 5103:54,5098:1 income 2063 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 100/40/50+10/9/7 3050 89 => warehouse 5103:54,5098:1 income 2063 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 100/40/50+10/9/7 3050 90 => warehouse 5103:54 income 2063 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 10/9/7 3049 0 => warehouse 5103:1 income 63 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 10/9/7 3049 89 => warehouse 5103:1 income 63 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 10/9/7 3049 90 => warehouse - income 63 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 10/9/7 3050 0 => warehouse 5103:1 income 63 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 10/9/7 3050 89 => warehouse 5103:1 income 63 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 10/9/7 3050 90 => warehouse - income 63 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 10/0/7 3049 0 => warehouse 5103:9 income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 10/0/7 3049 89 => warehouse 5103:9 income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 10/0/7 3049 90 => warehouse 5103:9 income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 10/0/7 3050 0 => warehouse 5103:9 income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 10/0/7 3050 89 => warehouse 5103:9 income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 10/0/7 3050 90 => warehouse 5103:9 income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 100/100/50 3049 0 => warehouse - income 5000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 100/100/50 3049 89 => warehouse - income 5000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 100/100/50 3049 90 => warehouse - income 5000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 100/100/50 3050 0 => warehouse - income 5000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 100/100/50 3050 89 => warehouse - income 5000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 100/100/50 3050 90 => warehouse - income 5000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 1/0/50 3049 0 => warehouse 5103:1 income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 1/0/50 3049 89 => warehouse 5103:1 income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 1/0/50 3049 90 => warehouse - income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 1/0/50 3050 0 => warehouse 5103:1 income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 1/0/50 3050 89 => warehouse 5103:1 income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 1/0/50 3050 90 => warehouse - income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 0/0/50 3049 0 => warehouse - income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 0/0/50 3049 89 => warehouse - income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 0/0/50 3049 90 => warehouse - income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 0/0/50 3050 0 => warehouse - income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 0/0/50 3050 89 => warehouse - income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 0/0/50 3050 90 => warehouse - income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 3/1/9 3049 0 => warehouse 5103:1 income 9 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 3/1/9 3049 89 => warehouse 5103:1 income 9 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 3/1/9 3049 90 => warehouse 5103:1 income 9 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 3/1/9 3050 0 => warehouse 5103:1 income 9 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 3/1/9 3050 89 => warehouse 5103:1 income 9 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 3/1/9 3050 90 => warehouse 5103:1 income 9 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 30000/30000/100000 3049 0 => warehouse - income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 30000/30000/100000 3049 89 => warehouse - income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 30000/30000/100000 3049 90 => warehouse - income 0 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 30000/30000/100000 3050 0 => warehouse - income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 30000/30000/100000 3050 89 => warehouse - income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 30000/30000/100000 3050 90 => warehouse - income 0 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 50000/20000/100000 3049 0 => warehouse 5103:27000 income 2000000000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 50000/20000/100000 3049 89 => warehouse 5103:27000 income 2000000000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 50000/20000/100000 3049 90 => warehouse 5103:27000 income 2000000000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 50000/20000/100000 3050 0 => warehouse 5103:27000 income 2000000000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 50000/20000/100000 3050 89 => warehouse 5103:27000 income 2000000000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 50000/20000/100000 3050 90 => warehouse 5103:27000 income 2000000000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 2/1/1000+2/1/1000+2/1/1000 3049 0 => warehouse 5103:1,5098:1,5103:1 income 3000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 2/1/1000+2/1/1000+2/1/1000 3049 89 => warehouse 5103:1,5098:1,5103:1 income 3000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 2/1/1000+2/1/1000+2/1/1000 3049 90 => warehouse - income 3000 next empty running 5016:4 | 5073:70 mode MAINTENANCE delay 360000
+rollover 2/1/1000+2/1/1000+2/1/1000 3050 0 => warehouse 5103:1,5098:1,5103:1 income 3000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 2/1/1000+2/1/1000+2/1/1000 3050 89 => warehouse 5103:1,5098:1,5103:1 income 3000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
+rollover 2/1/1000+2/1/1000+2/1/1000 3050 90 => warehouse - income 3000 next 5016:10,5073:100, running 5016:10 | 5073:100 mode MAINTENANCE delay 360000
