@@ -1,0 +1,22 @@
+# WarriorCorpseZombieDDMagicAggressive (21570, level 69, damage magic 4592-6), teleporting (the ai line sets
+# IsTeleport), every draw 0: settled and attacking nobody, a character it sees 300 away makes it abort and
+# teleport onto the character's position and want the teleport skill 4671-1 on it (1000000). It lands outside
+# its spawn territory (the sphere of its drift range), so it adds no attack desire and, 0 away, no damage magic.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombie
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagicAggressive
+npc zombie 21570 Monster 300 0 0 level 69 aggro 1000 skill DD_MAGIC 4592 6 ai IsTeleport=1
+roll zombie 99
+
+tick x8
+away
+approach zombie 300
+  S MagicSkillUse caster=zombie target=player skill=4671-1 hit=0 reuse=0 success=0
+  at zombie 0 0 0
+  desires zombie cast(player,4671,move)=1000000

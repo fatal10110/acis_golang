@@ -1,0 +1,19 @@
+# WarriorCorpseGhostDDMagicAggressive (21562, level 67, damage magic 4596-6; its self buff skill is left off
+# its line, so it casts nothing at first), every draw 0: settled (8 AI ticks) and attacking nobody, a character
+# it sees 300 away is both attacked (200) and hit with its damage magic (1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostDDMagic.WarriorCorpseGhostDDMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostDDMagic.WarriorCorpseGhostDDMagicAggressive
+npc ghost 21562 Monster 300 0 0 level 67 aggro 1000 skill DD_MAGIC 4596 6
+roll ghost 99
+
+tick x8
+away
+approach ghost 300
+  S MagicSkillUse caster=ghost target=player skill=4596-6 hit=10571 reuse=21142 success=0
+  desires ghost attack(player)=200 cast(player,4596,move)=1000000 wander()=5

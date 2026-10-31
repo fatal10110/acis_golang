@@ -339,6 +339,21 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegeguards.GludioHold.GludioSpearGuard":                                                        siegeguard.SpearGuard,
 	"script.ai.siegeguards.GludioStand.GludioBowGuardStand":                                                    siegeguard.BowGuardStand,
 	"script.ai.siegeguards.GludioStand.GludioStand":                                                            siegeguard.Stand,
+
+	"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard": raid.PrivateStandard,
+
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagicAggressive":              warrior.CastHoldMagicAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagic":                      warrior.CastSleepMagic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagicAggressive":            warrior.CastSleepMagicAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplashAggressive":                    warrior.CastSplashAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostDDMagic.WarriorCorpseGhostDDMagic":              warrior.CorpseGhostDDMagic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostDDMagic.WarriorCorpseGhostDDMagicAggressive":    warrior.CorpseGhostDDMagicAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombieDDMagicAggressive":         warrior.CorpseZombieDDMagicAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecialAggressive": warrior.CorpseZombiePhysicalSpecialAggressive,
+
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss2": warrior.RoyalRushRoomBoss2,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss5": warrior.RoyalRushRoomBoss5,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.OrfenPrivateRiba": warrior.OrfenPrivateRiba,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
