@@ -1,0 +1,23 @@
+# Ketra Orc support (KetraOrcSupport): the warehouse keeper of a Ketra Orc ally of level 4 whose private
+# warehouse holds an item answers its warehouse page; the withdrawal event releases the client, opens the
+# withdrawal list, then answers the no-quest page, as the event's answer stays the default.
+# Expectations are derived from the reference source (KetraOrcSupport.onFirstTalk, onAdvEvent) and replay
+# the reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/ketra_support_warehouse.golden
+character Ally 40
+standing 4
+warehouse 7186 1
+script script.feature.KetraOrcSupport
+item 7186
+page script/feature/KetraOrcSupport/
+npc jaff 31374 WarehouseKeeper 10 10 0
+
+action jaff
+action jaff
+  S ActionFailed
+  S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-4.htm
+  S ActionFailed
+bypass Quest KetraOrcSupport Withdraw
+  S ActionFailed
+  S NpcHtmlMessage obj=jaff item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed

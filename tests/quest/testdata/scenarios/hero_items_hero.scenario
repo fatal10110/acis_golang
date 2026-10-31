@@ -1,0 +1,57 @@
+# The hero's weapon and circlet (HeroWeapon, HeroCirclet) at a Monument of Heroes, asked by a hero. The weapon
+# list opens and a pick is given with no page, a second pick too (the list's other links stay open); the
+# monument then says the hero has one (each answer follows the monument's own page, which the bypass needs). An event naming no hero's weapon, or not a number, answers nothing.
+# The circlet is given with a message, then refused as already held.
+# Expectations are derived from the reference source (HeroWeapon.onTalk, onAdvEvent, HeroCirclet.onTalk) and
+# replay the reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/hero_items_hero.golden
+character Champion 76
+hero
+script script.feature.HeroWeapon
+script script.feature.HeroCirclet
+item 6842 6611 6612
+page olympiad/
+page script/feature/HeroWeapon/
+page script/feature/HeroCirclet/
+npc monument 31690 OlympiadManagerNpc 40 0 0
+
+action monument
+action monument
+  S ActionFailed
+  S NpcHtmlMessage obj=monument item=0 html="<html><body>Monument of Heroes:<br>\nYou are a Noblesse. Welcome. I offer many things - but only for Heroes.<br>\n\n<a action=\"bypass -h npc_{monument}_Quest HeroWeapon\">\"I want to receive weapons for a Hero.\"</a><br>\n<a action=\"bypass -h npc_{monument}_Quest HeroCirclet\">\"I want to receive the Wings of Destiny Circlet for Heroes Only.\"</a><br>\n<a action=\"bypass npc_{monument}_Olympiad 4\">\"I want to verify who is the Hero of this era.\"</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{monument}_Quest HeroWeapon
+  S NpcHtmlMessage obj=monument item=0 page=script/feature/HeroWeapon/weapon_list.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest HeroWeapon 6611
+  S SystemMessage id=54 3:6611
+bypass Quest HeroWeapon 6612
+  S SystemMessage id=54 3:6612
+bypass Quest HeroWeapon 6610
+bypass Quest HeroWeapon 6622
+bypass Quest HeroWeapon abc
+action monument
+  S ActionFailed
+  S NpcHtmlMessage obj=monument item=0 html="<html><body>Monument of Heroes:<br>\nYou are a Noblesse. Welcome. I offer many things - but only for Heroes.<br>\n\n<a action=\"bypass -h npc_{monument}_Quest HeroWeapon\">\"I want to receive weapons for a Hero.\"</a><br>\n<a action=\"bypass -h npc_{monument}_Quest HeroCirclet\">\"I want to receive the Wings of Destiny Circlet for Heroes Only.\"</a><br>\n<a action=\"bypass npc_{monument}_Olympiad 4\">\"I want to verify who is the Hero of this era.\"</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{monument}_Quest HeroWeapon
+  S NpcHtmlMessage obj=monument item=0 page=script/feature/HeroWeapon/already_have_weapon.htm
+  S ActionFailed
+  S ActionFailed
+action monument
+  S ActionFailed
+  S NpcHtmlMessage obj=monument item=0 html="<html><body>Monument of Heroes:<br>\nYou are a Noblesse. Welcome. I offer many things - but only for Heroes.<br>\n\n<a action=\"bypass -h npc_{monument}_Quest HeroWeapon\">\"I want to receive weapons for a Hero.\"</a><br>\n<a action=\"bypass -h npc_{monument}_Quest HeroCirclet\">\"I want to receive the Wings of Destiny Circlet for Heroes Only.\"</a><br>\n<a action=\"bypass npc_{monument}_Olympiad 4\">\"I want to verify who is the Hero of this era.\"</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{monument}_Quest HeroCirclet
+  S SystemMessage id=54 3:6842
+  S ActionFailed
+action monument
+  S ActionFailed
+  S NpcHtmlMessage obj=monument item=0 html="<html><body>Monument of Heroes:<br>\nYou are a Noblesse. Welcome. I offer many things - but only for Heroes.<br>\n\n<a action=\"bypass -h npc_{monument}_Quest HeroWeapon\">\"I want to receive weapons for a Hero.\"</a><br>\n<a action=\"bypass -h npc_{monument}_Quest HeroCirclet\">\"I want to receive the Wings of Destiny Circlet for Heroes Only.\"</a><br>\n<a action=\"bypass npc_{monument}_Olympiad 4\">\"I want to verify who is the Hero of this era.\"</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{monument}_Quest HeroCirclet
+  S NpcHtmlMessage obj=monument item=0 page=script/feature/HeroCirclet/already_have_circlet.htm
+  S ActionFailed
+  S ActionFailed
+  items 6842=1

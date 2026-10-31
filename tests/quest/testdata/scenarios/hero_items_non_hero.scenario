@@ -1,0 +1,21 @@
+# The hero's weapon and circlet (HeroWeapon, HeroCirclet) at a Monument of Heroes, asked by a character that is
+# not a hero: the monument offers it only the page that names the hero of the era, which links neither
+# feature, so both bypasses are refused (the bypass check) and nothing is given.
+# Expectations are derived from the reference source (OlympiadManagerNpc.showChatWindow) and replay the
+# reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/hero_items_non_hero.golden
+character Walker 76
+script script.feature.HeroWeapon
+script script.feature.HeroCirclet
+item 6842 6611
+page olympiad/
+npc monument 31690 OlympiadManagerNpc 40 0 0
+
+action monument
+action monument
+  S ActionFailed
+  S NpcHtmlMessage obj=monument item=0 page=olympiad/hero_main2.htm
+  S ActionFailed
+bypass npc_{monument}_Quest HeroWeapon
+bypass npc_{monument}_Quest HeroCirclet
+  items 6842=0
