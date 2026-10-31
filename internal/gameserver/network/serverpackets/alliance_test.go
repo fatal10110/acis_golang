@@ -5,17 +5,6 @@ import (
 	"testing"
 )
 
-// Reference: AskJoinAlly.writeImpl writes C 0xa8, D requester object id, S
-// the name it is given (RequestJoinAlly passes the alliance's name).
-func TestFrameAskJoinAlly(t *testing.T) {
-	got := framePayload(t, FrameAskJoinAlly(0x10000001, "Ally"))
-	want := appendD([]byte{0xa8}, 0x10000001)
-	want = append(want, encodeUTF16Z("Ally")...)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("AskJoinAlly = %x, want %x", got, want)
-	}
-}
-
 // Reference: AllianceInfo.writeImpl writes C 0xb4, S alliance name, D
 // total, D online, S leading clan, S its leader, D clan count, then per
 // clan S name, D 0, D level, S leader, D total, D online.

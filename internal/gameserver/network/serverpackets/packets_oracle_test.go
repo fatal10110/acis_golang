@@ -21,7 +21,7 @@ import (
 // encoder call here under the same name.
 func oracleCases() map[string]func() wire.Frame {
 	tell := int32(2) // the reference chat channel enum's TELL ordinal
-	return map[string]func() wire.Frame{
+	cases := map[string]func() wire.Frame{
 		"GetOnVehicle": func() wire.Frame {
 			return FrameGetOnVehicle(0x0a0b0c0d, 7, location.Location{X: 230, Y: -260, Z: -40})
 		},
@@ -76,6 +76,14 @@ func oracleCases() map[string]func() wire.Frame {
 			})
 		},
 	}
+	// The families probed from plain numbers, strings and creature stand-ins
+	// are in packets_oracle_cases_test.go.
+	for _, family := range []map[string]func() wire.Frame{oracleSimpleCases(), oracleWorldCases()} {
+		for name, build := range family {
+			cases[name] = build
+		}
+	}
+	return cases
 }
 
 // TestPacketsMatchReferenceProbe replays testdata/packets.golden: every line

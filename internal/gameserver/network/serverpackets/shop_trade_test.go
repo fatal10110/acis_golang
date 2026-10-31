@@ -137,27 +137,6 @@ func TestFrameSellList(t *testing.T) {
 	}
 }
 
-func TestFrameTradePackets(t *testing.T) {
-	tests := []struct {
-		name string
-		got  []byte
-		want []byte
-	}{
-		{"request", framePayload(t, FrameSendTradeRequest(42)), []byte{OpcodeSendTradeRequest, 42, 0, 0, 0}},
-		{"done success", framePayload(t, FrameSendTradeDone(true)), []byte{OpcodeSendTradeDone, 1, 0, 0, 0}},
-		{"done failure", framePayload(t, FrameSendTradeDone(false)), []byte{OpcodeSendTradeDone, 0, 0, 0, 0}},
-		{"press own", framePayload(t, FrameTradePressOwnOk()), []byte{OpcodeTradePressOwnOk}},
-		{"press other", framePayload(t, FrameTradePressOtherOk()), []byte{OpcodeTradePressOtherOk}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if !bytes.Equal(tt.got, tt.want) {
-				t.Fatalf("%s = %x, want %x", tt.name, tt.got, tt.want)
-			}
-		})
-	}
-}
-
 func TestFrameTradeStartAndAdd(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 57, Kind: item.KindEtcItem, Slot: item.SlotNone, Tradable: true},
