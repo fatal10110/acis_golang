@@ -47,6 +47,11 @@ func canKeepAttacking(attacker, target attackable.Combatant) bool {
 
 // betrayed reports whether c is a summon turned on its owner.
 func betrayed(c attackable.Combatant) bool {
-	summon, ok := c.(interface{ Betrayed() bool })
+	summon, ok := c.(betrayer)
 	return ok && summon.Betrayed()
+}
+
+// betrayer is a summon that tells whether it turned on its owner.
+type betrayer interface {
+	Betrayed() bool
 }
