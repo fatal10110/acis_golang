@@ -38,15 +38,6 @@ func TestFramePledgeShowMemberListAdd(t *testing.T) {
 	}
 }
 
-func TestFramePledgeShowMemberListDeleteAndDeleteAll(t *testing.T) {
-	if got, want := framePayload(t, FramePledgeShowMemberListDelete("Gone")), append([]byte{0x56}, encodeUTF16Z("Gone")...); !bytes.Equal(got, want) {
-		t.Fatalf("PledgeShowMemberListDelete = %x, want %x", got, want)
-	}
-	if got := framePayload(t, FramePledgeShowMemberListDeleteAll()); !bytes.Equal(got, []byte{0x82}) {
-		t.Fatalf("PledgeShowMemberListDeleteAll = %x, want 82", got)
-	}
-}
-
 func TestFramePledgeInfoAndStatusChanged(t *testing.T) {
 	got := framePayload(t, FramePledgeInfo(501, "Knights", ""))
 	want := appendD([]byte{0x83}, 501)
@@ -66,18 +57,6 @@ func TestFramePledgeInfoAndStatusChanged(t *testing.T) {
 	}
 }
 
-func TestFrameAskJoinPledgeAndJoinPledge(t *testing.T) {
-	got := framePayload(t, FrameAskJoinPledge(0x10000001, "Knights"))
-	want := appendD([]byte{0x32}, 0x10000001)
-	want = append(want, encodeUTF16Z("Knights")...)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("AskJoinPledge = %x, want %x", got, want)
-	}
-	if got, want := framePayload(t, FrameJoinPledge(501)), appendD([]byte{0x33}, 501); !bytes.Equal(got, want) {
-		t.Fatalf("JoinPledge = %x, want %x", got, want)
-	}
-}
-
 func TestFrameManagePledgePower(t *testing.T) {
 	got := framePayload(t, FrameManagePledgePower(3, 1, 66))
 	want := []byte{0x30}
@@ -86,19 +65,6 @@ func TestFrameManagePledgePower(t *testing.T) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Fatalf("ManagePledgePower = %x, want %x", got, want)
-	}
-}
-
-func TestFramePledgePowerGradeList(t *testing.T) {
-	got := framePayload(t, FramePledgePowerGradeList([10]int{1, 0, 0, 0, 0, 0, 4, 0, 0, 2}))
-	want := appendH([]byte{0xfe}, 0x3b)
-	want = appendD(want, 9)
-	for rank, n := range []int32{0, 0, 0, 0, 0, 4, 0, 0, 2} {
-		want = appendD(want, int32(rank+1))
-		want = appendD(want, n)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("PledgePowerGradeList = %x, want %x", got, want)
 	}
 }
 

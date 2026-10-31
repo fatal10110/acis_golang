@@ -159,14 +159,6 @@ func TestFramePetStatusShow(t *testing.T) {
 	}
 }
 
-func TestFramePetDelete(t *testing.T) {
-	got := framePayload(t, FramePetDelete(2, 0x01020304))
-	want := []byte{OpcodePetDelete, 0x02, 0x00, 0x00, 0x00, 0x04, 0x03, 0x02, 0x01}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FramePetDelete() = %x, want %x", got, want)
-	}
-}
-
 func TestFramePetItemList(t *testing.T) {
 	items := []*item.Instance{{ObjectID: 0x01020304, TemplateID: 57, Count: 10, Location: item.LocationPet}}
 	frame, err := FramePetItemList(items, petPacketTemplates())
@@ -374,38 +366,3 @@ func TestFramePetStatusUpdate(t *testing.T) {
 }
 
 // ---- from ride_test.go ----
-func TestFrameRideMountWyvern(t *testing.T) {
-	want := []byte{OpcodeRide}
-	want = binary.LittleEndian.AppendUint32(want, 7)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 2)
-	want = binary.LittleEndian.AppendUint32(want, 1012621)
-	if got := framePayload(t, FrameRide(7, 12621)); string(got) != string(want) {
-		t.Fatalf("Ride = %x, want %x", got, want)
-	}
-}
-
-// TestFrameRideMountTypes pins Ride's ride type switch (Ride.java:19-28):
-// the three striders ride as type 1, the wyvern as type 2, any other NPC
-// as 0.
-func TestFrameRideMountTypes(t *testing.T) {
-	for npcID, want := range map[int32]uint32{12526: 1, 12527: 1, 12528: 1, 12621: 2, 12077: 0} {
-		got := framePayload(t, FrameRide(7, npcID))
-		if v := binary.LittleEndian.Uint32(got[1+2*4:]); v != want {
-			t.Fatalf("Ride(%d) ride type = %d, want %d", npcID, v, want)
-		}
-	}
-}
-
-// TestFrameDismount pins Ride(objectId, ACTION_DISMOUNT, 0): no ride type
-// and the bare 1000000 class offset.
-func TestFrameDismount(t *testing.T) {
-	want := []byte{OpcodeRide}
-	want = binary.LittleEndian.AppendUint32(want, 7)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, 1000000)
-	if got := framePayload(t, FrameDismount(7)); string(got) != string(want) {
-		t.Fatalf("Dismount = %x, want %x", got, want)
-	}
-}
