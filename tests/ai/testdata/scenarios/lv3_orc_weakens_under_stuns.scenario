@@ -1,8 +1,8 @@
 # LV3Orc (27294, level 76, glowing at +10), raised for the character (spawn parameters character, character, owner),
 # every draw 0: it appears wanting its big body (4692-1) on itself and attacking the creature its first spawn
 # parameter named (200). Only a hit by skill 1245 while it is stunned (Shield Stun, 92) moves IntAI0 on (0 to 1,
-# dropping the glow): the same hit unstunned leaves both. The timer steps after the stun (it cannot be made to
-# end in a scenario) stay in the Boot test.
+# dropping the glow): the same hit unstunned leaves both. The timer steps after the stun (a landed effect cannot
+# end in a scenario, #4359) stay in the Boot test.
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc

@@ -1,5 +1,5 @@
 # RaidPrivateWizard (25002, level 1) raised for a level 20 master, every draw 0: the character at
-# its master's level is not 8 levels over it, so a hit on a wizard has its fellow want the debuff (once) and
+# its master's level is not 8 levels over it, so a hit on a wizard has its fellow want the debuff (twice) and
 # the magic strike, and attack the character with the damage over its level plus 7 times 20000.
 character Hunter 20
 random always 0

@@ -1,6 +1,5 @@
 # PartyPrivateWizardDD2Heal (21543, level 1; its shipped skills), a private of a master, every draw 0: a hit
-# by the character from 300 away while it is under 70% of its HP also wants its magic heal on itself
-# on itself, beside its long range DD magic on the character (2000000 each: its attacked hook and its party call).
+# by the character from 300 away while it is under 70% of its HP also wants its magic heal on itself, beside its long range DD magic on the character (2000000 each: its attacked hook and its party call).
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc

@@ -1,4 +1,4 @@
-# RaidPrivateWizard (25002), raised for a master 800 away: its 2 s check, with the
+# RaidPrivateWizard (25002), raised for a master 900 away: its 2 s check, with the
 # master out of 500 and the wizard not attacking, aborts what it does and teleports it to its master.
 character Hunter 20
 random always 0
