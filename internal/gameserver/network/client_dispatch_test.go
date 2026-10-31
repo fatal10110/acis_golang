@@ -55,7 +55,7 @@ func TestInboundRegistryServe(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var logged bytes.Buffer
-			l := &GameClientLink{log: zerolog.New(&logged)}
+			l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.New(&logged)})
 			cs := &connState{client: newDispatchTestClient(t)}
 			if tc.authed {
 				cs.client.SetAuthenticated("acc", link.SessionKey{})
@@ -105,7 +105,7 @@ func TestInboundRegistryServeUnregisteredOpcode(t *testing.T) {
 		})
 	cs := &connState{client: newDispatchTestClient(t)}
 
-	found, open := reg.serve(&GameClientLink{}, context.Background(), cs, 0x02, []byte{0x02})
+	found, open := reg.serve(newBareGameClientLink(t, GameClientLinkConfig{}), context.Background(), cs, 0x02, []byte{0x02})
 	if found || !open {
 		t.Fatalf("serve(unregistered) = found %v open %v, want false true", found, open)
 	}
@@ -125,7 +125,7 @@ func TestInboundRegistryServeExtendedSubOpcode(t *testing.T) {
 	cs := &connState{client: newDispatchTestClient(t)}
 	payload := []byte{0xd0, 0x10, 0x00, 0x07}
 
-	found, open := reg.serve(&GameClientLink{}, context.Background(), cs, sub, payload)
+	found, open := reg.serve(newBareGameClientLink(t, GameClientLinkConfig{}), context.Background(), cs, sub, payload)
 	if !found || !open {
 		t.Fatalf("serve(%#x) = found %v open %v, want true true", sub, found, open)
 	}

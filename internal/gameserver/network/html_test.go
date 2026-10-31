@@ -17,7 +17,7 @@ func TestRequestLinkHTMLSendsCachedNpcHtmlMessage(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"})
 	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
-	gcl := &GameClientLink{html: html}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: html})
 
 	gcl.requestLinkHTML(live, clientpackets.RequestLinkHTML{Link: "data/html/help/tutorial.htm"})
 
@@ -29,7 +29,7 @@ func TestRequestLinkHTMLSendsMissingNoticeForSafeMissingFile(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html/>"})
 	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
-	gcl := &GameClientLink{html: html}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: html})
 
 	gcl.requestLinkHTML(live, clientpackets.RequestLinkHTML{Link: "help/missing.htm"})
 
@@ -47,7 +47,7 @@ func TestRequestLinkHTMLRejectsUnsafeLinks(t *testing.T) {
 		t.Run(link, func(t *testing.T) {
 			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
-			gcl := &GameClientLink{html: html}
+			gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: html})
 
 			gcl.requestLinkHTML(live, clientpackets.RequestLinkHTML{Link: link})
 
@@ -62,7 +62,7 @@ func TestRequestBypassToServerPlayerHelpSendsCachedNpcHtmlMessage(t *testing.T) 
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"})
 	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
-	gcl := &GameClientLink{html: html}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: html})
 
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help tutorial.htm"})
 
@@ -74,7 +74,7 @@ func TestRequestBypassToServerPlayerHelpSetsItemID(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/lidias_diary/7064-16.htm": "<html><body>diary</body></html>"})
 	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
-	gcl := &GameClientLink{html: html}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: html})
 
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help lidias_diary/7064-16.htm#7064"})
 
@@ -86,7 +86,7 @@ func TestRequestBypassToServerPlayerHelpRejectsUnsafePath(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html/>"})
 	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
-	gcl := &GameClientLink{html: html}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: html})
 
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help ../admin.htm"})
 

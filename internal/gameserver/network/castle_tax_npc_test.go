@@ -46,7 +46,7 @@ func TestNpcCastle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l := &GameClientLink{castles: castle.NewManager(data, clan.NewTable(), nil, nil, zerolog.Nop()), clanHallData: halls}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Castles: castle.NewManager(data, clan.NewTable(), nil, nil, zerolog.Nop()), ClanHallData: halls})
 
 	for _, tt := range []struct {
 		name      string
@@ -79,7 +79,7 @@ func TestNpcCastle(t *testing.T) {
 		})
 	}
 
-	if _, ok := (&GameClientLink{}).npcCastle(&npc.Instance{Template: &npc.Template{ID: townNPC}}); ok {
+	if _, ok := newBareGameClientLink(t, GameClientLinkConfig{}).npcCastle(&npc.Instance{Template: &npc.Template{ID: townNPC}}); ok {
 		t.Fatal("a server without castles gives an NPC a castle")
 	}
 }

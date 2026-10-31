@@ -13,7 +13,7 @@ import (
 // number (CubicList.addOrRefreshCubic's (int) matk), fixed for its life: a
 // refresh by a stronger grant keeps it, as it keeps the level.
 func TestCubicMAtkIsTheGrantingPowerKeptAcrossRefresh(t *testing.T) {
-	link := &GameClientLink{log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 
 	def := cubicRuntimeDef(cubic.Storm)

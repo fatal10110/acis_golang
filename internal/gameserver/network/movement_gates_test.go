@@ -77,7 +77,7 @@ func TestMoveLivePlayerRejectsZeroMoveSpeed(t *testing.T) {
 	}
 	testsupport.ResetCapture(frames)
 
-	gcl := &GameClientLink{log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	target := location.Location{X: 100, Y: 0, Z: 0}
 	origin := location.Location{X: 0, Y: 0, Z: 0}
 	gcl.moveLivePlayer(live, target, origin)

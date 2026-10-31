@@ -34,7 +34,7 @@ func newIntentionFixture(t *testing.T) intentionFixture {
 	live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character, Attack: live.attack}, nil)
 	live.cast.SetQueue(live.Queue())
 	live.Character.SetCastController(live.cast)
-	f := intentionFixture{link: &GameClientLink{log: zerolog.Nop()}, live: live, world: world.New()}
+	f := intentionFixture{link: newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()}), live: live, world: world.New()}
 	f.spawn(t, live)
 	return f
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -20,7 +19,7 @@ import (
 // a party leader's alone; from anyone else either is dropped unheard.
 func TestChatCommandChannelDelivery(t *testing.T) {
 	in := sim.NewInline(time.Unix(0, 0))
-	l := &GameClientLink{log: zerolog.Nop(), queues: in, parties: party.NewRegistry[*livePlayer](in.Now), relations: relation.NewManager(nil)}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), Queues: in, TradeClock: in.Now})
 
 	// Players 1..6 in three parties led by 1, 3 and 5; player 1's party
 	// leads the channel the other two join. Player 4 blocks the channel

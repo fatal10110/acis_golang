@@ -812,7 +812,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	}
 
 	t.Run("short packet disconnects immediately pre-auth", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 
 		if _, err := decodeClientPacket(l, client, nil, shortPacket); !errors.Is(err, errMalformedPacketDisconnect) {
@@ -821,7 +821,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 
 	t.Run("validation error never disconnects pre-auth", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 
 		if _, err := decodeClientPacket(l, client, nil, validation); errors.Is(err, errMalformedPacketDisconnect) {
@@ -830,7 +830,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 
 	t.Run("short packet tolerates first, disconnects past threshold post-auth", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 		client.SetAuthenticated("acc", link.SessionKey{})
 
@@ -845,7 +845,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 
 	t.Run("validation error never disconnects post-auth even past threshold", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 		client.SetAuthenticated("acc", link.SessionKey{})
 
@@ -906,7 +906,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			actor.Attach(summon.Runtime{Sink: &summonSink{link: &GameClientLink{world: state}, actor: actor}})
+			actor.Attach(summon.Runtime{Sink: &summonSink{link: newBareGameClientLink(t, GameClientLinkConfig{World: state}), actor: actor}})
 			state.Spawn(actor, 0, 0, 0, 0)
 			actor.BroadcastSelfSkillUse(1422, 1)
 		}},

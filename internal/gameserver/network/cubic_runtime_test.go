@@ -31,7 +31,7 @@ func liveCubicRuntime(live *livePlayer, id cubic.ID) *cubic.Runtime {
 // caster's queue before live's own cast syncs that cubic's runtime. The
 // late sync must not start a runtime for a cubic the list no longer holds.
 func TestSyncCubicRuntimeSkipsACubicEvictedBeforeTheSync(t *testing.T) {
-	link := &GameClientLink{log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 
 	live.Character.AddOrRefreshCubic(cubic.Life, false)
@@ -51,7 +51,7 @@ func TestSyncCubicRuntimeSkipsACubicEvictedBeforeTheSync(t *testing.T) {
 // again: its pending cast effect does not land and its late disappear timer
 // leaves the new cubic of that id alone.
 func TestEvictedCubicRuntimeDoesNotActForARegrantedID(t *testing.T) {
-	link := &GameClientLink{log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 
 	live.Character.AddOrRefreshCubic(cubic.Life, false)
@@ -89,10 +89,10 @@ func TestEvictedCubicRuntimeDoesNotActForARegrantedID(t *testing.T) {
 // longer shows.
 func TestStaleCubicTickDoesNotFire(t *testing.T) {
 	const healSkill = 4051
-	link := &GameClientLink{
-		log:    zerolog.Nop(),
-		skills: skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: healSkill, Level: 1, Power: 10})),
-	}
+	link := newBareGameClientLink(t, GameClientLinkConfig{
+		Log:    zerolog.Nop(),
+		Skills: skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: healSkill, Level: 1, Power: 10})),
+	})
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetRollSource(func(int) int { return 0 })
