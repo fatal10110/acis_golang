@@ -439,10 +439,15 @@ func interactTargetRadius(target interactTarget) float64 {
 	if _, ok := target.(*door.Object); ok {
 		return door.CollisionRadius
 	}
-	if c, ok := target.(interface{ CollisionRadius() float64 }); ok {
+	if c, ok := target.(collisionSized); ok {
 		return c.CollisionRadius()
 	}
 	return 0
+}
+
+// collisionSized is an interact target with a collision radius: a creature.
+type collisionSized interface {
+	CollisionRadius() float64
 }
 
 // interactIntention is an interact queued behind a swing or a cast.

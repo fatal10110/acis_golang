@@ -87,7 +87,7 @@ func TestAdminBanOfLeavingPlayerIsStored(t *testing.T) {
 			// queue refuses new tasks.
 			target.Queue().Close()
 
-			l := &GameClientLink{world: state, log: zerolog.Nop(), admin: levels, persist: worker, accessLevels: store}
+			l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), Admin: levels, Persist: worker, AccessLevels: store})
 			tc.run(l, gm, tc.line)
 			if err := worker.Flush(context.Background(), target.ObjectID()); err != nil {
 				t.Fatalf("flush: %v", err)

@@ -63,7 +63,7 @@ func TestSendValidatedHTMLRefusesLongSetPage(t *testing.T) {
 func TestSetPageLimitsPageAsLoaded(t *testing.T) {
 	long := strings.Repeat("x", 8193)
 	short := "<html><body>%list%</body></html>"
-	gcl := &GameClientLink{html: testHTMLCache(t, map[string]string{"long.htm": long, "short.htm": short})}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: testHTMLCache(t, map[string]string{"long.htm": long, "short.htm": short})})
 
 	// The page cache ends every page with a line break.
 	if got := gcl.setPage("data/html/short.htm"); got != short+"\n" {

@@ -50,7 +50,7 @@ func TestWireSummonAIForwardsManaFieldsToOwner(t *testing.T) {
 		t.Fatalf("NewServitor() error: %v", err)
 	}
 
-	l := &GameClientLink{world: state, log: zerolog.Nop()}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop()})
 	aiController := l.wireSummonAI(servitor)
 
 	aiController.OnHitResult(actorcast.EffectResult{
@@ -105,7 +105,7 @@ func TestWireSummonAIForwardsDodgeAndCounterattackToTarget(t *testing.T) {
 		t.Fatalf("NewServitor() error: %v", err)
 	}
 
-	l := &GameClientLink{world: state, log: zerolog.Nop()}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop()})
 	aiController := l.wireSummonAI(servitor)
 
 	aiController.OnHitResult(actorcast.EffectResult{
@@ -153,7 +153,7 @@ func TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner(t *testing.T) {
 		t.Fatalf("NewServitor() error: %v", err)
 	}
 
-	l := &GameClientLink{world: state, log: zerolog.Nop()}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop()})
 	aiController := l.wireSummonAI(servitor)
 
 	aiController.OnHitResult(actorcast.EffectResult{
@@ -318,7 +318,7 @@ func TestWireSummonAIRemovesAIRunnerWhenDespawnReentersRegistration(t *testing.T
 // wireSummonAI's registration order that lost cleanup is l.combat.ai.Remove --
 // exactly the leak this type exists to prevent.
 func TestSummonSinkRunDespawnIsolatesAPanickingCleanup(t *testing.T) {
-	sink := &summonSink{link: &GameClientLink{log: zerolog.Nop()}}
+	sink := &summonSink{link: newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})}
 
 	var ran []string
 	sink.onDespawn(func() { ran = append(ran, "first"); panic("cleanup exploded") })
@@ -404,7 +404,7 @@ func TestSummonDespawnSurvivesAPanickingAbort(t *testing.T) {
 	state.AddPlayer(owner)
 	servitor := newTestServitor(t, owner)
 
-	sink := &summonSink{link: &GameClientLink{world: state, log: zerolog.Nop()}, actor: servitor}
+	sink := &summonSink{link: newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop()}), actor: servitor}
 	sink.brain = ai.NewSummon(servitor, panickingSummonMove{}, attack.NewPlayable(servitor, sink))
 	servitor.Attach(summon.Runtime{AI: sink.brain, Sink: sink})
 	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})

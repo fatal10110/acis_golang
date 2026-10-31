@@ -532,6 +532,7 @@ func (ids *exchangeIDs) release() {
 	if ids.s == nil {
 		return
 	}
+	// accepted: releasing ids is an optional allocator capability.
 	r, ok := ids.s.ids.(interface{ ReleaseID(int32) })
 	for _, id := range ids.pool {
 		if ok {
@@ -809,6 +810,7 @@ func (g *grantID) release() {
 	if g.id == 0 {
 		return
 	}
+	// accepted: releasing ids is an optional allocator capability.
 	if r, ok := g.s.ids.(interface{ ReleaseID(int32) }); ok {
 		r.ReleaseID(g.id)
 	}

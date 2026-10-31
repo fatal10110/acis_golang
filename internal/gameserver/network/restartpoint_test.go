@@ -29,7 +29,7 @@ func TestRestartLivePlayerWithNoRestartTableSendsActionFailed(t *testing.T) {
 	}
 	testsupport.ResetCapture(frames)
 
-	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{World: state, Geo: testGeo{}, Log: zerolog.Nop()})
 	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{})
 
 	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 1 || got[0] != serverpackets.OpcodeActionFailed {

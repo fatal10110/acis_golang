@@ -23,7 +23,7 @@ func TestWalkToCastTargetImmobileParksNothing(t *testing.T) {
 	testsupport.ResetCapture(frames)
 
 	parked := false
-	gcl := &GameClientLink{log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	if !gcl.walkToCastTarget(live, target.Character, 300, false, func() { parked = true }) {
 		t.Fatal("walkToCastTarget() = false for an immobile caster out of range, want the cast held back")
 	}

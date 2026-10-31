@@ -207,7 +207,7 @@ func holdTestLive(t *testing.T) (*livePlayer, *sim.Inline, *heldFrameLog) {
 // settle's own sends go out first; the settle then releases the rest in
 // order.
 func TestSendBehindPvPChangesHoldsLaterSendsUntilTheSettle(t *testing.T) {
-	l := &GameClientLink{}
+	l := newBareGameClientLink(t, GameClientLinkConfig{})
 	live, in, log := holdTestLive(t)
 	live.pvpChanges.push(pvpChange{})
 
@@ -236,7 +236,7 @@ func TestSendBehindPvPChangesHoldsLaterSendsUntilTheSettle(t *testing.T) {
 // to the player's queue runs the pending change and releases the held
 // frames.
 func TestSendBehindPvPChangesPostedSettleFlushes(t *testing.T) {
-	l := &GameClientLink{}
+	l := newBareGameClientLink(t, GameClientLinkConfig{})
 	live, in, log := holdTestLive(t)
 	live.pvpChanges.push(pvpChange{})
 
@@ -254,7 +254,7 @@ func TestSendBehindPvPChangesPostedSettleFlushes(t *testing.T) {
 // takes no more tasks, no settle can release the held frame, so it goes out
 // at once and ends the hold; later sends are not stranded.
 func TestSendBehindPvPChangesFlushesOnAClosedQueue(t *testing.T) {
-	l := &GameClientLink{}
+	l := newBareGameClientLink(t, GameClientLinkConfig{})
 	live, _, log := holdTestLive(t)
 	live.Queue().Close()
 	live.pvpChanges.push(pvpChange{reset: true})

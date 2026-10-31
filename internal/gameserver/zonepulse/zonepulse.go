@@ -237,7 +237,7 @@ func landSkills(cfg *Config, z *zone.Effect, t Target) {
 
 // holds reports whether t holds an effect of skill id.
 func holds(t Target, id int) bool {
-	h, ok := t.(interface{ EffectList() *effect.List })
+	h, ok := t.(effectHolder)
 	if !ok {
 		return false
 	}
@@ -248,11 +248,21 @@ func holds(t Target, id int) bool {
 // onQueueOf runs fn on t's own queue, or at once when t has none. A closed
 // queue drops it: t has left the world.
 func onQueueOf(t Target, fn func()) {
-	if q, ok := t.(interface{ Queue() *sim.Queue }); ok {
+	if q, ok := t.(queueOwner); ok {
 		if queue := q.Queue(); queue != nil {
 			queue.Post(fn)
 			return
 		}
 	}
 	fn()
+}
+
+// effectHolder is a target that holds effects.
+type effectHolder interface {
+	EffectList() *effect.List
+}
+
+// queueOwner is a target that runs its own work on a queue.
+type queueOwner interface {
+	Queue() *sim.Queue
 }

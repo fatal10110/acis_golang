@@ -230,6 +230,7 @@ func (l *GameClientLink) claimLotteryTicket(live *livePlayer, objectID int32) {
 // refused, so a refused attempt holds no object id; an allocator that
 // cannot take ids back keeps it.
 func (l *GameClientLink) releaseObjectID(id int32) {
+	// accepted: releasing ids is an optional allocator capability.
 	if r, ok := l.ids.(interface{ ReleaseID(int32) }); ok {
 		r.ReleaseID(id)
 	}

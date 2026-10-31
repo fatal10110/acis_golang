@@ -96,8 +96,13 @@ func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType s
 		return false
 	}
 	// A civilian NPC is no attackable NPC.
-	npc, ok := target.(interface{ Attackable() bool })
+	npc, ok := target.(attackableNPC)
 	return target.Kind() == actor.KindNPC && ok && npc.Attackable() && !target.Guard()
+}
+
+// attackableNPC is a creature that tells whether it may be attacked.
+type attackableNPC interface {
+	Attackable() bool
 }
 
 // notePvPHitFromAttacker flags attacker with the PvP flag tracker after a

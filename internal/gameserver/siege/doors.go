@@ -36,17 +36,25 @@ func swoopCannon(a any) bool {
 // ActingClanID is the clan of the player acting through a: a summon's
 // owner's, or a's own; 0 for none.
 func ActingClanID(a any) int32 {
-	if s, ok := a.(interface {
-		Owner() (attackable.Combatant, bool)
-	}); ok {
+	if s, ok := a.(ownedCombatant); ok {
 		if owner, ok := s.Owner(); ok && owner != nil {
 			a = owner
 		}
 	}
-	if c, ok := a.(interface{ ClanID() int32 }); ok {
+	if c, ok := a.(clanMember); ok {
 		return c.ClanID()
 	}
 	return 0
+}
+
+// ownedCombatant is a combatant that may act for an owner: a summon.
+type ownedCombatant interface {
+	Owner() (attackable.Combatant, bool)
+}
+
+// clanMember is a creature that tells its clan: a player.
+type clanMember interface {
+	ClanID() int32
 }
 
 // AllowsDoorAttack reports whether attacker may attack one of the

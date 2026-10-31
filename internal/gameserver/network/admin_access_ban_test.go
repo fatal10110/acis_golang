@@ -61,7 +61,7 @@ func TestAdminBanAccountOfLeavingPlayerReachesLogin(t *testing.T) {
 	// refuses new tasks.
 	target.Queue().Close()
 
-	l := &GameClientLink{world: state, log: zerolog.Nop(), loginLink: func() *LoginLink { return loginLink }}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), LoginLink: func() *LoginLink { return loginLink }})
 	l.adminBan(gm, "admin_ban account Leaver")
 
 	select {

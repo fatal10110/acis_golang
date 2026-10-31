@@ -48,7 +48,7 @@ func TestNpcResidenceName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l := &GameClientLink{castles: castle.NewManager(data, clan.NewTable(), nil, nil, zerolog.Nop()), clanHallData: halls}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Castles: castle.NewManager(data, clan.NewTable(), nil, nil, zerolog.Nop()), ClanHallData: halls})
 
 	for _, tt := range []struct {
 		name      string
