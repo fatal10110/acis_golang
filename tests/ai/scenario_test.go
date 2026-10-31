@@ -367,6 +367,9 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro": wizard.CorpseNecro,
 	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroAggressive": wizard.CorpseNecroAggressive,
 	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive": wizard.DDMagic2DispellAggressive,
+
+	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer1": wizard.RoyalRushHealer1,
+	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardShortSelfRange": wizard.RoyalRushShortSelfRange,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
