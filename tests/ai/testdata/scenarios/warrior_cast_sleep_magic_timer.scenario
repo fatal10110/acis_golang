@@ -1,0 +1,23 @@
+# WarriorCastSleepMagic (20078, level 30, sleep 4046-3), every draw 0: it appears with i_ai0, i_ai1 and
+# i_ai2 at 0. The first hit starts the 5 s timer 2001 and marks i_ai0 and i_ai1 (no sleep yet). Fired while it
+# attacks, the timer wants the sleep on the character it hates most (1000000). A hit by that character sets
+# i_ai2, which the next firing clears.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSleepMagic.WarriorCastSleepMagic
+npc sleeper 20078 Monster 100 0 0 level 30 skill SLEEP_MAGIC 4046 3
+roll sleeper 99
+
+hit sleeper 10
+  mem sleeper i_ai0=1 i_ai1=1 i_ai2=0
+tick
+advance 5s
+  desires sleeper attack(player)=27.027027027027028 cast(player,4046,move)=1000000
+hit sleeper 10
+  mem sleeper i_ai0=1 i_ai1=1 i_ai2=1
+advance 5s
+  mem sleeper i_ai0=1 i_ai1=1 i_ai2=0

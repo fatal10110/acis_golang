@@ -1,0 +1,13 @@
+# RoyalRushWizardShortSelfRange (18140, level 81, its shipped skills), every draw 0: a hit by the character,
+# whom its parent's hook entered in its hate list, wants its self range DD magic (4033-9) on itself (1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardShortSelfRange
+npc wiz 18140 Monster 300 0 0 level 81 skill W_SELF_RANGE_DD_MAGIC 4033 9 skill W_SHORT_RANGE_DD_MAGIC 4160 9
+
+hit wiz 10
+  desires wiz cast(wiz,4033,move)=1000000

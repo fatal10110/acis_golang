@@ -1,0 +1,16 @@
+# WarriorCastHoldMagicAggressive (20134, level 59, hold magic 4047-5), every draw 0: a character it sees
+# 300 away is attacked (200); the aggressive child adds no cast of its own.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastHoldMagic.WarriorCastHoldMagicAggressive
+npc hold 20134 Monster 300 0 0 level 59 aggro 1000 skill HOLD_MAGIC 4047 5
+roll hold 99
+
+away
+approach hold 300
+  desires hold attack(player)=200
