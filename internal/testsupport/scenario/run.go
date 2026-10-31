@@ -117,6 +117,39 @@ type run struct {
 	// reference pinned in each traced step.
 	draws      draws
 	traceDraws [][]string
+	// heard records the script events the NPCs' scripts receive;
+	// traceHeard those the reference's NPCs heard in each traced step.
+	heard      heardEvents
+	traceHeard [][]string
+}
+
+// heardEvents records the script events the NPCs' scripts receive, for the
+// step that caused them to take. Scripts deliver on the goroutine of their
+// sender, so it is guarded.
+type heardEvents struct {
+	mu     sync.Mutex
+	events []heardEvent
+}
+
+type heardEvent struct{ npcID, object, id, arg1, arg2 int32 }
+
+func (h *heardEvents) add(npcID, object, id, arg1, arg2 int32) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.events = append(h.events, heardEvent{npcID, object, id, arg1, arg2})
+}
+
+// take returns the events recorded since the last take, as heardLine
+// renders them with roles.
+func (h *heardEvents) take(roles map[int32]string) []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var out []string
+	for _, e := range h.events {
+		out = append(out, heardLine(roles, e.object, e.npcID, e.id, e.arg1, e.arg2))
+	}
+	h.events = nil
+	return out
 }
 
 // member is one member line's character in the world.
@@ -212,7 +245,7 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.traceDraws, err = checkTrace(sc, data, r.texts); err != nil {
+		if r.traceDraws, r.traceHeard, err = checkTrace(sc, data, r.texts); err != nil {
 			t.Fatalf("%s does not replay %s: %v", sc.Name, sc.Trace, err)
 		}
 	}
@@ -321,6 +354,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	if r.sc.Random != nil || r.sc.usesRandomSteps() {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
 	}
+	opts = append(opts, gameservertest.WithScriptEventsHeard(r.heard.add))
 	if r.sc.Teleports {
 		opts = append(opts, r.teleportOptions(t)...)
 	}
@@ -408,6 +442,7 @@ func (r *run) spawnNPCs(t *testing.T) {
 	if _, bad := r.draws.take(); len(bad) > 0 {
 		t.Fatalf("%s: script random at spawn: %s", r.sc.Name, strings.Join(bad, "; "))
 	}
+	r.heard.take(nil)
 }
 
 // seedHero makes the character an active hero of the running era, before
@@ -905,6 +940,9 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		}
 	}
 	if d := traceDrawDiff(r.traceDraws, i, drawn); d != "" {
+		fail("%s (want: the trace's)", d)
+	}
+	if d := traceHeardDiff(r.traceHeard, i, r.heard.take(r.roles)); d != "" {
 		fail("%s (want: the trace's)", d)
 	}
 	if st.Verb != "relog" {

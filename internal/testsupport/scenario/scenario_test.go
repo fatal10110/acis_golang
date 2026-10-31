@@ -156,7 +156,7 @@ func traceScenario(t *testing.T, steps string) *Scenario {
 
 func TestCheckTraceAcceptsAReplayingScenario(t *testing.T) {
 	sc := traceScenario(t, "action darin\n  S ActionFailed\nbypass npc_{darin}_Quest\n  S PlaySound type=0 file=a bind=0 obj=0 loc=0,0,0 delay=0\n  Q upsert Q001_LettersOfLove | <cond> | 1\nkill wolf\n  S ActionFailed\nrelog\n")
-	if _, err := checkTrace(sc, []byte(traceText), nil); err != nil {
+	if _, _, err := checkTrace(sc, []byte(traceText), nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -171,7 +171,7 @@ func TestCheckTraceNamesTheFirstDeparture(t *testing.T) {
 		{"short", "action darin\n  S ActionFailed\n", "the trace has 3 client packets, the scenario 1 steps"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := checkTrace(traceScenario(t, tc.steps), []byte(traceText), nil)
+			_, _, err := checkTrace(traceScenario(t, tc.steps), []byte(traceText), nil)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("checkTrace error = %v, want one containing %q", err, tc.want)
 			}

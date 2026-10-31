@@ -140,6 +140,12 @@ type Config struct {
 	// after the NPC's own queue may have closed at its decay, and so does a
 	// script timer whose NPC and player have no queue to run it on.
 	Queue *sim.Queue
+	// Heard, when set, is told of each script event delivered to an NPC's
+	// script, before the script runs: the receiver, the event and its two
+	// arguments. A test suite uses it to see which NPCs a script's send
+	// or broadcast reached; it may be called from any goroutine a script
+	// runs on.
+	Heard func(n *NPC, eventID, arg1, arg2 int32)
 
 	// raises overrides raisedHooks; tests use it.
 	raises func(hook, NPCKind) bool
@@ -175,6 +181,8 @@ type Registry struct {
 	zones map[int32][]*Script
 	// queue is the engine queue (Config.Queue).
 	queue *sim.Queue
+	// heard is Config.Heard.
+	heard func(n *NPC, eventID, arg1, arg2 int32)
 	// timers are the scripts' timers. They are not part of the registry:
 	// a leaf-locked container of their own.
 	timers *timers
@@ -232,7 +240,7 @@ const (
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue, heard: cfg.Heard}
 	r.timers = newTimers(r, cfg.Queue)
 	var w *world.State
 	if cfg.Env != nil {

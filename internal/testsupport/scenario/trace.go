@@ -227,6 +227,7 @@ type traceStep struct {
 	stmts  []string
 	memos  []string
 	draws  []string
+	heard  []string
 	lives  []string
 	spawns []string
 }
@@ -254,6 +255,7 @@ var (
 	traceApproach = regexp.MustCompile(`^# approach (\d+) \(object (\d+)\)$`)
 	traceNPC      = regexp.MustCompile(`^# npc (\S+) (\d+) \(object (\d+)\)$`)
 	traceDraw     = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
+	traceHeard    = regexp.MustCompile(`^# heard (\d+) \(object (\d+)\) (-?\d+) (-?\d+) (-?\d+)$`)
 	traceLive     = regexp.MustCompile(`^# live (\d+) (\d+)$`)
 	traceSpawned  = regexp.MustCompile(`^# spawned (\d+) (-|-?\d+,-?\d+( -?\d+,-?\d+)*)$`)
 )
@@ -410,6 +412,14 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
 			}
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
+		case strings.HasPrefix(line, "# heard "):
+			if !traceHeard.MatchString(line) {
+				return nil, nil, fmt.Errorf("trace line %q is not a heard <npc id> (object <id>) <event id> <arg1> <arg2>", line)
+			}
+			if len(raw) == 0 {
+				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
+			}
+			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		case strings.HasPrefix(line, "# draw "):
 			if !traceDraw.MatchString(line) {
 				return nil, nil, fmt.Errorf("trace line %q is not a draw <bound>:<value> <class>", line)
@@ -479,6 +489,10 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			}
 			if m := traceDraw.FindStringSubmatch(line); m != nil {
 				step.draws = append(step.draws, m[1])
+				continue
+			}
+			if m := traceHeard.FindStringSubmatch(line); m != nil {
+				step.heard = append(step.heard, heardLine(roles, atoi32(m[2]), atoi32(m[1]), atoi32(m[3]), atoi32(m[4]), atoi32(m[5])))
 				continue
 			}
 			if m := traceLive.FindStringSubmatch(line); m != nil {
@@ -634,74 +648,77 @@ func deferPlayerActions(task []string, effects int) ([]string, error) {
 // a relog, an enter) replays them all, its lines theirs in order; a relog's
 // packets are not compared, as the run does not compare them. It returns
 // the script draws the reference pinned in each traced step, each
-// "<bound>:<value>", for the run to compare with its own; a trace that pins
+// "<bound>:<value>", and the script events its NPCs heard from a script's
+// send or broadcast (see heardLine), for the run to compare with its own; a trace that pins
 // draws needs a random line. A trace of the reference probe's own play of
 // the scenario (under probeTraces) covers every step.
-func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]string, err error) {
+func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws, heard [][]string, err error) {
 	steps, objs, err := readTrace(sc, data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for i, next := 0, 0; next < len(steps); i++ {
 		if i >= len(sc.Steps) {
-			return nil, fmt.Errorf("the trace has %d client packets, the scenario %d steps", len(steps), len(sc.Steps))
+			return nil, nil, fmt.Errorf("the trace has %d client packets, the scenario %d steps", len(steps), len(sc.Steps))
 		}
 		st := sc.Steps[i]
 		clients, err := traceClients(st, objs, sc)
 		where := fmt.Sprintf("step %d (line %d) %q against trace %q", i+1, st.Line, st, steps[next].client)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", where, err)
+			return nil, nil, fmt.Errorf("%s: %w", where, err)
 		}
 		var ts traceStep
 		for j, client := range clients {
 			if next+j >= len(steps) {
-				return nil, fmt.Errorf("%s: the trace ends after %d of its %d client packets", where, j, len(clients))
+				return nil, nil, fmt.Errorf("%s: the trace ends after %d of its %d client packets", where, j, len(clients))
 			}
 			s := steps[next+j]
 			if client != s.client {
-				return nil, fmt.Errorf("%s: the step sends %q", where, client)
+				return nil, nil, fmt.Errorf("%s: the step sends %q", where, client)
 			}
 			ts.tasks = append(ts.tasks, s.tasks...)
 			ts.stmts = append(ts.stmts, s.stmts...)
 			ts.memos = append(ts.memos, s.memos...)
 			ts.draws = append(ts.draws, s.draws...)
+			ts.heard = append(ts.heard, s.heard...)
 			ts.lives = append(ts.lives, s.lives...)
 			ts.spawns = append(ts.spawns, s.spawns...)
 		}
 		next += len(clients)
 		sent, err := stepPackets(ts.tasks, st.Queues)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", where, err)
+			return nil, nil, fmt.Errorf("%s: %w", where, err)
 		}
 		if st.Verb != "relog" {
 			if err := checkClients(st, sc, sent, ts.tasks, pages); err != nil {
-				return nil, fmt.Errorf("%s: %w", where, err)
+				return nil, nil, fmt.Errorf("%s: %w", where, err)
 			}
 		}
 		if d := FirstDiff("statement", st.Statements, ts.stmts); d != "" {
-			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		if d := FirstDiff("memo", st.Memos, ts.memos); d != "" {
-			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		if d := FirstDiff("live", st.Lives, ts.lives); d != "" {
-			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		if d := FirstDiff("spawned", st.Spawns, ts.spawns); d != "" {
-			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		draws = append(draws, ts.draws)
+		heard = append(heard, ts.heard)
 	}
 	// The probe plays every step of a scenario it traces.
 	if strings.HasPrefix(sc.Trace, probeTraces) && len(draws) < len(sc.Steps) {
 		st := sc.Steps[len(draws)]
-		return nil, fmt.Errorf("the trace ends before step %d (line %d) %q", len(draws)+1, st.Line, st)
+		return nil, nil, fmt.Errorf("the trace ends before step %d (line %d) %q", len(draws)+1, st.Line, st)
 	}
 	// The run pins and records its script draws only with a random line.
 	if sc.Random == nil && slices.ContainsFunc(draws, func(d []string) bool { return len(d) > 0 }) {
-		return nil, fmt.Errorf("the trace pins script draws and the scenario has no random line")
+		return nil, nil, fmt.Errorf("the trace pins script draws and the scenario has no random line")
 	}
-	return draws, nil
+	return draws, heard, nil
 }
 
 // checkClients compares what each client was sent in a step with the
@@ -747,6 +764,35 @@ func checkClients(st Step, sc *Scenario, sent []string, tasks []traceTask, pages
 		}
 	}
 	return nil
+}
+
+// heardLine renders a script event an NPC heard as "<receiver> <event id>
+// <arg1> <arg2>": the receiver by its role, by its template id when none
+// names its object, and an argument that is the object id of a role by
+// that role.
+func heardLine(roles map[int32]string, object, npcID, eventID, arg1, arg2 int32) string {
+	name := func(obj int32, orElse string) string {
+		if role, ok := roles[obj]; ok {
+			return role
+		}
+		return orElse
+	}
+	return strings.Join([]string{
+		name(object, strconv.Itoa(int(npcID))), strconv.Itoa(int(eventID)),
+		name(arg1, strconv.Itoa(int(arg1))), name(arg2, strconv.Itoa(int(arg2))),
+	}, " ")
+}
+
+// traceHeardDiff compares the script events the NPCs heard in step i, as
+// heardLine renders them, with those the reference's NPCs heard in that
+// step. They are compared sorted: the order the NPCs around a broadcast
+// hear it in follows each side's known list. A step past the trace is not
+// compared.
+func traceHeardDiff(traceHeard [][]string, i int, heard []string) string {
+	if i >= len(traceHeard) {
+		return ""
+	}
+	return FirstDiff("script event heard", slices.Sorted(slices.Values(heard)), slices.Sorted(slices.Values(traceHeard[i])))
 }
 
 // traceDrawDiff compares the script draws step i made, each

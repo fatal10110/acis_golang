@@ -39,6 +39,8 @@ type scriptOptions struct {
 	skills []modelskill.Definition
 	// itemIDs wraps the object id allocator of the scripts' gives.
 	itemIDs func(next func() (int32, error)) func() (int32, error)
+	// heard is told of each script event an NPC's script receives.
+	heard func(npcID, objectID, eventID, arg1, arg2 int32)
 }
 
 // WithScripts boots the script registry from list and catalog, as the
@@ -62,6 +64,15 @@ func WithScriptRates(r script.Rates) Option {
 // draw; without it the draws are random.
 func WithScriptRand(rand func(n int) int) Option {
 	return func(o *options) { o.scriptHelpers().rand = rand }
+}
+
+// WithScriptEventsHeard makes heard told of each script event delivered to
+// an NPC's script, before the script runs, from any goroutine: the
+// receiver's template and object id, the event id and its two arguments.
+// What Server.ScriptEvent delivers is not told, as it is the suite's own
+// send; what the scripts send in answer is.
+func WithScriptEventsHeard(heard func(npcID, objectID, eventID, arg1, arg2 int32)) Option {
+	return func(o *options) { o.scriptHelpers().heard = heard }
 }
 
 // WithScriptSingleItemDrop is WithSingleItemDrop, named for the script
@@ -232,7 +243,13 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		k, ok := so.kinds[id]
 		return k, ok
 	}
-	registry := script.Build(so.list, so.catalog, script.Config{KindOf: kindOf, Log: o.log, Env: env, Queue: engine})
+	cfg := script.Config{KindOf: kindOf, Log: o.log, Env: env, Queue: engine}
+	if so.heard != nil {
+		cfg.Heard = func(n *script.NPC, eventID, arg1, arg2 int32) {
+			so.heard(n.NpcID(), n.ObjectID(), eventID, arg1, arg2)
+		}
+	}
+	registry := script.Build(so.list, so.catalog, cfg)
 	return &questBoot{store: store, registry: registry, journals: journals, env: env}
 }
 

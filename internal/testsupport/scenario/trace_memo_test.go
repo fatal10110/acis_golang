@@ -37,7 +37,7 @@ func TestCheckTraceComparesMemoWrites(t *testing.T) {
 		{"set for unset", "kill wolf\n  S ActionFailed\n" + set + "kill wolf\n  S ActionFailed\n" + set, `step 2 (line 7) "kill wolf" against trace "kill 20120": scenario memo 1 differs`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := checkTrace(traceScenario(t, tc.steps), []byte(memoTrace), nil)
+			_, _, err := checkTrace(traceScenario(t, tc.steps), []byte(memoTrace), nil)
 			switch {
 			case tc.want == "" && err != nil:
 				t.Fatalf("checkTrace error = %v, want none", err)
@@ -52,7 +52,7 @@ func TestCheckTraceComparesMemoWrites(t *testing.T) {
 // unknown journal statement does.
 func TestCheckTraceRejectsAnUnknownMemoStatement(t *testing.T) {
 	trace := "# player object 500\n# kill 20120 (object 700)\nQ DELETE FROM character_memo WHERE charId=? | 500\n"
-	_, err := checkTrace(traceScenario(t, "kill wolf\n"), []byte(trace), nil)
+	_, _, err := checkTrace(traceScenario(t, "kill wolf\n"), []byte(trace), nil)
 	if want := `is not a memo write`; err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("checkTrace error = %v, want one containing %q", err, want)
 	}

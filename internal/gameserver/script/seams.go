@@ -124,7 +124,21 @@ func (r *Registry) ScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32
 	r.scriptEvent(NPCOf(n), eventID, arg1, arg2)
 }
 
+// DeliverScriptEvent is ScriptEvent for a sender that is not a script (a
+// test suite's step): Config.Heard is not told of the event it delivers
+// to n, though it is of those the scripts send in answer.
+func (r *Registry) DeliverScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32) {
+	if r == nil {
+		return
+	}
+	r.deliverScriptEvent(NPCOf(n), eventID, arg1, arg2, false)
+}
+
 func (r *Registry) scriptEvent(n *NPC, eventID, arg1, arg2 int32) {
+	r.deliverScriptEvent(n, eventID, arg1, arg2, true)
+}
+
+func (r *Registry) deliverScriptEvent(n *NPC, eventID, arg1, arg2 int32, tell bool) {
 	if n.combatant() == nil {
 		return
 	}
@@ -134,6 +148,9 @@ func (r *Registry) scriptEvent(n *NPC, eventID, arg1, arg2 int32) {
 	}
 	e := ScriptEvent{NPC: n, EventID: eventID, Arg1: arg1, Arg2: arg2}
 	for _, s := range list {
+		if tell && r.heard != nil {
+			r.heard(n, eventID, arg1, arg2)
+		}
 		r.run(s, hookScriptEvent, func() { s.Hooks.ScriptEvent(s, e) })
 	}
 }

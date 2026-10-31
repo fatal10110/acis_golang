@@ -51,7 +51,7 @@ func mateScenario(t *testing.T, steps string) *Scenario {
 // character's by their tag, and each client's are compared with the step's S
 // lines (the client that played it) or its to line.
 func TestCheckTraceReplaysAMatesClient(t *testing.T) {
-	if _, err := checkTrace(mateScenario(t, mateSteps), []byte(mateTrace), nil); err != nil {
+	if _, _, err := checkTrace(mateScenario(t, mateSteps), []byte(mateTrace), nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -66,7 +66,7 @@ func TestCheckTraceNamesADepartureOfAMate(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			steps := strings.Replace(mateSteps, tc.from, tc.to, 1)
-			_, err := checkTrace(mateScenario(t, steps), []byte(mateTrace), nil)
+			_, _, err := checkTrace(mateScenario(t, steps), []byte(mateTrace), nil)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("checkTrace error = %v, want one containing %q", err, tc.want)
 			}
@@ -91,11 +91,11 @@ T 500
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := checkTrace(sc, []byte(trace), nil); err != nil {
+	if _, _, err := checkTrace(sc, []byte(trace), nil); err != nil {
 		t.Fatal(err)
 	}
 	sc.Steps[0].Packets = nil
-	if _, err := checkTrace(sc, []byte(trace), nil); err == nil || !strings.Contains(err.Error(), "scenario packet 1 missing") {
+	if _, _, err := checkTrace(sc, []byte(trace), nil); err == nil || !strings.Contains(err.Error(), "scenario packet 1 missing") {
 		t.Fatalf("checkTrace error = %v, want the character's missing packet", err)
 	}
 }

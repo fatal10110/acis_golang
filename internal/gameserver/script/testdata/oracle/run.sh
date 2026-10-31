@@ -73,6 +73,12 @@ docker run --rm --user "$(id -u):$(id -g)" \
 			src/net/sf/l2j/gameserver/network/GameClient.java
 		[ "$(grep -c "ProbeWire.capture(this, gsp)" src/net/sf/l2j/gameserver/network/GameClient.java)" = 1 ] \
 			|| { echo "game client send path not found" >&2; exit 1; }
+		# The script events an NPC hears (its own send, and the two radius broadcasts) go through the
+		# probe, which tells the scenario trace before the quest runs.
+		sed -i "s/quest.onScriptEvent(this, eventId, arg1, arg2);/net.sf.l2j.commons.probe.ProbeHeard.deliver(quest, this, eventId, arg1, arg2);/" src/net/sf/l2j/gameserver/model/actor/Npc.java
+		sed -i -E "s/quest\.onScriptEvent\(npc, eventId, arg1, (0|arg2)\);/net.sf.l2j.commons.probe.ProbeHeard.deliver(quest, npc, eventId, arg1, \1);/" src/net/sf/l2j/gameserver/scripting/Quest.java
+		[ "$(grep -c "ProbeHeard.deliver" src/net/sf/l2j/gameserver/model/actor/Npc.java)" = 1 ] && [ "$(grep -c "ProbeHeard.deliver" src/net/sf/l2j/gameserver/scripting/Quest.java)" = 2 ] \
+			|| { echo "script event delivery not found" >&2; exit 1; }
 		find src -name "*.java" \
 			| grep -v -e "/commons/pool/ThreadPool.java$" -e "/commons/pool/ConnectionPool.java$" \
 			          -e "/commons/random/Rnd.java$" > sources.txt

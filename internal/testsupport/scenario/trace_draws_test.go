@@ -27,7 +27,7 @@ func TestCheckTraceRejectsAnUnknownJournalStatement(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			trace := "# player object 500\n# kill 20120 (object 700)\nS ActionFailed 25\n" + tc.stmt + "\n"
-			_, err := checkTrace(traceScenario(t, "kill wolf\n  S ActionFailed\n"), []byte(trace), nil)
+			_, _, err := checkTrace(traceScenario(t, "kill wolf\n  S ActionFailed\n"), []byte(trace), nil)
 			switch {
 			case tc.want == "" && err != nil:
 				t.Fatalf("checkTrace error = %v, want none", err)
@@ -42,7 +42,7 @@ func TestCheckTraceRejectsAnUnknownJournalStatement(t *testing.T) {
 // same bounds, in the same order and count.
 func TestTraceDrawsCompareBoundsPerStep(t *testing.T) {
 	sc := traceScenario(t, "random always 0\nkill wolf\n  S ActionFailed\nkill wolf\n  S ActionFailed\nkill wolf\n")
-	want, err := checkTrace(sc, []byte(drawsTrace), nil)
+	want, _, err := checkTrace(sc, []byte(drawsTrace), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestTraceDrawsCompareBoundsPerStep(t *testing.T) {
 // A trace that pins draws needs the random line that makes the run pin and
 // record its own.
 func TestCheckTraceDrawsNeedARandomLine(t *testing.T) {
-	_, err := checkTrace(traceScenario(t, "kill wolf\n  S ActionFailed\nkill wolf\n  S ActionFailed\n"), []byte(drawsTrace), nil)
+	_, _, err := checkTrace(traceScenario(t, "kill wolf\n  S ActionFailed\nkill wolf\n  S ActionFailed\n"), []byte(drawsTrace), nil)
 	if err == nil || !strings.Contains(err.Error(), "the trace pins script draws and the scenario has no random line") {
 		t.Fatalf("checkTrace error = %v", err)
 	}
@@ -100,12 +100,12 @@ func TestCheckTraceDrawsNeedARandomLine(t *testing.T) {
 func TestReadTraceRejectsAMalformedDraw(t *testing.T) {
 	for _, line := range []string{"# draw 100 Quest", "# draw x:0 Quest"} {
 		trace := "# player object 500\n# kill 20120 (object 700)\n" + line + "\n"
-		if _, err := checkTrace(traceScenario(t, "random always 0\nkill wolf\n"), []byte(trace), nil); err == nil || !strings.Contains(err.Error(), "is not a draw") {
+		if _, _, err := checkTrace(traceScenario(t, "random always 0\nkill wolf\n"), []byte(trace), nil); err == nil || !strings.Contains(err.Error(), "is not a draw") {
 			t.Fatalf("%s: checkTrace error = %v", line, err)
 		}
 	}
 	trace := "# player object 500\n# draw 100:0 Quest\n# kill 20120 (object 700)\n"
-	if _, err := checkTrace(traceScenario(t, "random always 0\nkill wolf\n"), []byte(trace), nil); err == nil || !strings.Contains(err.Error(), "before the first client packet") {
+	if _, _, err := checkTrace(traceScenario(t, "random always 0\nkill wolf\n"), []byte(trace), nil); err == nil || !strings.Contains(err.Error(), "before the first client packet") {
 		t.Fatalf("draw before a step: checkTrace error = %v", err)
 	}
 }
