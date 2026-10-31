@@ -15,7 +15,12 @@ and compiles them unchanged inside the harness `VitalsCopy.java.tmpl`:
 - `model/actor/Creature.java`: the HP statement of `doRevive`,
 - `skills/funcs/FuncMaxHpMul.java`: the maximum HP function (the constitution bonus),
 - `model/actor/status/PetStatus.java`: `getMaxHp`,
-- `model/actor/instance/Pet.java`: `restoreExp`,
+- `model/actor/instance/Pet.java`: `restoreExp` and `deathPenalty`,
+- `model/actor/status/PlayableStatus.java`: `addExp` (the pet's loss is applied through it),
+- `model/actor/Playable.java`: `doRevive` (the phoenix blessing restores the maximum HP and MP),
+- `model/residence/castle/Castle.java`: `spawnDoors` (a door respawns at its maximum HP, or
+  half of it at mid-victory),
+- `CreatureStatus.java` also `setMaxHp` and `setMaxHpMp`,
 - `Config.java`: the `RESPAWN_RESTORE_HP`, `HP_REGEN_MULTIPLIER` and `RAID_HP_REGEN_MULTIPLIER`
   assignments, and `CreatureTemplate.java`: the `hpRegen` default.
 
@@ -35,6 +40,13 @@ Line formats (`VitalsProbe.java`):
   stops,
 - `revive <maxHP> <HP>`: HP right after a plain revive,
 - `petmaxhp <base> <CON> <HP>` (a summon's maximum HP runs the same MAX_HP function),
+- `playablerevive <phoenix 0|1> <maxHP> <maxMP> <HP> <MP> <blessing left 0|1>`: a dead player
+  or summon right after `doRevive`,
+- `spawndoors <maxHP> <weak 0|1> <door was dead 0|1> <HP> <dead after 0|1>`,
+- `petdeath <level> <exp of level-1> <exp of level> <exp of level+1> <exp> <exp lost> <exp kept>
+  <exp after> <level after>`: a pet dying (the growth table has only those three rows; a loss
+  that would take the experience below zero is skipped, and the level after is only meaningful
+  below level 81),
 - `petexp <before death> <exp now> <power> <exp added>`.
 
 ## Regenerating

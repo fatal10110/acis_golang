@@ -74,8 +74,8 @@ func leaveWolfDead(t *testing.T) *offlinePetWorld {
 	drainUntilQuiet(t, h.client)
 	killPet(t, h, wolf)
 	drainUntilQuiet(t, observer)
-	if wolf.Exp() != 481 || wolf.Level() != wolfLevel-1 {
-		t.Fatalf("dead wolf exp %d level %d, want 481 at level %d", wolf.Exp(), wolf.Level(), wolfLevel-1)
+	if died := wolfDeath(t, 510); wolf.Exp() != died.After || wolf.Level() != died.Level {
+		t.Fatalf("dead wolf exp %d level %d, want %d at level %d", wolf.Exp(), wolf.Level(), died.After, died.Level)
 	}
 
 	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
