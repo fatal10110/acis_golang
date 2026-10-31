@@ -9,6 +9,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/vitals"
 )
 
 // wolfPrevLevelExp is where the growth row below the wolf's spawn level
@@ -22,6 +23,13 @@ func penaltyWolfTemplate() *npc.Template {
 	return wolf
 }
 
+// wolfDeath is what the reference leaves a wolf that dies holding exp, in
+// the growth table penaltyWolfTemplate builds (testdata/vitals.golden).
+func wolfDeath(t *testing.T, exp int64) vitals.PetDeathResult {
+	t.Helper()
+	return vitals.PetDeath(t, wolfLevel, wolfPrevLevelExp, wolfLevelExp, wolfNextLevelExp, exp)
+}
+
 // TestPetDeathPenalty kills level-10 wolves. Level 10 spans 500 experience
 // (500 to 1000), and a pet loses 6.5-0.07*10 = 5.8 percent of its level's
 // span on death: 29 experience. A wolf with less than that to lose keeps its
@@ -30,15 +38,14 @@ func penaltyWolfTemplate() *npc.Template {
 func TestPetDeathPenalty(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
-		name      string
-		exp       int64
-		wantExp   int64
-		wantLevel int
+		name string
+		exp  int64
 	}{
-		{"keeps its level", 700, 671, wolfLevel},
-		{"drops a level", 510, 481, wolfLevel - 1},
-		{"skips a loss below zero", 10, 10, wolfLevel},
+		{"keeps its level", 700},
+		{"drops a level", 510},
+		{"skips a loss below zero", 10},
 	} {
+		wantExp, wantLevel := wolfDeath(t, tt.exp).After, wolfDeath(t, tt.exp).Level
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
@@ -63,13 +70,13 @@ func TestPetDeathPenalty(t *testing.T) {
 			h.srv.InventoryUpdates.Tick()
 			frames := drainFrames(t, h.client)
 
-			if got := wolf.Exp(); got != tt.wantExp {
-				t.Fatalf("dead wolf exp = %d, want %d", got, tt.wantExp)
+			if got := wolf.Exp(); got != wantExp {
+				t.Fatalf("dead wolf exp = %d, want %d", got, wantExp)
 			}
-			if got := wolf.Level(); got != tt.wantLevel {
-				t.Fatalf("dead wolf level = %d, want %d", got, tt.wantLevel)
+			if got := wolf.Level(); got != wantLevel {
+				t.Fatalf("dead wolf level = %d, want %d", got, wantLevel)
 			}
-			if tt.wantLevel == wolfLevel {
+			if wantLevel == wolfLevel {
 				if got := h.liveCollarEnchant(t); got != wolfLevel {
 					t.Fatalf("collar enchant = %d, want %d kept", got, wolfLevel)
 				}
@@ -84,7 +91,7 @@ func TestPetDeathPenalty(t *testing.T) {
 					petInfo = i
 				case collar < 0 && frame[0] == serverpackets.OpcodeInventoryUpdate:
 					for _, e := range readCollarUpdates(t, frame) {
-						if e.objID == h.collarID && int(e.enchant) == tt.wantLevel {
+						if e.objID == h.collarID && int(e.enchant) == wantLevel {
 							collar = i
 						}
 					}
@@ -93,8 +100,8 @@ func TestPetDeathPenalty(t *testing.T) {
 			if petInfo < 0 || collar < 0 || petInfo > collar {
 				t.Fatalf("PetInfo at %d, collar InventoryUpdate at %d, want both, PetInfo first", petInfo, collar)
 			}
-			if got := h.persistedCollarEnchant(t); got != tt.wantLevel {
-				t.Fatalf("persisted collar enchant = %d, want %d", got, tt.wantLevel)
+			if got := h.persistedCollarEnchant(t); got != wantLevel {
+				t.Fatalf("persisted collar enchant = %d, want %d", got, wantLevel)
 			}
 		})
 	}

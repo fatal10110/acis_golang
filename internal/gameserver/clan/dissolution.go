@@ -56,7 +56,7 @@ func (s *Service) RequestDissolve(c *player.Character, now time.Time, sieges Sie
 		return nil, DissolveNotLeader
 	case cl.allyID != 0:
 		return cl, DissolveInAlliance
-	case len(cl.wars) > 0:
+	case cl.wars.len() > 0:
 		return cl, DissolveAtWar
 	case cl.castleID > 0 || cl.hallID > 0:
 		return cl, DissolveOwnsResidence
@@ -162,13 +162,9 @@ func (s *Service) Destroy(cl *Clan, due bool, online func(int32) *player.Charact
 // other clan's lists; the stored rows go with cl's (DeleteClan).
 func (s *Service) forgetWars(cl *Clan) {
 	cl.mu.RLock()
-	related := make([]int32, 0, len(cl.wars)+len(cl.attackers))
-	for id := range cl.wars {
-		related = append(related, id)
-	}
-	for id := range cl.attackers {
-		related = append(related, id)
-	}
+	related := make([]int32, 0, cl.wars.len()+cl.attackers.len())
+	related = append(related, cl.wars.order()...)
+	related = append(related, cl.attackers.order()...)
 	cl.mu.RUnlock()
 	for _, id := range related {
 		other, ok := s.table.Get(id)
@@ -176,10 +172,10 @@ func (s *Service) forgetWars(cl *Clan) {
 			continue
 		}
 		unlock := lockPair(cl, other)
-		delete(other.wars, cl.id)
-		delete(other.attackers, cl.id)
-		delete(cl.wars, id)
-		delete(cl.attackers, id)
+		other.wars.remove(cl.id)
+		other.attackers.remove(cl.id)
+		cl.wars.remove(id)
+		cl.attackers.remove(id)
 		unlock()
 	}
 }

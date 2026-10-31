@@ -100,9 +100,11 @@ public final class VitalsCopy
 			return raid;
 		}
 
+		boolean dead;
+
 		boolean isDead()
 		{
-			return false;
+			return dead;
 		}
 
 		Status getStatus()
@@ -112,8 +114,63 @@ public final class VitalsCopy
 
 		void doRevive()
 		{
+			dead = false;
 @@REVIVE@@
 		}
+	}
+
+	static final class Revive
+	{
+		Revive(Object creature)
+		{
+		}
+	}
+
+	// A player or summon: its doRevive is cut from the reference; the phoenix
+	// blessing is a flag the revive consumes.
+	static final class Playable extends Creature
+	{
+		boolean phoenixBlessed;
+
+		Playable()
+		{
+			super(false);
+		}
+
+		boolean isTeleporting()
+		{
+			return false;
+		}
+
+		void setIsDead(boolean value)
+		{
+			dead = value;
+		}
+
+		boolean isPhoenixBlessed()
+		{
+			return phoenixBlessed;
+		}
+
+		void stopPhoenixBlessing(Object effect)
+		{
+			phoenixBlessed = false;
+		}
+
+		void broadcastPacket(Object packet)
+		{
+		}
+
+		@Override
+@@PLAYABLEREVIVE@@
+	}
+
+	// The doors of a castle: spawnDoors is cut from the reference.
+	static final class Castle
+	{
+		final java.util.List<Door> _doors = new java.util.ArrayList<>();
+
+@@SPAWNDOORS@@
 	}
 
 	static final class Door extends Creature
@@ -121,6 +178,10 @@ public final class VitalsCopy
 		Door()
 		{
 			super(false);
+		}
+
+		void closeMe()
+		{
 		}
 
 @@DAMAGE@@
@@ -157,9 +218,11 @@ public final class VitalsCopy
 			return maxHp;
 		}
 
+		int maxMp;
+
 		int getMaxMp()
 		{
-			return 0;
+			return maxMp;
 		}
 
 		int getLevel()
@@ -179,6 +242,7 @@ public final class VitalsCopy
 
 		void setMp(double newMp, boolean broadcast)
 		{
+			_mp = newMp;
 		}
 
 		void broadcastStatusUpdate()
@@ -206,6 +270,10 @@ public final class VitalsCopy
 
 @@HPRATIO@@
 
+@@SETMAXHP@@
+
+@@SETMAXHPMP@@
+
 @@SETHP1@@
 
 @@SETHP@@
@@ -225,11 +293,34 @@ public final class VitalsCopy
 @@PETMAXHP@@
 	}
 
-	// A pet's experience: what it lost on death and the restore of it.
+	static final class PlayerLevelData
+	{
+		static final PlayerLevelData INSTANCE = new PlayerLevelData();
+
+		static PlayerLevelData getInstance()
+		{
+			return INSTANCE;
+		}
+
+		long getRequiredExpForHighestLevel()
+		{
+			return Long.MAX_VALUE / 2;
+		}
+
+		int getMaxLevel()
+		{
+			return 81;
+		}
+	}
+
+	// A pet's experience: what it lost on death and the restore of it. Its
+	// growth table has the rows the probe sets; a level without a row starts at 0.
 	static final class PetExp
 	{
 		long _expBeforeDeath;
 		long exp;
+		int level;
+		final long[] expForLevel = new long[200];
 
 		PetExp getStatus()
 		{
@@ -241,10 +332,35 @@ public final class VitalsCopy
 			return exp;
 		}
 
-		void addExp(long value)
+		void setExp(long value)
 		{
-			exp += value;
+			exp = value;
 		}
+
+		int getLevel()
+		{
+			return level;
+		}
+
+		void addLevel(byte value)
+		{
+			level += value;
+		}
+
+		long getExpForLevel(int lvl)
+		{
+			return expForLevel[lvl];
+		}
+
+		// deathPenalty is private in the reference: the pet's death calls it.
+		void die()
+		{
+			deathPenalty();
+		}
+
+@@ADDEXP@@
+
+@@DEATHPENALTY@@
 
 @@RESTORE@@
 	}

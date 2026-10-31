@@ -30,4 +30,13 @@ func TestGoldenAnswers(t *testing.T) {
 	if got := PetExpRestored(t, 510, 481, 100); got != 29 {
 		t.Errorf("PetExpRestored(510, 481, 100) = %d, want 29", got)
 	}
+	if hp, mp := PhoenixRevivedVitals(t, 410, 200); hp != 410 || mp != 200 {
+		t.Errorf("PhoenixRevivedVitals(410, 200) = %v, %v, want both at the maximum", hp, mp)
+	}
+	if got := RespawnedDoorHP(t, 601, true, true); got != 300 {
+		t.Errorf("RespawnedDoorHP(601, weak, dead) = %v, want 300", got)
+	}
+	if got := PetDeath(t, 10, 200, 500, 1000, 510); got != (PetDeathResult{Lost: 29, Before: 510, After: 481, Level: 9}) {
+		t.Errorf("PetDeath(10, exp 510) = %+v", got)
+	}
 }

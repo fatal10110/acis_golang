@@ -1,6 +1,7 @@
 // Package vitals answers the exact door and pet vital-sign values behavior
-// tests assert: door damage stages, door regeneration ticks, revive HP, a
-// pet's maximum HP and the experience a resurrection gives back. The answers
+// tests assert: door damage stages, door regeneration ticks, revive HP, the
+// HP of respawned castle doors, a pet's maximum HP, the experience a pet
+// loses on death and the experience a resurrection gives back. The answers
 // are not worked by hand: they come from testdata/vitals.golden, the output of
 // testdata/oracle/run.sh, which runs the reference code itself (formats in the
 // README there). A question the golden does not list fails the test.
@@ -37,6 +38,30 @@ type petExpKey struct {
 	power       float64
 }
 
+type reviveKey struct {
+	blessed bool
+	maxHP   int
+	maxMP   int
+}
+
+type doorsKey struct {
+	maxHP      int
+	weak, dead bool
+}
+
+type petDeathKey struct {
+	level                int
+	prev, cur, next, exp int64
+}
+
+// PetDeathResult is what a pet's death penalty leaves.
+type PetDeathResult struct {
+	Lost   int64 // experience taken off; 0 when the loss was skipped, negative past level 93
+	Before int64 // experience kept for a resurrection to give back
+	After  int64 // experience after the death
+	Level  int   // level after the death (meaningful below level 81)
+}
+
 type table struct {
 	damage map[int][]run
 	period map[string]time.Duration
@@ -44,6 +69,10 @@ type table struct {
 	revive map[int]float64
 	petHP  map[[2]int]int
 	petExp map[petExpKey]int64
+
+	playableRevive map[reviveKey][2]float64
+	doors          map[doorsKey]float64
+	petDeath       map[petDeathKey]PetDeathResult
 }
 
 var (
@@ -56,6 +85,7 @@ func load() *table {
 		loaded = table{
 			damage: map[int][]run{}, period: map[string]time.Duration{}, regen: map[regenKey][]Tick{},
 			revive: map[int]float64{}, petHP: map[[2]int]int{}, petExp: map[petExpKey]int64{},
+			playableRevive: map[reviveKey][2]float64{}, doors: map[doorsKey]float64{}, petDeath: map[petDeathKey]PetDeathResult{},
 		}
 		for _, line := range strings.Split(golden, "\n") {
 			f := strings.Fields(line)
@@ -100,6 +130,14 @@ func (t *table) add(f []string) (err error) {
 		t.petHP[[2]int{atoi(f[1]), atoi(f[2])}] = atoi(f[3])
 	case "petexp":
 		t.petExp[petExpKey{whole(f[1]), whole(f[2]), num(f[3])}] = whole(f[4])
+	case "playablerevive":
+		t.playableRevive[reviveKey{f[1] == "1", atoi(f[2]), atoi(f[3])}] = [2]float64{num(f[4]), num(f[5])}
+	case "spawndoors":
+		t.doors[doorsKey{atoi(f[1]), f[2] == "1", f[3] == "1"}] = num(f[4])
+	case "petdeath":
+		t.petDeath[petDeathKey{atoi(f[1]), whole(f[2]), whole(f[3]), whole(f[4]), whole(f[5])}] = PetDeathResult{
+			Lost: whole(f[6]), Before: whole(f[7]), After: whole(f[8]), Level: atoi(f[9]),
+		}
 	default:
 		return fmt.Errorf("unknown line kind %q", f[0])
 	}
@@ -185,4 +223,40 @@ func PetExpRestored(tb testing.TB, before, exp int64, power float64) int64 {
 		tb.Fatalf("vitals.golden has no pet exp line for %d -> %d at power %v", before, exp, power)
 	}
 	return n
+}
+
+// PhoenixRevivedVitals is the HP and MP a dead player or summon with the
+// given maximums has right after a revive that consumed its phoenix blessing:
+// both at their maximum (a plain revive restores the share RevivedHP gives).
+func PhoenixRevivedVitals(tb testing.TB, maxHP, maxMP int) (hp, mp float64) {
+	tb.Helper()
+	v, ok := load().playableRevive[reviveKey{true, maxHP, maxMP}]
+	if !ok {
+		tb.Fatalf("vitals.golden has no phoenix revive line for max HP %d, max MP %d", maxHP, maxMP)
+	}
+	return v[0], v[1]
+}
+
+// RespawnedDoorHP is the HP a castle door of maxHP has when the castle's
+// doors respawn at a siege start (weak false) or, after the walls fell and
+// the defenders won, at mid-victory (weak true: half the maximum, rounded
+// down), whether the door stood (wasDead false) or was destroyed.
+func RespawnedDoorHP(tb testing.TB, maxHP int, weak, wasDead bool) float64 {
+	tb.Helper()
+	hp, ok := load().doors[doorsKey{maxHP, weak, wasDead}]
+	if !ok {
+		tb.Fatalf("vitals.golden has no respawned door line for max HP %d (weak %v, dead %v)", maxHP, weak, wasDead)
+	}
+	return hp
+}
+
+// PetDeath is what a pet of level dying with exp leaves, in a growth table
+// where level-1 starts at prev, level at cur and level+1 at next.
+func PetDeath(tb testing.TB, level int, prev, cur, next, exp int64) PetDeathResult {
+	tb.Helper()
+	r, ok := load().petDeath[petDeathKey{level, prev, cur, next, exp}]
+	if !ok {
+		tb.Fatalf("vitals.golden has no pet death line for level %d (%d, %d, %d) at exp %d", level, prev, cur, next, exp)
+	}
+	return r
 }
