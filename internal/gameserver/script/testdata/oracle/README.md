@@ -112,7 +112,7 @@ what the reference does in the scenario's own world:
   other; a cast's hit time and reuse delay follow them, so its `MagicSkillUse` matches the Go
   run's;
 - an NPC the scenario kills or hits is made the Go runner's fixture monster of the NPC line's
-  type: level 1, 1000 HP, no experience, SP, drops, skills, minions or aggression, its script
+  type: level 1 (the NPC line's level option, if any), 1000 HP, no experience, SP, drops, skills, minions or aggression, its script
   bindings kept. The templates get their own values back once the scenario is over;
 - a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value

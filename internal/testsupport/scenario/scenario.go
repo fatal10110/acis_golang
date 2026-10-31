@@ -359,7 +359,8 @@
 // character's); nor does the reference probe play a skill, door or summon line, an npc
 // line's clan or skill, a hit by another creature, an approach to a
 // distance, a cast or a jump, a clock line, an npc line's ai,
-// params, level, aggro, mp, mem, privates or master or an event, hp, mp, want, die, top,
+// params, aggro, mp, mem, privates or master or an event, a level on an npc
+// no kill or hit step names (the probe gives only a fought one its level), hp, mp, want, die, top,
 // land, stance or swing step, a skill hit, or a step's own random line, so a
 // traced scenario takes none.
 //

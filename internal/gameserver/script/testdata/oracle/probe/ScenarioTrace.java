@@ -258,7 +258,7 @@ final class ScenarioTrace
 	private boolean _muted;
 
 	/** An npc line: params holds the three spawn parameters the line gives (a number, an NPC role or character), null for none; ai the AI parameters of its ai option, which replace the template's as the Go runner's fixture template has only them, null for none. */
-	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai)
+	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level)
 	{
 	}
 
@@ -607,7 +607,7 @@ final class ScenarioTrace
 					_draws = Arrays.stream(f, _always ? 2 : 1, f.length).mapToInt(Integer::parseInt).toArray();
 				}
 				case "clock" -> _clock = clock(f[1]);
-				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f)));
+				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f), npcLevel(f)));
 				case "script", "stub" -> _scripts.add(ScriptProbe.PKG + f[1]);
 				case "hold" -> _holds.add(new int[]
 				{
@@ -689,6 +689,15 @@ final class ScenarioTrace
 			if (f[i].equals("params"))
 				return new String[] { f[i + 1], f[i + 2], f[i + 3] };
 		return null;
+	}
+
+	/** The template level of an npc line's level option, 0 without one. */
+	private static int npcLevel(String[] f)
+	{
+		for (int i = 7; i + 1 < f.length; i++)
+			if (f[i].equals("level"))
+				return Integer.parseInt(f[i + 1]);
+		return 0;
 	}
 
 	/** The mate line's flags: sponsor or apprentice, online, hold lines, and the offset. */
@@ -1227,7 +1236,11 @@ final class ScenarioTrace
 				if (n.ai() != null)
 					alter(NpcTemplate.class, template, "_aiParams", new NpcMemo(n.ai()));
 				if (fought.contains(n.role()))
+				{
 					fixture(template, n.type());
+					if (n.level() > 0)
+						alter(NpcTemplate.class, template, "_level", (byte) n.level());
+				}
 				spawn(n);
 			}
 			ThreadPool.advance(0);
