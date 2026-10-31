@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"math"
 	"os"
-	"sort"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -53,9 +52,10 @@ func rawMDef(a *Actor) float64 {
 }
 
 // goldenSummonScenarios is summon.Actor's half of the stat pipeline parity
-// oracle described in issue #1527: see the player and npc packages' golden
-// tests for the same shape of coverage (same-order attach-sequence
-// sensitivity, Set rebasing, attach/detach round-tripping).
+// oracle: see the player and npc packages' golden tests for the same shape of
+// coverage (same-order attach-sequence sensitivity, Set rebasing,
+// attach/detach round-tripping). testdata/oracle/StatPipelineProbe.java runs
+// the same cases through the reference calculator; keep the two in step.
 func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	t.Helper()
 	out := make(map[string]float64)
@@ -106,49 +106,21 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	return out
 }
 
-func TestGoldenSummonStatPipelineCapture(t *testing.T) {
-	if os.Getenv("ACIS_CAPTURE_GOLDEN") == "" {
-		t.Skip("set ACIS_CAPTURE_GOLDEN=1 to (re)capture the golden fixture from the current implementation")
-	}
-	got := goldenSummonScenarios(t)
-	writeSummonGolden(t, "testdata/golden_stats.json", got)
-}
-
-// TestGoldenSummonStatPipelineParity pins the stat func pipeline to
-// testdata/golden_stats.json. The file is captured from this implementation
-// (TestGoldenSummonStatPipelineCapture), not reference output; a reference
-// stat-pipeline probe is #4328.
+// TestGoldenSummonStatPipelineParity compares the stat func pipeline with
+// testdata/golden_stats.json, the reference calculator's output for the same
+// base stats and funcs. testdata/oracle/StatPipelineProbe.java produces it;
+// its cases mirror goldenSummonScenarios (see testdata/oracle/README.md).
 func TestGoldenSummonStatPipelineParity(t *testing.T) {
 	want := readSummonGolden(t, "testdata/golden_stats.json")
 	got := goldenSummonScenarios(t)
 	compareSummonGolden(t, want, got)
 }
 
-func writeSummonGolden(t testing.TB, path string, values map[string]float64) {
-	t.Helper()
-	keys := make([]string, 0, len(values))
-	for k := range values {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	bitsMap := make(map[string]uint64, len(values))
-	for _, k := range keys {
-		bitsMap[k] = math.Float64bits(values[k])
-	}
-	data, err := json.MarshalIndent(bitsMap, "", "  ")
-	if err != nil {
-		t.Fatalf("marshal golden fixture: %v", err)
-	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatalf("write golden fixture %s: %v", path, err)
-	}
-}
-
 func readSummonGolden(t testing.TB, path string) map[string]float64 {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read golden fixture %s: %v (capture it first with ACIS_CAPTURE_GOLDEN=1)", path, err)
+		t.Fatalf("read golden fixture %s: %v (regenerate it with testdata/oracle/run.sh)", path, err)
 	}
 	var bitsMap map[string]uint64
 	if err := json.Unmarshal(data, &bitsMap); err != nil {
