@@ -24,7 +24,7 @@ func waterIndex(t *testing.T) (*zone.Index, *zone.Water) {
 	return ix, water
 }
 
-func assertViewEvents(t *testing.T, when string, sink *recordingSink, want ...event.NPCInfoChanged) {
+func assertViewEvents(t *testing.T, when string, sink *recordingSink, want ...event.Event) {
 	t.Helper()
 	if len(sink.events) != len(want) {
 		t.Fatalf("%s: events = %v, want %v", when, sink.events, want)
@@ -42,7 +42,9 @@ func assertViewEvents(t *testing.T, when string, sink *recordingSink, want ...ev
 // (WaterZone.onEnter and onExit, WaterZone.java:28-59): spawning in water
 // enters the zone and swims, showing observers the stationary view of an
 // NPC whose move speed is 0 and the full one otherwise; despawning leaves
-// the zone, showing it again on dry land.
+// the zone, showing it again on dry land. The spawn sequence's stance
+// change (walk NpcInfo re-sent running, ChangeMoveType first when the NPC
+// can move) comes before the zone entry, as on every NPC spawn path (#4352).
 func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -52,6 +54,10 @@ func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 		{"still", 0, true},
 		{"able to move", 20, false},
 	} {
+		spawned := []event.Event{event.NPCInfoChanged{}, event.NPCInfoChanged{ServerObject: tc.stationary}}
+		if tc.runSpeed != 0 {
+			spawned = append([]event.Event{event.MoveTypeChanged{Running: true}}, spawned...)
+		}
 		t.Run("decoration "+tc.name, func(t *testing.T) {
 			ix, water := waterIndex(t)
 			inst, err := NewInstance(7, &Template{ID: 13006, Type: "ChristmasTree", RunSpeed: tc.runSpeed, WalkSpeed: tc.runSpeed})
@@ -71,7 +77,7 @@ func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 			if got := d.NPCInfoSnapshot().MoveType; got != int(move.MoveSwim) {
 				t.Fatalf("decoration in water shows move type %d, want %d (swim)", got, move.MoveSwim)
 			}
-			assertViewEvents(t, "spawned in water", sink, event.NPCInfoChanged{ServerObject: tc.stationary})
+			assertViewEvents(t, "spawned in water", sink, spawned...)
 			d.Despawn()
 			if water.Core().Inside(d.zones) || d.InsideZone(zone.FlagWater) {
 				t.Fatal("despawned decoration is still in the water")
@@ -92,7 +98,7 @@ func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 			if !water.Core().Inside(ep.zones) || !ep.InsideZone(zone.FlagWater) {
 				t.Fatal("effect point spawned in water is not in it")
 			}
-			assertViewEvents(t, "spawned in water", sink, event.NPCInfoChanged{ServerObject: tc.stationary})
+			assertViewEvents(t, "spawned in water", sink, spawned...)
 			ep.Despawn()
 			if water.Core().Inside(ep.zones) || ep.InsideZone(zone.FlagWater) {
 				t.Fatal("despawned effect point is still in the water")

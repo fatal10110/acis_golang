@@ -66,27 +66,30 @@ func readObjectFrames(c *testsupport.ScriptedClient, opcode byte, objID int32) [
 	return out
 }
 
-// assertPointNPCInfo fails unless frames hold exactly one NpcInfo of the
-// point: its template shown as 13018 and attackable 0, since no creature may
-// attack an effect point (EffectPoint.isAttackableBy).
-func assertPointNPCInfo(t *testing.T, frames [][]byte, what string) {
+// assertPointNPCInfo fails unless frames hold exactly want NpcInfo of the
+// point, each with its template shown as 13018 and attackable 0, since no
+// creature may attack an effect point (EffectPoint.isAttackableBy).
+func assertPointNPCInfo(t *testing.T, frames [][]byte, want int, what string) {
 	t.Helper()
-	if len(frames) != 1 {
-		t.Fatalf("%s: %d NpcInfo of the signet point, want 1", what, len(frames))
+	if len(frames) != want {
+		t.Fatalf("%s: %d NpcInfo of the signet point, want %d", what, len(frames), want)
 	}
-	r := wire.NewReader(frames[0][1:])
-	r.ReadInt32() // object id
-	if got := r.ReadInt32(); got != 13018+1_000_000 {
-		t.Fatalf("%s: NpcInfo template = %d, want %d", what, got, 13018+1_000_000)
-	}
-	if got := r.ReadInt32(); got != 0 {
-		t.Fatalf("%s: NpcInfo attackable = %d, want 0", what, got)
+	for _, f := range frames {
+		r := wire.NewReader(f[1:])
+		r.ReadInt32() // object id
+		if got := r.ReadInt32(); got != 13018+1_000_000 {
+			t.Fatalf("%s: NpcInfo template = %d, want %d", what, got, 13018+1_000_000)
+		}
+		if got := r.ReadInt32(); got != 0 {
+			t.Fatalf("%s: NpcInfo attackable = %d, want 0", what, got)
+		}
 	}
 }
 
 // TestSignetPointShownToCasterOnSpawn pins that a signet effect point is
 // shown like any NPC (EffectPoint does not override Npc.sendInfo): the
-// caster, who knows it as soon as it is placed, gets its NpcInfo, and its
+// caster, who knows it as soon as it is placed, gets its NpcInfo, again as
+// it takes its run stance (Npc.onSpawn), and its
 // DeleteObject when the signet ends and the point leaves the world.
 func TestSignetPointShownToCasterOnSpawn(t *testing.T) {
 	t.Parallel()
@@ -96,7 +99,7 @@ func TestSignetPointShownToCasterOnSpawn(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	point := castSignetPoint(t, srv, c)
-	assertPointNPCInfo(t, readObjectFrames(c, serverpackets.OpcodeNPCInfo, point.ObjectID()), "placed point")
+	assertPointNPCInfo(t, readObjectFrames(c, serverpackets.OpcodeNPCInfo, point.ObjectID()), 2, "placed point")
 
 	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
@@ -155,7 +158,7 @@ func TestSignetPointShownToPlayerWalkingIntoSight(t *testing.T) {
 		}
 		srv.TickPositions()
 	}
-	assertPointNPCInfo(t, readObjectFrames(wc, serverpackets.OpcodeNPCInfo, point.ObjectID()), "point walked into sight")
+	assertPointNPCInfo(t, readObjectFrames(wc, serverpackets.OpcodeNPCInfo, point.ObjectID()), 1, "point walked into sight")
 }
 
 // TestSignetPointClickAnswersActionFailed pins EffectPoint.onAction: a click

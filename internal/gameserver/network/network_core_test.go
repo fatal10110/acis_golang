@@ -891,15 +891,17 @@ func (sinkTestDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{0}} }
 func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		emit func(t *testing.T, state *world.State)
+		// emit triggers the broadcast under test; it calls drain to drop
+		// the frames its setup sent first.
+		emit func(t *testing.T, state *world.State, drain func())
 	}{
-		{"hostile", func(t *testing.T, state *world.State) {
+		{"hostile", func(t *testing.T, state *world.State, _ func()) {
 			h := newTestHostileNPC(t, 7)
 			h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state, nil)(h)})
 			state.Spawn(h, 0, 0, 0, 0)
 			h.BroadcastStop()
 		}},
-		{"summon", func(t *testing.T, state *world.State) {
+		{"summon", func(t *testing.T, state *world.State, _ func()) {
 			actor, err := summon.NewServitor(summon.ServitorConfig{ObjectID: 7})
 			if err != nil {
 				t.Fatal(err)
@@ -908,16 +910,17 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			state.Spawn(actor, 0, 0, 0, 0)
 			actor.BroadcastSelfSkillUse(1422, 1)
 		}},
-		{"effect point", func(t *testing.T, state *world.State) {
+		{"effect point", func(t *testing.T, state *world.State, drain func()) {
 			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1, sim.NewInline(time.Unix(0, 0)).NewQueue("effect-point"), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			ep.Attach(npc.Runtime{World: state, Sink: EffectPointSinks(state)(ep)})
 			ep.Spawn(0, 0, 0, 0)
+			drain() // the spawn sequence's NpcInfo frames
 			ep.BroadcastSkillLaunched(1, 1, []int32{1})
 		}},
-		{"door", func(t *testing.T, state *world.State) {
+		{"door", func(t *testing.T, state *world.State, _ func()) {
 			d, err := door.NewObject(7, &door.Template{ID: 1}, sinkTestDoorShape{})
 			if err != nil {
 				t.Fatal(err)
@@ -933,7 +936,13 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			state.Spawn(first, 10, 0, 0, 0)
 			state.Spawn(second, 20, 0, 0, 0)
 
-			tc.emit(t, state)
+			tc.emit(t, state, func() {
+				for _, r := range []*retainingReceiver{first, second} {
+					r.mu.Lock()
+					r.frames = nil
+					r.mu.Unlock()
+				}
+			})
 
 			if len(first.frames) != 1 || len(second.frames) != 1 {
 				t.Fatalf("frames = %d/%d, want 1/1", len(first.frames), len(second.frames))
