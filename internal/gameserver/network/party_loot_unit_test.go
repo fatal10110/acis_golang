@@ -120,7 +120,7 @@ func TestShareAdenaSkipsMembersAtTheCap(t *testing.T) {
 	first, second := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
 	a := newEquipTestLivePlayer(t, 2, first, templates, nil)
 	b := newEquipTestLivePlayer(t, 3, second, templates, nil)
-	l := &GameClientLink{log: zerolog.Nop(), ids: &sequentialIDs{next: 9000}}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), IDs: &sequentialIDs{next: 9000}})
 	l.killRewards = manager.NewKillRewardBook(manager.KillRewardSettings{PartyRange: 1500})
 	members := []*livePlayer{rich, a, b}
 

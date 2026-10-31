@@ -61,7 +61,7 @@ func TestLotteryPurchaseWithoutObjectIDChargesNothing(t *testing.T) {
 	})
 	live.lottoPicks = firstFivePicks()
 	lot := lottery.New(lottery.DefaultConfig(), drawnRoundStore{}, nil, nil, idleQueue(), zerolog.Nop())
-	l := &GameClientLink{log: zerolog.Nop(), ids: noIDs{}, lottery: lot}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), IDs: noIDs{}, Lottery: lot})
 	prize := lot.Status().Prize
 
 	if l.buyLotteryTicket(live) {
@@ -101,7 +101,7 @@ func TestLotteryClaimWithoutObjectIDKeepsTicket(t *testing.T) {
 	if _, adena := lot.Check(0, numbers); adena != 5000 {
 		t.Fatalf("the ticket wins %d, want the 5000 first prize", adena)
 	}
-	l := &GameClientLink{log: zerolog.Nop(), ids: noIDs{}, lottery: lot}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), IDs: noIDs{}, Lottery: lot})
 
 	l.claimLotteryTicket(live, 600)
 	if live.Inventory().ItemByObjectID(600) == nil {
@@ -155,7 +155,7 @@ func TestLotteryUnpaidPurchaseHoldsNoObjectID(t *testing.T) {
 	live.lottoPicks = firstFivePicks()
 	lot := lottery.New(lottery.DefaultConfig(), drawnRoundStore{}, nil, nil, idleQueue(), zerolog.Nop())
 	ids := &countingIDs{next: 9000}
-	l := &GameClientLink{log: zerolog.Nop(), ids: ids, lottery: lot}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), IDs: ids, Lottery: lot})
 	prize := lot.Status().Prize
 
 	for range 100 {

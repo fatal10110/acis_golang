@@ -49,7 +49,7 @@ func TestUnwiredOpcodeLogsNotWired(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%#x", op), func(t *testing.T) {
 			var logged bytes.Buffer
-			l := &GameClientLink{log: zerolog.New(&logged)}
+			l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.New(&logged)})
 			cs := &connState{client: newDispatchTestClient(t)}
 
 			if open := l.dispatch(context.Background(), cs, []byte{op, 0x01, 0x02}); !open {
@@ -75,7 +75,7 @@ func TestDispatchUnregisteredOpcodeLogsNotImplemented(t *testing.T) {
 		t.Fatalf("opcode %#x has a handler; pick an unregistered one", op)
 	}
 	var logged bytes.Buffer
-	l := &GameClientLink{log: zerolog.New(&logged)}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.New(&logged)})
 	cs := &connState{client: newDispatchTestClient(t)}
 
 	if open := l.dispatch(context.Background(), cs, []byte{op}); !open {

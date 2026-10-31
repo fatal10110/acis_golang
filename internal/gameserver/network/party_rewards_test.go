@@ -11,7 +11,7 @@ import (
 // RewardParty hands the kill reward a command channel's members as
 // characters, party by party, with the channel's level.
 func TestRewardPartyCommandChannel(t *testing.T) {
-	link := &GameClientLink{parties: party.NewRegistry[*livePlayer](func() time.Time { return time.Unix(0, 0) })}
+	link := newBareGameClientLink(t, GameClientLinkConfig{TradeClock: func() time.Time { return time.Unix(0, 0) }})
 	ps := make([]*livePlayer, 5)
 	for i, lvl := range []int{40, 30, 35, 52, 20} {
 		ps[i] = newTestLivePlayer(t, int32(i+1), &testsupport.FrameCapture{})

@@ -13,7 +13,7 @@ import (
 // member count and its leader's character; a party outside any channel
 // has none.
 func TestLootChannelCommandChannel(t *testing.T) {
-	link := &GameClientLink{parties: party.NewRegistry[*livePlayer](func() time.Time { return time.Unix(0, 0) })}
+	link := newBareGameClientLink(t, GameClientLinkConfig{TradeClock: func() time.Time { return time.Unix(0, 0) }})
 	ps := make([]*livePlayer, 5)
 	for i := range ps {
 		ps[i] = newTestLivePlayer(t, int32(i+1), &testsupport.FrameCapture{})

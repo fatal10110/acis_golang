@@ -42,7 +42,7 @@ func TestPlayerHelpItemIDSplitsTheWord(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
-			gcl := &GameClientLink{html: html}
+			gcl := newBareGameClientLink(t, GameClientLinkConfig{HTML: html})
 
 			gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: tc.command})
 
