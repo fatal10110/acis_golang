@@ -19,8 +19,9 @@ const (
 // or more wars keeps its larger table after they end.
 //
 // A chain that already holds eight ids when a ninth arrives is crowded: in
-// a table below 64 buckets the table grows until it holds three times the
-// current size at three quarters full (presize); from 64 buckets the chain
+// a table below 64 buckets the table doubles until three quarters of its
+// size reach four times the size it had (presize: 16 buckets become 128,
+// 32 become 256); from 64 buckets the chain
 // becomes a tree bucket, which lists its ids newest first and keeps the
 // order of its ids when the table doubles. A tree bucket that has shrunk
 // to a few ids turns back into a chain on removal, depending on the shape
@@ -72,8 +73,8 @@ func (s *warSet) add(id int32) {
 	}
 	if crowded {
 		if len(s.table) < setTreeMinSize {
-			// the table is grown to hold three times its size at
-			// three quarters full
+			// presize: double until three quarters of the table
+			// reach four times its current size
 			for want := 4 * len(s.table); want > threshold(len(s.table)); {
 				s.grow()
 			}
