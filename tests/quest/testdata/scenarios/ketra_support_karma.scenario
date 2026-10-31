@@ -1,0 +1,17 @@
+# Ketra Orc support (KetraOrcSupport): the grocer answers a player with karma its PK page, whatever the
+# alliance (here a Ketra ally of level 3).
+# Expectations are derived from the reference source (KetraOrcSupport.onFirstTalk) and replay the
+# reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/ketra_support_karma.golden
+character Ally 40
+standing 3
+karma 100
+script script.feature.KetraOrcSupport
+page script/feature/KetraOrcSupport/
+npc atan 31373 Merchant 0 -10 0
+
+action atan
+action atan
+  S ActionFailed
+  S NpcHtmlMessage obj=atan item=0 page=script/feature/KetraOrcSupport/31373-pk.htm
+  S ActionFailed

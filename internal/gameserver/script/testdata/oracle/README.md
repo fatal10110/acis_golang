@@ -120,8 +120,9 @@ what the reference does in the scenario's own world:
   from the seeded generator, reseeded per scenario. A script draw past the listed values, or
   outside its bound, fails the run. Each pinned draw is a `# draw` line of the step that drew
   it; the Go run of the same step must draw the same bounds in the same order;
-- the hold, equip, standing, pk, noble, cabal, festival, sealowner, memo and spoil lines are seeded as
+- the hold, equip, standing, pk, karma, warehouse, hero, noble, cabal, festival, sealowner, memo and spoil lines are seeded as
   the Go runner seeds them (inventory items, a worn item, the Ketra/Varka standing, the PK count,
+  the karma, the private warehouse's items, the hero status,
   the noblesse status,
   the Seven Signs sign-up, the festival scores and the seal owners, both given back after the
   scenario, the player memo rows, and the spoiler of the monster of an NPC line: set after

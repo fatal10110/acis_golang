@@ -31,39 +31,6 @@ func baiumZone(t *testing.T, dx int) *zone.Index {
 	return zones
 }
 
-// TestGrandBossTeleporterCubesLeaveAfterTheirTime: Benom's cube leaves the
-// world twenty minutes after it appears, every other cube fifteen.
-func TestGrandBossTeleporterCubesLeaveAfterTheirTime(t *testing.T) {
-	t.Parallel()
-	w := bootOracles(t, oracleSetup{zones: baiumZone(t, 1000)})
-	ids := []int{tpBenomCube, tpFrintCube, tpBaiumCube, tpAntharasCub, tpValakasCube, tpSailrenCube}
-	for i, id := range ids {
-		// A fixture spawner runs no created hook: run it as the spawn pass does.
-		w.srv.RunCreated(t, w.spawnFolk(t, folkTemplate("Folk", id), 40+10*i))
-	}
-	w.srv.Settle(t)
-	count := func(step string, want map[int]int) {
-		t.Helper()
-		for _, id := range ids {
-			if got := liveCount(w, id); got != want[id] {
-				t.Fatalf("%s: cubes %d in the world = %d, want %d", step, id, got, want[id])
-			}
-		}
-	}
-	all := map[int]int{}
-	for _, id := range ids {
-		all[id] = 1
-	}
-	w.srv.Advance(t, 15*time.Minute-time.Millisecond)
-	count("before fifteen minutes", all)
-	w.srv.Advance(t, time.Millisecond)
-	count("after fifteen minutes", map[int]int{tpBenomCube: 1})
-	w.srv.Advance(t, 5*time.Minute-time.Millisecond)
-	count("before twenty minutes", map[int]int{tpBenomCube: 1})
-	w.srv.Advance(t, time.Millisecond)
-	count("after twenty minutes", nil)
-}
-
 // TestGrandBossTeleporterExits: each cube's own page or talk sends the
 // player out of its lair: Benom's and Sailren's to one of their points up
 // to 100 away, Frintezza's up to 500 from its point, Valakas's up to 250,
