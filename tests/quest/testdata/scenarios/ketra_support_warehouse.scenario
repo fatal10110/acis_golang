@@ -19,5 +19,6 @@ action jaff
   S ActionFailed
 bypass Quest KetraOrcSupport Withdraw
   S ActionFailed
+  S WarehouseWithdrawList kind=1 adena=0 items=7186x1
   S NpcHtmlMessage obj=jaff item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
   S ActionFailed

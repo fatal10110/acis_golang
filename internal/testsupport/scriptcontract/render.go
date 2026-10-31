@@ -20,7 +20,7 @@ import (
 // TutorialShowQuestionMark, TutorialEnableClientEvent, TutorialCloseHtml),
 // RadarControl, DropItem, MagicSkillUse, NpcSay, TeleportToLocation,
 // SpecialCamera, SocialAction, NpcInfo, DeleteObject, ChangeMoveType, Die,
-// ExPlayScene and Earthquake are decoded; any other packet is an error, because the goldens write those with the reference
+// ExPlayScene, Earthquake and WarehouseWithdrawList are decoded; any other packet is an error, because the goldens write those with the reference
 // class name and raw bytes.
 //
 // DropItem leaves out the dropped object's id and place, and MagicSkillUse
@@ -161,6 +161,32 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 		d.int32() // the place is the world's
 		intensity, duration, npc := d.int32(), d.int32(), d.int32()
 		out = fmt.Sprintf("S Earthquake intensity=%d duration=%d npc=%d", intensity, duration, npc)
+	case 0x42:
+		// A warehouse withdrawal list renders its kind, the player's adena and each
+		// item's template and count: the object ids are the world's.
+		kind, adena := d.uint16(), d.int32()
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "S WarehouseWithdrawList kind=%d adena=%d items=", kind, adena)
+		n := d.uint16()
+		for i := range n {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+			d.uint16() // category
+			d.int32()  // object id
+			id, count := d.int32(), d.int32()
+			d.uint16() // sub-category
+			d.uint16() // custom type 1
+			d.int32()  // body part
+			d.uint16() // enchant level
+			d.uint16() // custom type 2
+			d.uint16()
+			d.int32() // object id again
+			d.int32() // augmentation
+			d.int32()
+			fmt.Fprintf(&sb, "%dx%d", id, count)
+		}
+		out = sb.String()
 	case 0xfe:
 		switch sub := d.uint16(); sub {
 		case 0x1a:

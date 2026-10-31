@@ -31,6 +31,9 @@ bypass Quest HeroWeapon 6612
 bypass Quest HeroWeapon 6610
 bypass Quest HeroWeapon 6622
 bypass Quest HeroWeapon abc
+bypass Quest HeroWeapon 57
+bypass Quest HeroWeapon 4294973907
+  items 6611=1 6612=1
 action monument
   S ActionFailed
   S NpcHtmlMessage obj=monument item=0 html="<html><body>Monument of Heroes:<br>\nYou are a Noblesse. Welcome. I offer many things - but only for Heroes.<br>\n\n<a action=\"bypass -h npc_{monument}_Quest HeroWeapon\">\"I want to receive weapons for a Hero.\"</a><br>\n<a action=\"bypass -h npc_{monument}_Quest HeroCirclet\">\"I want to receive the Wings of Destiny Circlet for Heroes Only.\"</a><br>\n<a action=\"bypass npc_{monument}_Olympiad 4\">\"I want to verify who is the Hero of this era.\"</a>\n</body></html>\n"
