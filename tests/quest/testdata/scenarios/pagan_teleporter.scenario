@@ -1,7 +1,7 @@
 # The Pagan Temple (PaganTeleporter): the temple gatekeeper and the chapel gatekeeper, asked by a
 # character holding no mark, answer their refusals; Triol's mirror sends the character to the
-# temple, answering no page (onTalk). A scenario has no door the reference also stands, so the
-# doors the gatekeepers open are in tests/npcs/teleporters_210_pr3_test.go.
+# temple, answering no page (onTalk). The doors the gatekeepers open are in pagan_teleporter_doors_*
+# (the reference probe reads no door line).
 trace internal/gameserver/script/testdata/oracle/scenarios/pagan_teleporter.golden
 character Pilgrim 40
 script script.teleport.PaganTeleporter

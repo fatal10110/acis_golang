@@ -223,8 +223,8 @@ func (sc *Scenario) checkHalls() error {
 		}
 		for _, ck := range st.Checks {
 			if ck.Kind == "items" && !strings.Contains(ck.Args[0], "=") {
-				if _, ok := sc.mate(ck.Args[0]); !ok {
-					return fmt.Errorf("%d: items %s: no mate line names it", ck.Line, ck.Args[0])
+				if _, ok := sc.mate(ck.Args[0]); !ok && !sc.isMember(ck.Args[0]) {
+					return fmt.Errorf("%d: items %s: no mate or member line names it", ck.Line, ck.Args[0])
 				}
 			}
 		}

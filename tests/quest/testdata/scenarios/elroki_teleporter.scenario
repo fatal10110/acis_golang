@@ -1,6 +1,7 @@
 # The Elroki teleporters (ElrokiTeleporter): Orahochin sends a character out of combat on,
-# answering no page (onTalk). A scenario puts no character in its attack stance, so Orahochin's
-# refusal and Gariachin's trip back are in tests/npcs/teleporters_210_pr3_test.go.
+# answering no page (onTalk). Orahochin's refusal of a character in its attack stance and Gariachin's
+# trip back are in elroki_teleporter_in_combat and elroki_teleporter_gariachin_in_combat (the
+# reference probe's hits put nobody in a stance).
 trace internal/gameserver/script/testdata/oracle/scenarios/elroki_teleporter.golden
 character Islander 40
 script script.teleport.ElrokiTeleporter

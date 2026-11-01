@@ -285,8 +285,8 @@ func (sc *Scenario) checkStateStep(verb string, args []string, roles map[string]
 			return fmt.Errorf("land <target> <skill id> <level> [by <creature>]")
 		}
 	case "stance":
-		if !roles[args[0]] || (args[1] != "on" && args[1] != "off") {
-			return fmt.Errorf("stance <role> <on|off>")
+		if (args[0] != "player" && !roles[args[0]]) || (args[1] != "on" && args[1] != "off") {
+			return fmt.Errorf("stance <role|player> <on|off>")
 		}
 	case "swing":
 		if !roles[args[0]] {
@@ -319,7 +319,7 @@ func checkStateCheck(kind string, args []string) error {
 		"effect":   "effect <role|player> <skill id> <held|none>",
 		"dead":     "dead <role|player> <yes|no>",
 		"inworld":  "inworld <role> <yes|no>",
-		"stance":   "stance <role> <on|off>",
+		"stance":   "stance <role|player> <on|off>",
 	}[kind]
 	bad := fmt.Errorf("%s", usage)
 	switch kind {
@@ -406,7 +406,7 @@ func (sc *Scenario) checkStateRoles(roles map[string]bool) error {
 			}
 			bad := ""
 			switch ck.Kind {
-			case "hp", "effect", "dead":
+			case "hp", "effect", "dead", "stance":
 				if ck.Args[0] != "player" && !roles[ck.Args[0]] {
 					bad = ck.Args[0]
 				}
@@ -453,9 +453,9 @@ func (sc *Scenario) tracedState() string {
 	}):
 		return "aggro, mem, privates or master option on an npc line"
 	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
-		return slices.Contains(stateVerbs, st.Verb) || st.Random != nil || (st.Verb == "hit" && len(st.Args) >= 5)
+		return (slices.Contains(stateVerbs, st.Verb) && !(st.Verb == "stance" && st.Args[0] == "player")) || st.Random != nil || (st.Verb == "hit" && len(st.Args) >= 5)
 	}):
-		return "hp, mp, want, die, top, land, stance or swing step, skill hit or random line in a step"
+		return "hp, mp, want, die, top, land or swing step, an NPC's stance step, skill hit or random line in a step"
 	case slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Level != 0 && !sc.fights(n.Role) }):
 		// The probe makes only the NPCs a kill or hit step names the fixture
 		// monster that takes a level; it plays every other one as shipped.

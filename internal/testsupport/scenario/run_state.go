@@ -224,6 +224,10 @@ func (r *run) state(t *testing.T, verb string, args []string) {
 		}
 		r.on(t, args[0], post, func() { h.AI().SetTopDesireTarget(top) })
 	case "stance":
+		if args[0] == "player" {
+			r.playerStance(t, args[1] == "on")
+			return
+		}
 		h, post := r.hostile(t, args[0])
 		r.on(t, args[0], post, func() { h.SetInCombat(args[1] == "on") })
 	case "land":
@@ -378,6 +382,9 @@ func (r *run) stateCheck(t *testing.T, ck Check) string {
 		_, in := r.srv.State.Object(r.objs[role])
 		return FirstDiff(role+" in the world", []string{yesNo(in)}, []string{ck.Args[1]})
 	case "stance":
+		if role == "player" {
+			return FirstDiff("player attack stance", []string{onOff(r.playerInStance(t))}, []string{ck.Args[1]})
+		}
 		on := r.liveNPC(t, role).InCombat()
 		return FirstDiff(role+" attack stance", []string{map[bool]string{true: "on", false: "off"}[on]}, []string{ck.Args[1]})
 	case "top":

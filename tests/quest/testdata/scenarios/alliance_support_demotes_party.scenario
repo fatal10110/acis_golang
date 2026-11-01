@@ -1,0 +1,23 @@
+# The killer's party loses its alliances (KetraOrcSupport onMyDying, testKetraDemote): Leader (Ketra 5,
+# level 5 badge), Mate (Ketra 2, level 2 badge) and Third (Varka 3, level 3 Varka badge) are one party;
+# Leader kills a Ketra footman. Leader and Mate lose the alliance, each badge going down a level; Third
+# keeps the Varka alliance and its badge. Not traced: the reference probe plays no member line.
+character Leader 40
+standing 5
+hold 7215 1
+member Mate 40 standing 2 hold 7212 1
+member Third 40 standing -3 hold 7223 1
+item 7211 7212 7214 7215 7222 7223
+script script.feature.KetraOrcSupport
+script script.feature.VarkaSilenosSupport
+npc footman 21324 Monster 40 0 0
+
+kill footman
+  S SystemMessage id=302 3:7215
+  S SystemMessage id=54 3:7214
+  standing player 0
+  standing Mate 0
+  standing Third -3
+  items 7215=0 7214=1
+  items Mate 7212=0 7211=1
+  items Third 7223=1 7222=0

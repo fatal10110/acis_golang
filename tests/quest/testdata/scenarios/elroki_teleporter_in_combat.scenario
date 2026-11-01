@@ -1,0 +1,39 @@
+# Orahochin (ElrokiTeleporter) refuses a character in its attack stance with 32111-no.htm (onTalk,
+# isInCombat) and sends it on once the stance is over, 15 seconds after the last blow. The reference
+# probe sets and ends the stance through the stance step and the attack stance task on its own clock.
+trace internal/gameserver/script/testdata/oracle/scenarios/elroki_teleporter_in_combat.golden
+character Islander 40
+script script.teleport.ElrokiTeleporter
+page default/32111.htm
+page script/teleport/ElrokiTeleporter/
+npc orahochin 32111 Folk 10 0 0
+
+action orahochin
+action orahochin
+  S ActionFailed
+  S NpcHtmlMessage obj=orahochin item=0 page=default/32111.htm
+  S ActionFailed
+stance player on
+  stance player on
+bypass npc_{orahochin}_Quest ElrokiTeleporter
+  S NpcHtmlMessage obj=orahochin item=0 page=script/teleport/ElrokiTeleporter/32111-no.htm
+  S ActionFailed
+  S ActionFailed
+  stance player on
+advance 14s
+  stance player on
+advance 2s
+  stance player off
+action orahochin
+  S ActionFailed
+  S NpcHtmlMessage obj=orahochin item=0 page=default/32111.htm
+  S ActionFailed
+bypass npc_{orahochin}_Quest ElrokiTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=4990,-1879,-3178 fast=0
+  S DeleteObject obj=orahochin
+  S ActionFailed

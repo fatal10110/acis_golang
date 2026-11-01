@@ -111,6 +111,9 @@ type run struct {
 	mates []mateClient
 	// summon is the summon line's summon once called.
 	summon *summon.Actor
+	// stance is the clock of the attack stances when the scenario ends the
+	// character's: it moves with the advance steps.
+	stance stanceClock
 	// items is the item catalog the server runs with.
 	items *item.Table
 	// draws is the random line's source; traceDraws the draws the
@@ -313,7 +316,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		gameservertest.WithAITask(),
 		// A creature that attacks or is attacked holds an attack stance, which
 		// the behaviors read (in combat); nothing ends it during a run.
-		gameservertest.WithAttackStanceClock(time.Now),
+		gameservertest.WithAttackStanceClock(r.stanceNow()),
 		gameservertest.WithDrivenClockStart(r.clockStart()),
 		gameservertest.WithLevels(scenarioLevels(t)),
 		// The NPC population, with no maker, over the scenario's templates:
@@ -396,6 +399,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	for _, m := range r.sc.Members {
 		c := r.srv.SeedCharacterFor(t, memberAccount(m), m.Name, m.Level, 0)
 		seedExp(t, r.srv.DB, c.ID, m.Level)
+		r.seedMember(t, c.ID, m)
 		r.roles[c.ID] = m.Name
 		r.members = append(r.members, member{obj: c.ID})
 	}
@@ -840,7 +844,19 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	case "bypass":
 		w := wire.NewPacketWriter(clientpackets.OpcodeRequestBypassToServer)
 		w.WriteString(expandRoles(st.Args[0], r.objs))
+		for range st.Repeat - 1 {
+			// An xN bypass: the sends before the last are not compared.
+			c.Send(w.Bytes())
+			r.srv.ReadQueued(t, c)
+			if st.As == "" && r.character(t).Teleporting() {
+				// A trip the next send follows: the client has arrived.
+				c.Send(wire.NewPacketWriter(clientpackets.OpcodeAppearing).Bytes())
+				r.srv.ReadQueued(t, c)
+			}
+		}
 		c.Send(w.Bytes())
+	case "appear":
+		c.Send(wire.NewPacketWriter(clientpackets.OpcodeAppearing).Bytes())
 	case "link":
 		w := wire.NewPacketWriter(clientpackets.OpcodeRequestLinkHtml)
 		w.WriteString(st.Args[0])
@@ -877,6 +893,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	case "advance":
 		d, _ := time.ParseDuration(st.Args[0])
 		r.srv.AdvanceWithEffects(t, d)
+		r.passStanceTime(t, d)
 	case "approach":
 		distance := 100
 		if len(st.Args) == 2 {
@@ -983,7 +1000,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		if err != nil {
 			fail("%v", err)
 		}
-		if d := FirstDiff("packet", got, want); d != "" {
+		if d := FirstDiff("packet", matchNearTeleports(got, want), want); d != "" {
 			fail("%s", d)
 		}
 	}
@@ -1148,7 +1165,7 @@ func (r *run) check(t *testing.T, ck Check) string {
 		var got, want []string
 		owner, args := r.player, ck.Args
 		if !strings.Contains(args[0], "=") {
-			owner, args = mateObject(r.mateIndex(t, args[0])), args[1:]
+			owner, args = r.otherCharacter(t, args[0]), args[1:]
 		}
 		for _, a := range args {
 			id, count, _ := strings.Cut(a, "=")
@@ -1168,6 +1185,8 @@ func (r *run) check(t *testing.T, ck Check) string {
 			}
 		})
 		return FirstDiff(quest+" state", []string{got}, []string{want})
+	case "open", "dungeon", "standing":
+		return r.seedCheck(t, ck)
 	case "hate", "desires", "at":
 		return r.fightCheck(t, ck)
 	case "mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance":
