@@ -17,6 +17,31 @@ public final class Clan
 		return castle;
 	}
 
+	public int crestId;
+	public int clanId;
+	public int allyCrestId;
+	public int allyId;
+
+	public int getCrestId()
+	{
+		return crestId;
+	}
+
+	public int getClanId()
+	{
+		return clanId;
+	}
+
+	public int getAllyCrestId()
+	{
+		return allyCrestId;
+	}
+
+	public int getAllyId()
+	{
+		return allyId;
+	}
+
 	public Object getFlag()
 	{
 		return flag;

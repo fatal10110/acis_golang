@@ -62,17 +62,37 @@ row, and the target of a skill cast from the next row.
 
 ## Adding a packet
 
-1. Add `PacketProbe.emit("Name/variant", new Packet(...))` to `PacketProbe.java`, `ProbeSimple.java`
-   or `ProbeWorld.java`. `run.sh` compiles whatever the probe sources use through the source path,
+1. Add `PacketProbe.emit("Name/variant", new Packet(...))` to `PacketProbe.java`, `ProbeSimple.java`,
+   `ProbeWorld.java`, `ProbeEngine.java` or `ProbeCharacters.java`. `run.sh` compiles whatever the probe sources use through the source path,
    so there is no class list; extend `stub/` if a constructor reads another engine getter.
 2. Regenerate (below).
 3. Add the same-named case to `oracleSimpleCases` or `oracleWorldCases` in
    `../../packets_oracle_cases_test.go` (or `oracleCases` in `../../packets_oracle_test.go`).
 4. Delete the hand-written byte test the case replaces.
 
-Not yet probed (they read the engine item, player, clan, castle or skill graphs):
-`UserInfo`/`CharInfo`/`NpcInfo`/`PetInfo`, the item, shop, trade, private store, macro, henna and
-party windows, and the pledge windows that take a clan.
+The packets that describe a character, an npc or a summon (`ProbeCharacters.java`) are `UserInfo`,
+`CharInfo`, the npc view `NpcInfo`, the summon view `SummonInfo`, `PetInfo`, `PetStatusUpdate` and
+`ServerObjectInfo`. Their stand-ins are `Npc`, `Summon`, `Pet`, `Servitor`, `Cubic`, `NpcTemplate`,
+`CreatureStatus` (the plain status values; the player's, the boat's and every npc's and summon's
+extend or use it), `FishingStance` and `CursedWeaponManager`. Every field is a function of the shared
+row; `variants()` then changes row "a" one thing at a time (flags, mount, cubics, invisibility, ...).
+The Go cases are in `../../packets_oracle_character_test.go`.
+
+The stat values the Go side computes from a template, the level and the buffs (attack, defense,
+accuracy, speeds, multipliers, the maxima of a character with a template) are not free inputs: the
+probe's status holds the numbers the Go calculators answer for the fixed inputs of the cases
+(`ProbeCharacters.player` and `.live`), and `TestOracleCharacterInputsPinned` fails when a calculator
+moves them. Those cases pin the packet layout and the plain fields; the calculators have their own
+probes (`model/actor/{player,npc,summon}/testdata`).
+
+Not probed there: the polymorphed views (`PcMorphInfo`, and the name and title `UserInfo` shows for a
+polymorphed player), which have no Go counterpart; the rules that choose an npc's title, crest and
+level label and a summon's owner-invisible hiding, which belong to the callers that build the snapshots;
+and a summon that has not yet shown its summon animation. A player mounted with a summon out (the
+summon's collision radius and height) cannot occur in the Go model.
+
+Not yet probed (they read the engine item, clan, castle or skill graphs): the item, shop, trade,
+private store, macro, henna and party windows, and the pledge windows that take a clan.
 
 The manor set windows hold their seeds in a hash set and `SellListProcure` its rows in an
 identity-hash map, so their probes use one seed per castle and one row; the other manor windows

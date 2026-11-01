@@ -75,12 +75,14 @@ func (p *livePlayer) refreshInfos(w *world.State) {
 func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 	switch o := obj.(type) {
 	case *livePlayer:
+		hidden := hiddenFrom(o, p)
 		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
 			Character:          o.Character,
 			Template:           o.Template(),
 			Items:              o.inventoryItems(),
 			Clan:               p.link.clanFields(o.Character),
-			Hidden:             hiddenFrom(o, p),
+			Hidden:             hidden,
+			Revealed:           o.Invisible() && !hidden,
 			HeroAura:           p.link.heroAura(o),
 			SpawnProtectedTeam: p.link.spawnProtectedTeam(o),
 		}))
@@ -426,8 +428,8 @@ func (l *GameClientLink) summonInfoSnapshot(a *summon.Actor, viewer *livePlayer,
 		// A summon's show-summon-animation flag is set when it is created
 		// and never cleared, so every summon NpcInfo carries 2.
 		InCombat: inCombat, AlikeDead: a.AlikeDead(), SummonAnimation: 2,
-		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
-		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
+		RightHand: a.WeaponItemID(), Chest: a.ArmorItemID(),
+		Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
 		AbnormalEffect: a.AbnormalEffect(), Team: team,
 		Attackable: viewer != nil && a.AttackableWithoutForceBy(viewer.Character),
 	}
@@ -528,5 +530,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		Team:              owner.DuelTeam(),
 		SoulShotsPerHit:   ssCount,
 		SpiritShotsPerHit: spsCount,
+		Weapon:            a.WeaponItemID(),
+		Armor:             a.ArmorItemID(),
 	}, true
 }

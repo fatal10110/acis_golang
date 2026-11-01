@@ -14,4 +14,10 @@ public final class Castle
 	{
 		return _id;
 	}
+
+	// The clan holding the castle; read by the creature info packets.
+	public int getOwnerId()
+	{
+		return 0;
+	}
 }

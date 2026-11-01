@@ -40,6 +40,10 @@ const (
 	weaponEquippedBonusSlots = 40
 )
 
+// crystallizeSkillID is the skill that lets a character crystallize items;
+// the client draws the crystallize entry for whoever has it.
+const crystallizeSkillID = 248
+
 // mountNpcIdOffset is added to a mounted character's mount npc id so the
 // client can distinguish the mount field's id space from regular npc ids;
 // an unmounted character reports 0.
@@ -149,11 +153,6 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 
 	inventoryLimit := c.InventoryLimit()
 
-	enchantEffect := rhand.EnchantLevel
-	if enchantEffect > maxDisplayedEnchant {
-		enchantEffect = maxDisplayedEnchant
-	}
-
 	w.WriteInt32(int32(x))
 	w.WriteInt32(int32(y))
 	w.WriteInt32(int32(z))
@@ -251,7 +250,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(userInfoRelation(s.Clan.Leader, c.SiegeState()))
 	w.WriteUint8(uint8(c.MountType()))
 	w.WriteUint8(uint8(c.OperateType()))
-	w.WriteUint8(0) // crystallize flag: not modeled
+	w.WriteUint8(boolUint8(c.HasSkill(crystallizeSkillID)))
 
 	w.WriteInt32(int32(progression.PKKills))
 	w.WriteInt32(int32(progression.PvPKills))
@@ -287,7 +286,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0)
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))
-	w.WriteUint8(byte(enchantEffect))
+	w.WriteUint8(uint8(enchantEffect(c, paperdoll)))
 	if s.SpawnProtectedTeam {
 		w.WriteUint8(teamBlue)
 	} else {
