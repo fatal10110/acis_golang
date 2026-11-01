@@ -4,21 +4,25 @@ import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.itemcontainer.Inventory;
 
 // The armor and jewelry penalties of the defence funcs apply to a Player
-// only; the summon cases never construct one.
+// only: it carries the worn items and whether its class is a mage class.
 public class Player extends Creature
 {
-	public Player(CreatureTemplate template, int level)
+	private final Inventory _inventory = new Inventory();
+	private final boolean _mageClass;
+
+	public Player(CreatureTemplate template, int level, boolean mageClass)
 	{
 		super(template, level);
+		_mageClass = mageClass;
 	}
 
 	public Inventory getInventory()
 	{
-		throw new UnsupportedOperationException();
+		return _inventory;
 	}
 
 	public boolean isMageClass()
 	{
-		throw new UnsupportedOperationException();
+		return _mageClass;
 	}
 }
