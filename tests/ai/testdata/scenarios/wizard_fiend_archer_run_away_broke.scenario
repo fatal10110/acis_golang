@@ -11,3 +11,4 @@ npc archer 21514 Monster 300 0 0 level 71 mp 0 skill W_FIEND_ARCHER 4160 6
 
 hit archer 10
   mem archer i_ai0=1
+  desires archer attack(player)=1000

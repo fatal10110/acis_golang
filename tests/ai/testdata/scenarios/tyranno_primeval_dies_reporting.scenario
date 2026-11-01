@@ -1,5 +1,5 @@
 # TyrannoPrimeval (22215): event 11049 makes it report (i_quest2 1); dying while reporting it shouts. (The events
-# it broadcasts, 11051 within 8000 and 11044 within 5000, are heard by tests/ai/warrior_individual5c_test.go.)
+# it broadcasts, 11051 within 8000 and 11044 within 5000, are traced by tyranno_primeval_broadcasts.scenario.)
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc
