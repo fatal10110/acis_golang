@@ -25,8 +25,8 @@ const lhandPaperdollIndex = 8
 const maxDisplayedEnchant = 127
 
 // charSelectInfoCharID is the id every list entry carries ahead of its login
-// name: the client keys its list by slot, so it is the same constant for every
-// character, not the character's object id.
+// name: every entry carries this same constant, never the character's object
+// id.
 const charSelectInfoCharID = 0x00030b7a
 
 // paperdollWriteOrder is the equip-array position CharSelectInfo writes at

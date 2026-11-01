@@ -2,7 +2,6 @@ package net.sf.l2j.gameserver.data.manager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,7 +18,7 @@ public final class CastleManorManager
 {
 	private static final CastleManorManager INSTANCE = new CastleManorManager();
 
-	public final Map<Integer, Seed> seeds = new LinkedHashMap<>();
+	public final Map<Integer, Seed> seeds = new HashMap<>();
 	public final Map<Integer, List<SeedProduction>> production = new HashMap<>();
 	public final Map<Integer, List<SeedProduction>> productionNext = new HashMap<>();
 	public final Map<Integer, List<CropProcure>> procure = new HashMap<>();

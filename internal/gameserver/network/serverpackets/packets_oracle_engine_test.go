@@ -274,7 +274,7 @@ func addManorCases(m map[string]func() wire.Frame) {
 				{ID: 7777, Amount: 1, StartAmount: 2, Price: 3, Reward: 1},
 			})
 		}
-		m["ExShowManorDefaultInfo"+h] = func() wire.Frame { return FrameExShowManorDefaultInfo(hidden, []manor.Seed{A, B, C}) }
+		m["ExShowManorDefaultInfo"+h] = func() wire.Frame { return FrameExShowManorDefaultInfo(hidden, []manor.Seed{C, B, A}) }
 	}
 	m["ExShowSeedInfo/empty"] = func() wire.Frame { return FrameExShowSeedInfo(3, false, nil) }
 	m["ExShowCropInfo/empty"] = func() wire.Frame { return FrameExShowCropInfo(4, true, nil) }
@@ -327,8 +327,8 @@ func addManorCases(m map[string]func() wire.Frame) {
 	m["ExShowSellCropList/three"] = func() wire.Frame {
 		return FrameExShowSellCropList(2, []ManorHeldCrop{
 			{ObjectID: 268, CropID: 5073, Count: 12, Seed: A, Procure: &ManorListing{Amount: 3, Price: 31, Reward: 1}},
-			{ObjectID: 269, CropID: 5068, Count: 1, Seed: B},
 			{ObjectID: 270, CropID: 5100, Count: 0x7fffffff, Seed: C},
+			{ObjectID: 269, CropID: 5068, Count: 1, Seed: B},
 		})
 	}
 

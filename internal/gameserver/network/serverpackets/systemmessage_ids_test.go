@@ -28,6 +28,8 @@ func TestSystemMessageIDs(t *testing.T) {
 		{SystemMessageS1CPWillBeRestored, 1405},
 		{SystemMessageS2CPWillBeRestoredByS1, 1406},
 		{SystemMessageS2S3SCreatedForS1ForS4Adena, 1147},
+		{SystemMessageS2WasDroppedInTheS1Region, 1815},
+		{SystemMessageServerDownInS1Seconds, 1},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("system message id = %d, want %d", tc.got, tc.want)
