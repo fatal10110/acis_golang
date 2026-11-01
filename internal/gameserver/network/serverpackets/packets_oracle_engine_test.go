@@ -8,6 +8,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // oracleEngineCases are the packets the reference builds from its item, clan,
@@ -117,29 +119,60 @@ func addCharSelectedCases(m map[string]func() wire.Frame) {
 	for r, row := range oracleRows {
 		v := row.v
 		m["CharSelected/"+row.name] = func() wire.Frame {
-			c := &player.Character{
-				ID:          v[0],
-				Race:        player.Race(r),
-				Location:    loc(v[3], v[4], v[5]),
-				SP:          int(v[8]),
-				Exp:         int64(v[9])*1000003 + int64(v[0]),
-				CharLevel:   int(v[1] ^ v[2]),
-				KarmaPoints: int(v[3] ^ v[4]),
-				PKKills:     int(v[5] ^ v[6]),
-			}
-			c.SetName(oracleStrings[r].s)
-			c.SetTitle(oracleStrings[(r+1)%len(oracleStrings)].s)
-			c.SetClanID(v[1])
-			c.SetSex(player.Sex(v[2] & 1))
-			c.SetClassID(oracleClassIDs[r])
-			c.SetResourceValues(player.Resources{CurrentHP: float64(v[6]) + 0.5, CurrentMP: float64(v[7]) + 0.25})
-			tmpl := &player.Template{
-				INT: int(v[0] + 1), STR: int(v[1] + 2), CON: int(v[2] + 3),
-				MEN: int(v[3] + 4), DEX: int(v[4] + 5), WIT: int(v[5] + 6),
-			}
-			return FrameCharSelected(CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: v[2], GameTime: v[6] ^ v[7]})
+			c := oracleCharSelectedCharacter(r)
+			c.AttachRuntime(&player.Template{
+				INT: oracleAttr(v[0] + 1), STR: oracleAttr(v[1] + 2), CON: oracleAttr(v[2] + 3),
+				MEN: oracleAttr(v[3] + 4), DEX: oracleAttr(v[4] + 5), WIT: oracleAttr(v[5] + 6),
+			}, nil)
+			return FrameCharSelected(CharSelectedSnapshot{Character: c, SessionID: v[2], GameTime: v[6] ^ v[7]})
 		}
 	}
+	// A character whose live funcs move its attributes off the class
+	// template's (ProbeEngine.charSelectedModified): CharSelected carries the
+	// computed values.
+	m["CharSelected/modified"] = func() wire.Frame {
+		v := oracleRows[0].v
+		c := oracleCharSelectedCharacter(0)
+		tmpl := oracleLiveTemplate
+		c.AttachRuntime(&tmpl, nil)
+		c.AddStatFuncs([]effect.Mod{
+			{Stat: stat.StatINT, Op: effect.OpAdd, Value: 3},
+			{Stat: stat.StatSTR, Op: effect.OpMul, Value: 1.5},
+			{Stat: stat.StatMEN, Op: effect.OpAdd, Value: 4},
+			{Stat: stat.StatDEX, Op: effect.OpSub, Value: 2},
+			{Stat: stat.StatWIT, Op: effect.OpAdd, Value: 4.75},
+		})
+		return FrameCharSelected(CharSelectedSnapshot{Character: c, SessionID: v[2], GameTime: v[6] ^ v[7]})
+	}
+}
+
+// oracleAttr folds a row word into the 1-99 a base attribute takes
+// (ProbeEngine.charSelectedAttr): the attribute bonus tables cover that range.
+func oracleAttr(x int32) int {
+	return 1 + int(((int64(x)-1)%99+99)%99)
+}
+
+// oracleCharSelectedCharacter is the character ProbeEngine.charSelectedPlayer
+// builds for row r, without a runtime template.
+func oracleCharSelectedCharacter(r int) *player.Character {
+	v := oracleRows[r].v
+	c := &player.Character{
+		ID:          v[0],
+		Race:        player.Race(r),
+		Location:    loc(v[3], v[4], v[5]),
+		SP:          int(v[8]),
+		Exp:         int64(v[9])*1000003 + int64(v[0]),
+		CharLevel:   int(v[1] ^ v[2]),
+		KarmaPoints: int(v[3] ^ v[4]),
+		PKKills:     int(v[5] ^ v[6]),
+	}
+	c.SetName(oracleStrings[r].s)
+	c.SetTitle(oracleStrings[(r+1)%len(oracleStrings)].s)
+	c.SetClanID(v[1])
+	c.SetSex(player.Sex(v[2] & 1))
+	c.SetClassID(oracleClassIDs[r])
+	c.SetResourceValues(player.Resources{CurrentHP: float64(v[6]) + 0.5, CurrentMP: float64(v[7]) + 0.25})
+	return c
 }
 
 // oracleSlotObjectID and oracleSlotItemID are ProbeEngine.paperdollObjectId

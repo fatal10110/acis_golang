@@ -12,10 +12,11 @@ import (
 const OpcodeCharSelected = 0x15
 
 // CharSelectedSnapshot is everything CharSelected needs about the character
-// entering the world and the session confirming it.
+// entering the world and the session confirming it. Character must be fully
+// restored (runtime template, equipment and skills attached): the packet
+// carries its computed base attributes.
 type CharSelectedSnapshot struct {
 	Character *player.Character
-	Template  *player.Template
 
 	// SessionID is the session-key half the client must present back
 	// unchanged once it sends EnterWorld.
@@ -34,7 +35,7 @@ func FrameCharSelected(s CharSelectedSnapshot) wire.Frame {
 }
 
 func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
-	c, t := s.Character, s.Template
+	c := s.Character
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
 	w.WriteString(c.CharacterName())
@@ -60,12 +61,13 @@ func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 	w.WriteInt32(int32(c.CharLevel))
 	w.WriteInt32(int32(c.Karma()))
 	w.WriteInt32(int32(c.PKKills))
-	w.WriteInt32(int32(t.INT))
-	w.WriteInt32(int32(t.STR))
-	w.WriteInt32(int32(t.CON))
-	w.WriteInt32(int32(t.MEN))
-	w.WriteInt32(int32(t.DEX))
-	w.WriteInt32(int32(t.WIT))
+	// Computed attributes, in this packet's own order (not UserInfo's).
+	w.WriteInt32(int32(c.INT()))
+	w.WriteInt32(int32(c.STR()))
+	w.WriteInt32(int32(c.CON()))
+	w.WriteInt32(int32(c.MEN()))
+	w.WriteInt32(int32(c.DEX()))
+	w.WriteInt32(int32(c.WIT()))
 
 	for i := 0; i < 30; i++ {
 		w.WriteInt32(0)
