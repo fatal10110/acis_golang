@@ -94,3 +94,51 @@ func TestHiddenGMShowsInvisibleTitleToGMViewers(t *testing.T) {
 		}
 	}
 }
+
+// TestHiddenGMIsShownOnEnterRangeByViewerKind pins the first-sight CharInfo
+// (a viewer entering the world after the //hide): a game master viewer gets
+// the hidden GM under the title "Invisible" in stealth, a plain viewer the
+// GM's own title with no stealth.
+func TestHiddenGMIsShownOnEnterRangeByViewerKind(t *testing.T) {
+	t.Parallel()
+	srv, gmID := bootAdmin(t, adminLevel)
+	gm := srv.Client
+	enterWorld(t, gm)
+	exchange(t, gm, encodeBuildCmd("hide"))
+	settle(t, gm)
+
+	for _, tc := range []struct {
+		account, name string
+		level         int
+		title         string
+		stealth       bool
+	}{
+		{"player2", "LateGM", adminLevel, "Invisible", true},
+		{"player3", "LatePlayer", userLevel, "Admin", false},
+	} {
+		ch := srv.SeedCharacterFor(t, tc.account, tc.name, 1, 0)
+		setAccessLevel(t, srv, ch.ID, tc.level)
+		viewer := srv.DialClient(t, tc.account, 1)
+		frames := enterWorldFrames(t, viewer)
+
+		var infos [][]byte
+		for _, f := range frames {
+			if f[0] != serverpackets.OpcodeCharInfo {
+				continue
+			}
+			if id, _, _ := charInfoTitleEffect(t, f); id == gmID {
+				infos = append(infos, f)
+			}
+		}
+		if len(infos) != 1 {
+			t.Fatalf("%s: got %d CharInfo of the hidden GM, want 1", tc.name, len(infos))
+		}
+		_, title, effect := charInfoTitleEffect(t, infos[0])
+		if title != tc.title {
+			t.Errorf("%s: CharInfo title = %q, want %q", tc.name, title, tc.title)
+		}
+		if got := effect&stealthEffect != 0; got != tc.stealth {
+			t.Errorf("%s: CharInfo stealth effect = %v, want %v (mask %#x)", tc.name, got, tc.stealth, effect)
+		}
+	}
+}
