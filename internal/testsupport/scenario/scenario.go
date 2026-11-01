@@ -111,8 +111,9 @@
 //	                                          rate is at least 300 of 1000). Role player pins the character's, set
 //	                                          each time it enters the world
 //	gauss <role> <value>                      optional: every normal (gaussian) draw of the NPC's formulas is that value: a
-//	                                          magic skill's landing threshold, which lands under -2 times its margin (a
-//	                                          mana-drain skill on a defender of equal strength lands from a draw of 2 on).
+//	                                          magic skill's landing check, which lands when its margin plus half the draw
+//	                                          is above 0 (against a defender of equal strength any draw above 0; an NPC
+//	                                          with no magic attack, as every scenario NPC, needs a draw above 2).
 //	                                          Not for a traced scenario: the reference probe cannot script that draw
 //	territory <name> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>
 //	                                          optional: an npcmaker territory, the box between those offsets from where the

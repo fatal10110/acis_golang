@@ -22,6 +22,8 @@ hit orc 1 skill 1245 1
   mem orc i_ai0=0
   shows orc glow=10
 land orc 92 1
+hit orc 1 skill 28 1
+  mem orc i_ai0=0
 hit orc 1 skill 1245 1
   mem orc i_ai0=1
   shows orc glow=0
