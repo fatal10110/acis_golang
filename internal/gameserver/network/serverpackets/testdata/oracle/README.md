@@ -30,6 +30,10 @@ wrote into a byte buffer.
   `ShopPreviewList`, `ShopPreviewInfo`, `TradeStart`, `TradeOwnAdd`, `TradeOtherAdd`, `TradeUpdate`,
   `TradeItemUpdate`, the `PrivateStore*` lists and messages, the `RecipeShop*`, `RecipeBookItemList`
   and `RecipeItemMakeInfo` packets, `SendMacroList` and the `Henna*` windows
+- the party, command channel and party-matching windows (`ProbeParty.java`): `PartySmallWindowAll`, `Add`,
+  `Update` and `Delete`, `PartySpelled`, `PartyMemberPosition`, `PartyMatchList`, `PartyMatchDetail`,
+  `ExPartyRoomMember`, `ExManagePartyRoomMember`, `ExListPartyMatchingWaitingRoom`, `ExMPCCShowPartyMemberInfo`,
+  `ExMultiPartyCommandChannelInfo`, `ExMPCCPartyInfoUpdate`, `ExOpenMPCC`, `ExCloseMPCC` and `ExClosePartyRoom`
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
 - the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
   `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,
@@ -109,8 +113,16 @@ inventory before writing (what a trade or a warehouse deposit may list, which sy
 crafts the recipe window shows) happen in the server before the Go encoder, so each Go case hands the encoder
 the rows the stand-ins hand the reference.
 
-Not yet probed (they read the engine clan, castle or skill graphs): the party windows and the pledge
-windows that take a clan.
+The party, command channel and party-matching windows (`ProbeParty.java`, `../../packets_oracle_party_test.go`)
+run over stand-ins for the party, room, channel, restart point table and room manager (`Party`, `PartyMatchRoom`,
+`CommandChannel`, `RestartPointData`, `RestartPoint`, `PartyMatchRoomManager`; the player gains an active class and a
+party). Like the shop windows, the members a window lists and the status and region of a room row are chosen before
+the encoder on the Go side, so each Go case hands the encoder the rows the stand-ins hand the reference. The party
+rows cast three doubles to int, so `ProbeParty.VITALS` adds NaN, infinity and values outside the int range; the
+position list comes out in the order of a hash map keyed by object id, which the `PartyMemberPosition/ids*` cases
+pin with ids that share a bucket, arrive out of order, and grow the map past its first resize.
+
+Not yet probed (they read the engine clan, castle or skill graphs): the pledge windows that take a clan.
 
 The manor set windows hold their seeds in a hash set and `SellListProcure` its rows in an
 identity-hash map, so their probes use one seed per castle and one row; the other manor windows

@@ -1,6 +1,11 @@
 package serverpackets
 
-import "github.com/fatal10110/acis_golang/internal/commons/wire"
+import (
+	"cmp"
+	"slices"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // Party and command channel packet opcodes.
 const (
@@ -54,13 +59,15 @@ const (
 	SystemMessageTargetCantFound                      = 50
 )
 
-// PartyMember is one member row of a party window packet.
+// PartyMember is one member row of a party window packet. The gauges are
+// the live values: the window sends them truncated toward zero and saturated
+// to the wire int.
 type PartyMember struct {
 	ObjectID  int32
 	Name      string
-	CP, MaxCP int32
-	HP, MaxHP int32
-	MP, MaxMP int32
+	CP, MaxCP float64
+	HP, MaxHP float64
+	MP, MaxMP float64
 	Level     int32
 	ClassID   int32
 	Race      int32
@@ -148,21 +155,23 @@ func FramePartySmallWindowUpdate(m PartyMember) wire.Frame {
 func writePartyMemberVitals(w *wire.Writer, m PartyMember) {
 	w.WriteInt32(m.ObjectID)
 	w.WriteString(m.Name)
-	w.WriteInt32(m.CP)
-	w.WriteInt32(m.MaxCP)
-	w.WriteInt32(m.HP)
-	w.WriteInt32(m.MaxHP)
-	w.WriteInt32(m.MP)
-	w.WriteInt32(m.MaxMP)
+	w.WriteInt32(statInt32(m.CP))
+	w.WriteInt32(statInt32(m.MaxCP))
+	w.WriteInt32(statInt32(m.HP))
+	w.WriteInt32(statInt32(m.MaxHP))
+	w.WriteInt32(statInt32(m.MP))
+	w.WriteInt32(statInt32(m.MaxMP))
 	w.WriteInt32(m.Level)
 	w.WriteInt32(m.ClassID)
 }
 
-// FramePartyMemberPosition carries every party member's position.
+// FramePartyMemberPosition carries every party member's position, one row
+// per member of the (party order) slice, in the order a hash map keyed by
+// object id yields them (the client reads the rows by id).
 func FramePartyMemberPosition(members []PartyMemberAt) wire.Frame {
 	w := newFrameWriter(OpcodePartyMemberPosition)
 	w.WriteInt32(int32(len(members)))
-	for _, m := range members {
+	for _, m := range inHashMapOrder(members) {
 		w.WriteInt32(m.ObjectID)
 		w.WriteInt32(m.X)
 		w.WriteInt32(m.Y)
@@ -209,4 +218,26 @@ func FrameExMPCCShowPartyMemberInfo(members []PartyChannelMember) wire.Frame {
 		w.WriteInt32(m.ClassID)
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// inHashMapOrder returns members in the iteration order of a java.util.HashMap
+// keyed by object id that they were put into in slice order: ascending
+// bucket, where the bucket is the spread hash masked by the table size
+// (16, doubled while the map holds more than three quarters of it), and
+// insertion order within a bucket. It holds while no bucket collects eight
+// collisions, which a party's nine ids cannot do on a table of 16.
+func inHashMapOrder(members []PartyMemberAt) []PartyMemberAt {
+	size := uint32(16)
+	for len(members) > int(size*3/4) {
+		size *= 2
+	}
+	bucket := func(id int32) uint32 {
+		h := uint32(id)
+		return (h ^ h>>16) & (size - 1)
+	}
+	ordered := slices.Clone(members)
+	slices.SortStableFunc(ordered, func(a, b PartyMemberAt) int {
+		return cmp.Compare(bucket(a.ObjectID), bucket(b.ObjectID))
+	})
+	return ordered
 }
