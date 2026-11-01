@@ -1,0 +1,16 @@
+# Elcroki (22214, level 80), healthy and out of combat with silhouettes counted (int slots 3 and 4 at 2 and 3), moved 200 from
+# its spawn point, every draw 0: its no-desire hook clears int slots 3 and 4 and wants to walk back to its spawn point
+# with weight 30.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki
+npc elcroki 22214 Monster 700 0 0 walks mem i_ai3=2,i_ai4=3 level 80 skill LONG_RANGE_DD_MAGIC1 4151 10 skill SELF_RANGE_DEBUFF1 4486 10 skill SELF_RANGE_BUFF1 5080 1 skill SELF_RANGE_DD_MAGIC1 5178 1
+
+jump elcroki 200 0 0
+tick x2
+  mem elcroki i_ai3=0 i_ai4=0
+  desires elcroki move_to(700,0,0)=30

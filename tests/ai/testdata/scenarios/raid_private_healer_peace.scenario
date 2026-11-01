@@ -1,0 +1,19 @@
+# RaidPrivateHealer (25008), two healers of one master in a peace zone, every draw 0, the second moved off its spawn
+# location: a hit on the first (the party call) puts the second back on its spawn location, with no attack desire (its
+# heal and curse desires are the ones a hit draws outside peace).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer
+zone peace 1 100 -1000 3000 1000 -1000 1000
+npc master 20003 Monster 400 0 0
+npc healer1 25008 Monster 600 0 0 skill HEAL_MAGIC_A 4780 3 skill SELF_RANGE_BUFF_A 4214 3 master master
+npc healer2 25008 Monster 800 0 0 skill HEAL_MAGIC_A 4780 3 skill SELF_RANGE_BUFF_A 4214 3 master master
+
+jump healer2 300 0 0
+  at healer2 300 0 0
+hit healer1 10
+  at healer2 800 0 0
+  desires healer2 cast(healer1,4780,move)=100 cast(player,4515,move)=1000000

@@ -1,0 +1,16 @@
+# WizardHereticPriestAggressive (22143) holding its ground (Hold 1), settled, every draw 0: the cleric (class 15) it sees 100
+# away gets its hold magic (4047, 1000000) and its long range DD magic held in place, 1000000 from the Hold branch and as much again from the cleric branch.
+character Hunter 20
+class 15
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1000 0 0 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9 ai Hold=1
+
+tick x9
+approach priest
+  S MagicSkillUse caster=priest target=player skill=4668-9 hit=5285 reuse=0 success=0
+  desires priest cast(player,4047)=1000000 cast(player,4668)=2000000

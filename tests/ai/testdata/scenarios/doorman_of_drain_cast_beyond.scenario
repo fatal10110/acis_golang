@@ -1,0 +1,19 @@
+# DoormanOfDrain (18343, level 78, SkillRange 500), every draw 0: a cast ending on the character beyond its
+# SkillRange drops every desire. (A buff stands in for its DD magic, so the cast does no random damage.)
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain
+npc door 18343 Monster 600 0 0 level 78 skill DD_MAGIC 1204 2 ai SkillRange=500
+
+top door player
+hit door 10
+  desires door cast(player,1204,move)=1000000
+tick x3
+  S MagicSkillUse caster=door target=player skill=1204-2 hit=10571 reuse=15857 success=0
+advance 12s
+  S SystemMessage id=110 4:1204,2
+  desires door -

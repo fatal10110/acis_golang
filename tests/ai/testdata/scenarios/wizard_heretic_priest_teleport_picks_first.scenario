@@ -1,0 +1,22 @@
+# WizardHereticPriestAggressive (22143) with three teleport points, the character a warrior in a party of two (more than its
+# party_members 0) in its spawn territory: seeing it, on a teleport draw under 33, a draw of 3 equal to 0 sends it to the first point
+# (the first two draws are the hold magic's and the teleport's).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1000 0 0 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9 ai TelPosX1=100,TelPosY1=200,TelPosZ1=300,TelPosX2=400,TelPosY2=500,TelPosZ2=600,TelPosX3=700,TelPosY3=800,TelPosZ3=900
+member Mate 20 -1500 0 0
+
+approach priest
+  random 0 0 0
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=100,200,300 fast=0
+  S DeleteObject obj=priest

@@ -1,0 +1,15 @@
+# WizardFiendArcherRunAway (21514, level 71), settled (eight AI cycles) and in a clan whose member is hit, every draw
+# 0: it wants its fiend archer skill on the attacker.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway
+npc archer 21514 Monster 300 0 0 level 71 clan runner 1000 skill W_FIEND_ARCHER 4160 6
+npc mate 20003 Monster 300 100 0 clan runner 1000
+
+tick x8
+hit mate 10
+  desires archer cast(player,4160,move)=1000000 wander()=5

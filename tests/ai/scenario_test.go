@@ -368,6 +368,17 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroAggressive": wizard.CorpseNecroAggressive,
 	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive":               wizard.DDMagic2DispellAggressive,
 
+	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticCoward":                  wizard.PartyPrivateHereticCoward,
+	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2":                     wizard.PartyPrivateHereticDD2,
+	"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2Curse":                wizard.PartyPrivateHereticDD2Curse,
+	"script.ai.individual.Monster.WizardBase.Wizard.Agit02VampireArcherAgit":                                      wizard.Agit02VampireArcherAgit,
+	"script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain":                                               wizard.DoormanOfDrain,
+	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer2":                                             wizard.RoyalRushHealer2,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway":                                     wizard.FiendArcherRunAway,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffCurseStoneAggressive":        wizard.CastClanBuffCurseStoneAggressive,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffRangeDDCurseStoneAggressive": wizard.CastClanBuffRangeDDCurseStoneAggressive,
+	"script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroSummon":     wizard.CorpseNecroSummon,
+
 	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer1":              wizard.RoyalRushHealer1,
 	"script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardShortSelfRange": wizard.RoyalRushShortSelfRange,
 }

@@ -1,0 +1,14 @@
+# WizardFiendArcherRunAway (21514, level 71) that cannot pay for its fiend archer skill (0 MP), every draw 0: a hit by
+# the character gives up its spells (int slot 0) and wants to attack.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway
+npc archer 21514 Monster 300 0 0 level 71 mp 0 skill W_FIEND_ARCHER 4160 6
+
+hit archer 10
+  mem archer i_ai0=1
+  desires archer attack(player)=1000
