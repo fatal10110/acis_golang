@@ -1,0 +1,25 @@
+# PartyPrivateWizardHereticCoward (22158) and PartyPrivateWizardHereticDD2 (22166), each the private of a master:
+# the coward's master dying takes it out of the world at once, no corpse left (it also wants to flee the master),
+# while the heretic DD2 whose master dies stays.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Curse
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticCoward
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2
+npc master1 20003 Monster 300 0 0
+npc coward 22158 Monster 200 0 0 master master1
+npc master2 20003 Monster 0 300 0
+npc heretic 22166 Monster 0 200 0 master master2
+
+kill master1
+  S SystemMessage id=95 1:0 1:0
+  S DeleteObject obj=coward
+  inworld coward no
+kill master2
+  S SystemMessage id=95 1:0 1:0
+  inworld heretic yes

@@ -42,9 +42,16 @@ import net.sf.l2j.gameserver.data.manager.RaidPointManager;
 import net.sf.l2j.gameserver.data.manager.RelationManager;
 import net.sf.l2j.gameserver.data.manager.SevenSignsManager;
 import net.sf.l2j.gameserver.data.manager.SpawnManager;
+import net.sf.l2j.gameserver.data.SkillTable;
+import net.sf.l2j.gameserver.skills.L2Skill;
+import net.sf.l2j.gameserver.data.manager.ZoneManager;
+import net.sf.l2j.gameserver.model.zone.form.ZoneCuboid;
+import net.sf.l2j.gameserver.model.zone.ZoneForm;
+import net.sf.l2j.gameserver.model.zone.type.subtype.ZoneType;
 import net.sf.l2j.gameserver.data.manager.ClanHallManager;
 import net.sf.l2j.gameserver.data.sql.ClanTable;
 import net.sf.l2j.gameserver.data.sql.PlayerInfoTable;
+import net.sf.l2j.gameserver.data.xml.DoorData;
 import net.sf.l2j.gameserver.data.xml.ItemData;
 import net.sf.l2j.gameserver.data.xml.NpcData;
 import net.sf.l2j.gameserver.data.xml.PlayerData;
@@ -64,6 +71,7 @@ import net.sf.l2j.gameserver.model.WorldRegion;
 import net.sf.l2j.gameserver.model.actor.Npc;
 import net.sf.l2j.gameserver.model.actor.Player;
 import net.sf.l2j.gameserver.model.actor.container.player.SubClass;
+import net.sf.l2j.gameserver.model.actor.instance.Door;
 import net.sf.l2j.gameserver.model.actor.instance.Folk;
 import net.sf.l2j.gameserver.model.actor.instance.Monster;
 import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
@@ -236,6 +244,16 @@ final class ScenarioTrace
 	/** The live lines of each step, by the step's index: NPC id. */
 	private final Map<Integer, List<Integer>> _lives = new HashMap<>();
 	private final Map<Integer, List<Integer>> _spawns = new HashMap<>();
+	/** The door lines: role, datapack door id. */
+	private final Map<String, Integer> _doors = new LinkedHashMap<>();
+	/** The zone lines: zone id, then the box's offsets dx1, dy1, dx2, dy2, dz1, dz2 from where the character enters the world. */
+	private final List<int[]> _zones = new ArrayList<>();
+	/** The shape each zoned id had before the scenario moved it. */
+	private final Map<Integer, ZoneForm> _shapes = new HashMap<>();
+	/** The open, dungeon, standing and stance expectations of each step, by the step's index, as written. */
+	private final Map<Integer, List<String[]>> _checks = new HashMap<>();
+	/** Whether a step sets or ends the character's attack stance, so the stance task runs on the scenario's time. */
+	private boolean _stances;
 
 	private GameClient _client;
 	/** The client the step being played sends its packets from: the player's, or the mate's of an as step. */
@@ -258,7 +276,7 @@ final class ScenarioTrace
 	private boolean _muted;
 
 	/** An npc line: params holds the three spawn parameters the line gives (a number, an NPC role or character), null for none; ai the AI parameters of its ai option, which replace the template's as the Go runner's fixture template has only them, null for none. */
-	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level)
+	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level, String[][] skills)
 	{
 	}
 
@@ -538,6 +556,12 @@ final class ScenarioTrace
 				_lives.computeIfAbsent(_steps.size() - 1, k -> new ArrayList<>()).add(Integer.parseInt(line.split("\\s+")[1]));
 				continue;
 			}
+			if ((raw.startsWith(" ") || raw.startsWith("\t")) && !_steps.isEmpty() && seedCheck(line))
+			{
+				// A step's expectation of the world once it is over: a door's open state, the dungeon flag, the character's standing or attack stance.
+				_checks.computeIfAbsent(_steps.size() - 1, k -> new ArrayList<>()).add(line.split("\\s+"));
+				continue;
+			}
 			if (line.startsWith("spawned ") && (raw.startsWith(" ") || raw.startsWith("\t")) && !_steps.isEmpty())
 			{
 				// A step's expectation: where the NPCs of that template no npc line placed stand once it is over.
@@ -550,6 +574,8 @@ final class ScenarioTrace
 			if (steps || isStep(f[0]))
 			{
 				steps = true;
+				if (f[0].equals("stance"))
+					_stances = true;
 				// A bypass keeps its own spacing.
 				_steps.add(f[0].equals("bypass") ? new String[] { "bypass", line.substring("bypass".length()).strip() } : asBypass(f, line));
 				continue;
@@ -607,13 +633,24 @@ final class ScenarioTrace
 					_draws = Arrays.stream(f, _always ? 2 : 1, f.length).mapToInt(Integer::parseInt).toArray();
 				}
 				case "clock" -> _clock = clock(f[1]);
-				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f), npcLevel(f)));
+				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f), npcLevel(f), npcSkills(f)));
 				case "script", "stub" -> _scripts.add(ScriptProbe.PKG + f[1]);
 				case "hold" -> _holds.add(new int[]
 				{
 					Integer.parseInt(f[1]),
 					Integer.parseInt(f[2])
 				});
+				case "zone" -> _zones.add(new int[]
+				{
+					Integer.parseInt(f[2]),
+					Integer.parseInt(f[3]),
+					Integer.parseInt(f[4]),
+					Integer.parseInt(f[5]),
+					Integer.parseInt(f[6]),
+					Integer.parseInt(f[7]),
+					Integer.parseInt(f[8])
+				});
+				case "door" -> _doors.put(f[1], Integer.parseInt(f[2]));
 				case "equip" -> _equips.add(Integer.parseInt(f[1]));
 				case "standing" -> _standing = Integer.parseInt(f[1]);
 				case "pk" -> _pk = Integer.parseInt(f[1]);
@@ -646,6 +683,11 @@ final class ScenarioTrace
 					f[2]
 				});
 				case "spoil" -> _spoils.put(f[1], f.length > 2);
+				case "roll" ->
+				{
+					// The Go runner pins an NPC's combat draws; the reference's come from its seeded generator,
+					// and the trace shows the outcome the pin must reproduce.
+				}
 				case "item", "page", "teleports" ->
 				{
 					// The reference loads every item, page and teleport list.
@@ -653,6 +695,18 @@ final class ScenarioTrace
 				default -> _unread.add(f[0]);
 			}
 		}
+	}
+
+	/** Whether an indented line is an expectation the probe reads: open, dungeon, or the character's standing or stance. */
+	private static boolean seedCheck(String line)
+	{
+		final String[] f = line.split("\\s+");
+		return switch (f[0])
+		{
+			case "open", "dungeon" -> true;
+			case "standing", "stance" -> f.length > 1 && f[1].equals("player");
+			default -> false;
+		};
 	}
 
 	/** Reads a clock line's hh:mm[:ss] as milliseconds since midnight. */
@@ -689,6 +743,20 @@ final class ScenarioTrace
 			if (f[i].equals("params"))
 				return new String[] { f[i + 1], f[i + 2], f[i + 3] };
 		return null;
+	}
+
+	/**
+	 * The skills of an npc line's skill options ({type, id, level} each), none without one. Past the
+	 * three offsets the options are read as the Go runner reads them: a word that is not an option
+	 * name is an operand of the one before.
+	 */
+	private static String[][] npcSkills(String[] f)
+	{
+		final List<String[]> skills = new ArrayList<>();
+		for (int i = 7; i + 3 < f.length; i++)
+			if (f[i].equals("skill"))
+				skills.add(new String[] { f[i + 1], f[i + 2], f[i + 3] });
+		return skills.toArray(new String[0][]);
 	}
 
 	/** The template level of an npc line's level option, 0 without one. */
@@ -748,7 +816,7 @@ final class ScenarioTrace
 	{
 		return switch (verb)
 		{
-			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event", "as", "away" -> true;
+			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event", "as", "away", "stance" -> true;
 			default -> false;
 		};
 	}
@@ -766,6 +834,18 @@ final class ScenarioTrace
 		else
 			seed();
 
+		// A zone line stands the shipped zone of that id in the box, as the Go run stands its own there.
+		for (int[] z : _zones)
+		{
+			final ZoneType zone = ZoneManager.getInstance().getZoneById(z[0]);
+			if (zone == null)
+				throw new IllegalStateException(_name + ": the datapack has no zone " + z[0]);
+			_shapes.put(z[0], zone.getZone());
+			set(ZoneType.class, zone, "_zone", new ZoneCuboid(X + z[1], X + z[3], Y + z[2], Y + z[4], Z + z[5], Z + z[6]));
+		}
+		// A door a scenario names starts closed, whatever an earlier scenario left it.
+		for (String role : _doors.keySet())
+			door(role).closeMe();
 		record();
 		for (int index = 0; index < _steps.size(); index++)
 		{
@@ -775,6 +855,7 @@ final class ScenarioTrace
 				case "action", "bypass", "link" -> client(s);
 				case "as" -> as(s);
 				case "away" -> away();
+				case "stance" -> stance(s[2]);
 				case "kill" ->
 				{
 					final int n = s.length > 2 ? Integer.parseInt(s[2].substring(1)) : 1;
@@ -814,6 +895,13 @@ final class ScenarioTrace
 				_lines.add("# live " + id + " " + live(id));
 			for (int id : _spawns.getOrDefault(index, List.of()))
 				_lines.add("# spawned " + id + " " + spawned(id));
+			for (String[] c : _checks.getOrDefault(index, List.of()))
+			{
+				// The line reads as the expectation does, with the value the probe's world holds in place of the expected one.
+				final List<String> key = new ArrayList<>(Arrays.asList(c).subList(0, c.length - 1));
+				key.add(seedValue(c));
+				_lines.add("# check " + String.join(" ", key));
+			}
 		}
 	}
 
@@ -1050,6 +1138,43 @@ final class ScenarioTrace
 		spawnNpcs();
 	}
 
+	/** The character's attack stance is set, as a blow it deals sets it, or ended. */
+	private void stance(String state)
+	{
+		_lines.add("# stance " + state);
+		if (state.equals("on"))
+			AttackStanceTaskManager.getInstance().add(_player);
+		else
+			AttackStanceTaskManager.getInstance().remove(_player);
+	}
+
+	/** What a door, dungeon, standing or stance expectation reads in the probe's world now. */
+	private String seedValue(String[] c)
+	{
+		return switch (c[0])
+		{
+			case "open" -> yesNo(door(c[1]).isOpened());
+			case "dungeon" -> yesNo(_player.isIn7sDungeon());
+			case "standing" -> String.valueOf(_player.getAllianceWithVarkaKetra());
+			default -> AttackStanceTaskManager.getInstance().isInAttackStance(_player) ? "on" : "off";
+		};
+	}
+
+	private static String yesNo(boolean b)
+	{
+		return b ? "yes" : "no";
+	}
+
+	/** The datapack door a door line names. */
+	private Door door(String role)
+	{
+		final Integer id = _doors.get(role);
+		final Door door = id == null ? null : DoorData.getInstance().getDoor(id);
+		if (door == null)
+			throw new IllegalStateException(_name + ": no door line names " + role);
+		return door;
+	}
+
 	/** The character moves 1500 behind where it entered the world, out of the NPCs' sight and the mate's reach, and one NPC AI tick runs. */
 	private void away()
 	{
@@ -1229,6 +1354,9 @@ final class ScenarioTrace
 			for (String[] s : _steps)
 				if (s[0].equals("kill") || s[0].equals("hit"))
 					fought.add(s[1]);
+			// The Go runner's world holds the scenario's spawns alone: the datapack's makers (loaded, never
+			// spawned here) are not what a script's spawn lookup finds.
+			alter(SpawnManager.class, SpawnManager.getInstance(), "_makers", ConcurrentHashMap.newKeySet());
 			for (NpcLine n : _npcs.values())
 			{
 				final NpcTemplate template = NpcData.getInstance().getTemplate(n.id());
@@ -1240,6 +1368,14 @@ final class ScenarioTrace
 					fixture(template, n.type());
 					if (n.level() > 0)
 						alter(NpcTemplate.class, template, "_level", (byte) n.level());
+				}
+				if (n.skills().length > 0)
+				{
+					// The Go runner's template lists the line's skills alone.
+					final Map<NpcSkillType, L2Skill> skills = new EnumMap<>(NpcSkillType.class);
+					for (String[] sk : n.skills())
+						skills.put(NpcSkillType.valueOf(sk[0]), SkillTable.getInstance().getInfo(Integer.parseInt(sk[1]), Integer.parseInt(sk[2])));
+					alter(NpcTemplate.class, template, "_skills", skills);
 				}
 				spawn(n);
 			}
@@ -1464,6 +1600,9 @@ final class ScenarioTrace
 			final long d = Math.min(STEP, ms - passed);
 			_lines.add("T " + d);
 			ThreadPool.advance(d);
+			// The stance task is not left queued between scenarios, so it runs on the scenario's own time.
+			if (_stances)
+				AttackStanceTaskManager.getInstance().run();
 		}
 	}
 
@@ -1669,7 +1808,7 @@ final class ScenarioTrace
 	 * Removes the scenario's player, the NPCs spawned for its NPC lines and every NPC and ground item
 	 * near it, so the next scenario starts alone.
 	 */
-	private void clear()
+	private void clear() throws Exception
 	{
 		final List<Npc> near = new ArrayList<>(_spawnedNpcs);
 		final List<ItemInstance> ground = new ArrayList<>();
@@ -1686,6 +1825,10 @@ final class ScenarioTrace
 			npc.deleteMe();
 		for (ItemInstance item : ground)
 			item.decayMe();
+		for (String role : _doors.keySet())
+			door(role).closeMe();
+		for (Map.Entry<Integer, ZoneForm> e : _shapes.entrySet())
+			set(ZoneType.class, ZoneManager.getInstance().getZoneById(e.getKey()), "_zone", e.getValue());
 		if (_player != null)
 			_player.deleteMe();
 		if (_mateClient != null && _mateClient.getPlayer() != null)

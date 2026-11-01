@@ -1,0 +1,33 @@
+# A priest of dusk sends the character into the Dusk necropolis of the festival and marks it inside a
+# Seven Signs dungeon (OracleTeleporter onTalk, setIsIn7sDungeon). Replayed by the reference probe,
+# which reads the dungeon flag.
+trace internal/gameserver/script/testdata/oracle/scenarios/oracle_teleporter_dusk_dungeon.golden
+character Pilgrim 40
+script script.teleport.OracleTeleporter
+page seven_signs/
+npc dusk 31085 DuskPriest 10 0 0
+
+action dusk
+action dusk
+  S ActionFailed
+  S ActionFailed
+  S NpcHtmlMessage obj=dusk item=0 page=seven_signs/dusk_priest_1.htm
+bypass npc_{dusk}_SevenSignsDesc 15
+  S NpcHtmlMessage obj=dusk item=0 page=seven_signs/desc_15.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{dusk}_SevenSigns 8 1
+  S NpcHtmlMessage obj=dusk item=0 page=seven_signs/signs_8_dusk.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{dusk}_Quest OracleTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=-81261,86531,-5157 fast=0
+  S DeleteObject obj=dusk
+  S ActionFailed
+  M set OracleTeleport_Npc | 31085
+  dungeon yes

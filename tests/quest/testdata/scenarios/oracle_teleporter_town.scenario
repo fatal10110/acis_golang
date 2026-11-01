@@ -1,8 +1,9 @@
 # The town priests (OracleTeleporter): a priest of dawn, asked through his Seven Signs pages for
 # the Oracle of Dawn, sends the character into the Dawn necropolis of the festival, remembers
 # himself in the player memo and answers no page (onTalk). A ziggurat gatekeeper's page offers
-# no link to the script; the gatekeepers' pages and fees, the temple priests' links and the Seven
-# Signs dungeon flag are in tests/npcs/teleporters_210_pr3_test.go.
+# no link to the script; the Seven Signs dungeon flag is in oracle_teleporter_dawn_dungeon and
+# oracle_teleporter_dusk_dungeon, the gatekeepers' pages and fees and the temple priests' links in
+# tests/npcs/teleporters_210_pr3_test.go.
 trace internal/gameserver/script/testdata/oracle/scenarios/oracle_teleporter_town.golden
 character Pilgrim 40
 script script.teleport.OracleTeleporter

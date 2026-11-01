@@ -1,0 +1,19 @@
+# TyrannoPrimeval (22215), every draw 0, told to report (event 11049, i_quest2 1) with another TyrannoPrimeval 3000 away, both far from the character: once
+# its report timer (600 s) ran, it broadcasts the script event 11051 (arguments 0 and the range 8000) to the NPCs around
+# it; dying while reporting it broadcasts 11044 (0, 0 and the range 5000). The reference run records what the other
+# one hears. The monsters list no skill, so the lethal hit asks for no cast.
+trace internal/gameserver/script/testdata/oracle/scenarios/tyranno_primeval_broadcasts.golden
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval
+npc rex 22215 Monster 4000 0 0
+npc listener 22215 Monster 7000 0 0
+
+event rex 11049 0 0
+advance 600s
+kill rex
+  S NpcSay obj=rex type=1 npc=1022215 text="Our master now comes to claim our vengeance. Soon you will all be nothing more than dirt..."

@@ -1,7 +1,9 @@
 # Raid boss information (RaidbossInfo): an Adventurer Guildsman's link opens the raid boss
-# levels, whose level 20 link is the page it names. The radar marks are in
-# tests/npcs/raidboss_info_test.go: the reference server holds the datapack's spawns, the
-# scenario world none. Expectations are the reference trace's (RaidbossInfo.onTalk,
+# levels, whose level 20 link is the page it names; its links mark a raid boss on the radar where
+# one stands (Greyclaw Kutus, Pan Dryad), and nothing for one that is not in the world (Tirak).
+# The reference probe keeps the scenario's spawns alone, so the radar finds no datapack spawn.
+# The mark at a spawn's point that differs from where its boss stands is in
+# tests/npcs/raidboss_info_test.go. Expectations are the reference trace's (RaidbossInfo.onTalk,
 # onAdvEvent).
 trace internal/gameserver/script/testdata/oracle/scenarios/raidboss_info_pages.golden
 character Seeker 20
@@ -9,6 +11,8 @@ script script.feature.RaidbossInfo
 page adventurer_guildsman/31729.htm
 page script/feature/RaidbossInfo/
 npc guild 31729 Adventurer 10 0 0
+npc kutus 25001 RaidBoss 600 300 0
+npc dryad 25019 RaidBoss -700 400 0
 
 action guild
 action guild
@@ -22,3 +26,10 @@ bypass npc_{guild}_Quest RaidbossInfo
 bypass Quest RaidbossInfo level20.htm
   S NpcHtmlMessage obj=guild item=0 page=script/feature/RaidbossInfo/level20.htm
   S ActionFailed
+bypass Quest RaidbossInfo 25001
+  S RadarControl show=2 type=2 loc=610,320,30
+  S RadarControl show=0 type=1 loc=610,320,30
+bypass Quest RaidbossInfo 25019
+  S RadarControl show=2 type=2 loc=-690,420,30
+  S RadarControl show=0 type=1 loc=-690,420,30
+bypass Quest RaidbossInfo 25038

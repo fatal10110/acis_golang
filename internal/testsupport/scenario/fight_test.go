@@ -127,8 +127,8 @@ func TestParseRejectsMalformedFightLines(t *testing.T) {
 		{"desires unknown role", npcs + "advance 1s\n  desires c -\n", `unknown role "c"`},
 		{"at usage", npcs + "advance 1s\n  at a 0 0\n", "at <role> <dx> <dy> <dz>"},
 		{"at unknown role", npcs + "advance 1s\n  at c 0 0 0\n", `unknown role "c"`},
-		{"traced skill line", "trace x.golden\ncharacter A 1\nskill 1068 1\nadvance 1s\n", "takes no skill, door or summon line"},
-		{"traced npc clan", "trace x.golden\ncharacter A 1\nnpc a 1 Monster 0 0 0 clan c 1\nadvance 1s\n", "takes no clan or skill option"},
+		{"traced skill line", "trace x.golden\ncharacter A 1\nskill 1068 1\nadvance 1s\n", "takes no skill or summon line"},
+		{"traced npc clan", "trace x.golden\ncharacter A 1\nnpc a 1 Monster 0 0 0 clan c 1\nadvance 1s\n", "takes no clan option"},
 		{"traced hit by", "trace x.golden\n" + npcs + "hit a 1 by b\n", "takes no hit by another creature"},
 		{"summon relog", "character A 1\nsummon s 1\nrelog\n", "takes no relog"},
 		{"created door", "character A 1\ndoor g 1 0 0 0\ncreate\nenter\n", "no skill, door or summon line"},
@@ -139,6 +139,19 @@ func TestParseRejectsMalformedFightLines(t *testing.T) {
 				t.Fatalf("Parse error = %v, want one containing %q", err, tc.want)
 			}
 		})
+	}
+}
+
+// TestTracedNpcTakesSkill: the reference probe lists an npc line's skills, so
+// a traced scenario takes the skill option.
+func TestTracedNpcTakesSkill(t *testing.T) {
+	text := "trace x.golden\ncharacter A 1\nnpc a 1 Monster 0 0 0 skill DEBUFF 4515 1\nadvance 1s\n"
+	sc, err := Parse("ok.scenario", []byte(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := sc.NPCs[0].Skills; len(got) != 1 {
+		t.Fatalf("skills = %v, want the debuff", got)
 	}
 }
 

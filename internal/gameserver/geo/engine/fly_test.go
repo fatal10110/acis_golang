@@ -29,14 +29,15 @@ func flyEngine(t *testing.T) *Engine {
 	return e
 }
 
-// (No reference probe yet: #4341.) Expected values are traced by hand through GeoEngine.canFly and
+// Expected values are traced by hand through GeoEngine.canFly and
 // GeoEngine.getValidFlyLocation (GeoEngine.java:1386-1666) with an oheight
 // of 32, the corridor PlayerMove.calculatePath asks for: the line's height at
 // each crossed cell border is oz + (int)(mz * distance from the origin), the
 // highest layer under that plus 32 must not rise above it, and the lowest
 // layer over it must not sink under it plus 32. A stop lands on the border of
 // the cell that failed, at the height of the last border cleared (oz before
-// the first).
+// the first). TestFlyMatchesReferenceProbe replays these same cases, and many
+// more, against the reference's own output (testdata/oracle).
 func TestFlyQueries(t *testing.T) {
 	e := flyEngine(t)
 	x0, y0 := WorldXMin, WorldYMin

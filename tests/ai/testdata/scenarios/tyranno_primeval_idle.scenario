@@ -1,0 +1,16 @@
+# TyrannoPrimeval (22215), out of combat with its chance multiplier (i_ai3) at 5, moved 200 from its spawn point
+# (mobile_type 0): the idle cycle (the second AI tick) wants its first self buff on itself (1000000), resets the multiplier to 1
+# and wants to walk back to its spawn point (30).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval
+npc rex 22215 Monster 1500 0 0 walks skill SELF_BUFF1 5087 1 skill SELF_BUFF2 5087 2 skill DEBUFF1 5098 1 skill DEBUFF2 5098 2 skill CAPTURE_CANCEL_A 5099 1 skill CAPTURE_CANCEL_B 5100 1 skill CAPTURE_CANCEL_C 5101 1 skill CAPTURE_CANCEL_ALL 5102 1 skill LONG_RANGE_DD_MAGIC1 5120 1 mem i_ai3=5
+
+jump rex 200 0 0
+tick x2
+  mem rex i_ai3=1
+  desires rex cast(rex,5087,move)=1000000 move_to(1500,0,0)=30 wander()=5

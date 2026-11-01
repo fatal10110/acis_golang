@@ -1,0 +1,44 @@
+# The Pagan Temple gatekeepers (PaganTeleporter) asked by a holder of the Pagan's Mark: the chapel
+# gatekeeper opens both chapel doors (32036-2.htm); the temple gatekeeper opens the temple door
+# (FadedMark.htm). Expectations are derived from the reference source (onTalk, DoorData.openMe), replayed by the
+# reference probe (door line, open state).
+trace internal/gameserver/script/testdata/oracle/scenarios/pagan_teleporter_doors_pagan.golden
+character Pilgrim 40
+hold 8067 1
+item 8064 8067
+script script.teleport.PaganTeleporter
+page default/32034.htm
+page default/32036.htm
+page script/teleport/PaganTeleporter/
+npc temple 32034 Folk 10 0 0
+npc chapel 32036 Folk 20 0 0
+door temple_door 19160001 100 0 0
+door chapel_door_1 19160010 120 0 0
+door chapel_door_2 19160011 140 0 0
+
+action chapel
+action chapel
+  S ActionFailed
+  S NpcHtmlMessage obj=chapel item=0 page=default/32036.htm
+  S ActionFailed
+bypass npc_{chapel}_Quest PaganTeleporter
+  S NpcHtmlMessage obj=chapel item=0 page=script/teleport/PaganTeleporter/32036-2.htm
+  S ActionFailed
+  S ActionFailed
+  open temple_door no
+  open chapel_door_1 yes
+  open chapel_door_2 yes
+  items 8064=0 8067=1
+action temple
+action temple
+  S ActionFailed
+  S NpcHtmlMessage obj=temple item=0 page=default/32034.htm
+  S ActionFailed
+bypass npc_{temple}_Quest PaganTeleporter
+  S NpcHtmlMessage obj=temple item=0 page=script/teleport/PaganTeleporter/FadedMark.htm
+  S ActionFailed
+  S ActionFailed
+  open temple_door yes
+  open chapel_door_1 yes
+  open chapel_door_2 yes
+  items 8064=0 8067=1

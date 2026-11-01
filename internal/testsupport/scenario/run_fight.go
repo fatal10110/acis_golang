@@ -19,7 +19,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -80,17 +79,7 @@ func (r *run) fightOptions(t *testing.T) []gameservertest.Option {
 		}
 		opts = append(opts, gameservertest.WithDoors(tmpls...))
 	}
-	if r.sc.Summon != nil && !r.sc.Summon.Servitor {
-		at := fixtureSpawn()
-		form, err := zone.NewCuboid(at.X-battlefieldReach, at.X+battlefieldReach, at.Y-battlefieldReach, at.Y+battlefieldReach,
-			at.Z-battlefieldReach, at.Z+battlefieldReach)
-		if err != nil {
-			t.Fatalf("%s: summon battlefield: %v", r.sc.Name, err)
-		}
-		field := zone.NewSiege(battlefieldID, form)
-		field.SetActive(true)
-		zones := zone.NewIndex()
-		zones.Add(field)
+	if zones := r.zoneIndex(t); zones != nil {
 		opts = append(opts, gameservertest.WithZones(zones))
 	}
 	return opts
@@ -148,8 +137,8 @@ func (r *run) seedSkills(t *testing.T) {
 // summon line's summon, as the character first enters the world.
 func (r *run) placeFight(t *testing.T) {
 	t.Helper()
-	if (len(r.sc.Doors) > 0 || (r.sc.Summon != nil && !r.sc.Summon.Servitor)) && r.origin != fixtureSpawn() {
-		t.Fatalf("%s: the character entered the world at %v, not the fixture spawn %v the doors and the battlefield stand by", r.sc.Name, r.origin, fixtureSpawn())
+	if (len(r.sc.Doors) > 0 || len(r.sc.Zones) > 0 || (r.sc.Summon != nil && !r.sc.Summon.Servitor)) && r.origin != fixtureSpawn() {
+		t.Fatalf("%s: the character entered the world at %v, not the fixture spawn %v the doors, the zones and the battlefield stand by", r.sc.Name, r.origin, fixtureSpawn())
 	}
 	for _, d := range r.sc.Doors {
 		obj, ok := r.srv.WorldObjects.Door(d.ID)

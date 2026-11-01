@@ -23,10 +23,26 @@ type Member struct {
 	Name  string
 	Level int
 	Dead  bool
+	// Standing is its Ketra/Varka alliance standing (positive Ketra, negative
+	// Varka, 0 none) and Holds the items it holds, both as it enters the world.
+	Standing int
+	Holds    []Hold
 	// DX, DY and DZ are where it stands, an offset from where the character
 	// first enters the world.
 	DX, DY, DZ int
 }
+
+// ZoneLine is one zone line: a zone of Kind (boss or peace) and id ID, the box
+// between those offsets from where the character first enters the world.
+type ZoneLine struct {
+	Kind               string
+	ID                 int
+	DX1, DY1, DX2, DY2 int
+	DZ1, DZ2           int
+}
+
+// zoneKinds are the kinds of zone a zone line builds.
+var zoneKinds = []string{"boss", "peace"}
 
 // Ground is one ground line: Count of item template Item lying at an offset
 // from the character, named Role. Cursed: the item is a cursed weapon whose
@@ -49,7 +65,7 @@ func (sc *Scenario) named(name string, roles map[string]bool) bool {
 		slices.ContainsFunc(sc.Grounds, func(g Ground) bool { return g.Role == name })
 }
 
-// world reads the territory, member, ground, roll and gauss lines.
+// world reads the territory, zone, member, ground, roll and gauss lines.
 func (sc *Scenario) world(key string, args []string, roles map[string]bool) error {
 	switch key {
 	case "territory":
@@ -67,8 +83,27 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 			return fmt.Errorf("territory %s is no box: want dx1 < dx2, dy1 < dy2 and dz1 <= dz2", args[0])
 		}
 		sc.Territories = append(sc.Territories, Territory{Name: args[0], DX1: n[0], DY1: n[1], DX2: n[2], DY2: n[3], DZ1: n[4], DZ2: n[5]})
+	case "zone":
+		usage := fmt.Errorf("zone <boss|peace> <id> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>")
+		if len(args) != 8 {
+			return usage
+		}
+		if !slices.Contains(zoneKinds, args[0]) {
+			return fmt.Errorf("zone kind %q is not one of %s", args[0], strings.Join(zoneKinds, ", "))
+		}
+		n, err := ints(args[1:])
+		if err != nil {
+			return fmt.Errorf("zone: %w", err)
+		}
+		if n[0] < 1 || n[0] == battlefieldID || slices.ContainsFunc(sc.Zones, func(z ZoneLine) bool { return z.ID == n[0] }) {
+			return fmt.Errorf("zone id %d is not 1 or more, the summon battlefield's, or listed twice", n[0])
+		}
+		if n[1] >= n[3] || n[2] >= n[4] || n[5] > n[6] {
+			return fmt.Errorf("zone %d is no box: want dx1 < dx2, dy1 < dy2 and dz1 <= dz2", n[0])
+		}
+		sc.Zones = append(sc.Zones, ZoneLine{Kind: args[0], ID: n[0], DX1: n[1], DY1: n[2], DX2: n[3], DY2: n[4], DZ1: n[5], DZ2: n[6]})
 	case "member":
-		usage := fmt.Errorf("member <name> <level> [dead] [<dx> <dy> <dz>]")
+		usage := fmt.Errorf("member <name> <level> [dead] [standing <n>] [hold <item id> <count>]... [<dx> <dy> <dz>]")
 		if len(args) < 2 {
 			return usage
 		}
@@ -80,8 +115,35 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 			return fmt.Errorf("member level %q is not a number of 1 or more", args[1])
 		}
 		m, rest := Member{Name: args[0], Level: level}, args[2:]
-		if len(rest) > 0 && rest[0] == "dead" {
-			m.Dead, rest = true, rest[1:]
+	options:
+		for len(rest) > 0 {
+			switch rest[0] {
+			case "dead":
+				m.Dead = true
+			case "standing":
+				if len(rest) < 2 {
+					return usage
+				}
+				v, err := strconv.Atoi(rest[1])
+				if err != nil || v == 0 || v > maxStanding || v < -maxStanding {
+					return fmt.Errorf("member standing %q is not 1 to %d (Ketra) or -1 to -%d (Varka)", rest[1], maxStanding, maxStanding)
+				}
+				m.Standing = v
+				rest = rest[1:]
+			case "hold":
+				if len(rest) < 3 {
+					return usage
+				}
+				n, err := ints(rest[1:3])
+				if err != nil || n[1] < 1 {
+					return fmt.Errorf("member hold %q %q is not <item id> <count of 1 or more>", rest[1], rest[2])
+				}
+				m.Holds = append(m.Holds, Hold{Item: int32(n[0]), Count: int32(n[1])})
+				rest = rest[2:]
+			default:
+				break options
+			}
+			rest = rest[1:]
 		}
 		switch len(rest) {
 		case 0:

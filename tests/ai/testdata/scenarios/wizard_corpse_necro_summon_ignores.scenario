@@ -1,0 +1,20 @@
+# WizardCorpseNecroSummon (21563, level 67), every draw 30 (not under 30), hating the character: the dead NPC within 200 is
+# left alone, no corpse clearing and no private.
+character Hunter 20
+random always 30
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroSummon
+npc necro 21563 Monster 1000 0 0 level 67 skill DEBUFF 4047 6 skill W_SHORT_RANGE_DD_MAGIC 4561 6 skill W_LONG_RANGE_DD_MAGIC 4597 6 skill CANCEL 4650 1 skill DD_MAGIC 4654 6 skill CLEAR_CORPSE 4672 1 ai SummonPrivate=21549
+npc corpse 20003 Monster 1000 100 0
+npc raised 21549 Monster 0 1500 0
+
+kill corpse
+  S SystemMessage id=95 1:0 1:0
+hit necro 10
+advance 6s
+  privates necro -

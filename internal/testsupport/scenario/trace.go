@@ -230,6 +230,7 @@ type traceStep struct {
 	heard  []string
 	lives  []string
 	spawns []string
+	checks []string
 }
 
 // traceTask is the rendered packets one task of a trace sent, in the
@@ -256,6 +257,8 @@ var (
 	traceNPC      = regexp.MustCompile(`^# npc (\S+) (\d+) \(object (\d+)\)$`)
 	traceDraw     = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
 	traceHeard    = regexp.MustCompile(`^# heard (\d+) \(object (\d+)\) (-?\d+) (-?\d+) (-?\d+)$`)
+	traceStance   = regexp.MustCompile(`^# stance (on|off)$`)
+	traceCheck    = regexp.MustCompile(`^# check (open|dungeon|standing|stance) (\S+( \S+)*)$`)
 	traceLive     = regexp.MustCompile(`^# live (\d+) (\d+)$`)
 	traceSpawned  = regexp.MustCompile(`^# spawned (\d+) (-|-?\d+,-?\d+( -?\d+,-?\d+)*)$`)
 )
@@ -368,6 +371,16 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			raw = append(raw, rawStep{client: "tick"})
 		case line == "# away":
 			raw = append(raw, rawStep{client: "away"})
+		case traceStance.MatchString(line):
+			raw = append(raw, rawStep{client: "stance " + traceStance.FindStringSubmatch(line)[1]})
+		case strings.HasPrefix(line, "# check "):
+			if !traceCheck.MatchString(line) {
+				return nil, nil, fmt.Errorf("trace line %q is not a check open|dungeon|standing|stance <what> <value>", line)
+			}
+			if len(raw) == 0 {
+				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
+			}
+			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		case traceNPC.MatchString(line):
 			m := traceNPC.FindStringSubmatch(line)
 			if !slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Role == m[1] && n.ID == atoi32(m[2]) }) {
@@ -497,6 +510,10 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			}
 			if m := traceLive.FindStringSubmatch(line); m != nil {
 				step.lives = append(step.lives, m[1]+"="+m[2])
+				continue
+			}
+			if m := traceCheck.FindStringSubmatch(line); m != nil {
+				step.checks = append(step.checks, strings.TrimPrefix(m[0], "# check "))
 				continue
 			}
 			if m := traceSpawned.FindStringSubmatch(line); m != nil {
@@ -683,6 +700,7 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws, hear
 			ts.heard = append(ts.heard, s.heard...)
 			ts.lives = append(ts.lives, s.lives...)
 			ts.spawns = append(ts.spawns, s.spawns...)
+			ts.checks = append(ts.checks, s.checks...)
 		}
 		next += len(clients)
 		sent, err := stepPackets(ts.tasks, st.Queues)
@@ -704,6 +722,9 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws, hear
 			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		if d := FirstDiff("spawned", st.Spawns, ts.spawns); d != "" {
+			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+		}
+		if d := FirstDiff("check", seedChecks(st), ts.checks); d != "" {
 			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		draws = append(draws, ts.draws)
@@ -759,7 +780,9 @@ func checkClients(st Step, sc *Scenario, sent []string, tasks []traceTask, pages
 		if err != nil {
 			return err
 		}
-		if d := FirstDiff(label, want, got[name]); d != "" {
+		// A wanted teleport box (loc=x,y,z+-n) takes the trace's landing inside it: the offset is no
+		// script draw, so the trace's own source drew a different one.
+		if d := FirstDiff(label, want, matchNearTeleports(got[name], want)); d != "" {
 			return fmt.Errorf("scenario %s (got: the scenario, want: the trace)", d)
 		}
 	}
@@ -867,6 +890,10 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 		return slices.Repeat([]string{"tick"}, times(st.Args)), nil
 	case "away":
 		return []string{"away"}, nil
+	case "stance":
+		if st.Args[0] == "player" {
+			return []string{"stance " + st.Args[1]}, nil
+		}
 	case "hallstatus":
 		return []string{"hallstatus " + st.Args[0] + " " + st.Args[1]}, nil
 	case "advance":

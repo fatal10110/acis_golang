@@ -274,10 +274,10 @@ func validDesire(d string) bool {
 // for none: the reference probe plays none of them.
 func (sc *Scenario) tracedFight() string {
 	switch {
-	case len(sc.Skills) > 0 || len(sc.Doors) > 0 || sc.Summon != nil:
-		return "skill, door or summon line"
-	case slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Clans != nil || n.Skills != nil }):
-		return "clan or skill option on an npc line"
+	case len(sc.Skills) > 0 || sc.Summon != nil:
+		return "skill or summon line"
+	case slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Clans != nil }):
+		return "clan option on an npc line"
 	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
 		return (st.Verb == "hit" && len(st.Args) == 4) || (st.Verb == "approach" && len(st.Args) == 2)
 	}):

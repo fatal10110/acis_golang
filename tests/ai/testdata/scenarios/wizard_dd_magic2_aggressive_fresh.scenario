@@ -1,0 +1,14 @@
+# WizardDDMagic2Aggressive (21311, level 76), every draw 0: a fresh one (a life time of 7 or less) wants nothing of the
+# character it sees.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+npc wiz 21311 Monster 1000 0 0 level 76 skill W_LONG_RANGE_DD_MAGIC 4158 8 skill W_SHORT_RANGE_DD_MAGIC 4160 8
+
+approach wiz
+  desires wiz -

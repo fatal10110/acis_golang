@@ -9,25 +9,19 @@ import (
 	"os"
 	"slices"
 	"strconv"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/elrokiteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/grandbossteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/oracleteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/paganteleporter"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
@@ -83,7 +77,6 @@ var (
 	tpDuskFestival = location.Location{X: -81261, Y: 86531, Z: -5157}
 	tpRiftEntrance = location.Location{X: -114755, Y: -179466, Z: -6752}
 	tpRiftRoom     = location.Location{X: -114796, Y: -179334, Z: -6752}
-	tpValakasIn    = location.Location{X: 183813, Y: -115157, Z: -3303}
 )
 
 // oracleSetup is what an oracle world's character brings into the world.
@@ -96,12 +89,6 @@ type oracleSetup struct {
 	memo string
 	// quests is how many real quests the character has started.
 	quests int
-	// doors are fixture doors standing in the world.
-	doors []*door.Template
-	// zones are the zones of the world; nil is none.
-	zones *zone.Index
-	// stance is the attack stance clock; nil keeps the real one.
-	stance func() time.Time
 }
 
 // oracleItems is the fixture catalog with the teleporters' fragment, marks
@@ -179,15 +166,6 @@ func bootOracles(t *testing.T, setup oracleSetup) *folkWorld {
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{raidTemplate(tpValakas)})),
 		gameservertest.WithNpcSpawns(nil),
 		noBypassReuse,
-	}
-	if len(setup.doors) > 0 {
-		opts = append(opts, gameservertest.WithDoors(setup.doors...))
-	}
-	if setup.zones != nil {
-		opts = append(opts, gameservertest.WithZones(setup.zones))
-	}
-	if setup.stance != nil {
-		opts = append(opts, gameservertest.WithAttackStanceClock(setup.stance))
 	}
 	srv := gameservertest.Boot(t, opts...)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
@@ -281,41 +259,6 @@ func (w *folkWorld) requireTripNear(t *testing.T, frames [][]byte, offset int, s
 	w.c.Send(encodeAppearing())
 	drainFrames(t, w.c)
 	return got
-}
-
-// TestOracleTeleporterTownPriestsSendIntoTheFestival: a town priest of
-// either side sends the player into its side's necropolis of the festival,
-// remembers itself in the player memo and marks the player inside a Seven
-// Signs dungeon, answering no page.
-func TestOracleTeleporterTownPriestsSendIntoTheFestival(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		name  string
-		kind  string
-		npcID int
-		want  location.Location
-	}{
-		{name: "dawn", kind: "DawnPriest", npcID: tpDawnTown, want: tpDawnFestival},
-		{name: "dusk", kind: "DuskPriest", npcID: tpDuskTown, want: tpDuskFestival},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			w := bootOracles(t, oracleSetup{})
-			priest := w.spawnFolk(t, folkTemplate(tt.kind, tt.npcID), 50)
-			w.openThrough(t, priest)
-			frames := w.tripFrames(t, npcCommand(priest, "Quest OracleTeleporter"))
-			if _, ok := firstOpcode(frames, serverpackets.OpcodeNpcHtmlMessage); ok {
-				t.Fatalf("the trip answered a page: %x", opcodes(frames))
-			}
-			w.requireTrip(t, frames, tt.want)
-			if got := w.oracleMemo(t); got != strconv.Itoa(tt.npcID) {
-				t.Fatalf("saved memo = %q, want %d", got, tt.npcID)
-			}
-			if !w.in7sDungeon(t) {
-				t.Fatal("the player is not marked inside a Seven Signs dungeon")
-			}
-		})
-	}
 }
 
 // TestOracleTeleporterReturn: a temple priest's return sends the player
@@ -562,76 +505,6 @@ func TestOracleTeleporterZigguratGatekeeperPages(t *testing.T) {
 	}
 }
 
-// pagenDoors are the Pagan Temple's doors the gatekeepers open.
-func paganDoors() []*door.Template {
-	return []*door.Template{scenarioDoor(19160001, 200), scenarioDoor(19160010, 240), scenarioDoor(19160011, 280)}
-}
-
-// scenarioDoor is a closed 16 by 16 fixture door of id dx east of the
-// fixture spawn point.
-func scenarioDoor(id, dx int) *door.Template {
-	at := gameservertest.ClassTemplate().Spawns[0]
-	x, y := at.X+dx, at.Y
-	return &door.Template{
-		ID: id, Name: "door_" + strconv.Itoa(id), Kind: door.KindDoor, Level: 1,
-		Position:    location.Location{X: x, Y: y, Z: at.Z},
-		Coordinates: []location.Point{{X: x - 8, Y: y - 8}, {X: x + 8, Y: y - 8}, {X: x + 8, Y: y + 8}, {X: x - 8, Y: y + 8}},
-		HP:          600, PDef: 100, MDef: 100, Height: 32,
-	}
-}
-
-// openDoors returns the ids of ids' doors that stand open.
-func (w *folkWorld) openDoors(t *testing.T, ids ...int) []int {
-	t.Helper()
-	var out []int
-	for _, id := range ids {
-		d, ok := w.srv.WorldObjects.Door(id)
-		if !ok {
-			t.Fatalf("door %d is not in the world", id)
-		}
-		if d.Opened() {
-			out = append(out, id)
-		}
-	}
-	return out
-}
-
-// TestPaganTeleporterGatekeepersOpenDoors: the temple gatekeeper opens the
-// temple door for a holder of either mark and refuses anyone else; the
-// chapel gatekeeper opens both chapel doors for a holder of the Pagan mark
-// alone; the gatekeepers inside open their doors for anyone.
-func TestPaganTeleporterGatekeepersOpenDoors(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		name  string
-		npcID int
-		held  map[int32]int32
-		page  string
-		open  []int
-	}{
-		{name: "temple without mark", npcID: tpTempleGK, page: "32034-1.htm"},
-		{name: "temple with visitor mark", npcID: tpTempleGK, held: map[int32]int32{tpVisitorMark: 1}, page: "FadedMark.htm", open: []int{19160001}},
-		{name: "temple with pagan mark", npcID: tpTempleGK, held: map[int32]int32{tpPaganMark: 1}, page: "FadedMark.htm", open: []int{19160001}},
-		{name: "temple way out", npcID: tpTempleOut, page: "FadedMark.htm", open: []int{19160001}},
-		{name: "chapel with visitor mark", npcID: tpChapelGK, held: map[int32]int32{tpVisitorMark: 1}, page: "32036-1.htm"},
-		{name: "chapel with pagan mark", npcID: tpChapelGK, held: map[int32]int32{tpPaganMark: 1}, page: "32036-2.htm", open: []int{19160010, 19160011}},
-		{name: "chapel way out", npcID: tpChapelOut, page: "FadedMark.htm", open: []int{19160010, 19160011}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			w := bootOracles(t, oracleSetup{held: tt.held, doors: paganDoors()})
-			gk := w.spawnFolk(t, folkTemplate("Folk", tt.npcID), 50)
-			w.openThrough(t, gk)
-			frames := w.tripFrames(t, npcCommand(gk, "Quest PaganTeleporter"))
-			wantPage(t, frames, gk, teleportPage(t, gk, "PaganTeleporter", tt.page), 2)
-			if got := w.openDoors(t, 19160001, 19160010, 19160011); !slices.Equal(got, tt.open) {
-				t.Fatalf("open doors = %v, want %v", got, tt.open)
-			}
-			w.requireSaved(t, map[int32]int{tpVisitorMark: int(tt.held[tpVisitorMark]), tpPaganMark: int(tt.held[tpPaganMark])})
-		})
-	}
-}
-
 // TestPaganTeleporterMirrors: Triol's mirrors send the player between the
 // temple and the town, answering no page.
 func TestPaganTeleporterMirrors(t *testing.T) {
@@ -653,53 +526,6 @@ func TestPaganTeleporterMirrors(t *testing.T) {
 				t.Fatalf("the trip answered a page: %x", opcodes(frames))
 			}
 			w.requireTrip(t, frames, tt.want)
-		})
-	}
-}
-
-// TestElrokiTeleporterRefusesAPlayerInCombat: Orahochin refuses a player
-// in its attack stance with 32111-no.htm and sends it on once the stance
-// is over; Gariachin sends a player back in combat or not.
-func TestElrokiTeleporterRefusesAPlayerInCombat(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		npcID int
-		want  location.Location
-	}{
-		{npcID: tpOrahochin, want: location.Location{X: 4990, Y: -1879, Z: -3178}},
-		{npcID: tpGariachin, want: location.Location{X: 7557, Y: -5513, Z: -3221}},
-	} {
-		t.Run(strconv.Itoa(tt.npcID), func(t *testing.T) {
-			t.Parallel()
-			var nowMS atomic.Int64
-			w := bootOracles(t, oracleSetup{stance: func() time.Time { return time.UnixMilli(nowMS.Load()) }})
-			gk := w.spawnFolk(t, folkTemplate("Folk", tt.npcID), 50)
-			attacker := w.srv.SpawnAttackingHostileNPCAt(t, location.Location{X: w.at.X - 40, Y: w.at.Y, Z: w.at.Z})
-			obj, ok := w.srv.State.Player(w.player)
-			if !ok {
-				t.Fatal("the character is not in the world")
-			}
-			attacker.DoAttack(t, obj.(attackable.Combatant))
-			w.srv.Settle(t)
-			if !w.srv.AttackStance.InAttackStance(obj.(task.AttackStanceActor)) {
-				t.Fatal("the landed hit did not put the player in its attack stance")
-			}
-			drainFrames(t, w.c)
-			w.openThrough(t, gk)
-			if tt.npcID == tpOrahochin {
-				frames := w.tripFrames(t, npcCommand(gk, "Quest ElrokiTeleporter"))
-				w.requireNoTrip(t, frames)
-				wantPage(t, frames, gk, teleportPage(t, gk, "ElrokiTeleporter", "32111-no.htm"), 2)
-
-				nowMS.Add(task.AttackStancePeriod.Milliseconds() + 1000)
-				if err := w.srv.AttackStance.Tick(); err != nil {
-					t.Fatalf("AttackStance.Tick() = %v", err)
-				}
-				w.srv.Settle(t)
-				drainFrames(t, w.c)
-				w.openThrough(t, gk)
-			}
-			w.requireTrip(t, w.tripFrames(t, npcCommand(gk, "Quest ElrokiTeleporter")), tt.want)
 		})
 	}
 }
