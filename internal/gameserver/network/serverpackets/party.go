@@ -220,11 +220,11 @@ func FrameExMPCCShowPartyMemberInfo(members []PartyChannelMember) wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// inHashMapOrder returns members in the iteration order of a java.util.HashMap
-// keyed by object id that they were put into in slice order: ascending
-// bucket, where the bucket is the spread hash masked by the table size
-// (16, doubled while the map holds more than three quarters of it), and
-// insertion order within a bucket. It holds while no bucket collects eight
+// inHashMapOrder returns members in the row order of a chained hash table
+// keyed by object id and filled in slice order: ascending bucket, then
+// insertion order within a bucket. The bucket is the id with its high half
+// folded in, masked by the table size (16, doubled while the table holds more
+// than three quarters of it). It holds while no bucket collects eight
 // collisions, which a party's nine ids cannot do on a table of 16.
 func inHashMapOrder(members []PartyMemberAt) []PartyMemberAt {
 	size := uint32(16)
