@@ -1,3 +1,4 @@
+import net.sf.l2j.commons.mmocore.MMOClient;
 import net.sf.l2j.commons.mmocore.PacketBytes;
 import net.sf.l2j.commons.mmocore.SendablePacket;
 import net.sf.l2j.gameserver.data.manager.RelationManager;
@@ -24,6 +25,11 @@ public final class PacketProbe
 	static void emit(String name, SendablePacket<?> packet) throws Exception
 	{
 		System.out.println(name + " " + PacketBytes.hex(packet));
+	}
+
+	static void emit(String name, SendablePacket<?> packet, MMOClient<?> client) throws Exception
+	{
+		System.out.println(name + " " + PacketBytes.hex(packet, client));
 	}
 
 	private static Player player(int objectId, String name, boolean online)
@@ -113,5 +119,6 @@ public final class PacketProbe
 
 		ProbeSimple.run();
 		ProbeWorld.run();
+		ProbeEngine.run();
 	}
 }

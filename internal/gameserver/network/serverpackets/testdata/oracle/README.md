@@ -18,8 +18,15 @@ wrote into a byte buffer.
   `SocialAction`, `DeleteObject`, `ChangeMoveType`, `ChangeWaitType`, `TargetUnselected`,
   `Revive`, `StopMove`, `TitleUpdate`, `Earthquake`, `MagicSkillUse`, `StatusUpdate`,
   `FlyToLocation`, `SetupGauge`)
+- the packets that read the engine's item, clan, siege, castle, manor and character graphs
+  (`ProbeEngine.java`): `SystemMessage`, `ConfirmDlg`, `Die`, `CharSelected`, `CharSelectInfo` and the
+  manor windows (`ExShowSeedInfo`, `ExShowCropInfo`, `ExShowManorDefaultInfo`, `ExShowSeedSetting`,
+  `ExShowCropSetting`, `ExShowSellCropList`, `ExShowProcureCropDetail`, `SellListProcure`,
+  `BuyListSeed`, `ExSendManorList`)
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
-- the value types `model/location/{Location,SpawnLocation,Point2D}`, `enums/{SayType,ZoneId}`,
+- the value types `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
+  `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,
+  `enums/actors/{ClassId,ClassRace,Sex}`,
   `enums/actors/WeightPenalty`, `enums/skills/EffectFlag` and the rest of their closure.
 
 Stand-ins (`stub/`, found first on the source path, so they shadow the reference
@@ -28,8 +35,15 @@ engine classes the packets only read through getters): `Config` (debug flag),
 (plain value holders; `Creature` carries the title, run and water flags and the move
 destination), `BoatInfo`, `BoatMove`, `BoatStatus`, `World`, `PlayerInfoTable`,
 `RelationManager` (registries `FriendList` reads), `IntIntHolder` (the id/value pair
-`StatusUpdate` holds, minus the skill lookup), `StatSet`, `MathUtil` (never reached)
-and `EffectHolder` (never written). They carry no packet logic: every byte comes from
+`StatusUpdate` holds, minus the skill lookup), `StatSet` (map-backed), `MathUtil` (never reached)
+and `EffectHolder` (never written). The engine graphs behind the last family are plain stand-ins too:
+`SystemMessageId` (id and parameter count; the shared no-parameter message is never cached),
+`ItemInstance`/`Item`/`PcInventory`/`ItemData`, `L2Skill`/`AbstractEffect` (never written), `Clan`,
+`Siege`/`ClanHallSiege`/`Castle`, `CastleManager`/`ClanHallManager`/`ClanTable`, `Monster` with its
+spoil state, the player's access level, appearance and status, `GameTimeTaskManager`,
+`CastleManorManager` (the reference's own lookups over tables the probe fills), and for the character
+list a `ConnectionPool` over `FakeDb`: in-memory tables answering the reference JDBC queries, so the
+list's own loading rules (subclass override, unset base class, augmentation read) run unchanged. They carry no packet logic: every byte comes from
 the reference `writeImpl`.
 
 `PacketBytes` (in `stub/.../commons/mmocore`, the packet base package, to reach the
@@ -56,10 +70,13 @@ row, and the target of a skill cast from the next row.
    `../../packets_oracle_cases_test.go` (or `oracleCases` in `../../packets_oracle_test.go`).
 4. Delete the hand-written byte test the case replaces.
 
-Not yet probed (they read the engine item, player, clan, castle or skill graphs): `SystemMessage`,
-`ConfirmDlg`, `CharSelectInfo`, `Die`, the manor windows, `UserInfo`/`CharInfo`/`NpcInfo`/`PetInfo`,
-the item, shop, trade, private store, macro, henna and party windows, and the pledge windows that
-take a clan.
+Not yet probed (they read the engine item, player, clan, castle or skill graphs):
+`UserInfo`/`CharInfo`/`NpcInfo`/`PetInfo`, the item, shop, trade, private store, macro, henna and
+party windows, and the pledge windows that take a clan.
+
+The manor set windows hold their seeds in a hash set and `SellListProcure` its rows in an
+identity-hash map, so their probes use one seed per castle and one row; the other manor windows
+iterate a map keyed by crop or castle id, whose order the golden pins.
 
 ## Regenerating
 

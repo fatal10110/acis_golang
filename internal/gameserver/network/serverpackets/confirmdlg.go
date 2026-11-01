@@ -44,7 +44,7 @@ const (
 // dialog: messageId, the caster's name (TYPE_TEXT), the caster's position
 // (TYPE_ZONE_NAME), the client-UI countdown, and the caster's object id for
 // DlgAnswer's requesterId echo — ConfirmDlg's two-parameter layout followed
-// by the countdown and requester id.
+// by the countdown and requester id, each left out when zero.
 func FrameConfirmDlgSummonFriendRequest(casterName string, casterID int32, x, y, z int32, timeout time.Duration) wire.Frame {
 	w := newFrameWriter(OpcodeConfirmDlg)
 	w.WriteInt32(ConfirmDlgSummonFriendRequest)
@@ -55,8 +55,12 @@ func FrameConfirmDlgSummonFriendRequest(casterName string, casterID int32, x, y,
 	w.WriteInt32(x)
 	w.WriteInt32(y)
 	w.WriteInt32(z)
-	w.WriteInt32(int32(timeout / time.Millisecond))
-	w.WriteInt32(casterID)
+	if ms := int32(timeout / time.Millisecond); ms != 0 {
+		w.WriteInt32(ms)
+	}
+	if casterID != 0 {
+		w.WriteInt32(casterID)
+	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
