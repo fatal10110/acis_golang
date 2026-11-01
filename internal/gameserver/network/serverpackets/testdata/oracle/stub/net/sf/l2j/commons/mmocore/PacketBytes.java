@@ -16,9 +16,16 @@ public final class PacketBytes
 	{
 	}
 
-	@SuppressWarnings("rawtypes")
-	public static String hex(SendablePacket packet) throws Exception
+	public static String hex(SendablePacket<?> packet) throws Exception
 	{
+		return hex(packet, null);
+	}
+
+	/** Serializes a packet that also reads its client (the character list hands it the slots). */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static String hex(SendablePacket packet, MMOClient client) throws Exception
+	{
+		packet._client = client;
 		final ByteBuffer buf = ByteBuffer.allocate(64 * 1024).order(ByteOrder.LITTLE_ENDIAN);
 		packet._buf = buf;
 
