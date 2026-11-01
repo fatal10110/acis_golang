@@ -203,33 +203,67 @@ final class ProbeEngine
 		for (int r = 0; r < ProbeSimple.ROWS.length; r++)
 		{
 			final int[] v = ProbeSimple.ROWS[r];
-			final Player p = new Player();
-			p.name = ProbeSimple.STRS[r];
-			p.title = ProbeSimple.STRS[(r + 1) % ProbeSimple.STRS.length];
-			p.objectId = v[0];
-			p.clanId = v[1];
-			p.appearance.sex = Sex.values()[v[2] & 1];
-			p.race = ClassRace.values()[r];
-			p.classId = ClassId.values()[CLASS_INDEX[r]];
-			p.x = v[3];
-			p.y = v[4];
-			p.z = v[5];
-			p.playerStatus.hp = v[6] + 0.5;
-			p.playerStatus.mp = v[7] + 0.25;
-			p.playerStatus.sp = v[8];
-			p.playerStatus.exp = (long) v[9] * 1000003L + v[0];
-			p.playerStatus.level = v[1] ^ v[2];
-			p.karma = v[3] ^ v[4];
-			p.pkKills = v[5] ^ v[6];
-			p.playerStatus.intelligence = v[0] + 1;
-			p.playerStatus.strength = v[1] + 2;
-			p.playerStatus.constitution = v[2] + 3;
-			p.playerStatus.mentality = v[3] + 4;
-			p.playerStatus.dexterity = v[4] + 5;
-			p.playerStatus.wit = v[5] + 6;
+			final Player p = charSelectedPlayer(r);
+			// The stand-in answers what PlayerStatus.getINT..getWIT compute from
+			// a class template's base attribute: never below 1 (Stats
+			// cantBeNegative), and within the 1-99 the attribute bonus tables
+			// cover, so the row's words fold into that range.
+			p.playerStatus.intelligence = charSelectedAttr(v[0] + 1);
+			p.playerStatus.strength = charSelectedAttr(v[1] + 2);
+			p.playerStatus.constitution = charSelectedAttr(v[2] + 3);
+			p.playerStatus.mentality = charSelectedAttr(v[3] + 4);
+			p.playerStatus.dexterity = charSelectedAttr(v[4] + 5);
+			p.playerStatus.wit = charSelectedAttr(v[5] + 6);
 			GameTimeTaskManager.getInstance().gameTime = v[6] ^ v[7];
 			PacketProbe.emit("CharSelected/" + ProbeSimple.ROW_NAMES[r], new CharSelected(p, v[2]));
 		}
+		charSelectedModified();
+	}
+	
+	// Row a with attributes its live funcs moved off the class template's
+	// (INT 21 + 3, STR 40 * 1.5, CON 43, MEN 25 + 4, DEX 30 - 2, WIT 11 + 4.75
+	// truncated): getINT..getWIT answer the computed values.
+	private static void charSelectedModified() throws Exception
+	{
+		final int[] v = ProbeSimple.ROWS[0];
+		final Player p = charSelectedPlayer(0);
+		p.playerStatus.intelligence = 24;
+		p.playerStatus.strength = 60;
+		p.playerStatus.constitution = 43;
+		p.playerStatus.mentality = 29;
+		p.playerStatus.dexterity = 28;
+		p.playerStatus.wit = 15;
+		GameTimeTaskManager.getInstance().gameTime = v[6] ^ v[7];
+		PacketProbe.emit("CharSelected/modified", new CharSelected(p, v[2]));
+	}
+	
+	private static int charSelectedAttr(int x)
+	{
+		return 1 + (int) Math.floorMod((long) x - 1, 99L);
+	}
+	
+	private static Player charSelectedPlayer(int r)
+	{
+		final int[] v = ProbeSimple.ROWS[r];
+		final Player p = new Player();
+		p.name = ProbeSimple.STRS[r];
+		p.title = ProbeSimple.STRS[(r + 1) % ProbeSimple.STRS.length];
+		p.objectId = v[0];
+		p.clanId = v[1];
+		p.appearance.sex = Sex.values()[v[2] & 1];
+		p.race = ClassRace.values()[r];
+		p.classId = ClassId.values()[CLASS_INDEX[r]];
+		p.x = v[3];
+		p.y = v[4];
+		p.z = v[5];
+		p.playerStatus.hp = v[6] + 0.5;
+		p.playerStatus.mp = v[7] + 0.25;
+		p.playerStatus.sp = v[8];
+		p.playerStatus.exp = (long) v[9] * 1000003L + v[0];
+		p.playerStatus.level = v[1] ^ v[2];
+		p.karma = v[3] ^ v[4];
+		p.pkKills = v[5] ^ v[6];
+		return p;
 	}
 
 	// A character-list row: every field a function of the shared row v and the object id.

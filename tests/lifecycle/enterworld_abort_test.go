@@ -11,22 +11,24 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-// TestEnterWorldAbortAfterAttachReleasesThePlayer forces one EnterWorld
-// failure after attachLivePlayer has already run and requires the login to
-// clean up after itself as thoroughly as a logout would.
+// TestSelectionAbortOnEquipRestoreReleasesThePlayer forces one selection
+// failure in the worn equipment's restore and requires the selection to
+// leave nothing behind, as a logout would.
 //
 // The trigger is a second datapack-edit shape: an equipped weapon whose
 // template carries a stat modifier naming a stat that does not exist.
 // stat.ByName rejects it inside EquipItemStats, so RestoreEquippedItemStats
-// fails (skill/effect/item_stats.go:60-63, skill/persistence.go:456-464) —
-// past the actor queue, the creature runtime and the shadow-item
-// registration, and before world.Spawn.
+// fails (skill/effect/item_stats.go:60-63). The equipment restores with the
+// selection, ahead of CharSelected, which carries the stats it moves
+// (#4370), so the selection closes the connection before the actor queue,
+// the creature runtime and the shadow-item registration exist.
 //
 // The shadow item is the destructive half of the leak this pins: a
 // registration nobody removes keeps decaying one second per tick for a
 // character who is not online and destroys the item at zero, so the tracker
-// is run past the weapon's whole remaining duration.
-func TestEnterWorldAbortAfterAttachReleasesThePlayer(t *testing.T) {
+// is run past the weapon's whole remaining duration; and every attempt that
+// reached the registration would charge the repeated-equip mana penalty.
+func TestSelectionAbortOnEquipRestoreReleasesThePlayer(t *testing.T) {
 	t.Parallel()
 	templates := gameservertest.ItemTemplates()
 	srv := gameservertest.Boot(t,
@@ -53,7 +55,7 @@ func TestEnterWorldAbortAfterAttachReleasesThePlayer(t *testing.T) {
 		t.Fatalf("mana after the first logout = %d, want 299", got)
 	}
 	// Baseline taken after a clean logout: whatever queues this boot keeps
-	// open, the aborted login below must not add one.
+	// open, the aborted selection below must not add one.
 	openQueues := srv.OpenActorQueues()
 
 	tmpl, ok := templates.Get(shadowSwordID)
@@ -64,25 +66,22 @@ func TestEnterWorldAbortAfterAttachReleasesThePlayer(t *testing.T) {
 	tmpl.Modifiers = append(slices.Clone(sound), item.StatModifier{Op: item.FuncAdd, Stat: "notARealStat", Value: 1})
 
 	c.Send(encodeRequestGameStart(0))
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
-	c.Send(encodeEnterWorld())
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeServerClose, "game start ServerClose")
 	if !c.AwaitClose(5 * time.Second) {
-		t.Fatal("aborted login kept the connection open; the equipped item's stat restore was expected to fail")
+		t.Fatal("aborted selection kept the connection open; the equipped item's stat restore was expected to fail")
 	}
 
 	if _, online := srv.State.Player(objID); online {
-		t.Error("character stayed in world state after the aborted login")
+		t.Error("character stayed in world state after the aborted selection")
 	}
 	if got := srv.OpenActorQueues(); got != openQueues {
-		t.Errorf("open actor queues after the aborted login = %d, want %d: the attached player's queue was never closed", got, openQueues)
+		t.Errorf("open actor queues after the aborted selection = %d, want %d: a player queue was left open", got, openQueues)
 	}
-	// 299 - 60: the attach that ran before the abort tracked the weapon and
-	// charged the repeated-equip penalty, so this run really did enter the
-	// post-attach window.
+	// The selection stopped ahead of the shadow-item registration: no
+	// repeated-equip penalty was charged for the login that never happened.
 	manaAtAbort := shadowSwordMana(t, srv, objID, sword)
-	if manaAtAbort != 239 {
-		t.Fatalf("mana after the aborted login = %d, want 239 (299 minus the repeated-equip penalty)", manaAtAbort)
+	if manaAtAbort != 299 {
+		t.Fatalf("mana after the aborted selection = %d, want 299 (no repeated-equip penalty)", manaAtAbort)
 	}
 
 	// Well past the weapon's remaining duration: a leaked registration would

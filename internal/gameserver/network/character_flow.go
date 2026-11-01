@@ -316,15 +316,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		return false
 	}
 	l.activateSpawnProtection(live)
-	if l.skills != nil {
-		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
-			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore equipped item stats")
-			return false
-		}
-	}
-	// Computed after RestoreEquippedItemStats so an item's equip-delay reuse
-	// timer, armed by that restore, is included in the login SkillCoolTime
-	// snapshot rather than missed.
+	// An item's equip-delay reuse timer, armed when the selection restored
+	// the worn equipment, is included in the login SkillCoolTime snapshot.
 	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	// Track this player for the in-game clock's activity reminder so the
@@ -746,6 +739,14 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		inv.UpdateWeight()
 	}
 	c.RefreshExpertisePenalty()
+	// The worn equipment's stat functions, item skills and set bonuses apply
+	// with the restore, still silent before anything reports c, so the
+	// selection already carries the stats they move.
+	if l.skills != nil {
+		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
+			return nil, fmt.Errorf("attach live player: restore equipped item stats: %w", err)
+		}
+	}
 
 	x, y, z := c.Position()
 	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.MoveSpeed(), l.geo, c, effect.WithEnv(l.effects))

@@ -78,8 +78,7 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client
 	chars[slot] = fresh
 	l.clanService().RestoreMembership(c, time.Now())
 	l.applyLoadedAccessLevel(c)
-	tmpl, ok := l.templates.Get(c.ClassID())
-	if !ok {
+	if _, ok := l.templates.Get(c.ClassID()); !ok {
 		l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 		return nil, selectionStopped
 	}
@@ -94,7 +93,7 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client
 	session.SendFrame(ssqSkyFrame(l.sevenSigns))
 	client.SetState(StateEntering)
 	session.SendFrame(serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{
-		Character: c, Template: tmpl, SessionID: client.SessionKey().PlayKey1,
+		Character: c, SessionID: client.SessionKey().PlayKey1,
 		GameTime: l.gameTime(),
 	}))
 	// From here on lookups by name and id find the character, as the world
