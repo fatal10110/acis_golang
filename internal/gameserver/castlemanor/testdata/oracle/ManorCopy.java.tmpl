@@ -176,9 +176,11 @@ public final class ManorCopy
 		final List<Integer> _items = new ArrayList<>();
 		final List<String> added = new ArrayList<>();
 
-		Object getItemsByItemId(int itemId)
+		// Like the reference: the items held with that id, an empty list
+		// (never null) when there are none.
+		List<Integer> getItemsByItemId(int itemId)
 		{
-			return _items.contains(itemId) ? itemId : null;
+			return _items.stream().filter(i -> i == itemId).toList();
 		}
 
 		boolean validateCapacity(int slotCount)

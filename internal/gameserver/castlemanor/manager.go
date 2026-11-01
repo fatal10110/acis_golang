@@ -378,8 +378,9 @@ func (m *Manager) changeMode() {
 		}
 		m.status = StatusModifiable
 	case StatusModifiable:
-		// Approving charges no castle anything: the next period's lists
-		// stand as set.
+		// Approving charges no castle anything and tells no one: the next
+		// period's lists stand as set, whatever the owning clan's warehouse
+		// holds.
 		m.status = StatusApproved
 	}
 	m.scheduleLocked(m.queue.Now())
