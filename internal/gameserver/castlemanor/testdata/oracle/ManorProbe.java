@@ -207,5 +207,58 @@ public final class ManorProbe
 					System.out.println("rollover " + procure + " " + treasury + " " + roll + " => warehouse " + (owner.warehouse.added.isEmpty() ? "-" : String.join(",", owner.warehouse.added))
 						+ " income " + gludio.seedIncome + " next " + (emptied ? "empty" : next) + " running" + state + " mode " + m._mode + " delay " + ManorCopy.ThreadPool.delay);
 				}
+
+		// The approval of a modifiable manor at its approve time. The next
+		// period sells 10 Dark Coda seeds at 5 and buys the crops
+		// start/price (alternating Dark Coda and Red Coda); the owner's
+		// warehouse holds <n> other items, plus the Dark Coda mature item
+		// when the count ends in "m". Printed: the treasury after, the next
+		// period's seeds and crops (id:amount), the messages the clan leader
+		// got, the mode and the delay until the next change.
+		final String[] approvals =
+		{
+			"100/30",
+			"0/30",
+			"100/30+5/10",
+			"0/30+0/10"
+		};
+		for (String procure : approvals)
+			for (String warehouse : new String[] { "0", "149", "150", "150m", "300" })
+				for (long treasury : new long[] { 0, 3049, 3050, 1000000 })
+				{
+					final ManorCopy m = manor(treasury);
+					final ManorCopy.Clan owner = ManorCopy.ClanTable.INSTANCE.clans.get(1);
+					final int others = Integer.parseInt(warehouse.replace("m", ""));
+					for (int i = 0; i < others; i++)
+						owner.warehouse._items.add(57);
+					if (warehouse.endsWith("m"))
+						owner.warehouse._items.add(CODA_MATURE);
+					final List<CropProcure> nextCrops = new ArrayList<>();
+					int i = 0;
+					for (String c : procure.split("\\+"))
+					{
+						final String[] f = c.split("/");
+						final int start = Integer.parseInt(f[0]);
+						nextCrops.add(new CropProcure(i++ % 2 == 0 ? CODA_CROP : RED_CROP, start, 1, start, Integer.parseInt(f[1])));
+					}
+					m._production.put(1, new ArrayList<>());
+					m._procure.put(1, new ArrayList<>());
+					m._productionNext.put(1, new ArrayList<>(List.of(new SeedProduction(CODA_SEED, 10, 5, 10))));
+					m._procureNext.put(1, nextCrops);
+					m._mode = ManorCopy.ManorStatus.MODIFIABLE;
+					ManorCopy.NOW = at(6, 0, 0, 0);
+					m.changeMode();
+					final ManorCopy.Castle gludio = ManorCopy.CastleManager.INSTANCE.castles.get(0);
+					final StringBuilder next = new StringBuilder();
+					for (SeedProduction s : m._productionNext.get(1))
+						next.append(s.getId()).append(':').append(s.getAmount()).append(',');
+					for (CropProcure s : m._procureNext.get(1))
+						next.append(s.getId()).append(':').append(s.getAmount()).append(',');
+					final List<String> sent = new ArrayList<>();
+					for (ManorCopy.SystemMessageId id : owner.leader.player.sent)
+						sent.add(id.toString());
+					System.out.println("approve " + procure + " " + warehouse + " " + treasury + " => treasury " + gludio.treasury + " next " + (next.length() == 0 ? "empty" : next)
+						+ " sent " + (sent.isEmpty() ? "-" : String.join(",", sent)) + " mode " + m._mode + " delay " + ManorCopy.ThreadPool.delay);
+				}
 	}
 }

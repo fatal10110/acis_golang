@@ -36,10 +36,19 @@ Line formats (`ManorProbe.java`):
   Dark Coda and Red Coda); the next period sells 10 Dark Coda seeds and buys 100 Dark Coda at 30,
   so it costs 3050 once running.
 
-Not covered: `changeMode` from MODIFIABLE (the approval), which takes the next period's cost from
-the castle's treasury when the owner's warehouse lacks room for the crops' mature items and empties
-the next period when the treasury cannot pay it; `CastleManorManager` is not yet modeled that way
-(tracked in #4361).
+- `approve <start/price>[+...] <warehouse> <treasury> => treasury <n> next <lists|empty> sent
+  <messages|-> mode <mode> delay <ms>`: a modifiable manor approved at 06:00 (Gludio owned by a
+  clan). The next period sells 10 Dark Coda seeds at 5 and buys the listed crops (alternating Dark
+  Coda and Red Coda), so it costs 3050 with `100/30`; the owner's warehouse holds `<warehouse>`
+  other items, plus the Dark Coda mature item when it ends in `m`. `sent` is what the clan leader
+  was told.
+
+The approval's warehouse check counts a slot for each crop whose mature item
+`getItemsByItemId(...) == null`; that method returns a list, empty when nothing matches, never
+null, so the count is always 0, `validateCapacity(0)` passes, and the approval never charges the
+treasury, empties the next period or tells the leader. The harness's `getItemsByItemId` returns a
+list the same way; the `approve` lines pin that outcome for full, overfull and empty warehouses and
+for short and ample treasuries (#4361).
 
 ## Regenerating
 
