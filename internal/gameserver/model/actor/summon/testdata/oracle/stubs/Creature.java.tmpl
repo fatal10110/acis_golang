@@ -11,7 +11,9 @@ import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.skills.AbstractEffect;
 import net.sf.l2j.gameserver.skills.Calculator;
 import net.sf.l2j.gameserver.skills.basefuncs.Func;
+import net.sf.l2j.gameserver.skills.funcs.FuncMAtkMod;
 import net.sf.l2j.gameserver.skills.funcs.FuncMDefMod;
+import net.sf.l2j.gameserver.skills.funcs.FuncMoveSpeed;
 import net.sf.l2j.gameserver.skills.funcs.FuncPAtkMod;
 import net.sf.l2j.gameserver.skills.funcs.FuncPDefMod;
 
@@ -47,7 +49,8 @@ public class Creature
 	}
 
 	// The reference adds fifteen builtin funcs here; the stat pipeline cases
-	// read three of them, so only those three statements are cut.
+	// read five of them (P.Atk, M.Atk, P.Def, M.Def and the run speed), so only
+	// those statements are cut.
 	public void addFuncsToNewCharacter()
 	{
 @@BUILTINS@@
