@@ -9,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
 
 // talkToFolk is a civilian NPC's answer to a player's interact in reach:
@@ -196,7 +198,7 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.AutoAttackStopped:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(f.ObjectID()) })
 	case event.MoveTypeChanged:
-		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running) })
+		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running, f.InsideZone(zone.FlagWater)) })
 	case event.AbnormalEffectChanged:
 		broadcastNPCView(s.link, &s.known, s.world, f, f.ServerObjectView())
 	case event.HallManagerBuffCheck:

@@ -42,9 +42,9 @@ func assertViewEvents(t *testing.T, when string, sink *recordingSink, want ...ev
 // (WaterZone.onEnter and onExit, WaterZone.java:28-59): spawning in water
 // enters the zone and swims, showing observers the stationary view of an
 // NPC whose move speed is 0 and the full one otherwise; despawning leaves
-// the zone, showing it again on dry land. The spawn sequence's stance
-// change (walk NpcInfo re-sent running, ChangeMoveType first when the NPC
-// can move) comes before the zone entry, as on every NPC spawn path (#4352).
+// the zone, showing it again on dry land. The zone entry comes before the
+// spawn sequence's stance change (ChangeMoveType when the NPC can move, then
+// its view again running), as on every NPC spawn path.
 func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -54,10 +54,11 @@ func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 		{"still", 0, true},
 		{"able to move", 20, false},
 	} {
-		spawned := []event.Event{event.NPCInfoChanged{}, event.NPCInfoChanged{ServerObject: tc.stationary}}
+		spawned := []event.Event{event.NPCInfoChanged{ServerObject: tc.stationary}}
 		if tc.runSpeed != 0 {
-			spawned = append([]event.Event{event.MoveTypeChanged{Running: true}}, spawned...)
+			spawned = append(spawned, event.MoveTypeChanged{Running: true})
 		}
+		spawned = append(spawned, event.NPCInfoChanged{})
 		t.Run("decoration "+tc.name, func(t *testing.T) {
 			ix, water := waterIndex(t)
 			inst, err := NewInstance(7, &Template{ID: 13006, Type: "ChristmasTree", RunSpeed: tc.runSpeed, WalkSpeed: tc.runSpeed})
