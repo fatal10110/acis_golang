@@ -22,6 +22,9 @@ func oracleEngineCases() map[string]func() wire.Frame {
 	addCharSelectedCases(m)
 	addCharSelectInfoCases(m)
 	addManorCases(m)
+	for name, build := range oracleCharacterCases() {
+		m[name] = build
+	}
 	return m
 }
 

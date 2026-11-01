@@ -120,5 +120,6 @@ public final class PacketProbe
 		ProbeSimple.run();
 		ProbeWorld.run();
 		ProbeEngine.run();
+		ProbeCharacters.run();
 	}
 }

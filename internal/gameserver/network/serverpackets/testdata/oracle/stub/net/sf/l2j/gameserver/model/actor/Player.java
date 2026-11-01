@@ -1,6 +1,11 @@
 package net.sf.l2j.gameserver.model.actor;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import net.sf.l2j.gameserver.enums.TeamType;
 import net.sf.l2j.gameserver.enums.ZoneId;
+import net.sf.l2j.gameserver.enums.actors.OperateType;
 import net.sf.l2j.gameserver.enums.actors.ClassId;
 import net.sf.l2j.gameserver.enums.actors.ClassRace;
 import net.sf.l2j.gameserver.enums.actors.WeightPenalty;
@@ -8,6 +13,9 @@ import net.sf.l2j.gameserver.enums.skills.EffectFlag;
 import net.sf.l2j.gameserver.model.AccessLevel;
 import net.sf.l2j.gameserver.model.actor.container.player.Appearance;
 import net.sf.l2j.gameserver.model.actor.container.player.BoatInfo;
+import net.sf.l2j.gameserver.model.actor.container.player.FishingStance;
+import net.sf.l2j.gameserver.model.actor.instance.Cubic;
+import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.actor.status.PlayerStatus;
 import net.sf.l2j.gameserver.model.itemcontainer.PcInventory;
 import net.sf.l2j.gameserver.model.pledge.Clan;
@@ -38,6 +46,43 @@ public final class Player extends Creature
 	public int adena;
 	public PcInventory inventory = new PcInventory();
 	public PlayerStatus playerStatus = new PlayerStatus();
+	public boolean clanLeader;
+	public int siegeState;
+	public int classIndex;
+	public int baseClass;
+	public int currentWeight;
+	public int weightLimit;
+	public Object activeWeaponItem;
+	public boolean mounted;
+	public Summon summon;
+	public int mountType;
+	public OperateType operateType = OperateType.NONE;
+	public boolean sitting;
+	public boolean gm;
+	public boolean crystallize;
+	public List<Cubic> cubics = new ArrayList<>();
+	public boolean inPartyMatchRoom;
+	public int clanPrivileges;
+	public int recomLeft;
+	public int recomHave;
+	public int mountNpcId;
+	public int enchantEffect;
+	public boolean spawnProtected;
+	public TeamType team = TeamType.NONE;
+	public int clanCrestLargeId;
+	public int clanCrestId;
+	public int allyId;
+	public int allyCrestId;
+	public boolean noble;
+	public boolean hero;
+	public boolean fishing;
+	public FishingStance fishingStance = new FishingStance();
+	public int pledgeClass;
+	public int pledgeType;
+	public int cursedWeaponEquippedId;
+	public int pvpFlag;
+	public int pvpKills;
+	public NpcTemplate polymorphTemplate;
 
 	public boolean isOnline()
 	{
@@ -149,9 +194,189 @@ public final class Player extends Creature
 		return playerStatus;
 	}
 
-	// Read only by the class table's parent lookup, which no packet reaches.
+
+	public boolean isClanLeader()
+	{
+		return clanLeader;
+	}
+
+	public int getSiegeState()
+	{
+		return siegeState;
+	}
+
+	public int getClassIndex()
+	{
+		return classIndex;
+	}
+
 	public int getBaseClass()
 	{
-		return 0;
+		return baseClass;
+	}
+
+	public int getCurrentWeight()
+	{
+		return currentWeight;
+	}
+
+	public int getWeightLimit()
+	{
+		return weightLimit;
+	}
+
+	public Object getActiveWeaponItem()
+	{
+		return activeWeaponItem;
+	}
+
+	public boolean isMounted()
+	{
+		return mounted;
+	}
+
+	public Summon getSummon()
+	{
+		return summon;
+	}
+
+	public int getMountType()
+	{
+		return mountType;
+	}
+
+	public OperateType getOperateType()
+	{
+		return operateType;
+	}
+
+	public boolean isSitting()
+	{
+		return sitting;
+	}
+
+	public boolean isGM()
+	{
+		return gm;
+	}
+
+	public boolean hasCrystallize()
+	{
+		return crystallize;
+	}
+
+	public List<Cubic> getCubicList()
+	{
+		return cubics;
+	}
+
+	public boolean isInPartyMatchRoom()
+	{
+		return inPartyMatchRoom;
+	}
+
+	public int getClanPrivileges()
+	{
+		return clanPrivileges;
+	}
+
+	public int getRecomLeft()
+	{
+		return recomLeft;
+	}
+
+	public int getRecomHave()
+	{
+		return recomHave;
+	}
+
+	public int getMountNpcId()
+	{
+		return mountNpcId;
+	}
+
+	public int getEnchantEffect()
+	{
+		return enchantEffect;
+	}
+
+	public boolean isSpawnProtected()
+	{
+		return spawnProtected;
+	}
+
+	public TeamType getTeam()
+	{
+		return team;
+	}
+
+	public int getClanCrestLargeId()
+	{
+		return clanCrestLargeId;
+	}
+
+	public int getClanCrestId()
+	{
+		return clanCrestId;
+	}
+
+	public int getAllyId()
+	{
+		return allyId;
+	}
+
+	public int getAllyCrestId()
+	{
+		return allyCrestId;
+	}
+
+	public boolean isNoble()
+	{
+		return noble;
+	}
+
+	public boolean isHero()
+	{
+		return hero;
+	}
+
+	public boolean isFishing()
+	{
+		return fishing;
+	}
+
+	public FishingStance getFishingStance()
+	{
+		return fishingStance;
+	}
+
+	public int getPledgeClass()
+	{
+		return pledgeClass;
+	}
+
+	public int getPledgeType()
+	{
+		return pledgeType;
+	}
+
+	public int getCursedWeaponEquippedId()
+	{
+		return cursedWeaponEquippedId;
+	}
+
+	public int getPvpFlag()
+	{
+		return pvpFlag;
+	}
+
+	public int getPvpKills()
+	{
+		return pvpKills;
+	}
+
+	public NpcTemplate getPolymorphTemplate()
+	{
+		return polymorphTemplate;
 	}
 }
