@@ -18,6 +18,7 @@ npc both 35601 Folk 0 10 0 maker isle walks
 npc wolf 20120 Monster 0 -10 0 walks maker isle
 roll vervato 0
 roll player 0
+gauss wolf -1.5
 ground potion 20 1 500 0 0
 ground zariche 8190 1 450 0 0 cursed
 
@@ -54,6 +55,9 @@ func TestParseReadsWorldLines(t *testing.T) {
 	}
 	if want := map[string]int{"vervato": 0, "player": 0}; !maps.Equal(sc.Rolls, want) {
 		t.Fatalf("rolls = %v", sc.Rolls)
+	}
+	if want := map[string]float64{"wolf": -1.5}; !maps.Equal(sc.Gauss, want) {
+		t.Fatalf("gauss = %v", sc.Gauss)
 	}
 	want := []Ground{{Role: "potion", Item: 20, Count: 1, DX: 500}, {Role: "zariche", Item: 8190, Count: 1, DX: 450, Cursed: true}}
 	if !slices.Equal(sc.Grounds, want) {
@@ -98,6 +102,13 @@ func TestParseRejectsMalformedWorldLines(t *testing.T) {
 		{"roll unknown role", "character A 1\nroll a 0\nadvance 1s\n", "no NPC line above"},
 		{"roll draw", "character A 1\nnpc a 1 Folk 0 0 0\nroll a -1\nadvance 1s\n", "not a number of 0 or more"},
 		{"roll twice", "character A 1\nnpc a 1 Folk 0 0 0\nroll a 0\nroll a 1\nadvance 1s\n", "listed twice"},
+		{"gauss unknown role", "character A 1\ngauss a 0\nadvance 1s\n", "no NPC line above"},
+		{"gauss player", "character A 1\ngauss player 0\nadvance 1s\n", "no NPC line above"},
+		{"gauss value", "character A 1\nnpc a 1 Folk 0 0 0\ngauss a x\nadvance 1s\n", "is not a number"},
+		{"gauss infinite", "character A 1\nnpc a 1 Folk 0 0 0\ngauss a Inf\nadvance 1s\n", "is not a number"},
+		{"gauss usage", "character A 1\nnpc a 1 Folk 0 0 0\ngauss a\nadvance 1s\n", "gauss <role> <value>"},
+		{"gauss twice", "character A 1\nnpc a 1 Folk 0 0 0\ngauss a 0\ngauss a 1\nadvance 1s\n", "listed twice"},
+		{"gauss trace", "trace x.golden\ncharacter A 1\nnpc a 1 Folk 0 0 0\ngauss a 0\nadvance 1s\n", "no gauss line"},
 		{"ground usage", "character A 1\nground g 20 1 0 0\nadvance 1s\n", "ground <role>"},
 		{"ground count", "character A 1\nground g 20 0 0 0 0\nadvance 1s\n", "not 1 or more"},
 		{"ground names a role", "character A 1\nnpc g 1 Folk 0 0 0\nground g 20 1 0 0 0\nadvance 1s\n", `role "g" named twice`},

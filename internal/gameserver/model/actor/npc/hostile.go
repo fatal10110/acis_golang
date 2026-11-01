@@ -191,6 +191,10 @@ type Hostile struct {
 	// damage-spread rolls. It defaults to math/rand's global source; tests
 	// substitute a fixed function for deterministic combat outcomes.
 	roll func(n int) int
+	// gaussian draws a standard normal for the formulas that use one (a
+	// magic skill's landing threshold). It defaults to the global source;
+	// tests substitute a fixed function.
+	gaussian func() float64
 
 	los LineOfSight
 
@@ -522,6 +526,12 @@ func (h *Hostile) relocate(position location.Location, placed bool) {
 // hit/crit/damage-spread rolls, for deterministic tests.
 func (h *Hostile) SetRollSource(f func(n int) int) {
 	h.roll = f
+}
+
+// SetGaussianSource overrides the standard normal draw Gaussian returns, for
+// deterministic tests.
+func (h *Hostile) SetGaussianSource(f func() float64) {
+	h.gaussian = f
 }
 
 // ObjectID returns the world object id assigned to this NPC.

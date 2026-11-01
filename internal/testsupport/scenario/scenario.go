@@ -110,6 +110,10 @@
 //	                                          least 1), with 99 none does (at most 99), and every blow lands (a hit
 //	                                          rate is at least 300 of 1000). Role player pins the character's, set
 //	                                          each time it enters the world
+//	gauss <role> <value>                      optional: every normal (gaussian) draw of the NPC's formulas is that value: a
+//	                                          magic skill's landing threshold, which lands under -2 times its margin (a
+//	                                          mana-drain skill on a defender of equal strength lands from a draw of 2 on).
+//	                                          Not for a traced scenario: the reference probe cannot script that draw
 //	territory <name> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>
 //	                                          optional: an npcmaker territory, the box between those offsets from where the
 //	                                          character first enters the world
@@ -199,6 +203,8 @@
 //	                       is in flight (it attacks now), as a script's AttackingNow reads it
 //	kill <role> [xN]       the character lands a lethal hit on the NPC, N times; a dead NPC is replaced by a fresh one first
 //	advance <duration>     time passes, as time.ParseDuration reads it
+//	                       the effect lists tick after each whole second of it, so a landed effect runs out (a rest
+//	                       under a second does not tick)
 //	approach <role> [<distance>]
 //	                       the character steps to that distance (default 100, inside its see range) in front
 //	                       of the NPC, and one AI tick runs, whose see-creature scan notices it
@@ -476,6 +482,8 @@ type Scenario struct {
 	NPCs    []NPC
 	// Rolls are the roll lines' draws by role.
 	Rolls map[string]int
+	// Gauss are the gauss lines' values by role.
+	Gauss map[string]float64
 	// Territories are the territory lines, Members the member lines and
 	// Grounds the ground lines.
 	Territories []Territory
@@ -758,6 +766,9 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if err := sc.checkHalls(); err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
+	if sc.Trace != "" && len(sc.Gauss) > 0 {
+		return nil, fmt.Errorf("%s: a traced scenario takes no gauss line", name)
+	}
 	if sc.Trace != "" && (len(sc.Members) > 0 || len(sc.Grounds) > 0) {
 		return nil, fmt.Errorf("%s: a traced scenario takes no member or ground line", name)
 	}
@@ -1028,7 +1039,7 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		opts.Role, opts.ID, opts.Type = role, int32(id), args[2]
 		opts.DX, opts.DY, opts.DZ = offsets[0], offsets[1], offsets[2]
 		sc.NPCs = append(sc.NPCs, opts)
-	case "territory", "member", "ground", "roll":
+	case "territory", "member", "ground", "roll", "gauss":
 		return sc.world(key, args, roles)
 	case "skill", "door", "summon":
 		return sc.fight(key, args, roles)
