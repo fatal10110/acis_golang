@@ -1,0 +1,45 @@
+package net.sf.l2j.gameserver.geoengine;
+
+import java.awt.Color;
+
+import net.sf.l2j.gameserver.enums.MoveDirectionType;
+import net.sf.l2j.gameserver.geoengine.geodata.ABlock;
+import net.sf.l2j.gameserver.geoengine.geodata.BlockNull;
+import net.sf.l2j.gameserver.geoengine.geodata.GeoStructure;
+import net.sf.l2j.gameserver.model.World;
+import net.sf.l2j.gameserver.model.location.Location;
+import net.sf.l2j.gameserver.network.serverpackets.ExServerPrimitive;
+
+/**
+ * The engine's block lookup and its two fly queries, cut verbatim from the reference. The
+ * reference engine cannot be constructed without region files, so this holds only the block grid
+ * the cut methods read; the probe fills it with synthetic blocks.
+ */
+public class GeoCopy
+{
+	private final ABlock[][] _blocks = new ABlock[GeoStructure.GEO_BLOCKS_X][GeoStructure.GEO_BLOCKS_Y];
+	
+	public GeoCopy()
+	{
+		final BlockNull nullBlock = new BlockNull();
+		for (ABlock[] column : _blocks)
+			java.util.Arrays.fill(column, nullBlock);
+	}
+	
+	public void setBlock(int blockX, int blockY, ABlock block)
+	{
+		_blocks[blockX][blockY] = block;
+	}
+	
+@@GEOX@@
+	
+@@GEOY@@
+	
+@@GETBLOCK@@
+	
+@@HEIGHTNEAREST@@
+	
+@@CANFLY@@
+	
+@@VALIDFLY@@
+}
