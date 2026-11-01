@@ -1,7 +1,8 @@
 # The Baium and Core cube (GrandBossTeleporter) standing inside Baium's boss zone (110002) answers its
 # own page (onFirstTalk) and sends the character to one of Baium's points up to 100 away (onTalk,
 # the second of its three points, the draws' offset 10,66 from it). Expectations are derived from the reference source; the
-# reference probe stands the zone at its datapack coordinates, far from the fixture NPC.
+# reference probe stands the shipped zone 110002 in the box for the scenario and replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_baium_cube.golden
 character Pilgrim 60
 random always 1
 script script.teleport.GrandBossTeleporter

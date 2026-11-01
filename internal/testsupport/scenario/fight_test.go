@@ -127,7 +127,7 @@ func TestParseRejectsMalformedFightLines(t *testing.T) {
 		{"desires unknown role", npcs + "advance 1s\n  desires c -\n", `unknown role "c"`},
 		{"at usage", npcs + "advance 1s\n  at a 0 0\n", "at <role> <dx> <dy> <dz>"},
 		{"at unknown role", npcs + "advance 1s\n  at c 0 0 0\n", `unknown role "c"`},
-		{"traced skill line", "trace x.golden\ncharacter A 1\nskill 1068 1\nadvance 1s\n", "takes no skill, door or summon line"},
+		{"traced skill line", "trace x.golden\ncharacter A 1\nskill 1068 1\nadvance 1s\n", "takes no skill or summon line"},
 		{"traced npc clan", "trace x.golden\ncharacter A 1\nnpc a 1 Monster 0 0 0 clan c 1\nadvance 1s\n", "takes no clan or skill option"},
 		{"traced hit by", "trace x.golden\n" + npcs + "hit a 1 by b\n", "takes no hit by another creature"},
 		{"summon relog", "character A 1\nsummon s 1\nrelog\n", "takes no relog"},

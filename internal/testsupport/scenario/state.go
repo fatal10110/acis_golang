@@ -453,9 +453,9 @@ func (sc *Scenario) tracedState() string {
 	}):
 		return "aggro, mem, privates or master option on an npc line"
 	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
-		return slices.Contains(stateVerbs, st.Verb) || st.Random != nil || (st.Verb == "hit" && len(st.Args) >= 5)
+		return (slices.Contains(stateVerbs, st.Verb) && !(st.Verb == "stance" && st.Args[0] == "player")) || st.Random != nil || (st.Verb == "hit" && len(st.Args) >= 5)
 	}):
-		return "hp, mp, want, die, top, land, stance or swing step, skill hit or random line in a step"
+		return "hp, mp, want, die, top, land or swing step, an NPC's stance step, skill hit or random line in a step"
 	case slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Level != 0 && !sc.fights(n.Role) }):
 		// The probe makes only the NPCs a kill or hit step names the fixture
 		// monster that takes a level; it plays every other one as shipped.

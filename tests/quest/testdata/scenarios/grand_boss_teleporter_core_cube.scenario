@@ -1,6 +1,7 @@
 # The Baium and Core cube (GrandBossTeleporter) standing outside Baium's boss zone (110002) sends the
 # character to one of Core's points (onTalk, the first of the draws' two points), with no offset.
 # Expectations are derived from the reference source.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_core_cube.golden
 character Pilgrim 60
 random always 0
 script script.teleport.GrandBossTeleporter

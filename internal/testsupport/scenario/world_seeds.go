@@ -67,18 +67,30 @@ func (sc *Scenario) checkSeedRoles() error {
 	return nil
 }
 
+// seedChecks are the checks of a step the reference probe reads, as the trace
+// writes them: a door's open state, the dungeon flag, the character's
+// standing and attack stance.
+func seedChecks(st Step) []string {
+	var out []string
+	for _, ck := range st.Checks {
+		switch {
+		case ck.Kind == "open", ck.Kind == "dungeon", (ck.Kind == "standing" || ck.Kind == "stance") && ck.Args[0] == "player":
+			out = append(out, ck.Kind+" "+strings.Join(ck.Args, " "))
+		}
+	}
+	return out
+}
+
 // tracedSeeds reports what of the world seeds a traced scenario uses, "" for
 // none: the reference probe plays none of them.
 func (sc *Scenario) tracedSeeds() string {
 	switch {
-	case len(sc.Zones) > 0:
-		return "zone line"
 	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
-		return st.Verb == "appear" || st.Repeat > 1 || slices.ContainsFunc(st.Packets, func(p string) bool { return wantNearTeleport.MatchString(p) }) || slices.ContainsFunc(st.Checks, func(ck Check) bool {
-			return ck.Kind == "open" || ck.Kind == "dungeon" || ck.Kind == "standing"
+		return st.Verb == "appear" || st.Repeat > 1 || slices.ContainsFunc(st.Checks, func(ck Check) bool {
+			return ck.Kind == "standing" && ck.Args[0] != "player"
 		})
 	}):
-		return "appear step, bypass count, teleport box or open, dungeon or standing check"
+		return "appear step, bypass count or a member's standing check"
 	}
 	return ""
 }

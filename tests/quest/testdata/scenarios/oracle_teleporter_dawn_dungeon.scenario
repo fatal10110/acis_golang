@@ -1,7 +1,8 @@
 # A priest of dawn, asked through his Seven Signs pages for the Oracle of Dawn, sends the character into
 # the Dawn necropolis of the festival and marks it inside a Seven Signs dungeon (OracleTeleporter
-# onTalk, setIsIn7sDungeon). The reference probe reads no dungeon expectation, so this scenario is not
-# traced; oracle_teleporter_town replays the trip itself.
+# onTalk, setIsIn7sDungeon). The reference probe reads the dungeon flag
+# and replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/oracle_teleporter_dawn_dungeon.golden
 character Pilgrim 40
 script script.teleport.OracleTeleporter
 page seven_signs/

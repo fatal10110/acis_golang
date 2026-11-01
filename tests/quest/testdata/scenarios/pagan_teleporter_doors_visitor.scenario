@@ -1,6 +1,8 @@
 # The Pagan Temple gatekeepers (PaganTeleporter) asked by a holder of the Visitor's Mark: the temple
 # gatekeeper opens the temple door (FadedMark.htm); the chapel gatekeeper refuses (32036-1.htm) and
-# opens no chapel door. Expectations are derived from the reference source (onTalk, DoorData.openMe).
+# opens no chapel door. Expectations are derived from the reference source (onTalk, DoorData.openMe), replayed by the
+# reference probe (door line, open state).
+trace internal/gameserver/script/testdata/oracle/scenarios/pagan_teleporter_doors_visitor.golden
 character Pilgrim 40
 hold 8064 1
 item 8064 8067

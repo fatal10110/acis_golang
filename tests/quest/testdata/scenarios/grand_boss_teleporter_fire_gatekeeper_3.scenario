@@ -1,6 +1,7 @@
 # A gatekeeper of the fire dragon (31687, GrandBossTeleporter) opens its own door (24210005) and none of the
 # other two, answering no page (onTalk, DoorData.openMe). Expectations are derived from the
-# reference source; the reference probe reads no door line.
+# reference source and replayed by the reference probe (door line, open state).
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_fire_gatekeeper_3.golden
 character Pilgrim 60
 script script.teleport.GrandBossTeleporter
 page default/31687.htm

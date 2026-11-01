@@ -1,8 +1,9 @@
 # The Pagan Temple gatekeepers (PaganTeleporter) asked by a character holding no mark: the temple
 # gatekeeper refuses (32034-1.htm) and opens no door; the way out of the temple and the way out of
 # the chapel open their doors for anyone, the temple's one and the chapel's two, answering FadedMark.htm.
-# Expectations are derived from the reference source (onTalk, DoorData.openMe); the reference probe
-# reads no door line.
+# Expectations are derived from the reference source (onTalk, DoorData.openMe) and
+# replayed by the reference probe, which reads the door line and each door's open state.
+trace internal/gameserver/script/testdata/oracle/scenarios/pagan_teleporter_doors_no_mark.golden
 character Pilgrim 40
 script script.teleport.PaganTeleporter
 page default/32034.htm

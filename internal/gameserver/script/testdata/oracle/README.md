@@ -137,6 +137,16 @@ what the reference does in the scenario's own world:
   (a script's spawns) stand, sorted, `-` for none; the Go run lists the same places. Only x and
   y: the probe runs with every geodata region removed, so a height it traces is the one asked for,
   not the ground's;
+- a `door <role> <door id> <dx> <dy> <dz>` line binds the role to the shipped door of that id (the offsets are the Go
+  fixture's; the probe's door stands where the datapack puts it), which the probe closes before the scenario and after it.
+  An indented `open <role> <yes|no>`, `dungeon <yes|no>`, `standing player <n>` or `stance player <on|off>` line under a step
+  makes the probe write a `# check` line after the step with what its world holds (the door's open state, the player's
+  Seven Signs dungeon flag, Ketra/Varka standing, attack stance); the Go run compares its own world's answer line by line.
+  A `stance player on|off` step adds the player to the attack stance task or removes it, and a scenario with such a step
+  also runs the stance task after each slice of an `advance`, so the stance ends 15 seconds after it was set. The zone line,
+  a `zone <boss|peace> <zone id> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>` line stands the shipped zone of that id (the datapack must have it)
+  in that box around where the character enters the world, for the scenario only; the `appear` step, the bypass `xN` count,
+  and a member's standing are the Go run's alone (a wanted `loc=x,y,z+-n` teleport line takes the trace's landing inside its box);
 - the `teleports` line gives the Go run the shipped gatekeeper teleport lists, which the probe
   always loads; the half-price weekend hours of a standard window read the probe wall clock
   (`ProbeClock.wallCalendar`, a Thursday while a scenario trace plays, as the Go run's clock start
@@ -361,6 +371,9 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # spawned <npc id> <x>,<y> ...   a scenario trace: where the living NPCs of that template that
                                 no NPC line placed stand once the step is over, sorted (the step's
                                 spawned line); - for none
+# stance <on|off>               a scenario trace: the player's stance step
+# check <kind> <what> <value>   a scenario trace: an open, dungeon, standing or stance expectation of the step, with the
+                                value the probe's world holds
 C Action item <item id> (object <id>)   a scenario trace: the pickup's action on the ground item
 # away                          a scenario trace: the player steps 1500 behind where it entered the world, one AI tick
 # mate <name> object <id>       a scenario trace with a mate that has a client: the mate's object id

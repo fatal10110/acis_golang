@@ -1,6 +1,7 @@
 # A priest of dusk sends the character into the Dusk necropolis of the festival and marks it inside a
-# Seven Signs dungeon (OracleTeleporter onTalk, setIsIn7sDungeon). Not traced: the reference probe
-# reads no dungeon expectation.
+# Seven Signs dungeon (OracleTeleporter onTalk, setIsIn7sDungeon). Replayed by the reference probe,
+# which reads the dungeon flag.
+trace internal/gameserver/script/testdata/oracle/scenarios/oracle_teleporter_dusk_dungeon.golden
 character Pilgrim 40
 script script.teleport.OracleTeleporter
 page seven_signs/
