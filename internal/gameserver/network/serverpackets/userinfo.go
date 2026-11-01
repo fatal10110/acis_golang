@@ -20,9 +20,18 @@ func clampInt32(value int) int32 {
 }
 
 // statInt32 narrows a live stat value to its wire int the way the client
-// status fields expect: truncated toward zero, saturating at the int32 range.
+// status fields expect: truncated toward zero, saturating at the int32 range,
+// and 0 for NaN.
 func statInt32(value float64) int32 {
-	return clampInt32(int(value))
+	switch {
+	case value != value:
+		return 0
+	case value >= math.MaxInt32:
+		return math.MaxInt32
+	case value <= math.MinInt32:
+		return math.MinInt32
+	}
+	return int32(value)
 }
 
 // OpcodeUserInfo is the wire opcode for UserInfo, the full self-status
