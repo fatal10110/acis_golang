@@ -148,6 +148,9 @@ type Character struct {
 	// sight past it; see character_invisible.go.
 	invisible     atomic.Bool
 	seesInvisible atomic.Bool
+	// polymorph is the NPC form the character is shown in; see
+	// character_polymorph.go.
+	polymorph atomic.Pointer[NPCForm]
 	// noble is the noblesse status; see character_noble.go.
 	noble atomic.Bool
 	// in7sDungeon is the Seven Signs dungeon membership; see

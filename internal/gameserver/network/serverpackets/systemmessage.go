@@ -93,6 +93,7 @@ const (
 	SystemMessageLethalStrike                      = 1667
 	SystemMessageLethalStrikeSuccessful            = 1668
 	SystemMessageInvalidTarget                     = 109
+	SystemMessageApplicantInformationIncorrect     = 12
 	SystemMessageSweeperFailedTargetNotSpoiled     = 343
 	SystemMessageSweepNotAllowed                   = 683
 	SystemMessageHarvestFailedSeedNotSown          = 893
