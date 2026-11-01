@@ -1,7 +1,8 @@
 # PartyLeaderWizardHereticAggressive (22163, level 78; the npc line gives the debuff 4088 and the DDs
 # 4158, 4622 the template lists), every draw 0: it keeps the DD2 curse aggressive's see hook, so the
 # settled character it sees is cursed and struck at once. Its script event broadcasts (10033, 10035)
-# are heard by no npc line here and so are not shown: tests/ai/wizard_individual6b_test.go keeps them.
+# are heard by no npc line here and so are not shown: party_leader_heretic_calls shows the call for help
+# a hit draws, and tests/ai/wizard_individual6b_test.go keeps the rest.
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc

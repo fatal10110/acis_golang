@@ -1,0 +1,28 @@
+# PartyLeaderWizardCorpseNecroAggressive (21596, level 68; SummonPrivate 21561), every draw 0, attacking another creature
+# with the dead character within 100: the AI tick's look places its SummonPrivate where the corpse lies, told (1000, the
+# creature it hates most), and wants the corpse cleared, weight 1000000 (its corpse clearing targets the caster).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardCorpseNecroAggressive
+npc necro 21596 Monster 50 0 0 level 68 skill DD_MAGIC1 4654 6 skill W_SHORT_RANGE_DD_MAGIC 4561 6 skill W_LONG_RANGE_DD_MAGIC 4593 6 skill CLEAR_CORPSE 4672 1 ai SummonPrivate=21561
+npc foe 20003 Monster 50 50 0
+npc raised 21561 Monster 0 1500 0
+
+die
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+want necro foe 1000000
+tick
+  S NpcInfo obj=raised npc=21561
+  S ChangeMoveType obj=raised running=1 swimming=0
+  S NpcInfo obj=raised npc=21561
+  privates necro 21561=1:1000,foe,0
+  desires necro attack(foe)=1000000 cast(necro,4672,move)=1000000

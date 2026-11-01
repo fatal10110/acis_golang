@@ -1,0 +1,16 @@
+# DoormanOfDrain (18343, level 78), every draw 0: it keeps to its spawn point; moved off it, it wants to walk back
+# (weight 30); arriving there, its move finished hook wants to do nothing (40), weight 30.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain
+npc door 18343 Monster 1500 0 0 level 78 walks skill DD_MAGIC 5043 10
+
+jump door 1700 0 0
+tick x2
+walk door
+  desires door nothing(40)=30
+  at door 1500 0 0

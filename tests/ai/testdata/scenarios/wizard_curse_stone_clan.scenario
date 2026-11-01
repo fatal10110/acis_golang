@@ -1,0 +1,17 @@
+# WizardCastClanBuffCurseStoneAggressive (21338, level 80), settled (eight AI cycles) and in a clan whose member is hit,
+# every draw 0: both buffs and its debuff, on itself, weight 1000000, and, through its parent, its long range DD magic
+# on the attacker far away.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffCurseStoneAggressive
+npc stone 21338 Monster 1500 0 0 level 80 clan ketra_orc_clan 500 skill BUFF1 4030 3 skill DEBUFF 4035 9 skill W_LONG_RANGE_DD_MAGIC 4158 9 skill W_SHORT_RANGE_DD_MAGIC 4561 9 skill BUFF2 4575 2 skill DEBUFF1 4578 1
+npc mate 20003 Monster 1500 100 0 clan ketra_orc_clan 500
+
+tick x8
+hit mate 10
+  desires stone cast(player,4158,move)=1000000 cast(stone,4030,move)=1000000 cast(stone,4575,move)=1000000 cast(stone,4035,move)=1000000 wander()=5

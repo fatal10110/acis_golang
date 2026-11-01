@@ -1,0 +1,17 @@
+# WizardDDMagic2Aggressive (21311, level 76, its shipped magics), settled in its territory with an empty hate list, every
+# draw 0: it wants its short range DD magic (4160-8) on the character it sees 100 away, weight 1000000, and gives it its
+# default hate list entry (300).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+npc wiz 21311 Monster 1000 0 0 level 76 skill W_LONG_RANGE_DD_MAGIC 4158 8 skill W_SHORT_RANGE_DD_MAGIC 4160 8
+
+tick x9
+approach wiz
+  S MagicSkillUse caster=wiz target=player skill=4160-8 hit=3964 reuse=0 success=0
+  desires wiz cast(player,4160,move)=1000000 wander()=5

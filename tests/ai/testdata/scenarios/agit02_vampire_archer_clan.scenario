@@ -1,0 +1,16 @@
+# Agit02VampireArcherAgit (35634, level 70), settled (a life time over 7 s) and with an empty hate list, every draw
+# 0: a hit on a member of its clan wants its fiend arrow on the attacker.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.Agit02VampireArcherAgit
+npc vamp 35634 Monster 1500 0 0 level 70 clan agit 1000 skill W_FIEND_ARCHER 5056 7
+npc mate 20003 Monster 1500 100 0 clan agit 1000
+
+tick x8
+advance 8s
+hit mate 10
+  desires vamp cast(player,5056,move)=1000000

@@ -1,0 +1,17 @@
+# WizardDDMagic2Aggressive (21311, level 76), settled, every draw 0: with someone on its hate list (the character hit it) it wants nothing of the character it sees.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+npc wiz 21311 Monster 1000 0 0 level 76 skill W_LONG_RANGE_DD_MAGIC 4158 8 skill W_SHORT_RANGE_DD_MAGIC 4160 8
+
+tick x9
+hit wiz 10
+  desires wiz cast(player,4158,move)=1000000 wander()=5
+approach wiz
+  S MagicSkillUse caster=wiz target=player skill=4158-8 hit=10571 reuse=0 success=0
+  desires wiz cast(player,4158,move)=1000000 wander()=5

@@ -1,0 +1,15 @@
+# Agit02VampireArcherAgit (35634, level 70), every draw 0: a hit of 10 by the character wants its fiend arrow on the
+# attacker (1000000), which it casts on the next AI cycles.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.Agit02VampireArcherAgit
+npc vamp 35634 Monster 1500 0 0 level 70 skill W_FIEND_ARCHER 5056 7
+
+hit vamp 10
+  desires vamp cast(player,5056,move)=1000000
+tick x3
+  S MagicSkillUse caster=vamp target=player skill=5056-7 hit=10571 reuse=0 success=0

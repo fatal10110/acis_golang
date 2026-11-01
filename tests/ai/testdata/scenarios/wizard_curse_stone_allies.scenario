@@ -1,0 +1,19 @@
+# WizardCastClanBuffCurseStoneAggressive (21338, level 80, a Ketra clan), every draw 0, for a Ketra ally (standing 1): it
+# is not attacked on sight; its hit makes the stone want to petrify it (4515, weight 1000000 from the attacked hook and
+# as much again from its own clan call), stop hating it and cast no buff nor DD magic.
+character Hunter 20
+standing 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffCurseStoneAggressive
+npc stone 21338 Monster 150 0 0 level 80 clan ketra_orc_clan 500 skill BUFF1 4030 3 skill DEBUFF 4035 9 skill W_LONG_RANGE_DD_MAGIC 4158 9 skill W_SHORT_RANGE_DD_MAGIC 4561 9 skill BUFF2 4575 2 skill DEBUFF1 4578 1
+
+tick x2
+  hate stone 0
+hit stone 10
+  desires stone cast(player,4515,move)=2000000 wander()=5
+  hate stone 0

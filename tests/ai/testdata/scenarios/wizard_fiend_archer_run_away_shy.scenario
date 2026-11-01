@@ -1,0 +1,17 @@
+# WizardFiendArcherRunAway (21514, level 71; a buff stands in for its fiend archer skill, so the cast does no random
+# damage), every draw 0: a cast ending on the character 50 away makes it flee from the character, weight 1000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardFiendArcherRunAway
+npc archer 21514 Monster 50 0 0 level 71 walks skill W_FIEND_ARCHER 1204 2
+
+hit archer 10
+tick x3
+  S MagicSkillUse caster=archer target=player skill=1204-2 hit=10571 reuse=15857 success=0
+advance 12s
+  S SystemMessage id=110 4:1204,2
+  desires archer cast(player,1204,move)=1000000 flee(player,200)=1000
