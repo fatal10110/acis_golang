@@ -4,8 +4,9 @@
 # attacked hook alone. The footman forgets the hit, and no behavior script is bound, so neither
 # soldier wants to attack the ally back. Each soldier lists the curse, which a scenario monster
 # needs to cast it; the cast itself is alliance_support_see_spell.scenario (two casts of one AI tick
-# have no fixed order). Expectations are derived from the reference source (onAttacked,
-# onClanAttacked).
+# have no fixed order). Untraced: the reference probe plays no clan option nor desires or hate
+# expectation (a monster's own cast is traced in alliance_support_petrify_cast.scenario).
+# Expectations are derived from the reference source (onAttacked, onClanAttacked).
 character Ally 40
 standing 1
 script script.feature.KetraOrcSupport

@@ -42,6 +42,8 @@ import net.sf.l2j.gameserver.data.manager.RaidPointManager;
 import net.sf.l2j.gameserver.data.manager.RelationManager;
 import net.sf.l2j.gameserver.data.manager.SevenSignsManager;
 import net.sf.l2j.gameserver.data.manager.SpawnManager;
+import net.sf.l2j.gameserver.data.SkillTable;
+import net.sf.l2j.gameserver.skills.L2Skill;
 import net.sf.l2j.gameserver.data.manager.ZoneManager;
 import net.sf.l2j.gameserver.model.zone.form.ZoneCuboid;
 import net.sf.l2j.gameserver.model.zone.ZoneForm;
@@ -274,7 +276,7 @@ final class ScenarioTrace
 	private boolean _muted;
 
 	/** An npc line: params holds the three spawn parameters the line gives (a number, an NPC role or character), null for none; ai the AI parameters of its ai option, which replace the template's as the Go runner's fixture template has only them, null for none. */
-	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level)
+	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level, String[][] skills)
 	{
 	}
 
@@ -631,7 +633,7 @@ final class ScenarioTrace
 					_draws = Arrays.stream(f, _always ? 2 : 1, f.length).mapToInt(Integer::parseInt).toArray();
 				}
 				case "clock" -> _clock = clock(f[1]);
-				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f), npcLevel(f)));
+				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f), npcLevel(f), npcSkills(f)));
 				case "script", "stub" -> _scripts.add(ScriptProbe.PKG + f[1]);
 				case "hold" -> _holds.add(new int[]
 				{
@@ -681,6 +683,11 @@ final class ScenarioTrace
 					f[2]
 				});
 				case "spoil" -> _spoils.put(f[1], f.length > 2);
+				case "roll" ->
+				{
+					// The Go runner pins an NPC's combat draws; the reference's come from its seeded generator,
+					// and the trace shows the outcome the pin must reproduce.
+				}
 				case "item", "page", "teleports" ->
 				{
 					// The reference loads every item, page and teleport list.
@@ -736,6 +743,20 @@ final class ScenarioTrace
 			if (f[i].equals("params"))
 				return new String[] { f[i + 1], f[i + 2], f[i + 3] };
 		return null;
+	}
+
+	/**
+	 * The skills of an npc line's skill options ({type, id, level} each), none without one. Past the
+	 * three offsets the options are read as the Go runner reads them: a word that is not an option
+	 * name is an operand of the one before.
+	 */
+	private static String[][] npcSkills(String[] f)
+	{
+		final List<String[]> skills = new ArrayList<>();
+		for (int i = 7; i + 3 < f.length; i++)
+			if (f[i].equals("skill"))
+				skills.add(new String[] { f[i + 1], f[i + 2], f[i + 3] });
+		return skills.toArray(new String[0][]);
 	}
 
 	/** The template level of an npc line's level option, 0 without one. */
@@ -1333,6 +1354,9 @@ final class ScenarioTrace
 			for (String[] s : _steps)
 				if (s[0].equals("kill") || s[0].equals("hit"))
 					fought.add(s[1]);
+			// The Go runner's world holds the scenario's spawns alone: the datapack's makers (loaded, never
+			// spawned here) are not what a script's spawn lookup finds.
+			alter(SpawnManager.class, SpawnManager.getInstance(), "_makers", ConcurrentHashMap.newKeySet());
 			for (NpcLine n : _npcs.values())
 			{
 				final NpcTemplate template = NpcData.getInstance().getTemplate(n.id());
@@ -1344,6 +1368,14 @@ final class ScenarioTrace
 					fixture(template, n.type());
 					if (n.level() > 0)
 						alter(NpcTemplate.class, template, "_level", (byte) n.level());
+				}
+				if (n.skills().length > 0)
+				{
+					// The Go runner's template lists the line's skills alone.
+					final Map<NpcSkillType, L2Skill> skills = new EnumMap<>(NpcSkillType.class);
+					for (String[] sk : n.skills())
+						skills.put(NpcSkillType.valueOf(sk[0]), SkillTable.getInstance().getInfo(Integer.parseInt(sk[1]), Integer.parseInt(sk[2])));
+					alter(NpcTemplate.class, template, "_skills", skills);
 				}
 				spawn(n);
 			}

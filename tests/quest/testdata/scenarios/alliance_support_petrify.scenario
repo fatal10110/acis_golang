@@ -1,8 +1,9 @@
 # Ketra and Varka soldiers (KetraOrcSupport, VarkaSilenosSupport) and a Ketra ally of level 1: the
 # ally's hit on a Varka recruit is left alone, the one on a Ketra footman makes it petrify the ally
 # (Raid Curse, 4515) and forget the hit, so its kill rewards no one. The cast itself is in
-# alliance_support_see_spell.scenario and alliance_support_clan_attacked.scenario: a traced NPC
-# line takes no skill, which a scenario monster needs to cast. Killing the recruit keeps the
+# alliance_support_petrify_cast.scenario (traced), alliance_support_see_spell.scenario and
+# alliance_support_clan_attacked.scenario: a scenario monster needs the curse listed to cast it,
+# and this one's steps run no AI tick before the kills. Killing the recruit keeps the
 # alliance; killing the footman breaks it, the level 1 badge going with no lower one given.
 # Expectations are derived from the reference source (onAttacked, onMyDying, testKetraDemote) and
 # replay the reference trace.

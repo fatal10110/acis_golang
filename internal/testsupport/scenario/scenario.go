@@ -384,7 +384,7 @@
 // as and enter steps and the away step, each client's packets compared by
 // its tag in the trace (S@<mate>, C@<mate>; an untagged line is the
 // character's); nor does the reference probe play a skill or summon line, an npc
-// line's clan or skill, a hit by another creature, an approach to a
+// line's clan, a hit by another creature, an approach to a
 // distance, a cast or a jump, a clock line, an npc line's ai,
 // params, aggro, mp, mem, privates or master or an event, a level on an npc
 // no kill or hit step names (the probe gives only a fought one its level), hp, mp, want, die, top,
