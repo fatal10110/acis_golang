@@ -83,9 +83,9 @@ func (d *Decoration) Attach(rt DecorationRuntime) {
 }
 
 // Spawn places the decoration in the world at (x, y, z) facing heading,
-// walking, so the players who see it appear are shown it so, then takes its
-// run stance and enters the zones at its position. It is a no-op until
-// Attach has installed a world.
+// walking, so the players who see it appear are shown it so, then enters the
+// zones at its position and takes its run stance. It is a no-op until Attach
+// has installed a world.
 func (d *Decoration) Spawn(x, y, z, heading int) {
 	if d.world == nil {
 		return
@@ -94,8 +94,8 @@ func (d *Decoration) Spawn(x, y, z, heading int) {
 	defer d.placeMu.Unlock()
 	d.running.Store(false)
 	d.world.Spawn(d, x, y, z, heading)
-	takeRunStance(&d.running, d.stats, d.sink)
 	d.zones.enter()
+	takeRunStance(&d.running, d.stats, d.sink)
 }
 
 // takeRunStance puts a walking fixed-stats NPC in its run stance and shows

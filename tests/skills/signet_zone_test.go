@@ -1,6 +1,8 @@
 package skills
 
 import (
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -14,15 +16,26 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-// readNPCInfoMoveTypes reads c until quiet and returns the move type byte
-// of every NpcInfo of objID: the field after the ally crest, followed by
-// the team byte, the collision radius and height (two doubles), the enchant
-// effect and the flying flag.
-func readNPCInfoMoveTypes(c *testsupport.ScriptedClient, objID int32) []byte {
-	var out []byte
+// readNPCStance reads c until quiet and describes, in order, every NpcInfo
+// of objID by its move type byte (the field after the ally crest, followed
+// by the team byte, the collision radius and height (two doubles), the
+// enchant effect and the flying flag) and every ChangeMoveType by its run and
+// swim flags.
+func readNPCStance(c *testsupport.ScriptedClient, objID int32) []string {
+	var out []string
 	for _, f := range c.ReadQueued() {
-		if len(f) >= 5 && f[0] == serverpackets.OpcodeNPCInfo && wire.NewReader(f[1:]).ReadInt32() == objID {
-			out = append(out, f[len(f)-1-(1+8+8+4+4)])
+		if len(f) < 5 {
+			continue
+		}
+		r := wire.NewReader(f[1:])
+		if r.ReadInt32() != objID {
+			continue
+		}
+		switch f[0] {
+		case serverpackets.OpcodeNPCInfo:
+			out = append(out, fmt.Sprintf("NpcInfo move=%d", f[len(f)-1-(1+8+8+4+4)]))
+		case serverpackets.OpcodeChangeMoveType:
+			out = append(out, fmt.Sprintf("ChangeMoveType run=%d swim=%d", r.ReadInt32(), r.ReadInt32()))
 		}
 	}
 	return out
@@ -31,10 +44,12 @@ func readNPCInfoMoveTypes(c *testsupport.ScriptedClient, objID int32) []byte {
 // TestSignetPointJoinsTheZonesItStandsIn pins a signet effect point's zone
 // membership (EffectPoint is an Npc, so Creature.setRegion enters and
 // leaves its zones): a point placed in water is the zone's occupant, and
-// its known players, shown its NpcInfo on sight and as it takes its run
-// stance, see it again, swimming, for the crossing (WaterZone.java:28-39: NpcInfo, as the shipped point
-// templates move at 20/50, not 0). Despawned when its signet ends, it leaves the zone,
-// showing its NpcInfo out of the water before it goes (WaterZone.java:48-59).
+// its known players, shown its NpcInfo on sight, see it again, swimming, for
+// the crossing (WaterZone.java:28-39: NpcInfo, as the shipped point templates
+// move at 20/50, not 0), then its run stance taken in the water:
+// ChangeMoveType flagged swimming and its NpcInfo, still swimming. Despawned
+// when its signet ends, it leaves the zone, showing its NpcInfo out of the
+// water before it goes (WaterZone.java:48-59).
 func TestSignetPointJoinsTheZonesItStandsIn(t *testing.T) {
 	t.Parallel()
 	def := modelskill.Definition{
@@ -82,9 +97,10 @@ func TestSignetPointJoinsTheZonesItStandsIn(t *testing.T) {
 		t.Fatal("signet point placed in water is not in it")
 	}
 	// The caster first comes to know the point, out of the water, sees it
-	// again as it takes its run stance, then, swimming, for the crossing.
-	if got := readNPCInfoMoveTypes(c, point.ObjectID()); len(got) != 3 || got[0] != byte(move.MoveGround) || got[1] != byte(move.MoveGround) || got[2] != byte(move.MoveSwim) {
-		t.Fatalf("NpcInfo move types of the point placed in the water = %v, want on the ground twice then swimming", got)
+	// again, swimming, for the crossing, then its run stance in the water.
+	ground, swim := fmt.Sprintf("NpcInfo move=%d", move.MoveGround), fmt.Sprintf("NpcInfo move=%d", move.MoveSwim)
+	if got, want := readNPCStance(c, point.ObjectID()), []string{ground, swim, "ChangeMoveType run=1 swim=1", swim}; !slices.Equal(got, want) {
+		t.Fatalf("stance frames of the point placed in the water = %q, want %q", got, want)
 	}
 
 	srv.Advance(t, 1100*time.Millisecond)
@@ -97,20 +113,9 @@ func TestSignetPointJoinsTheZonesItStandsIn(t *testing.T) {
 			t.Fatal("despawned signet point is still an occupant of the water zone")
 		}
 	}
-	if got := readNPCInfoMoveTypes(c, point.ObjectID()); len(got) != 1 || countMoveType(got, move.MoveGround) != 1 {
-		t.Fatalf("NpcInfo move types of the point leaving the water = %v, want one on the ground", got)
+	if got, want := readNPCStance(c, point.ObjectID()), []string{ground}; !slices.Equal(got, want) {
+		t.Fatalf("stance frames of the point leaving the water = %q, want %q", got, want)
 	}
-}
-
-// countMoveType counts the move types among types equal to want.
-func countMoveType(types []byte, want move.MoveType) int {
-	n := 0
-	for _, mt := range types {
-		if mt == byte(want) {
-			n++
-		}
-	}
-	return n
 }
 
 // assertOccupant fails unless objID is among z's occupants.

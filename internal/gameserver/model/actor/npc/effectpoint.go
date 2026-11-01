@@ -141,9 +141,9 @@ func (ep *EffectPoint) Attach(rt Runtime) {
 func (ep *EffectPoint) Kind() actor.Kind { return actor.KindNPC }
 
 // Spawn places the actor in the world at (x, y, z), facing heading,
-// walking, so the players who see it appear are shown it so, then takes its
-// run stance and enters the zones at its position. It is a no-op until
-// Attach has installed a world.
+// walking, so the players who see it appear are shown it so, then enters the
+// zones at its position and takes its run stance. It is a no-op until Attach
+// has installed a world.
 func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	if ep.world == nil {
 		return
@@ -152,8 +152,8 @@ func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	defer ep.placeMu.Unlock()
 	ep.running.Store(false)
 	ep.world.Spawn(ep, x, y, z, heading)
-	takeRunStance(&ep.running, ep.stats, ep.sink)
 	ep.zones.enter()
+	takeRunStance(&ep.running, ep.stats, ep.sink)
 }
 
 // Despawn takes the actor out of its zones, while its observers still know
