@@ -1,7 +1,7 @@
 # Klein, the watcher of Valakas (GrandBossTeleporter): with no player sent in yet he answers
 # 31540-01.htm (onTalk); his link takes the character's one floating stone and sends it into the
 # Lair of Valakas, answering no page (onAdvEvent). His count's other pages, the refusal without
-# a stone and the count's reset when Valakas dies are in tests/npcs/teleporters_210_pr4_test.go.
+# a stone and the count's reset when Valakas dies are in grand_boss_teleporter_klein_counts.
 trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_klein.golden
 character Pilgrim 60
 hold 7267 1

@@ -1,0 +1,25 @@
+# The Baium and Core cube (GrandBossTeleporter) standing outside Baium's boss zone (110002) sends the
+# character to one of Core's points (onTalk, the first of the draws' two points), with no offset.
+# Expectations are derived from the reference source.
+character Pilgrim 60
+random always 0
+script script.teleport.GrandBossTeleporter
+page default/31842.htm
+page script/teleport/GrandBossTeleporter/
+zone boss 110002 500 -20 540 20 -100 100
+npc core 31842 Folk 50 0 0
+
+action core
+action core
+  S ActionFailed
+  S NpcHtmlMessage obj=core item=0 page=script/teleport/GrandBossTeleporter/31842-01.htm
+  S ActionFailed
+bypass npc_{core}_Quest GrandBossTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=17252,114121,-3439 fast=0
+  S DeleteObject obj=core
+  S ActionFailed

@@ -1,0 +1,54 @@
+# The Pagan Temple gatekeepers (PaganTeleporter) asked by a character holding no mark: the temple
+# gatekeeper refuses (32034-1.htm) and opens no door; the way out of the temple and the way out of
+# the chapel open their doors for anyone, the temple's one and the chapel's two, answering FadedMark.htm.
+# Expectations are derived from the reference source (onTalk, DoorData.openMe); the reference probe
+# reads no door line.
+character Pilgrim 40
+script script.teleport.PaganTeleporter
+page default/32034.htm
+page default/32035.htm
+page default/32037.htm
+page script/teleport/PaganTeleporter/
+npc temple 32034 Folk 10 0 0
+npc templeout 32035 Folk 20 0 0
+npc chapelout 32037 Folk 30 0 0
+door temple_door 19160001 100 0 0
+door chapel_door_1 19160010 120 0 0
+door chapel_door_2 19160011 140 0 0
+
+action temple
+action temple
+  S ActionFailed
+  S NpcHtmlMessage obj=temple item=0 page=default/32034.htm
+  S ActionFailed
+bypass npc_{temple}_Quest PaganTeleporter
+  S NpcHtmlMessage obj=temple item=0 page=script/teleport/PaganTeleporter/32034-1.htm
+  S ActionFailed
+  S ActionFailed
+  open temple_door no
+  open chapel_door_1 no
+  open chapel_door_2 no
+action templeout
+action templeout
+  S ActionFailed
+  S NpcHtmlMessage obj=templeout item=0 page=default/32035.htm
+  S ActionFailed
+bypass npc_{templeout}_Quest PaganTeleporter
+  S NpcHtmlMessage obj=templeout item=0 page=script/teleport/PaganTeleporter/FadedMark.htm
+  S ActionFailed
+  S ActionFailed
+  open temple_door yes
+  open chapel_door_1 no
+  open chapel_door_2 no
+action chapelout
+action chapelout
+  S ActionFailed
+  S NpcHtmlMessage obj=chapelout item=0 page=default/32037.htm
+  S ActionFailed
+bypass npc_{chapelout}_Quest PaganTeleporter
+  S NpcHtmlMessage obj=chapelout item=0 page=script/teleport/PaganTeleporter/FadedMark.htm
+  S ActionFailed
+  S ActionFailed
+  open temple_door yes
+  open chapel_door_1 yes
+  open chapel_door_2 yes

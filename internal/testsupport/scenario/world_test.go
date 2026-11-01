@@ -37,7 +37,7 @@ func TestParseReadsWorldLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantMembers := []Member{{Name: "Fallen", Level: 20, Dead: true, DX: 300, DZ: -5}, {Name: "Friend", Level: 30}}
-	if !slices.Equal(sc.Members, wantMembers) {
+	if !reflect.DeepEqual(sc.Members, wantMembers) {
 		t.Fatalf("members = %+v", sc.Members)
 	}
 	wantTerritories := []Territory{{Name: "isle", DX1: -100, DY1: -100, DX2: 400, DY2: 400, DZ1: -100, DZ2: 100}}

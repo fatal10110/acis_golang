@@ -1,8 +1,9 @@
 # The grand boss cubes (GrandBossTeleporter): Benom's cube answers its own page (onFirstTalk);
 # Antharas's cube sends the character to the point of its two draws in its field outside the
 # lair, answering no page (onTalk). The despawns of the cubes (onCreated) are in
-# grand_boss_teleporter_cube_despawns; the other exits and the fire dragon gatekeepers' doors are in
-# tests/npcs/teleporters_210_pr4_test.go.
+# grand_boss_teleporter_cube_despawns; the Baium and Core cube is in grand_boss_teleporter_baium_cube and
+# _core_cube, the fire dragon gatekeepers' doors in grand_boss_teleporter_fire_gatekeeper_*, the other
+# exits in tests/npcs/teleporters_210_pr4_test.go.
 trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_cubes.golden
 character Pilgrim 60
 random 100 200

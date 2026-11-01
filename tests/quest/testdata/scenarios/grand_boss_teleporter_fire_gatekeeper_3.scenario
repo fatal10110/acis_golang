@@ -1,0 +1,22 @@
+# A gatekeeper of the fire dragon (31687, GrandBossTeleporter) opens its own door (24210005) and none of the
+# other two, answering no page (onTalk, DoorData.openMe). Expectations are derived from the
+# reference source; the reference probe reads no door line.
+character Pilgrim 60
+script script.teleport.GrandBossTeleporter
+page default/31687.htm
+page script/teleport/GrandBossTeleporter/
+npc keeper 31687 Folk 10 0 0
+door door_a 24210004 100 0 0
+door door_b 24210005 120 0 0
+door door_c 24210006 140 0 0
+
+action keeper
+action keeper
+  S ActionFailed
+  S NpcHtmlMessage obj=keeper item=0 page=default/31687.htm
+  S ActionFailed
+bypass npc_{keeper}_Quest GrandBossTeleporter
+  S ActionFailed
+  open door_a no
+  open door_b yes
+  open door_c no

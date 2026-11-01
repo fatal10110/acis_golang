@@ -118,11 +118,17 @@
 //	territory <name> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>
 //	                                          optional: an npcmaker territory, the box between those offsets from where the
 //	                                          character first enters the world
-//	member <name> <level> [dead] [<dx> <dy> <dz>]
+//	member <name> <level> [dead] [standing <n>] [hold <item id> <count>]... [<dx> <dy> <dz>]
 //	                                          optional: a second character, of its own account, that enters the world where the
 //	                                          character first does, right after it, joins its party, then stands at that
 //	                                          offset from the character (default 0 0 0); dead, it is then marked dead where
-//	                                          it stands. Its object id renders as its name
+//	                                          it stands; standing, it is a Ketra (1 to 5) or Varka (-1 to -5) ally of that
+//	                                          level; hold, it holds those items (in the catalog) as it enters. Its object id
+//	                                          renders as its name
+//	zone <boss|peace> <id> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>
+//	                                          optional, one per id: a zone of that kind (a boss zone, a peace zone), the box
+//	                                          between those offsets from the fixture spawn where the character first enters the
+//	                                          world, which a script reads (Script.Zone) and which flags what stands in it
 //	ground <role> <item id> <count> <dx> <dy> <dz> [cursed]
 //	                                          optional: an item lying on the ground at that offset from the character, laid
 //	                                          as the character first enters the world, after the NPCs; the template must be
@@ -165,7 +171,10 @@
 // Then the steps, each a verb line followed by its indented expectations:
 //
 //	action <role>          an Action packet on the NPC: the first selects it, the next talks
-//	bypass <command>       a RequestBypassToServer; {role} stands for the NPC's object id
+//	bypass <command> [xN]  a RequestBypassToServer; {role} stands for the NPC's object id; with xN the bypass is sent N times,
+//	                       the packets of the first N-1 sends are dropped (a teleport one of them started is answered with
+//	                       Appearing before the next) and the step's S lines are the last send's; the checks of the step
+//	                       show the others happened, a count the first N-1 changed
 //	as <mate> <action|bypass|link> ...
 //	                       the step is played by that mate, on its client: its packets are the S lines, and what
 //	                       the character was sent the `to player` lines
@@ -199,7 +208,10 @@
 //	                       queue, outside any cast, with the landing rolls of a cast's effects (roll pins them);
 //	                       time passes until the target holds one. A stun, a mute, a root or a hold lands so
 //	                       on an NPC
-//	stance <role> <on|off> the hostile NPC's attack stance is set or ended (the stance clock never ends one in a run)
+//	stance <role|player> <on|off>
+//	                       the hostile NPC's or the character's attack stance is set or ended (the stance clock never ends an
+//	                       NPC's in a run; a scenario with a stance step for the player runs the character's on the driven
+//	                       clock instead, which an advance step moves, so the stance ends 15 seconds after it was set)
 //	swing <role>           the AI ticks and the position ticks run, time passing, until the hostile NPC's swing
 //	                       is in flight (it attacks now), as a script's AttackingNow reads it
 //	kill <role> [xN]       the character lands a lethal hit on the NPC, N times; a dead NPC is replaced by a fresh one first
@@ -228,6 +240,8 @@
 //	walk <role>            position ticks run until the NPC's walk ends (a pick-up desire's walk to its item);
 //	                       the run fails if the NPC is not walking as the step starts
 //	mark <id>              a RequestTutorialQuestionMark: the character clicks that tutorial question mark
+//	appear                 the client answers the character's teleport (its TeleportToLocation) with Appearing: it is in
+//	                       the world at the landing point, and may act again
 //	relog                  back to character select and into the world again
 //	restart                a RequestRestart: back to character select
 //	enter                  the character is selected and enters the world (the EnterWorld burst)
@@ -239,6 +253,8 @@
 //
 //	  S <packet>           the packets of the step, in order, as scriptcontract.Packet renders them;
 //	                       "page=<path>" ends an NpcHtmlMessage whose text is that page, %objectId% filled in
+//	                       a TeleportToLocation line may write loc=<x>,<y>,<z>+-<n> for a landing anywhere within n of x and of y
+//	                       at height z (a script's teleport with an offset, which the server draws itself)
 //	  to <name> <packet>   a packet another online character (player, or a mate) was sent in the step, rendered as an
 //	                       S line is; a character with no to line was sent none of the rendered packets
 //	  Q <statement>        the character_quests statements of the step, in order: kind quest | params
@@ -252,7 +268,7 @@
 //	                       where the NPCs of that template stand alive that no npc line placed (a script's
 //	                       spawns), as world x and y in any order; - for none. The height is left out: the
 //	                       reference trace runs without geodata, so its heights are not the ground's
-//	  items <id>=<n> ...   the character's count of each item after the step (items <mate> <id>=<n> ... a mate's)
+//	  items <id>=<n> ...   the character's count of each item after the step (items <mate|member> <id>=<n> ... a mate's or a member's)
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them (a value
 //	                                        with blanks is quoted: quiz="20 21")
 //	  state <quest> <status> | -            the quest's state in memory after the step
@@ -291,7 +307,11 @@
 //	  top <role> <creature|->               the hostile NPC's top desire target
 //	  effect <role|player> <skill id> <held|none>
 //	                                        whether the NPC or the character holds an effect of that skill
-//	  stance <role> <on|off>                whether the hostile NPC holds an attack stance
+//	  stance <role|player> <on|off>         whether the hostile NPC or the character holds an attack stance
+//	  open <door role> <yes|no>             whether the door of a door line is open
+//	  dungeon <yes|no>                      whether the character is in the Seven Signs dungeon (the necropolis and
+//	                                        catacomb gatekeepers' flag)
+//	  standing <player|member> <n>          the character's or a member's Ketra/Varka alliance standing (0 none)
 //	  random <draw> ... | random always <draw>
 //	                                        not a check but the step's own script draws, in place of the random
 //	                                        line's for this step alone (every one must be drawn); the random line's
@@ -485,9 +505,10 @@ type Scenario struct {
 	Rolls map[string]int
 	// Gauss are the gauss lines' values by role.
 	Gauss map[string]float64
-	// Territories are the territory lines, Members the member lines and
-	// Grounds the ground lines.
+	// Territories are the territory lines, Zones the zone lines, Members the
+	// member lines and Grounds the ground lines.
 	Territories []Territory
+	Zones       []ZoneLine
 	Members     []Member
 	Grounds     []Ground
 	// Skills are the skill lines: the shipped skills the character knows.
@@ -611,6 +632,9 @@ type Step struct {
 	Line int
 	Verb string
 	Args []string
+	// Repeat is how many times a bypass step sends its command (0 without an
+	// xN: once).
+	Repeat int
 	// Packets, Statements and Memos are the S, Q and M lines without their
 	// prefix.
 	Packets    []string
@@ -688,6 +712,7 @@ var argCount = map[string][2]int{
 	"land":       {3, 5},
 	"stance":     {2, 2},
 	"swing":      {1, 1},
+	"appear":     {0, 0},
 }
 
 // Parse reads a scenario file.
@@ -738,11 +763,15 @@ func Parse(name string, data []byte) (*Scenario, error) {
 			if err := sc.checkStep(verb, args, roles); err != nil {
 				return nil, fail("%v", err)
 			}
+			repeat := 0
 			if verb == "bypass" {
 				// The command keeps its own spacing.
-				args = []string{strings.TrimSpace(strings.TrimPrefix(line, verb))}
+				var err error
+				if args, repeat, err = bypassArgs(strings.TrimSpace(strings.TrimPrefix(line, verb))); err != nil {
+					return nil, fail("%v", err)
+				}
 			}
-			sc.Steps = append(sc.Steps, Step{Line: n, Verb: verb, Args: args, As: as})
+			sc.Steps = append(sc.Steps, Step{Line: n, Verb: verb, Args: args, As: as, Repeat: repeat})
 			continue
 		}
 		if err := sc.header(verb, args, roles); err != nil {
@@ -784,6 +813,12 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	}
 	if err := sc.checkStateRoles(roles); err != nil {
 		return nil, fmt.Errorf("%s:%w", name, err)
+	}
+	if err := sc.checkSeedRoles(); err != nil {
+		return nil, fmt.Errorf("%s:%w", name, err)
+	}
+	if what := sc.tracedSeeds(); sc.Trace != "" && what != "" {
+		return nil, fmt.Errorf("%s: a traced scenario takes no %s", name, what)
 	}
 	if err := sc.checkFlow(); err != nil {
 		return nil, fmt.Errorf("%s:%w", name, err)
@@ -1040,7 +1075,7 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		opts.Role, opts.ID, opts.Type = role, int32(id), args[2]
 		opts.DX, opts.DY, opts.DZ = offsets[0], offsets[1], offsets[2]
 		sc.NPCs = append(sc.NPCs, opts)
-	case "territory", "member", "ground", "roll", "gauss":
+	case "territory", "zone", "member", "ground", "roll", "gauss":
 		return sc.world(key, args, roles)
 	case "skill", "door", "summon":
 		return sc.fight(key, args, roles)
@@ -1337,7 +1372,7 @@ func (s *Step) expect(n int, line string) error {
 			return err
 		}
 		s.Random = rd
-	case "items", "rows", "state", "hate", "desires", "at", "mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows":
+	case "items", "rows", "state", "hate", "desires", "at", "mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows", "open", "dungeon", "standing":
 		args := strings.Fields(rest)
 		if kind == "rows" {
 			var err error
@@ -1458,12 +1493,14 @@ func checkCheck(kind string, args []string) error {
 		return checkFightCheck(kind, args)
 	case "mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows":
 		return checkStateCheck(kind, args)
+	case "open", "dungeon", "standing":
+		return checkSeedCheck(kind, args)
 	case "items":
 		if len(args) == 0 {
 			return fmt.Errorf("items takes one or more <id>=<count>")
 		}
 		if !strings.Contains(args[0], "=") && len(args) > 1 {
-			// A mate's count: items <mate> <id>=<n> ...
+			// A mate's or a member's count: items <mate> <id>=<n> ...
 			args = args[1:]
 		}
 		for _, a := range args {

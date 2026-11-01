@@ -72,7 +72,7 @@ func TestParseRejectsBadStateLines(t *testing.T) {
 		{"top creature", head + "top a b\n", "no npc, summon or member line"},
 		{"land by", head + "land a 4515 1 with player\n", "land <target>"},
 		{"land level", head + "land a 4515 0\n", "skill level"},
-		{"stance word", head + "stance a maybe\n", "stance <role>"},
+		{"stance word", head + "stance a maybe\n", "stance <role|player>"},
 		{"swing role", head + "swing b\n", "unknown role"},
 		{"mem check", head + "advance 1s\n  mem a i_ai9=1\n", "is not <slot>=<value>"},
 		{"privates check", head + "advance 1s\n  privates a 2=0\n", "1 or more"},
