@@ -193,7 +193,9 @@ func (a characterStatActor) hasFullBodyArmor(slotMask int) bool {
 		return false
 	}
 	tmpl, ok := a.c.inventory.Templates().Get(inst.TemplateID)
-	return ok && (tmpl.Slot == item.SlotFullArmor || tmpl.Slot == item.SlotAllDress)
+	// Formal wear sits in the chest slot but is not a full-body piece: it
+	// takes the chest penalty only.
+	return ok && tmpl.Slot == item.SlotFullArmor
 }
 
 func (a characterStatActor) HasWeaponEquipped() bool {
