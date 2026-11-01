@@ -35,7 +35,8 @@ func spawnTemplates() *npc.Table {
 		return &npc.Template{ID: id, TemplateID: id, Type: typ, Name: name, Level: 1, HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true}
 	}
 	wolf := tmpl(wolfID, "Monster", "Wolf")
-	// A wolf leads the privates its spawn declares.
+	// A wolf is a party leader; the privates its spawn declares are
+	// created by the behavior withPartyLeader binds.
 	wolf.AIParams = npc.AIParams{"Party_Type": "2"}
 	return npc.NewTable([]*npc.Template{
 		wolf,
