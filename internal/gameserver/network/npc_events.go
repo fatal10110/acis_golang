@@ -9,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
 
 // shotRechargeRadius is how far an NPC's shot-recharge animation reaches.
@@ -89,7 +91,7 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.NPCInfoShown:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameNPCInfo(npcSnapshot(s.link, h, false)) })
 	case event.MoveTypeChanged:
-		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(h.ObjectID(), e.Running) })
+		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(h.ObjectID(), e.Running, h.InsideZone(zone.FlagWater)) })
 	case event.Flight:
 		x, y, z := h.Position()
 		s.broadcast(func() wire.Frame {
@@ -259,7 +261,7 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	case event.SkillLaunched:
 		frame = frames.SkillLaunched(s.ep.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 	case event.MoveTypeChanged:
-		frame = frames.ChangeMoveType(s.ep.ObjectID(), e.Running)
+		frame = frames.ChangeMoveType(s.ep.ObjectID(), e.Running, s.ep.InsideZone(zone.FlagWater))
 	case event.NPCInfoChanged:
 		// A signet point's template serves no residence: its view carries
 		// no crest.
@@ -294,7 +296,7 @@ func (s *decorationSink) Emit(ev event.Event) {
 		broadcastNPCView(s.link, &s.known, s.world, s.d, e.ServerObject)
 	case event.MoveTypeChanged:
 		broadcastKnown(&s.known, s.world, s.d, func() wire.Frame {
-			return serverpackets.NpcFrameBuilder{}.ChangeMoveType(s.d.ObjectID(), e.Running)
+			return serverpackets.NpcFrameBuilder{}.ChangeMoveType(s.d.ObjectID(), e.Running, s.d.InsideZone(zone.FlagWater))
 		})
 	}
 }

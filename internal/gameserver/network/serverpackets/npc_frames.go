@@ -34,9 +34,10 @@ func (NpcFrameBuilder) SocialAction(objectID int32, actionID int32) wire.Frame {
 	return FrameSocialAction(objectID, actionID)
 }
 
-// ChangeMoveType builds a walk/run stance broadcast packet.
-func (NpcFrameBuilder) ChangeMoveType(objectID int32, running bool) wire.Frame {
-	return FrameChangeMoveType(objectID, running, false)
+// ChangeMoveType builds a walk/run stance broadcast packet, flagged
+// swimming while the NPC is in water.
+func (NpcFrameBuilder) ChangeMoveType(objectID int32, running, swimming bool) wire.Frame {
+	return FrameChangeMoveType(objectID, running, swimming)
 }
 
 // NpcSay builds a chat-line broadcast packet, a shout when shout is set.
