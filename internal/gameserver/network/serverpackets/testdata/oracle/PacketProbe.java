@@ -121,5 +121,7 @@ public final class PacketProbe
 		ProbeWorld.run();
 		ProbeEngine.run();
 		ProbeCharacters.run();
+		ProbeItems.run();
+		ProbeShops.run();
 	}
 }

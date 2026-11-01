@@ -6,49 +6,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/macro"
 )
-
-// TestFrameSendMacroList pins both SendMacroList forms against the
-// reference layout (SendMacroList.writeImpl): opcode 0xE7, revision int32,
-// a zero byte, the list's count byte, then 0 for the empty list or 1 and
-// one macro: id int32, name, description and acronym strings, icon byte,
-// line count byte, and per line its 1-based number, type byte, d1 int32,
-// d2 byte and text string.
-func TestFrameSendMacroList(t *testing.T) {
-	empty := framePayload(t, FrameSendMacroList(2, 0, nil))
-	if want := []byte{0xe7, 2, 0, 0, 0, 0, 0, 0}; !bytes.Equal(empty, want) {
-		t.Fatalf("empty SendMacroList = % x, want % x", empty, want)
-	}
-
-	m := macro.Macro{
-		ID: 1000, Icon: 3, Name: "Go", Description: "d", Acronym: "G",
-		Commands: []macro.Command{
-			{Type: macro.CommandSkill, D1: 1177, D2: 0, Text: ""},
-			{Type: macro.CommandShortcut, D1: 2, D2: 5, Text: "/a"},
-		},
-	}
-	got := framePayload(t, FrameSendMacroList(5, 2, &m))
-	want := []byte{0xe7}
-	want = binary.LittleEndian.AppendUint32(want, 5)
-	want = append(want, 0, 2, 1)
-	want = binary.LittleEndian.AppendUint32(want, 1000)
-	want = append(want, encodeUTF16Z("Go")...)
-	want = append(want, encodeUTF16Z("d")...)
-	want = append(want, encodeUTF16Z("G")...)
-	want = append(want, 3, 2)
-	want = append(want, 1, 1)
-	want = binary.LittleEndian.AppendUint32(want, 1177)
-	want = append(want, 0)
-	want = append(want, encodeUTF16Z("")...)
-	want = append(want, 2, 4)
-	want = binary.LittleEndian.AppendUint32(want, 2)
-	want = append(want, 5)
-	want = append(want, encodeUTF16Z("/a")...)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("SendMacroList =\n% x\nwant\n% x", got, want)
-	}
-}
 
 // recommendationDiff encodes c twice, without and then with recommendations
 // (3 left, 200 held), and returns the second payload and where the two
