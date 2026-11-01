@@ -75,19 +75,24 @@ func (p *livePlayer) refreshInfos(w *world.State) {
 func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 	switch o := obj.(type) {
 	case *livePlayer:
-		hidden := hiddenFrom(o, p)
-		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
-			Character:          o.Character,
-			Template:           o.Template(),
-			Items:              o.inventoryItems(),
-			Clan:               p.link.clanFields(o.Character),
-			Hidden:             hidden,
-			Revealed:           o.Invisible() && !hidden,
-			HeroAura:           p.link.heroAura(o),
-			SpawnProtectedTeam: p.link.spawnProtectedTeam(o),
-		}))
-		if o.throne != nil {
-			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
+		// A polymorphed player is shown as its NPC form, seated or not.
+		if form := o.Polymorph(); form != nil {
+			p.sendVisibilityFrame(serverpackets.FramePcMorphInfo(o.Character, *form))
+		} else {
+			hidden := hiddenFrom(o, p)
+			p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
+				Character:          o.Character,
+				Template:           o.Template(),
+				Items:              o.inventoryItems(),
+				Clan:               p.link.clanFields(o.Character),
+				Hidden:             hidden,
+				Revealed:           o.Invisible() && !hidden,
+				HeroAura:           p.link.heroAura(o),
+				SpawnProtectedTeam: p.link.spawnProtectedTeam(o),
+			}))
+			if o.throne != nil {
+				p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
+			}
 		}
 		// Both players learn their relation to the other: p gets o's (and
 		// its summon's), o gets p's (and its summon's).

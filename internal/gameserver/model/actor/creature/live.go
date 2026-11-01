@@ -66,6 +66,15 @@ func (l *Live) Move() *move.CreatureMove {
 	return &l.movement
 }
 
+// MoveType reports how this creature travels from where it stands; a nil
+// Live stands on the ground.
+func (l *Live) MoveType() move.MoveType {
+	if l == nil {
+		return move.MoveGround
+	}
+	return l.movement.MoveType()
+}
+
 // MovingTo returns the target of this creature's leg in flight and whether
 // it is walking at all; a nil Live never walks.
 func (l *Live) MovingTo() (location.Location, bool) {

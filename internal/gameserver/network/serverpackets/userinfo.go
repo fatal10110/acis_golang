@@ -158,7 +158,12 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(z))
 	w.WriteInt32(int32(c.CurrentHeading()))
 	w.WriteInt32(c.ObjectID())
-	w.WriteString(c.CharacterName())
+	form := c.Polymorph()
+	if form != nil {
+		w.WriteString(form.Name)
+	} else {
+		w.WriteString(c.CharacterName())
+	}
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex()))
 	w.WriteInt32(int32(c.VisibleBaseClassID()))
@@ -241,7 +246,11 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(c.Face))
 	w.WriteInt32(boolInt32(s.IsGM))
 
-	w.WriteString(c.Title())
+	if form != nil {
+		w.WriteString(polymorphTitle)
+	} else {
+		w.WriteString(c.Title())
+	}
 
 	w.WriteInt32(c.ClanID())
 	w.WriteInt32(s.Clan.CrestID)

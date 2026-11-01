@@ -3,6 +3,7 @@ package net.sf.l2j.gameserver.model.actor.template;
 // Stand-in for an npc template: the plain values the creature info packets read.
 public final class NpcTemplate
 {
+	public int npcId;
 	public int idTemplate;
 	public int rightHand;
 	public int leftHand;
@@ -16,7 +17,7 @@ public final class NpcTemplate
 	// Read only by the polymorphed player view.
 	public int getNpcId()
 	{
-		return idTemplate;
+		return npcId;
 	}
 
 	public int getIdTemplate()

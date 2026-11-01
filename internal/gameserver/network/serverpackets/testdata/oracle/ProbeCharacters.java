@@ -71,7 +71,7 @@ final class ProbeCharacters
 
 	// The Go twin of the live character: its calculators answer these for the template and
 	// resources packets_oracle_character_test.go builds (oracleLive*), pinned there.
-	private static void live(Player p)
+	static void live(Player p)
 	{
 		final var st = p.playerStatus;
 		st.strength = 40;
@@ -395,6 +395,21 @@ final class ProbeCharacters
 
 	private static void npcs(int r, int[] v, String n) throws Exception
 	{
+		final Npc npc = npc(r, v);
+		PacketProbe.emit("NpcInfo" + n, new AbstractNpcInfo.NpcInfo(npc, null));
+
+		// The stationary view: the hit points show to a viewer who can attack it.
+		npc.getStatus().hp = f(v, 8);
+		npc.getStatus().maxHp = f(v, 9);
+		npc.attackable = true;
+		PacketProbe.emit("ServerObjectInfo/attackable" + n, new ServerObjectInfo(npc, null));
+		npc.attackable = false;
+		PacketProbe.emit("ServerObjectInfo/peaceful" + n, new ServerObjectInfo(npc, null));
+	}
+
+	// An npc of row r with the shared input.
+	static Npc npc(int r, int[] v)
+	{
 		final Npc npc = new Npc();
 		npc.objectId = f(v, 1);
 		npc.template.idTemplate = f(v, 2);
@@ -424,14 +439,6 @@ final class ProbeCharacters
 		npc.enchantEffect = f(v, 6);
 		npc.flying = (f(v, 7) & 1) != 0;
 		npc.move.moveType = MoveType.values()[r % 3];
-		PacketProbe.emit("NpcInfo" + n, new AbstractNpcInfo.NpcInfo(npc, null));
-
-		// The stationary view: the hit points show to a viewer who can attack it.
-		npc.getStatus().hp = f(v, 8);
-		npc.getStatus().maxHp = f(v, 9);
-		npc.attackable = true;
-		PacketProbe.emit("ServerObjectInfo/attackable" + n, new ServerObjectInfo(npc, null));
-		npc.attackable = false;
-		PacketProbe.emit("ServerObjectInfo/peaceful" + n, new ServerObjectInfo(npc, null));
+		return npc;
 	}
 }

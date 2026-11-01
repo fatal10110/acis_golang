@@ -123,5 +123,6 @@ public final class PacketProbe
 		ProbeCharacters.run();
 		ProbeItems.run();
 		ProbeShops.run();
+		ProbePolymorph.run();
 	}
 }
