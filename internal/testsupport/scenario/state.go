@@ -437,18 +437,29 @@ func (sc *Scenario) checkStateRoles(roles map[string]bool) error {
 	return nil
 }
 
+// fights reports whether a kill or hit step names the role.
+func (sc *Scenario) fights(role string) bool {
+	return slices.ContainsFunc(sc.Steps, func(st Step) bool {
+		return (st.Verb == "kill" || st.Verb == "hit") && len(st.Args) > 0 && st.Args[0] == role
+	})
+}
+
 // tracedState reports what of the state lines a traced scenario uses, ""
 // for none: the reference probe plays none of them.
 func (sc *Scenario) tracedState() string {
 	switch {
 	case slices.ContainsFunc(sc.NPCs, func(n NPC) bool {
-		return n.Level != 0 || n.Aggro != 0 || n.Mem != nil || n.Privates != nil || n.Master != ""
+		return n.Aggro != 0 || n.Mem != nil || n.Privates != nil || n.Master != ""
 	}):
-		return "level, aggro, mem, privates or master option on an npc line"
+		return "aggro, mem, privates or master option on an npc line"
 	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
 		return slices.Contains(stateVerbs, st.Verb) || st.Random != nil || (st.Verb == "hit" && len(st.Args) >= 5)
 	}):
 		return "hp, mp, want, die, top, land, stance or swing step, skill hit or random line in a step"
+	case slices.ContainsFunc(sc.NPCs, func(n NPC) bool { return n.Level != 0 && !sc.fights(n.Role) }):
+		// The probe makes only the NPCs a kill or hit step names the fixture
+		// monster that takes a level; it plays every other one as shipped.
+		return "level option on an npc line no kill or hit step names"
 	}
 	return ""
 }
