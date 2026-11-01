@@ -12,6 +12,7 @@ public class Creature extends WorldObject
 	public String title;
 	public boolean running;
 	public boolean inWater;
+	public boolean dead;
 	public BoatMove move;
 	public BoatStatus status;
 
@@ -33,6 +34,11 @@ public class Creature extends WorldObject
 	public final boolean isInWater()
 	{
 		return inWater;
+	}
+
+	public final boolean isDead()
+	{
+		return dead;
 	}
 
 	public BoatMove getMove()

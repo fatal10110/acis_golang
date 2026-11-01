@@ -6,32 +6,11 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 )
-
-// ---- from exsendmanorlist_test.go ----
-func TestFrameExSendManorList(t *testing.T) {
-	got := framePayload(t, FrameExSendManorList())
-
-	var want []byte
-	want = append(want, OpcodeExtended)
-	want = binary.LittleEndian.AppendUint16(want, OpcodeExSendManorList)
-	want = binary.LittleEndian.AppendUint32(want, uint32(len(manorNames)))
-	for i, name := range manorNames {
-		want = binary.LittleEndian.AppendUint32(want, uint32(i+1))
-		var w wire.Writer
-		w.WriteString(name)
-		want = append(want, w.Bytes()...)
-	}
-
-	if !bytes.Equal(got, want) {
-		t.Errorf("FrameExSendManorList() = % x, want % x", got, want)
-	}
-}
 
 // ---- from shop_trade_test.go ----
 

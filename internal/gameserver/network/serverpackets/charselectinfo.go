@@ -24,6 +24,11 @@ const lhandPaperdollIndex = 8
 // would wrap negative on the wire.
 const maxDisplayedEnchant = 127
 
+// charSelectInfoCharID is the id every list entry carries ahead of its login
+// name: every entry carries this same constant, never the character's object
+// id.
+const charSelectInfoCharID = 0x00030b7a
+
 // paperdollWriteOrder is the equip-array position CharSelectInfo writes at
 // each of its 17 paperdoll fields, in the client's expected order. Position
 // 7 (the weapon hand) appears twice; that duplication is the client's own
@@ -123,7 +128,7 @@ func writeCharSelectInfo(w *wire.Writer, loginName string, sessionID int32, slot
 
 	for i, s := range slots {
 		w.WriteString(s.Name)
-		w.WriteInt32(s.ObjectID)
+		w.WriteInt32(charSelectInfoCharID)
 		w.WriteString(loginName)
 		w.WriteInt32(sessionID)
 		w.WriteInt32(s.ClanID)

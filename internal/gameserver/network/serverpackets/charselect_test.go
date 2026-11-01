@@ -3,7 +3,6 @@ package serverpackets
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
 	"testing"
 	"time"
 
@@ -37,75 +36,6 @@ func TestFrameAuthLoginFail(t *testing.T) {
 	payload := EncodeAuthLoginFail(LoginFailSystemErrorTryLater)
 	if !bytes.Equal(frame.Bytes()[2:], payload) {
 		t.Fatalf("framed payload = % X, want EncodeAuthLoginFail output % X", frame.Bytes()[2:], payload)
-	}
-}
-
-// ---- from charcreatefail_test.go ----
-// ---- from charcreateok_test.go ----
-// ---- from chardeletefail_test.go ----
-// ---- from chardeleteok_test.go ----
-// ---- from charselected_test.go ----
-func TestFrameCharSelected(t *testing.T) {
-	c := &player.Character{
-		ID:       0x10000001,
-		Race:     player.RaceHuman,
-		Location: location.Location{X: 10, Y: 20, Z: 30},
-		SP:       7, Exp: 12345, CharLevel: 3,
-		KarmaPoints: 1, PKKills: 2,
-	}
-	c.SetName("Newbie")
-	c.SetTitle("Hero")
-	c.SetClanID(5)
-	c.SetResourceValues(player.Resources{CurrentHP: 75, CurrentMP: 30})
-	tmpl := &player.Template{STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25}
-
-	got := framePayload(t, FrameCharSelected(CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: 999, GameTime: 1234}))
-	resources := c.ResourceValues()
-
-	want := []byte{OpcodeCharSelected}
-	x, y, z := c.Position()
-	want = append(want, encodeUTF16Z(c.CharacterName())...)
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
-	want = append(want, encodeUTF16Z(c.Title())...)
-	want = binary.LittleEndian.AppendUint32(want, 999) // session id
-	want = binary.LittleEndian.AppendUint32(want, uint32(5))
-	want = binary.LittleEndian.AppendUint32(want, 0) // unknown
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex()))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
-
-	want = binary.LittleEndian.AppendUint32(want, 1)
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(x))
-	want = binary.LittleEndian.AppendUint32(want, uint32(y))
-	want = binary.LittleEndian.AppendUint32(want, uint32(z))
-	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(resources.CurrentHP))
-	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(resources.CurrentMP))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.SP))
-	want = binary.LittleEndian.AppendUint64(want, uint64(c.Exp))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.CharLevel))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Karma()))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.PKKills))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.INT))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.STR))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.CON))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.MEN))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.DEX))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.WIT))
-
-	for i := 0; i < 32; i++ { // 30 padding zeros + 2 reserved
-		want = binary.LittleEndian.AppendUint32(want, 0)
-	}
-	want = binary.LittleEndian.AppendUint32(want, 1234) // game time
-	want = binary.LittleEndian.AppendUint32(want, 0)    // reserved
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
-	for i := 0; i < 4; i++ {
-		want = binary.LittleEndian.AppendUint32(want, 0)
-	}
-
-	if !bytes.Equal(got, want) {
-		t.Errorf("FrameCharSelected mismatch:\n got  % x\n want % x", got, want)
 	}
 }
 
@@ -153,114 +83,6 @@ func TestNewCharacterSlot_Paperdoll(t *testing.T) {
 		if entry != (item.PaperdollEntry{}) {
 			t.Errorf("Paperdoll[%d] = %+v, want empty", i, entry)
 		}
-	}
-}
-
-func TestFrameCharSelectInfo(t *testing.T) {
-	slot := CharacterSlot{
-		Name: "Newbie", ObjectID: 0x10000001, ClanID: 0,
-		Sex: player.SexMale, Race: player.RaceHuman, ClassID: 0,
-		X: 10, Y: 20, Z: 30,
-		CurHP: 80, CurMP: 30, MaxHP: 80, MaxMP: 30,
-		SP: 0, Exp: 0, Level: 1,
-		Karma: 0, PKKills: 0, PvPKills: 0,
-		HairStyle: 1, HairColor: 2, Face: 0,
-		DeleteTimerSeconds: 0,
-	}
-	slot.Paperdoll[rhandPaperdollIndex] = item.PaperdollEntry{ObjectID: 100, TemplateID: 2369, EnchantLevel: 5, AugmentationID: 8191<<16 | 3}
-	slot.Paperdoll[10] = item.PaperdollEntry{ObjectID: 101, TemplateID: 1146}
-
-	got := framePayload(t, FrameCharSelectInfo("acct1", 999, []CharacterSlot{slot}, 0))
-
-	want := []byte{OpcodeCharSelectInfo}
-	want = binary.LittleEndian.AppendUint32(want, 1) // slot count
-
-	want = append(want, encodeUTF16Z(slot.Name)...)
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.ObjectID))
-	want = append(want, encodeUTF16Z("acct1")...)
-	want = binary.LittleEndian.AppendUint32(want, 999)
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.ClanID))
-	want = binary.LittleEndian.AppendUint32(want, 0)
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.Sex))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.Race))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.ClassID))
-
-	want = binary.LittleEndian.AppendUint32(want, 1)
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.X))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.Y))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.Z))
-
-	want = appendF64(want, slot.CurHP)
-	want = appendF64(want, slot.CurMP)
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.SP))
-	want = binary.LittleEndian.AppendUint64(want, uint64(slot.Exp))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.Level))
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.Karma))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.PKKills))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.PvPKills))
-
-	for i := 0; i < 7; i++ {
-		want = binary.LittleEndian.AppendUint32(want, 0)
-	}
-
-	for _, pos := range paperdollWriteOrder {
-		want = binary.LittleEndian.AppendUint32(want, uint32(slot.Paperdoll[pos].ObjectID))
-	}
-	for _, pos := range paperdollWriteOrder {
-		want = binary.LittleEndian.AppendUint32(want, uint32(slot.Paperdoll[pos].TemplateID))
-	}
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.HairStyle))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.HairColor))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.Face))
-
-	want = appendF64(want, slot.MaxHP)
-	want = appendF64(want, slot.MaxMP)
-
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.DeleteTimerSeconds))
-	want = binary.LittleEndian.AppendUint32(want, uint32(slot.ClassID))
-	want = binary.LittleEndian.AppendUint32(want, 1) // active slot (activeID=0, i=0)
-
-	want = append(want, 5)                                    // enchant effect from the RHAND weapon
-	want = binary.LittleEndian.AppendUint32(want, 8191<<16|3) // the RHAND weapon's augmentation id
-
-	if !bytes.Equal(got, want) {
-		t.Errorf("FrameCharSelectInfo mismatch:\n got  %x\n want %x", got, want)
-	}
-}
-
-// TestFrameCharSelectInfoUnsetAugmentationReadsZero pins that an
-// augmentations row left at its column default (-1) shows as no
-// augmentation on the character list.
-func TestFrameCharSelectInfoUnsetAugmentationReadsZero(t *testing.T) {
-	slot := CharacterSlot{Name: "Newbie", ObjectID: 1}
-	slot.Paperdoll[rhandPaperdollIndex] = item.PaperdollEntry{ObjectID: 100, TemplateID: 2369, AugmentationID: -1}
-	got := framePayload(t, FrameCharSelectInfo("acct1", 1, []CharacterSlot{slot}, 0))
-	if tail := binary.LittleEndian.Uint32(got[len(got)-4:]); tail != 0 {
-		t.Fatalf("augmentation id = %d, want 0", int32(tail))
-	}
-}
-
-func TestFrameCharSelectInfo_AutoPicksMostRecentlyAccessed(t *testing.T) {
-	older := CharacterSlot{Name: "Older", ObjectID: 1, LastAccess: 100}
-	newer := CharacterSlot{Name: "Newer", ObjectID: 2, LastAccess: 200}
-
-	payload := framePayload(t, FrameCharSelectInfo("acct1", 1, []CharacterSlot{older, newer}, -1))
-
-	// The active flag sits right after the (name, objectId, loginName,
-	// sessionId, clanId, builderLevel, sex, race, classId, 0x01, x, y, z,
-	// curHp, curMp, sp, exp, level, karma, pkKills, pvpKills, 7 zeros, 34
-	// paperdoll fields, hairStyle, hairColor, face, maxHp, maxMp,
-	// deleteTimer, classId) run for each slot; rather than compute that
-	// offset by hand, decode both slots back out using known-good sibling
-	// behavior: re-encode with an explicit activeID and compare.
-	wantOlderActive := framePayload(t, FrameCharSelectInfo("acct1", 1, []CharacterSlot{older, newer}, 1))
-	if !bytes.Equal(payload, wantOlderActive) {
-		t.Error("FrameCharSelectInfo with activeID=-1 did not pick the slot with the highest LastAccess")
 	}
 }
 

@@ -78,7 +78,7 @@ func oracleCases() map[string]func() wire.Frame {
 	}
 	// The families probed from plain numbers, strings and creature stand-ins
 	// are in packets_oracle_cases_test.go.
-	for _, family := range []map[string]func() wire.Frame{oracleSimpleCases(), oracleWorldCases()} {
+	for _, family := range []map[string]func() wire.Frame{oracleSimpleCases(), oracleWorldCases(), oracleEngineCases()} {
 		for name, build := range family {
 			cases[name] = build
 		}

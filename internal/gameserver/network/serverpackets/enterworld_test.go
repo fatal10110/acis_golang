@@ -203,21 +203,6 @@ func TestFrameShortCutRegisterItem(t *testing.T) {
 	}
 }
 
-func TestFrameDie(t *testing.T) {
-	got := framePayload(t, FrameDie(123, DieOptions{Castle: true}))
-	want := []byte{OpcodeDie}
-	want = appendD(want, 123)
-	want = appendD(want, 1)
-	want = appendD(want, 0)
-	want = appendD(want, 1)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameDie() = %x, want %x", got, want)
-	}
-}
-
 func TestFrameNpcHtmlMessage(t *testing.T) {
 	got := framePayload(t, FrameNpcHtmlMessage(7, "<html></html>", 57))
 	want := []byte{OpcodeNpcHtmlMessage}
