@@ -4,12 +4,14 @@ import net.sf.l2j.gameserver.enums.TeamType;
 import net.sf.l2j.gameserver.model.actor.move.BoatMove;
 import net.sf.l2j.gameserver.model.actor.status.CreatureStatus;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
+import net.sf.l2j.gameserver.model.itemcontainer.PcInventory;
 
 // Stand-in for a summon: a plain value holder for the getters the probed
 // packets read.
-public class Summon extends Creature
+public class Summon extends Playable
 {
 	public Player owner;
+	public PcInventory inventory = new PcInventory();
 	public NpcTemplate template = new NpcTemplate();
 	public CreatureStatus summonStatus = new CreatureStatus();
 	public int summonType;
@@ -97,5 +99,11 @@ public class Summon extends Creature
 	public boolean isAttackableWithoutForceBy(Player attacker)
 	{
 		return attackable;
+	}
+
+	@Override
+	public PcInventory getInventory()
+	{
+		return inventory;
 	}
 }

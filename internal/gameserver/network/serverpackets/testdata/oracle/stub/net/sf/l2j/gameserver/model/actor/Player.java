@@ -17,12 +17,16 @@ import net.sf.l2j.gameserver.model.actor.container.player.FishingStance;
 import net.sf.l2j.gameserver.model.actor.instance.Cubic;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.actor.status.PlayerStatus;
+import net.sf.l2j.gameserver.model.actor.container.player.HennaList;
+import net.sf.l2j.gameserver.model.craft.ManufactureList;
+import net.sf.l2j.gameserver.model.craft.RecipeBook;
 import net.sf.l2j.gameserver.model.itemcontainer.PcInventory;
+import net.sf.l2j.gameserver.model.trade.TradeList;
 import net.sf.l2j.gameserver.model.pledge.Clan;
 
 // Stand-in for the world player: a plain value holder for the getters the
 // probed packets read.
-public final class Player extends Creature
+public final class Player extends Playable
 {
 	public boolean online;
 	public BoatInfo boatInfo;
@@ -45,6 +49,14 @@ public final class Player extends Creature
 	public int pkKills;
 	public int adena;
 	public PcInventory inventory = new PcInventory();
+	public PcInventory warehouse = new PcInventory();
+	public TradeList activeTradeList;
+	public TradeList sellList = new TradeList();
+	public TradeList buyList = new TradeList();
+	public RecipeBook recipeBook = new RecipeBook();
+	public boolean dwarvenCraft;
+	public ManufactureList manufactureList = new ManufactureList();
+	public HennaList hennaList = new HennaList();
 	public PlayerStatus playerStatus = new PlayerStatus();
 	public boolean clanLeader;
 	public int siegeState;
@@ -184,6 +196,7 @@ public final class Player extends Creature
 		return adena;
 	}
 
+	@Override
 	public PcInventory getInventory()
 	{
 		return inventory;
@@ -378,5 +391,45 @@ public final class Player extends Creature
 	public NpcTemplate getPolymorphTemplate()
 	{
 		return polymorphTemplate;
+	}
+
+	public PcInventory getActiveWarehouse()
+	{
+		return warehouse;
+	}
+
+	public TradeList getActiveTradeList()
+	{
+		return activeTradeList;
+	}
+
+	public TradeList getSellList()
+	{
+		return sellList;
+	}
+
+	public TradeList getBuyList()
+	{
+		return buyList;
+	}
+
+	public RecipeBook getRecipeBook()
+	{
+		return recipeBook;
+	}
+
+	public boolean hasDwarvenCraft()
+	{
+		return dwarvenCraft;
+	}
+
+	public ManufactureList getManufactureList()
+	{
+		return manufactureList;
+	}
+
+	public HennaList getHennaList()
+	{
+		return hennaList;
 	}
 }

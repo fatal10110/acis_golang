@@ -1,6 +1,7 @@
 package net.sf.l2j.gameserver.model.actor.instance;
 
 import net.sf.l2j.gameserver.model.actor.Summon;
+import net.sf.l2j.gameserver.model.itemcontainer.PcInventory;
 
 // Stand-in for a pet: the food gauge, the per-level meal limit and the
 // carried weight.
@@ -11,20 +12,13 @@ public final class Pet extends Summon
 	public int totalWeight;
 	public int weapon;
 	public int armor;
+	public int inventoryLimit;
 
 	public final class PetData
 	{
 		public int maxMeal()
 		{
 			return maxMeal;
-		}
-	}
-
-	public final class PetInventory
-	{
-		public int getTotalWeight()
-		{
-			return totalWeight;
 		}
 	}
 
@@ -50,8 +44,15 @@ public final class Pet extends Summon
 		return new PetData();
 	}
 
-	public PetInventory getInventory()
+	@Override
+	public PcInventory getInventory()
 	{
-		return new PetInventory();
+		inventory.totalWeight = totalWeight;
+		return inventory;
+	}
+
+	public int getInventoryLimit()
+	{
+		return inventoryLimit;
 	}
 }

@@ -23,8 +23,15 @@ wrote into a byte buffer.
   manor windows (`ExShowSeedInfo`, `ExShowCropInfo`, `ExShowManorDefaultInfo`, `ExShowSeedSetting`,
   `ExShowCropSetting`, `ExShowSellCropList`, `ExShowProcureCropDetail`, `SellListProcure`,
   `BuyListSeed`, `ExSendManorList`)
+- the item, shop, trade, private store, recipe shop, macro and symbol windows (`ProbeItems.java`,
+  `ProbeShops.java`): `ItemList`, `InventoryUpdate`, `PetItemList`, `PetInventoryUpdate`,
+  `GMViewItemList`, `SpawnItem`, `DropItem`, `GetItem`, `PackageToList`, `PackageSendableList`,
+  `WarehouseDepositList`, `WarehouseWithdrawList`, `BuyList`, `SellList`, `MultiSellList`,
+  `ShopPreviewList`, `ShopPreviewInfo`, `TradeStart`, `TradeOwnAdd`, `TradeOtherAdd`, `TradeUpdate`,
+  `TradeItemUpdate`, the `PrivateStore*` lists and messages, the `RecipeShop*`, `RecipeBookItemList`
+  and `RecipeItemMakeInfo` packets, `SendMacroList` and the `Henna*` windows
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
-- the value types `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
+- the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
   `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,
   `enums/actors/{ClassId,ClassRace,Sex}`,
   `enums/actors/WeightPenalty`, `enums/skills/EffectFlag` and the rest of their closure.
@@ -38,7 +45,8 @@ destination), `BoatInfo`, `BoatMove`, `BoatStatus`, `World`, `PlayerInfoTable`,
 `StatusUpdate` holds, minus the skill lookup), `StatSet` (map-backed), `MathUtil` (never reached)
 and `EffectHolder` (never written). The engine graphs behind the last family are plain stand-ins too:
 `SystemMessageId` (id and parameter count; the shared no-parameter message is never cached),
-`ItemInstance`/`Item`/`PcInventory`/`ItemData`, `L2Skill`/`AbstractEffect` (never written), `Clan`,
+`ItemInstance`/`Item`/`PcInventory`/`ItemData`, `Playable`, `Augmentation`, `Product`, `Ingredient`, `MultisellData`,
+`TradeList`, `RecipeBook`, `Recipe`, `RecipeData`, `Henna`, `HennaList`, `HennaData`, `L2Skill`/`AbstractEffect` (never written), `Clan`,
 `Siege`/`ClanHallSiege`/`Castle`, `CastleManager`/`ClanHallManager`/`ClanTable`, `Monster` with its
 spoil state, the player's access level, appearance and status, `GameTimeTaskManager`,
 `CastleManorManager` (the reference's own lookups over tables the probe fills), and for the character
@@ -63,7 +71,8 @@ row, and the target of a skill cast from the next row.
 ## Adding a packet
 
 1. Add `PacketProbe.emit("Name/variant", new Packet(...))` to `PacketProbe.java`, `ProbeSimple.java`,
-   `ProbeWorld.java`, `ProbeEngine.java` or `ProbeCharacters.java`. `run.sh` compiles whatever the probe sources use through the source path,
+   `ProbeWorld.java`, `ProbeEngine.java`, `ProbeCharacters.java`, `ProbeItems.java` or
+   `ProbeShops.java`. `run.sh` compiles whatever the probe sources use through the source path,
    so there is no class list; extend `stub/` if a constructor reads another engine getter.
 2. Regenerate (below).
 3. Add the same-named case to `oracleSimpleCases` or `oracleWorldCases` in
@@ -91,8 +100,17 @@ level label and a summon's owner-invisible hiding, which belong to the callers t
 and a summon that has not yet shown its summon animation. A player mounted with a summon out (the
 summon's collision radius and height) cannot occur in the Go model.
 
-Not yet probed (they read the engine item, clan, castle or skill graphs): the item, shop, trade,
-private store, macro, henna and party windows, and the pledge windows that take a clan.
+The item and shop windows (`../../packets_oracle_item_test.go`, `../../packets_oracle_shop_test.go`) build
+every field from the shared row, rotated by the item kind (`ProbeItems.item`): a worn augmented weapon,
+a worn shadow armor, an augmented jewel, a quest stack and adena (plus a siege guard ticket for the
+merchant lists). The inventory sets are linked sets in the stand-in, so their order is the insertion order
+(the reference keeps them in an identity-hashed set). The selections a reference window makes from the
+inventory before writing (what a trade or a warehouse deposit may list, which symbols a class may draw, which
+crafts the recipe window shows) happen in the server before the Go encoder, so each Go case hands the encoder
+the rows the stand-ins hand the reference.
+
+Not yet probed (they read the engine clan, castle or skill graphs): the party windows and the pledge
+windows that take a clan.
 
 The manor set windows hold their seeds in a hash set and `SellListProcure` its rows in an
 identity-hash map, so their probes use one seed per castle and one row; the other manor windows

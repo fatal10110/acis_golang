@@ -13,4 +13,6 @@ public final class Config
 	public static boolean SHOW_SUMMON_CREST = false;
 	public static boolean GM_HERO_AURA = false;
 	public static int PLAYER_SPAWN_PROTECTION = 0;
+	public static int WEAR_PRICE = 10;
+	public static double RATE_SIEGE_GUARDS_PRICE = 1.0;
 }

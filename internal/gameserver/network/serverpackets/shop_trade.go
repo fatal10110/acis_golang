@@ -177,7 +177,7 @@ func writeTradeStart(w *wire.Writer, partnerID int32, items []*item.Instance, te
 		inst := row.inst
 		tmpl := row.tmpl
 		st := inst.Snapshot()
-		writeTradeItem(w, tmpl, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel)
+		writeTradeItem(w, tmpl, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel, st.CustomType1, st.CustomType2)
 	}
 	return nil
 }
@@ -204,7 +204,7 @@ func FrameTradeUpdate(it TradeItemSnapshot, quantity int, templates *item.Table)
 	}
 	w.WriteUint16(1)
 	w.WriteUint16(tradeUpdateMode(tmpl, quantity))
-	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel)
+	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel, 0, 0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
@@ -243,7 +243,7 @@ func writeTradeItemUpdate(w *wire.Writer, entries []TradeItemUpdateEntry, templa
 			mode = 3
 		}
 		w.WriteUint16(mode)
-		writeTradeItem(w, tmpl, entry.Item.ObjectID, entry.Item.TemplateID, available, entry.Item.EnchantLevel)
+		writeTradeItem(w, tmpl, entry.Item.ObjectID, entry.Item.TemplateID, available, entry.Item.EnchantLevel, 0, 0)
 	}
 	w.PatchUint16(countOffset, uint16(written))
 	return nil
@@ -257,7 +257,7 @@ func frameTradeAdd(opcode byte, it TradeItemSnapshot, quantity int, templates *i
 		return wire.Frame{}, fmt.Errorf("serverpackets: TradeAdd: no template loaded for item template %d", it.TemplateID)
 	}
 	w.WriteUint16(1)
-	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel)
+	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel, 0, 0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
@@ -283,17 +283,17 @@ func writeShopItem(w *wire.Writer, tmpl *item.Template, objectID, templateID int
 	w.WriteInt32(price)
 }
 
-func writeTradeItem(w *wire.Writer, tmpl *item.Template, objectID, templateID int32, count, enchant int) {
+func writeTradeItem(w *wire.Writer, tmpl *item.Template, objectID, templateID int32, count, enchant, custom1, custom2 int) {
 	category, subCategory := tmpl.Category()
 	w.WriteUint16(uint16(category))
 	w.WriteInt32(objectID)
 	w.WriteInt32(templateID)
 	w.WriteInt32(int32(count))
 	w.WriteUint16(uint16(subCategory))
-	w.WriteUint16(0)
+	w.WriteUint16(uint16(custom1))
 	w.WriteInt32(int32(tmpl.Slot))
 	w.WriteUint16(uint16(enchant))
-	w.WriteUint16(0)
+	w.WriteUint16(uint16(custom2))
 	w.WriteUint16(0)
 }
 
