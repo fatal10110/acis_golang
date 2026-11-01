@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -65,6 +66,14 @@ func (h *Hostile) Roll(n int) int {
 		return h.roll(n)
 	}
 	return rand.Intn(n)
+}
+
+// Gaussian draws a standard normal for the formulas that use one.
+func (h *Hostile) Gaussian() float64 {
+	if h.gaussian != nil {
+		return h.gaussian()
+	}
+	return rnd.NextGaussian()
 }
 
 // RandomDamageSpread returns the template-defined random-damage spread, or

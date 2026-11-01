@@ -248,6 +248,25 @@ func (r *run) pinPlayerRoll(t *testing.T, draw int) {
 	})
 }
 
+// pinGauss makes every normal draw of role's NPC's formulas v, set on the
+// NPC's own queue.
+func (r *run) pinGauss(t *testing.T, role string, v float64) {
+	t.Helper()
+	n, post := r.npcQueue(t, role)
+	pinned, ok := n.(interface{ SetGaussianSource(func() float64) })
+	if !ok {
+		t.Fatalf("%s: NPC %s (%T) has no normal random source", r.sc.Name, role, n)
+	}
+	done := make(chan struct{})
+	if !post(func() {
+		defer close(done)
+		pinned.SetGaussianSource(func() float64 { return v })
+	}) {
+		t.Fatalf("%s: NPC %s's queue is closed", r.sc.Name, role)
+	}
+	<-done
+}
+
 // pinRoll makes every combat draw of role's NPC draw, n-1 for a draw of
 // [0, n) it is not inside, set on the NPC's own queue.
 func (r *run) pinRoll(t *testing.T, role string, draw int) {

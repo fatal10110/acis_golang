@@ -1047,9 +1047,12 @@ func bootGeo(geo move.Geo) move.Geo {
 
 // Server is a booted gameserver stack plus its first connected client.
 type Server struct {
-	Client *testsupport.ScriptedClient
-	State  *world.State
-	DB     *sql.DB
+	// effectRest is the part of a second AdvanceWithEffects has passed
+	// since its last effect sweep; only the test goroutine touches it.
+	effectRest time.Duration
+	Client     *testsupport.ScriptedClient
+	State      *world.State
+	DB         *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
 	RaidPoints *raidpoint.Points
 	// Olympiad is the Olympiad, its records restored at boot and its

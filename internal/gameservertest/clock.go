@@ -39,6 +39,34 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	s.Settle(tb)
 }
 
+// AdvanceWithEffects is Advance with the production one-second effect sweep
+// running as time passes: it lets d pass in pieces that end on every whole
+// second of the time passed through here and ticks every live effect list
+// (TickEffects) after each whole second, so a buff, stun or damage-over-time
+// effect lands, ticks and expires on the same clock the timers run on, once
+// per elapsed second however the span is cut (the part of a second left over
+// counts toward the next call). A span a suite's pool pass would skip (see
+// Advance) is handed to Advance whole, so it is skipped there too. The
+// server's effect ticker is not otherwise running (WithProductionTickers
+// starts it).
+func (s *Server) AdvanceWithEffects(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	if !s.DrivesClock() && d > maxWallAdvance && s.queues.passOfSuite {
+		s.Advance(tb, d)
+		return
+	}
+	for d > 0 {
+		step := min(d, time.Second-s.effectRest)
+		s.Advance(tb, step)
+		d -= step
+		s.effectRest += step
+		if s.effectRest == time.Second {
+			s.effectRest = 0
+			s.TickEffects()
+		}
+	}
+}
+
 // maxWallAdvance is the longest single Advance a real-pool run sleeps out.
 // The real pool is there for real interleavings; a long timer's exact timing
 // is pinned on the driven clock, where waiting it out costs nothing.

@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,7 +49,7 @@ func (sc *Scenario) named(name string, roles map[string]bool) bool {
 		slices.ContainsFunc(sc.Grounds, func(g Ground) bool { return g.Role == name })
 }
 
-// world reads the territory, member, ground and roll lines.
+// world reads the territory, member, ground, roll and gauss lines.
 func (sc *Scenario) world(key string, args []string, roles map[string]bool) error {
 	switch key {
 	case "territory":
@@ -112,6 +113,24 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 			sc.Rolls = map[string]int{}
 		}
 		sc.Rolls[args[0]] = draw
+	case "gauss":
+		if len(args) != 2 {
+			return fmt.Errorf("gauss <role> <value>")
+		}
+		if !roles[args[0]] {
+			return fmt.Errorf("gauss: no NPC line above names role %q", args[0])
+		}
+		if _, dup := sc.Gauss[args[0]]; dup {
+			return fmt.Errorf("gauss: role %s listed twice", args[0])
+		}
+		v, err := strconv.ParseFloat(args[1], 64)
+		if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+			return fmt.Errorf("gauss value %q is not a number", args[1])
+		}
+		if sc.Gauss == nil {
+			sc.Gauss = map[string]float64{}
+		}
+		sc.Gauss[args[0]] = v
 	case "ground":
 		cursed := len(args) == 7 && args[6] == "cursed"
 		if cursed {

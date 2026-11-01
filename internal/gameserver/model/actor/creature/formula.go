@@ -355,7 +355,7 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 		MDef:     defending.MDef(),
 		VulnMul:  SkillVulnerability(target, def.SkillType, def),
 		Defended: def.Activation == modelskill.ActivationActive && def.Offensive,
-	}, rnd.NextGaussian())
+	}, gaussianOf(attacker))
 	return formulas.ManaDamageInput{
 		MAtk:            versus.MAtk(),
 		MDef:            defending.MDef(),
@@ -366,6 +366,16 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 		VulnMul:         SkillVulnerability(target, def.SkillType, def),
 		Affected:        affected,
 	}, true
+}
+
+// gaussianOf draws a standard normal for attacker's formula: from the
+// attacker when it keeps a source of its own (an NPC a test pins), else from
+// the global one.
+func gaussianOf(attacker FormulaActor) float64 {
+	if src, ok := attacker.(interface{ Gaussian() float64 }); ok {
+		return src.Gaussian()
+	}
+	return rnd.NextGaussian()
 }
 
 // ResolveSkillSuccessInput builds the skill's own landing input from the

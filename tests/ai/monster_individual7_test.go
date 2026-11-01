@@ -12,7 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/rs/zerolog"
 )
@@ -209,21 +208,6 @@ func (w *ind7World) skillHit(t *testing.T, h *npc.Hostile, id modelskill.ID, dam
 	}
 	<-done
 	w.srv.Settle(t)
-}
-
-// stun lands a five minute stun on h and returns it.
-func (w *ind7World) stun(t *testing.T, h *npc.Hostile) *effect.Effect {
-	t.Helper()
-	e, err := effect.New(effect.Skill{ID: ind7StunSkillID, Level: 1, Debuff: true}, modelskill.EffectTemplate{Name: "Stun", Count: 1, Time: 300})
-	if err != nil {
-		t.Fatalf("effect.New(Stun): %v", err)
-	}
-	e.Effector, e.Effected = h, h
-	w.onQueue(t, h, func() { h.EffectList().Add(e) })
-	if !h.Stunned() {
-		t.Fatal("setup: the npc is not stunned")
-	}
-	return e
 }
 
 // attackWeight returns h's attack desire weight on the character, 0 for
@@ -435,86 +419,6 @@ func TestLV3KnightDefenceAndCrazyModes(t *testing.T) {
 		t.Fatalf("slots after 4000 = %v, want 0 1", got)
 	}
 	w.wantCasts(t, "after 4000", knight, map[modelskill.ID]ind1Cast{ind7DefenceMode: {self, 1000000}})
-}
-
-// TestLV3OrcWeakensUnderStuns ports LV3Orc's hooks. It spawns glowing at
-// +10, wanting its big body on itself. Only a hit by skill 1245 while it
-// is stunned moves its int slot 0 on (0 to 1, dropping the glow; 2 to 3;
-// 4 to 5). Its 1 s timer, once the stun is gone, acts on 1, 3 and 5: it
-// drops its desires, wants the step's debuff on itself (with its normal
-// body at 3), moves the slot on and attacks the creature its first spawn
-// parameter named (200). Its combat draws are pinned so that no hit
-// breaks a stun.
-func TestLV3OrcWeakensUnderStuns(t *testing.T) {
-	t.Parallel()
-	w := bootIndividual7(t, raidBoot{}, ind7Template(ind7OrcID), warriorTemplate(ind7MasterID, nil))
-	me := w.player.ObjectID()
-	master := w.spawn(t, ind7MasterID, 600, 0)
-	orc := w.raise(t, master, ind7OrcID, 300, 0, script.Params{P1: me, P2: me, P3: master.ObjectID()})
-	// Every combat draw n-1: a hit never breaks the stun (a draw of 0 of 10).
-	w.onQueue(t, orc, func() { orc.SetRollSource(func(n int) int { return n - 1 }) })
-	self := orc.ObjectID()
-	step := func() int32 { return ind1Slot(orc, script.SlotIntAI0) }
-	if got := orc.NPCInfoSnapshot().EnchantEffect; got != 10 {
-		t.Fatalf("orc glow after it spawned = %d, want 10", got)
-	}
-	w.wantCasts(t, "after it spawned", orc, map[modelskill.ID]ind1Cast{ind7BigBody: {self, 1000000}})
-
-	w.skillHit(t, orc, ind7ShieldStun, 1)
-	if got := step(); got != 0 {
-		t.Fatalf("step after skill 1245 unstunned = %d, want 0", got)
-	}
-	stun := w.stun(t, orc)
-	w.skillHit(t, orc, ind7KnightBreak1, 1)
-	if got := step(); got != 0 {
-		t.Fatalf("step after another skill stunned = %d, want 0", got)
-	}
-	w.skillHit(t, orc, ind7ShieldStun, 1)
-	if got := step(); got != 1 {
-		t.Fatalf("step after skill 1245 stunned = %d, want 1", got)
-	}
-	if got := orc.NPCInfoSnapshot().EnchantEffect; got != 0 {
-		t.Fatalf("orc glow after the first step = %d, want 0", got)
-	}
-	w.srv.Advance(t, time.Second)
-	if got := step(); got != 1 {
-		t.Fatalf("step after a stunned second = %d, want 1", got)
-	}
-
-	for i, s := range []struct {
-		from  int32
-		casts []modelskill.ID
-	}{
-		{1, []modelskill.ID{ind7Debuff1}},
-		{3, []modelskill.ID{ind7Debuff2, ind7NormalBody}},
-		{5, []modelskill.ID{ind7Debuff3}},
-	} {
-		if i > 0 {
-			stun = w.stun(t, orc)
-			w.skillHit(t, orc, ind7ShieldStun, 1)
-			if got := step(); got != s.from {
-				t.Fatalf("step after skill 1245 stunned = %d, want %d", got, s.from)
-			}
-		}
-		w.onQueue(t, orc, func() { orc.EffectList().Remove(stun) })
-		w.skillHit(t, orc, ind7KnightBreak1, 1)
-		w.srv.Advance(t, time.Second)
-		if got := step(); got != s.from+1 {
-			t.Fatalf("step after the timer from %d = %d, want %d", s.from, got, s.from+1)
-		}
-		want := map[modelskill.ID]ind1Cast{}
-		for _, id := range s.casts {
-			want[id] = ind1Cast{self, 1000000}
-		}
-		w.wantCasts(t, fmt.Sprintf("after the timer from %d", s.from), orc, want)
-		if got := w.attackWeight(orc); got != 200 {
-			t.Fatalf("attack desire after the timer from %d = %v, want 200", s.from, got)
-		}
-	}
-	w.srv.Advance(t, time.Second)
-	if got := step(); got != 6 {
-		t.Fatalf("step after the last debuff = %d, want 6", got)
-	}
 }
 
 // TestLV3DwarfGuardsItsParty ports LV3PartyLeaderMonster's and LV3Dwarf's
