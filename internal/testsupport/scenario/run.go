@@ -676,6 +676,9 @@ func (r *run) spawn(t *testing.T, n NPC) {
 	if draw, ok := r.sc.Rolls[n.Role]; ok {
 		r.pinRoll(t, n.Role, draw)
 	}
+	if v, ok := r.sc.Gauss[n.Role]; ok {
+		r.pinGauss(t, n.Role, v)
+	}
 	r.setParams(t, live, n)
 	r.link(t, n)
 	r.srv.RunCreated(t, live)
@@ -873,7 +876,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		}
 	case "advance":
 		d, _ := time.ParseDuration(st.Args[0])
-		r.srv.Advance(t, d)
+		r.srv.AdvanceWithEffects(t, d)
 	case "approach":
 		distance := 100
 		if len(st.Args) == 2 {

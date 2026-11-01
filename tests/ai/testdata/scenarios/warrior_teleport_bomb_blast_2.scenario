@@ -1,7 +1,8 @@
 # WarriorTeleportBombAggressive (22133, level 78): seeing the character it jumps onto it and wants its
 # teleport effect (4671) on itself, and attacks no one. The effect's landing arms the 5 s
 # timer 1001, whose draw of 100 picks the blast: under 33 the first (4614), under 66 the second
-# (4489), else the third (4488); the blast's landing kills it. Here the draw is 40, the blast 4489-10.
+# (4489), else the third (4488); the blast's landing kills it. Here the draw is 40, the blast 4489-10, a mana drain (its normal draw pinned
+# to land it, which the character feels as the loss of its mana).
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc
@@ -12,6 +13,7 @@ script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBomb
 script script.ai.individual.Monster.WarriorBase.Warrior.WarriorTeleportBombAggressive
 npc bomb 22133 Monster 300 0 0 level 78 skill SELF_RANGE_DD_MAGIC 4614 8 skill SELF_RANGE_DD_MAGIC2 4489 10 skill SELF_RANGE_DD_MAGIC3 4488 10 skill TELEPORT_EFFECT 4671 1
 roll bomb 0
+gauss bomb 5
 
 tick x2
   S DeleteObject obj=bomb
@@ -24,5 +26,6 @@ advance 6s
   desires bomb cast(bomb,4489,move)=1000000
 tick x2
   S MagicSkillUse caster=bomb target=bomb skill=4489-10 hit=0 reuse=0 success=0
+  S SystemMessage id=970 0:"" 1:0
 advance 2s
   dead bomb yes
