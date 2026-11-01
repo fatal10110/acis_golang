@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // useItem handles UseItem. ctrl is the client's Ctrl modifier, carried into
@@ -886,11 +887,33 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 
 // broadcastCharacterInfo resends UserInfo to live (refreshing its own
 // visible state) and CharInfo to every client that already knows about it
-// (broadcastCharInfo).
+// (broadcastCharInfo). A polymorphed live is shown to them as its NPC form
+// instead, with no relation update.
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	l.broadcastCharInfo(live, items)
+	l.broadcastLooks(live, items)
+}
+
+// broadcastLooks shows live to every client that already knows about it:
+// its CharInfo (broadcastCharInfo), or its NPC form while it is
+// polymorphed, with no relation update.
+func (l *GameClientLink) broadcastLooks(live *livePlayer, items []*item.Instance) {
+	form := live.Polymorph()
+	if form == nil {
+		l.broadcastCharInfo(live, items)
+		return
+	}
+	if l.world == nil {
+		return
+	}
+	broadcastFrame(func() wire.Frame { return serverpackets.FramePcMorphInfo(live.Character, *form) }, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
+	})
 }
 
 // busyTrading reports whether live runs or is setting up a private store or

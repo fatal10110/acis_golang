@@ -238,7 +238,8 @@ final class ProbeParty
 
 	// The reference keeps the positions in a hash map keyed by object id, so the rows come
 	// in bucket order: ids that share a bucket (16 apart, or equal in the folded high half),
-	// ids that arrive out of bucket order, negative ids, and a party past the first resize.
+	// ids that arrive out of bucket order, negative ids, a party past the first resize, and nine ids
+	// in one bucket of 16 (the table doubles instead of treeifying).
 	private static void positionOrders() throws Exception
 	{
 		final int[][] idSets =
@@ -248,7 +249,9 @@ final class ProbeParty
 			{ 0x7fffffff, 0x10001, 0x20002, 16, 32, 48, 0x80000000, -1, 15 },
 			{ 1 },
 			{ 130, 114, 98, 82, 66, 50, 34, 18, 3, 1, 17, 33, 49 },
-			{}
+			{},
+			{ 1, 17, 33, 49, 65, 81, 97, 113, 129 },
+			{ 2, 1, 17, 33, 49, 65, 81, 97, 113, 129 }
 		};
 		final int[] v = ProbeSimple.ROWS[0];
 		for (int s = 0; s < idSets.length; s++)

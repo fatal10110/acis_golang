@@ -74,6 +74,8 @@ var oracleHashMapIDSets = [][]int32{
 	{1},
 	{130, 114, 98, 82, 66, 50, 34, 18, 3, 1, 17, 33, 49},
 	{},
+	{1, 17, 33, 49, 65, 81, 97, 113, 129},
+	{2, 1, 17, 33, 49, 65, 81, 97, 113, 129},
 }
 
 // oraclePartyCases are the party, command channel and party-matching packets

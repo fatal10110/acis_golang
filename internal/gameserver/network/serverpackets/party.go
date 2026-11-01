@@ -223,17 +223,33 @@ func FrameExMPCCShowPartyMemberInfo(members []PartyChannelMember) wire.Frame {
 // inHashMapOrder returns members in the row order of a chained hash table
 // keyed by object id and filled in slice order: ascending bucket, then
 // insertion order within a bucket. The bucket is the id with its high half
-// folded in, masked by the table size (16, doubled while the table holds more
-// than three quarters of it). It holds while no bucket collects eight
-// collisions, which a party's nine ids cannot do on a table of 16.
+// folded in, masked by the table size. The table starts at 16 and doubles when
+// it holds more than three quarters of its size, and also when a bucket reaches
+// nine nodes while the table is smaller than 64. Not modeled: a table that
+// keeps the capacity it grew to across refreshes of the same packet, and the
+// tree bin a ninth colliding node makes in a table of 64 or more.
 func inHashMapOrder(members []PartyMemberAt) []PartyMemberAt {
 	size := uint32(16)
-	for len(members) > int(size*3/4) {
-		size *= 2
-	}
 	bucket := func(id int32) uint32 {
 		h := uint32(id)
 		return (h ^ h>>16) & (size - 1)
+	}
+	inBucket := func(upTo int, b uint32) int {
+		n := 0
+		for _, m := range members[:upTo] {
+			if bucket(m.ObjectID) == b {
+				n++
+			}
+		}
+		return n
+	}
+	for i, m := range members {
+		if inBucket(i+1, bucket(m.ObjectID)) >= 9 && size < 64 {
+			size *= 2
+		}
+		if i+1 > int(size*3/4) {
+			size *= 2
+		}
 	}
 	ordered := slices.Clone(members)
 	slices.SortStableFunc(ordered, func(a, b PartyMemberAt) int {

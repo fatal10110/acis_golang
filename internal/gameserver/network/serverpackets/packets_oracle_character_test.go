@@ -117,25 +117,34 @@ func addSummonCases(m map[string]func() wire.Frame) {
 	}
 }
 
+// oracleNpc is ProbeCharacters.npc: the snapshot the probe's npc of row r
+// reads as, attackable as the row's f(9) says.
+func oracleNpc(r int, v [10]int32) npcinfo.Snapshot {
+	f := func(i int) int { return int(rowField(v, i)) }
+	return npcinfo.Snapshot{
+		ObjectID: rowField(v, 1), TemplateID: f(2), Attackable: f(9)&1 != 0,
+		X: f(3), Y: f(4), Z: f(5), Heading: f(6),
+		MAtkSpd: f(7), PAtkSpd: f(8), RunSpd: f(9), WalkSpd: f(0) ^ f(5),
+		MoveMultiplier: rowFloat(r, 0), AtkSpdMultiplier: rowFloat(r, 1),
+		CollisionRadius: rowDouble(r, 2), CollisionHeight: rowDouble(r, 3),
+		RightHand: f(4) ^ f(5), LeftHand: f(6) ^ f(7),
+		Running: f(3)&1 != 0, InCombat: f(1)&1 != 0, AlikeDead: f(2)&1 != 0,
+		SummonAnimation: 2,
+		Name:            oracleStrings[r].s, Title: oracleStrings[(r+1)%len(oracleStrings)].s,
+		AbnormalEffect: f(5), MoveType: r % 3, EnchantEffect: f(6), Flying: f(7)&1 != 0,
+	}
+}
+
 func addNpcCases(m map[string]func() wire.Frame) {
 	for r, row := range oracleRows {
 		v, n := row.v, "/"+row.name
 		f := func(i int) int { return int(rowField(v, i)) }
 		snapshot := func(attackable bool) npcinfo.Snapshot {
-			return npcinfo.Snapshot{
-				ObjectID: rowField(v, 1), TemplateID: f(2), Attackable: attackable,
-				X: f(3), Y: f(4), Z: f(5), Heading: f(6),
-				MAtkSpd: f(7), PAtkSpd: f(8), RunSpd: f(9), WalkSpd: f(0) ^ f(5),
-				MoveMultiplier: rowFloat(r, 0), AtkSpdMultiplier: rowFloat(r, 1),
-				CollisionRadius: rowDouble(r, 2), CollisionHeight: rowDouble(r, 3),
-				RightHand: f(4) ^ f(5), LeftHand: f(6) ^ f(7),
-				Running: f(3)&1 != 0, InCombat: f(1)&1 != 0, AlikeDead: f(2)&1 != 0,
-				SummonAnimation: 2,
-				Name:            oracleStrings[r].s, Title: oracleStrings[(r+1)%len(oracleStrings)].s,
-				AbnormalEffect: f(5), MoveType: r % 3, EnchantEffect: f(6), Flying: f(7)&1 != 0,
-			}
+			s := oracleNpc(r, v)
+			s.Attackable = attackable
+			return s
 		}
-		m["NpcInfo"+n] = func() wire.Frame { return FrameNPCInfo(snapshot(f(9)&1 != 0)) }
+		m["NpcInfo"+n] = func() wire.Frame { return FrameNPCInfo(oracleNpc(r, v)) }
 		server := func(attackable bool) NPCInfoSnapshot {
 			s := snapshot(attackable)
 			s.CurrentHP, s.MaxHP = f(8), f(9)
