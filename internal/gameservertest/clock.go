@@ -40,18 +40,18 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 }
 
 // AdvanceWithEffects is Advance with the production one-second effect sweep
-// running as time passes: on a driven clock it lets d pass in pieces that
-// end on every whole second of the time passed through here and ticks every
-// live effect list (TickEffects) after each whole second, so a buff, stun or
-// damage-over-time effect lands, ticks and expires on the same clock the
-// timers run on, once per elapsed second however the span is cut (the part
-// of a second left over counts toward the next call). On the wall clock the
-// real pool runs its own timers, so d passes in one Advance, as it would
-// there. The server's effect ticker is not otherwise running
-// (WithProductionTickers starts it).
+// running as time passes: it lets d pass in pieces that end on every whole
+// second of the time passed through here and ticks every live effect list
+// (TickEffects) after each whole second, so a buff, stun or damage-over-time
+// effect lands, ticks and expires on the same clock the timers run on, once
+// per elapsed second however the span is cut (the part of a second left over
+// counts toward the next call). A span a suite's pool pass would skip (see
+// Advance) is handed to Advance whole, so it is skipped there too. The
+// server's effect ticker is not otherwise running (WithProductionTickers
+// starts it).
 func (s *Server) AdvanceWithEffects(tb testing.TB, d time.Duration) {
 	tb.Helper()
-	if !s.DrivesClock() {
+	if !s.DrivesClock() && d > maxWallAdvance && s.queues.passOfSuite {
 		s.Advance(tb, d)
 		return
 	}
