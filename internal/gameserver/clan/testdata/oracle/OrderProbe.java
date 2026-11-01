@@ -77,7 +77,7 @@ public final class OrderProbe
 	 * ops <+offset | -offset, in order> => <iteration order>, offsets from 0x10000000.
 	 * The first `boot` adds ascend (the restore of the stored rows); every later add
 	 * is a war declared at runtime, in random order; removals are wars ended. Removals
-	 * stop once a tree bucket exists (its shrink back to a chain is not modeled).
+	 * stop once a tree bucket exists (treeOps removes from tree buckets).
 	 */
 	private static void ops(int boot, int later, int removals, int stride, int range) throws Exception
 	{
@@ -106,6 +106,59 @@ public final class OrderProbe
 				add(wars, ops, fresh(wars, stride, range));
 				later--;
 			}
+		}
+		print(ops, wars);
+	}
+
+	/**
+	 * ops lines that end wars in tree buckets: `boot` offsets a stride apart ascend,
+	 * `filler` offsets drawn over 0x30000 values follow (they grow the table past the
+	 * tree buckets), then `steps` times a war a stride apart is ended (`ended` times in
+	 * four) or declared.
+	 */
+	private static void treeOps(int boot, int filler, int steps, int ended, int stride, int range) throws Exception
+	{
+		final ClanCopy clan = new ClanCopy();
+		final Set<Integer> wars = field(clan, "_atWarWith");
+		final List<String> ops = new ArrayList<>();
+		final java.util.TreeSet<Integer> start = new java.util.TreeSet<>();
+		while (start.size() < boot)
+			start.add(next(range) * stride);
+		for (int offset : start)
+			add(wars, ops, offset);
+		for (int i = 0; i < filler; i++)
+			add(wars, ops, fresh(wars, 1, 0x30000));
+		final List<Integer> crowd = new ArrayList<>(start);
+		for (int i = 0; i < steps; i++)
+		{
+			if (!crowd.isEmpty() && (crowd.size() >= range / 2 || next(4) < ended))
+			{
+				final int gone = crowd.remove(next(crowd.size()));
+				wars.remove(BASE + gone);
+				ops.add("-" + gone);
+			}
+			else
+			{
+				final int offset = fresh(wars, stride, range);
+				add(wars, ops, offset);
+				crowd.add(offset);
+			}
+		}
+		print(ops, wars);
+	}
+
+	/** An ops line played as given: `+offset` declares a war, `-offset` ends one. */
+	private static void play(List<String> ops) throws Exception
+	{
+		final ClanCopy clan = new ClanCopy();
+		final Set<Integer> wars = field(clan, "_atWarWith");
+		for (String op : ops)
+		{
+			final int id = BASE + Integer.parseInt(op.substring(1));
+			if (op.charAt(0) == '+')
+				wars.add(id);
+			else
+				wars.remove(id);
 		}
 		print(ops, wars);
 	}
@@ -199,5 +252,35 @@ public final class OrderProbe
 		for (int stride : new int[] { 16, 64, 256 })
 			for (int round = 0; round < 3; round++)
 				ops(6 + round * 3, 24, 8 + round * 4, stride, 40);
+
+		// Wars ended and declared in tree buckets: a tree bucket losing an id turns
+		// back into a chain when its red-black tree is too small (root without two
+		// children, or its left child without a left child).
+		for (int stride : new int[] { 64, 128, 256, 4096 })
+			for (int round = 0; round < 4; round++)
+				treeOps(10 + round * 3, 0, 40, 2, stride, 40);
+		// The same after the table doubled past the tree buckets: a half holding all
+		// of a tree's ids keeps that tree, any other half of seven or more gets a new one.
+		for (int stride : new int[] { 128, 256, 512, 4096 })
+			for (int filler : new int[] { 90, 100 })
+				for (int ended = 2; ended <= 3; ended++)
+					treeOps(14, filler, 40, ended, stride, 40);
+		// Fourteen ids 256 apart make a tree bucket; ninety more grow the table to 256
+		// buckets with all fourteen in one half, so the bucket keeps the tree its own
+		// inserts shaped. Ending the listed wars turns it back into a chain (first
+		// line) or leaves it a tree (second) where a tree rebuilt in listing order
+		// would not, which the war declared last shows.
+		for (int[] ended : new int[][] { { 7, 0, 6, 2, 1, 3, 13 }, { 5, 8, 2, 4, 10, 3, 9, 0, 6 } })
+		{
+			final List<String> ops = new ArrayList<>();
+			for (int k = 0; k < 14; k++)
+				ops.add("+" + k * 256);
+			for (int offset = 1; offset <= 90; offset++)
+				ops.add("+" + offset);
+			for (int k : ended)
+				ops.add("-" + k * 256);
+			ops.add("+" + 14 * 256);
+			play(ops);
+		}
 	}
 }

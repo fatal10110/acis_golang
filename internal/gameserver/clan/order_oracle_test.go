@@ -29,7 +29,8 @@ func parseIDs(t *testing.T, s string) []int32 {
 // "war ids => order" covers sets from one clan to a hundred, which grow the
 // table through 32, 64, 128 and 256 buckets; "ops +id,-id => order" plays
 // wars declared and ended after the boot, with crowded buckets that grow the
-// table early or turn into trees; "sub types => order" every subset of the
+// table early or turn into trees, and tree buckets that lose ids and turn
+// back into chains or stay trees; "sub types => order" every subset of the
 // seven sub-unit types.
 func TestRegistryOrderMatchesReferenceProbe(t *testing.T) {
 	f, err := os.Open("testdata/order.golden")
@@ -38,7 +39,8 @@ func TestRegistryOrderMatchesReferenceProbe(t *testing.T) {
 	}
 	defer f.Close()
 
-	wars, subs, ops, trees := 0, 0, 0, 0
+	wars, subs, ops := 0, 0, 0
+	var trees treeCounts
 	sc := bufio.NewScanner(f)
 	sc.Buffer(nil, 1<<20)
 	for line := 1; sc.Scan(); line++ {
@@ -86,9 +88,19 @@ func TestRegistryOrderMatchesReferenceProbe(t *testing.T) {
 	if wars == 0 || subs == 0 || ops == 0 {
 		t.Fatal("golden is missing a section")
 	}
-	if trees == 0 {
+	if trees.lines == 0 {
 		t.Fatal("golden never crowds a bucket into a tree")
 	}
+	if trees.chained == 0 || trees.kept == 0 || trees.addedAfterKept == 0 {
+		t.Fatalf("golden misses a removal from a tree bucket: %+v", trees)
+	}
+}
+
+// treeCounts tallies what the "ops" lines do to tree buckets: lines ending
+// with one, removals that turn one back into a chain or leave it a tree, and
+// ids added to a tree bucket that has lost an id before.
+type treeCounts struct {
+	lines, chained, kept, addedAfterKept int
 }
 
 // opsBase is the id the "ops" golden lines count their offsets from.
@@ -96,18 +108,37 @@ const opsBase = 0x10000000
 
 // replayOps plays one "ops" golden line, "+offset" declaring a war and
 // "-offset" ending one, against a warSet and compares its listing.
-func replayOps(t *testing.T, line int, ops, order string, trees *int) {
+func replayOps(t *testing.T, line int, ops, order string, trees *treeCounts) {
 	t.Helper()
 	var set warSet
+	shrunk := map[int32]bool{} // ids of tree buckets that have lost an id
 	for _, op := range strings.Split(ops, ",") {
 		n, err := strconv.ParseInt(op[1:], 10, 32)
 		if err != nil || (op[0] != '+' && op[0] != '-') {
 			t.Fatalf("malformed op %q on golden line %d", op, line)
 		}
-		if id := int32(opsBase + n); op[0] == '+' {
+		id := int32(opsBase + n)
+		if op[0] == '+' {
+			if set.table != nil && !set.has(id) {
+				if bin := set.table[set.index(id)]; bin.root != nil && slices.ContainsFunc(bin.ids, func(m int32) bool { return shrunk[m] }) {
+					trees.addedAfterKept++
+				}
+			}
 			set.add(id)
+			continue
+		}
+		wasTree := set.has(id) && set.table[set.index(id)].root != nil
+		set.remove(id)
+		if !wasTree {
+			continue
+		}
+		if bin := set.table[set.index(id)]; bin.root != nil {
+			trees.kept++
+			for _, m := range bin.ids {
+				shrunk[m] = true
+			}
 		} else {
-			set.remove(id)
+			trees.chained++
 		}
 	}
 	var want []int32
@@ -119,7 +150,7 @@ func replayOps(t *testing.T, line int, ops, order string, trees *int) {
 	if got := set.order(); !slices.Equal(got, want) {
 		t.Errorf("line %d: order after %s = %v, want %v", line, ops, got, want)
 	}
-	if slices.ContainsFunc(set.table, func(b warBin) bool { return b.tree }) {
-		*trees++
+	if slices.ContainsFunc(set.table, func(b warBin) bool { return b.root != nil }) {
+		trees.lines++
 	}
 }

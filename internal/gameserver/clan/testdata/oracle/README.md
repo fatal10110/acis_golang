@@ -23,9 +23,18 @@ Line formats:
   goes to the tail of its bucket) and `-` are wars ended (the table never shrinks). Strides of
   16 to 4096 between the ids crowd buckets: past eight ids a bucket makes a table of fewer than
   64 buckets grow early, and from 64 buckets it becomes a tree bucket (newest id first). The
-  probe stops removing once a tree bucket exists (read through reflection, hence
-  `--add-opens` in `run.sh`): a tree bucket that has shrunk turns back into a chain depending
-  on the shape of its tree, which `warSet` does not model (tracked in #4362).
+  random lines of `ops(...)` stop removing once a tree bucket exists (read through
+  reflection, hence `--add-opens` in `run.sh`); the `treeOps(...)` lines and the two fixed
+  lines at the end then end and declare wars in tree buckets. A tree bucket (a JDK 21
+  `ConcurrentHashMap.TreeBin`) losing an id turns back into a chain when
+  `root.right == null || root.left == null || root.left.left == null` holds before the
+  red-black unlink (`TreeBin.removeTreeNode` returning true, then `untreeify(first)`), so the
+  shape of the tree (insertion order, `balanceInsertion`/`balanceDeletion`) decides it. A war
+  declared after that lands at the front of the bucket (still a tree) or its tail (a chain).
+  The two fixed lines grow a 256-bucket table past a tree bucket whose ids all stay in one
+  half: `transfer` keeps that `TreeBin` as it is (`(hc != 0) ? new TreeBin<K,V>(lo) : t`),
+  and the shrink then chains (first line) or keeps the tree (second) where a tree rebuilt in
+  listing order would not.
 - `sub <types, ascending> => <iteration order of the registry>`: every subset of the seven
   sub-unit types.
 
