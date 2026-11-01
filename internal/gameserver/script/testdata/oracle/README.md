@@ -114,6 +114,13 @@ what the reference does in the scenario's own world:
 - an NPC the scenario kills or hits is made the Go runner's fixture monster of the NPC line's
   type: level 1 (the NPC line's level option, if any), 1000 HP, no experience, SP, drops, skills, minions or aggression, its script
   bindings kept. The templates get their own values back once the scenario is over;
+- an NPC line's skill options replace the template's skills with those alone (the Go runner's
+  template lists them and nothing else), whether the NPC is fought or not; the line's roll is
+  not read: the reference draws a cast's landing from its seeded generator, and the trace shows
+  the outcome the Go run's pin must reproduce;
+- the datapack's npcmakers (loaded, never spawned here) are taken out of the spawn manager while
+  a scenario plays, so a script's spawn lookup finds the scenario's spawns alone, as it does in the
+  Go runner's world;
 - a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes

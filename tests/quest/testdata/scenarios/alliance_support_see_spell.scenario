@@ -4,7 +4,9 @@
 # is not allied with, wants nothing. The footman then petrifies the ally. Each soldier lists the
 # curse, which a scenario monster needs to cast it. The cast of a summon is in
 # tests/quest/alliance_support_test.go. The footman's combat draws are pinned so the curse lands.
-# Expectations are derived from the reference source (onSeeSpell).
+# Untraced: the reference probe plays no cast by the character nor desires expectation (a
+# monster's own cast is traced in alliance_support_petrify_cast.scenario). Expectations are
+# derived from the reference source (onSeeSpell).
 character Ally 40
 standing 1
 skill 75 1
