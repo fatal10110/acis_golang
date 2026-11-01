@@ -54,11 +54,11 @@ func (l *GameClientLink) clearSpawnProtectionOnAction(live *livePlayer) {
 }
 
 // refreshSpawnProtection shows live's protection change: its own UserInfo
-// to live, while its session is attached, and its CharInfo to every player
+// to live, while its session is attached, and its looks to every player
 // around it, so they see the blue team marker come and go.
 func (l *GameClientLink) refreshSpawnProtection(live *livePlayer) {
 	live.UpdateUserInfo()
-	l.broadcastCharInfo(live, live.inventoryItems())
+	l.broadcastLooks(live, live.inventoryItems())
 }
 
 // spawnProtectedTeam reports whether live is drawn in the blue team: it is

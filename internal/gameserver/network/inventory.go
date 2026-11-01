@@ -892,20 +892,28 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	if form := live.Polymorph(); form != nil {
-		if l.world == nil {
-			return
-		}
-		broadcastFrame(func() wire.Frame { return serverpackets.FramePcMorphInfo(live.Character, *form) }, func(send func(frameReceiver)) {
-			l.world.ForEachKnown(live, func(o world.Tracked) {
-				if receiver, ok := o.(frameReceiver); ok {
-					send(receiver)
-				}
-			})
-		})
+	l.broadcastLooks(live, items)
+}
+
+// broadcastLooks shows live to every client that already knows about it:
+// its CharInfo (broadcastCharInfo), or its NPC form while it is
+// polymorphed, with no relation update.
+func (l *GameClientLink) broadcastLooks(live *livePlayer, items []*item.Instance) {
+	form := live.Polymorph()
+	if form == nil {
+		l.broadcastCharInfo(live, items)
 		return
 	}
-	l.broadcastCharInfo(live, items)
+	if l.world == nil {
+		return
+	}
+	broadcastFrame(func() wire.Frame { return serverpackets.FramePcMorphInfo(live.Character, *form) }, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
+	})
 }
 
 // busyTrading reports whether live runs or is setting up a private store or
