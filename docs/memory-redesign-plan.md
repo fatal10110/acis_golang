@@ -265,11 +265,11 @@ Options:
 | Option | What changes | Memory beyond P2+P3 | Verdict |
 |---|---|---|---|
 | A. Whole world in ark | Per-actor queues become phased systems (move → AI → combat → effects → network), parallelised by spatial partition. Region entities and ark relations split archetypes so partitions never touch the same entity. | ~1–1.5 KB/NPC: no per-object allocation headers or size-class rounding, no ~16 per-object mutexes, dense columns. About 35–50 MB at 35k NPCs. | **No.** Rewrites sim, AI, scripts and network sinks. Every send-order guarantee would need re-proving against Java. The gain is about 10% of what P1–P3 deliver. |
-| B. ark as a single-owner dormant-NPC store, with P7 | One goroutine owns a World of dormant NPCs: components `{Slot, Template, Position, Heading, ObjectID}` plus a relation to their region entity. When a region activates, query by relation target and batch-hydrate into full actors. Single ownership sidesteps the thread-safety issue. | ~9 KB → ~150–200 B per dormant NPC | **Planned:** [dormant-npc-ark-plan.md](dormant-npc-ark-plan.md). It resolves the P7 blockers: timers run against a dormant handle with an escape hatch, lookups go through one resolver, and a measurement go/no-go gate comes first. |
+| B. ark as a single-owner dormant-NPC store, with P7 | One goroutine owns a World of dormant NPCs: components `{Slot, Template, Position, Heading, ObjectID}` plus a relation to their region entity. When a region activates, query by relation target and batch-hydrate into full actors. Single ownership sidesteps the thread-safety issue. | ~9 KB → ~150–200 B per dormant NPC | **Shelved, see #4392.** Two port-reviewer passes found the dormant-NPC design unsound: per-life parts are wired at spawn and can't be rebuilt from the template, threat/hate/desire tables are written from other queues, desires survive deactivation so few NPCs qualify, and ark had no remaining role. Revisit only from #4392 measurements. |
 | C. Plain struct-of-arrays columns for the sweeps, no library | AI tick and regen sweep read `{region, sleep latch, territory decision, regen phase}` from dense slices indexed by a slot id. | small | **Optional, for CPU** (#4388, #4390) more than memory. |
 
-Conclusion: ark does not fit as the core model. It is the right tool if P7 is ever done (option B),
-because there one owner, batch operations and relations are exactly what's needed.
+Conclusion: ark does not fit as the core model, and the dormant-NPC store (option B) is shelved
+after two reviews (#4392 tracks the measurements that would justify revisiting dormancy).
 
 ## 4. Libraries considered
 
@@ -283,7 +283,7 @@ because there one owner, batch operations and relations are exactly what's neede
 | `github.com/klauspost/compress` (zstd/s2) | compress geodata | Reject: no O(1) cell access; the lossless bit-packed encoding (P1b) already gets −61% |
 | `github.com/RussellLuo/timingwheel` | timers (P5) | Reject: a goroutine per expiry, a `Timer` allocation per `AfterFunc`, no `Reset`, unsynchronized re-arm write. Any single-ticker wheel also rounds deadlines (client-visible), see P5. |
 | `github.com/thinkgos/timer` | timers (P5) | Reject: no `Reset`, a new entry per add, adds the `ants` dependency and a goroutine hand-off per expiry, `Periodic` rounds up to 1 s |
-| `github.com/mlange-42/ark` (ECS) | NPC storage | Core model: reject (not thread-safe, structural moves, ~10% of the P1–P3 gain for a full rewrite). As a single-owner dormant-NPC store with P7: candidate (§P8 option B). |
+| `github.com/mlange-42/ark` (ECS) | NPC storage | Core model: reject (not thread-safe, structural moves, ~10% of the P1–P3 gain for a full rewrite). As a dormant-NPC store: shelved after review (§P8 option B, #4392). |
 | `github.com/RoaringBitmap/roaring` | compressed int sets | Skip: no large id sets found on the heap |
 | stdlib `weak` | caches | Skip: no cache that may drop entries |
 | `GOEXPERIMENT=arenas` | bulk allocation | Reject: abandoned upstream |
