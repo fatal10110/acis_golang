@@ -8,15 +8,45 @@ on:
 
 permissions: {}
 
+# One deploy at a time; a newer main run replaces a queued older one.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - name: Trigger deploy webhook
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      # Built here so the 4 GB production box never compiles next to the
+      # running gameserver.
+      - name: Build binaries
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
         run: |
-          status=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://deploy.iterharbor.com/deploy \
-            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}")
-          echo "webhook status: $status"
-          [ "$status" = "202" ]
+          go build -trimpath -o dist/gameserver ./cmd/gameserver
+          go build -trimpath -o dist/loginserver ./cmd/loginserver
+      # The webhook answers after the swap and restart, so a failed deploy
+      # fails this job. The gameserver stop can take up to 240s.
+      - name: Upload and deploy
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          curl -sS --fail-with-body --max-time 600 -X POST https://deploy.iterharbor.com/deploy \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" \
+            -H "X-Deploy-Commit: $COMMIT" \
+            -F gameserver=@dist/gameserver \
+            -F loginserver=@dist/loginserver

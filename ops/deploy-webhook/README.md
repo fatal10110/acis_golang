@@ -4,12 +4,17 @@ Separate module (own `go.mod`, excluded from the main `acis_golang` module's bui
 is server ops tooling, not game code.
 
 Runs on the production Hetzner box as `acis-deploy-webhook.service`, bound to `127.0.0.1:8080`
-behind Caddy (TLS at `deploy.iterharbor.com`). On a valid `Authorization: Bearer $DEPLOY_TOKEN`
-POST to `/deploy`, it pulls `main`, rebuilds `gameserver`/`loginserver`, and restarts both services
-— only swapping binaries if the build succeeds, so a broken build never touches the running server.
+behind Caddy (TLS at `deploy.iterharbor.com`).
 
-Triggered by `.github/workflows/deploy.yml` after the `Go` workflow passes on `main`. See
-[`docs/ops/hetzner-server.md`](../../../docs/ops/hetzner-server.md) for the full server setup.
+`.github/workflows/deploy.yml` runs after the `Go` workflow passes on `main`. It builds
+`gameserver`/`loginserver` on the GitHub runner and POSTs them as multipart fields `gameserver` and
+`loginserver` to `/deploy` with `Authorization: Bearer $DEPLOY_TOKEN`. The webhook stages both
+uploads as `<name>.new` in `BIN_DIR` (default `/opt/acis`), renames them into place only when both
+arrived intact, restarts `acis-loginserver` then `acis-gameserver`, and answers `200` once that is
+done, so a failed deploy fails the workflow. A second deploy while one runs gets `409`.
+
+Nothing is compiled on the server: the box has 4 GB of RAM and the gameserver alone uses about half,
+so an on-box `go build` pushed it into the OOM killer.
 
 Build and deploy a change to this file itself:
 
