@@ -20,6 +20,18 @@ type Maker struct {
 	run *makerRun
 }
 
+// SendSelf sends the maker's own npcmaker the script event e, as a maker
+// does through its npcmaker: World.Heard is told of it, then the maker's
+// ScriptEvent hook runs. A maker running its own hook directly through
+// ScriptEvent (a device resolving its own state) is not a send and is not
+// told to Heard.
+func (m *Maker) SendSelf(e MakerEvent) {
+	if heard := m.world.Heard; heard != nil {
+		heard(e.Group.Maker().Name, e.Name, e.Int1, e.Int2)
+	}
+	m.ScriptEvent(m, e)
+}
+
 // IsNight reports whether it is night in the game world (00:00 to 05:59
 // game time).
 func (m *Maker) IsNight() bool { return m.world.Night() }

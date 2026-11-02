@@ -14,7 +14,7 @@ func UniqueNpcKillEvent() script.Maker {
 			if uniqueSpawn(e.Group, e.Spawn) {
 				switch memoInt(e.Group, "event") {
 				case 0:
-					m.ScriptEvent(m, script.MakerEvent{Group: e.Group, Name: "1000"})
+					m.SendSelf(script.MakerEvent{Group: e.Group, Name: "1000"})
 				case 1:
 					sendNamed(e.Group, "maker_name", "1001", 0, 0)
 				}

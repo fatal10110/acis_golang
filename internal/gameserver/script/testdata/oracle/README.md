@@ -196,8 +196,9 @@ what the reference does in the scenario's own world:
   and a maker sending to another), which tells the trace before the maker's script runs. The
   unqualified calls and the calls on the parent class (`super.onMakerScriptEvent`) are a maker's
   own dispatch, not sends, and are not traced; the Go run records the same sends at the maker
-  group's event entry, so a maker sending to its own group in a way the reference writes as
-  `maker.getMaker()...` is outside what a scenario can compare. The Go run compares them per
+  group's event entry, and a maker sending to its own group (the reference writes
+  `maker.getMaker()...`) through `Maker.SendSelf`; a maker's own unqualified dispatch stays
+  untraced on both sides. The Go run compares them per
   step as an ordered list (a deletion then a spawn is not the other way round); the maker is
   named as the `npcmaker` line writes it, the event and the two integers as numbers;
 - an NPC line's `corpse <seconds>` option sets the template corpse time on the reference's

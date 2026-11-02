@@ -10,7 +10,7 @@ func InstantSpawn() script.Maker {
 	return script.Maker{MakerHooks: base.With(script.MakerHooks{
 		OnNPCDeleted: func(m *script.Maker, e script.MakerNPC) {
 			if e.Group.Alive() == 0 {
-				m.ScriptEvent(m, script.MakerEvent{Group: e.Group, Name: "1001"})
+				m.SendSelf(script.MakerEvent{Group: e.Group, Name: "1001"})
 			}
 		},
 	})}
