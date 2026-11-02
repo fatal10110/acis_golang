@@ -66,10 +66,16 @@ jobs:
       # take up to 240s.
       - name: Deploy
         env:
+          # Full webhook URL; a secret so the deploy host stays out of the
+          # public repo and logs.
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
-          curl -sS --fail-with-body --max-time 600 -X POST https://deploy.iterharbor.com/deploy \
+          # Only the whole secret is masked; curl errors print the bare host.
+          host=${DEPLOY_URL#*://}
+          echo "::add-mask::${host%%/*}"
+          curl -sS --fail-with-body --max-time 600 -X POST "$DEPLOY_URL" \
             -H "Authorization: Bearer $DEPLOY_TOKEN" \
             -H "X-Deploy-Tag: $TAG"
       - name: Prune old releases

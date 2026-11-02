@@ -4,7 +4,8 @@ Separate module (own `go.mod`, excluded from the main `acis_golang` module's bui
 is server ops tooling, not game code.
 
 Runs on the production Hetzner box as `acis-deploy-webhook.service`, bound to `127.0.0.1:8080`
-behind Caddy (TLS at `deploy.iterharbor.com`).
+behind Caddy for TLS. The public webhook URL is the `DEPLOY_URL` repository secret, so the deploy
+host never appears in the repository or workflow logs.
 
 `.github/workflows/deploy.yml` runs after the `Go` workflow passes on `main`. It builds
 `gameserver`/`loginserver` on the GitHub runner and publishes them, with a `SHA256SUMS` file, as a
