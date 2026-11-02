@@ -12,6 +12,12 @@ public final class GameClient extends MMOClient<MMOConnection<GameClient>>
 {
 	public CharSelectSlot[] slots;
 	public Player player;
+	public boolean detached;
+
+	public boolean isDetached()
+	{
+		return detached;
+	}
 
 	public GameClient()
 	{
