@@ -8,15 +8,80 @@ on:
 
 permissions: {}
 
+# One deploy at a time; a newer main run replaces a queued older one.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  # Deploy releases kept on GitHub; older ones are pruned with their tags.
+  KEEP_RELEASES: 30
+
 jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      # Creates the release and its tag.
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
-      - name: Trigger deploy webhook
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      # Built here so the 4 GB production box never compiles next to the
+      # running gameserver.
+      - name: Build binaries
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
         run: |
-          status=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://deploy.iterharbor.com/deploy \
-            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}")
-          echo "webhook status: $status"
-          [ "$status" = "202" ]
+          go build -trimpath -o dist/gameserver ./cmd/gameserver
+          go build -trimpath -o dist/loginserver ./cmd/loginserver
+          (cd dist && sha256sum gameserver loginserver > SHA256SUMS)
+      # One release per commit, tagged deploy-<sha>. A re-run replaces the
+      # assets of the existing release.
+      - name: Publish release
+        id: release
+        run: |
+          tag="deploy-${SHA:0:12}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* --target "$SHA" --prerelease --latest=false \
+              --title "$tag" --notes "$(git log -1 --format='%s%n%n%H' "$SHA")"
+          fi
+      # The server pulls the release assets itself and answers after the swap
+      # and restart, so a failed deploy fails this job; the gameserver stop can
+      # take up to 240s.
+      - name: Deploy
+        env:
+          # Full webhook URL; a secret so the deploy host stays out of the
+          # public repo and logs.
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          # Only the whole secret is masked; curl errors print the bare host.
+          host=${DEPLOY_URL#*://}
+          echo "::add-mask::${host%%/*}"
+          curl -sS --fail-with-body --max-time 600 -X POST "$DEPLOY_URL" \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" \
+            -H "X-Deploy-Tag: $TAG"
+      - name: Prune old releases
+        run: |
+          gh release list --limit 200 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("deploy-"))] | sort_by(.createdAt) | reverse | .[env.KEEP_RELEASES | tonumber:] | .[].tagName' |
+            while read -r tag; do
+              gh release delete "$tag" --cleanup-tag --yes
+            done
