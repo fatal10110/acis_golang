@@ -1,0 +1,13 @@
+# A monster whose corpse lasts 2 seconds (the corpse option, set on the reference's template as on the
+# runner's): killed, it dies and, within the kill step's 3.5 seconds, its corpse decays and the world
+# is told, which the trace compares. Without a corpse option the fixture's corpse time is not the
+# shipped one and the decay is not compared.
+trace internal/gameserver/script/testdata/oracle/scenarios/kill_corpse_decay.golden
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+npc rex 22215 Monster 100 0 0 corpse 2
+
+kill rex
+  S SystemMessage id=95 1:0 1:0
+  S DeleteObject obj=rex

@@ -105,6 +105,26 @@ func (r *run) maker(t *testing.T, tr Territory) *spawn.Maker {
 	return spawn.NewMaker(spawn.Maker{Name: "scenario_" + tr.Name, Territories: []*spawn.Territory{territory}, AIType: "default_maker", MaximumNPCs: 1}, 1)
 }
 
+// npcMakerTable is the spawn list of the npcmaker lines: each maker runs
+// the script of its AI type and spawns nothing. The table needs a territory,
+// which no maker spawns in.
+func npcMakerTable(t *testing.T, lines []NpcMaker) *spawn.Table {
+	t.Helper()
+	territory, err := spawn.NewTerritory("scenario_npcmakers", 0, 0, []spawn.Node{{X: 0, Y: 0}, {X: 1, Y: 0}, {X: 1, Y: 1}, {X: 0, Y: 1}})
+	if err != nil {
+		t.Fatalf("npcmaker territory: %v", err)
+	}
+	makers := make([]*spawn.Maker, len(lines))
+	for i, m := range lines {
+		makers[i] = spawn.NewMaker(spawn.Maker{Name: m.Name, Territories: []*spawn.Territory{territory}, AIType: m.AIType, MaximumNPCs: 1}, 1)
+	}
+	table, err := spawn.NewTable([]*spawn.Territory{territory}, makers)
+	if err != nil {
+		t.Fatalf("npcmaker table: %v", err)
+	}
+	return table
+}
+
 // lay lays ground line g's item at its offset from the character, owned by
 // no one, and names it by its role.
 func (r *run) lay(t *testing.T, g Ground) {

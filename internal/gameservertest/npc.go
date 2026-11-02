@@ -141,7 +141,7 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
 	s.installZones(hostile)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems, s.decay)
 	rt := npc.Runtime{
 		World:   s.State,
 		Items:   s.itemTable,
@@ -471,7 +471,7 @@ func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at
 	control.hostile, control.move = hostile, moveCtl
 	s.hostileControls.Store(hostile, control)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems, s.decay)
 	rt := npc.Runtime{
 		World:   s.State,
 		Items:   s.itemTable,

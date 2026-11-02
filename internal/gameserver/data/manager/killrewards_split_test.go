@@ -193,7 +193,7 @@ func TestRewarderTreatsGrandBossAsRaid(t *testing.T) {
 			t.Fatal(err)
 		}
 		hostile := &npc.Hostile{Instance: inst}
-		rewards, _ := NewHostileRewarder(hostile, tmpl, nil, KillRewardConfig{}, nil, nil, nil)
+		rewards, _ := NewHostileRewarder(hostile, tmpl, nil, KillRewardConfig{}, nil, nil, nil, nil)
 		if got := rewards.(*deathRewards).raid; got != tc.raid {
 			t.Errorf("%s: raid = %v, want %v", tc.kind, got, tc.raid)
 		}

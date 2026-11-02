@@ -21,13 +21,13 @@ S ActionFailed 25
 // receiver and the object ids among the arguments named by role.
 func TestCheckTraceReadsTheEventsNPCsHeard(t *testing.T) {
 	sc := traceScenario(t, "event wolf 7 character 0\n  S ActionFailed\n")
-	_, heard, err := checkTrace(sc, []byte(heardTrace), nil)
+	_, seen, err := checkTrace(sc, []byte(heardTrace), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := [][]string{{"wolf 9 player 0", "20121 9 wolf -3"}}
-	if len(heard) != 1 || !slices.Equal(heard[0], want[0]) {
-		t.Errorf("heard = %q, want %q", heard, want)
+	if len(seen) != 1 || !slices.Equal(seen[0].heard, want[0]) {
+		t.Errorf("heard = %q, want %q", seen, want)
 	}
 }
 
@@ -47,7 +47,7 @@ func TestCheckTraceRejectsABadHeardLine(t *testing.T) {
 // The events heard in a step are compared as a set: the order the NPCs
 // around a broadcast hear it in is not the reference's.
 func TestTraceHeardDiff(t *testing.T) {
-	trace := [][]string{{"a 1 0 0", "b 1 0 0"}}
+	trace := []traceSeen{{heard: []string{"a 1 0 0", "b 1 0 0"}}}
 	if d := traceHeardDiff(trace, 0, []string{"b 1 0 0", "a 1 0 0"}); d != "" {
 		t.Errorf("same events in another order differ: %s", d)
 	}

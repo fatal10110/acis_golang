@@ -135,6 +135,8 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict":                                                             royalrush.Afflict,
 	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc":                                                          royalrush.DefaultNpc,
 	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushKeyBox":                                                              royalrush.KeyBox,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox1":                                 royalrush.TriggerBox1,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBoxBase":                              royalrush.TriggerBoxBase,
 	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox":                                                          royalrush.TreasureBox,
 	"script.ai.individual.RoyalRushMissionNpc":                                                                              individual.RoyalRushMissionNpc,
 	"script.ai.individual.RoyalRushNpc":                                                                                     individual.RoyalRushNpc,
