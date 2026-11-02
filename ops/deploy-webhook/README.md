@@ -7,21 +7,26 @@ Runs on the production Hetzner box as `acis-deploy-webhook.service`, bound to `1
 behind Caddy (TLS at `deploy.iterharbor.com`).
 
 `.github/workflows/deploy.yml` runs after the `Go` workflow passes on `main`. It builds
-`gameserver`/`loginserver` on the GitHub runner, uploads them as the `deploy-binaries` artifact, and
-POSTs to `/deploy` with:
+`gameserver`/`loginserver` on the GitHub runner and publishes them, with a `SHA256SUMS` file, as a
+prerelease tagged `deploy-<first 12 chars of the commit sha>` on that commit. It then POSTs to
+`/deploy` with `Authorization: Bearer $DEPLOY_TOKEN` and `X-Deploy-Tag: <tag>`, and prunes deploy
+releases beyond the newest 30 (`KEEP_RELEASES`).
 
-| Header | Value |
-| --- | --- |
-| `Authorization` | `Bearer $DEPLOY_TOKEN` |
-| `X-Deploy-Run` | the Deploy run id |
-| `X-GitHub-Token` | the job's `GITHUB_TOKEN` (`actions: read`), which expires when the job ends |
+The webhook downloads the release assets from
+`https://github.com/$GITHUB_REPO/releases/download/<tag>/` (public, no GitHub credential on the
+server; `GITHUB_REPO` defaults to `fatal10110/acis_golang`). It saves each binary as `<name>.new` in
+`BIN_DIR` (default `/opt/acis`), checks it is an ELF file matching its `SHA256SUMS` entry, renames
+both into place only when both verified, restarts `acis-loginserver` then `acis-gameserver`, and
+answers `200` once that is done, so a failed deploy fails the workflow. A second deploy while one
+runs gets `409`.
 
-The webhook pulls the artifact from the GitHub API with that job token, so the server holds no
-GitHub credential of its own. It refuses runs that are not `.github/workflows/deploy.yml` on `main`,
-extracts both binaries as `<name>.new` in `BIN_DIR` (default `/opt/acis`), renames them into place
-only when both extracted intact, restarts `acis-loginserver` then `acis-gameserver`, and answers
-`200` once that is done, so a failed deploy fails the workflow. A second deploy while one runs gets
-`409`. `GITHUB_REPO` (default `fatal10110/acis_golang`) names the repository to pull from.
+Roll back (or deploy any kept commit) from the server by naming its tag:
+
+```bash
+ssh hetzner 'curl -sS --fail-with-body -X POST 127.0.0.1:8080/deploy \
+  -H "Authorization: Bearer $(systemctl show -p Environment --value acis-deploy-webhook | tr " " "\n" | sed -n "s/^DEPLOY_TOKEN=//p")" \
+  -H "X-Deploy-Tag: deploy-<sha12>"'
+```
 
 Nothing is compiled on the server: the box has 4 GB of RAM and the gameserver alone uses about half,
 so an on-box `go build` pushed it into the OOM killer.

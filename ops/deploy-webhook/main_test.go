@@ -1,145 +1,132 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
-	"encoding/json"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
-func artifactZip(t *testing.T, files map[string]string) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for name, content := range files {
-		fw, err := zw.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fw.Write([]byte(content))
-	}
-	zw.Close()
-	return buf.Bytes()
+func sha(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }
 
-// fakeGitHub serves one run (42) and its artifact, whose download redirects to
-// a separate storage host like the real API does.
-func fakeGitHub(t *testing.T, run map[string]string, zipBody []byte) *httptest.Server {
+// sumsFor renders sha256sum output for the given assets.
+func sumsFor(assets map[string]string) string {
+	var b strings.Builder
+	for name, content := range assets {
+		fmt.Fprintf(&b, "%s  %s\n", sha(content), name)
+	}
+	return b.String()
+}
+
+// fakeReleases serves the assets of release "deploy-abc" the way GitHub does:
+// the download URL redirects to a separate storage host.
+func fakeReleases(t *testing.T, assets map[string]string) *httptest.Server {
 	t.Helper()
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "" {
-			t.Error("job token leaked to the storage host")
+		content, ok := assets[strings.TrimPrefix(r.URL.Path, "/")]
+		if !ok {
+			http.NotFound(w, r)
+			return
 		}
-		w.Write(zipBody)
+		w.Write([]byte(content))
 	}))
 	t.Cleanup(storage.Close)
-
-	mux := http.NewServeMux()
-	var api *httptest.Server
-	authed := func(h http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get("Authorization") != "Bearer job-token" {
-				http.Error(w, "bad credentials", http.StatusUnauthorized)
-				return
-			}
-			h(w, r)
+	web := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name, ok := strings.CutPrefix(r.URL.Path, "/o/r/releases/download/deploy-abc/")
+		if !ok {
+			http.NotFound(w, r)
+			return
 		}
-	}
-	mux.HandleFunc("GET /repos/o/r/actions/runs/42", authed(func(w http.ResponseWriter, _ *http.Request) {
-		json.NewEncoder(w).Encode(run)
+		http.Redirect(w, r, storage.URL+"/"+name, http.StatusFound)
 	}))
-	mux.HandleFunc("GET /repos/o/r/actions/runs/42/artifacts", authed(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("name") != artifactName {
-			t.Errorf("artifact name = %q", r.URL.Query().Get("name"))
-		}
-		json.NewEncoder(w).Encode(map[string]any{"artifacts": []map[string]any{
-			{"archive_download_url": api.URL + "/zip", "expired": false},
-		}})
-	}))
-	mux.HandleFunc("GET /zip", authed(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, storage.URL+"/blob", http.StatusFound)
-	}))
-	api = httptest.NewServer(mux)
-	t.Cleanup(api.Close)
-	return api
+	t.Cleanup(web.Close)
+	return web
 }
 
 func TestDeploy(t *testing.T) {
 	const old = "\x7fELF old"
-	goodRun := map[string]string{"path": deployWorkflow, "head_branch": "main", "head_sha": "abc123"}
-	goodZip := map[string]string{"gameserver": "\x7fELF gs", "loginserver": "\x7fELF ls"}
+	good := map[string]string{"gameserver": "\x7fELF gs", "loginserver": "\x7fELF ls"}
+	withSums := func(bins map[string]string, sums string) map[string]string {
+		assets := map[string]string{sumsAsset: sums}
+		maps.Copy(assets, bins)
+		return assets
+	}
 	tests := []struct {
 		name     string
 		token    string
-		ghToken  string
-		run      map[string]string
-		zip      map[string]string
+		tag      string
+		assets   map[string]string
 		code     int
 		swapped  bool
 		restarts []string
 	}{
 		{
-			name:     "deploy run on main swaps and restarts in order",
+			name:     "verified release swaps and restarts in order",
 			token:    "secret",
-			ghToken:  "job-token",
-			run:      goodRun,
-			zip:      goodZip,
+			tag:      "deploy-abc",
+			assets:   withSums(good, sumsFor(good)),
 			code:     http.StatusOK,
 			swapped:  true,
 			restarts: services,
 		},
 		{
-			name:    "wrong deploy token",
-			token:   "nope",
-			ghToken: "job-token",
-			run:     goodRun,
-			zip:     goodZip,
-			code:    http.StatusUnauthorized,
+			name:   "wrong deploy token",
+			token:  "nope",
+			tag:    "deploy-abc",
+			assets: withSums(good, sumsFor(good)),
+			code:   http.StatusUnauthorized,
 		},
 		{
-			name:    "rejected job token",
-			token:   "secret",
-			ghToken: "stale",
-			run:     goodRun,
-			zip:     goodZip,
-			code:    http.StatusBadGateway,
+			name:   "tag with a path in it",
+			token:  "secret",
+			tag:    "../../evil/releases/download/x",
+			assets: withSums(good, sumsFor(good)),
+			code:   http.StatusBadRequest,
 		},
 		{
-			name:    "run from another workflow",
-			token:   "secret",
-			ghToken: "job-token",
-			run:     map[string]string{"path": ".github/workflows/go.yml", "head_branch": "main"},
-			zip:     goodZip,
-			code:    http.StatusBadGateway,
+			name:   "unknown release",
+			token:  "secret",
+			tag:    "deploy-zzz",
+			assets: withSums(good, sumsFor(good)),
+			code:   http.StatusBadGateway,
 		},
 		{
-			name:    "run on another branch",
-			token:   "secret",
-			ghToken: "job-token",
-			run:     map[string]string{"path": deployWorkflow, "head_branch": "feature"},
-			zip:     goodZip,
-			code:    http.StatusBadGateway,
+			name:   "binary does not match its checksum",
+			token:  "secret",
+			tag:    "deploy-abc",
+			assets: withSums(map[string]string{"gameserver": "\x7fELF gs", "loginserver": "\x7fELF tampered"}, sumsFor(good)),
+			code:   http.StatusBadGateway,
 		},
 		{
-			name:    "artifact missing a binary",
-			token:   "secret",
-			ghToken: "job-token",
-			run:     goodRun,
-			zip:     map[string]string{"gameserver": "\x7fELF gs"},
-			code:    http.StatusBadGateway,
+			name:   "release missing a binary",
+			token:  "secret",
+			tag:    "deploy-abc",
+			assets: withSums(map[string]string{"gameserver": "\x7fELF gs"}, sumsFor(good)),
+			code:   http.StatusBadGateway,
 		},
 		{
-			name:    "artifact holds a non-ELF file",
-			token:   "secret",
-			ghToken: "job-token",
-			run:     goodRun,
-			zip:     map[string]string{"gameserver": "\x7fELF gs", "loginserver": "#!/bin/sh"},
-			code:    http.StatusBadGateway,
+			name:   "checksums missing a binary",
+			token:  "secret",
+			tag:    "deploy-abc",
+			assets: withSums(good, sumsFor(map[string]string{"gameserver": "\x7fELF gs"})),
+			code:   http.StatusBadGateway,
+		},
+		{
+			name:   "non-ELF asset with a matching checksum",
+			token:  "secret",
+			tag:    "deploy-abc",
+			assets: withSums(map[string]string{"gameserver": "\x7fELF gs", "loginserver": "#!/bin/sh"}, sumsFor(map[string]string{"gameserver": "\x7fELF gs", "loginserver": "#!/bin/sh"})),
+			code:   http.StatusBadGateway,
 		},
 	}
 	for _, tc := range tests {
@@ -148,11 +135,10 @@ func TestDeploy(t *testing.T) {
 			for _, b := range binaries {
 				os.WriteFile(filepath.Join(dir, b), []byte(old), 0o644)
 			}
-			api := fakeGitHub(t, tc.run, artifactZip(t, tc.zip))
 			var restarted []string
 			h := newHandler(config{
 				token:  "secret",
-				api:    api.URL,
+				base:   fakeReleases(t, tc.assets).URL,
 				repo:   "o/r",
 				binDir: dir,
 				client: http.DefaultClient,
@@ -164,8 +150,7 @@ func TestDeploy(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/deploy", nil)
 			req.Header.Set("Authorization", "Bearer "+tc.token)
-			req.Header.Set("X-GitHub-Token", tc.ghToken)
-			req.Header.Set("X-Deploy-Run", "42")
+			req.Header.Set("X-Deploy-Tag", tc.tag)
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
 
@@ -187,9 +172,6 @@ func TestDeploy(t *testing.T) {
 			}
 			if left, _ := filepath.Glob(filepath.Join(dir, "*.new")); len(left) > 0 {
 				t.Errorf("staged files left behind: %v", left)
-			}
-			if left, _ := filepath.Glob(filepath.Join(dir, "*.zip")); len(left) > 0 {
-				t.Errorf("downloaded zip left behind: %v", left)
 			}
 		})
 	}
