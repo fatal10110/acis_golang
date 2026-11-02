@@ -1,22 +1,64 @@
 name: Deploy
 
+# Deploys only when someone publishes a GitHub release; the release's tag
+# selects the commit. Merges to main no longer deploy by themselves.
 on:
-  workflow_run:
-    workflows: ["Go"]
-    branches: [main]
-    types: [completed]
+  release:
+    types: [published]
 
 permissions: {}
 
+# One deploy at a time.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      # Attaches the built binaries to the release.
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name }}
     steps:
-      - name: Trigger deploy webhook
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      # Built here so the 4 GB production box never compiles next to the
+      # running gameserver.
+      - name: Build binaries
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
         run: |
-          status=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://deploy.iterharbor.com/deploy \
-            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}")
-          echo "webhook status: $status"
-          [ "$status" = "202" ]
+          go build -trimpath -o dist/gameserver ./cmd/gameserver
+          go build -trimpath -o dist/loginserver ./cmd/loginserver
+          (cd dist && sha256sum gameserver loginserver > SHA256SUMS)
+      # A re-run replaces the assets.
+      - name: Attach binaries to the release
+        run: gh release upload "$TAG" dist/* --clobber
+      # The server pulls the release assets itself and answers after the swap
+      # and restart, so a failed deploy fails this job; the gameserver stop can
+      # take up to 240s.
+      - name: Deploy
+        env:
+          # Full webhook URL; a secret so the deploy host stays out of the
+          # public repo and logs.
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          # Only the whole secret is masked; curl errors print the bare host.
+          host=${DEPLOY_URL#*://}
+          echo "::add-mask::${host%%/*}"
+          curl -sS --fail-with-body --max-time 600 -X POST "$DEPLOY_URL" \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" \
+            -H "X-Deploy-Tag: $TAG"

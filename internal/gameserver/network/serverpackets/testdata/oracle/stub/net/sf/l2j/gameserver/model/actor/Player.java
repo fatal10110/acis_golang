@@ -20,6 +20,7 @@ import net.sf.l2j.gameserver.model.actor.status.PlayerStatus;
 import net.sf.l2j.gameserver.model.actor.container.player.HennaList;
 import net.sf.l2j.gameserver.model.craft.ManufactureList;
 import net.sf.l2j.gameserver.model.craft.RecipeBook;
+import net.sf.l2j.gameserver.model.group.Party;
 import net.sf.l2j.gameserver.model.itemcontainer.PcInventory;
 import net.sf.l2j.gameserver.model.trade.TradeList;
 import net.sf.l2j.gameserver.model.pledge.Clan;
@@ -95,6 +96,8 @@ public final class Player extends Playable
 	public int pvpFlag;
 	public int pvpKills;
 	public NpcTemplate polymorphTemplate;
+	public int activeClass;
+	public Party party;
 
 	public boolean isOnline()
 	{
@@ -431,5 +434,20 @@ public final class Player extends Playable
 	public HennaList getHennaList()
 	{
 		return hennaList;
+	}
+
+	public int getActiveClass()
+	{
+		return activeClass;
+	}
+
+	public Party getParty()
+	{
+		return party;
+	}
+
+	public boolean isInParty()
+	{
+		return party != null;
 	}
 }
