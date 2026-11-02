@@ -32,7 +32,7 @@ func InstantSpawnSerial() script.Maker {
 			switch {
 			case left > 0:
 				loops.set(left - 1)
-				m.ScriptEvent(m, script.MakerEvent{Group: g, Name: "1001", Int1: respawnSeconds(e.Spawn), Int2: 0})
+				m.SendSelf(script.MakerEvent{Group: g, Name: "1001", Int1: respawnSeconds(e.Spawn), Int2: 0})
 			case left == 0:
 				if name, ok := g.Maker().AIParams["maker_name"]; ok {
 					g.SendMakerEvent(name, "1001", respawnSeconds(e.Spawn), 1)

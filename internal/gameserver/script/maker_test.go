@@ -96,3 +96,45 @@ func TestMakersNewPerNpcmakerWithFallback(t *testing.T) {
 		t.Fatalf("hook calls = %v, want %v", got, want)
 	}
 }
+
+// Heard is told of a script event sent to a maker before the maker's script
+// runs, with the maker's name, the event and its two integers; a maker with
+// no Heard to tell runs as before.
+func TestMakersHeardIsToldBeforeTheScriptRuns(t *testing.T) {
+	var got []string
+	world := MakerWorld{Heard: func(maker, event string, int1, int2 int) {
+		got = append(got, "heard:"+maker+":"+event+":"+string(rune('0'+int1))+string(rune('0'+int2)))
+	}}
+	ctor := func() Maker {
+		return Maker{MakerHooks: MakerHooks{OnScriptEvent: func(_ *Maker, e MakerEvent) { got = append(got, "ran:"+e.Name) }}}
+	}
+	g := fakeGroup{def: &spawn.Maker{Name: "room"}}
+	NewMakers(MakerCatalog{"t": ctor}, ctor, world, zerolog.Nop()).New("t").ScriptEvent(g, "1001", 2, 3)
+	NewMakers(MakerCatalog{"t": ctor}, ctor, MakerWorld{}, zerolog.Nop()).New("t").ScriptEvent(g, "1000", 0, 0)
+	want := []string{"heard:room:1001:23", "ran:1001", "ran:1000"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("calls = %v, want %v", got, want)
+	}
+}
+
+// A maker sending its own npcmaker a script event is told to Heard, then
+// runs its hook; the hook run directly through ScriptEvent is not a send.
+func TestMakerSendSelfIsHeardAndDirectDispatchIsNot(t *testing.T) {
+	var got []string
+	world := MakerWorld{Heard: func(maker, event string, _, _ int) { got = append(got, "heard:"+maker+":"+event) }}
+	ctor := func() Maker {
+		return Maker{MakerHooks: MakerHooks{
+			OnStart: func(m *Maker, e MakerStart) {
+				m.SendSelf(MakerEvent{Group: e.Group, Name: "1000"})
+				m.ScriptEvent(m, MakerEvent{Group: e.Group, Name: "10008"})
+			},
+			OnScriptEvent: func(_ *Maker, e MakerEvent) { got = append(got, "ran:"+e.Name) },
+		}}
+	}
+	g := fakeGroup{def: &spawn.Maker{Name: "room"}}
+	NewMakers(MakerCatalog{"t": ctor}, ctor, world, zerolog.Nop()).New("t").Start(g)
+	want := []string{"heard:room:1000", "ran:1000", "ran:10008"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("calls = %v, want %v", got, want)
+	}
+}

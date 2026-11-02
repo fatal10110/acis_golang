@@ -64,6 +64,12 @@ docker run --rm --user "$(id -u):$(id -g)" \
 		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/g" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushNpc.java
 		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushNpc.java)" -ge 1 ] \
 			|| { echo "royal rush calendar not found" >&2; exit 1; }
+		# So do the NPCs of the Four Sepulchers rooms: the minute of the hour decides whether they stand.
+		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/g" \
+			src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushDefaultNpc/RoyalRushDefaultNpc.java \
+			src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushDefaultNpc/RoyalRushTriggerBoxBase/RoyalRushTriggerBox*.java
+		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushDefaultNpc/RoyalRushTriggerBoxBase/RoyalRushTriggerBox1.java)" -ge 1 ] \
+			|| { echo "royal rush trigger box calendar not found" >&2; exit 1; }
 		# Every other wall clock read goes through the probe wall clock: the real one, except
 		# while a scenario trace plays (a virtual one, so its trace does not depend on when it ran).
 		find src -name "*.java" -exec sed -i "s/System\.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.wall()/g" {} +
@@ -79,6 +85,13 @@ docker run --rm --user "$(id -u):$(id -g)" \
 		sed -i -E "s/quest\.onScriptEvent\(npc, eventId, arg1, (0|arg2)\);/net.sf.l2j.commons.probe.ProbeHeard.deliver(quest, npc, eventId, arg1, \1);/" src/net/sf/l2j/gameserver/scripting/Quest.java
 		[ "$(grep -c "ProbeHeard.deliver" src/net/sf/l2j/gameserver/model/actor/Npc.java)" = 1 ] && [ "$(grep -c "ProbeHeard.deliver" src/net/sf/l2j/gameserver/scripting/Quest.java)" = 2 ] \
 			|| { echo "script event delivery not found" >&2; exit 1; }
+		# The script events sent to an NPC maker through its script (a script looking a maker up by name,
+		# a maker sending to another) go through the probe, which tells the scenario trace before the
+		# script of the maker runs. The calls a maker makes on itself (unqualified, or on its parent) are
+		# not sends and stay.
+		find src -name "*.java" -exec sed -i -E "s/([A-Za-z0-9_]+)\.getMaker\(\)\.onMakerScriptEvent\(/net.sf.l2j.commons.probe.ProbeMaker.send(\1.getMaker(), /g" {} +
+		[ "$(grep -rho "ProbeMaker.send(" src | wc -l)" -ge 100 ] && ! grep -rqE "[A-Za-z0-9_]+\.getMaker\(\)\.onMakerScriptEvent\(" src \
+			|| { echo "npc maker script event send not found" >&2; exit 1; }
 		find src -name "*.java" \
 			| grep -v -e "/commons/pool/ThreadPool.java$" -e "/commons/pool/ConnectionPool.java$" \
 			          -e "/commons/random/Rnd.java$" > sources.txt

@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -327,12 +328,12 @@ func raidLootRights(hostile *npc.Hostile, tmpl *npc.Template, channels LootChann
 // spawned outside the spawn table — the behavior-test boot uses it so kills
 // pay real experience/SP through the same death chain. Drop categories come
 // from the template, placed through ids and ground, and corpse-decay
-// scheduling from its CorpseTime, so a caller whose templates declare no
-// CorpseTime never reaches the decay hook this simplified signature leaves
-// out. The hit observer, nil for anything but a raid or grand boss with
+// scheduling from its CorpseTime through decay; with a nil decay a corpse
+// stays, so a caller whose templates declare a CorpseTime supplies one. The
+// hit observer, nil for anything but a raid or grand boss with
 // channels configured, watches the hits that win a command channel the
 // boss's loot rights.
-func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer) (npc.Rewards, npc.HitObserver) {
+func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer, decay *task.Decay) (npc.Rewards, npc.HitObserver) {
 	rights := raidLootRights(hostile, tmpl, config.Channels)
 	rewards := &deathRewards{
 		hostile:    hostile,
@@ -344,6 +345,7 @@ func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.S
 		items:      items,
 		ids:        ids,
 		ground:     ground,
+		decay:      decay,
 		rights:     rights,
 	}
 	if rights == nil {

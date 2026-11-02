@@ -18,6 +18,12 @@ type Territory struct {
 	DZ1, DZ2           int
 }
 
+// NpcMaker is one npcmaker line: a named npcmaker of an AI type, with no
+// NPC to spawn, which a script finds by name and sends script events.
+type NpcMaker struct {
+	Name, AIType string
+}
+
 // Member is one member line: a second character in the character's party.
 type Member struct {
 	Name  string
@@ -65,7 +71,8 @@ func (sc *Scenario) named(name string, roles map[string]bool) bool {
 		slices.ContainsFunc(sc.Grounds, func(g Ground) bool { return g.Role == name })
 }
 
-// world reads the territory, zone, member, ground, roll and gauss lines.
+// world reads the territory, npcmaker, zone, member, ground, roll and gauss
+// lines.
 func (sc *Scenario) world(key string, args []string, roles map[string]bool) error {
 	switch key {
 	case "territory":
@@ -83,6 +90,14 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 			return fmt.Errorf("territory %s is no box: want dx1 < dx2, dy1 < dy2 and dz1 <= dz2", args[0])
 		}
 		sc.Territories = append(sc.Territories, Territory{Name: args[0], DX1: n[0], DY1: n[1], DX2: n[2], DY2: n[3], DZ1: n[4], DZ2: n[5]})
+	case "npcmaker":
+		if len(args) != 2 {
+			return fmt.Errorf("npcmaker <name> <ai type>")
+		}
+		if slices.ContainsFunc(sc.NpcMakers, func(m NpcMaker) bool { return strings.EqualFold(m.Name, args[0]) }) {
+			return fmt.Errorf("npcmaker %s listed twice", args[0])
+		}
+		sc.NpcMakers = append(sc.NpcMakers, NpcMaker{Name: args[0], AIType: args[1]})
 	case "zone":
 		usage := fmt.Errorf("zone <boss|peace> <id> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>")
 		if len(args) != 8 {
@@ -258,7 +273,7 @@ func npcOptions(args []string, territories []Territory) (NPC, error) {
 			copy(n.Params[:], args[1:4])
 			args = args[4:]
 		default:
-			return NPC{}, fmt.Errorf("npc option %q is not walks, maker <territory>, clan, skill, ai, params <p1> <p2> <p3>, level, aggro, mem, privates or master", args[0])
+			return NPC{}, fmt.Errorf("npc option %q is not walks, maker <territory>, clan, corpse, skill, ai, params <p1> <p2> <p3>, level, aggro, mem, privates or master", args[0])
 		}
 	}
 	return n, nil

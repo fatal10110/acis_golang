@@ -98,10 +98,15 @@ func TestRendererComparesWhatAScriptDoes(t *testing.T) {
 			t.Errorf("%s: render = %q, %v, %v; want %q", c.name, got, ok, err, c.want)
 		}
 	}
-	// A corpse's decay is not compared; the order of a run of DeleteObjects do not count.
+	// A corpse's decay is not compared, unless its npc line names a corpse time; the order of a run of DeleteObjects do not count.
 	rd.render([]byte{serverpackets.OpcodeDie, 3, 0, 0, 0x10})
 	if _, ok, _ := rd.render(del(spawned)); ok {
 		t.Error("the DeleteObject of a dead NPC rendered")
+	}
+	rd.nameTemplates([]NPC{{Role: "unicorn", ID: 7, Corpse: 3}})
+	rd.render([]byte{serverpackets.OpcodeDie, 2, 0, 0, 0x10})
+	if got, ok, _ := rd.render(del(placed)); !ok || got != "DeleteObject obj=unicorn" {
+		t.Errorf("the DeleteObject of a dead NPC with a corpse time = %q, %v", got, ok)
 	}
 	// The reference shows a script-spawned NPC as NpcInfo, ChangeMoveType,
 	// NpcInfo: every line counts.

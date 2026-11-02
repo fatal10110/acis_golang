@@ -176,6 +176,7 @@ type options struct {
 	npcSpawns              *spawn.Table
 	spawnData              bool
 	makerCatalog           script.MakerCatalog
+	makerHeard             func(maker, event string, int1, int2 int)
 	dataReloads            network.DataReloads
 	npcDropRates           item.Rates
 	walkerRoutes           route.WalkerRoutes
@@ -2464,7 +2465,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	if o.npcSpawns != nil {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
-			spawnStore: spawnStore, makerCatalog: o.makerCatalog, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
+			spawnStore: spawnStore, makerCatalog: o.makerCatalog, makerHeard: o.makerHeard, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.Combat.AttackStance, log: o.log, makers: o.npcSpawns,
 			dropRates: o.npcDropRates, partyRange: o.partyRange, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes,

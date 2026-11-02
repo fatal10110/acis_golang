@@ -120,7 +120,10 @@ what the reference does in the scenario's own world:
   the outcome the Go run's pin must reproduce;
 - the datapack's npcmakers (loaded, never spawned here) are taken out of the spawn manager while
   a scenario plays, so a script's spawn lookup finds the scenario's spawns alone, as it does in the
-  Go runner's world;
+  Go runner's world. The scenario's `npcmaker <name> <ai type>` lines put their own in its place: an
+  `NpcMaker` of that name running the script of that AI type, with no spawn entry and no territory
+  (`start` is never called on it, so its script starts no timer), which a script finds by
+  `getNpcMaker(name)`;
 - a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes
@@ -186,8 +189,25 @@ what the reference does in the scenario's own world:
   quest that runs, whatever step or timer sent them. The event step's own delivery is its `# event`
   line, not a heard one. The Go run compares them per step as a sorted set, the receiver and
   an argument named by role: the order the NPCs around a broadcast hear it in follows each side's
-  known list. The maker script events (`onMakerScriptEvent`) are not traced: the probe builds no
-  NPC maker (#4337);
+  known list;
+- the script events sent to an NPC maker are `# maker` lines of the step that caused them: every
+  call `<maker>.getMaker().onMakerScriptEvent(...)` of the reference goes through
+  `ProbeMaker.send` (the build rewrites the 232 textual sites, a script looking a maker up by name
+  and a maker sending to another), which tells the trace before the maker's script runs. The
+  unqualified calls and the calls on the parent class (`super.onMakerScriptEvent`) are a maker's
+  own dispatch, not sends, and are not traced; the Go run records the same sends at the maker
+  group's event entry, and a maker sending to its own group (the reference writes
+  `maker.getMaker()...`) through `Maker.SendSelf`; a maker's own unqualified dispatch stays
+  untraced on both sides. The Go run compares them per
+  step as an ordered list (a deletion then a spawn is not the other way round); the maker is
+  named as the `npcmaker` line writes it, the event and the two integers as numbers;
+- an NPC line's `corpse <seconds>` option sets the template corpse time on the reference's
+  template as on the Go runner's, and the probe then runs the decay task after every tick (it
+  runs each second in the server; the probe cancels the periodic tasks between scenarios), so a
+  corpse decays at the tick its deadline falls on. The Go run compares the `DeleteObject` of a
+  corpse whose line names a corpse time, which it does not for a fixture template (its corpse
+  time is not the shipped one, and the kill's 3.5 s is shorter than the shipped one). Keep a
+  corpse time to whole seconds below 3, so the decay falls inside the kill step;
 - a client packet step is followed by 500 ms of virtual time (the `T 500` line) and a kill
   by seven such ticks; the Go run settles the queues after a packet instead and moves its clock
   only for a kill and an `advance` step, so a timer a script starts in a packet step needs an
@@ -373,6 +393,8 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
                                 (the arguments as the scenario writes them)
 # heard <npc id> (object <id>) <id> <arg1> <arg2>   a scenario trace: the NPC hears a script event a script
                                 sent or broadcast (the arguments as numbers; an object id is a role to the Go run)
+# maker <name> <event> <int1> <int2>   a scenario trace: the script event sent to the NPC maker of that name
+                                (the maker as its npcmaker line writes it), in the order they were sent
 # live <npc id> <count>         a scenario trace: how many living NPCs of that template the world
                                 holds once the step is over (the step's live line)
 # spawned <npc id> <x>,<y> ...   a scenario trace: where the living NPCs of that template that

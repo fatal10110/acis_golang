@@ -51,8 +51,10 @@ type renderer struct {
 	// dead holds the objects a Die packet has shown dead: their decay (a
 	// corpse's DeleteObject) follows the template's corpse time, which a
 	// fixture template does not share with the shipped one, so it is not
-	// compared.
-	dead map[int32]bool
+	// compared. The decay of an NPC whose line names a corpse time (decays
+	// holds its role) is compared: both sides run that corpse time.
+	dead   map[int32]bool
+	decays map[string]bool
 	// off turns the NpcInfo and DeleteObject rendering off: a trace that
 	// lists no npc line's object (an older, hand-made one) cannot tell the
 	// script-spawned NPCs from the world's.
@@ -66,14 +68,17 @@ type renderer struct {
 // newRenderer returns a renderer naming objects by roles, with no NPC
 // placed and none named by template.
 func newRenderer(roles map[int32]string) *renderer {
-	return &renderer{roles: roles, placed: map[int32]bool{}, byNPC: map[int32]string{}, spawned: map[int32]string{}, dead: map[int32]bool{}}
+	return &renderer{roles: roles, placed: map[int32]bool{}, byNPC: map[int32]string{}, spawned: map[int32]string{}, dead: map[int32]bool{}, decays: map[string]bool{}}
 }
 
 // nameTemplates fills byNPC from the scenario's npc lines: a template two
-// lines share names none.
+// lines share names none. It also notes the lines with a corpse time.
 func (rd *renderer) nameTemplates(npcs []NPC) {
 	dup := map[int32]bool{}
 	for _, n := range npcs {
+		if n.Corpse != 0 {
+			rd.decays[n.Role] = true
+		}
 		if _, ok := rd.byNPC[n.ID]; ok {
 			dup[n.ID] = true
 		}
@@ -103,7 +108,9 @@ func talkVerb(verb string) bool {
 // names.
 func (rd *renderer) render(payload []byte) (string, bool, error) {
 	if len(payload) >= 5 && payload[0] == serverpackets.OpcodeDie {
-		rd.dead[int32(binary.LittleEndian.Uint32(payload[1:5]))] = true
+		if obj := int32(binary.LittleEndian.Uint32(payload[1:5])); !rd.decays[rd.roles[obj]] {
+			rd.dead[obj] = true
+		}
 	}
 	if len(payload) == 0 || !slices.Contains(renders, payload[0]) {
 		return "", false, nil
@@ -228,6 +235,7 @@ type traceStep struct {
 	memos  []string
 	draws  []string
 	heard  []string
+	makers []string
 	lives  []string
 	spawns []string
 	checks []string
@@ -257,6 +265,7 @@ var (
 	traceNPC      = regexp.MustCompile(`^# npc (\S+) (\d+) \(object (\d+)\)$`)
 	traceDraw     = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
 	traceHeard    = regexp.MustCompile(`^# heard (\d+) \(object (\d+)\) (-?\d+) (-?\d+) (-?\d+)$`)
+	traceMaker    = regexp.MustCompile(`^# maker (\S+) (\S+) (-?\d+) (-?\d+)$`)
 	traceStance   = regexp.MustCompile(`^# stance (on|off)$`)
 	traceCheck    = regexp.MustCompile(`^# check (open|dungeon|standing|stance) (\S+( \S+)*)$`)
 	traceLive     = regexp.MustCompile(`^# live (\d+) (\d+)$`)
@@ -425,6 +434,14 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
 			}
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
+		case strings.HasPrefix(line, "# maker "):
+			if !traceMaker.MatchString(line) {
+				return nil, nil, fmt.Errorf("trace line %q is not a maker <name> <event> <int1> <int2>", line)
+			}
+			if len(raw) == 0 {
+				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
+			}
+			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		case strings.HasPrefix(line, "# heard "):
 			if !traceHeard.MatchString(line) {
 				return nil, nil, fmt.Errorf("trace line %q is not a heard <npc id> (object <id>) <event id> <arg1> <arg2>", line)
@@ -502,6 +519,10 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			}
 			if m := traceDraw.FindStringSubmatch(line); m != nil {
 				step.draws = append(step.draws, m[1])
+				continue
+			}
+			if m := traceMaker.FindStringSubmatch(line); m != nil {
+				step.makers = append(step.makers, makerLine(m[1], m[2], atoi32(m[3]), atoi32(m[4])))
 				continue
 			}
 			if m := traceHeard.FindStringSubmatch(line); m != nil {
@@ -669,7 +690,7 @@ func deferPlayerActions(task []string, effects int) ([]string, error) {
 // send or broadcast (see heardLine), for the run to compare with its own; a trace that pins
 // draws needs a random line. A trace of the reference probe's own play of
 // the scenario (under probeTraces) covers every step.
-func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws, heard [][]string, err error) {
+func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]string, seen []traceSeen, err error) {
 	steps, objs, err := readTrace(sc, data)
 	if err != nil {
 		return nil, nil, err
@@ -698,6 +719,7 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws, hear
 			ts.memos = append(ts.memos, s.memos...)
 			ts.draws = append(ts.draws, s.draws...)
 			ts.heard = append(ts.heard, s.heard...)
+			ts.makers = append(ts.makers, s.makers...)
 			ts.lives = append(ts.lives, s.lives...)
 			ts.spawns = append(ts.spawns, s.spawns...)
 			ts.checks = append(ts.checks, s.checks...)
@@ -728,7 +750,7 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws, hear
 			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		draws = append(draws, ts.draws)
-		heard = append(heard, ts.heard)
+		seen = append(seen, traceSeen{heard: ts.heard, makers: ts.makers})
 	}
 	// The probe plays every step of a scenario it traces.
 	if strings.HasPrefix(sc.Trace, probeTraces) && len(draws) < len(sc.Steps) {
@@ -739,7 +761,7 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws, hear
 	if sc.Random == nil && slices.ContainsFunc(draws, func(d []string) bool { return len(d) > 0 }) {
 		return nil, nil, fmt.Errorf("the trace pins script draws and the scenario has no random line")
 	}
-	return draws, heard, nil
+	return draws, seen, nil
 }
 
 // checkClients compares what each client was sent in a step with the
@@ -806,16 +828,42 @@ func heardLine(roles map[int32]string, object, npcID, eventID, arg1, arg2 int32)
 	}, " ")
 }
 
+// traceSeen is what the reference's scripts did in one traced step besides
+// the packets they sent: the script events its NPCs heard (see heardLine)
+// and the ones its npcmakers were sent (see makerLine), each in the order
+// the trace lists them.
+type traceSeen struct {
+	heard, makers []string
+}
+
+// makerLine renders a script event an npcmaker was sent as "<maker>
+// <event> <int1> <int2>".
+func makerLine(maker, event string, int1, int2 int32) string {
+	return strings.Join([]string{maker, event, strconv.Itoa(int(int1)), strconv.Itoa(int(int2))}, " ")
+}
+
 // traceHeardDiff compares the script events the NPCs heard in step i, as
 // heardLine renders them, with those the reference's NPCs heard in that
 // step. They are compared sorted: the order the NPCs around a broadcast
 // hear it in follows each side's known list. A step past the trace is not
 // compared.
-func traceHeardDiff(traceHeard [][]string, i int, heard []string) string {
-	if i >= len(traceHeard) {
+func traceHeardDiff(seen []traceSeen, i int, heard []string) string {
+	if i >= len(seen) {
 		return ""
 	}
-	return FirstDiff("script event heard", slices.Sorted(slices.Values(heard)), slices.Sorted(slices.Values(traceHeard[i])))
+	return FirstDiff("script event heard", slices.Sorted(slices.Values(heard)), slices.Sorted(slices.Values(seen[i].heard)))
+}
+
+// traceMakerDiff compares the script events the npcmakers were sent in
+// step i, as makerLine renders them, with those the reference's npcmakers
+// were sent in that step, in order: a maker told to delete its NPCs and
+// then to spawn them is not one told the other way round. A step past the
+// trace is not compared.
+func traceMakerDiff(seen []traceSeen, i int, sent []string) string {
+	if i >= len(seen) {
+		return ""
+	}
+	return FirstDiff("npcmaker script event", sent, seen[i].makers)
 }
 
 // traceDrawDiff compares the script draws step i made, each

@@ -1,0 +1,23 @@
+# RoyalRushTriggerBox1 (31468), the trigger box of a sepulcher's first room, and the three rooms its AI
+# parameters name (1st_type1_a to 1st_type3_a, npcmakers of the royal_rush_maker script, here with no NPC to
+# spawn). The first action selects it; the talk, at minute 0 (outside the closing minutes 50 to 59), draws
+# the room (every draw 0: the first) and sends it the maker script events 1000, which takes its NPCs out of
+# the world, then 1001, which fills it again. The reference run records what the makers are sent; the
+# second room is never named, so it hears nothing. The box leaves the world after the talk, showing no page.
+trace internal/gameserver/script/testdata/oracle/scenarios/royal_rush_trigger_room.golden
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBoxBase
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox1
+npcmaker 1st_type1_a royal_rush_maker
+npcmaker 1st_type2_a royal_rush_maker
+npc box 31468 Folk 40 0 0 ai room_event_1=1st_type1_a
+
+action box
+action box
+  S ActionFailed
+  S ActionFailed
+  S DeleteObject obj=box
+  S ActionFailed

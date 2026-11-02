@@ -114,6 +114,9 @@ type run struct {
 	// stance is the clock of the attack stances when the scenario ends the
 	// character's: it moves with the advance steps.
 	stance stanceClock
+	// corpses decays the dead NPCs whose line names a corpse time; nil
+	// without such a line.
+	corpses *corpses
 	// items is the item catalog the server runs with.
 	items *item.Table
 	// draws is the random line's source; traceDraws the draws the
@@ -122,8 +125,11 @@ type run struct {
 	traceDraws [][]string
 	// heard records the script events the NPCs' scripts receive;
 	// traceHeard those the reference's NPCs heard in each traced step.
-	heard      heardEvents
-	traceHeard [][]string
+	heard     heardEvents
+	traceSeen []traceSeen
+	// makerSent records the script events the npcmakers are sent, for the
+	// step that caused them to take.
+	makerSent makerEvents
 }
 
 // heardEvents records the script events the NPCs' scripts receive, for the
@@ -152,6 +158,29 @@ func (h *heardEvents) take(roles map[int32]string) []string {
 		out = append(out, heardLine(roles, e.object, e.npcID, e.id, e.arg1, e.arg2))
 	}
 	h.events = nil
+	return out
+}
+
+// makerEvents records the script events the npcmakers are sent, as
+// makerLine renders them. Scripts send on their own goroutine, so it is
+// guarded.
+type makerEvents struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (m *makerEvents) add(maker, event string, int1, int2 int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lines = append(m.lines, makerLine(maker, event, int32(int1), int32(int2)))
+}
+
+// take returns the events recorded since the last take.
+func (m *makerEvents) take() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := m.lines
+	m.lines = nil
 	return out
 }
 
@@ -248,7 +277,7 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.traceDraws, r.traceHeard, err = checkTrace(sc, data, r.texts); err != nil {
+		if r.traceDraws, r.traceSeen, err = checkTrace(sc, data, r.texts); err != nil {
 			t.Fatalf("%s does not replay %s: %v", sc.Name, sc.Trace, err)
 		}
 	}
@@ -357,7 +386,15 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	if r.sc.Random != nil || r.sc.usesRandomSteps() {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
 	}
-	opts = append(opts, gameservertest.WithScriptEventsHeard(r.heard.add))
+	opts = append(opts, gameservertest.WithScriptEventsHeard(r.heard.add), gameservertest.WithMakerEventsHeard(r.makerSent.add))
+	if r.sc.hasCorpses() {
+		r.corpses = newCorpses(t, r.clockStart())
+		opts = append(opts, gameservertest.WithDecay(r.corpses.task))
+	}
+	if len(r.sc.NpcMakers) > 0 {
+		// The makers are built and never started, as the reference probe leaves its own.
+		opts = append(opts, gameservertest.WithNpcSpawns(npcMakerTable(t, r.sc.NpcMakers)), gameservertest.WithNoSpawns())
+	}
 	if r.sc.Teleports {
 		opts = append(opts, r.teleportOptions(t)...)
 	}
@@ -371,6 +408,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedSevenSigns(t, store, r.sc) }))
 	}
 	r.srv = gameservertest.Boot(t, opts...)
+	if r.corpses != nil {
+		r.corpses.state.Store(r.srv.State)
+	}
 	if r.sc.HasClock && !r.srv.DrivesClock() {
 		t.Skipf("%s: the clock line needs the driven clock; the real pool runs on the wall clock", r.sc.Name)
 	}
@@ -447,6 +487,7 @@ func (r *run) spawnNPCs(t *testing.T) {
 		t.Fatalf("%s: script random at spawn: %s", r.sc.Name, strings.Join(bad, "; "))
 	}
 	r.heard.take(nil)
+	r.makerSent.take()
 }
 
 // seedHero makes the character an active hero of the running era, before
@@ -807,6 +848,9 @@ func template(n NPC) *npc.Template {
 	if n.Level != 0 {
 		tmpl.Level = n.Level
 	}
+	if n.Corpse != 0 {
+		tmpl.CorpseTime = n.Corpse
+	}
 	tmpl.AggroRange, tmpl.Privates = n.Aggro, n.Privates
 	tmpl.Clans, tmpl.ClanRange = n.Clans, n.ClanRange
 	if n.AI != nil {
@@ -888,12 +932,13 @@ func (r *run) step(t *testing.T, i int, st Step) {
 			}
 			h := r.live[role]
 			r.onPlayer(t, func(p attackable.Combatant) { h.TakeDamage(h.MaxHP()+1, p) })
-			r.srv.Advance(t, killWait)
+			r.passKillTime(t)
 		}
 	case "advance":
 		d, _ := time.ParseDuration(st.Args[0])
 		r.srv.AdvanceWithEffects(t, d)
 		r.passStanceTime(t, d)
+		r.passCorpseTime(t, d)
 	case "approach":
 		distance := 100
 		if len(st.Args) == 2 {
@@ -962,7 +1007,10 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if d := traceDrawDiff(r.traceDraws, i, drawn); d != "" {
 		fail("%s (want: the trace's)", d)
 	}
-	if d := traceHeardDiff(r.traceHeard, i, r.heard.take(r.roles)); d != "" {
+	if d := traceHeardDiff(r.traceSeen, i, r.heard.take(r.roles)); d != "" {
+		fail("%s (want: the trace's)", d)
+	}
+	if d := traceMakerDiff(r.traceSeen, i, r.makerSent.take()); d != "" {
 		fail("%s (want: the trace's)", d)
 	}
 	if st.Verb != "relog" {

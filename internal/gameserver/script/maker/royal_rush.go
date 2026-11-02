@@ -50,10 +50,10 @@ func royalRushHooks() script.MakerHooks {
 			}
 			switch now.Second() {
 			case 0:
-				m.ScriptEvent(m, script.MakerEvent{Group: e.Group, Name: "1000"})
+				m.SendSelf(script.MakerEvent{Group: e.Group, Name: "1000"})
 			case 1, 2:
 				if e.Group.Alive() > 0 {
-					m.ScriptEvent(m, script.MakerEvent{Group: e.Group, Name: "1000"})
+					m.SendSelf(script.MakerEvent{Group: e.Group, Name: "1000"})
 				}
 			}
 		},
