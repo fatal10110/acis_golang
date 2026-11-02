@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      # Lets the webhook download this run's artifact with the job token.
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,15 +40,23 @@ jobs:
         run: |
           go build -trimpath -o dist/gameserver ./cmd/gameserver
           go build -trimpath -o dist/loginserver ./cmd/loginserver
-      # The webhook answers after the swap and restart, so a failed deploy
-      # fails this job. The gameserver stop can take up to 240s.
-      - name: Upload and deploy
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deploy-binaries
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+      # The server pulls the artifact of this run with the job token, which
+      # expires when the job ends. The webhook answers after the swap and
+      # restart, so a failed deploy fails this job; the gameserver stop can
+      # take up to 240s.
+      - name: Deploy
         env:
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
-          COMMIT: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           curl -sS --fail-with-body --max-time 600 -X POST https://deploy.iterharbor.com/deploy \
             -H "Authorization: Bearer $DEPLOY_TOKEN" \
-            -H "X-Deploy-Commit: $COMMIT" \
-            -F gameserver=@dist/gameserver \
-            -F loginserver=@dist/loginserver
+            -H "X-GitHub-Token: $GH_TOKEN" \
+            -H "X-Deploy-Run: $RUN_ID"

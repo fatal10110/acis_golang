@@ -7,11 +7,21 @@ Runs on the production Hetzner box as `acis-deploy-webhook.service`, bound to `1
 behind Caddy (TLS at `deploy.iterharbor.com`).
 
 `.github/workflows/deploy.yml` runs after the `Go` workflow passes on `main`. It builds
-`gameserver`/`loginserver` on the GitHub runner and POSTs them as multipart fields `gameserver` and
-`loginserver` to `/deploy` with `Authorization: Bearer $DEPLOY_TOKEN`. The webhook stages both
-uploads as `<name>.new` in `BIN_DIR` (default `/opt/acis`), renames them into place only when both
-arrived intact, restarts `acis-loginserver` then `acis-gameserver`, and answers `200` once that is
-done, so a failed deploy fails the workflow. A second deploy while one runs gets `409`.
+`gameserver`/`loginserver` on the GitHub runner, uploads them as the `deploy-binaries` artifact, and
+POSTs to `/deploy` with:
+
+| Header | Value |
+| --- | --- |
+| `Authorization` | `Bearer $DEPLOY_TOKEN` |
+| `X-Deploy-Run` | the Deploy run id |
+| `X-GitHub-Token` | the job's `GITHUB_TOKEN` (`actions: read`), which expires when the job ends |
+
+The webhook pulls the artifact from the GitHub API with that job token, so the server holds no
+GitHub credential of its own. It refuses runs that are not `.github/workflows/deploy.yml` on `main`,
+extracts both binaries as `<name>.new` in `BIN_DIR` (default `/opt/acis`), renames them into place
+only when both extracted intact, restarts `acis-loginserver` then `acis-gameserver`, and answers
+`200` once that is done, so a failed deploy fails the workflow. A second deploy while one runs gets
+`409`. `GITHUB_REPO` (default `fatal10110/acis_golang`) names the repository to pull from.
 
 Nothing is compiled on the server: the box has 4 GB of RAM and the gameserver alone uses about half,
 so an on-box `go build` pushed it into the OOM killer.
