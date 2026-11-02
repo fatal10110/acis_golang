@@ -70,7 +70,7 @@ func (h fusionHandler) applyTriggered(caster Creature, effected Actor, triggered
 	if !ok {
 		return
 	}
-	applyEffects(caster, effected, def, def.Effects)
+	applyEffects(caster, effected, *def, def.Effects)
 }
 
 // DecreaseFusion removes one level from the target's triggered fusion effect.

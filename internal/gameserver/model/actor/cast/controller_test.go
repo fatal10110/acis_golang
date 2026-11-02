@@ -54,7 +54,7 @@ func TestAbortObserverFiresOnlyForAnInFlightCast(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl, _, aborts := newAbortController()
 			if tt.start {
-				if _, err := ctrl.Start(now, testTarget{}, scalingDef); err != nil {
+				if _, err := ctrl.Start(now, testTarget{}, &scalingDef); err != nil {
 					t.Fatalf("Start() error: %v", err)
 				}
 			}
@@ -79,7 +79,7 @@ func TestAbortObserverFiresOnlyForAnInFlightCast(t *testing.T) {
 // cast.
 func TestFinishObserverReportsTheCastThatEnded(t *testing.T) {
 	ctrl, _, rec := newAbortController()
-	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef); err != nil {
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &scalingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	ctrl.Finish()
@@ -144,7 +144,7 @@ func TestFinishRequestsShotRechargeForTheSkillsShotKind(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl, _, rec := newAbortController()
-			plan, err := ctrl.Start(now, testTarget{}, tt.def)
+			plan, err := ctrl.Start(now, testTarget{}, &tt.def)
 			if err != nil {
 				t.Fatalf("Start() error: %v", err)
 			}
@@ -204,7 +204,7 @@ func TestFinishObserverReportsTheCastsTarget(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl, _, rec := newAbortController()
 			target := &fakeCastCreature{id: 42}
-			if _, err := ctrl.Start(now, target, scalingDef); err != nil {
+			if _, err := ctrl.Start(now, target, &scalingDef); err != nil {
 				t.Fatalf("Start() error: %v", err)
 			}
 
@@ -239,7 +239,7 @@ func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl, _, rec := newAbortController()
 			if tt.start {
-				if _, err := ctrl.Start(now, testTarget{}, scalingDef); err != nil {
+				if _, err := ctrl.Start(now, testTarget{}, &scalingDef); err != nil {
 					t.Fatalf("Start() error: %v", err)
 				}
 			}
@@ -261,7 +261,7 @@ func TestStopCancelsPendingPhaseTimers(t *testing.T) {
 	ctrl, _, aborts := newAbortController()
 	ctrl.SetQueue(clock.q)
 
-	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &scalingDef)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestUnaffordableHitReportsBeforeTheAbortFunnel(t *testing.T) {
 
 	actor.hitCost = 20
 
-	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &scalingDef)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestCastCostsMayCallBackIntoTheController(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); err != nil {
+		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &def); err != nil {
 			done <- err
 			return
 		}
@@ -420,7 +420,7 @@ func TestStartRejectsACastItsOwnCostEnded(t *testing.T) {
 	rec := &event.Recorder{}
 	ctrl.sink = rec
 
-	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotCasting) {
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &def); !errors.Is(err, ErrNotCasting) {
 		t.Fatalf("Start() error = %v, want ErrNotCasting", err)
 	}
 	if ctrl.CastingNow() {
@@ -446,7 +446,7 @@ func TestStartItemFailureAfterTheCastEnded(t *testing.T) {
 	rec := &event.Recorder{}
 	ctrl.sink = rec
 
-	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotEnoughItems) {
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &def); !errors.Is(err, ErrNotEnoughItems) {
 		t.Fatalf("Start() error = %v, want ErrNotEnoughItems", err)
 	}
 	if ctrl.CastingNow() {
@@ -460,7 +460,7 @@ func TestStartItemFailureAfterTheCastEnded(t *testing.T) {
 	}
 
 	actor.consumeFail, actor.stopOnConsume = false, false
-	if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, def); err != nil {
+	if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, &def); err != nil {
 		t.Fatalf("Start() after the rejected Start error: %v", err)
 	}
 }
@@ -469,7 +469,7 @@ func TestStartThatCannotConsumeItsItemPaysNothing(t *testing.T) {
 	ctrl, actor, def := newReentrantCostController()
 	actor.consumeFail = true
 
-	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotEnoughItems) {
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &def); !errors.Is(err, ErrNotEnoughItems) {
 		t.Fatalf("Start() error = %v, want ErrNotEnoughItems", err)
 	}
 	if ctrl.CastingNow() {
@@ -480,7 +480,7 @@ func TestStartThatCannotConsumeItsItemPaysNothing(t *testing.T) {
 	}
 
 	actor.consumeFail = false
-	if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, def); err != nil {
+	if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, &def); err != nil {
 		t.Fatalf("Start() after a rejected Start error: %v", err)
 	}
 }
@@ -498,7 +498,7 @@ func TestStartCarriedConsumesCarrierBeforeCosts(t *testing.T) {
 			items, mp int
 			cooldowns int
 		}
-		plan, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error {
+		plan, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, &def, func() error {
 			seen.casting, seen.items, seen.mp, seen.cooldowns = ctrl.CastingNow(), actor.items[57], actor.mp, len(actor.disabled)
 			return nil
 		})
@@ -521,7 +521,7 @@ func TestStartCarriedConsumesCarrierBeforeCosts(t *testing.T) {
 		// the item short.
 		ctrl, actor, def := newReentrantCostController()
 		actor.consumeFail = true
-		plan, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error { return nil })
+		plan, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, &def, func() error { return nil })
 		if err != nil {
 			t.Fatalf("StartCarried() error = %v, want the cast started", err)
 		}
@@ -539,7 +539,7 @@ func TestStartCarriedConsumesCarrierBeforeCosts(t *testing.T) {
 		ctrl, actor, def := newReentrantCostController()
 		rec := &event.Recorder{}
 		ctrl.sink = rec
-		if _, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error { return errCarrier }); !errors.Is(err, errCarrier) {
+		if _, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, &def, func() error { return errCarrier }); !errors.Is(err, errCarrier) {
 			t.Fatalf("StartCarried() error = %v, want the carrier's error", err)
 		}
 		if ctrl.CastingNow() {
@@ -551,7 +551,7 @@ func TestStartCarriedConsumesCarrierBeforeCosts(t *testing.T) {
 		if actor.items[57] != 5 || actor.mp != 100 || len(actor.disabled) != 0 || len(actor.reuses) != 0 {
 			t.Fatalf("items=%d mp=%d disabled=%v reuses=%v, want nothing charged", actor.items[57], actor.mp, actor.disabled, actor.reuses)
 		}
-		if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, def); err != nil {
+		if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, &def); err != nil {
 			t.Fatalf("Start() after a lost carrier error: %v", err)
 		}
 	})
@@ -642,7 +642,7 @@ func TestCanCastWeaponDependency(t *testing.T) {
 			actor := &testActor{mp: 100, hp: 100, held: tt.held, physicalMuted: tt.muted}
 			ctrl := NewController(actor, nil)
 			def := modelskill.Definition{ID: 56, Level: 1, Activation: modelskill.ActivationActive, WeaponsAllowed: tt.allowed}
-			if err := ctrl.CanCast(testTarget{}, def); !errors.Is(err, tt.want) || (tt.want == nil && err != nil) {
+			if err := ctrl.CanCast(testTarget{}, &def); !errors.Is(err, tt.want) || (tt.want == nil && err != nil) {
 				t.Fatalf("CanCast = %v, want %v", err, tt.want)
 			}
 		})

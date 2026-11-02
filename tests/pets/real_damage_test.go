@@ -37,7 +37,7 @@ func TestHotSpringNectarKillsInvulnerablePet(t *testing.T) {
 	caster, aiCtl := h.srv.SpawnCastingHostileNPC(t, &npc.Template{
 		ID: 100, TemplateID: 100, Type: "Monster", Level: 1, HPMax: 1000,
 		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
-	}, modelskill.NewTable([]modelskill.Definition{nectar}))
+	}, modelskill.NewTable([]modelskill.Definition{*nectar}))
 	runOnPetQueue(t, pet, func() { pet.SetInvul(true) })
 	drainUntilQuiet(t, h.client)
 

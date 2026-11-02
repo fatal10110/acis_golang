@@ -93,7 +93,7 @@ func engraveWorld(t *testing.T) *clanWorld {
 		gameservertest.WithZones(artifactZones(t)),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{artifactTemplate()})),
 		gameservertest.WithNpcSpawns(nil),
-		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{seal}), gamesql.NewCharacterSkillStore(db))),
+		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{*seal}), gamesql.NewCharacterSkillStore(db))),
 		seedRival(t),
 		seedAllianceClans(t,
 			`UPDATE clan_data SET hasCastle = 1 WHERE clan_id = `+itoa(rivalsClanID),

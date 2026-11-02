@@ -17,8 +17,8 @@ import (
 // resolve a real skill.
 type fakeHostileCastDefs struct{}
 
-func (fakeHostileCastDefs) Definition(modelskill.Ref) (modelskill.Definition, bool) {
-	return modelskill.Definition{}, false
+func (fakeHostileCastDefs) Definition(modelskill.Ref) (*modelskill.Definition, bool) {
+	return nil, false
 }
 
 // TestNewLiveHostileWiresOnHitResultFromEffects pins the other half of issue

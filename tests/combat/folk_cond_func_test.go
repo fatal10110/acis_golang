@@ -59,7 +59,7 @@ func TestBehindGatedCritFuncAgainstFolkTarget(t *testing.T) {
 				CriticalRate() float64
 				SetRollSource(func(int) int)
 			})
-			var def modelskill.Definition
+			var def *modelskill.Definition
 			if tc.buff != 0 {
 				if def, ok = shippedSkills(t).Get(tc.buff, 1); !ok {
 					t.Fatalf("shipped skill %d-1 missing", tc.buff)
@@ -68,7 +68,7 @@ func TestBehindGatedCritFuncAgainstFolkTarget(t *testing.T) {
 			onQueue(t, srv.PlayerQueue(t, objID), func() {
 				unbuffed := pc.CriticalRate()
 				if tc.buff != 0 {
-					effect.Apply(pc, pc, effect.SkillFromDefinition(def), def.Effects)
+					effect.Apply(pc, pc, effect.SkillFromDefinition(*def), def.Effects)
 				}
 				calls := 0
 				pc.SetRollSource(func(int) int {
@@ -177,7 +177,7 @@ func TestFolkOwnFuncConditionsTested(t *testing.T) {
 		var unbuffed, shown, against float64
 		onQueue(t, folk.Queue(), func() {
 			unbuffed = folk.CriticalRate()
-			effect.Apply(folk, folk, effect.SkillFromDefinition(def), def.Effects)
+			effect.Apply(folk, folk, effect.SkillFromDefinition(*def), def.Effects)
 			shown = folk.CriticalRate()
 			against = folk.Against(pc.ConditionActor(), nil).CriticalRate()
 			calls := 0

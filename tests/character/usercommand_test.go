@@ -146,7 +146,7 @@ func escapeSkills(t *testing.T) *skillstate.Persistence {
 				shippedEscape.err = fmt.Errorf("skill %d missing", id)
 				return
 			}
-			shippedEscape.defs = append(shippedEscape.defs, def)
+			shippedEscape.defs = append(shippedEscape.defs, *def)
 		}
 	})
 	if shippedEscape.err != nil {

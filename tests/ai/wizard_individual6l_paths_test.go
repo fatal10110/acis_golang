@@ -65,7 +65,7 @@ func TestWizardSaintSelfRangeDDMagicStrikesNearAtWalkEnd(t *testing.T) {
 		t.Fatal("saint arriving 20 from its most hated wants its middle range DD magic")
 	}
 
-	shortKey := actorcast.ReuseKey(modelskill.Definition{ID: wShortDDID, Level: 1})
+	shortKey := actorcast.ReuseKey(&modelskill.Definition{ID: wShortDDID, Level: 1})
 	waiting := w.i6lWalkTo(t, i6lSelfID, -120, 30, func(h *npc.Hostile) { h.DisableSkill(shortKey, time.Minute) })
 	if !castOn(waiting, i6gDebuff, me) {
 		t.Fatal("saint arriving near its most hated, short range DD magic in reuse, wants no debuff on it")

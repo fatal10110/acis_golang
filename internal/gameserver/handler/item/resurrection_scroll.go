@@ -110,14 +110,14 @@ func deadPetRefusal(userID int32, owner attackable.Combatant) ResurrectionScroll
 // resurrection scroll at all. Each one is cast as an ordinary skill: no
 // item carries it, so the scroll is not consumed as the item used, only as
 // the skill's own consume item.
-func ResolveResurrectionScrollSkills(tmpl *modelitem.Template, defs actorcast.Definitions) ([]modelskill.Definition, bool) {
+func ResolveResurrectionScrollSkills(tmpl *modelitem.Template, defs actorcast.Definitions) ([]*modelskill.Definition, bool) {
 	if tmpl == nil || tmpl.Kind != modelitem.KindEtcItem || tmpl.EtcItem == nil || tmpl.EtcItem.Handler != ScrollsOfResurrectionHandler {
 		return nil, false
 	}
 	if defs == nil {
 		return nil, true
 	}
-	out := make([]modelskill.Definition, 0, len(tmpl.AttachedSkills))
+	out := make([]*modelskill.Definition, 0, len(tmpl.AttachedSkills))
 	for _, ref := range tmpl.AttachedSkills {
 		if def, ok := defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)}); ok {
 			out = append(out, def)

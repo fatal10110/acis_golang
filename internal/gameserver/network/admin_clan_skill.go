@@ -237,7 +237,7 @@ func (l *GameClientLink) clanSkillCatalog() []modelskill.Definition {
 	var out []modelskill.Definition
 	for id := modelskill.ID(firstClanSkillID); id <= lastClanSkillID; id++ {
 		if def, ok := l.skills.Definition(modelskill.Ref{ID: id, Level: l.skills.MaxLevel(id)}); ok {
-			out = append(out, def)
+			out = append(out, *def)
 		}
 	}
 	return out

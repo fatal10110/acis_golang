@@ -119,7 +119,7 @@ func shippedSkill(t *testing.T, ref modelskill.Ref) modelskill.Definition {
 	if !ok {
 		t.Fatalf("no shipped skill %d level %d", ref.ID, ref.Level)
 	}
-	return def
+	return *def
 }
 
 // seedSkills stores the skill lines' skills as the character's, before it

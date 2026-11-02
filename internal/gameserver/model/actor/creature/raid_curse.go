@@ -21,7 +21,7 @@ const (
 
 // RaidCurseSkills looks up loaded curse skill definitions.
 type RaidCurseSkills interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // RaidCurseTarget is a raid-related Attackable that can apply a curse and
@@ -180,8 +180,8 @@ func applyRaidCurse(in RaidCurseInput, target RaidCurseTarget, skillID modelskil
 	if !ok {
 		return false
 	}
-	broadcastRaidCurse(in, target, def)
-	applyRaidCurseEffects(in.Attacker, target, def)
+	broadcastRaidCurse(in, target, *def)
+	applyRaidCurseEffects(in.Attacker, target, *def)
 	if stopHate {
 		target.StopAggroHate(in.Attacker)
 		return true
@@ -189,9 +189,9 @@ func applyRaidCurse(in RaidCurseInput, target RaidCurseTarget, skillID modelskil
 	return false
 }
 
-func lookupRaidCurse(skills RaidCurseSkills, id modelskill.ID) (modelskill.Definition, bool) {
+func lookupRaidCurse(skills RaidCurseSkills, id modelskill.ID) (*modelskill.Definition, bool) {
 	if skills == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return skills.Definition(modelskill.Ref{ID: id, Level: raidCurseSkillLevel})
 }

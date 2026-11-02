@@ -104,7 +104,7 @@ func TestPlayerPreAttemptGateRejectsBeforeAnyCost(t *testing.T) {
 			name: "reuse before sitting", skillID: gateActiveSkillID,
 			setup: func(t *testing.T, srv *gameservertest.Server, objID int32) {
 				onPlayerQueue(t, srv, objID, func(pc *player.Character) {
-					pc.DisableSkill(cast.ReuseKey(gateSkills()[0]), time.Minute)
+					pc.DisableSkill(cast.ReuseKey(&gateSkills()[0]), time.Minute)
 				})
 				sit(t, srv, objID)
 			},

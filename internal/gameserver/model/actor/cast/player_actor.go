@@ -46,7 +46,7 @@ func (a PlayerActor) HP() int {
 }
 
 // MPInitialCost is def's up-front MP cost, scaled by the caster's skill MP-consume rate.
-func (a PlayerActor) MPInitialCost(def modelskill.Definition) int {
+func (a PlayerActor) MPInitialCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPInitialConsume)
 }
 
@@ -54,7 +54,7 @@ func (a PlayerActor) MPInitialCost(def modelskill.Definition) int {
 // extra danceCount * def.NextDanceCost surcharge for each dance/song
 // already active on the caster, then the whole sum is scaled by the
 // caster's dance MP-consume rate: casting more dances costs more MP.
-func (a PlayerActor) MPCost(def modelskill.Definition) int {
+func (a PlayerActor) MPCost(def *modelskill.Definition) int {
 	mp := def.MPConsume
 	if def.Dance {
 		if dc := a.danceCount(); dc > 0 {
@@ -71,7 +71,7 @@ func (a PlayerActor) danceCount() int {
 	return a.Character.EffectList().DanceCount()
 }
 
-func (a PlayerActor) scaleMP(def modelskill.Definition, mp int) int {
+func (a PlayerActor) scaleMP(def *modelskill.Definition, mp int) int {
 	if a.Character == nil {
 		return mp
 	}
@@ -156,7 +156,7 @@ func (PlayerActor) SpiritshotCharged() bool { return false }
 
 func (PlayerActor) BlessedSpiritshotCharged() bool { return false }
 
-func (a PlayerActor) SkillMastery(def modelskill.Definition) bool {
+func (a PlayerActor) SkillMastery(def *modelskill.Definition) bool {
 	if a.Character == nil || def.SkillType == "FISHING" {
 		return false
 	}

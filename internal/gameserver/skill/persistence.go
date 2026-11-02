@@ -386,7 +386,7 @@ func (p *Persistence) ReplayEffects(c *player.Character, applied func()) {
 			if !ok {
 				continue
 			}
-			effect.ApplyRestored(list, self, self, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
+			effect.ApplyRestored(list, self, self, effect.SkillFromDefinition(*def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
 		}
 		if applied != nil {
 			applied()
@@ -426,7 +426,7 @@ func (p *Persistence) ApplyTransientPassiveSkill(c *player.Character, skillID, o
 	if !ok || def.Activation != modelskill.ActivationPassive {
 		return nil
 	}
-	fns, err := effect.PassiveFuncs(def)
+	fns, err := effect.PassiveFuncs(*def)
 	if err != nil {
 		return fmt.Errorf("apply transient passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
 	}
@@ -458,7 +458,7 @@ func (p *Persistence) setKnownSkill(c *player.Character, skillID, level int, per
 	if !ok || def.Activation != modelskill.ActivationPassive {
 		return nil
 	}
-	fns, err := effect.PassiveFuncs(def)
+	fns, err := effect.PassiveFuncs(*def)
 	if err != nil {
 		return fmt.Errorf("apply passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
 	}
@@ -650,7 +650,7 @@ func (p *Persistence) augmentationGrant(inst *item.Instance, aug item.Augmentati
 	}
 	g := itemSkillGrant{def: def, noEquipDelay: true}
 	if def.Activation == modelskill.ActivationPassive {
-		fns, err := effect.PassiveFuncs(def)
+		fns, err := effect.PassiveFuncs(*def)
 		if err != nil {
 			return nil, nil, fmt.Errorf("skill %d level %d: %w", aug.SkillID, aug.SkillLevel, err)
 		}
@@ -832,7 +832,7 @@ func (p *Persistence) listenerSkillGrant(ref modelskill.Ref) (g itemSkillGrant, 
 	}
 	g = itemSkillGrant{def: def, noEquipDelay: true}
 	if def.Activation == modelskill.ActivationPassive {
-		if g.fns, err = effect.PassiveFuncs(def); err != nil {
+		if g.fns, err = effect.PassiveFuncs(*def); err != nil {
 			return itemSkillGrant{}, false, err
 		}
 	}
@@ -926,7 +926,7 @@ func removeItemSkill(c *player.Character, skillID int) bool {
 // itemSkillGrant is one loaded tmpl.AttachedSkills entry and, for a passive
 // one, the stat functions it attaches, owned by the skill.
 type itemSkillGrant struct {
-	def modelskill.Definition
+	def *modelskill.Definition
 	fns []effect.Mod
 	// noEquipDelay skips the equip-delay reuse timer an ACTIVE item skill
 	// arms: the +4 enchant skill is added without one.
@@ -945,7 +945,7 @@ func (p *Persistence) itemSkillGrants(tmpl *item.Template) ([]itemSkillGrant, er
 		}
 		g := itemSkillGrant{def: def}
 		if def.Activation == modelskill.ActivationPassive {
-			fns, err := effect.PassiveFuncs(def)
+			fns, err := effect.PassiveFuncs(*def)
 			if err != nil {
 				return nil, fmt.Errorf("item %d passive skill %d level %d: %w", tmpl.ID, ref.ID, ref.Level, err)
 			}
@@ -1120,7 +1120,7 @@ func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcon
 }
 
 // Definition returns a loaded skill definition.
-func (p *Persistence) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (p *Persistence) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	return p.definition(ref)
 }
 
@@ -1166,7 +1166,7 @@ func (p *Persistence) applyKnownSkills(c *player.Character, levels player.SkillL
 		if !ok || def.Activation != modelskill.ActivationPassive {
 			continue
 		}
-		fns, err := effect.PassiveFuncs(def)
+		fns, err := effect.PassiveFuncs(*def)
 		if err != nil {
 			return fmt.Errorf("restore passive stats for character %d skill %d level %d: %w", c.ID, id, level, err)
 		}
@@ -1185,9 +1185,9 @@ func (p *Persistence) lookup(ref modelskill.Ref) (bool, bool) {
 	return true, len(def.Effects) > 0
 }
 
-func (p *Persistence) definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (p *Persistence) definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	if p == nil || p.skills == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return p.skills.Get(ref.ID, ref.Level)
 }

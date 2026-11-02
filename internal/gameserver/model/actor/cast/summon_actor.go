@@ -34,8 +34,8 @@ func (a SummonActor) HP() int {
 	}
 	return int(a.Summon.HP())
 }
-func (SummonActor) MPInitialCost(d modelskill.Definition) int { return d.MPInitialConsume }
-func (SummonActor) MPCost(d modelskill.Definition) int        { return d.MPConsume }
+func (SummonActor) MPInitialCost(d *modelskill.Definition) int { return d.MPInitialConsume }
+func (SummonActor) MPCost(d *modelskill.Definition) int        { return d.MPConsume }
 func (a SummonActor) ReduceMP(n int) {
 	if a.Summon != nil {
 		a.Summon.ReduceMP(float64(n))
@@ -78,7 +78,7 @@ func (a SummonActor) SpiritshotCharged() bool { return a.Summon != nil && a.Summ
 func (a SummonActor) BlessedSpiritshotCharged() bool {
 	return a.Summon != nil && a.Summon.BlessedSpiritshotCharged()
 }
-func (SummonActor) SkillMastery(modelskill.Definition) bool { return false }
+func (SummonActor) SkillMastery(*modelskill.Definition) bool { return false }
 
 // ItemCount reads the owner's inventory: a summon's skill item cost is
 // checked against the stack its owner carries.

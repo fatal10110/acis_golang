@@ -42,7 +42,7 @@ var (
 // request that passes behind it. A caster still sitting down is not seated
 // yet: the request waits out the sit-down and is refused once it ends.
 // Every skill request path of a player shares it.
-func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Target, def modelskill.Definition) error {
+func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Target, def *modelskill.Definition) error {
 	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -61,7 +61,7 @@ func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Targe
 // CanPlayerAttemptItemCast is the pre-attempt gate of an item-carried
 // skill. It differs from CanPlayerAttemptCast only in that a toggle runs
 // the shared skill checks rather than CanCastToggle's.
-func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target Target, def modelskill.Definition) error {
+func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target Target, def *modelskill.Definition) error {
 	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -73,7 +73,7 @@ func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target T
 
 // playerAttemptRules is the player-only part of the pre-attempt gate;
 // sitting is whether the caster counts as seated.
-func (c *Controller) playerAttemptRules(caster *player.Character, target Target, def modelskill.Definition, sitting bool) error {
+func (c *Controller) playerAttemptRules(caster *player.Character, target Target, def *modelskill.Definition, sitting bool) error {
 	if err := playerStateBlocksCast(caster, def, sitting); err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func siegeSummonRefusal(caster *player.Character) error {
 
 // playerStateBlocksCast rejects a cast the caster's own state forbids, in the
 // specified order.
-func playerStateBlocksCast(caster *player.Character, def modelskill.Definition, sitting bool) error {
+func playerStateBlocksCast(caster *player.Character, def *modelskill.Definition, sitting bool) error {
 	if caster.WearingFormalWear() {
 		return ErrFormalWear
 	}
@@ -126,7 +126,7 @@ func playerStateBlocksCast(caster *player.Character, def modelskill.Definition, 
 	return nil
 }
 
-func fishingSkill(def modelskill.Definition) bool {
+func fishingSkill(def *modelskill.Definition) bool {
 	switch def.SkillType {
 	case "FISHING", "PUMPING", "REELING":
 		return true

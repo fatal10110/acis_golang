@@ -146,7 +146,7 @@ var errCollarGone = errors.New("summon: collar no longer in inventory")
 // itself, answering a refusal, and returns the cast's Schedule, or nil when
 // it was refused. A collar that left inv since it was used refuses the cast
 // with NOT_ENOUGH_ITEMS.
-func (l *GameClientLink) beginSummonCreatureCast(live *livePlayer, inv *itemcontainer.Inventory, collar *item.Instance, def skillref.Definition) func() {
+func (l *GameClientLink) beginSummonCreatureCast(live *livePlayer, inv *itemcontainer.Inventory, collar *item.Instance, def *skillref.Definition) func() {
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Controller:  controller,
@@ -211,7 +211,7 @@ func (l *GameClientLink) beginSummonCreatureCast(live *livePlayer, inv *itemcont
 				// resolves the item back to a pet template and spawns it —
 				// ApplyEffectsResult drives that the same way it drives every
 				// other skill's Hit-phase effects.
-				result := actorcast.ApplyItemEffectsResult(l.castEffects(), live.Character, target, def, collar)
+				result := actorcast.ApplyItemEffectsResult(l.castEffects(), live.Character, target, *def, collar)
 				l.sendSkillHandlerResult(live, result)
 				l.syncCubicTargets(live, result, def)
 			},

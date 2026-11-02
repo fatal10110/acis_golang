@@ -29,7 +29,7 @@ var shippedEscapeScrollSkill = sync.OnceValues(func() (modelskill.Definition, er
 		return modelskill.Definition{}, err
 	}
 	def, _ := table.Definition(modelskill.Ref{ID: 2013, Level: 1})
-	return def, nil
+	return *def, nil
 })
 
 // TestEscapeScrollRecallsToTown pins the Scroll of Escape half of the

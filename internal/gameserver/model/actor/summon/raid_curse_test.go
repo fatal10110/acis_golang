@@ -115,9 +115,12 @@ func (n *raidCurseNPC) StopAggroHate(attackable.Combatant) {
 
 type raidCurseSkillTable map[modelskill.Ref]modelskill.Definition
 
-func (s raidCurseSkillTable) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (s raidCurseSkillTable) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	def, ok := s[ref]
-	return def, ok
+	if !ok {
+		return nil, false
+	}
+	return &def, true
 }
 
 func newRaidCurseSkillTable() raidCurseSkillTable {

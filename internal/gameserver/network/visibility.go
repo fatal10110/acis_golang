@@ -187,7 +187,7 @@ type discoveredCreature interface {
 
 // castInFlight is the cast controller surface describeState reads.
 type castInFlight interface {
-	InFlight() (modelskill.Definition, actorcast.Target, bool)
+	InFlight() (*modelskill.Definition, actorcast.Target, bool)
 }
 
 // Every production cast controller is an *actorcast.Controller; pin that it

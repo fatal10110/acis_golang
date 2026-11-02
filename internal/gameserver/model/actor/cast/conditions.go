@@ -18,7 +18,7 @@ func (*ConditionError) Error() string { return "cast: skill condition not met" }
 // item costs: whether def's <cond> clauses hold against target. Player and
 // summon casters evaluate them; NPC casts never do.
 type conditionGate interface {
-	SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool)
+	SkillConditions(target Target, def *modelskill.Definition) (modelskill.ConditionClause, bool)
 }
 
 // olympiadGate is the optional Actor capability CanCast asks after the
@@ -45,7 +45,7 @@ type boatRider interface {
 }
 
 // ServitorSummon reports whether def summons a servitor rather than a cubic.
-func ServitorSummon(def modelskill.Definition) bool {
+func ServitorSummon(def *modelskill.Definition) bool {
 	return def.SkillType == "SUMMON" && !def.IsCubic
 }
 
@@ -76,7 +76,7 @@ func (a PlayerActor) AttackingNow() bool {
 }
 
 // olympiadRestricted reports whether def is barred from Olympiad matches.
-func olympiadRestricted(def modelskill.Definition) bool {
+func olympiadRestricted(def *modelskill.Definition) bool {
 	return def.HeroSkill || def.SkillType == "RESURRECT"
 }
 
@@ -96,20 +96,20 @@ func (a SummonActor) ActingPlayerInOlympiad() bool {
 }
 
 // SkillConditions evaluates def's <cond> clauses with the player as caster.
-func (a PlayerActor) SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool) {
-	return conditions.EvaluateSkill(def, a.Character, target)
+func (a PlayerActor) SkillConditions(target Target, def *modelskill.Definition) (modelskill.ConditionClause, bool) {
+	return conditions.EvaluateSkill(*def, a.Character, target)
 }
 
 // SkillConditions evaluates def's <cond> clauses with the summon as caster.
-func (a SummonActor) SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool) {
-	return conditions.EvaluateSkill(def, a.Summon, target)
+func (a SummonActor) SkillConditions(target Target, def *modelskill.Definition) (modelskill.ConditionClause, bool) {
+	return conditions.EvaluateSkill(*def, a.Summon, target)
 }
 
 // WeaponAllowed reports whether a creature holding the item types in held
 // (see Actor.HeldItemTypeMask) may use def: def names no weapon or shield
 // type, or held shares a bit with one it names. A name that is no weapon
 // or armor type restricts nothing.
-func WeaponAllowed(def modelskill.Definition, held int32) bool {
+func WeaponAllowed(def *modelskill.Definition, held int32) bool {
 	if def.WeaponsAllowed == "" {
 		return true
 	}

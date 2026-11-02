@@ -677,7 +677,7 @@ func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
 // finds the cast in flight: it swings nothing, and a target in reach is
 // answered with ActionFailed. Any other queued intention runs as usual; the
 // stop's own idle (endCastStop) then ends whatever walk it started.
-func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant, stopped bool) {
+func (l *GameClientLink) finishLiveCast(live *livePlayer, def *modelskill.Definition, target attackable.Combatant, stopped bool) {
 	if stopped && live.dropDeferredCast() {
 		sendMagicActionFailed(live)
 		return
@@ -764,7 +764,7 @@ func (l *GameClientLink) runDeferredAction(live *livePlayer, busy func(*livePlay
 // target when live may attack it without force, held with the cast's shift
 // modifier; anything else, a toggle included, goes idle. A stopped cast
 // still counts as in flight for that attack (attackAfterCast).
-func (live *livePlayer) endCastIntention(def modelskill.Definition, target attackable.Combatant, stopped bool) {
+func (live *livePlayer) endCastIntention(def *modelskill.Definition, target attackable.Combatant, stopped bool) {
 	if live.combat == nil {
 		return
 	}
@@ -781,7 +781,7 @@ func (live *livePlayer) endCastIntention(def modelskill.Definition, target attac
 // walks. It reports false, starting nothing, for any other skill, or a
 // target live may not attack without force. After a stopped cast the attack
 // is thought as if the cast were still in flight: it swings nothing.
-func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant, shift, stopped bool) bool {
+func (live *livePlayer) attackAfterCast(def *modelskill.Definition, target attackable.Combatant, shift, stopped bool) bool {
 	if live.combat == nil || !def.NextActionIsAttack || target == nil {
 		return false
 	}

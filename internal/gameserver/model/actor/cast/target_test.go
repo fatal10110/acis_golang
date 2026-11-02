@@ -30,7 +30,7 @@ func TestSelectTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := SelectTarget(caster, tt.selected, modelskill.Definition{Target: tt.target})
+			got, ok := SelectTarget(caster, tt.selected, &modelskill.Definition{Target: tt.target})
 			if ok != tt.wantOK || got != tt.want {
 				t.Fatalf("SelectTarget() = (%v, %v), want (%v, %v)", got, ok, tt.want, tt.wantOK)
 			}

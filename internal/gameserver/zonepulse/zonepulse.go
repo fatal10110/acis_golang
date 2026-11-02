@@ -30,7 +30,7 @@ type Objects interface {
 
 // Skills resolves a skill reference to its loaded definition.
 type Skills interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // Target is an occupant's world object as a pulse acts on it.
@@ -228,10 +228,10 @@ func landSkills(cfg *Config, z *zone.Effect, t Target) {
 		if !ok {
 			continue
 		}
-		if !cfg.Effects.Conditions(t, def) || holds(t, ref.ID) {
+		if !cfg.Effects.Conditions(t, *def) || holds(t, ref.ID) {
 			continue
 		}
-		cfg.Effects.Land(t, def)
+		cfg.Effects.Land(t, *def)
 	}
 }
 

@@ -494,7 +494,7 @@ func TestShippedFearCountsOnPlayableAndMonster(t *testing.T) {
 			{hostile, player, 5},
 			{player, hostile, 10},
 		} {
-			e := landShippedEffect(t, tc.effector, tc.target, def)
+			e := landShippedEffect(t, tc.effector, tc.target, *def)
 			if got := e.Remaining(); got != tc.want {
 				t.Fatalf("skill %d on %T: Remaining() = %d, want %d", id, tc.target, got, tc.want)
 			}

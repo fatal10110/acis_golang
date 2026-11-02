@@ -34,8 +34,8 @@ func (w *warriorWorld) fearNPC(t *testing.T, h *npc.Hostile) {
 // but still tracked, refuses it under fear and not without.
 func TestFearedNPCRefusesCastDesireWhileAnySkillWaits(t *testing.T) {
 	t.Parallel()
-	otherKey := actorcast.ReuseKey(modelskill.Definition{ID: wizardMuteID, Level: 1})
-	ownKey := actorcast.ReuseKey(modelskill.Definition{ID: wizardDDID, Level: 1})
+	otherKey := actorcast.ReuseKey(&modelskill.Definition{ID: wizardMuteID, Level: 1})
+	ownKey := actorcast.ReuseKey(&modelskill.Definition{ID: wizardDDID, Level: 1})
 	for _, row := range []struct {
 		name   string
 		feared bool

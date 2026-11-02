@@ -56,7 +56,7 @@ type TargetCast struct {
 	// Skills are cast, in order, on the user's current target as ordinary
 	// skill requests when Refusal is TargetCastAllowed. The item itself is
 	// not consumed: a skill that costs it names it as its consume item.
-	Skills []modelskill.Definition
+	Skills []*modelskill.Definition
 	// CtrlForces reports that the UseItem Ctrl modifier is the casts'
 	// force-use flag. Otherwise they are cast with no modifiers.
 	CtrlForces bool
@@ -97,7 +97,7 @@ func resolveKey(tmpl *modelitem.Template, user TargetCastUser, defs actorcast.De
 	if len(tmpl.AttachedSkills) == 0 {
 		return TargetCast{Handled: true, Refusal: TargetCastNoSkills}
 	}
-	skills := make([]modelskill.Definition, 0, len(tmpl.AttachedSkills))
+	skills := make([]*modelskill.Definition, 0, len(tmpl.AttachedSkills))
 	for _, ref := range tmpl.AttachedSkills {
 		if def, ok := resolveSkillRef(ref, defs); ok {
 			skills = append(skills, def)
@@ -119,7 +119,7 @@ func resolveSoulCrystal(tmpl *modelitem.Template, user TargetCastUser, defs acto
 	if _, ok := user.Target().(skilltarget.Actor); !ok {
 		return TargetCast{Handled: true, Refusal: TargetCastInvalidTarget}
 	}
-	return TargetCast{Handled: true, Skills: []modelskill.Definition{def}, CtrlForces: true}
+	return TargetCast{Handled: true, Skills: []*modelskill.Definition{def}, CtrlForces: true}
 }
 
 // resolveBeastSpice casts the spice's first skill on a FeedableBeast
@@ -136,12 +136,12 @@ func resolveBeastSpice(tmpl *modelitem.Template, user TargetCastUser, defs actor
 	if !ok {
 		return TargetCast{Handled: true, Refusal: TargetCastSilent}
 	}
-	return TargetCast{Handled: true, Skills: []modelskill.Definition{def}}
+	return TargetCast{Handled: true, Skills: []*modelskill.Definition{def}}
 }
 
-func resolveSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (modelskill.Definition, bool) {
+func resolveSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (*modelskill.Definition, bool) {
 	if defs == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
 }

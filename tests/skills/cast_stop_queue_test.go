@@ -87,7 +87,7 @@ func assertQueuedSkillDropped(t *testing.T, srv *gameservertest.Server, c *tests
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("a cast is in flight after the stop")
 	}
-	key := cast.ReuseKey(stopQueueSkills()[1])
+	key := cast.ReuseKey(&stopQueueSkills()[1])
 	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
 		if pc.SkillDisabled(key) {
 			t.Error("queued skill's reuse was stamped")
@@ -195,7 +195,7 @@ func TestQueuedSkillStillRunsAfterNaturalFinish(t *testing.T) {
 
 	srv.AdvanceUntil(t, "queued skill start", func() bool {
 		var started bool
-		onPlayerQueue(t, srv, objID, func(pc *player.Character) { started = pc.SkillDisabled(cast.ReuseKey(stopQueueSkills()[1])) })
+		onPlayerQueue(t, srv, objID, func(pc *player.Character) { started = pc.SkillDisabled(cast.ReuseKey(&stopQueueSkills()[1])) })
 		return started
 	})
 	if frames := queueFrames(t, c); !castStartedFor(t, frames, stopQueuePhysicalSkillID) {
