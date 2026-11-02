@@ -6,3 +6,7 @@ log
 ops/admin-panel/admin-panel
 .env
 backups/
+
+# Packed geodata cache the game server and cmd/geopack write.
+geodata.cache
+geodata.cache.tmp*

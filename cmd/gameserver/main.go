@@ -102,6 +102,7 @@ type gameServerPaths struct {
 	PlayersConfigPath string
 	HexIDPath         string
 	GeoConfigPath     string
+	GeoCachePath      string
 	NpcsConfigPath    string
 	ClansConfigPath   string
 	EventsConfigPath  string
@@ -123,6 +124,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.PlayersConfigPath, "players-config", "config/players.properties", "player properties file")
 	flag.StringVar(&paths.HexIDPath, "hexid", "config/hexid.txt", "game server hexid properties file")
 	flag.StringVar(&paths.GeoConfigPath, "geo-config", "config/geoengine.properties", "geoengine properties file")
+	flag.StringVar(&paths.GeoCachePath, "geodata-cache", "geodata.cache", "packed geodata cache file, built from the region files when missing or stale; empty loads the region files onto the heap")
 	flag.StringVar(&paths.NpcsConfigPath, "npcs-config", "config/npcs.properties", "npc properties file")
 	flag.StringVar(&paths.ClansConfigPath, "clans-config", "config/clans.properties", "clan properties file")
 	flag.StringVar(&paths.EventsConfigPath, "events-config", "config/events.properties", "events properties file")

@@ -36,10 +36,11 @@ func bootDoors(t *testing.T, tmpls []*door.Template, ids *sequentialIDs, state *
 	t.Helper()
 	geo := engine.New()
 	for _, tmpl := range tmpls {
-		region := block.NewRegion()
+		builder := block.NewRegionBuilder()
 		for i := range block.RegionBlockCount {
-			region.SetFlat(i, int16(tmpl.Position.Z))
+			builder.SetFlat(i, int16(tmpl.Position.Z))
 		}
+		region := builder.Build()
 		regionX := engine.TileXMin + (tmpl.Position.X-engine.WorldXMin)/engine.TileSize
 		regionY := engine.TileYMin + (tmpl.Position.Y-engine.WorldYMin)/engine.TileSize
 		if err := geo.SetRegion(regionX, regionY, region); err != nil {

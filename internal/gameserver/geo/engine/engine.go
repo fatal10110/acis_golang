@@ -142,11 +142,11 @@ func (e *Engine) NSWENearest(geoX, geoY, worldZ int) block.NSWE {
 // always answers open, same as every other null-block query on this engine.
 func (e *Engine) NodeBelow(geoX, geoY, worldZ int) (height int16, nswe block.NSWE, ok bool) {
 	b := e.blockAtGeo(geoX, geoY)
-	layer := b.Below(localCell(geoX), localCell(geoY), int32(worldZ))
+	layer, cell := b.belowCell(localCell(geoX), localCell(geoY), int32(worldZ), nil)
 	if layer == -1 {
 		return 0, 0, false
 	}
-	return b.Height(layer), b.NSWE(layer), true
+	return cell.Height, cell.NSWE, true
 }
 
 // NodeAtOrAbove returns the resolved height and own decoded NSWE mask of the
@@ -179,11 +179,11 @@ func (e *Engine) Above(geoX, geoY, worldZ int) (int16, bool) {
 	if !b.HasGeodata() {
 		return 0, false
 	}
-	layer := b.Above(localCell(geoX), localCell(geoY), int32(worldZ))
+	layer, cell := b.aboveCell(localCell(geoX), localCell(geoY), int32(worldZ), nil)
 	if layer == -1 {
 		return 0, false
 	}
-	return b.Height(layer), true
+	return cell.Height, true
 }
 
 // CanMove reports whether a straight move from origin to target crosses no blocked edge
