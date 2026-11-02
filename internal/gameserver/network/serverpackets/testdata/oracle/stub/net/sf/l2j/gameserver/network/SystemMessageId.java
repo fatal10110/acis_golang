@@ -14,6 +14,11 @@ public final class SystemMessageId
 	public static final SystemMessageId LOOTING_BY_TURN = new SystemMessageId(1034);
 	public static final SystemMessageId LOOTING_BY_TURN_INCLUDE_SPOIL = new SystemMessageId(1035);
 
+	public static final SystemMessageId PREPARATIONS_PERIOD_BEGUN = new SystemMessageId(1);
+	public static final SystemMessageId COMPETITION_PERIOD_BEGUN = new SystemMessageId(2);
+	public static final SystemMessageId RESULTS_PERIOD_BEGUN = new SystemMessageId(3);
+	public static final SystemMessageId VALIDATION_PERIOD_BEGUN = new SystemMessageId(4);
+
 	private final int _id;
 	private int _paramCount;
 

@@ -181,6 +181,20 @@ public final class Clan
 		return (int) members.values().stream().filter(ClanMember::isOnline).count();
 	}
 
+	public int getLeaderSubPledge(int leaderId)
+	{
+		int id = 0;
+		for (SubPledge sp : subPledges.values())
+		{
+			if (sp.getLeaderId() == 0)
+				continue;
+
+			if (sp.getLeaderId() == leaderId)
+				id = sp.getId();
+		}
+		return id;
+	}
+
 	public final SubPledge getSubPledge(int pledgeType)
 	{
 		return subPledges.get(pledgeType);

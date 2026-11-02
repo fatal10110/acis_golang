@@ -34,6 +34,10 @@ wrote into a byte buffer.
   `Update` and `Delete`, `PartySpelled`, `PartyMemberPosition`, `PartyMatchList`, `PartyMatchDetail`,
   `ExPartyRoomMember`, `ExManagePartyRoomMember`, `ExListPartyMatchingWaitingRoom`, `ExMPCCShowPartyMemberInfo`,
   `ExMultiPartyCommandChannelInfo`, `ExMPCCPartyInfoUpdate`, `ExOpenMPCC`, `ExCloseMPCC` and `ExClosePartyRoom`
+- the pledge windows (`ProbePledge.java`): `PledgeShowMemberListAll`, `Add` and `Update`, `PledgeInfo`,
+  `PledgeStatusChanged`, `PledgeShowInfoUpdate`, `ManagePledgePower`, `PledgeReceiveMemberInfo`, `PowerInfo`,
+  `WarList` and `SubPledgeCreated`, `PledgeSkillList` and `ListAdd`, `PledgeCrest`, `AllianceInfo`,
+  `GMViewPledgeInfo`, `ExHeroList` and `ShowMiniMap`
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
 - the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
   `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,
@@ -124,7 +128,21 @@ rows cast three doubles to int, so `ProbeParty.VITALS` adds NaN, infinity and va
 position list comes out in the order of a hash map keyed by object id, which the `PartyMemberPosition/ids*` cases
 pin with ids that share a bucket, arrive out of order, and grow the map past its first resize.
 
-Not yet probed (they read the engine clan, castle or skill graphs): the pledge windows that take a clan.
+The pledge windows (`ProbePledge.java`, `../../packets_oracle_pledge_test.go`) run the reference roster entry
+(`ClanMember`) over stand-ins for the clan, clan table, crest cache, hero manager and Seven Signs period (`Clan`,
+`ClanTable`, `CrestCache`, `HeroManager`, `SevenSignsManager`, `GameClient`, `StatSet`, `Config`; the player gains
+the title, power grade and mentor links). Which members a window lists, the names it shows for a sub-unit and its
+captain, and the order of the clan, alliance and hero tables are chosen before the encoder on the Go side, so each
+Go case hands the encoder the rows the stand-ins hand the reference, in the order the reference's hash tables list
+them (the roster table order is also covered by the clan registry oracle). The rows pin the quirks of the
+reference: an online member with object id 0 counts as offline in `PledgeShowMemberListUpdate`; an offline member
+shows no sex and race there but its stored ones in the full roster; the game master's view marks only a sponsor
+where the roster marks an apprentice too; a mentor outside the roster is named `Error`; a crest of any size but
+256 bytes is no crest; `AllianceInfo` of alliance 0 lists no clan; a rank without a mask has the empty one.
+The skill list probe uses ids that one table run lists in ascending order (the Go order differs for other ids: #4404).
+
+`StartPledgeWar`, `StopPledgeWar` and `SurrenderPledgeWar` are not probed: nothing in the reference ever builds
+them, and the Go side has no encoder for them.
 
 The manor set windows hold their seeds in a hash set and `SellListProcure` its rows in an
 identity-hash map, so their probes use one seed per castle and one row; the other manor windows
