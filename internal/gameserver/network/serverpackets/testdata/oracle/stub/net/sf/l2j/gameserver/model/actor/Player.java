@@ -24,6 +24,7 @@ import net.sf.l2j.gameserver.model.group.Party;
 import net.sf.l2j.gameserver.model.itemcontainer.PcInventory;
 import net.sf.l2j.gameserver.model.trade.TradeList;
 import net.sf.l2j.gameserver.model.pledge.Clan;
+import net.sf.l2j.gameserver.network.GameClient;
 
 // Stand-in for the world player: a plain value holder for the getters the
 // probed packets read.
@@ -98,6 +99,44 @@ public final class Player extends Playable
 	public NpcTemplate polymorphTemplate;
 	public int activeClass;
 	public Party party;
+	public int sponsor;
+	public int apprentice;
+	public int powerGrade;
+	public GameClient client;
+
+	public int getSponsor()
+	{
+		return sponsor;
+	}
+
+	public int getApprentice()
+	{
+		return apprentice;
+	}
+
+	public int getPowerGrade()
+	{
+		return powerGrade;
+	}
+
+	public void setPowerGrade(int powerGrade)
+	{
+		this.powerGrade = powerGrade;
+	}
+
+	public void setPledgeType(int pledgeType)
+	{
+		this.pledgeType = pledgeType;
+	}
+
+	public GameClient getClient()
+	{
+		return client;
+	}
+
+	public void addSiegeSkills()
+	{
+	}
 
 	public boolean isOnline()
 	{

@@ -98,18 +98,6 @@ func TestFrameHennaInfo(t *testing.T) {
 	}
 }
 
-func TestFramePledgeSkillList(t *testing.T) {
-	got := framePayload(t, FramePledgeSkillList([]SkillListEntry{{ID: 370, Level: 2}}))
-	want := []byte{OpcodeExtended}
-	want = appendH(want, OpcodeExPledgeSkillList)
-	want = appendD(want, 1)
-	want = appendD(want, 370)
-	want = appendD(want, 2)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FramePledgeSkillList() = %x, want %x", got, want)
-	}
-}
-
 func TestFrameExCursedWeaponList(t *testing.T) {
 	got := framePayload(t, FrameExCursedWeaponList([]int32{8190, 8689}))
 	want := []byte{OpcodeExtended}

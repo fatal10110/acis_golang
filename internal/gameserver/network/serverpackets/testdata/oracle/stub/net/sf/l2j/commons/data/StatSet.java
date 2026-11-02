@@ -20,6 +20,23 @@ public final class StatSet
 		return ((Number) _map.get(key)).intValue();
 	}
 
+	public String getString(String key)
+	{
+		return (String) _map.get(key);
+	}
+
+	public String getString(String key, String defaultValue)
+	{
+		final Object val = _map.get(key);
+		return (val == null) ? defaultValue : (String) val;
+	}
+
+	public int getInteger(String key, int defaultValue)
+	{
+		final Object val = _map.get(key);
+		return (val == null) ? defaultValue : ((Number) val).intValue();
+	}
+
 	public boolean getBool(String key)
 	{
 		return (Boolean) _map.get(key);
