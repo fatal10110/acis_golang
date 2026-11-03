@@ -57,6 +57,9 @@ type Instance struct {
 
 	// name and title, once set, replace the template's; see Name and Title.
 	name, title atomic.Pointer[string]
+	// form is the NPC the NPC is shown as, nil while it is shown as itself;
+	// see Polymorph.
+	form atomic.Pointer[Template]
 }
 
 var supportedInstanceKinds = map[InstanceKind]struct{}{

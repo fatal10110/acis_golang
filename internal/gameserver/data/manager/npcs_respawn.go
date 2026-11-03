@@ -12,6 +12,13 @@ import (
 )
 
 func (n *Npcs) RespawnHook(actorID int32) func() {
+	// The look the NPC leaves in is the one it comes back in.
+	var form *npc.Template
+	if obj, ok := n.state.Object(actorID); ok {
+		if m, ok := obj.(interface{ Polymorph() *npc.Template }); ok {
+			form = m.Polymorph()
+		}
+	}
 	n.mu.Lock()
 	key, tracked := n.live[actorID]
 	if tracked {
@@ -19,6 +26,10 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		n.liveCount--
 	}
 	slot, ok := n.slot[key]
+	if tracked && ok {
+		slot.form = form
+		n.slot[key] = slot
+	}
 	n.mu.Unlock()
 	if !tracked || !ok {
 		return nil

@@ -1,8 +1,6 @@
 package npc
 
 import (
-	"sync/atomic"
-
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
@@ -98,12 +96,11 @@ type TowerRuntime struct {
 	Working *Template
 }
 
-// tower is a control tower's own state. form is its working form while it
-// works, nil while it stands dead.
+// tower is a control tower's own state. The tower works while it is shown
+// in a form (Polymorph), whichever it is, and stands dead otherwise.
 type tower struct {
 	siege   TowerSiege
 	working *Template
-	form    atomic.Pointer[Template]
 }
 
 // Tower reports a castle control tower.
@@ -115,8 +112,9 @@ func (f *Folk) Tower() bool {
 // TowerLife reports a life control tower.
 func (f *Folk) TowerLife() bool { return hostileKind(f.Instance) == lifeTower }
 
-// TowerWorking reports a control tower in its working form.
-func (f *Folk) TowerWorking() bool { return f.towerState.form.Load() != nil }
+// TowerWorking reports a control tower shown in a form: its working one, or
+// any other a game master gave it.
+func (f *Folk) TowerWorking() bool { return f.Tower() && f.Polymorph() != nil }
 
 // PolymorphTower puts a control tower in its working form, as a siege
 // starts: the players around it see it go and come back as it now is. A
@@ -125,8 +123,7 @@ func (f *Folk) PolymorphTower() {
 	if !f.Tower() || f.towerState.working == nil {
 		return
 	}
-	f.towerState.form.Store(f.towerState.working)
-	f.reappear()
+	f.Morph(f.towerState.working)
 }
 
 // UnpolymorphTower stands a control tower dead at full HP, as a siege
@@ -137,8 +134,7 @@ func (f *Folk) UnpolymorphTower() {
 		return
 	}
 	f.SetHP(f.MaxHPValue())
-	f.towerState.form.Store(nil)
-	f.reappear()
+	f.Morph(nil)
 }
 
 // TowerMidVictory is a control tower's turn when its castle changes hands
@@ -152,19 +148,8 @@ func (f *Folk) TowerMidVictory() {
 		f.SetHP(f.MaxHPValue())
 		f.PolymorphTower()
 	case !f.TowerLife() && f.TowerWorking():
-		f.towerState.form.Store(nil)
-		f.reappear()
+		f.Morph(nil)
 	}
-}
-
-// reappear takes the NPC off the grid and puts it back where it stands:
-// the players around it forget it, then see it again as it now is.
-func (f *Folk) reappear() {
-	if f.world == nil {
-		return
-	}
-	f.world.Leave(f)
-	f.world.Rejoin(f)
 }
 
 // towerHit is a hit on a control tower, after its HP is touched. A working
@@ -175,11 +160,11 @@ func (f *Folk) towerHit() {
 	if s == nil || !s.InProgress() {
 		return
 	}
-	form := f.towerState.form.Load()
-	if form == nil || f.HP() > folkMinHP || !f.towerState.form.CompareAndSwap(form, nil) {
+	form := f.Instance.form.Load()
+	if form == nil || f.HP() > folkMinHP || !f.Instance.form.CompareAndSwap(form, nil) {
 		return
 	}
-	f.reappear()
+	reshow(f.world, f)
 	if f.TowerLife() {
 		s.LifeTowerDown()
 	}

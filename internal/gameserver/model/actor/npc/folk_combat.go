@@ -398,9 +398,10 @@ func (f *Folk) StopAbnormalEffect(mask int) { f.abnormalEffect.And(^int32(mask))
 func (f *Folk) UpdateAbnormalEffect() { f.emit(event.AbnormalEffectChanged{}) }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
-// always shown, the view an NPC that cannot move is announced with.
+// always shown, the view an NPC that cannot move is announced with. It never
+// shows a form.
 func (f *Folk) ServerObjectInfoSnapshot() npcinfo.Snapshot {
-	s := f.NPCInfoSnapshot()
+	s := f.infoSnapshot()
 	s.Name = f.Instance.Name()
 	return s
 }
