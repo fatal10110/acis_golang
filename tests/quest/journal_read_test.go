@@ -113,9 +113,9 @@ func TestJournalLoadsAtSelectionAndAnswersQuestList(t *testing.T) {
 }
 
 // TestFailedJournalLoadRefusesSelection selects a character whose journal
-// cannot be read. The selection is refused silently and the connection
-// stays at character select: entering with an empty journal would offer
-// one-time quest rewards again.
+// cannot be read. The selection is refused, answered with the character
+// list, and the connection stays at character select: entering with an empty
+// journal would offer one-time quest rewards again.
 func TestFailedJournalLoadRefusesSelection(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -129,6 +129,9 @@ func TestFailedJournalLoadRefusesSelection(t *testing.T) {
 	objID := srv.SoleObjectID(t)
 
 	c.Send(encodeRequestGameStart(0))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("refused selection: opcode %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
+	}
 	c.ExpectNoFrame()
 	if _, ok := srv.State.Player(objID); ok {
 		t.Fatal("refused selection registered the player in the world")

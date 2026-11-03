@@ -96,9 +96,10 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 
 // TestSelectRefusedWhenQueuedSavesTimeOut backs up a logged-out character's
 // persistence lane past the connection's wait budget and selects the
-// character again. The selection is refused silently rather than loading
-// rows the old session has not written; once the lane drains, a new
-// selection goes through.
+// character again. The selection is refused rather than loading rows the old
+// session has not written: the client gets its character list back, and the
+// wait that passed half its budget is logged with the lane and the owner.
+// Once the lane drains, a new selection goes through.
 func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -110,6 +111,7 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 		// goroutine; on a driven clock the read below would let virtual time
 		// pass while the budget has not.
 		gameservertest.WithRealPool(),
+		gameservertest.WithCapturedLog(),
 	)
 	startInWorld(t, srv.Client)
 	objID := srv.SoleObjectID(t)
@@ -125,9 +127,11 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 
 	c := srv.DialClient(t, "player1", 1)
 	c.Send(encodeRequestGameStart(0))
-	if frame := c.ReadWithTimeout(time.Second); frame != nil {
-		t.Fatalf("selection answered %#x while its queued saves were still held past the wait budget", frame[0])
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelectInfo, "refused selection's character list")
+	if _, ok := srv.State.Player(objID); ok {
+		t.Fatal("refused selection registered the player in the world")
 	}
+	assertSelectionWaitWarned(t, srv, objID)
 
 	release()
 	srv.FlushPersistence(t)

@@ -245,9 +245,10 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
   - `LivePlayerPersistWait` = 3 × `livePlayerDetachSaveTimeout` + `task.ItemInstanceSaveTimeout`
     = 16 s bounds every `awaitPersistence` wait: character select, restart, and a connection
     handler's exit after its detach. An autosave or other job queued ahead of the detach counts
-    against it. A select wait that gives up is logged and refuses the selection
-    (`network/client_loop.go`) rather than load unwritten rows; the restart and disconnect waits
-    log and carry on.
+    against it. A select wait that passes half its budget logs a warning naming the persistence
+    lane and the owner; one that gives up is logged and refuses the selection
+    (`network/character_select.go`), answered with the character list, rather than load unwritten
+    rows; the restart and disconnect waits log and carry on.
   - `task.ItemInstanceSaveTimeout` = 10 s: budget per item-save chunk and per shutdown step.
   - `task.ItemInstanceTickBudget` = 30 s (half the tick period): budget for one periodic item
     save. The tick runs under a context the ticker's stop cancels (`scheduler.StartContext`), so

@@ -457,8 +457,8 @@ func TestDetachingPlayerGetsNoJournalWrite(t *testing.T) {
 }
 
 // TestFailedSealedDrainRefusesSelection makes journal writes fail while a
-// character sets a condition and leaves: its next selection is refused
-// silently, since loading would lose the writes. Once writes succeed again
+// character sets a condition and leaves: its next selection is refused and
+// answered with the character list, since loading would lose the writes. Once writes succeed again
 // the next selection applies them first and loads them.
 func TestFailedSealedDrainRefusesSelection(t *testing.T) {
 	t.Parallel()
@@ -474,6 +474,9 @@ func TestFailedSealedDrainRefusesSelection(t *testing.T) {
 	restart(t, srv)
 
 	srv.Client.Send(encodeRequestGameStart(0))
+	if frame := srv.Client.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("refused selection: opcode %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
+	}
 	srv.Client.ExpectNoFrame()
 	if _, ok := srv.State.Player(objID); ok {
 		t.Fatal("refused selection registered the player")
