@@ -127,7 +127,7 @@ func TestMidSwingQueuedCastRefusedAtSwingEndDoesNotAttack(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(midSwingSkillID, false, false))
 	assertFrameOpcode(t, mustRead(t, c, "queued ActionFailed"), serverpackets.OpcodeActionFailed, "queued ActionFailed")
-	pc.DisableSkill(cast.ReuseKey(midSwingSkill()), 10*time.Minute)
+	pc.DisableSkill(cast.ReuseKey(new(midSwingSkill())), 10*time.Minute)
 
 	assertNoAttackFor(t, srv, c, 3*time.Second, "after the refused queued cast")
 	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.WakeAI() })

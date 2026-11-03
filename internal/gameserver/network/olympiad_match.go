@@ -452,7 +452,7 @@ func (a olympiadArena) Buff(objectID int32) {
 		}
 		for _, ref := range refs {
 			if def, ok := a.l.skills.Definition(ref); ok {
-				skillhandler.LandEffects(live.Character, live.Character, def)
+				skillhandler.LandEffects(live.Character, live.Character, *def)
 			}
 		}
 	})

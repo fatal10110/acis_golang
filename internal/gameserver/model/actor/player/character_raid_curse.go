@@ -10,7 +10,7 @@ import (
 var _ creature.RaidCurseAttacker = (*Character)(nil)
 
 type skillDefinitions interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // TestCursesOnAttack applies this player's raid petrification and mounted

@@ -38,7 +38,7 @@ func SkillStatFuncs(def modelskill.Definition) ([]Mod, error) {
 
 // skillLookup resolves a loaded skill definition by id and level.
 type skillLookup interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // TemplatePassiveMods resolves passives through lookup and builds each
@@ -55,7 +55,7 @@ func TemplatePassiveMods(lookup skillLookup, passives []modelskill.Ref) ([]Mod, 
 		if !ok {
 			continue
 		}
-		fns, err := SkillStatFuncs(def)
+		fns, err := SkillStatFuncs(*def)
 		if err != nil {
 			if errors.Is(err, ErrEnchantNeedsItem) {
 				continue

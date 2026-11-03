@@ -105,7 +105,7 @@ func (l *GameClientLink) userCommandEscape(live *livePlayer, _ int32) {
 	if !ok {
 		return
 	}
-	l.castItemSkills(live, live.Inventory(), nil, []modelskill.Definition{def}, false, false)
+	l.castItemSkills(live, live.Inventory(), nil, []*modelskill.Definition{def}, false, false)
 }
 
 // userCommandMount (/mount) mounts live on its rideable pet, or takes it

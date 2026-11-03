@@ -18,7 +18,7 @@ import (
 // broadcast and its effect actually landing.
 const cubicCastDelay = 2 * time.Second
 
-func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.EffectResult, def modelskill.Definition) {
+func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.EffectResult, def *modelskill.Definition) {
 	if result.CubicTouched {
 		l.syncCubicRuntime(caster, result.CubicID, def)
 	}
@@ -50,7 +50,7 @@ func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.E
 // runtime change happens under cubicsMu: whichever sync runs last sees the
 // final list, stops every runtime it no longer holds, and never starts a
 // runtime for an id that was evicted meanwhile.
-func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def modelskill.Definition) {
+func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def *modelskill.Definition) {
 	if live == nil {
 		return
 	}
@@ -77,7 +77,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 	runtime, exists := live.cubics[id]
 	if !exists {
 		interval := time.Duration(def.CubicActivationTime) * time.Second
-		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(def), def.CubicActivationChance, interval, func() {
+		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(*def), def.CubicActivationChance, interval, func() {
 			l.fireCubic(live, id, runtime)
 		}, func() {
 			l.expireCubic(live, id, runtime)
@@ -259,7 +259,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id, runtime) {
 			return
 		}
-		actorcast.ApplyCubicEffect(l.combat.skillHandlers, live, def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
+		actorcast.ApplyCubicEffect(l.combat.skillHandlers, live, *def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }

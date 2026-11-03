@@ -94,12 +94,16 @@ func (c *Controller) runSignetLaunch(seq uint64, launch func() int, failed func(
 	if !c.stillCasting(seq) {
 		return
 	}
-	def, _ := c.CurrentSkill()
+	def, casting := c.CurrentSkill()
 	n := 0
 	if launch != nil {
 		n = launch()
 	}
 	c.SetLaunchTargets(n)
+	if !casting {
+		// The cast ended after the check above; launch still ran.
+		return
+	}
 	if physical, magic := def.UsesSoulShot(), def.UsesSpiritShot(); physical || magic {
 		c.emit(event.ShotsRechargeRequested{Physical: physical, Magic: magic})
 	}

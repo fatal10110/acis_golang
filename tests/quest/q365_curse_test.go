@@ -60,7 +60,7 @@ func TestQ365RareFindsCurseOnce(t *testing.T) {
 					script.Catalog{q365Path: q365.New},
 				),
 				gameservertest.WithScriptRand(draws.rand),
-				gameservertest.WithScriptSkills(curse),
+				gameservertest.WithScriptSkills(*curse),
 			)
 			w.roles[w.player] = "player"
 			w.spawnFolk(t, "collob", q365Collob, 40, 0, 0)

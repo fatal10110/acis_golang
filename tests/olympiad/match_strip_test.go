@@ -122,7 +122,7 @@ func TestOlympiadMatchStripsBuffsAndRestores(t *testing.T) {
 		t.Fatal("no Might 1 among the shipped skills")
 	}
 	m.onCharacter(t, a, func(pc *player.Character) {
-		skillhandler.LandEffects(pc, pc, might)
+		skillhandler.LandEffects(pc, pc, *might)
 		pc.SetAutoSoulShot(stripSoulshot, true)
 	})
 	if !m.hasEffect(t, a, stripMight) {

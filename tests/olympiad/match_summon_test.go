@@ -211,7 +211,7 @@ func TestOlympiadMatchStripsServitorHeroGearAndRestores(t *testing.T) {
 	}
 	inv := alpha.Inventory()
 	m.onQueue(t, alpha, func() {
-		skillhandler.LandEffects(alpha, servitor, might)
+		skillhandler.LandEffects(alpha, servitor, *might)
 		alpha.AddOrRefreshCubic(cubic.Storm, true)
 		alpha.SetChargedShot(item.ShotSoul, true)
 		servitor.SetTarget(alpha)
@@ -278,7 +278,7 @@ func TestOlympiadMatchStripsServitorHeroGearAndRestores(t *testing.T) {
 
 	m.fighting(t)
 	m.onQueue(t, alpha, func() {
-		skillhandler.LandEffects(alpha, servitor, might)
+		skillhandler.LandEffects(alpha, servitor, *might)
 		alpha.IncreaseCharges(2, 7)
 	})
 	if m.srv.PlayerCharges(t, a.id) != 2 {

@@ -355,7 +355,7 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 			assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 			readCastStartFrames(t, c, objID, int32(def.ID), int32(def.Level), 500, 60_000, objID)
 
-			key := cast.ReuseKey(def)
+			key := cast.ReuseKey(&def)
 			if got := ch.HasSkillReuse(key); got != !tt.mastery {
 				t.Fatalf("HasSkillReuse(%d) = %v, want %v", key, got, !tt.mastery)
 			}

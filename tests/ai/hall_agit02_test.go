@@ -410,7 +410,7 @@ func TestDietrichStaysPutWhileLockedOutOfHisSkills(t *testing.T) {
 			w, _, dietrich, mikhail, _ := bootDevastatedCastle(t, classBishop, 0, siegeSkillBoot(t))
 			w.selectTarget(t, mikhail)
 			w.cast(t, siegeBlessID)
-			key := actorcast.ReuseKey(modelskill.Definition{ID: hallReuseCurse, Level: 1})
+			key := actorcast.ReuseKey(&modelskill.Definition{ID: hallReuseCurse, Level: 1})
 			w.onQueue(t, dietrich, func() { dietrich.DisableSkill(key, time.Millisecond) })
 			w.srv.Advance(t, hallTimerStep)
 			w.srv.Settle(t)

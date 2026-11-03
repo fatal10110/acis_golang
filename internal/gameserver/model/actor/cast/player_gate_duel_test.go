@@ -52,7 +52,7 @@ func TestPlayerPreAttemptGateRefusesTargetOutsideCasterDuel(t *testing.T) {
 				other.JoinDuel(tt.otherDuel)
 				other.SetDuelState(duel.Duelling)
 			}
-			err := ctrl.CanPlayerAttemptCast(caster, tt.aim(t, caster, other), def)
+			err := ctrl.CanPlayerAttemptCast(caster, tt.aim(t, caster, other), &def)
 			if tt.want == nil && err != nil {
 				t.Fatalf("CanPlayerAttemptCast = %v, want nil", err)
 			}

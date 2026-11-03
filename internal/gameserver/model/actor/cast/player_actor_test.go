@@ -59,19 +59,19 @@ func TestPlayerActorMPCostAppliesDanceSurcharge(t *testing.T) {
 	actor := PlayerActor{Character: ch}
 
 	dance := modelskill.Definition{Dance: true, MPConsume: 10, NextDanceCost: 4}
-	if got := actor.MPCost(dance); got != 10 {
+	if got := actor.MPCost(&dance); got != 10 {
 		t.Fatalf("MPCost() with no active dances = %d, want 10", got)
 	}
 
 	ch.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1, Dance: true, Toggle: true}, Type: effect.TypeBuff})
 	ch.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 2, Dance: true, Toggle: true}, Type: effect.TypeBuff})
 
-	if got := actor.MPCost(dance); got != 18 {
+	if got := actor.MPCost(&dance); got != 18 {
 		t.Fatalf("MPCost() with 2 active dances = %d, want 18 (10 + 2*4)", got)
 	}
 
 	nonDance := modelskill.Definition{MPConsume: 10, NextDanceCost: 4}
-	if got := actor.MPCost(nonDance); got != 10 {
+	if got := actor.MPCost(&nonDance); got != 10 {
 		t.Fatalf("MPCost() for non-dance skill = %d, want 10, unaffected by active dances", got)
 	}
 }
@@ -103,10 +103,10 @@ func TestPlayerActorMPCostAppliesSkillMPConsumeRates(t *testing.T) {
 		{name: "dance takes precedence", def: modelskill.Definition{Dance: true, Magic: true, MPInitialConsume: 11, MPConsume: 21}, init: 22, cost: 42},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := actor.MPInitialCost(tt.def); got != tt.init {
+			if got := actor.MPInitialCost(&tt.def); got != tt.init {
 				t.Fatalf("MPInitialCost() = %d, want %d", got, tt.init)
 			}
-			if got := actor.MPCost(tt.def); got != tt.cost {
+			if got := actor.MPCost(&tt.def); got != tt.cost {
 				t.Fatalf("MPCost() = %d, want %d", got, tt.cost)
 			}
 		})

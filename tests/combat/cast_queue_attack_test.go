@@ -144,7 +144,7 @@ func TestMidCastSkillReplacesQueuedAttack(t *testing.T) {
 	t.Parallel()
 	srv, pc, hostileID := bootMidCastBesideHostile(t)
 	c := srv.Client
-	key := cast.ReuseKey(queueCastSkill(queueNextSkillID))
+	key := cast.ReuseKey(new(queueCastSkill(queueNextSkillID)))
 
 	requestAttackMidCast(t, c, hostileID)
 	c.Send(encodeRequestMagicSkillUse(queueNextSkillID, false, false))
@@ -162,7 +162,7 @@ func TestMidCastAttackReplacesQueuedSkill(t *testing.T) {
 	t.Parallel()
 	srv, pc, hostileID := bootMidCastBesideHostile(t)
 	c := srv.Client
-	key := cast.ReuseKey(queueCastSkill(queueNextSkillID))
+	key := cast.ReuseKey(new(queueCastSkill(queueNextSkillID)))
 
 	c.Send(encodeRequestMagicSkillUse(queueNextSkillID, false, false))
 	assertFrameOpcode(t, mustRead(t, c, "queued skill ActionFailed"), serverpackets.OpcodeActionFailed, "queued skill ActionFailed")
@@ -183,7 +183,7 @@ func TestQueuedSkillWhoseTargetLeftSendsNothing(t *testing.T) {
 	t.Parallel()
 	srv, pc, hostileID := bootMidCastBesideHostile(t)
 	c := srv.Client
-	key := cast.ReuseKey(queueOneSkill())
+	key := cast.ReuseKey(new(queueOneSkill()))
 	mpBefore := srv.PlayerCurrentMP(t, pc.ObjectID())
 
 	c.Send(encodeRequestMagicSkillUse(queueOneSkillID, false, false))

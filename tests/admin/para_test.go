@@ -190,7 +190,7 @@ func TestAdminParaLocksFolkSkills(t *testing.T) {
 	drain(t, gm)
 	exchange(t, gm, encodeAction(folk.ObjectID()))
 	ref := modelskill.Ref{ID: paraFolkHeal, Level: 1}
-	ownKey := actorcast.ReuseKey(def)
+	ownKey := actorcast.ReuseKey(&def)
 	folk.AddCastDesire(folk, ref, 1_000_000, true, true)
 	if frames := tick(); castsOf(frames, folk.ObjectID()) != 1 {
 		t.Fatalf("folk not held: frames %x, want its heal cast", testsupport.FrameOpcodes(frames))
@@ -208,7 +208,7 @@ func TestAdminParaLocksFolkSkills(t *testing.T) {
 		t.Fatal("held folk with no skill waiting refuses its heal")
 	}
 	onParaQueue(t, folk.Queue(), func() {
-		folk.DisableSkill(actorcast.ReuseKey(modelskill.Definition{ID: paraOtherSkill, Level: 1}), time.Minute)
+		folk.DisableSkill(actorcast.ReuseKey(&modelskill.Definition{ID: paraOtherSkill, Level: 1}), time.Minute)
 	})
 	if !folk.SkillDisabled(ownKey) {
 		t.Fatal("held folk with another skill waiting may use its heal")

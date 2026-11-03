@@ -137,7 +137,7 @@ func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Def
 		level = 1
 	}
 	if resolved, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.EffectID), Level: level}); ok {
-		return resolved
+		return *resolved
 	}
 	return def
 }

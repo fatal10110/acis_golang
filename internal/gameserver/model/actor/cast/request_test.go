@@ -70,7 +70,7 @@ func TestStartPlayerSkillKeepsTargetRejectionFromResolver(t *testing.T) {
 		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
 		Selected: &requestTarget{id: 20}, SkillID: 3, Definitions: defs,
 		Hooks: StartHooks{
-			ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+			ResolveTarget: func(Target, world.Tracked, *modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
 				return nil, skilltarget.CastRejectInvalidTarget
 			},
 		},
@@ -342,7 +342,7 @@ func TestStartItemSkillKeepsResolverRejection(t *testing.T) {
 		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch, Selected: target,
 		Skill: modelskill.Ref{ID: 7, Level: 1}, Definitions: defs,
 		Hooks: StartHooks{
-			ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+			ResolveTarget: func(Target, world.Tracked, *modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
 				return target, skilltarget.CastRejectInvalidTarget
 			},
 		},
@@ -531,9 +531,12 @@ func newRequestCharacter(id int32) *player.Character {
 	return ch
 }
 
-func (d requestDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (d requestDefinitions) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	def, ok := d[ref]
-	return def, ok
+	if !ok {
+		return nil, false
+	}
+	return &def, true
 }
 
 type requestTarget struct {

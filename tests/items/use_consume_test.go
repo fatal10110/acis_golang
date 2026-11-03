@@ -391,7 +391,7 @@ func disablePlayerSkill(t *testing.T, srv *gameservertest.Server, objID int32, d
 	if !ok {
 		t.Fatalf("world.Player(%d) = %T does not expose DisableSkill", objID, obj)
 	}
-	disabler.DisableSkill(actorcast.ReuseKey(def), delay)
+	disabler.DisableSkill(actorcast.ReuseKey(&def), delay)
 }
 
 // collectMagicSkillUseIDs lets window pass and returns the skill ids of the

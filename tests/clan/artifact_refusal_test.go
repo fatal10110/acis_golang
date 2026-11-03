@@ -113,7 +113,7 @@ func bootRefusalWorld(t *testing.T) *refusalWorld {
 		gameservertest.WithZones(refusalZones(t)),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{artifactTemplate(), dion})),
 		gameservertest.WithNpcSpawns(nil),
-		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{seal}), gamesql.NewCharacterSkillStore(db))),
+		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{*seal}), gamesql.NewCharacterSkillStore(db))),
 		seedRival(t,
 			castMember{strayID, "player3", "Stray"},
 			castMember{engraverSquireID, "player4", "Squire"},

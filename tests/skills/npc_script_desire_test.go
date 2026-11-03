@@ -114,10 +114,10 @@ type laterDefinitions struct {
 	table atomic.Pointer[modelskill.Table]
 }
 
-func (d *laterDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (d *laterDefinitions) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	table := d.table.Load()
 	if table == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return table.Definition(ref)
 }

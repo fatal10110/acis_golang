@@ -83,7 +83,7 @@ func bootMidCast(t *testing.T) (*gameservertest.Server, *testsupport.ScriptedCli
 // which stamps its reuse.
 func advanceUntilStarted(t *testing.T, srv *gameservertest.Server, objID, skillID int32) {
 	t.Helper()
-	key := cast.ReuseKey(queueSkillDef(skillID))
+	key := cast.ReuseKey(new(queueSkillDef(skillID)))
 	srv.AdvanceUntil(t, "queued skill start", func() bool {
 		var started bool
 		onPlayerQueue(t, srv, objID, func(pc *player.Character) { started = pc.SkillDisabled(key) })
@@ -208,7 +208,7 @@ func TestMidCastRequestOnReuseIsRefusedNotQueued(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := bootMidCast(t)
 	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
-		pc.DisableSkill(cast.ReuseKey(queueSkillDef(queueSkillID)), 50*time.Millisecond)
+		pc.DisableSkill(cast.ReuseKey(new(queueSkillDef(queueSkillID))), 50*time.Millisecond)
 	})
 
 	c.Send(encodeRequestMagicSkillUse(queueSkillID, false, false))
@@ -233,7 +233,7 @@ func TestQueuedSkillFailingItsResumeSendsReasonAlone(t *testing.T) {
 
 	assertQueuedWithActionFailed(t, c, queueSkillID)
 	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
-		pc.DisableSkill(cast.ReuseKey(queueSkillDef(queueSkillID)), time.Minute)
+		pc.DisableSkill(cast.ReuseKey(new(queueSkillDef(queueSkillID))), time.Minute)
 	})
 
 	advanceUntilCastEnds(t, srv, objID)

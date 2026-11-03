@@ -49,6 +49,8 @@ type scriptTimer struct {
 	// owner is the bound player when queue is that player's own queue, nil
 	// otherwise. Set before the timer registers, it never changes.
 	owner *player.Character
+	// armed is the timer of t's firings, made at the start and re-armed
+	// for each deadline of a fixed-rate timer.
 	armed *sim.Timer
 	// decays reports that the timer stops when its NPC decays: its script
 	// is a behavior bound to the NPC's template.
@@ -243,7 +245,7 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 	index(ts.byNPC, t.key.npc, t)
 	index(ts.byPlayer, t.key.player, t)
 	t.due = t.queue.Now().Add(max(d, 0))
-	ts.arm(t)
+	t.armed = t.queue.After(max(d, 0), func() { ts.fire(t) })
 	ts.mu.Unlock()
 
 	// A start that raced a removal it is subject to may have registered
@@ -282,9 +284,13 @@ func unindex(m map[any]map[*scriptTimer]struct{}, id any, t *scriptTimer) {
 	}
 }
 
-// arm schedules t's next firing at t.due. ts.mu is held.
-func (ts *timers) arm(t *scriptTimer) {
-	t.armed = t.queue.After(max(t.due.Sub(t.queue.Now()), 0), func() { ts.fire(t) })
+// rearm schedules the next firing of the fixed-rate timer t, one period
+// after the last deadline, or at once when that is already past. ts.mu is
+// held. On a closed home queue nothing is armed, as a start there arms
+// nothing.
+func (ts *timers) rearm(t *scriptTimer) {
+	t.due = t.due.Add(t.period)
+	t.armed.Rearm(max(t.due.Sub(t.queue.Now()), 0))
 }
 
 // remove takes t out of the registry and stops its armed firing. ts.mu is
@@ -335,8 +341,7 @@ func (ts *timers) fire(t *scriptTimer) {
 	}
 	ts.mu.Lock()
 	if ts.byScript[s][t.key] == t {
-		t.due = t.due.Add(t.period)
-		ts.arm(t)
+		ts.rearm(t)
 	}
 	ts.mu.Unlock()
 }

@@ -256,7 +256,7 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 		}
 		var ids []int32
 		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
-			applyEffects(actor, target, sub, sub.Effects)
+			applyEffects(actor, target, *sub, sub.Effects)
 			if ct := target; ct != nil {
 				actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
 				ids = append(ids, ct.ObjectID())

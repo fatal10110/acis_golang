@@ -78,7 +78,7 @@ func TestAugmentationActiveSkillRedisabledOnEquip(t *testing.T) {
 		return reported
 	}
 
-	key := cast.ReuseKey(active)
+	key := cast.ReuseKey(&active)
 	t.Run("reuse running", func(t *testing.T) {
 		p, c, clock, inst := setup(t, activeID, 2)
 		expiry := clock.Now().Add(40 * time.Second)
@@ -119,7 +119,7 @@ func TestAugmentationActiveSkillRedisabledOnEquip(t *testing.T) {
 	})
 	t.Run("passive skill", func(t *testing.T) {
 		p, c, clock, inst := setup(t, passiveID, 1)
-		pkey := cast.ReuseKey(passive)
+		pkey := cast.ReuseKey(&passive)
 		c.SetSkillReuse(modelskill.Ref{ID: modelskill.ID(passiveID), Level: 1}, pkey, time.Minute, clock.Now().Add(time.Minute))
 		got := equip(t, p, c, inst)
 		if len(got) != 1 || !got[0].SkillsChanged || got[0].TimersChanged {

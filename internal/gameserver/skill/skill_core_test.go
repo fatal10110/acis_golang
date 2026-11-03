@@ -610,7 +610,7 @@ func mustPassiveFuncs(t *testing.T, p *Persistence, id int) []effect.Mod {
 	if !ok {
 		t.Fatalf("skill %d not loaded", id)
 	}
-	fns, err := effect.PassiveFuncs(def)
+	fns, err := effect.PassiveFuncs(*def)
 	if err != nil {
 		t.Fatalf("PassiveFuncs(%d) error: %v", id, err)
 	}
