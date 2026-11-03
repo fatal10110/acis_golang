@@ -40,22 +40,21 @@ type spawnBinding struct {
 	row      SpawnRow
 }
 
-// newSpawnBinding binds an NPC of tmpl to no spawn: no spawn parameters
-// and a script memory of its own.
-func newSpawnBinding(tmpl *Template) spawnBinding {
-	return spawnBinding{template: tmpl, scratch: NewScratch()}
-}
-
-// bindSpawn binds the NPC to slot; a nil slot keeps the current binding.
-func (b *spawnBinding) bindSpawn(slot SpawnSlot) {
-	if slot == nil {
-		return
+// newSpawnBinding binds an NPC of inst to the slot placing it: the slot's
+// spawn parameters, row and script memory. With no slot, or one with no
+// script memory, the NPC gets a script memory of its own here, before it can
+// be published.
+func newSpawnBinding(inst *Instance) spawnBinding {
+	b := spawnBinding{template: inst.Template}
+	if slot := inst.Slot; slot != nil {
+		b.spawn = slot.AIParams()
+		b.row = slot.Row()
+		b.scratch = slot.Scratch()
 	}
-	b.spawn = slot.AIParams()
-	b.row = slot.Row()
-	if s := slot.Scratch(); s != nil {
-		b.scratch = s
+	if b.scratch == nil {
+		b.scratch = NewScratch()
 	}
+	return b
 }
 
 // SpawnParam returns the AI parameter name its spawn sets, ignoring the

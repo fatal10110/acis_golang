@@ -65,7 +65,8 @@ type Hostile struct {
 	// sink receives this NPC's events. Attach installs it before the NPC is
 	// published into world.State; nil drops every event.
 	sink event.Sink
-	log  zerolog.Logger
+	// log is the logger shared by every NPC Attach wired; nil logs nothing.
+	log *zerolog.Logger
 
 	// rewards computes this NPC's drop/experience payout when TakeDamage
 	// kills it. It is nil until Attach installs one, in which case death
@@ -145,12 +146,10 @@ type Hostile struct {
 	// or one of its minions), set per-instance rather than derived from
 	// the template. See RaidRelated.
 	raidRelated atomic.Bool
-	// raidMultipliers scale the base defences and regeneration while
-	// raidRelated is set; nil leaves them unchanged. See SetRaidMultipliers.
-	raidMultipliers atomic.Pointer[RaidMultipliers]
-	// aiConfig holds the target-selection switches; nil means
-	// DefaultAIConfig. See SetAIConfig.
-	aiConfig atomic.Pointer[AIConfig]
+	// settings holds the target-selection switches and the raid
+	// multipliers that scale the base defences and regeneration while
+	// raidRelated is set; nil reads the defaults. See UseSettings.
+	settings atomic.Pointer[HostileSettings]
 
 	// cast is the live cast controller; see SetCastController.
 	cast atomic.Pointer[CastControl]
@@ -280,7 +279,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 
 	h := &Hostile{
 		Instance:           inst,
-		spawnBinding:       newSpawnBinding(inst.Template),
+		spawnBinding:       newSpawnBinding(inst),
 		Live:               live,
 		move:               movement,
 		roll:               rand.Intn,
@@ -358,7 +357,8 @@ func (h *Hostile) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.C
 type Runtime struct {
 	World   *world.State
 	LOS     LineOfSight
-	Log     zerolog.Logger
+	// Log is the logger the NPC shares with others; nil logs nothing.
+	Log     *zerolog.Logger
 	Items   *item.Table
 	Rewards Rewards
 	Sink    event.Sink
@@ -370,9 +370,6 @@ type Runtime struct {
 	// Ground takes the items the NPC picks up out of the world; nil leaves
 	// them on the ground.
 	Ground GroundTaker
-	// Slot is the spawn slot that placed the NPC; nil leaves it with no
-	// spawn parameters and a script memory of its own.
-	Slot SpawnSlot
 	// Guarded is the siege of the castle a siege guard belongs to; nil
 	// leaves the guard unattackable.
 	Guarded GuardedSiege
@@ -410,11 +407,21 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.guarded = rt.Guarded
 	h.regenSettings = rt.Regen
 	h.party = rt.Party
-	h.bindSpawn(rt.Slot)
 	h.Scratch().setLife(h)
 	h.brain.KeepTerritory(h.Scratch().Territory())
 	h.items = rt.Items
 	h.holdTemplateItems()
+}
+
+// nopLog is the logger of an NPC wired with none.
+var nopLog = zerolog.Nop()
+
+// logger returns the logger h logs through.
+func (h *Hostile) logger() *zerolog.Logger {
+	if h.log == nil {
+		return &nopLog
+	}
+	return h.log
 }
 
 // HeldItemTypeMask returns the item-type bits of this NPC's right-hand

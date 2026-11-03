@@ -55,7 +55,7 @@ func (h *Hostile) AddGeoPathFailCount() {
 		if cur > max {
 			if h.geoPathFailCount.CompareAndSwap(cur, 0) {
 				x, y, z := h.Position()
-				h.log.Warn().
+				h.logger().Warn().
 					Str("npc", h.CharacterName()).
 					Int("x", x).
 					Int("y", y).

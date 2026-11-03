@@ -210,11 +210,10 @@ type Npcs struct {
 	// maxGeoPathFailCount is each hostile's pathfinding-fail overflow
 	// threshold; zero keeps the default.
 	maxGeoPathFailCount int
-	// raidMultipliers scale every raid-related hostile's base defences and
-	// regeneration.
-	raidMultipliers npc.RaidMultipliers
-	// aiConfig holds every hostile's target-selection switches.
-	aiConfig npc.AIConfig
+	// settings holds every hostile's target-selection switches and the
+	// raid multipliers scaling every raid-related one's base defences and
+	// regeneration: each hostile spawned reads this one holder at every use.
+	settings *npc.HostileSettings
 	// events is the SpawnEvents list: the makers of the events it names
 	// start after the on-start makers, and the spawn condition of a maker
 	// with an event reads it.
@@ -445,8 +444,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		maxBuffsAmount:      maxBuffsAmount,
 		randomWalkRate:      randomWalkRate,
 		maxGeoPathFailCount: maxGeoPathFailCount,
-		raidMultipliers:     raidMultipliers,
-		aiConfig:            aiConfig,
+		settings:            npc.NewHostileSettings(aiConfig, raidMultipliers),
 		events:              newSpawnEvents(events),
 		geo:                 geo,
 		state:               state,

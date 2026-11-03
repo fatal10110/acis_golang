@@ -118,9 +118,6 @@ type FolkRuntime struct {
 	// Zones are the zones the NPC's membership follows; nil leaves it in
 	// none.
 	Zones *zone.Index
-	// Slot is the spawn slot that placed the NPC; nil leaves it with no
-	// spawn parameters and a script memory of its own.
-	Slot SpawnSlot
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts ScriptHooks
 	// Remover takes the NPC out of the world for DeleteNow; nil decays it
@@ -183,7 +180,6 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	}
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
-	f.bindSpawn(rt.Slot)
 	f.Scratch().setLife(f)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	f.resolveWeapon(rt.Items)

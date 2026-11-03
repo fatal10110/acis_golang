@@ -29,7 +29,7 @@ type EffectPoint struct {
 	effects *effect.List
 	world   *world.State
 	sink    event.Sink
-	log     zerolog.Logger
+	log     *zerolog.Logger
 	// stats are the client-visible stats it is shown with, fixed at
 	// creation.
 	stats fixedStats

@@ -5,6 +5,7 @@
 package sim
 
 import (
+	"strconv"
 	"sync"
 	"time"
 )
@@ -31,8 +32,10 @@ type clockTimer interface {
 
 // Queue is one owner's FIFO of tasks.
 type Queue struct {
-	id   string
-	exec executor
+	id string
+	// serial, when non-zero, follows id in the queue's name (see Serial).
+	serial int32
+	exec   executor
 
 	// draining is held while q's tasks run; AssertOwner probes it.
 	draining sync.Mutex
@@ -247,13 +250,28 @@ type Ticker Timer
 // Safe to call more than once.
 func (k *Ticker) Stop() { (*Timer)(k).Stop() }
 
+// Serial makes n part of q's name: its id, a dash, then n, built only
+// when a log line or panic names q. Call it before q is shared.
+func (q *Queue) Serial(n int32) *Queue {
+	q.serial = n
+	return q
+}
+
+// name is what logs and panics call q.
+func (q *Queue) name() string {
+	if q.serial == 0 {
+		return q.id
+	}
+	return q.id + "-" + strconv.FormatInt(int64(q.serial), 10)
+}
+
 // AssertOwner panics unless the caller is running one of q's tasks. Every
 // build catches state touched while q is idle; the simdebug build also
 // catches a caller on another goroutine while q is busy.
 func AssertOwner(q *Queue) {
 	if q.draining.TryLock() {
 		q.draining.Unlock()
-		panic("sim: state of queue " + q.id + " touched off its queue")
+		panic("sim: state of queue " + q.name() + " touched off its queue")
 	}
 	assertDrainer(q)
 }

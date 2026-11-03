@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
-	"github.com/rs/zerolog"
 )
 
 // fakeHostileCastDefs is a minimal non-nil actorcast.Definitions: this test
@@ -50,7 +49,7 @@ func TestNewLiveHostileWiresOnHitResultFromEffects(t *testing.T) {
 		},
 	}
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), fakeHostileCastDefs{}, effects, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, &testLog, fakeHostileCastDefs{}, effects, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
@@ -90,7 +89,7 @@ func TestNewLiveHostileLeavesOnHitResultUnsetWithoutCastDefs(t *testing.T) {
 	state := world.New()
 	positions := task.NewPositionUpdates(state)
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, &testLog, nil, actorcast.EffectHandlers{}, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}

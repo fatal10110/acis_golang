@@ -341,7 +341,6 @@ func NewAttackable(actor AttackableActor, move AttackableMoveController, attack 
 		hates:          attackable.NewHateTable(actor),
 		desires:        NewDesireQueue(),
 		current:        intention{kind: IntentionIdle},
-		territory:      &TerritoryMemory{},
 		now:            actor.Now,
 		randomWalkRate: defaultRandomWalkRate,
 		roll:           rnd.Get,
@@ -1251,11 +1250,11 @@ func (a *Attackable) KeepTerritory(m *TerritoryMemory) {
 // resumes it on its grid (KeepTerritory).
 func (a *Attackable) syncOOTSweepLocked() {
 	if a.actor.InTerritory() {
-		a.territory.Store(false, time.Time{})
+		a.territoryLocked().Store(false, time.Time{})
 		a.stopOOTSweep()
 		return
 	}
-	if outside, _ := a.territory.Load(); outside {
+	if outside, _ := a.territoryLocked().Load(); outside {
 		return
 	}
 	a.atHookPoint(HookOutOfTerritory)
@@ -1275,8 +1274,18 @@ func (a *Attackable) stopOOTSweep() {
 // armOOTSweep schedules the next stale-hate sweep d from now on the actor's
 // queue and records the actor outside with that deadline.
 func (a *Attackable) armOOTSweep(d time.Duration) {
-	a.territory.Store(true, a.now().Add(d))
+	a.territoryLocked().Store(true, a.now().Add(d))
 	a.armOOTSweepAt(d)
+}
+
+// territoryLocked returns the actor's out-of-territory state: an actor no
+// KeepTerritory handed one keeps its own from its first use. The caller
+// holds a.mu.
+func (a *Attackable) territoryLocked() *TerritoryMemory {
+	if a.territory == nil {
+		a.territory = &TerritoryMemory{}
+	}
+	return a.territory
 }
 
 // armOOTSweepAt schedules this life's next stale-hate sweep firing d from
@@ -1298,7 +1307,7 @@ func (a *Attackable) sweepStaleThreats(seq uint64) {
 		return
 	}
 	now := a.now()
-	_, due := a.territory.Load()
+	_, due := a.territoryLocked().Load()
 	_, d := NextOnGrid(due.Add(ootSweepPeriod), now, ootSweepPeriod)
 	a.armOOTSweep(d)
 	if a.actor.InTerritory() {

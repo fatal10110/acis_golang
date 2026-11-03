@@ -160,13 +160,29 @@ func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
 	return !ok || g.CanMoveTo(target)
 }
 
+// hostileWiring is every adapter newLiveHostile wires one live Hostile
+// with, in a single allocation: each controller holds a pointer into it.
+type hostileWiring struct {
+	control   hostileControl
+	stat      statOwnerRef
+	located   locatedRef
+	actor     creatureActorRef
+	walker    walkerActorRef
+	moveCtl   routeAwareMoveController
+	route     hostileRoute
+	routeMove atomic.Bool
+}
+
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
-// finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
-	control := &hostileControl{walker: walker, log: log, chance: castEffects.Chance}
-	statRef := &statOwnerRef{}
+// finished Hostile via locatedRef/creatureActorRef/statOwnerRef. log is the
+// logger shared by every NPC.
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log *zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
+	w := &hostileWiring{}
+	control := &w.control
+	control.walker, control.log, control.chance = walker, log, castEffects.Chance
+	statRef := &w.stat
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithEnv(effects))
 	if err != nil {
 		return nil, nil, err
@@ -179,19 +195,20 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		live.Move().UseCreatureZoneSwim()
 	}
 
-	locRef := &locatedRef{}
+	locRef := &w.located
 	moveCtl, err := move.NewController(live.Move(), locRef, control)
 	if err != nil {
 		return nil, nil, err
 	}
 	moveCtl.SetPositionUpdates(positions)
 
-	actorRef := &creatureActorRef{}
+	actorRef := &w.actor
 	attackCtl := attack.NewAttackable(actorRef, control)
 	attackCtl.SetQueue(queue)
 
-	routeMove := &atomic.Bool{}
-	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{AttackableMoveController: moveCtl, routeMove: routeMove}, attackCtl, castDefs)
+	routeMove := &w.routeMove
+	w.moveCtl = routeAwareMoveController{AttackableMoveController: moveCtl, routeMove: routeMove}
+	hostile, err := npc.NewHostile(inst, live, &w.moveCtl, attackCtl, castDefs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -238,9 +255,11 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		hostile.SetCastController(castController)
 	}
 
-	walkerRef := &walkerActorRef{Hostile: hostile, moveCtl: moveCtl, routeMove: routeMove}
+	walkerRef := &w.walker
+	walkerRef.Hostile, walkerRef.moveCtl, walkerRef.routeMove = hostile, moveCtl, routeMove
 	if walker != nil {
-		hostile.AI().SetRoute(hostileRoute{walker: walker, ref: walkerRef, log: log})
+		w.route = hostileRoute{walker: walker, ref: walkerRef, log: log}
+		hostile.AI().SetRoute(&w.route)
 	}
 
 	control.hostile, control.move, control.walkerRef, control.routeMove = hostile, moveCtl, walkerRef, routeMove
@@ -261,7 +280,7 @@ type hostileControl struct {
 	walker    *task.Walker
 	walkerRef *walkerActorRef
 	routeMove *atomic.Bool
-	log       zerolog.Logger
+	log       *zerolog.Logger
 	// chance runs the chance procs of the NPC's landed hits.
 	chance *actorcast.ChanceProcs
 }
@@ -343,19 +362,19 @@ func (c *hostileControl) runAI() {
 type hostileRoute struct {
 	walker *task.Walker
 	ref    *walkerActorRef
-	log    zerolog.Logger
+	log    *zerolog.Logger
 }
 
 // Walk puts the NPC on route name; a route with no node for the NPC moves
 // it nowhere.
-func (r hostileRoute) Walk(name string) {
+func (r *hostileRoute) Walk(name string) {
 	if err := r.walker.Walk(r.ref, name, r.ref.Instance.Template.Alias); err != nil {
 		r.log.Debug().Err(err).Str("route", name).Msg("npc: route walk")
 	}
 }
 
 // Leave takes the NPC off its route.
-func (r hostileRoute) Leave() { r.walker.LeaveRoute(r.ref) }
+func (r *hostileRoute) Leave() { r.walker.LeaveRoute(r.ref) }
 
 // deathRewards applies one victim's live death rewards at its position at
 // the moment of death, rather than a position fixed when it spawned —

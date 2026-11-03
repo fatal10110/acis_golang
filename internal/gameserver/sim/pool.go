@@ -45,7 +45,7 @@ type Pool struct {
 // it shows up in profiles.
 type slot struct {
 	mu    sync.Mutex
-	queue string
+	queue *Queue
 	start time.Time // zero while idle
 	seq   uint64    // tasks started on this worker
 }
@@ -122,7 +122,7 @@ func (p *Pool) enqueue(q *Queue, fn func()) bool {
 	q.tasks = append(q.tasks, fn)
 	if len(q.tasks) > highWater && !q.backlog {
 		q.backlog = true
-		p.log.Warn().Str("queue", q.id).Int("pending", len(q.tasks)).Msg("sim: queue backlog over high-water mark")
+		p.log.Warn().Str("queue", q.name()).Int("pending", len(q.tasks)).Msg("sim: queue backlog over high-water mark")
 	}
 	return true
 }
@@ -205,7 +205,7 @@ func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 		for ; i < n; i++ {
 			fn := batch[i]
 			batch[i] = nil
-			p.run(s, q.id, fn)
+			p.run(s, q, fn)
 		}
 	})
 }
@@ -214,7 +214,7 @@ func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 // contained so the worker survives; runtime.Goexit is logged and costs the
 // worker goroutine, which work replaces. A slow task is logged with its
 // final duration once it returns.
-func (p *Pool) run(s *slot, queue string, fn func()) {
+func (p *Pool) run(s *slot, queue *Queue, fn func()) {
 	start := time.Now()
 	s.mu.Lock()
 	s.queue, s.start = queue, start
@@ -226,12 +226,12 @@ func (p *Pool) run(s *slot, queue string, fn func()) {
 		s.start = time.Time{}
 		s.mu.Unlock()
 		if r := recover(); r != nil {
-			p.log.Error().Str("queue", queue).Interface("panic", r).Msg("sim: recovered panic in queued task")
+			p.log.Error().Str("queue", queue.name()).Interface("panic", r).Msg("sim: recovered panic in queued task")
 		} else if !returned {
-			p.log.Error().Str("queue", queue).Msg("sim: queued task called runtime.Goexit; worker replaced")
+			p.log.Error().Str("queue", queue.name()).Msg("sim: queued task called runtime.Goexit; worker replaced")
 		}
 		if d := time.Since(start); d > slowTask {
-			p.log.Warn().Str("queue", queue).Dur("elapsed", d).Msg("sim: slow task")
+			p.log.Warn().Str("queue", queue.name()).Dur("elapsed", d).Msg("sim: slow task")
 		}
 	}()
 	fn()
@@ -258,7 +258,7 @@ func (p *Pool) watch(idle <-chan struct{}) {
 					continue
 				}
 				reported[i] = seq
-				p.log.Warn().Str("queue", queue).Dur("elapsed", now.Sub(start)).Msg("sim: task still running")
+				p.log.Warn().Str("queue", queue.name()).Dur("elapsed", now.Sub(start)).Msg("sim: task still running")
 			}
 		}
 	}

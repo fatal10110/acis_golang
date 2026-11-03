@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -142,7 +141,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	inst.Home = loc
 	inst.HasHome = true
-	inst.DriftRange = n.aiConfig.DriftRange
+	inst.DriftRange = n.settings.AI().DriftRange
 	inst.SpawnHeading = heading
 	n.mu.Lock()
 	info := n.slot[key]
@@ -159,6 +158,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 		info.memory.scratch.Respawned()
 		slot = info.memory
 	}
+	inst.Slot = slot
 
 	if npc.FolkKind(inst) {
 		if f := n.spawnFolk(key, inst, loc, heading, slot, master); f != nil {
@@ -172,15 +172,14 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 
 	speed := tmpl.RunSpeed
-	queue := n.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID))
-	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
+	queue := n.queues.NewQueue("npc").Serial(inst.ObjectID)
+	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, &n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil
 	}
 	hostile.AI().SetRandomWalkRate(n.randomWalkRate)
-	hostile.SetRaidMultipliers(n.raidMultipliers)
-	hostile.SetAIConfig(n.aiConfig)
+	hostile.UseSettings(n.settings)
 
 	// MP goes first: a saved HP of zero leaves the NPC dead, and a dead
 	// NPC's MP no longer changes.
@@ -193,7 +192,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	hostile.SetCurrentHP(hp)
 	rewards := n.rewarderFor(hostile, tmpl)
-	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n, Slot: slot, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
+	rt := npc.Runtime{World: n.state, Log: &n.log, Items: n.items, Rewards: rewards, Remover: n, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
 	if n.rewards.Settings != nil {
 		rt.Party = n.rewards.Settings
 	}
