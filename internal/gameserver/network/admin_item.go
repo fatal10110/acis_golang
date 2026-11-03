@@ -232,9 +232,8 @@ func (l *GameClientLink) giveAround(gm *livePlayer, id int32, count, radius int)
 }
 
 // giveCreatedItem gives live, on its own queue, count units of item id
-// named in chat as picked up; a cursed weapon makes live its holder.
+// named in chat as picked up. A cursed weapon makes live its holder
+// through the obtained-item event the addition emits.
 func (l *GameClientLink) giveCreatedItem(live *livePlayer, id int32, count int) {
-	if live.AddCreatedItem(id, count, l.nextObjectID) {
-		l.obtainCursedWeapon(live, id)
-	}
+	live.AddCreatedItem(id, count, l.nextObjectID)
 }
