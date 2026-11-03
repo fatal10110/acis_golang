@@ -74,6 +74,9 @@ type Snapshot struct {
 type Table struct {
 	mu    sync.RWMutex
 	clans map[int32]*Clan
+	// order holds the clan ids in the order the registry lists them: boot
+	// rows first, then each clan as it is founded.
+	order warSet
 }
 
 // NewTable returns an empty registry.
@@ -113,12 +116,14 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) (clamped []int3
 			}
 		}
 		t.clans[r.ID] = cl
+		t.order.add(r.ID)
 	}
 	for _, m := range s.Members {
 		if cl, ok := t.clans[m.ClanID]; ok {
 			member := m.Member
 			member.Online = false
 			cl.members[member.ObjectID] = &member
+			cl.memberOrder.add(member.ObjectID)
 		}
 	}
 	for _, p := range s.Privileges {
@@ -213,6 +218,7 @@ func (t *Table) insert(cl *Clan) bool {
 		return false
 	}
 	t.clans[cl.id] = cl
+	t.order.add(cl.id)
 	return true
 }
 
@@ -221,4 +227,5 @@ func (t *Table) remove(id int32) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.clans, id)
+	t.order.remove(id)
 }

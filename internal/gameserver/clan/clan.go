@@ -81,7 +81,11 @@ type Clan struct {
 	destroyed bool
 	board     board
 
-	members map[int32]*Member
+	// members maps each member's object id to its roster entry;
+	// memberOrder holds those ids in the order the roster lists them:
+	// restored members first, then each as it joins.
+	members     map[int32]*Member
+	memberOrder warSet
 	// loginGrades holds the stored power grade of an offline member whose
 	// roster entry still shows an older one; the entry takes it when the
 	// member logs in.
