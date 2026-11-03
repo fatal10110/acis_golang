@@ -20,13 +20,13 @@ func flyOracleEngine(t *testing.T) *Engine {
 		gridBlocksX = (TileXMax - TileXMin + 1) * block.RegionBlocksX
 		gridBlocksY = (TileYMax - TileYMin + 1) * block.RegionBlocksY
 	)
-	regions := map[[2]int]*block.Region{}
-	place := func(blockX, blockY int, set func(r *block.Region, index int) error) {
+	regions := map[[2]int]*block.RegionBuilder{}
+	place := func(blockX, blockY int, set func(r *block.RegionBuilder, index int) error) {
 		t.Helper()
 		tile := [2]int{TileXMin + blockX/block.RegionBlocksX, TileYMin + blockY/block.RegionBlocksY}
 		r := regions[tile]
 		if r == nil {
-			r = block.NewRegion()
+			r = block.NewRegionBuilder()
 			regions[tile] = r
 		}
 		index := (blockX%block.RegionBlocksX)*block.RegionBlocksY + blockY%block.RegionBlocksY
@@ -35,7 +35,7 @@ func flyOracleEngine(t *testing.T) *Engine {
 		}
 	}
 	flat := func(blockX, blockY int, height int16) {
-		place(blockX, blockY, func(r *block.Region, index int) error {
+		place(blockX, blockY, func(r *block.RegionBuilder, index int) error {
 			r.SetFlat(index, height)
 			return nil
 		})
@@ -47,7 +47,10 @@ func flyOracleEngine(t *testing.T) *Engine {
 				cells[x*block.CellsY+y] = block.Cell{Height: height(x, y), NSWE: block.AllDirections}
 			}
 		}
-		place(blockX, blockY, func(r *block.Region, index int) error { return r.SetComplex(index, cells) })
+		place(blockX, blockY, func(r *block.RegionBuilder, index int) error {
+			r.SetComplex(index, cells)
+			return nil
+		})
 	}
 	multilayer := func(blockX, blockY int, heights func(x, y int) []int16) {
 		var cells [block.CellCount][]block.Cell
@@ -58,7 +61,7 @@ func flyOracleEngine(t *testing.T) *Engine {
 				}
 			}
 		}
-		place(blockX, blockY, func(r *block.Region, index int) error { return r.SetMultilayer(index, cells) })
+		place(blockX, blockY, func(r *block.RegionBuilder, index int) error { return r.SetMultilayer(index, cells) })
 	}
 
 	complex(0, 0, func(x, _ int) int16 {
@@ -90,7 +93,7 @@ func flyOracleEngine(t *testing.T) *Engine {
 
 	e := New()
 	for tile, r := range regions {
-		if err := e.SetRegion(tile[0], tile[1], r); err != nil {
+		if err := e.SetRegion(tile[0], tile[1], r.Build()); err != nil {
 			t.Fatalf("SetRegion %v: %v", tile, err)
 		}
 	}

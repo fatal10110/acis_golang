@@ -638,7 +638,7 @@ func newGridEngine(t testing.TB, width, height int, cell func(x, y int) block.Ce
 	t.Helper()
 
 	e := engine.New()
-	region := block.NewRegion()
+	region := block.NewRegionBuilder()
 	for blockX := 0; blockX*block.CellsX < width; blockX++ {
 		for blockY := 0; blockY*block.CellsY < height; blockY++ {
 			var cells [block.CellCount]block.Cell
@@ -649,12 +649,10 @@ func newGridEngine(t testing.TB, width, height int, cell func(x, y int) block.Ce
 					cells[x*block.CellsY+y] = cell(gx, gy)
 				}
 			}
-			if err := region.SetComplex(blockX*block.RegionBlocksY+blockY, cells); err != nil {
-				t.Fatalf("SetComplex(): %v", err)
-			}
+			region.SetComplex(blockX*block.RegionBlocksY+blockY, cells)
 		}
 	}
-	if err := e.SetRegion(engine.TileXMin, engine.TileYMin, region); err != nil {
+	if err := e.SetRegion(engine.TileXMin, engine.TileYMin, region.Build()); err != nil {
 		t.Fatalf("SetRegion(): %v", err)
 	}
 	return e

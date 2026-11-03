@@ -23,7 +23,8 @@ FROM alpine:3.22
 # tzdata: the server schedules Seven Signs, Olympiad, sieges and other
 # timers on local wall-clock time, read from TZ (see docs/ops/docker.md).
 RUN apk add --no-cache tzdata ca-certificates \
-	&& mkdir -p /opt/acis/config /opt/acis/data /opt/acis/log
+	&& mkdir -p /opt/acis/config /opt/acis/data /opt/acis/log /opt/acis/cache \
+	&& chown 1000:1000 /opt/acis/cache
 COPY --from=build /out/ /usr/local/bin/
 WORKDIR /opt/acis
 # docker-compose.yml runs the servers as the host user that owns the mounted
@@ -31,4 +32,4 @@ WORKDIR /opt/acis
 USER 1000:1000
 # 2106 login clients, 9014 game server link, 7777 game clients.
 EXPOSE 2106 9014 7777
-CMD ["gameserver"]
+CMD ["gameserver", "-geodata-cache", "cache/geodata.cache"]

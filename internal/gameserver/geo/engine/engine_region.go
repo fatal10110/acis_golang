@@ -83,6 +83,20 @@ func (b regionBlock) Below(cellX, cellY int, worldZ int32) int {
 	return b.region.Below(b.blockX, b.blockY, cellX, cellY, worldZ)
 }
 
+func (b regionBlock) aboveCell(cellX, cellY int, worldZ int32) (int, block.Cell) {
+	if b.region == nil {
+		return 0, block.Cell{Height: 0, NSWE: block.AllDirections}
+	}
+	return b.region.AboveCell(b.blockX, b.blockY, cellX, cellY, worldZ)
+}
+
+func (b regionBlock) belowCell(cellX, cellY int, worldZ int32) (int, block.Cell) {
+	if b.region == nil {
+		return 0, block.Cell{Height: 0, NSWE: block.AllDirections}
+	}
+	return b.region.BelowCell(b.blockX, b.blockY, cellX, cellY, worldZ)
+}
+
 func (b regionBlock) Height(layer int) int16 {
 	if b.region == nil {
 		// Unloaded region: constant ground height 0, same contract as

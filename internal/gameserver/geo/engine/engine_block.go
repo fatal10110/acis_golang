@@ -95,6 +95,31 @@ func (b engineBlock) BelowIgnoring(cellX, cellY int, worldZ int32, ignore dynami
 	return b.static().Below(cellX, cellY, worldZ)
 }
 
+// aboveCell is AboveIgnoring that also resolves the found layer's cell; the
+// cell is zero when the layer is -1.
+func (b engineBlock) aboveCell(cellX, cellY int, worldZ int32, ignore dynamic.Object) (int, block.Cell) {
+	if b.dyn == nil {
+		return b.static().aboveCell(cellX, cellY, worldZ)
+	}
+	return b.resolve(b.dyn.AboveIgnoring(cellX, cellY, worldZ, ignore))
+}
+
+// belowCell is BelowIgnoring that also resolves the found layer's cell; the
+// cell is zero when the layer is -1.
+func (b engineBlock) belowCell(cellX, cellY int, worldZ int32, ignore dynamic.Object) (int, block.Cell) {
+	if b.dyn == nil {
+		return b.static().belowCell(cellX, cellY, worldZ)
+	}
+	return b.resolve(b.dyn.BelowIgnoring(cellX, cellY, worldZ, ignore))
+}
+
+func (b engineBlock) resolve(layer int) (int, block.Cell) {
+	if layer < 0 {
+		return layer, block.Cell{}
+	}
+	return layer, block.Cell{Height: b.dyn.Height(layer), NSWE: b.dyn.NSWE(layer)}
+}
+
 func (b engineBlock) Height(layer int) int16 {
 	if b.dyn != nil {
 		return b.dyn.Height(layer)

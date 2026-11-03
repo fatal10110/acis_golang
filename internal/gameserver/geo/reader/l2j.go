@@ -22,13 +22,13 @@ func ReadL2J(r io.Reader) (*block.Region, error) {
 	}
 
 	p := l2jParser{data: data}
-	region := block.NewRegion()
+	region := block.NewRegionBuilder()
 	for i := 0; i < block.RegionBlockCount; i++ {
 		if err := p.block(region, i); err != nil {
 			return nil, err
 		}
 	}
-	return region, nil
+	return region.Build(), nil
 }
 
 type l2jParser struct {
@@ -36,7 +36,7 @@ type l2jParser struct {
 	off  int
 }
 
-func (p *l2jParser) block(region *block.Region, i int) error {
+func (p *l2jParser) block(region *block.RegionBuilder, i int) error {
 	typ, err := p.u8()
 	if err != nil {
 		return fmt.Errorf("geo/reader: block %d: read type: %w", i, err)
@@ -59,9 +59,7 @@ func (p *l2jParser) block(region *block.Region, i int) error {
 			}
 			cells[c] = code
 		}
-		if err := region.SetComplexEncoded(i, cells); err != nil {
-			return fmt.Errorf("geo/reader: block %d complex: %w", i, err)
-		}
+		region.SetComplexEncoded(i, cells)
 		return nil
 	case l2jMultilayer:
 		var counts [block.CellCount]uint8
