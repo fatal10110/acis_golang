@@ -82,8 +82,10 @@ type Clan struct {
 	board     board
 
 	// members maps each member's object id to its roster entry;
-	// memberOrder holds those ids in the order the roster lists them:
-	// restored members first, then each as it joins.
+	// memberOrder holds those ids in the roster's hash table order. Ids go
+	// in on boot restore in stored row order and as each member joins, and
+	// come out when a member leaves; insertion order only breaks ties
+	// inside a bucket.
 	members     map[int32]*Member
 	memberOrder warSet
 	// loginGrades holds the stored power grade of an offline member whose

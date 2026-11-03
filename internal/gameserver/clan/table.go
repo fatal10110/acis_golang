@@ -74,8 +74,9 @@ type Snapshot struct {
 type Table struct {
 	mu    sync.RWMutex
 	clans map[int32]*Clan
-	// order holds the clan ids in the order the registry lists them: boot
-	// rows first, then each clan as it is founded.
+	// order holds the clan ids in the registry's hash table order. Ids go in
+	// on boot restore in row order and as each clan is founded, and come out
+	// on dissolution; insertion order only breaks ties inside a bucket.
 	order warSet
 }
 
