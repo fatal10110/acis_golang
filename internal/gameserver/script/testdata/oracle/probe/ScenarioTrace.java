@@ -778,10 +778,6 @@ final class ScenarioTrace
 		return null;
 	}
 
-	/**
-	 * The three spawn parameters of an npc line's params option, null without one. The other options
-	 * (walks, maker, ...) are not read: the probe plays the shipped template.
-	 */
 	/** Reads an npcmaker line: npcmaker name ai [max n] [spawn npc type x y z [respawn seconds] [db name]]. */
 	private static MakerLine makerLine(String[] f)
 	{
@@ -839,6 +835,10 @@ final class ScenarioTrace
 		return data;
 	}
 
+	/**
+	 * The three spawn parameters of an npc line's params option, null without one. The other options
+	 * (walks, maker, ...) are not read: the probe plays the shipped template.
+	 */
 	private static String[] npcParams(String[] f)
 	{
 		for (int i = 7; i + 3 < f.length; i++)
