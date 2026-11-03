@@ -47,6 +47,25 @@ public final class ManorProbe
 		return m;
 	}
 
+	/** One castle's lists of a period: seeds then crops, as id:amount. */
+	private static String lists(ManorCopy m, int castle, boolean next)
+	{
+		final StringBuilder b = new StringBuilder();
+		for (SeedProduction s : (next ? m._productionNext : m._production).get(castle))
+			b.append(' ').append(s.getId()).append(':').append(s.getAmount());
+		b.append(" |");
+		for (CropProcure c : (next ? m._procureNext : m._procure).get(castle))
+			b.append(' ').append(c.getId()).append(':').append(c.getAmount());
+		return b.toString();
+	}
+
+	/** Runs the scheduled mode changes already due, as the scheduler does with a delay below 1. */
+	private static void settle()
+	{
+		while (ManorCopy.ThreadPool.delay <= 0)
+			ManorCopy.ThreadPool.task.run();
+	}
+
 	public static void main(String[] args) throws Exception
 	{
 		// The mode a manor starts in, by minute of each hour of the day, as runs.
@@ -136,11 +155,11 @@ public final class ManorProbe
 					final String[] f = s.split("x");
 					procure.add(new CropProcure(CODA_CROP, Integer.parseInt(f[1]), 1, Integer.parseInt(f[1]), Integer.parseInt(f[0])));
 				}
-			m._production.put(1, production);
-			m._procure.put(1, procure);
+			m._production.put(1, new ArrayList<>());
+			m._procure.put(1, new ArrayList<>());
 			m._productionNext.put(1, production);
 			m._procureNext.put(1, procure);
-			System.out.println("cost " + c[0] + "|" + c[1] + " => " + m.getManorCost(1, false));
+			System.out.println("cost " + c[0] + "|" + c[1] + " => " + m.getManorCost(1, true) + " running " + m.getManorCost(1, false));
 		}
 
 		// The rollover of an approved manor at its refresh time. The running
@@ -260,5 +279,126 @@ public final class ManorProbe
 					System.out.println("approve " + procure + " " + warehouse + " " + treasury + " => treasury " + gludio.treasury + " next " + (next.length() == 0 ? "empty" : next)
 						+ " sent " + (sent.isEmpty() ? "-" : String.join(",", sent)) + " mode " + m._mode + " delay " + ManorCopy.ThreadPool.delay);
 				}
+
+		// The seed and crop limits: the manors.xml limits times the drop rate.
+		final int[][] limits =
+		{
+			{ 8100, 9000, 1 },
+			{ 8100, 9000, 3 },
+			{ 0, 30, 7 },
+			{ 1073741824, 2147483647, 2 },
+			{ 715827883, 1000000, 3 }
+		};
+		for (int[] l : limits)
+		{
+			final ManorCopy.Seed seed = new ManorCopy.Seed(CODA_SEED, CODA_CROP, CODA_MATURE, 5);
+			seed._seedsLimit = l[0];
+			seed._cropsLimit = l[1];
+			ManorCopy.Config.RATE_DROP_MANOR = l[2];
+			System.out.println("limit " + l[0] + "/" + l[1] + " x" + l[2] + " => " + seed.getSeedsLimit() + " " + seed.getCropsLimit());
+		}
+
+		// decreaseAmount from a start amount, one call per value: whether it
+		// took them and the amount left.
+		final String[] decreases =
+		{
+			"5 5,1",
+			"10 3,7,1,0",
+			"0 0,1",
+			"5 -3,9",
+			"2147483647 -1,2147483647"
+		};
+		for (String d : decreases)
+		{
+			final String[] f = d.split(" ");
+			final SeedProduction p = new SeedProduction(CODA_SEED, Integer.parseInt(f[0]), 6, 10);
+			final StringBuilder b = new StringBuilder();
+			for (String v : f[1].split(","))
+			{
+				final boolean ok = p.decreaseAmount(Integer.parseInt(v));
+				b.append(' ').append(ok).append(':').append(p.getAmount());
+			}
+			System.out.println("decrease " + d + " =>" + b);
+		}
+
+		// The constructor's autosave.
+		{
+			final ManorCopy m = manor(0);
+			m.autosave();
+			System.out.println("autosave default => delay " + ManorCopy.ThreadPool.fixedDelay + " period " + ManorCopy.ThreadPool.fixedPeriod);
+		}
+
+		// Days of the cycle, step by step, on Gludio's stored manor: the
+		// running period buys 100 Dark Coda at 50 (40 still wanted) and 10 Red
+		// Coda at 7 (9 still wanted); the next sells 10 Dark Coda seeds at 5
+		// and buys 100 Dark Coda at 30. Dion (2) has no owner and sells 3 Red
+		// Coda seeds at 9. A case is "<hh:mm> <treasury> <roll>" then its
+		// steps: start (the constructor's mode and schedule), run (the clock
+		// moves to the next change, which runs), sell <n> (decreaseAmount on
+		// Gludio's first running seed), reset (resetManorData of Gludio). Each
+		// step settles the changes already due. Printed after each step: the
+		// mode, the delay to the next change, storeMe calls so far, the
+		// messages the clan leader got and the items paid into the clan
+		// warehouse during the step, Gludio's seed income and treasury, and
+		// each castle's running and next lists.
+		final String[][] cycles =
+		{
+			{ "12:00 5000 89", "start", "run", "sell 3", "run", "run", "run" },
+			{ "19:00 3049 90", "start", "run", "run", "run", "run" },
+			{ "21:03 5000 0", "start" },
+			{ "06:00 5000 0", "start", "run" },
+			{ "20:03 5000 0", "start", "run" },
+			{ "12:00 5000 0", "start", "reset", "run" }
+		};
+		for (String[] c : cycles)
+		{
+			final String[] f = c[0].split(" ");
+			final String[] hm = f[0].split(":");
+			final ManorCopy m = manor(Long.parseLong(f[1]));
+			final ManorCopy.Castle dion = new ManorCopy.Castle(2);
+			ManorCopy.CastleManager.INSTANCE.castles.add(dion);
+			m._production.put(1, new ArrayList<>());
+			m._procure.put(1, new ArrayList<>(List.of(new CropProcure(CODA_CROP, 40, 1, 100, 50), new CropProcure(RED_CROP, 9, 2, 10, 7))));
+			m._productionNext.put(1, new ArrayList<>(List.of(new SeedProduction(CODA_SEED, 10, 5, 10))));
+			m._procureNext.put(1, new ArrayList<>(List.of(new CropProcure(CODA_CROP, 100, 1, 100, 30))));
+			m._production.put(2, new ArrayList<>(List.of(new SeedProduction(RED_SEED, 3, 9, 3))));
+			m._procure.put(2, new ArrayList<>());
+			m._productionNext.put(2, new ArrayList<>());
+			m._procureNext.put(2, new ArrayList<>());
+			ManorCopy.Rnd.roll = Integer.parseInt(f[2]);
+			final ManorCopy.Castle gludio = ManorCopy.CastleManager.INSTANCE.castles.get(0);
+			final ManorCopy.Clan owner = ManorCopy.ClanTable.INSTANCE.clans.get(1);
+			for (int step = 1; step < c.length; step++)
+			{
+				final String action = c[step];
+				if (action.equals("start"))
+				{
+					ManorCopy.NOW = at(Integer.parseInt(hm[0]), Integer.parseInt(hm[1]), 0, 0);
+					m.initMode();
+					m.schedule();
+				}
+				else if (action.equals("run"))
+				{
+					ManorCopy.NOW += ManorCopy.ThreadPool.delay;
+					ManorCopy.ThreadPool.task.run();
+				}
+				else if (action.startsWith("sell "))
+				{
+					if (!m._production.get(1).get(0).decreaseAmount(Integer.parseInt(action.substring(5))))
+						throw new IllegalStateException(c[0] + ": " + action);
+				}
+				else if (action.equals("reset"))
+					m.resetManorData(1);
+				settle();
+				final List<String> sent = new ArrayList<>();
+				for (ManorCopy.SystemMessageId id : owner.leader.player.sent)
+					sent.add(id.toString());
+				System.out.println("cycle " + c[0] + " " + step + " " + action + " => mode " + m._mode + " delay " + ManorCopy.ThreadPool.delay + " stores " + m.stores
+					+ " sent " + (sent.isEmpty() ? "-" : String.join(",", sent)) + " warehouse " + (owner.warehouse.added.isEmpty() ? "-" : String.join(",", owner.warehouse.added))
+					+ " income " + gludio.seedIncome + " treasury " + gludio.treasury + " gludio" + lists(m, 1, false) + " /" + lists(m, 1, true) + " dion" + lists(m, 2, false) + " /" + lists(m, 2, true));
+				owner.leader.player.sent.clear();
+				owner.warehouse.added.clear();
+			}
+		}
 	}
 }
