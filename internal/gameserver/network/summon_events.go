@@ -49,8 +49,6 @@ type summonSink struct {
 	cleanupMu sync.Mutex
 	cleanup   []func()
 	despawned bool
-	// known is the scratch known-list snapshot the health-bar update reads.
-	known world.KnownBuffer
 }
 
 // onDespawn registers fn as runtime cleanup that runs exactly once when the
@@ -376,9 +374,7 @@ func (s *summonSink) broadcastHP() {
 	if s.link.world == nil || s.actor == nil {
 		return
 	}
-	known := s.known.SnapshotCopy(s.link.world, s.actor)
-	defer known.Release()
-	sendHPToWatchers(known.Tracked(), s.actor.ObjectID(), s.actor.PublishHP)
+	sendHPToWatchers(s.link.world.KnownPlayers(s.actor), s.actor.ObjectID(), s.actor.PublishHP)
 }
 
 // leaveCorpseBehind settles a dead summon whose owner is leaving the world

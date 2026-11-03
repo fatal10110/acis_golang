@@ -2,7 +2,9 @@ package world
 
 import (
 	"fmt"
+	"iter"
 	"slices"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
@@ -577,7 +579,7 @@ func (s *State) notifyArrivalActivity(r *Region, obj Tracked, arrival regionActi
 func (s *State) regionNeighborhoodEmpty(r *Region) bool {
 	var buf [9]*Region
 	for _, n := range s.AppendNeighbors(buf[:0], r, 1) {
-		if n.playersCount != 0 {
+		if len(n.players) != 0 {
 			return false
 		}
 	}
@@ -653,6 +655,41 @@ func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
 	}
 	return out
 }
+
+// KnownPlayers yields every player in t's surrounding regions, excluding t
+// itself: the recipients of a broadcast about t. It yields nothing when t is
+// off the grid, and follows the same surroundings as AppendKnown. The
+// players are collected into pooled scratch first, so no region lock is held
+// while the loop body runs, and a broadcast keeps no known-list storage of
+// its own.
+func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
+	return func(yield func(Tracked) bool) {
+		r := t.presence().knownRegion()
+		if r == nil {
+			return
+		}
+		scratch := knownPlayersScratch.Get().(*[]Tracked)
+		players := (*scratch)[:0]
+		var regionBuf [9]*Region
+		for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
+			players = region.appendPlayersExcept(players, t.ObjectID())
+		}
+		defer func() {
+			clear(players)
+			*scratch = players[:0]
+			knownPlayersScratch.Put(scratch)
+		}()
+		for _, p := range players {
+			if !yield(p) {
+				return
+			}
+		}
+	}
+}
+
+// knownPlayersScratch holds the reusable collection slices of KnownPlayers;
+// each one serves a single iteration at a time.
+var knownPlayersScratch = sync.Pool{New: func() any { return new([]Tracked) }}
 
 // AppendAround appends every object in the regions surrounding the one
 // holding (x, y) to out, excluding the object except: what an object in
