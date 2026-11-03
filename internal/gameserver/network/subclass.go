@@ -569,7 +569,7 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		c.SetChargedShot(kind, false)
 	}
 	live.shortcuts.Replace(l.restoreItemShortcuts(c, rows.shortcuts))
-	live.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(inv, live.shortcuts.All())))
+	live.SendFrame(serverpackets.FrameShortCutInit(l.serverShortcutList(live, live.shortcuts.All())))
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)
 	})

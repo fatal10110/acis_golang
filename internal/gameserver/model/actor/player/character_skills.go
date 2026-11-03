@@ -176,8 +176,22 @@ func (c *Character) RestoreSkillReuse(ref modelskill.Ref, key int32, delay time.
 	c.disableSkillUntil(key, expiresAt)
 }
 
-// SkillReuseTimers returns pending reuse timers as persistence rows need
-// them, dropping timers that have already expired.
+// SkillReuseRemaining returns the time key's recorded reuse timer has left
+// at now, zero once it ran out. A timer that ran out stays recorded until
+// ClearSkillReuses, so ok reports whether one was recorded at all.
+func (c *Character) SkillReuseRemaining(key int32, now time.Time) (time.Duration, bool) {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	reuse, ok := c.skills.reuses[key]
+	if !ok {
+		return 0, false
+	}
+	return max(reuse.expiresAt.Sub(now), 0), true
+}
+
+// SkillReuseTimers returns the reuse timers still running at now, as
+// persistence rows and SkillCoolTime need them. Timers that ran out are
+// skipped but stay recorded until ClearSkillReuses.
 func (c *Character) SkillReuseTimers(now time.Time) []effect.ReuseTimer {
 	c.skills.mu.Lock()
 	defer c.skills.mu.Unlock()
@@ -185,9 +199,8 @@ func (c *Character) SkillReuseTimers(now time.Time) []effect.ReuseTimer {
 		return nil
 	}
 	timers := make([]effect.ReuseTimer, 0, len(c.skills.reuses))
-	for key, reuse := range c.skills.reuses {
+	for _, reuse := range c.skills.reuses {
 		if !reuse.expiresAt.After(now) {
-			delete(c.skills.reuses, key)
 			continue
 		}
 		timers = append(timers, effect.ReuseTimer{
