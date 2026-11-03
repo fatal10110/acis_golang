@@ -519,6 +519,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		Log:                 &n.log,
 		Scripts:             scripts,
 		Remover:             n,
+		Spawns:              n,
 		SeeRange:            aiConfig.SeeRange,
 	}
 	return n, nil

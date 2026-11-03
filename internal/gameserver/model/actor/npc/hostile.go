@@ -76,6 +76,9 @@ type Hostile struct {
 	// remover takes this NPC out of the world for DeleteMe; nil despawns it
 	// with no respawn. Installed by Attach.
 	remover Remover
+	// spawns runs the hook of the spawn that placed this NPC when it is
+	// shown again in place; nil runs none. Installed by Attach.
+	spawns SpawnHook
 	// hits watches the hits this NPC registers; nil watches none. Installed
 	// by Attach.
 	hits HitObserver
@@ -385,6 +388,9 @@ type Runtime struct {
 	RewardsFor RewardsSource
 	Sink       event.Sink
 	Remover    Remover
+	// Spawns runs the hook of the spawn that placed the NPC when it is
+	// shown again in place; nil runs none.
+	Spawns SpawnHook
 	// Hits watches every hit this NPC registers; nil watches none.
 	Hits HitObserver
 	// Scripts raises the NPC's script hooks; nil raises none.
@@ -428,6 +434,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	}
 	h.sink = rt.Sink
 	h.remover = rt.Remover
+	h.spawns = rt.Spawns
 	h.hits = rt.Hits
 	h.scripts = rt.Scripts
 	h.ground = rt.Ground

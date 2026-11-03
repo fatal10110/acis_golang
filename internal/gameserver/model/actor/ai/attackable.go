@@ -922,6 +922,22 @@ func (a *Attackable) ClearCurrentDesire() {
 	a.clearCurrentDesire()
 }
 
+// CleanupForSpawn readies the loop for the actor shown again where it
+// stands as if newly spawned: its queued desires, its attack latch, its
+// route walk, the final target of the desire it last took up and the hold
+// of its last social animation are dropped. The current intention, the
+// threat and hate tables and the territory memory stay. Call it on the
+// actor's queue.
+func (a *Attackable) CleanupForSpawn() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.desires.Load().Clear()
+	a.latched = intention{}
+	a.leaveRoute()
+	a.topDesireTarget = nil
+	a.socialHold = time.Time{}
+}
+
 func (a *Attackable) castingNow() bool {
 	cast := a.CastControllerIfBuilt()
 	return cast != nil && cast.CastingNow()

@@ -58,6 +58,9 @@ type FolkSpawner struct {
 	// Remover takes the NPC out of the world for a script delete; nil
 	// decays it with no respawn.
 	Remover npc.FolkRemover
+	// Spawns runs the hook of the spawn that placed the NPC when it is
+	// shown again in place; nil runs none.
+	Spawns npc.SpawnHook
 	// Ground takes the items the NPC picks up out of the world; nil leaves
 	// them on the ground.
 	Ground npc.GroundTaker
@@ -94,6 +97,7 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 		Zones:    s.Zones,
 		Scripts:  s.Scripts,
 		Remover:  s.Remover,
+		Spawns:   s.Spawns,
 		Ground:   s.Ground,
 		Landing:  s.Geo,
 		SeeRange: s.SeeRange,

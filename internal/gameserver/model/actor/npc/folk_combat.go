@@ -43,6 +43,9 @@ type folkCombat struct {
 	// it out of the world for DeleteNow; nil decays it with no respawn.
 	scripts ScriptHooks
 	remover FolkRemover
+	// spawns runs the hook of the spawn that placed the NPC when it is
+	// shown again in place; nil runs none.
+	spawns SpawnHook
 	// ground takes the items the NPC picks up out of the world; nil leaves
 	// them on the ground.
 	ground GroundTaker
@@ -121,6 +124,9 @@ type FolkRuntime struct {
 	// Remover takes the NPC out of the world for DeleteNow; nil decays it
 	// with no respawn.
 	Remover FolkRemover
+	// Spawns runs the hook of the spawn that placed the NPC when it is
+	// shown again in place; nil runs none.
+	Spawns SpawnHook
 	// Ground takes the items the NPC picks up out of the world; nil leaves
 	// them on the ground.
 	Ground GroundTaker
@@ -172,7 +178,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 		return errors.New("npc: folk runtime needs a queue")
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
-	f.scripts, f.remover, f.ground, f.landing = rt.Scripts, rt.Remover, rt.Ground, rt.Landing
+	f.scripts, f.remover, f.spawns, f.ground, f.landing = rt.Scripts, rt.Remover, rt.Spawns, rt.Ground, rt.Landing
 	f.seeDistance = rt.SeeRange
 	f.regenSettings = rt.Regen
 	if f.Tower() {
