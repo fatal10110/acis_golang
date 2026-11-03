@@ -50,7 +50,7 @@ fly <name> <ox oy oz> <oheight> <tx ty tz> <canFly> <stop x y z>
 ```
 
 `canFly` is `canFly(..., null)`; the stop is `getValidFlyLocation(..., null)`. The queries cover
-the cases of `fly_test.go` (traced by hand before this probe), diagonals in every direction, steep
+level and descending lines over a low floor, a high floor and null geodata, diagonals in every direction, steep
 and shallow slopes, vertical and horizontal lines, cell borders, multilayer ceilings and middle
 layers, the corridor height truncated to an int (fractional, negative, huge and not-a-number),
 lines long enough to wrap the 32-bit squared-delta sum, and walks that leave the geodata grid on
