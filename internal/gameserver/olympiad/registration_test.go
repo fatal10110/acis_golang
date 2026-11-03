@@ -18,8 +18,10 @@ type recordingStore struct {
 	saves []map[int32]Noble
 }
 
-func (s *recordingStore) LoadCycle(context.Context) (int32, bool, error) { return 0, false, nil }
-func (s *recordingStore) SaveCycle(context.Context, int32) error         { return nil }
+func (s *recordingStore) LoadStatus(context.Context) (Status, bool, error) {
+	return Status{}, false, nil
+}
+func (s *recordingStore) SaveStatus(context.Context, Status) error { return nil }
 func (s *recordingStore) LoadNobles(context.Context) (map[int32]Noble, error) {
 	return map[int32]Noble{}, nil
 }
@@ -80,6 +82,7 @@ func TestRegisterChecks(t *testing.T) {
 	}{
 		{"validation", Validation, time.Hour, nil, RegisterNotInProgress},
 		{"validation beats every other check", Validation, time.Minute, func(a *Applicant) { a.Noble = false }, RegisterNotInProgress},
+		{"between windows", Interval, time.Hour, nil, RegisterNotInProgress},
 		{"window closing", Competition, 10*time.Minute - time.Millisecond, nil, RegisterClosing},
 		{"window closing beats noble", Competition, time.Minute, func(a *Applicant) { a.Noble = false }, RegisterClosing},
 		{"ten minutes left", Competition, 10 * time.Minute, nil, Registered},
@@ -204,8 +207,8 @@ func TestUnregister(t *testing.T) {
 // TestPasses pins Olympiad.getNoblessePasses with the default rates
 // (OlyGPPerPoint 1000, OlyHeroPoints 300): points capped at 1000 and none
 // under 50, hero points added, the record left rewarded with no points and
-// saved at once; nothing in the competition window, without a record, or a
-// second time.
+// saved at once; nothing outside the validation period after an Olympiad's
+// end, without a record, or a second time.
 func TestPasses(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -237,14 +240,16 @@ func TestPasses(t *testing.T) {
 		}
 	}
 
-	o, store := newRegistrationOlympiad(Competition, time.Hour, map[int32]Noble{1: {Points: 100}})
-	if got := passes(t, o, 1, true); got != 0 || len(store.saves) != 0 {
-		t.Fatalf("claim in the window = %d, %d saves", got, len(store.saves))
+	for _, period := range []Period{Competition, Interval} {
+		o, store := newRegistrationOlympiad(period, time.Hour, map[int32]Noble{1: {Points: 100}})
+		if got := passes(t, o, 1, true); got != 0 || len(store.saves) != 0 {
+			t.Fatalf("claim in period %v = %d, %d saves", period, got, len(store.saves))
+		}
+		if n, _ := o.Noble(1); n.Points != 100 || n.Rewarded {
+			t.Fatalf("record after a claim refused in period %v = %+v", period, n)
+		}
 	}
-	if n, _ := o.Noble(1); n.Points != 100 || n.Rewarded {
-		t.Fatalf("record after a refused claim = %+v", n)
-	}
-	o.period = Validation
+	o, _ := newRegistrationOlympiad(Validation, time.Hour, nil)
 	if got := passes(t, o, 2, true); got != 0 {
 		t.Fatalf("claim without a record = %d", got)
 	}
