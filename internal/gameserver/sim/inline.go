@@ -19,6 +19,7 @@ type Inline struct {
 	mu     sync.Mutex
 	at     time.Time // the virtual now
 	tasks  []inlineTask
+	head   int // index of the next task to run in tasks
 	timers vtimerHeap
 	seq    uint64
 	// ready holds one token once work may be runnable: a task was posted,
@@ -77,13 +78,15 @@ func (in *Inline) NextTimer() (time.Time, bool) {
 func (in *Inline) Run() {
 	for {
 		in.mu.Lock()
-		if len(in.tasks) == 0 {
+		if in.head == len(in.tasks) {
+			// Reuse the buffer, so posts at a steady rate allocate nothing.
+			in.tasks, in.head = in.tasks[:0], 0
 			in.mu.Unlock()
 			return
 		}
-		t := in.tasks[0]
-		in.tasks[0] = inlineTask{}
-		in.tasks = in.tasks[1:]
+		t := in.tasks[in.head]
+		in.tasks[in.head] = inlineTask{}
+		in.head++
 		in.mu.Unlock()
 		drainAs(t.q, t.fn)
 	}
