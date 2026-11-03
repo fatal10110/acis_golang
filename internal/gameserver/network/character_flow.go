@@ -590,11 +590,12 @@ func skillCoolTimeEntries(timers []effect.ReuseTimer, now time.Time) []serverpac
 		if remaining <= 0 {
 			continue
 		}
+		// The client's seconds are the int-narrowed milliseconds divided by 1000.
 		entries = append(entries, serverpackets.SkillCoolTimeEntry{
 			SkillID:          int32(timer.Skill.ID),
 			Level:            int32(timer.Skill.Level),
-			ReuseSeconds:     int32(timer.Delay / 1000),
-			RemainingSeconds: int32(remaining / 1000),
+			ReuseSeconds:     int32(timer.Delay) / 1000,
+			RemainingSeconds: int32(remaining) / 1000,
 		})
 	}
 	return entries

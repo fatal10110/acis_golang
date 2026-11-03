@@ -121,73 +121,9 @@ func TestFrameExCursedWeaponLocationEmpty(t *testing.T) {
 	}
 }
 
-func TestFrameQuestList(t *testing.T) {
-	got := framePayload(t, FrameQuestList([]QuestListEntry{{QuestID: 255, Flags: 7}}))
-	want := []byte{OpcodeQuestList}
-	want = appendH(want, 1)
-	want = appendD(want, 255)
-	want = appendD(want, 7)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameQuestList() = %x, want %x", got, want)
-	}
-}
-
 func TestFrameQuestListRejectsOversizedCount(t *testing.T) {
 	if err := FrameQuestList(make([]QuestListEntry, 1<<16)).Err(); err == nil {
 		t.Fatal("FrameQuestList oversized count error = nil, want error")
-	}
-}
-
-func TestFrameShortCutInit(t *testing.T) {
-	got := framePayload(t, FrameShortCutInit([]Shortcut{{Slot: 0, Type: ShortcutAction, ID: 2, CharacterType: 1}}))
-	want := []byte{OpcodeShortCutInit}
-	want = appendD(want, 1)
-	want = appendD(want, int32(ShortcutAction))
-	want = appendD(want, 0)
-	want = appendD(want, 2)
-	want = appendD(want, 1)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShortCutInit() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameShortCutRegisterSkill(t *testing.T) {
-	got := framePayload(t, FrameShortCutRegister(Shortcut{Slot: 3, Page: 1, Type: ShortcutSkill, ID: 248, Level: 1, CharacterType: 1}))
-	want := []byte{OpcodeShortCutRegister}
-	want = appendD(want, int32(ShortcutSkill))
-	want = appendD(want, 15)
-	want = appendD(want, 248)
-	want = appendD(want, 1)
-	want = append(want, 0)
-	want = appendD(want, 1)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShortCutRegister(skill) = %x, want %x", got, want)
-	}
-}
-
-func TestFrameShortCutRegisterItem(t *testing.T) {
-	got := framePayload(t, FrameShortCutRegister(Shortcut{
-		Slot:             2,
-		Page:             0,
-		Type:             ShortcutItem,
-		ID:               57,
-		CharacterType:    1,
-		SharedReuseGroup: -1,
-		RemainingSeconds: 4,
-		ReuseSeconds:     12,
-		AugmentationID:   12345,
-	}))
-	want := []byte{OpcodeShortCutRegister}
-	want = appendD(want, int32(ShortcutItem))
-	want = appendD(want, 2)
-	want = appendD(want, 57)
-	want = appendD(want, 1)
-	want = appendD(want, -1)
-	want = appendD(want, 4)
-	want = appendD(want, 12)
-	want = appendD(want, 12345)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShortCutRegister(item) = %x, want %x", got, want)
 	}
 }
 

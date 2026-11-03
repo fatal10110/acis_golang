@@ -13,6 +13,14 @@ public class IntIntHolder
 		_value = value;
 	}
 
+	// The skill an item shortcut reads the reuse of; set by the probe.
+	public net.sf.l2j.gameserver.skills.L2Skill skill;
+
+	public net.sf.l2j.gameserver.skills.L2Skill getSkill()
+	{
+		return skill;
+	}
+
 	public int getId()
 	{
 		return _id;

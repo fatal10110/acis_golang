@@ -1,7 +1,10 @@
 package net.sf.l2j.gameserver.model.actor;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import net.sf.l2j.gameserver.enums.TeamType;
 import net.sf.l2j.gameserver.enums.ZoneId;
@@ -18,6 +21,10 @@ import net.sf.l2j.gameserver.model.actor.instance.Cubic;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.actor.status.PlayerStatus;
 import net.sf.l2j.gameserver.model.actor.container.player.HennaList;
+import net.sf.l2j.gameserver.model.actor.container.player.QuestList;
+import net.sf.l2j.gameserver.model.actor.container.player.ShortcutList;
+import net.sf.l2j.gameserver.model.records.Timestamp;
+import net.sf.l2j.gameserver.skills.L2Skill;
 import net.sf.l2j.gameserver.model.craft.ManufactureList;
 import net.sf.l2j.gameserver.model.craft.RecipeBook;
 import net.sf.l2j.gameserver.model.group.Party;
@@ -103,6 +110,49 @@ public final class Player extends Playable
 	public int apprentice;
 	public int powerGrade;
 	public GameClient client;
+	public int olympiadSide;
+	public final Map<Integer, L2Skill> skills = new LinkedHashMap<>();
+	public boolean wearingFormalWear;
+	public final ShortcutList shortcutList = new ShortcutList();
+	public final QuestList questList = new QuestList();
+	public final List<Timestamp> reuseTimeStamps = new ArrayList<>();
+	public final Map<Integer, Timestamp> reuseTimeStamp = new HashMap<>();
+
+	public int getOlympiadSide()
+	{
+		return olympiadSide;
+	}
+
+	// The reference keeps the skills sorted by id; the stand-in keeps the order the probe adds them.
+	public Map<Integer, L2Skill> getSkills()
+	{
+		return skills;
+	}
+
+	public boolean isWearingFormalWear()
+	{
+		return wearingFormalWear;
+	}
+
+	public ShortcutList getShortcutList()
+	{
+		return shortcutList;
+	}
+
+	public QuestList getQuestList()
+	{
+		return questList;
+	}
+
+	public List<Timestamp> getReuseTimeStamps()
+	{
+		return reuseTimeStamps;
+	}
+
+	public Map<Integer, Timestamp> getReuseTimeStamp()
+	{
+		return reuseTimeStamp;
+	}
 
 	public int getSponsor()
 	{

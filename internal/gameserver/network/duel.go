@@ -410,9 +410,9 @@ func duelUserInfo(live *livePlayer) serverpackets.DuelUserInfo {
 	res := live.ResourceValues()
 	return serverpackets.DuelUserInfo{
 		Name: live.CharacterName(), ObjectID: live.ObjectID(), ClassID: int32(live.ClassID()), Level: int32(live.Level()),
-		HP: int32(res.CurrentHP), MaxHP: int32(res.MaxHP),
-		MP: int32(res.CurrentMP), MaxMP: int32(res.MaxMP),
-		CP: int32(res.CurrentCP), MaxCP: int32(res.MaxCP),
+		HP: res.CurrentHP, MaxHP: res.MaxHP,
+		MP: res.CurrentMP, MaxMP: res.MaxMP,
+		CP: res.CurrentCP, MaxCP: res.MaxCP,
 	}
 }
 

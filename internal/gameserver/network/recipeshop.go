@@ -72,13 +72,13 @@ func (l *GameClientLink) sendRecipeShopSellList(live, crafter *livePlayer) {
 	}
 	offered, _ := crafter.PrivateStore().ManufactureList()
 	res := crafter.ResourceValues()
-	live.SendFrame(serverpackets.FrameRecipeShopSellList(crafter.ObjectID(), int32(res.CurrentMP), int32(res.MaxMP), adena, offered))
+	live.SendFrame(serverpackets.FrameRecipeShopSellList(crafter.ObjectID(), res.CurrentMP, res.MaxMP, adena, offered))
 }
 
 // sendRecipeShopItemInfo sends live crafter's craft window for recipeID.
 func sendRecipeShopItemInfo(live, crafter *livePlayer, recipeID int32) {
 	res := crafter.ResourceValues()
-	live.SendFrame(serverpackets.FrameRecipeShopItemInfo(crafter.ObjectID(), recipeID, int32(res.CurrentMP), int32(res.MaxMP)))
+	live.SendFrame(serverpackets.FrameRecipeShopItemInfo(crafter.ObjectID(), recipeID, res.CurrentMP, res.MaxMP))
 }
 
 // showWorkshopRecipe answers RequestRecipeShopMakeInfo with a workshop's

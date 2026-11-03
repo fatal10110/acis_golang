@@ -1,6 +1,7 @@
 package net.sf.l2j.gameserver.model.item.instance;
 
 import net.sf.l2j.gameserver.model.Augmentation;
+import net.sf.l2j.gameserver.model.item.kind.EtcItem;
 import net.sf.l2j.gameserver.model.item.kind.Item;
 
 // Stand-in for an item stack: the identity, the template and the owner-specific
@@ -25,6 +26,18 @@ public final class ItemInstance
 		this.objectId = objectId;
 		this.item = item;
 		this.count = count;
+	}
+
+	public EtcItem etc;
+
+	public boolean isEtcItem()
+	{
+		return etc != null;
+	}
+
+	public EtcItem getEtcItem()
+	{
+		return etc;
 	}
 
 	public int getObjectId()
