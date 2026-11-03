@@ -1,0 +1,3 @@
+# The datapack copy is kept byte for byte (ops/datapack.sha256): no line-ending
+# conversion, and it stays out of the language statistics.
+/aCis_datapack/** -text linguist-vendored
