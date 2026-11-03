@@ -115,9 +115,6 @@ type Self struct {
 	ObjectID int32
 	X, Y, Z  int32
 	Heading  int32
-	// Created reports that EnterGame created the character and so waited
-	// out the select delay.
-	Created bool
 	// Burst holds copies of the EnterWorld frames that preceded UserInfo
 	// (objects already in sight among them), in arrival order.
 	Burst [][]byte
@@ -134,12 +131,13 @@ func (e *GameStartError) Error() string {
 }
 
 // EnterGame authenticates account with the keys its login session issued,
-// selects the first character (creating charName when the account has none,
-// then waiting selectWait, the server's character-select reuse delay, which
-// drops a game start sent sooner), and enters the world. It returns once the
+// selects the first character (creating charName when the account has none)
+// and enters the world. ctx ending fails the entry at once. It returns once the
 // burst's UserInfo arrives, with the burst frames before it; the rest of the
 // burst is left unread.
-func EnterGame(ctx context.Context, g *GameConn, account string, keys SessionKeys, charName string, selectWait time.Duration) (Self, error) {
+func EnterGame(ctx context.Context, g *GameConn, account string, keys SessionKeys, charName string) (Self, error) {
+	stop := context.AfterFunc(ctx, func() { _ = g.conn.SetDeadline(time.Unix(1, 0)) })
+	defer stop()
 	if err := g.Send(encodeAuthLogin(account, keys)); err != nil {
 		return Self{}, fmt.Errorf("send AuthLogin: %w", err)
 	}
@@ -150,8 +148,7 @@ func EnterGame(ctx context.Context, g *GameConn, account string, keys SessionKey
 	if reply[0] == serverpackets.OpcodeAuthLoginFail {
 		return Self{}, &GameStartError{Packet: "AuthLoginFail", Reason: wire.NewReader(reply[1:]).ReadInt32()}
 	}
-	created := wire.NewReader(reply[1:]).ReadInt32() == 0
-	if created {
+	if wire.NewReader(reply[1:]).ReadInt32() == 0 {
 		if err := g.Send(encodeRequestCharacterCreate(charName)); err != nil {
 			return Self{}, fmt.Errorf("send RequestCharacterCreate: %w", err)
 		}
@@ -164,9 +161,6 @@ func EnterGame(ctx context.Context, g *GameConn, account string, keys SessionKey
 		}
 		if _, err := g.readUntil(serverpackets.OpcodeCharSelectInfo); err != nil {
 			return Self{}, fmt.Errorf("read CharSelectInfo after create: %w", err)
-		}
-		if err := wait(ctx, selectWait); err != nil {
-			return Self{}, err
 		}
 	}
 
@@ -189,7 +183,7 @@ func EnterGame(ctx context.Context, g *GameConn, account string, keys SessionKey
 		switch raw[0] {
 		case serverpackets.OpcodeUserInfo:
 			self := decodeUserInfo(raw)
-			self.Created, self.Burst = created, burst
+			self.Burst = burst
 			return self, nil
 		case serverpackets.OpcodeServerClose:
 			return Self{}, errServerClose

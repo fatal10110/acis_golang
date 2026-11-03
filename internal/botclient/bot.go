@@ -42,9 +42,11 @@ type botState struct {
 	self    Self
 	dead    bool
 	targets map[int32]npcSighting
-	// loggingOut is set once Logout is sent; the server's ActionFailed
-	// after it (a refused logout, as in combat) is then signaled on refused.
+	// loggingOut is set once Logout is sent. An ActionFailed after it (a
+	// refused logout, as in combat, or one already in flight) is then
+	// signaled on refused; LeaveWorld sets leftWorld.
 	loggingOut bool
+	leftWorld  bool
 	refused    chan struct{}
 }
 
@@ -81,6 +83,10 @@ func (s *botState) observe(raw []byte) {
 		}
 	case serverpackets.OpcodeDeleteObject:
 		delete(s.targets, decodeObjectID(raw))
+	case serverpackets.OpcodeLeaveWorld:
+		if s.loggingOut {
+			s.leftWorld = true
+		}
 	case serverpackets.OpcodeActionFailed:
 		if s.loggingOut {
 			select {
@@ -135,22 +141,12 @@ func (b *bot) run(ctx context.Context) {
 		return
 	}
 	defer g.Close()
-	stop := context.AfterFunc(ctx, func() { _ = g.conn.SetDeadline(time.Unix(1, 0)) })
-	self, err := EnterGame(ctx, g, b.account, res.Keys, b.account, b.cfg.SelectWait)
-	if !stop() {
-		// ctx ended during entry; the poisoned deadline already failed it.
-		b.rec.fail(ctx, "game", ctx.Err())
-		return
-	}
+	self, err := EnterGame(ctx, g, b.account, res.Keys, b.account)
 	if err != nil {
 		b.rec.fail(ctx, "game", err)
 		return
 	}
-	entry := time.Since(start)
-	if self.Created {
-		entry -= b.cfg.SelectWait
-	}
-	b.rec.latency(&b.rec.enterWorld, entry)
+	b.rec.latency(&b.rec.enterWorld, time.Since(start))
 	b.rec.entered.Add(1)
 
 	b.play(ctx, g, self)
@@ -213,25 +209,60 @@ func (b *bot) play(ctx context.Context, g *GameConn, self Self) {
 		}
 	}
 
-	// The server refuses a logout in combat and keeps the connection open,
-	// so a refusal, like a silent server, ends in closing the connection.
+	b.logout(g, state, readErr)
+}
+
+// logoutRefusalGrace is how long a logout waits for LeaveWorld after an
+// ActionFailed: one already in flight before the Logout is followed by
+// LeaveWorld and the close, a refusal by nothing.
+const logoutRefusalGrace = time.Second
+
+// logout sends Logout and waits for the server to close the connection.
+// The server refuses a logout in combat and keeps the connection open, so a
+// refusal, like a silent server, ends in closing the connection. The outcome
+// is counted as action "logout" (LeaveWorld then the close),
+// "logout_refused" or "logout_timeout".
+func (b *bot) logout(g *GameConn, state *botState, readErr <-chan error) {
 	state.mu.Lock()
 	state.loggingOut = true
 	state.mu.Unlock()
-	if err := g.Send(encodeLogout()); err == nil {
-		t := time.NewTimer(b.cfg.Timeout)
+	if err := g.Send(encodeLogout()); err != nil {
+		g.Close()
+		<-readErr
+		return
+	}
+	t := time.NewTimer(b.cfg.Timeout)
+	defer t.Stop()
+	refused := false
+	for {
 		select {
 		case <-readErr:
-			t.Stop()
+			state.mu.Lock()
+			left := state.leftWorld
+			state.mu.Unlock()
+			if left {
+				b.rec.action("logout")
+			} else {
+				b.rec.disconnect(errors.New("closed after Logout without LeaveWorld"))
+			}
 			return
 		case <-state.refused:
-			b.rec.action("logout_refused")
+			if !refused {
+				refused = true
+				t.Reset(min(logoutRefusalGrace, b.cfg.Timeout))
+			}
+			continue
 		case <-t.C:
+			if refused {
+				b.rec.action("logout_refused")
+			} else {
+				b.rec.action("logout_timeout")
+			}
 		}
-		t.Stop()
+		g.Close()
+		<-readErr
+		return
 	}
-	g.Close()
-	<-readErr
 }
 
 // act sends the packets of one behavior tick.

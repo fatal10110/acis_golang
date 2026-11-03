@@ -132,10 +132,8 @@ Requirements and limits:
   login-path numbers without it. Failed logins count toward `LoginTryBeforeBan` for `127.0.0.1`.
 - Account names hold at most 14 characters, so the prefix plus the last bot index must fit, using
   lowercase ASCII letters and digits. Each bot names its character after its account.
-- A bot whose account has no character creates a human fighter, then waits `-select-wait` (default
-  3.5s) before selecting it: the gameserver silently drops a selection sent within
-  `CharacterSelectTime` (server.properties, default 3000 ms) of the creation. Lower it only together
-  with that setting. An account that already has a character selects its first slot at once.
+- A bot whose account has no character creates a human fighter and selects it; an account that
+  already has a character selects its first slot.
 - `-game-addr` replaces the game address the ServerList advertises, for a gameserver whose
   `GameserverHostname` is not reachable from the bot host.
 
@@ -147,8 +145,9 @@ sight), `idle` sends nothing. A dead bot asks to restart in town instead. A bot 
 `-actions` ticks or at `-duration`, whichever comes first, then sends `Logout`; a refused logout (in
 combat) or no answer within `-timeout` closes the connection.
 
-The report lists the bot and entered-world counts, connect (TCP plus Init), login (Init to `PlayOk`)
-and enter-world (game connect to `UserInfo`, character-creation wait excluded) latency as p50, p99
+The report lists the bot, started and entered-world counts (a `-duration` that ends during the
+`-rate` ramp leaves the remaining bots unstarted; they are counted in neither errors nor `aborted`), connect (TCP plus Init), login (Init to `PlayOk`)
+and enter-world (game connect to `UserInfo`, character creation included) latency as p50, p99
 and max, packets sent and received in total and per second, action counts, disconnects (the server
 closed an in-world bot), errors by phase (`login`, `game`) with up to ten distinct samples, and bots
 the run's end interrupted before entering (`aborted`). `-json <file>` (or `-json -` for stdout)

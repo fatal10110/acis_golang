@@ -14,10 +14,7 @@ import (
 // crypt, character creation (or selection of an existing one), EnterWorld,
 // then the full behavior cycle against a visible monster.
 func TestBotSwarmPlaysThroughLoginAndGameServer(t *testing.T) {
-	srv := gameservertest.Boot(t,
-		gameservertest.WithReuseDelays(0, 0),
-		gameservertest.WithProductionTickers(),
-	)
+	srv := gameservertest.Boot(t, gameservertest.WithProductionTickers())
 	// swarm0 already has a character and selects it; the others create one.
 	srv.SeedCharacterFor(t, "swarm0", "Swarm0", 1, 0)
 	spawn := location.Location{X: 10, Y: 20, Z: gameservertest.SpawnZ}
@@ -33,13 +30,12 @@ func TestBotSwarmPlaysThroughLoginAndGameServer(t *testing.T) {
 	cfg.Duration = 0
 	cfg.Actions = 2 * len(botclient.DefaultBehaviors)
 	cfg.ActionInterval = 0 // back to back: the run is bounded by the action budget
-	cfg.SelectWait = 0     // WithReuseDelays(0, 0) lifts the character-select gate
 
 	report, err := botclient.Run(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Entered != 3 || len(report.Errors) != 0 || report.Disconnects != 0 || report.Aborted != 0 {
+	if report.Started != 3 || report.Entered != 3 || len(report.Errors) != 0 || report.Disconnects != 0 || report.Aborted != 0 {
 		t.Fatalf("report = %+v", report)
 	}
 	for name, l := range map[string]botclient.Latency{"connect": report.Connect, "login": report.Login, "enter world": report.EnterWorld} {
@@ -58,6 +54,9 @@ func TestBotSwarmPlaysThroughLoginAndGameServer(t *testing.T) {
 	if report.Actions[string(botclient.BehaviorAttack)] == 0 {
 		t.Errorf("no bot attacked the monster in sight (actions %v)", report.Actions)
 	}
+	if report.Actions["logout"] != 3 || report.Actions["logout_refused"] != 0 || report.Actions["logout_timeout"] != 0 {
+		t.Errorf("logouts: want 3 answered with LeaveWorld (actions %v)", report.Actions)
+	}
 
 	var accounts, created int
 	if err := srv.DB.QueryRow("SELECT COUNT(*) FROM accounts WHERE login IN ('swarm0', 'swarm1', 'swarm2')").Scan(&accounts); err != nil {
@@ -68,5 +67,12 @@ func TestBotSwarmPlaysThroughLoginAndGameServer(t *testing.T) {
 	}
 	if accounts != 3 || created != 2 {
 		t.Fatalf("auto-created accounts = %d (want 3), created characters = %d (want 2)", accounts, created)
+	}
+	var online int
+	if err := srv.DB.QueryRow("SELECT COUNT(*) FROM characters WHERE account_name IN ('swarm0', 'swarm1', 'swarm2') AND online <> 0").Scan(&online); err != nil {
+		t.Fatal(err)
+	}
+	if online != 0 {
+		t.Errorf("%d swarm characters still online after logout", online)
 	}
 }

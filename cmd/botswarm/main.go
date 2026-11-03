@@ -44,7 +44,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs.DurationVar(&cfg.ActionInterval, "interval", cfg.ActionInterval, "pause between a bot's behavior ticks")
 	behaviors := fs.String("behaviors", joinBehaviors(cfg.Behaviors), "comma-separated behavior cycle: move, validate, chat, attack, idle")
 	moveRadius := fs.Int("move-radius", int(cfg.MoveRadius), "largest move offset per axis from the bot's position")
-	fs.DurationVar(&cfg.SelectWait, "select-wait", cfg.SelectWait, "wait between creating a character and selecting it (above the server's CharacterSelectTime)")
 	fs.DurationVar(&cfg.Timeout, "timeout", cfg.Timeout, "handshake read/write and logout timeout")
 	fs.Uint64Var(&cfg.Seed, "seed", cfg.Seed, "move offset random seed")
 	jsonOut := fs.String("json", "", "also write the report as JSON to this file (- for stdout)")
@@ -82,7 +81,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
-	if report.Entered != int64(cfg.Bots) || report.Disconnects > 0 || len(report.Errors) > 0 {
+	if report.Started != cfg.Bots || report.Entered != int64(cfg.Bots) || report.Disconnects > 0 || len(report.Errors) > 0 {
 		return 1
 	}
 	return 0

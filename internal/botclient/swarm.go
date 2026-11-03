@@ -55,9 +55,6 @@ type Config struct {
 	Behaviors []Behavior
 	// MoveRadius bounds a move's offset from the bot's position on each axis.
 	MoveRadius int32
-	// SelectWait follows a character creation before the game start: the
-	// game server drops a start sent within its CharacterSelectTime.
-	SelectWait time.Duration
 	// Timeout bounds every handshake read and write and the logout wait.
 	Timeout time.Duration
 	// Seed seeds the move offsets.
@@ -78,7 +75,6 @@ func DefaultConfig() Config {
 		ActionInterval: time.Second,
 		Behaviors:      DefaultBehaviors,
 		MoveRadius:     300,
-		SelectWait:     3500 * time.Millisecond,
 		Timeout:        30 * time.Second,
 		Seed:           1,
 	}
@@ -128,7 +124,10 @@ type Latency struct {
 
 // Report is a run's outcome.
 type Report struct {
-	Bots        int     `json:"bots"`
+	Bots int `json:"bots"`
+	// Started counts the bots the ramp launched; a duration that ends
+	// mid-ramp leaves the rest unstarted.
+	Started     int     `json:"started"`
 	Entered     int64   `json:"entered_world"`
 	ElapsedSecs float64 `json:"elapsed_seconds"`
 
@@ -157,7 +156,7 @@ func (r *Report) WriteText(w io.Writer) error {
 	line := func(name string, l Latency) string {
 		return fmt.Sprintf("%-12s n=%-5d p50=%8.1fms p99=%8.1fms max=%8.1fms\n", name, l.Count, l.P50ms, l.P99ms, l.Maxms)
 	}
-	text := fmt.Sprintf("bots %d, entered world %d, elapsed %.1fs\n", r.Bots, r.Entered, r.ElapsedSecs) +
+	text := fmt.Sprintf("bots %d, started %d, entered world %d, elapsed %.1fs\n", r.Bots, r.Started, r.Entered, r.ElapsedSecs) +
 		line("connect", r.Connect) + line("login", r.Login) + line("enter world", r.EnterWorld) +
 		fmt.Sprintf("packets sent %d (%.1f/s), received %d (%.1f/s)\n", r.PacketsSent, r.PacketsSentPerSec, r.PacketsReceived, r.PacketsRecvPerSec) +
 		fmt.Sprintf("actions %v\n", sortedCounts(r.Actions)) +
@@ -253,6 +252,7 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 
 	var wg sync.WaitGroup
 	var gap time.Duration
+	started := 0
 	if cfg.Rate > 0 {
 		gap = time.Duration(float64(time.Second) / cfg.Rate)
 	}
@@ -268,6 +268,7 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 			rng:     rand.New(rand.NewPCG(cfg.Seed, uint64(i))),
 		}
 		wg.Go(func() { b.run(ctx) })
+		started++
 	}
 	wg.Wait()
 
@@ -276,6 +277,7 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 	defer rec.mu.Unlock()
 	r := Report{
 		Bots:            cfg.Bots,
+		Started:         started,
 		Entered:         rec.entered.Load(),
 		ElapsedSecs:     elapsed.Seconds(),
 		Connect:         summarize(rec.connect),
