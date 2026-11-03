@@ -21,6 +21,7 @@ func (f *Folk) InstantTeleportTo(j location.Jump) {
 		if f.world != nil {
 			f.world.SetPosition(f, target.X, target.Y, target.Z)
 		}
+		f.aiSleep.wakeOutOfTerritory(f)
 		return
 	}
 	target := move.Land(m.move, j, m.cfg.InWater)
@@ -30,4 +31,5 @@ func (f *Folk) InstantTeleportTo(j location.Jump) {
 		m.cfg.World.SetPosition(f, target.X, target.Y, target.Z)
 	}
 	m.ResetGeoPathFailCount()
+	f.aiSleep.wakeOutOfTerritory(f)
 }

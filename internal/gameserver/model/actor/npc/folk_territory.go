@@ -45,6 +45,7 @@ func (f *Folk) TeleportJump(j location.Jump) {
 		_ = f.world.Teleport(f, target.X, target.Y, target.Z)
 	}
 	f.zones.enter()
+	f.aiSleep.wakeOutOfTerritory(f)
 }
 
 // inWater reports whether at lies in a water zone of the NPC's zone index.
