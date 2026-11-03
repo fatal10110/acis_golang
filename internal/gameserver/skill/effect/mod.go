@@ -314,6 +314,18 @@ func (o ModOwner) is(owner ModOwner) bool {
 	return o == owner
 }
 
+// Owns reports whether any attached Mod's Owner is owner.
+func (c *Calculator) Owns(owner ModOwner) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, m := range c.mods {
+		if m.Owner.is(owner) {
+			return true
+		}
+	}
+	return false
+}
+
 // RemoveOwner removes every Mod whose Owner is owner and returns how many it
 // removed.
 func (c *Calculator) RemoveOwner(owner ModOwner) int {

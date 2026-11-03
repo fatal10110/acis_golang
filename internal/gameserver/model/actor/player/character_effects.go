@@ -67,6 +67,20 @@ func (c *Character) StatFuncsAttached(fns []effect.Mod) {
 	c.statsModified(stats)
 }
 
+// HasStatsByOwner reports whether any stat func added for owner is still
+// attached.
+func (c *Character) HasStatsByOwner(owner effect.ModOwner) bool {
+	c.statMu.RLock()
+	calcs := c.statCalcs
+	c.statMu.RUnlock()
+	for _, calc := range calcs {
+		if calc != nil && calc.Owns(owner) {
+			return true
+		}
+	}
+	return false
+}
+
 // RemoveStatsByOwner drops every stat func previously added for owner. An
 // effect a stop-all is ending changes the movement speed only: the stop-all's
 // caller reports the strip once, when it ends.

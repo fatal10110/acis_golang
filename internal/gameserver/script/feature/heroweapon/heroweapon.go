@@ -23,13 +23,20 @@ func New() script.Script {
 	}
 }
 
-// onAdvEvent gives the hero's weapon the event names; another id gives
-// nothing. Either answers nothing.
+// onAdvEvent gives the hero's weapon the event names to a player holding
+// none yet; another id, or a player already holding one, gets nothing.
+// Either answers nothing.
 func onAdvEvent(s *script.Script, e script.Event) string {
 	// An event that is not an int32 number aborts here.
 	id, err := strconv.ParseInt(e.Name, 10, 32)
 	if err != nil {
 		panic(err)
+	}
+	// The weapon list stays open after a pick, so its other links still
+	// answer: a hero holding one weapon gets no second, or one list would
+	// hand out every weapon type.
+	if e.Player.HasAtLeastOneItem(weaponIDs()...) {
+		return ""
 	}
 	weaponID := int32(id)
 	if slices.Contains(weaponIDs(), weaponID) {
