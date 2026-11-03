@@ -539,4 +539,12 @@ public final class Player extends Playable
 	{
 		return party != null;
 	}
+
+	// The packets sent to this player, in order.
+	public final List<net.sf.l2j.gameserver.network.serverpackets.L2GameServerPacket> sent = new ArrayList<>();
+
+	public void sendPacket(net.sf.l2j.gameserver.network.serverpackets.L2GameServerPacket packet)
+	{
+		sent.add(packet);
+	}
 }

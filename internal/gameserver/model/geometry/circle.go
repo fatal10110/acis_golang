@@ -83,6 +83,12 @@ func (c Circle) IntersectsRect(ax1, ax2, ay1, ay2 int) bool {
 	return false
 }
 
+// Center returns the disc's centre.
+func (c Circle) Center() (x, y int) { return c.x, c.y }
+
+// Radius returns the disc's radius.
+func (c Circle) Radius() int { return c.rad }
+
 // Bounds is the disc's bounding box.
 func (c Circle) Bounds() (minX, maxX, minY, maxY int) {
 	return c.x - c.rad, c.x + c.rad, c.y - c.rad, c.y + c.rad

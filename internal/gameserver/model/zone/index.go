@@ -1,6 +1,7 @@
 package zone
 
 import (
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -112,6 +113,35 @@ func (s *zoneSet) at(x, y int) []Kind {
 		return nil
 	}
 	return s.byRegion[(x-world.MinX)/regionEdge][(y-world.MinY)/regionEdge]
+}
+
+// Around returns the zones attached to the region containing (x, y) and to
+// the regions around it, each once: the region's own zones first, then
+// those of the three-by-three block centred on it, column by column. nil
+// when the point falls outside the world.
+func (ix *Index) Around(x, y int) []Kind {
+	s := ix.set()
+	if x < world.MinX || x > world.MaxX || y < world.MinY || y > world.MaxY {
+		return nil
+	}
+	rx, ry := (x-world.MinX)/regionEdge, (y-world.MinY)/regionEdge
+	var out []Kind
+	add := func(zones []Kind) {
+		for _, k := range zones {
+			if !slices.Contains(out, k) {
+				out = append(out, k)
+			}
+		}
+	}
+	add(s.byRegion[rx][ry])
+	for nx := rx - 1; nx <= rx+1; nx++ {
+		for ny := ry - 1; ny <= ry+1; ny++ {
+			if nx >= 0 && nx < world.RegionsX && ny >= 0 && ny < world.RegionsY {
+				add(s.byRegion[nx][ny])
+			}
+		}
+	}
+	return out
 }
 
 // Revalidate syncs a's zone occupancy against its current position: every

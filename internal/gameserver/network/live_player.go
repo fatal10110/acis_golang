@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/macro"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -150,6 +151,11 @@ type livePlayer struct {
 	// duplicate character selection uses to take the character away from its
 	// previous session.
 	kick func()
+	// drawingAnchor is where the login spawned p, at the depth its debug
+	// drawings are anchored to; drawings holds those drawings by name. Both
+	// are owned by p's queue.
+	drawingAnchor location.Location
+	drawings      map[string]*serverpackets.Drawing
 	// spawnProtectionGen is owned by p's queue.
 	spawnProtectionGen uint64
 	// deliveryStopped is set on p's queue when detach begins. Autosave and
