@@ -9,6 +9,10 @@ import (
 // is shown as itself.
 func (inst *Instance) Polymorph() *Template { return inst.form.Load() }
 
+// SetPolymorph gives an NPC not yet in the world form as its look, nil for
+// its own: it is first seen so. Morph changes the look of one in the world.
+func (inst *Instance) SetPolymorph(form *Template) { inst.form.Store(form) }
+
 // showForm shows s in the NPC's form, when it has one: the form's template
 // id, held items and body. Everything else stays the NPC's own.
 func (inst *Instance) showForm(s *npcinfo.Snapshot) {
