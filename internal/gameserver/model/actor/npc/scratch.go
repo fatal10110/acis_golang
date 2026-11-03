@@ -2,6 +2,7 @@ package npc
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 )
@@ -80,6 +81,23 @@ type Scratch struct {
 	party party
 	// territory is the NPC's out-of-territory state, in every life.
 	territory ai.TerritoryMemory
+	// scriptTimers is what the script engine keeps of the timers bound to
+	// the NPC, opaque here; see ScriptTimers.
+	scriptTimers atomic.Value
+}
+
+// ScriptTimers returns what the script engine keeps of the timers bound to
+// the NPC, nil before it keeps anything.
+func (s *Scratch) ScriptTimers() any { return s.scriptTimers.Load() }
+
+// KeepScriptTimers stores v as ScriptTimers unless a value is stored
+// already, and returns the stored value. Every v must have the same
+// concrete type.
+func (s *Scratch) KeepScriptTimers(v any) any {
+	if s.scriptTimers.CompareAndSwap(nil, v) {
+		return v
+	}
+	return s.scriptTimers.Load()
 }
 
 // NewScratch returns the memory of an NPC that has never lived: every slot

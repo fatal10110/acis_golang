@@ -267,6 +267,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		s.path = l.Path
 		s.env = cfg.Env
 		s.timers = r.timers
+		s.ownTimers = &scriptTimers{}
 		s.registry = r
 		s.Name = l.Path[strings.LastIndexByte(l.Path, '.')+1:]
 		e.bound = boundOf(&s, cfg.KindOf)

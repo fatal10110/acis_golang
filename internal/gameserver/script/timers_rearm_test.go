@@ -9,10 +9,10 @@ import (
 // armedTimer returns the timer name of the script labelled label, bound to
 // nothing, and its sim timer.
 func armedTimer(w *timerWorld, label, name string) *scriptTimer {
-	ts := w.r.timers
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	st := ts.byScript[w.script(label)][timerKey{name: name}]
+	own := w.script(label).ownTimers
+	own.mu.Lock()
+	defer own.mu.Unlock()
+	st := own.loose[timerKey{name: name}]
 	if st == nil {
 		w.t.Fatalf("no timer %s of %s", name, label)
 	}

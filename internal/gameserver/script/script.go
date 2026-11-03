@@ -48,6 +48,8 @@ type Script struct {
 	env *Env
 	// timers are the timers of every script; Build sets them.
 	timers *timers
+	// ownTimers is the script's table of its timers; Build sets it.
+	ownTimers *scriptTimers
 	// registry is the registry that registered the script; Build sets it.
 	// The script-event sends dispatch through it.
 	registry *Registry
