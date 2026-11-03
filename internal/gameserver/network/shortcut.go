@@ -3,10 +3,10 @@ package network
 import (
 	"context"
 
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -30,7 +30,7 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 	if !ok {
 		return
 	}
-	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
+	live.SendFrame(serverpackets.FrameShortCutRegister(l.serverShortcut(live, sc)))
 	// An item no longer held, a recipe the book lacks or a macro the list
 	// lacks still shows on the bar for this session, but is neither kept nor
 	// saved: ShortCutRegister is answered before the integrity check drops
@@ -117,7 +117,7 @@ func (l *GameClientLink) refreshSkillShortcuts(live *livePlayer, skillID, level 
 	updated := live.shortcuts.RefreshSkillLevel(skillID, level)
 	for _, sc := range updated {
 		l.saveShortcut(live, sc, "refresh skill shortcut")
-		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
+		live.SendFrame(serverpackets.FrameShortCutRegister(l.serverShortcut(live, sc)))
 	}
 }
 
@@ -139,17 +139,18 @@ func (l *GameClientLink) saveShortcut(live *livePlayer, sc shortcut.Shortcut, op
 	})
 }
 
-func serverShortcutList(inv *itemcontainer.Inventory, shortcuts []shortcut.Shortcut) []serverpackets.Shortcut {
+func (l *GameClientLink) serverShortcutList(live *livePlayer, shortcuts []shortcut.Shortcut) []serverpackets.Shortcut {
 	out := make([]serverpackets.Shortcut, 0, len(shortcuts))
 	for _, sc := range shortcuts {
-		out = append(out, serverShortcut(inv, sc))
+		out = append(out, l.serverShortcut(live, sc))
 	}
 	return out
 }
 
-// serverShortcut builds the wire entry of sc. An item shortcut on an
-// augmented weapon or armor piece held in inv carries its augmentation id.
-func serverShortcut(inv *itemcontainer.Inventory, sc shortcut.Shortcut) serverpackets.Shortcut {
+// serverShortcut builds live's wire entry of sc. An item shortcut on an
+// augmented weapon or armor piece carries its augmentation id; one on an
+// etc item carries the reuse of the item's first skill.
+func (l *GameClientLink) serverShortcut(live *livePlayer, sc shortcut.Shortcut) serverpackets.Shortcut {
 	out := serverpackets.Shortcut{
 		Slot:             sc.Slot,
 		Page:             sc.Page,
@@ -159,6 +160,7 @@ func serverShortcut(inv *itemcontainer.Inventory, sc shortcut.Shortcut) serverpa
 		Level:            sc.Level,
 		SharedReuseGroup: sc.SharedReuseGroup,
 	}
+	inv := live.Inventory()
 	if sc.Type != shortcut.Item || inv == nil {
 		return out
 	}
@@ -166,12 +168,37 @@ func serverShortcut(inv *itemcontainer.Inventory, sc shortcut.Shortcut) serverpa
 	if inst == nil {
 		return out
 	}
-	if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok && tmpl.Kind != item.KindEtcItem {
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok {
+		return out
+	}
+	if tmpl.Kind != item.KindEtcItem {
 		if aug, ok := inst.AugmentationValue(); ok {
 			out.AugmentationID = aug.Attributes
 		}
+		return out
 	}
+	out.RemainingSeconds, out.ReuseSeconds = l.itemSkillReuse(live, tmpl.AttachedSkills)
 	return out
+}
+
+// itemSkillReuse returns the whole seconds live's reuse timer for the first
+// of an etc item's skills has left, and that skill's reuse delay in whole
+// seconds. Both are zero when the item casts no skill or no timer was
+// recorded for it; a timer that ran out still reports the delay.
+func (l *GameClientLink) itemSkillReuse(live *livePlayer, skills []item.SkillRef) (remaining, reuse int32) {
+	if l.skills == nil || len(skills) == 0 {
+		return 0, 0
+	}
+	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skills[0].ID), Level: int(skills[0].Level)})
+	if !ok {
+		return 0, 0
+	}
+	left, ok := live.SkillReuseRemaining(actorcast.ReuseKey(def), live.Now())
+	if !ok {
+		return 0, 0
+	}
+	return int32(left.Milliseconds() / 1000), int32(def.ReuseDelay / 1000)
 }
 
 func serverShortcutType(typ shortcut.Type) serverpackets.ShortcutType {

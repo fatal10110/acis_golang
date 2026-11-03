@@ -1089,6 +1089,10 @@ func (p *Persistence) UnequipItemStatsReporting(c *player.Character, worn WornSt
 // worn shares tmpl's id — every tmpl.AttachedSkills entry. It reports
 // whether the caller must resend SkillList: a loaded +4 skill asks for it at
 // +4 or higher even when the Expertise gate kept it from being granted.
+//
+// Only a second worn copy of the same item keeps the item skills: the item
+// being withdrawn never counts for itself, so a weapon that stays worn while
+// the grade penalty turns on loses its item skills with it.
 func (p *Persistence) withdrawItemSkills(c *player.Character, worn []*item.Instance, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
 	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
 		skillsChanged = true
