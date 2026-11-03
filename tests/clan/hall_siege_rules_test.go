@@ -214,10 +214,18 @@ func TestHallSiegeDateSetAnewAtBoot(t *testing.T) {
 	if owner != int64(holdersClanID) || paidUntil != hallPaidUntil {
 		t.Fatalf("hall row = owner %#x, paidUntil %d", owner, paidUntil)
 	}
-	lo := clanhall.NextSiegeDate(before, []int{14, 0, 0, 12, 0}).UnixMilli()
-	hi := clanhall.NextSiegeDate(after, []int{14, 0, 0, 12, 0}).UnixMilli()
-	if endDate < lo || endDate > hi || w.siege.Date() != endDate {
-		t.Fatalf("next siege date = %d (siege %d), want within %d..%d", endDate, w.siege.Date(), lo, hi)
+	// The hall rows are restored before the halls run on the sim clock, so the
+	// date is set from the wall clock at some millisecond of the boot, and the
+	// date keeps only that millisecond of it: look for the instant of the boot
+	// that yields it, instead of bounding it by two dates (which invert when
+	// the boot straddles a second).
+	setFromBoot := false
+	for ms := before.UnixMilli(); ms <= after.UnixMilli() && !setFromBoot; ms++ {
+		setFromBoot = clanhall.NextSiegeDate(time.UnixMilli(ms), []int{14, 0, 0, 12, 0}).UnixMilli() == endDate
+	}
+	if !setFromBoot || w.siege.Date() != endDate {
+		t.Fatalf("next siege date = %d (siege %d), want one set from a boot instant in %d..%d",
+			endDate, w.siege.Date(), before.UnixMilli(), after.UnixMilli())
 	}
 }
 
