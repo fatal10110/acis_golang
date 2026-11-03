@@ -92,6 +92,11 @@ var adminCommands = map[string]adminCommand{
 	// Manor; see admin_manor.go.
 	"admin_manor": (*GameClientLink).adminManor,
 
+	// GM shop and item creation; see admin_buy.go and admin_item.go.
+	"admin_buy":  (*GameClientLink).adminBuy,
+	"admin_item": (*GameClientLink).adminItem,
+	"admin_give": (*GameClientLink).adminGive,
+
 	// Olympiad and heroes; see admin_olympiad.go.
 	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
 	"admin_sethero": (*GameClientLink).adminSetHero,
