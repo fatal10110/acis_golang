@@ -147,18 +147,24 @@ type Timer struct {
 	next   time.Time     // deadline of the armed expiry
 	ct     clockTimer
 	done   bool // stopped, cancelled by Close, or a one-shot that ran
+	// ran marks a one-shot whose fn has started and that nothing stopped
+	// since: Rearm may arm it again.
+	ran bool
 	// pastClose marks a timer AfterPastClose armed, which Close leaves.
 	pastClose bool
-	queued    bool // an expiry is posted and has not run yet
+	queued    bool   // an expiry is posted and has not run yet
+	post      func() // run as a func value, made at the first expiry
 }
 
 // Stop cancels the timer and reports whether this call kept fn from running.
-// An expiry already posted but not yet run is cancelled too.
+// An expiry already posted but not yet run is cancelled too. A one-shot
+// stopped after its fn ran can no longer be re-armed.
 func (t *Timer) Stop() bool {
 	q := t.q
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if t.done {
+		t.ran = false
 		return false
 	}
 	t.done = true
@@ -186,7 +192,10 @@ func (t *Timer) fire() {
 	if t.queued {
 		return
 	}
-	if !q.enqueue(t.run) {
+	if t.post == nil {
+		t.post = t.run
+	}
+	if !q.enqueue(t.post) {
 		t.done = true
 		delete(q.timers, t)
 		t.ct.Stop()
@@ -205,11 +214,30 @@ func (t *Timer) run() {
 	}
 	t.queued = false
 	if t.period == 0 {
-		t.done = true
+		t.done, t.ran = true, true
 		delete(q.timers, t)
 	}
 	q.mu.Unlock()
 	t.fn()
+}
+
+// Rearm arms again a one-shot whose fn has run, from inside fn or later, to
+// run fn once more d from now. It reuses t and its clock timer, so it
+// allocates nothing. It reports false and arms nothing when fn has not run,
+// when t was stopped since, or when q is closed and t is not an
+// AfterPastClose timer.
+func (t *Timer) Rearm(d time.Duration) bool {
+	q := t.q
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if !t.ran || q.closed && !t.pastClose {
+		return false
+	}
+	t.ran, t.done = false, false
+	t.next = q.exec.Now().Add(d)
+	t.ct.Reset(d)
+	q.timers[t] = struct{}{}
+	return true
 }
 
 // Ticker is a periodic callback armed by Queue.Every.
