@@ -1,0 +1,114 @@
+# Sense for Business (Q328): a level 21 character accepts at Sarien; with nothing to sell she
+# asks for more; six monster eyes give six carcasses and four basilisks four gizzards (every roll
+# pinned to succeed, so each eye gives a carcass); Sarien pays 25 a carcass, 60 a gizzard and
+# 618 more for ten or more; then the player quits the repeatable quest; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q328_sense_for_business.golden
+character Merchant 21
+random always 0
+script quest.Q328_SenseForBusiness
+item 1366 1347 1348
+page merchant/30436.htm
+page script/quest/Q328_SenseForBusiness/
+npc sarien 30436 Merchant 10 0 0
+npc eye 20055 Monster 40 0 0
+npc basilisk 20070 Monster 0 40 0
+
+# Sarien: accept.
+action sarien
+action sarien
+  S ActionFailed
+  S NpcHtmlMessage obj=sarien item=0 page=merchant/30436.htm
+  S ActionFailed
+bypass npc_{sarien}_Quest
+  S NpcHtmlMessage obj=sarien item=0 page=script/quest/Q328_SenseForBusiness/30436-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q328_SenseForBusiness CREATED
+bypass Quest Q328_SenseForBusiness 30436-03.htm
+  S QuestList 328:0x80000001
+  S ExShowQuestMark quest=328
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sarien item=0 page=script/quest/Q328_SenseForBusiness/30436-03.htm
+  S ActionFailed
+  Q upsert Q328_SenseForBusiness | <state> | STARTED
+  Q upsert Q328_SenseForBusiness | <cond> | 1
+  state Q328_SenseForBusiness STARTED
+  rows Q328_SenseForBusiness <cond>=1 <state>=STARTED
+
+# Nothing to sell yet.
+action sarien
+  S ActionFailed
+  S NpcHtmlMessage obj=sarien item=0 page=merchant/30436.htm
+  S ActionFailed
+bypass npc_{sarien}_Quest
+  S NpcHtmlMessage obj=sarien item=0 page=script/quest/Q328_SenseForBusiness/30436-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Six carcasses and four gizzards.
+kill eye x6
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1347
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1347
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1347
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1347
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1347
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1347
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1347=6 1366=0
+kill basilisk x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1348
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1348
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1348
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1348
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1348=4
+
+# Sarien: 6 x 25 + 4 x 60 + 618.
+action sarien
+  S ActionFailed
+  S NpcHtmlMessage obj=sarien item=0 page=merchant/30436.htm
+  S ActionFailed
+bypass npc_{sarien}_Quest
+  S SystemMessage id=301 3:1347 6:6
+  S SystemMessage id=301 3:1348 6:4
+  S SystemMessage id=52 6:1008
+  S NpcHtmlMessage obj=sarien item=0 page=script/quest/Q328_SenseForBusiness/30436-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1347=0 1348=0 57=1008
+  rows Q328_SenseForBusiness <cond>=1 <state>=STARTED
+
+# Quit.
+bypass Quest Q328_SenseForBusiness 30436-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=sarien item=0 page=script/quest/Q328_SenseForBusiness/30436-06.htm
+  S ActionFailed
+  Q delete-quest Q328_SenseForBusiness
+  state Q328_SenseForBusiness -
+  rows Q328_SenseForBusiness -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q328_SenseForBusiness -
+  rows Q328_SenseForBusiness -
+  items 57=1008

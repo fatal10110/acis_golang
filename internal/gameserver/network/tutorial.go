@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -17,9 +18,24 @@ import (
 // goes to live's tutorial quest, which answers through the tutorial window.
 // A player with no tutorial quest state gets nothing at all;
 // the tutorial window and its question marks leave the client waiting on
-// no answer, so no ActionFailed is owed either.
+// no answer, so no ActionFailed is owed either. It runs on live's queue,
+// so the quest's hook runs as a hook on that queue.
 func (l *GameClientLink) tutorialRequest(live *livePlayer, name string) {
-	live.NotifyTutorial(name)
+	live.NotifyTutorialOnQueue(name)
+}
+
+// noteRestoredHP runs live's restored-HP tutorial step once (see
+// Character.NotifyRestoredHP), after the restored equipment and effects
+// apply and before any tick of those effects runs (replaySavedEffects).
+// The selection that restored the HP had no client to show the
+// step's answer, so its frames are dropped; its journal writes stay.
+func (live *livePlayer) noteRestoredHP() {
+	if !live.restoredHPPending.CompareAndSwap(true, false) {
+		return
+	}
+	live.quietTutorial.Store(true)
+	defer live.quietTutorial.Store(false)
+	live.NotifyRestoredHP(math.Float64frombits(live.restoredHP.Load()))
 }
 
 // tutorialPickedUp hands the tutorial quest of picker, the player that

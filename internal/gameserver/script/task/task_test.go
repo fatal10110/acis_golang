@@ -20,6 +20,7 @@ func TestTasksMatchReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"task.CastleTaxRefresh", "task.ClanLadderRefresh", "task.ClanLeaderTransfer",
 		"task.RaidPointReset", "task.RecommendationUpdate", "task.SevenSignsUpdate",
+		"task.ServerRestart", "task.ServerShutdown",
 	},
 		`string "task"`, "hook onEnd none",
 		// The recommendation refresh's body (its level bands, SQL, log
@@ -31,13 +32,11 @@ func TestTasksMatchReferenceFingerprints(t *testing.T) {
 		`string "TRUNCATE character_recommends"`,
 		`string "UPDATE characters SET rec_left=?, rec_have=? WHERE obj_Id=?"`,
 		`string "level"`, `string "obj_Id"`, `string "rec_have"`,
-		"call CLogger.error", "call ConnectionPool.getConnection",
-		"call Player.sendPacket", "call PlayerStatus.getLevel", "call UserInfo.new",
-		// The raid point reset reads a clan's level and credits its
-		// reputation through Server.MemberClan and Server.AddClanReputation;
-		// these rows are shared with quests, which map them on their own
-		// handles.
-		"call Clan.getLevel", "call Clan.addReputationScore")
+		"call PlayerStatus.getLevel", "call UserInfo.new",
+		// The raid point reset reads a clan's level through
+		// Server.MemberClan; the row is shared with quests, which map it on
+		// their own handle.
+		"call Clan.getLevel")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +74,9 @@ func (s *server) AddClanReputation(clanID int32, points int) {
 	s.calls = append(s.calls, fmt.Sprintf("AddClanReputation %d %d", clanID, points))
 }
 func (s *server) CleanUpRaidPoints() { s.calls = append(s.calls, "CleanUpRaidPoints") }
+func (s *server) Shutdown(seconds int32, restart bool) {
+	s.calls = append(s.calls, fmt.Sprintf("Shutdown %d %t", seconds, restart))
+}
 
 // TestTaskStarts pins what each task's start does, in order.
 func TestTaskStarts(t *testing.T) {
@@ -91,6 +93,8 @@ func TestTaskStarts(t *testing.T) {
 		{"ClanLadderRefresh", ClanLadderRefresh, false, []string{"RefreshClanLadder"}},
 		{"RecommendationUpdate", RecommendationUpdate, false, []string{"RefreshRecommendations"}},
 		{"RaidPointReset with no winners", RaidPointReset, false, []string{"CleanUpRaidPoints"}},
+		{"ServerShutdown", ServerShutdown, false, []string{"Shutdown 600 false"}},
+		{"ServerRestart", ServerRestart, false, []string{"Shutdown 600 true"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := &server{sealValidation: tc.sealValidation}

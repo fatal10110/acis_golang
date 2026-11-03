@@ -1,8 +1,6 @@
 package network
 
 import (
-	"errors"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -12,58 +10,6 @@ import (
 
 // partyRegistry is the registry of the parties live players form.
 type partyRegistry = party.Registry[*livePlayer]
-
-// dispatchParty decodes and runs one top-level party packet. It reports
-// false once the connection has been closed for a malformed packet.
-func (l *GameClientLink) dispatchParty(client *Client, live *livePlayer, opcode byte, payload []byte) bool {
-	switch opcode {
-	case clientpackets.OpcodeRequestJoinParty:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestJoinParty, l.requestJoinParty)
-	case clientpackets.OpcodeRequestAnswerJoinParty:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestAnswerJoinParty, l.requestAnswerJoinParty)
-	case clientpackets.OpcodeRequestWithdrawParty:
-		// The request carries no body. A player in no party leaves nothing
-		// and hears nothing: the menu action waits on no answer.
-		if live != nil {
-			onLive(live, func() { l.withdrawParty(live) })
-		}
-	case clientpackets.OpcodeRequestOustPartyMember:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestOustPartyMember, l.requestOustPartyMember)
-	}
-	return true
-}
-
-// dispatchPartyExtended decodes and runs one extended party or command
-// channel packet; see dispatchParty.
-func (l *GameClientLink) dispatchPartyExtended(client *Client, live *livePlayer, second uint16, payload []byte) bool {
-	switch second {
-	case clientpackets.OpcodeRequestChangePartyLeader:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestChangePartyLeader, l.requestChangePartyLeader)
-	case clientpackets.OpcodeRequestExAskJoinMPCC:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExAskJoinMPCC, l.requestAskJoinChannel)
-	case clientpackets.OpcodeRequestExAcceptJoinMPCC:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExAcceptJoinMPCC, l.requestAcceptJoinChannel)
-	case clientpackets.OpcodeRequestExOustFromMPCC:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExOustFromMPCC, l.requestOustFromChannel)
-	case clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExMPCCShowPartyMembersInfo, l.requestChannelPartyMembers)
-	}
-	return true
-}
-
-// dispatchLive decodes payload and runs handle on live's queue. A packet
-// with no player in the world is dropped once decoded. It reports false
-// once the connection has been closed for a malformed packet.
-func dispatchLive[T any](l *GameClientLink, client *Client, live *livePlayer, payload []byte, decode func([]byte) (T, error), handle func(*livePlayer, T)) bool {
-	req, err := decodeClientPacket(l, client, payload, decode)
-	if err != nil {
-		return !errors.Is(err, errMalformedPacketDisconnect)
-	}
-	if live != nil {
-		onLive(live, func() { handle(live, req) })
-	}
-	return true
-}
 
 func (l *GameClientLink) livePlayerByName(name string) (*livePlayer, bool) {
 	if l.world == nil {
@@ -90,7 +36,7 @@ const (
 // even an invitation of oneself; an invisible target is refused as the
 // wrong target; a target whose connection is gone, or either side in jail,
 // is refused once the party check passed. Either side competing in an
-// Olympiad match is then turned away without a word, as the reference does:
+// Olympiad match is then turned away without a word on purpose:
 // neither the inviter nor the target hears of it.
 func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.RequestJoinParty) {
 	target, ok := l.livePlayerByName(req.Target)
@@ -99,7 +45,7 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if blocked := l.blockRefusal(live, target); blocked != 0 {
-		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.CharacterName()))
 		return
 	}
 	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() || target.Invisible() {
@@ -107,7 +53,7 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if l.parties.InParty(target.ObjectID()) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsAlreadyInParty, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsAlreadyInParty, target.CharacterName()))
 		return
 	}
 	if target.clientDetached() {
@@ -127,7 +73,7 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if book.ProcessingRequest(target.ObjectID()) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	}
 
@@ -158,11 +104,11 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	case tradebook.RequestTargetBusy:
 		l.parties.CancelInvite(live.ObjectID())
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	}
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouInvitedS1ToParty, target.Name))
-	target.SendFrame(serverpackets.FrameAskJoinParty(live.Name, int32(loot)))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouInvitedS1ToParty, target.CharacterName()))
+	target.SendFrame(serverpackets.FrameAskJoinParty(live.CharacterName(), int32(loot)))
 }
 
 // requestAnswerJoinParty answers live's pending party invitation. With no
@@ -188,7 +134,7 @@ func (l *GameClientLink) requestAnswerJoinParty(live *livePlayer, req clientpack
 // leads. Anyone else, or a name no member has, expels nobody and hears
 // nothing.
 func (l *GameClientLink) requestOustPartyMember(live *livePlayer, req clientpackets.TargetName) {
-	l.applyPartyNotices(l.parties.Expel(live.ObjectID(), req.Name))
+	l.applyOwnPartyNotices(live, l.parties.Expel(live.ObjectID(), req.Name))
 }
 
 // requestChangePartyLeader hands the party live leads to the named member.
@@ -206,8 +152,9 @@ func (l *GameClientLink) leaveParty(live *livePlayer) {
 }
 
 // sendPartyVitals answers a vitals change of live's: its party-window row
-// is refreshed on the other members' windows, and its row in its duel
-// opponents' window, when a gauge left its segment.
+// is refreshed on the other members' windows, and its gauges in its
+// Olympiad stadium's and its duel opponents' windows, when a gauge left its
+// segment.
 func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 	var view partyView
 	inParty := false
@@ -215,6 +162,7 @@ func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 		view, inParty = l.parties.View(live.ObjectID())
 	}
 	cpOrHP, partyRow := live.VitalsGaugesStale(inParty)
+	l.sendOlympiadVitals(live, cpOrHP)
 	l.sendDuelVitals(live, cpOrHP)
 	if !partyRow {
 		return
@@ -223,6 +171,14 @@ func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 	l.broadcastToMembers(without(view.Members, live), func() wire.Frame {
 		return serverpackets.FramePartySmallWindowUpdate(row)
 	})
+}
+
+// applyOwnPartyNotices is applyPartyNotices for a party change made by a
+// task of live's own queue: a festival that takes live out of its arena
+// then does it inside the call, before the notices that follow, while every
+// other member's removal is still posted to its own queue.
+func (l *GameClientLink) applyOwnPartyNotices(live *livePlayer, notices []party.Notice) {
+	live.RunOnOwnQueue(func() { l.applyPartyNotices(notices) })
 }
 
 // applyPartyNotices sends the packets of a party change, in order.
@@ -242,7 +198,7 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			})
 		case party.WindowDelete[*livePlayer]:
 			l.broadcastToMembers(n.To, func() wire.Frame {
-				return serverpackets.FramePartySmallWindowDelete(n.Member.ObjectID(), n.Member.Name)
+				return serverpackets.FramePartySmallWindowDelete(n.Member.ObjectID(), n.Member.CharacterName())
 			})
 		case party.WindowDeleteAll[*livePlayer]:
 			n.To.SendFrame(serverpackets.FramePartySmallWindowDeleteAll())
@@ -272,7 +228,7 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			l.broadcastToMembers(n.To, serverpackets.FrameExCloseMPCC)
 		case party.ChannelPartyUpdate[*livePlayer]:
 			l.broadcastToMembers(n.To, func() wire.Frame {
-				return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.Name, n.Leader.ObjectID(), int32(n.Count), n.Added)
+				return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.CharacterName(), n.Leader.ObjectID(), int32(n.Count), n.Added)
 			})
 		case party.LeaderChanged[*livePlayer]:
 			if l.rooms != nil {
@@ -284,7 +240,22 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			l.stopPartyPositions(n.ID)
 		case party.Edited[*livePlayer]:
 			l.cancelPartyDuel(n.Leader)
+		case party.Departing[*livePlayer]:
+			l.festivalPartyChanged(n.Member, n.Members)
 		}
+	}
+}
+
+// festivalPartyChanged has the festival follow member, a festival
+// participant, leaving its party: members are who the party holds now. A
+// party left too small to keep its run has member expelled from it, which
+// is no more than a formality once member is out of it.
+func (l *GameClientLink) festivalPartyChanged(member *livePlayer, members []*livePlayer) {
+	if l.festival == nil || !l.festival.IsParticipant(member.ObjectID()) {
+		return
+	}
+	if l.festival.UpdateParticipants(member.ObjectID(), festivalMembers(members)) && l.parties != nil {
+		l.applyPartyNotices(l.parties.Leave(member, party.Expelled))
 	}
 }
 
@@ -307,13 +278,13 @@ func partyMemberRow(live *livePlayer) serverpackets.PartyMember {
 	res := live.ResourceValues()
 	return serverpackets.PartyMember{
 		ObjectID: live.ObjectID(),
-		Name:     live.Name,
-		CP:       int32(res.CurrentCP),
-		MaxCP:    int32(res.MaxCP),
-		HP:       int32(res.CurrentHP),
-		MaxHP:    int32(res.MaxHP),
-		MP:       int32(res.CurrentMP),
-		MaxMP:    int32(res.MaxMP),
+		Name:     live.CharacterName(),
+		CP:       res.CurrentCP,
+		MaxCP:    res.MaxCP,
+		HP:       res.CurrentHP,
+		MaxHP:    res.MaxHP,
+		MP:       res.CurrentMP,
+		MaxMP:    res.MaxMP,
 		Level:    int32(live.Level()),
 		ClassID:  int32(live.ClassID()),
 		Race:     int32(live.Race),

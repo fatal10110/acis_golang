@@ -1,0 +1,17 @@
+# TreasureChestMimic (21671), a level 30 mimic. A plain hit of 10 adds hate 10 / (30 + 7) * 100
+# and no cast. The Unlock skill (27) hitting it for 1 makes it want its wrath (4245) on itself
+# and its strong attack (4144) of level 30 - 5 on the character, each at 1000000, and adds
+# the key's damage as 1 / 37 * 100 more hate (the attack desire the key's level gives is 1 / 37
+# * 150 in integers, 0).
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Chests.TreasureChestMimic
+npc mimic 21671 Monster 700 0 0 level 30 skill SELF_BUFF 4245 1 skill DEBUFF 4144 25
+
+hit mimic 10
+  hate mimic 27.027027027027028
+  desires mimic attack(player)=27.027027027027028
+hit mimic 1 skill 27 1
+  hate mimic 29.72972972972973
+  desires mimic attack(player)=29.72972972972973 cast(mimic,4245,move)=1000000 cast(player,4144,move)=1000000

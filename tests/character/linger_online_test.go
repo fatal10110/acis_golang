@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -36,20 +35,7 @@ func TestAutosaveWhileLingeringStoresOnline2(t *testing.T) {
 		t.Fatalf("online in game = %d, want 1", got)
 	}
 
-	srv.SetPlayerInCombat(t, objID, true)
-	if err := c.Close(); err != nil {
-		t.Fatal(err)
-	}
-	obj, ok := srv.State.Player(objID)
-	if !ok {
-		t.Fatal("a player dropped in combat left the world at once")
-	}
-	for deadline := time.Now().Add(5 * time.Second); !network.ClientDetached(obj); {
-		if time.Now().After(deadline) {
-			t.Fatal("the server never noticed the connection drop")
-		}
-		time.Sleep(time.Millisecond)
-	}
+	srv.DropInCombat(t, objID, c)
 	// The first autosave falls due 5 minutes after entering the world.
 	srv.TickAutosave(t)
 	if _, ok := srv.State.Player(objID); !ok {

@@ -1,0 +1,16 @@
+# WizardHallDDMagic2Aggressive (18330) with a ShoutMsg1: unlike its parent, which shouts as a fresh one appears, it shouts
+# nothing (its created hook does nothing). The second kill replaces the dead one with a fresh one first.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHallDDMagic2Aggressive
+npc hall 18330 Monster 300 0 0 ai ShoutMsg1=1000290 skill W_LONG_RANGE_DD_MAGIC 4137 9 skill W_SHORT_RANGE_DD_MAGIC 4560 9
+
+kill hall x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0

@@ -26,7 +26,7 @@ const (
 )
 
 // lengthText writes a catch's length as the pages show it.
-func lengthText(length float64) string { return commons.JavaDouble(length) }
+func lengthText(length float64) string { return commons.FormatDouble(length) }
 
 // FillWinners sets the winners page's placeholders: the winners' table,
 // the prizes paid in itemName, the minutes left in the running week and

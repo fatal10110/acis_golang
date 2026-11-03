@@ -78,14 +78,17 @@ func (f *Folk) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, sk mode
 
 // SkillAttacked is caster's offensive skill def landing on this NPC, once
 // its effects applied, for a skill that is a debuff or carries aggro
-// points: the attacked hooks run with max(120, aggro points) as the damage.
-// A dead NPC is called too. Unlike a hostile NPC, a civilian NPC makes no
-// clan call for a skill: a clan member is never told of one.
+// points: the attacked hooks run with max(120, aggro points) as the damage,
+// then the party is called as for a hit, with no built-in assist. A dead
+// NPC is called too. Unlike a hostile NPC, a civilian NPC makes no clan
+// call for a skill: a clan member is never told of one.
 func (f *Folk) SkillAttacked(caster attackable.Combatant, def modelskill.Definition) {
 	if caster == nil {
 		return
 	}
-	f.raiseAttacked(caster, int32(max(120, def.AggroPoints)), skillRef(def))
+	value := max(120, def.AggroPoints)
+	f.raiseAttacked(caster, int32(value), skillRef(def))
+	propagatePartyAttacked(f, caster, value, false)
 }
 
 // raiseAttacked runs f's attacked hooks.
@@ -96,21 +99,35 @@ func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk mod
 }
 
 // reduceHP is an NPC's HP reduction: a dead NPC takes nothing; a hit from a
-// creature first puts a walking NPC in run stance, then runs its attacked
-// hooks with the damage truncated to an int and sk the skill that dealt it,
-// then its clan calls: itself, then every NPC of its clan in range. An
+// creature first puts a walking NPC in run stance and adds the damage to its
+// aggro list, at no hate, then runs its attacked hooks with the damage
+// truncated to an int and sk the skill that dealt it, then calls its party,
+// then makes its clan calls: itself, then every NPC of its clan in range. An
 // invulnerable NPC, or a hit from an attacker without damage permission,
 // then takes nothing.
 // The HP left is never under folkMinHP for an undying template, nor under
 // zero otherwise, and an NPC left under folkDeathHP dies. It reports
 // whether this call killed the NPC. A hit has no sleep, hold or stun to
-// break: none lands on a civilian NPC.
+// break: none lands on a civilian NPC. A holy artifact takes no hit at all;
+// a siege headquarters runs its own hit first (headquartersHit), and a
+// Swoop Cannon's hit on it stops there; a control tower runs its own after
+// (towerHit).
 func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref) bool {
-	return f.loseHP(amount, attacker, sk, true)
+	if f.HolyThing() {
+		return false
+	}
+	if f.SiegeFlag() && !f.headquartersHit(attacker) {
+		return false
+	}
+	killed := f.loseHP(amount, attacker, sk, true)
+	if f.Tower() {
+		f.towerHit()
+	}
+	return killed
 }
 
-// loseHP is reduceHP; hit false leaves out the attacked hooks and the clan
-// calls, for an HP loss that is not a hit.
+// loseHP is reduceHP; hit false leaves out the aggro, the attacked hooks
+// and the clan calls, for an HP loss that is not a hit.
 func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref, hit bool) bool {
 	if f.Dead() {
 		return false
@@ -120,8 +137,10 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 		f.forceRunStance()
 	}
 	if attacker != nil && hit {
-		damage := commons.JavaInt(amount)
+		f.fight.aggro.AddDamage(attacker, amount, 0)
+		damage := commons.TruncInt32Sat(amount)
 		f.raiseAttacked(attacker, damage, sk)
+		propagatePartyAttacked(f, attacker, int(damage), false)
 		raiseClanAttacked(f.scripts, f.world, f, attacker, damage, sk, clanAttackedByHit)
 	}
 	if f.Invul() || !creature.CanDealDamage(attacker) {
@@ -272,14 +291,14 @@ func (f *Folk) Regen() *creature.Regen { return &f.regen }
 
 // SettleRegen arms the NPC's regeneration task when it is spawned, alive
 // and short of HP or MP, its first tick one period from now, and disarms
-// it otherwise (CreatureStatus.setHp/setMp's start and stop).
+// it otherwise; every HP or MP change settles it so.
 func (f *Folk) SettleRegen() {
-	f.regen.Settle(f.Queue(), f.regenShort)
+	f.regen.Settle(f.Queue(), f.RegenShort)
 }
 
-// regenShort reports whether the NPC regenerates: spawned (on the grid or
+// RegenShort reports whether the NPC regenerates: spawned (on the grid or
 // off it mid-relocation), not dead, and below its maximum HP or MP.
-func (f *Folk) regenShort() bool {
+func (f *Folk) RegenShort() bool {
 	if !f.Spawned() {
 		return false
 	}
@@ -299,7 +318,7 @@ func (f *Folk) Invulnerable() bool { return f.Invul() }
 func (f *Folk) SetInvul(v bool) bool { return f.invul.Swap(v) != v }
 
 // CanBeHealed reports whether the NPC may be healed.
-func (f *Folk) CanBeHealed() bool { return !f.Invul() }
+func (f *Folk) CanBeHealed() bool { return !f.Invul() && !f.SiegeFlag() }
 
 // HealEffectiveness returns the percentage incoming heals are scaled by.
 func (f *Folk) HealEffectiveness() float64 { return f.CalcStat(stat.HealEffectiveness, 100) }
@@ -312,5 +331,5 @@ func (f *Folk) RechargeMP(amount float64) float64 { return f.CalcStat(stat.Recha
 
 // HealInput resolves the NPC's side of an outgoing heal.
 func (f *Folk) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
-	return creature.ResolveHealInput(def, f.HealProficiency(), f.MAtk(), formulas.HealShotScalingNPC), true
+	return creature.ResolveHealInput(def, f.HealProficiency(), f.Against(f.ConditionActor(), nil).MAtk(), formulas.HealShotScalingNPC), true
 }

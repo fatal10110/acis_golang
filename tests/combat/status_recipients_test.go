@@ -40,11 +40,7 @@ func statusFixture(objectID int32, pairs ...int32) []byte {
 // StatusUpdate about objectID, and whether a Die for it arrived.
 func statusFramesFor(t *testing.T, c *scriptedClient, objectID int32) (statuses [][]byte, died bool) {
 	t.Helper()
-	for range 100 {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			return statuses, died
-		}
+	for _, frame := range c.ReadQueued() {
 		if len(frame) < 5 || wireReader(frame[1:]).ReadInt32() != objectID {
 			continue
 		}
@@ -55,8 +51,7 @@ func statusFramesFor(t *testing.T, c *scriptedClient, objectID int32) (statuses 
 			died = true
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil, false
+	return statuses, died
 }
 
 func assertStatusFrames(t *testing.T, what string, got [][]byte, want ...[]byte) {

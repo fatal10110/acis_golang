@@ -1,0 +1,21 @@
+# LV3Dagger (27299, level 76) raised as the private of a master, with the character as the player
+# it hunts (spawn parameters character, character, master), every draw 0: its created hook wants its
+# buff (4522) on the character at 1000000. The character's hit adds to its attack desire and,
+# the character being its top desire target on a draw under 33, wants physical special 1 (4101)
+# at 1000, which it casts on itself. After 15 s its timer 4000 (draws 0) wants its weak mode off
+# (4524) on itself.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3Dagger
+npc owner 20003 Monster 600 0 0
+npc dagger 27299 Monster 300 0 0 level 76 skill PHYSICAL_SPECIAL3 4032 8 skill PHYSICAL_SPECIAL2 4072 7 skill PHYSICAL_SPECIAL1 4101 8 skill BUFF 4522 1 skill WEAK_MODE_TRUE 4523 1 skill WEAK_MODE_FALSE 4524 1 params character character owner master owner
+
+hit dagger 10
+  desires dagger attack(player)=224.09638554216866 cast(dagger,4101,move)=1000 cast(player,4522,move)=1000000
+advance 15s
+  S MagicSkillUse caster=dagger target=dagger skill=4101-8 hit=1321 reuse=7928 success=0
+  desires dagger attack(player)=224.09638554216866 cast(dagger,4524,move)=1000000

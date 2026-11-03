@@ -42,7 +42,7 @@ func TestCursedWeaponEndBehindLogoutDeletesStoredWeapon(t *testing.T) {
 	})
 	link.persist = worker
 	instances := task.NewItemInstances(gamesql.NewItemFlushStore(db), link.itemTemplates, worker, link.itemWrites, zerolog.Nop())
-	link.itemInstances = instances
+	link.belongings.itemInstances = instances
 
 	table, err := entity.NewCursedWeaponTable([]entity.CursedWeapon{{
 		ItemID: weaponID, Name: "Cursed", DropRate: 1, Duration: 72, DurationLost: 24, DisappearChance: 50, StageKills: 10,

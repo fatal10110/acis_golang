@@ -6,48 +6,32 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 )
 
-// dispatchSiege decodes and runs one siege window packet; see
-// dispatchPartyMatch.
-func (l *GameClientLink) dispatchSiege(client *Client, live *livePlayer, opcode byte, payload []byte) bool {
-	switch opcode {
-	case clientpackets.OpcodeRequestSiegeAttackerList:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestSiegeList, l.requestSiegeAttackerList)
-	case clientpackets.OpcodeRequestSiegeDefenderList:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestSiegeList, l.requestSiegeDefenderList)
-	case clientpackets.OpcodeRequestJoinSiege:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestJoinSiege, l.requestJoinSiege)
-	case clientpackets.OpcodeRequestConfirmSiegeWaitingList:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestConfirmSiegeWaitingList, l.requestConfirmSiegeWaitingList)
-	}
-	return true
-}
-
 // castleSiege resolves castle id's siege.
 func (l *GameClientLink) castleSiege(id int32) (*siege.Siege, bool) {
 	return l.sieges.Get(int(id))
 }
 
-// requestSiegeAttackerList shows the attacking clans of castle req.ID.
-//
-// ponytail: a siegable clan hall's attackers wait on the clan hall sieges
-// (#244); for such an id, as for an id naming nothing, the reference sends
-// nothing, the window simply staying empty, and so does this.
+// requestSiegeAttackerList shows the attacking clans of castle req.ID, or
+// of siegable hall req.ID; an id naming neither answers nothing, the window
+// staying empty.
 func (l *GameClientLink) requestSiegeAttackerList(live *livePlayer, req clientpackets.RequestSiegeList) {
 	s, ok := l.castleSiege(req.ID)
 	if !ok {
+		l.requestHallSiegeAttackerList(live, req.ID)
 		return
 	}
 	live.SendFrame(frameSiegeAttackerList(s))
 }
 
 // requestSiegeDefenderList shows the defending clans of castle req.ID; an
-// id naming no castle answers nothing, as the reference does.
+// id naming no castle answers nothing, the window staying empty.
 func (l *GameClientLink) requestSiegeDefenderList(live *livePlayer, req clientpackets.RequestSiegeList) {
 	s, ok := l.castleSiege(req.ID)
 	if !ok {
@@ -59,11 +43,9 @@ func (l *GameClientLink) requestSiegeDefenderList(live *livePlayer, req clientpa
 // requestJoinSiege registers live's clan on castle req.ID's siege, or drops
 // its registration. live needs the siege management privilege. A clan
 // whose dissolution is pending may not register. Registering or dropping,
-// refused or not, live then sees the siege window again.
-//
-// ponytail: a siegable clan hall's registration waits on the clan hall
-// sieges (#244); for such an id, as for an id naming nothing, the
-// reference answers nothing, and so does this.
+// refused or not, live then sees the siege window again. An id naming a
+// siegable hall registers on its siege (requestJoinHallSiege); one naming
+// neither answers nothing.
 func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.RequestJoinSiege) {
 	cl, member := l.clanService().ClanOf(live.Character)
 	if !member || !cl.HasPrivilege(live.ObjectID(), clan.PrivCastleSiege) {
@@ -72,6 +54,7 @@ func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.Re
 	}
 	s, ok := l.castleSiege(req.ID)
 	if !ok {
+		l.requestJoinHallSiege(live, cl, req)
 		return
 	}
 	if req.IsJoining == 1 {
@@ -98,7 +81,7 @@ func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.Re
 // requestConfirmSiegeWaitingList is the castle lord's answer to a clan's
 // request to defend castle req.CastleID, then the defender list again.
 // Only the leader of the clan owning the castle answers; anyone else, a
-// castle or clan id naming nothing, gets nothing, as in the reference.
+// castle or clan id naming nothing, gets nothing.
 func (l *GameClientLink) requestConfirmSiegeWaitingList(live *livePlayer, req clientpackets.RequestConfirmSiegeWaitingList) {
 	own, ok := l.clanService().ClanOf(live.Character)
 	if !ok {
@@ -189,15 +172,16 @@ const siegeNpcKind = "SiegeNpc"
 // reports whether f is one: the leader of the clan owning the castle reads
 // siege/01.htm, or siege/03.htm while its siege is under way; anyone else
 // reads siege/02.htm while it is under way and otherwise sees the siege
-// window. A page comes with ActionFailed. A messenger of no castle is left
-// to the chat window (the siegable clan halls' messengers, #244).
+// window. A page comes with ActionFailed. A messenger of no castle is a
+// siegable hall's (showHallSiegeMessenger); one of neither is left to the
+// chat window.
 func (l *GameClientLink) showSiegeMessenger(live *livePlayer, f *npc.Folk) bool {
 	if f.Instance.Template.Type != siegeNpcKind {
 		return false
 	}
 	c, ok := l.castles.ByNPC(f.NpcID())
 	if !ok {
-		return false
+		return l.showHallSiegeMessenger(live, f)
 	}
 	s, ok := l.castleSiege(int32(c.ID))
 	if !ok {
@@ -223,17 +207,13 @@ func (l *GameClientLink) showSiegeMessenger(live *livePlayer, f *npc.Folk) bool 
 }
 
 // wireSiegeZones gives the castle battlefields their effects on players:
-// the combat zone notices, the pvp flag of a player leaving a battlefield
-// under siege, and the town teleport of a player thrown off one.
-//
-// ponytail: the forced dismount of a wyvern rider on a battlefield under
-// siege, as on no-landing ground, is not wired (#3377).
-func (l *GameClientLink) wireSiegeZones() {
-	if l.zones == nil {
-		return
-	}
-	for _, field := range zone.OfKind[*zone.Siege](l.zones) {
+// the combat zone notices, the forced dismount of a wyvern rider on a
+// battlefield under siege, the pvp flag of a player leaving one, and the
+// town teleport of a player thrown off one.
+func (l *GameClientLink) wireSiegeZones(ix *zone.Index) {
+	for _, field := range zone.OfKind[*zone.Siege](ix) {
 		field.CombatNotice = l.siegeCombatNotice
+		field.DismountTimer = l.siegeDismountTimer
 		field.FlagPvP = l.siegeFlagPvP
 		field.Banish = l.siegeBanisher(field)
 	}
@@ -247,8 +227,8 @@ func (l *GameClientLink) siegeBanished(live *livePlayer) bool {
 }
 
 // siegeCombatNotice tells a player it entered or left a combat zone. A
-// player thrown off the battlefield as its siege starts hears neither: the
-// reference teleports it out before the battlefield turns on.
+// player thrown off the battlefield as its siege starts hears neither: it
+// is teleported out before the battlefield turns on.
 func (l *GameClientLink) siegeCombatNotice(a zone.Actor, entering bool) {
 	za, ok := a.(*liveZoneActor)
 	if !ok || l.siegeBanished(za.live) {
@@ -265,8 +245,7 @@ func (l *GameClientLink) siegeCombatNotice(a zone.Actor, entering bool) {
 // pvp flag; a player thrown off the battlefield as its siege starts is not
 // flagged. Zone rules run with the player's zone state locked and the flag
 // broadcasts, so the revalidation that ran this rule applies the flag once
-// that lock is released, before its compass update, in the reference's
-// order (SiegeZone.onExit, then Player.revalidateZone's compass code).
+// that lock is released, ahead of its compass update.
 func (l *GameClientLink) siegeFlagPvP(a zone.Actor) {
 	za, ok := a.(*liveZoneActor)
 	if !ok || l.siegeBanished(za.live) {
@@ -275,14 +254,13 @@ func (l *GameClientLink) siegeFlagPvP(a zone.Actor) {
 	za.leftBattlefield = true
 }
 
-// siegeBanisher teleports a player thrown off field to its town restart
-// point (SiegeZone.banishForeigners), on the player's own queue, so after
-// the siege has taken its next step. Its outcome follows the reference's
-// teleport made in place: thrown off as the siege starts, before field
-// turns on, the player gets no combat notice or flag; thrown off while
-// field is on, at the end of the siege or as the castle changes hands, it
-// leaves a battlefield under siege and is flagged, even when field has
-// turned off by the time the teleport runs.
+// siegeBanisher teleports a player thrown off field to its town restart point,
+// on the player's own queue, so after the siege has taken its next step. Its
+// outcome is that of a teleport made in place: thrown off as the siege starts,
+// before field turns on, the player gets no combat notice or flag; thrown off
+// while field is on, at the end of the siege or as the castle changes hands, it
+// leaves a battlefield under siege and is flagged, even when field has turned
+// off by the time the teleport runs.
 func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
 	return func(a zone.Actor) {
 		za, ok := a.(*liveZoneActor)
@@ -290,23 +268,38 @@ func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
 			return
 		}
 		live := za.live
-		active := field.Active()
-		if !active {
-			l.siegeBanishing.Store(live, struct{}{})
-		}
-		posted := postLive(live, func() {
-			defer l.siegeBanishing.Delete(live)
+		l.banishOffBattlefield(live, field, func() {
 			if dest, ok := l.restartDestination(live); ok {
 				l.teleportLivePlayer(live, dest, restartTeleportOffset)
 			}
-			if active && !field.Active() {
-				l.startPvPFlag(live, false)
-			}
 		})
-		if !posted {
-			// The player's queue is closed, so the job never runs.
-			l.siegeBanishing.Delete(live)
+	}
+}
+
+// banishOffBattlefield runs teleport, live's banishment, on live's queue.
+// Banished while field is off, as its siege starts, live hears no combat
+// notice and takes no flag until the teleport has run; banished while field
+// is on, it is flagged once teleported should field have turned off by
+// then. A nil field leaves the teleport alone.
+func (l *GameClientLink) banishOffBattlefield(live *livePlayer, field *zone.Siege, teleport func()) {
+	if field == nil {
+		postLive(live, teleport)
+		return
+	}
+	active := field.Active()
+	if !active {
+		l.siegeBanishing.Store(live, struct{}{})
+	}
+	posted := postLive(live, func() {
+		defer l.siegeBanishing.Delete(live)
+		teleport()
+		if active && !field.Active() {
+			l.startPvPFlag(live, false)
 		}
+	})
+	if !posted {
+		// The player's queue is closed, so the job never runs.
+		l.siegeBanishing.Delete(live)
 	}
 }
 
@@ -318,7 +311,7 @@ func SiegeNotifier(l *GameClientLink) siege.Notifier { return siegeNotices{l: l}
 
 // The notices reach each player on its own queue, behind the siege states
 // and teleports the siege posted there before them, so a player sees them
-// in the reference's order.
+// in the order they were posted.
 
 // Announce sends m to every player in the world.
 func (n siegeNotices) Announce(m siege.Message) {
@@ -334,6 +327,42 @@ func (n siegeNotices) PlaySound(file string) {
 func (n siegeNotices) TellClans(clans []*clan.Clan, m siege.Message) {
 	for _, cl := range clans {
 		n.l.broadcastToClanQueued(cl, nil, func() wire.Frame { return frameSiegeMessage(m) })
+	}
+}
+
+// GuardDoors makes s the siege of each door named in gates (castles.xml
+// <gates>), resolved by name now and kept by door id, so a door reload
+// guards the new door too. A name naming no door is left out: it is not
+// one of the castle's doors.
+func (n siegeNotices) GuardDoors(gates []string, s door.Siege) {
+	l := n.l
+	if l.doors == nil {
+		return
+	}
+	for _, name := range gates {
+		if d, ok := l.doors.DoorByName(name); ok {
+			l.doors.SetDoorSiege(d.DoorID(), s)
+		}
+	}
+}
+
+// CloseDoors closes each door named in gates that stands open; a door
+// that is unknown or broken stays as it is.
+func (n siegeNotices) CloseDoors(gates []string) { n.l.setHallDoors(gates, false) }
+
+// RespawnDoors stands each door named in gates again: a broken one
+// revives with the configured RespawnRestoreHP, each closes, then its HP
+// is set to its maximum, or to half of it when weak.
+func (n siegeNotices) RespawnDoors(gates []string, weak bool) {
+	l := n.l
+	if l.doors == nil {
+		return
+	}
+	restoreHP := l.playerConfig().RespawnRestoreHP
+	for _, name := range gates {
+		if d, ok := l.doors.DoorByName(name); ok {
+			l.doors.RespawnDoor(d.DoorID(), restoreHP, weak)
+		}
 	}
 }
 

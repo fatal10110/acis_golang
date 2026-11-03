@@ -7,6 +7,7 @@ import (
 	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -48,7 +49,10 @@ type CreatureActor interface {
 	PhysicalAttackRange() int
 	PoleAttackAngle() int
 	PoleAttackCountMax() int
-	ForEachKnownCombatantInRadius(int, func(attackable.Combatant))
+	// ForEachKnownHitTargetInRadius calls its func for every creature the
+	// actor knows within the radius that a pole swing may splash onto, a
+	// door among them through its hit surface.
+	ForEachKnownHitTargetInRadius(int, func(attackable.Combatant))
 	WeaponReuseDelay() time.Duration
 	WeaponGrade() int
 	SoulshotCharged() bool
@@ -96,11 +100,37 @@ type PlayerActor interface {
 	// BroadcastStatus reports a change to the player's HP, MP or CP that its
 	// own writer left unreported.
 	BroadcastStatus()
+	// CursedWeaponEquipped and IsHero decide whether the player's landed
+	// hit empties a player target's CP.
+	CursedWeaponEquipped() bool
+	IsHero() bool
+}
+
+// Target is a creature, or a door's hit surface, as a physical hit lands
+// on it: the state the hit reads and the reactions it calls. A kind with no
+// such state or reaction gives the neutral answer at its implementation.
+type Target interface {
+	attackable.Combatant
+	// Invul reports an invulnerable target: it takes no reflected or
+	// cast-breaking hit, and the attacker reads its hit as blocked,
+	// Paralyzed telling it the target is petrified.
+	Invul() bool
+	Paralyzed() bool
+	// CalcStat and MaxHPValue size the damage the target reflects.
+	CalcStat(s stat.Stat, base float64) float64
+	MaxHPValue() float64
+	// BreakCastOnDamage rolls whether damage breaks the target's cast.
+	BreakCastOnDamage(damage float64)
+	// NotifyAttacked reports a damaging physical hit, or an offensive
+	// skill, from attacker reaching the target; NotifyEvaded a physical
+	// hit from attacker that missed it.
+	NotifyAttacked(attacker attackable.Combatant)
+	NotifyEvaded(attacker attackable.Combatant)
 }
 
 // Hit is one precomputed physical attack result.
 type Hit struct {
-	Target   attackable.Combatant
+	Target   Target
 	TargetID int32
 	Damage   int
 	Crit     bool
@@ -119,7 +149,12 @@ type Controller struct {
 	playable PlayableActor
 	player   PlayerActor
 
+	// attackable marks a hostile NPC's controller: it reports its attack's
+	// end (AttackEnded) and never swings at a creature faking death.
 	attackable bool
+	// npc marks any NPC's controller: its AI re-runs desire selection as the
+	// hit animation ends and as a bow shot lands (AttackRethink).
+	npc bool
 
 	mu             sync.RWMutex
 	attacking      bool
@@ -162,7 +197,14 @@ func NewPlayer(actor PlayerActor, sink event.Sink) *Controller {
 // NewAttackable returns an attack controller with hostile NPC-specific
 // rules.
 func NewAttackable(actor CreatureActor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, attackable: true, sink: sink}
+	return &Controller{actor: actor, attackable: true, npc: true, sink: sink}
+}
+
+// NewNPC returns the attack controller of an NPC that is not attackable, a
+// civilian NPC: the base creature rules, with its AI re-running desire
+// selection on the attack phases as any NPC's does.
+func NewNPC(actor CreatureActor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, npc: true, sink: sink}
 }
 
 func (c *Controller) emit(e event.Event) {
@@ -195,30 +237,35 @@ func (c *Controller) InHitAnimation() bool {
 
 // CanAttack reports whether target may be physically attacked now. It is a
 // silent query; RefuseAttack is the think-time form that tells the player.
+// A swing in flight or a bow reuse does not refuse it: a think checks
+// AttackingNow and BowCoolingDown itself before the gate, and a script asks
+// it mid-fight.
 func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	ok, _ := c.check(target)
 	return ok
 }
 
-// RefuseAttack reports whether CanAttack refuses target. When the player's
-// active weapon is why (a fishing rod, or a bow without arrows or the MP to
-// fire), it also tells the player so, as the reference's
-// PlayerAttack.canAttack does each time the attack think asks it. The player
-// attack think calls it once per think that reaches the attack gate.
+// RefuseAttack reports whether CanAttack refuses target. When the refusal is
+// one the player is told of (the geodata hides the target, a peace zone holds
+// either side of a playable-on-playable attack, or the player's active weapon
+// cannot attack), it also emits AttackRefused naming why; a summon's sink
+// hands it to the owner. The player and summon attack thinks call it once per
+// think that reaches the attack gate.
 func (c *Controller) RefuseAttack(target attackable.Combatant) bool {
 	ok, why := c.check(target)
 	if !ok && why != 0 {
-		c.emit(event.AttackWeaponRefused{Reason: why})
+		c.emit(event.AttackRefused{Reason: why})
 	}
 	return !ok
 }
 
-// check runs the attack gate, naming the weapon refusal when that is why it
-// refuses (zero otherwise). The weapon gate runs last, as the reference
-// checks it only once every creature and playable rule allows the attack.
-func (c *Controller) check(target attackable.Combatant) (bool, event.AttackWeaponRefusal) {
-	if !c.gateAllows(target) {
-		return false, 0
+// check runs the attack gate, naming the refusal its actor is told of (zero
+// for a silent one). The sight check precedes the peace-zone checks, and the
+// weapon gate runs last, only once every creature and playable rule allows
+// the attack.
+func (c *Controller) check(target attackable.Combatant) (bool, event.AttackRefusal) {
+	if ok, why := c.gateAllows(target); !ok {
+		return false, why
 	}
 	if c.player != nil {
 		switch c.actor.AttackType() {
@@ -239,41 +286,37 @@ func (c *Controller) check(target attackable.Combatant) (bool, event.AttackWeapo
 	return true, 0
 }
 
-// gateAllows runs the creature and playable rules of the attack gate.
-func (c *Controller) gateAllows(target attackable.Combatant) bool {
+// gateAllows runs the creature and playable rules of the attack gate, naming
+// the sight or peace-zone refusal its actor is told of.
+func (c *Controller) gateAllows(target attackable.Combatant) (bool, event.AttackRefusal) {
 	if target == nil || c.actor == nil {
-		return false
+		return false, 0
 	}
 	if c.actor.AttackDisabled() {
-		return false
-	}
-	c.mu.RLock()
-	busy := c.attacking || c.bowCooling
-	c.mu.RUnlock()
-	if busy {
-		return false
+		return false, 0
 	}
 	if c.actor.MovementDisabled() && !c.actor.InAttackRange(target) {
-		return false
+		return false, 0
 	}
 	if !c.actor.Knows(target) {
-		return false
+		return false, 0
 	}
 	if t, ok := target.(skilltarget.Actor); !ok || !t.AttackableBy(c.actor) {
-		return false
+		return false, 0
 	}
 	if !c.actor.CanSee(target) {
-		return false
+		return false, event.AttackRefusedCantSeeTarget
 	}
 
-	if c.playable != nil {
-		if target.Kind().Playable() {
-			if c.playable.InPeaceZone() || target.InPeaceZone() {
-				return false
-			}
+	if c.playable != nil && target.Kind().Playable() {
+		if c.playable.InPeaceZone() {
+			return false, event.AttackRefusedInPeaceZone
+		}
+		if target.InPeaceZone() {
+			return false, event.AttackRefusedTargetInPeaceZone
 		}
 	}
-	return true
+	return true, 0
 }
 
 // DoAttack starts one physical attack animation against target. The hit
@@ -284,7 +327,14 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 		return
 	}
 
-	attackTime := time.Duration(formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))) * time.Millisecond
+	attackMillis := formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))
+	attackTime := time.Duration(attackMillis) * time.Millisecond
+	// A melee swing lands half way through the attack time and finishes as
+	// long again after its landing; a dual swing halves that step once more,
+	// landing its hits a step apart. Each step is whole milliseconds,
+	// rounded down.
+	step := time.Duration(attackMillis/2) * time.Millisecond
+	finishAt := 2 * step
 	c.actor.SetHeadingTo(target)
 	attackType := c.actor.AttackType()
 
@@ -293,10 +343,12 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 	var bowReuse time.Duration
 	switch attackType {
 	case item.WeaponDual, item.WeaponDualFist:
+		step = time.Duration(attackMillis/2/2) * time.Millisecond
+		finishAt = 3 * step
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
 		landings = []scheduledHit{
-			{hits: hits[:1], delay: attackTime / 2},
-			{hits: hits[1:], delay: attackTime},
+			{hits: hits[:1], delay: step},
+			{hits: hits[1:], delay: 2 * step},
 		}
 	case item.WeaponBow:
 		if c.player != nil {
@@ -305,6 +357,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 		c.actor.ConsumeBowMP()
 		hits = []Hit{c.makeHit(target, false)}
 		landings = []scheduledHit{{hits: hits, delay: attackTime}}
+		finishAt = attackTime
 		bowReuse = c.scaledBowReuse()
 	case item.WeaponPole:
 		hits = []Hit{c.makeHit(target, false)}
@@ -317,7 +370,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 			}
 			angle := c.actor.PoleAttackAngle()
 			primaryIsPlayable := target.Kind().Playable()
-			c.actor.ForEachKnownCombatantInRadius(c.actor.PhysicalAttackRange(), func(candidate attackable.Combatant) {
+			c.actor.ForEachKnownHitTargetInRadius(c.actor.PhysicalAttackRange(), func(candidate attackable.Combatant) {
 				if len(hits) >= maxTargets || candidate.ObjectID() == c.actor.ObjectID() || candidate.ObjectID() == target.ObjectID() {
 					return
 				}
@@ -337,13 +390,13 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 				hits = append(hits, c.makeHit(candidate, false))
 			})
 		}
-		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
+		landings = []scheduledHit{{hits: hits, delay: step}}
 	default:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
+		landings = []scheduledHit{{hits: hits, delay: step}}
 	}
 
-	c.start(attackType, attackTime, landings, bowReuse)
+	c.start(target, attackType, finishAt, landings, bowReuse)
 	if attackType == item.WeaponBow && c.player != nil {
 		c.player.NotifyBowDraw(int(attackTime/time.Millisecond) + int(bowReuse/time.Millisecond))
 	}
@@ -365,11 +418,11 @@ func (c *Controller) Stop() {
 	c.mu.Unlock()
 }
 
+// makeHit builds the hit on target. Every creature and door hit surface is
+// a Target; a hit on anything else has no target and is never delivered.
 func (c *Controller) makeHit(target attackable.Combatant, split bool) Hit {
 	hit := c.actor.MakeAttackHit(target, split)
-	if hit.Target == nil {
-		hit.Target = target
-	}
+	hit.Target, _ = target.(Target)
 	if hit.TargetID == 0 {
 		hit.TargetID = target.ObjectID()
 	}
@@ -381,7 +434,9 @@ type scheduledHit struct {
 	delay time.Duration
 }
 
-func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hits []scheduledHit, bowReuse time.Duration) {
+// start arms the swing: its hit groups land at their delays and the swing
+// finishes at finishAt, both counted from now.
+func (c *Controller) start(target attackable.Combatant, weapon item.WeaponType, finishAt time.Duration, hits []scheduledHit, bowReuse time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -392,13 +447,9 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 	c.bowCooling = weapon == item.WeaponBow
 	c.inHitAnimation = true
 
-	finishAt := attackTime
-	finish := func() { c.finishAttack(seq) }
+	finish := func() { c.finishAttack(seq, target) }
 	if weapon == item.WeaponBow {
-		finish = func() { c.finishBow(seq, bowReuse) }
-	}
-	if weapon == item.WeaponDual || weapon == item.WeaponDualFist {
-		finishAt = attackTime * 3 / 2
+		finish = func() { c.finishBow(seq, target, bowReuse) }
 	}
 	if len(hits) == 0 {
 		c.scheduleLocked(finishAt, finish)
@@ -477,10 +528,11 @@ func (c *Controller) hitFlags(hit Hit) uint8 {
 
 // swingHitTimer returns the shot step the first hit group of a swing runs
 // once its main target is known to still be there: a swing with any hit
-// that connects, in any group, spends the soulshot charge, and a player or
-// summon then charges its shots again from its auto-use shots. It runs once
-// per swing, ahead of the first hit's own feedback; a dual weapon's second
-// hit spends and charges nothing.
+// that connects, in any group, spends the soulshot charge and may empty the
+// main target's CP (breakCursedCP), and a player or summon then charges its
+// shots again from its auto-use shots. It runs once per swing, ahead of the
+// first hit's own feedback; a dual weapon's second hit spends and charges
+// nothing.
 func (c *Controller) swingHitTimer(groups []scheduledHit) func() {
 	connects := false
 	for _, group := range groups {
@@ -488,13 +540,41 @@ func (c *Controller) swingHitTimer(groups []scheduledHit) func() {
 			connects = connects || !hit.Miss
 		}
 	}
+	main := groups[0].hits[0].Target
 	return func() {
 		if connects {
 			c.actor.SetChargedShot(item.ShotSoul, false)
+			c.breakCursedCP(main)
 		}
 		if c.playable != nil {
 			c.emit(event.ShotsRechargeRequested{Physical: true})
 		}
+	}
+}
+
+// cpBreakTarget is a player whose CP a cursed-weapon hit empties. Only a
+// player holds CP, so the hit target is narrowed by kind here instead of
+// every hit target carrying CP state (an accepted kind narrowing, #2362).
+type cpBreakTarget interface {
+	CursedWeaponEquipped() bool
+	SetCP(value float64)
+	BroadcastStatus()
+}
+
+// breakCursedCP empties the CP of target, a player the player attacking
+// connected with, when the attacker holds a cursed weapon or is a hero
+// striking a holder, and reports the CP. An invulnerable target keeps it.
+func (c *Controller) breakCursedCP(target Target) {
+	if c.player == nil || target == nil || target.Kind() != actor.KindPlayer || target.Invul() {
+		return
+	}
+	victim, ok := target.(cpBreakTarget)
+	if !ok {
+		return
+	}
+	if c.player.CursedWeaponEquipped() || (c.player.IsHero() && victim.CursedWeaponEquipped()) {
+		victim.SetCP(0)
+		victim.BroadcastStatus()
 	}
 }
 
@@ -538,9 +618,8 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 		onHitTimer()
 	}
 	// The target hears of a miss before the attacker's feedback goes out.
-	target, reacts := hit.Target.(attackedTarget)
-	if hit.Miss && reacts {
-		target.NotifyEvaded(c.actor)
+	if hit.Miss {
+		hit.Target.NotifyEvaded(c.actor)
 	}
 	// The attacker's feedback goes out before the target takes the damage.
 	c.reportHit(hit)
@@ -548,9 +627,7 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 		return
 	}
 	c.emit(event.AttackStanceRequested{})
-	if reacts {
-		target.NotifyAttacked(c.actor)
-	}
+	hit.Target.NotifyAttacked(c.actor)
 	reflected := c.reflectedDamage(hit)
 	hit.Target.TakeDamage(hit.Damage, c.actor)
 	if c.playable != nil {
@@ -564,14 +641,6 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 	c.emit(event.HitLanded{Target: hit.Target, Crit: hit.Crit, Reflected: reflected > 0})
 }
 
-// reflectingTarget is the target state a landed hit reads to size the
-// damage the target reflects back on its attacker.
-type reflectingTarget interface {
-	Invul() bool
-	CalcStat(s stat.Stat, base float64) float64
-	MaxHPValue() float64
-}
-
 // reflectedDamage returns the share of hit's damage its target reflects
 // back on the attacker, capped at the target's max HP, read before the
 // target takes the hit. A bow hit and a hit on an invulnerable target
@@ -581,8 +650,8 @@ func (c *Controller) reflectedDamage(hit Hit) int {
 	if c.actor.AttackType() == item.WeaponBow {
 		return 0
 	}
-	target, ok := hit.Target.(reflectingTarget)
-	if !ok || target.Invul() {
+	target := hit.Target
+	if target.Invul() {
 		return 0
 	}
 	if hit.Target.RaidRelated() {
@@ -629,43 +698,15 @@ func (c *Controller) absorbDamage(hit Hit) {
 	}
 }
 
-// castBreakTarget is a hit target whose cast a landed hit may break.
-type castBreakTarget interface {
-	BreakCastOnDamage(damage float64)
-}
-
 // breakTargetCast rolls whether hit breaks its target's cast, once the
 // damage, the reflected damage and the absorbed HP have all applied. A
 // target the hit killed, a raid-related target and an invulnerable one
 // roll nothing.
 func breakTargetCast(hit Hit) {
-	target, ok := hit.Target.(castBreakTarget)
-	if !ok || hit.Target.AlikeDead() || hit.Target.RaidRelated() {
+	if hit.Target.AlikeDead() || hit.Target.RaidRelated() || hit.Target.Invul() {
 		return
 	}
-	if t, ok := hit.Target.(invulTarget); ok && t.Invul() {
-		return
-	}
-	target.BreakCastOnDamage(float64(hit.Damage))
-}
-
-// attackedTarget is a hit target whose AI reacts to the hit: players,
-// summons and hostile NPCs, which all enter their attack stance. A hostile
-// NPC's aggression runs from its damage path.
-type attackedTarget interface {
-	// NotifyAttacked reports a damaging physical hit, or an offensive
-	// skill, from attacker reaching the target.
-	NotifyAttacked(attacker attackable.Combatant)
-	// NotifyEvaded reports a physical hit from attacker that missed the
-	// target.
-	NotifyEvaded(attacker attackable.Combatant)
-}
-
-// invulTarget is the target state the attacker's damage feedback reads when
-// the hit resolves.
-type invulTarget interface {
-	Invul() bool
-	Paralyzed() bool
+	hit.Target.BreakCastOnDamage(float64(hit.Damage))
 }
 
 // reportHit emits the attacker's damage feedback for hit. NPCs report
@@ -681,15 +722,15 @@ func (c *Controller) reportHit(hit Hit) {
 			return
 		}
 	}
-	e := event.HitDealt{Damage: hit.Damage, Crit: hit.Crit, Miss: hit.Miss}
-	if t, ok := hit.Target.(invulTarget); ok && t.Invul() {
+	e := event.HitDealt{TargetID: hit.Target.ObjectID(), Damage: hit.Damage, Crit: hit.Crit, Miss: hit.Miss}
+	if hit.Target.Invul() {
 		e.Blocked = true
-		e.Petrified = t.Paralyzed()
+		e.Petrified = hit.Target.Paralyzed()
 	}
 	c.emit(e)
 }
 
-func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
+func (c *Controller) finishBow(seq uint64, target attackable.Combatant, reuse time.Duration) {
 	c.mu.Lock()
 	if seq != c.attackSeq {
 		c.mu.Unlock()
@@ -703,6 +744,7 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 	if reuse > 0 {
 		c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
 		c.mu.Unlock()
+		c.emitEnded(target)
 		c.emitRethink()
 		if c.player != nil {
 			c.emit(event.BowShotFinished{})
@@ -713,11 +755,12 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 	c.bowCooling = false
 	c.mu.Unlock()
 
+	c.emitEnded(target)
 	c.emitRethink()
 	c.emit(event.AttackFinished{BowReuse: true})
 }
 
-func (c *Controller) finishAttack(seq uint64) {
+func (c *Controller) finishAttack(seq uint64, target attackable.Combatant) {
 	c.mu.Lock()
 	if seq != c.attackSeq {
 		c.mu.Unlock()
@@ -728,7 +771,16 @@ func (c *Controller) finishAttack(seq uint64) {
 	c.inHitAnimation = false
 	c.mu.Unlock()
 
+	c.emitEnded(target)
 	c.emit(event.AttackFinished{})
+}
+
+// emitEnded tells an NPC's AI that its attack on target ended, ahead of
+// the re-run that end causes. Other actors' attacks report no such end.
+func (c *Controller) emitEnded(target attackable.Combatant) {
+	if c.attackable {
+		c.emit(event.AttackEnded{Target: target})
+	}
 }
 
 // endHitAnimation closes the hit animation window 300ms after the first hit
@@ -744,7 +796,7 @@ func (c *Controller) endHitAnimation() {
 // emitRethink asks an NPC's AI to re-run desire selection. Other actors'
 // AI does not re-run on attack phases.
 func (c *Controller) emitRethink() {
-	if c.attackable {
+	if c.npc {
 		c.emit(event.AttackRethink{})
 	}
 }

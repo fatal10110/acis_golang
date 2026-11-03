@@ -1,0 +1,474 @@
+# Adept of Taste (Q330): a level 24 character accepts at Jonas, who has nothing to cook yet, and
+# Mirien sends the player back while the ingredient list is still out. Each supplier hands out his
+# book, contract or list and sends the player away once with one short; the character already holds
+# one item short of each count. Sonia: a sprout's red root (roll 0), a sprout's white root (roll
+# 75), a sprout past both chances (roll 80) and a wild sprout's red root past its count give the
+# white mandragora sap. Jacob: a bloody bee's nectar (roll 0), Jacob offers plain honey (the player
+# says no), a stinger wasp's royal jelly (roll 85) and a wasp past both chances (roll 97) give the
+# golden honey. Pano: a hobgoblin's amulet gives the Dion potato. Glyvka: a gray ant's green moss
+# and a giant crimson ant's brown moss (roll 9) give the brown moss bundle. Rollant: a searcher's
+# two bodies (roll 0) and a gazer's two, cut to the one missing (roll 9), give the floating eye
+# meat. With three special ingredients and the even roll pinned to true, Jonas cooks the fifth steak
+# dish (the jackpot), Mirien reviews it, and Jonas pays for the review as the repeatable quest ends;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q330_adept_of_taste.golden
+character Gourmet 24
+hold 1422 39
+hold 1423 39
+hold 1427 19
+hold 1428 9
+hold 1432 29
+hold 1435 19
+hold 1436 19
+hold 1440 27
+random 0 0 75 0 80 0 0 0 85 0 97 0 0 0 9 0 0 0 9 0 0
+script quest.Q330_AdeptOfTaste
+item 1420 1421 1422 1423 1424 1425 1426 1427 1428 1429 1430 1431 1432 1433 1434 1435 1436 1437 1438 1439 1440 1441 1442 1443 1444 1445 1446 1447 1448 1449 1450 1451 1455 1456 1457
+page default/30469.htm
+page trainer/30461.htm
+page merchant/30062.htm
+page guard/30073.htm
+page merchant/30078.htm
+page trainer/30067.htm
+page trainer/30069.htm
+page script/quest/Q330_AdeptOfTaste/
+npc jonas 30469 Folk 10 0 0
+npc mirien 30461 Trainer 20 0 0
+npc sonia 30062 Merchant 30 0 0
+npc jacob 30073 Guard -10 0 0
+npc pano 30078 Merchant -20 0 0
+npc glyvka 30067 Trainer -30 0 0
+npc rollant 30069 Trainer 0 10 0
+npc sprout 20154 Monster 0 40 0
+npc wildsprout 20223 Monster -40 40 0
+npc bee 20204 Monster 40 -40 0
+npc wasp 20229 Monster -40 -40 0
+npc hobgoblin 20147 Monster 60 0 0
+npc grayant 20226 Monster -60 0 0
+npc crimsonant 20228 Monster 0 60 0
+npc searcher 20265 Monster 0 -60 0
+npc gazer 20266 Monster 60 60 0
+
+# Jonas: accept; the ingredient list.
+action jonas
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q330_AdeptOfTaste CREATED
+bypass Quest Q330_AdeptOfTaste 30469-03.htm
+  S QuestList 330:0x80000001
+  S ExShowQuestMark quest=330
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1420
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-03.htm
+  S ActionFailed
+  Q upsert Q330_AdeptOfTaste | <state> | STARTED
+  Q upsert Q330_AdeptOfTaste | <cond> | 1
+  state Q330_AdeptOfTaste STARTED
+  rows Q330_AdeptOfTaste <cond>=1 <state>=STARTED
+  items 1420=1
+
+# Jonas: the five ingredients are not in; he tells about the mandragora juice.
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q330_AdeptOfTaste 30469-04t1.htm
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-04t1.htm
+  S ActionFailed
+
+# Mirien: nothing to judge while the ingredient list is out.
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q330_AdeptOfTaste/30461-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sonia: her botany book, then one root of each colour short.
+action sonia
+action sonia
+  S ActionFailed
+  S NpcHtmlMessage obj=sonia item=0 page=merchant/30062.htm
+  S ActionFailed
+bypass npc_{sonia}_Quest
+  S SystemMessage id=54 3:1421
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sonia item=0 page=script/quest/Q330_AdeptOfTaste/30062-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1421=1
+action sonia
+  S ActionFailed
+  S NpcHtmlMessage obj=sonia item=0 page=merchant/30062.htm
+  S ActionFailed
+bypass npc_{sonia}_Quest
+  S NpcHtmlMessage obj=sonia item=0 page=script/quest/Q330_AdeptOfTaste/30062-02.htm
+  S ActionFailed
+  S ActionFailed
+kill sprout
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1422
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1422=40
+kill sprout
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1423
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1423=40
+kill sprout
+  S SystemMessage id=95 1:0 1:0
+  items 1422=40 1423=40
+kill wildsprout
+  S SystemMessage id=95 1:0 1:0
+  items 1422=40 1423=40
+
+# Sonia: forty of each make the white mandragora sap; then she has nothing more.
+action sonia
+  S ActionFailed
+  S NpcHtmlMessage obj=sonia item=0 page=merchant/30062.htm
+  S ActionFailed
+bypass npc_{sonia}_Quest
+  S SystemMessage id=302 3:1421
+  S SystemMessage id=301 3:1422 6:40
+  S SystemMessage id=301 3:1423 6:40
+  S SystemMessage id=54 3:1425
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sonia item=0 page=script/quest/Q330_AdeptOfTaste/30062-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 1421=0 1422=0 1423=0 1425=1
+action sonia
+  S ActionFailed
+  S NpcHtmlMessage obj=sonia item=0 page=merchant/30062.htm
+  S ActionFailed
+bypass npc_{sonia}_Quest
+  S NpcHtmlMessage obj=sonia item=0 page=script/quest/Q330_AdeptOfTaste/30062-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Jacob: his insect book, then one nectar short.
+action jacob
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S SystemMessage id=54 3:1426
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1426=1
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-02.htm
+  S ActionFailed
+  S ActionFailed
+kill bee
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1427
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1427=20
+
+# Jacob: twenty nectars, but one royal jelly short; the player will gather more.
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q330_AdeptOfTaste 30073-04.htm
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-04.htm
+  S ActionFailed
+  items 1426=1 1427=20 1428=9
+kill wasp
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1428
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1428=10
+kill wasp
+  S SystemMessage id=95 1:0 1:0
+  items 1427=20 1428=10
+
+# Jacob: the golden honey; then he has nothing more.
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S SystemMessage id=302 3:1426
+  S SystemMessage id=301 3:1427 6:20
+  S SystemMessage id=301 3:1428 6:10
+  S SystemMessage id=54 3:1430
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 1426=0 1427=0 1428=0 1430=1
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Pano: his contract, then one amulet short.
+action pano
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S SystemMessage id=54 3:1431
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q330_AdeptOfTaste/30078-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1431=1
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q330_AdeptOfTaste/30078-02.htm
+  S ActionFailed
+  S ActionFailed
+kill hobgoblin
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1432
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1432=30
+
+# Pano: the Dion potato; then he has nothing more.
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S SystemMessage id=302 3:1431
+  S SystemMessage id=301 3:1432 6:30
+  S SystemMessage id=54 3:1433
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q330_AdeptOfTaste/30078-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 1431=0 1432=0 1433=1
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q330_AdeptOfTaste/30078-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Glyvka: her botany book, then one moss of each colour short.
+action glyvka
+action glyvka
+  S ActionFailed
+  S NpcHtmlMessage obj=glyvka item=0 page=trainer/30067.htm
+  S ActionFailed
+bypass npc_{glyvka}_Quest
+  S SystemMessage id=54 3:1434
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1434=1
+action glyvka
+  S ActionFailed
+  S NpcHtmlMessage obj=glyvka item=0 page=trainer/30067.htm
+  S ActionFailed
+bypass npc_{glyvka}_Quest
+  S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-02.htm
+  S ActionFailed
+  S ActionFailed
+kill grayant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1435
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1435=20
+kill crimsonant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1436
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1436=20
+
+# Glyvka: the brown moss bundle; then she has nothing more.
+action glyvka
+  S ActionFailed
+  S NpcHtmlMessage obj=glyvka item=0 page=trainer/30067.htm
+  S ActionFailed
+bypass npc_{glyvka}_Quest
+  S SystemMessage id=302 3:1434
+  S SystemMessage id=301 3:1435 6:20
+  S SystemMessage id=301 3:1436 6:20
+  S SystemMessage id=54 3:1438
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 1434=0 1435=0 1436=0 1438=1
+action glyvka
+  S ActionFailed
+  S NpcHtmlMessage obj=glyvka item=0 page=trainer/30067.htm
+  S ActionFailed
+bypass npc_{glyvka}_Quest
+  S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rollant: his creature book, then three bodies short.
+action rollant
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S SystemMessage id=54 3:1439
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q330_AdeptOfTaste/30069-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1439=1
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q330_AdeptOfTaste/30069-02.htm
+  S ActionFailed
+  S ActionFailed
+kill searcher
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1440 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1440=29
+kill gazer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1440
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1440=30
+
+# Rollant: the floating eye meat; then he has nothing more.
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S SystemMessage id=302 3:1439
+  S SystemMessage id=301 3:1440 6:30
+  S SystemMessage id=54 3:1441
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q330_AdeptOfTaste/30069-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 1439=0 1440=0 1441=1
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q330_AdeptOfTaste/30069-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Jonas: three special ingredients and the roll on true: the fifth steak dish.
+action jonas
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S PlaySound type=0 file=ItemSound.quest_jackpot bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1420
+  S SystemMessage id=302 3:1425
+  S SystemMessage id=302 3:1430
+  S SystemMessage id=302 3:1433
+  S SystemMessage id=302 3:1438
+  S SystemMessage id=302 3:1441
+  S SystemMessage id=54 3:1446
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-05t5.htm
+  S ActionFailed
+  S ActionFailed
+  items 1420=0 1425=0 1430=0 1433=0 1438=0 1441=0 1446=1
+
+# Jonas: the dish goes to Mirien first.
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mirien: her review of the fifth dish; then she has judged it already.
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1446
+  S SystemMessage id=54 3:1451
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q330_AdeptOfTaste/30461-02t5.htm
+  S ActionFailed
+  S ActionFailed
+  items 1446=0 1451=1
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q330_AdeptOfTaste/30461-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Jonas: the review pays 7800 adena, the steak recipe and experience; the quest ends.
+action jonas
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S SystemMessage id=302 3:1451
+  S SystemMessage id=52 6:7800
+  S SystemMessage id=54 3:1457
+  S SystemMessage id=45 1:12000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-06t5.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q330_AdeptOfTaste
+  items 1451=0 1457=1 57=7800
+  state Q330_AdeptOfTaste -
+  rows Q330_AdeptOfTaste -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q330_AdeptOfTaste -
+  rows Q330_AdeptOfTaste -
+  items 1457=1 57=7800

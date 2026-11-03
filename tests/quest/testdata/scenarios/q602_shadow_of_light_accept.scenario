@@ -1,0 +1,45 @@
+# Shadow of Light (Q602): a level 68 character accepts the quest from the Eye of Argos. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q602_shadow_of_light_accept.golden
+character Hero 68
+script quest.Q602_ShadowOfLight
+item 7189 6699 6698 6700 57
+page default/31683.htm
+page script/quest/Q602_ShadowOfLight/
+npc eye 31683 Folk 10 0 0
+npc buffalo 21299 Monster 40 0 0
+
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q602_ShadowOfLight/31683-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q602_ShadowOfLight 31683-02.htm
+  S QuestList 602:0x80000001
+  S ExShowQuestMark quest=602
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q602_ShadowOfLight/31683-02.htm
+  S ActionFailed
+  Q upsert Q602_ShadowOfLight | <state> | STARTED
+  Q upsert Q602_ShadowOfLight | <cond> | 1
+  rows Q602_ShadowOfLight <cond>=1 <state>=STARTED
+  state Q602_ShadowOfLight STARTED
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q602_ShadowOfLight/31683-03.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q602_ShadowOfLight <cond>=1 <state>=STARTED
+  state Q602_ShadowOfLight STARTED

@@ -36,3 +36,9 @@ func FramePlaySoundAt(sound Sound) wire.Frame {
 	w.WriteInt32(sound.Delay)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
+
+// FrameMusicAt builds the music playback packet bound to the object
+// objectID standing at at: type 1, no delay.
+func FrameMusicAt(objectID int32, file string, at location.Location) wire.Frame {
+	return FramePlaySoundAt(Sound{Type: 1, File: file, BindToObject: true, ObjectID: objectID, Location: at})
+}

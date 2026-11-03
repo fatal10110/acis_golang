@@ -34,8 +34,14 @@ func AlreadyCompletedMsg() string { return alreadyCompletedPage }
 // player's last quest NPC, then, when exactly one script holds the NPC's
 // first talk, that script answers and Interact reports true. Otherwise it
 // reports false and the NPC answers with its own window. An empty answer
-// releases the client; an aborted one sends nothing.
-func (r *Registry) Interact(p *Player, n *NPC) bool {
+// releases the client; an aborted one sends nothing. It runs on p's own
+// queue, and so does the hook (TeleportTo).
+func (r *Registry) Interact(p *Player, n *NPC) (answered bool) {
+	p.character().RunOnOwnQueue(func() { answered = r.interact(p, n) })
+	return answered
+}
+
+func (r *Registry) interact(p *Player, n *NPC) bool {
 	c := p.character()
 	c.SetLastQuestNPC(n.ObjectID())
 	s, res, bound := r.FirstTalk(n.NpcID(), FirstTalk{NPC: n, Player: p})
@@ -56,8 +62,13 @@ func (r *Registry) Interact(p *Player, n *NPC) bool {
 // the real quests the NPC starts; none gives the no-quest page, one that
 // quest's window, more a choice list. With a name it opens the window of
 // the script of that name, ignoring case, bound to the NPC or not; an
-// unknown name gives the no-quest page.
+// unknown name gives the no-quest page. It runs on p's own queue, and so
+// does the hook (TeleportTo).
 func (r *Registry) QuestWindow(p *Player, n *NPC, name string) {
+	p.character().RunOnOwnQueue(func() { r.openQuestWindow(p, n, name) })
+}
+
+func (r *Registry) openQuestWindow(p *Player, n *NPC, name string) {
 	if name != "" {
 		r.questWindow(p, n, r.byName[strings.ToLower(name)])
 		return
@@ -150,8 +161,13 @@ func showQuestChoice(c *player.Character, n *NPC, quests []*Script) {
 // that is no NPC in the world): the event hook of the script of that name,
 // ignoring case, runs when the player stands strictly within
 // InteractionDistance of last and a script talking through last counts as
-// the same script. Anything else does nothing.
+// the same script. Anything else does nothing. It runs on p's own queue,
+// and so does the hook (TeleportTo).
 func (r *Registry) QuestEvent(p *Player, last *NPC, name, event string) {
+	p.character().RunOnOwnQueue(func() { r.questEvent(p, last, name, event) })
+}
+
+func (r *Registry) questEvent(p *Player, last *NPC, name, event string) {
 	s := r.byName[strings.ToLower(name)]
 	if s == nil || last == nil {
 		return

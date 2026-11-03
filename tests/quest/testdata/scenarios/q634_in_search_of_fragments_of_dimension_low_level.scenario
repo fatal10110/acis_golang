@@ -1,0 +1,21 @@
+# In Search of Fragments of Dimension (Q634): a level 19 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q634_in_search_of_fragments_of_dimension_low_level.golden
+character Hero 19
+script quest.Q634_InSearchOfFragmentsOfDimension
+item 7079
+page default/31494.htm
+page default/31507.htm
+page script/quest/Q634_InSearchOfFragmentsOfDimension/
+npc gate1 31494 Folk 10 0 0
+npc gate14 31507 Folk 20 0 0
+
+action gate1
+action gate1
+  S ActionFailed
+  S NpcHtmlMessage obj=gate1 item=0 page=default/31494.htm
+  S ActionFailed
+bypass npc_{gate1}_Quest Q634_InSearchOfFragmentsOfDimension
+  S NpcHtmlMessage obj=gate1 item=0 page=script/quest/Q634_InSearchOfFragmentsOfDimension/01a.htm
+  S ActionFailed
+  S ActionFailed

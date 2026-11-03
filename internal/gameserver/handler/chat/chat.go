@@ -2,7 +2,8 @@ package chat
 
 import (
 	"strings"
-	"unicode/utf16"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Type is a chat channel, as the client numbers it in Say2 and CreatureSay.
@@ -95,7 +96,7 @@ func Admit(typ int32, text, target string, gm, walkerProtection bool) (Line, boo
 	if !t.Valid() {
 		return Line{}, false
 	}
-	if text == "" || len(utf16.Encode([]rune(text))) > MaxTextLength {
+	if text == "" || commons.UTF16Len(text) > MaxTextLength {
 		return Line{}, false
 	}
 	if walkerProtection && t == Tell && isWalkerCommand(text) {

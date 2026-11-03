@@ -171,7 +171,7 @@ func TestRootedPetFearedStaysPutAndStaysAfraid(t *testing.T) {
 }
 
 // Siege-summon fixture: a servitor skill that calls the Siege Golem
-// template, whose npc id marks it a siege summon.
+// template, whose type marks it a siege summon.
 const (
 	siegeGolemNPCID    = 14737
 	summonGolemSkillID = 13
@@ -181,6 +181,26 @@ const (
 // tmpl, casts it, waits for the servitor to reach world state, and spawns
 // the fixture monster. extra adds boot options, such as the zones.
 func bootFearServitor(t *testing.T, tmpl *npc.Template, skillID int, extra ...gameservertest.Option) (*petWorld, *summon.Actor, *npc.Hostile) {
+	t.Helper()
+	h := bootServitorCaster(t, tmpl, skillID, extra...)
+	h.client.Send(encodeRequestMagicSkillUse(int32(skillID)))
+	var actor *summon.Actor
+	h.srv.AdvanceUntil(t, "servitor in world state", func() bool {
+		obj, ok := h.srv.State.Summon(h.ownerID)
+		if !ok {
+			return false
+		}
+		actor, ok = obj.(*summon.Actor)
+		return ok
+	})
+	hostile := h.srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, h.client)
+	return h, actor, hostile
+}
+
+// bootServitorCaster brings the owner in knowing one servitor skill that
+// calls tmpl, not cast yet. extra adds boot options, such as the zones.
+func bootServitorCaster(t *testing.T, tmpl *npc.Template, skillID int, extra ...gameservertest.Option) *petWorld {
 	t.Helper()
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
@@ -204,22 +224,11 @@ func bootFearServitor(t *testing.T, tmpl *npc.Template, skillID int, extra ...ga
 	}
 	h := &petWorld{srv: srv, client: srv.Client, ownerID: ownerID, seeded: map[int32][]int32{}}
 	startInWorld(t, h.client)
-	h.client.Send(encodeRequestMagicSkillUse(int32(skillID)))
-	var actor *summon.Actor
-	srv.AdvanceUntil(t, "servitor in world state", func() bool {
-		obj, ok := srv.State.Summon(ownerID)
-		if !ok {
-			return false
-		}
-		actor, ok = obj.(*summon.Actor)
-		return ok
-	})
-	hostile := srv.SpawnHostileNPC(t)
-	drainUntilQuiet(t, h.client)
-	return h, actor, hostile
+	return h
 }
 
-// siegeGolemTemplate is a servitor template carrying the Siege Golem id.
+// siegeGolemTemplate is the Siege Golem servitor template, of type
+// SiegeSummon.
 func siegeGolemTemplate() *npc.Template {
 	return &npc.Template{
 		ID: siegeGolemNPCID, TemplateID: siegeGolemNPCID, Type: "SiegeSummon", Name: "Siege Golem", Level: 60,
@@ -239,10 +248,12 @@ func catTemplate() *npc.Template {
 
 // TestSiegeSummonRejectsFearAndBluff pins a siege summon's immunity: a Fear
 // landing on a Siege Golem is refused at start, so it is not afraid, holds
-// no effect and runs nowhere; a Bluff is refused the same way.
+// no effect and runs nowhere; a Bluff is refused the same way. The golem is
+// called on an active battlefield, the only ground it stays on.
 func TestSiegeSummonRejectsFearAndBluff(t *testing.T) {
 	t.Parallel()
-	h, golem, hostile := bootFearServitor(t, siegeGolemTemplate(), summonGolemSkillID)
+	h, golem, hostile := bootFearServitor(t, siegeGolemTemplate(), summonGolemSkillID,
+		gameservertest.WithZones(battlefieldZones(t, -1_000, 1_000, true)))
 	fear := landPetFear(t, golem, hostile, 1092, 6, 2)
 	if golem.Afraid() || fear.InUse() {
 		t.Errorf("siege golem Afraid() = %v, fear in use = %v, want the fear refused", golem.Afraid(), fear.InUse())

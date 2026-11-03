@@ -1,0 +1,65 @@
+# Collector of Jewels (Q369), fifty of each: a character at cond 1 holding 49 of each shard kills a Death Fire
+# (the fiftieth flare, the freezing ones still short) and a Roxide (the fiftieth freezing: cond 2); Nell pays
+# 12500 adena for the shards and the character quits. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q369_collector_of_jewels_progress.golden
+character Jewels 25
+quest Q369_CollectorOfJewels <cond>=1 <state>=STARTED
+hold 5882 49
+hold 5883 49
+random always 0
+script quest.Q369_CollectorOfJewels
+item 57 5882 5883
+page trainer/30376.htm
+page script/quest/Q369_CollectorOfJewels/
+npc nell 30376 Trainer 10 0 0
+npc lakin 20609 Monster 40 0 0
+npc rowin 20612 Monster 50 0 0
+npc deathfire 20749 Monster 60 0 0
+npc undine 20616 Monster -40 0 0
+npc rowinundine 20619 Monster -50 0 0
+npc roxide 20747 Monster -60 0 0
+
+kill deathfire
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5882
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 5882=50
+  rows Q369_CollectorOfJewels <cond>=1 <state>=STARTED
+kill roxide
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5883
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 369:0x80000003
+  S ExShowQuestMark quest=369
+  Q upsert Q369_CollectorOfJewels | <cond> | 2
+  items 5883=50
+  rows Q369_CollectorOfJewels <cond>=2 <state>=STARTED
+action nell
+action nell
+  S ActionFailed
+  S NpcHtmlMessage obj=nell item=0 page=trainer/30376.htm
+  S ActionFailed
+bypass npc_{nell}_Quest
+  S QuestList 369:0x80000007
+  S ExShowQuestMark quest=369
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:5882 6:50
+  S SystemMessage id=301 3:5883 6:50
+  S SystemMessage id=52 6:12500
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q369_CollectorOfJewels | <cond> | 3
+  rows Q369_CollectorOfJewels <cond>=3 <state>=STARTED
+  items 5882=0 5883=0 57=12500
+bypass Quest Q369_CollectorOfJewels 30376-06.htm
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-06.htm
+  S ActionFailed
+bypass Quest Q369_CollectorOfJewels 30376-08.htm
+  S QuestList
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-08.htm
+  S ActionFailed
+  Q delete-quest Q369_CollectorOfJewels
+  state Q369_CollectorOfJewels -
+  rows Q369_CollectorOfJewels -

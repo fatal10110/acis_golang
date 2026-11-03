@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/macro"
@@ -88,8 +89,26 @@ type livePlayer struct {
 	// follow carry the result, so those refreshes stay silent. Written on
 	// the owner's queue; atomic for the Emit readers.
 	replayingEffects atomic.Bool
-	shortcuts        *shortcut.List
-	macros           *macro.List
+	// replayMayDie is set for the replay window of a player that entered
+	// it alive: a damage-over-time tick due on the loading screen may kill
+	// it there, before it is in the world. Every frame its own client would
+	// get from then on is dropped (see deathOnLoadingScreen), except the
+	// events loadingDeath holds for the burst. Written on the owner's
+	// queue; atomic for the send paths.
+	replayMayDie atomic.Bool
+	// restoredHP is the HP the selection restored, which noteRestoredHP
+	// measures once the restored equipment and effects apply; it is
+	// pending until then. quietTutorial keeps that measure's tutorial
+	// answer from the client. Atomic: the selection, the owner's queue and
+	// a detach touch them.
+	restoredHP        atomic.Uint64
+	restoredHPPending atomic.Bool
+	quietTutorial     atomic.Bool
+	// loadingDeath holds the events of that death whose state outlives it
+	// and that no EnterWorld frame carries (see holdForEnterWorld).
+	loadingDeath loadingDeathEvents
+	shortcuts    *shortcut.List
+	macros       *macro.List
 	// board is the player's community board session; owned by its queue.
 	board boardSession
 	// duelCondition is what the player's duel saved of it when it began;
@@ -111,13 +130,19 @@ type livePlayer struct {
 	// owned by p's queue. See punishment.go.
 	punishTimer    *sim.Timer
 	punishDeadline time.Time
+	// siegeRestart is the restart a dead siege attacker waits out, nil for
+	// none; owned by p's queue. See restartpoint.go.
+	siegeRestart *sim.Timer
+	// wyvernDismount is the countdown that takes a wyvern rider off its
+	// mount over ground closed to wyverns, nil for none; owned by p's
+	// queue. See wyvern_dismount.go.
+	wyvernDismount *sim.Timer
 	// handlerPanicked records that a task this player's connection waited on
 	// panicked. Written by onLive and read by the dispatch loop, both on the
 	// owning connection goroutine and nowhere else.
 	handlerPanicked bool
 	log             zerolog.Logger
 
-	known          world.KnownBuffer
 	zoneActor      *liveZoneActor
 	visibilitySend func(wire.Frame) bool
 	// kick closes this player's client connection (ServerClose then close),
@@ -152,8 +177,10 @@ type livePlayer struct {
 	// deferredUseItem is a weapon or shield toggle queued as the next
 	// intention; see tryToUseItem.
 	deferredUseItem *useItemIntention
-	// deferredAction runs a player request held until a swing, cast or posture settles.
-	deferredAction func()
+	// deferredAction runs a player request held until a swing, cast or
+	// posture settles; deferredActionIntention names it for the character page.
+	deferredAction          func()
+	deferredActionIntention string
 	// deferredInteract is an interact queued as the next intention; see
 	// tryToInteract.
 	deferredInteract *interactIntention
@@ -168,6 +195,10 @@ type livePlayer struct {
 	// Trainer, shop and other service requests act on it while
 	// playerCanDoInteract(p, currentFolk) holds.
 	currentFolk atomic.Pointer[npc.Folk]
+
+	// requestedGate is the door whose open or close question the player
+	// was last asked; the dialog's answer takes it.
+	requestedGate atomic.Pointer[door.Object]
 
 	// bypasses are the links of the last validated HTML page p was sent.
 	bypasses bypassWhitelist
@@ -276,7 +307,7 @@ type deferredMagicSkill struct {
 type itemAICastIntention struct {
 	inventory *itemcontainer.Inventory
 	item      *item.Instance
-	skill     modelskill.Definition
+	skill     *modelskill.Definition
 	selected  world.Tracked
 	// ctrl is the UseItem Ctrl modifier, the cast's force-use flag.
 	ctrl bool
@@ -348,6 +379,22 @@ func postLive(live *livePlayer, fn func()) bool {
 	return live.Queue().Post(fn)
 }
 
+// onOwnQueue runs fn for live at once when the caller already runs on live's
+// queue (owned), else posts it there: a party recall or a script hook asks
+// a teleport from another queue, and the teleport touches state only live's
+// queue owns. A posted fn is dropped once live has begun leaving the world.
+func onOwnQueue(live *livePlayer, owned bool, fn func()) {
+	if owned {
+		fn()
+		return
+	}
+	postLive(live, func() {
+		if !live.detached() {
+			fn()
+		}
+	})
+}
+
 // onLive runs fn on live's queue, or on the calling goroutine when live is
 // nil; see onQueue. It reports whether fn returned normally and records a
 // failure on live, so the dispatch loop drops the session even at the call
@@ -379,13 +426,13 @@ func (p *livePlayer) Stop() {
 // The attack stance and in-combat state are left alone: they end only on
 // their own expiry, on death or on logout.
 //
-// A teleport has already left p unable to act. Its attack stop is answered
-// with two ActionFailed, the refused idle's and the stop's own, and a cast
-// in flight is stopped with the intention queued behind it still in place:
-// the stopped cast's end thinks it once, refused, before the teleport drops
-// it with everything else. Last, a teleport's abort resets the selection
-// (Creature.abortAll(true)): ActionFailed always, then TargetUnselected to
-// p and its observers when something, p itself included, was selected.
+// A teleport has already left p unable to act. Its attack stop is answered with
+// two ActionFailed, the refused idle's and the stop's own, and a cast in flight
+// is stopped with the intention queued behind it still in place: the stopped
+// cast's end thinks it once, refused, before the teleport drops it with
+// everything else. Last, a teleport's abort resets the selection: ActionFailed
+// always, then TargetUnselected to p and its observers when something, p itself
+// included, was selected.
 func (p *livePlayer) abortAll(teleport bool) {
 	queuedForCast := teleport && p.cast != nil && p.cast.CastingNow()
 	if queuedForCast {
@@ -420,8 +467,8 @@ func (p *livePlayer) abortAll(teleport bool) {
 	// Detach stops them (stopCubics); death removes them (removeAllCubics).
 }
 
-// resetTarget clears p's selection the way Player.setTarget(null) answers
-// it, with no early return for an empty selection: ActionFailed, then
+// resetTarget clears p's selection as any deselection is answered, with no
+// early return for an empty selection: ActionFailed, then
 // TargetUnselected to p and its observers when one was held.
 func (p *livePlayer) resetTarget() {
 	old := p.TakeTarget()
@@ -492,7 +539,8 @@ func (p *livePlayer) Departed() bool {
 
 // markDetaching runs on p's queue, where autosave and shadow-item expiry
 // check detached, so neither enqueues after detach's own writes (#1948). It
-// also marks the character, whose quest journal then takes no change.
+// also marks the character: a script invocation that wrote it, on any queue,
+// has finished first, and no other writes it after.
 func (p *livePlayer) markDetaching() {
 	sim.AssertOwner(p.Queue())
 	p.deliveryStopped.Store(true)
@@ -525,6 +573,7 @@ func (p *livePlayer) clearNextIntentionLocked() {
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
 	p.deferredAction = nil
+	p.deferredActionIntention = ""
 	p.deferredInteract = nil
 }
 
@@ -644,19 +693,19 @@ func (p *livePlayer) dropDeferredCast() bool {
 	return queued
 }
 
-func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
+func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill *modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl})
 }
 
 // approachItemAICast is deferItemAICast for the current CAST intention,
 // walking to its final target finalID before it casts.
-func (p *livePlayer) approachItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool, finalID int32) {
+func (p *livePlayer) approachItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill *modelskill.Definition, selected world.Tracked, ctrl bool, finalID int32) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl, approach: finalID})
 }
 
 // deferSummonCreatureCast stores the SUMMON_CREATURE cast of the pet collar
 // collar as the next CAST intention, cast on the player itself.
-func (p *livePlayer) deferSummonCreatureCast(inventory *itemcontainer.Inventory, collar *item.Instance, skill modelskill.Definition) {
+func (p *livePlayer) deferSummonCreatureCast(inventory *itemcontainer.Inventory, collar *item.Instance, skill *modelskill.Definition) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: collar, skill: skill, selected: p.Character, summon: true})
 }
 
@@ -725,13 +774,15 @@ func (p *livePlayer) hasDeferredUseItem() bool {
 	return p.deferredUseItem != nil
 }
 
-// deferAction replaces the next player intention. It is drained by the
-// player's queue when the swing, cast, or posture transition ends.
-func (p *livePlayer) deferAction(run func()) {
+// deferAction replaces the next player intention with run, named intention
+// on the character page. It is drained by the player's queue when the swing,
+// cast, or posture transition ends.
+func (p *livePlayer) deferAction(intention string, run func()) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.clearNextIntentionLocked()
 	p.deferredAction = run
+	p.deferredActionIntention = intention
 }
 
 func (p *livePlayer) takeDeferredAction() func() {
@@ -739,6 +790,7 @@ func (p *livePlayer) takeDeferredAction() func() {
 	defer p.pickupMu.Unlock()
 	run := p.deferredAction
 	p.deferredAction = nil
+	p.deferredActionIntention = ""
 	return run
 }
 
@@ -1021,7 +1073,7 @@ func (p *livePlayer) SendInventoryUpdate(updates []itemcontainer.Update) {
 	if inv == nil {
 		return
 	}
-	frame, err := serverpackets.FrameInventoryUpdate(updates, inv.ItemsUnordered(), inv.Templates())
+	frame, err := serverpackets.FrameInventoryUpdate(updates, inv.Templates())
 	if err != nil {
 		p.log.Error().Err(err).Msg("build InventoryUpdate")
 		return

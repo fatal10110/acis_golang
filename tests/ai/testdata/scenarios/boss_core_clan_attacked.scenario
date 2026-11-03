@@ -1,0 +1,28 @@
+# Core (29006) and a monster of its clan beside it, every draw 0. A hit on the monster calls
+# Core: the first time it speaks its two opening lines, the next time its taunt. Killed, its
+# attacked hook says the taunt, then its clan call on itself says it again, before its dying
+# hook plays its music and speaks its three last lines; a later hit on the monster calls the
+# dead Core, which says nothing.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.core.Core
+npc core 29006 GrandBoss 100 0 0 clan core_clan 300
+npc guard 20120 Monster 100 50 0 clan core_clan 300
+
+hit guard 10
+  S NpcSay obj=core type=0 npc=1029006 text="A non-permitted target has been discovered."
+  S NpcSay obj=core type=0 npc=1029006 text="Intruder removal system initiated."
+hit guard 10
+  S NpcSay obj=core type=0 npc=1029006 text="Removing intruders."
+kill core
+  S NpcSay obj=core type=0 npc=1029006 text="Removing intruders."
+  S NpcSay obj=core type=0 npc=1029006 text="Removing intruders."
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=1 file=BS02_D bind=1 obj=core loc=110,20,30 delay=0
+  S NpcSay obj=core type=0 npc=1029006 text="A fatal error has occurred."
+  S NpcSay obj=core type=0 npc=1029006 text="System is being shut down..."
+  S NpcSay obj=core type=0 npc=1029006 text="......"
+hit guard 10

@@ -5,8 +5,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
 
@@ -50,22 +52,25 @@ func kinds(ks ...NPCKind) kindSet {
 // Until then no script subscribing to it registers, so no script waits on a
 // hook that never fires.
 var raisedHooks = map[hook]kindSet{
-	// The attacks and deaths (attacked.go, clan.go). Only a hostile NPC
-	// has a party.
+	// The attacks and deaths (attacked.go, clan.go). A civilian NPC's
+	// party hears its death, but no script binds the party-attacked hook
+	// to a civilian NPC, so that one is not raised on it.
 	hookAttacked:      kinds(KindFolk, KindHostile),
 	hookPartyAttacked: kinds(KindHostile),
 	hookClanAttacked:  kinds(KindFolk, KindHostile),
-	hookPartyDied:     kinds(KindHostile),
+	hookPartyDied:     kinds(KindFolk, KindHostile),
 	hookClanDied:      kinds(KindFolk, KindHostile),
 	// The spawner and the NPC's death and decay (lifecycle.go).
 	hookCreated: kinds(KindFolk, KindHostile),
 	hookDecayed: kinds(KindFolk, KindHostile),
 	hookMyDying: kinds(KindFolk, KindHostile),
-	// The AI's idle and arrival (idle.go). A civilian NPC walks no point
-	// and keeps no territory yet (#3492).
+	// The AI's idle and arrival (idle.go).
 	hookNoDesire:       kinds(KindFolk, KindHostile),
-	hookMoveToFinished: kinds(KindHostile),
-	hookOutOfTerritory: kinds(KindHostile),
+	hookMoveToFinished: kinds(KindFolk, KindHostile),
+	hookOutOfTerritory: kinds(KindFolk, KindHostile),
+	// The AI tick's scan, the look-neighbour call and the re-fire after a
+	// playable's teleport or summoning (see_creature.go).
+	hookSeeCreature: kinds(KindFolk, KindHostile),
 	// The schedule runner (StartSchedule).
 	hookStart: kinds(KindOther),
 	// The tutorial events (TutorialEvent) and the quest event links
@@ -77,16 +82,47 @@ var raisedHooks = map[hook]kindSet{
 	// The quest windows (QuestWindow), for both NPC kinds a dialog command
 	// reaches.
 	hookTalk: kinds(KindFolk, KindHostile),
-	// The use of an item (ItemUsed) and the entry into a zone (ZoneEntered).
+	// The use of an item (ItemUsed), the entry into a zone (ZoneEntered)
+	// and the death of a player or its summon (PlayableDied).
 	hookItemUse:   kinds(KindOther),
 	hookZoneEnter: kinds(KindOther),
+	hookDeath:     kinds(KindOther),
+	// The opening or closing of a door (WatchDoors).
+	hookDoorChange: kinds(KindOther),
+	// A hit on a door, calling the NPCs of the door clan around it
+	// (DoorAttacked).
+	hookStaticObjectClanAttacked: kinds(KindFolk, KindHostile),
 	// The script-event sends (SendScriptEvent, BroadcastScriptEvent), to an
 	// NPC of either kind.
 	hookScriptEvent: kinds(KindFolk, KindHostile),
 	// The interact of a civilian NPC and of a talking hostile one
 	// (Interact).
 	hookFirstTalk: kinds(KindFolk, KindHostile),
+	// The end of an NPC's cast, and of a hostile NPC's attack (spell.go):
+	// only an attackable NPC reports its attack's end.
+	hookUseSkillFinished: kinds(KindFolk, KindHostile),
+	hookAttackFinished:   kinds(KindHostile),
+	// A player's skill seen around an NPC or landing on it, and an effect
+	// about to land on an NPC, over the see-spell list (spell.go).
+	hookSeeSpell:              kinds(KindFolk, KindHostile),
+	hookSpelled:               kinds(KindFolk, KindHostile),
+	hookAbnormalStatusChanged: kinds(KindFolk, KindHostile),
+	// An NPC's look for ground items (LookItem) and its pick-up of one, in
+	// its AI's think pass (ground_item.go).
+	hookSeeItem:    kinds(KindFolk, KindHostile),
+	hookPickedItem: kinds(KindFolk, KindHostile),
 }
+
+// silentHooks lists, per hook, the NPC kinds no game event ever raises it
+// on: a civilian NPC's attack reports no end. A binding to one of those
+// NPCs still registers, as it does on the NPCs the hook is raised on, and
+// the hook never runs for them.
+var silentHooks = map[hook]kindSet{
+	hookAttackFinished: kinds(KindFolk),
+}
+
+// silent reports whether no game event ever raises h on an NPC of kind k.
+func silent(h hook, k NPCKind) bool { return silentHooks[h]&kinds(k) != 0 }
 
 // Config is what Build needs besides the list and the catalog.
 type Config struct {
@@ -96,10 +132,20 @@ type Config struct {
 	Log    zerolog.Logger
 	// Env is what the registered scripts' helpers act through.
 	Env *Env
+	// HandleOps holds, per scripts.xml path, the kind-specific handle
+	// operations the script's hooks reach. A script missing from it reaches
+	// none.
+	HandleOps map[string]HandleOps
 	// Queue is the engine queue. The dying hooks run on it, as they come
 	// after the NPC's own queue may have closed at its decay, and so does a
 	// script timer whose NPC and player have no queue to run it on.
 	Queue *sim.Queue
+	// Heard, when set, is told of each script event delivered to an NPC's
+	// script, before the script runs: the receiver, the event and its two
+	// arguments. A test suite uses it to see which NPCs a script's send
+	// or broadcast reached; it may be called from any goroutine a script
+	// runs on.
+	Heard func(n *NPC, eventID, arg1, arg2 int32)
 
 	// raises overrides raisedHooks; tests use it.
 	raises func(hook, NPCKind) bool
@@ -125,8 +171,6 @@ type Registry struct {
 	// byName holds, per lower-cased name, the first registered script of
 	// that name in list order.
 	byName map[string]*Script
-	// behaves holds the NPC ids a behavior is bound to.
-	behaves map[int32]bool
 	// behaviors holds, per NPC id, the behaviors left on any of its event
 	// lists.
 	behaviors map[int32]map[*Script]bool
@@ -137,9 +181,23 @@ type Registry struct {
 	zones map[int32][]*Script
 	// queue is the engine queue (Config.Queue).
 	queue *sim.Queue
+	// heard is Config.Heard.
+	heard func(n *NPC, eventID, arg1, arg2 int32)
 	// timers are the scripts' timers. They are not part of the registry:
 	// a leaf-locked container of their own.
 	timers *timers
+	// memo is the scripts' global memo, a leaf-locked container of its
+	// own like the timers.
+	memo *GlobalMemo
+	// doors are the world's doors (Env.Doors), which a door handle in a
+	// hook's payload opens and closes; nil when the server has none.
+	doors Doors
+	// world is the world a hit door calls the NPCs around it in
+	// (Env.World); nil finds none.
+	world *world.State
+	// runs counts the hook invocations in flight, for a player leaving the
+	// world to wait out the ones that wrote it. It carries its own lock.
+	runs player.ScriptRuns
 }
 
 type npcKey struct {
@@ -173,15 +231,24 @@ const (
 // catalog has. A listed path with no script, or whose constructor panics,
 // is logged at error level and skipped; a catalog entry that is not listed
 // is never built. A script whose hooks the engine does not raise for the
-// NPC kinds it is bound to is refused: logged and skipped.
+// NPC kinds it is bound to is refused: logged and skipped. So is a script
+// whose hooks call a handle operation that does not exist for the kind of
+// an NPC the hook runs for (Config.HandleOps).
 //
 // For each (NPC, event) a behavior first removes any other behavior and a
 // script removes an earlier registration of itself; it is then appended,
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue, heard: cfg.Heard}
 	r.timers = newTimers(r, cfg.Queue)
+	var w *world.State
+	if cfg.Env != nil {
+		w = cfg.Env.World
+		r.doors = cfg.Env.Doors
+	}
+	r.world = w
+	r.memo = newGlobalMemo(w)
 	registered := 0
 	for _, l := range list {
 		e := entry{path: l.Path}
@@ -203,8 +270,14 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		s.registry = r
 		s.Name = l.Path[strings.LastIndexByte(l.Path, '.')+1:]
 		e.bound = boundOf(&s, cfg.KindOf)
-		if err := gate(&s, e.bound, &cfg); err != nil {
-			r.log.Error().Err(err).Str("script", l.Path).Msg("script: refused; a hook it needs is not raised")
+		err := gate(&s, e.bound, &cfg)
+		refusal := "script: refused; a hook it needs is not raised"
+		if err == nil {
+			err = gateHandles(&s, e.bound, &cfg)
+			refusal = "script: refused; a handle operation it calls does not exist for an NPC kind it is bound to"
+		}
+		if err != nil {
+			r.log.Error().Err(err).Str("script", l.Path).Msg(refusal)
 			e.state = entryRefused
 			r.entries = append(r.entries, e)
 			continue
@@ -227,6 +300,9 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 				r.behaviors[k.npc][s] = true
 			}
 		}
+	}
+	if cfg.Env != nil && cfg.Env.Doors != nil {
+		r.WatchDoors(cfg.Env.Doors)
 	}
 	r.log.Info().Int("listed", len(list)).Int("registered", registered).Msg("script: registry built")
 	return r
@@ -273,7 +349,8 @@ func boundOf(s *Script, kindOf func(int32) (NPCKind, bool)) Bindings {
 }
 
 // gate checks that the engine raises every hook s subscribes to: for each
-// binding, the event's hook on that NPC's kind, and the event and timer
+// binding, the event's hook on that NPC's kind unless no game event raises
+// it there, and the event and timer
 // hooks when s sets them. A behavior's timers stop when its NPC decays, so
 // a behavior that sets the timer hook needs it raised on the kind of every
 // NPC it is bound to.
@@ -282,7 +359,7 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 		h := npcEvents[ev].hook
 		for _, id := range bound[ev] {
 			k, _ := cfg.KindOf(id)
-			if !cfg.raised(h, k) {
+			if !cfg.raised(h, k) && !silent(h, k) {
 				return fmt.Errorf("%s on npc %d: hook %s is not raised for %s npcs", ev, id, h, k)
 			}
 		}
@@ -297,7 +374,7 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 			}
 		}
 	}
-	for _, h := range []hook{hookEvent, hookStart, hookTimer, hookItemUse, hookZoneEnter} {
+	for _, h := range []hook{hookEvent, hookStart, hookTimer, hookItemUse, hookZoneEnter, hookDeath, hookDoorChange} {
 		if set.has(h) && !cfg.raised(h, KindOther) && !cfg.raised(h, KindFolk) && !cfg.raised(h, KindHostile) {
 			return fmt.Errorf("hook %s is not raised", h)
 		}
@@ -351,9 +428,6 @@ func (r *Registry) register(s *Script, bound Bindings) {
 		for _, id := range ids {
 			k := npcKey{id, ev}
 			r.npc[k] = registerOn(r.npc[k], s, ev)
-			if s.Behavior {
-				r.behaves[id] = true
-			}
 		}
 	}
 }
@@ -391,16 +465,9 @@ func (r *Registry) scripts(npcID int32, ev NPCEvent) []*Script {
 }
 
 // Behaves reports whether a behavior is bound to the NPC with id npcID, on
-// any event; a nil registry binds none. Until one is, the NPC keeps its
-// built-in stand-in reactions.
+// any event; a nil registry binds none.
 func (r *Registry) Behaves(npcID int32) bool {
-	return r != nil && r.behaves[npcID]
-}
-
-// ReactsToCreated reports whether a script, a behavior or not, reacts to
-// the creation of an NPC with id npcID; a nil registry binds none.
-func (r *Registry) ReactsToCreated(npcID int32) bool {
-	return len(r.scripts(npcID, EventCreated)) > 0
+	return r != nil && len(r.behaviors[npcID]) > 0
 }
 
 // behaviorOn reports whether s is a behavior left on any event list of the

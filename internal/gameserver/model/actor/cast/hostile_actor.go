@@ -42,15 +42,15 @@ func (a HostileActor) HP() int {
 // overridden per Player/Npc.
 // Unlike PlayerActor, there is no Dance/song surcharge: Bard/Warsmith dance
 // skills are never cast by a hostile NPC caster.
-func (a HostileActor) MPInitialCost(def modelskill.Definition) int {
+func (a HostileActor) MPInitialCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPInitialConsume)
 }
 
-func (a HostileActor) MPCost(def modelskill.Definition) int {
+func (a HostileActor) MPCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPConsume)
 }
 
-func (a HostileActor) scaleMP(def modelskill.Definition, mp int) int {
+func (a HostileActor) scaleMP(def *modelskill.Definition, mp int) int {
 	if a.Hostile == nil {
 		return mp
 	}
@@ -107,9 +107,9 @@ func (a HostileActor) SpiritshotCharged() bool {
 func (a HostileActor) BlessedSpiritshotCharged() bool {
 	return a.Hostile != nil && a.Hostile.BlessedSpiritshotCharged()
 }
-func (HostileActor) SkillMastery(modelskill.Definition) bool { return false }
-func (HostileActor) ItemCount(int) int                       { return 0 }
-func (HostileActor) ConsumeItem(int, int) bool               { return false }
+func (HostileActor) SkillMastery(*modelskill.Definition) bool { return false }
+func (HostileActor) ItemCount(int) int                        { return 0 }
+func (HostileActor) ConsumeItem(int, int) bool                { return false }
 
 // HostileActor casters hold no cubics, ground signet, skill lock or charges.
 func (HostileActor) ExitSignetGround()             {}
@@ -126,3 +126,6 @@ func (a HostileActor) HeldItemTypeMask() int32 {
 	}
 	return a.Hostile.HeldItemTypeMask()
 }
+
+// npcCaster gives a hostile NPC's casts the NPC finish timing.
+func (HostileActor) npcCaster() {}

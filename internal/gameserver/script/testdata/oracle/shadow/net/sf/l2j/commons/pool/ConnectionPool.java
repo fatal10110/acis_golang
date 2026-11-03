@@ -63,7 +63,7 @@ public final class ConnectionPool
 		}
 	}
 	
-	private static final Pattern CREATE = Pattern.compile("CREATE TABLE[^`]*`(\\w+)`\\s*\\((.*?)\\n\\)", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+	private static final Pattern CREATE = Pattern.compile("CREATE TABLE(?:\\s+IF NOT EXISTS)?\\s+`?(\\w+)`?\\s*\\((.*?)\\n\\)", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 	private static final Pattern COLUMN = Pattern.compile("^\\s*`(\\w+)`", Pattern.MULTILINE);
 	private static final Pattern INSERT = Pattern.compile("INSERT[^`]*`(\\w+)`\\s*VALUES(.*?);", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 	
@@ -78,6 +78,7 @@ public final class ConnectionPool
 			while (col.find())
 				cols.add(col.group(1).toLowerCase());
 			columns.put(c.group(1).toLowerCase(), cols);
+			ProbeStore.schema(c.group(1).toLowerCase(), c.group(2));
 		}
 		final Matcher m = INSERT.matcher(sql);
 		while (m.find())
@@ -191,7 +192,7 @@ public final class ConnectionPool
 	private static Object statement(String sql, Class<?> type)
 	{
 		final TreeMap<Integer, Object> params = new TreeMap<>();
-		final List<String> batch = new ArrayList<>();
+		final List<Object[]> batch = new ArrayList<>();
 		final InvocationHandler h = (proxy, m, args) ->
 		{
 			final String name = m.getName();
@@ -206,19 +207,41 @@ public final class ConnectionPool
 					params.clear();
 					return null;
 				case "addBatch":
-					batch.add(render(args != null && args.length == 1 ? (String) args[0] : sql, params));
+					final String batched = args != null && args.length == 1 ? (String) args[0] : sql;
+					batch.add(new Object[]
+					{
+						batched,
+						new ArrayList<>(params.values()),
+						render(batched, params)
+					});
 					return null;
 				case "executeBatch":
-					batch.forEach(ConnectionPool::report);
 					final int[] counts = new int[batch.size()];
+					for (int b = 0; b < batch.size(); b++)
+					{
+						final Object[] e = batch.get(b);
+						report((String) e[2]);
+						@SuppressWarnings("unchecked")
+						final ProbeStore.Result r = ProbeStore.run((String) e[0], (List<Object>) e[1]);
+						counts[b] = r == null ? 0 : r.count();
+					}
 					batch.clear();
 					return counts;
 				case "executeQuery":
 					final String query = args != null && args.length >= 1 ? (String) args[0] : sql;
 					report(render(query, params));
-					return resultSet(rowsFor(query));
+					final ProbeStore.Result kept = ProbeStore.run(query, new ArrayList<>(params.values()));
+					return resultSet(kept != null ? kept.rows() : rowsFor(query));
 				case "executeUpdate", "execute", "executeLargeUpdate":
-					report(render(args != null && args.length >= 1 ? (String) args[0] : sql, params));
+					final String update = args != null && args.length >= 1 ? (String) args[0] : sql;
+					report(render(update, params));
+					final ProbeStore.Result done = ProbeStore.run(update, new ArrayList<>(params.values()));
+					if (done != null && done.rows() != null)
+						return name.equals("execute") ? Boolean.TRUE : zero(m.getReturnType());
+					if (done != null && m.getReturnType() == int.class)
+						return done.count();
+					if (done != null && m.getReturnType() == long.class)
+						return (long) done.count();
 					return zero(m.getReturnType());
 				case "getGeneratedKeys", "getResultSet":
 					return resultSet(List.of());
@@ -237,6 +260,38 @@ public final class ConnectionPool
 		{
 			iface
 		}, h);
+	}
+
+	/**
+	 * Keeps the rows of tables from now on: their statements change and read them, as a database
+	 * would (see {@link ProbeStore}), until {@link #forget}.
+	 */
+	public static void keep(String... tables)
+	{
+		ProbeStore.keep(tables);
+	}
+
+	/**
+	 * Drops the kept rows and stops keeping any; returns each statement on a kept table the store
+	 * could not run since {@link #keep}, which the caller fails on.
+	 */
+	public static List<String> forget()
+	{
+		return ProbeStore.forget();
+	}
+
+	/** Runs sql with params against the kept rows only, unreported: the probe's own setup writes. */
+	public static void apply(String sql, Object... params)
+	{
+		try
+		{
+			if (ProbeStore.run(sql, List.of(params)) == null)
+				throw new IllegalStateException("not a statement on a kept table: " + sql);
+		}
+		catch (java.sql.SQLException e)
+		{
+			throw new IllegalStateException(e.getMessage(), e);
+		}
 	}
 
 	private static String render(String sql, TreeMap<Integer, Object> params)

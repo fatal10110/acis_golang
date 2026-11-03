@@ -40,6 +40,7 @@ func statusRow(t *testing.T, db *sql.DB) (cycle int, period string, date int64) 
 // welcome message, and a calendar with no overdue change leaves the status
 // row untouched.
 func TestEnterWorldBurstCarriesCurrentPeriodMessage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 
 	frames := startInWorld(t, srv.Client)
@@ -56,6 +57,7 @@ func TestEnterWorldBurstCarriesCurrentPeriodMessage(t *testing.T) {
 // the status row advances and is re-stamped, and a client entering afterwards
 // hears the new period's announcement.
 func TestBootCatchesUpOverduePeriodAndReportsItOnEntry(t *testing.T) {
+	t.Parallel()
 	staleSave := time.Now().Add(-time.Hour)
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),

@@ -143,12 +143,12 @@ func TestInFlightItemWriteCannotRevertAnOwnershipTransfer(t *testing.T) {
 	const objectID int32 = 5100
 	const count = 100
 	blocking := &blockingItemStore{
-		itemStore: link.items,
+		itemStore: link.belongings.items,
 		objectID:  objectID,
 		entered:   make(chan struct{}),
 		release:   make(chan struct{}),
 	}
-	link.items = blocking
+	link.belongings.items = blocking
 
 	adena := first.Inventory().AddNew(item.AdenaID, count, objectID)
 	first.Inventory().DrainUpdates()

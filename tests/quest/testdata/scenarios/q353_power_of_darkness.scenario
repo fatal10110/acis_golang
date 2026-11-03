@@ -1,0 +1,104 @@
+# Power of Darkness (Q353): a level 55 character accepts at Galman through his pages; Galman has
+# no stones to buy; two Malruk succubi give a stone each (every roll pinned to succeed); Galman buys
+# them; then the character quits at Galman and the quest ends; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q353_power_of_darkness.golden
+character Galman 55
+random always 0
+script quest.Q353_PowerOfDarkness
+item 57 5862
+page merchant/31044.htm
+page script/quest/Q353_PowerOfDarkness/
+npc galman 31044 Merchant 10 0 0
+npc succubus 20244 Monster 40 0 0
+
+# Galman: accept through 31044-03.
+action galman
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+bypass npc_{galman}_Quest
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q353_PowerOfDarkness 31044-03.htm
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-03.htm
+  S ActionFailed
+bypass Quest Q353_PowerOfDarkness 31044-04.htm
+  S QuestList 353:0x80000001
+  S ExShowQuestMark quest=353
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-04.htm
+  S ActionFailed
+  Q upsert Q353_PowerOfDarkness | <state> | STARTED
+  Q upsert Q353_PowerOfDarkness | <cond> | 1
+  rows Q353_PowerOfDarkness <cond>=1 <state>=STARTED
+  state Q353_PowerOfDarkness STARTED
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+bypass npc_{galman}_Quest
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two succubi: a stone each.
+kill succubus x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5862
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5862
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5862=2
+
+# Galman buys the stones.
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+bypass npc_{galman}_Quest
+  S SystemMessage id=301 3:5862 6:2
+  S SystemMessage id=52 6:2960
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 5862=0 57=2960
+bypass Quest Q353_PowerOfDarkness 31044-07.htm
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-07.htm
+  S ActionFailed
+
+# Galman: the character quits.
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+bypass npc_{galman}_Quest
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q353_PowerOfDarkness 31044-08.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-08.htm
+  S ActionFailed
+  Q delete-quest Q353_PowerOfDarkness
+  state Q353_PowerOfDarkness -
+  rows Q353_PowerOfDarkness -
+relog
+  rows Q353_PowerOfDarkness -
+  items 57=2960

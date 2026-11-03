@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -38,6 +39,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/shutdown"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -122,6 +124,8 @@ func provideGameClientLink(
 	effectEnv effect.Env,
 	gameplay gameplayConfig,
 	rewards manager.KillRewardConfig,
+	events *script.EventBook,
+	questRates *script.RateBook,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	worker *persist.Worker,
@@ -141,69 +145,53 @@ func provideGameClientLink(
 	lotteryState *lottery.Lottery,
 	fishChamp *fishchamp.Championship,
 	derbyTrack *derby.Track,
+	fleet *boat.Fleet,
 	hallFunctions *clanhall.Functions,
 	halls *clanhall.Halls,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	reloads network.DataReloads,
+	bossZones *gamesql.BossZoneStore,
+	loginStatus *network.LoginStatus,
+	countdown *shutdown.Countdown,
 	chatLog chatLogger,
+	itemLog itemLogger,
 ) (*network.GameClientLink, error) {
-	enchantCfg := gameplay.Enchant
-	freightCfg := gameplay.Freight
-	playerConfig := network.PlayerConfig{
-		Enchant:                    &enchantCfg,
-		RespawnRestoreHP:           float64(gameplay.RespawnRestoreHP),
-		DeathPenaltyChance:         int(gameplay.DeathPenaltyChance),
-		MaxBuffsAmount:             int(gameplay.MaxBuffsAmount),
-		MagicFailures:              bool(gameplay.MagicFailures),
-		PerfectShieldBlockRate:     int(gameplay.PerfectShieldBlockRate),
-		SpawnProtection:            time.Duration(gameplay.SpawnProtection),
-		SkillEnchantSPBookNeeded:   bool(gameplay.SkillEnchantSPBookNeeded),
-		AutoLearnSkills:            bool(gameplay.AutoLearnSkills),
-		WeightLimitMultiplier:      float64(gameplay.WeightLimitMultiplier),
-		InventorySlots:             gameplay.InventorySlots,
-		StorageSlots:               gameplay.StorageSlots,
-		Freight:                    &freightCfg,
-		KarmaPlayerCanTeleport:     bool(gameplay.KarmaPlayerCanTeleport),
-		KarmaPlayerCanShop:         gameplay.KarmaServiceGates.CanShop,
-		KarmaPlayerCanUseGK:        gameplay.KarmaServiceGates.CanUseGK,
-		KarmaPlayerCanUseWareHouse: gameplay.KarmaServiceGates.CanUseWareHouse,
-		KarmaPlayerCanTrade:        bool(gameplay.KarmaPlayerCanTrade),
-		AwardPKKillPVPPoint:        pvpOptions.AwardPKKillPVPPoint,
-		AllowWater:                 cfg.AllowWater,
-		EnableFallingDamage:        cfg.EnableFallingDamage,
-		AllowDelevel:               bool(gameplay.AllowDelevel),
-		RateKarmaExpLost:           float64(gameplay.RateKarmaExpLost),
-		DeathDrop:                  gameplay.DeathDrop,
-		CharacterSelectDelay:       time.Duration(gameplay.CharacterSelectDelay),
-		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
-		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
-		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
-		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
-		RollDiceDelay:              time.Duration(gameplay.RollDiceDelay),
-		SubclassDelay:              time.Duration(gameplay.SubclassDelay),
-		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
-		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
-		DiscardItemDisabled:        !bool(gameplay.AllowDiscardItem),
-		GMStartupUnlisted:          !gameplay.Admin.GMStartupAutoList,
-		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
-		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
-		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
-		GMHeroAura:                 gameplay.Admin.GMHeroAura,
-		PartyRange:                 rewards.PartyRange,
-	}
+	playerConfig := newPlayerConfig(cfg, gameplay, pvpOptions)
 	network.SetOutboundRejectLog(log)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
-		Validator:     validator,
+		Flow: network.CharacterFlowConfig{
+			Validator:   validator,
+			NoCipher:    !cfg.UseBlowfishCipher,
+			PlayerClock: playerClock,
+			Autosave:    autosave,
+		},
+		Belongings: network.BelongingsConfig{
+			Items:            items,
+			Shortcuts:        shortcuts,
+			Hennas:           hennas,
+			HennaTable:       data.Hennas,
+			RecipeBooks:      recipeBooks,
+			GroundItems:      ground,
+			InventoryUpdates: inventoryUpdates,
+			ItemInstances:    itemInstances,
+		},
+		Combat: network.CombatConfig{
+			AttackStance: attackStance,
+			AI:           ai,
+			PvPFlags:     pvpFlags,
+			HealSps:      data.HealSps,
+		},
+		Summoning: network.SummoningConfig{
+			Items:  data.SummonItems,
+			Store:  petStore,
+			Config: petCfg,
+			Decay:  decay,
+		},
+		Enchanting:    network.EnchantingConfig{ArmorSets: data.ArmorSets},
 		Effects:       effectEnv,
-		NoCipher:      !cfg.UseBlowfishCipher,
 		LoginLink:     links.get,
 		Roster:        roster,
-		Items:         items,
-		Shortcuts:     shortcuts,
-		Hennas:        hennas,
-		HennaTable:    data.Hennas,
-		RecipeBooks:   recipeBooks,
 		Subclasses:    subclasses,
 		Recipes:       data.Recipes,
 		Merchant:      shops,
@@ -215,25 +203,16 @@ func provideGameClientLink(
 		Skills:        skills,
 		Spellbooks:    spellbooks,
 		SkillTrees:    data.Trees,
-		HealSps:       data.HealSps,
 		CursedWeapons: data.CursedWeapons,
 		CursedRuntime: cursedWeapons,
 		World:         state,
 		NPCs:          data.NPCs,
-		SummonItems:   data.SummonItems,
 		Doors:         worldObjects,
-		PetStore:      petStore,
 		Geo:           move.NewGeo(data.Geo, data.Finder),
 		Zones:         data.Zones,
 		IDs:           ids,
 		Fences:        fence.NewManager(data.Geo, state, ids),
-		GroundItems:   ground,
-		AttackStance:  attackStance,
-		AI:            ai,
-		PvPFlags:      pvpFlags,
-		Decay:         decay,
 		Positions:     positions,
-		PlayerClock:   playerClock,
 		GameClock:     gameClock,
 		SevenSigns:    sevenSigns,
 		Festival:      fest,
@@ -243,20 +222,18 @@ func provideGameClientLink(
 		RaidPoints:    raidPoints,
 		Water:         water,
 		ShadowItems:   shadowItems,
-		Autosave:      autosave,
 
-		InventoryUpdates: inventoryUpdates,
-		ItemInstances:    itemInstances,
-		Persist:          worker,
-		ItemWrites:       itemWrites,
-		Queues:           pool,
-		Restarts:         data.Restarts,
-		ClanHallData:     data.ClanHalls,
-		CastleData:       data.Castles,
-		Observers:        data.Observers,
-		Levels:           data.Levels,
-		Admin:            data.Admin,
-		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),
+		Persist:      worker,
+		ItemWrites:   itemWrites,
+		Queues:       pool,
+		Restarts:     data.Restarts,
+		ClanHallData: data.ClanHalls,
+		CastleData:   data.Castles,
+		Observers:    data.Observers,
+		Levels:       data.Levels,
+		Admin:        data.Admin,
+		GMAudit:      gmAudit.enabled(gameplay.Admin.GMAudit),
+		ItemLog:      itemLog.enabled(bool(gameplay.LogItems)),
 		Chat: network.ChatConfig{
 			Log:              chatLog.enabled(gameplay.Chat.LogChat),
 			WalkerProtection: gameplay.Chat.WalkerProtection,
@@ -265,8 +242,10 @@ func provideGameClientLink(
 			HeroVoiceDelay:   gameplay.Chat.HeroVoiceDelay,
 		},
 		PlayerConfig:     playerConfig,
-		PetConfig:        petCfg,
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
+		ShowNPCCrest:     bool(gameplay.ShowNPCCrest),
+		ShowSummonCrest:  bool(gameplay.ShowSummonCrest),
+		Wyvern:           &gameplay.Wyvern,
 		Macros:           macros,
 		Recommendations:  recommendations,
 		Quests:           quests,
@@ -281,7 +260,6 @@ func provideGameClientLink(
 
 		Augmentations:       data.Augmentations,
 		AugmentationChances: gameplay.AugmentationChances,
-		ArmorSets:           data.ArmorSets,
 		Manor:               manorConfig(gameplay.Manor, data),
 		Fish:                data.Fish,
 
@@ -307,11 +285,19 @@ func provideGameClientLink(
 		Lottery:             lotteryState,
 		FishingChampionship: fishChamp,
 		Derby:               derbyTrack,
+		Boats:               fleet,
 
 		ClanHallFunctions: hallFunctions,
 		ClanHalls:         halls,
 
-		Reloads: reloads,
+		Reloads:     reloads,
+		KillRewards: rewards.Settings,
+		Events:      events,
+		QuestRates:  questRates,
+		BossZones:   bossZones,
+
+		Shutdown:    countdown,
+		LoginStatus: loginStatus,
 	})
 	if err != nil {
 		return nil, err
@@ -319,6 +305,7 @@ func provideGameClientLink(
 	if effects != nil {
 		effects.SetShadowItemExpiry(link.ExpireShadowItem)
 	}
+	worldObjects.SetRegenSettings(link.PlayerRules())
 	return link, nil
 }
 
@@ -385,7 +372,7 @@ func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, 
 	})
 }
 
-func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {
+func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, status *network.LoginStatus, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 	lc.Append(fx.Hook{
@@ -396,10 +383,12 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				network.Maintain(runCtx, cfg.LoginAddr, cfg.Auth, network.LoginLinkHandlers{
+				auth := func() network.LoginServerAuth { return status.Auth(cfg.Auth) }
+				network.Maintain(runCtx, cfg.LoginAddr, auth, network.LoginLinkHandlers{
 					PlayerAuthResponse: playerAuthResponseHandler(links, validator, log),
 				}, network.DefaultReconnectDelay, func(link *network.LoginLink) {
 					links.set(link)
+					status.Registered(link.ServerName)
 					if accounts := onlineAccounts(state); len(accounts) > 0 {
 						if err := link.SendPlayerInGame(accounts); err != nil {
 							log.Error().Err(err).Int("accounts", len(accounts)).Msg("send online roster to loginserver")
@@ -447,4 +436,61 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			}
 		},
 	})
+}
+
+// newPlayerConfig gathers the settings the game client link reads at each
+// use from the server and players properties, at boot and on
+// //reload config.
+func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, pvpOptions task.PvPFlagOptions) network.PlayerConfig {
+	enchantCfg := gameplay.Enchant
+	freightCfg := gameplay.Freight
+	return network.PlayerConfig{
+		Enchant:                    &enchantCfg,
+		RespawnRestoreHP:           float64(gameplay.RespawnRestoreHP),
+		DeathPenaltyChance:         int(gameplay.DeathPenaltyChance),
+		MaxBuffsAmount:             int(gameplay.MaxBuffsAmount),
+		ShowNPCLevel:               bool(gameplay.ShowNPCLevel),
+		MagicFailures:              bool(gameplay.MagicFailures),
+		PerfectShieldBlockRate:     int(gameplay.PerfectShieldBlockRate),
+		SpawnProtection:            time.Duration(gameplay.SpawnProtection),
+		SkillEnchantSPBookNeeded:   bool(gameplay.SkillEnchantSPBookNeeded),
+		AutoLearnSkills:            bool(gameplay.AutoLearnSkills),
+		WeightLimitMultiplier:      float64(gameplay.WeightLimitMultiplier),
+		InventorySlots:             gameplay.InventorySlots,
+		Regen:                      gameplay.RegenMultipliers,
+		StorageSlots:               gameplay.StorageSlots,
+		Freight:                    &freightCfg,
+		KarmaPlayerCanTeleport:     bool(gameplay.KarmaPlayerCanTeleport),
+		KarmaPlayerCanShop:         gameplay.KarmaServiceGates.CanShop,
+		KarmaPlayerCanUseGK:        gameplay.KarmaServiceGates.CanUseGK,
+		KarmaPlayerCanUseWareHouse: gameplay.KarmaServiceGates.CanUseWareHouse,
+		KarmaPlayerCanTrade:        bool(gameplay.KarmaPlayerCanTrade),
+		AwardPKKillPVPPoint:        pvpOptions.AwardPKKillPVPPoint,
+		AllowWater:                 cfg.AllowWater,
+		EnableFallingDamage:        cfg.EnableFallingDamage,
+		AllowDelevel:               bool(gameplay.AllowDelevel),
+		RateKarmaExpLost:           float64(gameplay.RateKarmaExpLost),
+		DeathDrop:                  gameplay.DeathDrop,
+		CharacterSelectDelay:       time.Duration(gameplay.CharacterSelectDelay),
+		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
+		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
+		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
+		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
+		ManorDelay:                 time.Duration(gameplay.ManorDelay),
+		RollDiceDelay:              time.Duration(gameplay.RollDiceDelay),
+		SocialDelay:                time.Duration(gameplay.SocialDelay),
+		DropItemDelay:              time.Duration(gameplay.DropItemDelay),
+		WarehouseDisabled:          !bool(gameplay.WarehouseAllowed),
+		FakeDeathUpProtection:      time.Duration(gameplay.FakeDeathUpProtection),
+		SubclassDelay:              time.Duration(gameplay.SubclassDelay),
+		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
+		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
+		DiscardItemDisabled:        !bool(gameplay.AllowDiscardItem),
+		GMStartupUnlisted:          !gameplay.Admin.GMStartupAutoList,
+		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
+		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
+		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
+		GMHeroAura:                 gameplay.Admin.GMHeroAura,
+		DefaultAccessLevel:         gameplay.Admin.DefaultAccessLevel,
+	}
 }

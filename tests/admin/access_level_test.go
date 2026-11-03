@@ -386,8 +386,8 @@ func TestSelectionRereadsBan(t *testing.T) {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	c.Send(w.Bytes())
-	if f := c.ReadWithTimeout(500 * time.Millisecond); f != nil {
-		t.Fatalf("selection of a banned character answered %#x, want nothing", f[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("selection of a banned character answered %#x, want nothing", queued[0][0])
 	}
 }
 

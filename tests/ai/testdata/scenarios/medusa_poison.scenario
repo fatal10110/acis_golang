@@ -1,0 +1,21 @@
+# Medusa (20158), every draw 0: her attacked hook reads her hit points before the hit lowers
+# them. The first hit (850 of her 1000) finds her at full hit points and hating no one, so only
+# her parent's attacked hook answers it. The second finds her at 150 (15%, under a fifth), hit
+# by the creature she hates most: she calls out (NpcString 1000452). She also asks for her
+# fatal poison (4320-3) on the character, which the scenario's skill table does not hold, so no
+# cast desire is queued here; tests/ai/warrior_individual1c_test.go checks that desire.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa
+npc medusa 20158 Monster 40 0 0
+
+hit medusa 360
+  desires medusa attack(player)=4500
+hit medusa 10
+  S NpcSay obj=medusa type=0 npc=1020158 text="It's a good day to die! Welcome to hell, maggot!"
+  desires medusa attack(player)=4625

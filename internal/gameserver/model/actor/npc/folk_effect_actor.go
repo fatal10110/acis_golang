@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -15,8 +16,18 @@ import (
 // EffectList returns the buffs and debuffs the NPC holds.
 func (f *Folk) EffectList() *effect.List { return f.effects }
 
-// Paralyzed reports whether an effect paralyzes the NPC.
-func (f *Folk) Paralyzed() bool { return f.effects.IsAffected(effect.FlagParalyzed) }
+// Paralyzed reports whether the NPC is paralyzed, by its transient lock
+// (SetParalyzed) or by an effect. No paralyzing effect lands on a civilian
+// NPC, so in practice only the lock holds one.
+func (f *Folk) Paralyzed() bool {
+	return f.paralyzed.Load() || f.effects.IsAffected(effect.FlagParalyzed)
+}
+
+// SetParalyzed sets or clears the NPC's transient paralysis lock and
+// reports whether it changed. While it holds, the NPC neither moves,
+// attacks, acts on its desires nor uses a skill while any of its skills
+// waits for its reuse.
+func (f *Folk) SetParalyzed(v bool) bool { return f.paralyzed.CompareAndSwap(!v, v) }
 
 // Afraid reports whether an effect fears the NPC.
 func (f *Folk) Afraid() bool { return f.effects.IsAffected(effect.FlagFear) }
@@ -39,17 +50,20 @@ func (f *Folk) AddChanceTrigger(e *effect.Effect) { f.effects.AddChanceTrigger(e
 // RemoveChanceTrigger drops an exiting chance-skill trigger.
 func (f *Folk) RemoveChanceTrigger(e *effect.Effect) { f.effects.RemoveChanceTrigger(e) }
 
-// AbortAll stops the NPC's cast in flight.
-func (f *Folk) AbortAll(bool) { f.StopCast() }
+// AbortAll stops the NPC's walk, its swing in flight and its cast in
+// flight. The NPC keeps no selected target to reset.
+func (f *Folk) AbortAll(bool) { f.abortAll() }
 
-// The NPC keeps no attack or selected target, and the effects that stop,
-// redirect, frighten, bluff or throw a creature never land on it, so the
-// hooks below that only those reach do nothing. FearImmune and BluffExempt
-// report the civilian NPC's own immunity.
+// StopAttack aborts the NPC's swing in flight, if any.
+func (f *Folk) StopAttack() { f.stopAttack() }
+
+// The NPC keeps no selected target, and the effects that stop, redirect,
+// frighten, bluff or throw a creature never land on it, so the hooks below
+// that only those reach do nothing. FearImmune and BluffExempt report the
+// civilian NPC's own immunity.
 func (f *Folk) StopMove()                                  {}
 func (f *Folk) TryToIdle()                                 {}
 func (f *Folk) ClearTarget()                               {}
-func (f *Folk) StopAttack()                                {}
 func (f *Folk) FearImmune() bool                           { return true }
 func (f *Folk) FleeFrom(effect.Actor, int)                 {}
 func (f *Folk) BluffExempt() bool                          { return true }
@@ -69,14 +83,14 @@ func (f *Folk) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 // outside movement.
 func (f *Folk) SetXYZ(x, y, z int) {
 	if f.world != nil {
-		px, py, pz := f.Position()
 		_ = f.world.Move(f, x, y, z)
-		f.zones.place(location.Location{X: px, Y: py, Z: pz})
+		f.zones.place()
 	}
 }
 
-// A civilian NPC keeps no hate, aggro or overhit state: the aggro controls
-// act only on an attackable NPC.
+// The skills and effects that reach these aggro and overhit controls act
+// only on an attackable NPC's lists, so they do nothing here: a civilian
+// NPC's aggro list is its AI's alone (see folk_fight.go).
 func (f *Folk) NotifyAggression(attackable.Combatant, int) {}
 func (f *Folk) ReduceAllAggroHate(float64)                 {}
 func (f *Folk) StopAggroHate(attackable.Combatant)         {}
@@ -107,7 +121,7 @@ func (f *Folk) SkillReflectInput(def modelskill.Definition) formulas.SkillReflec
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  f.CalcStat(reflectStat, 0),
+		ReflectChance:  f.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
 	}
 }
 
@@ -126,7 +140,8 @@ func (f *Folk) RaceMultiplier(attacker creature.FormulaActor) float64 {
 	if !ok {
 		return 1
 	}
-	return 1 + ((attacker.CalcStat(atk, 1) - f.CalcStat(res, 1)) / 100)
+	self := f.ConditionActor()
+	return 1 + ((attacker.Against(self, nil).CalcStat(atk, 1) - f.calcFor(res, 1, self, nil)) / 100)
 }
 
 // PhysicalSkillInput resolves a physical skill's damage against the NPC.
@@ -150,7 +165,9 @@ func (f *Folk) ManaDamageInput(caster creature.FormulaActor, def modelskill.Defi
 }
 
 // CounterSkillPhysical returns the NPC's physical skill counter rate.
-func (f *Folk) CounterSkillPhysical() float64 { return f.CalcStat(stat.CounterSkillPhysical, 0) }
+func (f *Folk) CounterSkillPhysical() float64 {
+	return f.calcFor(stat.CounterSkillPhysical, 0, f.ConditionActor(), nil)
+}
 
 // LethalInput resolves a lethal-strike roll against the NPC.
 func (f *Folk) LethalInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.LethalInput, bool) {
@@ -163,7 +180,7 @@ func (f *Folk) LethalInput(caster creature.FormulaActor, def modelskill.Definiti
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: caster.Level(),
 		TargetLevel:   f.Level(),
-		LethalMul:     caster.LethalRate(),
+		LethalMul:     caster.Against(f.ConditionActor(), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 
@@ -177,9 +194,9 @@ func (f *Folk) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attacka
 	}
 }
 
-// Lethalable reports true: the lethal-strike exemptions are attackable
-// NPCs, doors and siege flags.
-func (f *Folk) Lethalable() bool { return true }
+// Lethalable reports whether a lethal strike can land on the NPC: on any
+// civilian NPC but a siege headquarters.
+func (f *Folk) Lethalable() bool { return !f.SiegeFlag() }
 
 // SpoilPool reports none: a civilian NPC has nothing to sweep.
 func (f *Folk) SpoilPool() *item.SpoilPool { return nil }

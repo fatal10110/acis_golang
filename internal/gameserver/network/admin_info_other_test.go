@@ -27,7 +27,7 @@ func TestAdminInfoOtherSelectionClearsBypasses(t *testing.T) {
 	gm.StoreTarget(ground)
 	sent := len(capture.Frames())
 
-	(&GameClientLink{}).adminInfo(gm, "admin_info")
+	newBareGameClientLink(t, GameClientLinkConfig{}).adminInfo(gm, "admin_info")
 
 	frames := capture.Frames()[sent:]
 	testsupport.AssertOpcodeSequence(t, frames, serverpackets.OpcodeNpcHtmlMessage)

@@ -1,0 +1,42 @@
+# Little Wing (Q420): Maria turns the deluxe list and its materials into the deluxe fairy stone.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_maria_deluxe.golden
+character Wing 35
+quest Q420_LittleWing <cond>=2 <state>=STARTED
+hold 3819 1
+hold 1870 10
+hold 1871 10
+hold 2131 1
+hold 1873 5
+hold 1875 1
+hold 3820 20
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page default/30608.htm
+page script/quest/Q420_LittleWing/
+npc maria 30608 Folk 10 0 0
+
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q420_LittleWing/30608-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q420_LittleWing 30608-05.htm
+  S SystemMessage id=301 3:1870 6:10
+  S SystemMessage id=301 3:1871 6:10
+  S SystemMessage id=302 3:2131
+  S SystemMessage id=302 3:1875
+  S SystemMessage id=301 3:1873 6:5
+  S SystemMessage id=301 3:3820 6:20
+  S SystemMessage id=302 3:3819
+  S SystemMessage id=54 3:3817
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q420_LittleWing/30608-05.htm
+  S ActionFailed
+  items 3817=1 3819=0 1870=0 1871=0 2131=0 1873=0 1875=0 3820=0
+
+  state Q420_LittleWing STARTED
+  rows Q420_LittleWing <cond>=2 <state>=STARTED

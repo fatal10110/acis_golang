@@ -1,0 +1,17 @@
+# WarriorCast3SkillsMagical (20610, Sentinel Of Water, level 31, its shipped DD magic), every draw
+# 0, 300 away from the character. Its first hit finds it hating no one, so it only takes the
+# Warrior's hate; the second, by the character it now hates most from farther than 100, also
+# wants its DD magic (4002) on the character, weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsMagical
+npc sentinel 20610 Monster 300 0 0 skill DD_MAGIC 4002 3
+
+hit sentinel 80
+  desires sentinel attack(player)=1000
+hit sentinel 80
+  desires sentinel attack(player)=2000 cast(player,4002,move)=1000000

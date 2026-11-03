@@ -1,0 +1,17 @@
+# WarriorPhysicalSpecialShotNoRange (22066, its shipped skills), every draw 0, 40 away from the
+# character. Its hit draws under 33 twice: it wants its physical special (4032) on the character,
+# which it casts at once, and its self range physical special (4232) on itself, weight 1000000 each,
+# beside the Warrior's hate.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRange
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotNoRange
+npc golem 22066 Monster 40 0 0 skill PHYSICAL_SPECIAL 4032 6 skill SELF_RANGE_PHYSICAL_SPECIAL 4232 5
+
+hit golem 22
+  S MagicSkillUse caster=golem target=player skill=4032-6 hit=1321 reuse=7928 success=0
+  desires golem attack(player)=275 cast(player,4032,move)=1000000 cast(player,4232,move)=1000000

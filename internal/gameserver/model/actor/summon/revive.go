@@ -14,10 +14,11 @@ import (
 // HP. Observers see the new status and the revive.
 //
 // A pet also closes its owner's pending resurrection offer, cancels its
-// corpse's decay and goes idle; its feeding and its regeneration resume, as
-// they skip only a dead pet, and a baby pet starts healing its owner again.
-// A servitor keeps its decay: at the deadline it leaves the world, alive
-// (Decay).
+// corpse's decay, starts eating again (its first meal a full period away),
+// runs unless it is hungry, and goes idle; its regeneration resumes, and a
+// baby pet starts healing its owner again. A servitor keeps its decay: at
+// the deadline it leaves the world, alive (Decay); its lifetime stays
+// stopped.
 //
 // A corpse its owner left behind revives too, on the queue of its own the
 // corpse moved to (AdoptCorpseQueue), and stays where it stood up, since its
@@ -107,6 +108,10 @@ func petRestoredExp(before, current int64, percent float64) int64 {
 func (a *Actor) revive() bool {
 	blessed := a.EffectList().IsAffected(effect.FlagPhoenixBlessing)
 	maxHP, maxMP := math.Floor(a.MaxHPValue()), math.Floor(a.MaxMPValue())
+	var restoreHP float64
+	if a.settings != nil {
+		restoreHP = a.settings.RespawnRestoreHP()
+	}
 	a.vitals.mu.Lock()
 	if !a.dead || a.decayed {
 		a.vitals.mu.Unlock()
@@ -117,7 +122,7 @@ func (a *Actor) revive() bool {
 	if blessed {
 		a.vitals.hp, a.vitals.mp = maxHP, maxMP
 	} else {
-		a.vitals.hp = min(maxHP*a.respawnRestoreHP, maxHP)
+		a.vitals.hp = min(maxHP*restoreHP, maxHP)
 	}
 	a.vitals.mu.Unlock()
 
@@ -135,6 +140,10 @@ func (a *Actor) revive() bool {
 	a.emit(event.Revived{})
 	if a.isPet {
 		a.CancelDecay()
+		a.startLifeTask()
+		if !a.Hungry() {
+			a.forceRunStance()
+		}
 		a.TryToIdle()
 		a.startBabyHeal()
 	}

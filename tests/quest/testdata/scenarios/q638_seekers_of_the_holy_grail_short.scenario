@@ -1,0 +1,22 @@
+# Seekers of the Holy Grail (Q638): a character short of two thousand totems is told to bring more.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q638_seekers_of_the_holy_grail_short.golden
+character Hero 73
+quest Q638_SeekersOfTheHolyGrail <cond>=1 <state>=STARTED
+hold 8068 1999
+script quest.Q638_SeekersOfTheHolyGrail
+item 8068 959 960 57
+page villagemaster/31328.htm
+page script/quest/Q638_SeekersOfTheHolyGrail/
+npc innocentin 31328 VillageMasterPriest 10 0 0
+
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q638_SeekersOfTheHolyGrail/31328-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 8068=1999

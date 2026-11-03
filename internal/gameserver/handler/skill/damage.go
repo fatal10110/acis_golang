@@ -5,7 +5,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -132,7 +134,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -153,7 +155,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		if damage > 0 {
 			if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), false, &result) {
 				target.ReduceHP(damage, cast.Caster, cast.Skill)
-				recordDamage(&result, cast.Caster, target, javaInt(damage), false, false)
+				recordDamage(&result, cast.Caster, target, truncDamage(damage), false, false)
 			}
 			applyLethalHit(cast, cast.Skill, target, &result)
 		} else {
@@ -162,8 +164,41 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
+	chargeCaster(cast)
+	killSuicideCaster(cast)
 	dischargeSoulshot(cast)
 	return result
+}
+
+// chargeCaster rushes a CHARGE skill's caster FlyRadius units toward the
+// first target, or along its own heading when the skill reached nobody,
+// stopping short of geodata. Observers see the flight from the old
+// position, then the landing position.
+func chargeCaster(cast Cast) {
+	if cast.Skill.Flight == nil || *cast.Skill.Flight != modelskill.FlightCharge {
+		return
+	}
+	caster := cast.Caster
+	x, y, z := caster.Position()
+	from := location.Location{X: x, Y: y, Z: z}
+	heading := caster.Heading()
+	if len(cast.Targets) > 0 && cast.Targets[0] != nil {
+		tx, ty, _ := cast.Targets[0].Position()
+		heading = from.HeadingTo(location.Location{X: tx, Y: ty})
+	}
+	point := location.OrientedLocation{Location: from, Heading: heading}.Ahead(cast.Skill.FlyRadius)
+	landing := caster.ValidLocation(x, y, z, point.X, point.Y, z)
+	caster.FlyTo(landing, modelskill.FlightCharge)
+	caster.SetXYZ(landing.X, landing.Y, landing.Z)
+	caster.BroadcastPosition()
+}
+
+// killSuicideCaster kills a suicide attack's caster by its own hand, once
+// the attack has gone off, whether or not it reached anyone.
+func killSuicideCaster(cast Cast) {
+	if cast.Skill.SuicideAttack {
+		cast.Caster.Kill(cast.Caster)
+	}
 }
 
 type chargeDamHandler struct{}
@@ -184,7 +219,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		modifier = .8 + .2*float64(caster.Charges()+cast.Skill.NumCharges)
 	}
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -206,7 +241,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		damage := formulas.PhysicalSkillDamage(in) * modifier
 		if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), false, &result) {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
-			recordDamage(&result, cast.Caster, target, javaInt(damage), false, false)
+			recordDamage(&result, cast.Caster, target, truncDamage(damage), false, false)
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -239,7 +274,7 @@ func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, resul
 
 // mdamHandler resolves MDAM/DEATHLINK; magicFailures is the server's
 // MagicFailures switch.
-type mdamHandler struct{ magicFailures bool }
+type mdamHandler struct{ magicFailures *magicFailureSwitch }
 
 func (mdamHandler) Types() []string { return []string{"MDAM", "DEATHLINK"} }
 
@@ -252,19 +287,20 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 	if alikeDead(cast.Caster) {
 		return result
 	}
+	failures := h.magicFailures.enabled()
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || target.Dead() {
 			continue
 		}
-		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, h.magicFailures)
+		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, failures)
 		if !ok {
 			continue
 		}
 		if in.Shield != formulas.ShieldPerfect {
 			reportMagicFailure(cast, target, in.Failure, &result)
 		}
-		damage := javaInt(formulas.MagicDamage(in))
+		damage := truncDamage(formulas.MagicDamage(in))
 		if damage > 0 {
 			// MDAM rolls the target's cast break, then reports the damage
 			// before applying it, unlike the physical handlers.
@@ -280,6 +316,7 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
+	killSuicideCaster(cast)
 	dischargeSpiritshot(cast)
 	return result
 }
@@ -291,6 +328,10 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 // already-resolved shield outcome for the landing roll.
 func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefense, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	if d, ok := asDoor(obj); ok {
+		rollDoorEffects(cast, d, bss, shield, 1, result) // id-only addSkillName overload: level 1
 		return
 	}
 	elt, ok := obj.(effect.Actor)
@@ -315,7 +356,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 
 // drainHandler resolves DRAIN: magic damage whose caster regains part of
 // the HP it drains. magicFailures is the server's MagicFailures switch.
-type drainHandler struct{ magicFailures bool }
+type drainHandler struct{ magicFailures *magicFailureSwitch }
 
 func (drainHandler) Types() []string { return []string{"DRAIN"} }
 
@@ -338,8 +379,9 @@ func (h drainHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	corpseMob := cast.Skill.Target == modelskill.TargetCorpseMob
+	failures := h.magicFailures.enabled()
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || (alikeDead(target) && !corpseMob) {
 			continue
 		}
@@ -347,14 +389,14 @@ func (h drainHandler) UseResult(cast Cast) Result {
 		if !sameObject(cast.Caster, target) && target.Invul() {
 			continue
 		}
-		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, h.magicFailures)
+		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, failures)
 		if !ok {
 			continue
 		}
 		if in.Shield != formulas.ShieldPerfect {
 			reportMagicFailure(cast, target, in.Failure, &result)
 		}
-		damage := javaInt(formulas.MagicDamage(in))
+		damage := truncDamage(formulas.MagicDamage(in))
 		if damage <= 0 {
 			continue
 		}
@@ -389,7 +431,7 @@ func (h drainHandler) UseResult(cast Cast) Result {
 // playable caster drains only what gets past a player target's CP; any
 // other drain is capped at the target's current HP. Both pools count in
 // whole points.
-func drainAbsorb(cast Cast, target Creature, damage int) float64 {
+func drainAbsorb(cast Cast, target damageTarget, damage int) float64 {
 	targetCP := 0
 	if p, ok := asPlayer(target); ok {
 		targetCP = int(p.CP())
@@ -417,6 +459,10 @@ func drainAbsorb(cast Cast, target Creature, damage int) float64 {
 // state gates it, and the effects land with neither.
 func applyDrainEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, bss bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	if d, ok := asDoor(obj); ok {
+		rollDoorEffects(cast, d, bss, shield, 1, result) // id-only addSkillName overload: level 1
 		return
 	}
 	elt, ok := obj.(effect.Actor)
@@ -453,7 +499,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || alikeDead(target) {
 			continue
 		}
@@ -480,7 +526,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 			// the damage report.
 			damage := 1.0
 			if in.Shield != formulas.ShieldPerfect {
-				damage = float64(commons.JavaInt(formulas.BlowDamage(in)))
+				damage = float64(commons.TruncInt32Sat(formulas.BlowDamage(in)))
 			}
 			if in.Crit {
 				damage *= 2
@@ -490,7 +536,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 				countered := applyPhysicalSkillCounter(cast, target, damage, counter, true, &result)
 				if !countered {
 					target.ReduceHP(damage, cast.Caster, cast.Skill)
-					recordDamage(&result, cast.Caster, target, javaInt(damage), false, true)
+					recordDamage(&result, cast.Caster, target, truncDamage(damage), false, true)
 				}
 			}
 			dischargeSoulshot(cast)
@@ -506,7 +552,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 // applyPhysicalSkillCounter turns a countered physical skill back onto its
 // caster: the counter notices, the caster's HP loss, then the countering
 // target's damage feedback, which carries the skill's physical-critical flag.
-func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float64, pcrit bool, result *Result) bool {
+func applyPhysicalSkillCounter(cast Cast, target damageTarget, damage, counter float64, pcrit bool, result *Result) bool {
 	if !counterSkillReflects(cast.Skill, counter) {
 		return false
 	}
@@ -522,7 +568,7 @@ func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float
 	if cast.Caster != nil {
 		damage *= counter / 100
 		cast.Caster.ReduceHP(damage, target, cast.Skill)
-		recordDamage(result, target, cast.Caster, javaInt(damage), false, pcrit)
+		recordDamage(result, target, cast.Caster, truncDamage(damage), false, pcrit)
 	}
 	return true
 }
@@ -532,10 +578,10 @@ type damageSummon interface {
 	IsPet() bool
 }
 
-// javaInt narrows a damage amount to the int32 a damage report carries: a
+// truncDamage narrows a damage amount to the int32 a damage report carries: a
 // zero-defence hit's +Inf saturates and a NaN reports 0.
-func javaInt(damage float64) int {
-	return int(commons.JavaInt(damage))
+func truncDamage(damage float64) int {
+	return int(commons.TruncInt32Sat(damage))
 }
 
 // recordDamage records attacker's damage feedback against target at its
@@ -545,7 +591,7 @@ func recordDamage(result *Result, attacker, target Actor, amount int, mcrit, pcr
 	if result == nil || attacker == nil || target == nil {
 		return
 	}
-	m := Damage{Amount: int32(amount), MagicCrit: mcrit, PhysicalCrit: pcrit}
+	m := Damage{TargetID: target.ObjectID(), Amount: int32(amount), MagicCrit: mcrit, PhysicalCrit: pcrit}
 	switch attacker.Kind() {
 	case actor.KindPlayer:
 		m.RecipientID = attacker.ObjectID()
@@ -575,9 +621,14 @@ func counterattackObjectID(obj Actor) int32 {
 	return obj.ObjectID()
 }
 
+// actorName is the name a client message shows for obj: a door's, or a
+// creature's; a signet effect point has none.
 func actorName(obj Actor) string {
-	if target, ok := asEffected(obj); ok {
-		return target.CharacterName()
+	if d, ok := asDoor(obj); ok {
+		return d.CharacterName()
+	}
+	if e, ok := asEffected(obj); ok {
+		return e.CharacterName()
 	}
 	return ""
 }
@@ -646,7 +697,7 @@ func deliverDamage(caster Creature, target Actor, amount int, mcrit bool) {
 	recordDamage(&result, caster, target, amount, mcrit, false)
 	for _, m := range result.Messages {
 		if d, ok := m.(Damage); ok {
-			n.NotifySkillDamage(int(d.Amount), d.MagicCrit, d.Blocked, d.Petrified)
+			n.NotifySkillDamage(d.TargetID, int(d.Amount), d.MagicCrit, d.Blocked, d.Petrified)
 		}
 	}
 }
@@ -697,6 +748,10 @@ func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, count
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
+	if d, ok := asDoor(obj); ok {
+		rollDoorEffects(cast, d, true, shield, cast.Skill.Level, result)
+		return
+	}
 	elt, ok := obj.(effect.Actor)
 	if !ok {
 		return
@@ -715,6 +770,10 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
+	if d, ok := asDoor(obj); ok {
+		rollDoorEffects(cast, d, true, shield, cast.Skill.Level, result)
+		return
+	}
 	elt, ok := obj.(effect.Actor)
 	if !ok {
 		return
@@ -724,6 +783,16 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 		return
 	}
 	landRolledDamageEffects(cast, elt, shield, result)
+}
+
+// rollDoorEffects is a damage skill's effect step on door d: d never
+// reflects, and the landing roll runs as on a creature, a failure reporting
+// the resist at level, but a success lands nothing, since a door holds no
+// effects.
+func rollDoorEffects(cast Cast, d *door.Object, bss bool, shield formulas.ShieldDefense, level int, result *Result) {
+	if succeeded, ok := doorLands(cast.Caster, d, cast.Skill, bss, shield); ok && !succeeded {
+		appendResisted(result, d, cast.Skill, level, true)
+	}
 }
 
 // landRolledDamageEffects is the unreflected BLOW/CHARGEDAM landing: the
@@ -757,6 +826,10 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
+		if d, ok := asDoor(obj); ok {
+			manaDamageDoor(cast, d, &result)
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
@@ -819,13 +892,13 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 			result.ManaDrains = append(result.ManaDrains, ManaDrain{
 				TargetID:   obj.ObjectID(),
 				CasterName: actorName(cast.Caster),
-				MP:         commons.JavaInt(mp),
+				MP:         commons.TruncInt32Sat(mp),
 			})
 			result.record(result.ManaDrains[len(result.ManaDrains)-1])
 		}
 		if cast.Caster != nil && cast.Caster.Kind() == actor.KindPlayer {
-			result.OpponentMPReduced = append(result.OpponentMPReduced, commons.JavaInt(mp))
-			result.record(OpponentMPReducedMessage{MP: commons.JavaInt(mp)})
+			result.OpponentMPReduced = append(result.OpponentMPReduced, commons.TruncInt32Sat(mp))
+			result.record(OpponentMPReducedMessage{MP: commons.TruncInt32Sat(mp)})
 		}
 	}
 	applySelfEffects(cast, cast.Skill)

@@ -3,7 +3,7 @@ package npc
 import (
 	"strconv"
 	"strings"
-	"unicode/utf16"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
@@ -126,6 +126,9 @@ const (
 	BypassOlympiadNoble
 	// BypassClassRanking shows the month's ranking of class Index.
 	BypassClassRanking
+	// BypassOlympiadStadiums lists the Olympiad stadiums, each a link to
+	// watch it.
+	BypassOlympiadStadiums
 	// BypassSevenSigns runs a Seven Signs priest's or Mammon NPC's
 	// "SevenSigns <n> ..." command for a talker who selected it; see
 	// signspriest.Service.Command. DawnPriest names a Priest of Dawn.
@@ -140,6 +143,56 @@ const (
 	// BypassClanHallManager runs any command on a clan hall manager, whose
 	// own dialog answers every command.
 	BypassClanHallManager
+	// BypassDungeonEnter takes the talker down into the Seven Signs dungeon
+	// behind a dungeon gatekeeper: its instant destination 0, then the
+	// dungeon membership.
+	BypassDungeonEnter
+	// BypassDungeonExit takes the talker out of a Seven Signs dungeon: the
+	// gatekeeper's instant destination 0, then the membership cleared.
+	BypassDungeonExit
+	// BypassDungeonRefused turns the talker away from a Seven Signs dungeon:
+	// the message DungeonOnly names, when set, then HTML alone.
+	BypassDungeonRefused
+	// BypassChatAs opens HTML the way Chat says, as a chat window opens on
+	// an interact.
+	BypassChatAs
+	// BypassDoors opens the doors of DoorScope when OpenDoors is set, else
+	// closes them: each of DoorIDs in turn, or every gate of the clan hall.
+	// HTML, when set, follows alone. A malformed door list stops the
+	// handling once the doors before the fault are done.
+	BypassDoors
+	// BypassDoorsBusy refuses a doorman's gates during a siege: HTML, then
+	// ActionFailed, then the message saying so.
+	BypassDoorsBusy
+	// BypassClanGate sends the talker to its clan leader's portal: HTML, the
+	// page saying there is none, opens with ActionFailed when the leader is
+	// online without one.
+	BypassClanGate
+	// BypassMassTeleport arms the mass gatekeeper's teleport of its
+	// defenders Delay from now, unless one is pending, then opens HTML alone.
+	BypassMassTeleport
+	// BypassMercenaryHire opens the untaxed buy window of buylist ListID,
+	// then HTML alone; a list this NPC may not sell answers nothing.
+	BypassMercenaryHire
+	// BypassWyvernNoStrider tells a talker on no strider it may ride a
+	// wyvern only from one, then opens HTML and releases the client with
+	// ActionFailed.
+	BypassWyvernNoStrider
+	// BypassAlreadyTrading tells a talker tied up in a trade that it is,
+	// and does nothing else.
+	BypassAlreadyTrading
+	// BypassChamberlain runs one of the castle chamberlain dialog's own
+	// commands for a talker of Standing.
+	BypassChamberlain
+	// BypassWyvernRide takes Count B-grade crystals from the talker, which
+	// leaves its strider for a wyvern, then opens HTML and releases the
+	// client with ActionFailed; a talker holding too few gets ShortHTML
+	// instead, keeping its strider.
+	BypassWyvernRide
+	// BypassFestival runs a festival guide's or witch's "Festival <Index>"
+	// command, or its "FestivalDesc <Index>" one when FestivalDesc is set;
+	// see festival.Manager.Command and Description.
+	BypassFestival
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -160,11 +213,23 @@ type Talker struct {
 	SubclassActive bool
 	// ThirdClass is set when the talker's class is a third occupation.
 	ThirdClass bool
+	// Trading is set while the talker is tied up in a trade.
+	Trading bool
 	// CurrentFolk is set when the NPC is the one the talker last selected.
 	CurrentFolk bool
+	// MountNPCID is the mount the talker rides, 0 on foot, and MountLevel
+	// its level.
+	MountNPCID int32
+	MountLevel int
 	// SevenSigns reads the talker's Record of Seven Signs; nil reads an
 	// empty record.
 	SevenSigns func() sevensigns.Record
+	// Residence reads the talker's standing at the castle or clan hall the
+	// NPC serves; nil reads a residence of no one.
+	Residence func() ResidenceTalk
+	// FestivalNotice reads the festival guides' line on when the next
+	// festival begins; nil reads an empty line.
+	FestivalNotice func() string
 }
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -178,9 +243,7 @@ type BypassReply struct {
 	LeadingActionFailed bool
 	// CancelEnchant drops the talker's enchant scroll selection before the
 	// command runs: a warehouse keeper does so for every command its karma
-	// gate lets through. Its refusal of a talker tied up in a trade needs
-	// no field: the interact gate ahead of every dialog command already
-	// refuses one.
+	// gate lets through and that finds the talker in no trade.
 	CancelEnchant bool
 	// ListID is the buylist BypassBuyList and BypassWearList name.
 	ListID int
@@ -202,11 +265,32 @@ type BypassReply struct {
 	Chat ChatOutcome
 	// DawnPriest is set when BypassSevenSigns runs at a Priest of Dawn.
 	DawnPriest bool
+	// DungeonOnly is the cabal BypassDungeonRefused says alone may enter,
+	// NoCabal when the refusal gives no reason.
+	DungeonOnly sevensigns.Cabal
+	// DoorScope and OpenDoors are the door command BypassDoors runs, and
+	// doorCommand its text; see DoorIDs.
+	DoorScope   DoorScope
+	OpenDoors   bool
+	doorCommand string
+	// Delay is how long BypassMassTeleport's teleport waits.
+	Delay time.Duration
+	// Count is the crystal count BypassWyvernRide takes, and ShortHTML the
+	// page it opens when the talker holds fewer.
+	Count     int
+	ShortHTML string
+	// Standing is the talker's standing at the chamberlain dialog
+	// BypassChamberlain runs.
+	Standing ChamberlainStanding
+	// FestivalDesc is set when BypassFestival runs a description command.
+	FestivalDesc bool
 }
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
-// link after the object id, sent by talker. A shop, fisherman, gatekeeper
-// or warehouse keeper first applies its karma gate to every command,
+// link after the object id, sent by talker. A dungeon gatekeeper first
+// answers its own necro, cata and exit; see dungeonGatekeeperCommand. A
+// shop, fisherman, gatekeeper or warehouse keeper first applies its karma
+// gate to every command,
 // answering with its refusal page when that page exists. A fisherman's
 // FishSkillList opens the fishing skills list, and its FishingChampionship
 // and FishingReward go to the fishing championship. A symbol maker's Draw and
@@ -230,12 +314,19 @@ type BypassReply struct {
 // commands to the race track, and every command on a wedding manager to
 // its dialog, as does every command on an auctioneer or a clan hall
 // manager. A Seven Signs priest's and a Mammon NPC's own commands go to
-// signsPriestBypass. Every other command belongs to a system not in place
-// yet.
+// signsPriestBypass, and a festival guide's or witch's to
+// festivalGuideBypass. A castle or clan hall NPC answers its own commands
+// before the generic ones (see residenceCommand), a castle warehouse keeper
+// and a clan hall doorman their residence's chat pages, and a castle or
+// clan hall doorman lets only its owners teleport. Every other command
+// belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
 	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
+	if out, ok := f.dungeonGatekeeperCommand(pages, kind, talker, command, reply); ok {
+		return out
+	}
 	if kind == weddingManager {
 		reply.Outcome = BypassWedding
 		return reply
@@ -251,6 +342,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
 	}
+	if out, ok := f.residenceCommand(pages, kind, rules, talker, command, reply); ok {
+		return out
+	}
 	if kind == "OlympiadManagerNpc" {
 		switch {
 		case strings.HasPrefix(command, "OlympiadNoble"):
@@ -262,8 +356,8 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	if out, ok := f.signsPriestBypass(pages, kind, talker, command, reply); ok {
 		return out
 	}
-	if _, ok := unportedFolkCommands[kind]; ok {
-		return reply
+	if out, ok := f.festivalGuideBypass(pages, kind, talker, command, reply); ok {
+		return out
 	}
 	if _, ok := classmaster.ParseCommand(command); kind == "ClassMaster" && ok {
 		reply.Outcome = BypassClassMaster
@@ -311,7 +405,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 	}
 	// A merchant or fisherman keeps its sale's empty page in its own folder.
-	if (kind == "Merchant" || kind == "Fisherman") && strings.EqualFold(firstToken(command), "Sell") {
+	if merchantKind(kind) && strings.EqualFold(firstToken(command), "Sell") {
 		reply.Outcome = BypassSellList
 		if page, ok := pages.Get("data/html/" + chat.dir + "/" + strconv.Itoa(f.NpcID()) + "-empty.htm"); ok {
 			reply.HTML = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID())))
@@ -328,7 +422,11 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return reply
 		}
 	}
-	reply.CancelEnchant = kind == "WarehouseKeeper"
+	if (kind == "WarehouseKeeper" || kind == "CastleWarehouseKeeper") && talker.Trading {
+		reply.Outcome = BypassAlreadyTrading
+		return reply
+	}
+	reply.CancelEnchant = kind == "WarehouseKeeper" || kind == "CastleWarehouseKeeper"
 	if reply.CancelEnchant {
 		if cmd := warehouseCommand(command); cmd != WarehouseNoCommand {
 			reply.Outcome, reply.Warehouse = BypassWarehouse, cmd
@@ -336,7 +434,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return reply
 		}
 	}
-	if kind == "Merchant" || kind == "Fisherman" {
+	if merchantKind(kind) {
 		if out, ok := f.merchantMultisell(pages, talker, command, reply); ok {
 			return out
 		}
@@ -356,38 +454,11 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "EnchantSkillList"):
 		reply.Outcome = BypassEnchantSkillList
 		return reply
-	case strings.EqualFold(command, "TerritoryStatus"):
-		reply.Outcome = BypassTerritoryStatus
-		return reply
-	case strings.HasPrefix(command, "Quest"):
-		reply.Outcome = BypassQuest
-		return reply
-	case strings.HasPrefix(command, "Chat"):
-		val := 0
-		if arg, ok := commandChars(command, 5, -1); ok {
-			if n, err := commons.ParseInt(arg, 32); err == nil {
-				val = int(n)
-			}
-		}
-		reply.Outcome = BypassChatWindow
-		if kind == "OlympiadManagerNpc" {
-			reply.HTML = f.olympiadChat(pages, val, talker.Noble, talker.Hero, talker.InactiveHero)
-		} else {
-			reply.HTML = f.chatPage(pages, chat, val)
-		}
-		return reply
-	case strings.HasPrefix(command, "Link"):
-		if len(command) < 5 {
-			reply.Outcome = BypassAborted
-			return reply
-		}
-		path := strings.TrimFunc(command[5:], func(r rune) bool { return r <= ' ' })
-		if strings.Contains(path, "..") {
-			reply.Outcome = BypassRefused
-			return reply
-		}
-		reply.Outcome, reply.HTML = BypassPage, f.page(pages, "data/html/"+path)
-		return reply
+	}
+	if out, ok := f.dialogCommand(pages, kind, chat, talker, command, reply); ok {
+		return out
+	}
+	switch {
 	case strings.HasPrefix(command, "Loto"):
 		reply.Outcome = BypassLottery
 		return reply
@@ -396,10 +467,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "observe"):
 		return observeCommand(reply, BypassObserve, command)
 	case strings.HasPrefix(command, "multisell"):
-		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], javaSpace)
+		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], isCtrlOrSpace)
 		return reply
 	case strings.HasPrefix(command, "exc_multisell"):
-		reply.Outcome, reply.Multisell, reply.InventoryOnly = BypassMultisell, strings.TrimFunc(command[len("exc_multisell"):], javaSpace), true
+		reply.Outcome, reply.Multisell, reply.InventoryOnly = BypassMultisell, strings.TrimFunc(command[len("exc_multisell"):], isCtrlOrSpace), true
 		return reply
 	case strings.HasPrefix(command, "Augment"):
 		// The choice is the one character after "Augment ": a command too
@@ -409,7 +480,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassAborted
 			return reply
 		}
-		choice, err := commons.Atoi(strings.TrimFunc(arg, javaSpace))
+		choice, err := strconv.Atoi(strings.TrimFunc(arg, isCtrlOrSpace))
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply
@@ -427,15 +498,69 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		reply.Outcome = BypassTeleportList
 		return reply
 	case strings.HasPrefix(command, "teleport"):
-		return teleportCommand(reply, BypassTeleport, command)
+		return gateTeleport(teleportCommand(reply, BypassTeleport, command), kind, talker)
 	case strings.HasPrefix(command, "instant_teleport"):
-		return teleportCommand(reply, BypassInstantTeleport, command)
+		return gateTeleport(teleportCommand(reply, BypassInstantTeleport, command), kind, talker)
 	}
 	if strings.HasPrefix(command, "CPRecovery") {
 		reply.Outcome = BypassRefused
 		if arenaManager(f.NpcID()) {
 			reply.Outcome = BypassCPRecovery
 		}
+	}
+	return reply
+}
+
+// dialogCommand answers the generic dialog commands; see
+// ParseDialogCommand. A residence NPC's or an Olympiad manager's chat page
+// comes from its own pages, any other from chat. ok is false for every
+// other command.
+func (f *Folk) dialogCommand(pages Pages, kind InstanceKind, chat folkChat, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
+	dialog := ParseDialogCommand(command)
+	switch dialog.Command {
+	case DialogTerritoryStatus:
+		reply.Outcome = BypassTerritoryStatus
+	case DialogQuest:
+		reply.Outcome = BypassQuest
+	case DialogChat:
+		if page, how, ok := f.residenceChatPage(pages, kind, talker.residence(), dialog.Val); ok {
+			reply.Outcome, reply.HTML, reply.Chat = BypassChatAs, page, how
+			return reply, true
+		}
+		reply.Outcome = BypassChatWindow
+		if kind == "OlympiadManagerNpc" {
+			reply.HTML = f.olympiadChat(pages, dialog.Val, talker.Noble, talker.Hero, talker.InactiveHero)
+		} else {
+			reply.HTML = f.chatPage(pages, chat, dialog.Val)
+		}
+	case DialogLink:
+		reply.Outcome, reply.HTML = BypassPage, f.page(pages, dialog.Path)
+	case DialogRefused:
+		reply.Outcome = BypassRefused
+	case DialogAborted:
+		reply.Outcome = BypassAborted
+	default:
+		return reply, false
+	}
+	return reply, true
+}
+
+// merchantKind reports whether kind answers the merchant's shop commands: a
+// merchant, a fisherman, a manor manager, and a castle chamberlain or a
+// wyvern manager past their own dialogs.
+func merchantKind(kind InstanceKind) bool {
+	switch kind {
+	case "Merchant", "Fisherman", "ManorManagerNpc", "CastleChamberlain", "WyvernManagerNpc":
+		return true
+	}
+	return false
+}
+
+// gateTeleport refuses a parsed teleport the NPC of kind does not let the
+// talker take; see teleportAllowed.
+func gateTeleport(reply BypassReply, kind InstanceKind, talker Talker) BypassReply {
+	if (reply.Outcome == BypassTeleport || reply.Outcome == BypassInstantTeleport) && !teleportAllowed(kind, talker) {
+		reply.Outcome = BypassRefused
 	}
 	return reply
 }
@@ -451,7 +576,7 @@ func observeCommand(reply BypassReply, outcome BypassOutcome, command string) By
 		reply.Outcome = BypassAborted
 		return reply
 	}
-	id, err := commons.ParseInt(words[1], 32)
+	id, err := strconv.ParseInt(words[1], 10, 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply
@@ -469,7 +594,7 @@ func teleportCommand(reply BypassReply, outcome BypassOutcome, command string) B
 		reply.Outcome = BypassReleased
 		return reply
 	}
-	index, err := commons.ParseInt(words[1], 32)
+	index, err := strconv.ParseInt(words[1], 10, 32)
 	if err != nil {
 		reply.Outcome = BypassReleased
 		return reply
@@ -492,7 +617,7 @@ func (f *Folk) adventurerCommand(pages Pages, command string, reply BypassReply)
 			reply.Outcome = BypassAborted
 			return reply, true
 		}
-		level, err := commons.ParseInt(strings.TrimFunc(arg, javaSpace), 32)
+		level, err := strconv.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 10, 32)
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply, true
@@ -532,7 +657,7 @@ func merchantCommand(reply BypassReply, rules ChatRules, command string) (Bypass
 		reply.Outcome = BypassRefused
 		return reply, true
 	}
-	id, err := commons.ParseInt(tokens[1], 32)
+	id, err := strconv.ParseInt(tokens[1], 10, 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply, true
@@ -581,25 +706,25 @@ func (f *Folk) merchantMultisell(pages Pages, talker Talker, command string, rep
 	return reply, false
 }
 
-// javaSpace is the set trimmed around a command argument: every character
+// isCtrlOrSpace is the set trimmed around a command argument: every character
 // up to and including the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }
 
 // commandChars returns command's characters from begin up to end, or to
 // its end when end is negative, counting characters as the client encodes
 // them: one per UTF-16 unit, so a character outside the Basic Multilingual
 // Plane counts two. ok is false when command is too short for the range. A
-// bound that splits such a character keeps its half as U+FFFD, which no
+// bound that splits such a character leaves its half as U+FFFD, which no
 // number reads.
 func commandChars(command string, begin, end int) (string, bool) {
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if end < 0 {
 		end = len(units)
 	}
 	if begin > end || end > len(units) {
 		return "", false
 	}
-	return string(utf16.Decode(units[begin:end])), true
+	return commons.UTF16String(units[begin:end]), true
 }
 
 // olympiadCommand answers an Olympiad manager's "Olympiad <n>" command,
@@ -609,15 +734,15 @@ func commandChars(command string, begin, end int) (string, bool) {
 // other, and stops the handling when the class is missing or does not
 // parse; 4 shows the heroes; 5 asks an elected hero to confirm its claim
 // and 6 claims the status, answering nothing to anyone else; 7 opens the
-// Monument of Heroes' main page. The stadium list (3) needs the matches
-// (#3340); any other choice answers nothing.
+// Monument of Heroes' main page; 3 lists the stadiums, whose links watch
+// one. Any other choice answers nothing.
 func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply BypassReply) BypassReply {
 	arg, ok := commandChars(command, 9, 10)
 	if !ok {
 		reply.Outcome = BypassAborted
 		return reply
 	}
-	choice, err := commons.Atoi(arg)
+	choice, err := strconv.Atoi(arg)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply
@@ -626,7 +751,7 @@ func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply
 	case 2:
 		return classRankingCommand(reply, command)
 	case 3:
-		reply.Outcome = BypassUnported
+		reply.Outcome = BypassOlympiadStadiums
 	case 4:
 		reply.Outcome = BypassHeroList
 	case 5:

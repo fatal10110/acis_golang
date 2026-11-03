@@ -1,0 +1,16 @@
+# The Queen Ant (29001), a level 1 grand boss, sees the level 1 character cast Ultimate Debuff
+# (4694, 100 aggro points) on a monster beside her, every draw 0: a hostile spell, on a draw
+# under 15, makes her want strike 4018 on the caster.
+character Hunter 1
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAnt
+npc queen 29001 GrandBoss 250 0 0 skill BUFF 4017 1 skill DD_MAGIC 4018 1 skill DD_MAGIC_A 4019 1 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+npc wolf 20120 Monster 150 0 0
+
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires queen cast(player,4018,move)=1000000

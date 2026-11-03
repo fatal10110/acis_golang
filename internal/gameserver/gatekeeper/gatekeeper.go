@@ -30,6 +30,9 @@ type Service struct {
 	// gnosis reports a talker who travels for an ancient adena price's
 	// base count; nil reports nobody.
 	gnosis func(objectID int32) bool
+	// besieged reports a castle whose siege is being fought; nil reports
+	// none.
+	besieged func(castleID int) bool
 }
 
 // destinations is one loaded snapshot of both destination tables.
@@ -51,9 +54,8 @@ func NewService(teleports travel.TeleportTable, instants travel.InstantTable, fr
 }
 
 // SetTables replaces the destinations with teleports and instants, at once
-// for every later request: TeleportData.reload and
-// InstantTeleportData.reload. A request already running keeps the tables
-// it started with.
+// for every later request, as a teleport reload does. A request already
+// running keeps the tables it started with.
 func (s *Service) SetTables(teleports travel.TeleportTable, instants travel.InstantTable) {
 	s.tables.Store(&destinations{teleports: teleports, instants: instants})
 }
@@ -66,8 +68,18 @@ func (s *Service) SetGnosisFollower(follower func(objectID int32) bool) {
 	s.gnosis = follower
 }
 
+// SetCastleSieges sets the siege rule a destination tied to a castle reads:
+// besieged reports whether that castle's siege is being fought. Call it
+// before the service is shared.
+func (s *Service) SetCastleSieges(besieged func(castleID int) bool) {
+	s.besieged = besieged
+}
+
 // Notices a teleport reports, in the order they happen.
 type (
+	// CastleBesieged refuses a trip to a destination tied to a castle
+	// whose siege is being fought.
+	CastleBesieged struct{}
 	// NotEnoughAdena refuses a trip the player cannot pay in adena for.
 	NotEnoughAdena struct{}
 	// AdenaSpent names the adena a trip took.
@@ -126,10 +138,11 @@ func (s *Service) Window(objectID int32, npcID int, kind travel.Kind, talkerID i
 
 // Teleport takes c to destination index of npcID's list. An NPC without a
 // list, or an index past its end, answers nothing; a negative index, or
-// one equal to the list's length, is only released. A priced destination,
-// unless teleports are free, is paid first: in adena, or in its price item.
-// A trip c cannot pay for is refused and released; a paid or free trip
-// departs, then releases.
+// one equal to the list's length, is only released. A destination tied to
+// a castle whose siege is being fought is refused, unreleased. A priced
+// destination, unless teleports are free, is paid first: in adena, or in
+// its price item. A trip c cannot pay for is refused and released; a paid
+// or free trip departs, then releases.
 func (s *Service) Teleport(c *player.Character, npcID, index int) Trip {
 	list, ok := s.tables.Load().teleports[npcID]
 	if !ok || index > len(list) {
@@ -139,8 +152,9 @@ func (s *Service) Teleport(c *player.Character, npcID, index int) Trip {
 		return Trip{Release: true}
 	}
 	t := list[index]
-	// ponytail: a destination tied to a castle (CastleID) is refused with
-	// CANNOT_PORT_VILLAGE_IN_SIEGE while that castle's siege runs (#3375).
+	if t.CastleID > 0 && s.besieged != nil && s.besieged(t.CastleID) {
+		return Trip{Notices: []any{CastleBesieged{}}}
+	}
 	trip := Trip{Depart: true, Destination: t.Location, Release: true}
 	if s.free || t.PriceCount == 0 {
 		return trip
@@ -164,8 +178,7 @@ func (s *Service) Instant(npcID, index int) Trip {
 	return Trip{Depart: true, Destination: list[index]}
 }
 
-// price is t's price at now for the talker talkerID
-// (TeleportLocation.getCalculatedPriceCount): an ancient adena price is
+// price is t's price at now for the talker talkerID: an ancient adena price is
 // its base count for a Gnosis follower and 1.6 times it, truncated, for
 // everyone else.
 func (s *Service) price(t travel.Teleport, now time.Time, talkerID int32) int {
@@ -173,7 +186,7 @@ func (s *Service) price(t travel.Teleport, now time.Time, talkerID int32) int {
 		if s.gnosis != nil && s.gnosis(talkerID) {
 			return t.PriceCount
 		}
-		return int(commons.JavaInt(float64(t.PriceCount) * 1.6))
+		return int(commons.TruncInt32Sat(float64(t.PriceCount) * 1.6))
 	}
 	return t.CalculatedPrice(now)
 }

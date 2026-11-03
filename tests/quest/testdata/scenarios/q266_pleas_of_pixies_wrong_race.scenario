@@ -1,0 +1,22 @@
+# Pleas of Pixies (Q266), refused: Murika sends a human fighter away, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q266_pleas_of_pixies_wrong_race.golden
+character Pixie 3
+script quest.Q266_PleasOfPixies
+item 1334
+page default/31852.htm
+page script/quest/Q266_PleasOfPixies/
+npc murika 31852 Folk 10 0 0
+
+# Murika: elves only.
+action murika
+action murika
+  S ActionFailed
+  S NpcHtmlMessage obj=murika item=0 page=default/31852.htm
+  S ActionFailed
+bypass npc_{murika}_Quest
+  S NpcHtmlMessage obj=murika item=0 page=script/quest/Q266_PleasOfPixies/31852-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q266_PleasOfPixies CREATED
+  rows Q266_PleasOfPixies -

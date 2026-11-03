@@ -3,7 +3,6 @@ package skills
 import (
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -201,6 +200,7 @@ func TestNPCCastNeedsAllowedWeapon(t *testing.T) {
 				RightHand: tc.rHand, LeftHand: tc.lHand,
 			}, modelskill.NewTable([]modelskill.Definition{def}))
 			drainUntilQuiet(t, srv.Client)
+			firstCycleOnNPCQueue(t, hostile)
 			hostile.AI().Desires().AddOrUpdate(&ai.Desire{
 				Kind: ai.IntentionCast, FinalTarget: hostile, Skill: modelskill.Ref{ID: weaponSkillID, Level: 1},
 				Weight: 1_000_000, QueuedAt: hostile.Now(),
@@ -211,11 +211,7 @@ func TestNPCCastNeedsAllowedWeapon(t *testing.T) {
 				assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeMagicSkillUse, tc.name)
 				return
 			}
-			for {
-				frame := srv.Client.ReadWithTimeout(300 * time.Millisecond)
-				if frame == nil {
-					break
-				}
+			for _, frame := range srv.Client.ReadQueued() {
 				if frame[0] == serverpackets.OpcodeMagicSkillUse || frame[0] == serverpackets.OpcodeSystemMessage {
 					t.Fatalf("%s: refused monster cast sent opcode %#x", tc.name, frame[0])
 				}

@@ -1,0 +1,133 @@
+# Chest caught with a bait of fire (Q030): a level 60 character who completed Linnaeus' Special
+# Bait (Q053) and holds a red treasure box accepts at the fisherman, who opens the chest and finds
+# a musical score; Rukal trades it for a necklace of protection and the quest completes; then
+# relog. The fisherman's quest link lists both his quests. Expectations replay the reference trace
+# of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q030_chest_caught_with_a_bait_of_fire.golden
+character Angler 60
+quest Q053_LinnaeusSpecialBait <state>=COMPLETED
+hold 6511 1
+script quest.Q030_ChestCaughtWithABaitOfFire
+script quest.Q053_LinnaeusSpecialBait
+item 6511 7628 916
+page fisherman/31577.htm
+page default/30629.htm
+page script/quest/Q030_ChestCaughtWithABaitOfFire/
+npc linnaeus 31577 Fisherman 10 0 0
+npc rukal 30629 Folk 20 0 0
+
+# The fisherman: accept.
+action linnaeus
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 html="<html><body><a action=\"bypass -h npc_{linnaeus}_Quest Q053_LinnaeusSpecialBait\">[Linnaues' Special Bait (Done)]</a><br><a action=\"bypass -h npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire\">[Chest caught with a bait of fire]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/31577-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q030_ChestCaughtWithABaitOfFire CREATED
+bypass Quest Q030_ChestCaughtWithABaitOfFire 31577-04.htm
+  S QuestList 53:0x00000000 30:0x80000001
+  S ExShowQuestMark quest=30
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/31577-04.htm
+  S ActionFailed
+  Q upsert Q030_ChestCaughtWithABaitOfFire | <state> | STARTED
+  Q upsert Q030_ChestCaughtWithABaitOfFire | <cond> | 1
+  state Q030_ChestCaughtWithABaitOfFire STARTED
+  rows Q030_ChestCaughtWithABaitOfFire <cond>=1 <state>=STARTED
+
+# Rukal has nothing for the quest before the musical score.
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# The fisherman opens the chest.
+action linnaeus
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 html="<html><body><a action=\"bypass -h npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire\">[Chest caught with a bait of fire (In Progress)]</a><br><a action=\"bypass -h npc_{linnaeus}_Quest Q053_LinnaeusSpecialBait\">[Linnaues' Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/31577-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q030_ChestCaughtWithABaitOfFire 31577-07.htm
+  S QuestList 53:0x00000000 30:0x80000003
+  S ExShowQuestMark quest=30
+  S SystemMessage id=302 3:6511
+  S SystemMessage id=54 3:7628
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/31577-07.htm
+  S ActionFailed
+  Q upsert Q030_ChestCaughtWithABaitOfFire | <cond> | 2
+  rows Q030_ChestCaughtWithABaitOfFire <cond>=2 <state>=STARTED
+  items 6511=0 7628=1
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 html="<html><body><a action=\"bypass -h npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire\">[Chest caught with a bait of fire (In Progress)]</a><br><a action=\"bypass -h npc_{linnaeus}_Quest Q053_LinnaeusSpecialBait\">[Linnaues' Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/31577-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rukal trades the musical score; the quest completes.
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/30629-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q030_ChestCaughtWithABaitOfFire 30629-02.htm
+  S SystemMessage id=302 3:7628
+  S SystemMessage id=54 3:916
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 53:0x00000000 30:0x00000000
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/30629-02.htm
+  S ActionFailed
+  Q upsert Q030_ChestCaughtWithABaitOfFire | <state> | COMPLETED
+  Q delete-except-state Q030_ChestCaughtWithABaitOfFire
+  state Q030_ChestCaughtWithABaitOfFire COMPLETED
+  rows Q030_ChestCaughtWithABaitOfFire <state>=COMPLETED
+  items 7628=0 916=1
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q030_ChestCaughtWithABaitOfFire COMPLETED
+  rows Q030_ChestCaughtWithABaitOfFire <state>=COMPLETED
+  items 916=1
+action linnaeus
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 html="<html><body><a action=\"bypass -h npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire\">[Chest caught with a bait of fire (Done)]</a><br><a action=\"bypass -h npc_{linnaeus}_Quest Q053_LinnaeusSpecialBait\">[Linnaues' Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire
+  S NpcHtmlMessage obj=linnaeus item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

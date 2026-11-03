@@ -1,0 +1,23 @@
+# WarriorBerserkerPhysicalSpecialStoneAggressive (21327, a Ketra berserker, level 78, every draw 0), the
+# character a Ketra ally (standing 1): it is not attacked on sight, and its hit makes the
+# berserker want to petrify it (4515-1, as much from its attacked hook as from its own clan
+# call: 2000000) and stop hating it.
+character Hunter 20
+standing 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserker
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialStoneAggressive
+npc berserker 21327 Monster 150 0 0 level 78 skill DEBUFF1 4515 1 clan ketra_orc_clan 300
+
+tick x2
+  desires berserker wander()=5
+  hate berserker 0
+hit berserker 10
+  desires berserker cast(player,4515,move)=2000000 wander()=5
+  hate berserker 0

@@ -1,0 +1,24 @@
+# Rise and Fall of the Elroki Tribe (Q643): a bone drops for a draw under the chance.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q643_rise_and_fall_of_the_elroki_tribe_hunt.golden
+character Hero 75
+quest Q643_RiseAndFallOfTheElrokiTribe <cond>=1 <state>=STARTED
+random 0 750000 0 0
+script quest.Q643_RiseAndFallOfTheElrokiTribe
+item 8776 57 8712 8713 8714 8715 8716 8717 8718 8719 8720 8721 8722
+page merchant/32106.htm
+page default/32117.htm
+page script/quest/Q643_RiseAndFallOfTheElrokiTribe/
+npc singsing 32106 Merchant 10 0 0
+npc karakawei 32117 Folk 20 0 0
+npc m1 22208 Monster 40 0 0
+npc m2 22227 Monster 50 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 8776=0
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8776
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8776=1

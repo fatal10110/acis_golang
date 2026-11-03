@@ -2,7 +2,6 @@ package pets
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -66,8 +65,8 @@ func assertSummonCastRejected(t *testing.T, h *petWorld, petActor *summon.Actor,
 	if mover, target := r.ReadInt32(), r.ReadInt32(); mover != petActor.ObjectID() || target != targetID {
 		t.Fatalf("MoveToPawn = %d toward %d, want pet %d toward %d", mover, target, petActor.ObjectID(), targetID)
 	}
-	if extra := h.client.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-		t.Fatalf("rejected summon cast sent extra frame %#x", extra[0])
+	if queued := h.client.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("rejected summon cast sent extra frame %#x", queued[0][0])
 	}
 }
 

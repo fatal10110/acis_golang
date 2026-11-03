@@ -1,0 +1,13 @@
+# WizardHereticPriestAggressive (22143) holding its ground (Hold 1), every draw 0: a hit by the character from 300
+# away wants the debuff held and the long range DD magic held too, the two desires on the magic adding up.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 300 0 0 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9 ai Hold=1
+
+hit priest 10
+  desires priest cast(player,4466)=1000000 cast(player,4668)=2000000

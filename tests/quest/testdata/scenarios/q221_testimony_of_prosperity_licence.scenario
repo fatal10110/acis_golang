@@ -1,0 +1,110 @@
+# Testimony Of Prosperity (Q221), the collection round, first leg: a level 38 Scavenger at cond 1 asks Lockirin for the collection licence and the five notices,
+# takes Spiron's notice, Shari's contribution and Spiron's receipt for it.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q221_testimony_of_prosperity_licence.golden
+character Dwarf 38
+class 54
+quest Q221_TestimonyOfProsperity <state>=STARTED <cond>=1
+hold 3239 1
+script quest.Q221_TestimonyOfProsperity
+item 3023 3030 3238 3239 3240 3241 3242 3243 3244 3245 3246 3247 3248 3249 3250 3251 3252 3253 3254 3255 3256 3257 3258 3259 3260 3261 3262 3263 3264 3265 3266 3267 3268 3269 3270 3271 3272 3273 3274 3275 3428 1867 57 7562
+page default/30531.htm
+page default/30532.htm
+page merchant/30517.htm
+page script/quest/Q221_TestimonyOfProsperity/
+npc lockirin 30531 Folk 10 0 0
+npc spiron 30532 Folk -10 0 0
+npc shari 30517 Merchant -20 0 0
+
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30531-02.htm
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-02.htm
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30531-03.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3246
+  S SystemMessage id=54 3:3247
+  S SystemMessage id=54 3:3248
+  S SystemMessage id=54 3:3249
+  S SystemMessage id=54 3:3250
+  S SystemMessage id=54 3:3251
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-03.htm
+  S ActionFailed
+  items 3246=1 3247=1 3248=1 3249=1 3250=1 3251=1
+bypass Quest Q221_TestimonyOfProsperity 30531-02.htm
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-04.htm
+  S ActionFailed
+  S ActionFailed
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3247
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q221_TestimonyOfProsperity/30532-01.htm
+  S ActionFailed
+  S ActionFailed
+action shari
+action shari
+  S ActionFailed
+  S NpcHtmlMessage obj=shari item=0 page=merchant/30517.htm
+  S ActionFailed
+bypass npc_{shari}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3252
+  S NpcHtmlMessage obj=shari item=0 page=script/quest/Q221_TestimonyOfProsperity/30517-01.htm
+  S ActionFailed
+  S ActionFailed
+action shari
+  S ActionFailed
+  S NpcHtmlMessage obj=shari item=0 page=merchant/30517.htm
+  S ActionFailed
+bypass npc_{shari}_Quest
+  S NpcHtmlMessage obj=shari item=0 page=script/quest/Q221_TestimonyOfProsperity/30517-02.htm
+  S ActionFailed
+  S ActionFailed
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3252
+  S SystemMessage id=54 3:3258
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q221_TestimonyOfProsperity/30532-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 3252=0 3258=1
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q221_TestimonyOfProsperity/30532-04.htm
+  S ActionFailed
+  S ActionFailed
+action shari
+action shari
+  S ActionFailed
+  S NpcHtmlMessage obj=shari item=0 page=merchant/30517.htm
+  S ActionFailed
+bypass npc_{shari}_Quest
+  S NpcHtmlMessage obj=shari item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed

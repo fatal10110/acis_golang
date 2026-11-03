@@ -2,7 +2,6 @@ package duel
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
@@ -12,8 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
-
-const quiet = 300 * time.Millisecond
 
 // player is one dialed client and its character.
 type player struct {
@@ -214,20 +211,11 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	drainFrames(t, c)
 }
 
-// drainFrames collects every frame the client receives until the server
-// goes quiet, in arrival order.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for range 400 {
-		frame := c.ReadWithTimeout(quiet)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 400 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 // systemMessage is one SystemMessage: its id and its text and number

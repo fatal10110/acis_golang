@@ -1,11 +1,16 @@
 #!/bin/sh
 # Builds the reference probe and regenerates the script registration manifest, the
-# quest packet traces and the engine-contract goldens. See README.md in this directory.
+# quest packet traces, the engine-contract goldens and the quest scenario traces. See
+# README.md in this directory.
 #
 # usage: run.sh [JAVA_TREE [DATAPACK]]
 #   JAVA_TREE  reference server checkout (default: $ACIS_JAVA, else ../../../../../../aCis_gameserver
 #              resolved from the repository root's parent)
 #   DATAPACK   reference datapack checkout (default: $ACIS_DATAPACK, else the sibling aCis_datapack)
+#
+# PROBE_ONLY=<globs> plays only the scenarios whose file name matches one of the comma-separated
+# globs (for example PROBE_ONLY='q359_*,q362_*') and replaces only their traces; every other trace
+# stays as committed. Without it every scenario plays and the trace directory is replaced whole.
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -14,6 +19,7 @@ repo=$(cd "$here/../../../../.." && pwd)
 java_tree=${1:-${ACIS_JAVA:-$repo/../aCis_gameserver}}
 datapack=${2:-${ACIS_DATAPACK:-$repo/../aCis_datapack}}
 image=${PROBE_IMAGE:-eclipse-temurin:21-jdk-alpine}
+only=${PROBE_ONLY:-}
 
 for d in "$java_tree/java/net/sf/l2j" "$datapack/data/xml"; do
 	[ -d "$d" ] || { echo "missing $d (set ACIS_JAVA / ACIS_DATAPACK)" >&2; exit 1; }
@@ -38,27 +44,57 @@ docker run --rm --user "$(id -u):$(id -g)" \
 	-v "$java_tree:/ref:ro" -v "$here:/probe:ro" -v "$work:/work" \
 	"$image" sh -euc '
 		cd /work
-		# The four shadowed classes replace their reference files.
-		find /ref/java -name "*.java" \
-			| grep -v -e "/commons/pool/ThreadPool.java$" -e "/commons/pool/ConnectionPool.java$" \
-			          -e "/commons/random/Rnd.java$" -e "/gameserver/network/GameClient.java$" \
-			          -e "/gameserver/scripting/ScheduledQuest.java$" > sources.txt
-		# The game client keeps its reference body; only the socket write in its packet
-		# send becomes the probe wire.
-		mkdir -p patched
-		sed "s/getConnection().sendPacket(gsp);/net.sf.l2j.commons.mmocore.ProbeWire.capture(this, gsp);/" \
-			/ref/java/net/sf/l2j/gameserver/network/GameClient.java > patched/GameClient.java
-		[ "$(grep -c "ProbeWire.capture(this, gsp)" patched/GameClient.java)" = 1 ] \
-			|| { echo "game client send path not found" >&2; exit 1; }
-		echo patched/GameClient.java >> sources.txt
+		# The reference tree, patched below; the four shadowed classes replace their reference files.
+		mkdir -p src
+		cp -r /ref/java/. src/
 		# The scheduled script keeps its reference body; its clock read and calendar come from
 		# the probe clock, which answers as the reference does until the schedule golden sets it.
-		sed -e "s/System.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.now()/" \
+		sed -i -e "s/System.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.now()/" \
 			-e "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.calendar()/" \
-			/ref/java/net/sf/l2j/gameserver/scripting/ScheduledQuest.java > patched/ScheduledQuest.java
-		[ "$(grep -c "ProbeClock.now()" patched/ScheduledQuest.java)" = 1 ] && [ "$(grep -c "ProbeClock.calendar()" patched/ScheduledQuest.java)" = 1 ] \
+			src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java
+		[ "$(grep -c "ProbeClock.now()" src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java)" = 1 ] && [ "$(grep -c "ProbeClock.calendar()" src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java)" = 1 ] \
 			|| { echo "scheduled script clock not found" >&2; exit 1; }
-		echo patched/ScheduledQuest.java >> sources.txt
+		# The half-price teleport hours read the calendar of the probe wall clock, so a gatekeeper window
+		# does not depend on when the scenario ran.
+		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/" src/net/sf/l2j/gameserver/model/location/TeleportLocation.java
+		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/model/location/TeleportLocation.java)" = 1 ] \
+			|| { echo "teleport location calendar not found" >&2; exit 1; }
+		# The Four Sepulchers manager reads the minute and second of the probe wall clock, so what it
+		# announces does not depend on when the scenario ran.
+		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/g" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushNpc.java
+		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushNpc.java)" -ge 1 ] \
+			|| { echo "royal rush calendar not found" >&2; exit 1; }
+		# So do the NPCs of the Four Sepulchers rooms: the minute of the hour decides whether they stand.
+		sed -i "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.wallCalendar()/g" \
+			src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushDefaultNpc/RoyalRushDefaultNpc.java \
+			src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushDefaultNpc/RoyalRushTriggerBoxBase/RoyalRushTriggerBox*.java
+		[ "$(grep -c "ProbeClock.wallCalendar()" src/net/sf/l2j/gameserver/scripting/script/ai/individual/RoyalRushDefaultNpc/RoyalRushTriggerBoxBase/RoyalRushTriggerBox1.java)" -ge 1 ] \
+			|| { echo "royal rush trigger box calendar not found" >&2; exit 1; }
+		# Every other wall clock read goes through the probe wall clock: the real one, except
+		# while a scenario trace plays (a virtual one, so its trace does not depend on when it ran).
+		find src -name "*.java" -exec sed -i "s/System\.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.wall()/g" {} +
+		# The game client keeps its reference body; only the socket write in its packet
+		# send becomes the probe wire.
+		sed -i "s/getConnection().sendPacket(gsp);/net.sf.l2j.commons.mmocore.ProbeWire.capture(this, gsp);/" \
+			src/net/sf/l2j/gameserver/network/GameClient.java
+		[ "$(grep -c "ProbeWire.capture(this, gsp)" src/net/sf/l2j/gameserver/network/GameClient.java)" = 1 ] \
+			|| { echo "game client send path not found" >&2; exit 1; }
+		# The script events an NPC hears (its own send, and the two radius broadcasts) go through the
+		# probe, which tells the scenario trace before the quest runs.
+		sed -i "s/quest.onScriptEvent(this, eventId, arg1, arg2);/net.sf.l2j.commons.probe.ProbeHeard.deliver(quest, this, eventId, arg1, arg2);/" src/net/sf/l2j/gameserver/model/actor/Npc.java
+		sed -i -E "s/quest\.onScriptEvent\(npc, eventId, arg1, (0|arg2)\);/net.sf.l2j.commons.probe.ProbeHeard.deliver(quest, npc, eventId, arg1, \1);/" src/net/sf/l2j/gameserver/scripting/Quest.java
+		[ "$(grep -c "ProbeHeard.deliver" src/net/sf/l2j/gameserver/model/actor/Npc.java)" = 1 ] && [ "$(grep -c "ProbeHeard.deliver" src/net/sf/l2j/gameserver/scripting/Quest.java)" = 2 ] \
+			|| { echo "script event delivery not found" >&2; exit 1; }
+		# The script events sent to an NPC maker through its script (a script looking a maker up by name,
+		# a maker sending to another) go through the probe, which tells the scenario trace before the
+		# script of the maker runs. The calls a maker makes on itself (unqualified, or on its parent) are
+		# not sends and stay.
+		find src -name "*.java" -exec sed -i -E "s/([A-Za-z0-9_]+)\.getMaker\(\)\.onMakerScriptEvent\(/net.sf.l2j.commons.probe.ProbeMaker.send(\1.getMaker(), /g" {} +
+		[ "$(grep -rho "ProbeMaker.send(" src | wc -l)" -ge 100 ] && ! grep -rqE "[A-Za-z0-9_]+\.getMaker\(\)\.onMakerScriptEvent\(" src \
+			|| { echo "npc maker script event send not found" >&2; exit 1; }
+		find src -name "*.java" \
+			| grep -v -e "/commons/pool/ThreadPool.java$" -e "/commons/pool/ConnectionPool.java$" \
+			          -e "/commons/random/Rnd.java$" > sources.txt
 		find /probe/shadow /probe/probe -name "*.java" >> sources.txt
 		javac -J-Xmx1500m -nowarn -encoding UTF-8 -proc:none -cp "/ref/lib/*" -d classes @sources.txt > javac.log 2>&1 \
 			|| { cat javac.log >&2; echo "probe build failed" >&2; exit 1; }
@@ -66,11 +102,18 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 docker run --rm --user "$(id -u):$(id -g)" \
 	-v "$java_tree/lib:/reflib:ro" -v "$datapack/data:/work/run/data:ro" -v "$datapack/sql:/refsql:ro" -v "$work/geodata:/work/run/data/geodata:ro" \
-	-v "$work:/work" -w /work/run \
-	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
+	-v "$repo/tests/quest/testdata/scenarios:/scenarios:ro" -v "$repo/tests/ai/testdata/scenarios:/scenarios-ai:ro" -v "$work:/work" -w /work/run \
+	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -Dprobe.scenarios=/scenarios:/scenarios-ai -Dprobe.only="$only" -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
 	2> "$work/probe.log" || { tail -40 "$work/probe.log" >&2; exit 1; }
 
 cp "$work"/out/*.golden "$here/"
+# The quest scenario traces replace the whole directory, so a trace whose scenario is gone goes too.
+# A PROBE_ONLY run replaces only the traces it played.
+if [ -z "$only" ]; then
+	rm -rf "$here/scenarios"
+fi
+mkdir -p "$here/scenarios"
+[ -z "$(ls "$work"/out/scenarios 2>/dev/null)" ] || cp "$work"/out/scenarios/*.golden "$here/scenarios/"
 contracts="$repo/internal/testsupport/scriptcontract/testdata"
 mkdir -p "$contracts"
 cp "$work"/out/contracts/*.golden "$contracts/"

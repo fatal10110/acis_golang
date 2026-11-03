@@ -1,0 +1,19 @@
+# WarriorCastDDMagicSelfBuff (21405, Tera Beetle, level 80, self buff 4029-3, DD magic 4001-9), every
+# draw 0 and its skills never landing: it wants its self buff on itself once created (1000000); a hit
+# while it fights nothing wants the buff again (the weight doubles).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagicSelfBuff
+npc beetle 21405 Monster 300 0 0 level 80 skill DD_MAGIC 4001 9 skill SELF_BUFF 4029 3
+roll beetle 99
+
+tick
+  desires beetle cast(beetle,4029,move)=1000000
+hit beetle 10
+  S MagicSkillUse caster=beetle target=beetle skill=4029-3 hit=2378 reuse=10571 success=0
+  desires beetle attack(player)=11.494252873563218 cast(beetle,4029,move)=2000000

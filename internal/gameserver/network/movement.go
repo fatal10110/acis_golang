@@ -73,7 +73,7 @@ func (l *GameClientLink) tryLiveMoveTo(live *livePlayer, target location.Locatio
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
-		live.deferAction(func() { l.startLiveMove(live, target, boatID) })
+		live.deferAction("MOVE_TO", func() { l.startLiveMove(live, target, boatID) })
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -166,7 +166,7 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 		l.adoptCameraPosition(live, reported)
 		return
 	}
-	damage, falling := live.CheckFall(reported.Z, !liveSwimming(live) && !live.Flying(), l.playerConfig.EnableFallingDamage, time.Now())
+	damage, falling := live.CheckFall(reported.Z, !liveSwimming(live) && !live.Flying(), l.playerConfig().EnableFallingDamage, time.Now())
 	if damage > 0 {
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageFallDamage, int32(damage)))
 	}
@@ -283,7 +283,8 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	dropPostureQueuedIntentions(live)
 	l.broadcastLiveWaitType(live, stand)
 	if !stand {
-		live.NotifyTutorial(player.TutorialSat)
+		// The sit request runs on live's queue.
+		live.NotifyTutorialOnQueue(player.TutorialSat)
 	}
 	return true
 }
@@ -323,8 +324,10 @@ func (l *GameClientLink) broadcastLiveWaitType(live *livePlayer, stand bool) {
 // mounted is answered with a single ActionFailed and goes idle; one seated
 // while it plays dead gets up out of fake death, its Fake Death effect, if
 // still on, ending with its own get-up first; anyone else stands up as a
-// stand request does. Either way the intentions the player held or queued,
-// a click held behind a posture transition among them, are dropped, on live's own queue, the only one that touches them; the
+// stand request does, the stand becoming its current intention while the
+// stand-up lasts. Either way the intentions the player held or queued,
+// a click held behind a posture transition among them, are dropped, on
+// live's own queue, the only one that touches them; the
 // idle answers nothing more even when the damage has meanwhile started a
 // stand-up. A chair is released when a stand-up ends.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
@@ -350,14 +353,21 @@ func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 		if !live.detached() {
 			live.takeDeferredAction()
 			dropPostureQueuedIntentions(live)
+			if live.StandingNow() {
+				live.holdPosture(true)
+			}
 		}
 	})
 }
 
 // broadcastLiveSocialAction handles an emote request. A fishing player is
 // told it cannot emote while fishing, whatever the emote. Any other rejected
-// emote (out-of-range id, a request still to answer, dead, sitting, or in
-// combat) answers with nothing, on purpose. Emotes don't register a pending client action the way
+// emote (out-of-range id, a private store or craft open, a request still to
+// answer, dead, or a current intention other than idle) answers with
+// nothing, on purpose. The intention gate is not the combat stance: a player
+// whose attack ended emotes inside the stance window, one walking to a point
+// or following does not, and a seated player that finished sitting down is
+// idle again. Emotes don't register a pending client action the way
 // target/attack/item clicks do, so silence can't freeze input the way the
 // silent-drop bug class behind #829 freezes it — and the specified handler
 // stays silent on every rejection path except the fishing one. Adding
@@ -369,7 +379,7 @@ func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID in
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDoWhileFishing))
 		return
 	}
-	if actionID < 2 || actionID > 13 || live.Operating() || l.holdsActiveRequester(live) || live.AlikeDead() || !live.Standing() || live.InCombat() {
+	if actionID < 2 || actionID > 13 || live.Operating() || l.holdsActiveRequester(live) || live.AlikeDead() || !live.intentionIdle() {
 		return
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -393,8 +403,9 @@ func (l *GameClientLink) broadcastLiveStopMove(live *livePlayer, at location.Loc
 // observer, so the corpse-fall animation plays immediately instead of only
 // on a later dead reconnect.
 func (l *GameClientLink) broadcastLiveDie(live *livePlayer) {
+	options := l.dieOptions(live)
 	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameDie(live.ObjectID(), dieOptions(live))
+		return serverpackets.FrameDie(live.ObjectID(), options)
 	})
 }
 
@@ -407,7 +418,7 @@ func (l *GameClientLink) broadcastLiveRevive(live *livePlayer) {
 }
 
 // broadcastLiveFrame sends one serialized frame to live's own session and to
-// every object it currently knows. Each recipient gets an independent pooled
+// every player that currently knows it. Each recipient gets an independent pooled
 // copy because its session encrypts outgoing bytes in place.
 func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
 	broadcastFrame(frame, func(send func(frameReceiver)) {
@@ -415,9 +426,7 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		if l.world == nil {
 			return
 		}
-		known := live.known.SnapshotCopy(l.world, live)
-		defer known.Release()
-		for _, o := range known.Tracked() {
+		for o := range l.world.KnownPlayers(live) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
@@ -426,7 +435,13 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 }
 
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {
-	previous := live.CurrentLocation()
+	l.placeLivePlayer(live, position, heading, false)
+}
+
+// placeLivePlayer is updateLivePlayerPosition; with keepRegion live stays
+// in the region holding it, and in that region's zones, until its next
+// position update, as an instant teleport leaves it.
+func (l *GameClientLink) placeLivePlayer(live *livePlayer, position location.Location, heading int, keepRegion bool) {
 	live.Character.SetLastKnownPosition(position, heading)
 	live.Character.SetHeading(heading)
 	if live.move != nil {
@@ -439,8 +454,12 @@ func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position loc
 	if l.world == nil {
 		return
 	}
+	if keepRegion {
+		l.world.SetPosition(live, position.X, position.Y, position.Z)
+		return
+	}
 	if err := l.world.Move(live, position.X, position.Y, position.Z); err != nil {
 		l.log.Debug().Err(err).Int32("object_id", live.ObjectID()).Msg("move player")
 	}
-	l.revalidateZones(live, previous, revalidateForce)
+	l.revalidateZones(live, revalidateForce)
 }

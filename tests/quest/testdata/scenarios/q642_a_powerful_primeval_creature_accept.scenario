@@ -1,0 +1,46 @@
+# A Powerful Primeval Creature (Q642): a level 75 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q642_a_powerful_primeval_creature_accept.golden
+character Hero 75
+script quest.Q642_APowerfulPrimevalCreature
+item 8774 8775 57 8690 8692 8694 8696 8698 8700 8702 8704 8706 8708 8710
+page merchant/32105.htm
+page script/quest/Q642_APowerfulPrimevalCreature/
+npc dinn 32105 Merchant 10 0 0
+
+action dinn
+action dinn
+  S ActionFailed
+  S NpcHtmlMessage obj=dinn item=0 page=merchant/32105.htm
+  S ActionFailed
+bypass npc_{dinn}_Quest
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q642_APowerfulPrimevalCreature/32105-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q642_APowerfulPrimevalCreature 32105-02.htm
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q642_APowerfulPrimevalCreature/32105-02.htm
+  S ActionFailed
+bypass Quest Q642_APowerfulPrimevalCreature 32105-03.htm
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q642_APowerfulPrimevalCreature/32105-03.htm
+  S ActionFailed
+bypass Quest Q642_APowerfulPrimevalCreature 32105-04.htm
+  S QuestList 642:0x80000001
+  S ExShowQuestMark quest=642
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q642_APowerfulPrimevalCreature/32105-04.htm
+  S ActionFailed
+  Q upsert Q642_APowerfulPrimevalCreature | <state> | STARTED
+  Q upsert Q642_APowerfulPrimevalCreature | <cond> | 1
+  rows Q642_APowerfulPrimevalCreature <cond>=1 <state>=STARTED
+  state Q642_APowerfulPrimevalCreature STARTED
+action dinn
+  S ActionFailed
+  S NpcHtmlMessage obj=dinn item=0 page=merchant/32105.htm
+  S ActionFailed
+bypass npc_{dinn}_Quest
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q642_APowerfulPrimevalCreature/32105-08.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q642_APowerfulPrimevalCreature <cond>=1 <state>=STARTED
+  state Q642_APowerfulPrimevalCreature STARTED

@@ -17,6 +17,9 @@ const maxDesires = 50
 //
 // mu guards desires. An attacker's hit queues an attack desire from the
 // attacker's queue (AddAttackDesire) while the owner's AI ranks them.
+//
+// A nil queue is an empty one: it holds no desire and every method but
+// AddOrUpdate reads nothing from it and changes nothing.
 type DesireQueue struct {
 	mu      sync.RWMutex
 	desires []*Desire
@@ -53,6 +56,9 @@ func (q *DesireQueue) AddOrUpdate(desire *Desire) {
 // the queue is empty. Ties resolve to whichever entry the scan reaches
 // first.
 func (q *DesireQueue) Peek() (desire *Desire, ok bool) {
+	if q == nil {
+		return nil, false
+	}
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -73,6 +79,9 @@ func (q *DesireQueue) Peek() (desire *Desire, ok bool) {
 // Desire of the given kind. A Desire whose weight would drop below zero is
 // removed from the queue instead of going negative.
 func (q *DesireQueue) DecreaseWeightByType(kind Intention, amount float64) {
+	if q == nil {
+		return
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -91,6 +100,9 @@ func (q *DesireQueue) DecreaseWeightByType(kind Intention, amount float64) {
 
 // Remove drops queued Desires of kind aimed at target.
 func (q *DesireQueue) Remove(kind Intention, target attackable.Combatant) {
+	if q == nil {
+		return
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -99,18 +111,11 @@ func (q *DesireQueue) Remove(kind Intention, target attackable.Combatant) {
 	})
 }
 
-// RemoveFinalTarget drops every queued Desire aimed at target.
-func (q *DesireQueue) RemoveFinalTarget(target attackable.Combatant) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	q.removeLocked(func(d *Desire) bool {
-		return sameCombatant(d.FinalTarget, target)
-	})
-}
-
 // RemoveKind drops every queued Desire of kind.
 func (q *DesireQueue) RemoveKind(kind Intention) {
+	if q == nil {
+		return
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -132,6 +137,9 @@ func (q *DesireQueue) removeLocked(drop func(*Desire) bool) {
 
 // RemoveIf drops every queued Desire for which drop returns true.
 func (q *DesireQueue) RemoveIf(drop func(*Desire) bool) {
+	if q == nil {
+		return
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.removeLocked(drop)
@@ -139,6 +147,9 @@ func (q *DesireQueue) RemoveIf(drop func(*Desire) bool) {
 
 // hasKind reports whether any queued Desire has the given kind.
 func (q *DesireQueue) hasKind(kind Intention) bool {
+	if q == nil {
+		return false
+	}
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 	for _, d := range q.desires {
@@ -149,8 +160,18 @@ func (q *DesireQueue) hasKind(kind Intention) bool {
 	return false
 }
 
+// HasKind reports whether any queued Desire has the given kind.
+func (q *DesireQueue) HasKind(kind Intention) bool { return q.hasKind(kind) }
+
+// AnyMatch reports whether a queued Desire matches. match runs under the
+// queue's read lock and must not call back into the queue.
+func (q *DesireQueue) AnyMatch(match func(*Desire) bool) bool { return q.anyMatch(match) }
+
 // anyMatch reports whether a queued Desire matches.
 func (q *DesireQueue) anyMatch(match func(*Desire) bool) bool {
+	if q == nil {
+		return false
+	}
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 	return slices.ContainsFunc(q.desires, match)
@@ -158,6 +179,9 @@ func (q *DesireQueue) anyMatch(match func(*Desire) bool) bool {
 
 // Has reports whether a queued Desire is Equal to probe.
 func (q *DesireQueue) Has(probe *Desire) bool {
+	if q == nil {
+		return false
+	}
 	if probe == nil {
 		return false
 	}
@@ -178,6 +202,9 @@ func (q *DesireQueue) Has(probe *Desire) bool {
 // treated the same as no match, since callers only act on the non-moving
 // case.
 func (q *DesireQueue) NonMovingAttack(target attackable.Combatant) (*Desire, bool) {
+	if q == nil {
+		return nil, false
+	}
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -191,6 +218,9 @@ func (q *DesireQueue) NonMovingAttack(target attackable.Combatant) (*Desire, boo
 
 // Len returns the number of Desires currently queued.
 func (q *DesireQueue) Len() int {
+	if q == nil {
+		return 0
+	}
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -199,6 +229,9 @@ func (q *DesireQueue) Len() int {
 
 // Clear drops every queued Desire.
 func (q *DesireQueue) Clear() {
+	if q == nil {
+		return
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.desires = nil

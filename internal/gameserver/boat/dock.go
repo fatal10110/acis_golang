@@ -85,8 +85,8 @@ func (d *Dock) AdjustedBoardingPoint(origin, dest Point, inBoat bool) Point {
 	}
 	ratio := boardingRatio(inBoat)
 	return Point{
-		X: javaRound(float64(origin.X) + ratio*float64(dest.X-origin.X)),
-		Y: javaRound(float64(origin.Y) + ratio*float64(dest.Y-origin.Y)),
+		X: roundHalfUp(float64(origin.X) + ratio*float64(dest.X-origin.X)),
+		Y: roundHalfUp(float64(origin.Y) + ratio*float64(dest.Y-origin.Y)),
 	}
 }
 
@@ -152,16 +152,16 @@ func (p Point) angleTo(q Point) float64 {
 func (p Point) rotate(angle float64) Point {
 	cos, sin := math.Cos(angle), math.Sin(angle)
 	x, y := float64(p.X), float64(p.Y)
-	return Point{X: javaRound(x*cos - y*sin), Y: javaRound(x*sin + y*cos)}
+	return Point{X: roundHalfUp(x*cos - y*sin), Y: roundHalfUp(x*sin + y*cos)}
 }
 
 // scale multiplies p by factor, rounding each coordinate.
 func (p Point) scale(factor float64) Point {
-	return Point{X: javaRound(float64(p.X) * factor), Y: javaRound(float64(p.Y) * factor)}
+	return Point{X: roundHalfUp(float64(p.X) * factor), Y: roundHalfUp(float64(p.Y) * factor)}
 }
 
-// javaRound rounds half up, toward positive infinity.
-func javaRound(v float64) int { return int(math.Floor(v + 0.5)) }
+// roundHalfUp rounds half up, toward positive infinity.
+func roundHalfUp(v float64) int { return int(math.Floor(v + 0.5)) }
 
 // line is a segment from (x1, y1) to (x2, y2).
 type line struct{ x1, y1, x2, y2 int }
@@ -194,7 +194,7 @@ func (l line) adjustedIntersection(start, end Point, ratio float64) (Point, bool
 		return Point{}, false
 	}
 	return Point{
-		X: javaRound(float64(start.X) + ratio*float64(p.X-start.X)),
-		Y: javaRound(float64(start.Y) + ratio*float64(p.Y-start.Y)),
+		X: roundHalfUp(float64(start.X) + ratio*float64(p.X-start.X)),
+		Y: roundHalfUp(float64(start.Y) + ratio*float64(p.Y-start.Y)),
 	}, true
 }

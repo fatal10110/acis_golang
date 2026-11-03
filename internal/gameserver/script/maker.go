@@ -2,7 +2,9 @@ package script
 
 import (
 	"runtime/debug"
+	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
@@ -13,7 +15,34 @@ import (
 // MakerHooks. Every npcmaker gets a value of its own.
 type Maker struct {
 	MakerHooks
+	world MakerWorld
+	// run raises the maker's hooks; set by the registry.
+	run *makerRun
 }
+
+// SendSelf sends the maker's own npcmaker the script event e, as a maker
+// does through its npcmaker: World.Heard is told of it, then the maker's
+// ScriptEvent hook runs. A maker running its own hook directly through
+// ScriptEvent (a device resolving its own state) is not a send and is not
+// told to Heard.
+func (m *Maker) SendSelf(e MakerEvent) {
+	if heard := m.world.Heard; heard != nil {
+		heard(e.Group.Maker().Name, e.Name, e.Int1, e.Int2)
+	}
+	m.ScriptEvent(m, e)
+}
+
+// IsNight reports whether it is night in the game world (00:00 to 05:59
+// game time).
+func (m *Maker) IsNight() bool { return m.world.Night() }
+
+// Rnd returns a uniform random int in [0, n), drawn from the scripts'
+// random source; it panics when n is not positive.
+func (m *Maker) Rnd(n int) int { return m.world.Rand(n) }
+
+// Now returns the local wall-clock time, read from the clock the maker's
+// timers run on.
+func (m *Maker) Now() time.Time { return m.world.Now() }
 
 // MakerHooks holds a maker's handlers, one func field per hook; a nil
 // field does not react. The field list, the invokers and With are kept by
@@ -24,6 +53,12 @@ type MakerHooks struct {
 	OnNPCDeleted  func(*Maker, MakerNPC)
 	OnNPCDBInfo   func(*Maker, MakerSpawn)
 	OnScriptEvent func(*Maker, MakerEvent)
+	// OnDoorEvent runs for each opening or closing of a door the maker
+	// registered on with Door.AddMakerEvent.
+	OnDoorEvent func(*Maker, MakerDoor)
+	// OnSiegeEvent runs for each status change of a siege the maker
+	// registered on with Castle.AddMakerEvent.
+	OnSiegeEvent func(*Maker, MakerSiege)
 	// OnTimer is never raised by the engine: a maker schedules its own
 	// timers with the group's After or Every and calls it from there.
 	OnTimer func(*Maker, MakerTimer)
@@ -54,6 +89,20 @@ type MakerEvent struct {
 	Int1, Int2 int
 }
 
+// MakerSiege: the siege of Castle, which Group's maker registered on,
+// changed to Status.
+type MakerSiege struct {
+	Group  spawn.Group
+	Castle *Castle
+	Status SiegeStatus
+}
+
+// MakerDoor: Door, which Group's maker registered on, opened or closed.
+type MakerDoor struct {
+	Group spawn.Group
+	Door  *Door
+}
+
 // MakerTimer: the maker's timer Name came due.
 type MakerTimer struct {
 	Group spawn.Group
@@ -77,6 +126,12 @@ func (h MakerHooks) With(o MakerHooks) MakerHooks {
 	}
 	if o.OnScriptEvent != nil {
 		h.OnScriptEvent = o.OnScriptEvent
+	}
+	if o.OnSiegeEvent != nil {
+		h.OnSiegeEvent = o.OnSiegeEvent
+	}
+	if o.OnDoorEvent != nil {
+		h.OnDoorEvent = o.OnDoorEvent
 	}
 	if o.OnTimer != nil {
 		h.OnTimer = o.OnTimer
@@ -117,6 +172,18 @@ func (h *MakerHooks) ScriptEvent(m *Maker, e MakerEvent) {
 	}
 }
 
+func (h *MakerHooks) SiegeEvent(m *Maker, e MakerSiege) {
+	if h.OnSiegeEvent != nil {
+		h.OnSiegeEvent(m, e)
+	}
+}
+
+func (h *MakerHooks) DoorEvent(m *Maker, e MakerDoor) {
+	if h.OnDoorEvent != nil {
+		h.OnDoorEvent(m, e)
+	}
+}
+
 func (h *MakerHooks) Timer(m *Maker, e MakerTimer) {
 	if h.OnTimer != nil {
 		h.OnTimer(m, e)
@@ -132,13 +199,43 @@ type MakerCatalog map[string]func() Maker
 type Makers struct {
 	catalog  MakerCatalog
 	fallback func() Maker
+	world    MakerWorld
 	log      zerolog.Logger
 }
 
+// MakerWorld is what the makers read of the world.
+type MakerWorld struct {
+	// Night tells whether it is night in the game world.
+	Night func() bool
+	// Castles finds a castle by id; nil finds none.
+	Castles CastlesByID
+	// Sieges are the castles' sieges; nil finds none.
+	Sieges Sieges
+	// Doors are the doors of the world; nil finds none.
+	Doors Doors
+	// Rand returns a uniform random int in [0, n), from the source the
+	// scripts draw from (Env.Rand).
+	Rand func(n int) int
+	// Now returns the local wall-clock time, from the clock the maker
+	// timers run on.
+	Now func() time.Time
+	// Heard, when set, is told of each script event sent to an npcmaker by
+	// its name (a script's or another maker's), before the maker's script
+	// runs: the maker's name, the event and its two arguments. A test
+	// suite uses it to see which makers a send reached; it may be called
+	// from any goroutine a script runs on.
+	Heard func(maker, event string, int1, int2 int)
+}
+
+// CastlesByID finds a castle by its id.
+type CastlesByID interface {
+	Get(id int) (*castle.Castle, bool)
+}
+
 // NewMakers returns the registry of catalog, giving every type the catalog
-// lacks the maker fallback builds.
-func NewMakers(catalog MakerCatalog, fallback func() Maker, log zerolog.Logger) *Makers {
-	return &Makers{catalog: catalog, fallback: fallback, log: log}
+// lacks the maker fallback builds, its makers reading world.
+func NewMakers(catalog MakerCatalog, fallback func() Maker, world MakerWorld, log zerolog.Logger) *Makers {
+	return &Makers{catalog: catalog, fallback: fallback, world: world, log: log}
 }
 
 // Registered reports whether aiType has a maker of its own; any other type
@@ -155,7 +252,10 @@ func (r *Makers) New(aiType string) spawn.Behavior {
 		ctor = r.fallback
 	}
 	m := ctor()
-	return &makerRun{m: &m, aiType: aiType, log: r.log}
+	m.world = r.world
+	run := &makerRun{m: &m, aiType: aiType, log: r.log}
+	m.run = run
+	return run
 }
 
 // makerRun raises one npcmaker's maker hooks, each invocation recovering
@@ -183,8 +283,23 @@ func (r *makerRun) NPCDBInfo(g spawn.Group, s spawn.GroupSpawn) {
 }
 
 func (r *makerRun) ScriptEvent(g spawn.Group, name string, int1, int2 int) {
+	if heard := r.m.world.Heard; heard != nil {
+		heard(g.Maker().Name, name, int1, int2)
+	}
 	r.run(g, "onMakerScriptEvent", func() {
 		r.m.MakerHooks.ScriptEvent(r.m, MakerEvent{Group: g, Name: name, Int1: int1, Int2: int2})
+	})
+}
+
+func (r *makerRun) SiegeEvent(g spawn.Group, c *Castle, st SiegeStatus) {
+	r.run(g, "onSiegeEvent", func() {
+		r.m.MakerHooks.SiegeEvent(r.m, MakerSiege{Group: g, Castle: c, Status: st})
+	})
+}
+
+func (r *makerRun) DoorEvent(g spawn.Group, d *Door) {
+	r.run(g, "onDoorEvent", func() {
+		r.m.MakerHooks.DoorEvent(r.m, MakerDoor{Group: g, Door: d})
 	})
 }
 

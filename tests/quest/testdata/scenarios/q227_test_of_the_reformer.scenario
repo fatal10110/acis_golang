@@ -1,0 +1,299 @@
+# Test of the Reformer (Q227), played by a level 39 Cleric who holds the Book of Reform and the
+# Huge Nail already (the Nameless revenant and its Aruraune need a skill hit, which a traced scenario
+# cannot play): Pupina sends it with the letter of introduction to Sla; Sla to Katari, whose
+# inspector, pilgrim and betrayer this scenario kills at their fixtures and talks to; the Ol Mahum
+# money and the greetings; Kakan sends it to the Crimson werewolf; Nyakuri to the Krudel lizardman;
+# Ramus asks for the five bone fragments of the skeletons and the horror; Sla gives the Mark of
+# Reformer. Katari, Kakan and Nyakuri call pilgrims, an inspector, a betrayer, a werewolf and a
+# lizardman which the scenario cannot reach; the Boot tests play them.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q227_test_of_the_reformer.golden
+character Reformer 39
+class 15
+quest Q227_TestOfTheReformer <state>=STARTED <cond>=3
+hold 2822 1
+hold 2832 1
+script quest.Q227_TestOfTheReformer
+item 2821 2822 2823 2824 2825 2826 2827 2828 2829 2830 2831 2832 2833 2834 2835 2836 2837 2838 2839 3037 7562
+page trainer/30118.htm
+page default/30666.htm
+page default/30667.htm
+page default/30668.htm
+page default/30669.htm
+page default/30670.htm
+page default/30732.htm
+page script/quest/Q227_TestOfTheReformer/
+npc pupina 30118 Trainer 10 0 0
+npc sla 30666 Folk -10 0 0
+npc ramus 30667 Folk 0 10 0
+npc katari 30668 Folk 0 -10 0
+npc kakan 30669 Folk 10 10 0
+npc nyakuri 30670 Folk -10 10 0
+npc pilgrim 30732 Folk 10 -10 0
+npc inspector 27129 Monster 40 0 0
+npc betrayer 27130 Monster -40 0 0
+npc werewolf 27131 Monster 0 40 0
+npc krudel 27132 Monster 0 -40 0
+npc horror 20404 Monster 40 40 0
+npc lord 20104 Monster -40 40 0
+npc marksman 20102 Monster 40 -40 0
+npc misery 20022 Monster -40 -40 0
+npc archer 20100 Monster 60 0 0
+
+# Pupina: the huge nail is in, so she sends the traveller to Sla.
+action pupina
+action pupina
+  S ActionFailed
+  S NpcHtmlMessage obj=pupina item=0 page=trainer/30118.htm
+  S ActionFailed
+bypass npc_{pupina}_Quest
+  S NpcHtmlMessage obj=pupina item=0 page=script/quest/Q227_TestOfTheReformer/30118-05.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=3 <state>=STARTED
+bypass Quest Q227_TestOfTheReformer 30118-06.htm
+  S QuestList 227:0x8000000f
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2822
+  S SystemMessage id=302 3:2832
+  S SystemMessage id=54 3:2823
+  S NpcHtmlMessage obj=pupina item=0 page=script/quest/Q227_TestOfTheReformer/30118-06.htm
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 4
+  items 2822=0 2832=0 2823=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=4 <state>=STARTED
+action pupina
+  S ActionFailed
+  S NpcHtmlMessage obj=pupina item=0 page=trainer/30118.htm
+  S ActionFailed
+action pupina
+  S ActionFailed
+  S NpcHtmlMessage obj=pupina item=0 page=trainer/30118.htm
+  S ActionFailed
+bypass npc_{pupina}_Quest
+  S NpcHtmlMessage obj=pupina item=0 page=script/quest/Q227_TestOfTheReformer/30118-07.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=4 <state>=STARTED
+# Sla takes the letter of introduction for hers.
+action sla
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+bypass npc_{sla}_Quest
+  S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=4 <state>=STARTED
+bypass Quest Q227_TestOfTheReformer 30666-03.htm
+  S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-03.htm
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=4 <state>=STARTED
+bypass Quest Q227_TestOfTheReformer 30666-04.htm
+  S QuestList 227:0x8000001f
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2823
+  S SystemMessage id=54 3:2824
+  S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-04.htm
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 5
+  items 2823=0 2824=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=5 <state>=STARTED
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+bypass npc_{sla}_Quest
+  S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-05.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=5 <state>=STARTED
+# Katari takes Sla's letter and calls the pilgrim and the inspector; the inspector dies.
+action katari
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+bypass npc_{katari}_Quest
+  S QuestList 227:0x8000003f
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2824
+  S NpcHtmlMessage obj=katari item=0 page=script/quest/Q227_TestOfTheReformer/30668-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 6
+  items 2824=0
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=6 <state>=STARTED
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+bypass npc_{katari}_Quest
+  S NpcHtmlMessage obj=katari item=0 page=script/quest/Q227_TestOfTheReformer/30668-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=6 <state>=STARTED
+kill inspector
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 227:0x8000007f
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q227_TestOfTheReformer | <cond> | 7
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=7 <state>=STARTED
+# The pilgrim gives the Ol Mahum money.
+action pilgrim
+action pilgrim
+  S ActionFailed
+  S NpcHtmlMessage obj=pilgrim item=0 page=default/30732.htm
+  S ActionFailed
+bypass npc_{pilgrim}_Quest
+  S QuestList 227:0x800000ff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2826
+  S NpcHtmlMessage obj=pilgrim item=0 page=script/quest/Q227_TestOfTheReformer/30732-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 8
+  items 2826=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=8 <state>=STARTED
+# Katari calls the betrayer, who dies and drops the letter of betrayal.
+action katari
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+bypass npc_{katari}_Quest
+  S NpcHtmlMessage obj=katari item=0 page=script/quest/Q227_TestOfTheReformer/30668-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=8 <state>=STARTED
+kill betrayer
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 227:0x800001ff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2833
+  Q upsert Q227_TestOfTheReformer | <cond> | 9
+  items 2833=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=9 <state>=STARTED
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+bypass npc_{katari}_Quest
+  S QuestList 227:0x800003ff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2833
+  S SystemMessage id=54 3:2827
+  S NpcHtmlMessage obj=katari item=0 page=script/quest/Q227_TestOfTheReformer/30668-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 10
+  items 2833=0 2827=1
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=10 <state>=STARTED
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+action katari
+  S ActionFailed
+  S NpcHtmlMessage obj=katari item=0 page=default/30668.htm
+  S ActionFailed
+bypass npc_{katari}_Quest
+  S NpcHtmlMessage obj=katari item=0 page=script/quest/Q227_TestOfTheReformer/30668-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=10 <state>=STARTED
+# Sla trades the money for three greetings.
+action sla
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+bypass npc_{sla}_Quest
+  S QuestList 227:0x800007ff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2826
+  S SystemMessage id=53 3:2825 6:3
+  S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 11
+  items 2826=0 2825=3
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=11 <state>=STARTED
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+action sla
+  S ActionFailed
+  S NpcHtmlMessage obj=sla item=0 page=default/30666.htm
+  S ActionFailed
+bypass npc_{sla}_Quest
+  S NpcHtmlMessage obj=sla item=0 page=script/quest/Q227_TestOfTheReformer/30666-06.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=11 <state>=STARTED
+# Kakan calls the pilgrim and the werewolf; only an allowed skill spares the werewolf its mark, so the late
+# half of the test is played from cond 13 by its own scenario.
+action kakan
+action kakan
+  S ActionFailed
+  S NpcHtmlMessage obj=kakan item=0 page=default/30669.htm
+  S ActionFailed
+bypass npc_{kakan}_Quest
+  S NpcHtmlMessage obj=kakan item=0 page=script/quest/Q227_TestOfTheReformer/30669-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=11 <state>=STARTED
+bypass Quest Q227_TestOfTheReformer 30669-02.htm
+  S NpcHtmlMessage obj=kakan item=0 page=script/quest/Q227_TestOfTheReformer/30669-02.htm
+  S ActionFailed
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=11 <state>=STARTED
+bypass Quest Q227_TestOfTheReformer 30669-03.htm
+  S QuestList 227:0x80000fff
+  S ExShowQuestMark quest=227
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kakan item=0 page=script/quest/Q227_TestOfTheReformer/30669-03.htm
+  S ActionFailed
+  Q upsert Q227_TestOfTheReformer | <cond> | 12
+  state Q227_TestOfTheReformer STARTED
+  rows Q227_TestOfTheReformer <cond>=12 <state>=STARTED

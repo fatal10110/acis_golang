@@ -1,0 +1,34 @@
+# Test Of Magus (Q228), a Dark Wizard (class 39) of level 39 may start it: Rukal offers it on
+# the 30629-03 page and the 30629-04 bypass accepts, paying the level 39 set's Dimensional Diamonds.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q228_test_of_magus_dark_wizard.golden
+character Warlock 39
+class 39
+script quest.Q228_TestOfMagus
+item 2840 2841 2842 2843 2844 2845 2846 2847 2848 2849 2850 2851 2852 2853 2854 2855 2856 2857 2858 2859 2860 2861 2862 2863 7562
+page default/30629.htm
+page script/quest/Q228_TestOfMagus/
+npc rukal 30629 Folk 10 0 0
+
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30629-04.htm
+  S QuestList 228:0x80000001
+  S ExShowQuestMark quest=228
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2841
+  S SystemMessage id=53 3:7562 6:122
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-04a.htm
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <state> | STARTED
+  Q upsert Q228_TestOfMagus | <cond> | 1
+  M set secondClassChange39 | true
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=1

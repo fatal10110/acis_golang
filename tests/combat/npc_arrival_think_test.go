@@ -74,11 +74,7 @@ func TestArrivalLeavesQueuedAttackForNextRunAI(t *testing.T) {
 	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionAttack, FinalTarget: victim}) {
 		t.Fatal("attack desire dropped on arrival, want it still queued")
 	}
-	for {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		switch frame[0] {
 		case serverpackets.OpcodeAttack, serverpackets.OpcodeMoveToPawn, serverpackets.OpcodeMoveToLocation:
 			t.Fatalf("arrival sent opcode %#x, want no attack or chase before the next runAI", frame[0])
@@ -137,7 +133,7 @@ func TestChaseArrivalSwingsOnNextAICycle(t *testing.T) {
 	}
 
 	swung := func() bool {
-		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+		for _, frame := range c.ReadQueued() {
 			if frame[0] == serverpackets.OpcodeAttack && len(frame) >= 5 && wireReader(frame[1:]).ReadInt32() == hostile.ObjectID() {
 				return true
 			}

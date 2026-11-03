@@ -7,7 +7,6 @@ import (
 	"math"
 	"net"
 	"testing"
-	"unicode/utf16"
 )
 
 // ---- from frame_length_test.go ----
@@ -424,22 +423,26 @@ func TestMaxStringUnitsCoversLargestFramePayload(t *testing.T) {
 	}
 }
 
-func TestReaderReadStringDecodesLikeUTF16Decode(t *testing.T) {
-	cases := [][]uint16{
-		{},
-		{'a', 'b', 'c'},
-		{0x0439, 0x4E2D, 0xFFFF},         // 2- and 3-byte UTF-8 runes
-		{0xD83D, 0xDE00},                 // valid surrogate pair
-		{0xD83D},                         // lone high surrogate at end
-		{0xDE00, 'x'},                    // lone low surrogate
-		{0xD83D, 'x', 0xD83D, 0xDE00},    // high surrogate followed by non-low
-		{0xD83D, 0xD83D, 0xDE00, 0xDE00}, // high, pair, low
+func TestReaderReadStringDecodesUTF16(t *testing.T) {
+	cases := []struct {
+		units []uint16
+		want  string
+	}{
+		{nil, ""},
+		{[]uint16{'a', 'b', 'c'}, "abc"},
+		{[]uint16{0x0439, 0x4E2D, 0xFFFF}, "\u0439\u4E2D\uFFFF"}, // 2- and 3-byte UTF-8 runes
+		{[]uint16{0xD83D, 0xDE00}, "\U0001F600"},                 // valid surrogate pair
+		// An unpaired surrogate reads as U+FFFD, one unit for one.
+		{[]uint16{0xD83D}, "\uFFFD"},                                         // lone high surrogate at end
+		{[]uint16{0xDE00, 'x'}, "\uFFFDx"},                                   // lone low surrogate
+		{[]uint16{0xD83D, 'x', 0xD83D, 0xDE00}, "\uFFFDx\U0001F600"},         // high surrogate followed by non-low
+		{[]uint16{0xD83D, 0xD83D, 0xDE00, 0xDE00}, "\uFFFD\U0001F600\uFFFD"}, // high, pair, low
+		{[]uint16{0xDE00, 0xD83D}, "\uFFFD\uFFFD"},                           // reversed pair
 	}
-	for _, units := range cases {
-		want := string(utf16.Decode(units))
-		r := NewReader(append(utf16LE(units, true), 0x7F))
-		if got := r.ReadString(); got != want {
-			t.Fatalf("ReadString(%04X) = %q, want %q", units, got, want)
+	for _, tc := range cases {
+		r := NewReader(append(utf16LE(tc.units, true), 0x7F))
+		if got := r.ReadString(); got != tc.want {
+			t.Fatalf("ReadString(%04X) = %q, want %q", tc.units, got, tc.want)
 		}
 		if got := r.ReadUint8(); got != 0x7F || r.Err() != nil {
 			t.Fatalf("byte after string = %#x, Err() = %v; want 0x7F, nil", got, r.Err())
@@ -610,5 +613,14 @@ func TestFrameFootprintCountsOwnedWriterCapacity(t *testing.T) {
 	}
 	if got := BorrowedFrame(make([]byte, 40)).Footprint(); got != 40 {
 		t.Fatalf("borrowed 40-byte frame: Footprint = %d, want 40", got)
+	}
+}
+
+func TestWriterWriteUTF16WritesUnitsVerbatim(t *testing.T) {
+	units := []uint16{'a', 0xD83D, 0xDE00, 0xD83D}
+	var w Writer
+	w.WriteUTF16(units)
+	if got, want := w.Bytes(), utf16LE(units, true); !bytes.Equal(got, want) {
+		t.Fatalf("WriteUTF16(%04X) = % X, want % X", units, got, want)
 	}
 }

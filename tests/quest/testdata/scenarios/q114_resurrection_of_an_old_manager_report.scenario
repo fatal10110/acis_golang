@@ -1,0 +1,58 @@
+# Resurrection of an Old Manager (Q114), cond 8 to 9: Wendy's report (talk 2) moves the quest
+# to cond 9 on its last page. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager_report.golden
+character Manager 49
+quest Q114_ResurrectionOfAnOldManager <cond>=8 <state>=STARTED choice=2 talk=0
+script quest.Q114_ResurrectionOfAnOldManager
+item 57 8090 8091 8287 8288 8289
+page default/32047.htm
+page default/32041.htm
+page script/quest/Q114_ResurrectionOfAnOldManager/
+npc wendy 32047 Folk 20 0 0
+npc yumi 32041 Folk 10 0 0
+
+action wendy
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-30.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-31.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-31.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-30.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-30.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 2
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-33.htm
+  S QuestList 114:0x800001ff
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-34.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 9
+  rows Q114_ResurrectionOfAnOldManager <cond>=9 <state>=STARTED choice=2 talk=2
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-27.htm
+  S ActionFailed
+  S ActionFailed
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-22.htm
+  S ActionFailed
+  S ActionFailed

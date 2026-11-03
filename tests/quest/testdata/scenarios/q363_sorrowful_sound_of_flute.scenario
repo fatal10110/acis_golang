@@ -1,0 +1,127 @@
+# Sorrowful Sound of Flute (Q363): a level 15 character accepts at Nanarin, asks Opix, picks the flute and
+# hands it to Barbado, who plays it; Nanarin pays with the Theme of Solitude; then relog. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q363_sorrowful_sound_of_flute.golden
+character Flute 15
+script quest.Q363_SorrowfulSoundOfFlute
+item 4318 4319 4320 4420
+page default/30956.htm
+page villagemaster/30595.htm
+page default/30959.htm
+page script/quest/Q363_SorrowfulSoundOfFlute/
+npc nanarin 30956 Folk 10 0 0
+npc opix 30595 VillageMasterDwarf 20 0 0
+npc barbado 30959 Folk 30 0 0
+
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q363_SorrowfulSoundOfFlute 30956-02.htm
+  S QuestList 363:0x80000001
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-02.htm
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <state> | STARTED
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 1
+  state Q363_SorrowfulSoundOfFlute STARTED
+  rows Q363_SorrowfulSoundOfFlute <cond>=1 <state>=STARTED
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-02.htm
+  S ActionFailed
+  S ActionFailed
+action opix
+action opix
+  S ActionFailed
+  S NpcHtmlMessage obj=opix item=0 page=villagemaster/30595.htm
+  S ActionFailed
+bypass npc_{opix}_Quest
+  S QuestList 363:0x80000003
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=opix item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30595-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 2
+  rows Q363_SorrowfulSoundOfFlute <cond>=2 <state>=STARTED
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q363_SorrowfulSoundOfFlute 30956-06.htm
+  S QuestList 363:0x80000007
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4319
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-06.htm
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 3
+  rows Q363_SorrowfulSoundOfFlute <cond>=3 <state>=STARTED
+  items 4319=1
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-08.htm
+  S ActionFailed
+  S ActionFailed
+action barbado
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S QuestList 363:0x8000000f
+  S ExShowQuestMark quest=363
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4319
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30959-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q363_SorrowfulSoundOfFlute | <cond> | 4
+  Q upsert Q363_SorrowfulSoundOfFlute | success | 1
+  rows Q363_SorrowfulSoundOfFlute <cond>=4 <state>=STARTED success=1
+  items 4319=0
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30959-03.htm
+  S ActionFailed
+  S ActionFailed
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S SystemMessage id=54 3:4420
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q363_SorrowfulSoundOfFlute
+  items 4420=1
+  state Q363_SorrowfulSoundOfFlute -
+  rows Q363_SorrowfulSoundOfFlute -
+relog
+  rows Q363_SorrowfulSoundOfFlute -
+  items 4420=1

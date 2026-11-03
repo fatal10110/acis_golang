@@ -2,11 +2,10 @@ package zone
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // TargetScope narrows which occupant families an effect zone works on.
@@ -94,43 +93,23 @@ type Effect struct {
 	pulsing atomic.Bool
 }
 
-// NewEffect builds an effect zone from its data settings.
-func NewEffect(id int, form Form, set *commons.StatSet) (*Effect, error) {
-	f := commons.NewFields(set, "zone: effect")
-	chance := f.IntDefault("chance", 100)
-	initial := f.IntDefault("initialDelay", 0)
-	reuse := f.IntDefault("reuseDelay", 30000)
-	enabled := f.BoolDefault("defaultStatus", true)
-	skills, err := parseSkillRefs(f.StringDefault("skill", ""))
-	if err != nil {
-		f.Fail(err)
-	}
-	target := ScopePlayer
-	if raw := f.StringDefault("targetType", ""); raw != "" {
-		if t, err := ParseTargetScope(raw); err != nil {
-			f.Fail(err)
-		} else {
-			target = t
-		}
-	}
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
+// NewEffect builds an enabled effect zone with no skills, a 100 percent
+// chance and a 30 second pulse starting at once, aimed at players; the
+// loader overrides these from the zone's data settings before publishing it.
+func NewEffect(id int, form Form) *Effect {
 	z := &Effect{
-		Zone:         newZone(id, form),
-		Skills:       skills,
-		Chance:       chance,
-		InitialDelay: time.Duration(initial) * time.Millisecond,
-		ReuseDelay:   time.Duration(reuse) * time.Millisecond,
-		Target:       target,
+		Zone:       newZone(id, form),
+		Chance:     100,
+		ReuseDelay: 30 * time.Second,
+		Target:     ScopePlayer,
 	}
-	z.enabled.Store(enabled)
-	return z, nil
+	z.enabled.Store(true)
+	return z
 }
 
-// parseSkillRefs parses the data files' skill list syntax: semicolon
-// separated "id-level" pairs.
-func parseSkillRefs(raw string) ([]SkillRef, error) {
+// ParseSkillRefs parses the data files' skill list syntax: semicolon
+// separated "id-level" pairs. An empty list is no skills.
+func ParseSkillRefs(raw string) ([]SkillRef, error) {
 	if raw == "" {
 		return nil, nil
 	}
@@ -141,11 +120,11 @@ func parseSkillRefs(raw string) ([]SkillRef, error) {
 		if len(idLevel) != 2 {
 			return nil, fmt.Errorf("zone: malformed skill reference %q", part)
 		}
-		id, err := commons.Atoi(idLevel[0])
+		id, err := strconv.Atoi(idLevel[0])
 		if err != nil {
 			return nil, fmt.Errorf("zone: malformed skill reference %q: %w", part, err)
 		}
-		level, err := commons.Atoi(idLevel[1])
+		level, err := strconv.Atoi(idLevel[1])
 		if err != nil {
 			return nil, fmt.Errorf("zone: malformed skill reference %q: %w", part, err)
 		}

@@ -5,13 +5,15 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// petNamePattern is the valid pet name: 1 to 16 ASCII letters or digits.
-var petNamePattern = regexp.MustCompile(`^[A-Za-z0-9]{1,16}$`)
+// shortNamePattern is 1 to 16 ASCII letters or digits: a valid pet name,
+// and the name //set name gives a player.
+var shortNamePattern = regexp.MustCompile(`^[A-Za-z0-9]{1,16}$`)
 
 type petNameStore interface {
 	NameTaken(context.Context, string) (bool, error)
@@ -68,7 +70,7 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 	if !ok {
 		return nil
 	}
-	if len(req.Name) < 1 || len(req.Name) > 16 {
+	if n := commons.UTF16Len(req.Name); n < 1 || n > 16 {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingCharnameUpTo16Chars))
 		return nil
 	}
@@ -76,11 +78,11 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingYouCannotSetNameOfThePet))
 		return nil
 	}
-	if !petNamePattern.MatchString(req.Name) {
+	if !shortNamePattern.MatchString(req.Name) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingPetnameContainsInvalidChars))
 		return nil
 	}
-	if l.npcs == nil || l.petStore == nil {
+	if l.npcs == nil || l.summoning.store == nil {
 		return nil
 	}
 	// The npc-name collision (silent reject) is checked before the pets
@@ -88,7 +90,7 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 	if _, ok := l.npcs.GetByName(req.Name); ok {
 		return nil
 	}
-	store, ok := l.petStore.(petNameStore)
+	store, ok := l.summoning.store.(petNameStore)
 	if !ok {
 		return nil
 	}
@@ -135,7 +137,7 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 	// so an older copy cannot land after it. The rename does not wait for the write:
 	// the rename itself is in memory and the name is otherwise stored with
 	// the pet's next save, so a failed write is logged, not rolled back.
-	pets, log := l.petStore, l.log
+	pets, log := l.summoning.store, l.log
 	l.persist.Enqueue(itemObjectID, func() {
 		saveCtx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
@@ -144,9 +146,7 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 		}
 	})
 	if inv := live.Inventory(); inv != nil {
-		if control := inv.ItemByObjectID(actor.ControlItemID()); control != nil {
-			control.SetCustomType2(1)
-		}
+		inv.SetCustomType2(inv.ItemByObjectID(actor.ControlItemID()), 1)
 	}
 	actor.UpdateStatus()
 	sendSummonInfosToOwner(actor)

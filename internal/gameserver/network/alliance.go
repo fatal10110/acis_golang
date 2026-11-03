@@ -31,13 +31,13 @@ func (l *GameClientLink) requestJoinAlly(live *livePlayer, req clientpackets.Req
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveInvitedTheWrongTarget))
 		return
 	}
-	if check := l.clanService().CheckAllyJoin(c.ID, target.Character, time.Now()); check.Refusal != clan.AllyJoinAllowed {
-		sendAllyJoinRefusal(live, target.Name, check)
+	if check := l.clanService().CheckAllyJoin(c.ID, target.Character, time.Now(), l.sieges); check.Refusal != clan.AllyJoinAllowed {
+		sendAllyJoinRefusal(live, target.CharacterName(), check)
 		return
 	}
-	switch l.clanService().Invites().Send(clan.InviteJoinAlly, c.ID, c.Name, target.ObjectID(), 0) {
+	switch l.clanService().Invites().Send(clan.InviteJoinAlly, c.ID, c.CharacterName(), target.ObjectID(), 0) {
 	case clan.InviteTargetBusy:
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	case clan.InviteRequesterBusy:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWaitingForAnotherReply))
@@ -45,7 +45,7 @@ func (l *GameClientLink) requestJoinAlly(live *livePlayer, req clientpackets.Req
 	}
 	allyName := cl.Info().AllyName
 	target.SendFrame(serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageS2AllianceLeaderOfS1Requested,
-		serverpackets.TextParam(allyName), serverpackets.TextParam(c.Name)))
+		serverpackets.TextParam(allyName), serverpackets.TextParam(c.CharacterName())))
 	target.SendFrame(serverpackets.FrameAskJoinAlly(c.ObjectID(), allyName))
 }
 
@@ -75,6 +75,8 @@ func sendAllyJoinRefusal(to *livePlayer, target string, check clan.AllyJoinCheck
 		frame = serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CantEnterAllianceWithin1Day, check.Target.Name())
 	case clan.AllyJoinTargetDismissedPenalty:
 		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantEnterAllianceWithin1Day)
+	case clan.AllyJoinOpposedInSiege:
+		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageOpposingClanInSiege)
 	case clan.AllyJoinAtWar:
 		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageMayNotAllyClanBattle)
 	case clan.AllyJoinFull:
@@ -109,9 +111,9 @@ func (l *GameClientLink) requestAnswerJoinAlly(live *livePlayer, req clientpacke
 	if !ok || sent.Kind != clan.InviteJoinAlly {
 		return
 	}
-	check := l.clanService().JoinAlly(invite.RequesterID, c, time.Now())
+	check := l.clanService().JoinAlly(invite.RequesterID, c, time.Now(), l.sieges)
 	if check.Refusal != clan.AllyJoinAllowed {
-		sendAllyJoinRefusal(requester, c.Name, check)
+		sendAllyJoinRefusal(requester, c.CharacterName(), check)
 		return
 	}
 	l.refreshClanAppearance(live, check.Target)
@@ -179,7 +181,7 @@ func (l *GameClientLink) requestDismissAlly(live *livePlayer) {
 // refreshed, then live takes a full death's experience loss. A clanless
 // player's request does nothing.
 func (l *GameClientLink) dissolveAlly(live *livePlayer) {
-	out, result := l.clanService().DissolveAlly(live.Character, l.crests, time.Now())
+	out, result := l.clanService().DissolveAlly(live.Character, l.crests, time.Now(), l.sieges)
 	switch result {
 	case clan.AllyDissolveNoClan:
 		l.log.Debug().Int32("object_id", live.ObjectID()).Msg("alliance dissolution from a clanless player")
@@ -189,6 +191,9 @@ func (l *GameClientLink) dissolveAlly(live *livePlayer) {
 		return
 	case clan.AllyDissolveNotAllyLeader:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFeatureOnlyForAllianceLeader))
+		return
+	case clan.AllyDissolveInSiege:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDissolveAllyInSiege))
 		return
 	}
 	l.broadcastToClans(out.Clans, func() wire.Frame {
@@ -217,7 +222,7 @@ func (l *GameClientLink) broadcastToClans(clans []*clan.Clan, build func() wire.
 // createAlly founds the alliance name with live's clan as its leading clan.
 func (l *GameClientLink) createAlly(live *livePlayer, name string) {
 	var msg int
-	switch l.clanService().CreateAlly(live.Character, name, time.Now()) {
+	switch l.clanService().CreateAlly(live.Character, name, time.Now(), l.sieges) {
 	case clan.AllyCreated:
 		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 		return
@@ -237,6 +242,8 @@ func (l *GameClientLink) createAlly(live *livePlayer, name string) {
 		msg = serverpackets.SystemMessageIncorrectAllianceNameLength
 	case clan.AllyCreateNameTaken:
 		msg = serverpackets.SystemMessageAllianceAlreadyExists
+	case clan.AllyCreateInSiege:
+		msg = serverpackets.SystemMessageNoAllyCreationInSiege
 	}
 	live.SendFrame(serverpackets.FrameSystemMessage(msg))
 }

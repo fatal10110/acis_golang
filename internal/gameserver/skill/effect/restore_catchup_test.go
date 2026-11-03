@@ -89,9 +89,9 @@ func TestApplyRestoredEndsAPoisonWhoseWholeRunPassedWithItsDamage(t *testing.T) 
 	}
 }
 
-// A restored poison from a skill whose damage-over-time may kill still runs
-// from the replay: none of its ticks run on the loading screen (#3394).
-func TestApplyRestoredLeavesALethalPoisonToTheReplay(t *testing.T) {
+// A restored poison from a skill whose damage-over-time may kill runs the
+// ticks due on the loading screen as any other poison does (#3394).
+func TestApplyRestoredRunsTheLoadingScreenTicksOfALethalPoison(t *testing.T) {
 	now := time.Unix(5000, 0)
 	var events []string
 	list := catchUpList(now, &events)
@@ -99,12 +99,11 @@ func TestApplyRestoredLeavesALethalPoisonToTheReplay(t *testing.T) {
 
 	ApplyRestored(list, target, target, Skill{ID: 4082, Level: 1, KillByDOT: true}, restoredPoison(10, 3), 10, 1, now.Add(-40*time.Second))
 
-	if target.hp != 100 || damageTicks(target.events) != 0 {
-		t.Fatalf("HP after the replay = %g (%v), want 100: a lethal poison waits for the replay", target.hp, target.events)
+	if target.hp != 50 || damageTicks(target.events) != 10 {
+		t.Fatalf("HP after the replay = %g (%v), want 50: all ten 5 HP ticks came due on the loading screen", target.hp, target.events)
 	}
-	held := list.All()
-	if len(held) != 1 || held[0].Remaining() != 10 {
-		t.Fatalf("list after the replay = %d effects, want the lethal poison with all 10 ticks left", len(held))
+	if held := list.All(); len(held) != 0 {
+		t.Fatalf("list after the replay holds %d effects, want the ended poison gone", len(held))
 	}
 }
 

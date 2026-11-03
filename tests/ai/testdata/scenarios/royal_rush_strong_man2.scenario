@@ -1,0 +1,17 @@
+# RoyalRushStrongMan2 (18159, level 81): as strong man 1 save that a mate hitting it while it fights the
+# character makes it want its first DD magic (4657) on the character, not its self range blast.
+clock 00:10:00
+character Hunter 20
+random always 0
+member Mate 20 -1500 0 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2
+npc sm 18159 Monster 100 0 0 level 81 skill SELF_BUFF 4318 1 skill PHYSICAL_SPECIAL1 4582 9 skill DD_MAGIC1 4657 9
+
+hit sm 10
+  desires sm attack(player)=211.36363636363637 cast(player,4582,move)=1000000 cast(sm,4318,move)=1000000
+hit sm 10 by Mate
+  desires sm attack(player)=211.36363636363637 attack(Mate)=11.363636363636363 cast(player,4582,move)=1000000 cast(sm,4318,move)=1000000 cast(player,4657,move)=1000000

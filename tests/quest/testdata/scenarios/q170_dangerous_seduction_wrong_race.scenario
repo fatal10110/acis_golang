@@ -1,0 +1,22 @@
+# Dangerous Seduction (Q170), refused: a human fighter of level 21 is turned away by Vellior,
+# who takes dark elves only, and the quest is not started. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q170_dangerous_seduction_wrong_race.golden
+character Stranger 21
+script quest.Q170_DangerousSeduction
+item 1046
+page default/30305.htm
+page script/quest/Q170_DangerousSeduction/
+npc vellior 30305 Folk 10 0 0
+
+action vellior
+action vellior
+  S ActionFailed
+  S NpcHtmlMessage obj=vellior item=0 page=default/30305.htm
+  S ActionFailed
+bypass npc_{vellior}_Quest
+  S NpcHtmlMessage obj=vellior item=0 page=script/quest/Q170_DangerousSeduction/30305-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q170_DangerousSeduction CREATED
+  rows Q170_DangerousSeduction -

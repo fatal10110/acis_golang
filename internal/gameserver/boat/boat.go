@@ -40,6 +40,8 @@ type Boat struct {
 	passengers []int32
 	// fare is the ticket collection due after a departure.
 	fare fareDue
+	// retired marks a boat taken out of its fleet: it takes no one aboard.
+	retired bool
 
 	// Owned by the tick goroutine.
 	xAccurate, yAccurate float64
@@ -61,6 +63,10 @@ func (*Boat) Kind() actor.Kind { return actor.KindBoat }
 // Attach installs sink as the receiver of this boat's events. Call it once,
 // before the boat is spawned.
 func (b *Boat) Attach(sink event.Sink) { b.sink = sink }
+
+// Remove takes b, retired from its fleet, out of the world: whoever sees
+// it forgets it.
+func (b *Boat) Remove() { b.world.Despawn(b) }
 
 // Departure reports the leg the boat is under way on: where it heads and
 // the move and rotation speeds it travels with. ok is false while the boat

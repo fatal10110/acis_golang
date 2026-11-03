@@ -70,7 +70,7 @@ func TestCharacterReduceDeathPenaltyLevelFiresReducedUpdater(t *testing.T) {
 
 func TestCharacterDeathPenaltySkillUpdaterReplacesLevelOnEachChange(t *testing.T) {
 	c := &Character{ID: 1}
-	c.deathPenaltyChance = 100
+	setRules(c, func(r *Rules) { r.DeathPenaltyChance = 100 })
 	rec := recordEvents(c)
 
 	c.RaiseDeathPenaltyLevel(nil, 1)
@@ -116,7 +116,7 @@ func TestRaiseDeathPenaltyLevelRejectsPlayerKiller(t *testing.T) {
 
 func TestRaiseDeathPenaltyLevelNoKarmaFailsChanceRoll(t *testing.T) {
 	c := &Character{ID: 1}
-	c.deathPenaltyChance = 20
+	setRules(c, func(r *Rules) { r.DeathPenaltyChance = 20 })
 
 	// roll above the configured chance, no karma: blocked.
 	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 21); changed || got != 0 {
@@ -130,7 +130,7 @@ func TestRaiseDeathPenaltyLevelNoKarmaFailsChanceRoll(t *testing.T) {
 
 func TestRaiseDeathPenaltyLevelUsesConfiguredChance(t *testing.T) {
 	c := &Character{ID: 1}
-	c.deathPenaltyChance = 0
+	setRules(c, func(r *Rules) { r.DeathPenaltyChance = 0 })
 
 	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 1); changed || got != 0 {
 		t.Fatalf("RaiseDeathPenaltyLevel(configured chance) = (%d, %v), want (0, false)", got, changed)

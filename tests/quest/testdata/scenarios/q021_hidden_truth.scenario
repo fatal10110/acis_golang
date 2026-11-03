@@ -1,0 +1,362 @@
+# Hidden Truth (Q021), played by a level 63 character: the mysterious wizard starts it; the
+# tombstone wakes the duke's ghost (far away, out of sight; a second call finds it there); the
+# duke calls his page, whose walk ends 9.5 s later and marks end_walk; the bookshelf drops a
+# book, the player learns the truth, and the page is sent away; the bookshelf gives the cross of
+# Einhasad; the three priests each see it, the third moving the quest on; Innocentin swaps the
+# cross for the one of the next quest and the quest completes. Expectations come from the
+# reference trace (Q021_HiddenTruth.java, Quest.addSpawn, QuestState.setCond).
+trace internal/gameserver/script/testdata/oracle/scenarios/q021_hidden_truth.golden
+character Truth 63
+script quest.Q021_HiddenTruth
+item 7140 7141
+page default/31522.htm
+page default/31523.htm
+page default/31524.htm
+page default/31525.htm
+page default/31526.htm
+page default/31348.htm
+page default/31349.htm
+page default/31350.htm
+page villagemaster/31328.htm
+page script/quest/Q021_HiddenTruth/
+npc wizard 31522 Folk 10 0 0
+npc tombstone 31523 Folk -10 0 0
+npc duke 31524 Folk 0 10 0
+npc page 31525 Folk 0 -10 0
+npc bookshelf 31526 Folk 20 20 0
+npc agripel 31348 Folk -20 -20 0
+npc benedict 31349 Folk 20 -20 0
+npc dominic 31350 Folk -20 20 0
+npc innocentin 31328 VillageMasterPriest 15 -15 0
+
+# The wizard: level 63 may start the quest.
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q021_HiddenTruth/31522-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q021_HiddenTruth CREATED
+bypass Quest Q021_HiddenTruth 31522-04.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q021_HiddenTruth/31522-04.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31522-01.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q021_HiddenTruth/31522-01.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31522-02.htm
+  S QuestList 21:0x80000001
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q021_HiddenTruth/31522-02.htm
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <state> | STARTED
+  Q upsert Q021_HiddenTruth | <cond> | 1
+  state Q021_HiddenTruth STARTED
+  rows Q021_HiddenTruth <cond>=1 <state>=STARTED
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q021_HiddenTruth/31522-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The tombstone wakes the duke's ghost (cond 2); a second call finds it standing.
+action tombstone
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31523.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-02.htm
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-02.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-03.htm
+  S QuestList 21:0x80000003
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=SkillSound5.horror_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-03.htm
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 2
+  rows Q021_HiddenTruth <cond>=2 <state>=STARTED
+action tombstone
+  S ActionFailed
+  S NpcHtmlMessage obj=tombstone item=0 page=default/31523.htm
+  S ActionFailed
+bypass npc_{tombstone}_Quest
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-02.htm
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-02.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31523-03.htm
+  S PlaySound type=0 file=SkillSound5.horror_02 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tombstone item=0 page=script/quest/Q021_HiddenTruth/31523-04.htm
+  S ActionFailed
+
+# The duke calls his page (cond 3); while it walks, his talk finds it there, and the page has
+# not arrived yet.
+action duke
+action duke
+  S ActionFailed
+  S NpcHtmlMessage obj=duke item=0 page=default/31524.htm
+  S ActionFailed
+bypass npc_{duke}_Quest
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31524-02.htm
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-02.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31524-03.htm
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-03.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31524-04.htm
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-04.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31524-05.htm
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-05.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31524-06.htm
+  S QuestList 21:0x80000007
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-06.htm
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 3
+  rows Q021_HiddenTruth <cond>=3 <state>=STARTED
+action duke
+  S ActionFailed
+  S NpcHtmlMessage obj=duke item=0 page=default/31524.htm
+  S ActionFailed
+bypass npc_{duke}_Quest
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-07a.htm
+  S ActionFailed
+  S ActionFailed
+action page
+action page
+  S ActionFailed
+  S NpcHtmlMessage obj=page item=0 page=default/31525.htm
+  S ActionFailed
+bypass npc_{page}_Quest
+  S NpcHtmlMessage obj=page item=0 page=script/quest/Q021_HiddenTruth/31525-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# The page's walk ends 9.5 s after it appeared: end_walk.
+advance 10s
+  Q upsert Q021_HiddenTruth | end_walk | 1
+  rows Q021_HiddenTruth <cond>=3 <state>=STARTED end_walk=1
+
+# The bookshelf now opens; the page moves the quest to cond 4.
+action bookshelf
+action bookshelf
+  S ActionFailed
+  S NpcHtmlMessage obj=bookshelf item=0 page=default/31526.htm
+  S ActionFailed
+bypass npc_{bookshelf}_Quest
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-01.htm
+  S ActionFailed
+  S ActionFailed
+action page
+action page
+  S ActionFailed
+  S NpcHtmlMessage obj=page item=0 page=default/31525.htm
+  S ActionFailed
+bypass npc_{page}_Quest
+  S QuestList 21:0x8000000f
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=page item=0 page=script/quest/Q021_HiddenTruth/31525-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 4
+  rows Q021_HiddenTruth <cond>=4 <state>=STARTED end_walk=1
+action page
+  S ActionFailed
+  S NpcHtmlMessage obj=page item=0 page=default/31525.htm
+  S ActionFailed
+bypass npc_{page}_Quest
+  S NpcHtmlMessage obj=page item=0 page=script/quest/Q021_HiddenTruth/31525-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# The bookshelf: the dropped book, the truth, then the page is sent away (cond 5) and the cross
+# of Einhasad is given (cond 6).
+action bookshelf
+action bookshelf
+  S ActionFailed
+  S NpcHtmlMessage obj=bookshelf item=0 page=default/31526.htm
+  S ActionFailed
+bypass npc_{bookshelf}_Quest
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31526-03.htm
+  S PlaySound type=0 file=ItemSound.item_drop_equip_armor_cloth bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-03.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31526-04.htm
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-04.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31526-05.htm
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-05.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31526-06.htm
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-06.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31526-07.htm
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-07.htm
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | truth | 1
+  rows Q021_HiddenTruth <cond>=4 <state>=STARTED end_walk=1 truth=1
+bypass Quest Q021_HiddenTruth 31526-08.htm
+  S QuestList 21:0x8000001f
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-08.htm
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 5
+  Q delete-var Q021_HiddenTruth | end_walk
+  Q delete-var Q021_HiddenTruth | truth
+  rows Q021_HiddenTruth <cond>=5 <state>=STARTED
+bypass Quest Q021_HiddenTruth 31526-12.htm
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-12.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31526-14.htm
+  S QuestList 21:0x8000003f
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7140
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-14.htm
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 6
+  items 7140=1
+  rows Q021_HiddenTruth <cond>=6 <state>=STARTED
+# At cond 6 the bookshelf shows 31526-15, a page the same as 31526-14.
+action bookshelf
+  S ActionFailed
+  S NpcHtmlMessage obj=bookshelf item=0 page=default/31526.htm
+  S ActionFailed
+bypass npc_{bookshelf}_Quest
+  S NpcHtmlMessage obj=bookshelf item=0 page=script/quest/Q021_HiddenTruth/31526-15.htm
+  S ActionFailed
+  S ActionFailed
+action duke
+action duke
+  S ActionFailed
+  S NpcHtmlMessage obj=duke item=0 page=default/31524.htm
+  S ActionFailed
+bypass npc_{duke}_Quest
+  S NpcHtmlMessage obj=duke item=0 page=script/quest/Q021_HiddenTruth/31524-07c.htm
+  S ActionFailed
+  S ActionFailed
+
+# The three priests: each is marked, the third moves the quest to cond 7.
+action agripel
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q021_HiddenTruth/31348-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | 31348 | 1
+  rows Q021_HiddenTruth <cond>=6 <state>=STARTED 31348=1
+action benedict
+action benedict
+  S ActionFailed
+  S NpcHtmlMessage obj=benedict item=0 page=default/31349.htm
+  S ActionFailed
+bypass npc_{benedict}_Quest
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q021_HiddenTruth/31349-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | 31349 | 1
+  rows Q021_HiddenTruth <cond>=6 <state>=STARTED 31348=1 31349=1
+action dominic
+action dominic
+  S ActionFailed
+  S NpcHtmlMessage obj=dominic item=0 page=default/31350.htm
+  S ActionFailed
+bypass npc_{dominic}_Quest
+  S QuestList 21:0x8000007f
+  S ExShowQuestMark quest=21
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q021_HiddenTruth/31350-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <cond> | 7
+  rows Q021_HiddenTruth <cond>=7 <state>=STARTED 31348=1 31349=1
+action agripel
+action agripel
+  S ActionFailed
+  S NpcHtmlMessage obj=agripel item=0 page=default/31348.htm
+  S ActionFailed
+bypass npc_{agripel}_Quest
+  S NpcHtmlMessage obj=agripel item=0 page=script/quest/Q021_HiddenTruth/31348-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# Innocentin swaps the cross; the quest completes.
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q021_HiddenTruth/31328-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31328-02.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q021_HiddenTruth/31328-02.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31328-03.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q021_HiddenTruth/31328-03.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31328-04.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q021_HiddenTruth/31328-04.htm
+  S ActionFailed
+bypass Quest Q021_HiddenTruth 31328-05.htm
+  S SystemMessage id=302 3:7140
+  S SystemMessage id=54 3:7141
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 21:0x00000000
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q021_HiddenTruth/31328-05.htm
+  S ActionFailed
+  Q upsert Q021_HiddenTruth | <state> | COMPLETED
+  Q delete-except-state Q021_HiddenTruth
+  state Q021_HiddenTruth COMPLETED
+  rows Q021_HiddenTruth <state>=COMPLETED
+  items 7140=0 7141=1
+
+relog
+  state Q021_HiddenTruth COMPLETED
+  rows Q021_HiddenTruth <state>=COMPLETED
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q021_HiddenTruth/31328-06.htm
+  S ActionFailed
+  S ActionFailed
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

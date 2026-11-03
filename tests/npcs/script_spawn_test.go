@@ -256,7 +256,7 @@ func TestScriptPrivateFollowsMaster(t *testing.T) {
 	pup := spawnedNPC(t, w, spawnPupID).(*npc.Hostile)
 	scout := spawnedNPC(t, w, spawnScoutID).(*npc.Hostile)
 	for _, p := range []*npc.Hostile{pup, scout} {
-		if p.Master() != boss || !slices.Contains(boss.Minions(), p) {
+		if p.Master() != boss || !slices.Contains(boss.Minions(), npc.PartyMember(p)) {
 			t.Fatalf("private %d is not linked to its master", p.ObjectID())
 		}
 		if rec, ok := w.srv.NpcSpawns.SpawnOf(p.ObjectID()); !ok || rec.MasterID != boss.ObjectID() {
@@ -273,18 +273,18 @@ func TestScriptPrivateFollowsMaster(t *testing.T) {
 	}
 	bx, by, _ := boss.Position()
 	sx, sy, _ := scout.Position()
-	if d := math.Hypot(float64(sx-bx), float64(sy-by)); d < 39 || d > 121 {
-		t.Fatalf("scout %.0f from its master; want 40 to 120", d)
+	if d := math.Hypot(float64(sx-bx), float64(sy-by)); !inPrivateRing(d, 40, 120) {
+		t.Fatalf("scout %.2f from its master; want 40 to 120", d)
 	}
 
 	// The scout's despawn passes: it is no longer the master's private.
 	w.srv.Advance(t, 10*time.Second)
-	if !around.Decayed() || slices.Contains(boss.Minions(), scout) || scout.Master() != nil {
-		t.Fatalf("despawned scout gone %v, still a private %v", around.Decayed(), slices.Contains(boss.Minions(), scout))
+	if !around.Decayed() || slices.Contains(boss.Minions(), npc.PartyMember(scout)) || scout.Master() != nil {
+		t.Fatalf("despawned scout gone %v, still a private %v", around.Decayed(), slices.Contains(boss.Minions(), npc.PartyMember(scout)))
 	}
 
 	// Deleting the master's spawn deletes its private with it.
-	if !w.srv.NpcSpawns.DeleteFixed(boss.ObjectID()) {
+	if !w.srv.NpcSpawns.DeleteFixedWithPrivates(boss.ObjectID()) {
 		t.Fatal("the master's spawn was not deleted")
 	}
 	w.srv.Settle(t)
@@ -312,7 +312,7 @@ func TestScriptCreatePrivatesFromTemplate(t *testing.T) {
 	pup := spawnedNPC(t, w, spawnPupID).(*npc.Hostile)
 	scout := spawnedNPC(t, w, spawnScoutID).(*npc.Hostile)
 	minions := captain.Minions()
-	if len(minions) != 2 || !slices.Contains(minions, pup) || !slices.Contains(minions, scout) {
+	if len(minions) != 2 || !slices.Contains(minions, npc.PartyMember(pup)) || !slices.Contains(minions, npc.PartyMember(scout)) {
 		t.Fatalf("captain's privates = %d, want the pup and the scout", len(minions))
 	}
 	if earlier.Decayed() || wolf.Master() != captain {
@@ -337,7 +337,7 @@ func TestScriptCreatePrivatesFromTemplate(t *testing.T) {
 	if <-armed {
 		t.Fatal("the decayed private armed a respawn of its own")
 	}
-	if pup.Master() != captain || !slices.Contains(captain.Minions(), pup) {
+	if pup.Master() != captain || !slices.Contains(captain.Minions(), npc.PartyMember(pup)) {
 		t.Fatal("a private with a respawn delay lost its master at decay")
 	}
 	w.srv.Advance(t, time.Minute)
@@ -356,7 +356,7 @@ func TestScriptCreatePrivatesFromSpawn(t *testing.T) {
 	w.spawner.CreatePrivates(script.NPCOf(captain))
 
 	minions := captain.Minions()
-	if len(minions) != 1 || minions[0].Instance.Template.ID != spawnWolfID {
+	if len(minions) != 1 || minions[0].NpcID() != spawnWolfID {
 		t.Fatalf("captain's privates = %d, want the spawn's one wolf", len(minions))
 	}
 	if got := minions[0].Scratch().Int(npc.IntWeightPoint); got != 9 {

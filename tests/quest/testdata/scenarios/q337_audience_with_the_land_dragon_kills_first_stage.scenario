@@ -1,0 +1,43 @@
+# Audience with the Land Dragon (Q337), the monsters of the first stage drop what the watchmen ask for once: the sacrifice, the zealot, Kranrot and Hamrut, the drake and the stalker. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_kills_first_stage.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop1=1 drop2=1 drop3=1 drop4=1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc sacrifice 27171 Monster 40 0 0
+npc zealot 27172 Monster 45 0 0
+npc kranrot 20650 Monster 50 0 0
+npc hamrut 20649 Monster 55 0 0
+npc drake 20680 Monster 60 0 0
+npc stalker 20679 Monster 65 0 0
+
+kill sacrifice
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3857
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill sacrifice
+  S SystemMessage id=95 1:0 1:0
+kill zealot
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3858
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill kranrot
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3855
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill hamrut
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3856
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill drake
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3854
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill stalker
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3853
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3857=1 3858=1 3855=1 3856=1 3854=1 3853=1
+  rows Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop1=1 drop2=1 drop3=1 drop4=1
+  state Q337_AudienceWithTheLandDragon STARTED

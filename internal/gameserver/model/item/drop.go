@@ -98,8 +98,8 @@ type rolledDrop struct {
 // fractional remainder still gets one extra attempt, e.g. a rate of 1.5 rolls
 // twice) and returns the resulting item quantities, merging duplicates when
 // more than one attempt or drop lands on the same item. The results come in
-// the order the reference walks its per-category result map (see
-// dropMerger), the order a kill drops them in. levelMultiplier scales the
+// the order of the per-category result map (see dropMerger), the order a
+// kill drops them in. levelMultiplier scales the
 // category's base chance down for an out-leveled kill (1 leaves it
 // unaffected); rate is the drop-rate multiplier already resolved for this
 // category's kind and raid/non-raid status (see Rates.Resolve). A zero

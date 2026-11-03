@@ -1,0 +1,65 @@
+# Curiosity of a Dwarf (Q329), the bonus: for a player on the quest, eleven punchers give eleven
+# heartstones (every roll pinned to 0); Rolento pays 1000 each and 1183 more for over ten.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q329_curiosity_of_a_dwarf_bonus.golden
+character Dwarfish 33
+quest Q329_CuriosityOfADwarf <cond>=1 <state>=STARTED
+random always 0
+script quest.Q329_CuriosityOfADwarf
+item 1346 1365
+page merchant/30437.htm
+page script/quest/Q329_CuriosityOfADwarf/
+npc rolento 30437 Merchant 10 0 0
+npc puncher 20085 Monster 0 40 0
+
+# Eleven heartstones.
+kill puncher x11
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1346
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1346=11
+
+# Rolento: 11 x 1000 + 1183.
+action rolento
+action rolento
+  S ActionFailed
+  S NpcHtmlMessage obj=rolento item=0 page=merchant/30437.htm
+  S ActionFailed
+bypass npc_{rolento}_Quest
+  S SystemMessage id=301 3:1346 6:11
+  S SystemMessage id=52 6:12183
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q329_CuriosityOfADwarf/30437-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1346=0 57=12183
+  rows Q329_CuriosityOfADwarf <cond>=1 <state>=STARTED

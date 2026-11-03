@@ -1,0 +1,49 @@
+# Path to a Palus Knight (Q410), a level 19 dark fighter accepts at Virgil and gets the talisman; relog and Virgil asks for the skulls. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q410_path_to_a_palus_knight_accept.golden
+character Fighter 19
+class 31
+script quest.Q410_PathToAPalusKnight
+item 1237 1238 1239 1240 1241 1242 1243 1244
+page trainer/30329.htm
+page default/30422.htm
+page script/quest/Q410_PathToAPalusKnight/
+npc virgil 30329 Trainer 10 0 0
+npc kalinta 30422 Folk -10 0 0
+npc spider 20038 Monster 40 0 0
+npc tracker 20043 Monster 50 0 0
+npc lycan 20049 Monster 60 0 0
+
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=trainer/30329.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q410_PathToAPalusKnight 30329-05.htm
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-05.htm
+  S ActionFailed
+bypass Quest Q410_PathToAPalusKnight 30329-06.htm
+  S QuestList 410:0x80000001
+  S ExShowQuestMark quest=410
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1237
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-06.htm
+  S ActionFailed
+  Q upsert Q410_PathToAPalusKnight | <state> | STARTED
+  Q upsert Q410_PathToAPalusKnight | <cond> | 1
+  items 1237=1
+  rows Q410_PathToAPalusKnight <cond>=1 <state>=STARTED
+  state Q410_PathToAPalusKnight STARTED
+relog
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=trainer/30329.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-07.htm
+  S ActionFailed
+  S ActionFailed

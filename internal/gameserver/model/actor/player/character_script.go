@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // GiveScriptItems adds count units of itemID to c's inventory the way a
@@ -23,9 +24,13 @@ func (c *Character) AddScriptItems(itemID int32, count int, multiple bool, nextI
 }
 
 func (c *Character) addScriptItems(itemID int32, count, enchant int, multiple bool, nextID func() (int32, error), notice event.ObtainNotice) {
-	if count <= 0 || c.Detaching() || c.inventory == nil {
+	if count <= 0 || c.inventory == nil {
 		return
 	}
+	c.whileAttached(func() { c.createScriptItems(itemID, count, enchant, multiple, nextID, notice) })
+}
+
+func (c *Character) createScriptItems(itemID int32, count, enchant int, multiple bool, nextID func() (int32, error), notice event.ObtainNotice) {
 	tmpl, ok := c.inventory.Templates().Get(itemID)
 	if !ok {
 		return
@@ -36,12 +41,10 @@ func (c *Character) addScriptItems(itemID int32, count, enchant int, multiple bo
 	}
 	var last *item.Instance
 	for range instances {
-		id, err := nextID()
+		inst, err := c.inventory.AddCreated(itemID, count, nextID)
 		if err != nil {
 			c.log.Error().Err(err).Int32("item_id", itemID).Msg("allocate script item id")
-			break
 		}
-		inst := c.inventory.AddNew(itemID, count, id)
 		if inst == nil {
 			break
 		}
@@ -63,9 +66,13 @@ func (c *Character) addScriptItems(itemID int32, count, enchant int, multiple bo
 // worn instance is taken off first. An unknown item, one c does not hold
 // and a character leaving the world lose nothing.
 func (c *Character) TakeScriptItems(itemID int32, count int) {
-	if c.Detaching() || c.inventory == nil {
+	if c.inventory == nil {
 		return
 	}
+	c.whileAttached(func() { c.takeScriptItems(itemID, count) })
+}
+
+func (c *Character) takeScriptItems(itemID int32, count int) {
 	tmpl, ok := c.inventory.Templates().Get(itemID)
 	if !ok {
 		return
@@ -103,6 +110,34 @@ func (c *Character) TakeScriptItems(itemID int32, count int) {
 	c.emit(event.ItemsTaken{ItemID: itemID, Count: count, Short: !taken})
 }
 
+// ReduceScriptAdena takes count adena from c for a script, and reports
+// whether it did. Short of count, c is told so and keeps its adena; a
+// payment the inventory refuses fails silently; a count below one is paid
+// at once. A character leaving the world pays nothing and reports false.
+func (c *Character) ReduceScriptAdena(count int) bool {
+	if c.inventory == nil {
+		return false
+	}
+	paid := false
+	c.whileAttached(func() { paid = c.reduceScriptAdena(count) })
+	return paid
+}
+
+func (c *Character) reduceScriptAdena(count int) bool {
+	if count > c.inventory.Adena() {
+		c.emit(event.ItemsTaken{ItemID: item.AdenaID, Short: true})
+		return false
+	}
+	if count <= 0 {
+		return true
+	}
+	if c.inventory.DestroyByTemplateID(item.AdenaID, count) == nil {
+		return false
+	}
+	c.emit(event.ItemsTaken{ItemID: item.AdenaID, Count: count})
+	return true
+}
+
 // unequipForTake takes inst off when c wears it.
 func (c *Character) unequipForTake(inst *item.Instance) {
 	if inst.Equipped() {
@@ -115,14 +150,35 @@ func (c *Character) unequipForTake(inst *item.Instance) {
 // instance holding fewer units and a character leaving the world lose
 // nothing.
 func (c *Character) DestroyScriptItems(itemID int32, count int) bool {
-	if c.Detaching() || c.inventory == nil {
+	if c.inventory == nil {
 		return false
 	}
-	inst := c.inventory.ItemByTemplateID(itemID)
-	if inst == nil || inst.CountValue() < count {
+	destroyed := false
+	c.whileAttached(func() {
+		inst := c.inventory.ItemByTemplateID(itemID)
+		destroyed = inst != nil && inst.CountValue() >= count && c.inventory.DestroyItem(inst, count) != nil
+	})
+	return destroyed
+}
+
+// DestroyScriptItemsNotify is DestroyScriptItems naming the outcome in chat:
+// what disappeared, or that c holds too few. Adena is paid as
+// ReduceScriptAdena pays it.
+func (c *Character) DestroyScriptItemsNotify(itemID int32, count int) bool {
+	if c.inventory == nil {
 		return false
 	}
-	return c.inventory.DestroyItem(inst, count) != nil
+	destroyed := false
+	c.whileAttached(func() {
+		if itemID == item.AdenaID {
+			destroyed = c.reduceScriptAdena(count)
+			return
+		}
+		inst := c.inventory.ItemByTemplateID(itemID)
+		destroyed = inst != nil && inst.CountValue() >= count && c.inventory.DestroyItem(inst, count) != nil
+		c.emit(event.ItemsTaken{ItemID: itemID, Count: count, Short: !destroyed})
+	})
+	return destroyed
 }
 
 // HoldsItem reports whether c's inventory holds the item instance
@@ -151,6 +207,16 @@ func (c *Character) PartyMembers() []*Character {
 	return c.social.PartyMembers(c.ObjectID())
 }
 
+// Channel returns the command channel c's party is in: its leader and its
+// parties in the order they joined, each party's characters in party
+// order. ok is false when c is in none.
+func (c *Character) Channel() (leader *Character, parties [][]*Character, ok bool) {
+	if c.social == nil {
+		return nil, nil, false
+	}
+	return c.social.Channel(c.ObjectID())
+}
+
 // OnlineClanLeader returns the leader of c's clan when that leader is in
 // the world.
 func (c *Character) OnlineClanLeader() (*Character, bool) {
@@ -167,4 +233,13 @@ func (c *Character) OnlineClanLeader() (*Character, bool) {
 		return nil, false
 	}
 	return h.PlayerCharacter(), true
+}
+
+// CallSkill makes c use ref on the creature targetID, as a script does: the
+// cast animation shows and the skill's effects land, with no cast time,
+// cost, reuse or target check. Asked from a task of c's own queue
+// (OnOwnQueue), the cast runs inside the call; from any other, on c's queue
+// once the calling task is done.
+func (c *Character) CallSkill(targetID int32, ref modelskill.Ref) {
+	c.emit(event.SkillCalled{TargetID: targetID, Skill: ref, OwnQueue: c.OnOwnQueue()})
 }

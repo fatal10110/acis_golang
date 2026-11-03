@@ -1,0 +1,101 @@
+# Recover the Farmland (Q327), from Piotur: a level 25 character accepts at Piotur; with nothing
+# to pay for he asks for more; a Turek warlord gives a medallion and a clay urn fragment (every
+# roll pinned to succeed); Piotur pays 50 and moves the quest on to cond 4, past 2 and 3 (the
+# flags row); Iris buys the fragment for 307 experience; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q327_recover_the_farmland_piotur.golden
+character Farmer 25
+random always 0
+script quest.Q327_RecoverTheFarmland
+item 5012 1846 1847 1848 1849 1850 1851 1852 1853 1854 1855 1463 2510 1061 734 735 736 737
+page default/30597.htm
+page guard/30382.htm
+page trainer/30034.htm
+page merchant/30313.htm
+page merchant/30314.htm
+page script/quest/Q327_RecoverTheFarmland/
+npc piotur 30597 Folk -10 0 0
+npc iris 30034 Trainer 0 10 0
+npc warlord 20495 Monster 40 0 0
+
+# Piotur: accept.
+action piotur
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q327_RecoverTheFarmland CREATED
+bypass Quest Q327_RecoverTheFarmland 30597-03.htm
+  S QuestList 327:0x80000001
+  S ExShowQuestMark quest=327
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-03.htm
+  S ActionFailed
+  Q upsert Q327_RecoverTheFarmland | <state> | STARTED
+  Q upsert Q327_RecoverTheFarmland | <cond> | 1
+  state Q327_RecoverTheFarmland STARTED
+  rows Q327_RecoverTheFarmland <cond>=1 <state>=STARTED
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# A medallion and a fragment.
+kill warlord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1847
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1847=1 1848=1
+
+# Piotur: 50.
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S QuestList 327:0x80000009
+  S ExShowQuestMark quest=327
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1847
+  S SystemMessage id=52 6:50
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q327_RecoverTheFarmland | <flags> | -2147483639
+  Q upsert Q327_RecoverTheFarmland | <cond> | 4
+  items 1847=0 57=50
+  rows Q327_RecoverTheFarmland <cond>=4 <flags>=-2147483639 <state>=STARTED
+
+# Iris: experience for the fragment.
+action iris
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30034-03.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1848
+  S SystemMessage id=45 1:307
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-03.htm
+  S ActionFailed
+  items 1848=0
+
+# Relog: the quest stays at cond 4.
+relog
+  state Q327_RecoverTheFarmland STARTED
+  rows Q327_RecoverTheFarmland <cond>=4 <flags>=-2147483639 <state>=STARTED
+  items 57=50

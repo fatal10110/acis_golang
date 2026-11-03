@@ -67,7 +67,7 @@ type fightCounts struct {
 }
 
 // records are the diaries, fight histories and messages the pages show.
-// As in the reference, every hero's diary entries go to one list and
+// Every hero's diary entries go to one list and
 // every hero's fights to another: a hero's page shows all of them, and an
 // election forgets which heroes have pages but keeps the lists.
 type records struct {
@@ -98,7 +98,7 @@ func (m *Manager) loadRecords(ctx context.Context, objectID int32) {
 
 // loadFights appends objectID's fights started before this month's first
 // day to the shared list and counts its results. The month starts at
-// midnight, but at the current second, as the reference's does.
+// midnight, but at the current second.
 func (m *Manager) loadFights(ctx context.Context, objectID int32) {
 	now := m.now()
 	before := time.Date(now.Year(), now.Month(), 1, 0, 0, now.Second(), 0, now.Location()).UnixMilli()

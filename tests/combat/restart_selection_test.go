@@ -272,11 +272,7 @@ func TestRestartPointSelections(t *testing.T) {
 			c := srv.Client
 			c.Send(encodeRequestRestartPoint(tt.request))
 			if tt.dest == "" {
-				for {
-					frame := c.ReadWithTimeout(500 * time.Millisecond)
-					if frame == nil {
-						break
-					}
+				for _, frame := range c.ReadQueued() {
 					if frame[0] == serverpackets.OpcodeRevive || frame[0] == serverpackets.OpcodeTeleportToLocation {
 						t.Fatalf("refused restart sent opcode %#x", frame[0])
 					}

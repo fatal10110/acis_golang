@@ -1,0 +1,20 @@
+# FreyaDeacon (32029), free, talked to by a player in no party: its greeting freya_deacon001.htm,
+# then the entry answers freya_deacon_q0656_06.htm (no party). Expectations are derived from the
+# reference source (FreyaDeacon.java 56-79, 86-91). The party branches (the refusals, the payment,
+# the party teleport, the zone entry, the doors, maker event 11040 and script events 10005, 10026
+# and 10027) are in tests/ai/boss_sirra_test.go: the format forms no party, sends no script event
+# and declares no door, zone or npcmaker of its own type.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.boss.sirra.FreyaDeacon
+page script/ai/boss/sirra/FreyaDeacon/
+npc deacon 32029 Folk 60 0 0
+
+action deacon
+action deacon
+  S ActionFailed
+  S NpcHtmlMessage obj=deacon item=0 page=script/ai/boss/sirra/FreyaDeacon/freya_deacon001.htm
+  S ActionFailed
+bypass Quest FreyaDeacon enter
+  S NpcHtmlMessage obj=deacon item=0 page=script/ai/boss/sirra/FreyaDeacon/freya_deacon_q0656_06.htm
+  S ActionFailed

@@ -45,12 +45,11 @@ func (l *GameClientLink) observe(live *livePlayer, id int) {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoObserveWithPet))
 			return
 		}
-		// ponytail: a castle viewpoint opens while that castle's siege
-		// is in progress (#3375); it is always closed until then.
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyViewSiege))
-		return
-	}
-	if hasSummon {
+		if !l.castleBesieged(loc.CastleID) {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyViewSiege))
+			return
+		}
+	} else if hasSummon {
 		return
 	}
 	if live.InCombat() {
@@ -74,7 +73,7 @@ func (l *GameClientLink) enterObserverMode(live *livePlayer, loc observer.Locati
 	}
 	l.dropAllSummons(live)
 	if l.parties != nil {
-		l.applyPartyNotices(l.parties.Leave(live, party.Expelled))
+		l.applyOwnPartyNotices(live, l.parties.Leave(live, party.Expelled))
 	}
 	live.Character.StandUp()
 	live.SetSavedLocation(live.CurrentLocation())

@@ -1,0 +1,42 @@
+# Searching for Treasure (Q383), level 42 with a map: the character sells it to Espen for 1000 adena. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q383_searching_for_treasure_sell.golden
+character Treasure 42
+hold 5915 1
+script quest.Q383_SearchingForTreasure
+item 57 1661 5915 2450 4481 1337 4408
+page merchant/30890.htm
+page default/31148.htm
+page script/quest/Q383_SearchingForTreasure/
+npc espen 30890 Merchant 10 0 0
+npc chest 31148 Folk -10 0 0
+
+action espen
+action espen
+  S ActionFailed
+  S NpcHtmlMessage obj=espen item=0 page=merchant/30890.htm
+  S ActionFailed
+bypass npc_{espen}_Quest
+  S NpcHtmlMessage obj=espen item=0 page=script/quest/Q383_SearchingForTreasure/30890-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q383_SearchingForTreasure 30890-03.htm
+  S NpcHtmlMessage obj=espen item=0 page=script/quest/Q383_SearchingForTreasure/30890-03.htm
+  S ActionFailed
+bypass Quest Q383_SearchingForTreasure 30890-04.htm
+  S SystemMessage id=302 3:5915
+  S SystemMessage id=52 6:1000
+  S NpcHtmlMessage obj=espen item=0 page=script/quest/Q383_SearchingForTreasure/30890-04.htm
+  S ActionFailed
+  items 57=1000 5915=0
+action espen
+  S ActionFailed
+  S NpcHtmlMessage obj=espen item=0 page=merchant/30890.htm
+  S ActionFailed
+action espen
+  S ActionFailed
+  S NpcHtmlMessage obj=espen item=0 page=merchant/30890.htm
+  S ActionFailed
+bypass npc_{espen}_Quest
+  S NpcHtmlMessage obj=espen item=0 page=script/quest/Q383_SearchingForTreasure/30890-01.htm
+  S ActionFailed
+  S ActionFailed

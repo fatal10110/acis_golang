@@ -1,0 +1,70 @@
+# Testimony Of Glory (Q220), Chianta below level 37: a level 36 Orc Raider at cond 5 holding his first order, the scepters and the letters is told 30642-05, takes the second order
+# (30642-06, cond stays 5) and is turned away with 30642-08 until level 37, also after a relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q220_testimony_of_glory_chianta_low.golden
+character Raider 36
+class 45
+quest Q220_TestimonyOfGlory <state>=STARTED <cond>=5
+hold 3210 1
+hold 3211 1
+hold 3212 1
+hold 3213 1
+hold 3214 1
+hold 3215 1
+hold 3228 1
+hold 3229 1
+hold 3230 1
+script quest.Q220_TestimonyOfGlory
+item 3203 3204 3205 3206 3207 3208 3209 3210 3211 3212 3213 3214 3215 3216 3217 3218 3219 3220 3221 3222 3223 3224 3225 3226 3227 3228 3229 3230 3231 3232 3233 3234 3235 3236 3237 7562
+page default/30642.htm
+page script/quest/Q220_TestimonyOfGlory/
+npc chianta 30642 Folk -10 10 0
+
+action chianta
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q220_TestimonyOfGlory/30642-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q220_TestimonyOfGlory 30642-07.htm
+  S SystemMessage id=302 3:3210
+  S SystemMessage id=302 3:3230
+  S SystemMessage id=302 3:3228
+  S SystemMessage id=302 3:3229
+  S SystemMessage id=302 3:3211
+  S SystemMessage id=302 3:3212
+  S SystemMessage id=302 3:3215
+  S SystemMessage id=302 3:3214
+  S SystemMessage id=302 3:3213
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3216
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q220_TestimonyOfGlory/30642-06.htm
+  S ActionFailed
+  state Q220_TestimonyOfGlory STARTED
+  rows Q220_TestimonyOfGlory <cond>=5 <state>=STARTED
+  items 3216=1 3210=0 3230=0 3228=0 3229=0 3211=0 3212=0 3213=0 3214=0 3215=0
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q220_TestimonyOfGlory/30642-08.htm
+  S ActionFailed
+  S ActionFailed
+relog
+action chianta
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q220_TestimonyOfGlory/30642-08.htm
+  S ActionFailed
+  S ActionFailed

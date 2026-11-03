@@ -1,0 +1,139 @@
+# Alligator Hunter (Q338): a level 40 character accepts at Enverun; with no pelt he asks for
+# some; eleven alligators give eleven pelts (every roll pinned to succeed); Enverun pays 60 a pelt
+# and 3430 more for over ten; one more pelt is paid 60 with no bonus; then the player quits the
+# repeatable quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q338_alligator_hunter.golden
+character Hunter 40
+random always 0
+script quest.Q338_AlligatorHunter
+item 4337
+page merchant/30892.htm
+page script/quest/Q338_AlligatorHunter/
+npc enverun 30892 Merchant 10 0 0
+npc alligator 20135 Monster 40 0 0
+
+# Enverun: accept.
+action enverun
+action enverun
+  S ActionFailed
+  S NpcHtmlMessage obj=enverun item=0 page=merchant/30892.htm
+  S ActionFailed
+bypass npc_{enverun}_Quest
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q338_AlligatorHunter CREATED
+bypass Quest Q338_AlligatorHunter 30892-02.htm
+  S QuestList 338:0x80000001
+  S ExShowQuestMark quest=338
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-02.htm
+  S ActionFailed
+  Q upsert Q338_AlligatorHunter | <state> | STARTED
+  Q upsert Q338_AlligatorHunter | <cond> | 1
+  state Q338_AlligatorHunter STARTED
+  rows Q338_AlligatorHunter <cond>=1 <state>=STARTED
+
+# No pelt yet.
+action enverun
+  S ActionFailed
+  S NpcHtmlMessage obj=enverun item=0 page=merchant/30892.htm
+  S ActionFailed
+bypass npc_{enverun}_Quest
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Eleven pelts.
+kill alligator x11
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4337=11
+
+# Enverun: 11 x 60 + 3430.
+action enverun
+  S ActionFailed
+  S NpcHtmlMessage obj=enverun item=0 page=merchant/30892.htm
+  S ActionFailed
+bypass npc_{enverun}_Quest
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q338_AlligatorHunter 30892-05.htm
+  S SystemMessage id=301 3:4337 6:11
+  S SystemMessage id=52 6:4090
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-05.htm
+  S ActionFailed
+  items 4337=0 57=4090
+  rows Q338_AlligatorHunter <cond>=1 <state>=STARTED
+
+# One more pelt: 60, no bonus.
+kill alligator
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4337
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4337=1
+action enverun
+  S ActionFailed
+  S NpcHtmlMessage obj=enverun item=0 page=merchant/30892.htm
+  S ActionFailed
+bypass npc_{enverun}_Quest
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q338_AlligatorHunter 30892-05.htm
+  S SystemMessage id=302 3:4337
+  S SystemMessage id=52 6:60
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-05.htm
+  S ActionFailed
+  items 4337=0 57=4150
+
+# Quit.
+bypass Quest Q338_AlligatorHunter 30892-07.htm
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-07.htm
+  S ActionFailed
+bypass Quest Q338_AlligatorHunter 30892-08.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=enverun item=0 page=script/quest/Q338_AlligatorHunter/30892-08.htm
+  S ActionFailed
+  Q delete-quest Q338_AlligatorHunter
+  state Q338_AlligatorHunter -
+  rows Q338_AlligatorHunter -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q338_AlligatorHunter -
+  rows Q338_AlligatorHunter -
+  items 57=4150

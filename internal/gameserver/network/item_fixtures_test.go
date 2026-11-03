@@ -20,11 +20,12 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *testsupport.FrameCa
 		t.Fatal("missing test class template")
 	}
 	ch := &player.Character{
-		ID: id, Name: "Player",
+		ID:        id,
 		Race:      player.RaceHuman,
 		CharLevel: 1,
 		Location:  location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
+	ch.SetName("Player")
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, templates, items))
 

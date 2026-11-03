@@ -233,9 +233,9 @@ func TestNPCAutoAttackSendsNoDamageFeedback(t *testing.T) {
 
 	attacker.DoAttack(t, victim.(attackable.Combatant))
 	assertAttackBy(t, c, attacker.ObjectID())
-	for end := c.Now().Add(2 * time.Second); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil || frame[0] != serverpackets.OpcodeSystemMessage {
+	srv.Advance(t, 2*time.Second)
+	for _, frame := range c.ReadQueued() {
+		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
 		if id := wireReader(frame[1:]).ReadInt32(); slices.Contains(damageFeedbackIDs, id) {

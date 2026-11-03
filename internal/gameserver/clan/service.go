@@ -137,6 +137,7 @@ func (s *Service) write(ownerID int32, what string, fn func(context.Context, Sto
 // updateClanLocked queues cl's clan_data row as it stands; cl.mu is held.
 func (s *Service) updateClanLocked(cl *Clan) {
 	row := cl.rowLocked()
+	cl.storedReputation = row.Reputation
 	s.write(cl.id, "update clan", func(ctx context.Context, st Store) error { return st.UpdateClan(ctx, row) })
 }
 

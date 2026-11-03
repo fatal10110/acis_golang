@@ -27,13 +27,13 @@ type AIController struct {
 	// OnTargetRejection sends the caster-visible result of a failed target
 	// condition (CanCastPlayable's last gate). Network wiring owns the
 	// system-message encoding.
-	OnTargetRejection func(skilltarget.CastRejection, modelskill.Definition)
+	OnTargetRejection func(skilltarget.CastRejection, *modelskill.Definition)
 	// OnCastRefusal sends the caster-visible reason of a playable cast
 	// refused by AttemptCast or CanCastPlayable: the error names the failed
 	// gate (ErrSkillDisabled, ErrNotEnoughMP, ErrCantSeeTarget, a
 	// *ConditionError, ...). Network wiring owns the system-message
 	// encoding.
-	OnCastRefusal func(error, modelskill.Definition)
+	OnCastRefusal func(error, *modelskill.Definition)
 	// OnHitResult receives the EffectResult of a resolved Hit-phase cast.
 	// Summon casters wire it to forward the result to the owner, as a
 	// summon forwards its packets. Hostile NPC casters wire it to a
@@ -123,7 +123,12 @@ func (a *AIController) CanDesire(target attackable.Combatant, ref modelskill.Ref
 	if !a.CanAttempt(target, ref) {
 		return false
 	}
-	def, _ := a.definition(ref)
+	def, ok := a.definition(ref)
+	if !ok {
+		// A reload dropped ref after CanAttempt found it: it has no MP or
+		// HP left to charge.
+		return true
+	}
 	actor := a.Controller.actor
 	if mp := actor.MPCost(def); mp > 0 && mp > actor.MP() {
 		return false
@@ -172,7 +177,7 @@ func (a *AIController) FinalTarget(target attackable.Combatant, ref modelskill.R
 		return nil
 	}
 	selected, _ := any(target).(skilltarget.Actor)
-	final, _ := handler.FinalTarget(a.Caster, selected, &def).(attackable.Combatant)
+	final, _ := handler.FinalTarget(a.Caster, selected, def).(attackable.Combatant)
 	return final
 }
 
@@ -213,7 +218,7 @@ func (a *AIController) CanCastPlayable(target attackable.Combatant, ref modelski
 	return a.meetsCastConditions(target, def, ctrl)
 }
 
-func (a *AIController) refuse(err error, def modelskill.Definition) {
+func (a *AIController) refuse(err error, def *modelskill.Definition) {
 	if a.OnCastRefusal != nil {
 		a.OnCastRefusal(err, def)
 	}
@@ -222,12 +227,12 @@ func (a *AIController) refuse(err error, def modelskill.Definition) {
 // meetsCastConditions applies def's target-type conditions for a playable
 // caster against target, the last check before a playable's cast commits.
 // A failure is reported through OnTargetRejection.
-func (a *AIController) meetsCastConditions(target attackable.Combatant, def modelskill.Definition, ctrl bool) bool {
+func (a *AIController) meetsCastConditions(target attackable.Combatant, def *modelskill.Definition, ctrl bool) bool {
 	aimed, ok := any(target).(skilltarget.Actor)
 	if !ok || a.Caster == nil {
 		return false
 	}
-	rejection := skilltarget.CastRejectionFor(def.Target, a.Caster, aimed, &def, ctrl)
+	rejection := skilltarget.CastRejectionFor(def.Target, a.Caster, aimed, def, ctrl)
 	if rejection == skilltarget.CastRejectNone {
 		return true
 	}
@@ -240,6 +245,18 @@ func (a *AIController) meetsCastConditions(target attackable.Combatant, def mode
 // MeetsHPMPDisabled reports whether the actor currently has the HP/MP and is
 // not muted for ref against target.
 func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref modelskill.Ref) bool {
+	return a.meets(target, ref, a.Controller.MeetsHPMPDisabled)
+}
+
+// MeetsHPMP reports whether the actor currently has the MP and HP ref's cast
+// at target takes, whatever mutes it.
+func (a *AIController) MeetsHPMP(target attackable.Combatant, ref modelskill.Ref) bool {
+	return a.meets(target, ref, a.Controller.MeetsHPMP)
+}
+
+// meets runs gate on ref's definition at target: false for no controller,
+// no target, a skill the actor's table lacks, or a refusal.
+func (a *AIController) meets(target attackable.Combatant, ref modelskill.Ref, gate func(Target, *modelskill.Definition) error) bool {
 	if a.Controller == nil || target == nil {
 		return false
 	}
@@ -251,7 +268,7 @@ func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref models
 	if !ok {
 		return false
 	}
-	return a.Controller.MeetsHPMPDisabled(castTarget, def) == nil
+	return gate(castTarget, def) == nil
 }
 
 // AICaster is an AI-driven caster: the launch-revalidated creature plus the
@@ -272,6 +289,26 @@ type AICaster interface {
 // Finish phases, applying def's effects through Effects once the Hit phase
 // consumes its final resource cost.
 func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
+	a.cast(target, ref, a.startChecked)
+}
+
+// CastUnchecked is Cast past every gate the cast's start runs (see
+// Controller.StartUnchecked): a cast already in flight is replaced by it.
+// A skill the actor's table lacks starts nothing.
+func (a *AIController) CastUnchecked(target attackable.Combatant, ref modelskill.Ref) {
+	a.cast(target, ref, a.startUnchecked)
+}
+
+func (a *AIController) startChecked(target Target, def *modelskill.Definition) (Plan, error) {
+	return a.Controller.Start(a.Controller.Now(), target, def)
+}
+
+func (a *AIController) startUnchecked(target Target, def *modelskill.Definition) (Plan, error) {
+	return a.Controller.StartUnchecked(a.Controller.Now(), target, def)
+}
+
+// cast starts ref's cast at target through start and schedules its phases.
+func (a *AIController) cast(target attackable.Combatant, ref modelskill.Ref, start func(Target, *modelskill.Definition) (Plan, error)) {
 	if a.Controller == nil || target == nil {
 		return
 	}
@@ -281,7 +318,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	}
 	castTarget := Target(target)
 
-	plan, err := a.Controller.Start(a.Controller.Now(), castTarget, def)
+	plan, err := start(castTarget, def)
 	if err != nil {
 		return
 	}
@@ -299,7 +336,10 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	// effect-affected set as one snapshot instead of two independent
 	// resolutions 400ms apart.
 	var launchTargets []skilltarget.Actor
-	var launchResolved bool
+	// launchRan is true once the launch's target handler ran, even when it
+	// found no target: such a cast still runs its skill handler, with no
+	// targets.
+	var launchRan bool
 
 	a.Controller.Schedule(plan, Hooks{
 		Launch: func() bool {
@@ -309,8 +349,13 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 				}
 				return false
 			}
-			launchTargets, launchResolved = ResolveAffected(a.Effects, a.Caster, castTarget, def)
+			launchTargets, launchRan = resolveLaunchTargets(a.Effects, a.Caster, castTarget, *def)
 			a.Controller.SetLaunchTargets(len(launchTargets))
+			var first attackable.Combatant
+			if len(launchTargets) > 0 {
+				first, _ = launchTargets[0].(attackable.Combatant)
+			}
+			a.Controller.setLaunchFirst(first)
 			// The target list is recomputed at the launch timer and that
 			// full set is broadcast; when resolution finds no affected
 			// targets, the empty list is broadcast as-is
@@ -330,7 +375,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			// drives every non-player-initiated cast, so it must skip
 			// FUSION here rather than let it reach fusionHandler, which
 			// has no caster-type gate of its own.
-			if def.SkillType == "FUSION" || !launchResolved {
+			if def.SkillType == "FUSION" || !launchRan {
 				return
 			}
 			// Off the grid, an object knows nothing, itself included.
@@ -343,7 +388,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 					a.OnHitResult(EffectResult{Messages: []any{message}})
 				}
 			}
-			result := ApplyResolvedEffectsResult(handlers, a.Caster, launchTargets, def)
+			result := ApplyResolvedEffectsResult(handlers, a.Caster, launchTargets, *def)
 			if a.OnHitResult != nil {
 				a.OnHitResult(result)
 			}
@@ -351,9 +396,9 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	})
 }
 
-func (a *AIController) definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (a *AIController) definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	if a.Definitions == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return a.Definitions.Definition(ref)
 }

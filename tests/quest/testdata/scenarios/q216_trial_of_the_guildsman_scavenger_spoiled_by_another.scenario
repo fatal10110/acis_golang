@@ -1,0 +1,19 @@
+# Trial of the Guildsman (Q216) at cond 5, played by a level 36 Scavenger holding Pinter's instructions:
+# the ant another player spoiled drops a Scavenger five Amber Beads, and no Amber Lump,
+# every script roll pinned to 0. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q216_trial_of_the_guildsman_scavenger_spoiled_by_another.golden
+character Scavenger 36
+class 54
+quest Q216_TrialOfTheGuildsman <state>=STARTED <cond>=5
+hold 3135 1
+random always 0
+script quest.Q216_TrialOfTheGuildsman
+item 3025 3124 3135 3136 3137 3138
+npc ant 20079 Monster 40 0 0
+spoil ant other
+
+kill ant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3136=5 3137=0

@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -54,11 +53,11 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 		// no heading toward the target and no MoveToPawn to anyone.
 		caster.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertStaticSystemMessage(t, caster.Read(), serverpackets.SystemMessageInvalidTarget)
-		if extra := caster.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("living corpse-player rejection extra caster frame = %#x, want none", extra[0])
+		if queued := caster.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("living corpse-player rejection extra caster frame = %#x, want none", queued[0][0])
 		}
-		if extra := patient.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("living corpse-player rejection observer frame = %#x, want none", extra[0])
+		if queued := patient.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("living corpse-player rejection observer frame = %#x, want none", queued[0][0])
 		}
 		if got := playerHeading(t, srv, srv.SoleObjectID(t)); got != headingBefore {
 			t.Fatalf("caster heading after rejected cast = %d, want unchanged %d", got, headingBefore)
@@ -86,11 +85,11 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 
 		caster.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertStaticSystemMessage(t, caster.Read(), serverpackets.SystemMessageNotEnoughMP)
-		if extra := caster.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("low MP corpse-player rejection extra frame = %#x, want no ActionFailed or MoveToPawn", extra[0])
+		if queued := caster.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("low MP corpse-player rejection extra frame = %#x, want no ActionFailed or MoveToPawn", queued[0][0])
 		}
-		if extra := patient.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("low MP corpse-player rejection observer frame = %#x, want none", extra[0])
+		if queued := patient.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("low MP corpse-player rejection observer frame = %#x, want none", queued[0][0])
 		}
 	})
 
@@ -106,8 +105,8 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 
 		c.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, corpsePlayerSkillID, 1)
-		if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("dead non-playable corpse-player rejection extra frame = %#x, want no ActionFailed or MoveToPawn", extra[0])
+		if queued := c.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("dead non-playable corpse-player rejection extra frame = %#x, want no ActionFailed or MoveToPawn", queued[0][0])
 		}
 	})
 

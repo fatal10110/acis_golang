@@ -1,0 +1,35 @@
+# Daimon the White-Eyed, Part 1 (Q603): a character with 200 beads hands them in and gets the
+# unfinished summon crystal; the quest ends. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q603_daimon_the_white_eyed_part1_finish.golden
+character Hero 75
+quest Q603_DaimonTheWhiteEyed_Part1 <cond>=8 <state>=STARTED
+hold 7190 200
+script quest.Q603_DaimonTheWhiteEyed_Part1
+item 7190 7191 7192
+page default/31683.htm
+page script/quest/Q603_DaimonTheWhiteEyed_Part1/
+npc eye 31683 Folk 10 0 0
+
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31683-10.htm
+  S SystemMessage id=301 3:7190 6:200
+  S SystemMessage id=54 3:7192
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-10.htm
+  S ActionFailed
+  Q delete-quest Q603_DaimonTheWhiteEyed_Part1
+  items 7190=0 7192=1
+  state Q603_DaimonTheWhiteEyed_Part1 -
+  rows Q603_DaimonTheWhiteEyed_Part1 -
+relog
+  state Q603_DaimonTheWhiteEyed_Part1 -
+  rows Q603_DaimonTheWhiteEyed_Part1 -

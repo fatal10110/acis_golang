@@ -163,6 +163,7 @@ func (g *group) dropOwner(t *testing.T) int32 {
 // though Rival, outside the channel, dealt most of the damage and the
 // killing blow, and Leader never hit it.
 func TestRaidChannelRightsTakeDrops(t *testing.T) {
+	t.Parallel()
 	g, channels := bootCCLoot(t)
 	channels.join(g.character(t, ccLeader), 19, g.players[ccLeader].id, g.players[ccMember].id)
 	boss := g.spawnBesideLeader(t, ccLootBoss(raidBossID))
@@ -184,6 +185,7 @@ func TestRaidChannelRightsTakeDrops(t *testing.T) {
 // drops to the top damage dealer; 37 on Queen Ant win them, announced with
 // Queen Ant's own text.
 func TestRaidChannelAtThresholdGetsNoRights(t *testing.T) {
+	t.Parallel()
 	g, channels := bootCCLoot(t)
 	channel := channels.join(g.character(t, ccLeader), 18, g.players[ccLeader].id, g.players[ccMember].id)
 	boss := g.spawnBesideLeader(t, ccLootBoss(raidBossID))
@@ -213,6 +215,7 @@ func TestRaidChannelAtThresholdGetsNoRights(t *testing.T) {
 // and the boss announces the lapse to every observer on the first second
 // past the five minutes. The drops then go to the top dealer again.
 func TestRaidChannelRightsLapse(t *testing.T) {
+	t.Parallel()
 	g, channels := bootCCLoot(t)
 	channels.join(g.character(t, ccLeader), 19, g.players[ccLeader].id, g.players[ccMember].id)
 	channels.join(g.character(t, ccOther), 19, g.players[ccOther].id)

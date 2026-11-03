@@ -1,0 +1,109 @@
+# Saga of the Shillien Saint (Q098) on the saga core, played by a level 76 Shillien Elder from
+# the start: Anastia offers it and gives the main item; Agnes sends the player to Duncan,
+# who asks for what the player does not hold; Anastia has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q098_SagaOfTheShillienSaint.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q098_saga_of_the_shillien_saint.golden
+character ShillienElder 76
+class 43
+script quest.Q098_SagaOfTheShillienSaint
+item 7090
+page trainer/31581.htm
+page default/31588.htm
+page default/31626.htm
+page script/quest/Q098_SagaOfTheShillienSaint/
+npc anastia 31581 Trainer 10 0 0
+npc agnes 31588 Folk -10 0 0
+npc duncan 31626 Folk 0 10 0
+
+action anastia
+action anastia
+  S ActionFailed
+  S NpcHtmlMessage obj=anastia item=0 page=trainer/31581.htm
+  S ActionFailed
+bypass npc_{anastia}_Quest
+  S NpcHtmlMessage obj=anastia item=0 page=script/quest/Q098_SagaOfTheShillienSaint/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q098_SagaOfTheShillienSaint 0-1
+  S NpcHtmlMessage obj=anastia item=0 page=script/quest/Q098_SagaOfTheShillienSaint/0-05.htm
+  S ActionFailed
+bypass Quest Q098_SagaOfTheShillienSaint accept
+  S QuestList 98:0x80000001
+  S ExShowQuestMark quest=98
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7090
+  S NpcHtmlMessage obj=anastia item=0 page=script/quest/Q098_SagaOfTheShillienSaint/0-03.htm
+  S ActionFailed
+  Q upsert Q098_SagaOfTheShillienSaint | <state> | STARTED
+  Q upsert Q098_SagaOfTheShillienSaint | <cond> | 1
+  items 7090=1
+  state Q098_SagaOfTheShillienSaint STARTED
+action anastia
+  S ActionFailed
+  S NpcHtmlMessage obj=anastia item=0 page=trainer/31581.htm
+  S ActionFailed
+bypass npc_{anastia}_Quest
+  S NpcHtmlMessage obj=anastia item=0 page=script/quest/Q098_SagaOfTheShillienSaint/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action agnes
+action agnes
+  S ActionFailed
+  S NpcHtmlMessage obj=agnes item=0 page=default/31588.htm
+  S ActionFailed
+bypass npc_{agnes}_Quest
+  S NpcHtmlMessage obj=agnes item=0 page=script/quest/Q098_SagaOfTheShillienSaint/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q098_SagaOfTheShillienSaint 2-1
+  S QuestList 98:0x80000003
+  S ExShowQuestMark quest=98
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=agnes item=0 page=script/quest/Q098_SagaOfTheShillienSaint/2-05.htm
+  S ActionFailed
+  Q upsert Q098_SagaOfTheShillienSaint | <cond> | 2
+action agnes
+  S ActionFailed
+  S NpcHtmlMessage obj=agnes item=0 page=default/31588.htm
+  S ActionFailed
+bypass npc_{agnes}_Quest
+  S NpcHtmlMessage obj=agnes item=0 page=script/quest/Q098_SagaOfTheShillienSaint/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action duncan
+action duncan
+  S ActionFailed
+  S NpcHtmlMessage obj=duncan item=0 page=default/31626.htm
+  S ActionFailed
+bypass npc_{duncan}_Quest
+  S NpcHtmlMessage obj=duncan item=0 page=script/quest/Q098_SagaOfTheShillienSaint/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q098_SagaOfTheShillienSaint 1-3
+  S QuestList 98:0x80000007
+  S ExShowQuestMark quest=98
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=duncan item=0 page=script/quest/Q098_SagaOfTheShillienSaint/1-05.htm
+  S ActionFailed
+  Q upsert Q098_SagaOfTheShillienSaint | <cond> | 3
+action duncan
+  S ActionFailed
+  S NpcHtmlMessage obj=duncan item=0 page=default/31626.htm
+  S ActionFailed
+bypass npc_{duncan}_Quest
+  S NpcHtmlMessage obj=duncan item=0 page=script/quest/Q098_SagaOfTheShillienSaint/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action anastia
+action anastia
+  S ActionFailed
+  S NpcHtmlMessage obj=anastia item=0 page=trainer/31581.htm
+  S ActionFailed
+bypass npc_{anastia}_Quest
+  S NpcHtmlMessage obj=anastia item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q098_SagaOfTheShillienSaint STARTED
+  rows Q098_SagaOfTheShillienSaint <cond>=3 <state>=STARTED

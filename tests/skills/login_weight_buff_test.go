@@ -3,7 +3,6 @@ package skills
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -86,8 +85,8 @@ func TestRestoredWeightLimitBuffSetsLoginWeightBand(t *testing.T) {
 		}
 		frames = append(frames, frame)
 	}
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("EnterWorld sent opcode %#x after its ActionFailed", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("EnterWorld sent opcode %#x after its ActionFailed", queued[0][0])
 	}
 
 	for _, i := range []int{4, 14} {

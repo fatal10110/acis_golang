@@ -1,0 +1,28 @@
+# The Elmoreden cemetery teleporters (ElmoredenCemeteryTeleporter): both ghost chamberlains,
+# followed by a character holding neither an antique brooch nor a used grave pass, answer their
+# own refusal page, <npc id>-1.htm (onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/elmoreden_cemetery_teleporter_refused.golden
+character Mourner 20
+script script.teleport.ElmoredenCemeteryTeleporter
+page default/31919.htm
+page default/31920.htm
+page script/teleport/ElmoredenCemeteryTeleporter/
+npc first 31919 Folk 10 0 0
+npc second 31920 Folk -10 0 0
+
+action first
+action first
+  S ActionFailed
+  S NpcHtmlMessage obj=first item=0 page=default/31919.htm
+  S ActionFailed
+bypass Quest ElmoredenCemeteryTeleporter 4S
+  S NpcHtmlMessage obj=first item=0 page=script/teleport/ElmoredenCemeteryTeleporter/31919-1.htm
+  S ActionFailed
+action second
+action second
+  S ActionFailed
+  S NpcHtmlMessage obj=second item=0 page=default/31920.htm
+  S ActionFailed
+bypass Quest ElmoredenCemeteryTeleporter IT
+  S NpcHtmlMessage obj=second item=0 page=script/teleport/ElmoredenCemeteryTeleporter/31920-1.htm
+  S ActionFailed

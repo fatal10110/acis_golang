@@ -25,7 +25,7 @@ func newCombatHostile(t testing.TB, id int32, tpl *Template) *Hostile {
 	return h
 }
 
-func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackController) *Hostile {
+func newTestHostile(t *testing.T, move ai.AttackableMoveController, strike ai.AttackController) *Hostile {
 	t.Helper()
 	hostile, err := NewHostile(&Instance{
 		ObjectID: 101,
@@ -99,6 +99,7 @@ type hostileMove struct {
 	followRange  int
 	home         location.Location
 	locations    []location.Location
+	straight     []location.Location
 	moved        chan location.Location
 	stopCount    int
 
@@ -130,6 +131,12 @@ func (m *hostileMove) MoveToLocation(target location.Location) (bool, error) {
 	if m.moved != nil {
 		m.moved <- target
 	}
+	return true, nil
+}
+
+// MoveStraightToLocation records a walk with path-finding off in straight.
+func (m *hostileMove) MoveStraightToLocation(target location.Location) (bool, error) {
+	m.straight = append(m.straight, target)
 	return true, nil
 }
 

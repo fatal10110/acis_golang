@@ -1,0 +1,42 @@
+# Path To Become A Scavenger (Q417), a level 18 dwarven fighter is turned away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q417_path_to_become_a_scavenger_low_level.golden
+character Scavenger 18
+class 53
+script quest.Q417_PathToBecomeAScavenger
+item 1642 1643 1644 1645 1646 1647 1648 1649 1650 1651 1652 1653 1654 1655 1656 1657 8543
+page default/30524.htm
+page warehouse/30316.htm
+page merchant/30517.htm
+page merchant/30519.htm
+page villagemaster/30525.htm
+page default/30538.htm
+page default/30556.htm
+page default/30557.htm
+page villagemaster/31958.htm
+page script/quest/Q417_PathToBecomeAScavenger/
+npc pippi 30524 Folk 10 0 0
+npc raut 30316 WarehouseKeeper -20 0 0
+npc shari 30517 Merchant 30 0 0
+npc mion 30519 Merchant -40 0 0
+npc bronk 30525 VillageMasterDwarf 50 0 0
+npc zimenf 30538 Folk -60 0 0
+npc toma 30556 Folk 70 0 0
+npc torai 30557 Folk -80 0 0
+npc yasheni 31958 VillageMasterDwarf 90 0 0
+npc hbear 20777 Monster -100 0 0
+npc honey 27058 Monster 110 0 0
+npc hunter 20403 Monster -120 0 0
+npc plunder 20508 Monster 130 0 0
+
+action pippi
+action pippi
+  S ActionFailed
+  S NpcHtmlMessage obj=pippi item=0 page=default/30524.htm
+  S ActionFailed
+bypass npc_{pippi}_Quest
+  S NpcHtmlMessage obj=pippi item=0 page=script/quest/Q417_PathToBecomeAScavenger/30524-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q417_PathToBecomeAScavenger 30524-05.htm
+  S NpcHtmlMessage obj=pippi item=0 page=script/quest/Q417_PathToBecomeAScavenger/30524-02.htm
+  S ActionFailed

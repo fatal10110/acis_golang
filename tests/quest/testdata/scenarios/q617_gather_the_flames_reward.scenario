@@ -1,0 +1,38 @@
+# Gather the Flames (Q617): a thousand torches pay the last recipe of the draw to Vulcan; with none left the page stays.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q617_gather_the_flames_reward.golden
+character Hero 74
+quest Q617_GatherTheFlames <cond>=1 <state>=STARTED
+hold 7264 1000
+random 9
+script quest.Q617_GatherTheFlames
+item 7264 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page default/31539.htm
+page script/quest/Q617_GatherTheFlames/
+npc vulcan 31539 Folk 10 0 0
+
+action vulcan
+action vulcan
+  S ActionFailed
+  S NpcHtmlMessage obj=vulcan item=0 page=default/31539.htm
+  S ActionFailed
+bypass npc_{vulcan}_Quest
+  S NpcHtmlMessage obj=vulcan item=0 page=script/quest/Q617_GatherTheFlames/31539-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q617_GatherTheFlames 31539-05.htm
+  S SystemMessage id=301 3:7264 6:1000
+  S SystemMessage id=54 3:7580
+  S NpcHtmlMessage obj=vulcan item=0 page=script/quest/Q617_GatherTheFlames/31539-07.htm
+  S ActionFailed
+  items 7264=0 7580=1
+action vulcan
+  S ActionFailed
+  S NpcHtmlMessage obj=vulcan item=0 page=default/31539.htm
+  S ActionFailed
+bypass npc_{vulcan}_Quest
+  S NpcHtmlMessage obj=vulcan item=0 page=script/quest/Q617_GatherTheFlames/31539-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q617_GatherTheFlames 31539-05.htm
+  items 7264=0 7580=1

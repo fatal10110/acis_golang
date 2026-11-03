@@ -60,7 +60,7 @@ func (g *engineSightGeo) heights() []float64 {
 func sightEngine(t *testing.T, x, y int, groundZ int16, wallX int, wallZ int16) *engine.Engine {
 	t.Helper()
 	eng := engine.New()
-	region := block.NewRegion()
+	region := block.NewRegionBuilder()
 	for i := range block.RegionBlockCount {
 		region.SetFlat(i, groundZ)
 	}
@@ -79,13 +79,11 @@ func sightEngine(t *testing.T, x, y int, groundZ int16, wallX int, wallZ int16) 
 				cells[cx*block.CellsY+cy] = cell
 			}
 		}
-		if err := region.SetComplex(blockX*block.RegionBlocksY+blockY, cells); err != nil {
-			t.Fatalf("wall block: %v", err)
-		}
+		region.SetComplex(blockX*block.RegionBlocksY+blockY, cells)
 	}
 	regionX := engine.TileXMin + (x-engine.WorldXMin)/engine.TileSize
 	regionY := engine.TileYMin + (y-engine.WorldYMin)/engine.TileSize
-	if err := eng.SetRegion(regionX, regionY, region); err != nil {
+	if err := eng.SetRegion(regionX, regionY, region.Build()); err != nil {
 		t.Fatalf("sight geodata: %v", err)
 	}
 	return eng
@@ -165,7 +163,7 @@ func TestRangedCastAtDoorSeesItAtDoorEyeHeight(t *testing.T) {
 
 			selectTarget(t, c, gate.ObjectID())
 			if tc.opens {
-				castUnlock(t, c, objID, def, gate.ObjectID())
+				castUnlock(t, srv, c, objID, def, gate.ObjectID())
 				if !gate.Opened() {
 					t.Fatal("door still closed after a guaranteed unlock it can be seen for")
 				}

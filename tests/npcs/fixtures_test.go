@@ -132,16 +132,12 @@ func startInWorld(t *testing.T, srv *gameservertest.Server, c *testsupport.Scrip
 	enterWorld(t, srv, c)
 }
 
-// enterWorld sends EnterWorld and returns its burst once the server has
-// handled it. On the wall clock (the real pool) the character's rows are read
-// before the burst's first frame, and the player joins the world only after
-// them, so a quiet window alone could close before either: the drain starts
-// only once the request has been handled.
+// enterWorld sends EnterWorld and returns its burst and whatever the work
+// it started sent once the server has caught up.
 func enterWorld(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	srv.Settle(t)
-	return drainFrames(t, c)
+	return srv.ReadQueued(t, c)
 }
 
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
@@ -149,20 +145,25 @@ func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	drainFrames(t, c)
 }
 
-// drainFrames collects every frame the client receives until the server
-// goes quiet, in arrival order.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	frames := make([][]byte, 0, 8)
-	for i := 0; i < 200; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
+	return c.ReadQueued()
+}
+
+// advanceUntilSwingLands lets time pass in short steps until cond holds,
+// for up to a minute: swings miss at random, so a landing hit can take more
+// swings than AdvanceUntil's limit leaves room for.
+func advanceUntilSwingLands(t *testing.T, srv *gameservertest.Server, what string, cond func() bool) {
+	t.Helper()
+	const step, limit = 10 * time.Millisecond, time.Minute
+	for passed := time.Duration(0); !cond(); passed += step {
+		if passed >= limit {
+			t.Fatalf("%s not observed within %v", what, limit)
 		}
-		frames = append(frames, frame)
+		srv.Advance(t, step)
 	}
-	t.Fatal("client kept receiving frames after 200 drains")
-	return nil
 }
 
 func opcodes(frames [][]byte) []byte {

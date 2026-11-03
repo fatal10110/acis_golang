@@ -69,7 +69,7 @@ default), the first login creates the account.
 | `server.properties` | `LoginHost` | `loginserver` | The game server links to the `loginserver` service. |
 | `server.properties` | `Hostname` | `$ACIS_PUBLIC_HOST` (default `127.0.0.1`) | The address the login server gives clients for the game server. The reference `*` would give them the game container's internal address. |
 
-The script also creates `log/loginserver`, `log/gameserver` and the datapack's `data/crests`. It
+The script also creates `log/loginserver`, `log/gameserver`, `cache` and the datapack's `data/crests`. It
 refuses to run when `config/server.properties` already exists, so it never undoes your edits. To
 change a value later, edit `config/*.properties` and restart the service.
 
@@ -82,10 +82,11 @@ Compose reads these from the environment or from `.env`:
 | `ACIS_DATAPACK_DIR` | `../aCis_datapack` | Datapack checkout. `sql/` and `tools/` create the schema, and `data/` is mounted read-write, because the game server writes clan crests to `data/crests/` and admin announcement edits to `data/xml/announcements.xml`. |
 | `ACIS_CONFIG_DIR` | `./config` | Config directory, mounted read-write at `/opt/acis/config`. |
 | `ACIS_LOG_DIR` | `./log` | Log root. Each server writes the files named in `logging.properties` under its own `loginserver/` or `gameserver/` subdirectory. |
+| `ACIS_CACHE_DIR` | `./cache` | Game server cache directory, mounted at `/opt/acis/cache`. The game server keeps the packed geodata cache there (`-geodata-cache cache/geodata.cache`): the first boot builds it from `data/geodata/`, later boots map it instead of loading every region onto the heap. Deleting it only costs one rebuild. |
 | `ACIS_DB_ROOT_PASSWORD` | `123321` | MariaDB root password, applied only when the volume is first created. |
 | `ACIS_DB_BIND`, `ACIS_DB_PORT` | `127.0.0.1`, `3306` | Host address and port the database is published on. Leave the address on loopback. |
 | `ACIS_MARIADB_TAG` | `11` | MariaDB image tag. CI tests against MariaDB 11. |
-| `ACIS_UID`, `ACIS_GID` | `1000` | Host user the servers run as. It needs write access to the config, log and `data/crests` directories. |
+| `ACIS_UID`, `ACIS_GID` | `1000` | Host user the servers run as. It needs write access to the config, log, cache and `data/crests` directories. |
 | `TZ` | `UTC` | Server time zone. Seven Signs, Olympiad, sieges, the manor, the lottery and the fishing championship run on local wall-clock time. Set the zone the reference server ran in. |
 
 The published ports are 2106 (login clients) and 7777 (game clients). Port 9014, the link between
@@ -108,9 +109,24 @@ On `stop`, `restart` and `down`, Docker sends SIGTERM. The game server then clos
 with `ServerClose`, saves players and world state, and exits. Its `stop_grace_period` (240s) is set
 above the server's own worst-case shutdown (`gameServerStopTimeout`, currently 3m35s).
 `TestComposeStopGraceCoversGameServerStop` fails if the two drift apart. The `servers` profile
-uses `restart: unless-stopped`, so a crashed server comes back up. The reference loop scripts
-also restarted on the admin restart exit code. The Go server has no admin shutdown or restart
-command yet ([#3369](https://github.com/fatal10110/acis_golang/issues/3369)).
+uses `restart: unless-stopped`, so a crashed server comes back up, and so does one stopped
+in game: `//server restart` (exit code 2) and `//server shutdown` (exit code 0) both end in a
+restart under this policy. To keep the server down, stop it with `docker compose stop`.
+
+CI runs `ops/docker/smoke-test.sh` on every change. It checks that `docker-compose.yml` parses,
+that the image builds and each of its binaries starts, and that the `db` service's first start
+loads every table file of a stub datapack. It also checks that a first start without
+`tools/full_install.sql` exits non-zero, and that under `docker compose up` the `restart: always`
+restart that follows serves an empty database but never reports healthy, and that a data directory
+left by a first start killed before the schema load never reports healthy either. With
+`ACIS_SMOKE_DATAPACK` set to an `aCis_datapack` checkout it also loads the real schema and checks
+that `acis` holds one table per `sql/*.sql` file; CI does this when the `ACIS_DATAPACK_TOKEN`
+secret (read access to the repository holding `aCis_datapack`) is set, and warns otherwise. To run
+it locally, stop any compose database first: the `db` container name is fixed:
+
+```sh
+ACIS_SMOKE_DATAPACK=../aCis_datapack ops/docker/smoke-test.sh
+```
 
 Backups: [backup-restore.md](backup-restore.md). Moving an existing Java server:
 [migrating-from-java.md](migrating-from-java.md).
@@ -119,11 +135,12 @@ Backups: [backup-restore.md](backup-restore.md). Moving an existing Java server:
 
 | Symptom | Cause and fix |
 | --- | --- |
-| `db` exits on first start and its log shows `acis schema: ... not found`. | `ACIS_DATAPACK_DIR` does not point at an `aCis_datapack` checkout. The data directory was already created, so the next start skips the schema load. Run `docker compose down -v` (it **deletes** the database volume), fix the path, and start again. |
+| `db` stays unhealthy, `loginserver` and `gameserver` never start, and `docker inspect --format '{{json .State.Health}}' mariadb-server` shows `acis schema load did not finish`. The first `db` log shows `acis schema: ... not found` or a failed load. | The first-start schema load failed, usually because `ACIS_DATAPACK_DIR` does not point at an `aCis_datapack` checkout. That start exits; `restart: always` starts `db` again, and since the data directory already exists, that start skips the schema load and serves an empty or partial `acis` database. The load leaves the marker `/var/lib/mysql/.acis-schema-incomplete` behind, and the healthcheck fails while it exists. Run `docker compose down -v` (it **deletes** the database volume), fix the path, and start again. |
+| `db` stays unhealthy, `loginserver` and `gameserver` never start, and `docker inspect --format '{{json .State.Health}}' mariadb-server` shows `acis database has no tables`. The `db` log has no `acis schema:` lines. | The first `db` start was killed (out of memory, host reboot, `docker kill`) after MariaDB initialized the data directory but before the schema load ran. Every later start sees an initialized data directory and skips the load, so the `acis` database has no tables. Run `docker compose down -v` (it **deletes** the database volume) and start again. |
 | The game server exits with `open config/hexid.txt: no such file or directory`. | Step 4 was skipped, or the file was not renamed to `hexid.txt`. |
 | The game server log shows `wrong hexid`, or it keeps retrying the login link. | `config/hexid.txt` does not match the `gameservers` table, for example after the database was recreated. Register again (step 4), then restart **both** services: the login server reads the registered servers only at startup. |
 | Clients see the server list, but entering the game times out. | `Hostname` in `config/server.properties` is not reachable from the client. Set it to the public IP or DNS name and restart `gameserver`. |
-| `permission denied` on `log/...` or `data/crests/...`. | Docker created a missing bind-mount directory as root, or `ACIS_UID` does not own the directory. Run `ops/docker/init-config.sh` first, or `chown` the directory to `ACIS_UID:ACIS_GID`. |
+| `permission denied` on `log/...`, `cache/...` or `data/crests/...`, or the game server logs that it cannot build the packed geodata cache and loads the regions onto the heap. | Docker created a missing bind-mount directory as root, or `ACIS_UID` does not own the directory. Run `ops/docker/init-config.sh` first, or `chown` the directory to `ACIS_UID:ACIS_GID`. |
 | The game server boot fails and names a geodata file. | A region listed in `config/geoengine.properties` is missing or malformed under `data/geodata/`. Unlisted regions are not loaded. |
 | `gameserver` exits with code 137 on `stop`. | Docker killed it before it finished saving. Keep `stop_grace_period` above `gameServerStopTimeout`. Check with `docker inspect --format '{{.State.ExitCode}}' <container>`. |
 | Events start hours early or late. | `TZ` differs from the zone the schedules were set up in. |

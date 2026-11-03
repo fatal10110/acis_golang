@@ -1,0 +1,62 @@
+# Exploration of the Giants' Cave, Part 2 (Q377), a character with two sets of books trades both at Sobling (draws 1, 0) and ends the quest. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q377_exploration_of_the_giants_cave_part2_recipes.golden
+character Exploration 57
+quest Q377_ExplorationOfTheGiantsCave_Part2 <cond>=1 <state>=STARTED
+hold 5945 1
+hold 5946 1
+hold 5947 1
+hold 5948 1
+hold 5949 1
+hold 5950 1
+hold 5951 1
+hold 5952 1
+hold 5953 1
+hold 5954 1
+random 1 0
+script quest.Q377_ExplorationOfTheGiantsCave_Part2
+item 5892 5955 5945 5946 5947 5948 5949 5950 5951 5952 5953 5954 5338 5336 5420 5422
+page default/31147.htm
+page script/quest/Q377_ExplorationOfTheGiantsCave_Part2/
+npc sobling 31147 Folk 10 0 0
+npc m54 20654 Monster 40 0 0
+npc m56 20656 Monster 50 0 0
+npc m57 20657 Monster 60 0 0
+npc m58 20658 Monster 70 0 0
+
+action sobling
+action sobling
+  S ActionFailed
+  S NpcHtmlMessage obj=sobling item=0 page=default/31147.htm
+  S ActionFailed
+bypass npc_{sobling}_Quest
+  S SystemMessage id=302 3:5945
+  S SystemMessage id=302 3:5946
+  S SystemMessage id=302 3:5947
+  S SystemMessage id=302 3:5948
+  S SystemMessage id=302 3:5949
+  S SystemMessage id=54 3:5336
+  S NpcHtmlMessage obj=sobling item=0 page=script/quest/Q377_ExplorationOfTheGiantsCave_Part2/31147-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 5945=0 5949=0 5950=1 5954=1 5338=0 5336=1
+bypass Quest Q377_ExplorationOfTheGiantsCave_Part2 31147-04.htm
+  S SystemMessage id=302 3:5950
+  S SystemMessage id=302 3:5951
+  S SystemMessage id=302 3:5952
+  S SystemMessage id=302 3:5953
+  S SystemMessage id=302 3:5954
+  S SystemMessage id=54 3:5420
+  S NpcHtmlMessage obj=sobling item=0 page=script/quest/Q377_ExplorationOfTheGiantsCave_Part2/31147-04.htm
+  S ActionFailed
+  items 5950=0 5954=0 5420=1 5422=0
+bypass Quest Q377_ExplorationOfTheGiantsCave_Part2 31147-07.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=sobling item=0 page=script/quest/Q377_ExplorationOfTheGiantsCave_Part2/31147-07.htm
+  S ActionFailed
+  Q delete-quest Q377_ExplorationOfTheGiantsCave_Part2
+  rows Q377_ExplorationOfTheGiantsCave_Part2 -
+  state Q377_ExplorationOfTheGiantsCave_Part2 -
+relog
+  rows Q377_ExplorationOfTheGiantsCave_Part2 -
+  state Q377_ExplorationOfTheGiantsCave_Part2 -

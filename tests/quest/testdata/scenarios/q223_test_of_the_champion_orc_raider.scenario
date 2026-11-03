@@ -1,0 +1,45 @@
+# Test of the Champion (Q223), accepted by a level 39 Orc Raider: Ascalon's first page is his orc
+# version, and the accept pays the level 39 set's diamonds for an Orc Raider (64). Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q223_test_of_the_champion_orc_raider.golden
+character Raider 39
+class 45
+script quest.Q223_TestOfTheChampion
+item 3276 3277 3278 3279 3280 3281 3282 3283 3284 3285 3286 3287 3288 3289 3290 3291 3292 7562
+page default/30624.htm
+page script/quest/Q223_TestOfTheChampion/
+npc ascalon 30624 Folk 10 0 0
+
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-05.htm
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-05.htm
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-06.htm
+  S QuestList 223:0x80000001
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3277
+  S SystemMessage id=53 3:7562 6:64
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-06a.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <state> | STARTED
+  Q upsert Q223_TestOfTheChampion | <cond> | 1
+  M set secondClassChange39 | true
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=1
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-07.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,12 @@
+# DoormanOfDrain (18343, level 78), every draw 0: a gatekeeper younger than 7 s does not strike the character it sees.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain
+npc door 18343 Monster 1500 0 0 level 78 skill DD_MAGIC 5043 10 skill MAGIC_HEAL 1011 6
+
+approach door
+  desires door -

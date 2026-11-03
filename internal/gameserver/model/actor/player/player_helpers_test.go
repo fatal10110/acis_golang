@@ -269,16 +269,17 @@ func combatItems() *item.Table {
 
 func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*item.Instance) *Character {
 	c := &Character{
-		ID: id, Name: "char",
+		ID:   id,
 		Race: RaceHuman, CharLevel: 1,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
+	c.SetName("char")
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)
-	c.perfectShieldBlockRate = 5
+	setRules(c, func(r *Rules) { r.PerfectShieldBlockRate = 5 })
 	return c
 }
 
@@ -384,4 +385,11 @@ func attachIdleLive(t *testing.T, c *Character) *Character {
 	live.SetQueue(idleQueue())
 	c.Live = live
 	return c
+}
+
+// setRules puts in force for c its rules as edit changes them.
+func setRules(c *Character, edit func(*Rules)) {
+	r := *c.rules()
+	edit(&r)
+	c.ruleBook.Store(NewRuleBook(r))
 }

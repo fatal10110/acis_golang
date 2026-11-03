@@ -1,0 +1,32 @@
+# Kail's Magic Coin (Q382), level 55: the four orcs drop their coins, the captain one of three by its draw. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q382_kails_magic_coin_drops.golden
+character Magic 55
+quest Q382_KailsMagicCoin <cond>=1 <state>=STARTED
+random 0 0 0 2 0
+script quest.Q382_KailsMagicCoin
+item 5898 5961 5962 5963
+page villagemaster/30687.htm
+page script/quest/Q382_KailsMagicCoin/
+npc vergara 30687 VillageMasterDwarf 10 0 0
+npc orc 21017 Monster 40 0 0
+npc archer 21019 Monster 50 0 0
+npc shaman 21020 Monster 60 0 0
+npc captain 21022 Monster 70 0 0
+
+kill orc
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5961
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill archer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5962
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill captain
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5961=1 5962=1 5963=2

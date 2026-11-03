@@ -1,8 +1,6 @@
 package network
 
 import (
-	"time"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -11,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
 
 // talkToFolk is a civilian NPC's answer to a player's interact in reach:
@@ -27,7 +27,7 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if f.Muted() {
 		return
 	}
-	if id, ok := f.TalkAnimation(time.Now()); ok {
+	if id, ok := f.TalkAnimation(); ok {
 		l.broadcastNPCFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
 	}
 	if f.QuestTalker() && l.talkThroughScripts(live, f) {
@@ -36,21 +36,13 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if showObserverGroups(live, f) || l.showSiegeMessenger(live, f) {
 		return
 	}
-	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma(), folkChatState{l: l, live: live})
-	switch outcome {
-	case npc.ChatWedding:
-		l.weddingGreeting(live, f)
-	case npc.ChatUnported:
-		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
-	default:
-		sendFolkChat(live, f, html, outcome)
-	}
+	l.openFolkChat(live, f)
 }
 
 // sendFolkChat opens html, f's chat window, the way outcome says: with
-// ActionFailed first for a Seven Signs priest, after the page for everyone
-// else. A Mammon NPC refusing the talker says why instead, releasing the
-// client after a cabal refusal.
+// ActionFailed first or alone, after the page, or not at all. A Mammon NPC
+// refusing the talker says why instead, releasing the client after a cabal
+// refusal.
 func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOutcome) {
 	switch outcome {
 	case npc.ChatShownReleased:
@@ -65,6 +57,11 @@ func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOu
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.ChatCompetitionOnly:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageQuestEventPeriod))
+	case npc.ChatPageOnly:
+		sendFilledHTML(live, f.ObjectID(), html, 0)
+	case npc.ChatReleasedOnly:
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case npc.ChatSilent:
 	default:
 		sendFilledHTML(live, f.ObjectID(), html, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -72,10 +69,12 @@ func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOu
 }
 
 // folkChatState is what a civilian NPC's chat window reads of live and of
-// the Seven Signs, festival and noble state.
+// the Seven Signs, festival, noble and residence state. f is the NPC talked
+// to.
 type folkChatState struct {
 	l    *GameClientLink
 	live *livePlayer
+	f    *npc.Folk
 }
 
 func (s folkChatState) SevenSigns() sevensigns.Record {
@@ -93,6 +92,8 @@ func (s folkChatState) FestivalNotice() string {
 }
 
 func (s folkChatState) Noble() bool { return s.live.IsNoble() }
+
+func (s folkChatState) Residence() npc.ResidenceTalk { return s.l.residenceTalk(s.live, s.f) }
 
 func (s folkChatState) Hero() (isHero, inactive bool) {
 	return s.live.IsHero(), s.l.heroes != nil && s.l.heroes.IsInactive(s.live.ObjectID())
@@ -135,7 +136,6 @@ type folkSink struct {
 	world  *world.State
 	stance AttackStanceTracker
 	f      *npc.Folk
-	known  world.KnownBuffer
 	link   *GameClientLink
 }
 
@@ -151,18 +151,28 @@ func (s *folkSink) Emit(ev event.Event) {
 		at := location.Location{X: x, Y: y, Z: z}
 		s.broadcast(func() wire.Frame { return frames.Stop(f.ObjectID(), at, f.Heading()) })
 	case event.Teleported:
-		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(f.ObjectID(), e.To, false) })
+		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(f.ObjectID(), e.To, e.Instant) })
 	case event.SocialAction:
 		s.broadcast(func() wire.Frame { return frames.SocialAction(f.ObjectID(), e.ID) })
 	case event.NpcSay:
-		s.broadcast(func() wire.Frame { return frames.NpcSay(f.ObjectID(), e.NpcID, e.Text) })
+		s.broadcast(func() wire.Frame { return frames.NpcSay(f.ObjectID(), e.NpcID, e.Text, e.Shout) })
+	case event.CameraShotPlayed:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameSpecialCamera(f.ObjectID(), e.Shot) })
+	case event.OnScreenMessage:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs) })
+	case event.NpcShout:
+		broadcastInRadius(s.world, f, e.Radius, func() wire.Frame { return frames.NpcSay(f.ObjectID(), e.NpcID, e.Text, true) })
+	case event.NpcSystemMessage:
+		broadcastInRadius(s.world, f, e.Radius, func() wire.Frame { return frameNpcSystemMessage(e) })
+	case event.MusicPlayed:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameMusicAt(f.ObjectID(), e.File, e.At) })
 	case event.HPChanged:
-		known := s.known.SnapshotCopy(s.world, f)
-		defer known.Release()
-		sendHPToWatchers(known.Tracked(), f.ObjectID(), f.PublishHP)
+		sendHPToWatchers(s.world.KnownPlayers(f), f.ObjectID(), f.PublishHP)
 	case event.Status:
 		attrs := npcStatusAttributes(e.Attrs)
 		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })
+	case event.Attack:
+		s.broadcast(func() wire.Frame { return frames.Attack(e) })
 	case event.Attacked, event.AttackStanceRequested:
 		s.startAttackStance()
 	case event.Died:
@@ -174,6 +184,10 @@ func (s *folkSink) Emit(ev event.Event) {
 		})
 	case event.SkillLaunched:
 		s.broadcast(func() wire.Frame { return frames.SkillLaunched(f.ObjectID(), e.SkillID, e.Level, e.TargetIDs) })
+	case event.ShotRecharged:
+		broadcastInRadius(s.world, f, shotRechargeRadius, func() wire.Frame {
+			return frames.SkillUse(f.ObjectID(), e.At, f.ObjectID(), e.At, e.SkillID, 1, 0, 0, false)
+		})
 	case event.SkillCanceled:
 		s.broadcast(func() wire.Frame { return frames.SkillCanceled(e.ObjectID) })
 	case event.MoveToPawn:
@@ -181,9 +195,9 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.AutoAttackStopped:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(f.ObjectID()) })
 	case event.MoveTypeChanged:
-		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running) })
+		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running, f.InsideZone(zone.FlagWater)) })
 	case event.AbnormalEffectChanged:
-		s.broadcast(func() wire.Frame { return frames.Info(f.NPCInfoSnapshot()) })
+		broadcastNPCView(s.link, s.world, f, f.ServerObjectView())
 	case event.HallManagerBuffCheck:
 		if s.link != nil {
 			s.link.hallManagerSelfBuff(f)
@@ -192,12 +206,12 @@ func (s *folkSink) Emit(ev event.Event) {
 		if s.link != nil {
 			s.link.hallSupportAnswer(f, e)
 		}
-	case event.NPCInfoChanged:
-		if e.ServerObject {
-			s.broadcast(func() wire.Frame { return frames.ObjectInfo(f.ServerObjectInfoSnapshot()) })
-			return
+	case event.HeadquartersAttacked:
+		if s.link != nil {
+			s.link.warnHeadquartersAttacked(f)
 		}
-		s.broadcast(func() wire.Frame { return frames.Info(f.NPCInfoSnapshot()) })
+	case event.NPCInfoChanged:
+		broadcastNPCView(s.link, s.world, f, e.ServerObject || f.ServerObjectView())
 	}
 }
 
@@ -229,7 +243,7 @@ func (s *folkSink) stopAttackStance() {
 
 // broadcast fans one lazily built frame out to the NPC's observers.
 func (s *folkSink) broadcast(build func() wire.Frame) {
-	broadcastKnown(&s.known, s.world, s.f, build)
+	broadcastKnown(s.world, s.f, build)
 }
 
 // chatRules are the karma gates on service NPC dialogs.
@@ -239,4 +253,13 @@ func (c PlayerConfig) chatRules() npc.ChatRules {
 		KarmaCanUseGK:        c.KarmaPlayerCanUseGK,
 		KarmaCanUseWarehouse: c.KarmaPlayerCanUseWareHouse,
 	}
+}
+
+// chatRules are the gates on service NPC dialogs: the karma gates, the
+// manor switch and the wyvern ride settings.
+func (l *GameClientLink) chatRules() npc.ChatRules {
+	rules := l.playerConfig().chatRules()
+	rules.AllowManor = l.manor.Allowed
+	rules.Wyvern = l.wyvern
+	return rules
 }

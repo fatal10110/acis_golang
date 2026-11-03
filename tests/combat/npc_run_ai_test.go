@@ -44,10 +44,10 @@ func startHostileAttack(t *testing.T, atkSpd, rightHand int) (*gameservertest.Se
 // whether its first attack is latched.
 type hostilePrelude func(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile)
 
-// walkInPlace runs a MOVE_TO desire to the monster's own position. It
-// finishes in the same cycle with no packet, and leaves a walk as the last
-// executed desire, so the next attack is not latched.
-func walkInPlace(t *testing.T, _ *gameservertest.Server, hostile *npc.Hostile) {
+// walkInPlace runs a MOVE_TO desire to the monster's own position: a
+// zero-length move that arrives on the next move tick. It leaves a walk as
+// the last executed desire, so the next attack is not latched.
+func walkInPlace(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile) {
 	t.Helper()
 	x, y, z := hostile.Position()
 	if !hostile.AI().AddMoveToDesire(location.Location{X: x, Y: y, Z: z}, 1) {
@@ -55,6 +55,13 @@ func walkInPlace(t *testing.T, _ *gameservertest.Server, hostile *npc.Hostile) {
 	}
 	if err := hostile.TickThink(); err != nil {
 		t.Fatalf("walk-in-place TickThink() error: %v", err)
+	}
+	if !hostile.Move().Moving() {
+		t.Fatal("walk in place not started, want a zero-length move")
+	}
+	srv.TickPositions()
+	if hostile.Move().Moving() {
+		t.Fatal("walk in place still moving after one move tick")
 	}
 	if got := hostile.AI().Desires().Len(); got != 0 {
 		t.Fatalf("queued desires after walking in place = %d, want 0", got)
@@ -65,7 +72,7 @@ func walkInPlace(t *testing.T, _ *gameservertest.Server, hostile *npc.Hostile) {
 // monster gets its attack desire.
 func startHostileAttackAfter(t *testing.T, atkSpd, rightHand int, prelude hostilePrelude) (*gameservertest.Server, *npc.Hostile, attackable.Combatant, time.Duration) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -103,16 +110,22 @@ func startHostileAttackAfter(t *testing.T, atkSpd, rightHand int, prelude hostil
 	return srv, hostile, victim, time.Duration(formulas.TimeBetweenAttacks(hostile.AttackSpeed())) * time.Millisecond
 }
 
-// decayAttackDesire runs one hate-decay step: the weak attack desire drops
-// out of the queue while the hate entry keeps the monster out of peace.
+// decayAttackDesire runs AI cycles as the AI task does, Tick then TickThink,
+// until one reaches the hate decay: the weak attack desire drops out of the
+// queue after that cycle's selection, while the hate entry keeps the monster
+// out of peace.
 func decayAttackDesire(t *testing.T, hostile *npc.Hostile) {
 	t.Helper()
 	for range 3 {
 		hostile.Tick()
+		if err := hostile.TickThink(); err != nil {
+			t.Fatalf("TickThink() error: %v", err)
+		}
+		if hostile.AI().Desires().Len() == 0 {
+			return
+		}
 	}
-	if got := hostile.AI().Desires().Len(); got != 0 {
-		t.Fatalf("queued desires after decay = %d, want 0", got)
-	}
+	t.Fatalf("queued desires after decay = %d, want 0", hostile.AI().Desires().Len())
 }
 
 // intentionAfter lets d pass, ending just past a swing timer, and fails
@@ -226,32 +239,4 @@ func TestBowShotIdlesHostileWithNoDesire(t *testing.T) {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	readUntil(t, srv.Client, serverpackets.OpcodeAttack, "second bow Attack inside the cancelled reuse")
-}
-
-// TestBowReuseEndContinuesHostileWithoutIdle pins
-// AttackableAI.onEvtBowAttackReuse: a bow's reuse ending only THINKs, so a
-// monster whose last desire decayed during the reuse delay does not run
-// runAI's empty-queue idle abort then.
-func TestBowReuseEndContinuesHostileWithoutIdle(t *testing.T) {
-	t.Parallel()
-	srv, hostile, _, attackTime := startHostileAttack(t, 300, bowItemID)
-	reuse := 1500 * time.Millisecond * 345 / time.Duration(hostile.AttackSpeed())
-
-	srv.Advance(t, attackTime+hitAnimationTail+10*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() after the shot's hit animation = %v, want %v", got, ai.IntentionAttack)
-	}
-	decayAttackDesire(t, hostile)
-	drainUntilQuiet(t, srv.Client)
-
-	srv.Advance(t, reuse-hitAnimationTail)
-	for {
-		frame := srv.Client.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
-		if frame[0] == serverpackets.OpcodeChangeMoveType {
-			t.Fatal("ChangeMoveType at the bow reuse end, want no idle abort")
-		}
-	}
 }

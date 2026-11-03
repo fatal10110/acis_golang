@@ -1,0 +1,14 @@
+# WarriorPriestAggressive (21306), every draw 0, far from the character. Seeing it, the priest attacks
+# the character, weight 200, and wants no buff on it.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorPriest.WarriorPriest
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorPriest.WarriorPriestAggressive
+npc priest 21306 Monster 1500 0 0
+
+approach priest
+  desires priest attack(player)=200

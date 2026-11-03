@@ -134,7 +134,7 @@ func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.
 	// the workshop is held: a private store deal opens its operation first
 	// and holds the store inside it, and the other order would let each wait
 	// for the other.
-	end := l.itemInstances.BeginOperation(live.ObjectID(), crafter.ObjectID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), crafter.ObjectID())
 	defer end()
 	// An order for a recipe the workshop does not list is dropped: the
 	// window never offers one, so only a crafted packet names it.

@@ -1,8 +1,8 @@
 package network
 
 import (
+	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
@@ -87,7 +87,7 @@ func heroPageParam(token string) (int32, bool) {
 	if len(parts) < 2 {
 		return 0, false
 	}
-	v, err := commons.ParseInt(parts[1], 32)
+	v, err := strconv.ParseInt(parts[1], 10, 32)
 	if err != nil {
 		return 0, false
 	}
@@ -98,17 +98,8 @@ func heroPageParam(token string) (int32, bool) {
 // write one, of at most 300 characters; anything else is dropped without
 // an answer, as the request expects none.
 func (l *GameClientLink) writeHeroWords(live *livePlayer, req clientpackets.RequestWriteHeroWords) {
-	if l.heroes == nil || !live.IsHero() || utf16Len(req.Message) > maxHeroWordsLength {
+	if l.heroes == nil || !live.IsHero() || commons.UTF16Len(req.Message) > maxHeroWordsLength {
 		return
 	}
 	l.heroes.SetMessage(live.ObjectID(), req.Message)
-}
-
-// utf16Len is s's length in UTF-16 units.
-func utf16Len(s string) int {
-	n := 0
-	for _, r := range s {
-		n += utf16.RuneLen(r)
-	}
-	return n
 }

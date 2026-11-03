@@ -40,7 +40,10 @@ type Character struct {
 
 	ID          int32
 	AccountName string
-	Name        string
+	// name is read through CharacterName: an admin renames a live
+	// character while other actors' queues read it (CharInfo, clan and
+	// party rows, item logs), so it is atomic. See character_name.go.
+	name atomic.Pointer[string]
 
 	// baseClassID is the class the character was created into, or the
 	// occupation it later moved to on that class line; see BaseClassID.
@@ -93,6 +96,14 @@ type Character struct {
 	vitalsMu sync.RWMutex
 	// regen is the HP/MP/CP regeneration task SettleRegen arms on a drop.
 	regen creature.Regen
+	// seenMaxHP, seenMaxMP and seenMaxCP are the whole-point maxima the
+	// last ResourceValues read finalized; see noteMaxima.
+	seenMaxHP, seenMaxMP, seenMaxCP atomic.Int64
+	// shownMaxHP, shownMaxMP and shownMaxCP are the whole-point maxima
+	// SettleMaxima last measured a change against; maximaShown is set once
+	// the client has been shown them (AdoptMaxima). Guarded by vitalsMu.
+	shownMaxHP, shownMaxMP, shownMaxCP float64
+	maximaShown                        bool
 	// reviveMu makes a revive one step from dead to alive, so exactly one
 	// of two revives wins a death. The player's own restart-point request
 	// and a resurrecting caster's hit run on different queues. Without the
@@ -107,9 +118,6 @@ type Character struct {
 	reviveRequested bool
 	revivePower     float64
 	revivePet       bool
-	// respawnRestoreHP is the fraction of max HP a revive restores when no
-	// Phoenix Blessing does it in full.
-	respawnRestoreHP float64
 	// partyBars gates the party-window refreshes vitals changes send; see
 	// PartyWindowStale.
 	partyBars partyBars
@@ -140,6 +148,9 @@ type Character struct {
 	// sight past it; see character_invisible.go.
 	invisible     atomic.Bool
 	seesInvisible atomic.Bool
+	// polymorph is the NPC form the character is shown in; see
+	// character_polymorph.go.
+	polymorph atomic.Pointer[NPCForm]
 	// noble is the noblesse status; see character_noble.go.
 	noble atomic.Bool
 	// in7sDungeon is the Seven Signs dungeon membership; see
@@ -196,25 +207,31 @@ type Character struct {
 	// runtimeTemplate is the active class's template and baseTemplate the
 	// base class's; a class switch replaces runtimeTemplate on the owner's
 	// queue while other actors read it.
-	runtimeTemplate    atomic.Pointer[Template]
-	baseTemplate       atomic.Pointer[Template]
-	levelTable         *LevelTable
-	allowDelevel       bool
-	deathDrop          DeathDropRules
-	raidCursesDisabled bool
-	skillDefs          skillDefinitions
-	rateKarmaExpLost   float64
-	inventory          *itemcontainer.Inventory
-	world              *world.State
+	runtimeTemplate atomic.Pointer[Template]
+	baseTemplate    atomic.Pointer[Template]
+	levelTable      *LevelTable
+	// ruleBook holds the server rules c reads; see rules.
+	ruleBook atomic.Pointer[RuleBook]
+	// itemDrops answers the multiple item drop rule; set by Configure.
+	itemDrops ItemDropRule
+	skillDefs skillDefinitions
+	inventory *itemcontainer.Inventory
+	// warehouse is c's private warehouse, set by AttachWarehouse before c
+	// is shared; nil before.
+	warehouse *itemcontainer.Container
+	world     *world.State
 	// worldHandle is the object the world registers c under when c is
 	// embedded in one; nil means c itself. See SetWorldHandle.
 	worldHandle              world.Tracked
 	los                      LineOfSight
-	zones                    PeaceZoneQuery
+	zones                    ZoneQuery
 	social                   SocialGraph
 	hallFunctions            HallFunctions
+	sieges                   SiegeGround
+	seals                    SealRules
 	partyLoot                PartyLoot
 	tutorial                 TutorialEvents
+	deaths                   DeathEvents
 	mounts                   MountBodies
 	mountData                MountDataSource
 	mountFeed                mountFeedState
@@ -225,16 +242,13 @@ type Character struct {
 	insideNoSummonFriendZone atomic.Bool
 	insideBossZone           atomic.Bool
 	insideClanHallZone       atomic.Bool
+	insideMotherTreeZone     atomic.Bool
+	insideCastleZone         atomic.Bool
 	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32
 	abnormalEffectMask       atomic.Int32
 	weightPenalty            int
-	weightLimitMultiplier    float64
-	inventorySlots           InventorySlots
-	storageSlots             StorageSlots
-	maxBuffsAmount           int
-	awardPKKillPVPPoint      bool
 	roll                     func(int) int
 	floatRoll                func(float64) float64
 
@@ -259,6 +273,9 @@ type Character struct {
 	// intention reads the creature c's current intention acts on; see
 	// SetIntentionSource.
 	intention atomic.Pointer[IntentionSource]
+	// festival tells whether the character is signed up for a festival;
+	// nil until the network layer attaches it.
+	festival atomic.Pointer[FestivalRoster]
 
 	// sink receives this character's events. Attach sets it once, before
 	// the character is published into the world, and it never changes
@@ -267,6 +284,9 @@ type Character struct {
 	// sessionDetached is set once the owning session has let go of this
 	// character; see DetachSession.
 	sessionDetached atomic.Bool
+	// ownQueue marks a task of the character's own queue running a stretch
+	// that may act on the character inside the call; see RunOnOwnQueue.
+	ownQueue sim.Turn
 
 	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
 	// teleport-confirm request state, which the caster's queue records
@@ -285,6 +305,10 @@ type Character struct {
 	// is a leaf.
 	statMu    sync.RWMutex
 	statCalcs [stat.Count]*effect.Calculator
+
+	// equipped records the template each worn item's equip stats attached
+	// with (see EquippedTemplate).
+	equipped equippedTemplates
 
 	// stateMu guards transient live flags and item-use disabled timestamps.
 	// A killer's queue raises the death penalty (RaiseDeathPenaltyLevel).
@@ -335,13 +359,7 @@ type Character struct {
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.
-	deathPenaltyLevel  int
-	deathPenaltyChance int
-
-	// perfectShieldBlockRate is the players.properties-configured
-	// PerfectShieldBlockRate roll threshold for a shield block to upgrade
-	// to a perfect block.
-	perfectShieldBlockRate int
+	deathPenaltyLevel int
 
 	skills skillState
 	cubics cubic.List
@@ -362,6 +380,13 @@ type Character struct {
 	// detaching is set once the character starts leaving the world; see
 	// MarkDetaching.
 	detaching atomic.Bool
+	// detachGate orders the script's writes to c, which may come from any
+	// queue, against MarkDetaching: see whileAttached.
+	detachGate detachGate
+	// scriptRuns counts the script invocations in flight; Configure sets
+	// it, and ownScriptRuns stands in until then.
+	scriptRuns    *ScriptRuns
+	ownScriptRuns ScriptRuns
 	// lastQuestNPC is the object id of the NPC c last talked to about
 	// quests; see SetLastQuestNPC.
 	lastQuestNPC atomic.Int32
@@ -394,7 +419,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	c := &Character{
 		ID:          objectID,
 		AccountName: accountName,
-		Name:        name,
 
 		Race: race,
 
@@ -414,12 +438,12 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		AccessLevel: defaultAccessLevel,
 
-		stateInit:      true,
-		running:        true,
-		standing:       true,
-		maxBuffsAmount: defaultMaxBuffsAmount,
+		stateInit: true,
+		running:   true,
+		standing:  true,
 	}
 
+	c.SetName(name)
 	c.SetSex(sex)
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)

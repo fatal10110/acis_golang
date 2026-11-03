@@ -1,0 +1,145 @@
+# Test of the Lord (Q232), Takuna's charm and the marsh spider feelers and feet make the handiwork brooch; Chianta's charm and twenty monster eye corneas make the woodcarving.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q232_legs.golden
+character Shaman 39
+class 50
+quest Q232_TestOfTheLord <state>=STARTED <cond>=1
+random always 0
+hold 3407 9
+hold 3408 9
+hold 3410 19
+hold 3391 1
+script quest.Q232_TestOfTheLord
+item 1341 3390 3391 3392 3393 3394 3395 3396 3397 3398 3399 3400 3401 3402 3403 3404 3405 3406 3407 3408 3409 3410 3411 3412 3413 3414 3415 3416 7562
+page default/30641.htm
+page default/30642.htm
+page script/quest/Q232_TestOfTheLord/
+npc takuna 30641 Folk 10 0 0
+npc chianta 30642 Folk 20 0 0
+npc m20233 20233 Monster 30 0 0
+npc m20564 20564 Monster 40 0 0
+
+action takuna
+action takuna
+  S ActionFailed
+  S NpcHtmlMessage obj=takuna item=0 page=default/30641.htm
+  S ActionFailed
+bypass npc_{takuna}_Quest
+  S NpcHtmlMessage obj=takuna item=0 page=script/quest/Q232_TestOfTheLord/30641-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30641-02.htm
+  S SystemMessage id=54 3:3395
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=takuna item=0 page=script/quest/Q232_TestOfTheLord/30641-02.htm
+  S ActionFailed
+action takuna
+  S ActionFailed
+  S NpcHtmlMessage obj=takuna item=0 page=default/30641.htm
+  S ActionFailed
+action takuna
+  S ActionFailed
+  S NpcHtmlMessage obj=takuna item=0 page=default/30641.htm
+  S ActionFailed
+bypass npc_{takuna}_Quest
+  S NpcHtmlMessage obj=takuna item=0 page=script/quest/Q232_TestOfTheLord/30641-03.htm
+  S ActionFailed
+  S ActionFailed
+kill m20233
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3407
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill m20233
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3408
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+action takuna
+  S ActionFailed
+  S NpcHtmlMessage obj=takuna item=0 page=default/30641.htm
+  S ActionFailed
+action takuna
+  S ActionFailed
+  S NpcHtmlMessage obj=takuna item=0 page=default/30641.htm
+  S ActionFailed
+bypass npc_{takuna}_Quest
+  S SystemMessage id=301 3:3407 6:10
+  S SystemMessage id=301 3:3408 6:10
+  S SystemMessage id=302 3:3395
+  S SystemMessage id=54 3:3409
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=takuna item=0 page=script/quest/Q232_TestOfTheLord/30641-04.htm
+  S ActionFailed
+  S ActionFailed
+action takuna
+  S ActionFailed
+  S NpcHtmlMessage obj=takuna item=0 page=default/30641.htm
+  S ActionFailed
+action takuna
+  S ActionFailed
+  S NpcHtmlMessage obj=takuna item=0 page=default/30641.htm
+  S ActionFailed
+bypass npc_{takuna}_Quest
+  S NpcHtmlMessage obj=takuna item=0 page=script/quest/Q232_TestOfTheLord/30641-05.htm
+  S ActionFailed
+  S ActionFailed
+action chianta
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q232_TestOfTheLord/30642-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30642-02.htm
+  S SystemMessage id=54 3:3396
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q232_TestOfTheLord/30642-02.htm
+  S ActionFailed
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q232_TestOfTheLord/30642-03.htm
+  S ActionFailed
+  S ActionFailed
+kill m20564
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3410
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S SystemMessage id=301 3:3410 6:20
+  S SystemMessage id=302 3:3396
+  S SystemMessage id=54 3:3411
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q232_TestOfTheLord/30642-04.htm
+  S ActionFailed
+  S ActionFailed
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q232_TestOfTheLord/30642-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 3409=1 3411=1 3395=0 3396=0 3407=0 3408=0 3410=0
+  state Q232_TestOfTheLord STARTED
+  rows Q232_TestOfTheLord <cond>=1 <state>=STARTED

@@ -1,0 +1,216 @@
+# Daimon the White-Eyed, Part 1 (Q603): from the first stage the character reads the five tablets in
+# turn, a broken crystal each, and hands the five crystals in to the Eye of Argos. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q603_daimon_the_white_eyed_part1_tablets.golden
+character Hero 75
+quest Q603_DaimonTheWhiteEyed_Part1 <cond>=1 <state>=STARTED
+script quest.Q603_DaimonTheWhiteEyed_Part1
+item 7190 7191 7192
+page default/31683.htm
+page default/31548.htm
+page default/31549.htm
+page default/31550.htm
+page default/31551.htm
+page default/31552.htm
+page script/quest/Q603_DaimonTheWhiteEyed_Part1/
+npc eye 31683 Folk 10 0 0
+npc tab1 31548 Folk 20 0 0
+npc tab2 31549 Folk 30 0 0
+npc tab3 31550 Folk 40 0 0
+npc tab4 31551 Folk 50 0 0
+npc tab5 31552 Folk 60 0 0
+
+# The five tablets in turn, a crystal each; a tablet read already, or read too early, answers differently.
+action tab1
+action tab1
+  S ActionFailed
+  S NpcHtmlMessage obj=tab1 item=0 page=default/31548.htm
+  S ActionFailed
+bypass npc_{tab1}_Quest
+  S NpcHtmlMessage obj=tab1 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31548-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31548-02.htm
+  S QuestList 603:0x80000003
+  S ExShowQuestMark quest=603
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7191
+  S NpcHtmlMessage obj=tab1 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31548-02.htm
+  S ActionFailed
+  Q upsert Q603_DaimonTheWhiteEyed_Part1 | <cond> | 2
+  items 7191=1
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=2 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED
+action tab1
+  S ActionFailed
+  S NpcHtmlMessage obj=tab1 item=0 page=default/31550.htm
+  S ActionFailed
+action tab1
+  S ActionFailed
+  S NpcHtmlMessage obj=tab1 item=0 page=default/31548.htm
+  S ActionFailed
+bypass npc_{tab1}_Quest
+  S NpcHtmlMessage obj=tab1 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31549-03.htm
+  S ActionFailed
+  S ActionFailed
+action tab2
+action tab2
+  S ActionFailed
+  S NpcHtmlMessage obj=tab2 item=0 page=default/31552.htm
+  S ActionFailed
+bypass npc_{tab2}_Quest
+  S NpcHtmlMessage obj=tab2 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31549-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31549-02.htm
+  S QuestList 603:0x80000007
+  S ExShowQuestMark quest=603
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7191
+  S NpcHtmlMessage obj=tab2 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31549-02.htm
+  S ActionFailed
+  Q upsert Q603_DaimonTheWhiteEyed_Part1 | <cond> | 3
+  items 7191=2
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=3 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED
+action tab2
+  S ActionFailed
+  S NpcHtmlMessage obj=tab2 item=0 page=default/31548.htm
+  S ActionFailed
+action tab2
+  S ActionFailed
+  S NpcHtmlMessage obj=tab2 item=0 page=default/31552.htm
+  S ActionFailed
+bypass npc_{tab2}_Quest
+  S NpcHtmlMessage obj=tab2 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31549-03.htm
+  S ActionFailed
+  S ActionFailed
+action tab3
+action tab3
+  S ActionFailed
+  S NpcHtmlMessage obj=tab3 item=0 page=default/31551.htm
+  S ActionFailed
+bypass npc_{tab3}_Quest
+  S NpcHtmlMessage obj=tab3 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31550-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31550-02.htm
+  S QuestList 603:0x8000000f
+  S ExShowQuestMark quest=603
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7191
+  S NpcHtmlMessage obj=tab3 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31550-02.htm
+  S ActionFailed
+  Q upsert Q603_DaimonTheWhiteEyed_Part1 | <cond> | 4
+  items 7191=3
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=4 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED
+action tab3
+  S ActionFailed
+  S NpcHtmlMessage obj=tab3 item=0 page=default/31548.htm
+  S ActionFailed
+action tab3
+  S ActionFailed
+  S NpcHtmlMessage obj=tab3 item=0 page=default/31552.htm
+  S ActionFailed
+bypass npc_{tab3}_Quest
+  S NpcHtmlMessage obj=tab3 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31549-03.htm
+  S ActionFailed
+  S ActionFailed
+action tab4
+action tab4
+  S ActionFailed
+  S NpcHtmlMessage obj=tab4 item=0 page=default/31548.htm
+  S ActionFailed
+bypass npc_{tab4}_Quest
+  S NpcHtmlMessage obj=tab4 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31551-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31551-02.htm
+  S QuestList 603:0x8000001f
+  S ExShowQuestMark quest=603
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7191
+  S NpcHtmlMessage obj=tab4 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31551-02.htm
+  S ActionFailed
+  Q upsert Q603_DaimonTheWhiteEyed_Part1 | <cond> | 5
+  items 7191=4
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=5 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED
+action tab4
+  S ActionFailed
+  S NpcHtmlMessage obj=tab4 item=0 page=default/31548.htm
+  S ActionFailed
+action tab4
+  S ActionFailed
+  S NpcHtmlMessage obj=tab4 item=0 page=default/31550.htm
+  S ActionFailed
+bypass npc_{tab4}_Quest
+  S NpcHtmlMessage obj=tab4 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31549-03.htm
+  S ActionFailed
+  S ActionFailed
+action tab5
+action tab5
+  S ActionFailed
+  S NpcHtmlMessage obj=tab5 item=0 page=default/31548.htm
+  S ActionFailed
+bypass npc_{tab5}_Quest
+  S NpcHtmlMessage obj=tab5 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31552-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31552-02.htm
+  S QuestList 603:0x8000003f
+  S ExShowQuestMark quest=603
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7191
+  S NpcHtmlMessage obj=tab5 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31552-02.htm
+  S ActionFailed
+  Q upsert Q603_DaimonTheWhiteEyed_Part1 | <cond> | 6
+  items 7191=5
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=6 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED
+action tab5
+  S ActionFailed
+  S NpcHtmlMessage obj=tab5 item=0 page=default/31550.htm
+  S ActionFailed
+action tab5
+  S ActionFailed
+  S NpcHtmlMessage obj=tab5 item=0 page=default/31551.htm
+  S ActionFailed
+bypass npc_{tab5}_Quest
+  S NpcHtmlMessage obj=tab5 item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31552-03.htm
+  S ActionFailed
+  S ActionFailed
+# Five crystals: back to the Eye of Argos.
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31683-06.htm
+  S QuestList 603:0x8000007f
+  S ExShowQuestMark quest=603
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7191 6:5
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-06.htm
+  S ActionFailed
+  Q upsert Q603_DaimonTheWhiteEyed_Part1 | <cond> | 7
+  items 7191=0
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=7 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-08.htm
+  S ActionFailed
+  S ActionFailed

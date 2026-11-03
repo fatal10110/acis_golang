@@ -1,20 +1,28 @@
 package gameservertest
 
 import (
+	"cmp"
+	"context"
+	"maps"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -53,6 +61,42 @@ func WithWalkerRoutes(routes route.WalkerRoutes) Option {
 	return func(o *options) { o.walkerRoutes = routes }
 }
 
+// WithNpcSpawnSkills gives the WithNpcSpawns population defs as the skills
+// its NPCs cast, their effects dispatched through the link's NPC cast seam,
+// as the game server gives it the skill data; by default its NPCs cast
+// nothing.
+func WithNpcSpawnSkills(defs actorcast.Definitions) Option {
+	return func(o *options) { o.npcSpawnSkills = defs }
+}
+
+// WithSpawnData backs the WithNpcSpawns population's database-tracked
+// spawns with the spawn_data table, as the game server does: their rows
+// are restored at boot, and Shutdown saves them.
+func WithSpawnData() Option {
+	return func(o *options) { o.spawnData = true }
+}
+
+// WithSpawnDataSeed hands seed the spawn_data store of WithSpawnData before
+// the population restores its rows, so a boot can find rows a previous run
+// left: a row saved alive, or dead with its respawn ahead.
+func WithSpawnDataSeed(seed func(*gamesql.SpawnStore)) Option {
+	return func(o *options) { o.seedSpawnData = seed }
+}
+
+// WithMakerEventsHeard makes heard told of each script event sent to an
+// npcmaker of the WithNpcSpawns population by its name, before the maker's
+// script runs, from any goroutine: the maker's name, the event and its two
+// arguments.
+func WithMakerEventsHeard(heard func(maker, event string, int1, int2 int)) Option {
+	return func(o *options) { o.makerHeard = heard }
+}
+
+// WithMakers gives the WithNpcSpawns population catalog's makers beside
+// the server's own; a type in both runs catalog's.
+func WithMakers(catalog script.MakerCatalog) Option {
+	return func(o *options) { o.makerCatalog = catalog }
+}
+
 // npcSpawnDeps are the server parts a live NPC population is built over.
 type npcSpawnDeps struct {
 	state     *world.State
@@ -69,14 +113,55 @@ type npcSpawnDeps struct {
 	stance    network.AttackStanceTracker
 	makers    *spawn.Table
 	dropRates item.Rates
-	log       zerolog.Logger
+	// channels resolves the command channel that wins a raid boss's loot
+	// rights, as the link's does.
+	channels gamemanager.LootChannels
+	// partyRange is the WithPartyRange party range; 0 keeps the shipped
+	// one.
+	partyRange int
+	log        zerolog.Logger
 	// sevenSigns is the state the Seven Signs groups follow, and whose
 	// period changes swap them.
 	sevenSigns *sevensigns.State
 	// scripts raises the spawned NPCs' script hooks.
 	scripts *script.Registry
+	// spawner is the scripts' spawner, bound to the population before the
+	// first NPC spawns.
+	spawner *script.Spawner
 	// routes is the walker route data.
 	routes route.WalkerRoutes
+	// skills are the skills the NPCs cast, nil for none.
+	skills actorcast.Definitions
+
+	// zones is the WithZones index the spawned NPCs enter, as production
+	// hands the population its zones; nil when none was supplied.
+	zones *zone.Index
+
+	// spawnStore restores and saves the database-tracked spawns' rows; nil
+	// keeps them in memory only.
+	spawnStore *gamesql.SpawnStore
+	// rand is the scripts' random source the makers draw from; nil draws
+	// at random.
+	rand func(n int) int
+	// makerCatalog are makers added to the server's own.
+	makerCatalog script.MakerCatalog
+	// makerHeard is told of the script events sent to the makers by name;
+	// nil for none.
+	makerHeard func(maker, event string, int1, int2 int)
+	// driftRange is the WithMaxDriftRange drift range; 0 keeps the shipped
+	// one.
+	driftRange int
+	// night tells the makers whether it is night in the game world; nil
+	// says it is day.
+	night func() bool
+	// castles and sieges are the castles the makers find by id and their
+	// sieges; nil finds none.
+	castles *castle.Manager
+	sieges  *siege.Engine
+	// doors are the doors the makers find by name; nil finds none.
+	doors *gamemanager.WorldObjects
+	// noSpawns is WithNoSpawns.
+	noSpawns bool
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -116,15 +201,52 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if templates == nil {
 		templates = npc.NewTable(nil)
 	}
-	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, nil), templates, deps.geo, deps.state, deps.ids,
-		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates, RateXP: 1, RateSP: 1}, time.Now, deps.log,
-		nil, actorcast.EffectHandlers{}, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
-		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
-		script.NewMakers(maker.Catalog(), maker.Default, deps.log), deps.scripts)
+	castEffects := actorcast.EffectHandlers{}
+	if deps.skills != nil {
+		castEffects = link.HostileCastEffects()
+	}
+	var states map[string]*spawn.State
+	if deps.spawnStore != nil {
+		if states, err = deps.spawnStore.LoadStates(context.Background()); err != nil {
+			t.Fatalf("load spawn data: %v", err)
+		}
+	}
+	makers := maker.Catalog()
+	maps.Copy(makers, deps.makerCatalog)
+	night := deps.night
+	if night == nil {
+		night = func() bool { return false }
+	}
+	rand := deps.rand
+	if rand == nil {
+		rand = rnd.Get
+	}
+	makerWorld := script.MakerWorld{Night: night, Castles: deps.castles, Sieges: deps.sieges, Rand: rand, Now: now, Heard: deps.makerHeard}
+	if deps.doors != nil {
+		makerWorld.Doors = deps.doors
+	}
+	limits := npc.DefaultLimits()
+	if deps.driftRange != 0 {
+		limits.DriftRange = deps.driftRange
+	}
+	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
+		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1}), Channels: deps.channels}, time.Now, deps.log,
+		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
+		limits, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
+		script.NewMakers(makers, maker.Default, makerWorld, deps.log), deps.scripts, deps.zones)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}
+	if deps.spawner != nil {
+		deps.spawner.Bind(npcs)
+	}
+	npcs.SetGroundTaker(link)
+	npcs.SetGuardedSieges(link.GuardedSiege)
+	npcs.SetResidenceOwners(link.NPCResidenceOwner)
+	npcs.SetSpawnTimes(network.SpawnTimes(link))
+	npcs.SetRegenSettings(link.PlayerRules())
 	link.SetNpcSpawns(npcs)
+	npcs.SetNoSpawns(deps.noSpawns)
 	npcs.SpawnOnStart()
 	if deps.sevenSigns != nil {
 		deps.sevenSigns.SetSpawns(npcs)
@@ -139,4 +261,4 @@ func (noDecay) Decay(task.DecayActor) {}
 
 type noRespawn struct{}
 
-func (noRespawn) Respawn(string) {}
+func (noRespawn) Respawn(task.SlotID) {}

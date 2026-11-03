@@ -62,8 +62,8 @@ func TestMultiRowItemWriteSkipsOnlyTheRowsALaterWriteLanded(t *testing.T) {
 	order := persist.NewOrder()
 	link.persist = worker
 	link.itemWrites = order
-	recording := &batchRecordingItemStore{itemStore: link.items}
-	link.items = recording
+	recording := &batchRecordingItemStore{itemStore: link.belongings.items}
+	link.belongings.items = recording
 
 	const adenaID, potionID int32 = 5400, 5401
 	inv := first.Inventory()

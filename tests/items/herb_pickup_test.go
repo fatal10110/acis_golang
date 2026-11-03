@@ -23,7 +23,7 @@ func herbSkills(t *testing.T) *skillstate.Persistence {
 	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{
 			ID: 2278, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "HOT", Potion: true, HitTime: 0,
+			SkillType: "HOT", Potion: true, HitTime: 0, ReuseDelay: 2000,
 			Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 5, Time: 3, Value: 12, Icon: true}},
 		},
 	}), known)

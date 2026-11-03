@@ -1,0 +1,37 @@
+# Possessor of a Precious Soul - 3 (Q246), started on a subclass (cond 2, Ossian's two items)
+# and played on the base class: Ossian answers the no-quest page, and a Pilgrim and a Judge of
+# Splendor killed on the base class leave nothing, every script roll pinned to 0. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q246_possessor_of_a_precious_soul_base_class_started.golden
+character Fighter 76
+class 2
+quest Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
+random always 0
+script quest.Q246_PossessorOfAPreciousSoul
+item 7591 7592
+page default/31741.htm
+page script/quest/Q246_PossessorOfAPreciousSoul/
+npc ossian 31741 Folk -10 0 0
+npc pilgrim 21541 Monster 40 0 0
+npc judge 21544 Monster -40 0 0
+
+# Ossian has nothing for the base class, though the quest waits for the Waterbinder and the Evergreen.
+action ossian
+action ossian
+  S ActionFailed
+  S NpcHtmlMessage obj=ossian item=0 page=default/31741.htm
+  S ActionFailed
+bypass npc_{ossian}_Quest
+  S NpcHtmlMessage obj=ossian item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
+
+# A Pilgrim and a Judge of Splendor killed on the base class leave nothing (the rolls would pass).
+kill pilgrim
+  S SystemMessage id=95 1:0 1:0
+  items 7591=0
+kill judge
+  S SystemMessage id=95 1:0 1:0
+  items 7591=0 7592=0
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=2

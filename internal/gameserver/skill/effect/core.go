@@ -7,6 +7,7 @@ import (
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 )
 
 // ErrUnsupportedCoreEffect marks New's rejection of an effect template whose
@@ -62,8 +63,8 @@ const (
 	FlagFakeDeath
 )
 
-// magicCircleAbnormalMask is AbnormalEffect.MAGIC_CIRCLE's client bitmask,
-// ClanGate's abnormal-effect icon.
+// magicCircleAbnormalMask is the client's magic-circle abnormal-effect
+// bitmask, ClanGate's abnormal-effect icon.
 const magicCircleAbnormalMask = 0x800000
 
 // clanGateOpener is a ClanGate target that tells the other online members
@@ -356,16 +357,21 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 		NegateIDs:           def.NegateIDs,
 		NegateTypes:         def.NegateTypes,
 		FlyRadius:           def.FlyRadius,
+		Stat:                def.Stat,
 	}
 }
 
 // Apply instantiates each of templates as a fresh live effect of effector on
 // effected and hosts it where Attach places it. It rolls no landing chance
 // and checks no landing gate; callers decide that first (see Lands). A
-// template naming an effect core this port hasn't wired yet is skipped
-// rather than failing the whole batch.
+// template whose attached condition rejects the pair (see Admits), or one
+// naming an effect core this port hasn't wired yet, is skipped rather than
+// failing the whole batch.
 func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate) {
 	for _, tmpl := range templates {
+		if !Admits(effector, effected, meta, tmpl) {
+			continue
+		}
 		e, err := New(meta, tmpl)
 		if err != nil {
 			continue
@@ -380,7 +386,8 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // template: each is built, given its saved count and time, then scheduled.
 // effector and effected are both the relogging character: the original
 // caster identity is not persisted, so every reinstated effect is treated as
-// self-applied. The replay is silent (see List.AddRestored): it activates and refreshes icons
+// self-applied, and a template whose attached condition rejects that pair
+// (see Admits) is not reinstated. The replay is silent (see List.AddRestored): it activates and refreshes icons
 // but sends no stack or expiry system messages.
 //
 // restoredAt, when set, is the instant the saved state was read back: each
@@ -388,9 +395,9 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // run no action and whose first tick came due in between has ended and is
 // not reinstated (see resumeRestored). One whose ticks run an action runs
 // the actions of the ticks due in between, in time order with those of the
-// other effects the same List.Restore reinstates (see List.Restore); only a
-// lethal damage-over-time tick still waits for the replay (see
-// restoreAnchor).
+// other effects the same List.Restore reinstates (see List.Restore). A
+// damage-over-time tick that may kill does too: a death it causes there
+// runs on a character not yet in the world, whose owner keeps it silent.
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	if list == nil {
 		return
@@ -406,41 +413,23 @@ func applyRestored(list *List, effector, effected Actor, meta Skill, templates [
 		now = list.now()
 	}
 	for _, tmpl := range templates {
+		if !Admits(effector, effected, meta, tmpl) {
+			continue
+		}
 		e, err := New(meta, tmpl)
 		if err != nil {
 			continue
 		}
-		at := restoreAnchor(meta, tmpl, restoredAt)
-		if !at.IsZero() && e.OnAction == nil {
-			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, at, now); !ok {
+		if !restoredAt.IsZero() && e.OnAction == nil {
+			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, restoredAt, now); !ok {
 				continue
 			}
 		}
 		e.Effector = effector
 		e.Effected = effected
-		e.seedRestore(count, elapsedSeconds, at)
+		e.seedRestore(count, elapsedSeconds, restoredAt)
 		list.AddRestored(e)
 	}
-}
-
-// restoreAnchor is the instant from which an effect built from tmpl for the
-// skill meta and restored at restoredAt runs its schedule: restoredAt
-// itself, or zero (the replay) for a damage-over-time tick that may kill.
-// Such a tick due on the loading screen would put the character through
-// death before it is in the world, so that effect still starts its schedule
-// at the replay (#3394).
-func restoreAnchor(meta Skill, tmpl modelskill.EffectTemplate, restoredAt time.Time) time.Time {
-	if restoredAt.IsZero() || lethalTick(meta, tmpl) {
-		return time.Time{}
-	}
-	return restoredAt
-}
-
-// lethalTick reports whether an effect built from tmpl for the skill meta
-// has a damage-over-time tick that may kill.
-func lethalTick(meta Skill, tmpl modelskill.EffectTemplate) bool {
-	k, ok := coreKinds[tmpl.Name]
-	return ok && k.typ == TypeDamOverTime && meta.KillByDOT
 }
 
 // actsOnTick reports whether an effect built from tmpl has a tick action.
@@ -455,9 +444,8 @@ func actsOnTick(tmpl modelskill.EffectTemplate) bool {
 }
 
 // Known reports whether New can build an effect named name. The match is
-// exact. The reference resolves an <effect name> to its implementation when
-// it loads the effect, and a name with none rejects the skill or item that
-// carries it.
+// exact. An <effect name> resolves to its implementation when the effect
+// loads, and a name with none rejects the skill or item that carries it.
 func Known(name string) bool {
 	_, ok := coreKinds[name]
 	return ok
@@ -499,21 +487,15 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Level:             level,
 		RejectsIfAffected: k.rejectsIfAffected,
 		SelfTarget:        k.selfTarget,
-		// Mirrors AbstractEffect._isHerbEffect = _skill.getName().contains("Herb"):
+		// A skill whose name contains "Herb" makes a herb effect:
 		// a herb buff is identified by its owning skill's name, not by how it
 		// was cast, so this applies uniformly to every application path.
 		Herb: strings.Contains(skill.Name, "Herb"),
 	}
 
-	// tmpl.AttachCondition is the <cond> sibling gating the whole <effect>
-	// block (not any one func's own predicate); AND it onto every func this
-	// effect contributes (a <cond> stays in scope for every stat element
-	// until the next <cond> resets it).
-	attachGate, err := funcCondition(nil, tmpl.AttachCondition)
-	if err != nil {
-		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
-	}
-	funcs, err := statFuncs(ModOwnerEffect(e), tmpl.Funcs, attachGate)
+	// tmpl.AttachCondition gates creating the effect itself (see Admits),
+	// not its funcs.
+	funcs, err := statFuncs(ModOwnerEffect(e), tmpl.Funcs, conditions.SkillOf(skill.Stat))
 	if err != nil {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}
@@ -770,10 +752,9 @@ func (e *Effect) DecreaseForce(list *List, reapply func(level int)) {
 	}
 }
 
-// IncreasePower grows a live seed effect's charge level by one in place,
-// matching EffectSeed.increasePower(): unlike a fusion effect's
-// IncreaseEffect, the same instance keeps running — only its Level (power)
-// changes, nothing is removed or reapplied.
+// IncreasePower grows a live seed effect's charge level by one in place: unlike
+// a fusion effect's IncreaseEffect, the same instance keeps running — only its
+// Level (power) changes, nothing is removed or reapplied.
 func (e *Effect) IncreasePower() {
 	if e == nil {
 		return

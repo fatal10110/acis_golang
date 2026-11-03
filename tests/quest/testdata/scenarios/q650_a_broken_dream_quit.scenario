@@ -1,0 +1,39 @@
+# A Broken Dream (Q650): the character gives the quest up.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q650_a_broken_dream_quit.golden
+character Hero 39
+quest Q117_TheOceanOfDistantStars <state>=COMPLETED
+quest Q650_ABrokenDream <cond>=1 <state>=STARTED
+hold 8514 3
+script quest.Q117_TheOceanOfDistantStars
+script quest.Q650_ABrokenDream
+item 8514
+page default/32054.htm
+page script/quest/Q650_ABrokenDream/
+npc ghost 32054 Folk 10 0 0
+
+action ghost
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/32054.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 html="<html><body><a action=\"bypass -h npc_{ghost}_Quest Q117_TheOceanOfDistantStars\">[The Ocean of Distant Stars (Done)]</a><br><a action=\"bypass -h npc_{ghost}_Quest Q650_ABrokenDream\">[A Broken Dream (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{ghost}_Quest Q650_ABrokenDream
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q650_ABrokenDream/32054-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q650_ABrokenDream 32054-03.htm
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q650_ABrokenDream/32054-03.htm
+  S ActionFailed
+bypass Quest Q650_ABrokenDream 32054-05.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 117:0x00000000
+  S SystemMessage id=301 3:8514 6:3
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q650_ABrokenDream/32054-05.htm
+  S ActionFailed
+  Q delete-quest Q650_ABrokenDream
+  rows Q650_ABrokenDream -
+  state Q650_ABrokenDream -

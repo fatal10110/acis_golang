@@ -1,0 +1,189 @@
+# Specialty Liquor Delivery (Q622): the whole delivery, from Jeremy through the five villagers and back, to the last NPC, who pays adena and a haste potion.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q622_specialty_liquor_delivery_chain.golden
+character Hero 68
+random 1
+script quest.Q622_SpecialtyLiquorDelivery
+item 7197 7198 57 734 6847 6849 6851
+page default/31521.htm
+page default/31543.htm
+page default/31544.htm
+page default/31545.htm
+page default/31546.htm
+page default/31547.htm
+page warehouse/31267.htm
+page script/quest/Q622_SpecialtyLiquorDelivery/
+npc jeremy 31521 Folk 10 0 0
+npc pulin 31543 Folk 20 0 0
+npc naff 31544 Folk 30 0 0
+npc crocus 31545 Folk 40 0 0
+npc kuber 31546 Folk 50 0 0
+npc beolin 31547 Folk 60 0 0
+npc lietta 31267 WarehouseKeeper 70 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31521-02.htm
+  S QuestList 622:0x80000001
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7197 6:5
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-02.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <state> | STARTED
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 1
+  rows Q622_SpecialtyLiquorDelivery <cond>=1 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7197=5
+action beolin
+action beolin
+  S ActionFailed
+  S NpcHtmlMessage obj=beolin item=0 page=default/31547.htm
+  S ActionFailed
+bypass npc_{beolin}_Quest
+  S NpcHtmlMessage obj=beolin item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31547-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31547-02.htm
+  S QuestList 622:0x80000003
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7197
+  S SystemMessage id=54 3:7198
+  S NpcHtmlMessage obj=beolin item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31547-02.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 2
+  rows Q622_SpecialtyLiquorDelivery <cond>=2 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7197=4 7198=1
+action kuber
+action kuber
+  S ActionFailed
+  S NpcHtmlMessage obj=kuber item=0 page=default/31546.htm
+  S ActionFailed
+bypass npc_{kuber}_Quest
+  S NpcHtmlMessage obj=kuber item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31546-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31546-02.htm
+  S QuestList 622:0x80000007
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7197
+  S SystemMessage id=54 3:7198
+  S NpcHtmlMessage obj=kuber item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31546-02.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 3
+  rows Q622_SpecialtyLiquorDelivery <cond>=3 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7197=3 7198=2
+action crocus
+action crocus
+  S ActionFailed
+  S NpcHtmlMessage obj=crocus item=0 page=default/31545.htm
+  S ActionFailed
+bypass npc_{crocus}_Quest
+  S NpcHtmlMessage obj=crocus item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31545-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31545-02.htm
+  S QuestList 622:0x8000000f
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7197
+  S SystemMessage id=54 3:7198
+  S NpcHtmlMessage obj=crocus item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31545-02.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 4
+  rows Q622_SpecialtyLiquorDelivery <cond>=4 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7197=2 7198=3
+action naff
+action naff
+  S ActionFailed
+  S NpcHtmlMessage obj=naff item=0 page=default/31544.htm
+  S ActionFailed
+bypass npc_{naff}_Quest
+  S NpcHtmlMessage obj=naff item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31544-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31544-02.htm
+  S QuestList 622:0x8000001f
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7197
+  S SystemMessage id=54 3:7198
+  S NpcHtmlMessage obj=naff item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31544-02.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 5
+  rows Q622_SpecialtyLiquorDelivery <cond>=5 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7197=1 7198=4
+action pulin
+action pulin
+  S ActionFailed
+  S NpcHtmlMessage obj=pulin item=0 page=default/31543.htm
+  S ActionFailed
+bypass npc_{pulin}_Quest
+  S NpcHtmlMessage obj=pulin item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31543-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31543-02.htm
+  S QuestList 622:0x8000003f
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7197
+  S SystemMessage id=54 3:7198
+  S NpcHtmlMessage obj=pulin item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31543-02.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 6
+  rows Q622_SpecialtyLiquorDelivery <cond>=6 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7197=0 7198=5
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31521-06.htm
+  S QuestList 622:0x8000007f
+  S ExShowQuestMark quest=622
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7198 6:5
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31521-06.htm
+  S ActionFailed
+  Q upsert Q622_SpecialtyLiquorDelivery | <cond> | 7
+  rows Q622_SpecialtyLiquorDelivery <cond>=7 <state>=STARTED
+  state Q622_SpecialtyLiquorDelivery STARTED
+  items 7198=0
+action lietta
+action lietta
+  S ActionFailed
+  S NpcHtmlMessage obj=lietta item=0 page=warehouse/31267.htm
+  S ActionFailed
+bypass npc_{lietta}_Quest
+  S NpcHtmlMessage obj=lietta item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31267-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q622_SpecialtyLiquorDelivery 31267-02.htm
+  S SystemMessage id=52 6:18800
+  S SystemMessage id=54 3:734
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=lietta item=0 page=script/quest/Q622_SpecialtyLiquorDelivery/31267-02.htm
+  S ActionFailed
+  Q delete-quest Q622_SpecialtyLiquorDelivery
+  rows Q622_SpecialtyLiquorDelivery -
+  state Q622_SpecialtyLiquorDelivery -
+  items 57=18800 734=1

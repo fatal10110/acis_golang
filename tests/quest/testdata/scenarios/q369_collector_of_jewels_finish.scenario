@@ -1,0 +1,66 @@
+# Collector of Jewels (Q369), two hundred of each: a character at cond 3 holding 199 of each shard kills a
+# Rowin Salamander (the 200th flare) and a Rowin Undine (the 200th freezing: cond 4); Nell pays 63500 adena
+# and the quest ends. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q369_collector_of_jewels_finish.golden
+character Jewels 25
+quest Q369_CollectorOfJewels <cond>=3 <state>=STARTED
+hold 5882 199
+hold 5883 199
+random always 0
+script quest.Q369_CollectorOfJewels
+item 57 5882 5883
+page trainer/30376.htm
+page script/quest/Q369_CollectorOfJewels/
+npc nell 30376 Trainer 10 0 0
+npc lakin 20609 Monster 40 0 0
+npc rowin 20612 Monster 50 0 0
+npc deathfire 20749 Monster 60 0 0
+npc undine 20616 Monster -40 0 0
+npc rowinundine 20619 Monster -50 0 0
+npc roxide 20747 Monster -60 0 0
+
+action nell
+action nell
+  S ActionFailed
+  S NpcHtmlMessage obj=nell item=0 page=trainer/30376.htm
+  S ActionFailed
+bypass npc_{nell}_Quest
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-09.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q369_CollectorOfJewels <cond>=3 <state>=STARTED
+kill rowin
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5882
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 5882=200
+  rows Q369_CollectorOfJewels <cond>=3 <state>=STARTED
+kill rowinundine
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5883
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 369:0x8000000f
+  S ExShowQuestMark quest=369
+  Q upsert Q369_CollectorOfJewels | <cond> | 4
+  items 5883=200
+  rows Q369_CollectorOfJewels <cond>=4 <state>=STARTED
+action nell
+  S ActionFailed
+  S NpcHtmlMessage obj=nell item=0 page=trainer/30376.htm
+  S ActionFailed
+bypass npc_{nell}_Quest
+  S SystemMessage id=301 3:5882 6:200
+  S SystemMessage id=301 3:5883 6:200
+  S SystemMessage id=52 6:63500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q369_CollectorOfJewels
+  items 5882=0 5883=0 57=63500
+  state Q369_CollectorOfJewels -
+  rows Q369_CollectorOfJewels -
+relog
+  rows Q369_CollectorOfJewels -
+  items 57=63500

@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -20,15 +19,9 @@ func bossEjectZone(t *testing.T, oust location.Location, minX int) (*zone.Index,
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := commons.NewStatSet()
-	set.Set("InvadeTime", "600000")
-	set.Set("oustX", oust.X)
-	set.Set("oustY", oust.Y)
-	set.Set("oustZ", oust.Z)
-	boss, err := zone.NewBoss(1, form, set)
-	if err != nil {
-		t.Fatal(err)
-	}
+	boss := zone.NewBoss(1, form)
+	boss.InvadeWindow = 10 * time.Minute
+	boss.OustLoc = oust
 	zones := zone.NewIndex()
 	zones.Add(boss)
 	return zones, boss
@@ -81,9 +74,13 @@ func TestBossZoneLoginEjectsAfterExpiredPermission(t *testing.T) {
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	c.Send(encodeEnterWorld())
-	frames := append(readEnterWorldBurst(t, c), readUntilQuiet(c)...)
+	// The ejection runs as the player spawns (BossZone.onEnter from
+	// spawnMe), so its teleport sits inside the enter burst.
+	frames := readUntilQuiet(c)
+	if to := gameservertest.AssertSpawnTeleport(t, frames, objID); to != oust {
+		t.Fatalf("ejected to %+v, want %+v", to, oust)
+	}
 	waitForWorldPosition(t, srv, objID, oust)
-	assertEjectFrame(t, frames, objID, oust.X, oust.X)
 }
 
 func TestBossZoneTeleportRejoinEjectsToTown(t *testing.T) {

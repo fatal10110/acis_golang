@@ -1,0 +1,22 @@
+# Prove your courage! (Q613): a level 75 Varka ally of level 2 holding the level 3 mark is not offered the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q613_prove_your_courage_low_standing.golden
+character Ally 75
+standing -2
+hold 7223 1
+script quest.Q613_ProveYourCourage
+item 7240 7229 7223
+page npcdefault.htm
+page script/quest/Q613_ProveYourCourage/
+npc ashas 31377 Folk 10 0 0
+npc hekaton 25299 Monster 40 0 0
+
+action ashas
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q613_ProveYourCourage/31377-02.htm
+  S ActionFailed
+  S ActionFailed

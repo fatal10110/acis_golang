@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -50,18 +48,21 @@ func FramePackageToList(recipients []PackageRecipient) wire.Frame {
 }
 
 // FramePackageSendableList builds the list of inventory items that can be
-// sent as freight.
+// sent as freight. An item whose template templates no longer holds (one a
+// reload removed) is left out.
 func FramePackageSendableList(objectID, playerAdena int32, items []*item.Instance, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePackageSendableList)
 	w.WriteInt32(objectID)
 	w.WriteInt32(playerAdena)
-	w.WriteInt32(int32(len(items)))
+	countOffset := w.Len()
+	w.WriteInt32(0) // backfilled with the written count once the loop below finishes
+	var written int32
 	for _, inst := range items {
-		if err := writeWarehouseItem(w, inst, templates, false); err != nil {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: PackageSendableList: %w", err)
+		if writeWarehouseItem(w, inst, templates, false) {
+			written++
 		}
 	}
+	w.PatchInt32(countOffset, written)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
@@ -77,33 +78,37 @@ func FrameWarehouseWithdrawList(whType WarehouseType, playerAdena int32, items [
 	return frameWarehouseList(OpcodeWarehouseWithdrawList, whType, playerAdena, items, templates)
 }
 
+// frameWarehouseList builds a deposit or withdraw list. An item whose
+// template templates no longer holds (one a reload removed) is left out.
 func frameWarehouseList(opcode byte, whType WarehouseType, playerAdena int32, items []*item.Instance, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(opcode)
 	w.WriteUint16(uint16(whType))
 	w.WriteInt32(playerAdena)
-	count, err := wire.Uint16Count(len(items))
+	countOffset, err := reserveUint16Count(w, len(items))
 	if err != nil {
 		releaseFrameWriter(w)
 		return wire.Frame{}, err
 	}
-	w.WriteUint16(count)
+	var written int
 	for _, inst := range items {
-		if err := writeWarehouseItem(w, inst, templates, true); err != nil {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: warehouse list: %w", err)
+		if writeWarehouseItem(w, inst, templates, true) {
+			written++
 		}
 	}
+	w.PatchUint16(countOffset, uint16(written))
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
-func writeWarehouseItem(w *wire.Writer, inst *item.Instance, templates *item.Table, includeAugmentation bool) error {
+// writeWarehouseItem writes inst's row and reports whether it did: a nil
+// item, or one whose template templates no longer holds, writes nothing.
+func writeWarehouseItem(w *wire.Writer, inst *item.Instance, templates *item.Table, includeAugmentation bool) bool {
 	if inst == nil {
-		return fmt.Errorf("nil item")
+		return false
 	}
 	st := inst.Snapshot()
 	tmpl, ok := templates.Get(st.TemplateID)
 	if !ok {
-		return fmt.Errorf("no template loaded for item template %d", st.TemplateID)
+		return false
 	}
 	category, subCategory := tmpl.Category()
 
@@ -127,5 +132,5 @@ func writeWarehouseItem(w *wire.Writer, inst *item.Instance, templates *item.Tab
 			w.WriteInt32(st.Augmentation.Attributes >> 16)
 		}
 	}
-	return nil
+	return true
 }

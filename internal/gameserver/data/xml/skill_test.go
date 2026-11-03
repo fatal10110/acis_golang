@@ -64,8 +64,13 @@ func (fakeWearingActor) InventorySize() int                { return 0 }
 func (fakeWearingActor) InventoryLimit() int               { return 0 }
 func (fakeWearingActor) Charges() int                      { return 0 }
 func (a fakeWearingActor) IsWearingType(mask int) bool     { return a.mask&mask != 0 }
+func (fakeWearingActor) TargetID() (int, bool)             { return 0, false }
+func (fakeWearingActor) RaceOrdinal() (int, bool)          { return 0, false }
 
-var _ stat.Actor = fakeWearingActor{}
+var (
+	_ stat.Actor       = fakeWearingActor{}
+	_ conditions.Actor = fakeWearingActor{}
+)
 
 // TestConditionalStatFuncsBuildForEveryShippedSkill covers issue #1499's
 // acceptance criteria directly against the real datapack: every shipped
@@ -131,7 +136,7 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 142 level 5 not loaded")
 		}
-		funcs, err := effect.PassiveFuncs(def)
+		funcs, err := effect.PassiveFuncs(*def)
 		if err != nil {
 			t.Fatalf("PassiveFuncs(skill 142 level 5): %v", err)
 		}
@@ -143,10 +148,10 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 			}
 			rEvasFunc = true
 			const lightMask = 1 << 15 // item.ArmorLight.Mask()
-			if !fn.Cond.Test(fakeWearingActor{mask: lightMask}) {
+			if !fn.Cond.Test(fakeWearingActor{mask: lightMask}, nil, nil) {
 				t.Error("rEvas bonus should apply while wearing light armor")
 			}
-			if fn.Cond.Test(fakeWearingActor{mask: 0}) {
+			if fn.Cond.Test(fakeWearingActor{mask: 0}, nil, nil) {
 				t.Error("rEvas bonus should not apply while not wearing light armor")
 			}
 		}
@@ -217,7 +222,7 @@ func TestSkillStackTypeComesFromFirstShippedTemplate(t *testing.T) {
 		if len(def.Effects) != 2 || def.Effects[1].StackType != tc.second {
 			t.Fatalf("skill %d effects = %+v, want two templates, second %q", tc.id, def.Effects, tc.second)
 		}
-		if got := effect.SkillFromDefinition(def).StackType; got != tc.first {
+		if got := effect.SkillFromDefinition(*def).StackType; got != tc.first {
 			t.Fatalf("SkillFromDefinition(skill %d).StackType = %q, want first template's %q", tc.id, got, tc.first)
 		}
 	}
@@ -274,6 +279,26 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		}
 	})
 
+	t.Run("servitor lifetime and upkeep", func(t *testing.T) {
+		// Summon Kat the Cat: a 20-minute lifetime losing 500 ms a second
+		// idle and 1000 in combat, with crystal (D) upkeep from its level
+		// tables (level 1: none; level 3: 1 at 4 steps; level 5: 1 at 14).
+		for _, tc := range []struct {
+			level, countOT, steps int
+		}{{1, 0, 0}, {3, 1, 4}, {5, 1, 14}} {
+			d, ok := table.Get(1111, tc.level)
+			if !ok || d.SummonTotalLifeTime != 1200000 || d.SummonTimeLostIdle != 500 || d.SummonTimeLostActive != 1000 ||
+				d.ItemConsumeIDOT != 1458 || d.ItemConsumeCountOT != tc.countOT || d.ItemConsumeSteps != tc.steps {
+				t.Fatalf("skill 1111 level %d = total %d idle %d active %d upkeep %d x%d steps %d (loaded %v), want 1200000 500 1000 1458 x%d steps %d",
+					tc.level, d.SummonTotalLifeTime, d.SummonTimeLostIdle, d.SummonTimeLostActive, d.ItemConsumeIDOT, d.ItemConsumeCountOT, d.ItemConsumeSteps, ok, tc.countOT, tc.steps)
+			}
+		}
+		// Power Strike sets none of them.
+		if d, ok := table.Get(3, 1); !ok || d.SummonTimeLostIdle != 0 || d.ItemConsumeIDOT != 0 || d.ItemConsumeSteps != 0 {
+			t.Fatalf("skill 3 level 1 lifetime fields = idle %d upkeep %d steps %d (loaded %v), want zero", d.SummonTimeLostIdle, d.ItemConsumeIDOT, d.ItemConsumeSteps, ok)
+		}
+	})
+
 	t.Run("regular level with table-substituted fields", func(t *testing.T) {
 		d, ok := table.Get(3, 1)
 		if !ok {
@@ -318,7 +343,7 @@ func TestLoadSkillDefinitions(t *testing.T) {
 			if def.Activation != skill.ActivationPassive {
 				t.Fatalf("skill 5076 level %d activation = %v, want passive", level, def.Activation)
 			}
-			funcs, err := effect.PassiveFuncs(def)
+			funcs, err := effect.PassiveFuncs(*def)
 			if err != nil {
 				t.Fatalf("PassiveFuncs(skill 5076 level %d) error: %v", level, err)
 			}

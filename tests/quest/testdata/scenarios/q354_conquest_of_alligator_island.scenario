@@ -1,0 +1,120 @@
+# Conquest of Alligator Island (Q354): a level 38 character accepts at Kluck; with no fragment
+# his menu keeps its plain page and he has no teeth to buy; two Crokian lads give a tooth and a
+# fragment each (every roll pinned to succeed); two fragments are not enough for a map; Kluck buys
+# the teeth, then the character quits and the quest ends; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q354_conquest_of_alligator_island.golden
+character Kluck 38
+random always 0
+script quest.Q354_ConquestOfAlligatorIsland
+item 57 5863 5864 5915
+page warehouse/30895.htm
+page script/quest/Q354_ConquestOfAlligatorIsland/
+npc kluck 30895 WarehouseKeeper 10 0 0
+npc crokian 20804 Monster 40 0 0
+
+# Kluck: accept.
+action kluck
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+bypass npc_{kluck}_Quest
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-02.htm
+  S QuestList 354:0x80000001
+  S ExShowQuestMark quest=354
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-02.htm
+  S ActionFailed
+  Q upsert Q354_ConquestOfAlligatorIsland | <state> | STARTED
+  Q upsert Q354_ConquestOfAlligatorIsland | <cond> | 1
+  rows Q354_ConquestOfAlligatorIsland <cond>=1 <state>=STARTED
+  state Q354_ConquestOfAlligatorIsland STARTED
+
+# Kluck: no fragment, no teeth.
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+bypass npc_{kluck}_Quest
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-04.htm
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-04.htm
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-03.htm
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-03.htm
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-05.htm
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-05.htm
+  S ActionFailed
+  items 57=0
+
+# Two lads: a tooth and a fragment each.
+kill crokian x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5863
+  S SystemMessage id=54 3:5864
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5863
+  S SystemMessage id=54 3:5864
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5863=2 5864=2
+
+# Kluck: two fragments make no map; he buys the teeth; the character quits.
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+bypass npc_{kluck}_Quest
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-03a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-07.htm
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-07.htm
+  S ActionFailed
+  items 5864=2 5915=0
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+bypass npc_{kluck}_Quest
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-03a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-05.htm
+  S SystemMessage id=301 3:5863 6:2
+  S SystemMessage id=52 6:3540
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-05a.htm
+  S ActionFailed
+  items 5863=0 57=3540
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-09.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=301 3:5864 6:2
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-09.htm
+  S ActionFailed
+  Q delete-quest Q354_ConquestOfAlligatorIsland
+  items 5864=0
+  state Q354_ConquestOfAlligatorIsland -
+  rows Q354_ConquestOfAlligatorIsland -
+relog
+  rows Q354_ConquestOfAlligatorIsland -
+  items 57=3540

@@ -1,0 +1,28 @@
+# Test of the Searcher (Q225), the chest without its key: a level 39 Rogue at cond 17 who lost the
+# rusted key opens the strong wooden chest and is told it is locked; nothing changes. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q225_test_of_the_searcher_no_key.golden
+character Searcher 39
+class 7
+quest Q225_TestOfTheSearcher <state>=STARTED <cond>=17
+script quest.Q225_TestOfTheSearcher
+item 2784 2785 2786 2787 2788 2789 2790 2791 2792 2793 2794 2795 2796 2797 2798 2799 2800 2801 2802 2803 2804 2805 2806 2807 2808 2809 7562
+page default/30628.htm
+page script/quest/Q225_TestOfTheSearcher/
+npc chest 30628 Folk -10 -10 0
+
+action chest
+action chest
+  S ActionFailed
+  S NpcHtmlMessage obj=chest item=0 page=default/30628.htm
+  S ActionFailed
+bypass npc_{chest}_Quest
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q225_TestOfTheSearcher/30628-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q225_TestOfTheSearcher 30628-01a.htm
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q225_TestOfTheSearcher/30628-02.htm
+  S ActionFailed
+  items 2806=0 2807=0
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <state>=STARTED <cond>=17

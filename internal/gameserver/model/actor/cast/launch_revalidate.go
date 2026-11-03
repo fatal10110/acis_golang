@@ -41,7 +41,7 @@ type LaunchCaster interface {
 // is the caster itself. A target
 // that is not a creature (a door) is never lost, has no collision radius and
 // no peace zone of its own.
-func RevalidateLaunch(caster LaunchCaster, target Target, def modelskill.Definition) LaunchAbortReason {
+func RevalidateLaunch(caster LaunchCaster, target Target, def *modelskill.Definition) LaunchAbortReason {
 	if caster == nil || target == nil || sameLaunchTarget(caster, target) {
 		return LaunchAbortNone
 	}
@@ -80,11 +80,11 @@ func sameLaunchTarget(a LaunchCaster, b Target) bool {
 	return a.ObjectID() == b.ObjectID()
 }
 
-// launchEscapeRange mirrors CreatureCast.onMagicLaunch's escape-range
+// launchEscapeRange is the magic launch's escape-range
 // derivation: the skill's effect range if set, else its radius when the
 // skill has no cast range and a radius bigger than the default, else no
 // range check at all.
-func launchEscapeRange(def modelskill.Definition) int {
+func launchEscapeRange(def *modelskill.Definition) int {
 	if def.EffectRange > 0 {
 		return def.EffectRange
 	}
@@ -95,8 +95,7 @@ func launchEscapeRange(def modelskill.Definition) int {
 }
 
 // withinLaunchRange reports whether a and b are within rangeVal of each
-// other in 3D, including both actors' collision radii, matching
-// MathUtil.checkIfInRange(range, actor, target, true).
+// other in 3D, including both actors' collision radii.
 func withinLaunchRange(rangeVal int, a, b Target) bool {
 	ax, ay, az := a.Position()
 	bx, by, bz := b.Position()

@@ -240,6 +240,7 @@ type ServitorDamageShared struct {
 // for hits delivered outside a cast's own handler result. Blocked marks an
 // invulnerable target and Petrified one that is also paralyzed.
 type SkillDamageDealt struct {
+	TargetID  int32
 	Amount    int
 	MagicCrit bool
 	Blocked   bool
@@ -307,21 +308,42 @@ type SummonConfirmRequested struct {
 	Timeout    time.Duration
 }
 
-// TeleportRequested reports a discontinuous relocation to (X, Y, Z) within
-// Radius.
-type TeleportRequested struct{ X, Y, Z, Radius int }
+// TeleportRequested reports a discontinuous relocation of a player to
+// (X, Y, Z) within Radius. OwnQueue marks a request raised on the
+// character's own queue, which moves it inside the call; any other runs on
+// that queue once the raising task is done.
+type TeleportRequested struct {
+	X, Y, Z, Radius int
+	OwnQueue        bool
+}
+
+// SummonTeleportRequested reports an ordinary teleport of a summon to
+// where Jump lands. It runs on the summon's queue once the raising task is
+// done.
+type SummonTeleportRequested struct {
+	Jump location.Jump
+}
+
+// InstantTeleportRequested reports a jump of a player or a summon to where
+// Jump lands, keeping it in its region, shown without the teleport fade.
+// OwnQueue is as for TeleportRequested (always false for a summon).
+type InstantTeleportRequested struct {
+	Jump     location.Jump
+	OwnQueue bool
+}
 
 // RecallRequested reports a recall skill sending the character to the
 // place Destination names, resolved for the character where it stands.
-type RecallRequested struct{ Destination modelskill.RecallType }
-
-// Relocated reports that the server-authoritative position moved away from
-// Previous. Placed marks a position set outside movement (a forced flight's
-// landing) rather than a movement step.
-type Relocated struct {
-	Previous location.Location
-	Placed   bool
+// OwnQueue is as for TeleportRequested.
+type RecallRequested struct {
+	Destination modelskill.RecallType
+	OwnQueue    bool
 }
+
+// Relocated reports that the server-authoritative position moved. Placed
+// marks a position set outside movement (a forced flight's landing) rather
+// than a movement step.
+type Relocated struct{ Placed bool }
 
 // PvPFlagged reports a hit that flags the character for PvP; UseFlaggedDuration
 // selects the PvP-versus-PvP duration. ByServitor marks a hit or skill of
@@ -347,62 +369,63 @@ type ChargeMessage struct {
 // ChargesChanged reports that the Force/Soul charge count changed.
 type ChargesChanged struct{}
 
-func (VitalsChanged) event()          {}
-func (ActionsStopRequested) event()   {}
-func (IdleRequested) event()          {}
-func (ThinkRequested) event()         {}
-func (BowDrawn) event()               {}
-func (StanceChanged) event()          {}
-func (FakeDeathRevived) event()       {}
-func (PostureSettled) event()         {}
-func (DeathSettled) event()           {}
-func (EffectIconsChanged) event()     {}
-func (PositionCorrected) event()      {}
-func (WeightPenaltyChanged) event()   {}
-func (UserInfoChanged) event()        {}
-func (RunSpeedChanged) event()        {}
-func (EffectsStripped) event()        {}
-func (StatsModified) event()          {}
-func (GradePenaltyChanged) event()    {}
-func (DeathPenaltyChanged) event()    {}
-func (ExpSPGained) event()            {}
-func (ExpSPLost) event()              {}
-func (SPChanged) event()              {}
-func (KarmaChanged) event()           {}
-func (LevelChanged) event()           {}
-func (LeveledUp) event()              {}
-func (ShortBuff) event()              {}
-func (RegenMax) event()               {}
-func (EffectRemovedLackHP) event()    {}
-func (EffectRemovedLackMP) event()    {}
-func (RelaxHPFull) event()            {}
-func (Restored) event()               {}
-func (SpoilResult) event()            {}
-func (OverHit) event()                {}
-func (ServitorVanished) event()       {}
-func (ShieldBlocked) event()          {}
-func (EffectEnded) event()            {}
-func (EffectFelt) event()             {}
-func (AttackFailed) event()           {}
-func (SkillResisted) event()          {}
-func (MagicResisted) event()          {}
-func (DamageReceived) event()         {}
-func (ServitorDamageShared) event()   {}
-func (SkillDamageDealt) event()       {}
-func (HerbConsumed) event()           {}
-func (ItemObtained) event()           {}
-func (AttackRequested) event()        {}
-func (FleeRequested) event()          {}
-func (Retargeted) event()             {}
-func (SummonConfirmRequested) event() {}
-func (TeleportRequested) event()      {}
-func (RecallRequested) event()        {}
-func (Relocated) event()              {}
-func (PvPFlagged) event()             {}
-func (RelationChanged) event()        {}
-func (PKKarmaGained) event()          {}
-func (ChargeMessage) event()          {}
-func (ChargesChanged) event()         {}
+func (VitalsChanged) event()           {}
+func (ActionsStopRequested) event()    {}
+func (IdleRequested) event()           {}
+func (ThinkRequested) event()          {}
+func (BowDrawn) event()                {}
+func (StanceChanged) event()           {}
+func (FakeDeathRevived) event()        {}
+func (PostureSettled) event()          {}
+func (DeathSettled) event()            {}
+func (EffectIconsChanged) event()      {}
+func (PositionCorrected) event()       {}
+func (WeightPenaltyChanged) event()    {}
+func (UserInfoChanged) event()         {}
+func (RunSpeedChanged) event()         {}
+func (EffectsStripped) event()         {}
+func (StatsModified) event()           {}
+func (GradePenaltyChanged) event()     {}
+func (DeathPenaltyChanged) event()     {}
+func (ExpSPGained) event()             {}
+func (ExpSPLost) event()               {}
+func (SPChanged) event()               {}
+func (KarmaChanged) event()            {}
+func (LevelChanged) event()            {}
+func (LeveledUp) event()               {}
+func (ShortBuff) event()               {}
+func (RegenMax) event()                {}
+func (EffectRemovedLackHP) event()     {}
+func (EffectRemovedLackMP) event()     {}
+func (RelaxHPFull) event()             {}
+func (Restored) event()                {}
+func (SpoilResult) event()             {}
+func (OverHit) event()                 {}
+func (ServitorVanished) event()        {}
+func (ShieldBlocked) event()           {}
+func (EffectEnded) event()             {}
+func (EffectFelt) event()              {}
+func (AttackFailed) event()            {}
+func (SkillResisted) event()           {}
+func (MagicResisted) event()           {}
+func (DamageReceived) event()          {}
+func (ServitorDamageShared) event()    {}
+func (SkillDamageDealt) event()        {}
+func (HerbConsumed) event()            {}
+func (ItemObtained) event()            {}
+func (AttackRequested) event()         {}
+func (FleeRequested) event()           {}
+func (Retargeted) event()              {}
+func (SummonConfirmRequested) event()  {}
+func (TeleportRequested) event()       {}
+func (SummonTeleportRequested) event() {}
+func (RecallRequested) event()         {}
+func (Relocated) event()               {}
+func (PvPFlagged) event()              {}
+func (RelationChanged) event()         {}
+func (PKKarmaGained) event()           {}
+func (ChargeMessage) event()           {}
+func (ChargesChanged) event()          {}
 
 // PetSummonRequested reports a SUMMON_CREATURE cast with a pet collar;
 // ControlItem is the collar's item instance.
@@ -485,3 +508,5 @@ func (MountOutOfFeed) event() {}
 type DuelDefeated struct{}
 
 func (DuelDefeated) event() {}
+
+func (InstantTeleportRequested) event() {}

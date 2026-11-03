@@ -15,6 +15,9 @@ type Message struct {
 const (
 	MsgEnteredCombatZone            = 283
 	MsgLeftCombatZone               = 284
+	MsgClanEngravedRuler            = 285 // clan name
+	MsgOpponentStartedEngraving     = 287
+	MsgCastleGateBrokenDown         = 288
 	MsgClanVictoriousOverSiege      = 291 // clan name, castle name
 	MsgAnnouncedSiegeTime           = 292 // castle name
 	MsgRegistrationTermEnded        = 293 // castle name
@@ -32,12 +35,14 @@ const (
 	MsgCannotAttackAllianceCastle   = 690
 	MsgSiegeStarted                 = 711 // castle name
 	MsgSiegeEnded                   = 712 // castle name
+	MsgTowerDestroyedNoResurrection = 717
 	MsgDeadlinePassed               = 845 // castle name
 	MsgSiegeCanceledNoInterest      = 846 // castle name
 	MsgSiegeDraw                    = 856 // castle name
 	MsgDissolutionInProgress        = 1114
 	MsgTemporaryAlliance            = 1189
 	MsgTemporaryAllianceDissolved   = 1190
+	MsgCastleWallDamaged            = 1686
 	MsgClanDefeatedLostReputation   = 1772 // number
 	MsgClanVictoriousGainReputation = 1773 // number
 )

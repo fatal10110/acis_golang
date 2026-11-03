@@ -370,11 +370,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 
 	// Mdam reports the damage before the effect resist.
 	found, damaged := false, false
-	for i := 0; i < 50 && !found; i++ {
-		frame = c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
@@ -463,11 +459,7 @@ func TestMagicDamageHalfFailureSendsAttackFailed(t *testing.T) {
 	srv.AdvanceUntil(t, "MDAM half-fail drain", func() bool { return hostile.CurrentHP() < maxHP })
 
 	found := false
-	for i := 0; i < 50 && !found; i++ {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
@@ -611,11 +603,7 @@ func TestSignetMDamFullFailureSendsResistedSkill(t *testing.T) {
 	}
 
 	var found bool
-	for range 50 {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
@@ -705,6 +693,7 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		withWarriorBehavior(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: 43, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -725,6 +714,8 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(43, false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "DOT cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
 	hostile.SetInvul(true)
@@ -752,6 +743,7 @@ func TestPdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		withWarriorBehavior(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: 42, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -793,6 +785,7 @@ func TestMdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
+		withWarriorBehavior(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: 45, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -864,6 +857,8 @@ func TestManadamOnInvulnerableNPCDrainsNoMP(t *testing.T) {
 	}
 
 	c.Send(encodeRequestMagicSkillUse(46, false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "MANADAM cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
 	if mp := hostile.CurrentMP(); mp != beforeMP {

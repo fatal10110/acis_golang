@@ -1,0 +1,47 @@
+# The Other Side of Truth (Q115), the third sculpture passed by: a level 53 character on cond 7 that
+# has woken the first two sculptures leaves the third's piece of the tablet, and the fourth still asks for
+# the watcher. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q115_the_other_side_of_truth_skip.golden
+character Seeker 53
+quest Q115_TheOtherSideOfTruth <cond>=7 <state>=STARTED ex=3
+script quest.Q115_TheOtherSideOfTruth
+item 57 8079 8080 8081 8082
+page default/32018.htm
+page default/32020.htm
+page default/32021.htm
+page default/32022.htm
+page default/32077.htm
+page default/32078.htm
+page default/32079.htm
+page script/quest/Q115_TheOtherSideOfTruth/
+npc rafforty 32020 Folk 10 0 0
+npc misa 32018 Folk 0 10 0
+npc kierre 32022 Folk -10 0 0
+npc s1 32021 Folk 0 -10 0
+npc s2 32077 Folk 20 0 0
+npc s3 32078 Folk 0 20 0
+npc s4 32079 Folk -20 0 0
+
+action s3
+action s3
+  S ActionFailed
+  S NpcHtmlMessage obj=s3 item=0 page=default/32078.htm
+  S ActionFailed
+bypass npc_{s3}_Quest
+  S NpcHtmlMessage obj=s3 item=0 page=script/quest/Q115_TheOtherSideOfTruth/sculpture-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth sculpture-04.htm
+  S NpcHtmlMessage obj=s3 item=0 page=script/quest/Q115_TheOtherSideOfTruth/sculpture-04.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | ex | 7
+  rows Q115_TheOtherSideOfTruth <cond>=7 <state>=STARTED ex=7
+action s4
+action s4
+  S ActionFailed
+  S NpcHtmlMessage obj=s4 item=0 page=default/32079.htm
+  S ActionFailed
+bypass npc_{s4}_Quest
+  S NpcHtmlMessage obj=s4 item=0 page=script/quest/Q115_TheOtherSideOfTruth/sculpture-05.htm
+  S ActionFailed
+  S ActionFailed

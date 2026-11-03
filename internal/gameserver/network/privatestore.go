@@ -1,8 +1,7 @@
 package network
 
 import (
-	"unicode/utf16"
-
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -83,12 +82,11 @@ func (l *GameClientLink) canOpenPrivateStore(live *livePlayer, cancelTrade bool)
 }
 
 // storeOpenState reads what the store set-up checks need from live. A duel
-// counts as fighting. No Olympiad (#216) is modeled yet, so it never
-// refuses.
+// counts as fighting; an Olympiad competitor stands where no store opens.
 func (l *GameClientLink) storeOpenState(live *livePlayer) privatestore.OpenState {
 	attacking := live.attack != nil && live.attack.AttackingNow()
 	requesting := l.trades != nil && l.trades.ProcessingRequest(live.ObjectID())
-	noStore := live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoStore)
+	noStore := (live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoStore)) || live.OlympiadMode()
 	return privatestore.OpenState{
 		Operate:     live.OperateType(),
 		AlikeDead:   live.AlikeDead(),
@@ -207,7 +205,7 @@ func (l *GameClientLink) sendRecipeShopManageList(live *livePlayer, dwarven bool
 // but a manage window only opens after the set-up checks refused a casting
 // player, so no cast is ever in flight here.
 func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID int32) bool {
-	scroll := l.enchantStateStore().Active(live.ObjectID())
+	scroll := l.enchanting.scrolls.Active(live.ObjectID())
 	return func(objectID int32) bool {
 		return objectID == scroll || (objectID != live.MountObjectID() && live.ControlItemInUse(objectID))
 	}
@@ -215,7 +213,7 @@ func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID int32) bool
 
 // storeTrader is live as one side of a store deal.
 func (l *GameClientLink) storeTrader(live *livePlayer) privatestore.Trader {
-	scroll := l.enchantStateStore().Active(live.ObjectID())
+	scroll := l.enchanting.scrolls.Active(live.ObjectID())
 	return privatestore.Trader{
 		Inv: live.Inventory(),
 		Bound: func(objectID int32) bool {
@@ -236,7 +234,7 @@ func (l *GameClientLink) quitPrivateStore(live *livePlayer) {
 // storeMessageFits reports whether text is short enough for a store title
 // or workshop name.
 func storeMessageFits(text string) bool {
-	return len(utf16.Encode([]rune(text))) <= privatestore.MaxMessageLength
+	return commons.UTF16Len(text) <= privatestore.MaxMessageLength
 }
 
 // setSellStoreTitle answers SetPrivateStoreMsgSell: the title is kept and
@@ -383,7 +381,9 @@ func (l *GameClientLink) openStore(live *livePlayer, operate privatestore.Operat
 	if live.move != nil {
 		live.move.Stop()
 	}
-	live.Character.Sit()
+	// The store's set-up runs on live's queue: the tutorial hears of the
+	// seat as a hook on that queue.
+	live.RunOnOwnQueue(func() { live.Character.Sit() })
 	live.SetOperateType(operate)
 	l.broadcastCharacterInfo(live)
 	l.broadcastLiveFrame(live, title)
@@ -428,7 +428,7 @@ func (l *GameClientLink) buyFromStore(live *livePlayer, req clientpackets.Reques
 	for i, row := range req.Items {
 		rows[i] = privatestore.PurchaseRow{ObjectID: row.ObjectID, Count: int(row.Count), Price: int(row.Price)}
 	}
-	end := l.itemInstances.BeginOperation(live.ObjectID(), owner.ObjectID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), owner.ObjectID())
 	defer end()
 	deal, err := owner.PrivateStore().Buy(l.inventory, l.storeTrader(owner), l.storeTrader(live), rows)
 	l.applyPersistActions(deal.Persist)
@@ -439,8 +439,8 @@ func (l *GameClientLink) buyFromStore(live *livePlayer, req clientpackets.Reques
 	}
 	if l.answerDeal(live, deal) {
 		for _, row := range deal.Rows {
-			owner.SendFrame(storeDealFrame(row, live.Name, false))
-			live.SendFrame(storeDealFrame(row, owner.Name, true))
+			owner.SendFrame(storeDealFrame(row, live.CharacterName(), false))
+			live.SendFrame(storeDealFrame(row, owner.CharacterName(), true))
 		}
 	}
 	l.closeSoldOutStore(owner, deal)
@@ -465,7 +465,7 @@ func (l *GameClientLink) sellToStore(live *livePlayer, req clientpackets.Request
 	for i, row := range req.Items {
 		rows[i] = privatestore.SaleRow{ObjectID: row.ObjectID, ItemID: row.ItemID, Enchant: row.Enchant, Count: int(row.Count), Price: int(row.Price)}
 	}
-	end := l.itemInstances.BeginOperation(live.ObjectID(), owner.ObjectID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), owner.ObjectID())
 	defer end()
 	deal, err := owner.PrivateStore().Sell(l.inventory, l.storeTrader(owner), l.storeTrader(live), rows)
 	l.applyPersistActions(deal.Persist)
@@ -476,8 +476,8 @@ func (l *GameClientLink) sellToStore(live *livePlayer, req clientpackets.Request
 	}
 	if l.answerDeal(live, deal) {
 		for _, row := range deal.Rows {
-			owner.SendFrame(storeDealFrame(row, live.Name, true))
-			live.SendFrame(storeDealFrame(row, owner.Name, false))
+			owner.SendFrame(storeDealFrame(row, live.CharacterName(), true))
+			live.SendFrame(storeDealFrame(row, owner.CharacterName(), false))
 		}
 	}
 	l.closeSoldOutStore(owner, deal)

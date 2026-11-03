@@ -1,0 +1,17 @@
+# The Queen Ant (29001), a level 1 grand boss placed by an npcmaker whose territory holds her
+# but not where the level 1 character enters the world, every draw 99. The character steps 100
+# in front of her, inside her territory, and kills her: her attacked hook wants nothing on these
+# draws but the attack by the damage; the grand boss's death sends the raid success message and
+# sound, then her dying hook plays BS02_D.
+character Hunter 1
+random always 99
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAnt
+territory nest 150 -200 900 200 -100 100
+npc queen 29001 GrandBoss 700 0 0 maker nest
+
+approach queen
+kill queen
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=1 file=BS02_D bind=1 obj=queen loc=710,20,30 delay=0

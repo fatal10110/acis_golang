@@ -1,0 +1,29 @@
+# Hunting Leto Lizardman (Q300), too few bracelets: a character at cond 2 with fifty-nine bracelets
+# reports to Rath, who sends it back with nothing taken; the quest stays at cond 2. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q300_hunting_leto_lizardman_too_few.golden
+character Leto 34
+quest Q300_HuntingLetoLizardman <cond>=2 <state>=STARTED
+hold 7139 59
+script quest.Q300_HuntingLetoLizardman
+item 7139 1867 1872 57
+page guard/30126.htm
+page script/quest/Q300_HuntingLetoLizardman/
+npc rath 30126 Guard 10 0 0
+
+# Rath: the bracelets are counted, one short.
+action rath
+action rath
+  S ActionFailed
+  S NpcHtmlMessage obj=rath item=0 page=guard/30126.htm
+  S ActionFailed
+bypass npc_{rath}_Quest
+  S NpcHtmlMessage obj=rath item=0 page=script/quest/Q300_HuntingLetoLizardman/30126-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q300_HuntingLetoLizardman 30126-05.htm
+  S NpcHtmlMessage obj=rath item=0 page=script/quest/Q300_HuntingLetoLizardman/30126-05.htm
+  S ActionFailed
+  items 7139=59
+  state Q300_HuntingLetoLizardman STARTED
+  rows Q300_HuntingLetoLizardman <cond>=2 <state>=STARTED

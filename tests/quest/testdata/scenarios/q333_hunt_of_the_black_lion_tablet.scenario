@@ -1,0 +1,189 @@
+# Hunt of the Black Lion (Q333), the tablet run: a level 25 fighter on Sophya's fourth letter, who
+# has heard Redfoot's gossip three times, holds 99 stakato talons, seven lion claws, nine lion eyes,
+# two of each tablet fragment but the first, three fourth cargo boxes, eighty guild coins and 1000
+# adena. A Marsh Stakato drone drops the hundredth talon and a fourth box (both rolls 0); Sophya
+# pays 3500 adena and three claws, and trades ten claws, with no eye past the ninth, for four
+# hundred soulshots (roll 30). Redfoot has no more gossip; he opens two boxes into the first tablet
+# fragment (rolls 78 and 10, then 99 and 20, the even roll false both times). Rupio breaks the first
+# tablet (even roll false) and assembles the second (true), Lockirin buys it for 30000 adena, and
+# Morgan pays 300 adena for a box and no coin past the eightieth; Sophya then has nothing to pay for
+# while a box is left. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q333_hunt_of_the_black_lion_tablet.golden
+character Mercenary 25
+quest Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED state=3
+hold 57 1000
+hold 1369 1
+hold 3674 1
+hold 3851 99
+hold 3675 7
+hold 3676 9
+hold 3463 2
+hold 3464 2
+hold 3465 2
+hold 3443 3
+hold 3677 80
+random 0 0 30 78 10 1 99 20 1 1 0
+script quest.Q333_HuntOfTheBlackLion
+item 57 735 736 1061 1369 1463 2510 3440 3441 3442 3443 3444 3445 3446 3447 3448 3449 3450 3451 3452 3453 3454 3455 3456 3457 3458 3459 3460 3461 3462 3463 3464 3465 3466 3671 3672 3673 3674 3675 3676 3677 3848 3849 3850 3851
+page default/30735.htm
+page default/30736.htm
+page trainer/30471.htm
+page default/30130.htm
+page default/30531.htm
+page default/30737.htm
+page script/quest/Q333_HuntOfTheBlackLion/
+npc sophya 30735 Folk 10 0 0
+npc redfoot 30736 Folk 20 0 0
+npc rupio 30471 Trainer 30 0 0
+npc undrias 30130 Folk -10 0 0
+npc lockirin 30531 Folk -20 0 0
+npc morgan 30737 Folk -30 0 0
+npc drone 20234 Monster 0 -40 0
+
+# The hunt on the fourth ground.
+kill drone
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3851
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3443
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3851=100 3443=4
+
+# Sophya: a hundred talons pay three claws; past nine eyes ten claws make supplies alone.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S SystemMessage id=301 3:3851 6:100
+  S SystemMessage id=52 6:3500
+  S SystemMessage id=53 3:3675 6:3
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-23.htm
+  S ActionFailed
+  S ActionFailed
+  items 3851=0 57=4500 3675=10
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=53 3:1463 6:400
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-19b.htm
+  S ActionFailed
+  items 3675=0 3676=9 1463=400
+
+# Redfoot: no gossip past the third; two boxes, two first tablet fragments.
+action redfoot
+action redfoot
+  S ActionFailed
+  S NpcHtmlMessage obj=redfoot item=0 page=default/30736.htm
+  S ActionFailed
+bypass npc_{redfoot}_Quest
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30736-07.htm
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-08.htm
+  S ActionFailed
+  items 57=4500
+  rows Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED state=3
+bypass Quest Q333_HuntOfTheBlackLion 30736-09.htm
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-09.htm
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30736-03.htm
+  S SystemMessage id=672 1:650
+  S SystemMessage id=302 3:3443
+  S SystemMessage id=54 3:3462
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-04o.htm
+  S ActionFailed
+  items 57=3850 3443=3 3462=1
+bypass Quest Q333_HuntOfTheBlackLion 30736-06.htm
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-06.htm
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30736-03.htm
+  S SystemMessage id=672 1:650
+  S SystemMessage id=302 3:3443
+  S SystemMessage id=54 3:3462
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-04o.htm
+  S ActionFailed
+  items 57=3200 3443=2 3462=2
+
+# Rupio: the first tablet breaks, the second holds.
+action rupio
+action rupio
+  S ActionFailed
+  S NpcHtmlMessage obj=rupio item=0 page=trainer/30471.htm
+  S ActionFailed
+bypass npc_{rupio}_Quest
+  S NpcHtmlMessage obj=rupio item=0 page=script/quest/Q333_HuntOfTheBlackLion/30471-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30471-06.htm
+  S SystemMessage id=302 3:3462
+  S SystemMessage id=302 3:3463
+  S SystemMessage id=302 3:3464
+  S SystemMessage id=302 3:3465
+  S NpcHtmlMessage obj=rupio item=0 page=script/quest/Q333_HuntOfTheBlackLion/30471-08.htm
+  S ActionFailed
+  items 3462=1 3463=1 3464=1 3465=1 3466=0
+action rupio
+  S ActionFailed
+  S NpcHtmlMessage obj=rupio item=0 page=trainer/30471.htm
+  S ActionFailed
+bypass npc_{rupio}_Quest
+  S NpcHtmlMessage obj=rupio item=0 page=script/quest/Q333_HuntOfTheBlackLion/30471-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30471-06.htm
+  S SystemMessage id=302 3:3462
+  S SystemMessage id=302 3:3463
+  S SystemMessage id=302 3:3464
+  S SystemMessage id=302 3:3465
+  S SystemMessage id=54 3:3466
+  S NpcHtmlMessage obj=rupio item=0 page=script/quest/Q333_HuntOfTheBlackLion/30471-07.htm
+  S ActionFailed
+  items 3462=0 3463=0 3464=0 3465=0 3466=1
+
+# Lockirin buys the tablet.
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q333_HuntOfTheBlackLion/30531-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30531-04.htm
+  S SystemMessage id=302 3:3466
+  S SystemMessage id=52 6:30000
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q333_HuntOfTheBlackLion/30531-04.htm
+  S ActionFailed
+  items 3466=0 57=33200
+
+# Morgan: eighty coins, the top pay and no more coins.
+action morgan
+action morgan
+  S ActionFailed
+  S NpcHtmlMessage obj=morgan item=0 page=default/30737.htm
+  S ActionFailed
+bypass npc_{morgan}_Quest
+  S NpcHtmlMessage obj=morgan item=0 page=script/quest/Q333_HuntOfTheBlackLion/30737-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30737-06.htm
+  S SystemMessage id=302 3:3443
+  S SystemMessage id=52 6:300
+  S NpcHtmlMessage obj=morgan item=0 page=script/quest/Q333_HuntOfTheBlackLion/30737-05.htm
+  S ActionFailed
+  items 3443=1 57=33500 3677=80
+
+# Sophya: nothing to pay for while a box is left.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q333_HuntOfTheBlackLion STARTED

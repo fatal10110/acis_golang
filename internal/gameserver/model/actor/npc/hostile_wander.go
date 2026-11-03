@@ -1,45 +1,18 @@
 package npc
 
 import (
-	"time"
-
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 )
 
-// minWanderOffset is Npc.moveFromSpawnPointUsingRandomOffset's "offset
-// isn't noticeable" cutoff: offsets below this do not start a walk.
+// minWanderOffset is the random wander's "offset isn't noticeable" cutoff:
+// offsets below this do not start a walk.
 const minWanderOffset = 10
 
 // randomWalkLoopLimit is how many offset samples a maker wander tries
 // before aiming at the current triangle's center.
 const randomWalkLoopLimit = 3
-
-// ShouldIdleWander reports whether an empty desire queue should become a
-// wander desire. An NPC a behavior is bound to never does: its no-desire
-// hooks decide. Otherwise hold-position kinds stay put. MovingAttack is not
-// a wander gate for the Warrior and Wizard scripts; only the
-// MonsterBehavior script's no-desire hook reads it. This kind rule stands
-// in for the unbound ids until their behaviors are ported (#2148).
-func (h *Hostile) ShouldIdleWander() bool {
-	if h.behaves() {
-		return false
-	}
-	switch hostileKind(h.Instance) {
-	case "Guard", "SiegeGuard", "Chest", "HalishaChest":
-		return false
-	default:
-		return true
-	}
-}
-
-// After runs fn on this NPC's queue once d has elapsed, for the AI's
-// wander chain. Closing the queue at deletion cancels it.
-func (h *Hostile) After(d time.Duration, fn func()) ai.Timer {
-	return h.Queue().After(d, fn)
-}
 
 // RealMoveSpeed is the stance-aware move speed used as the wander offset
 // basis (walk after thinkWander switches stance).

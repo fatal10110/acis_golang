@@ -49,9 +49,9 @@ func Open(cfg Config) (*sql.DB, error) {
 		return nil, err
 	}
 
-	pool, err := sql.Open("mysql", dsn)
+	pool, err := OpenDSN(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open database pool: %w", err)
+		return nil, err
 	}
 
 	maxOpen := cfg.MaxConnections
@@ -63,6 +63,19 @@ func Open(cfg Config) (*sql.DB, error) {
 	pool.SetConnMaxIdleTime(defaultMaxIdleTime)
 	pool.SetConnMaxLifetime(defaultConnMaxLifetime)
 	return pool, nil
+}
+
+// OpenDSN builds a connection pool on a go-sql-driver/mysql DSN.
+func OpenDSN(dsn string) (*sql.DB, error) {
+	driverCfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open database pool: %w", err)
+	}
+	connector, err := mysql.NewConnector(driverCfg)
+	if err != nil {
+		return nil, fmt.Errorf("open database pool: %w", err)
+	}
+	return sql.OpenDB(connector), nil
 }
 
 // dataSourceName converts a MariaDB or MySQL JDBC URL, as shipped in
@@ -115,8 +128,7 @@ func dataSourceName(cfg Config) (string, error) {
 // (as documented in driver.properties of the bundled connector) into the
 // equivalent go-sql-driver/mysql setting. Connector/J options with no safe
 // go-sql-driver equivalent are rejected rather than silently dropped or
-// forwarded as a MySQL session variable (see aCis_gameserver
-// ConnectionPool.setUrl and PR #278).
+// forwarded as a MySQL session variable (see PR #278).
 func applyConnectorOption(driverCfg *mysql.Config, key, value string) error {
 	switch key {
 	case "timezone":

@@ -1,0 +1,18 @@
+# The castle defend teleporter (CastleDefendTeleporter): the leader of a clan registered to attack
+# Gludio Castle's siege is on neither the owner nor the defender side, so Gludio Castle's first
+# inner gatekeeper answers its refusal (onFirstTalk), which carries no link: the "1" link of the
+# defenders' page, sent anyway, is dropped before the script sees it, and nobody moves.
+trace internal/gameserver/script/testdata/oracle/scenarios/castle_defend_teleporter_attacker.golden
+character Raider 20
+clan 5
+siege 1 attacker
+script script.teleport.CastleDefendTeleporter
+page script/teleport/CastleDefendTeleporter/
+npc gatekeeper 35092 Folk 10 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/teleport/CastleDefendTeleporter/first_group_1_no.htm
+  S ActionFailed
+bypass Quest CastleDefendTeleporter 1

@@ -116,7 +116,7 @@ func (m *Manager) Bypass(page func(path string) string, npcID int, objectID int3
 		if len(args) < 3 {
 			return Reply{Aborted: true}
 		}
-		pageNo, err := commons.ParseInt(args[2], 32)
+		pageNo, err := strconv.ParseInt(args[2], 10, 32)
 		if err != nil {
 			return Reply{Aborted: true}
 		}
@@ -166,7 +166,7 @@ func (d dialog) give(args []string) Reply {
 	if len(args) < 2 {
 		return Reply{Aborted: true}
 	}
-	cost, err := commons.ParseInt(args[1], 32)
+	cost, err := strconv.ParseInt(args[1], 10, 32)
 	if err != nil {
 		return Reply{Aborted: true}
 	}
@@ -184,7 +184,7 @@ func (d dialog) give(args []string) Reply {
 				continue
 			}
 			if def, ok := d.m.skills.Definition(buff.Skill); ok {
-				reply.Buffs = append(reply.Buffs, def)
+				reply.Buffs = append(reply.Buffs, *def)
 			}
 		}
 	}
@@ -201,11 +201,11 @@ func (d dialog) selectSkill(command string, args []string) Reply {
 		return Reply{Aborted: true}
 	}
 	group, name := args[0], args[1]
-	id, err := commons.ParseInt(args[2], 32)
+	id, err := strconv.ParseInt(args[2], 10, 32)
 	if err != nil {
 		return Reply{Aborted: true}
 	}
-	pageNo, err := commons.ParseInt(args[3], 32)
+	pageNo, err := strconv.ParseInt(args[3], 10, 32)
 	if err != nil {
 		return Reply{Aborted: true}
 	}
@@ -251,7 +251,7 @@ func (d dialog) create(args []string) Reply {
 		return Reply{Message: nameNotice}
 	}
 	name := args[0]
-	if utf16Len(name) > 14 {
+	if commons.UTF16Len(name) > 14 {
 		return Reply{Message: nameNotice}
 	}
 	if o := d.m.owners[d.talker.ObjectID]; o != nil {
@@ -262,7 +262,7 @@ func (d dialog) create(args []string) Reply {
 			return Reply{Message: "The scheme name already exists."}
 		}
 	}
-	d.m.setLocked(d.talker.ObjectID, strings.TrimFunc(name, javaSpace), nil)
+	d.m.setLocked(d.talker.ObjectID, strings.TrimFunc(name, isCtrlOrSpace), nil)
 	return Reply{Page: d.schemesPage()}
 }
 
@@ -443,7 +443,10 @@ func (m *Manager) skillName(id int32) (string, bool) {
 		return "", false
 	}
 	def, ok := m.skills.Get(skill.ID(id), 1)
-	return def.Name, ok
+	if !ok {
+		return "", false
+	}
+	return def.Name, true
 }
 
 // fee is what giving ids costs: the static cost per buff when one is set,
@@ -505,6 +508,6 @@ func fields(command string) []string {
 // UTF-16 unit.
 func equalIgnoreCase(a, b string) bool { return compareIgnoreCase(a, b) == 0 }
 
-// javaSpace is the set trimmed around a scheme name: every character up to
+// isCtrlOrSpace is the set trimmed around a scheme name: every character up to
 // and including the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }

@@ -13,6 +13,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
@@ -45,25 +47,35 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.At
 // attack: an AttackRequest on the object already selected.
 func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected, ctrl, shift bool) {
 	target := l.resolveTarget(objectID)
-	// A fence answers every click, plain, forced or shifted, with
-	// ActionFailed: it is never selected.
-	if target == nil || target.Kind() == actor.KindFence {
+	// A fence, a signet effect point or a Christmas tree answers every
+	// click, plain, forced or shifted, with ActionFailed: it is never
+	// selected.
+	if _, point := target.(*npc.EffectPoint); target == nil || point || target.Kind() == actor.KindFence || christmasTree(target) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if _, ok := target.(*boat.Boat); ok {
 		// A click on a boat, plain or forced, does nothing at all: a boat is
-		// never selected, and the reference answers no packet either.
+		// never selected, and silence is the expected answer.
 		return
 	}
-	_, ground := target.(*grounditem.Item)
-	if ground {
+	ground, isGround := target.(*grounditem.Item)
+	if isGround {
+		// A player in flight picks nothing up: the click is refused ahead of
+		// every pickup gate.
+		if live.Flying() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+		if l.refuseTicketPickup(live, ground) {
+			return
+		}
 		if inPostureTransition(live) {
 			if live.DenyAIAction() {
 				live.SendFrame(serverpackets.FrameActionFailed())
 				return
 			}
-			live.deferAction(func() {
+			live.deferAction("PICK_UP", func() {
 				if l.resolveTarget(objectID) != target {
 					live.SendFrame(serverpackets.FrameActionFailed())
 					return
@@ -90,19 +102,24 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		return
 	}
 	if busy {
-		if live.DenyAIAction() || (ctrl && liveOutOfControl(live)) || target.ObjectID() == live.ObjectID() {
+		// A click on a player across the boat boundary is refused ahead
+		// of the intention it would queue, as it is when nothing is busy:
+		// whatever was queued stays.
+		if live.DenyAIAction() || target.ObjectID() == live.ObjectID() || acrossBoatBoundary(live, target) {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
 		if pet, ok := target.(*summon.Actor); ok && !ctrl && pet.ShownAsOwnedBy(live.ObjectID()) {
 			live.deferInteract(pet, shift)
-		} else if f, ok := target.(*npc.Folk); ok && !ctrl {
+		} else if f, ok := target.(*npc.Folk); ok && !attacksFolk(live, f, ctrl) {
 			live.deferInteract(f, shift)
 		} else if h, ok := target.(*npc.Hostile); ok && interactsWith(live, h, ctrl) {
 			live.deferInteract(h, shift)
+		} else if d, ok := target.(*door.Object); ok && !d.AttackableBy(live.Character) {
+			live.deferInteract(d, shift)
 		} else {
-			run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
-			live.deferAction(func() {
+			intention, run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
+			live.deferAction(intention, func() {
 				if l.resolveTarget(objectID) != target {
 					live.SendFrame(serverpackets.FrameActionFailed())
 					return
@@ -131,7 +148,17 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 		l.tryToInteract(live, h, shift)
 		return
 	}
+	if l.actOnDoor(live, target, shift) {
+		return
+	}
 	l.attackLiveTarget(live, target, shift)
+}
+
+// christmasTree reports whether target is a Christmas tree, which answers
+// every click with ActionFailed alone.
+func christmasTree(target world.Tracked) bool {
+	d, ok := target.(*npc.Decoration)
+	return ok && d.Instance.Kind == npc.ChristmasTree
 }
 
 // interactsWith reports whether a click on the selected hostile NPC h is an
@@ -162,31 +189,32 @@ func (l *GameClientLink) actOnStaticObject(live *livePlayer, obj *staticobject.O
 	l.tryToInteract(live, obj, shift)
 }
 
-// queuedSelectedTargetAction captures the click's resolved intention before a
-// posture transition ends. A later selection must not change what it runs.
-func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target world.Tracked, ctrl, shift bool) func() {
+// queuedSelectedTargetAction captures the click's resolved intention, and its
+// name, before a posture transition ends. A later selection must not change
+// what it runs.
+func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target world.Tracked, ctrl, shift bool) (string, func()) {
 	attack := func() { l.attackQueuedTarget(live, target, shift) }
 	switch v := target.(type) {
 	case *summon.Actor:
 		// The caller queues a click without ctrl on an owned summon as its
 		// interact intention, so only a ctrl-click reaches here.
 		if v.ShownAsOwnedBy(live.ObjectID()) {
-			return attack
+			return "ATTACK", attack
 		}
 		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
-			return attack
+			return "ATTACK", attack
 		}
-		return func() { l.startLiveFollow(live, v, shift) }
+		return "FOLLOW", func() { l.startLiveFollow(live, v, shift) }
 	case *livePlayer:
 		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
-			return attack
+			return "ATTACK", attack
 		}
 		if v.Operating() {
-			return func() { l.tryToInteract(live, v, shift) }
+			return "INTERACT", func() { l.tryToInteract(live, v, shift) }
 		}
-		return func() { l.startLiveFollow(live, v, shift) }
+		return "FOLLOW", func() { l.startLiveFollow(live, v, shift) }
 	}
-	return attack
+	return "ATTACK", attack
 }
 
 func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *livePlayer, target world.Tracked, shift bool) bool {
@@ -369,19 +397,20 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 		l.attackLiveTarget(live, s, shift)
 		return true
 	}
-	l.followLiveTarget(live, s, ctrl, shift)
+	l.followLiveTarget(live, s, shift)
 	return true
 }
 
 // actOnFolk answers a click on an already-selected civilian NPC and
-// reports whether target was one. A forced click attacks it, since another
-// creature may always attack it by force; any other click talks to it.
+// reports whether target was one. A forced click attacks it while it may be
+// attacked by force; any other click, a forced one on its corpse or on a
+// holy artifact included, talks to it.
 func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
 	f, ok := target.(*npc.Folk)
 	if !ok || live == nil {
 		return false
 	}
-	if ctrl {
+	if attacksFolk(live, f, ctrl) {
 		l.attackLiveTarget(live, f, shift)
 		return true
 	}
@@ -389,9 +418,16 @@ func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl,
 	return true
 }
 
+// attacksFolk reports whether a click on the selected civilian NPC f is an
+// attack rather than an interact.
+func attacksFolk(live *livePlayer, f *npc.Folk, ctrl bool) bool {
+	return f.AttackableWithoutForceBy(live.Character) || (ctrl && f.AttackableBy(live.Character))
+}
+
 // interactTarget is what a player's interact intention walks to and acts
 // on: the player's own summon, whose status window opens, a civilian NPC,
-// whose chat window opens, a player running a store, or a static object.
+// whose chat window opens, a player running a store, a static object, or a
+// door.
 type interactTarget interface {
 	world.Tracked
 	Position() (x, y, z int)
@@ -400,10 +436,18 @@ type interactTarget interface {
 // interactTargetRadius is target's collision radius, counted into the
 // approach range: a creature's own, none for a static object.
 func interactTargetRadius(target interactTarget) float64 {
-	if c, ok := target.(interface{ CollisionRadius() float64 }); ok {
+	if _, ok := target.(*door.Object); ok {
+		return door.CollisionRadius
+	}
+	if c, ok := target.(collisionSized); ok {
 		return c.CollisionRadius()
 	}
 	return 0
+}
+
+// collisionSized is an interact target with a collision radius: a creature.
+type collisionSized interface {
+	CollisionRadius() float64
 }
 
 // interactIntention is an interact queued behind a swing or a cast.
@@ -561,7 +605,8 @@ func movingNPC(target interactTarget) bool {
 
 // onInteract acts on an interact target in reach: the player's own summon
 // shows its status window, a civilian NPC talks, a talking hostile NPC
-// too, a player running a store shows its store window.
+// too, a player running a store shows its store window, and a clan hall
+// door asks its owners whether to open or close it.
 func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 	switch t := target.(type) {
 	case *livePlayer:
@@ -574,6 +619,8 @@ func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 		l.talkToHostile(live, t)
 	case *staticobject.Object:
 		l.showStaticObject(live, t)
+	case *door.Object:
+		l.interactDoor(live, t)
 	}
 }
 
@@ -680,7 +727,10 @@ func (l *GameClientLink) playerCanDoInteract(live *livePlayer, target interactTa
 // invalid or unclaimable target (wrong type, busy, out of range) still falls
 // back to a plain sit: the sit happens unconditionally ahead of the chair
 // check. Any rejection releases the client with
-// ActionFailed instead of silence.
+// ActionFailed instead of silence. A request made during a swing, a cast or
+// a sit-down or stand-up waits for its end as the next intention, and so
+// does a sit made during a walk to a point: the walk goes on and the sit is
+// carried out on arrival. A stand during a walk runs at once.
 func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	if live == nil {
 		return
@@ -690,17 +740,30 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if itemAICastBusy(live) {
-		live.deferAction(func() { l.runChangeWaitType(live, stand, target) })
+	if itemAICastBusy(live) || (!stand && live.currentIntentionName() == "MOVE_TO") {
+		live.deferAction(waitTypeIntention(stand), func() { l.runChangeWaitType(live, stand, target) })
 		return
 	}
 	live.takeDeferredAction()
 	l.runChangeWaitType(live, stand, target)
 }
 
+// waitTypeIntention names a sit or stand request on the character page.
+func waitTypeIntention(stand bool) string {
+	if stand {
+		return "STAND"
+	}
+	return "SIT"
+}
+
+// runChangeWaitType carries out a sit or stand request. Every refusal
+// sends the player idle, dropping its intentions and stopping a walk under
+// way (StopMove), then answers ActionFailed.
 func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target world.Tracked) {
-	if live.DenyAIAction() {
-		live.SendFrame(serverpackets.FrameActionFailed())
+	// A player unable to act, a rider, or one running a store or its
+	// set-up (for a sit) neither sits nor stands.
+	if live.DenyAIAction() || live.Mounted() || (!stand && live.Operating()) {
+		refuseChangeWaitType(live)
 		return
 	}
 	// A stand while lying in fake death gets up out of it instead of
@@ -709,16 +772,36 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 	// not seated, and the request is refused below as a stand while not
 	// seated.
 	if stand && live.StandFromFakeDeath() {
+		live.holdPosture(true)
 		return
 	}
 	if !stand {
+		// An accepted sit stops a walk or follow first, so observers see
+		// the stop ahead of the sit and the throne range is measured
+		// where the player stopped.
+		if live.move != nil && !live.AlikeDead() && live.Standing() {
+			live.move.Stop()
+		}
 		if target != nil && l.sitLiveOnChair(live, target) {
+			live.holdPosture(false)
 			return
 		}
 	}
+	// A posture already taken, or a player lying dead or playing dead,
+	// refuses the request.
 	if !l.changeLiveWaitType(live, stand) {
-		live.SendFrame(serverpackets.FrameActionFailed())
+		refuseChangeWaitType(live)
+		return
 	}
+	// The request stays the current intention until the transition ends.
+	live.holdPosture(stand)
+}
+
+// refuseChangeWaitType refuses a sit or stand request: live goes idle, then
+// is answered ActionFailed.
+func refuseChangeWaitType(live *livePlayer) {
+	live.goIdle()
+	live.SendFrame(serverpackets.FrameActionFailed())
 }
 
 // sitLiveOnChair claims target as a throne and sits live on it, for a sit
@@ -749,8 +832,15 @@ type positionedTarget interface {
 	Heading() int
 }
 
+// selectLiveTarget makes target live's selection, showing it to live and
+// its observers. A festival monster stays out of reach of a player who is
+// no festival participant: the selection is cleared instead.
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
 	if live == nil || target == nil {
+		return false
+	}
+	if h, ok := target.(*npc.Hostile); ok && h.FestivalMonster() && !live.FestivalParticipant() {
+		l.announceTargetCleared(live, live.TakeTarget())
 		return false
 	}
 	if cur := live.Target(); cur != nil && cur.ObjectID() == target.ObjectID() {
@@ -836,14 +926,16 @@ func (l *GameClientLink) attackQueuedTarget(live *livePlayer, target world.Track
 }
 
 func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world.Tracked, shift, request bool) bool {
-	combatant, ok := target.(attackable.Combatant)
+	combatant, ok := hitTarget(target)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	// An attack request is rejected while out of control, before it is
-	// dispatched to the target's action.
-	if request && liveOutOfControl(live) {
+	// An attack request from a player that cannot act is answered
+	// ActionFailed alone, before any intention changes. A confused player
+	// can act: a plain click or an effect-driven attack still swings. Only
+	// the forced click refuses it, up front in handleAttackRequest.
+	if request && live.DenyAIAction() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
@@ -876,9 +968,21 @@ func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world
 	return true
 }
 
+// hitTarget returns target as the creature a physical hit lands on: a
+// creature as itself, a door through its hit surface. Any other object is
+// never attacked.
+func hitTarget(target any) (attackable.Combatant, bool) {
+	if d, ok := target.(*door.Object); ok {
+		return doorhit.Of(d), true
+	}
+	c, ok := target.(attackable.Combatant)
+	return c, ok
+}
+
 // liveOutOfControl reports whether live is out of control: stunned,
 // immobile until attacked, sleeping, paralyzed, afraid, confused,
-// teleporting or dead. Such a player may not send an attack request or walk.
+// teleporting or dead. Such a player may not send a forced attack request
+// or walk.
 func liveOutOfControl(live *livePlayer) bool {
 	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
 		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead()
@@ -890,8 +994,8 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	if l.attackStance != nil {
-		l.attackStance.Add(live)
+	if l.combat.attackStance != nil {
+		l.combat.attackStance.Add(live)
 	}
 	if !live.SetInCombat(true) {
 		return
@@ -908,6 +1012,21 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	})
 }
 
+// stopLiveAttackStance ends the attack stance of live, which just died: it
+// is out of combat at once, and when it was in stance, live and its
+// observers see the stance end right after its Die. Its summon, whose stance
+// is this one, gets no AutoAttackStop: only the stance expiry sends that, and
+// it no longer runs.
+func (l *GameClientLink) stopLiveAttackStance(live *livePlayer) {
+	live.SetInCombat(false)
+	if l.combat.attackStance == nil || !l.combat.attackStance.Remove(live) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStop(live.ObjectID())
+	})
+}
+
 // startSummonAttackStance enters or refreshes the attack stance of actor's
 // owner, which a summon's stance is. Entering it shows the stance on actor,
 // then on its owner.
@@ -918,13 +1037,13 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 // expiry ends it on actor (attackStanceEffects).
 func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 	if actor.OwnerLeft() {
-		if l.attackStance == nil {
+		if l.combat.attackStance == nil {
 			return
 		}
-		if !l.attackStance.InAttackStance(actor) {
+		if !l.combat.attackStance.InAttackStance(actor) {
 			l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
 		}
-		l.attackStance.Add(actor)
+		l.combat.attackStance.Add(actor)
 		// A hit that passed its Knows check as the summon's decay
 		// despawned it can get here after the despawn cleanup's Remove
 		// (leaveCorpseBehind), and its entry would outlive the summon,
@@ -933,7 +1052,7 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 		// the cleanup or this check drops the entry.
 		if l.world != nil {
 			if obj, ok := l.world.Object(actor.ObjectID()); !ok || obj != world.Tracked(actor) {
-				l.attackStance.Remove(actor)
+				l.combat.attackStance.Remove(actor)
 			}
 		}
 		return
@@ -942,8 +1061,8 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 	if !ok {
 		return
 	}
-	if l.attackStance != nil {
-		l.attackStance.Add(owner)
+	if l.combat.attackStance != nil {
+		l.combat.attackStance.Add(owner)
 	}
 	if !owner.SetInCombat(true) {
 		return

@@ -1,0 +1,21 @@
+# An Aged Ex-Adventurer (Q652), refused: Tantan sends a level 45 character away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q652_an_aged_ex_adventurer_low_level.golden
+character Recruit 45
+script quest.Q652_AnAgedExAdventurer
+item 1464 956 57
+page default/32012.htm
+page script/quest/Q652_AnAgedExAdventurer/
+npc tantan 32012 Folk 10 0 0
+
+action tantan
+action tantan
+  S ActionFailed
+  S NpcHtmlMessage obj=tantan item=0 page=default/32012.htm
+  S ActionFailed
+bypass npc_{tantan}_Quest
+  S NpcHtmlMessage obj=tantan item=0 page=script/quest/Q652_AnAgedExAdventurer/32012-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q652_AnAgedExAdventurer CREATED
+  rows Q652_AnAgedExAdventurer -

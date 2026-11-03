@@ -1,0 +1,35 @@
+# For Sleepless Deadmen (Q359), the last reward: a character at cond 3 hears the last page and takes the
+# reward the draw 7 picks (5495 x4). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q359_for_sleepless_deadmen_reward.golden
+character Sleepless 60
+quest Q359_ForSleeplessDeadmen <cond>=3 <state>=STARTED
+random 7
+script quest.Q359_ForSleeplessDeadmen
+item 57 5869 6341 6342 6343 6344 6345 6346 5494 5495
+page villagemaster/30857.htm
+page script/quest/Q359_ForSleeplessDeadmen/
+npc orven 30857 VillageMasterPriest 10 0 0
+
+action orven
+action orven
+  S ActionFailed
+  S NpcHtmlMessage obj=orven item=0 page=villagemaster/30857.htm
+  S ActionFailed
+bypass npc_{orven}_Quest
+  S NpcHtmlMessage obj=orven item=0 page=script/quest/Q359_ForSleeplessDeadmen/30857-09.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q359_ForSleeplessDeadmen <cond>=3 <state>=STARTED
+bypass Quest Q359_ForSleeplessDeadmen 30857-10.htm
+  S SystemMessage id=53 3:5495 6:4
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=orven item=0 page=script/quest/Q359_ForSleeplessDeadmen/30857-10.htm
+  S ActionFailed
+  Q delete-quest Q359_ForSleeplessDeadmen
+  items 5495=4
+  state Q359_ForSleeplessDeadmen -
+  rows Q359_ForSleeplessDeadmen -
+relog
+  rows Q359_ForSleeplessDeadmen -
+  items 5495=4

@@ -1,0 +1,315 @@
+# Inhabitants of the Forest of the Dead (Q024) from the broken cross to the Mysterious Wizard's
+# end: Lidia's letter and hairpin, the totem doll of the forest's undead. Expectations come from
+# the reference trace (Q024_InhabitantsOfTheForestOfTheDead.onAdvEvent, onTalk, onMyDying).
+trace internal/gameserver/script/testdata/oracle/scenarios/q024_inhabitants_of_the_forest_of_the_dead_letter.golden
+character Mourner 65
+quest Q024_InhabitantsOfTheForestOfTheDead <cond>=4 <state>=STARTED state=4
+hold 7154 1
+random always 0
+script quest.Q024_InhabitantsOfTheForestOfTheDead
+item 7065 7148 7151 7154 7156
+page default/31389.htm
+page default/31522.htm
+page default/31532.htm
+page script/quest/Q024_InhabitantsOfTheForestOfTheDead/
+npc dorian 31389 Folk 10 0 0
+npc wizard 31522 Folk -10 0 0
+npc maid 31532 Folk 0 -10 0
+npc snatcher 21557 Monster 0 40 0
+
+# Dorian takes the broken cross.
+action dorian
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-16.htm
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-16.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-17.htm
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-17.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-18.htm
+  S PlaySound type=0 file=InterfaceSound.charstat_open_01 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-18.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31389-19.htm
+  S QuestList 24:0x8000001f
+  S ExShowQuestMark quest=24
+  S SystemMessage id=302 3:7154
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-19.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 5
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 5
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=5 <state>=STARTED state=5
+  items 7154=0
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-20.htm
+  S ActionFailed
+  S ActionFailed
+
+# The maid's letter; without the hairpin she waits.
+action maid
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-02.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-02.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-03.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-03.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-04.htm
+  S QuestList 24:0x8000003f
+  S ExShowQuestMark quest=24
+  S SystemMessage id=54 3:7065
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-04.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 6
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 6
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=6 <state>=STARTED state=6
+  items 7065=1
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-06.htm
+  S QuestList 24:0x8000007f
+  S ExShowQuestMark quest=24
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-07.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 7
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 7
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=7 <state>=STARTED state=7
+  items 7065=1 7148=0
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-07a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Dorian gives the hairpin, once.
+action dorian
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S QuestList 24:0x800000ff
+  S ExShowQuestMark quest=24
+  S SystemMessage id=54 3:7148
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-21.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 8
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=8 <state>=STARTED state=7
+  items 7148=1
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-22.htm
+  S ActionFailed
+  S ActionFailed
+
+# The maid takes the letter and the hairpin.
+action maid
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-07a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-06.htm
+  S SystemMessage id=302 3:7065
+  S SystemMessage id=302 3:7148
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-06.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 8
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=8 <state>=STARTED state=8
+  items 7065=0 7148=0
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-09.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-09.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-10.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-10.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 9
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=8 <state>=STARTED state=9
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-14.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-14.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 10
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=8 <state>=STARTED state=10
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-15.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-15.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-16.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-16.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-18.htm
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-18.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31532-19.htm
+  S QuestList 24:0x800001ff
+  S ExShowQuestMark quest=24
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-19.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 9
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 11
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=9 <state>=STARTED state=11
+action maid
+  S ActionFailed
+  S NpcHtmlMessage obj=maid item=0 page=default/31532.htm
+  S ActionFailed
+bypass npc_{maid}_Quest
+  S NpcHtmlMessage obj=maid item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31532-20.htm
+  S ActionFailed
+  S ActionFailed
+
+# An undead of the forest drops the totem doll.
+kill snatcher
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7151
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 24:0x800003ff
+  S ExShowQuestMark quest=24
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 10
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=10 <state>=STARTED state=11
+  items 7151=1
+
+# The Mysterious Wizard takes it.
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-02.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-02.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-03.htm
+  S SystemMessage id=302 3:7151
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-03.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 12
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=10 <state>=STARTED state=12
+  items 7151=0
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-05.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-05.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-06.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-06.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-07.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-07.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-08.htm
+  S QuestList 24:0x800007ff
+  S ExShowQuestMark quest=24
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-08.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <cond> | 11
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 13
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=11 <state>=STARTED state=13
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-10.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-10.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-11.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-11.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-12.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-12.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-16.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-16.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-17.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-17.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | state | 14
+  rows Q024_InhabitantsOfTheForestOfTheDead <cond>=11 <state>=STARTED state=14
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-18.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-19.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-19.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-20.htm
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-20.htm
+  S ActionFailed
+bypass Quest Q024_InhabitantsOfTheForestOfTheDead 31522-21.htm
+  S SystemMessage id=54 3:7156
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 24:0x00000000
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-21.htm
+  S ActionFailed
+  Q upsert Q024_InhabitantsOfTheForestOfTheDead | <state> | COMPLETED
+  Q delete-except-state Q024_InhabitantsOfTheForestOfTheDead
+  rows Q024_InhabitantsOfTheForestOfTheDead <state>=COMPLETED
+  items 7156=1
+  state Q024_InhabitantsOfTheForestOfTheDead COMPLETED
+
+# Done: the wizard's own page, the already-completed one elsewhere.
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31522-22.htm
+  S ActionFailed
+  S ActionFailed
+action dorian
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog

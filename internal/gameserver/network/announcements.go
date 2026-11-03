@@ -54,6 +54,6 @@ func announceToOnline(state *world.State, text string, critical bool) {
 // automatic, each under live's own name.
 func (l *GameClientLink) sendLoginAnnouncements(live *livePlayer) {
 	for _, a := range l.announcements.Login() {
-		live.SendFrame(serverpackets.FrameCreatureSay(0, int32(announceChannel(a.Critical)), live.Name, a.Message))
+		live.SendFrame(serverpackets.FrameCreatureSay(0, int32(announceChannel(a.Critical)), live.CharacterName(), a.Message))
 	}
 }

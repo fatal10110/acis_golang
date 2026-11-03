@@ -79,10 +79,10 @@ func (l *GameClientLink) deleteTargetShortcuts(live *livePlayer, typ shortcut.Ty
 // shot still held also turns that shot's automatic use off. Every deletion
 // then re-announces each shot still on automatic use.
 func (l *GameClientLink) shortcutDeleted(live *livePlayer, sc shortcut.Shortcut) {
-	if l.shortcuts != nil {
+	if l.belongings.shortcuts != nil {
 		slot, page, classIndex := sc.Slot, sc.Page, live.ClassIndex()
 		l.queueRowWrite(live.ObjectID(), "delete shortcut", func(ctx context.Context, ownerID int32) error {
-			return l.shortcuts.Delete(ctx, ownerID, classIndex, slot, page)
+			return l.belongings.shortcuts.Delete(ctx, ownerID, classIndex, slot, page)
 		})
 	}
 	if sc.Type == shortcut.Item {
@@ -126,14 +126,14 @@ func (l *GameClientLink) refreshSkillShortcuts(live *livePlayer, skillID, level 
 // ShortCutRegister sent first, and a failed insert is only logged, so the
 // client's reply never depends on the row landing.
 func (l *GameClientLink) saveShortcut(live *livePlayer, sc shortcut.Shortcut, op string) {
-	if l.shortcuts == nil {
+	if l.belongings.shortcuts == nil {
 		return
 	}
 	ownerID, classIndex := live.ObjectID(), live.ClassIndex()
 	l.persist.Enqueue(ownerID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := l.shortcuts.Save(ctx, ownerID, classIndex, sc); err != nil {
+		if err := l.belongings.shortcuts.Save(ctx, ownerID, classIndex, sc); err != nil {
 			l.log.Error().Err(err).Int32("object_id", ownerID).Msg(op)
 		}
 	})

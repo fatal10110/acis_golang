@@ -1,0 +1,19 @@
+# WarriorCast3SkillsMagical3 (20611, Dre Vanul Warrior, level 32, its shipped hold), every draw
+# 0, 50 away from the character. Its hit, from too close for any range band, holds no one and
+# arms the 12 s timer "2001"; the timer wants its hold (4047) on its last attacker, weight
+# 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3
+npc dre 20611 Monster 50 0 0 skill HOLD_MAGIC 4047 3
+
+hit dre 80
+  desires dre attack(player)=1000
+advance 11s
+  desires dre attack(player)=1000
+advance 1s
+  desires dre attack(player)=1000 cast(player,4047,move)=1000000

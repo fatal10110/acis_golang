@@ -1,0 +1,13 @@
+# RaidPrivateHealer (25008, level 1), every draw 0: 2 s after it appeared its check wants its self range
+# buff on itself (1000000), on a draw of 1 nothing.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer
+npc master 20003 Monster 400 0 0
+npc healer1 25008 Monster 100 0 0 skill HEAL_MAGIC_A 4780 3 skill SELF_RANGE_BUFF_A 4214 3 master master
+
+advance 2s
+  desires healer1 cast(healer1,4214,move)=1000000

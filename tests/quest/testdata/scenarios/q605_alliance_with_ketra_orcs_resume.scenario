@@ -1,0 +1,37 @@
+# Alliance with Ketra Orcs (Q605): a character that holds the level 3 mark from an earlier quest takes the quest back at its
+# stage 4, whatever its standing was. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q605_alliance_with_ketra_orcs_resume.golden
+character Ally 74
+hold 7213 1
+script quest.Q605_AllianceWithKetraOrcs
+item 7211 7212 7213 7214 7215 7216 7217 7218 7219 7220 7233
+page npcdefault.htm
+page script/quest/Q605_AllianceWithKetraOrcs/
+npc wahkan 31371 Folk 10 0 0
+
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q605_AllianceWithKetraOrcs 31371-03a.htm
+  Q upsert Q605_AllianceWithKetraOrcs | <state> | STARTED
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q605_AllianceWithKetraOrcs | <cond> | 4
+  S QuestList 605:0x8000000f
+  S ExShowQuestMark quest=605
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-06.htm
+  S ActionFailed
+  rows Q605_AllianceWithKetraOrcs <cond>=4 <state>=STARTED
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-21.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,29 @@
+# An Arrogant Search (Q348), level 60: too few fabrics pay by the blooded ones and end the quest. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q348_an_arrogant_search_short.golden
+character Dragoon 60
+quest Q348_AnArrogantSearch <cond>=26 <state>=STARTED points=0
+hold 4295 3
+hold 4294 2
+script quest.Q348_AnArrogantSearch
+item 4287 4288 4289 4290 4291 4292 4293 4397 4398 4399 4294 4295 1831 1061
+page trainer/30864.htm
+page script/quest/Q348_AnArrogantSearch/
+npc hanellin 30864 Trainer 10 0 0
+
+action hanellin
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+bypass npc_{hanellin}_Quest
+  S SystemMessage id=301 3:4295 6:3
+  S SystemMessage id=52 6:7000
+  S QuestList
+  S SystemMessage id=301 3:4294 6:2
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-54.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q348_AnArrogantSearch
+  items 4295=0 4294=0 57=7000
+  state Q348_AnArrogantSearch -
+  rows Q348_AnArrogantSearch -

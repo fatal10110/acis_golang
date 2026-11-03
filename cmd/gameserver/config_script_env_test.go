@@ -8,11 +8,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // TestScriptEnvReadsQuestRates pins the server.properties quest rates into
-// the script helpers, each defaulting to 1, beside the kill rewards' party
-// range and multiple item drop.
+// the book the script helpers read, each defaulting to 1, beside the kill
+// rewards' party range and multiple item drop.
 func TestScriptEnvReadsQuestRates(t *testing.T) {
 	dir := t.TempDir()
 	for _, tc := range []struct {
@@ -33,11 +34,12 @@ func TestScriptEnvReadsQuestRates(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		env, err := provideScriptEnv(props, manager.KillRewardConfig{PartyRange: 1500, MultipleItemDrop: true}, nil, nil)
+		rates, err := provideQuestRates(props)
 		if err != nil {
-			t.Fatalf("provideScriptEnv(%q) error = %v", tc.body, err)
+			t.Fatalf("provideQuestRates(%q) error = %v", tc.body, err)
 		}
-		if env.Rates != tc.want || env.PartyRange != 1500 || !env.MultipleItemDrop {
+		env := provideScriptEnv(manager.KillRewardConfig{Settings: manager.NewKillRewardBook(manager.KillRewardSettings{PartyRange: 1500, MultipleItemDrop: true})}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{}, nil, nil, nil, nil, nil, nil, rates)
+		if env.Rates.Rates() != tc.want || env.Drops.PartyRange() != 1500 || !env.Drops.MultipleItemDrop() {
 			t.Fatalf("provideScriptEnv(%q) = %+v, want rates %+v", tc.body, env, tc.want)
 		}
 	}
@@ -48,7 +50,7 @@ func TestScriptEnvReadsQuestRates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil); err == nil {
+	if _, err := provideQuestRates(props); err == nil {
 		t.Fatal("a rate that is no number was accepted")
 	}
 }

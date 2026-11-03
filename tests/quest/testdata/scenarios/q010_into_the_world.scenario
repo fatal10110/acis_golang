@@ -1,0 +1,168 @@
+# Into the World (Q010): a dwarf of level 3 accepts at Balanki, takes Reed's necklace to Gerald,
+# reports back to Reed, then Balanki rewards the trip with a scroll of escape to Giran and a mark
+# of traveler; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q010_into_the_world.golden
+character Delver 3
+class 53
+script quest.Q010_IntoTheWorld
+item 7574 7559 7570
+page default/30533.htm
+page villagemaster/30520.htm
+page default/30650.htm
+page script/quest/Q010_IntoTheWorld/
+npc balanki 30533 Folk 10 0 0
+npc reed 30520 VillageMasterDwarf 20 0 0
+npc gerald 30650 Folk 30 0 0
+
+# Balanki: accept.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q010_IntoTheWorld/30533-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q010_IntoTheWorld CREATED
+bypass Quest Q010_IntoTheWorld 30533-02.htm
+  S QuestList 10:0x80000001
+  S ExShowQuestMark quest=10
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q010_IntoTheWorld/30533-02.htm
+  S ActionFailed
+  Q upsert Q010_IntoTheWorld | <state> | STARTED
+  Q upsert Q010_IntoTheWorld | <cond> | 1
+  state Q010_IntoTheWorld STARTED
+  rows Q010_IntoTheWorld <cond>=1 <state>=STARTED
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q010_IntoTheWorld/30533-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Reed hands over the necklace.
+action reed
+action reed
+  S ActionFailed
+  S NpcHtmlMessage obj=reed item=0 page=villagemaster/30520.htm
+  S ActionFailed
+bypass npc_{reed}_Quest
+  S NpcHtmlMessage obj=reed item=0 page=script/quest/Q010_IntoTheWorld/30520-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q010_IntoTheWorld 30520-02.htm
+  S QuestList 10:0x80000003
+  S ExShowQuestMark quest=10
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7574
+  S NpcHtmlMessage obj=reed item=0 page=script/quest/Q010_IntoTheWorld/30520-02.htm
+  S ActionFailed
+  Q upsert Q010_IntoTheWorld | <cond> | 2
+  rows Q010_IntoTheWorld <cond>=2 <state>=STARTED
+  items 7574=1
+action reed
+  S ActionFailed
+  S NpcHtmlMessage obj=reed item=0 page=villagemaster/30520.htm
+  S ActionFailed
+bypass npc_{reed}_Quest
+  S NpcHtmlMessage obj=reed item=0 page=script/quest/Q010_IntoTheWorld/30520-02a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gerald takes the necklace.
+action gerald
+action gerald
+  S ActionFailed
+  S NpcHtmlMessage obj=gerald item=0 page=default/30650.htm
+  S ActionFailed
+bypass npc_{gerald}_Quest
+  S NpcHtmlMessage obj=gerald item=0 page=script/quest/Q010_IntoTheWorld/30650-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q010_IntoTheWorld 30650-02.htm
+  S QuestList 10:0x80000007
+  S ExShowQuestMark quest=10
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7574
+  S NpcHtmlMessage obj=gerald item=0 page=script/quest/Q010_IntoTheWorld/30650-02.htm
+  S ActionFailed
+  Q upsert Q010_IntoTheWorld | <cond> | 3
+  rows Q010_IntoTheWorld <cond>=3 <state>=STARTED
+  items 7574=0
+action gerald
+  S ActionFailed
+  S NpcHtmlMessage obj=gerald item=0 page=default/30650.htm
+  S ActionFailed
+bypass npc_{gerald}_Quest
+  S NpcHtmlMessage obj=gerald item=0 page=script/quest/Q010_IntoTheWorld/30650-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Back to Reed.
+action reed
+action reed
+  S ActionFailed
+  S NpcHtmlMessage obj=reed item=0 page=villagemaster/30520.htm
+  S ActionFailed
+bypass npc_{reed}_Quest
+  S NpcHtmlMessage obj=reed item=0 page=script/quest/Q010_IntoTheWorld/30520-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q010_IntoTheWorld 30520-04.htm
+  S QuestList 10:0x8000000f
+  S ExShowQuestMark quest=10
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=reed item=0 page=script/quest/Q010_IntoTheWorld/30520-04.htm
+  S ActionFailed
+  Q upsert Q010_IntoTheWorld | <cond> | 4
+  rows Q010_IntoTheWorld <cond>=4 <state>=STARTED
+action reed
+  S ActionFailed
+  S NpcHtmlMessage obj=reed item=0 page=villagemaster/30520.htm
+  S ActionFailed
+bypass npc_{reed}_Quest
+  S NpcHtmlMessage obj=reed item=0 page=script/quest/Q010_IntoTheWorld/30520-04a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Balanki: the reward; the quest completes.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q010_IntoTheWorld/30533-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q010_IntoTheWorld 30533-05.htm
+  S SystemMessage id=54 3:7559
+  S SystemMessage id=54 3:7570
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 10:0x00000000
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q010_IntoTheWorld/30533-05.htm
+  S ActionFailed
+  Q upsert Q010_IntoTheWorld | <state> | COMPLETED
+  Q delete-except-state Q010_IntoTheWorld
+  state Q010_IntoTheWorld COMPLETED
+  rows Q010_IntoTheWorld <state>=COMPLETED
+  items 7559=1 7570=1 7574=0
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q010_IntoTheWorld COMPLETED
+  rows Q010_IntoTheWorld <state>=COMPLETED
+  items 7559=1 7570=1
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

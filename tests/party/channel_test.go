@@ -23,6 +23,7 @@ func twoParties(t *testing.T) *group {
 // in one party are ignored; a member who leads nothing cannot invite; and a
 // party leader who leads no level 5 clan is refused. Nobody is asked.
 func TestChannelInviteRefusals(t *testing.T) {
+	t.Parallel()
 	g := twoParties(t)
 	leader, member, other := g.players[0], g.players[1], g.players[2]
 
@@ -58,6 +59,7 @@ func TestChannelInviteRefusals(t *testing.T) {
 // TestChannelInviteWithoutParty pins RequestExAskJoinMPCC from a player in
 // no party: ignored without an answer.
 func TestChannelInviteWithoutParty(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}})
 	g.invite(t, 1, 2, 0)
 	g.players[0].c.Send(encodeExtendedName(clientpackets.OpcodeRequestExAskJoinMPCC, "Member"))
@@ -67,6 +69,7 @@ func TestChannelInviteWithoutParty(t *testing.T) {
 // TestChannelOustRefusals pins RequestExOustFromMPCC's refusals: an unknown
 // name, oneself, a target in no party, and a requester leading no channel.
 func TestChannelOustRefusals(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Loner", 40}})
 	g.invite(t, 0, 1, 0)
 	leader := g.players[0]
@@ -88,6 +91,7 @@ func TestChannelOustRefusals(t *testing.T) {
 // online party member's id lists its party's members, in join order, with
 // their class; a player in no party lists nothing.
 func TestChannelPartyMembersInfo(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Loner", 40}})
 	g.invite(t, 0, 1, 0)
 	loner := g.players[2]

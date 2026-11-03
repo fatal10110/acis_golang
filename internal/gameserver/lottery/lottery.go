@@ -465,7 +465,7 @@ func (c Config) Payout(prize int32, winners [4]int32) (prize1, prize2, prize3, n
 		if count == 0 {
 			return 0
 		}
-		return commons.JavaInt(float64(prize-prize4) * rate / float64(count))
+		return commons.TruncInt32Sat(float64(prize-prize4) * rate / float64(count))
 	}
 	prize1 = share(winners[0], c.FiveNumberRate)
 	prize2 = share(winners[1], c.FourNumberRate)

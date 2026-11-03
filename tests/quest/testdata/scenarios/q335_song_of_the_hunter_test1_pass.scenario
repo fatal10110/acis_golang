@@ -1,0 +1,50 @@
+# Song of the Hunter (Q335), level 35: Grey's first test: three requirements are met, Grey takes every item of the test, gives the first license and, below level 45, wants nothing more. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_test1_pass.golden
+character Hunter 35
+quest Q335_SongOfTheHunter <cond>=1 <state>=STARTED
+hold 3695 1
+hold 3709 40
+hold 3710 20
+hold 3715 20
+hold 3716 5
+script quest.Q335_SongOfTheHunter
+item 3692 3695 3709 3710 3715 3716
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S QuestList 335:0x80000003
+  S ExShowQuestMark quest=335
+  S SystemMessage id=301 3:3709 6:40
+  S SystemMessage id=301 3:3710 6:20
+  S SystemMessage id=301 3:3715 6:20
+  S SystemMessage id=301 3:3716 6:5
+  S SystemMessage id=302 3:3695
+  S SystemMessage id=54 3:3692
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | <cond> | 2
+  state Q335_SongOfTheHunter STARTED
+  items 3695=0 3709=0 3710=0 3715=0 3716=0 3692=1
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-07.htm
+  S ActionFailed
+  S ActionFailed
+  items 3692=1

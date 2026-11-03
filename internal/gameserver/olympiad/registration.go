@@ -136,11 +136,9 @@ func (o *Olympiad) registeredLocked(objectID int32, baseClass int) (RegisterResu
 	return 0, false
 }
 
-// inMatchLocked reports whether objectID competes in a running match.
-// No match runs yet: the game manager that starts them is #3340, which
-// answers this from its stadiums' games during the competition window.
-func (o *Olympiad) inMatchLocked(int32) bool {
-	return false
+// inMatchLocked reports whether objectID competes in a stadium's match.
+func (o *Olympiad) inMatchLocked(objectID int32) bool {
+	return o.games != nil && o.games.inMatch(objectID)
 }
 
 // Unregister takes the player objectID, of base class baseClass, off the
@@ -185,13 +183,18 @@ func (o *Olympiad) IsRegisteredInComp(objectID int32, baseClass int) bool {
 	return o.period == Competition && o.inMatchLocked(objectID)
 }
 
-// RemoveDisconnectedCompetitor takes the player objectID, of base class
-// baseClass, off the waiting list it is on, as it leaves the world or is
-// jailed. Recording the departure in its running match is the game
-// manager's (#3340).
-func (o *Olympiad) RemoveDisconnectedCompetitor(objectID int32, baseClass int) {
+// RemoveDisconnectedCompetitor records, as the player objectID of base
+// class baseClass leaves the world or is jailed, that it left the match of
+// stadium gameID once that match brought its competitors in, then takes it
+// off the waiting list it is on.
+func (o *Olympiad) RemoveDisconnectedCompetitor(objectID int32, baseClass, gameID int) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if s, ok := o.Stadium(gameID); ok && s.GameStarted() {
+		if g := s.Game(); g != nil {
+			g.Disconnect(objectID)
+		}
+	}
 	o.removeLocked(objectID, baseClass)
 }
 
@@ -229,18 +232,25 @@ func (o *Olympiad) Points(objectID int32) int {
 // Passes trades objectID's points for Noblesse Gate Passes outside the
 // competition window, once a cycle: its points, at most 1000 and none
 // below 50, plus HeroPoints for a hero (hero set), times GPPerPoint. The
-// record is then marked rewarded with no points, whatever it paid, and the
-// change is queued for the database at once, so a second claim pays
-// nothing even across a restart. Without a record, inside the window or
-// once rewarded it pays 0 and changes nothing.
-func (o *Olympiad) Passes(objectID int32, hero bool) int {
+// record is then marked rewarded with no points, whatever it paid, and
+// stored before Passes returns, so a second claim pays nothing even across
+// a restart. Without a record, inside the window or once rewarded it pays
+// 0 and changes nothing.
+//
+// The claim's row lands before Passes returns what to pay, so the passes a
+// caller creates on it, written later by the item persistence, can never
+// reach the database ahead of it (#3454): a crash in between loses the
+// passes, never leaves them claimable again. A claim whose row did not
+// land by the end of ctx pays nothing and is put back unclaimed, with the
+// error; should the row land after all, the noble's next claim pays it.
+func (o *Olympiad) Passes(ctx context.Context, objectID int32, hero bool) (int, error) {
 	o.order.Lock()
-	defer o.order.Unlock()
 	o.mu.Lock()
 	n, ok := o.nobles[objectID]
 	if o.period == Competition || !ok || n.Rewarded {
 		o.mu.Unlock()
-		return 0
+		o.order.Unlock()
+		return 0, nil
 	}
 	points := min(1000, n.Points)
 	if points < 50 {
@@ -249,12 +259,25 @@ func (o *Olympiad) Passes(objectID int32, hero bool) int {
 	if hero {
 		points += o.cfg.HeroPoints
 	}
-	n.Rewarded, n.Points = true, 0
-	o.nobles[objectID] = n
+	claimed := n
+	claimed.Rewarded, claimed.Points = true, 0
+	o.nobles[objectID] = claimed
 	o.mu.Unlock()
-	saved := map[int32]Noble{objectID: n}
-	o.write("save noblesse pass claim", func(ctx context.Context, st Store) error { return st.SaveNobles(ctx, saved) })
-	return points * o.cfg.GPPerPoint
+	saved := map[int32]Noble{objectID: claimed}
+	landed := o.writeLanded("save noblesse pass claim", func(ctx context.Context, st Store) error { return st.SaveNobles(ctx, saved) })
+	o.order.Unlock()
+
+	if err := awaitLanded(ctx, landed); err != nil {
+		o.order.Lock()
+		o.mu.Lock()
+		if cur, ok := o.nobles[objectID]; ok && cur == claimed {
+			o.nobles[objectID] = n
+		}
+		o.mu.Unlock()
+		o.order.Unlock()
+		return 0, err
+	}
+	return points * o.cfg.GPPerPoint, nil
 }
 
 // ClassLeaders returns the names of the month's best ten of classID with at

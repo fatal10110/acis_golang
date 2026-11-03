@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 )
 
 // The clan window requests answer nothing when the player has no clan, or
@@ -17,10 +18,13 @@ import (
 
 // enterWorldClan sends the clan part of the login burst, on live's queue
 // before it spawns: the clan's skill list, then live is given the clan
-// skills its rank reaches (shown by the burst's SkillList), its fellow
-// members learn it logged in, and it gets its own roster row and the
-// rosters, the main clan's then each sub-unit's. The siege state (#3150)
-// joins here once it exists.
+// skills its rank reaches and, leading a clan of siege level, the siege
+// skills (shown by the burst's SkillList); its fellow members learn it
+// logged in, and so does its sponsor, or else its apprentice; it is told
+// when its clan's hall lease is unpaid; it takes the siege state of a siege
+// in progress its clan fights, the attacker state when its clan attacks a
+// clan hall siege being fought; and it gets its own roster row and the
+// rosters, the main clan's then each sub-unit's.
 func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	c := live.Character
 	cl, ok := l.clanService().ClanOf(c)
@@ -30,16 +34,46 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	client.Session.SendFrame(framePledgeSkillList(cl))
 	cl.SetOnline(c.ID, clan.LiveMember(c))
 	l.giveClanSkills(live, cl, c.PledgeClass())
+	if l.leadsSiegeClan(live, cl) {
+		l.giveSiegeSkills(live)
+	}
 	m, _ := cl.Member(c.ID)
 	row := liveMemberRow(c, m)
 	l.broadcastToClan(cl, c.ID,
 		func() wire.Frame {
-			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanMemberS1LoggedIn, c.Name)
+			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanMemberS1LoggedIn, c.CharacterName())
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListUpdate(row) })
+	l.tellMentorLoggedIn(c)
+	if l.halls.LeaseUnpaid(cl.ID()) {
+		// Sent without its S1 parameter, so the lease shows blank.
+		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanHallPaymentDueTomorrowS1))
+	}
+	if state := l.sieges.StateOf(cl.ID()); state != siege.StateNone {
+		c.SetSiegeState(int32(state))
+	}
+	if l.halls.Besieging(cl.ID()) {
+		c.SetSiegeState(int32(siege.StateAttacker))
+	}
 	client.Session.SendFrame(serverpackets.FramePledgeShowMemberListUpdate(row))
 	for _, frame := range l.pledgeListFrames(cl, live) {
 		client.Session.SendFrame(frame)
+	}
+}
+
+// tellMentorLoggedIn tells c's sponsor in the world that its apprentice c
+// logged in; with no sponsor, it tells c's apprentice in the world that
+// its sponsor c logged in.
+func (l *GameClientLink) tellMentorLoggedIn(c *player.Character) {
+	notice, mentorID := serverpackets.SystemMessageYourApprenticeS1HasLoggedIn, c.Sponsor()
+	if mentorID == 0 {
+		notice, mentorID = serverpackets.SystemMessageYourSponsorS1HasLoggedIn, c.Apprentice()
+	}
+	if mentorID == 0 {
+		return
+	}
+	if mentor, ok := l.livePlayerByID(mentorID); ok {
+		mentor.SendFrame(serverpackets.FrameSystemMessageString(notice, c.CharacterName()))
 	}
 }
 
@@ -89,12 +123,12 @@ func (l *GameClientLink) requestJoinPledge(live *livePlayer, req clientpackets.R
 	}
 	blocksInviter := l.relations.IsBlocked(target.ObjectID(), c.ID)
 	if refusal := l.clanService().CheckJoin(cl, c.ID, target.Character, blocksInviter, int(req.PledgeType), time.Now()); refusal != clan.JoinAllowed {
-		sendJoinRefusal(live, cl, target.Name, refusal)
+		sendJoinRefusal(live, cl, target.CharacterName(), refusal)
 		return
 	}
-	switch l.clanService().Invites().Send(clan.InviteJoinPledge, c.ID, c.Name, target.ObjectID(), int(req.PledgeType)) {
+	switch l.clanService().Invites().Send(clan.InviteJoinPledge, c.ID, c.CharacterName(), target.ObjectID(), int(req.PledgeType)) {
 	case clan.InviteTargetBusy:
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	case clan.InviteRequesterBusy:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWaitingForAnotherReply))
@@ -102,7 +136,7 @@ func (l *GameClientLink) requestJoinPledge(live *livePlayer, req clientpackets.R
 	}
 	name := cl.Name()
 	target.SendFrame(serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageS1HasInvitedYouToJoinTheClanS2,
-		serverpackets.TextParam(c.Name), serverpackets.TextParam(name)))
+		serverpackets.TextParam(c.CharacterName()), serverpackets.TextParam(name)))
 	target.SendFrame(serverpackets.FrameAskJoinPledge(c.ObjectID(), name))
 }
 
@@ -155,7 +189,7 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 	if req.Answer == 0 {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouDidNotRespondToS1ClanInvitation, invite.RequesterName))
 		if requester != nil {
-			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DidNotRespondToClanInvitation, c.Name))
+			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DidNotRespondToClanInvitation, c.CharacterName()))
 		}
 		l.clanService().Invites().Answered(c.ID)
 		return
@@ -169,14 +203,17 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 		return
 	}
 	// The clan's skills are given against the rank live held before it
-	// joined, as the reference grants them before it recomputes the rank;
+	// joined: they are granted before the rank is recomputed;
 	// no SkillList follows.
 	rank := c.PledgeClass()
 	blocksInviter := l.relations.IsBlocked(c.ID, invite.RequesterID)
 	if refusal := l.clanService().Join(cl, invite.RequesterID, c, blocksInviter, sent.PledgeType, time.Now()); refusal != clan.JoinAllowed {
-		sendJoinRefusal(requester, cl, c.Name, refusal)
+		sendJoinRefusal(requester, cl, c.CharacterName(), refusal)
 	} else {
 		l.giveClanSkills(live, cl, rank)
+		if state := l.sieges.StateOf(cl.ID()); state != siege.StateNone {
+			c.SetSiegeState(int32(state))
+		}
 		l.sendJoinedClan(live, cl)
 	}
 	l.clanService().Invites().Answered(c.ID)
@@ -193,7 +230,7 @@ func (l *GameClientLink) sendJoinedClan(live *livePlayer, cl *clan.Clan) {
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageEnteredTheClan))
 	l.broadcastToClan(cl, c.ID,
 		func() wire.Frame {
-			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasJoinedClan, c.Name)
+			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasJoinedClan, c.CharacterName())
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListAdd(row) })
 	l.broadcastToClan(cl, 0, func() wire.Frame { return framePledgeShowInfoUpdate(cl) })
@@ -236,9 +273,9 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 	l.sendLeftClan(live, cl)
 	l.broadcastToClan(cl, 0,
 		func() wire.Frame {
-			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasWithdrawnFromTheClan, c.Name)
+			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasWithdrawnFromTheClan, c.CharacterName())
 		},
-		func() wire.Frame { return serverpackets.FramePledgeShowMemberListDelete(c.Name) })
+		func() wire.Frame { return serverpackets.FramePledgeShowMemberListDelete(c.CharacterName()) })
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveWithdrawnFromClan))
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMustWaitBeforeJoiningAnotherClan))
 	l.refreshWarTags(live, cl)
@@ -247,7 +284,8 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 // requestOustPledgeMember expels the member live names from live's clan.
 // An expelled member online learns it on its own queue, where a castle's
 // clan first checks what it wears (checkLeaverItems); an offline one's
-// circlets go back to its inventory.
+// circlets go back to its inventory. One lingering after its connection
+// dropped leaves as an online one does, its client told nothing.
 func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpackets.RequestOustPledgeMember) {
 	online := func(id int32) *player.Character {
 		if target, ok := l.livePlayerByID(id); ok {
@@ -256,7 +294,7 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 		return nil
 	}
 	now := time.Now()
-	cl, m, refusal := l.clanService().Oust(live.Character, req.Name, online, now)
+	cl, m, refusal := l.clanService().Oust(live.Character, req.Name, online, l.clanMemberConnected, now)
 	switch refusal {
 	case clan.OustNotMember:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouAreNotAClanMember))

@@ -1,0 +1,14 @@
+# WarriorCorpseGhostDDMagic (21556, level 65, self buff 4074-2), every draw 0: as it appears it wants its
+# self buff on itself (1000000) and casts it.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostDDMagic.WarriorCorpseGhostDDMagic
+npc ghost 21556 Monster 300 0 0 level 65 skill SELF_BUFF 4074 2
+roll ghost 99
+
+tick x8
+  S MagicSkillUse caster=ghost target=ghost skill=4074-2 hit=5285 reuse=21142 success=0

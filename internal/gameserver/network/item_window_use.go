@@ -87,7 +87,7 @@ func (l *GameClientLink) throwDie(live *livePlayer, dieID int32, allowed func() 
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameDice(live.ObjectID(), dieID, number, landing)
 	})
-	name := live.Name
+	name := live.CharacterName()
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS1RolledS2, name, number)
 	})

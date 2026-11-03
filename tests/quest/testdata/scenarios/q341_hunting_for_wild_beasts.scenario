@@ -1,0 +1,147 @@
+# Hunting for Wild Beasts (Q341): a level 20 character accepts at Pano; five each of three bears
+# give fifteen skins (every roll pinned to succeed), not enough for Pano; five grizzlies bring
+# the twentieth skin, and a sixth gives none; Pano takes the twenty skins for 3710 adena, and the
+# repeatable quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q341_hunting_for_wild_beasts.golden
+character Beastly 20
+random always 0
+script quest.Q341_HuntingForWildBeasts
+item 4259
+page merchant/30078.htm
+page script/quest/Q341_HuntingForWildBeasts/
+npc pano 30078 Merchant 10 0 0
+npc red 20021 Monster 40 0 0
+npc dion 20203 Monster 0 40 0
+npc brown 20310 Monster -40 0 0
+npc grizzly 20335 Monster 0 -40 0
+
+# Pano: accept.
+action pano
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q341_HuntingForWildBeasts/30078-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q341_HuntingForWildBeasts CREATED
+bypass Quest Q341_HuntingForWildBeasts 30078-01a.htm
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q341_HuntingForWildBeasts/30078-01a.htm
+  S ActionFailed
+bypass Quest Q341_HuntingForWildBeasts 30078-02.htm
+  S QuestList 341:0x80000001
+  S ExShowQuestMark quest=341
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q341_HuntingForWildBeasts/30078-02.htm
+  S ActionFailed
+  Q upsert Q341_HuntingForWildBeasts | <state> | STARTED
+  Q upsert Q341_HuntingForWildBeasts | <cond> | 1
+  state Q341_HuntingForWildBeasts STARTED
+  rows Q341_HuntingForWildBeasts <cond>=1 <state>=STARTED
+
+# Fifteen skins: not enough yet.
+kill red x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4259=5
+kill dion x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4259=10
+kill brown x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4259=15
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q341_HuntingForWildBeasts/30078-03.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q341_HuntingForWildBeasts <cond>=1 <state>=STARTED
+
+# The twentieth skin, then none past it.
+kill grizzly x6
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4259
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  items 4259=20
+
+# Pano: the skins for adena; the quest ends.
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S SystemMessage id=301 3:4259 6:20
+  S SystemMessage id=52 6:3710
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q341_HuntingForWildBeasts/30078-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q341_HuntingForWildBeasts
+  items 4259=0 57=3710
+  state Q341_HuntingForWildBeasts -
+  rows Q341_HuntingForWildBeasts -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q341_HuntingForWildBeasts -
+  rows Q341_HuntingForWildBeasts -
+  items 57=3710

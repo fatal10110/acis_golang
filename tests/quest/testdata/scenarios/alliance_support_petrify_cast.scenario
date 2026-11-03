@@ -1,0 +1,17 @@
+# A Ketra footman (KetraOrcSupport) that lists Raid Curse (4515, a debuff) and a Ketra ally of level 1
+# who hits it: the footman petrifies the ally, its cast and the curse landing played by the reference
+# server. The footman's combat draw is pinned so the curse lands, as the reference run's draw lets it.
+# Expectations are the reference trace's (onAttacked).
+trace internal/gameserver/script/testdata/oracle/scenarios/alliance_support_petrify_cast.golden
+character Ally 40
+standing 1
+script script.feature.KetraOrcSupport
+npc footman 21324 Monster 40 0 0 skill DEBUFF 4515 1
+roll footman 0
+
+hit footman 10
+tick x3
+  S MagicSkillUse caster=footman target=player skill=4515-1 hit=0 reuse=0 success=0
+  S ActionFailed
+  S ActionFailed
+  S SystemMessage id=110 4:4515,1

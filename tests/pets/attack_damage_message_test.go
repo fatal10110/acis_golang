@@ -41,48 +41,49 @@ var damageFeedbackIDs = []int32{
 	serverpackets.SystemMessageOpponentPetrified, serverpackets.SystemMessageAttackWasBlocked,
 }
 
-// summonSwingFeedback reads for window after attackerID's first Attack frame
-// arrives and returns that frame's first hit plus every damage-feedback
-// message read, until the first run for a landed hit ends.
-func summonSwingFeedback(t *testing.T, c *testsupport.ScriptedClient, attackerID int32, window time.Duration) (swingHit, []feedbackMessage) {
+// summonSwingFeedback reads until attackerID's first Attack frame, lets
+// window pass, and returns that frame's first hit plus every damage-feedback
+// message queued meanwhile, up to the end of the first run for a landed hit.
+func summonSwingFeedback(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, attackerID int32, window time.Duration) (swingHit, []feedbackMessage) {
 	t.Helper()
 	var hit swingHit
-	sawAttack := false
-	var messages []feedbackMessage
-	end := c.Now().Add(5 * time.Second)
-	for c.Now().Before(end) {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
+	var frames [][]byte
+	for i := 0; ; i++ {
+		frame := c.ReadWithTimeout(5 * time.Second)
+		if frame == nil || i == 100 {
+			t.Fatalf("summon %d never swung", attackerID)
+		}
+		if frame[0] != serverpackets.OpcodeAttack {
+			frames = append(frames, frame)
 			continue
 		}
-		switch frame[0] {
-		case serverpackets.OpcodeAttack:
-			r := wire.NewReader(frame[1:])
-			if r.ReadInt32() != attackerID || sawAttack {
-				continue
-			}
-			r.ReadInt32() // target id
-			hit = swingHit{Damage: r.ReadInt32(), Flags: r.ReadUint8()}
-			sawAttack = true
-			end = c.Now().Add(window)
-		case serverpackets.OpcodeSystemMessage:
-			r := wire.NewReader(frame[1:])
-			m := feedbackMessage{ID: r.ReadInt32()}
-			if !slices.Contains(damageFeedbackIDs, m.ID) {
-				continue
-			}
-			if r.ReadInt32() == 1 {
-				r.ReadInt32() // parameter type
-				m.Amount = r.ReadInt32()
-			}
-			messages = append(messages, m)
-			if m.ID == serverpackets.SystemMessagePetHitForS1Damage || m.ID == serverpackets.SystemMessageSummonGaveDamageS1 {
-				return hit, messages
-			}
+		r := wire.NewReader(frame[1:])
+		if r.ReadInt32() != attackerID {
+			continue
 		}
+		r.ReadInt32() // target id
+		hit = swingHit{Damage: r.ReadInt32(), Flags: r.ReadUint8()}
+		break
 	}
-	if !sawAttack {
-		t.Fatalf("summon %d never swung", attackerID)
+	srv.Advance(t, window)
+	var messages []feedbackMessage
+	for _, frame := range append(frames, c.ReadQueued()...) {
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		r := wire.NewReader(frame[1:])
+		m := feedbackMessage{ID: r.ReadInt32()}
+		if !slices.Contains(damageFeedbackIDs, m.ID) {
+			continue
+		}
+		if r.ReadInt32() == 1 {
+			r.ReadInt32() // parameter type
+			m.Amount = r.ReadInt32()
+		}
+		messages = append(messages, m)
+		if m.ID == serverpackets.SystemMessagePetHitForS1Damage || m.ID == serverpackets.SystemMessageSummonGaveDamageS1 {
+			break
+		}
 	}
 	return hit, messages
 }
@@ -178,7 +179,7 @@ func TestPetAutoAttackDamageFeedbackReachesOwner(t *testing.T) {
 			drainFrames(t, h.client)
 			h.client.Send(encodeRequestActionUse(petAttackAction, false))
 
-			hit, got := summonSwingFeedback(t, h.client, petActor.ObjectID(), 2*time.Second)
+			hit, got := summonSwingFeedback(t, h.srv, h.client, petActor.ObjectID(), 2*time.Second)
 			if want := tt.want(hit); !slices.Equal(got, want) {
 				t.Fatalf("owner damage feedback = %+v, want %+v", got, want)
 			}
@@ -232,7 +233,7 @@ func TestServitorAutoAttackDamageFeedbackReachesOwner(t *testing.T) {
 	drainFrames(t, c)
 	c.Send(encodeRequestActionUse(petAttackAction, false))
 
-	hit, got := summonSwingFeedback(t, c, servitor.ObjectID(), 2*time.Second)
+	hit, got := summonSwingFeedback(t, srv, c, servitor.ObjectID(), 2*time.Second)
 	if hit.Flags&(attack.HitMiss|attack.HitCritical) != 0 {
 		t.Fatalf("servitor Attack flags = %#x, want a plain landed hit", hit.Flags)
 	}

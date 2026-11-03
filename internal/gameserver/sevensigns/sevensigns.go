@@ -55,6 +55,23 @@ func (p Period) String() string {
 	}
 }
 
+// Name is the period's display name, as a castle chamberlain's report
+// shows it.
+func (p Period) Name() string {
+	switch p {
+	case Recruiting:
+		return "Quest Event Initialization"
+	case Competition:
+		return "Competition (Quest Event)"
+	case Results:
+		return "Quest Event Results"
+	case SealValidation:
+		return "Seal Validation"
+	default:
+		return p.String()
+	}
+}
+
 // ParsePeriod parses a persisted enum name into p.
 func ParsePeriod(name string) (Period, error) {
 	for p := Period(0); p < periodCount; p++ {
@@ -304,6 +321,24 @@ func (s *State) Save(ctx context.Context) error {
 	return err
 }
 
+// SaveStatus writes the status row alone, stamping it with the time of the
+// write, then the festival's status columns.
+func (s *State) SaveStatus(ctx context.Context) error {
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+
+	s.mu.Lock()
+	s.row.LastSave = s.now()
+	row := s.row
+	s.mu.Unlock()
+
+	err := s.store.SaveStatus(ctx, row)
+	if s.festival != nil {
+		err = errors.Join(err, s.festival.SaveStatus(ctx))
+	}
+	return err
+}
+
 // CurrentPeriod returns the active period.
 func (s *State) CurrentPeriod() Period {
 	s.mu.Lock()
@@ -412,7 +447,7 @@ func (s *State) settleCastles(ended Period, castles Castles, strifeOwner Cabal) 
 	case Recruiting:
 		castles.ResetCertificates()
 	case Competition:
-		castles.ValidateTaxes(castleTaxCap(strifeOwner))
+		castles.ValidateTaxes(CastleTaxCap(strifeOwner))
 	}
 }
 

@@ -1,0 +1,19 @@
+# WizardHereticPriestAggressive (22143, level 78; its shipped skills), every draw 0: a hit by the character while it neither
+# attacks nor casts broadcasts the call for help (script event 10033, naming the character and the priest) to the NPCs
+# within its HelpCastRange (500), here a heretic private (22166) whose script hears it; the reference run records what
+# the NPCs hear.
+trace internal/gameserver/script/testdata/oracle/scenarios/wizard_heretic_priest_calls.golden
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1500 0 0 level 78 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9
+npc listener 22166 Monster 1500 100 0 skill W_SHORT_RANGE_DD_MAGIC 4622 9 skill W_LONG_RANGE_DD_MAGIC 4665 9
+
+hit priest 10

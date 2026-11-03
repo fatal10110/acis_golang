@@ -1,0 +1,31 @@
+# Testimony Of Glory (Q220), Chianta's second order: a level 38 Orc Raider at cond 5 holding Chianta's second order trades it for the third (30642-09, cond 6).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q220_testimony_of_glory_chianta_order2.golden
+character Raider 38
+class 45
+quest Q220_TestimonyOfGlory <state>=STARTED <cond>=5
+hold 3216 1
+script quest.Q220_TestimonyOfGlory
+item 3203 3204 3205 3206 3207 3208 3209 3210 3211 3212 3213 3214 3215 3216 3217 3218 3219 3220 3221 3222 3223 3224 3225 3226 3227 3228 3229 3230 3231 3232 3233 3234 3235 3236 3237 7562
+page default/30642.htm
+page script/quest/Q220_TestimonyOfGlory/
+npc chianta 30642 Folk -10 10 0
+
+action chianta
+action chianta
+  S ActionFailed
+  S NpcHtmlMessage obj=chianta item=0 page=default/30642.htm
+  S ActionFailed
+bypass npc_{chianta}_Quest
+  S QuestList 220:0x8000003f
+  S ExShowQuestMark quest=220
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3216
+  S SystemMessage id=54 3:3217
+  S NpcHtmlMessage obj=chianta item=0 page=script/quest/Q220_TestimonyOfGlory/30642-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q220_TestimonyOfGlory | <cond> | 6
+  state Q220_TestimonyOfGlory STARTED
+  rows Q220_TestimonyOfGlory <cond>=6 <state>=STARTED
+  items 3217=1 3216=0

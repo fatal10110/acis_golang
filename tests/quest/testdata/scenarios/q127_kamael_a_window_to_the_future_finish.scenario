@@ -1,0 +1,107 @@
+# Kamael: A Window to the Future (Q127): with every mark and the story seen (cond 8), Rodemai sends the
+# character back (cond 9) and Dominic takes the six marks and ends the quest; Dominic and Klaus then have
+# the completed message; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q127_kamael_a_window_to_the_future_finish.golden
+character Kamael 20
+script quest.Q127_KamaelAWindowToTheFuture
+quest Q127_KamaelAWindowToTheFuture <cond>=8 <state>=STARTED
+hold 8939 1
+hold 8940 1
+hold 8941 1
+hold 8942 1
+hold 8943 1
+hold 8944 1
+item 8939 8940 8941 8942 8943 8944
+page default/31350.htm
+page default/30756.htm
+page villagemaster/30187.htm
+page villagemaster/32092.htm
+page villagemaster/31288.htm
+page villagemaster/30862.htm
+page trainer/30113.htm
+page script/quest/Q127_KamaelAWindowToTheFuture/
+npc dominic 31350 Folk 10 0 0
+npc klaus 30187 VillageMasterFighter 20 0 0
+npc alder 32092 VillageMasterDwarf 30 0 0
+npc aklan 31288 VillageMasterOrc 0 10 0
+npc oltlin 30862 VillageMasterDElf 0 20 0
+npc juris 30113 Trainer 0 30 0
+npc rodemai 30756 Folk -10 0 0
+
+# Rodemai: cond 9.
+action rodemai
+action rodemai
+  S ActionFailed
+  S NpcHtmlMessage obj=rodemai item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{rodemai}_Quest
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30756-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 30756-05.htm
+  S QuestList 127:0x800001ff
+  S ExShowQuestMark quest=127
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/30756-05.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <cond> | 9
+  rows Q127_KamaelAWindowToTheFuture <cond>=9 <state>=STARTED
+
+# Dominic takes the marks and ends the quest.
+action dominic
+action dominic
+  S ActionFailed
+  S NpcHtmlMessage obj=dominic item=0 page=default/31350.htm
+  S ActionFailed
+bypass npc_{dominic}_Quest
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31350-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q127_KamaelAWindowToTheFuture 31350-06.htm
+  S SystemMessage id=302 3:8940
+  S SystemMessage id=302 3:8941
+  S SystemMessage id=302 3:8942
+  S SystemMessage id=302 3:8943
+  S SystemMessage id=302 3:8944
+  S SystemMessage id=302 3:8939
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 127:0x00000000
+  S NpcHtmlMessage obj=dominic item=0 page=script/quest/Q127_KamaelAWindowToTheFuture/31350-06.htm
+  S ActionFailed
+  Q upsert Q127_KamaelAWindowToTheFuture | <state> | COMPLETED
+  Q delete-except-state Q127_KamaelAWindowToTheFuture
+  state Q127_KamaelAWindowToTheFuture COMPLETED
+  rows Q127_KamaelAWindowToTheFuture <state>=COMPLETED
+  items 8939=0 8940=0 8941=0 8942=0 8943=0 8944=0
+
+# Completed: Dominic and Klaus.
+action dominic
+  S ActionFailed
+  S NpcHtmlMessage obj=dominic item=0 page=default/31350.htm
+  S ActionFailed
+bypass npc_{dominic}_Quest
+  S NpcHtmlMessage obj=dominic item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action klaus
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=villagemaster/30187.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  state Q127_KamaelAWindowToTheFuture COMPLETED
+  rows Q127_KamaelAWindowToTheFuture <state>=COMPLETED
+action klaus
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=villagemaster/30187.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

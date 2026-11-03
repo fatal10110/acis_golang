@@ -1,0 +1,231 @@
+# Rancher's Plea (Q259): a level 15 character accepts at Edmond; Marius has no trade for fewer
+# than ten giant spider skins; ten spiders give ten skins (a drop that cannot miss), which Marius
+# trades for a healing potion, and his "more" link then says the player has too few; twenty-two
+# more skins buy a second potion, the "more" link now offers the trades again, and ten skins buy
+# fifty arrows; Edmond pays 25 for each of the two skins left, and the player quits; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q259_ranchers_plea.golden
+character Rancher 15
+script quest.Q259_RanchersPlea
+item 1495 1061 17
+page default/30497.htm
+page default/30405.htm
+page script/quest/Q259_RanchersPlea/
+npc edmond 30497 Folk 10 0 0
+npc marius 30405 Folk 20 0 0
+npc spider 20103 Monster 40 0 0
+
+# Edmond: accept.
+action edmond
+action edmond
+  S ActionFailed
+  S NpcHtmlMessage obj=edmond item=0 page=default/30497.htm
+  S ActionFailed
+bypass npc_{edmond}_Quest
+  S NpcHtmlMessage obj=edmond item=0 page=script/quest/Q259_RanchersPlea/30497-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q259_RanchersPlea CREATED
+bypass Quest Q259_RanchersPlea 30497-03.htm
+  S QuestList 259:0x80000001
+  S ExShowQuestMark quest=259
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=edmond item=0 page=script/quest/Q259_RanchersPlea/30497-03.htm
+  S ActionFailed
+  Q upsert Q259_RanchersPlea | <state> | STARTED
+  Q upsert Q259_RanchersPlea | <cond> | 1
+  state Q259_RanchersPlea STARTED
+  rows Q259_RanchersPlea <cond>=1 <state>=STARTED
+action edmond
+  S ActionFailed
+  S NpcHtmlMessage obj=edmond item=0 page=default/30497.htm
+  S ActionFailed
+bypass npc_{edmond}_Quest
+  S NpcHtmlMessage obj=edmond item=0 page=script/quest/Q259_RanchersPlea/30497-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Marius: too few skins.
+action marius
+action marius
+  S ActionFailed
+  S NpcHtmlMessage obj=marius item=0 page=default/30405.htm
+  S ActionFailed
+bypass npc_{marius}_Quest
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten giant spiders: a skin each.
+kill spider x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1495=10
+
+# Marius: a healing potion for ten; then too few for more.
+action marius
+  S ActionFailed
+  S NpcHtmlMessage obj=marius item=0 page=default/30405.htm
+  S ActionFailed
+bypass npc_{marius}_Quest
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q259_RanchersPlea 30405-04.htm
+  S SystemMessage id=301 3:1495 6:10
+  S SystemMessage id=54 3:1061
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-04.htm
+  S ActionFailed
+  items 1495=0 1061=1
+bypass Quest Q259_RanchersPlea 30405-07.htm
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-07.htm
+  S ActionFailed
+
+# Twenty-two more spiders; Marius: a second potion, then the trades again, and fifty arrows.
+kill spider x22
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1495
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1495=22
+action marius
+  S ActionFailed
+  S NpcHtmlMessage obj=marius item=0 page=default/30405.htm
+  S ActionFailed
+bypass npc_{marius}_Quest
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q259_RanchersPlea 30405-04.htm
+  S SystemMessage id=301 3:1495 6:10
+  S SystemMessage id=54 3:1061
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-04.htm
+  S ActionFailed
+  items 1495=12 1061=2
+bypass Quest Q259_RanchersPlea 30405-07.htm
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-06.htm
+  S ActionFailed
+bypass Quest Q259_RanchersPlea 30405-05.htm
+  S SystemMessage id=301 3:1495 6:10
+  S SystemMessage id=53 3:17 6:50
+  S NpcHtmlMessage obj=marius item=0 page=script/quest/Q259_RanchersPlea/30405-05.htm
+  S ActionFailed
+  items 1495=2 17=50
+
+# Edmond: 25 for each of the two skins left; then quit.
+action edmond
+action edmond
+  S ActionFailed
+  S NpcHtmlMessage obj=edmond item=0 page=default/30497.htm
+  S ActionFailed
+bypass npc_{edmond}_Quest
+  S SystemMessage id=301 3:1495 6:2
+  S SystemMessage id=52 6:50
+  S NpcHtmlMessage obj=edmond item=0 page=script/quest/Q259_RanchersPlea/30497-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1495=0 57=50
+bypass Quest Q259_RanchersPlea 30497-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=edmond item=0 page=script/quest/Q259_RanchersPlea/30497-06.htm
+  S ActionFailed
+  Q delete-quest Q259_RanchersPlea
+  state Q259_RanchersPlea -
+  rows Q259_RanchersPlea -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q259_RanchersPlea -
+  rows Q259_RanchersPlea -
+  items 57=50 1061=2 17=50

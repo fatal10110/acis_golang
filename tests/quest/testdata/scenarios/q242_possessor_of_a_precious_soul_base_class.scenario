@@ -1,0 +1,26 @@
+# Possessor of a Precious Soul - 2 (Q242), refused: a level 76 human Gladiator playing its base
+# class, holding Virgil's letter, is turned away by Virgil, who takes subclasses only; the quest
+# is not started and the letter is kept. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q242_possessor_of_a_precious_soul_base_class.golden
+character Fighter 76
+class 2
+hold 7677 1
+script quest.Q242_PossessorOfAPreciousSoul
+item 7677
+page default/31742.htm
+page script/quest/Q242_PossessorOfAPreciousSoul/
+npc virgil 31742 Folk 10 0 0
+
+# Virgil turns away a character playing its base class, letter in hand.
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=default/31742.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31742-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 7677=1
+  state Q242_PossessorOfAPreciousSoul CREATED
+  rows Q242_PossessorOfAPreciousSoul -

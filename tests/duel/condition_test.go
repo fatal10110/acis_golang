@@ -166,7 +166,7 @@ func TestDuelRelogKeepsStartEffects(t *testing.T) {
 
 	ch := a.players[0]
 	ch.c.Send(wire.NewPacketWriter(clientpackets.OpcodeLogout).Bytes())
-	ch.c.ReadWithTimeout(quiet) // LeaveWorld
+	ch.c.Read() // LeaveWorld
 	a.srv.AdvanceUntil(t, "challenger out of the world", func() bool {
 		_, ok := a.srv.State.Player(ch.id)
 		return !ok

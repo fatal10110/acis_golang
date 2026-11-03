@@ -3,30 +3,35 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/rs/zerolog"
 )
 
-// itemFile is the root element of one item template XML file: a flat list
-// of <item> elements.
+// itemFile is the root element of one item template XML file: a <list> of
+// <item> elements. It decodes itself (see templatedecode.go).
 type itemFile struct {
-	Items []itemElement `xml:"item"`
+	Items []itemElement
 }
 
-// itemElement is one <item> element: its own attributes (id, type, name)
-// fold in directly; <set> children flatten alongside them; <table>, <for>
-// and <cond> are distinctly shaped child blocks handled by their own types.
+// itemElement is one <item> element: its own attributes and, in document
+// order, the children the reader acts on. It decodes itself (see
+// templatedecode.go).
 type itemElement struct {
-	Attrs  []xml.Attr     `xml:",any,attr"`
-	Tables []tableElement `xml:"table"`
-	Sets   []setElem      `xml:"set"`
-	For    []forElement   `xml:"for"`
-	Cond   []condElement  `xml:"cond"`
+	Attrs    []xml.Attr
+	Children []itemChild
+}
+
+// itemChild is one <table>, <set>, <for> or <cond> child of an <item>:
+// exactly one field is set.
+type itemChild struct {
+	Table *tableElement
+	Set   *templateSet
+	For   *forElement
+	Cond  *condElement
 }
 
 // setElem is one <set name="..." val="..."/> attribute-style element.
@@ -66,11 +71,15 @@ type condElement struct {
 // condNode is one node of a <cond> block's predicate tree (a combinator
 // such as <and>, or a leaf predicate such as <player .../>), captured
 // generically and recursively since this loader doesn't interpret
-// condition semantics — see item.Condition.
+// condition semantics — see item.Condition. It decodes itself (see
+// templatedecode.go).
 type condNode struct {
 	XMLName  xml.Name
-	Attrs    []xml.Attr `xml:",any,attr"`
-	Children []condNode `xml:",any"`
+	Attrs    []xml.Attr
+	Children []condNode
+	// Pos is the element's index among its parent's child nodes, as
+	// decodeChildNodes counts them.
+	Pos int
 }
 
 // LoadItemTemplates parses every ".xml" item template file directly under
@@ -85,50 +94,120 @@ type condNode struct {
 // turned into a Template is logged and skipped on its own; the rest of the
 // file and other files continue loading.
 //
+// The tables an item declares stay declared for the next items of its file
+// until one of them loads: a skipped item's tables, up to the node that
+// failed it, are visible to the items after it.
+//
 // log receives skipped-item diagnostics; the zero logger discards them.
 func LoadItemTemplates(dir string, log zerolog.Logger) (*item.Table, error) {
-	docs, err := loadXMLDocuments[itemFile](dir, "item template")
+	docs, err := loadTemplateDocuments[itemFile](dir, "item template")
 	if err != nil {
 		return nil, err
 	}
 
 	var templates []*item.Template
 	for _, doc := range docs {
+		tables := make(map[string][]string)
 		for _, el := range doc.Data.Items {
-			tpl, err := buildItemTemplate(el)
+			tpl, err := buildItemTemplate(el, tables)
 			if err != nil {
 				log.Error().Err(err).Str("file", doc.Path).Msg("data/xml: skipping malformed item template")
 				continue
 			}
 			templates = append(templates, tpl)
+			clear(tables)
 		}
 	}
 
 	return item.NewTable(templates), nil
 }
 
-// buildItemTemplate resolves one parsed <item> element into a Template:
-// its own attributes and <set> children fold into one name-keyed value set
-// (<set> values resolved against the element's tables), every attribute is
-// then read and defaulted there, and the kind-specific detail is built from
-// the same resolved values.
-func buildItemTemplate(el itemElement) (*item.Template, error) {
-	tables, err := buildValueTables(el.Tables)
-	if err != nil {
+// buildItemTemplate resolves one parsed <item> element into a Template,
+// reading its children in document order. Its value set starts from its id
+// (as item_id) and name; each <table> adds a row to tables and each <set> a
+// value, resolved against the tables declared so far. The first <for> or
+// <cond> creates the template from those values, after which a <table> or
+// <set> fails the item. An item with neither is created after its last
+// child. tables is the file's table set, which the caller clears once an
+// item loads.
+func buildItemTemplate(el itemElement, tables map[string][]string) (*item.Template, error) {
+	head := newAttrValues(foldAttrs(el.Attrs), "item template")
+	id := head.int32("id")
+	kind := head.str("type")
+	name := head.str("name")
+	if err := head.Err(); err != nil {
 		return nil, err
 	}
 
-	vals := foldAttrs(el.Attrs)
-	for _, s := range el.Sets {
-		val, err := resolveTableValue(tables, s.Name, s.Val, 1)
-		if err != nil {
-			return nil, err
+	vals := map[string]string{"item_id": strconv.Itoa(int(id)), "name": name}
+	var tpl *item.Template
+	create := func() error {
+		if tpl != nil {
+			return nil
 		}
-		vals[s.Name] = val
+		var err error
+		tpl, err = newItemTemplate(kind, vals)
+		return err
 	}
+	for _, c := range el.Children {
+		switch {
+		case c.Table != nil:
+			if tpl != nil {
+				return nil, fmt.Errorf("item template %d: <table> after the item was created", id)
+			}
+			row, err := readValueTable(*c.Table)
+			if err != nil {
+				return nil, fmt.Errorf("item template %d: %w", id, err)
+			}
+			tables[c.Table.Name] = row
+		case c.Set != nil:
+			if tpl != nil {
+				return nil, fmt.Errorf("item template %d: <set> after the item was created", id)
+			}
+			s, err := readTemplateSet(*c.Set)
+			if err != nil {
+				return nil, fmt.Errorf("item template %d: %w", id, err)
+			}
+			val, err := resolveTableValue(tables, s.name, s.val, 1)
+			if err != nil {
+				return nil, fmt.Errorf("item template %d: %w", id, err)
+			}
+			vals[s.name] = val
+		case c.For != nil:
+			if err := create(); err != nil {
+				return nil, err
+			}
+			mods, err := buildItemFor(tpl.ID, *c.For, tables)
+			if err != nil {
+				return nil, err
+			}
+			tpl.Modifiers = append(tpl.Modifiers, mods...)
+		case c.Cond != nil:
+			if err := create(); err != nil {
+				return nil, err
+			}
+			uc, null, err := buildUseCondition(tpl.ID, c.Cond.Attrs, c.Cond.Children)
+			if err != nil {
+				return nil, err
+			}
+			// A <cond> that holds no condition never bars the item.
+			if !null {
+				tpl.UseConditions = append(tpl.UseConditions, uc)
+			}
+		}
+	}
+	if err := create(); err != nil {
+		return nil, err
+	}
+	return tpl, nil
+}
 
+// newItemTemplate creates an item of kind from its value set: every value is
+// read and defaulted there, and the kind-specific detail is built from the
+// same values.
+func newItemTemplate(kind string, vals map[string]string) (*item.Template, error) {
 	a := newAttrValues(vals, "item template")
-	id := a.int32("id")
+	id := a.int32("item_id")
 	if err := a.Err(); err != nil {
 		return nil, err
 	}
@@ -151,7 +230,11 @@ func buildItemTemplate(el itemElement) (*item.Template, error) {
 		Depositable:    a.boolDefault("is_depositable", true),
 		OlyRestricted:  a.boolDefault("is_oly_restricted", false),
 	}
-	tpl.Kind = attrEnum(a, "type", item.ParseKind)
+	k, err := item.ParseKind(kind)
+	if err != nil {
+		a.fail(err)
+	}
+	tpl.Kind = k
 	tpl.Slot = attrEnumDefault(a, "bodypart", item.ParseSlot, item.SlotNone)
 	tpl.DefaultAction = attrEnumDefault(a, "default_action", item.ParseActionType, item.ActionNone)
 
@@ -163,13 +246,6 @@ func buildItemTemplate(el itemElement) (*item.Template, error) {
 			tpl.AttachedSkills = skills
 		}
 	}
-
-	modifiers, useConditions, err := buildItemClauses(id, el, tables)
-	if err != nil {
-		return nil, err
-	}
-	tpl.Modifiers = modifiers
-	tpl.UseConditions = useConditions
 
 	switch tpl.Kind {
 	case item.KindWeapon:
@@ -263,12 +339,12 @@ func parseIntPairAttr(a *attrValues, key string) (int32, int32) {
 		a.fail(fmt.Errorf("attribute %q: want \"a,b\", got %q", key, raw))
 		return 0, 0
 	}
-	rate, err := commons.ParseInt(strings.TrimSpace(parts[0]), 32)
+	rate, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 32)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0, 0
 	}
-	value, err := commons.ParseInt(strings.TrimSpace(parts[1]), 32)
+	value, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 32)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0, 0
@@ -318,66 +394,50 @@ func foldAttrs(attrs []xml.Attr) map[string]string {
 	return vals
 }
 
-// buildItemClauses builds an <item> element's stat modifiers (from its
-// <for> blocks) and use conditions (from its <cond> blocks).
-func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]item.StatModifier, []item.UseCondition, error) {
+// buildItemFor builds the stat modifiers of one <for> block of item id.
+func buildItemFor(id int32, forEl forElement, tables map[string][]string) ([]item.StatModifier, error) {
 	var modifiers []item.StatModifier
-	for _, forEl := range el.For {
-		var attachCond *item.UseCondition
-		for i, opEl := range forEl.Ops {
-			tag := opEl.XMLName.Local
-			if strings.EqualFold(tag, "cond") {
-				// Only a <cond> that is the block's first node gates it, and
-				// only when its predicate holds a condition; any other one is
-				// never read.
-				if leadsWithCond(tag, i, forEl.LeadingNode) {
-					uc, null, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
-					if err != nil {
-						return nil, nil, err
-					}
-					if !null {
-						attachCond = &uc
-					}
+	var attachCond *item.UseCondition
+	for i, opEl := range forEl.Ops {
+		tag := opEl.XMLName.Local
+		if strings.EqualFold(tag, "cond") {
+			// Only a <cond> that is the block's first node gates it, and
+			// only when its predicate holds a condition; any other one is
+			// never read.
+			if leadsWithCond(tag, i, forEl.LeadingNode) {
+				uc, null, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
+				if err != nil {
+					return nil, err
 				}
-				continue
-			}
-
-			if strings.EqualFold(tag, "effect") {
-				// An item has no effect templates: the effect is read with
-				// the skill grammar, then discarded.
-				if err := validateItemEffect(id, opEl, tables); err != nil {
-					return nil, nil, err
+				if !null {
+					attachCond = &uc
 				}
-				continue
 			}
-
-			op, err := item.ParseFuncOp(tag)
-			if err != nil {
-				// Unrecognized <for> children are silently ignored.
-				continue
-			}
-			mod, err := buildItemFunc(id, op, opEl.Attrs, opEl.Children, tables)
-			if err != nil {
-				return nil, nil, err
-			}
-			mod.AttachCondition = attachCond
-			modifiers = append(modifiers, mod)
+			continue
 		}
-	}
 
-	var useConditions []item.UseCondition
-	for _, condEl := range el.Cond {
-		uc, null, err := buildUseCondition(id, condEl.Attrs, condEl.Children)
+		if strings.EqualFold(tag, "effect") {
+			// An item has no effect templates: the effect is read with
+			// the skill grammar, then discarded.
+			if err := validateItemEffect(id, opEl, tables); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		op, err := item.ParseFuncOp(tag)
 		if err != nil {
-			return nil, nil, err
+			// Unrecognized <for> children are silently ignored.
+			continue
 		}
-		// A <cond> that holds no condition never bars the item.
-		if !null {
-			useConditions = append(useConditions, uc)
+		mod, err := buildItemFunc(id, op, opEl.Attrs, opEl.Children, tables)
+		if err != nil {
+			return nil, err
 		}
+		mod.AttachCondition = attachCond
+		modifiers = append(modifiers, mod)
 	}
-
-	return modifiers, useConditions, nil
+	return modifiers, nil
 }
 
 // buildItemFunc builds one stat func of an item, directly under <for> or
@@ -497,7 +557,7 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (uc item
 	if err != nil {
 		return item.UseCondition{}, false, fmt.Errorf("item template %d: cond: %w", id, err)
 	}
-	if conditions.IsNull(effect.ItemCondition(root)) {
+	if conditions.IsNull(conditions.ItemCondition(root)) {
 		return item.UseCondition{}, true, nil
 	}
 	a := newAttrValues(foldAttrs(attrs), fmt.Sprintf("item template %d: use condition", id))
@@ -530,8 +590,8 @@ func buildCondition(n condNode, role condRole) (item.Condition, error) {
 		return item.Condition{}, fmt.Errorf("<%s>: %w", n.XMLName.Local, err)
 	}
 	var children []item.Condition
-	for i, c := range n.Children {
-		child, err := buildCondition(c, childConditionRole(n, role, i))
+	for _, c := range conditionChildren(n, role) {
+		child, err := buildCondition(c.node, c.role)
 		if err != nil {
 			return item.Condition{}, err
 		}

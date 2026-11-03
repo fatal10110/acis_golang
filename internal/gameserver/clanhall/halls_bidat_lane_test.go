@@ -81,7 +81,6 @@ func (w *heldLanes) drain(order ...int32) {
 // adenaBank pays every fee and takes every refund.
 type adenaBank struct{}
 
-func (adenaBank) PayHallFee(int32, int) bool           { return true }
 func (adenaBank) TakeAdena(int32, int) (Landing, bool) { return nil, true }
 func (adenaBank) ReturnAdena(int32, int) Landing       { return nil }
 

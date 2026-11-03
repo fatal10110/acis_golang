@@ -202,15 +202,13 @@ type castOutcome struct {
 	launched    bool
 }
 
-// watchCast reads the caster's frames until the driven clock passes until.
-func watchCast(t *testing.T, c *testsupport.ScriptedClient, until time.Time) castOutcome {
+// watchCast lets the clock pass until and reports what the caster was sent
+// meanwhile.
+func watchCast(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, until time.Time) castOutcome {
 	t.Helper()
 	var out castOutcome
-	for c.Now().Before(until) {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			continue
-		}
+	srv.Advance(t, max(until.Sub(c.Now()), 0))
+	for _, frame := range c.ReadQueued() {
 		switch frame[0] {
 		case serverpackets.OpcodeMagicSkillCanceled:
 			out.canceled = true
@@ -289,7 +287,7 @@ func TestDamageCastBreakRules(t *testing.T) {
 			end := c.Now().Add(hitTime*time.Millisecond + time.Second)
 
 			attacker.DoAttack(t, victim)
-			got := watchCast(t, c, end)
+			got := watchCast(t, srv, c, end)
 
 			if got.interrupted != tt.interrupted || got.canceled != tt.interrupted {
 				t.Fatalf("CASTING_INTERRUPTED = %v, MagicSkillCanceled = %v, want both %v", got.interrupted, got.canceled, tt.interrupted)

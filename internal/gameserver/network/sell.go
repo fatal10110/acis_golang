@@ -63,20 +63,19 @@ func (l *GameClientLink) requestSellItem(live *livePlayer, req clientpackets.Req
 		rows[i] = invops.SaleRow{ObjectID: row.ObjectID, Count: int(row.Count)}
 	}
 	inv := live.Inventory()
-	enchantScroll := l.enchantStateStore().Active(live.ObjectID())
+	enchantScroll := l.enchanting.scrolls.Active(live.ObjectID())
 	res, sold, err := l.inventory.Sell(inv, rows, func(objectID int32) bool {
 		return objectID == enchantScroll || live.ControlItemInUse(objectID)
 	})
 	if err != nil {
 		l.log.Error().Err(err).Msg("sell items")
 		live.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
-	if !sold {
-		return
 	}
 	if len(res.Changed) > 0 {
 		l.applyEquipStatChanges(live, inv, res.Result)
+	}
+	if err != nil || !sold {
+		return
 	}
 	if page, ok := f.SoldPage(setPages{l.html}); ok {
 		sendFilledHTML(live, f.ObjectID(), page, 0)

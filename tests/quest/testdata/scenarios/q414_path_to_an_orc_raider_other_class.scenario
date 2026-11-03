@@ -1,0 +1,30 @@
+# Path To An Orc Raider (Q414), an orc raider is told he already is one. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q414_path_to_an_orc_raider_other_class.golden
+character Fighter 19
+class 45
+script quest.Q414_PathToAnOrcRaider
+item 1578 1579 1580 1589 1590 1591 1592 8544
+page trainer/30570.htm
+page trainer/30501.htm
+page trainer/31978.htm
+page script/quest/Q414_PathToAnOrcRaider/
+npc karukia 30570 Trainer 10 0 0
+npc kasman 30501 Trainer -20 0 0
+npc tazeer 31978 Trainer 30 0 0
+npc raider 20320 Monster -40 0 0
+npc ratman 27045 Monster 50 0 0
+npc umbar 27054 Monster -60 0 0
+npc timora 27320 Monster 70 0 0
+
+action karukia
+action karukia
+  S ActionFailed
+  S NpcHtmlMessage obj=karukia item=0 page=trainer/30570.htm
+  S ActionFailed
+bypass npc_{karukia}_Quest
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q414_PathToAnOrcRaider 30570-05.htm
+  S NpcHtmlMessage obj=karukia item=0 page=script/quest/Q414_PathToAnOrcRaider/30570-02a.htm
+  S ActionFailed

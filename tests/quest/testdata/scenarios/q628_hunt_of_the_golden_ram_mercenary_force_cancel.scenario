@@ -1,0 +1,37 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): the character asks to quit, is asked once more, and gives the quest up; the badge goes with it.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_cancel.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+hold 7246 1
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31554.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc kahman 31554 Folk 10 0 0
+
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-09.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-04b.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 31554-06.htm
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-06.htm
+  S ActionFailed
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 31554-07.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:7246
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-07.htm
+  S ActionFailed
+  Q delete-quest Q628_HuntOfTheGoldenRamMercenaryForce
+  state Q628_HuntOfTheGoldenRamMercenaryForce -
+  rows Q628_HuntOfTheGoldenRamMercenaryForce -
+  items 7246=0
+relog
+  rows Q628_HuntOfTheGoldenRamMercenaryForce -

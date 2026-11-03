@@ -89,7 +89,7 @@ func (s *State) playerCabalLocked(objectID int32) Cabal {
 // never signed up always leaves. During results and seal validation, one
 // outside the winning cabal leaves; in the other periods one signed up for
 // a cabal leaves, while a sign-up left without one stays — the reverse of
-// the login rule, as the reference has it.
+// the login rule.
 func (s *State) ExpelledAtPeriodChange(objectID int32) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -115,4 +115,13 @@ func (s *State) ExpelledAtLogin(objectID int32) bool {
 		return cabal != s.winningCabalLocked()
 	}
 	return cabal == NoCabal
+}
+
+// StrifeForbidsSummoning reports whether objectID may not call a siege
+// summon: during seal validation, while Dawn owns the Seal of Strife, a
+// Dusk member may not.
+func (s *State) StrifeForbidsSummoning(objectID int32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.row.Period == SealValidation && s.strifeOwnerLocked() == Dawn && s.playerCabalLocked(objectID) == Dusk
 }

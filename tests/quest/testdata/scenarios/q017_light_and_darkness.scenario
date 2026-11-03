@@ -1,0 +1,214 @@
+# Light and Darkness (Q017): a level 61 character accepts at the hierarch with four bloods of
+# saint, finds the second altar silent while the first is due, blesses the four altars of saints
+# in order (each one, visited again, says it is blessed), and the hierarch rewards the work with
+# experience; then relog. The quest given up for want of blood is
+# q017_light_and_darkness_no_blood.scenario. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q017_light_and_darkness.golden
+character Blesser 61
+script quest.Q017_LightAndDarkness
+item 7168
+page default/31517.htm
+page default/31508.htm
+page default/31509.htm
+page default/31510.htm
+page default/31511.htm
+page script/quest/Q017_LightAndDarkness/
+npc hierarch 31517 Folk 10 0 0
+npc altar1 31508 Folk 20 0 0
+npc altar2 31509 Folk 30 0 0
+npc altar3 31510 Folk 40 0 0
+npc altar4 31511 Folk 50 0 0
+
+# The hierarch: accept with four bloods of saint.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q017_LightAndDarkness/31517-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q017_LightAndDarkness CREATED
+bypass Quest Q017_LightAndDarkness 31517-02.htm
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q017_LightAndDarkness/31517-02.htm
+  S ActionFailed
+bypass Quest Q017_LightAndDarkness 31517-04.htm
+  S QuestList 17:0x80000001
+  S ExShowQuestMark quest=17
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7168 6:4
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q017_LightAndDarkness/31517-04.htm
+  S ActionFailed
+  Q upsert Q017_LightAndDarkness | <state> | STARTED
+  Q upsert Q017_LightAndDarkness | <cond> | 1
+  state Q017_LightAndDarkness STARTED
+  rows Q017_LightAndDarkness <cond>=1 <state>=STARTED
+  items 7168=4
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q017_LightAndDarkness/31517-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The second altar is silent while the first is due.
+action altar2
+action altar2
+  S ActionFailed
+  S NpcHtmlMessage obj=altar2 item=0 page=default/31509.htm
+  S ActionFailed
+bypass npc_{altar2}_Quest
+  S NpcHtmlMessage obj=altar2 item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Altar of saints 1: a blood blesses it.
+action altar1
+action altar1
+  S ActionFailed
+  S NpcHtmlMessage obj=altar1 item=0 page=default/31508.htm
+  S ActionFailed
+bypass npc_{altar1}_Quest
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q017_LightAndDarkness/31508-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q017_LightAndDarkness 31508-02.htm
+  S QuestList 17:0x80000003
+  S ExShowQuestMark quest=17
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7168
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q017_LightAndDarkness/31508-02.htm
+  S ActionFailed
+  Q upsert Q017_LightAndDarkness | <cond> | 2
+  rows Q017_LightAndDarkness <cond>=2 <state>=STARTED
+  items 7168=3
+action altar1
+  S ActionFailed
+  S NpcHtmlMessage obj=altar1 item=0 page=default/31508.htm
+  S ActionFailed
+bypass npc_{altar1}_Quest
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q017_LightAndDarkness/31508-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Altar of saints 2: a blood blesses it.
+action altar2
+action altar2
+  S ActionFailed
+  S NpcHtmlMessage obj=altar2 item=0 page=default/31509.htm
+  S ActionFailed
+bypass npc_{altar2}_Quest
+  S NpcHtmlMessage obj=altar2 item=0 page=script/quest/Q017_LightAndDarkness/31509-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q017_LightAndDarkness 31509-02.htm
+  S QuestList 17:0x80000007
+  S ExShowQuestMark quest=17
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7168
+  S NpcHtmlMessage obj=altar2 item=0 page=script/quest/Q017_LightAndDarkness/31509-02.htm
+  S ActionFailed
+  Q upsert Q017_LightAndDarkness | <cond> | 3
+  rows Q017_LightAndDarkness <cond>=3 <state>=STARTED
+  items 7168=2
+action altar2
+  S ActionFailed
+  S NpcHtmlMessage obj=altar2 item=0 page=default/31509.htm
+  S ActionFailed
+bypass npc_{altar2}_Quest
+  S NpcHtmlMessage obj=altar2 item=0 page=script/quest/Q017_LightAndDarkness/31509-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Altar of saints 3: a blood blesses it.
+action altar3
+action altar3
+  S ActionFailed
+  S NpcHtmlMessage obj=altar3 item=0 page=default/31510.htm
+  S ActionFailed
+bypass npc_{altar3}_Quest
+  S NpcHtmlMessage obj=altar3 item=0 page=script/quest/Q017_LightAndDarkness/31510-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q017_LightAndDarkness 31510-02.htm
+  S QuestList 17:0x8000000f
+  S ExShowQuestMark quest=17
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7168
+  S NpcHtmlMessage obj=altar3 item=0 page=script/quest/Q017_LightAndDarkness/31510-02.htm
+  S ActionFailed
+  Q upsert Q017_LightAndDarkness | <cond> | 4
+  rows Q017_LightAndDarkness <cond>=4 <state>=STARTED
+  items 7168=1
+action altar3
+  S ActionFailed
+  S NpcHtmlMessage obj=altar3 item=0 page=default/31510.htm
+  S ActionFailed
+bypass npc_{altar3}_Quest
+  S NpcHtmlMessage obj=altar3 item=0 page=script/quest/Q017_LightAndDarkness/31510-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Altar of saints 4: a blood blesses it.
+action altar4
+action altar4
+  S ActionFailed
+  S NpcHtmlMessage obj=altar4 item=0 page=default/31511.htm
+  S ActionFailed
+bypass npc_{altar4}_Quest
+  S NpcHtmlMessage obj=altar4 item=0 page=script/quest/Q017_LightAndDarkness/31511-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q017_LightAndDarkness 31511-02.htm
+  S QuestList 17:0x8000001f
+  S ExShowQuestMark quest=17
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7168
+  S NpcHtmlMessage obj=altar4 item=0 page=script/quest/Q017_LightAndDarkness/31511-02.htm
+  S ActionFailed
+  Q upsert Q017_LightAndDarkness | <cond> | 5
+  rows Q017_LightAndDarkness <cond>=5 <state>=STARTED
+  items 7168=0
+action altar4
+  S ActionFailed
+  S NpcHtmlMessage obj=altar4 item=0 page=default/31511.htm
+  S ActionFailed
+bypass npc_{altar4}_Quest
+  S NpcHtmlMessage obj=altar4 item=0 page=script/quest/Q017_LightAndDarkness/31511-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# The hierarch: experience; the quest completes.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S SystemMessage id=45 1:105527
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 17:0x00000000
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q017_LightAndDarkness/31517-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q017_LightAndDarkness | <state> | COMPLETED
+  Q delete-except-state Q017_LightAndDarkness
+  state Q017_LightAndDarkness COMPLETED
+  rows Q017_LightAndDarkness <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q017_LightAndDarkness COMPLETED
+  rows Q017_LightAndDarkness <state>=COMPLETED
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

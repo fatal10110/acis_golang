@@ -1,0 +1,20 @@
+# Whisper of Dreams, Part 2 (Q375), level 60 without the mysterious stone: Manakia turns the character away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q375_whisper_of_dreams_part2_no_stone.golden
+character Whisper 60
+script quest.Q375_WhisperOfDreams_Part2
+item 57 5887 5888 5889 5348 5350 5352
+page trainer/30515.htm
+page script/quest/Q375_WhisperOfDreams_Part2/
+npc manakia 30515 Trainer 10 0 0
+npc karik 20629 Monster 40 0 0
+npc howler 20624 Monster 50 0 0
+
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q375_WhisperOfDreams_Part2/30515-01.htm
+  S ActionFailed
+  S ActionFailed

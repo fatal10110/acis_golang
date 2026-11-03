@@ -54,6 +54,9 @@ type PetInfoSnapshot struct {
 	Team              int
 	SoulShotsPerHit   int
 	SpiritShotsPerHit int
+	// Weapon and Armor are the item ids a pet wears in its right hand and on
+	// its chest, 0 for none and for a servitor.
+	Weapon, Armor int
 }
 
 // FramePetStatusUpdate builds the owner-only status refresh for a pet or
@@ -109,8 +112,8 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 	w.WriteFloat64(s.AtkSpdMultiplier)
 	w.WriteFloat64(s.CollisionRadius)
 	w.WriteFloat64(s.CollisionHeight)
-	w.WriteInt32(0) // weapon: Summon.getWeapon() is always 0 (base class, no override)
-	w.WriteInt32(0) // armor: Summon.getArmor() is always 0 (base class, no override)
+	w.WriteInt32(int32(s.Weapon))
+	w.WriteInt32(int32(s.Armor))
 	w.WriteInt32(0)
 	w.WriteUint8(1) // owner is always present: PetInfo is only ever sent to a live summon's own owner
 	w.WriteUint8(1)

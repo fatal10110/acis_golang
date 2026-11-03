@@ -41,16 +41,18 @@ func (a *Actor) Kill(killer attackable.Combatant) bool {
 // casting, drops its target, loses the effects that do not last through
 // death (its owner's pet window is refreshed once after that strip, not per
 // stripped stat change), and republishes its status. Observers then see it die
-// (event.Died) and it goes idle; killer gets its karma for the kill. A
+// (event.Died) and it goes idle; its owner hears of the death (SummonDied),
+// then killer gets its karma for the kill. A
 // summon whose Phoenix Blessing survived the death offers its owner its
 // resurrection, and last the owner is told (event.DeathSettled).
 //
 // A dead pet stops eating, a dead baby pet stops healing its owner, and a
-// dead servitor's lifetime stops (see TickPet and TickServitor). The owner's
+// dead servitor's lifetime stops for good. The owner's
 // side then schedules the corpse's decay (DecayDelay, Decay), and last a pet
 // pays its death penalty.
 func (a *Actor) die(killer attackable.Combatant) {
 	a.stopBabyHeal(false)
+	a.stopLifeTask(false)
 	if a.brain != nil {
 		a.brain.AbortAll()
 	}
@@ -67,6 +69,7 @@ func (a *Actor) die(killer attackable.Combatant) {
 	a.idle()
 	owner := a.currentOwner()
 	if owner != nil {
+		owner.SummonDied(a, killer)
 		owner.AwardSummonKillKarma(killer)
 		if a.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
 			owner.OfferSummonRevive()

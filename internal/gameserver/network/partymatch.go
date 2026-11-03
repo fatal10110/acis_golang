@@ -15,47 +15,6 @@ import (
 // open, and of the players waiting for one.
 type roomRegistry = partymatch.Registry[*livePlayer]
 
-// dispatchPartyMatch decodes and runs one top-level party-matching packet.
-// It reports false once the connection has been closed for a malformed
-// packet.
-func (l *GameClientLink) dispatchPartyMatch(client *Client, live *livePlayer, opcode byte, payload []byte) bool {
-	switch opcode {
-	case clientpackets.OpcodeRequestListPartyWaiting:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestListPartyWaiting, l.requestListPartyWaiting)
-	case clientpackets.OpcodeRequestManagePartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestManagePartyRoom, l.requestManagePartyRoom)
-	case clientpackets.OpcodeRequestJoinPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestJoinPartyRoom, l.requestJoinPartyRoom)
-	}
-	return true
-}
-
-// dispatchPartyMatchExtended decodes and runs one extended party-matching
-// packet; see dispatchPartyMatch.
-func (l *GameClientLink) dispatchPartyMatchExtended(client *Client, live *livePlayer, second uint16, payload []byte) bool {
-	switch second {
-	case clientpackets.OpcodeRequestOustFromPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestOustFromPartyRoom, l.requestOustFromPartyRoom)
-	case clientpackets.OpcodeRequestDismissPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestDismissPartyRoom, l.requestDismissPartyRoom)
-	case clientpackets.OpcodeRequestWithdrawPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestWithdrawPartyRoom, l.requestWithdrawPartyRoom)
-	case clientpackets.OpcodeRequestAskJoinPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestAskJoinPartyRoom, l.requestAskJoinPartyRoom)
-	case clientpackets.OpcodeAnswerJoinPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeAnswerJoinPartyRoom, l.answerJoinPartyRoom)
-	case clientpackets.OpcodeRequestListPartyMatchingWaitingRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestListPartyMatchingWaitingRoom, l.requestListWaitingPlayers)
-	case clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom:
-		// The request carries no body; leaving the waiting list answers
-		// nothing, the client having closed its window already.
-		if live != nil {
-			onLive(live, func() { l.rooms.RemoveWaiting(live) })
-		}
-	}
-	return true
-}
-
 // requestListPartyWaiting opens live's party-matching window. In a room,
 // it shows that room again. Otherwise live joins the waiting list and is
 // shown the rooms it asked for, unless it is a party member that does not
@@ -158,10 +117,10 @@ func (l *GameClientLink) requestAskJoinPartyRoom(live *livePlayer, req clientpac
 		return
 	}
 	if l.tradeBook().Invite(tradebook.KindPartyRoom, live.ObjectID(), target.ObjectID(), false).Status != tradebook.RequestStarted {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	}
-	target.SendFrame(serverpackets.FrameExAskJoinPartyRoom(live.Name))
+	target.SendFrame(serverpackets.FrameExAskJoinPartyRoom(live.CharacterName()))
 }
 
 // answerJoinPartyRoom answers live's pending room invitation. With none
@@ -197,7 +156,7 @@ func (l *GameClientLink) requestListWaitingPlayers(live *livePlayer, req clientp
 	players := l.rooms.Waiting(live, req.MinLevel, req.MaxLevel)
 	rows := make([]serverpackets.WaitingPlayer, len(players))
 	for i, p := range players {
-		rows[i] = serverpackets.WaitingPlayer{Name: p.Name, ClassID: int32(p.ClassID()), Level: int32(p.Level())}
+		rows[i] = serverpackets.WaitingPlayer{Name: p.CharacterName(), ClassID: int32(p.ClassID()), Level: int32(p.Level())}
 	}
 	live.SendFrame(serverpackets.FrameExListPartyMatchingWaitingRoom(req.Mode, rows))
 }
@@ -210,7 +169,7 @@ func (l *GameClientLink) withdrawParty(live *livePlayer) {
 	if notices == nil {
 		return
 	}
-	l.applyPartyNotices(notices)
+	l.applyOwnPartyNotices(live, notices)
 	l.applyRoomNotices(l.rooms.LeaveWithParty(live))
 }
 
@@ -300,7 +259,7 @@ func (l *GameClientLink) roomMemberRow(m, leader *livePlayer) serverpackets.Part
 	}
 	return serverpackets.PartyRoomMember{
 		ObjectID: m.ObjectID(),
-		Name:     m.Name,
+		Name:     m.CharacterName(),
 		ClassID:  int32(m.ClassID()),
 		Level:    int32(m.Level()),
 		Location: l.roomLocation(m),
@@ -339,7 +298,7 @@ func roomRows(rooms []partymatch.Room[*livePlayer]) []serverpackets.PartyRoom {
 			MaxLevel:   r.Settings.MaxLevel,
 			Members:    int32(len(r.Members)),
 			MaxMembers: r.Settings.MaxMembers,
-			LeaderName: r.Leader().Name,
+			LeaderName: r.Leader().CharacterName(),
 		}
 	}
 	return rows

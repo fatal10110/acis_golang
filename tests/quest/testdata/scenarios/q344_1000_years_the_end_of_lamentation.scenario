@@ -1,0 +1,222 @@
+# 1000 Years, the End of Lamentation (Q344): a level 48 character accepts at Gilmore; with no
+# article he asks for them; eleven cave servants give eleven articles (every roll pinned to
+# succeed); Gilmore pays 60 an article, and the special roll of 0 (under 1) shows the relic
+# page; the relic roll 3 gives the crucifix (cond 2); Gilmore waits; Orven takes it for 19
+# items of 1875 (roll 0), then has given it; Rodemai has nothing for him; Gilmore sees the trade
+# done and moves the quest back to cond 1; one more article is paid 60, the special roll of 1
+# misses, and the player quits the repeatable quest; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q344_1000_years_the_end_of_lamentation.golden
+character Watcher 48
+random 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 1
+script quest.Q344_1000YearsTheEndOfLamentation
+item 57 4269 4270 4271 4272 4273 1875 952 2437 1882 1881 191 1874 1887 951 133 1879 885
+page default/30754.htm
+page default/30756.htm
+page villagemaster/30857.htm
+page default/30623.htm
+page villagemaster/30704.htm
+page script/quest/Q344_1000YearsTheEndOfLamentation/
+npc gilmore 30754 Folk 10 0 0
+npc rodemai 30756 Folk -10 0 0
+npc orven 30857 VillageMasterPriest 0 10 0
+npc kaien 30623 Folk 0 -10 0
+npc garvarentz 30704 VillageMasterOrc 10 10 0
+npc servant 20236 Monster 40 0 0
+
+# Gilmore: accept.
+action gilmore
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q344_1000YearsTheEndOfLamentation 30754-03.htm
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-03.htm
+  S ActionFailed
+bypass Quest Q344_1000YearsTheEndOfLamentation 30754-04.htm
+  S QuestList 344:0x80000001
+  S ExShowQuestMark quest=344
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-04.htm
+  S ActionFailed
+  Q upsert Q344_1000YearsTheEndOfLamentation | <state> | STARTED
+  Q upsert Q344_1000YearsTheEndOfLamentation | <cond> | 1
+  state Q344_1000YearsTheEndOfLamentation STARTED
+  rows Q344_1000YearsTheEndOfLamentation <cond>=1 <state>=STARTED
+
+# No article yet.
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Eleven articles.
+kill servant x11
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4269=11
+
+# Gilmore: 11 x 60, and the relic page.
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q344_1000YearsTheEndOfLamentation 30754-06.htm
+  S SystemMessage id=301 3:4269 6:11
+  S SystemMessage id=52 6:660
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-10.htm
+  S ActionFailed
+  items 4269=0 57=660
+bypass Quest Q344_1000YearsTheEndOfLamentation 30754-11.htm
+  S SystemMessage id=54 3:4273
+  S QuestList 344:0x80000003
+  S ExShowQuestMark quest=344
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-11.htm
+  S ActionFailed
+  Q upsert Q344_1000YearsTheEndOfLamentation | <cond> | 2
+  items 4273=1
+  rows Q344_1000YearsTheEndOfLamentation <cond>=2 <state>=STARTED
+
+# Gilmore waits for the trade.
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-15.htm
+  S ActionFailed
+  S ActionFailed
+
+# Orven: the crucifix for 19 of 1875, then the trade is done.
+action orven
+action orven
+  S ActionFailed
+  S NpcHtmlMessage obj=orven item=0 page=villagemaster/30857.htm
+  S ActionFailed
+bypass npc_{orven}_Quest
+  S SystemMessage id=302 3:4273
+  S SystemMessage id=53 3:1875 6:19
+  S NpcHtmlMessage obj=orven item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30857-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q344_1000YearsTheEndOfLamentation | success | 1
+  items 4273=0 1875=19
+  rows Q344_1000YearsTheEndOfLamentation <cond>=2 <state>=STARTED success=1
+action orven
+  S ActionFailed
+  S NpcHtmlMessage obj=orven item=0 page=villagemaster/30857.htm
+  S ActionFailed
+bypass npc_{orven}_Quest
+  S NpcHtmlMessage obj=orven item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30857-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rodemai: the trade is done.
+action rodemai
+action rodemai
+  S ActionFailed
+  S NpcHtmlMessage obj=rodemai item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{rodemai}_Quest
+  S NpcHtmlMessage obj=rodemai item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30756-02.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q344_1000YearsTheEndOfLamentation <cond>=2 <state>=STARTED success=1
+
+# Gilmore: back to cond 1.
+action gilmore
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-16.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q344_1000YearsTheEndOfLamentation 30754-07.htm
+  S QuestList 344:0x80000001
+  S ExShowQuestMark quest=344
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-07.htm
+  S ActionFailed
+  Q upsert Q344_1000YearsTheEndOfLamentation | <cond> | 1
+  Q delete-var Q344_1000YearsTheEndOfLamentation | success
+  rows Q344_1000YearsTheEndOfLamentation <cond>=1 <state>=STARTED
+
+# One more article: 60, the special roll misses; quit.
+kill servant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4269
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4269=1
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q344_1000YearsTheEndOfLamentation 30754-06.htm
+  S SystemMessage id=302 3:4269
+  S SystemMessage id=52 6:60
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-06.htm
+  S ActionFailed
+  items 4269=0 57=720
+bypass Quest Q344_1000YearsTheEndOfLamentation 30754-08.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-08.htm
+  S ActionFailed
+  Q delete-quest Q344_1000YearsTheEndOfLamentation
+  state Q344_1000YearsTheEndOfLamentation -
+  rows Q344_1000YearsTheEndOfLamentation -
+
+relog
+  state Q344_1000YearsTheEndOfLamentation -
+  rows Q344_1000YearsTheEndOfLamentation -
+  items 57=720 1875=19

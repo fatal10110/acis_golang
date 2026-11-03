@@ -1,0 +1,16 @@
+# Core (29006), a level 1 grand boss hit by a level 10 character, more than 8 levels above it:
+# each hit makes it want skill 4515 on the character at 1000000 more (its fixture template lists
+# the skill, so the NPC can cast). Its first hit also makes it speak its two opening lines; on
+# a draw of 1 in 100 the next one says no taunt.
+character Hunter 10
+random always 1
+script script.ai.individual.DefaultNpc
+script script.ai.boss.core.Core
+npc core 29006 GrandBoss 100 0 0 skill DEBUFF 4515 1
+
+hit core 10
+  S NpcSay obj=core type=0 npc=1029006 text="A non-permitted target has been discovered."
+  S NpcSay obj=core type=0 npc=1029006 text="Intruder removal system initiated."
+  desires core cast(player,4515,move)=1000000
+hit core 10
+  desires core cast(player,4515,move)=2000000

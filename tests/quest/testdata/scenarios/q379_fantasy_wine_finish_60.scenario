@@ -1,0 +1,39 @@
+# Fantasy Wine (Q379), a character with the full set makes the wine of 60 (draw 9). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q379_fantasy_wine_finish_60.golden
+character Fantasy 20
+quest Q379_FantasyWine <cond>=2 <state>=STARTED
+hold 5893 80
+hold 5894 100
+random 9
+script quest.Q379_FantasyWine
+item 5893 5894 5956 5957 5958
+page guard/30074.htm
+page script/quest/Q379_FantasyWine/
+npc harlan 30074 Guard 10 0 0
+npc champion 20291 Monster 40 0 0
+npc shaman 20292 Monster 50 0 0
+
+action harlan
+action harlan
+  S ActionFailed
+  S NpcHtmlMessage obj=harlan item=0 page=guard/30074.htm
+  S ActionFailed
+bypass npc_{harlan}_Quest
+  S NpcHtmlMessage obj=harlan item=0 page=script/quest/Q379_FantasyWine/30074-5.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q379_FantasyWine 30074-6.htm
+  S SystemMessage id=301 3:5893 6:80
+  S SystemMessage id=301 3:5894 6:100
+  S SystemMessage id=54 3:5958
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=harlan item=0 page=script/quest/Q379_FantasyWine/30074-8.htm
+  S ActionFailed
+  Q delete-quest Q379_FantasyWine
+  items 5893=0 5894=0 5956=0 5957=0 5958=1
+  rows Q379_FantasyWine -
+  state Q379_FantasyWine -
+relog
+  rows Q379_FantasyWine -
+  state Q379_FantasyWine -

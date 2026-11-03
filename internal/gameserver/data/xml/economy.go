@@ -167,8 +167,7 @@ type augmentationFile struct {
 
 // augmentationSkillElement is required because zero is a legal skill/level
 // id: a plain int cannot tell an absent attribute from "0", so id, skillId,
-// and skillLevel use coord to reject that ambiguity the same way the
-// StatSet bag being replaced did.
+// and skillLevel use coord to reject an absent or malformed value.
 type augmentationSkillElement struct {
 	ID         *coord `xml:"id,attr"`
 	SkillID    *coord `xml:"skillId,attr"`

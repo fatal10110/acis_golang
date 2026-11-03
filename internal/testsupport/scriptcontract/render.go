@@ -1,11 +1,9 @@
 package scriptcontract
 
 import (
-	"cmp"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -17,9 +15,20 @@ import (
 // roles maps object ids to the role names the golden uses; they replace the
 // ids in object fields and, as {role}, inside page text.
 //
-// NpcHtmlMessage, SystemMessage, PlaySound, ExShowQuestMark, QuestList and
-// ActionFailed are decoded; any other packet is an error, because the goldens
-// write those with the reference class name and raw bytes.
+// NpcHtmlMessage, SystemMessage, PlaySound, ExShowQuestMark, QuestList,
+// ActionFailed, the tutorial window's packets (TutorialShowHtml,
+// TutorialShowQuestionMark, TutorialEnableClientEvent, TutorialCloseHtml),
+// RadarControl, DropItem, MagicSkillUse, NpcSay, TeleportToLocation,
+// SpecialCamera, SocialAction, NpcInfo, DeleteObject, ChangeMoveType, Die,
+// ExPlayScene, Earthquake and WarehouseWithdrawList are decoded; any other packet is an error, because the goldens write those with the reference
+// class name and raw bytes.
+//
+// DropItem leaves out the dropped object's id and place, and MagicSkillUse
+// the caster's and the target's places: the world draws those (the object id
+// sequence, the drop scatter, where each creature stands), not the script.
+// NpcInfo keeps the NPC's object and template id only: its place, speeds,
+// equipment and name are the world's too. Earthquake leaves out its place
+// for the same reason.
 func Packet(payload []byte, roles map[int32]string) (string, error) {
 	if len(payload) == 0 {
 		return "", errors.New("empty packet")
@@ -32,9 +41,7 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 	case 0x0f:
 		obj := role(d.int32(), roles)
 		html := d.str()
-		for _, id := range sortedIDs(roles) {
-			html = strings.ReplaceAll(html, strconv.Itoa(int(id)), "{"+roles[id]+"}")
-		}
+		html = roleIDs(html, roles)
 		out = fmt.Sprintf("S NpcHtmlMessage obj=%s item=%d html=%s", obj, d.int32(), Quote(html))
 	case 0x64:
 		var sb strings.Builder
@@ -70,11 +77,125 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 			fmt.Fprintf(&sb, " %d:0x%08x", d.int32(), uint32(d.int32()))
 		}
 		out = sb.String()
+	case 0xa0:
+		html := d.str()
+		html = roleIDs(html, roles)
+		out = "S TutorialShowHtml html=" + Quote(html)
+	case 0xa1:
+		out = fmt.Sprintf("S TutorialShowQuestionMark id=%d", d.int32())
+	case 0xa2:
+		out = fmt.Sprintf("S TutorialEnableClientEvent id=%d", d.int32())
+	case 0xa3:
+		out = "S TutorialCloseHtml"
+	case 0xeb:
+		show, typ := d.int32(), d.int32()
+		out = fmt.Sprintf("S RadarControl show=%d type=%d loc=%d,%d,%d", show, typ, d.int32(), d.int32(), d.int32())
+	case 0x0c:
+		by := role(d.int32(), roles)
+		d.int32() // the dropped object
+		item := d.int32()
+		d.int32() // x, y, z
+		d.int32()
+		d.int32()
+		stackable, count := d.int32(), d.int32()
+		out = fmt.Sprintf("S DropItem by=%s item=%d count=%d stackable=%d animate=%d", by, item, count, stackable, d.int32())
+	case 0x48:
+		caster, target := role(d.int32(), roles), role(d.int32(), roles)
+		skill, level, hit, reuse := d.int32(), d.int32(), d.int32(), d.int32()
+		d.int32() // the caster's x, y, z
+		d.int32()
+		d.int32()
+		success := d.int32()
+		if success != 0 {
+			d.uint16()
+		}
+		d.int32() // the target's x, y, z
+		d.int32()
+		d.int32()
+		out = fmt.Sprintf("S MagicSkillUse caster=%s target=%s skill=%d-%d hit=%d reuse=%d success=%d", caster, target, skill, level, hit, reuse, success)
+	case 0x02:
+		// The speaker's npc field is the client's NPC name id: 1000000 plus
+		// the template id.
+		speaker, typ, npcID := role(d.int32(), roles), d.int32(), d.int32()
+		out = fmt.Sprintf("S NpcSay obj=%s type=%d npc=%d text=%s", speaker, typ, npcID, Quote(d.str()))
+	case 0x28:
+		obj := role(d.int32(), roles)
+		x, y, z := d.int32(), d.int32(), d.int32()
+		out = fmt.Sprintf("S TeleportToLocation obj=%s loc=%d,%d,%d fast=%d", obj, x, y, z, d.int32())
+	case 0xc7:
+		obj := role(d.int32(), roles)
+		var shot [9]int32
+		for i := range shot {
+			shot[i] = d.int32()
+		}
+		out = fmt.Sprintf("S SpecialCamera obj=%s distance=%d yaw=%d pitch=%d time=%d duration=%d turn=%d rise=%d widescreen=%d unknown=%d",
+			obj, shot[0], shot[1], shot[2], shot[3], shot[4], shot[5], shot[6], shot[7], shot[8])
+	case 0x2d:
+		obj := role(d.int32(), roles)
+		out = fmt.Sprintf("S SocialAction obj=%s action=%d", obj, d.int32())
+	case 0x16:
+		// The npc field is the client's NPC name id: 1000000 plus the
+		// template id.
+		obj, npcID := role(d.int32(), roles), d.int32()
+		out = fmt.Sprintf("S NpcInfo obj=%s npc=%d", obj, npcID-1000000)
+		d.b = nil
+	case 0x12:
+		obj := role(d.int32(), roles)
+		d.int32() // how the client removes it
+		out = "S DeleteObject obj=" + obj
+	case 0x2e:
+		obj := role(d.int32(), roles)
+		running, swimming := d.int32(), d.int32()
+		out = fmt.Sprintf("S ChangeMoveType obj=%s running=%d swimming=%d", obj, running, swimming)
+	case 0x06:
+		obj := role(d.int32(), roles)
+		var opts [6]int32
+		for i := range opts {
+			opts[i] = d.int32()
+		}
+		out = fmt.Sprintf("S Die obj=%s village=%d clanhall=%d castle=%d siegehq=%d sweep=%d fixed=%d",
+			obj, opts[0], opts[1], opts[2], opts[3], opts[4], opts[5])
+	case 0xc4:
+		d.int32()
+		d.int32()
+		d.int32() // the place is the world's
+		intensity, duration, npc := d.int32(), d.int32(), d.int32()
+		out = fmt.Sprintf("S Earthquake intensity=%d duration=%d npc=%d", intensity, duration, npc)
+	case 0x42:
+		// A warehouse withdrawal list renders its kind, the player's adena and each
+		// item's template and count: the object ids are the world's.
+		kind, adena := d.uint16(), d.int32()
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "S WarehouseWithdrawList kind=%d adena=%d items=", kind, adena)
+		n := d.uint16()
+		for i := range n {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+			d.uint16() // category
+			d.int32()  // object id
+			id, count := d.int32(), d.int32()
+			d.uint16() // sub-category
+			d.uint16() // custom type 1
+			d.int32()  // body part
+			d.uint16() // enchant level
+			d.uint16() // custom type 2
+			d.uint16()
+			d.int32() // object id again
+			d.int32() // augmentation
+			d.int32()
+			fmt.Fprintf(&sb, "%dx%d", id, count)
+		}
+		out = sb.String()
 	case 0xfe:
-		if sub := d.uint16(); sub != 0x1a {
+		switch sub := d.uint16(); sub {
+		case 0x1a:
+			out = fmt.Sprintf("S ExShowQuestMark quest=%d", d.int32())
+		case 0x5b:
+			out = "S ExPlayScene"
+		default:
 			return "", fmt.Errorf("extended packet 0x%04x is not rendered", sub)
 		}
-		out = fmt.Sprintf("S ExShowQuestMark quest=%d", d.int32())
 	default:
 		return "", fmt.Errorf("packet 0x%02x is not rendered", payload[0])
 	}
@@ -185,21 +306,36 @@ func role(id int32, roles map[int32]string) string {
 	return strconv.Itoa(int(id))
 }
 
-// sortedIDs orders role ids longest decimal first, so no id is replaced inside
-// a longer one.
-func sortedIDs(roles map[int32]string) []int32 {
-	ids := make([]int32, 0, len(roles))
-	for id := range roles {
-		ids = append(ids, id)
-	}
-	slices.SortFunc(ids, func(a, b int32) int {
-		if c := cmp.Compare(len(strconv.Itoa(int(b))), len(strconv.Itoa(int(a)))); c != 0 {
-			return c
+// roleIDs replaces, in text, every run of digits that is a role's object id
+// with the role name in braces. A longer number holding an id's digits, such
+// as a system message id in a link, is left whole, and so is a number that
+// ends a word, such as the quest id in a quest name (Q101_...).
+func roleIDs(text string, roles map[int32]string) string {
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		if text[i] < '0' || text[i] > '9' {
+			b.WriteByte(text[i])
+			i++
+			continue
 		}
-		return cmp.Compare(a, b)
-	})
-	return ids
+		j := i
+		for j < len(text) && text[j] >= '0' && text[j] <= '9' {
+			j++
+		}
+		run := text[i:j]
+		inWord := i > 0 && isLetter(text[i-1])
+		if id, err := strconv.ParseInt(run, 10, 32); err == nil && strconv.FormatInt(id, 10) == run {
+			if name, ok := roles[int32(id)]; ok && !inWord {
+				run = "{" + name + "}"
+			}
+		}
+		b.WriteString(run)
+		i = j
+	}
+	return b.String()
 }
+
+func isLetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 
 type decoder struct {
 	b   []byte

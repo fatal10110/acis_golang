@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -39,13 +38,9 @@ func TestSummonEnteringBossZoneWithoutLeaveIsDismissed(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			set := commons.NewStatSet()
-			set.Set("InvadeTime", "600000")
 			// The lair covers the wolf's spawn point, not its owner.
-			boss, err := zone.NewBoss(1, summonZoneBox(t, 30, 1_000), set)
-			if err != nil {
-				t.Fatalf("build boss zone: %v", err)
-			}
+			boss := zone.NewBoss(1, summonZoneBox(t, 30, 1_000))
+			boss.InvadeWindow = 10 * time.Minute
 			var summonEnters atomic.Int32
 			boss.OnEnter(func(a zone.Actor) {
 				if a.Class() == zone.ClassSummon {
@@ -100,10 +95,7 @@ func TestSummonZonesFollowOwnerTeleport(t *testing.T) {
 		}
 	})
 	// The swamp covers the wolf's spawn point, not its owner.
-	swamp, err := zone.NewSwamp(2, summonZoneBox(t, 30, 1_000), commons.NewStatSet())
-	if err != nil {
-		t.Fatalf("build swamp: %v", err)
-	}
+	swamp := zone.NewSwamp(2, summonZoneBox(t, 30, 1_000))
 	zones := zone.NewIndex()
 	zones.Add(peace)
 	zones.Add(swamp)
@@ -112,11 +104,10 @@ func TestSummonZonesFollowOwnerTeleport(t *testing.T) {
 	if got, gotExits := enters.Load(), exits.Load(); got != 1 || gotExits != 0 {
 		t.Fatalf("after the summon: wolf peace enters/exits = %d/%d, want 1/0", got, gotExits)
 	}
-	base := wolfTemplate().RunSpeed
 	if !wolf.InsideZone(zone.FlagSwamp) {
 		t.Fatal("wolf spawned in a swamp is not in it")
 	}
-	swampSpeed := wolf.MoveSpeed(base)
+	swampSpeed := wolf.MoveSpeed()
 	drainUntilQuiet(t, h.client)
 
 	obj, ok := h.srv.State.Player(h.ownerID)
@@ -141,7 +132,7 @@ func TestSummonZonesFollowOwnerTeleport(t *testing.T) {
 	}
 	// The swamp scales the base speed before the RUN_SPEED stat, which
 	// only multiplies it here.
-	speed := wolf.MoveSpeed(base)
+	speed := wolf.MoveSpeed()
 	if want := speed * float64(100+swamp.MoveBonus) / 100; swampSpeed != want {
 		t.Fatalf("wolf move speed in the swamp = %v, want %v (%v out of it)", swampSpeed, want, speed)
 	}

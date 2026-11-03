@@ -27,7 +27,7 @@ func (p petitionPresence) GM(objectID int32) bool {
 }
 
 func petitionPerson(live *livePlayer) petition.Person {
-	return petition.Person{ID: live.ObjectID(), Name: live.Name}
+	return petition.Person{ID: live.ObjectID(), Name: live.CharacterName()}
 }
 
 // deliverPetition sends each notice to its recipient still in the world,
@@ -112,14 +112,14 @@ func (l *GameClientLink) requestPetition(live *livePlayer, req clientpackets.Req
 	case petition.SubmitTooLong:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetitionMaxChars255))
 	case petition.SubmitBadType, petition.SubmitNoID:
-		// A type the client cannot name is a malformed request; the
-		// reference answers it with nothing, but the petition window
-		// still waits on an answer.
+		// A type the client cannot name is a malformed request; it
+		// carries no message of its own, but the petition window still
+		// waits on an answer.
 		l.log.Warn().Err(err).Int32("object_id", live.ObjectID()).Int32("type", req.Type).Msg("petition refused")
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case petition.Submitted:
 		if s.NotifyGMs {
-			l.tellGMsOfPetition(live.ObjectID(), live.Name+" has submitted a new petition.")
+			l.tellGMsOfPetition(live.ObjectID(), live.CharacterName()+" has submitted a new petition.")
 		}
 		maxPerPlayer := l.petitions.Config().MaxPerPlayer
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetitionAcceptedRecentNoS1, s.ID))
@@ -142,17 +142,17 @@ func (l *GameClientLink) requestPetitionCancel(live *livePlayer) {
 	case petition.CancelDone:
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetitionCanceledSubmitS1MoreToday, int32(c.Remaining)))
 		if c.NotifyGMs {
-			l.tellGMsOfPetition(live.ObjectID(), live.Name+" has canceled a pending petition.")
+			l.tellGMsOfPetition(live.ObjectID(), live.CharacterName()+" has canceled a pending petition.")
 		}
 	}
 }
 
 // petitionVote records live's rating of its closed petition. Without a
 // closed petition awaiting it, or with a rate the client cannot name, it
-// is dropped without an answer as in the reference: the client closes its
+// is dropped without an answer on purpose: the client closes its
 // feedback window when it sends the vote and waits on nothing.
 func (l *GameClientLink) petitionVote(live *livePlayer, req clientpackets.PetitionVote) {
-	l.petitions.Vote(live.ObjectID(), req.Rate, strings.TrimFunc(req.Feedback, javaSpace))
+	l.petitions.Vote(live.ObjectID(), req.Rate, strings.TrimFunc(req.Feedback, isCtrlOrSpace))
 }
 
 // chatPetition says live's line in the chat of the petition it sent or

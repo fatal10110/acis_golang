@@ -1,0 +1,22 @@
+# Dark Winged Spies (Q275), refused: Tantus sends away a human of level 11. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q275_dark_winged_spies_wrong_race.golden
+character Spy 11
+script quest.Q275_DarkWingedSpies
+item 1478
+page default/30567.htm
+page script/quest/Q275_DarkWingedSpies/
+npc tantus 30567 Folk 10 0 0
+
+# Tantus: the quest cannot start.
+action tantus
+action tantus
+  S ActionFailed
+  S NpcHtmlMessage obj=tantus item=0 page=default/30567.htm
+  S ActionFailed
+bypass npc_{tantus}_Quest
+  S NpcHtmlMessage obj=tantus item=0 page=script/quest/Q275_DarkWingedSpies/30567-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q275_DarkWingedSpies CREATED
+  rows Q275_DarkWingedSpies -

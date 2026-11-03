@@ -49,15 +49,15 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 		}
 
 		next := e.blockAtGeo(nx, ny)
-		layer := next.Below(localCell(nx), localCell(ny), int32(goz+block.CellIgnoreHeight))
+		layer, cell := next.belowCell(localCell(nx), localCell(ny), int32(goz+block.CellIgnoreHeight), nil)
 		if layer == -1 {
 			return false
 		}
 
 		gox = nx
 		goy = ny
-		goz = int(next.Height(layer))
-		nswe = next.NSWE(layer)
+		goz = int(cell.Height)
+		nswe = cell.NSWE
 	}
 
 	return goz == int(e.Height(tx, ty, tz))
@@ -95,8 +95,10 @@ func (e *Engine) CanSeeWithHeights(ox, oy, oz int, oheight float64, tx, ty, tz i
 }
 
 // CanSeeWithHeightsIgnoring reports mutual line of sight while ignoring one
-// dynamic geodata object, such as the target door itself.
+// dynamic geodata object, such as the target door itself. A stand-in for
+// a stored object ignores the object it stands for.
 func (e *Engine) CanSeeWithHeightsIgnoring(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object) bool {
+	ignore = dynamic.Stored(ignore)
 	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight, ignore) &&
 		e.canSee(tx, ty, tz, theight, ox, oy, oz, oheight, ignore)
 }
@@ -151,7 +153,7 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 	gty := GeoY(ty)
 
 	current := e.blockAtGeo(gox, goy)
-	layer := current.BelowIgnoring(localCell(gox), localCell(goy), int32(oz+block.CellHeight), ignore)
+	layer, cell := current.belowCell(localCell(gox), localCell(goy), int32(oz+block.CellHeight), ignore)
 	if layer == -1 {
 		return false
 	}
@@ -159,8 +161,8 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 		return layer == current.BelowIgnoring(localCell(gtx), localCell(gty), int32(tz+block.CellHeight), ignore)
 	}
 
-	groundZ := int(current.Height(layer))
-	nswe := current.NSWE(layer)
+	groundZ := int(cell.Height)
+	nswe := cell.NSWE
 	dx := tx - ox
 	dy := ty - oy
 	m := float64(dy) / float64(dx)
@@ -201,21 +203,21 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 		losZ += mz * math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY))
 
 		if nswe.Allows(step) {
-			layer = current.BelowIgnoring(localCell(gox), localCell(goy), int32(groundZ+block.CellIgnoreHeight), ignore)
+			layer, cell = current.belowCell(localCell(gox), localCell(goy), int32(groundZ+block.CellIgnoreHeight), ignore)
 		} else {
-			layer = current.AboveIgnoring(localCell(gox), localCell(goy), int32(groundZ-2*block.CellHeight), ignore)
+			layer, cell = current.aboveCell(localCell(gox), localCell(goy), int32(groundZ-2*block.CellHeight), ignore)
 		}
 		if layer == -1 {
 			return false
 		}
 
-		nextZ := int(current.Height(layer))
+		nextZ := int(cell.Height)
 		if float64(nextZ) > losZ {
 			return false
 		}
 
 		groundZ = nextZ
-		nswe = current.NSWE(layer)
+		nswe = cell.NSWE
 	}
 
 	return true

@@ -21,7 +21,7 @@ func TestLearnGeneralBadPassiveStillCompletes(t *testing.T) {
 	tmpl := &player.Template{Skills: []player.SkillGrant{{SkillID: skillID, Level: 1, MinLevel: 1, Cost: 50}}}
 	ch := &player.Character{ID: 1, CharLevel: 5, SP: 80, Exp: 1000}
 
-	result, status, err := LearnGeneral(ch, tmpl, p, modelskill.BookPolicy{}, skillID, 1)
+	result, status, err := LearnGeneral(ch, tmpl, p, modelskill.BookPolicy{}, nil, skillID, 1)
 	if err == nil {
 		t.Fatal("LearnGeneral() error = nil, want the bad passive definition reported")
 	}

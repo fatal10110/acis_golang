@@ -1,0 +1,13 @@
+# RoyalRushHealer2 (18186, level 81), every draw 50: a hit by the character from 300 away wants only its self range
+# DD magic on itself (1000000): both of its other draws are lost.
+character Hunter 20
+random always 50
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.RoyalRushHealer2
+npc healer 18186 Monster 300 0 0 level 81 skill W_SELF_RANGE_DD_MAGIC 4033 9 skill W_LONG_RANGE_DD_MAGIC 4597 9 skill W_RANGE_HEAL 4613 9 skill W_SELF_RANGE_DEBUFF 4657 9 skill W_RANGE_DEBUFF 4640 9
+
+hit healer 10
+  desires healer cast(healer,4033,move)=1000000

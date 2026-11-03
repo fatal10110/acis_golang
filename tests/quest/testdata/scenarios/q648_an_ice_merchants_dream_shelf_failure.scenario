@@ -1,0 +1,43 @@
+# An Ice Merchant's Dream (Q648): the wrong second tool spoils the crystal.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q648_an_ice_merchants_dream_shelf_failure.golden
+character Hero 53
+quest Q648_AnIceMerchantsDream <cond>=1 <state>=STARTED
+hold 8077 2
+random 1
+script quest.Q648_AnIceMerchantsDream
+item 8057 8077 8078 57
+page default/32020.htm
+page default/32023.htm
+page script/quest/Q648_AnIceMerchantsDream/
+npc rafforty 32020 Folk 10 0 0
+npc shelf 32023 Folk 20 0 0
+
+action shelf
+action shelf
+  S ActionFailed
+  S NpcHtmlMessage obj=shelf item=0 page=default/32023.htm
+  S ActionFailed
+bypass npc_{shelf}_Quest
+  S NpcHtmlMessage obj=shelf item=0 page=script/quest/Q648_AnIceMerchantsDream/32023-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q648_AnIceMerchantsDream | exCond | 0
+bypass Quest Q648_AnIceMerchantsDream 32023-05.htm
+  S NpcHtmlMessage obj=shelf item=0 page=script/quest/Q648_AnIceMerchantsDream/32023-05.htm
+  S ActionFailed
+  Q upsert Q648_AnIceMerchantsDream | exCond | 20
+bypass Quest Q648_AnIceMerchantsDream 32023-06-chisel
+  S PlaySound type=0 file=ItemSound2.broken_key bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8077
+  S NpcHtmlMessage obj=shelf item=0 page=script/quest/Q648_AnIceMerchantsDream/32023-06.htm
+  S ActionFailed
+  Q upsert Q648_AnIceMerchantsDream | exCond | 21
+bypass Quest Q648_AnIceMerchantsDream 32023-07-file
+  S PlaySound type=0 file=ItemSound3.sys_enchant_failed bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=shelf item=0 page=script/quest/Q648_AnIceMerchantsDream/32023-08.htm
+  S ActionFailed
+  Q upsert Q648_AnIceMerchantsDream | exCond | 0
+  items 8077=1 8078=0
+  rows Q648_AnIceMerchantsDream <cond>=1 <state>=STARTED exCond=0
+  state Q648_AnIceMerchantsDream STARTED

@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/macro"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -84,7 +85,7 @@ func (l *GameClientLink) makeMacro(live *livePlayer, req clientpackets.RequestMa
 	commandText := 0
 	for i, c := range req.Commands {
 		m.Commands[i] = macro.Command{Type: c.Type, D1: c.D1, D2: c.D2, Text: c.Text}
-		commandText += macro.UTF16Len(c.Text)
+		commandText += commons.UTF16Len(c.Text)
 	}
 	if msg, refused := macroRefusalMessage(live.macros.Check(m, commandText)); refused {
 		live.SendFrame(serverpackets.FrameSystemMessage(msg))
@@ -117,7 +118,7 @@ func macroRefusalMessage(r macro.Refusal) (int, bool) {
 
 // deleteMacro answers RequestDeleteMacro: the macro's row and every
 // shortcut bound to it go, then the refreshed macro list is sent. Deleting
-// an id the list does not hold answers nothing, as the reference does: the
+// an id the list does not hold answers nothing on purpose: the
 // macro window registers no pending action and the list it shows is
 // unchanged.
 func (l *GameClientLink) deleteMacro(live *livePlayer, req clientpackets.RequestDeleteMacro) {

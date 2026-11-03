@@ -1,0 +1,135 @@
+# Gatekeeper's Offering (Q277): a level 15 character accepts at Tamil (a gatekeeper); twenty
+# greystone golems give twenty starstones (every roll pinned to succeed), the twentieth moving the
+# quest on; Tamil takes them for two gatekeeper charms, and the repeatable quest ends; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q277_gatekeepers_offering.golden
+character Offerer 15
+random always 0
+script quest.Q277_GatekeepersOffering
+item 1572 1658
+page gatekeeper/30576.htm
+page script/quest/Q277_GatekeepersOffering/
+npc tamil 30576 Gatekeeper 10 0 0
+npc golem 20333 Monster 40 0 0
+
+# Tamil: accept.
+action tamil
+action tamil
+  S ActionFailed
+  S NpcHtmlMessage obj=tamil item=0 page=gatekeeper/30576.htm
+  S ActionFailed
+bypass npc_{tamil}_Quest
+  S NpcHtmlMessage obj=tamil item=0 page=script/quest/Q277_GatekeepersOffering/30576-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q277_GatekeepersOffering CREATED
+bypass Quest Q277_GatekeepersOffering 30576-03.htm
+  S QuestList 277:0x80000001
+  S ExShowQuestMark quest=277
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tamil item=0 page=script/quest/Q277_GatekeepersOffering/30576-03.htm
+  S ActionFailed
+  Q upsert Q277_GatekeepersOffering | <state> | STARTED
+  Q upsert Q277_GatekeepersOffering | <cond> | 1
+  state Q277_GatekeepersOffering STARTED
+  rows Q277_GatekeepersOffering <cond>=1 <state>=STARTED
+action tamil
+  S ActionFailed
+  S NpcHtmlMessage obj=tamil item=0 page=gatekeeper/30576.htm
+  S ActionFailed
+bypass npc_{tamil}_Quest
+  S NpcHtmlMessage obj=tamil item=0 page=script/quest/Q277_GatekeepersOffering/30576-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Twenty golems: a starstone each; the twentieth completes the set.
+kill golem x20
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1572
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 277:0x80000003
+  S ExShowQuestMark quest=277
+  Q upsert Q277_GatekeepersOffering | <cond> | 2
+  items 1572=20
+  rows Q277_GatekeepersOffering <cond>=2 <state>=STARTED
+
+# Tamil: the starstones for two charms; the quest ends.
+action tamil
+  S ActionFailed
+  S NpcHtmlMessage obj=tamil item=0 page=gatekeeper/30576.htm
+  S ActionFailed
+bypass npc_{tamil}_Quest
+  S SystemMessage id=301 3:1572 6:20
+  S SystemMessage id=53 3:1658 6:2
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=tamil item=0 page=script/quest/Q277_GatekeepersOffering/30576-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q277_GatekeepersOffering
+  items 1572=0 1658=2
+  state Q277_GatekeepersOffering -
+  rows Q277_GatekeepersOffering -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q277_GatekeepersOffering -
+  rows Q277_GatekeepersOffering -
+  items 1658=2

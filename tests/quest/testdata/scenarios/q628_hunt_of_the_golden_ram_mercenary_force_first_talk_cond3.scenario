@@ -1,0 +1,38 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): at cond 3 each of the four NPCs answers a first talk with its own page.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_first_talk_cond3.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
+hold 7247 1
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31553.htm
+page default/31554.htm
+page default/31555.htm
+page default/31556.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc pierce 31553 Folk 10 0 0
+npc kahman 31554 Folk 20 0 0
+npc abercrombie 31555 Folk 30 0 0
+npc selina 31556 Folk 40 0 0
+
+action pierce
+action pierce
+  S ActionFailed
+  S NpcHtmlMessage obj=pierce item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31553-09.htm
+  S ActionFailed
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-09.htm
+  S ActionFailed
+action abercrombie
+action abercrombie
+  S ActionFailed
+  S NpcHtmlMessage obj=abercrombie item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31555-10.htm
+  S ActionFailed
+action selina
+action selina
+  S ActionFailed
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-10.htm
+  S ActionFailed

@@ -2,6 +2,7 @@ package skill
 
 import (
 	"strings"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -11,6 +12,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -119,7 +122,7 @@ type Player interface {
 	NotifyAttackFailed()
 	NotifyResistedSkill(targetName string, skillID modelskill.ID, level int)
 	NotifyResistedMagic(attackerName string)
-	NotifySkillDamage(amount int, magicCrit, blocked, petrified bool)
+	NotifySkillDamage(targetID int32, amount int, magicCrit, blocked, petrified bool)
 	NotifySpoilAlready()
 	NotifySpoilSuccess()
 	// Summon-friend eligibility state the caster and target share.
@@ -127,6 +130,15 @@ type Player interface {
 	OlympiadMode() bool
 	ObserverMode() bool
 	NoSummonFriendZone() bool
+
+	// AddExpAndSp grants experience and SP.
+	AddExpAndSp(exp int64, sp int)
+	// ReviveRequest offers this player a resurrection, for itself or for
+	// its pet.
+	ReviveRequest(reviver player.Reviver, power float64, isPet bool)
+	// NotifyEffectRemovedDueLackMP tells this player its effect ended
+	// because a tick could not pay its MP cost.
+	NotifyEffectRemovedDueLackMP(*effect.Effect)
 }
 
 // NPC is the NPC-only cast participant surface.
@@ -142,6 +154,20 @@ type NPC interface {
 	// MonsterKind reports a Monster-family NPC, the only one sown or
 	// harvested.
 	MonsterKind() bool
+	// AggroHate is this NPC's hate against attacker; 0 for one that keeps
+	// no threat table.
+	AggroHate(attacker attackable.Combatant) float64
+
+	// Chest surface: Unlockable reports a chest an unlock skill may open,
+	// and only such an NPC is a box, claims an unlock attempt or is
+	// deleted by one.
+	Unlockable() bool
+	Box() bool
+	Interacted() bool
+	ClaimInteraction() bool
+	AddAttackDesire(attacker attackable.Combatant, hate float64)
+	AddDamageHate(attacker attackable.Combatant, damage, hate float64)
+	DeleteMe()
 }
 
 // Summon is the summon-only cast participant surface.
@@ -150,11 +176,57 @@ type Summon interface {
 	SiegeSummon() bool
 	SummonOwner() summon.Owner
 	UnSummon(owner summon.Owner)
+	// IsPet tells a pet from a servitor.
+	IsPet() bool
+	// AddExpAndSp grants a pet experience and SP.
+	AddExpAndSp(exp int64, sp int)
+	// ReviveRestoringExp revives this summon outright on a player's
+	// resurrection, restoring part of a pet's lost exp; ResurrectOutright
+	// does it for a non-player caster's, on the summon's own queue.
+	ReviveRestoringExp(power float64) bool
+	ResurrectOutright(power float64)
 }
 
 // asCreature returns a as a creature, or false for a cast participant that
 // is not one (a door or a signet effect point).
 func asCreature(a Actor) (Creature, bool) {
+	c, ok := a.(Creature)
+	return c, ok
+}
+
+// damageTarget is what a damage skill reads and hits on its target: every
+// creature, and a door, which takes the damage but holds no effects and
+// counters, reflects or dies to a lethal strike never.
+type damageTarget interface {
+	attackable.Combatant
+	Invul() bool
+	HP() float64
+	PhysicalSkillInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
+	MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition, magicFailures bool) (formulas.MagicDamageInput, bool)
+	BlowInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.BlowInput, bool)
+	CounterSkillPhysical() float64
+	ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
+}
+
+// asDoor returns a as a door: the door itself, or the hit surface a
+// summon's cast aims at it through.
+func asDoor(a Actor) (*door.Object, bool) {
+	switch d := a.(type) {
+	case *door.Object:
+		return d, true
+	case doorhit.Target:
+		return d.Object, d.Object != nil
+	}
+	return nil, false
+}
+
+// asDamageTarget returns a as the target of a damage skill: a creature as
+// itself, a door through its hit surface. Any other participant (a signet
+// effect point) takes no damage.
+func asDamageTarget(a Actor) (damageTarget, bool) {
+	if d, ok := asDoor(a); ok {
+		return doorhit.Of(d), true
+	}
 	c, ok := a.(Creature)
 	return c, ok
 }
@@ -175,6 +247,15 @@ func asNPC(a Actor) (NPC, bool) {
 	}
 	n, ok := a.(NPC)
 	return n, ok
+}
+
+// asSummon returns a as a summon, or false for any other kind.
+func asSummon(a Actor) (Summon, bool) {
+	if a == nil || a.Kind() != actor.KindSummon {
+		return nil, false
+	}
+	s, ok := a.(Summon)
+	return s, ok
 }
 
 // asEffected returns a as an effect target: every creature plus a signet
@@ -236,7 +317,7 @@ func (c Cast) reportResisted(target Actor, def modelskill.Definition, count int)
 
 // Definitions resolves loaded skill definitions.
 type Definitions interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 	MaxLevel(modelskill.ID) int
 }
 
@@ -316,9 +397,11 @@ const (
 )
 
 // Damage reports a skill hit's damage to the attacking side. RecipientID is
-// the attacking player, or the owner of the attacking summon.
+// the attacking player, or the owner of the attacking summon; TargetID is
+// the object id of the target hit.
 type Damage struct {
 	RecipientID  int32
+	TargetID     int32
 	Source       DamageSource
 	Amount       int32
 	MagicCrit    bool
@@ -396,9 +479,26 @@ type resultHandler interface {
 // Registry maps skill type names to their handlers.
 type Registry struct {
 	entries map[string]Handler
-	// magicFailures is the server's MagicFailures switch, read by the
-	// cubic damage path (UseCubic).
-	magicFailures bool
+	// magicFailures is the server's MagicFailures switch, shared with the
+	// magic damage handlers and read by the cubic damage path (UseCubic).
+	magicFailures *magicFailureSwitch
+}
+
+// magicFailureSwitch is the server's MagicFailures switch in force. A nil
+// switch is off.
+type magicFailureSwitch struct{ on atomic.Bool }
+
+func (s *magicFailureSwitch) enabled() bool {
+	return s != nil && s.on.Load()
+}
+
+// SetMagicFailures puts the MagicFailures switch on in force for the casts
+// that start after it. A registry built by NewRegistry has no switch, so
+// keeps magic failures off.
+func (r *Registry) SetMagicFailures(on bool) {
+	if r.magicFailures != nil {
+		r.magicFailures.on.Store(on)
+	}
 }
 
 // NewRegistry returns a registry populated with handlers.
@@ -424,11 +524,13 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 }
 
 func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskill.HealSpsTable) *Registry {
+	failures := &magicFailureSwitch{}
+	failures.on.Store(magicFailures)
 	r := NewRegistry(
 		pdamHandler{},
 		chargeDamHandler{},
-		mdamHandler{magicFailures: magicFailures},
-		drainHandler{magicFailures: magicFailures},
+		mdamHandler{magicFailures: failures},
+		drainHandler{magicFailures: failures},
 		blowHandler{},
 		manaDamageHandler{},
 		healHandler{buff: continuousHandler{defs: defs}, healSps: healSps},
@@ -463,7 +565,7 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		fishingHandler{},
 		fishingSkillHandler{},
 	)
-	r.magicFailures = magicFailures
+	r.magicFailures = failures
 	return r
 }
 
@@ -500,7 +602,7 @@ func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, healSps 
 		r.Register(harvestHandler{ids: signet.IDs, cropRate: signet.ManorCropRate})
 		r.Register(sweepHandler{ids: signet.IDs})
 	}
-	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, zones: signet.Zones, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
+	r.Register(signetHandler{defs: defs, magicFailures: r.magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, zones: signet.Zones, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
 	return r
 }
 
@@ -608,6 +710,15 @@ func cursed(a Actor) bool {
 	return ok && p.CursedWeaponEquipped()
 }
 
+// actingCursed reports whether the player acting through a, a itself or
+// a summon's owner, wields a cursed weapon.
+func actingCursed(a Actor) bool {
+	if s, ok := a.(Summon); ok {
+		return cursed(s.SummonOwner())
+	}
+	return cursed(a)
+}
+
 // formulaCasterOf returns a as a formula caster, or nil for a cast
 // participant that is not a creature (a door or a signet effect point).
 // Formula inputs treat a nil caster as one that cannot roll.
@@ -627,6 +738,7 @@ var (
 	_ NPC          = (*npc.Hostile)(nil)
 	_ Creature     = (*player.Character)(nil)
 	_ Creature     = (*npc.Hostile)(nil)
+	_ NPC          = (*npc.Folk)(nil)
 	_ Summon       = (*summon.Actor)(nil)
 	_ damageSummon = (*summon.Actor)(nil)
 )

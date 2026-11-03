@@ -1,0 +1,19 @@
+# Possessor of a Precious Soul - 3 (Q246), started on a subclass (cond 4, Barakiel's Rain Song)
+# and played on the base class: Barakiel killed on the base class gives no Rain Song.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q246_possessor_of_a_precious_soul_base_class_barakiel.golden
+character Fighter 76
+class 2
+quest Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=4
+script quest.Q246_PossessorOfAPreciousSoul
+item 7593
+page script/quest/Q246_PossessorOfAPreciousSoul/
+npc barakiel 25325 RaidBoss 0 40 0
+
+# Barakiel killed on the base class gives no Rain Song, though the quest waits for it.
+kill barakiel
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  items 7593=0
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=4

@@ -3,7 +3,6 @@ package items
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -62,8 +61,8 @@ func assertDropRefused(t *testing.T, srv *gameservertest.Server, c *testsupport.
 	before := mustFindItem(t, srv, ownerID, objectID).Count
 	c.Send(encodeRequestDropItem(objectID, count, x, spawnY, spawnZ))
 	assertStaticSystemMessage(t, c.Read(), messageID)
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("refused drop sent opcode %#x after its refusal, want nothing", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("refused drop sent opcode %#x after its refusal, want nothing", queued[0][0])
 	}
 	if snaps := srv.GroundItems.Snapshots(nil); len(snaps) != 0 {
 		t.Fatalf("ground items after a refused drop = %+v, want none", snaps)

@@ -1,0 +1,16 @@
+# GuardFixed (30040), a town guard of Gludio: a hit of 10 makes it hate the character by
+# 2000 and want to attack it, from its post (GuardFixed's attacked hook, which never calls
+# Guard's). GuardMoveAroundFixed's 5-minute return draws its spawn point, which an npc
+# line without a maker does not have; tests/ai/guard_fixed_test.go covers it.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Guard.Guard
+script script.ai.individual.Guard.GuardFixed
+script script.ai.individual.Guard.GuardMoveAround
+script script.ai.individual.Guard.GuardMoveAroundFixed
+script script.ai.individual.Guard.GuardStand
+npc post 30040 Guard 300 0 0
+
+hit post 10
+  hate post 2000
+  desires post attack(player)=2000

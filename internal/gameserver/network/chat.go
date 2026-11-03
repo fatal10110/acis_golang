@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -56,8 +57,8 @@ var chatHandlers = map[chat.Type]chatHandler{
 }
 
 // handleSay2 delivers a chat line live says. A line the chat rules drop,
-// or one on a channel with no handler, goes unanswered as in the
-// reference: the client prints nothing of its own and waits on no reply.
+// or one on a channel with no handler, goes unanswered on purpose: the
+// client prints nothing of its own and waits on no reply.
 func (l *GameClientLink) handleSay2(client *Client, live *livePlayer, req clientpackets.Say2) {
 	line, ok := chat.Admit(req.Type, req.Text, req.Target, live.accessLevel().IsGM, l.chat.WalkerProtection)
 	if !ok {
@@ -67,10 +68,10 @@ func (l *GameClientLink) handleSay2(client *Client, live *livePlayer, req client
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageChattingProhibited))
 		return
 	}
-	l.chat.Log.Info().Msg(chat.LogEntry(line, live.Name))
+	l.chat.Log.Info().Msg(chat.LogEntry(line, live.CharacterName()))
 	handle := chatHandlers[line.Type]
 	if handle == nil {
-		l.log.Warn().Str("player", live.Name).Stringer("type", line.Type).Msg("chat line on a channel with no handler")
+		l.log.Warn().Str("player", live.CharacterName()).Stringer("type", line.Type).Msg("chat line on a channel with no handler")
 		return
 	}
 	line.Text = chat.Clean(line.Text)
@@ -80,7 +81,7 @@ func (l *GameClientLink) handleSay2(client *Client, live *livePlayer, req client
 // frameCreatureSay builds live's line as its listeners see it.
 func frameCreatureSay(live *livePlayer, line chat.Line) func() wire.Frame {
 	return func() wire.Frame {
-		return serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.Name, line.Text)
+		return serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.CharacterName(), line.Text)
 	}
 }
 
@@ -156,7 +157,7 @@ func (l *GameClientLink) chatTell(_ *Client, live *livePlayer, line chat.Line) {
 	}
 	if !live.accessLevel().IsGM {
 		if target.BlockingAll() {
-			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1BlockedEverything, target.Name))
+			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1BlockedEverything, target.CharacterName()))
 			return
 		}
 		if l.relations.IsBlocked(target.ObjectID(), live.ObjectID()) {
@@ -164,8 +165,8 @@ func (l *GameClientLink) chatTell(_ *Client, live *livePlayer, line chat.Line) {
 			return
 		}
 	}
-	target.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.Name, line.Text))
-	live.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), "->"+target.Name, line.Text))
+	target.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.CharacterName(), line.Text))
+	live.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), "->"+target.CharacterName(), line.Text))
 }
 
 // chatParty is heard by every member of live's party, live included. With
@@ -232,10 +233,16 @@ func (l *GameClientLink) broadcastToChannel(speaker *livePlayer, members []*live
 // the world whose position falls in the same restart region as speaker's,
 // speaker included. Players outside every region share the empty one.
 func (l *GameClientLink) broadcastToRegion(speaker *livePlayer, build func() wire.Frame) {
+	l.broadcastToRegionAt(speaker.CurrentLocation(), build)
+}
+
+// broadcastToRegionAt sends one copy of the built frame to every player in
+// the world whose position falls in the same restart region as at.
+func (l *GameClientLink) broadcastToRegionAt(at location.Location, build func() wire.Frame) {
 	if l.world == nil {
 		return
 	}
-	region := l.restarts.PointIndexAt(speaker.CurrentLocation())
+	region := l.restarts.PointIndexAt(at)
 	broadcastFrame(build, func(send func(frameReceiver)) {
 		for _, p := range l.world.Players() {
 			if listener, ok := p.(*livePlayer); ok && l.restarts.PointIndexAt(listener.CurrentLocation()) == region {

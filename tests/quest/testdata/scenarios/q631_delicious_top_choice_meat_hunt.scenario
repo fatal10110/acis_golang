@@ -1,0 +1,55 @@
+# Delicious Top Choice Meat (Q631): a monster drops top quality meat only for a draw under its own chance; the hundred and twentieth moves the quest to cond 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q631_delicious_top_choice_meat_hunt.golden
+character Hero 65
+quest Q631_DeliciousTopChoiceMeat <cond>=1 <state>=STARTED
+hold 7546 118
+random 0 601000 0 0 0 0
+script quest.Q631_DeliciousTopChoiceMeat
+item 7546 4039 4040 4041 4042 4043 4044
+page default/31537.htm
+page script/quest/Q631_DeliciousTopChoiceMeat/
+npc tunatun 31537 Folk 10 0 0
+npc m1 21460 Monster 40 0 0
+npc m2 21461 Monster 50 0 0
+npc m3 21505 Monster 60 0 0
+
+action tunatun
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q631_DeliciousTopChoiceMeat/31537-03a.htm
+  S ActionFailed
+  S ActionFailed
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 7546=118
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7546
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7546=119
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7546
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 631:0x80000003
+  S ExShowQuestMark quest=631
+  Q upsert Q631_DeliciousTopChoiceMeat | <cond> | 2
+  rows Q631_DeliciousTopChoiceMeat <cond>=2 <state>=STARTED
+  state Q631_DeliciousTopChoiceMeat STARTED
+  items 7546=120
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q631_DeliciousTopChoiceMeat/31537-04.htm
+  S ActionFailed
+  S ActionFailed

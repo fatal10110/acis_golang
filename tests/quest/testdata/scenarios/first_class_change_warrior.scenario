@@ -1,0 +1,47 @@
+# First class change (FirstClassChange): a level 20 human fighter holding the medallion of the
+# Warrior asks Grand Master Ramos about the Warrior and changes profession: the medallion is
+# taken, fifteen D-grade coupons given, the fanfare played, then the class change's own
+# animation and message, and the congratulation page. After a relog the character plays the
+# Warrior, so Ramos says it has already changed profession. Expectations are the reference
+# trace's (FirstClassChange.onTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/first_class_change_warrior.golden
+character Fighter 20
+hold 1145 1
+script script.feature.FirstClassChange
+item 1145 8869
+page villagemaster/30373.htm
+page script/feature/FirstClassChange/
+npc ramos 30373 VillageMasterFighter 10 0 0
+
+action ramos
+action ramos
+  S ActionFailed
+  S NpcHtmlMessage obj=ramos item=0 page=villagemaster/30373.htm
+  S ActionFailed
+bypass npc_{ramos}_Quest FirstClassChange
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest FirstClassChange 30373-09.htm
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-09.htm
+  S ActionFailed
+bypass Quest FirstClassChange HW
+  S SystemMessage id=302 3:1145
+  S SystemMessage id=53 3:8869 6:15
+  S PlaySound type=0 file=ItemSound.quest_fanfare_2 bind=0 obj=0 loc=0,0,0 delay=0
+  S MagicSkillUse caster=player target=player skill=5103-1 hit=1000 reuse=0 success=0
+  S SystemMessage id=1308
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-29.htm
+  S ActionFailed
+  items 1145=0 8869=15
+relog
+  items 1145=0 8869=15
+action ramos
+action ramos
+  S ActionFailed
+  S NpcHtmlMessage obj=ramos item=0 page=villagemaster/30373.htm
+  S ActionFailed
+bypass npc_{ramos}_Quest FirstClassChange
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-38.htm
+  S ActionFailed
+  S ActionFailed

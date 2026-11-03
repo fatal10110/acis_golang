@@ -1,0 +1,65 @@
+package catalog
+
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+)
+
+// aiIndividual1 is the catalog of batch 1 of 8 of the individual NPC behaviors (#186).
+func aiIndividual1() script.Catalog {
+	return script.Catalog{
+		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo":                                                       warrior.CorePrivatePremo,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval":                                                         warrior.RamphoPrimeval,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1":                                                    warrior.RoyalRushStrongMan1,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2":                                                    warrior.RoyalRushStrongMan2,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2":                                       warrior.RoyalRushWarriorPhysicalSpecial2,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.CorePrivateWarriorAggressive":                         warrior.CorePrivateWarriorAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":                                               warrior.Medusa,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.QueenAntPrivateGuardAnt":                              warrior.QueenAntPrivateGuardAnt,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAttackPetAggressive":                           warrior.AttackPetAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorBerserkerAggressive":                           warrior.BerserkerAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorHoldAggressive":                                warrior.HoldAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorSeeSpellAggressive":                            warrior.SeeSpellAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorSummonPrivateAtDyingAggressive":                warrior.SummonPrivateAtDyingAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate":                                             warrior.AggressiveImmediate,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive":                                          warrior.Cast2DebuffsAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive":                                   warrior.Cast2SkillsApproachAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproach":                  warrior.Cast3SkillsApproach,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproachAggressive":        warrior.Cast3SkillsApproachAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproachRevivalAggressive": warrior.Cast3SkillsApproachRevivalAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproachStoneAggressive":   warrior.Cast3SkillsApproachStoneAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsCurse":                      warrior.Cast3SkillsCurse,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsCurseAggressive":            warrior.Cast3SkillsCurseAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsMagical":                    warrior.Cast3SkillsMagical,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsMagicalAggressive":          warrior.Cast3SkillsMagicalAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.WarriorCast3SkillsMagicalRevived":             warrior.Cast3SkillsMagicalRevived,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical.ZakenPrivateValeMaster":                       warrior.ZakenPrivateValeMaster,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2":                  warrior.Cast3SkillsMagical2,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2Aggressive":        warrior.Cast3SkillsMagical2Aggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2Revived":           warrior.Cast3SkillsMagical2Revived,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2StoneAggressive":   warrior.Cast3SkillsMagical2StoneAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3":                  warrior.Cast3SkillsMagical3,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3Aggressive":        warrior.Cast3SkillsMagical3Aggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical3.WarriorCast3SkillsMagical3Revived":           warrior.Cast3SkillsMagical3Revived,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical4.WarriorCast3SkillsMagical4":                  warrior.Cast3SkillsMagical4,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical4.WarriorCast3SkillsMagical4Revived":           warrior.Cast3SkillsMagical4Revived,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSelfRangeDDMagicAggressive":                                  warrior.CastSelfRangeDDMagicAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSelfRangeDDMagicBuffAggressive":                              warrior.CastSelfRangeDDMagicBuffAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseNecroLongAggressive":                                       warrior.CorpseNecroLongAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorDisguise":                                                        warrior.Disguise,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorFlee":                                                            warrior.Flee,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.FarmGrowthStep":                                           warrior.FarmGrowthStep,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep1":                                       warrior.WarriorGrowthStep1,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep2":                                       warrior.WarriorGrowthStep2,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep3Aggressive":                             warrior.WarriorGrowthStep3Aggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorGrowth.WarriorGrowthStep4Aggressive":                             warrior.WarriorGrowthStep4Aggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHereticPriestAggressive":                                         warrior.HereticPriestAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.AncientEgg":                                                 warrior.AncientEgg,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.PrimevalPlant":                                              warrior.PrimevalPlant,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.RoyalRushWarriorPhysicalSpecial1Hold":                       warrior.RoyalRushWarriorPhysicalSpecial1Hold,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecialGolemAggressive":                           warrior.RunAwayPhysicalSpecialGolemAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorTimerBomb":                                                       warrior.TimerBomb,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorUseBow":                                                          warrior.UseBow,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorUseBowNotFleeAggressive":                                         warrior.UseBowNotFleeAggressive,
+	}
+}

@@ -1,0 +1,40 @@
+# Echo crystals (EchoCrystal): Octavia trades the Theme of Comedy score, whose short-of-adena
+# and no-score pages are shared with the Theme of Battle, for its crystal with exactly 200 adena
+# held. Expectations are the reference trace's (EchoCrystal.onTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/echo_crystal_octavia.golden
+character Singer 20
+hold 4419 1
+hold 57 200
+script script.feature.EchoCrystal
+item 4417 4419
+page default/31043.htm
+page script/feature/EchoCrystal/
+npc octavia 31043 Folk 10 0 0
+
+action octavia
+action octavia
+  S ActionFailed
+  S NpcHtmlMessage obj=octavia item=0 page=default/31043.htm
+  S ActionFailed
+bypass npc_{octavia}_Quest EchoCrystal
+  S NpcHtmlMessage obj=octavia item=0 page=script/feature/EchoCrystal/1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest EchoCrystal 4419
+  S SystemMessage id=672 1:200
+  S SystemMessage id=54 3:4417
+  S NpcHtmlMessage obj=octavia item=0 page=script/feature/EchoCrystal/31043-16.htm
+  S ActionFailed
+  items 57=0 4419=1 4417=1
+action octavia
+  S ActionFailed
+  S NpcHtmlMessage obj=octavia item=0 page=default/31043.htm
+  S ActionFailed
+bypass npc_{octavia}_Quest EchoCrystal
+  S NpcHtmlMessage obj=octavia item=0 page=script/feature/EchoCrystal/1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest EchoCrystal 4419
+  S NpcHtmlMessage obj=octavia item=0 page=script/feature/EchoCrystal/31043-05.htm
+  S ActionFailed
+  items 57=0 4419=1 4417=1

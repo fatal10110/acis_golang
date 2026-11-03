@@ -1,0 +1,19 @@
+# The Finest Ingredients - Part 1 (Q624): a level 72 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q624_the_finest_ingredients_1_low_level.golden
+character Hero 72
+script quest.Q624_TheFinestIngredients_Part1
+item 7202 7203 7204 7080 7205
+page default/31521.htm
+page script/quest/Q624_TheFinestIngredients_Part1/
+npc jeremy 31521 Folk 10 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q624_TheFinestIngredients_Part1/31521-03.htm
+  S ActionFailed
+  S ActionFailed

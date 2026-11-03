@@ -1,0 +1,22 @@
+# Collect Arrowheads (Q303), refused: a level 9 character is too young for Minia, and the quest
+# is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q303_collect_arrowheads_low_level.golden
+character Archer 9
+script quest.Q303_CollectArrowheads
+item 963
+page trainer/30029.htm
+page script/quest/Q303_CollectArrowheads/
+npc minia 30029 Trainer 10 0 0
+
+# Minia: too young.
+action minia
+action minia
+  S ActionFailed
+  S NpcHtmlMessage obj=minia item=0 page=trainer/30029.htm
+  S ActionFailed
+bypass npc_{minia}_Quest
+  S NpcHtmlMessage obj=minia item=0 page=script/quest/Q303_CollectArrowheads/30029-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q303_CollectArrowheads CREATED
+  rows Q303_CollectArrowheads -

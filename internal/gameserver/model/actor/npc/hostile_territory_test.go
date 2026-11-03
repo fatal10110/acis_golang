@@ -3,6 +3,7 @@ package npc
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -287,6 +288,7 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 			hostile.Instance.HasHome = true
 			hostile.Instance.Home = home
 			world.New().Spawn(hostile, home.X+tc.offset, home.Y, tc.z, 0)
+			firstAICycle(t, hostile)
 
 			got := hostile.ReturnHome()
 			if got != tc.wantHome {
@@ -300,6 +302,10 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 					if err := hostile.RunAI(); err != nil {
 						t.Fatalf("RunAI() error: %v", err)
 					}
+					if !slices.Equal(movement.locations, []location.Location{home}) || movement.home != (location.Location{}) {
+						t.Fatalf("walks = %v, MoveHome destination = %#v; want one path-finding walk to %#v", movement.locations, movement.home, home)
+					}
+					return
 				}
 				if movement.home != home {
 					t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
@@ -320,6 +326,7 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{}
 	world.New().Spawn(hostile, 100, 0, 0, 0)
+	firstAICycle(t, hostile)
 
 	if !hostile.InTerritory() {
 		t.Fatal("InTerritory() = false at 100 units, want true for the global 200-unit territory")
@@ -451,7 +458,7 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	if hostile.Running() {
 		t.Fatal("Running() = true after ordinary ReturnHome, want walk stance")
 	}
-	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: false}}; !reflect.DeepEqual(got, want) {
+	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: false}, event.NPCInfoChanged{}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("events = %+v, want %+v", got, want)
 	}
 }
@@ -490,6 +497,7 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	clock := driveHostile(hostile)
+	firstAICycle(t, hostile)
 	hostile.SetHeading(0)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
 	if err := hostile.RunAI(); err != nil {
@@ -575,6 +583,7 @@ func TestReturnHomeWanderRecheckSkippedWhileRooted(t *testing.T) {
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	clock := driveHostile(hostile)
+	firstAICycle(t, hostile)
 	hostile.SetHeading(0)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
 	if err := hostile.RunAI(); err != nil {
@@ -653,6 +662,7 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	clock := driveHostile(hostile)
+	firstAICycle(t, hostile)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
 	if err := hostile.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
@@ -695,7 +705,16 @@ func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {
 	if !hostile.Running() {
 		t.Fatal("Running() = false after SiegeGuard ReturnHome, want run stance")
 	}
-	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: true}}; !reflect.DeepEqual(got, want) {
+	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: true}, event.NPCInfoChanged{}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("events = %+v, want %+v", got, want)
+	}
+}
+
+// firstAICycle runs hostile's first periodic AI cycle on an empty queue:
+// before it, an event's desire selection takes up nothing but an attack.
+func firstAICycle(t *testing.T, hostile *Hostile) {
+	t.Helper()
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("first TickThink() error: %v", err)
 	}
 }

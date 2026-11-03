@@ -10,9 +10,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 )
 
-// AutosaveInitialDelay and AutosaveInterval reproduce GameClient's
-// _autoSaveInDB schedule: first save 5 minutes after a player attaches,
-// then every 15 minutes for as long as it stays tracked.
+// AutosaveInitialDelay and AutosaveInterval set the per-player autosave
+// schedule: first save 5 minutes after a player attaches, then every 15
+// minutes for as long as it stays tracked.
 const (
 	AutosaveInitialDelay = 5 * time.Minute
 	AutosaveInterval     = 15 * time.Minute

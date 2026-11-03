@@ -1,0 +1,11 @@
+# AgitWarrior's no-desire hook: an Oel Mahum Berserker (35428) standing out of the character's
+# sight, with nothing to do, wants to wander, trying a walk every 5 s, with weight 5. An NPC
+# first idles on its second AI cycle. Its move-finished look around is covered by
+# tests/ai/agit_warrior_test.go, as the format cannot hold an NPC to one walk.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.AgitWarrior.AgitWarrior
+npc berserker 35428 Monster 1000 0 0 walks
+
+tick x2
+  desires berserker wander()=5

@@ -9,13 +9,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+var _ attack.Target = (*Actor)(nil)
 
 // AttackDisabled reports whether this summon cannot start a physical attack:
 // dead, paralyzed, or held by stun, sleep, fear, or an immobile-until-attacked
@@ -59,6 +63,15 @@ func (a *Actor) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Com
 			fn(combatant)
 		}
 	})
+}
+
+// ForEachKnownHitTargetInRadius calls fn for every creature the summon
+// knows within radius, a door through its hit surface.
+func (a *Actor) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	if a.world == nil {
+		return
+	}
+	doorhit.ForEachKnownInRadius(a.world, a, radius, fn)
 }
 
 func (a *Actor) PoleAttackAngle() int {
@@ -123,7 +136,7 @@ func (a *Actor) InPeaceZone() bool { return a.membership.has(zone.FlagPeace) }
 func (a *Actor) Evasion() int { return int(a.EvasionRate()) }
 
 func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	hit := attack.Hit{TargetID: target.ObjectID()}
 	// Folding this needs the world known-list to hand out formula operands.
 	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
 	// yields attackable.Combatant, narrowed from world.Tracked, and world
@@ -139,11 +152,11 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 	_, _, z := a.Position()
 	_, _, targetZ := other.Position()
 	behind, inFront := creature.AttackFacing(other, a)
-	if formulas.Missed(formulas.HitRate(int(a.Accuracy()), other.Evasion(), z-targetZ, a.EffectList().IsNight(), behind, inFront), a.Roll(1000)) {
+	if formulas.Missed(formulas.HitRate(int(a.Accuracy()), other.Against(a.ConditionActor(), nil).Evasion(), z-targetZ, a.EffectList().IsNight(), behind, inFront), a.Roll(1000)) {
 		hit.Miss = true
 		return hit
 	}
-	crit := formulas.CritSucceeds(a.CriticalRate(a.combatStats().CritRate), a.Roll(1000))
+	crit := formulas.CritSucceeds(a.Against(conditions.ActorOf(other), nil).CriticalRate(), a.Roll(1000))
 	in, shield := creature.ResolvePhysicalAttackInput(a, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit

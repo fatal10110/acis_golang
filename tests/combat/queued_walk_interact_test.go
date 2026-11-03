@@ -116,7 +116,7 @@ func TestWalkRequestedMidSwingRunsAtSwingEnd(t *testing.T) {
 	if !landed {
 		t.Fatal("the queued walk started before the swing landed")
 	}
-	assertNoSwingBy(t, s.c, s.objID, 2*time.Second, "after the queued walk")
+	assertNoSwingBy(t, s.srv, s.c, s.objID, 2*time.Second, "after the queued walk")
 }
 
 // TestWalkRequestedMidCastRunsAtCastEnd is the same for a cast in flight:
@@ -188,17 +188,14 @@ func clickThroneQueued(t *testing.T, srv *gameservertest.Server, throne *statico
 	}
 }
 
-// assertThroneInteract reads for d and checks the queued throne interact
+// assertThroneInteract lets d pass and checks the queued throne interact
 // ran as PlayerAI.thinkInteract (PlayerAI.java:413-461) does for a throne:
 // ActionFailed only after an after frame, and no sit or claim.
-func assertThroneInteract(t *testing.T, c *scriptedClient, throne *staticobject.Object, after byte, d time.Duration) {
+func assertThroneInteract(t *testing.T, srv *gameservertest.Server, c *scriptedClient, throne *staticobject.Object, after byte, d time.Duration) {
 	t.Helper()
 	seen, released := false, false
-	for end := c.Now().Add(d); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			continue
-		}
+	srv.Advance(t, d)
+	for _, frame := range c.ReadQueued() {
 		switch frame[0] {
 		case after:
 			seen = true
@@ -242,7 +239,7 @@ func TestThroneClickMidSwingInteractsAtSwingEnd(t *testing.T) {
 			if throne.Busy() {
 				t.Fatal("a throne click claimed the throne")
 			}
-			assertNoSwingBy(t, s.c, s.objID, 2*time.Second, "after the queued throne interact")
+			assertNoSwingBy(t, s.srv, s.c, s.objID, 2*time.Second, "after the queued throne interact")
 			return
 		case frame[0] == serverpackets.OpcodeChangeWaitType, frame[0] == serverpackets.OpcodeChairSit:
 			t.Fatalf("queued throne interact sat the player: opcode %#x", frame[0])
@@ -268,7 +265,7 @@ func TestThroneClickMidCastInteractsAtCastEnd(t *testing.T) {
 	if !pc.CastingNow() {
 		t.Fatal("the throne click ended the cast")
 	}
-	assertThroneInteract(t, srv.Client, throne, serverpackets.OpcodeMagicSkillLaunched, 2*queueHitTime*time.Millisecond)
+	assertThroneInteract(t, srv, srv.Client, throne, serverpackets.OpcodeMagicSkillLaunched, 2*queueHitTime*time.Millisecond)
 	if !pc.Standing() {
 		t.Fatal("a throne click left the player not standing")
 	}

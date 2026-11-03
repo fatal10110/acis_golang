@@ -77,11 +77,10 @@ func (a *auction) remove(clanID int32) *Bidder {
 	return nil
 }
 
-// listed returns the bids in the order the reference's bid map iterates
-// them: by the bucket each clan id falls in, a table of 16 doubled each
-// time the bids reached three quarters of it, then by when each bid was
-// first made. Past the first table the order within a bucket is an
-// approximation: a grown table splits its buckets in an order of its own.
+// listed returns the bids in listing order: by the bucket each clan id falls in,
+// a table of 16 doubled each time the bids reached three quarters of it, then by
+// when each bid was first made. Past the first table the order within a bucket
+// is an approximation: a grown table splits its buckets in an order of its own.
 func (a *auction) listed() []*Bidder {
 	size := 16
 	for a.mostBidders >= size-size/4 {
@@ -462,9 +461,14 @@ type HallView struct {
 	Town        string
 	Description string
 	Size        int
+	Grade       int
 	Lease       int
 	AuctionMin  int
 	OwnerID     int32
+	// PaidUntil is when the owner's lease runs out, in milliseconds; 0 for
+	// a free hall. Paid is false in the day of grace of an unpaid lease.
+	PaidUntil int64
+	Paid      bool
 	// Auction reports whether the hall holds an auction; the fields below
 	// are its.
 	Auction bool
@@ -472,8 +476,10 @@ type HallView struct {
 	MinBid  int
 	// Seller is the registered sale, nil for none.
 	Seller *Seller
-	// Bidders are the bids in listing order.
+	// Bidders are the bids in listing order; Highest is the one standing
+	// highest, nil for none.
 	Bidders []Bidder
+	Highest *Bidder
 }
 
 // Bid returns clan clanID's bid in v.
@@ -520,7 +526,8 @@ func (hs *Halls) Auctionable() []HallView {
 func (h *hall) viewLocked() HallView {
 	v := HallView{
 		ID: h.id(), Name: h.data.Name, Town: h.data.Town, Description: h.data.Description,
-		Size: h.data.Size, Lease: h.data.Lease, AuctionMin: h.data.AuctionMin, OwnerID: h.ownerID,
+		Size: h.data.Size, Grade: h.data.Grade, Lease: h.data.Lease, AuctionMin: h.data.AuctionMin,
+		OwnerID: h.ownerID, PaidUntil: h.paidUntil, Paid: h.paid,
 	}
 	a := h.auction
 	if a == nil {
@@ -530,6 +537,10 @@ func (h *hall) viewLocked() HallView {
 	if a.seller != nil {
 		s := *a.seller
 		v.Seller = &s
+	}
+	if a.highest != nil {
+		b := *a.highest
+		v.Highest = &b
 	}
 	for _, b := range a.listed() {
 		v.Bidders = append(v.Bidders, *b)

@@ -1,0 +1,19 @@
+# A Looter and a Railroad Man (Q649): a level 29 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q649_a_looter_and_a_railroad_man_low_level.golden
+character Hero 29
+script quest.Q649_ALooterAndARailroadMan
+item 8099 57
+page default/32052.htm
+page script/quest/Q649_ALooterAndARailroadMan/
+npc obi 32052 Folk 10 0 0
+
+action obi
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q649_ALooterAndARailroadMan/32052-0a.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,18 @@
+# Audience with the Land Dragon (Q337), the Harit shaman and matriarch call no zealot on a draw other than 0, nor without the request. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_shaman_no_call.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop1=1 drop3=1
+random 3 0
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc shaman 20644 Monster 40 0 0
+npc matriarch 20645 Monster 45 0 0
+
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+kill matriarch
+  S SystemMessage id=95 1:0 1:0
+  items 3858=0
+  rows Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop1=1 drop3=1
+  state Q337_AudienceWithTheLandDragon STARTED

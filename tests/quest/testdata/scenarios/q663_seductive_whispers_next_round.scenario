@@ -1,0 +1,67 @@
+# Seductive Whispers (Q663), a won round is played on, and the next win is taken. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_next_round.golden
+character Gambler 50
+quest Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=7
+random 0 4
+script quest.Q663_SeductiveWhispers
+item 8766 57
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 html="<html><body>Blacksmith Wilbert:<br>\nYou've won <font color=\"LEVEL\">1</font> in a row. Would you like to quit? Or do you want to keep playing?<br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-20.htm\">Continue the game.</a><br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-21.htm\">Quit the game and collect the prize.</a>\n</body></html>\n"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-20.htm
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-20.htm
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 14
+  Q upsert Q663_SeductiveWhispers | stateEx | 0
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-05a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-09.htm
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-09a.htm
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 15
+  Q upsert Q663_SeductiveWhispers | stateEx | 0
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-14.htm
+  S NpcHtmlMessage obj=wilbert item=0 html="<html><body>Blacksmith Wilbert:<br>\nLet's see, now... The card you drew is <font color=\"LEVEL\"><font color=\"ff453d\"> Sun Card: 5 </font></font>.<br>\n<br>\nThe cards on the table are:<br>\n<table border=\"0\" border color=\"white\" width=\"230\" height=\"60\">\n<tr><td width=\"80\" height=\"20\" align=\"center\">[Wilbert]</td><td width=\"150\" height=\"20\" align=\"center\">[ Gambler ]</td></tr>\n<tr><td width=\"80\" height=\"30\" align=\"center\">No such card</td><td width=\"150\" height=\"30\" align=\"center\"><font color=\"ff453d\"> Sun Card: 5 </font></td></tr>\n</table>\n<br>\nDragon's spore! You've won. If my luck stays this bad, I'm going to have a lot of explaining to do to the missus!<br>\nBy my reckonin', you have 2 consecutive wins. Do you want to quit? Or would you like to keep playing?<br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-20.htm\">Challenge him again.</a><br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-21.htm\">Quit the game and collect the prize.</a>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 17
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 html="<html><body>Blacksmith Wilbert:<br>\nYou've won <font color=\"LEVEL\">2</font> in a row. Would you like to quit? Or do you want to keep playing?<br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-20.htm\">Continue the game.</a><br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-21.htm\">Quit the game and collect the prize.</a>\n</body></html>\n"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-21.htm
+  S SystemMessage id=52 6:80000
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-21.htm
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 1
+  Q upsert Q663_SeductiveWhispers | stateEx | 0
+  items 57=80000
+  rows Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1 stateEx=0
+  state Q663_SeductiveWhispers STARTED

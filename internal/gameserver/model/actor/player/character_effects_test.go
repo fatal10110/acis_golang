@@ -348,7 +348,7 @@ func TestAddRewardItemNotifiesTheUpdateHook(t *testing.T) {
 	c.AttachRuntime(&Template{}, inv)
 	rec := recordEvents(c)
 
-	if !c.AddRewardItem(57, 10, 0x30000001) {
+	if !c.AddRewardItem(57, 10, true, func() (int32, error) { return 0x30000001, nil }) {
 		t.Fatal("AddRewardItem() = false for a known stackable template")
 	}
 	if delivery.calls != 1 {
@@ -359,7 +359,7 @@ func TestAddRewardItemNotifiesTheUpdateHook(t *testing.T) {
 		t.Fatalf("ItemObtained events = %+v, want %+v", got, want)
 	}
 
-	if c.AddRewardItem(9999, 1, 0x30000002) {
+	if c.AddRewardItem(9999, 1, true, func() (int32, error) { return 0x30000002, nil }) {
 		t.Fatal("AddRewardItem() = true for an unknown template")
 	}
 	if delivery.calls != 1 {

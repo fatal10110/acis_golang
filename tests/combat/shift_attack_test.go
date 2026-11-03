@@ -18,7 +18,7 @@ func assertHeldAttackIdle(t *testing.T, srv *gameservertest.Server, c *scriptedC
 	sawFailed := false
 	for passed := time.Duration(0); passed < d; passed += 100 * time.Millisecond {
 		srv.Advance(t, 100*time.Millisecond)
-		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+		for _, frame := range c.ReadQueued() {
 			switch {
 			case frame[0] == serverpackets.OpcodeActionFailed:
 				sawFailed = true

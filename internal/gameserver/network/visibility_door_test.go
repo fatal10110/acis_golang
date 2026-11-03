@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -16,7 +17,7 @@ func TestDiscoverDoorSendsInfoThenStatus(t *testing.T) {
 	}
 
 	var frames [][]byte
-	p := &livePlayer{visibilitySend: func(frame wire.Frame) bool {
+	p := &livePlayer{Character: &player.Character{ID: 1}, visibilitySend: func(frame wire.Frame) bool {
 		frames = append(frames, append([]byte(nil), frame.Bytes()...))
 		frame.Release()
 		return true

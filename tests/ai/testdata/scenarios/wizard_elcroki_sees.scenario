@@ -1,0 +1,25 @@
+# Elcroki (22214, level 80, its shipped skills; ag_type 1, silhouettes 22209 and 22212), every draw 0: seeing the character
+# 150 away with an empty hate list, it raises two silhouette1 privates, each told (1000, the character), counts them in
+# int slots 3 and 4, and wants its long range DD magic (farther than its LongRangeSkillDist 100) and its self range one
+# on the character.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki
+npc elcroki 22214 Monster 1000 0 0 level 80 skill LONG_RANGE_DD_MAGIC1 4151 10 skill SELF_RANGE_DEBUFF1 4486 10 skill SELF_RANGE_BUFF1 5080 1 skill SELF_RANGE_DD_MAGIC1 5178 1 ai ag_type=1,silhouette1=22209,silhouette2=22212,LongRangeSkillDist=100
+npc sil1 22209 Monster 0 1500 0
+npc sil2 22212 Monster 500 1500 0
+
+approach elcroki 150
+  S NpcInfo obj=sil1 npc=22209
+  S ChangeMoveType obj=sil1 running=1 swimming=0
+  S NpcInfo obj=sil1 npc=22209
+  S NpcInfo obj=sil1 npc=22209
+  S ChangeMoveType obj=sil1 running=1 swimming=0
+  S NpcInfo obj=sil1 npc=22209
+  mem elcroki i_ai3=2 i_ai4=2
+  privates elcroki 22209=2:1000,player,0
+  desires elcroki cast(player,4151,move)=1000000 cast(elcroki,5178,move)=1000000

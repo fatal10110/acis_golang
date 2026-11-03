@@ -1,0 +1,17 @@
+# Alliance with Varka Silenos (Q611) at cond 6: no Ketra warrior drops a badge any more. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q611_alliance_with_varka_silenos_hunt_done.golden
+character Ally 74
+quest Q611_AllianceWithVarkaSilenos <cond>=6 <state>=STARTED
+random 0
+script quest.Q611_AllianceWithVarkaSilenos
+item 7221 7222 7223 7224 7225 7226 7227 7228 7229 7230 7234
+page npcdefault.htm
+page script/quest/Q611_AllianceWithVarkaSilenos/
+npc naran 31378 Folk 10 0 0
+npc soldier 21324 Monster 40 0 0
+npc officer 21331 Monster 40 0 0
+npc captain 21339 Monster 40 0 0
+
+kill soldier
+  S SystemMessage id=95 1:0 1:0
+  items 7226=0

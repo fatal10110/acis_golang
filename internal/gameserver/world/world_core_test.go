@@ -179,24 +179,24 @@ func TestRegion_appendObjectsExcept(t *testing.T) {
 	}
 }
 
-func TestRegion_playersCountFollowsPlayerAddRemove(t *testing.T) {
+func TestRegion_playersFollowPlayerAddRemove(t *testing.T) {
 	r := newRegion(0, 0)
 	p := &regionTestPlayer{regionTestObject{id: 10}}
 	npc := &regionTestObject{id: 11}
 	r.add(p)
 	r.add(npc)
-	if n := r.playersCount; n != 1 {
-		t.Fatalf("playersCount after add player+npc = %d, want 1", n)
+	if n := len(r.players); n != 1 {
+		t.Fatalf("players after add player+npc = %d, want 1", n)
 	}
 	r.remove(11)
-	if n := r.playersCount; n != 1 {
-		t.Fatalf("playersCount after remove npc = %d, want 1", n)
+	if n := len(r.players); n != 1 {
+		t.Fatalf("players after remove npc = %d, want 1", n)
 	}
 	if !r.removeIfSame(10, p) {
 		t.Fatal("removeIfSame did not drop player")
 	}
-	if n := r.playersCount; n != 0 {
-		t.Fatalf("playersCount after removeIfSame player = %d, want 0", n)
+	if n := len(r.players); n != 0 {
+		t.Fatalf("players after removeIfSame player = %d, want 0", n)
 	}
 }
 

@@ -34,10 +34,10 @@ func crossingClan(t *testing.T, score int) *clan.Clan {
 // changes nothing, so the member ends as the current score says. Above 0 a
 // stale fall leaves the given skill; at 0 a stale rise gives nothing back.
 func TestReputationCrossingAppliesOnlyOnCurrentSide(t *testing.T) {
-	link := &GameClientLink{
-		log:    zerolog.Nop(),
-		skills: skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: 370, Level: 1})),
-	}
+	link := newBareGameClientLink(t, GameClientLinkConfig{
+		Log:    zerolog.Nop(),
+		Skills: skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: 370, Level: 1})),
+	})
 
 	t.Run("score above 0", func(t *testing.T) {
 		member := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})

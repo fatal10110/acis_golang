@@ -1,0 +1,23 @@
+# Hunt of the Black Lion (Q333), refused: Sophya sends a level 24 character away, and the quest is
+# not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q333_hunt_of_the_black_lion_low_level.golden
+character Recruit 24
+hold 1369 1
+script quest.Q333_HuntOfTheBlackLion
+item 1369
+page default/30735.htm
+page script/quest/Q333_HuntOfTheBlackLion/
+npc sophya 30735 Folk 10 0 0
+
+# Sophya: level 25 and up only.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q333_HuntOfTheBlackLion CREATED
+  rows Q333_HuntOfTheBlackLion -

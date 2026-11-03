@@ -36,7 +36,7 @@ func (d *deathRewards) rewardGroup(p *player.Character) (RewardParty, bool) {
 // spent, in range or not. The pooled exp takes the attacker's overhit
 // bonus, and the members split it by the party rules; a member the cutoff
 // leaves out is still paid nothing.
-func (d *deathRewards) grantParty(attacker *player.Character, group RewardParty, entries []playerRewardEntry, spent map[int32]bool, summonDamage map[int32]float64, totalDamage float64) {
+func (d *deathRewards) grantParty(s *KillRewardSettings, attacker *player.Character, group RewardParty, entries []playerRewardEntry, spent map[int32]bool, summonDamage map[int32]float64, totalDamage float64) {
 	var (
 		partyDamage float64
 		partyLevel  int
@@ -47,7 +47,7 @@ func (d *deathRewards) grantParty(attacker *player.Character, group RewardParty,
 		if m.Dead() {
 			continue
 		}
-		inRange := d.inPartyRange(m)
+		inRange := d.inPartyRange(s, m)
 		if inRange {
 			rewarded = append(rewarded, m)
 			if m.Level() > partyLevel {
@@ -69,7 +69,7 @@ func (d *deathRewards) grantParty(attacker *player.Character, group RewardParty,
 		ownDamage[id] = entries[i].damage
 	}
 
-	rewardExp, rewardSp := d.ratedReward()
+	rewardExp, rewardSp := d.ratedReward(s)
 	exp, sp := player.PartyKillPool(rewardExp, rewardSp, partyDamage, totalDamage, partyLevel-d.tmpl.Level)
 	if d.hostile.OverhitValid(attacker) {
 		attacker.NotifyOverHit()
@@ -88,7 +88,7 @@ func (d *deathRewards) grantParty(attacker *player.Character, group RewardParty,
 			members[i].ServitorPenalty = owns[i].ExpPenalty()
 		}
 	}
-	shares := d.config.PartyXP.Shares(exp, sp, partyLevel, members)
+	shares := s.PartyXP.Shares(exp, sp, partyLevel, members)
 	for i, m := range rewarded {
 		if m.Dead() {
 			continue
@@ -99,6 +99,6 @@ func (d *deathRewards) grantParty(attacker *player.Character, group RewardParty,
 			continue
 		}
 		m.UpdateKarmaLoss(d.config.PlayerLevels, shares[i].Exp)
-		d.pay(m, owns[i], shares[i].Exp, shares[i].Sp, ownDamage[m.ObjectID()], summonDamage)
+		d.pay(s, m, owns[i], shares[i].Exp, shares[i].Sp, ownDamage[m.ObjectID()], summonDamage)
 	}
 }

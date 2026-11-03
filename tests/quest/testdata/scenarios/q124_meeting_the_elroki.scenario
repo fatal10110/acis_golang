@@ -1,0 +1,247 @@
+# Meeting the Elroki (Q124): a level 75 character accepts at Marquez and goes to Mushika and Asamah
+# (who has nothing to say at cond 4), Karakawei (who remembers the progress mark on a second talk)
+# and Mantarasa, whose egg Asamah takes for adena; Asamah then has her completed page and Marquez
+# the completed message; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q124_meeting_the_elroki.golden
+character Explorer 75
+script quest.Q124_MeetingTheElroki
+item 8778 57
+page default/32113.htm
+page default/32114.htm
+page default/32115.htm
+page default/32117.htm
+page default/32118.htm
+page script/quest/Q124_MeetingTheElroki/
+npc marquez 32113 Folk 10 0 0
+npc mushika 32114 Folk 20 0 0
+npc asamah 32115 Folk 30 0 0
+npc karakawei 32117 Folk 0 10 0
+npc mantarasa 32118 Folk 0 20 0
+
+# Marquez: accept, then the way to Mushika.
+action marquez
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q124_MeetingTheElroki/32113-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q124_MeetingTheElroki CREATED
+bypass Quest Q124_MeetingTheElroki 32113-02.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q124_MeetingTheElroki/32113-02.htm
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32113-03.htm
+  S QuestList 124:0x80000001
+  S ExShowQuestMark quest=124
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q124_MeetingTheElroki/32113-03.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | <state> | STARTED
+  Q upsert Q124_MeetingTheElroki | <cond> | 1
+  state Q124_MeetingTheElroki STARTED
+  rows Q124_MeetingTheElroki <cond>=1 <state>=STARTED
+bypass Quest Q124_MeetingTheElroki 32113-04.htm
+  S QuestList 124:0x80000003
+  S ExShowQuestMark quest=124
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q124_MeetingTheElroki/32113-04.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | <cond> | 2
+  rows Q124_MeetingTheElroki <cond>=2 <state>=STARTED
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q124_MeetingTheElroki/32113-04a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mushika.
+action mushika
+action mushika
+  S ActionFailed
+  S NpcHtmlMessage obj=mushika item=0 page=default/32114.htm
+  S ActionFailed
+bypass npc_{mushika}_Quest
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q124_MeetingTheElroki/32114-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32114-02.htm
+  S QuestList 124:0x80000007
+  S ExShowQuestMark quest=124
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q124_MeetingTheElroki/32114-02.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | <cond> | 3
+  rows Q124_MeetingTheElroki <cond>=3 <state>=STARTED
+action mushika
+  S ActionFailed
+  S NpcHtmlMessage obj=mushika item=0 page=default/32114.htm
+  S ActionFailed
+bypass npc_{mushika}_Quest
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q124_MeetingTheElroki/32114-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Asamah.
+action asamah
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q124_MeetingTheElroki/32115-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32115-02.htm
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q124_MeetingTheElroki/32115-02.htm
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32115-03.htm
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q124_MeetingTheElroki/32115-03.htm
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32115-04.htm
+  S QuestList 124:0x8000000f
+  S ExShowQuestMark quest=124
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q124_MeetingTheElroki/32115-04.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | <cond> | 4
+  rows Q124_MeetingTheElroki <cond>=4 <state>=STARTED
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S NpcHtmlMessage obj=asamah item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Karakawei: the progress mark, kept for the next talk.
+action karakawei
+action karakawei
+  S ActionFailed
+  S NpcHtmlMessage obj=karakawei item=0 page=default/32117.htm
+  S ActionFailed
+bypass npc_{karakawei}_Quest
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q124_MeetingTheElroki/32117-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32117-02.htm
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q124_MeetingTheElroki/32117-02.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | progress | 1
+  rows Q124_MeetingTheElroki <cond>=4 <state>=STARTED progress=1
+bypass Quest Q124_MeetingTheElroki 32117-03a.htm
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q124_MeetingTheElroki/32117-03a.htm
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32117-02.htm
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q124_MeetingTheElroki/32117-02.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | progress | 1
+action karakawei
+  S ActionFailed
+  S NpcHtmlMessage obj=karakawei item=0 page=default/32117.htm
+  S ActionFailed
+bypass npc_{karakawei}_Quest
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q124_MeetingTheElroki/32117-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32117-03.htm
+  S QuestList 124:0x8000001f
+  S ExShowQuestMark quest=124
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q124_MeetingTheElroki/32117-03.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | <cond> | 5
+  rows Q124_MeetingTheElroki <cond>=5 <state>=STARTED progress=1
+action karakawei
+  S ActionFailed
+  S NpcHtmlMessage obj=karakawei item=0 page=default/32117.htm
+  S ActionFailed
+bypass npc_{karakawei}_Quest
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q124_MeetingTheElroki/32117-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mantarasa gives the egg.
+action mantarasa
+action mantarasa
+  S ActionFailed
+  S NpcHtmlMessage obj=mantarasa item=0 page=default/32118.htm
+  S ActionFailed
+bypass npc_{mantarasa}_Quest
+  S NpcHtmlMessage obj=mantarasa item=0 page=script/quest/Q124_MeetingTheElroki/32118-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q124_MeetingTheElroki 32118-02.htm
+  S QuestList 124:0x8000003f
+  S ExShowQuestMark quest=124
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8778
+  S NpcHtmlMessage obj=mantarasa item=0 page=script/quest/Q124_MeetingTheElroki/32118-02.htm
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | <cond> | 6
+  rows Q124_MeetingTheElroki <cond>=6 <state>=STARTED progress=1
+  items 8778=1
+action mantarasa
+  S ActionFailed
+  S NpcHtmlMessage obj=mantarasa item=0 page=default/32118.htm
+  S ActionFailed
+bypass npc_{mantarasa}_Quest
+  S NpcHtmlMessage obj=mantarasa item=0 page=script/quest/Q124_MeetingTheElroki/32118-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Asamah takes the egg and pays.
+action asamah
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S SystemMessage id=302 3:8778
+  S SystemMessage id=52 6:71318
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 124:0x00000000
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q124_MeetingTheElroki/32115-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q124_MeetingTheElroki | <state> | COMPLETED
+  Q delete-except-state Q124_MeetingTheElroki
+  state Q124_MeetingTheElroki COMPLETED
+  rows Q124_MeetingTheElroki <state>=COMPLETED
+  items 8778=0 57=71318
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q124_MeetingTheElroki/32115-06.htm
+  S ActionFailed
+  S ActionFailed
+action marquez
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 57=71318
+  state Q124_MeetingTheElroki COMPLETED
+  rows Q124_MeetingTheElroki <state>=COMPLETED
+action asamah
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q124_MeetingTheElroki/32115-06.htm
+  S ActionFailed
+  S ActionFailed

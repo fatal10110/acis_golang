@@ -1,0 +1,15 @@
+# WarriorCast3SkillsMagical4 (21197, Nephilim Priest, its shipped heal) beside a Warrior of its
+# clan, every draw 0. Told of the character's hit on the Warrior while it does not attack, it
+# wants its heal (4065-5) on the Warrior, weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical4.WarriorCast3SkillsMagical4
+npc priest 21197 Monster 600 0 0 clan c_dungeon_clan 400 skill MAGIC_HEAL 4065 5
+npc guard 20001 Monster 700 0 0 clan c_dungeon_clan 400
+
+hit guard 22
+  desires priest cast(guard,4065,move)=1000000

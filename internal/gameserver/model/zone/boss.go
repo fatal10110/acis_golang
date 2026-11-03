@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -44,24 +43,16 @@ type Boss struct {
 	deadlines map[int32]time.Time
 }
 
-// NewBoss builds a boss lair zone from its data settings.
-func NewBoss(id int, form Form, set *commons.StatSet) (*Boss, error) {
-	f := commons.NewFields(set, "zone: boss")
-	invade := f.IntDefault("InvadeTime", 0)
-	oustX := f.IntDefault("oustX", 0)
-	oustY := f.IntDefault("oustY", 0)
-	oustZ := f.IntDefault("oustZ", 0)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
+// NewBoss builds a boss lair zone with entry policing off (no invade
+// window) and ousted players sent to their town respawn; the loader
+// overrides these from the zone's data settings before publishing it.
+func NewBoss(id int, form Form) *Boss {
 	return &Boss{
-		Zone:         newZone(id, form),
-		InvadeWindow: time.Duration(invade) * time.Millisecond,
-		OustLoc:      location.Location{X: oustX, Y: oustY, Z: oustZ},
-		now:          time.Now,
-		allowed:      make(map[int32]struct{}),
-		deadlines:    make(map[int32]time.Time),
-	}, nil
+		Zone:      newZone(id, form),
+		now:       time.Now,
+		allowed:   make(map[int32]struct{}),
+		deadlines: make(map[int32]time.Time),
+	}
 }
 
 // Core exposes the shared zone state.
@@ -197,7 +188,7 @@ func (z *Boss) isAllowed(id int32) bool {
 
 // AllowEntry permits the player to enter (or re-enter) for the given
 // window from now. A permission restored at boot gets a zero window: the
-// reference reads the stored players before the zone's InvadeTime, so the
+// stored players are read before the zone's InvadeTime is known, so the
 // entry lapses at once and only the permission itself (summons, the next
 // save) survives the restart.
 func (z *Boss) AllowEntry(id int32, window time.Duration) {
@@ -226,24 +217,4 @@ func (z *Boss) AllowedPlayers() []int32 {
 		out = append(out, id)
 	}
 	return out
-}
-
-// OustAll throws every online player inside out via the Eject hook and
-// wipes all entry permissions. It returns the players it acted on.
-func (z *Boss) OustAll() []Actor {
-	players := z.playersInside(nil)
-	for _, a := range players {
-		p, ok := a.(Player)
-		if ok && !p.Online() {
-			continue
-		}
-		if z.Eject != nil {
-			z.Eject(a)
-		}
-	}
-	z.bmu.Lock()
-	z.allowed = make(map[int32]struct{})
-	z.deadlines = make(map[int32]time.Time)
-	z.bmu.Unlock()
-	return players
 }

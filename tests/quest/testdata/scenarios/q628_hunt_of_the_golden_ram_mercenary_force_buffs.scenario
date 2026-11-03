@@ -1,0 +1,51 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): Selina casts a blessing for coins once the badge is of a soldier, and takes no coin and says so when the coins fall short.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_buffs.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
+hold 7247 1
+hold 7251 6
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31556.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc selina 31556 Folk 10 0 0
+
+action selina
+action selina
+  S ActionFailed
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-10.htm
+  S ActionFailed
+bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 4404
+  S SystemMessage id=301 3:7251 6:2
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-12.htm
+  S ActionFailed
+  items 7251=4
+tick x3
+  S MagicSkillUse caster=selina target=player skill=4404-2 hit=0 reuse=0 success=0
+  S SystemMessage id=110 4:4404,2
+action selina
+  S ActionFailed
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-10.htm
+  S ActionFailed
+action selina
+  S ActionFailed
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-10.htm
+  S ActionFailed
+bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 4400
+  S SystemMessage id=301 3:7251 6:3
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-12.htm
+  S ActionFailed
+  items 7251=1
+action selina
+  S ActionFailed
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-10.htm
+  S ActionFailed
+action selina
+  S ActionFailed
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-10.htm
+  S ActionFailed
+bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 4402
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-11.htm
+  S ActionFailed
+  items 7251=1

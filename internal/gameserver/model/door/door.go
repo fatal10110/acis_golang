@@ -6,13 +6,14 @@ import (
 	"math"
 	"sync/atomic"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -29,9 +30,14 @@ const (
 	KindWall
 )
 
-var kindNames = map[string]Kind{
-	"DOOR": KindDoor,
-	"WALL": KindWall,
+// ParseKind maps a door's XML type spelling onto its Kind.
+func ParseKind(s string) (Kind, error) {
+	for k, name := range kindStrings {
+		if name == s {
+			return Kind(k), nil
+		}
+	}
+	return 0, fmt.Errorf("door: unknown type %q", s)
 }
 
 var kindStrings = [...]string{"DOOR", "WALL"}
@@ -54,11 +60,14 @@ const (
 	OpenNPC
 )
 
-var openKindNames = map[string]OpenKind{
-	"CLICK": OpenClick,
-	"TIME":  OpenTime,
-	"SKILL": OpenSkill,
-	"NPC":   OpenNPC,
+// ParseOpenKind maps a door's XML openType spelling onto its OpenKind.
+func ParseOpenKind(s string) (OpenKind, error) {
+	for o, name := range openKindStrings {
+		if name == s {
+			return OpenKind(o), nil
+		}
+	}
+	return 0, fmt.Errorf("door: unknown openType %q", s)
 }
 
 var openKindStrings = [...]string{"CLICK", "TIME", "SKILL", "NPC"}
@@ -120,25 +129,76 @@ type Object struct {
 
 	// hp holds the current HP as math.Float64bits; it and dead change only
 	// through the state owner, under the lock it applies door changes with.
-	hp    atomic.Uint64
-	dead  atomic.Bool
-	siege atomic.Pointer[siegeRef]
+	hp     atomic.Uint64
+	dead   atomic.Bool
+	siege  atomic.Pointer[siegeRef]
+	strife atomic.Pointer[strifeRef]
+	// hpUpgrade multiplies the template HP into the maximum HP: 1 until
+	// the castle owning the door upgrades it. It changes only through the
+	// state owner, like hp.
+	hpUpgrade atomic.Int32
 
-	sink  event.Sink
-	owner StateOwner
-	sight Sight
+	sink     event.Sink
+	owner    StateOwner
+	sight    Sight
+	clanCall atomic.Pointer[clanCallRef]
 }
 
-// Siege is the siege state of the residence a door belongs to, deciding
-// whether a hit lowers the door's HP: a castle's siege in progress lets
-// every attacker but the anti-infantry Swoop Cannon through, and a siegable
-// clan hall's active siege zone lets any attacker through. A door with no
-// siege never loses HP, whoever hits it.
+// Siege is the siege state of the residence a door belongs to. A door with
+// no siege can be neither attacked nor damaged, whoever hits it.
 type Siege interface {
-	AllowsDoorDamage(attacker attackable.Combatant) bool
+	// AllowsDoorAttack reports whether attacker, a playable, may attack the
+	// door: during a castle siege in progress only the attacker side may,
+	// and a wall only through a siege summon other than the anti-infantry
+	// Swoop Cannon; during a siegable clan hall's siege only the attacker
+	// side may, once the siege lets its doors be attacked.
+	AllowsDoorAttack(attacker skilltarget.Actor, wall bool) bool
+	// DoorHit is what the siege makes of attacker's hit on the door: a
+	// castle's siege in progress ignores the Swoop Cannon's hits and lets
+	// every other attacker's lower the door's HP, a siegable clan hall's
+	// active siege zone lets any attacker's, and anything else leaves the
+	// hit harmless.
+	DoorHit(attacker attackable.Combatant) HitOutcome
+	// ShowsDoorHP reports whether the door's status updates show its HP:
+	// only while its castle's siege is in progress.
+	ShowsDoorHP() bool
+	// DoorBroken tells the residence one of its doors broke down: during
+	// a castle siege in progress the defenders hear that a wall was
+	// damaged or a gate broken down.
+	DoorBroken(wall bool)
 }
 
 type siegeRef struct{ siege Siege }
+
+// HitOutcome is what a door's residence siege makes of a hit on the door.
+type HitOutcome uint8
+
+const (
+	// HitHarmless lowers no HP; the door still calls its clan.
+	HitHarmless HitOutcome = iota
+	// HitDamages lowers the door's HP, then the door calls its clan.
+	HitDamages
+	// HitIgnored drops the hit whole: no HP change and no clan call.
+	HitIgnored
+)
+
+// ClanCall is what a hit on a door tells the NPCs around it.
+type ClanCall interface {
+	// DoorAttacked tells the NPCs of the door clan around d that attacker
+	// hit d for damage. It runs on the hitting goroutine, with no door
+	// lock held.
+	DoorAttacked(d *Object, attacker attackable.Combatant, damage float64)
+}
+
+type clanCallRef struct{ call ClanCall }
+
+// Strife is the Seven Signs state a door's defences read: the owner of each
+// seal, in Avarice, Gnosis, Strife order.
+type Strife interface {
+	SealOwners() [3]sevensigns.Cabal
+}
+
+type strifeRef struct{ strife Strife }
 
 // HPRegen is the HP a damaged door regains on each regeneration tick: the
 // creature base HP regeneration, which no door overrides.
@@ -159,6 +219,7 @@ type Sight interface {
 type StateOwner interface {
 	SetDoorOpen(id int, open bool) bool
 	ReduceDoorHP(id int, amount float64)
+	TakeDoorHP(id int, amount float64)
 }
 
 // NewObject creates a live door object from a static template and geodata shape.
@@ -184,6 +245,7 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 		geoData:  cloneGeoData(data),
 	}
 	o.opened.Store(tmpl.Opened)
+	o.hpUpgrade.Store(1)
 	o.StoreHP(float64(tmpl.HP))
 	return o, nil
 }
@@ -203,9 +265,33 @@ func (o *Object) SetDead(dead bool) bool {
 // Unlockable reports whether a skill can open this door.
 func (o *Object) Unlockable() bool { return o.Template.OpenKind == OpenSkill }
 
-// ponytail: siege ownership is unported (#236); add its attacker-side check here.
-// AttackableBy stays false until then.
-func (*Object) AttackableBy(skilltarget.Actor) bool { return false }
+// AttackableBy reports whether attacker may attack the door: a standing
+// door is attacked only by a playable its residence's siege lets through.
+func (o *Object) AttackableBy(attacker skilltarget.Actor) bool {
+	if o.Dead() || attacker == nil || attacker.ObjectID() == o.objectID || !attacker.Kind().Playable() {
+		return false
+	}
+	ref := o.siege.Load()
+	return ref != nil && ref.siege.AllowsDoorAttack(attacker, o.Wall())
+}
+
+// Wall reports whether the door is a castle wall rather than a gate.
+func (o *Object) Wall() bool { return o.Template.Kind == KindWall }
+
+// ShowsHP reports whether the door's status updates show its HP: only
+// while its residence's siege lets them.
+func (o *Object) ShowsHP() bool {
+	ref := o.siege.Load()
+	return ref != nil && ref.siege.ShowsDoorHP()
+}
+
+// TellBroken tells the door's residence it broke down. The state owner
+// calls it once the door's death has been applied and broadcast.
+func (o *Object) TellBroken() {
+	if ref := o.siege.Load(); ref != nil {
+		ref.siege.DoorBroken(o.Wall())
+	}
+}
 
 // AttackableWithoutForceBy matches the door attackability rule.
 func (o *Object) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
@@ -218,8 +304,55 @@ func (o *Object) Kind() actor.Kind { return actor.KindDoor }
 // DoorID returns the static door id from doors.xml.
 func (o *Object) DoorID() int { return o.Template.ID }
 
-// MaxHP returns the door's maximum HP.
-func (o *Object) MaxHP() int { return o.Template.HP }
+// Level returns the door's template level.
+func (o *Object) Level() int { return o.Template.Level }
+
+// CharacterName returns the door's template name, the name messages show.
+func (o *Object) CharacterName() string { return o.Template.Name }
+
+// SetStrife installs the Seven Signs state the door's defences read.
+func (o *Object) SetStrife(s Strife) {
+	if s == nil {
+		o.strife.Store(nil)
+		return
+	}
+	o.strife.Store(&strifeRef{strife: s})
+}
+
+// PhysicalDefence returns the door's P.Def: the template value under the
+// Seal of Strife, truncated.
+func (o *Object) PhysicalDefence() int { return o.underStrife(o.Template.PDef) }
+
+// MagicDefence returns the door's M.Def: the template value under the Seal
+// of Strife, truncated.
+func (o *Object) MagicDefence() int { return o.underStrife(o.Template.MDef) }
+
+// underStrife scales a template defence by the Seal of Strife: raised by a
+// fifth while Dawn owns the seal, cut to 30% while Dusk does.
+func (o *Object) underStrife(base int) int {
+	factor := 1.0
+	if ref := o.strife.Load(); ref != nil {
+		switch ref.strife.SealOwners()[sevensigns.Strife-sevensigns.Avarice] {
+		case sevensigns.Dawn:
+			factor = 1.2
+		case sevensigns.Dusk:
+			factor = 0.3
+		}
+	}
+	return int(float64(base) * factor)
+}
+
+// MaxHP returns the door's maximum HP: its template HP times its HP
+// upgrade ratio.
+func (o *Object) MaxHP() int { return o.Template.HP * o.HPUpgradeRatio() }
+
+// HPUpgradeRatio returns the ratio the door's castle upgraded its maximum
+// HP by, 1 for none.
+func (o *Object) HPUpgradeRatio() int { return int(o.hpUpgrade.Load()) }
+
+// StoreHPUpgradeRatio updates only the door's HP upgrade ratio. It is the
+// state owner's primitive, like StoreHP.
+func (o *Object) StoreHPUpgradeRatio(ratio int) { o.hpUpgrade.Store(int32(ratio)) }
 
 // CurrentHP returns the door's current HP.
 func (o *Object) CurrentHP() float64 { return math.Float64frombits(o.hp.Load()) }
@@ -256,20 +389,36 @@ func (o *Object) SetSiege(s Siege) {
 	o.siege.Store(&siegeRef{siege: s})
 }
 
-// ReduceHP applies a hit's damage to the door. Only a hit its residence's
-// siege allows lowers HP, and an attacker whose access level deals no damage
-// lowers nothing; the state owner applies the loss, its status broadcast,
-// the regeneration schedule and, once HP runs out, the door's death.
-func (o *Object) ReduceHP(amount float64, attacker attackable.Combatant) {
-	ref := o.siege.Load()
-	if ref == nil || !ref.siege.AllowsDoorDamage(attacker) {
+// ReduceHP applies a hit's damage to the door: an auto-attack's, with no
+// skill, or a damage skill's. Every hit routed onto a door ends here. Only a
+// hit its residence's siege lets damage lowers HP, and an attacker whose
+// access level deals no damage lowers nothing; the state owner applies the
+// loss, its status broadcast, the regeneration schedule and, once HP runs
+// out, the door's death. Then, whatever the HP did, the door calls its clan
+// (SetClanCall), unless the siege ignores the hit.
+func (o *Object) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
+	outcome := HitHarmless
+	if ref := o.siege.Load(); ref != nil {
+		outcome = ref.siege.DoorHit(attacker)
+	}
+	if outcome == HitIgnored {
 		return
 	}
-	if attacker != nil && !attacker.CanGiveDamage() {
-		return
-	}
-	if o.owner != nil {
+	if outcome == HitDamages && (attacker == nil || attacker.CanGiveDamage()) && o.owner != nil {
 		o.owner.ReduceDoorHP(o.DoorID(), amount)
+	}
+	if ref := o.clanCall.Load(); ref != nil && attacker != nil {
+		ref.call.DoorAttacked(o, attacker, amount)
+	}
+}
+
+// TakeHP takes amount straight off the door's HP, as a REAL_DAMAGE skill
+// does: no siege permission and no attacker check apply. A loss leaving
+// zero HP or less breaks the door; any other sets its HP. The state owner
+// applies the change and what follows it.
+func (o *Object) TakeHP(amount float64) {
+	if o.owner != nil {
+		o.owner.TakeDoorHP(o.DoorID(), amount)
 	}
 }
 
@@ -305,6 +454,16 @@ func (o *Object) SetOwner(owner StateOwner) { o.owner = owner }
 // SetSight installs the geodata query CanSeeTarget runs. Call it once,
 // before the door is spawned.
 func (o *Object) SetSight(sight Sight) { o.sight = sight }
+
+// SetClanCall installs the call a hit on the door makes to the NPCs
+// around it; nil removes it. It may be installed once the door stands.
+func (o *Object) SetClanCall(c ClanCall) {
+	if c == nil {
+		o.clanCall.Store(nil)
+		return
+	}
+	o.clanCall.Store(&clanCallRef{call: c})
+}
 
 // BroadcastStatus reports this door's current open/close state, HP and
 // damage stage to observers.
@@ -342,56 +501,6 @@ func cloneGeoData(data [][]block.NSWE) [][]block.NSWE {
 		out[i] = append([]block.NSWE(nil), data[i]...)
 	}
 	return out
-}
-
-// NewTemplate builds a Template from set. The XML attributes, position,
-// coordinates, and stats are required; function attributes use the shipped
-// defaults when absent.
-func NewTemplate(set *commons.StatSet) (*Template, error) {
-	idf := commons.NewFields(set, "door: template")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(set, fmt.Sprintf("door: template %d", id))
-	kind := commons.FieldEnum[Kind](f, "type", kindNames)
-	level := f.Int("level")
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	position := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
-	coords := commons.FieldList[location.Point](f, "coords")
-	if len(coords) < 3 {
-		f.Fail(fmt.Errorf("coords requires at least 3 points"))
-	}
-
-	t := &Template{
-		ID:          id,
-		Name:        f.StringDefault("name", ""),
-		Kind:        kind,
-		Level:       level,
-		Position:    position,
-		Coordinates: append([]location.Point(nil), coords...),
-	}
-	if t.Name == "" {
-		f.Fail(fmt.Errorf("name is required"))
-	}
-	t.HP = f.Int("hp")
-	t.PDef = f.Int("pDef")
-	t.MDef = f.Int("mDef")
-	t.Height = f.Int("height")
-	t.CastleID = f.IntDefault("castle", 0)
-	t.ClanHallID = f.IntDefault("clanHall", 0)
-	t.TriggeredID = f.IntDefault("triggeredId", 0)
-	t.Opened = f.BoolDefault("opened", false)
-	t.OpenKind = commons.FieldEnumDefault[OpenKind](f, "openType", openKindNames, OpenNPC)
-	t.OpenTime = f.IntDefault("openTime", 0)
-	t.RandomTime = f.IntDefault("randomTime", 0)
-	t.CloseTime = f.IntDefault("closeTime", 0)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return t, nil
 }
 
 // Table stores door templates keyed by door id.

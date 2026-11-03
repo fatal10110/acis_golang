@@ -1,0 +1,156 @@
+# Bard's Mandolin (Q362): a level 15 character accepts at Swan, is sent to Woodrow, gets the flute from Galion,
+# carries Swan's letter to Nanarin and takes the reward at Swan (30957-7); then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q362_bards_mandolin.golden
+character Mandolin 15
+script quest.Q362_BardsMandolin
+item 57 4316 4317 4410
+page default/30957.htm
+page default/30956.htm
+page default/30958.htm
+page merchant/30837.htm
+page script/quest/Q362_BardsMandolin/
+npc swan 30957 Folk 10 0 0
+npc nanarin 30956 Folk 20 0 0
+npc galion 30958 Folk 30 0 0
+npc woodrow 30837 Merchant -10 0 0
+
+action swan
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q362_BardsMandolin/30957-1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q362_BardsMandolin 30957-3.htm
+  S QuestList 362:0x80000001
+  S ExShowQuestMark quest=362
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q362_BardsMandolin/30957-3.htm
+  S ActionFailed
+  Q upsert Q362_BardsMandolin | <state> | STARTED
+  Q upsert Q362_BardsMandolin | <cond> | 1
+  state Q362_BardsMandolin STARTED
+  rows Q362_BardsMandolin <cond>=1 <state>=STARTED
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q362_BardsMandolin/30957-4.htm
+  S ActionFailed
+  S ActionFailed
+action woodrow
+action woodrow
+  S ActionFailed
+  S NpcHtmlMessage obj=woodrow item=0 page=merchant/30837.htm
+  S ActionFailed
+bypass npc_{woodrow}_Quest
+  S QuestList 362:0x80000003
+  S ExShowQuestMark quest=362
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=woodrow item=0 page=script/quest/Q362_BardsMandolin/30837-1.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q362_BardsMandolin | <cond> | 2
+  rows Q362_BardsMandolin <cond>=2 <state>=STARTED
+action woodrow
+  S ActionFailed
+  S NpcHtmlMessage obj=woodrow item=0 page=merchant/30837.htm
+  S ActionFailed
+bypass npc_{woodrow}_Quest
+  S NpcHtmlMessage obj=woodrow item=0 page=script/quest/Q362_BardsMandolin/30837-2.htm
+  S ActionFailed
+  S ActionFailed
+action galion
+action galion
+  S ActionFailed
+  S NpcHtmlMessage obj=galion item=0 page=default/30958.htm
+  S ActionFailed
+bypass npc_{galion}_Quest
+  S QuestList 362:0x80000007
+  S ExShowQuestMark quest=362
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4316
+  S NpcHtmlMessage obj=galion item=0 page=script/quest/Q362_BardsMandolin/30958-1.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q362_BardsMandolin | <cond> | 3
+  rows Q362_BardsMandolin <cond>=3 <state>=STARTED
+  items 4316=1
+action swan
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S QuestList 362:0x8000000f
+  S ExShowQuestMark quest=362
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4317
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q362_BardsMandolin/30957-5.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q362_BardsMandolin | <cond> | 4
+  rows Q362_BardsMandolin <cond>=4 <state>=STARTED
+  items 4317=1
+action galion
+action galion
+  S ActionFailed
+  S NpcHtmlMessage obj=galion item=0 page=default/30958.htm
+  S ActionFailed
+bypass npc_{galion}_Quest
+  S NpcHtmlMessage obj=galion item=0 page=script/quest/Q362_BardsMandolin/30958-2.htm
+  S ActionFailed
+  S ActionFailed
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S QuestList 362:0x8000001f
+  S ExShowQuestMark quest=362
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4316
+  S SystemMessage id=302 3:4317
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q362_BardsMandolin/30956-1.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q362_BardsMandolin | <cond> | 5
+  rows Q362_BardsMandolin <cond>=5 <state>=STARTED
+  items 4316=0 4317=0
+action woodrow
+action woodrow
+  S ActionFailed
+  S NpcHtmlMessage obj=woodrow item=0 page=merchant/30837.htm
+  S ActionFailed
+bypass npc_{woodrow}_Quest
+  S NpcHtmlMessage obj=woodrow item=0 page=script/quest/Q362_BardsMandolin/30837-3.htm
+  S ActionFailed
+  S ActionFailed
+action swan
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q362_BardsMandolin/30957-6.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q362_BardsMandolin 30957-7.htm
+  S SystemMessage id=52 6:10000
+  S SystemMessage id=54 3:4410
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q362_BardsMandolin/30957-7.htm
+  S ActionFailed
+  Q delete-quest Q362_BardsMandolin
+  items 57=10000 4410=1
+  state Q362_BardsMandolin -
+  rows Q362_BardsMandolin -
+relog
+  rows Q362_BardsMandolin -
+  items 57=10000 4410=1

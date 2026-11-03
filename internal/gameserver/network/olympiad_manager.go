@@ -51,7 +51,17 @@ func (l *GameClientLink) olympiadNobleBypass(live *livePlayer, f *npc.Folk, choi
 	case 7:
 		l.openMultisell(live, f, passesMultisell, false)
 	case 10:
-		if passes := o.Passes(id, l.olympiadHero(live)); passes > 0 {
+		// The claim is stored before the passes exist (Passes), so their row
+		// can never land ahead of it. One that cannot be stored pays nothing
+		// and stays open; like a claim paying nothing, it answers nothing.
+		ctx, cancel := context.WithTimeout(context.Background(), olympiad.TaskTimeout)
+		passes, err := o.Passes(ctx, id, l.olympiadHero(live))
+		cancel()
+		if err != nil {
+			l.log.Error().Err(err).Int32("object_id", id).Msg("olympiad: store the noblesse pass claim")
+			return
+		}
+		if passes > 0 {
 			live.AddCreatedItem(olympiad.NoblesseGatePass, passes, l.nextObjectID)
 		}
 	}
@@ -69,7 +79,7 @@ func (l *GameClientLink) olympiadHero(live *livePlayer) bool {
 func (l *GameClientLink) registerOlympiad(live *livePlayer, f *npc.Folk, kind olympiad.GameType) {
 	cursedWeapon := live.CursedWeaponID()
 	result := l.olympiad.Register(olympiad.Applicant{
-		ObjectID: live.ObjectID(), Name: live.Name, BaseClass: live.BaseClassID(), Noble: live.IsNoble(),
+		ObjectID: live.ObjectID(), Name: live.CharacterName(), BaseClass: live.BaseClassID(), Noble: live.IsNoble(),
 		SubclassActive: live.ClassIndex() != 0, CursedWeaponID: cursedWeapon, Overweight: live.Overweight(),
 	}, kind)
 	var msg int
@@ -138,11 +148,12 @@ func (l *GameClientLink) leaveOlympiadOnSubclass(live *livePlayer) {
 	}
 }
 
-// dropOlympiadCompetitor takes live off the Olympiad's waiting list as it
-// leaves the world or is jailed.
+// dropOlympiadCompetitor records, as live leaves the world or is jailed,
+// that it left the Olympiad match it competes in, and takes it off the
+// Olympiad's waiting list.
 func (l *GameClientLink) dropOlympiadCompetitor(live *livePlayer) {
 	if l.olympiad != nil {
-		l.olympiad.RemoveDisconnectedCompetitor(live.ObjectID(), live.BaseClassID())
+		l.olympiad.RemoveDisconnectedCompetitor(live.ObjectID(), live.BaseClassID(), live.OlympiadGameID())
 	}
 }
 

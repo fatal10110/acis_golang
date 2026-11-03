@@ -1,0 +1,16 @@
+# The playable tests of GludioWizardStand's hooks: a monster (20999, bound to no behavior)
+# hitting a clan mate of Aden's standing wizard (35249), the knight (35235), calls the wizard
+# for nothing, even on a winning draw: only a player's or a summon's hit makes it cast.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioWizardStand
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 1500 150 0 walks clan aden_siege_clan 300
+npc wizard 35249 SiegeGuard 1500 0 0 walks clan aden_siege_clan 300 skill DD_MAGIC 4114 1
+npc monster 20999 Monster 1600 0 0
+
+hit knight 22 by monster
+  desires wizard -
+  desires knight attack(monster)=50

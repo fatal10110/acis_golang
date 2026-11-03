@@ -96,6 +96,15 @@ func (s *crashStore) UpdateHall(_ context.Context, row HallRow) error {
 	return nil
 }
 
+func (s *crashStore) UpdateSiegableHall(_ context.Context, hallID, ownerID int32, next int64) error {
+	s.log.add(func(d *crashDB) {
+		row := d.halls[hallID]
+		row.ID, row.OwnerID, row.EndDate = hallID, ownerID, next
+		d.halls[hallID] = row
+	})
+	return nil
+}
+
 func (s *crashStore) UpdateEndDate(_ context.Context, hallID int32, end int64) error {
 	s.log.add(func(d *crashDB) {
 		row := d.halls[hallID]
@@ -150,11 +159,6 @@ type crashBank struct {
 	log  *crashLog
 	mu   sync.Mutex
 	held map[int32]int
-}
-
-func (b *crashBank) PayHallFee(clanID int32, adena int) bool {
-	_, ok := b.TakeAdena(clanID, adena)
-	return ok
 }
 
 func (b *crashBank) TakeAdena(clanID int32, adena int) (Landing, bool) {

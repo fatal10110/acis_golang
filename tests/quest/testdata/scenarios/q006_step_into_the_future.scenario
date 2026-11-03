@@ -1,0 +1,148 @@
+# Step into the Future (Q006): a human of level 3 accepts at Roxxy, takes Baulro's letter to Sir
+# Collin Windawood, and Roxxy rewards the trip with a mark of traveler and a scroll of escape to
+# Giran; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q006_step_into_the_future.golden
+character Walker 3
+script quest.Q006_StepIntoTheFuture
+item 7571 7559 7570
+page gatekeeper/30006.htm
+page trainer/30033.htm
+page default/30311.htm
+page script/quest/Q006_StepIntoTheFuture/
+npc roxxy 30006 Gatekeeper 10 0 0
+npc baulro 30033 Trainer 20 0 0
+npc collin 30311 Folk 30 0 0
+
+# Roxxy: accept.
+action roxxy
+action roxxy
+  S ActionFailed
+  S NpcHtmlMessage obj=roxxy item=0 page=gatekeeper/30006.htm
+  S ActionFailed
+bypass npc_{roxxy}_Quest
+  S NpcHtmlMessage obj=roxxy item=0 page=script/quest/Q006_StepIntoTheFuture/30006-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q006_StepIntoTheFuture CREATED
+bypass Quest Q006_StepIntoTheFuture 30006-03.htm
+  S QuestList 6:0x80000001
+  S ExShowQuestMark quest=6
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=roxxy item=0 page=script/quest/Q006_StepIntoTheFuture/30006-03.htm
+  S ActionFailed
+  Q upsert Q006_StepIntoTheFuture | <state> | STARTED
+  Q upsert Q006_StepIntoTheFuture | <cond> | 1
+  state Q006_StepIntoTheFuture STARTED
+  rows Q006_StepIntoTheFuture <cond>=1 <state>=STARTED
+action roxxy
+  S ActionFailed
+  S NpcHtmlMessage obj=roxxy item=0 page=gatekeeper/30006.htm
+  S ActionFailed
+bypass npc_{roxxy}_Quest
+  S NpcHtmlMessage obj=roxxy item=0 page=script/quest/Q006_StepIntoTheFuture/30006-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Baulro: his letter for Sir Collin.
+action baulro
+action baulro
+  S ActionFailed
+  S NpcHtmlMessage obj=baulro item=0 page=trainer/30033.htm
+  S ActionFailed
+bypass npc_{baulro}_Quest
+  S NpcHtmlMessage obj=baulro item=0 page=script/quest/Q006_StepIntoTheFuture/30033-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q006_StepIntoTheFuture 30033-02.htm
+  S QuestList 6:0x80000003
+  S ExShowQuestMark quest=6
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7571
+  S NpcHtmlMessage obj=baulro item=0 page=script/quest/Q006_StepIntoTheFuture/30033-02.htm
+  S ActionFailed
+  Q upsert Q006_StepIntoTheFuture | <cond> | 2
+  items 7571=1
+action baulro
+  S ActionFailed
+  S NpcHtmlMessage obj=baulro item=0 page=trainer/30033.htm
+  S ActionFailed
+bypass npc_{baulro}_Quest
+  S NpcHtmlMessage obj=baulro item=0 page=script/quest/Q006_StepIntoTheFuture/30033-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sir Collin takes the letter.
+action collin
+action collin
+  S ActionFailed
+  S NpcHtmlMessage obj=collin item=0 page=default/30311.htm
+  S ActionFailed
+bypass npc_{collin}_Quest
+  S NpcHtmlMessage obj=collin item=0 page=script/quest/Q006_StepIntoTheFuture/30311-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q006_StepIntoTheFuture 30311-02.htm
+  S QuestList 6:0x80000007
+  S ExShowQuestMark quest=6
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7571
+  S NpcHtmlMessage obj=collin item=0 page=script/quest/Q006_StepIntoTheFuture/30311-02.htm
+  S ActionFailed
+  Q upsert Q006_StepIntoTheFuture | <cond> | 3
+  rows Q006_StepIntoTheFuture <cond>=3 <state>=STARTED
+  items 7571=0
+action collin
+  S ActionFailed
+  S NpcHtmlMessage obj=collin item=0 page=default/30311.htm
+  S ActionFailed
+bypass npc_{collin}_Quest
+  S NpcHtmlMessage obj=collin item=0 page=script/quest/Q006_StepIntoTheFuture/30311-03a.htm
+  S ActionFailed
+  S ActionFailed
+action baulro
+action baulro
+  S ActionFailed
+  S NpcHtmlMessage obj=baulro item=0 page=trainer/30033.htm
+  S ActionFailed
+bypass npc_{baulro}_Quest
+  S NpcHtmlMessage obj=baulro item=0 page=script/quest/Q006_StepIntoTheFuture/30033-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Roxxy: the reward; the quest completes.
+action roxxy
+action roxxy
+  S ActionFailed
+  S NpcHtmlMessage obj=roxxy item=0 page=gatekeeper/30006.htm
+  S ActionFailed
+bypass npc_{roxxy}_Quest
+  S NpcHtmlMessage obj=roxxy item=0 page=script/quest/Q006_StepIntoTheFuture/30006-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q006_StepIntoTheFuture 30006-06.htm
+  S SystemMessage id=54 3:7570
+  S SystemMessage id=54 3:7559
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 6:0x00000000
+  S NpcHtmlMessage obj=roxxy item=0 page=script/quest/Q006_StepIntoTheFuture/30006-06.htm
+  S ActionFailed
+  Q upsert Q006_StepIntoTheFuture | <state> | COMPLETED
+  Q delete-except-state Q006_StepIntoTheFuture
+  state Q006_StepIntoTheFuture COMPLETED
+  rows Q006_StepIntoTheFuture <state>=COMPLETED
+  items 7571=0 7570=1 7559=1
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q006_StepIntoTheFuture COMPLETED
+  rows Q006_StepIntoTheFuture <state>=COMPLETED
+  items 7570=1 7559=1
+action roxxy
+action roxxy
+  S ActionFailed
+  S NpcHtmlMessage obj=roxxy item=0 page=gatekeeper/30006.htm
+  S ActionFailed
+bypass npc_{roxxy}_Quest
+  S NpcHtmlMessage obj=roxxy item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

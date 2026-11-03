@@ -1,0 +1,24 @@
+# PartyLeaderPhysicalSpecial (20947, Connabi, level 54, physical special 4032-5), every draw 0: hit
+# by its top desire target below 20 percent of its hit points it wants its physical special once
+# (i_ai0 1); a clan member told of a hit, settled, wants it on the attacker.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPhysicalSpecial
+npc connabi 20947 Monster 300 0 0 level 54 skill PHYSICAL_SPECIAL 4032 5 clan green_clan 300
+npc mate 20947 Monster 400 0 0 level 54 skill PHYSICAL_SPECIAL 4032 5 clan green_clan 300
+roll connabi 99
+roll mate 99
+
+tick x8
+hit connabi 10
+  S MagicSkillUse caster=mate target=player skill=4032-5 hit=1321 reuse=7928 success=0
+  mem mate i_ai0=1
+hp connabi 100
+hit connabi 10
+  mem connabi i_ai0=1
+  desires connabi attack(player)=64.78688524590163 cast(player,4032,move)=1000000 wander()=5

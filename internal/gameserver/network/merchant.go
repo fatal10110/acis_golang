@@ -130,7 +130,7 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 		return
 	}
 	if taxedBy != nil {
-		taxedBy.RiseTaxRevenue(int64(commons.JavaInt(float64(res.Subtotal) * taxRate)))
+		taxedBy.RiseTaxRevenue(int64(commons.TruncInt32Sat(float64(res.Subtotal) * taxRate)))
 	}
 	if seller != nil {
 		if path, ok := seller.BoughtPage(); ok {

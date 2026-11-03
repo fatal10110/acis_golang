@@ -1,0 +1,20 @@
+# Hiding Behind the Truth (Q025) below level 66, Benedict turns the player away. Expectations
+# come from the reference trace (Q025_HidingBehindTheTruth.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q025_hiding_behind_the_truth_low_level.golden
+character Young 65
+quest Q024_InhabitantsOfTheForestOfTheDead <state>=COMPLETED
+script quest.Q024_InhabitantsOfTheForestOfTheDead
+script quest.Q025_HidingBehindTheTruth
+page default/31349.htm
+page script/quest/Q025_HidingBehindTheTruth/
+npc benedict 31349 Folk 10 0 0
+
+action benedict
+action benedict
+  S ActionFailed
+  S NpcHtmlMessage obj=benedict item=0 page=default/31349.htm
+  S ActionFailed
+bypass npc_{benedict}_Quest
+  S NpcHtmlMessage obj=benedict item=0 page=script/quest/Q025_HidingBehindTheTruth/31349-02.htm
+  S ActionFailed
+  S ActionFailed

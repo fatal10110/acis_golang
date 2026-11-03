@@ -1,0 +1,25 @@
+# Benom (29054), a level 1 raid boss standing 100 from the level 1 character, killed twice, every
+# draw 99, no siege event since it appeared. Each death sends the character its experience message
+# (none earned) and the raid success message and sound; 3 s later Benom's dying hook shouts its last
+# line and leaves the exit teleporter (29055) at the dungeon's entrance, which no packet here
+# renders. The fresh Benom that replaces it shouts its challenge as it appears (created). Expectations are derived from the reference source
+# (Benom.java 57-77 and 201-212).
+character Hunter 1
+random always 99
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.boss.benom.Benom
+npc benom 29054 RaidBoss 100 0 0
+npc cubic 29055 Folk 3000 0 0
+
+kill benom x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=benom type=1 npc=1029054 text="It's not over yet... It won't be... over... like this... Never..."
+  S NpcSay obj=benom type=1 npc=1029054 text="Who dares to covet the throne of our castle! Leave immediately or you will pay the price of your audacity with your very own blood!"
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=benom type=1 npc=1029054 text="It's not over yet... It won't be... over... like this... Never..."

@@ -117,8 +117,8 @@ func (p *ownerItemPersister) Persist(inst *item.Instance) { p.instances.AddOwned
 // itemPersister returns the persistence dependency for ownerID's inventory,
 // or nil when no item persistence task is wired.
 func (l *GameClientLink) itemPersister(ownerID int32) item.Persister {
-	if l.itemInstances == nil {
+	if l.belongings.itemInstances == nil {
 		return nil
 	}
-	return &ownerItemPersister{instances: l.itemInstances, ownerID: ownerID}
+	return &ownerItemPersister{instances: l.belongings.itemInstances, ownerID: ownerID}
 }

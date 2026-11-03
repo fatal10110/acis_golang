@@ -1,0 +1,22 @@
+# Whisper of Dreams, Part 1 (Q374), level 55: Manakia turns the character away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q374_whisper_of_dreams_part1_low_level.golden
+character Whisper 55
+script quest.Q374_WhisperOfDreams_Part1
+item 57 5884 5885 5886 5887 5486 5487 5488 5485 5489
+page trainer/30515.htm
+page default/30557.htm
+page script/quest/Q374_WhisperOfDreams_Part1/
+npc manakia 30515 Trainer 10 0 0
+npc torai 30557 Folk 20 0 0
+npc beast 20620 Monster 40 0 0
+npc wave 20621 Monster 50 0 0
+
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q374_WhisperOfDreams_Part1/30515-01.htm
+  S ActionFailed
+  S ActionFailed

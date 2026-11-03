@@ -1,0 +1,145 @@
+# Repent Your Sins (Q422), from cond 3 (a scenario sets no PK count, so the offer, the
+# manacles and the PK relief are in tests/quest/q422_flow_test.go): the Black Judge's own
+# window (BlackJudge) leads to the quest, which tells a player of level 21 to 30 to see
+# Piotur; ten Turek War Hounds give ten tails (always drops, draws 0); Piotur takes them,
+# the Black Judge gives the manual of manacles, and Pushkin wants the materials. Expectations
+# are derived from the reference source (Q422_RepentYourSins.java, Quest.dropItemsAlways).
+trace internal/gameserver/script/testdata/oracle/scenarios/q422_repent_your_sins.golden
+character Penitent 30
+quest Q422_RepentYourSins <state>=STARTED <cond>=3
+random always 0
+script quest.Q422_RepentYourSins
+script script.feature.BlackJudge
+item 4327 4331
+page script/feature/BlackJudge/
+page default/30597.htm
+page trainer/30300.htm
+page script/quest/Q422_RepentYourSins/
+npc judge 30981 Folk 10 0 0
+npc piotur 30597 Folk -10 0 0
+npc pushkin 30300 Trainer 0 10 0
+npc hound 20494 Monster 40 0 0
+
+action judge
+action judge
+  S ActionFailed
+  S NpcHtmlMessage obj=judge item=0 page=script/feature/BlackJudge/black_judge001.htm
+  S ActionFailed
+bypass npc_{judge}_Quest
+  S NpcHtmlMessage obj=judge item=0 page=script/quest/Q422_RepentYourSins/30981-07.htm
+  S ActionFailed
+  S ActionFailed
+action piotur
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S QuestList 422:0x80000047
+  S ExShowQuestMark quest=422
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q422_RepentYourSins/30597-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q422_RepentYourSins | <flags> | -2147483577
+  Q upsert Q422_RepentYourSins | <cond> | 7
+
+# Ten hounds, ten tails: the tenth with the middle sound, and no cond change.
+kill hound x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4327
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 4327=10
+
+# Piotur takes the tails; the Black Judge then hands over the manual.
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S QuestList 422:0x80000447
+  S ExShowQuestMark quest=422
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:4327 6:10
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q422_RepentYourSins/30597-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q422_RepentYourSins | <flags> | -2147482553
+  Q upsert Q422_RepentYourSins | <cond> | 11
+  items 4327=0
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q422_RepentYourSins/30597-04.htm
+  S ActionFailed
+  S ActionFailed
+action judge
+action judge
+  S ActionFailed
+  S NpcHtmlMessage obj=judge item=0 page=script/feature/BlackJudge/black_judge001.htm
+  S ActionFailed
+bypass npc_{judge}_Quest
+  S QuestList 422:0x80002447
+  S ExShowQuestMark quest=422
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4331
+  S NpcHtmlMessage obj=judge item=0 page=script/quest/Q422_RepentYourSins/30981-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q422_RepentYourSins | <flags> | -2147474361
+  Q upsert Q422_RepentYourSins | <cond> | 14
+  items 4331=1
+action judge
+  S ActionFailed
+  S NpcHtmlMessage obj=judge item=0 page=script/feature/BlackJudge/black_judge001.htm
+  S ActionFailed
+bypass npc_{judge}_Quest
+  S NpcHtmlMessage obj=judge item=0 page=script/quest/Q422_RepentYourSins/30981-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Pushkin wants the materials before he forges the manacles.
+action pushkin
+action pushkin
+  S ActionFailed
+  S NpcHtmlMessage obj=pushkin item=0 page=trainer/30300.htm
+  S ActionFailed
+bypass npc_{pushkin}_Quest
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q422_RepentYourSins/30300-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Relog: the started quest at cond 14 and the manual come back.
+relog
+  state Q422_RepentYourSins STARTED
+  rows Q422_RepentYourSins <cond>=14 <flags>=-2147474361 <state>=STARTED
+  items 4331=1

@@ -116,7 +116,7 @@ func (e Entry) prepare(enchant *int, taxRate float64) Entry {
 		if in.ItemID == item.AdenaID {
 			adenaTemplate = in.template
 			if in.TaxIngredient {
-				out.taxAmount += int(commons.JavaRound(float64(in.Count) * taxRate))
+				out.taxAmount += int(commons.RoundHalfUp(float64(in.Count) * taxRate))
 			} else {
 				adena += in.Count
 			}
@@ -250,8 +250,8 @@ func NewTable(lists []*List) (*Table, error) {
 	return &Table{commons.NewLookup(lists, func(l *List) int32 { return l.ID })}, nil
 }
 
-// Replace swaps t's lists for from's, at once for every holder of t:
-// MultisellData.reload. A list already prepared for a player stays as it
+// Replace swaps t's lists for from's, at once for every holder of t, as a
+// multisell reload does. A list already prepared for a player stays as it
 // was prepared.
 func (t *Table) Replace(from *Table) {
 	t.Swap(from.Lookup)

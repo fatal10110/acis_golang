@@ -1,0 +1,110 @@
+# Into the City of Humans (Q009): an orc of level 3 accepts at Petukai, visits Tanapi, then Tamil,
+# who rewards the trip with a mark of traveler and a scroll of escape to Giran; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q009_into_the_city_of_humans.golden
+character Roamer 3
+class 44
+script quest.Q009_IntoTheCityOfHumans
+item 7559 7570
+page guard/30583.htm
+page trainer/30571.htm
+page gatekeeper/30576.htm
+page script/quest/Q009_IntoTheCityOfHumans/
+npc petukai 30583 Guard 10 0 0
+npc tanapi 30571 Trainer 20 0 0
+npc tamil 30576 Gatekeeper 30 0 0
+
+# Petukai: accept.
+action petukai
+action petukai
+  S ActionFailed
+  S NpcHtmlMessage obj=petukai item=0 page=guard/30583.htm
+  S ActionFailed
+bypass npc_{petukai}_Quest
+  S NpcHtmlMessage obj=petukai item=0 page=script/quest/Q009_IntoTheCityOfHumans/30583-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q009_IntoTheCityOfHumans CREATED
+bypass Quest Q009_IntoTheCityOfHumans 30583-01.htm
+  S QuestList 9:0x80000001
+  S ExShowQuestMark quest=9
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=petukai item=0 page=script/quest/Q009_IntoTheCityOfHumans/30583-01.htm
+  S ActionFailed
+  Q upsert Q009_IntoTheCityOfHumans | <state> | STARTED
+  Q upsert Q009_IntoTheCityOfHumans | <cond> | 1
+  state Q009_IntoTheCityOfHumans STARTED
+  rows Q009_IntoTheCityOfHumans <cond>=1 <state>=STARTED
+action petukai
+  S ActionFailed
+  S NpcHtmlMessage obj=petukai item=0 page=guard/30583.htm
+  S ActionFailed
+bypass npc_{petukai}_Quest
+  S NpcHtmlMessage obj=petukai item=0 page=script/quest/Q009_IntoTheCityOfHumans/30583-01a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Tanapi sends the player on to Tamil.
+action tanapi
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q009_IntoTheCityOfHumans/30571-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q009_IntoTheCityOfHumans 30571-01.htm
+  S QuestList 9:0x80000003
+  S ExShowQuestMark quest=9
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q009_IntoTheCityOfHumans/30571-01.htm
+  S ActionFailed
+  Q upsert Q009_IntoTheCityOfHumans | <cond> | 2
+  rows Q009_IntoTheCityOfHumans <cond>=2 <state>=STARTED
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q009_IntoTheCityOfHumans/30571-01a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Tamil: the reward; the quest completes.
+action tamil
+action tamil
+  S ActionFailed
+  S NpcHtmlMessage obj=tamil item=0 page=gatekeeper/30576.htm
+  S ActionFailed
+bypass npc_{tamil}_Quest
+  S NpcHtmlMessage obj=tamil item=0 page=script/quest/Q009_IntoTheCityOfHumans/30576-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q009_IntoTheCityOfHumans 30576-01.htm
+  S SystemMessage id=54 3:7570
+  S SystemMessage id=54 3:7559
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 9:0x00000000
+  S NpcHtmlMessage obj=tamil item=0 page=script/quest/Q009_IntoTheCityOfHumans/30576-01.htm
+  S ActionFailed
+  Q upsert Q009_IntoTheCityOfHumans | <state> | COMPLETED
+  Q delete-except-state Q009_IntoTheCityOfHumans
+  state Q009_IntoTheCityOfHumans COMPLETED
+  rows Q009_IntoTheCityOfHumans <state>=COMPLETED
+  items 7570=1 7559=1
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q009_IntoTheCityOfHumans COMPLETED
+  rows Q009_IntoTheCityOfHumans <state>=COMPLETED
+  items 7570=1 7559=1
+action tamil
+action tamil
+  S ActionFailed
+  S NpcHtmlMessage obj=tamil item=0 page=gatekeeper/30576.htm
+  S ActionFailed
+bypass npc_{tamil}_Quest
+  S NpcHtmlMessage obj=tamil item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

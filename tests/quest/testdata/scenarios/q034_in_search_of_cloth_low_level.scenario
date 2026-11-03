@@ -1,0 +1,24 @@
+# In Search of Cloth (Q034), refused: a level 59 character, one short of the quest's level, is
+# turned away by Radia although its formal wear (Q037) is at its sixth step, and the quest is not
+# started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q034_in_search_of_cloth_low_level.golden
+character Weaver 59
+quest Q037_MakeFormalWear <cond>=6 <state>=STARTED
+script quest.Q034_InSearchOfCloth
+script quest.Q037_MakeFormalWear
+item 7528 1866 1868 7161 7076
+page merchant/30088.htm
+page script/quest/Q034_InSearchOfCloth/
+npc radia 30088 Merchant 10 0 0
+
+action radia
+action radia
+  S ActionFailed
+  S NpcHtmlMessage obj=radia item=0 page=merchant/30088.htm
+  S ActionFailed
+bypass npc_{radia}_Quest
+  S NpcHtmlMessage obj=radia item=0 page=script/quest/Q034_InSearchOfCloth/30088-0b.htm
+  S ActionFailed
+  S ActionFailed
+  state Q034_InSearchOfCloth CREATED
+  rows Q034_InSearchOfCloth -

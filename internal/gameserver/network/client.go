@@ -41,6 +41,9 @@ type Client struct {
 	// while the loop stays parked, so the loop still owns it.
 	stats           clientStats
 	floodProtectors [numFloodProtectors]time.Time
+	// frameUnread marks the frame in hand as one that failed to decode, so
+	// no handler ran for it. The read loop owns it like stats.
+	frameUnread bool
 }
 
 // NewClient returns a Client wrapping session, starting in StateConnected.
@@ -106,14 +109,14 @@ func (c *Client) Accept(opcode byte) bool {
 
 // countUnderflow records one malformed-packet (buffer underflow) occurrence
 // in the current 60s sliding window and reports whether the per-minute
-// threshold has now been exceeded, mirroring ClientStats.countUnderflowException.
+// threshold has now been exceeded.
 func (c *Client) countUnderflow() bool {
 	return countInWindow(&c.mu, &c.underflowCount, &c.underflowWindowStart, maxUnderflowsPerMin)
 }
 
 // countUnknownPacket records one unknown/rejected-opcode occurrence in the
 // current 60s sliding window and reports whether the per-minute threshold
-// has now been exceeded, mirroring ClientStats.countUnknownPacket.
+// has now been exceeded.
 func (c *Client) countUnknownPacket() bool {
 	return countInWindow(&c.mu, &c.unknownCount, &c.unknownWindowStart, maxUnknownPerMin)
 }

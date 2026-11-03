@@ -3,7 +3,6 @@ package character
 import (
 	"bytes"
 	"context"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
-	"github.com/rs/zerolog"
 )
 
 type logBuffer struct {
@@ -54,19 +52,11 @@ func encodeRequestShortCutDel(slot int32) []byte {
 	return w.Bytes()
 }
 
-// rejectSilenceWindow is how long a test waits to confirm a handler stayed
-// silent.
-const rejectSilenceWindow = 300 * time.Millisecond
-
-// drainQuiet reads until the stream stays quiet for one silence window.
+// drainQuiet reads every frame the server has queued to the client once it
+// has caught up.
 func drainQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for range 100 {
-		if c.ReadWithTimeout(rejectSilenceWindow) == nil {
-			return
-		}
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
+	c.ReadQueued()
 }
 
 // shortCutInitEntry is one parsed ShortCutInit row.
@@ -131,22 +121,20 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 	const staleObjectID int32 = 999
 	const missingObjectID int32 = 998
 
-	logs := &logBuffer{}
+	// Every shortcut row write takes longer than the sim pool's 50 ms
+	// slow-task budget, so a write still made on the player's queue would
+	// show up in the watchdog's log below.
+	const storeDelay = 150 * time.Millisecond
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithLog(zerolog.New(logs)),
+		gameservertest.WithCapturedLog(),
 		gameservertest.WithReuseDelays(0, 0),
-		// Every shortcut row write takes longer than the sim pool's 50 ms
-		// slow-task budget, so a write still made on the player's queue
-		// would show up in the watchdog's log below.
-		gameservertest.WithSlowStores(150*time.Millisecond),
+		gameservertest.WithSlowStores(storeDelay),
 	)
 	t.Cleanup(func() {
 		if t.Failed() {
-			logs.mu.Lock()
-			defer logs.mu.Unlock()
-			t.Logf("server log:\n%s", logs.buf.String())
+			t.Logf("server log:\n%s", srv.LogText())
 		}
 	})
 	c := srv.Client
@@ -195,8 +183,8 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 	if typ, slot, id := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.ShortcutItem) || slot != wireShortcutSlot(1, 5) || id != missingObjectID {
 		t.Fatalf("missing-object ShortCutRegister = type %d slot %d id %d, want item at slot %d for %d", typ, slot, id, wireShortcutSlot(1, 5), missingObjectID)
 	}
-	if frame := c.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("missing-object register sent a second frame %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("missing-object register sent a second frame %#x", queued[0][0])
 	}
 
 	// Shortcut rows are written on the persistence worker.
@@ -236,14 +224,13 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 	}
 
 	// The register and delete above ran on the player's queue while every
-	// shortcut write took 150 ms: the writes are queued on the persistence
-	// worker, so no queue task waited for one.
+	// shortcut write took storeDelay: the writes are queued on the
+	// persistence worker, so no queue task waited for one. A task that did
+	// would have run for at least storeDelay; a shorter slow task is CPU
+	// contention on a loaded runner.
 	srv.Settle(t)
-	logs.mu.Lock()
-	logged := logs.buf.String()
-	logs.mu.Unlock()
-	if strings.Contains(logged, "sim: slow task") {
-		t.Fatalf("queue task blocked on the shortcut store:\n%s", logged)
+	if lines := srv.SlowTaskLogs(storeDelay); len(lines) != 0 {
+		t.Fatalf("queue task blocked on the shortcut store: %v", lines)
 	}
 
 	// Restart back to selection and re-enter: the surviving potion shortcut

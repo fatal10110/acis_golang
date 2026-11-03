@@ -1,0 +1,30 @@
+# I'd Rather Be Collecting Fairy Breath (Q659): the fairy breath drops for a draw under the chance, without a limit.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q659_id_rather_be_collecting_fairy_breath_hunt.golden
+character Hero 26
+quest Q659_IdRatherBeCollectingFairyBreath <cond>=1 <state>=STARTED
+random 900000 0 0
+script quest.Q659_IdRatherBeCollectingFairyBreath
+item 8286 57
+page default/30634.htm
+page script/quest/Q659_IdRatherBeCollectingFairyBreath/
+npc galatea 30634 Folk 10 0 0
+npc m1 21023 Monster 40 0 0
+npc m2 21024 Monster 50 0 0
+npc m3 21025 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 8286=0
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8286=1
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8286=2
+  rows Q659_IdRatherBeCollectingFairyBreath <cond>=1 <state>=STARTED
+  state Q659_IdRatherBeCollectingFairyBreath STARTED

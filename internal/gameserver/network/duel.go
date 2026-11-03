@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -24,25 +25,6 @@ type duelRegistry = duel.Manager[*livePlayer]
 
 var _ duel.Player = (*livePlayer)(nil)
 
-// dispatchDuel decodes and runs one extended duel packet. It reports false
-// once the connection has been closed for a malformed packet.
-func (l *GameClientLink) dispatchDuel(client *Client, live *livePlayer, second uint16, payload []byte) bool {
-	switch second {
-	case clientpackets.OpcodeRequestDuelStart:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestDuelStart, l.requestDuelStart)
-	case clientpackets.OpcodeRequestDuelAnswerStart:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestDuelAnswerStart, l.requestDuelAnswerStart)
-	case clientpackets.OpcodeRequestDuelSurrender:
-		// The request carries no body. A player in no duel surrenders
-		// nothing and hears nothing, as the menu action waits on no
-		// answer; the duel's end answers a surrender.
-		if live != nil && l.duels != nil {
-			onLive(live, func() { l.duels.Surrender(live) })
-		}
-	}
-	return true
-}
-
 // requestDuelStart challenges the named player to a duel, or its party to
 // a party duel; a party duel's challenge goes to the party's leader.
 func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.RequestDuelStart) {
@@ -56,16 +38,16 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if reason, ok := l.duelRefusal(target); !ok {
-		live.SendFrame(serverpackets.FrameSystemMessageString(reason, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(reason, target.CharacterName()))
 		return
 	}
 	if !inDuelRange(live, target) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CannotReceiveDuelTooFar, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CannotReceiveDuelTooFar, target.CharacterName()))
 		return
 	}
 	if !req.Party {
 		if l.tradeBook().ProcessingRequest(target.ObjectID()) {
-			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 			return
 		}
 		l.leavePartyMatch(live)
@@ -73,9 +55,9 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 		if !l.challengeToDuel(live, target, tradebook.KindDuel) {
 			return
 		}
-		target.SendFrame(serverpackets.FrameExDuelAskStart(live.Name, false))
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1ChallengedToDuel, target.Name))
-		target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1ChallengedYouToDuel, live.Name))
+		target.SendFrame(serverpackets.FrameExDuelAskStart(live.CharacterName(), false))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1ChallengedToDuel, target.CharacterName()))
+		target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1ChallengedYouToDuel, live.CharacterName()))
 		return
 	}
 
@@ -86,16 +68,16 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 	}
 	leader := targetParty.Leader
 	if l.tradeBook().ProcessingRequest(leader.ObjectID()) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, leader.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, leader.CharacterName()))
 		return
 	}
 	l.prepareDuelParties(own.Members, targetParty.Members)
 	if !l.challengeToDuel(live, leader, tradebook.KindPartyDuel) {
 		return
 	}
-	leader.SendFrame(serverpackets.FrameExDuelAskStart(live.Name, true))
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PartyChallengedToDuel, leader.Name))
-	target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PartyChallengedYourParty, live.Name))
+	leader.SendFrame(serverpackets.FrameExDuelAskStart(live.CharacterName(), true))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PartyChallengedToDuel, leader.CharacterName()))
+	target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PartyChallengedYourParty, live.CharacterName()))
 }
 
 // challengeToDuel records live's challenge of target, of kind. A target
@@ -103,7 +85,7 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 // no one.
 func (l *GameClientLink) challengeToDuel(live, target *livePlayer, kind tradebook.RequestKind) bool {
 	if l.tradeBook().Invite(kind, live.ObjectID(), target.ObjectID(), false).Status != tradebook.RequestStarted {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return false
 	}
 	return true
@@ -176,12 +158,12 @@ func (l *GameClientLink) requestDuelAnswerStart(live *livePlayer, req clientpack
 		if party {
 			requester.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOpposingPartyDeclinedDuel))
 		} else {
-			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeclinedYourDuel, live.Name))
+			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeclinedYourDuel, live.CharacterName()))
 		}
 		return
 	}
 	if reason, ok := l.duelRefusal(requester); !ok {
-		live.SendFrame(serverpackets.FrameSystemMessageString(reason, requester.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(reason, requester.CharacterName()))
 		return
 	}
 	if _, ok := l.duelRefusal(live); !ok {
@@ -189,14 +171,14 @@ func (l *GameClientLink) requestDuelAnswerStart(live *livePlayer, req clientpack
 		return
 	}
 	if !inDuelRange(requester, live) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CannotReceiveDuelTooFar, requester.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CannotReceiveDuelTooFar, requester.CharacterName()))
 		return
 	}
 	if !party {
 		l.leavePartyMatch(live)
 		l.leavePartyMatch(requester)
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouAcceptedS1Duel, requester.Name))
-		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AcceptedYourDuel, live.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouAcceptedS1Duel, requester.CharacterName()))
+		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AcceptedYourDuel, live.CharacterName()))
 		l.beginDuel(live, requester, nil, nil, false)
 		return
 	}
@@ -206,8 +188,8 @@ func (l *GameClientLink) requestDuelAnswerStart(live *livePlayer, req clientpack
 		return
 	}
 	l.prepareDuelParties(requesterParty.Members, ownParty.Members)
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouAcceptedS1PartyDuel, requester.Name))
-	requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AcceptedYourPartyDuel, live.Name))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouAcceptedS1PartyDuel, requester.CharacterName()))
+	requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AcceptedYourPartyDuel, live.CharacterName()))
 	l.beginDuel(live, requester, requesterParty.Members, ownParty.Members, true)
 }
 
@@ -427,7 +409,7 @@ func (l *GameClientLink) refreshDuelLook(live *livePlayer) {
 func duelUserInfo(live *livePlayer) serverpackets.DuelUserInfo {
 	res := live.ResourceValues()
 	return serverpackets.DuelUserInfo{
-		Name: live.Name, ObjectID: live.ObjectID(), ClassID: int32(live.ClassID()), Level: int32(live.Level()),
+		Name: live.CharacterName(), ObjectID: live.ObjectID(), ClassID: int32(live.ClassID()), Level: int32(live.Level()),
 		HP: int32(res.CurrentHP), MaxHP: int32(res.MaxHP),
 		MP: int32(res.CurrentMP), MaxMP: int32(res.MaxMP),
 		CP: int32(res.CurrentCP), MaxCP: int32(res.MaxCP),
@@ -506,13 +488,13 @@ func duelEndMessages(v duel.View[*livePlayer], res duel.Result) []func() wire.Fr
 	}
 	switch res {
 	case duel.Team2Surrender:
-		return []func() wire.Frame{withdrawal(v.B.Name, v.A.Name), victory(v.A.Name)}
+		return []func() wire.Frame{withdrawal(v.B.CharacterName(), v.A.CharacterName()), victory(v.A.CharacterName())}
 	case duel.Team1Win:
-		return []func() wire.Frame{victory(v.A.Name)}
+		return []func() wire.Frame{victory(v.A.CharacterName())}
 	case duel.Team1Surrender:
-		return []func() wire.Frame{withdrawal(v.A.Name, v.B.Name), victory(v.B.Name)}
+		return []func() wire.Frame{withdrawal(v.A.CharacterName(), v.B.CharacterName()), victory(v.B.CharacterName())}
 	case duel.Team2Win:
-		return []func() wire.Frame{victory(v.B.Name)}
+		return []func() wire.Frame{victory(v.B.CharacterName())}
 	}
 	return []func() wire.Frame{func() wire.Frame { return serverpackets.FrameSystemMessage(serverpackets.SystemMessageDuelEndedInTie) }}
 }
@@ -600,8 +582,9 @@ func (l *GameClientLink) sendDuelVitals(live *livePlayer, cpOrHP bool) {
 	l.broadcastToMembers(opponents, func() wire.Frame { return serverpackets.FrameExDuelUpdateUserInfo(info) })
 }
 
-// refuseFrozenDuellist answers an action on a player, or a player's summon,
-// that lost its duel: the other side is frozen. It reports whether it did.
+// refuseFrozenDuellist answers an action on a player that lost its duel, or
+// on its summon or signet effect point: the other side is frozen. It reports
+// whether it did.
 func (l *GameClientLink) refuseFrozenDuellist(live *livePlayer, objectID int32) bool {
 	target := l.resolveTarget(objectID)
 	if target == nil {
@@ -614,6 +597,10 @@ func (l *GameClientLink) refuseFrozenDuellist(live *livePlayer, objectID int32) 
 	case *summon.Actor:
 		if owner, ok := liveSummonOwner(t); ok {
 			p = owner
+		}
+	case *npc.EffectPoint:
+		if owner, ok := l.world.Player(t.OwnerID()); ok {
+			p, _ = owner.(*livePlayer)
 		}
 	}
 	if p == nil || p.DuelState() != duel.Dead {

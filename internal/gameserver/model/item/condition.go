@@ -1,9 +1,5 @@
 package item
 
-import (
-	"strings"
-)
-
 // Condition is one node of an item's use-condition expression tree: either
 // a combinator ("and", "or", "not") wrapping child nodes, or a leaf
 // predicate (e.g. one player-state check) carrying its own attributes. Kind
@@ -27,32 +23,4 @@ type UseCondition struct {
 	Message   string
 	MessageID int32
 	AddName   bool
-}
-
-// EvaluateCondition walks cond's and/or/not combinator tree, deferring to
-// leaf for every non-combinator node. Shared by the player and pet
-// use-condition evaluators (internal/gameserver/network/item_use_gate.go,
-// internal/gameserver/petitem/conditions.go), which differ only in which
-// actor a leaf checks against and which leaf kinds/attrs they support.
-func EvaluateCondition(cond Condition, leaf func(Condition) bool) bool {
-	switch strings.ToLower(cond.Kind) {
-	case "and":
-		for _, child := range cond.Children {
-			if !EvaluateCondition(child, leaf) {
-				return false
-			}
-		}
-		return true
-	case "or":
-		for _, child := range cond.Children {
-			if EvaluateCondition(child, leaf) {
-				return true
-			}
-		}
-		return false
-	case "not":
-		return len(cond.Children) == 1 && !EvaluateCondition(cond.Children[0], leaf)
-	default:
-		return leaf(cond)
-	}
 }

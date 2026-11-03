@@ -60,7 +60,7 @@ func TestSkillFileStopsAtMalformedSkill(t *testing.T) {
 		{name: "unknown skill condition stat", body: `<cond><skill stat="bogus"/></cond>`},
 		{name: "skill condition without stat", body: `<cond><skill/></cond>`},
 		{name: "insidePoly without zone", body: `<cond><player insidePoly="true"/></cond>`},
-		{name: "insidePoly zone without maxZ", body: `<cond><player insidePoly="true"><zone minZ="0"><node x="0" y="0"/></zone></player></cond>`},
+		{name: "insidePoly zone without maxZ", body: `<cond><player insidePoly="true"> <zone minZ="0"><node x="0" y="0"/></zone></player></cond>`},
 		{name: "malformed condition integer in a for block", body: `<for><cond><player level="oops"/></cond><add stat="pAtk" val="1"/></for>`},
 		{name: "malformed condition integer in a func", body: `<for><add stat="pAtk" val="1"><player level="oops"/></add></for>`},
 		{name: "unresolved table read as an empty integer", body: `<cond><player charges="#missing"/></cond>`},

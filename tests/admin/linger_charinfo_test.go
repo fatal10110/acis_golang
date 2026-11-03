@@ -3,9 +3,7 @@ package admin
 import (
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -17,20 +15,7 @@ func TestCharacterPageShowsLingeringPlayerDisconnected(t *testing.T) {
 	t.Parallel()
 	srv, gm, user, userID := bootEditAdmin(t)
 
-	srv.SetPlayerInCombat(t, userID, true)
-	if err := user.Close(); err != nil {
-		t.Fatal(err)
-	}
-	obj, ok := srv.State.Player(userID)
-	if !ok {
-		t.Fatal("a player dropped in combat left the world at once")
-	}
-	for deadline := time.Now().Add(5 * time.Second); !network.ClientDetached(obj); {
-		if time.Now().After(deadline) {
-			t.Fatal("the server never noticed the connection drop")
-		}
-		time.Sleep(time.Millisecond)
-	}
+	srv.DropInCombat(t, userID, user)
 
 	pages := only(exchange(t, gm, encodeBuildCmd("debug Player")), serverpackets.OpcodeNpcHtmlMessage)
 	if len(pages) != 1 {

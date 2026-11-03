@@ -1,0 +1,23 @@
+# Find Glittering Jewelry (Q035), refused: a level 60 character who has not started Make Formal
+# Wear (Q037) is turned away by Ellie and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q035_find_glittering_jewelry_unready.golden
+character Jeweler 60
+script quest.Q035_FindGlitteringJewelry
+script quest.Q037_MakeFormalWear
+item 7162 1893 1873 4044 7077
+page merchant/30091.htm
+page script/quest/Q035_FindGlitteringJewelry/
+npc ellie 30091 Merchant 10 0 0
+
+action ellie
+action ellie
+  S ActionFailed
+  S NpcHtmlMessage obj=ellie item=0 page=merchant/30091.htm
+  S ActionFailed
+bypass npc_{ellie}_Quest
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q035_FindGlitteringJewelry/30091-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q035_FindGlitteringJewelry CREATED
+  rows Q035_FindGlitteringJewelry -

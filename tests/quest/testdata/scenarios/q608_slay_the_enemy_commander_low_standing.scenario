@@ -1,0 +1,22 @@
+# Slay the Enemy Commander (Q608): a level 75 Ketra ally of level 3 holding the level 4 mark is not offered the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q608_slay_the_enemy_commander_low_standing.golden
+character Ally 75
+standing 3
+hold 7214 1
+script quest.Q608_SlayTheEnemyCommander
+item 7236 7220 7214
+page npcdefault.htm
+page script/quest/Q608_SlayTheEnemyCommander/
+npc kadun 31370 Folk 10 0 0
+npc mos 25312 Monster 40 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q608_SlayTheEnemyCommander/31370-02.htm
+  S ActionFailed
+  S ActionFailed

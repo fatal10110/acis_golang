@@ -1,0 +1,20 @@
+# Audience with the Land Dragon (Q337), level 49: Gabrielle refuses the character and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_low_level.golden
+character Dragoon 49
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page default/30753.htm
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc gabrielle 30753 Folk 10 0 0
+
+action gabrielle
+action gabrielle
+  S ActionFailed
+  S NpcHtmlMessage obj=gabrielle item=0 page=default/30753.htm
+  S ActionFailed
+bypass npc_{gabrielle}_Quest
+  S NpcHtmlMessage obj=gabrielle item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30753-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q337_AudienceWithTheLandDragon CREATED
+  rows Q337_AudienceWithTheLandDragon -

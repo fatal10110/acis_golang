@@ -89,7 +89,7 @@ func TestRecommendationStoreReceiveAddsToStoredCount(t *testing.T) {
 			t.Fatalf("Get %d: %v", id, err)
 		}
 		if c.RecommendationsHave() != want {
-			t.Errorf("%s have %d, want %d", c.Name, c.RecommendationsHave(), want)
+			t.Errorf("%s have %d, want %d", c.CharacterName(), c.RecommendationsHave(), want)
 		}
 	}
 }

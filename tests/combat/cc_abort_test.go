@@ -50,7 +50,7 @@ func landEffect(t *testing.T, target effectHolder, name string) {
 // answers ActionFailed, and the aborted cast never launches.
 func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(combatPersistence(t,
@@ -95,11 +95,7 @@ func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 	}
 	assertFrameOpcode(t, mustRead(t, c, "cast-stop ActionFailed"), serverpackets.OpcodeActionFailed, "cast-stop ActionFailed")
 
-	for {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMagicSkillLaunched || frame[0] == serverpackets.OpcodeMagicSkillCanceled {
 			t.Fatalf("post-stun frame opcode %#x: the aborted cast must neither launch nor cancel again", frame[0])
 		}
@@ -113,7 +109,7 @@ func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 // ends with a StopMove broadcast to observers before anything else.
 func TestStunStopsWalkingNPC(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -125,7 +121,7 @@ func TestStunStopsWalkingNPC(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	tickThinkWander(t, hostile)
-	assertFrameOpcode(t, mustRead(t, c, "ChangeMoveType"), serverpackets.OpcodeChangeMoveType, "ChangeMoveType")
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 	if !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false after wander, want a live walk")
@@ -149,7 +145,7 @@ func TestStunStopsWalkingNPC(t *testing.T) {
 // ActionFailed, and the cast stop answers the last ActionFailed.
 func TestRemoveTargetStopsWalkingPlayer(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -186,11 +182,7 @@ func TestRemoveTargetStopsWalkingPlayer(t *testing.T) {
 	}
 	assertFrameOpcode(t, mustRead(t, c, "attack-stop ActionFailed"), serverpackets.OpcodeActionFailed, "attack-stop ActionFailed")
 	assertFrameOpcode(t, mustRead(t, c, "cast-stop ActionFailed"), serverpackets.OpcodeActionFailed, "cast-stop ActionFailed")
-	for {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMoveToLocation || frame[0] == serverpackets.OpcodeStopMove {
 			t.Fatalf("post-RemoveTarget frame opcode %#x: the walk must stay stopped", frame[0])
 		}

@@ -21,31 +21,17 @@ const (
 	elmoreFirstCastleID      = 7
 )
 
-// npcCastle returns the castle inst belongs to. A maker whose spawn time
-// names a residence gives its NPCs that castle, or none when it names a
-// siegable clan hall instead; otherwise the NPC belongs to the first castle
-// whose npcs list holds its template id.
-//
-// Artifacts, control towers and mercenary guards are given their castle
-// as they spawn, by the siege systems that spawn them (#236, #238).
+// npcCastle returns the castle inst belongs to. A mercenary belongs to the
+// castle whose siege hired it, a control tower to the castle it was placed
+// for, a holy artifact to the castle that placed it. A maker whose spawn
+// time names a residence gives its NPCs that castle, or none when it names
+// a siegable clan hall instead; otherwise the NPC belongs to the first
+// castle whose npcs list holds its template id.
 func (l *GameClientLink) npcCastle(inst *npc.Instance) (*castle.Castle, bool) {
-	if inst == nil {
+	if inst == nil || inst.Template == nil {
 		return nil, false
 	}
-	if id, ok := inst.Maker.ResidenceParam(); ok {
-		if c, ok := l.castles.Get(id); ok {
-			return c, true
-		}
-		if l.clanHallData != nil {
-			if h, ok := l.clanHallData.Get(id); ok && h.IsSiegable() {
-				return nil, false
-			}
-		}
-	}
-	if inst.Template == nil {
-		return nil, false
-	}
-	return l.castles.ByNPC(inst.Template.ID)
+	return l.castles.ForNPC(inst.ObjectID, inst.Template.ID, inst.CastleID, inst.Maker, l.clanHallData.Siegable)
 }
 
 // npcTaxRate is the tax rate of the castle inst belongs to, 0 when it
@@ -67,11 +53,12 @@ func (l *GameClientLink) npcOwnedCastleTaxRate(inst *npc.Instance) float64 {
 	return 0
 }
 
-// showTerritoryStatus answers f's TerritoryStatus command: the town and
-// kingdom of f's castle, with its lord, lord's clan and tax rate in force
-// when a clan owns it. An NPC of no castle answers nothing.
-func (l *GameClientLink) showTerritoryStatus(live *livePlayer, f *npc.Folk) {
-	c, ok := l.npcCastle(f.Instance)
+// showTerritoryStatus answers the TerritoryStatus command of the NPC
+// objectID, an instance of inst: the town and kingdom of its castle, with
+// its lord, lord's clan and tax rate in force when a clan owns it. An NPC
+// of no castle answers nothing.
+func (l *GameClientLink) showTerritoryStatus(live *livePlayer, objectID int32, inst *npc.Instance) {
+	c, ok := l.npcCastle(inst)
 	if !ok {
 		return
 	}
@@ -100,10 +87,10 @@ func (l *GameClientLink) showTerritoryStatus(live *livePlayer, f *npc.Folk) {
 	pairs = append(pairs,
 		"%territory%", territory,
 		"%townName%", town,
-		"%objectId%", strconv.Itoa(int(f.ObjectID())),
+		"%objectId%", strconv.Itoa(int(objectID)),
 	)
 	for i := 0; i < len(pairs); i += 2 {
 		page = strings.ReplaceAll(page, pairs[i], pairs[i+1])
 	}
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	sendFilledHTML(live, objectID, page, 0)
 }

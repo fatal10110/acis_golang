@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
@@ -229,7 +228,7 @@ func onTimer(s *script.Script, e script.Timer) string {
 // eventNumber reads the number after an event's two-letter prefix; ok is
 // false, and the event does nothing more, when it is not a 32-bit integer.
 func eventNumber(event string) (n int64, ok bool) {
-	n, err := commons.ParseInt(event[2:], 32)
+	n, err := strconv.ParseInt(event[2:], 10, 32)
 	return n, err == nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -18,7 +19,7 @@ type stallingGate struct {
 	release chan struct{}
 }
 
-func (g *stallingGate) Test(stat.Actor) bool {
+func (g *stallingGate) Test(stat.Actor, conditions.Actor, conditions.Skill) bool {
 	if g.armed.CompareAndSwap(true, false) {
 		close(g.entered)
 		<-g.release
@@ -31,11 +32,11 @@ func (g *stallingGate) Test(stat.Actor) bool {
 // to the movement, while a slow lands and refreshes. The movement must end
 // at the slowed speed, not the unslowed one the first refresh read.
 func TestSummonMoveSpeedRefreshKeepsLatestStats(t *testing.T) {
-	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
-	if err := a.InitMovement(location.Location{}, 120, openGeo{}); err != nil {
+	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll, RunSpeed: 120})
+	if err := a.InitMovement(location.Location{}, openGeo{}); err != nil {
 		t.Fatalf("InitMovement: %v", err)
 	}
-	full := a.MoveSpeed(120)
+	full := a.MoveSpeed()
 
 	gate := &stallingGate{entered: make(chan struct{}), release: make(chan struct{})}
 	gate.armed.Store(true)

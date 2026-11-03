@@ -1,0 +1,29 @@
+# Rise and Fall of the Elroki Tribe (Q643): ten bones pay adena.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q643_rise_and_fall_of_the_elroki_tribe_sell.golden
+character Hero 75
+quest Q643_RiseAndFallOfTheElrokiTribe <cond>=1 <state>=STARTED
+hold 8776 10
+script quest.Q643_RiseAndFallOfTheElrokiTribe
+item 8776 57 8712 8713 8714 8715 8716 8717 8718 8719 8720 8721 8722
+page merchant/32106.htm
+page default/32117.htm
+page script/quest/Q643_RiseAndFallOfTheElrokiTribe/
+npc singsing 32106 Merchant 10 0 0
+npc karakawei 32117 Folk 20 0 0
+
+action singsing
+action singsing
+  S ActionFailed
+  S NpcHtmlMessage obj=singsing item=0 page=merchant/32106.htm
+  S ActionFailed
+bypass npc_{singsing}_Quest
+  S NpcHtmlMessage obj=singsing item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32106-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q643_RiseAndFallOfTheElrokiTribe 32106-07.htm
+  S SystemMessage id=301 3:8776 6:10
+  S SystemMessage id=52 6:13740
+  S NpcHtmlMessage obj=singsing item=0 page=script/quest/Q643_RiseAndFallOfTheElrokiTribe/32106-07.htm
+  S ActionFailed
+  items 8776=0 57=13740

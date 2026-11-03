@@ -54,9 +54,7 @@ func (c *Character) reportDeathDrop(killer attackable.Combatant) {
 	if pk != nil && c.InPvPZone() {
 		return
 	}
-	c.stateMu.RLock()
-	rules := c.deathDrop
-	c.stateMu.RUnlock()
+	rules := c.rules().DeathDrop
 	c.progressionMu.RLock()
 	karma, pkKills := c.KarmaPoints, c.PKKills
 	c.progressionMu.RUnlock()
@@ -79,5 +77,7 @@ func (c *Character) reportDeathDrop(killer attackable.Combatant) {
 		WeaponChance: rates.EquipWeapon,
 		ItemChance:   rates.Item,
 		Limit:        rates.Limit,
+		GMDrops:      rules.GMDrops,
+		Kept:         rules.Kept,
 	})
 }

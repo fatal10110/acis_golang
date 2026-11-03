@@ -12,6 +12,7 @@ import (
 // forms no party with the departed character. The target hears nothing,
 // is in no party, and is free to be invited again at once.
 func TestAcceptAfterInviterLeftFormsNothing(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}})
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 

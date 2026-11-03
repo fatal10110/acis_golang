@@ -2,7 +2,6 @@ package party
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	playermodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -47,6 +46,7 @@ func (g *group) character(t *testing.T, i int) *playermodel.Character {
 }
 
 func TestInviteRefusedWhileTargetBlocksEverything(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 	member.c.Send(encodeBlock(clientpackets.BlockAll, ""))
@@ -67,6 +67,7 @@ func TestInviteRefusedWhileTargetBlocksEverything(t *testing.T) {
 }
 
 func TestInviteRefusedByTargetBlockList(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}})
 	leader, member := g.players[0], g.players[1]
 	member.c.Send(encodeBlock(clientpackets.BlockAdd, "Leader"))
@@ -91,24 +92,12 @@ func TestInviteRefusedByTargetBlockList(t *testing.T) {
 }
 
 func TestInviteRefusedWhileTargetConnectionIsGone(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 	// In combat, a player whose connection dropped stays in the world a
 	// while before it leaves.
-	g.srv.SetPlayerInCombat(t, member.id, true)
-	if err := member.c.Close(); err != nil {
-		t.Fatal(err)
-	}
-	obj, ok := g.srv.State.Player(member.id)
-	if !ok {
-		t.Fatal("Member left the world at once")
-	}
-	for deadline := time.Now().Add(5 * time.Second); !network.ClientDetached(obj); {
-		if time.Now().After(deadline) {
-			t.Fatal("the server never noticed Member's connection drop")
-		}
-		time.Sleep(time.Millisecond)
-	}
+	g.srv.DropInCombat(t, member.id, member.c)
 
 	leader.c.Send(encodeJoinParty("Member", 0))
 	assertSystemMessageText(t, leader.c.Read(), serverpackets.SystemMessageS1, detachedText)
@@ -118,6 +107,7 @@ func TestInviteRefusedWhileTargetConnectionIsGone(t *testing.T) {
 }
 
 func TestInviteRefusedWhileJailed(t *testing.T) {
+	t.Parallel()
 	t.Run("target", func(t *testing.T) {
 		g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 		g.character(t, 1).SetPunishment(playermodel.PunishJail, 0)

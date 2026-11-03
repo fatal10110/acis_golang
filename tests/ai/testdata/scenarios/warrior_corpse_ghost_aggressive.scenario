@@ -1,0 +1,22 @@
+# WarriorCorpseGhostPhysicalSpecialAggressive (21571, level 69, strike 4581-6, every draw 0; no self buff
+# listed): the character it already attacks and hates (a want step and a hit, past 8 ticks of life
+# time) that it sees again makes it cast its strike on its most hated creature, the character,
+# as its attacked hook did when hit (the reuse of the first strike has run out by then).
+character Hunter 20
+random always 99
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostPhysicalSpecial
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostPhysicalSpecialAggressive
+npc ghost 21571 Monster 600 0 0 level 69 skill PHYSICAL_SPECIAL 4581 6
+
+tick x8
+hit ghost 10
+  random always 99
+  desires ghost attack(player)=13.157894736842104 wander()=5
+away
+approach ghost
+  random always 0
+  S MagicSkillUse caster=ghost target=player skill=4581-6 hit=2378 reuse=7928 success=0

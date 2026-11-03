@@ -5,7 +5,10 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
 
@@ -29,8 +32,8 @@ func TestNPCHandleSummonerAndDecayed(t *testing.T) {
 	}
 
 	h := NPCOf(f)
-	if h == nil || h.brain != nil {
-		t.Fatalf("folk handle = %+v, want one with no brain", h)
+	if h == nil || h.mind() != brain(f) {
+		t.Fatalf("folk handle = %+v, want one whose brain is the NPC's own AI", h)
 	}
 	p, ok := h.Summoner().(*Player)
 	if !ok || combatantOf(p) != summoner {
@@ -68,4 +71,69 @@ func TestScheduleDespawnOfNothingPanics(t *testing.T) {
 			s.ScheduleDespawn(h, time.Second)
 		}()
 	}
+}
+
+// A spawner built over no population places nothing until it is bound,
+// and is bound once only.
+func TestSpawnerBindOnce(t *testing.T) {
+	s := NewSpawner(nil, zerolog.Nop())
+	mustPanic := func(what string, fn func()) {
+		t.Helper()
+		defer func() {
+			if recover() == nil {
+				t.Fatalf("%s did not panic", what)
+			}
+		}()
+		fn()
+	}
+	mustPanic("spawn through an unbound spawner", func() { s.AddSpawn(1, Loc{}, false, 0) })
+	mustPanic("bind to no population", func() { s.Bind(nil) })
+	s.Bind(nopPopulation{})
+	if got := s.AddSpawn(1, Loc{}, false, 0); got != nil {
+		t.Fatalf("spawn placed %v, want nothing", got)
+	}
+	mustPanic("second bind", func() { s.Bind(nopPopulation{}) })
+}
+
+// nopPopulation places nothing: every NPC id lacks a template.
+type nopPopulation struct{}
+
+func (nopPopulation) AddSpawn(int32, int, int, int, int, bool, time.Duration) (attackable.Combatant, error) {
+	return nil, npc.ErrNoTemplate
+}
+
+func (nopPopulation) CreatePrivate(npc.PartyMember, int32, *location.Location, int, time.Duration, [3]int32) (npc.PartyMember, error) {
+	return nil, npc.ErrNoTemplate
+}
+
+func (nopPopulation) CreatePrivates(npc.PartyMember) error { return nil }
+
+func (nopPopulation) ScheduleDespawn(attackable.Combatant, time.Duration) {}
+
+func (nopPopulation) RespawnDelay(*npc.Hostile) time.Duration { return 0 }
+
+func (nopPopulation) ScheduleRespawn(*npc.Hostile, time.Duration) error { return nil }
+
+func (nopPopulation) DecayMe(*npc.Hostile) {}
+
+func (nopPopulation) MakerEvent(string, string, int, int) bool { return false }
+
+func (nopPopulation) HasMaker(string) bool { return false }
+
+func (nopPopulation) DoRespawn(npc.PartyMember) {}
+
+func (nopPopulation) DrawSpawnPoint(npc.PartyMember) (location.Location, int, bool) {
+	return location.Location{}, 0, false
+}
+
+func (nopPopulation) SetRespawnDelay(npc.PartyMember, time.Duration) error { return nil }
+
+func (nopPopulation) FindSpawn(int32) spawn.Locator { return nil }
+
+func (nopPopulation) StartSpawnTime(string, ...string) int { return 0 }
+
+func (nopPopulation) StopSpawnTime(string, ...string) int { return 0 }
+
+func (nopPopulation) SpawnForClan(int32, int, int, int, int, int32) (attackable.Combatant, error) {
+	return nil, npc.ErrNoTemplate
 }

@@ -1,0 +1,44 @@
+# The state lines of the format that read what a script reads of a monster and its fight: the npc
+# line's mp option and the mp step and check; the want step (an attack desire on a creature,
+# holding its ground or walking to it), which the desires check lists in full or short; a hit by a
+# member of the party; a servitor of the character as a creature; the reach check of its top
+# desire target, and the shows check of an appearance (LV3Orc, 27294, spawns with its weapon glowing at
+# +10). The monster is WarriorRunAwayPhysicalSpecial (21508), a fixture of 1000 MP, 60 from the
+# character.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3Orc
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecial
+npc wolf 21508 Monster 60 0 0 walks mp 250
+npc post 21508 Monster 0 300 0
+npc orc 27294 Monster 0 -200 0
+member Pal 20
+summon pet 14001 servitor 20
+roll wolf 0
+roll post 0
+roll orc 0
+
+advance 1s
+  mp wolf 250
+  shows wolf rhand=0 lhand=0 glow=0
+  shows orc glow=10
+mp wolf 40
+  mp wolf 40
+want wolf player 100 hold
+  desires wolf attack(player,hold)=100
+  desires wolf attack(player)=100
+want wolf pet 70
+  desires wolf attack(player,hold)=100 attack(pet)=70
+hit wolf 10 by Pal
+  hate wolf 125 Pal
+hit wolf 10 by pet
+  hate wolf 195 pet
+top wolf player
+  reach wolf yes
+top post player
+  reach post no
+swing wolf

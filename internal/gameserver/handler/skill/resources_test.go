@@ -288,7 +288,7 @@ func TestBalanceLifeEqualizesLivingTargets(t *testing.T) {
 func TestGiveSPRealDamageAndDummy(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &skillTarget{}
-	target := &skillTarget{hp: 25, maxHP: 100}
+	target := &skillTarget{hp: 25, maxHP: 100, isPlayer: true}
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "GIVE_SP", Power: 42.9},

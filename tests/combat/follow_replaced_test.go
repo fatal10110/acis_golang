@@ -116,13 +116,16 @@ func TestRefusedInstantSkillEndsFollow(t *testing.T) {
 
 // TestSitStandEndsFollow has a following player sit down and stand up. The
 // sit replaces the follow: once standing, the player does not walk after
-// the followed player when it walks off.
+// the followed player when it walks off. The sit stops the follow first, so
+// its StopMove comes ahead of the ChangeWaitType.
 func TestSitStandEndsFollow(t *testing.T) {
 	t.Parallel()
 	p := bootClickPair(t, 0)
 	p.startFollowing(t)
 
-	sitPlayer(t, p.c)
+	p.c.Send(encodeRequestChangeWaitType(false))
+	assertFrameOpcode(t, mustRead(t, p.c, "follow StopMove"), serverpackets.OpcodeStopMove, "follow StopMove")
+	assertFrameOpcode(t, mustRead(t, p.c, "sit ChangeWaitType"), serverpackets.OpcodeChangeWaitType, "sit ChangeWaitType")
 	p.srv.Advance(t, 3*time.Second)
 	p.c.Send(encodeRequestChangeWaitType(true))
 	assertFrameOpcode(t, mustRead(t, p.c, "stand ChangeWaitType"), serverpackets.OpcodeChangeWaitType, "stand ChangeWaitType")

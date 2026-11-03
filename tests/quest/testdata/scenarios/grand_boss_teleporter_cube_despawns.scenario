@@ -1,0 +1,38 @@
+# The grand boss cubes (GrandBossTeleporter): a cube leaves the world fifteen minutes after it appears,
+# Benom's cube (29055) twenty (onCreated schedules the despawn).
+# Expectations are derived from the reference source (GrandBossTeleporter.onCreated) and replay the
+# reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_cube_despawns.golden
+character Pilgrim 60
+script script.teleport.GrandBossTeleporter
+npc benom 29055 Folk 10 0 0
+npc frintezza 29061 Folk 20 0 0
+npc baium 31842 Folk 30 0 0
+npc antharas 31859 Folk 40 0 0
+npc valakas 31759 Folk 50 0 0
+npc sailren 32107 Folk 60 0 0
+
+advance 14m59s
+  live 29055 1
+  live 29061 1
+  live 31842 1
+  live 31859 1
+  live 31759 1
+  live 32107 1
+advance 1s
+  S DeleteObject obj=antharas
+  S DeleteObject obj=baium
+  S DeleteObject obj=frintezza
+  S DeleteObject obj=sailren
+  S DeleteObject obj=valakas
+  live 29055 1
+  live 29061 0
+  live 31842 0
+  live 31859 0
+  live 31759 0
+  live 32107 0
+advance 4m59s
+  live 29055 1
+advance 1s
+  S DeleteObject obj=benom
+  live 29055 0

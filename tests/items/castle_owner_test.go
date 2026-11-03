@@ -69,6 +69,10 @@ func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB), extra ...game
 	if err != nil {
 		t.Fatalf("read castle page: %v", err)
 	}
+	list, err := os.ReadFile(datapack.Path(t, "data", "html", "admin", "castles.htm"))
+	if err != nil {
+		t.Fatalf("read castle list: %v", err)
+	}
 	db := sqltest.SharedDB(t)
 	opts := []gameservertest.Option{
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skills, gamesql.NewCharacterSkillStore(db))),
@@ -77,7 +81,7 @@ func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB), extra ...game
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCastles(castles),
 		gameservertest.WithAdmin(adminData),
-		gameservertest.WithHTMLPages(map[string]string{"admin/castle.htm": string(page)}),
+		gameservertest.WithHTMLPages(map[string]string{"admin/castle.htm": string(page), "admin/castles.htm": string(list)}),
 		gameservertest.WithReuseDelays(3*time.Second, 0),
 		gameservertest.WithClanSeed(func(db *sql.DB) {
 			for _, s := range []struct {
@@ -133,17 +137,10 @@ func (w *castleWorld) castleCommand(t *testing.T, args string) (gm, leader [][]b
 	return collectFrames(w.gm), collectFrames(w.leader)
 }
 
-// collectFrames reads until the client stays quiet for 300ms.
+// collectFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func collectFrames(c *testsupport.ScriptedClient) [][]byte {
-	var out [][]byte
-	for range 100 {
-		f := c.ReadWithTimeout(300 * time.Millisecond)
-		if f == nil {
-			break
-		}
-		out = append(out, f)
-	}
-	return out
+	return c.ReadQueued()
 }
 
 // gmAnswer decodes the game master's frames: the texts it was told, the
@@ -299,12 +296,14 @@ func TestAdminCastleSetAndRemoveOwner(t *testing.T) {
 // //castle certificates puts the certificates back to 300, both stored.
 func TestAdminCastlePageRestoresStoredCastle(t *testing.T) {
 	t.Parallel()
+	// The NPC spawns place the castles' control towers, which the page
+	// counts.
 	w := bootCastleWorld(t, 1, func(db *sql.DB) {
 		if _, err := db.ExecContext(context.Background(), `UPDATE castle SET currentTaxPercent=10, nextTaxPercent=20,
 			treasury=1234567, taxRevenue=1000, seedIncome=500, certificates=120 WHERE id=1`); err != nil {
 			t.Fatalf("seed castle row: %v", err)
 		}
-	})
+	}, gameservertest.WithNpcSpawns(nil))
 	w.enter(t)
 
 	gm, _ := w.castleCommand(t, "gludio_castle")
@@ -355,8 +354,9 @@ func TestAdminCastlePageRestoresStoredCastle(t *testing.T) {
 	if texts, page, _ := gmAnswer(t, gm); len(texts) != 1 || texts[0] != "Usage: //castle [set|remove|certificates|tax castleName]." || page == "" {
 		t.Fatalf("unknown action told %q, page %q", texts, page)
 	}
+	// An alias no castle has opens the castle list.
 	gm, _ = w.castleCommand(t, "set nowhere_castle")
-	if texts, page, failed := gmAnswer(t, gm); len(texts) != 0 || page != "" || !failed {
+	if texts, page, failed := gmAnswer(t, gm); len(texts) != 0 || failed || !strings.Contains(page, "Castles Menu") || !strings.Contains(page, `<a action="bypass -h admin_siege gludio_castle">Gludio Castle</a>`) {
 		t.Fatalf("unknown castle: texts %q, page %q, ActionFailed %v", texts, page, failed)
 	}
 }

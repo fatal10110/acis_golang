@@ -66,8 +66,6 @@ func TestRestartWithinFakeDeathGetUpOnCorpseOnlyGetsUp(t *testing.T) {
 	drainUntilQuiet(t, vc)
 	drainUntilQuiet(t, c)
 
-	// Each quiet read lets the clock run, so the state is checked before the
-	// frames are read.
 	restartInsideGetUp := func(what string) {
 		t.Helper()
 		vc.Send(encodeRequestRestartPoint(0))
@@ -81,11 +79,9 @@ func TestRestartWithinFakeDeathGetUpOnCorpseOnlyGetsUp(t *testing.T) {
 	if srv.DrivesClock() {
 		srv.Advance(t, getUp-vc.Now().Sub(diedAt)-10*time.Millisecond)
 		restartInsideGetUp("restart 10ms before the get-up ends")
-		// The frame reads ran the clock past the death's get-up end, but
-		// well short of a get-up restarted by the last request.
-		if elapsed := vc.Now().Sub(diedAt); elapsed >= 2*getUp-10*time.Millisecond {
-			t.Fatalf("frame reads ran %v past the death; the check below proves nothing", elapsed)
-		}
+		// Past the death's get-up end, well short of a get-up restarted by
+		// the last request.
+		srv.Advance(t, getUp-vc.Now().Sub(diedAt))
 		if victim.FakeDead() {
 			t.Fatal("FakeDead() = true after the death's get-up end: a repeated request moved it")
 		}

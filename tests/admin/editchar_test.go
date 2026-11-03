@@ -112,13 +112,13 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set color -FF")), "Usage: //set color <number>")
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set color 80000000")), "Usage: //set color <number>")
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set color")), "Usage: //set color <number>")
-	// Any digit Integer.decode reads is a hexadecimal digit: fullwidth
-	// letters included.
-	sent = exchange(t, gm, encodeBuildCmd("set color \uFF26\uFF26"))
+	// Only ASCII hexadecimal digits read: fullwidth letters do not.
+	assertTexts(t, exchange(t, gm, encodeBuildCmd("set color \uFF26\uFF26")), "Usage: //set color <number>")
+	sent = exchange(t, gm, encodeBuildCmd("set color FF"))
 	assertTexts(t, messages(append(sent, settle(t, gm)...)), "You successfully set color name of Player.")
 	settle(t, user)
 	if target.NameColor() != 0xFF {
-		t.Fatalf("name color = %#x after //set color with fullwidth digits, want 0xff", target.NameColor())
+		t.Fatalf("name color = %#x after //set color FF, want 0xff", target.NameColor())
 	}
 
 	// tcolor reads its value from the space before it on, which never
@@ -162,8 +162,7 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	}
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set level 82")), "Invalid used level for //set level.")
 	settle(t, gm)
-	// Long.parseLong reads any Unicode decimal digit: fullwidth "500".
-	exchange(t, gm, encodeBuildCmd("set exp \uFF15\uFF10\uFF10"))
+	exchange(t, gm, encodeBuildCmd("set exp 500"))
 	settle(t, user)
 	if target.Level() != 3 || target.ProgressionValues().Exp != 500 {
 		t.Fatalf("level %d exp %d after //set exp 500, want 3 and 500", target.Level(), target.ProgressionValues().Exp)

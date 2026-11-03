@@ -750,8 +750,7 @@ func TestSelectionWaitsForAccountSessionToLeave(t *testing.T) {
 	// The sender's queue is held, so Settle would wait on it; the selection
 	// itself runs on the connection, and once it is handled its answer, if
 	// any, is already on the way.
-	w.srv.AwaitHandled(t)
-	if frames := drainFrames(t, c); len(frames) != 0 {
+	if frames := w.srv.ReadHandled(t, c); len(frames) != 0 {
 		t.Fatalf("selection with the sender still in the world answered %x, want nothing", opcodes(frames))
 	}
 

@@ -1,0 +1,47 @@
+# Test of the Lord (Q232), started: a level 39 Orc Shaman reads Kakai's explanation, is accepted and gets the Ordeal Necklace and the level 39 set of Dimensional Diamonds; the quest then answers the first step.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q232_start.golden
+character Shaman 39
+class 50
+random always 0
+script quest.Q232_TestOfTheLord
+item 1341 3390 3391 3392 3393 3394 3395 3396 3397 3398 3399 3400 3401 3402 3403 3404 3405 3406 3407 3408 3409 3410 3411 3412 3413 3414 3415 3416 7562
+page villagemaster/30565.htm
+page script/quest/Q232_TestOfTheLord/
+npc kakai 30565 VillageMasterOrc 10 0 0
+
+action kakai
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30565-05.htm
+  S QuestList 232:0x80000001
+  S ExShowQuestMark quest=232
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3391
+  S SystemMessage id=53 3:7562 6:92
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-05b.htm
+  S ActionFailed
+  Q upsert Q232_TestOfTheLord | <state> | STARTED
+  Q upsert Q232_TestOfTheLord | <cond> | 1
+  M set secondClassChange39 | true
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 3391=1 7562=92
+  state Q232_TestOfTheLord STARTED
+  rows Q232_TestOfTheLord <cond>=1 <state>=STARTED

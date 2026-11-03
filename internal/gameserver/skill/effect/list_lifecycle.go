@@ -66,9 +66,10 @@ type restoreBatch struct {
 // catchUp), and then refreshes the icons once. A tick that comes due while
 // apply runs is left to the effects sweep: an effect anchored at the replay
 // itself has its first tick at least restoreMinDelay after its add, so
-// however long apply takes, the replay never runs it. The reference schedules every restored effect
-// at the restore instant on its own fixed-rate task, so the ticks due since
-// then interleave by time, not by the order the effects were saved in. A
+// however long apply takes, the replay never runs it. Every restored effect
+// is anchored at the restore instant on its own fixed-rate clock, so the
+// ticks due since then interleave by time, not by the order the effects
+// were saved in. A
 // Restore inside another one just runs apply: the outermost one catches up
 // and refreshes for all of them. Call it on the owner's queue.
 func (l *List) Restore(apply func()) {
@@ -108,7 +109,7 @@ func (l *List) Restore(apply func()) {
 }
 
 func (l *List) addAnnounced(e *Effect, announce bool) {
-	if l == nil || e == nil || (l.admit != nil && !l.admit(e)) {
+	if !l.Admits(e) {
 		return
 	}
 	var pending []func()
@@ -331,7 +332,7 @@ func (l *List) notifyActivityTransition() {
 }
 
 // StopByType removes every active effect of the given type, running each
-// removed instance's exit hook, matching Creature.stopEffects(EffectType).
+// removed instance's exit hook.
 func (l *List) StopByType(t Type) {
 	if l == nil {
 		return
@@ -344,7 +345,7 @@ func (l *List) StopByType(t Type) {
 }
 
 // StopBySkillID removes every held effect the given skill applied, running
-// each removed instance's exit hook, matching Creature.stopSkillEffects(int).
+// each removed instance's exit hook.
 func (l *List) StopBySkillID(id modelskill.ID) {
 	if l == nil {
 		return
@@ -357,7 +358,7 @@ func (l *List) StopBySkillID(id modelskill.ID) {
 }
 
 // StopAllToggles removes every toggle held among the buffs, running each
-// exit hook, matching EffectList.stopAllToggles.
+// exit hook.
 func (l *List) StopAllToggles() {
 	if l == nil {
 		return
@@ -408,9 +409,8 @@ func (l *List) strip(e *Effect) {
 }
 
 // notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon
-// state, mirroring Creature.addEffect()/removeEffect() unconditionally
-// queueing an EffectList icon update on every add or remove attempt,
-// regardless of whether the attempt actually changed anything.
+// state, queued unconditionally on every add or remove attempt, regardless
+// of whether the attempt actually changed anything.
 func (l *List) notifyAbnormalUpdate() {
 	if l.owner != nil && l.catchingUp.Load() == 0 {
 		l.owner.UpdateEffectIcons()
@@ -484,13 +484,19 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 		if e.OnStart != nil {
 			ok = e.OnStart(e)
 		}
+		// Each activation tests the funcs' attached conditions afresh, before
+		// l.mu: a condition may read this same list.
+		var fns []Mod
+		if ok {
+			fns = e.attachableFuncs()
+		}
 
 		attached := false
 		l.mu.Lock()
 		if ok {
 			e.inUse = true
 			if !e.startRefused {
-				l.attachStatFuncs(e)
+				l.attachStatFuncs(fns)
 				attached = true
 			}
 		} else {
@@ -501,7 +507,7 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 		// The stat refresh runs outside l.mu: a RUN_SPEED change rebuilds the
 		// owner's appearance for its observers, which reads this list's flags.
 		if attached && l.owner != nil {
-			l.owner.StatFuncsAttached(e.Funcs)
+			l.owner.StatFuncsAttached(fns)
 		}
 		if ok && announce && !e.startRefused && e.Template.Icon && l.owner != nil {
 			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)

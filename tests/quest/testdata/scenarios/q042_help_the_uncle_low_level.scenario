@@ -1,0 +1,22 @@
+# Help the Uncle! (Q042), refused: a level 24 character, one short of the quest's level, is turned
+# away by Waters and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q042_help_the_uncle_low_level.golden
+character Helper 24
+script quest.Q042_HelpTheUncle
+item 291 7548 7549 7583
+page merchant/30828.htm
+page script/quest/Q042_HelpTheUncle/
+npc waters 30828 Merchant 10 0 0
+
+action waters
+action waters
+  S ActionFailed
+  S NpcHtmlMessage obj=waters item=0 page=merchant/30828.htm
+  S ActionFailed
+bypass npc_{waters}_Quest
+  S NpcHtmlMessage obj=waters item=0 page=script/quest/Q042_HelpTheUncle/30828-00a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q042_HelpTheUncle CREATED
+  rows Q042_HelpTheUncle -

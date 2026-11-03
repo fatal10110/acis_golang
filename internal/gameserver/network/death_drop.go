@@ -16,7 +16,7 @@ import (
 const deathDropOffset = 25
 
 // dropItemsOnDeath rolls the items live's death costs it at e's rates. A
-// game master keeps everything unless the server lets it drop. Otherwise
+// game master keeps everything unless e lets it drop. Otherwise
 // the death drops nothing unless its first roll passes; then every item
 // the death may drop is taken in container order: a worn item comes off
 // whether or not it then drops, and each rolls its own chance until the
@@ -25,12 +25,11 @@ const deathDropOffset = 25
 // inventory changes reach live as the usual batched InventoryUpdate, and
 // observers see the gear change on live's next appearance refresh.
 func (l *GameClientLink) dropItemsOnDeath(live *livePlayer, e event.DeathItemDrop) {
-	rules := l.playerConfig.DeathDrop
-	if live.accessLevel().IsGM && !rules.GMDrops {
+	if live.accessLevel().IsGM && !e.GMDrops {
 		return
 	}
 	inv := live.Inventory()
-	if inv == nil || l.inventory == nil || l.groundItems == nil {
+	if inv == nil || l.inventory == nil || l.belongings.groundItems == nil {
 		return
 	}
 	if e.Chance <= 0 || live.Roll(100) >= e.Chance {
@@ -38,7 +37,7 @@ func (l *GameClientLink) dropItemsOnDeath(live *livePlayer, e event.DeathItemDro
 	}
 	dropped := 0
 	for _, inst := range inv.Items() {
-		tmpl, ok := invops.DeathDroppable(inv, inst, rules.Kept)
+		tmpl, ok := invops.DeathDroppable(inv, inst, e.Kept)
 		if !ok || live.ControlItemInUse(inst.ObjectID) {
 			continue
 		}
@@ -108,7 +107,7 @@ func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inven
 		at := l.geo.ValidLocation(x, y, z, tx, ty, tz)
 		tx, ty, tz = at.X, at.Y, at.Z
 	}
-	l.groundItems.Drop(ground, task.DropOptions{
+	l.belongings.groundItems.Drop(ground, task.DropOptions{
 		X:             tx,
 		Y:             ty,
 		Z:             tz,

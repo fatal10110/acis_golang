@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -15,15 +14,12 @@ import (
 // whether any was a MagicSkillCanceled for hostile.
 func sawNPCCancel(c *testsupport.ScriptedClient, hostile *npc.Hostile) bool {
 	canceled := false
-	for {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return canceled
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMagicSkillCanceled && wireReader(frame[1:]).ReadInt32() == hostile.ObjectID() {
 			canceled = true
 		}
 	}
+	return canceled
 }
 
 // TestCastStoppingEffectsStopNPCCast lands Mute, PhysicalMute and
@@ -123,11 +119,7 @@ func TestMutedNPCDropsBlockedCastDesire(t *testing.T) {
 
 			thinkOnNPCQueue(t, hostile)
 			cast := false
-			for {
-				frame := c.ReadWithTimeout(300 * time.Millisecond)
-				if frame == nil {
-					break
-				}
+			for _, frame := range c.ReadQueued() {
 				if frame[0] == serverpackets.OpcodeMagicSkillUse {
 					cast = true
 				}

@@ -1,0 +1,124 @@
+# Meeting with the Golden Ram (Q018): a level 66 character accepts at Donal; Abercrombie has
+# nothing for it before the supply box; Daisy hands over the box, and Abercrombie takes it for
+# adena and experience; the quest completes; then relog. Expectations replay the reference trace
+# of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q018_meeting_with_the_golden_ram.golden
+character Rammer 66
+script quest.Q018_MeetingWithTheGoldenRam
+item 7245 57
+page villagemaster/31314.htm
+page warehouse/31315.htm
+page default/31555.htm
+page script/quest/Q018_MeetingWithTheGoldenRam/
+npc donal 31314 VillageMasterDwarf 10 0 0
+npc daisy 31315 WarehouseKeeper 20 0 0
+npc abercrombie 31555 Folk 30 0 0
+
+# Donal: accept.
+action donal
+action donal
+  S ActionFailed
+  S NpcHtmlMessage obj=donal item=0 page=villagemaster/31314.htm
+  S ActionFailed
+bypass npc_{donal}_Quest
+  S NpcHtmlMessage obj=donal item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31314-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q018_MeetingWithTheGoldenRam CREATED
+bypass Quest Q018_MeetingWithTheGoldenRam 31314-03.htm
+  S QuestList 18:0x80000001
+  S ExShowQuestMark quest=18
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=donal item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31314-03.htm
+  S ActionFailed
+  Q upsert Q018_MeetingWithTheGoldenRam | <state> | STARTED
+  Q upsert Q018_MeetingWithTheGoldenRam | <cond> | 1
+  state Q018_MeetingWithTheGoldenRam STARTED
+  rows Q018_MeetingWithTheGoldenRam <cond>=1 <state>=STARTED
+action donal
+  S ActionFailed
+  S NpcHtmlMessage obj=donal item=0 page=villagemaster/31314.htm
+  S ActionFailed
+bypass npc_{donal}_Quest
+  S NpcHtmlMessage obj=donal item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31314-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Abercrombie before the box: the no-quest page.
+action abercrombie
+action abercrombie
+  S ActionFailed
+  S NpcHtmlMessage obj=abercrombie item=0 page=default/31555.htm
+  S ActionFailed
+bypass npc_{abercrombie}_Quest
+  S NpcHtmlMessage obj=abercrombie item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Daisy hands over the supply box.
+action daisy
+action daisy
+  S ActionFailed
+  S NpcHtmlMessage obj=daisy item=0 page=warehouse/31315.htm
+  S ActionFailed
+bypass npc_{daisy}_Quest
+  S NpcHtmlMessage obj=daisy item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31315-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q018_MeetingWithTheGoldenRam 31315-02.htm
+  S QuestList 18:0x80000003
+  S ExShowQuestMark quest=18
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7245
+  S NpcHtmlMessage obj=daisy item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31315-02.htm
+  S ActionFailed
+  Q upsert Q018_MeetingWithTheGoldenRam | <cond> | 2
+  rows Q018_MeetingWithTheGoldenRam <cond>=2 <state>=STARTED
+  items 7245=1
+action daisy
+  S ActionFailed
+  S NpcHtmlMessage obj=daisy item=0 page=warehouse/31315.htm
+  S ActionFailed
+bypass npc_{daisy}_Quest
+  S NpcHtmlMessage obj=daisy item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31315-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Abercrombie takes the box; the quest completes.
+action abercrombie
+action abercrombie
+  S ActionFailed
+  S NpcHtmlMessage obj=abercrombie item=0 page=default/31555.htm
+  S ActionFailed
+bypass npc_{abercrombie}_Quest
+  S NpcHtmlMessage obj=abercrombie item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31555-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q018_MeetingWithTheGoldenRam 31555-02.htm
+  S SystemMessage id=302 3:7245
+  S SystemMessage id=52 6:15000
+  S SystemMessage id=45 1:50000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 18:0x00000000
+  S NpcHtmlMessage obj=abercrombie item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31555-02.htm
+  S ActionFailed
+  Q upsert Q018_MeetingWithTheGoldenRam | <state> | COMPLETED
+  Q delete-except-state Q018_MeetingWithTheGoldenRam
+  state Q018_MeetingWithTheGoldenRam COMPLETED
+  rows Q018_MeetingWithTheGoldenRam <state>=COMPLETED
+  items 7245=0 57=15000
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q018_MeetingWithTheGoldenRam COMPLETED
+  rows Q018_MeetingWithTheGoldenRam <state>=COMPLETED
+  items 57=15000
+action donal
+action donal
+  S ActionFailed
+  S NpcHtmlMessage obj=donal item=0 page=villagemaster/31314.htm
+  S ActionFailed
+bypass npc_{donal}_Quest
+  S NpcHtmlMessage obj=donal item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -83,7 +83,7 @@ func derbyFrames(part event.DerbyPart) []func() wire.Frame {
 // showDerbyRace shows p, coming to know race manager f, the race as it
 // stands. It runs ahead of f's NpcInfo, the order a player walking up to
 // the manager sees. A manager spawned in sight of p is shown the same way,
-// although there the reference sends the race after the NpcInfo: Discover
+// although the expected order there is the race after the NpcInfo: Discover
 // is not told which side moved, and managers spawn at boot, before anyone
 // is in sight.
 func (p *livePlayer) showDerbyRace(f *npc.Folk) {
@@ -97,8 +97,8 @@ func (p *livePlayer) showDerbyRace(f *npc.Folk) {
 
 // hideDerbyRunners removes the race's runners from p, losing sight of race
 // manager f, ahead of f itself: the order of a player walking away. A
-// manager despawned in sight of p goes the same way, although there the
-// reference deletes the manager before its runners.
+// manager despawned in sight of p goes the same way, although the expected
+// order there removes the manager before its runners.
 func (p *livePlayer) hideDerbyRunners(f *npc.Folk) {
 	if p.link == nil || p.link.derby == nil || !f.DerbyTrackManager() {
 		return
@@ -187,12 +187,7 @@ func (l *GameClientLink) redeemDerbyTicket(live *livePlayer, redeem *derby.Redem
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, redeem.Payout))
 		return
 	}
-	id, err := l.nextObjectID()
-	if err != nil {
-		l.log.Error().Err(err).Msg("derby: allocate race payout")
-		return
-	}
-	live.AddRewardItem(item.AdenaID, int(redeem.Payout), id)
+	live.AddRewardItem(item.AdenaID, int(redeem.Payout), false, l.nextObjectID)
 }
 
 // derbyHolder reads a player's inventory for a race manager.

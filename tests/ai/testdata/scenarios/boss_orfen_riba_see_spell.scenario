@@ -1,0 +1,16 @@
+# Riba Iren (29018), a level 1 monster, sees a level 10 character, more than 8 levels above it,
+# cast Ultimate Debuff (4694) on a monster beside it: it wants its mute (4215) on the character at
+# 1000000. The character's combat draws are pinned so the debuff lands.
+character Hunter 10
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.orfen.OrfenPrivateRibaIren
+npc riba 29018 Monster 250 0 0 skill DEBUFF_A 4215 1
+npc wolf 20120 Monster 150 0 0
+
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires riba cast(player,4215,move)=1000000

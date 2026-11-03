@@ -3,7 +3,6 @@ package items
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -251,7 +250,8 @@ func TestWalkCancelsActiveEnchant(t *testing.T) {
 		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk after enchant cancel")
 
 		c.Send(encodeRequestEnchantItem(weapon))
-		if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+		if queued := c.ReadQueued(); len(queued) != 0 {
+			reply := queued[0]
 			t.Fatalf("enchant after walk-cancel replied %x, want no reply", reply)
 		}
 		if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 1 {
@@ -285,7 +285,8 @@ func TestEnchantRequestWithoutSelectionIsSilent(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestEnchantItem(weapon))
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("enchant without active scroll replied %x, want no reply at all", reply)
 	}
 }

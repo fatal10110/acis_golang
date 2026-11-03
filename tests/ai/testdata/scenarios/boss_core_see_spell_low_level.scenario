@@ -1,0 +1,16 @@
+# Core (29006), a level 1 grand boss, sees the level 1 character cast Ultimate Debuff (4694) on
+# a monster beside it. The character is not more than 8 levels above it, so its parent's
+# see-spell hook runs, which does nothing: no desire.
+character Hunter 1
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.core.Core
+npc core 29006 GrandBoss 250 0 0
+npc wolf 20120 Monster 150 0 0
+
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires core -

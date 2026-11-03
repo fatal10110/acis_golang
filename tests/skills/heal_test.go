@@ -346,8 +346,8 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 
 	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
-	if frame := c.ReadWithTimeout(time.Second); frame != nil {
-		t.Fatalf("full-health tick frame opcode %#x, want silence", frame[0])
+	if frames := c.ReadQueued(); len(frames) != 0 {
+		t.Fatalf("full-health tick frame opcode %#x, want silence", frames[0][0])
 	}
 	if got := srv.PlayerCurrentHP(t, objID); got != maxHP {
 		t.Fatalf("HP after full-health tick = %d, want unchanged %d", got, maxHP)
@@ -500,20 +500,11 @@ func TestHealEffectOtherCastSendsHPRestoredByHealer(t *testing.T) {
 	drainUntilQuiet(t, patient)
 }
 
-// collectUntilQuiet returns every frame the client receives until the server
-// stays quiet for a full read timeout.
+// collectUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func collectUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
+	return c.ReadQueued()
 }
 
 // hpRestoredAmount returns the amount of the single S1_HP_RESTORED message

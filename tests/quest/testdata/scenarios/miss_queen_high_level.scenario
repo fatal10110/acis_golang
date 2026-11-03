@@ -1,0 +1,20 @@
+# Miss Queen (MissQueen): a level 26 human fighter of a starting class with no PK is past the
+# trainee's coupon's levels and is refused it. Expectations are the reference trace's
+# (MissQueen.onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/miss_queen_high_level.golden
+character Veteran 26
+script script.feature.MissQueen
+item 7832
+page default/31760.htm
+page script/feature/MissQueen/
+npc queen 31760 Folk 10 0 0
+
+action queen
+action queen
+  S ActionFailed
+  S NpcHtmlMessage obj=queen item=0 page=default/31760.htm
+  S ActionFailed
+bypass Quest MissQueen newbie_coupon
+  S NpcHtmlMessage obj=queen item=0 page=script/feature/MissQueen/31760-03.htm
+  S ActionFailed
+  items 7832=0

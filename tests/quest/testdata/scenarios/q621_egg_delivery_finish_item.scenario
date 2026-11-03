@@ -1,0 +1,31 @@
+# Egg Delivery (Q621): the last NPC pays the second recipe of the draw.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q621_egg_delivery_finish_item.golden
+character Hero 68
+quest Q621_EggDelivery <cond>=7 <state>=STARTED
+random 0 1
+script quest.Q621_EggDelivery
+item 7195 7196 57 734 6847 6849 6851
+page default/31584.htm
+page script/quest/Q621_EggDelivery/
+npc valentine 31584 Folk 10 0 0
+
+action valentine
+action valentine
+  S ActionFailed
+  S NpcHtmlMessage obj=valentine item=0 page=default/31584.htm
+  S ActionFailed
+bypass npc_{valentine}_Quest
+  S NpcHtmlMessage obj=valentine item=0 page=script/quest/Q621_EggDelivery/31584-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q621_EggDelivery 31584-02.htm
+  S SystemMessage id=54 3:6849
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=valentine item=0 page=script/quest/Q621_EggDelivery/31584-02.htm
+  S ActionFailed
+  Q delete-quest Q621_EggDelivery
+  rows Q621_EggDelivery -
+  state Q621_EggDelivery -
+  items 57=0 734=0 6849=1

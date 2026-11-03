@@ -1,0 +1,15 @@
+# PartyLeaderPatrol (27041, Baranka's Messenger, level 12): with no desire left it does nothing, so
+# it does not wander.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderPatrol
+npc patrol 27041 Monster 300 0 0 level 12 walks
+
+tick x4
+  at patrol 300 0 0
+  desires patrol -

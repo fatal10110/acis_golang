@@ -1,0 +1,25 @@
+# Competition for the Bandit Stronghold (Q504), registrations still open: the Bandit Stronghold (hall 35)
+# is not waiting for its battle, so the messenger answers even the leader of a level 4 clan with the
+# date of the next siege its hall stores (2100-01-01 00:00:00 in the server's zone, UTC), and no quest
+# starts.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q504_competition_waits_for_siege.golden
+character Leader 40
+clan 4
+hall 35 registering date 4102444800000
+script quest.Q504_CompetitionForTheBanditStronghold
+script script.siegablehall.BanditStronghold
+page script/siegablehall/BanditStronghold/
+page script/quest/Q504_CompetitionForTheBanditStronghold/
+npc messenger 35437 Folk 10 0 0
+
+action messenger
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/BanditStronghold/azit_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 html="<html><body>Messenger:<br>\nI thought I made it clear that registration does not begin until one hour before the next siege at 2100-01-01 00:00:00.\n</body></html>\n"
+  S ActionFailed
+  S ActionFailed
+  state Q504_CompetitionForTheBanditStronghold CREATED

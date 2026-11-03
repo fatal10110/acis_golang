@@ -7,16 +7,27 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// HPRegenRate returns a's HP regeneration per tick: its npc template's base
-// through its live stat calculator, scaled by a pet's weight-penalty band.
+// HPRegenRate returns a's HP regeneration per tick: the configured multiple
+// of its npc template's base through its live stat calculator, scaled by a
+// pet's weight-penalty band.
 func (a *Actor) HPRegenRate() float64 {
-	return a.calcStat(stat.RegenerateHPRate, a.combatStats().HPRegen) * weightPenaltyRegen[a.weightPenalty.Load()]
+	return a.calcStat(stat.RegenerateHPRate, a.combatStats().HPRegen*a.regenMultipliers().HP) * weightPenaltyRegen[a.weightPenalty.Load()]
 }
 
-// MPRegenRate returns a's MP regeneration per tick: its npc template's base
-// through its live stat calculator, scaled by a pet's weight-penalty band.
+// MPRegenRate returns a's MP regeneration per tick: the configured multiple
+// of its npc template's base through its live stat calculator, scaled by a
+// pet's weight-penalty band.
 func (a *Actor) MPRegenRate() float64 {
-	return a.calcStat(stat.RegenerateMPRate, a.combatStats().MPRegen) * weightPenaltyRegen[a.weightPenalty.Load()]
+	return a.calcStat(stat.RegenerateMPRate, a.combatStats().MPRegen*a.regenMultipliers().MP) * weightPenaltyRegen[a.weightPenalty.Load()]
+}
+
+// regenMultipliers are the base regeneration multipliers in force for a,
+// the shipped ones without settings.
+func (a *Actor) regenMultipliers() creature.RegenMultipliers {
+	if a.settings == nil {
+		return creature.DefaultRegenMultipliers
+	}
+	return a.settings.RegenMultipliers()
 }
 
 // TickRegen applies one HP/MP regeneration step: each resource short of its
@@ -44,14 +55,14 @@ func (a *Actor) Regen() *creature.Regen { return &a.regen }
 
 // SettleRegen arms a's regeneration task when it is spawned, alive and
 // short of HP or MP, its first tick one period from now, and disarms
-// it otherwise (CreatureStatus.setHp/setMp's start and stop).
+// it otherwise; every HP or MP change settles it so.
 func (a *Actor) SettleRegen() {
-	a.regen.Settle(a.Queue(), a.regenShort)
+	a.regen.Settle(a.Queue(), a.RegenShort)
 }
 
-// regenShort reports whether a regenerates: spawned (on the grid or off it
+// RegenShort reports whether a regenerates: spawned (on the grid or off it
 // mid-relocation, as a hidden owner's summon is), not dead, and below its
 // maximum HP or MP.
-func (a *Actor) regenShort() bool {
+func (a *Actor) RegenShort() bool {
 	return a.Spawned() && !a.Dead() && (a.HP() < a.MaxHPValue() || a.MPValue() < a.MaxMPValue())
 }

@@ -1,0 +1,21 @@
+# The Name of Evil - 2 (Q126), refused: a level 76 character, one short of the quest's level, is
+# turned away by Asamanah and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q126_the_name_of_evil_2_low_level.golden
+character Seeker 76
+script quest.Q126_TheNameOfEvil_2
+item 8783 729
+page default/32115.htm
+page script/quest/Q126_TheNameOfEvil_2/
+npc asamanah 32115 Folk 10 0 0
+
+action asamanah
+action asamanah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamanah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamanah}_Quest
+  S NpcHtmlMessage obj=asamanah item=0 page=script/quest/Q126_TheNameOfEvil_2/32115-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q126_TheNameOfEvil_2 CREATED
+  rows Q126_TheNameOfEvil_2 -

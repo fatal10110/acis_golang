@@ -1,0 +1,20 @@
+# For Sleepless Deadmen (Q359), level 59: Orven turns the character away; the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q359_for_sleepless_deadmen_low_level.golden
+character Sleepless 59
+script quest.Q359_ForSleeplessDeadmen
+item 57 5869
+page villagemaster/30857.htm
+page script/quest/Q359_ForSleeplessDeadmen/
+npc orven 30857 VillageMasterPriest 10 0 0
+
+action orven
+action orven
+  S ActionFailed
+  S NpcHtmlMessage obj=orven item=0 page=villagemaster/30857.htm
+  S ActionFailed
+bypass npc_{orven}_Quest
+  S NpcHtmlMessage obj=orven item=0 page=script/quest/Q359_ForSleeplessDeadmen/30857-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q359_ForSleeplessDeadmen -

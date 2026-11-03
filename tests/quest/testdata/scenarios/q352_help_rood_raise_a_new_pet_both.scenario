@@ -1,0 +1,29 @@
+# Help Rood Raise a New Pet (Q352), both eggs: holding one egg of each kind, Rood buys both with
+# the double bonus. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q352_help_rood_raise_a_new_pet_both.golden
+character Rood 39
+quest Q352_HelpRoodRaiseANewPet <cond>=1 <state>=STARTED
+hold 5860 1
+hold 5861 1
+script quest.Q352_HelpRoodRaiseANewPet
+item 57 5860 5861
+page merchant/31067.htm
+page script/quest/Q352_HelpRoodRaiseANewPet/
+npc rood 31067 Merchant 10 0 0
+npc lienrik 20786 Monster 40 0 0
+
+# Rood buys both eggs.
+action rood
+action rood
+  S ActionFailed
+  S NpcHtmlMessage obj=rood item=0 page=merchant/31067.htm
+  S ActionFailed
+bypass npc_{rood}_Quest
+  S SystemMessage id=302 3:5860
+  S SystemMessage id=302 3:5861
+  S SystemMessage id=52 6:5059
+  S NpcHtmlMessage obj=rood item=0 page=script/quest/Q352_HelpRoodRaiseANewPet/31067-08.htm
+  S ActionFailed
+  S ActionFailed
+  items 5860=0 5861=0 57=5059
+  rows Q352_HelpRoodRaiseANewPet <cond>=1 <state>=STARTED

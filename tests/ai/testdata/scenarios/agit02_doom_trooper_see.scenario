@@ -1,0 +1,14 @@
+# Agit02DoomTrooperAgit (35414), every draw 0, far from the character. Seeing it, the trooper takes
+# none of the parent's attack on sight: it wants to attack the character, weight 200.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplash
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.Agit02DoomTrooperAgit
+npc trooper 35414 Monster 1500 0 0
+
+approach trooper
+  desires trooper attack(player)=200

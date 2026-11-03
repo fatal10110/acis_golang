@@ -413,7 +413,7 @@ func TestBabyPetHealWaitsOutItsReuse(t *testing.T) {
 
 // babyHealKey is the reuse key of the baby pet's heal skillID.
 func babyHealKey(skillID modelskill.ID) int32 {
-	return actorcast.ReuseKey(modelskill.Definition{ID: skillID, Level: babyHealLevel})
+	return actorcast.ReuseKey(&modelskill.Definition{ID: skillID, Level: babyHealLevel})
 }
 
 // TestStunnedBabyPetWithHealOnReuseStaysSilent: once Heal Trick is on reuse,

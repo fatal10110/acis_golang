@@ -2,8 +2,12 @@ package gameservertest
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // lockedBuffer collects log lines from every goroutine the server runs.
@@ -33,13 +37,23 @@ func (s *Server) LogText() string {
 	return s.logs.String()
 }
 
-// SlowTaskLogs returns the sim pool watchdog's "slow task" lines, which name
-// a queue whose task ran past the 50 ms budget — a queued task that blocked,
-// most likely on the database.
-func (s *Server) SlowTaskLogs() []string {
+// SlowTaskLogs returns the sim pool watchdog's "slow task" lines whose task
+// ran for at least atLeast. The watchdog names every queue whose task ran
+// past the 50 ms budget; a suite that slows its stores (WithSlowStores)
+// passes the store delay, since a task that waited on one of those stores
+// ran at least that long, while a shorter slow task is CPU contention on a
+// loaded runner. A line whose elapsed time cannot be read is returned too.
+func (s *Server) SlowTaskLogs(atLeast time.Duration) []string {
 	var out []string
 	for _, line := range strings.Split(s.LogText(), "\n") {
-		if strings.Contains(line, "sim: slow task") {
+		if !strings.Contains(line, "sim: slow task") {
+			continue
+		}
+		var entry struct {
+			Elapsed *float64 `json:"elapsed"`
+		}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil || entry.Elapsed == nil ||
+			time.Duration(*entry.Elapsed*float64(zerolog.DurationFieldUnit)) >= atLeast {
 			out = append(out, line)
 		}
 	}

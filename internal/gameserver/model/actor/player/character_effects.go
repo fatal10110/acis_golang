@@ -31,9 +31,7 @@ func (c *Character) MaxBuffCount() int {
 	if c == nil {
 		return defaultMaxBuffsAmount
 	}
-	c.stateMu.RLock()
-	base := c.maxBuffsAmount
-	c.stateMu.RUnlock()
+	base := c.rules().MaxBuffsAmount
 	return base + c.SkillLevel(int(modelskill.DivineInspirationSkillID))
 }
 
@@ -44,7 +42,10 @@ func (c *Character) MaxBuffCount() int {
 // all-or-nothing to readers must serialize at a higher level (see
 // effect.List, which does this for effect-driven adds through
 // AttachStatFuncs and StatFuncsAttached).
+//
+// A func whose attached condition fails for c is left out.
 func (c *Character) AddStatFuncs(fns []effect.Mod) {
+	fns = effect.Attachable(fns, c.ConditionActor())
 	c.AttachStatFuncs(fns)
 	c.StatFuncsAttached(fns)
 }
@@ -88,6 +89,7 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner.Stripped() {
 		if len(stats) > 0 {
 			c.refreshMoveSpeed()
+			c.ResourceValues() // a changed maximum settles (noteMaxima)
 		}
 		return
 	}
@@ -105,6 +107,9 @@ func (c *Character) statsModified(stats []stat.Stat) {
 		return
 	}
 	c.refreshMoveSpeed()
+	// Reading the maxima once the change is reported settles a changed
+	// one (noteMaxima), so its status report follows this one.
+	defer c.ResourceValues()
 	if slices.Contains(stats, stat.RunSpeed) {
 		c.emit(event.RunSpeedChanged{})
 		return

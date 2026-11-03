@@ -45,7 +45,7 @@ func npcActivity(t *testing.T, srv *gameservertest.Server, c *scriptedClient, id
 	var seen npcMoves
 	for passed := time.Duration(0); passed < d; passed += 100 * time.Millisecond {
 		srv.Advance(t, 100*time.Millisecond)
-		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+		for _, frame := range c.ReadQueued() {
 			if len(frame) < 5 || wireReader(frame[1:]).ReadInt32() != id {
 				continue
 			}
@@ -96,7 +96,7 @@ func TestHalishaChestNeverChasesOutOfRangePlayer(t *testing.T) {
 			if got := chest.MovementDisabled(); got == tt.chase {
 				t.Fatalf("MovementDisabled() = %v, want %v", got, !tt.chase)
 			}
-			chest.AddCombatDamageHate(player, 50)
+			chest.AddAttackDesire(player, 50)
 			if got := chest.AI().CurrentIntention(); got != ai.IntentionAttack {
 				t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionAttack)
 			}
@@ -149,7 +149,7 @@ func TestNPCClosesInOnUnseenTargetInReach(t *testing.T) {
 				drainUntilQuiet(t, c)
 			}
 
-			monster.AddCombatDamageHate(player, 50)
+			monster.AddAttackDesire(player, 50)
 
 			seen := npcActivity(t, srv, c, monster.ObjectID(), 2*time.Second)
 			seen.requireMoved(t, tt.move)
@@ -212,14 +212,16 @@ func TestIdleHoldDesireTargetFailsAggroScanWithoutChase(t *testing.T) {
 	startInWorld(t, c)
 	player := liveCombatant(t, srv)
 
-	// Far beyond the monster's knowledge, so queuing the desire runs no
-	// Think: the hold desire stays queued and the current intention idle.
+	// Far beyond the monster's knowledge. The hold desire goes straight into
+	// the queue, with no hate: a first attack desire would run the desire
+	// selection, whose prune drops a desire on a creature the monster does
+	// not know. It stays queued and the current intention idle.
 	px, py, pz := player.Position()
 	home := location.Location{X: px + 20000, Y: py, Z: pz}
 	monster := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
 	drainUntilQuiet(t, c)
 
-	monster.AddAttackDesireHold(player, 50)
+	monster.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionAttack, FinalTarget: player, Weight: 50})
 	if got := monster.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionIdle)
 	}

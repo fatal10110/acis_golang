@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -53,14 +52,10 @@ func TestDamageZoneHurtsAPlayerEveryReuseDelay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := commons.NewStatSet()
-	set.Set("hpDamage", "5")
-	set.Set("initialDelay", "1100")
-	set.Set("reuseDelay", "5300")
-	damage, err := zone.NewDamage(1, form, set)
-	if err != nil {
-		t.Fatal(err)
-	}
+	damage := zone.NewDamage(1, form)
+	damage.HPDamage = 5
+	damage.InitialDelay = 1100 * time.Millisecond
+	damage.ReuseDelay = 5300 * time.Millisecond
 	zones := zone.NewIndex()
 	zones.Add(damage)
 	srv, character, objID := bootInZones(t, zones)

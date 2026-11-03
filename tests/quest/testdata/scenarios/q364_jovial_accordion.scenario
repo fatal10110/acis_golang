@@ -1,0 +1,172 @@
+# Jovial Accordion (Q364): a level 15 character accepts at Barbado, takes the two keys at Swan, steals the
+# beer and the clothes out of the chests (both draws succeed), hands them to Sabrin and Xaber, takes Swan's
+# 100 adena and the echo crystal at Barbado; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q364_jovial_accordion.golden
+character Accordion 15
+random 0 0
+script quest.Q364_JovialAccordion
+item 57 4321 4322 4323 4324 4421
+page default/30959.htm
+page default/30957.htm
+page merchant/30060.htm
+page guard/30075.htm
+page default/30961.htm
+page default/30960.htm
+page script/quest/Q364_JovialAccordion/
+npc barbado 30959 Folk 10 0 0
+npc swan 30957 Folk 20 0 0
+npc sabrin 30060 Merchant 30 0 0
+npc xaber 30075 Guard -10 0 0
+npc clothchest 30961 Folk -20 0 0
+npc beerchest 30960 Folk -30 0 0
+
+action barbado
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q364_JovialAccordion/30959-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q364_JovialAccordion 30959-02.htm
+  S QuestList 364:0x80000001
+  S ExShowQuestMark quest=364
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q364_JovialAccordion/30959-02.htm
+  S ActionFailed
+  Q upsert Q364_JovialAccordion | <state> | STARTED
+  Q upsert Q364_JovialAccordion | <cond> | 1
+  Q upsert Q364_JovialAccordion | items | 0
+  state Q364_JovialAccordion STARTED
+  rows Q364_JovialAccordion <cond>=1 <state>=STARTED items=0
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q364_JovialAccordion/30959-03.htm
+  S ActionFailed
+  S ActionFailed
+action swan
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q364_JovialAccordion/30957-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q364_JovialAccordion 30957-02.htm
+  S QuestList 364:0x80000003
+  S ExShowQuestMark quest=364
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4323
+  S SystemMessage id=54 3:4324
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q364_JovialAccordion/30957-02.htm
+  S ActionFailed
+  Q upsert Q364_JovialAccordion | <cond> | 2
+  rows Q364_JovialAccordion <cond>=2 <state>=STARTED items=0
+  items 4323=1 4324=1
+action beerchest
+action beerchest
+  S ActionFailed
+  S NpcHtmlMessage obj=beerchest item=0 page=default/30960.htm
+  S ActionFailed
+bypass npc_{beerchest}_Quest
+  S NpcHtmlMessage obj=beerchest item=0 page=script/quest/Q364_JovialAccordion/30960-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q364_JovialAccordion 30960-04.htm
+  S SystemMessage id=302 3:4324
+  S SystemMessage id=54 3:4321
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=beerchest item=0 page=script/quest/Q364_JovialAccordion/30960-02.htm
+  S ActionFailed
+  items 4324=0 4321=1
+action clothchest
+action clothchest
+  S ActionFailed
+  S NpcHtmlMessage obj=clothchest item=0 page=default/30961.htm
+  S ActionFailed
+bypass npc_{clothchest}_Quest
+  S NpcHtmlMessage obj=clothchest item=0 page=script/quest/Q364_JovialAccordion/30961-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q364_JovialAccordion 30961-04.htm
+  S SystemMessage id=302 3:4323
+  S SystemMessage id=54 3:4322
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=clothchest item=0 page=script/quest/Q364_JovialAccordion/30961-02.htm
+  S ActionFailed
+  items 4323=0 4322=1
+action sabrin
+action sabrin
+  S ActionFailed
+  S NpcHtmlMessage obj=sabrin item=0 page=merchant/30060.htm
+  S ActionFailed
+bypass npc_{sabrin}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4321
+  S NpcHtmlMessage obj=sabrin item=0 page=script/quest/Q364_JovialAccordion/30060-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q364_JovialAccordion | items | 1
+  items 4321=0
+action xaber
+action xaber
+  S ActionFailed
+  S NpcHtmlMessage obj=xaber item=0 page=guard/30075.htm
+  S ActionFailed
+bypass npc_{xaber}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4322
+  S NpcHtmlMessage obj=xaber item=0 page=script/quest/Q364_JovialAccordion/30075-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q364_JovialAccordion | items | 2
+  items 4322=0
+action swan
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S QuestList 364:0x80000007
+  S ExShowQuestMark quest=364
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=52 6:100
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q364_JovialAccordion/30957-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q364_JovialAccordion | <cond> | 3
+  rows Q364_JovialAccordion <cond>=3 <state>=STARTED items=2
+  items 57=100
+action swan
+  S ActionFailed
+  S NpcHtmlMessage obj=swan item=0 page=default/30957.htm
+  S ActionFailed
+bypass npc_{swan}_Quest
+  S NpcHtmlMessage obj=swan item=0 page=script/quest/Q364_JovialAccordion/30957-07.htm
+  S ActionFailed
+  S ActionFailed
+action barbado
+action barbado
+  S ActionFailed
+  S NpcHtmlMessage obj=barbado item=0 page=default/30959.htm
+  S ActionFailed
+bypass npc_{barbado}_Quest
+  S SystemMessage id=54 3:4421
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=barbado item=0 page=script/quest/Q364_JovialAccordion/30959-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q364_JovialAccordion
+  items 4421=1
+  state Q364_JovialAccordion -
+  rows Q364_JovialAccordion -
+relog
+  rows Q364_JovialAccordion -
+  items 4421=1 57=100

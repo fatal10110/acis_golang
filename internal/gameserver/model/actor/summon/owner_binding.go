@@ -79,9 +79,10 @@ func (a *Actor) RelinkOwner(owner Owner, inv *itemcontainer.Inventory, q *sim.Qu
 	a.effects.SetQueue(q)
 	a.emit(event.OwnerRelinked{})
 	if !a.Dead() {
-		// The owner-heal ticked on the queue the pet leaves, which closes
-		// with the relink.
+		// The owner-heal and the feeding ticked on the queue the pet
+		// leaves, which closes with the relink.
 		a.moveBabyHeal()
+		a.moveLifeTask()
 		a.liftCollar(inv)
 	}
 	// Last, so nothing that waits for the owner to be back (a later
@@ -130,8 +131,8 @@ func (a *Actor) Post(fn func()) bool {
 // ownerDuelID is the duel a's owner is in: 0 for none, -1 when a answers to
 // no owner, which no duellist's duel matches.
 func (a *Actor) ownerDuelID() int32 {
-	owner, ok := a.currentOwner().(interface{ DuelID() int32 })
-	if !ok {
+	owner := a.currentOwner()
+	if owner == nil {
 		return -1
 	}
 	return owner.DuelID()

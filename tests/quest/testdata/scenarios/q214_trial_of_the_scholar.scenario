@@ -1,0 +1,490 @@
+# Trial Of The Scholar (Q214), a second class-change test for wizards, first part, played by a level 36
+# Human Wizard who already holds all but the last brown scroll scrap (every script roll pinned to 1, so
+# every drop lands): Mirien starts it and pays the level 35 set's Dimensional Diamonds; Sylvain, Maria,
+# Lucas and Creta pass the letters and paintings round until the Leto lizardman warrior drops the last
+# scroll scrap and Maria turns the scraps into the crystal of purity; Sylvain trades the crystal for his
+# symbol, and Mirien trades the symbol for the second sigil; then relog, and Sylvain, who has done his part,
+# says so. The server drops a client's packets past 160 a second, which a scenario played at full speed reaches,
+# so the trial is played in three parts.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q214_trial_of_the_scholar.golden
+character Scholar 36
+class 11
+random always 1
+hold 2687 4
+script quest.Q214_TrialOfTheScholar
+item 2674 2675 2676 2677 2678 2679 2680 2681 2682 2683 2684 2685 2686 2687 2688 2689 2690 2691 2692 2693 2694 2695 2696 2697 2698 2699 2700 2701 2702 2703 2704 2705 2706 2707 2708 2709 2710 2711 2713 2714 2715 2716 2717 2718 2719 2720 7562
+page trainer/30461.htm
+page villagemaster/30070.htm
+page guard/30071.htm
+page default/30608.htm
+page default/30609.htm
+page script/quest/Q214_TrialOfTheScholar/
+npc mirien 30461 Trainer 10 0 0
+npc sylvain 30070 VillageMasterPriest -10 0 0
+npc lucas 30071 Guard 0 10 0
+npc valkon 30103 WarehouseKeeper 0 -10 0
+npc dieter 30111 Trainer 10 10 0
+npc jurek 30115 VillageMasterMystic -10 10 0
+npc edroc 30230 Merchant 10 -10 0
+npc raut 30316 WarehouseKeeper -10 -10 0
+npc poitan 30458 Trainer 20 0 0
+npc maria 30608 Folk -20 0 0
+npc creta 30609 Folk 0 20 0
+npc cronos 30610 Folk 0 -20 0
+npc triff 30611 Folk 20 20 0
+npc casian 30612 Folk -20 20 0
+npc leto 20580 Monster -60 0 0
+
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30461-04.htm
+  S QuestList 214:0x80000001
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2675
+  S SystemMessage id=53 3:7562 6:168
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-04a.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <state> | STARTED
+  Q upsert Q214_TrialOfTheScholar | <cond> | 1
+  M set secondClassChange35 | true
+  items 2675=1 7562=168
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=1
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-05.htm
+  S ActionFailed
+  S ActionFailed
+action sylvain
+action sylvain
+  S ActionFailed
+  S NpcHtmlMessage obj=sylvain item=0 page=villagemaster/30070.htm
+  S ActionFailed
+bypass npc_{sylvain}_Quest
+  S NpcHtmlMessage obj=sylvain item=0 page=script/quest/Q214_TrialOfTheScholar/30070-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30070-02.htm
+  S QuestList 214:0x80000003
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2689
+  S SystemMessage id=54 3:2692
+  S NpcHtmlMessage obj=sylvain item=0 page=script/quest/Q214_TrialOfTheScholar/30070-02.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 2
+  items 2689=1 2692=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=2
+action sylvain
+  S ActionFailed
+  S NpcHtmlMessage obj=sylvain item=0 page=villagemaster/30070.htm
+  S ActionFailed
+bypass npc_{sylvain}_Quest
+  S NpcHtmlMessage obj=sylvain item=0 page=script/quest/Q214_TrialOfTheScholar/30070-03.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30608-02.htm
+  S QuestList 214:0x80000007
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2692
+  S SystemMessage id=54 3:2679
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-02.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 3
+  items 2679=1 2692=0
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=3
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-03.htm
+  S ActionFailed
+  S ActionFailed
+action lucas
+action lucas
+  S ActionFailed
+  S NpcHtmlMessage obj=lucas item=0 page=guard/30071.htm
+  S ActionFailed
+bypass npc_{lucas}_Quest
+  S QuestList 214:0x8000000f
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2679
+  S SystemMessage id=54 3:2681
+  S NpcHtmlMessage obj=lucas item=0 page=script/quest/Q214_TrialOfTheScholar/30071-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 4
+  items 2679=0 2681=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=4
+action lucas
+  S ActionFailed
+  S NpcHtmlMessage obj=lucas item=0 page=guard/30071.htm
+  S ActionFailed
+bypass npc_{lucas}_Quest
+  S NpcHtmlMessage obj=lucas item=0 page=script/quest/Q214_TrialOfTheScholar/30071-02.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S QuestList 214:0x8000001f
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2681
+  S SystemMessage id=54 3:2680
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 5
+  items 2680=1 2681=0
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=5
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-05.htm
+  S ActionFailed
+  S ActionFailed
+action creta
+action creta
+  S ActionFailed
+  S NpcHtmlMessage obj=creta item=0 page=default/30609.htm
+  S ActionFailed
+bypass npc_{creta}_Quest
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30609-02.htm
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-02.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30609-03.htm
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-03.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30609-05.htm
+  S QuestList 214:0x8000003f
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2680
+  S SystemMessage id=54 3:2683
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-05.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 6
+  items 2680=0 2683=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=6
+action creta
+  S ActionFailed
+  S NpcHtmlMessage obj=creta item=0 page=default/30609.htm
+  S ActionFailed
+bypass npc_{creta}_Quest
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-06.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30608-07.htm
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-07.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30608-08.htm
+  S QuestList 214:0x8000007f
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2683
+  S SystemMessage id=54 3:2682
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-08.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 7
+  items 2682=1 2683=0
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=7
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-09.htm
+  S ActionFailed
+  S ActionFailed
+action creta
+action creta
+  S ActionFailed
+  S NpcHtmlMessage obj=creta item=0 page=default/30609.htm
+  S ActionFailed
+bypass npc_{creta}_Quest
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30609-08.htm
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-08.htm
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30609-09.htm
+  S QuestList 214:0x800000ff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2682
+  S SystemMessage id=54 3:2684
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-09.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 8
+  items 2682=0 2684=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=8
+action creta
+  S ActionFailed
+  S NpcHtmlMessage obj=creta item=0 page=default/30609.htm
+  S ActionFailed
+bypass npc_{creta}_Quest
+  S NpcHtmlMessage obj=creta item=0 page=script/quest/Q214_TrialOfTheScholar/30609-10.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S QuestList 214:0x800001ff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2684
+  S SystemMessage id=54 3:2685
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 9
+  items 2684=0 2685=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=9
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-11.htm
+  S ActionFailed
+  S ActionFailed
+action lucas
+action lucas
+  S ActionFailed
+  S NpcHtmlMessage obj=lucas item=0 page=guard/30071.htm
+  S ActionFailed
+bypass npc_{lucas}_Quest
+  S NpcHtmlMessage obj=lucas item=0 page=script/quest/Q214_TrialOfTheScholar/30071-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30071-04.htm
+  S QuestList 214:0x800003ff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2685
+  S SystemMessage id=54 3:2686
+  S NpcHtmlMessage obj=lucas item=0 page=script/quest/Q214_TrialOfTheScholar/30071-04.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 10
+  items 2685=0 2686=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=10
+action lucas
+  S ActionFailed
+  S NpcHtmlMessage obj=lucas item=0 page=guard/30071.htm
+  S ActionFailed
+bypass npc_{lucas}_Quest
+  S NpcHtmlMessage obj=lucas item=0 page=script/quest/Q214_TrialOfTheScholar/30071-05.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S QuestList 214:0x800007ff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-12.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 11
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=11
+kill leto
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2687
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 214:0x80000fff
+  S ExShowQuestMark quest=214
+  Q upsert Q214_TrialOfTheScholar | <cond> | 12
+  items 2687=5
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=12
+action lucas
+action lucas
+  S ActionFailed
+  S NpcHtmlMessage obj=lucas item=0 page=guard/30071.htm
+  S ActionFailed
+bypass npc_{lucas}_Quest
+  S NpcHtmlMessage obj=lucas item=0 page=script/quest/Q214_TrialOfTheScholar/30071-06.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-13.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30608-14.htm
+  S QuestList 214:0x80001fff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2687 6:5
+  S SystemMessage id=302 3:2686
+  S SystemMessage id=54 3:2688
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-14.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 13
+  items 2686=0 2687=0 2688=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=13
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-15.htm
+  S ActionFailed
+  S ActionFailed
+action lucas
+action lucas
+  S ActionFailed
+  S NpcHtmlMessage obj=lucas item=0 page=guard/30071.htm
+  S ActionFailed
+bypass npc_{lucas}_Quest
+  S NpcHtmlMessage obj=lucas item=0 page=script/quest/Q214_TrialOfTheScholar/30071-07.htm
+  S ActionFailed
+  S ActionFailed
+action sylvain
+action sylvain
+  S ActionFailed
+  S NpcHtmlMessage obj=sylvain item=0 page=villagemaster/30070.htm
+  S ActionFailed
+bypass npc_{sylvain}_Quest
+  S QuestList 214:0x80003fff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2688
+  S SystemMessage id=302 3:2689
+  S SystemMessage id=54 3:2693
+  S NpcHtmlMessage obj=sylvain item=0 page=script/quest/Q214_TrialOfTheScholar/30070-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 14
+  items 2688=0 2689=0 2693=1
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=14
+action sylvain
+  S ActionFailed
+  S NpcHtmlMessage obj=sylvain item=0 page=villagemaster/30070.htm
+  S ActionFailed
+bypass npc_{sylvain}_Quest
+  S NpcHtmlMessage obj=sylvain item=0 page=script/quest/Q214_TrialOfTheScholar/30070-05.htm
+  S ActionFailed
+  S ActionFailed
+action maria
+action maria
+  S ActionFailed
+  S NpcHtmlMessage obj=maria item=0 page=default/30608.htm
+  S ActionFailed
+bypass npc_{maria}_Quest
+  S NpcHtmlMessage obj=maria item=0 page=script/quest/Q214_TrialOfTheScholar/30608-16.htm
+  S ActionFailed
+  S ActionFailed
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S QuestList 214:0x80007fff
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2675
+  S SystemMessage id=302 3:2693
+  S SystemMessage id=54 3:2676
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <cond> | 15
+  items 2675=0 2676=1 2693=0
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=15
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-07.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=15
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-07.htm
+  S ActionFailed
+  S ActionFailed
+action sylvain
+action sylvain
+  S ActionFailed
+  S NpcHtmlMessage obj=sylvain item=0 page=villagemaster/30070.htm
+  S ActionFailed
+bypass npc_{sylvain}_Quest
+  S NpcHtmlMessage obj=sylvain item=0 page=script/quest/Q214_TrialOfTheScholar/30070-06.htm
+  S ActionFailed
+  S ActionFailed

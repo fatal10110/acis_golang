@@ -24,14 +24,26 @@ func (h *Hostile) SetCastController(c CastControl) {
 	h.cast.Store(&c)
 }
 
-// CastControl returns h's cast controller, nil when it has none.
+// CastControl returns h's cast controller, nil when it has none. An NPC
+// whose AI cast controller is built on first use reports that one once it
+// exists, and none before: an NPC that never cast has no cast to stop or
+// break.
 func (h *Hostile) CastControl() CastControl { return h.castControl() }
 
 func (h *Hostile) castControl() CastControl {
 	if p := h.cast.Load(); p != nil {
 		return *p
 	}
+	if holder, ok := h.brain.CastControllerIfBuilt().(castControlHolder); ok {
+		return holder.CastControl()
+	}
 	return nil
+}
+
+// castControlHolder is an AI cast controller that holds the live cast
+// controller an NPC's damage and crowd control drive.
+type castControlHolder interface {
+	CastControl() CastControl
 }
 
 // CastingNow reports whether h has a cast in flight.

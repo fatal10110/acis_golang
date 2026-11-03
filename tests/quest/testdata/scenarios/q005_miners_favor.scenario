@@ -1,0 +1,171 @@
+# Miner's Favor (Q005): a dwarf of level 2 accepts at Bolter (his list and his smelly socks),
+# fetches the powder from Shari (asked twice), the boots from Garita and the beer from Reed,
+# trades the socks for Brunon's pick, which completes the list, and Bolter takes the four for a
+# necklace; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q005_miners_favor.golden
+character Digger 2
+class 53
+script quest.Q005_MinersFavor
+item 1547 1548 1549 1550 1551 1552 906
+page default/30554.htm
+page merchant/30517.htm
+page merchant/30518.htm
+page villagemaster/30520.htm
+page trainer/30526.htm
+page script/quest/Q005_MinersFavor/
+npc bolter 30554 Folk 10 0 0
+npc shari 30517 Merchant 20 0 0
+npc garita 30518 Merchant 30 0 0
+npc reed 30520 VillageMasterDwarf 40 0 0
+npc brunon 30526 Trainer 50 0 0
+
+# Bolter: accept with his list and socks.
+action bolter
+action bolter
+  S ActionFailed
+  S NpcHtmlMessage obj=bolter item=0 page=default/30554.htm
+  S ActionFailed
+bypass npc_{bolter}_Quest
+  S NpcHtmlMessage obj=bolter item=0 page=script/quest/Q005_MinersFavor/30554-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q005_MinersFavor CREATED
+bypass Quest Q005_MinersFavor 30554-03.htm
+  S QuestList 5:0x80000001
+  S ExShowQuestMark quest=5
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1547
+  S SystemMessage id=54 3:1552
+  S NpcHtmlMessage obj=bolter item=0 page=script/quest/Q005_MinersFavor/30554-03.htm
+  S ActionFailed
+  Q upsert Q005_MinersFavor | <state> | STARTED
+  Q upsert Q005_MinersFavor | <cond> | 1
+  state Q005_MinersFavor STARTED
+  rows Q005_MinersFavor <cond>=1 <state>=STARTED
+  items 1547=1 1552=1
+action bolter
+  S ActionFailed
+  S NpcHtmlMessage obj=bolter item=0 page=default/30554.htm
+  S ActionFailed
+bypass npc_{bolter}_Quest
+  S NpcHtmlMessage obj=bolter item=0 page=script/quest/Q005_MinersFavor/30554-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q005_MinersFavor 30554-05.htm
+  S NpcHtmlMessage obj=bolter item=0 page=script/quest/Q005_MinersFavor/30554-05.htm
+  S ActionFailed
+
+# Shari, Garita and Reed: an item each.
+action shari
+action shari
+  S ActionFailed
+  S NpcHtmlMessage obj=shari item=0 page=merchant/30517.htm
+  S ActionFailed
+bypass npc_{shari}_Quest
+  S SystemMessage id=54 3:1550
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=shari item=0 page=script/quest/Q005_MinersFavor/30517-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1550=1
+action shari
+  S ActionFailed
+  S NpcHtmlMessage obj=shari item=0 page=merchant/30517.htm
+  S ActionFailed
+bypass npc_{shari}_Quest
+  S NpcHtmlMessage obj=shari item=0 page=script/quest/Q005_MinersFavor/30517-02.htm
+  S ActionFailed
+  S ActionFailed
+action garita
+action garita
+  S ActionFailed
+  S NpcHtmlMessage obj=garita item=0 page=merchant/30518.htm
+  S ActionFailed
+bypass npc_{garita}_Quest
+  S SystemMessage id=54 3:1548
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=garita item=0 page=script/quest/Q005_MinersFavor/30518-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1548=1
+action reed
+action reed
+  S ActionFailed
+  S NpcHtmlMessage obj=reed item=0 page=villagemaster/30520.htm
+  S ActionFailed
+bypass npc_{reed}_Quest
+  S SystemMessage id=54 3:1551
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=reed item=0 page=script/quest/Q005_MinersFavor/30520-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1551=1
+
+# Brunon: the socks for his pick, the last item of the list.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q005_MinersFavor/30526-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q005_MinersFavor 30526-02.htm
+  S SystemMessage id=302 3:1552
+  S SystemMessage id=54 3:1549
+  S QuestList 5:0x80000003
+  S ExShowQuestMark quest=5
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q005_MinersFavor/30526-02.htm
+  S ActionFailed
+  Q upsert Q005_MinersFavor | <cond> | 2
+  rows Q005_MinersFavor <cond>=2 <state>=STARTED
+  items 1552=0 1549=1
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q005_MinersFavor/30526-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Bolter: the list and the four items for the necklace; the quest completes.
+action bolter
+action bolter
+  S ActionFailed
+  S NpcHtmlMessage obj=bolter item=0 page=default/30554.htm
+  S ActionFailed
+bypass npc_{bolter}_Quest
+  S SystemMessage id=302 3:1547
+  S SystemMessage id=302 3:1550
+  S SystemMessage id=302 3:1549
+  S SystemMessage id=302 3:1548
+  S SystemMessage id=302 3:1551
+  S SystemMessage id=54 3:906
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 5:0x00000000
+  S NpcHtmlMessage obj=bolter item=0 page=script/quest/Q005_MinersFavor/30554-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q005_MinersFavor | <state> | COMPLETED
+  Q delete-except-state Q005_MinersFavor
+  state Q005_MinersFavor COMPLETED
+  rows Q005_MinersFavor <state>=COMPLETED
+  items 1547=0 1548=0 1549=0 1550=0 1551=0 1552=0 906=1
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q005_MinersFavor COMPLETED
+  rows Q005_MinersFavor <state>=COMPLETED
+  items 906=1
+action bolter
+action bolter
+  S ActionFailed
+  S NpcHtmlMessage obj=bolter item=0 page=default/30554.htm
+  S ActionFailed
+bypass npc_{bolter}_Quest
+  S NpcHtmlMessage obj=bolter item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

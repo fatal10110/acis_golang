@@ -86,3 +86,18 @@ func (r *registry[T]) appendAll(dst []T) []T {
 	}
 	return dst
 }
+
+// find returns the first entry match accepts, in map order, and stops
+// there; the zero T when match accepts none. match runs under the read
+// lock, so it must not add or remove entries of this registry.
+func (r *registry[T]) find(match func(T) bool) (T, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, obj := range r.entries {
+		if match(obj) {
+			return obj, true
+		}
+	}
+	var zero T
+	return zero, false
+}

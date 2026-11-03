@@ -1,0 +1,38 @@
+# War with Varka Silenos (Q606): a level 74 Ketra ally is offered the quest by Kadun Zu Ketra and takes it; with no
+# Varka mane yet he is told to bring some. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q606_war_with_varka_silenos_accept.golden
+character Ally 74
+standing 1
+script quest.Q606_WarWithVarkaSilenos
+item 7233 7186
+page npcdefault.htm
+page script/quest/Q606_WarWithVarkaSilenos/
+npc kadun 31370 Folk 10 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q606_WarWithVarkaSilenos 31370-03.htm
+  Q upsert Q606_WarWithVarkaSilenos | <state> | STARTED
+  Q upsert Q606_WarWithVarkaSilenos | <cond> | 1
+  S QuestList 606:0x80000001
+  S ExShowQuestMark quest=606
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-03.htm
+  S ActionFailed
+  rows Q606_WarWithVarkaSilenos <cond>=1 <state>=STARTED
+  state Q606_WarWithVarkaSilenos STARTED
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-05.htm
+  S ActionFailed
+  S ActionFailed

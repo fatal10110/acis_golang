@@ -1,0 +1,39 @@
+# Legacy of Insolence (Q372): a character at the second step asks Walderal again and then leaves the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q372_legacy_of_insolence_finish.golden
+character Insolence 59
+quest Q372_LegacyOfInsolence <cond>=2 <state>=STARTED
+script quest.Q372_LegacyOfInsolence
+item 57 5966 5967 5968 5969 5972 5973 5974 5975 5976 5977 5978 5979 5980 5981 5982 5983 5984 5985 5986 5987 5988 5989 5990 5991 5992 5993 5994 5995 5996 5997 5998 5999 6000 6001 5368 5370 5380 5382 5392 5394 5404 5406 5426 5428 5430 5432 5496 5497 5502 5503 5508 5509 5514 5515 5525 5526 5527 5528
+page warehouse/30844.htm
+page merchant/30839.htm
+page default/30929.htm
+page default/31001.htm
+page trainer/30855.htm
+page script/quest/Q372_LegacyOfInsolence/
+npc walderal 30844 WarehouseKeeper 10 0 0
+npc holly 30839 Merchant -10 0 0
+npc patrin 30929 Folk 20 0 0
+npc claudia 31001 Folk -20 0 0
+npc desmond 30855 Trainer 30 0 0
+npc beast 20817 Monster 40 0 0
+
+action walderal
+action walderal
+  S ActionFailed
+  S NpcHtmlMessage obj=walderal item=0 page=warehouse/30844.htm
+  S ActionFailed
+bypass npc_{walderal}_Quest
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q372_LegacyOfInsolence 30844-09.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-09.htm
+  S ActionFailed
+  Q delete-quest Q372_LegacyOfInsolence
+  state Q372_LegacyOfInsolence -
+  rows Q372_LegacyOfInsolence -
+relog
+  rows Q372_LegacyOfInsolence -

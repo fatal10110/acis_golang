@@ -29,7 +29,7 @@ func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
-	plan, err := ctrl.Start(now, testTarget{}, def)
+	plan, err := ctrl.Start(now, testTarget{}, &def)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true}
-	plan, err := ctrl.Start(now, testTarget{}, def)
+	plan, err := ctrl.Start(now, testTarget{}, &def)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true, MPConsume: 50}
-	plan, err := ctrl.Start(now, testTarget{}, def)
+	plan, err := ctrl.Start(now, testTarget{}, &def)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
-	plan, err := ctrl.Start(now, testTarget{}, def)
+	plan, err := ctrl.Start(now, testTarget{}, &def)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
-	plan, err := ctrl.Start(now, testTarget{}, def)
+	plan, err := ctrl.Start(now, testTarget{}, &def)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestInterruptOnDamageImmuneOverridesFusion(t *testing.T) {
 
 	def := scalingDef
 	def.SkillType = "FUSION"
-	if _, err := ctrl.Start(now, testTarget{}, def); err != nil {
+	if _, err := ctrl.Start(now, testTarget{}, &def); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 
@@ -228,7 +228,7 @@ func TestScheduleStartedAfterInterruptDoesNotFireStaleTimer(t *testing.T) {
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, Magic: true, StaticHitTime: true, HitTime: 1000, StaticReuse: true}
-	plan, err := ctrl.Start(now, testTarget{}, def)
+	plan, err := ctrl.Start(now, testTarget{}, &def)
 	if err != nil {
 		t.Fatalf("first Start() error: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestScheduleStartedAfterInterruptDoesNotFireStaleTimer(t *testing.T) {
 	ctrl.Schedule(plan, Hooks{Hit: func() { firstHit = true }})
 	ctrl.Stop()
 
-	secondPlan, err := ctrl.Start(now, testTarget{}, def)
+	secondPlan, err := ctrl.Start(now, testTarget{}, &def)
 	if err != nil {
 		t.Fatalf("second Start() error: %v", err)
 	}
@@ -287,7 +287,7 @@ func (c *castClock) advance(d time.Duration) { c.in.Advance(d) }
 func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 	now := time.Unix(1000, 0)
 	ctrl, _, rec := newAbortController()
-	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
+	plan, err := ctrl.Start(now, testTarget{}, &modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 		t.Fatalf("fusion abort order: aborts before end = %d, after stop = %d; want end before abort (0, 1)", abortsBeforeEnd, got)
 	}
 
-	plan, err = ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
+	plan, err = ctrl.Start(now, testTarget{}, &modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +321,7 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 func TestScheduleFusionStopsWhenRecurringCheckFails(t *testing.T) {
 	now := time.Unix(1000, 0)
 	ctrl, _, _ := newAbortController()
-	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
+	plan, err := ctrl.Start(now, testTarget{}, &modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestScheduleFusionStopsWhenRecurringCheckFails(t *testing.T) {
 func TestScheduleFusionReportsWhenCastAlreadyStopped(t *testing.T) {
 	now := time.Unix(1000, 0)
 	ctrl, _, _ := newAbortController()
-	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
+	plan, err := ctrl.Start(now, testTarget{}, &modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
 	ctrl := NewController(scalingActor(), nil)
 	ctrl.SetQueue(clock.q)
 
-	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &scalingDef)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -409,7 +409,7 @@ func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
 	ctrl := NewController(scalingActor(), nil)
 	ctrl.SetQueue(clock.q)
 
-	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &scalingDef)
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
@@ -436,7 +436,7 @@ func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
 
 	// A fresh cast on the same controller must not inherit the stale hold.
 	var order []string
-	plan2, err := ctrl.Start(time.Unix(2000, 0), testTarget{}, scalingDef)
+	plan2, err := ctrl.Start(time.Unix(2000, 0), testTarget{}, &scalingDef)
 	if err != nil {
 		t.Fatalf("second Start() error: %v", err)
 	}

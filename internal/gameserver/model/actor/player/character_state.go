@@ -134,8 +134,8 @@ func (c *Character) StandingNow() bool {
 
 // beginPostureTransitionLocked starts a sit-down (standing false) or
 // stand-up transition that ends after delay with a PostureSettled event. A
-// transition still running is left alone, as Player.sitDown, standUp and
-// startFakeDeath each schedule their own uncancelled end: every one ends at
+// transition still running is left alone: sitting down, standing up and
+// faking death each schedule their own uncancelled end; every one ends at
 // its own time, and the flag it raised stays up until an end clears it. A
 // character without a live runtime has no queue to end it on and starts
 // none. c.stateMu must be held.
@@ -154,8 +154,8 @@ func (c *Character) beginPostureTransitionLocked(standing bool, delay time.Durat
 // settlePosture ends a sit-down (standing false) or stand-up transition,
 // whatever began after it. A sit-down's end leaves the character seated,
 // even when a stand-up or a get-up out of fake death took the standing
-// posture meanwhile: the reference's end sets isSitting whatever happened
-// in between. A stand-up's end only clears StandingNow and leaves the
+// posture meanwhile: a sit-down's end sets the seated flag whatever
+// happened in between. A stand-up's end only clears StandingNow and leaves the
 // posture a later sit-down took.
 func (c *Character) settlePosture(standing bool) {
 	c.stateMu.Lock()
@@ -457,14 +457,11 @@ func (c *Character) liveLocked() *creature.Live {
 	return c.Live
 }
 
-// recentFakeDeathGrace is how long a player is exempt from hostile NPC
-// auto-targeting after standing up from Fake Death, matching the shipped
-// PlayerFakeDeathUpProtection default (players.properties).
-const recentFakeDeathGrace = 5 * time.Second
-
-// MarkRecentFakeDeath starts this player's post-fake-death grace period.
+// MarkRecentFakeDeath starts this player's post-fake-death grace period,
+// as long as the rules' FakeDeathUpProtection, during which hostile NPC
+// auto-targeting skips it.
 func (c *Character) MarkRecentFakeDeath() {
-	until := c.Now().Add(recentFakeDeathGrace)
+	until := c.Now().Add(c.rules().FakeDeathUpProtection)
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.recentFakeDeathUntil = until

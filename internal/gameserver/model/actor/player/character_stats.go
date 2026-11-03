@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
@@ -44,7 +45,13 @@ func (c *Character) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 }
 
 func (c *Character) calcStat(s stat.Stat, base float64) float64 {
-	value := c.statCalc(s).Calc(characterStatActor{c: c}, base)
+	return c.calcFor(s, base, nil, nil)
+}
+
+// calcFor is calcStat for a calculation against target run for skill (nil
+// for none).
+func (c *Character) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	value := c.statCalc(s).Calc(characterStatActor{c: c}, base, target, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -186,7 +193,9 @@ func (a characterStatActor) hasFullBodyArmor(slotMask int) bool {
 		return false
 	}
 	tmpl, ok := a.c.inventory.Templates().Get(inst.TemplateID)
-	return ok && (tmpl.Slot == item.SlotFullArmor || tmpl.Slot == item.SlotAllDress)
+	// Formal wear sits in the chest slot but is not a full-body piece: it
+	// takes the chest penalty only.
+	return ok && tmpl.Slot == item.SlotFullArmor
 }
 
 func (a characterStatActor) HasWeaponEquipped() bool {
@@ -239,7 +248,7 @@ func (c *Character) ShieldDefense(caster creature.FormulaActor, def modelskill.D
 		return formulas.ShieldFailed
 	}
 
-	baseRate := c.calcStat(stat.ShieldRate, 0)
+	baseRate := c.calcFor(stat.ShieldRate, 0, conditions.ActorOf(caster), nil)
 	if baseRate == 0 {
 		return formulas.ShieldFailed
 	}
@@ -249,9 +258,7 @@ func (c *Character) ShieldDefense(caster creature.FormulaActor, def modelskill.D
 		return formulas.ShieldFailed
 	}
 
-	c.stateMu.RLock()
-	perfectRate := c.perfectShieldBlockRate
-	c.stateMu.RUnlock()
+	perfectRate := c.rules().PerfectShieldBlockRate
 
 	result := formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectRate, c.rollValue(100))
 	c.notifyShieldBlock(result)
@@ -300,7 +307,11 @@ func attackerUsesBow(caster creature.FormulaActor) bool {
 // MAtk returns the current magic attack value, truncated to a whole
 // number. A rider casts from its mount's M.Atk. instead of its class and
 // weapon.
-func (c *Character) MAtk() float64 {
+func (c *Character) MAtk() float64 { return c.mAtk(nil, nil) }
+
+// mAtk is MAtk for a calculation against target run for skill. A rider's
+// M.Atk. is calculated against no target for no skill.
+func (c *Character) mAtk(target conditions.Actor, skill conditions.Skill) float64 {
 	if m, ok := c.ridden(); ok {
 		return math.Trunc(c.calcStat(stat.MagicAttack, m.mAtk))
 	}
@@ -309,18 +320,21 @@ func (c *Character) MAtk() float64 {
 	if tmpl != nil && tmpl.MAtk > 0 {
 		base = tmpl.MAtk
 	}
-	return math.Trunc(c.calcStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", base)))
+	return math.Trunc(c.calcFor(stat.MagicAttack, c.activeWeapon().stat("mAtk", base), target, skill))
 }
 
 // MDef returns the current magic defence value, truncated to a whole
 // number.
-func (c *Character) MDef() float64 {
+func (c *Character) MDef() float64 { return c.mDef(nil, nil) }
+
+// mDef is MDef for a calculation against target run for skill.
+func (c *Character) mDef(target conditions.Actor, skill conditions.Skill) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.MDef > 0 {
 		base = tmpl.MDef
 	}
-	return math.Trunc(c.calcStat(stat.MagicDefence, base))
+	return math.Trunc(c.calcFor(stat.MagicDefence, base, target, skill))
 }
 
 // HP returns current HP as a floating-point skill-resource value.
@@ -347,31 +361,42 @@ func (c *Character) MaxMPValue() float64 { return c.ResourceValues().MaxMP }
 // MaxCPValue returns maximum CP as a floating-point skill-resource value.
 func (c *Character) MaxCPValue() float64 { return c.ResourceValues().MaxCP }
 
-// HPRegenRate returns c's current HP regeneration rate.
+// HPRegenRate returns c's current HP regeneration rate: the configured
+// multiple of its base through the stat, times the siege headquarters,
+// clan hall, posture and weight penalty multipliers, plus the Mother Tree
+// bonus.
 func (c *Character) HPRegenRate() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateHPRate, 0)
 	}
-	return c.calcStat(stat.RegenerateHPRate, c.levelTableValue(tmpl.HPRegenTable, 0)) * c.hpRegenHallMultiplier() * c.weightPenaltyRegenMultiplier()
+	rate := c.calcStat(stat.RegenerateHPRate, c.levelTableValue(tmpl.HPRegenTable, 0)*c.rules().Regen.InForce().HP) * c.hpRegenHeadquartersMultiplier() * c.hpRegenHallMultiplier() * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
+	hp, _ := c.motherTreeRegenBonus()
+	return rate + hp
 }
 
-// MPRegenRate returns c's current MP regeneration rate.
+// MPRegenRate returns c's current MP regeneration rate: the configured
+// multiple of its base through the stat, times the clan hall, posture and
+// weight penalty multipliers, plus the Mother Tree bonus.
 func (c *Character) MPRegenRate() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateMPRate, 0)
 	}
-	return c.calcStat(stat.RegenerateMPRate, c.levelTableValue(tmpl.MPRegenTable, 0)) * c.mpRegenHallMultiplier() * c.weightPenaltyRegenMultiplier()
+	rate := c.calcStat(stat.RegenerateMPRate, c.levelTableValue(tmpl.MPRegenTable, 0)*c.rules().Regen.InForce().MP) * c.mpRegenHallMultiplier() * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
+	_, mp := c.motherTreeRegenBonus()
+	return rate + mp
 }
 
-// CPRegenRate returns c's current CP regeneration rate.
+// CPRegenRate returns c's current CP regeneration rate: the configured
+// multiple of its base through the stat, times the posture and weight
+// penalty multipliers.
 func (c *Character) CPRegenRate() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateCPRate, 0)
 	}
-	return c.calcStat(stat.RegenerateCPRate, c.levelTableValue(tmpl.CPRegenTable, 0)) * c.weightPenaltyRegenMultiplier()
+	return c.calcStat(stat.RegenerateCPRate, c.levelTableValue(tmpl.CPRegenTable, 0)*c.rules().Regen.InForce().CP) * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
 }
 
 func (c *Character) levelTableValue(values []float64, fallback float64) float64 {
@@ -387,13 +412,14 @@ func (c *Character) levelTableValue(values []float64, fallback float64) float64 
 // caller's earlier liveness check cannot race a death into a corpse heal.
 // Callers that change HP outside a client request broadcast the resulting
 // status themselves; the cast and item paths already send their own batched
-// StatusUpdate at the call site.
+// StatusUpdate at the call site. The low-HP tutorial event the write owes
+// waits for that status report (see writeHPLocked).
 func (c *Character) AddHP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
 	maxHP := c.MaxHPValue()
-	defer c.SettleRegen() // after the unlock below
+	defer c.settleRegenTask() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() || c.curHP >= maxHP {
@@ -452,16 +478,18 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
+	maxMP := c.MaxMPValue()
 	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.dead.Load() || c.curMP <= 0 {
+	mp := c.boundedLocked(c.curMP, maxMP)
+	if c.dead.Load() || mp <= 0 {
 		return 0
 	}
-	if amount > c.curMP {
-		amount = c.curMP
+	if amount > mp {
+		amount = mp
 	}
-	c.curMP -= amount
+	c.curMP = mp - amount
 	return amount
 }
 
@@ -486,7 +514,7 @@ type hitOutcome struct {
 // share and under vitalsMu, and after applyNonConsumptionDamageEffects's
 // sleep/immobile-stop, stand-up, and stun-break side effects, which run
 // first. Already-dead is a no-op.
-func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool) hitOutcome {
+func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool, maxima Resources) hitOutcome {
 	if amount < 0 {
 		amount = 0
 	}
@@ -495,14 +523,15 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 	}
 	hit := hitOutcome{applied: true}
 	if !ignoreCP && c.hitByOther(attacker) && attacker.Kind().Playable() {
-		hit.cpOnly = c.curCP >= amount
-		drained := math.Min(c.curCP, amount)
-		c.curCP -= drained
+		cp := c.boundedLocked(c.curCP, maxima.MaxCP)
+		hit.cpOnly = cp >= amount
+		drained := math.Min(cp, amount)
+		c.curCP = cp - drained
 		amount -= drained
 	}
 	// Only damage left over once CP has absorbed its share writes HP.
 	if amount > 0 {
-		hp := c.curHP - amount
+		hp := c.boundedLocked(c.curHP, maxima.MaxHP) - amount
 		if hp <= 0 && c.InDuel() {
 			// A duel never kills: the hit leaves 1 HP, and a character
 			// still fighting is defeated.
@@ -581,7 +610,7 @@ func (c *Character) shareDamageWithServitor(amount float64, attacker attackable.
 	if !location.In3DRadius(x, y, z, sx, sy, sz, servitorDamageShareRadius) {
 		return 0
 	}
-	share := int(commons.JavaInt(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100))
+	share := int(commons.TruncInt32Sat(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100))
 	share = min(int(servitor.HP())-1, share)
 	if share <= 0 {
 		return 0
@@ -610,8 +639,9 @@ func (c *Character) NotifyServitorDamageShare(targetDamage, servitorDamage int) 
 func (c *Character) landHit(amount float64, attacker attackable.Combatant, ignoreCP, isDOT bool) bool {
 	shared := c.shareDamageWithServitor(amount, attacker)
 	amount -= float64(shared)
+	maxima := c.ResourceValues()
 	c.vitalsMu.Lock()
-	hit := c.absorbCPThenReduceHP(amount, attacker, ignoreCP)
+	hit := c.absorbCPThenReduceHP(amount, attacker, ignoreCP, maxima)
 	c.vitalsMu.Unlock()
 	if !hit.applied {
 		return false
@@ -637,7 +667,7 @@ func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatan
 	if hit.cpOnly {
 		c.BroadcastStatus()
 	}
-	if full := int(commons.JavaInt(amount)); full > 0 && !isDOT && c.hitByOther(attacker) {
+	if full := int(commons.TruncInt32Sat(amount)); full > 0 && !isDOT && c.hitByOther(attacker) {
 		c.emit(event.DamageReceived{AttackerName: attacker.CharacterName(), Amount: full})
 		if shared > 0 {
 			if recipient, ok := actingPlayer(attacker).(servitorShareRecipient); ok {
@@ -732,6 +762,12 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT b
 	c.reducePeriodicHP(amount, attacker, isDOT, false)
 }
 
+// ReduceHPBySkillDOT applies a skill's damage-over-time tick: a player
+// records no skill for it.
+func (c *Character) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, _ modelskill.Ref) {
+	c.ReduceHPByDOT(amount, attacker, true)
+}
+
 // ReduceHPByToggleUpkeep applies a toggle skill's own damage-over-time
 // upkeep tick. It is ReduceHPByDOT's real DOT tick, except the HP counts as
 // spent rather than taken in a hit: the wake-up side effects never run, so
@@ -768,14 +804,14 @@ func (c *Character) reducePeriodicHP(amount float64, attacker effect.Actor, isDO
 	}
 }
 
-// applyNonConsumptionDamageEffects mirrors PlayerStatus.reduceHp's
-// !isHPConsumption block: every normal-hit or DOT damage source stops SLEEP
-// and IMMOBILE_UNTIL_ATTACKED, stands the character up when it has finished
-// sitting down (an ordinary sit or a fake-death lie-down) unless it is in
-// shop mode, and — for non-DOT damage only — has a 1-in-10 chance to break
-// STUN. A sit-down or lie-down still under way is left to finish. HP spent
-// as a skill's own resource cost, a toggle's upkeep tick among it
-// (ReduceHPByToggleUpkeep), never routes through here.
+// applyNonConsumptionDamageEffects runs what damage that is not an HP cost
+// does: every normal-hit or DOT damage source stops SLEEP and
+// IMMOBILE_UNTIL_ATTACKED, stands the character up when it has finished sitting
+// down (an ordinary sit or a fake-death lie-down) unless it is in shop mode,
+// and — for non-DOT damage only — has a 1-in-10 chance to break STUN. A
+// sit-down or lie-down still under way is left to finish. HP spent as a skill's
+// own resource cost, a toggle's upkeep tick among it (ReduceHPByToggleUpkeep),
+// never routes through here.
 func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 	live := c.liveLocked()
 	list := live.EffectList()
@@ -792,10 +828,11 @@ func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 }
 
 // SetHP sets current HP, clamped to [0, MaxHP]. It has no effect on a dead
-// character; Revive is the only way back to positive HP.
+// character; Revive is the only way back to positive HP. Like AddHP it
+// leaves the low-HP tutorial event to the caller's status report.
 func (c *Character) SetHP(value float64) {
 	maxHP := c.MaxHPValue()
-	defer c.SettleRegen() // after the unlock below
+	defer c.settleRegenTask() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
@@ -829,9 +866,10 @@ func (c *Character) SetCP(value float64) {
 	c.curCP = value
 }
 
-// CanBeHealed reports whether c may receive HP/MP restoration.
+// CanBeHealed reports whether c may receive HP/MP restoration. A
+// cursed-weapon holder never may.
 func (c *Character) CanBeHealed() bool {
-	return !c.Dead() && !c.Invul()
+	return !c.Dead() && !c.Invul() && !c.CursedWeaponEquipped()
 }
 
 // Invulnerable reports whether c ignores direct resource effects.
@@ -859,7 +897,7 @@ func (c *Character) HealInput(def modelskill.Definition) (formulas.HealInput, bo
 	if ClassMage(c.ClassID()) {
 		scaling = formulas.HealShotScalingMage
 	}
-	return creature.ResolveHealInput(def, c.HealProficiency(), c.MAtk(), scaling), true
+	return creature.ResolveHealInput(def, c.HealProficiency(), c.mAtk(c.ConditionActor(), nil), scaling), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
@@ -881,7 +919,7 @@ func (c *Character) BlowInput(caster creature.FormulaActor, def modelskill.Defin
 }
 
 func (c *Character) CounterSkillPhysical() float64 {
-	return c.CalcStat(stat.CounterSkillPhysical, 0)
+	return c.calcFor(stat.CounterSkillPhysical, 0, c.ConditionActor(), nil)
 }
 
 // CancelVulnerability returns c's CANCEL_VULN multiplier for the cancel and
@@ -903,7 +941,7 @@ func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillR
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  c.CalcStat(reflectStat, 0),
+		ReflectChance:  c.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
 	}
 }
 
@@ -911,11 +949,6 @@ func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillR
 // cast by caster against c.
 func (c *Character) ManaDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, c, c.MaxMPValue(), def)
-}
-
-// LethalRate returns c's lethal-strike rate multiplier.
-func (c *Character) LethalRate() float64 {
-	return c.calcStat(stat.LethalRate, 1)
 }
 
 // LethalInput resolves a lethal-strike roll against c.
@@ -933,7 +966,7 @@ func (c *Character) LethalInput(caster creature.FormulaActor, def modelskill.Def
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: attacker.Level(),
 		TargetLevel:   c.Level(),
-		LethalMul:     attacker.LethalRate(),
+		LethalMul:     attacker.Against(c.ConditionActor(), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 
@@ -941,7 +974,10 @@ func (c *Character) LethalInput(caster creature.FormulaActor, def modelskill.Def
 func (c *Character) ApplyLethalOutcome(outcome formulas.LethalOutcome, _ attackable.Combatant, _ modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
+		// This HP write reports no status, so its low-HP event comes at
+		// once, before the CP write.
 		c.SetHP(1)
+		c.lowHPNotice()
 		c.SetCP(1)
 	case formulas.LethalHalf:
 		c.SetCP(1)

@@ -1,0 +1,24 @@
+# Sorrowful Sound of Flute (Q363), level 14: Nanarin turns the character away. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q363_sorrowful_sound_of_flute_low_level.golden
+character Flute 14
+script quest.Q363_SorrowfulSoundOfFlute
+item 4318 4319 4320 4420
+page default/30956.htm
+page villagemaster/30595.htm
+page default/30959.htm
+page script/quest/Q363_SorrowfulSoundOfFlute/
+npc nanarin 30956 Folk 10 0 0
+npc opix 30595 VillageMasterDwarf 20 0 0
+npc barbado 30959 Folk 30 0 0
+
+action nanarin
+action nanarin
+  S ActionFailed
+  S NpcHtmlMessage obj=nanarin item=0 page=default/30956.htm
+  S ActionFailed
+bypass npc_{nanarin}_Quest
+  S NpcHtmlMessage obj=nanarin item=0 page=script/quest/Q363_SorrowfulSoundOfFlute/30956-03.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q363_SorrowfulSoundOfFlute -

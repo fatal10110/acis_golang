@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -56,7 +55,8 @@ func TestUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
 
 	drainUntilQuiet(t, c)
 	c.Send(encodeUseItem(shot, false))
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("second use while charged replied %x, want no reply at all", reply)
 	}
 }
@@ -115,7 +115,8 @@ func TestUseSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
 	assertExAutoSoulShot(t, c.Read(), 1463, false)
 	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageAutoUseOfItemCancelled, 1463)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "failed consume")
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("unexpected extra reply %x, want none (not-enough suppressed while auto-enabled)", reply)
 	}
 }
@@ -199,7 +200,8 @@ func TestAutoSoulShotIgnoresUnknownAndFishingShots(t *testing.T) {
 
 	for _, itemID := range []int32{999999, 6535} {
 		c.Send(encodeRequestAutoSoulShot(itemID, 1))
-		if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+		if queued := c.ReadQueued(); len(queued) != 0 {
+			reply := queued[0]
 			t.Fatalf("auto-soulshot for %d replied %x, want silence", itemID, reply)
 		}
 	}

@@ -25,15 +25,16 @@ func TestScriptCatalogRejectsDuplicates(t *testing.T) {
 	}
 }
 
-// TestScriptCatalogCompleteness reports every scripts.xml path that has no
-// Go script yet, and fails on a catalog entry scripts.xml does not list:
-// it would never be built.
+// TestScriptCatalogCompleteness fails on every scripts.xml path that has
+// no Go script, and on a catalog entry scripts.xml does not list: it would
+// never be built. A task the file lists only in a comment (commentedTasks)
+// is exempt.
 func TestScriptCatalogCompleteness(t *testing.T) {
 	list, err := gamexml.LoadScriptList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(nil))
+	catalog, err := scriptCatalog(scriptCatalogs(nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,22 +47,22 @@ func TestScriptCatalogCompleteness(t *testing.T) {
 		}
 	}
 	for path := range catalog {
-		if !listed[path] {
+		if !listed[path] && !slices.Contains(commentedTasks, path) {
 			t.Errorf("catalog entry %s is not listed in scripts.xml", path)
 		}
 	}
-	t.Logf("%d of %d listed scripts have no Go script yet", len(missing), len(list))
 	for _, path := range missing {
-		t.Logf("unported: %s", path)
+		t.Errorf("listed script %s has no Go script", path)
 	}
 }
 
 // manifestScript is what the reference manifest records for one script:
-// its kind, its class's own hooks, its bind lines and whether its entry
-// schedules it.
+// its kind, its class's own hooks, its player-level triggers, its bind
+// lines and whether its entry schedules it.
 type manifestScript struct {
 	kind      string
 	hooks     []string
+	on        []string
 	binds     []string
 	scheduled bool
 }
@@ -104,6 +105,8 @@ func readScriptManifest(t *testing.T) map[string]*manifestScript {
 			scripts[fields[1]] = cur
 		case strings.HasPrefix(line, "  kind "):
 			cur.kind = fields[1]
+		case strings.HasPrefix(line, "  on ") && cur != nil:
+			cur.on = append(cur.on, fields[1])
 		case strings.HasPrefix(line, "  bind "):
 			cur.binds = append(cur.binds, strings.TrimSpace(line))
 		case line == "  scheduled" && cur != nil:
@@ -129,7 +132,8 @@ func readScriptManifest(t *testing.T) map[string]*manifestScript {
 
 // manifestMismatches builds the registry from list and catalog with cfg
 // and returns every way a catalog script's dump differs from the reference
-// manifest: not registered, kind, own hooks, bind lines.
+// manifest: not registered, kind, own hooks, player-level triggers, bind
+// lines.
 func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Catalog, cfg script.Config) []string {
 	t.Helper()
 	want := readScriptManifest(t)
@@ -163,6 +167,8 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 			cur.kind = fields[1]
 		case strings.HasPrefix(line, "  hooks "):
 			cur.hooks = strings.Split(fields[1], ",")
+		case strings.HasPrefix(line, "  on "):
+			cur.on = append(cur.on, fields[1])
 		case strings.HasPrefix(line, "  bind "):
 			cur.binds = append(cur.binds, strings.TrimSpace(line))
 		case line == "  scheduled":
@@ -180,6 +186,9 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 			}
 			if !slices.Equal(g.hooks, w.hooks) {
 				out = append(out, path+": own hooks "+strings.Join(g.hooks, ",")+", reference "+strings.Join(w.hooks, ","))
+			}
+			if !slices.Equal(g.on, w.on) {
+				out = append(out, path+": on "+strings.Join(g.on, ",")+", reference "+strings.Join(w.on, ","))
 			}
 			if !slices.Equal(g.binds, w.binds) {
 				out = append(out, path+": binds "+strings.Join(g.binds, "; ")+", reference "+strings.Join(w.binds, "; "))
@@ -246,7 +255,7 @@ func TestManifestComparisonCatchesDifferences(t *testing.T) {
 	}
 	q001 := stand(script.Bindings{script.EventQuestStart: {30048}, script.EventTalked: {30006, 30033, 30048}})
 	folk := func(int32) (script.NPCKind, bool) { return script.KindFolk, true }
-	unraised := stand(script.Bindings{script.EventSeeItem: {30048}})
+	unraised := stand(script.Bindings{script.EventPartyAttacked: {30048}})
 	if got := manifestMismatches(t, list, unraised, script.Config{KindOf: folk, Log: zerolog.Nop()}); !slices.Equal(got, []string{"script quest.Q001_LettersOfLove refused"}) {
 		t.Fatalf("a refused script gave %q", got)
 	}
@@ -281,7 +290,11 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(crystals))
+	buffs, err := gamexml.LoadNewbieBuffs(filepath.Join(root, "newbieBuffs.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := scriptCatalog(scriptCatalogs(crystals, buffs))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +314,7 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := script.Config{KindOf: npcKindOf(npcs), Log: zerolog.Nop()}
+	cfg := script.Config{KindOf: npcKindOf(npcs), Log: zerolog.Nop(), HandleOps: handleOps()}
 	for _, m := range manifestMismatches(t, list, catalog, cfg) {
 		t.Error(m)
 	}

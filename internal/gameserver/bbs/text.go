@@ -2,34 +2,12 @@ package bbs
 
 import (
 	"strings"
-	"unicode/utf16"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Text lengths and cuts on the board count UTF-16 code units, the unit the
 // client and the stored limits use.
-
-// textLen is s's length in UTF-16 code units.
-func textLen(s string) int {
-	n := 0
-	for _, r := range s {
-		n += utf16.RuneLen(r)
-	}
-	return n
-}
-
-// cut returns the first n UTF-16 code units of s, or s when it is no
-// longer. A character that would straddle the cut is left out.
-func cut(s string, n int) string {
-	used := 0
-	for i, r := range s {
-		w := utf16.RuneLen(r)
-		if used+w > n {
-			return s[:i]
-		}
-		used += w
-	}
-	return s
-}
 
 // trimOr cuts s to max UTF-16 code units, or returns fallback for an empty
 // s.
@@ -37,14 +15,14 @@ func trimOr(s string, max int, fallback string) string {
 	if s == "" {
 		return fallback
 	}
-	return cut(s, max)
+	return commons.UTF16Cut(s, max)
 }
 
 // ellipsize cuts s longer than max UTF-16 code units to max-3 of them and
 // appends "...".
 func ellipsize(s string, max int) string {
-	if textLen(s) > max {
-		return cut(s, max-3) + "..."
+	if commons.UTF16Len(s) > max {
+		return commons.UTF16Cut(s, max-3) + "..."
 	}
 	return s
 }

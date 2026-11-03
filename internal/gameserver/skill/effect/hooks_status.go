@@ -71,7 +71,7 @@ func distrustStart(e *Effect) bool {
 	return true
 }
 
-// growStart ports EffectGrow.onStart(): rejects a target that isn't
+// growStart starts a Grow effect: rejects a target that isn't
 // Npc-shaped (a player target never grows), otherwise scales its collision
 // radius by growRadiusScale and refreshes its visible state.
 func growStart(e *Effect) bool {
@@ -84,7 +84,7 @@ func growStart(e *Effect) bool {
 	return true
 }
 
-// growExit ports EffectGrow.onExit(): restores the target's runtime
+// growExit ends a Grow effect: restores the target's runtime
 // collision-radius override to its template value.
 func growExit(e *Effect) {
 	target, ok := asNPC(e.Effected)
@@ -108,7 +108,7 @@ func recoveryStart(e *Effect) bool {
 	return true
 }
 
-// randomizeHateStart ports EffectRandomizeHate.onStart(): rejects a target
+// randomizeHateStart starts a RandomizeHate effect: rejects a target
 // that isn't an Attackable-shaped actor, otherwise delegates the swap to
 // its threat table.
 func randomizeHateStart(e *Effect) bool {

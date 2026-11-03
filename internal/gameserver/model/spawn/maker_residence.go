@@ -52,7 +52,7 @@ func (m *Maker) ResidenceParam() (id int, ok bool) {
 }
 
 // splitSpawnTime splits s at every bracket, keeping empty parts but the
-// trailing ones, as the reference's split on "[()]" does.
+// trailing ones, as a regular-expression split on "[()]" does.
 func splitSpawnTime(s string) []string {
 	var parts []string
 	start := 0

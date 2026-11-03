@@ -1,0 +1,26 @@
+# Little Wing's Big Adventure (Q421), a character with two flutes is turned away by Cronos. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q421_little_wings_big_adventure_two_flutes.golden
+character Wing 45
+hold 3500 1
+hold 3501 1
+script quest.Q421_LittleWingsBigAdventure
+item 3500 3501 3502 4325 4422 4423 4424
+page default/30610.htm
+page default/30747.htm
+page script/quest/Q421_LittleWingsBigAdventure/
+npc cronos 30610 Folk 10 0 0
+npc mimyu 30747 Folk -20 0 0
+npc wind 27185 Monster 30 0 0
+npc star 27186 Monster -40 0 0
+npc twilight 27187 Monster 50 0 0
+npc abyss 27188 Monster -60 0 0
+
+action cronos
+action cronos
+  S ActionFailed
+  S NpcHtmlMessage obj=cronos item=0 page=default/30610.htm
+  S ActionFailed
+bypass npc_{cronos}_Quest
+  S NpcHtmlMessage obj=cronos item=0 page=script/quest/Q421_LittleWingsBigAdventure/30610-02.htm
+  S ActionFailed
+  S ActionFailed

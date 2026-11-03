@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,7 +29,9 @@ import (
 // and forced to a single live instance: a database-tracked spawn ignores
 // its declared total and only ever has one instance.
 type slotInfo struct {
-	key   string
+	// key is the id the slot lives under: its own (serial), or the one
+	// a database-tracked entry declares every slot under.
+	key   task.SlotID
 	maker *spawn.Maker
 	// group is the run-time npcmaker the slot belongs to and spawnIdx its
 	// entry there; nil for a private's or a standalone spawn's slot.
@@ -42,10 +43,34 @@ type slotInfo struct {
 	// one of its spawn's NPCs, so the maker is not told it left.
 	spawning bool
 	first    bool
-	entry    spawn.Entry
-	dbName   string
-	masterID int32
-	liveID   int32
+	// orphan marks an npcmaker's slot its spawn no longer lists: its NPC
+	// came back through a respawn armed after the spawn let it go (a
+	// DeleteAll, or a spawn that does not respawn). Its group counts it
+	// alive, but no spawn count, list or delete reaches it, and its
+	// leaving runs no maker hook. It lives under a key of its own (see
+	// orphanKey), so the spawn can place an NPC of its own meanwhile.
+	orphan bool
+	// epoch is the DespawnAll run the slot was declared in.
+	epoch int
+	// serial is the slot's own id. It tells an npcmaker's slot apart from
+	// any other declared under the same key: a database-tracked entry
+	// declares each of its slots under its one key. It is the key the slot
+	// lives under once its spawn lets it go (see orphanKey).
+	serial task.SlotID
+	// seq numbers the slot among its entry's for an npcmaker's slot, among
+	// the standalone spawns and privates for any other: with the maker, the
+	// entry and the RespawnAll run it makes the slot's name (slotName).
+	seq int32
+	// entry is the entry the slot was declared under: its maker's own, or
+	// one of the slot's for a standalone spawn or a private. It is never
+	// written through: a change replaces it.
+	entry  *spawn.Entry
+	dbName string
+	// master is the master a private's slot spawns its NPC for, as the
+	// life it had when the slot was declared (npc.Current reads it now);
+	// nil for any other slot.
+	master npc.PartyMember
+	liveID int32
 	// tmpl is the template resolved when the slot was declared. Every
 	// respawn of the slot builds from it, so a //reload npc swapping the
 	// template table leaves the slot's existing spawn unchanged: only slots
@@ -54,8 +79,10 @@ type slotInfo struct {
 	tmpl *npc.Template
 	// fixed marks a standalone spawn placed at a point of its own, not
 	// declared under a maker: at and heading are that point. It never
-	// respawns.
+	// respawns. placed marks a script private created at a point of its
+	// own: at and heading are that point, where it respawns too.
 	fixed   bool
+	placed  bool
 	at      location.Location
 	heading int
 	// scripted marks a private a script created: no respawn is armed when
@@ -64,6 +91,12 @@ type slotInfo struct {
 	// summoner is the creature the slot's NPC was spawned for; nil for
 	// none.
 	summoner attackable.Combatant
+	// castleID is the castle the slot's NPC belongs to as it spawns; 0
+	// for none.
+	castleID int
+	// clanID is the clan the slot's NPC belongs to as it spawns; 0 for
+	// none.
+	clanID int32
 	// memory is what the slot hands every NPC it spawns: the entry's own
 	// AI parameters and the script memory carried from one life to the
 	// next.
@@ -74,11 +107,50 @@ type slotInfo struct {
 type slotMemory struct {
 	params  npc.AIParams
 	scratch *npc.Scratch
+	// row is the persisted row of a database-tracked slot, nil for any
+	// other.
+	row *dbRow
 }
 
-func newSlotMemory(entry spawn.Entry) *slotMemory {
-	return &slotMemory{params: npc.AIParams(entry.AIParams), scratch: npc.NewScratch()}
+func newSlotMemory(entry *spawn.Entry, row *dbRow) *slotMemory {
+	return &slotMemory{params: npc.AIParams(entry.AIParams), scratch: npc.NewScratch(), row: row}
 }
+
+// Row returns the slot's persisted row; nil when it keeps none.
+func (m *slotMemory) Row() npc.SpawnRow {
+	if m.row == nil {
+		return nil
+	}
+	return m.row
+}
+
+// dbRow is the database-tracked spawn of an npcmaker entry as its NPCs see
+// it (npc.SpawnRow): the spawn_data row of the spawn list the entry was
+// declared from, and whether the entry's NPC was last placed from a live
+// row. Every slot the entry declares shares it, so the flag outlives a
+// slot dropped by the group's DeleteAll.
+type dbRow struct {
+	rows *Spawns
+	name string
+	// slot is the key every slot of the row's entry is declared under.
+	slot task.SlotID
+	// loaded is set when a placement restores a live row, cleared when a
+	// boot finds the row dead or the entry's maker clears it; a placement
+	// from a fresh or expired row leaves it as it was.
+	loaded atomic.Bool
+}
+
+// DBValue returns the row's script value.
+func (r *dbRow) DBValue() int {
+	v, _ := r.rows.DBValue(r.name)
+	return v
+}
+
+// SetDBValue stores the row's script value.
+func (r *dbRow) SetDBValue(v int) { r.rows.SetDBValue(r.name, v) }
+
+// DBLoaded reports whether the entry's NPC was last placed from a live row.
+func (r *dbRow) DBLoaded() bool { return r.loaded.Load() }
 
 // AIParams returns the spawn entry's <ai> values.
 func (m *slotMemory) AIParams() npc.AIParams { return m.params }
@@ -86,23 +158,14 @@ func (m *slotMemory) AIParams() npc.AIParams { return m.params }
 // Scratch returns the slot's script memory.
 func (m *slotMemory) Scratch() *npc.Scratch { return m.scratch }
 
-// KillRewardConfig carries live reward settings loaded at game-server boot.
+// KillRewardConfig is what a kill's rewards read besides the NPC: the
+// settings in force and the services the rewards go through.
 type KillRewardConfig struct {
-	Rates         item.Rates
-	AutoLoot      bool
-	AutoLootRaid  bool
-	AutoLootHerbs bool
-	// MultipleItemDrop drops a non-stackable item rolled with a count
-	// above one as that many ground items; false drops just one.
-	MultipleItemDrop  bool
-	DeepBlueDropRules bool
-	PlayerLevels      *player.LevelTable
-	PartyRange        int
-	// RateXP and RateSP scale every kill's exp and sp reward before it is
-	// split between the attackers.
-	RateXP, RateSP float64
-	// PartyXP are the rules a party shares a kill's exp and sp by.
-	PartyXP player.PartyXPRules
+	// Settings holds the reward settings in force; nil rewards under the
+	// zero settings.
+	Settings *KillRewardBook
+	// PlayerLevels is the exp table a reward levels a player up by.
+	PlayerLevels *player.LevelTable
 	// Parties resolves a rewarded player's party; nil rewards every
 	// attacker alone.
 	Parties RewardParties
@@ -151,18 +214,22 @@ type RaidKillRecorder interface {
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
 type Npcs struct {
-	effects        effect.Env
+	effects effect.Env
+	// effectOpts build every hostile's effect list over effects; one
+	// slice all of them share.
+	effectOpts     []effect.Option
 	templates      *npc.Table
-	maxBuffsAmount int
 	randomWalkRate int
 	// maxGeoPathFailCount is each hostile's pathfinding-fail overflow
 	// threshold; zero keeps the default.
 	maxGeoPathFailCount int
-	// raidMultipliers scale every raid-related hostile's base defences and
-	// regeneration.
-	raidMultipliers npc.RaidMultipliers
-	// aiConfig holds every hostile's target-selection switches.
-	aiConfig npc.AIConfig
+	// settings holds every hostile's target-selection switches and the
+	// raid multipliers scaling every raid-related one's base defences and
+	// regeneration: each hostile spawned reads this one holder at every use.
+	settings *npc.HostileSettings
+	// limits holds the base buff-slot count and the drift range every NPC
+	// spawned reads at each use; SetLimits replaces them whole.
+	limits *npc.LimitBook
 	// events is the SpawnEvents list: the makers of the events it names
 	// start after the on-start makers, and the spawn condition of a maker
 	// with an event reads it.
@@ -210,18 +277,33 @@ type Npcs struct {
 	gate sync.RWMutex
 
 	mu   sync.Mutex
-	slot map[string]slotInfo
-	live map[int32]string
-	// gen counts the RespawnAll runs; it suffixes the slot keys after the
-	// first, so a respawn armed for a slot of an earlier run never fires
-	// on the slot of the same maker entry spawned anew.
+	slot map[task.SlotID]slotInfo
+	// privates indexes the keys of the private slots in slot by their
+	// master's script memory, which every life of the master shares, so a
+	// master's decay visits only its own privates' slots. Every slot
+	// change goes through addSlotLocked and dropSlotLocked to keep it in
+	// step.
+	privates map[*npc.Scratch]map[task.SlotID]struct{}
+	live     map[int32]task.SlotID
+	// gen counts the RespawnAll runs; it suffixes the slot names after the
+	// first. Every slot declared has an id of its own, so a respawn armed
+	// for a slot of an earlier run never fires on the slot of the same
+	// maker entry spawned anew.
 	gen int
+	// despawns counts the DespawnAll runs: a slot declared before the
+	// last one is gone for good.
+	despawns int
+	// slotIDs counts the slot ids handed out (newSlotID).
+	slotIDs atomic.Uint32
 	// groups are the run-time npcmakers of the spawn list in use, in list
 	// order.
 	groups []*makerGroup
 	// sevenSigns is the Seven Signs state the ssq_* groups follow; nil
 	// until StartSevenSigns.
 	sevenSigns SevenSigns
+	// spawnTimes is the world state the makers with a spawn time follow;
+	// nil until SetSpawnTimes.
+	spawnTimes SpawnTimes
 
 	// liveCount is guarded by mu, not atomic: every update pairs it with a
 	// live map write/delete that must stay consistent with the count.
@@ -234,19 +316,68 @@ type Npcs struct {
 	restoredDeadCount     atomic.Int64
 	skippedNonCombatCount atomic.Int64
 	folkCount             atomic.Int64
-	// fixedSeq numbers the standalone spawns SpawnFixed places.
-	fixedSeq atomic.Int64
+	// fixedSeq numbers the standalone spawns SpawnFixed places and the
+	// privates scripts create.
+	fixedSeq atomic.Int32
+	// noSpawns is SetNoSpawns' switch.
+	noSpawns atomic.Bool
 
 	// scripts raises each live hostile NPC's script hooks; nil raises
 	// none.
 	scripts npc.ScriptHooks
+	// pickUps takes the ground items live NPCs pick up out of the world;
+	// nil leaves them on the ground. Set once, before any spawn.
+	pickUps npc.GroundTaker
+	// guarded resolves the siege a siege guard defends, and the one a
+	// control tower stands for; nil gives none. Set once, before any spawn.
+	guarded func(*npc.Instance) npc.GuardedSiege
+	// owners resolves the clan owning the residence an NPC serves; nil
+	// gives none. Set once, before any spawn.
+	owners func(*npc.Instance) int32
+	// regen answers the base regeneration multipliers of every NPC; nil
+	// gives the shipped ones. Set once, before any spawn.
+	regen npc.RegenSettings
+}
+
+// SetGroundTaker makes t take the ground items the NPCs spawned from now on
+// pick up out of the world. Call it before SpawnOnStart.
+func (n *Npcs) SetGroundTaker(t npc.GroundTaker) {
+	n.pickUps = t
+	n.folk.Ground = t
+}
+
+// SetLimits puts l in force for every NPC of the population, the ones in
+// the world and the ones still to spawn, in place of the limits before.
+func (n *Npcs) SetLimits(l npc.Limits) {
+	n.limits.Set(l)
+}
+
+// SetRegenSettings makes every NPC spawned from now on read its base
+// regeneration multipliers from s. Call it before SpawnOnStart.
+func (n *Npcs) SetRegenSettings(s npc.RegenSettings) {
+	n.regen = s
+	n.folk.Regen = s
+}
+
+// SetGuardedSieges makes resolve give each siege guard spawned from now on
+// the siege it defends, and each control tower the siege of its castle,
+// nil for none. Call it before SpawnOnStart.
+func (n *Npcs) SetGuardedSieges(resolve func(*npc.Instance) npc.GuardedSiege) {
+	n.guarded = resolve
+}
+
+// SetResidenceOwners makes owner give each NPC spawned from now on
+// the clan owning the residence it serves, read at each use. Call it before
+// SpawnOnStart.
+func (n *Npcs) SetResidenceOwners(owner func(*npc.Instance) int32) {
+	n.owners = owner
 }
 
 // NewNpcs builds a population that raises no script hook and spawns it at
 // once, as SpawnOnStart does: every "on start" maker's qualifying entries,
 // respecting persisted dead/alive data for database-tracked entries.
 func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.Env, queues Queues, makers MakerBehaviors, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	n, err := newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), DefaultSpawnEvents(), effects, queues, makers, nil, zoneIndexes...)
+	n, err := newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, npc.DefaultLimits(), 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), DefaultSpawnEvents(), effects, queues, makers, nil, zoneIndexes...)
 	if err != nil {
 		return nil, err
 	}
@@ -259,17 +390,17 @@ type Queues interface {
 	NewQueue(id string) *sim.Queue
 }
 
-// NewNpcsWithMaxBuffsAmount builds live NPCs with the configured buff-slot
-// base, RandomWalkRate and raid base multipliers, each running its work on a
+// NewNpcsWithMaxBuffsAmount builds live NPCs with the limits (buff-slot
+// base and drift range), RandomWalkRate and raid base multipliers, each running its work on a
 // queue from queues. newFolkSink builds the sink a civilian NPC shows its
 // movement and status through. events is the SpawnEvents list. scripts
 // raises the script hooks of every live NPC. Nothing spawns until
 // SpawnOnStart: the caller wires what the hooks reach first.
-func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, scripts npc.ScriptHooks, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, aiConfig, events, effects, queues, makers, scripts, zoneIndexes...)
+func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, limits npc.Limits, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, scripts npc.ScriptHooks, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, limits, randomWalkRate, maxGeoPathFailCount, raidMultipliers, aiConfig, events, effects, queues, makers, scripts, zoneIndexes...)
 }
 
-func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, scripts npc.ScriptHooks, zoneIndexes ...*zone.Index) (*Npcs, error) {
+func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, limits npc.Limits, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, scripts npc.ScriptHooks, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -334,11 +465,11 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	n := &Npcs{
 		templates:           templates,
 		effects:             effects,
-		maxBuffsAmount:      maxBuffsAmount,
+		effectOpts:          []effect.Option{effect.WithEnv(effects)},
 		randomWalkRate:      randomWalkRate,
 		maxGeoPathFailCount: maxGeoPathFailCount,
-		raidMultipliers:     raidMultipliers,
-		aiConfig:            aiConfig,
+		settings:            npc.NewHostileSettings(aiConfig, raidMultipliers),
+		limits:              npc.NewLimitBook(limits),
 		events:              newSpawnEvents(events),
 		geo:                 geo,
 		state:               state,
@@ -362,8 +493,9 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		makerQueue:          queues.NewQueue("makers"),
 		castDefs:            castDefs,
 		castEffects:         castEffects,
-		slot:                make(map[string]slotInfo),
-		live:                make(map[int32]string),
+		slot:                make(map[task.SlotID]slotInfo),
+		privates:            make(map[*npc.Scratch]map[task.SlotID]struct{}),
+		live:                make(map[int32]task.SlotID),
 	}
 	n.folk = FolkSpawner{
 		State:               state,
@@ -379,11 +511,11 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		Items:               items,
 		Decay:               decay,
 		Effects:             effects,
-		MaxBuffsAmount:      maxBuffsAmount,
 		MaxGeoPathFailCount: maxGeoPathFailCount,
-		Log:                 log,
+		Log:                 &n.log,
 		Scripts:             scripts,
 		Remover:             n,
+		SeeRange:            aiConfig.SeeRange,
 	}
 	return n, nil
 }
@@ -395,15 +527,18 @@ func (n *Npcs) SpawnOnStart() {
 	n.spawnOnStart(n.currentSpawns(), 0)
 }
 
-// spawnOnStart builds the npcmakers of spawns, their slots keyed for
-// RespawnAll run gen, and starts them as SpawnManager.spawn does: every
-// on-start maker in list order, then the makers of each listed spawn
-// event, then the Seven Signs groups once that state is known.
+// spawnOnStart builds the npcmakers of spawns, their slots keyed for RespawnAll
+// run gen, and starts them: every on-start maker in list order, then the makers
+// of each listed spawn event, then the Seven Signs groups once that state is
+// known. With SetNoSpawns it only builds them.
 func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	groups := n.newGroups(spawns, gen)
+	if n.noSpawns.Load() {
+		return
+	}
 	for _, g := range groups {
 		if g.def.OnStart() {
-			g.behavior.Start(g)
+			g.behavior.Start(g.in(&hookScope{}))
 		}
 	}
 	for _, event := range n.events {
@@ -412,13 +547,9 @@ func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	n.sevenSignsPass()
 }
 
-// slotKey is the key of the slot base names in RespawnAll run gen: base
-// itself at boot.
-func slotKey(base string, gen int) string {
-	if gen == 0 {
-		return base
-	}
-	return base + "@" + strconv.Itoa(gen)
+// newSlotID returns a slot id no slot had before.
+func (n *Npcs) newSlotID() task.SlotID {
+	return task.SlotID(n.slotIDs.Add(1))
 }
 
 // currentSpawns returns the spawn list in use.

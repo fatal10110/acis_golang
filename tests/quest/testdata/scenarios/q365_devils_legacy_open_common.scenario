@@ -1,0 +1,65 @@
+# Devil's Legacy (Q365), level 39 with three chests and 1800 adena: Collob opens them for three of the common finds. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q365_devils_legacy_open_common.golden
+character Raider 39
+quest Q365_DevilsLegacy <cond>=1 <state>=STARTED
+hold 5873 3
+hold 57 1800
+random 0 0 79 99 50 3
+script quest.Q365_DevilsLegacy
+item 57 5873 951 952 955 956 1868 1872 1879 1880 1881 1882 1884
+page warehouse/30095.htm
+page warehouse/30092.htm
+page script/quest/Q365_DevilsLegacy/
+npc randolf 30095 WarehouseKeeper 10 0 0
+npc collob 30092 WarehouseKeeper -10 0 0
+npc zombie 20836 Monster 40 0 0
+npc captain 21629 Monster 50 0 0
+
+action collob
+  items 57=1800 5873=3
+action collob
+  S ActionFailed
+  S NpcHtmlMessage obj=collob item=0 page=warehouse/30092.htm
+  S ActionFailed
+bypass npc_{collob}_Quest
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q365_DevilsLegacy/30092-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q365_DevilsLegacy 30092-05.htm
+  S SystemMessage id=302 3:5873
+  S SystemMessage id=672 1:600
+  S SystemMessage id=54 3:955
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q365_DevilsLegacy/30092-05.htm
+  S ActionFailed
+  items 57=1200 5873=2 955=1
+action collob
+  S ActionFailed
+  S NpcHtmlMessage obj=collob item=0 page=warehouse/30092.htm
+  S ActionFailed
+bypass npc_{collob}_Quest
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q365_DevilsLegacy/30092-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q365_DevilsLegacy 30092-05.htm
+  S SystemMessage id=302 3:5873
+  S SystemMessage id=672 1:600
+  S SystemMessage id=54 3:1872
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q365_DevilsLegacy/30092-05.htm
+  S ActionFailed
+  items 57=600 5873=1 955=1 1872=1
+action collob
+  S ActionFailed
+  S NpcHtmlMessage obj=collob item=0 page=warehouse/30092.htm
+  S ActionFailed
+bypass npc_{collob}_Quest
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q365_DevilsLegacy/30092-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q365_DevilsLegacy 30092-05.htm
+  S SystemMessage id=302 3:5873
+  S SystemMessage id=672 1:600
+  S SystemMessage id=54 3:956
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q365_DevilsLegacy/30092-05.htm
+  S ActionFailed
+  items 57=0 5873=0 955=1 956=1 1872=1

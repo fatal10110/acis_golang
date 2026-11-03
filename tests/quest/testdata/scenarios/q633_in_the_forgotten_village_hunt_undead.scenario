@@ -1,0 +1,28 @@
+# In the Forgotten Village (Q633): a zombie drops a liver only for a draw under its own chance, and no bone.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q633_in_the_forgotten_village_hunt_undead.golden
+character Hero 65
+quest Q633_InTheForgottenVillage <cond>=1 <state>=STARTED
+random 0 0 0 411000 0 0
+script quest.Q633_InTheForgottenVillage
+item 7544 7545 57
+page default/31388.htm
+page script/quest/Q633_InTheForgottenVillage/
+npc mina 31388 Folk 10 0 0
+npc m1 21553 Monster 40 0 0
+npc m2 21601 Monster 50 0 0
+npc m3 21596 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7545=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 7545=1
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7545=2

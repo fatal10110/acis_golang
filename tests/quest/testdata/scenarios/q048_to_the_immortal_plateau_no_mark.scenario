@@ -1,0 +1,23 @@
+# To the Immortal Plateau (Q048), refused: a level 3 orc fighter without a mark of traveler gets Galladucci's
+# page with no offer, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q048_to_the_immortal_plateau_no_mark.golden
+character Traveler 3
+class 44
+script quest.Q048_ToTheImmortalPlateau
+item 7563 7564 7565 7566 7567 7568 7570 7557
+page merchant/30097.htm
+page script/quest/Q048_ToTheImmortalPlateau/
+npc galladucci 30097 Merchant 10 0 0
+
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q048_ToTheImmortalPlateau/30097-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q048_ToTheImmortalPlateau CREATED
+  rows Q048_ToTheImmortalPlateau -

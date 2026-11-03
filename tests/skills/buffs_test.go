@@ -172,11 +172,7 @@ func denyCasterDamage(t *testing.T, srv *gameservertest.Server, objID int32) {
 
 func drainAssertingNoAttackFailed(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
@@ -184,7 +180,6 @@ func drainAssertingNoAttackFailed(t *testing.T, c *testsupport.ScriptedClient) {
 			t.Fatal("got AttackFailed; invul/permission refuse is silent")
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
 }
 
 // TestStunBlocksCastingAndMovement lands a stun through a self-cast skill
@@ -219,6 +214,7 @@ func TestStunBlocksCastingAndMovement(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "stun cast ack")
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 20, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "stun launch")
+	srv.AdvanceUntil(t, "stun cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(21, false, false))
@@ -246,28 +242,23 @@ func buffSlotIDs(entries []abnormalStatusEntry) []int32 {
 	return ids
 }
 
-func castSlotBuff(t *testing.T, c *testsupport.ScriptedClient, objID, skillID int32) []abnormalStatusEntry {
+// castSlotBuff casts skillID on self, lets the cast run to its end so the
+// next cast is not refused as still casting, and returns the last
+// AbnormalStatusUpdate entries the caster was sent.
+func castSlotBuff(t *testing.T, srv *gameservertest.Server, objID, skillID int32) []abnormalStatusEntry {
 	t.Helper()
+	c := srv.Client
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, skillID, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
-	return drainCollectingAbnormal(t, c)
-}
-
-func drainCollectingAbnormal(t *testing.T, c *testsupport.ScriptedClient) []abnormalStatusEntry {
-	t.Helper()
+	srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	var last []abnormalStatusEntry
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return last
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeAbnormalStatusUpdate {
 			last = readAbnormalStatusUpdateEntriesFromFrame(t, frame)
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
 	return last
 }
 
@@ -307,13 +298,13 @@ func TestBuffSlotCapUsesMaxBuffsAmount(t *testing.T) {
 		t.Fatalf("MaxBuffCount() = %d, want 2", got)
 	}
 
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 101)); !slices.Equal(icons, []int32{101}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 101)); !slices.Equal(icons, []int32{101}) {
 		t.Fatalf("icons after first buff = %v, want [101]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 102)); !slices.Equal(icons, []int32{101, 102}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 102)); !slices.Equal(icons, []int32{101, 102}) {
 		t.Fatalf("icons after second buff = %v, want [101 102]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 103)); !slices.Equal(icons, []int32{102, 103}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 103)); !slices.Equal(icons, []int32{102, 103}) {
 		t.Fatalf("icons after third buff at cap 2 = %v, want oldest evicted [102 103]", icons)
 	}
 }
@@ -347,16 +338,16 @@ func TestDivineInspirationAddsBuffSlots(t *testing.T) {
 		t.Fatalf("MaxBuffCount() with Divine Inspiration 1 = %d, want 3", got)
 	}
 
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 101)); !slices.Equal(icons, []int32{101}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 101)); !slices.Equal(icons, []int32{101}) {
 		t.Fatalf("icons after first buff = %v, want [101]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 102)); !slices.Equal(icons, []int32{101, 102}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 102)); !slices.Equal(icons, []int32{101, 102}) {
 		t.Fatalf("icons after second buff = %v, want [101 102]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 103)); !slices.Equal(icons, []int32{101, 102, 103}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 103)); !slices.Equal(icons, []int32{101, 102, 103}) {
 		t.Fatalf("icons after third buff with extra slot = %v, want [101 102 103]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 104)); !slices.Equal(icons, []int32{102, 103, 104}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 104)); !slices.Equal(icons, []int32{102, 103, 104}) {
 		t.Fatalf("icons after fourth buff at cap 3 = %v, want oldest evicted [102 103 104]", icons)
 	}
 }
@@ -403,10 +394,10 @@ func TestStackedStrongerBuffCancelsLesserByDefault(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 202, 1)
 	startInWorld(t, c)
 
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 201)); !slices.Equal(icons, []int32{201}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 201)); !slices.Equal(icons, []int32{201}) {
 		t.Fatalf("icons after weaker buff = %v, want [201]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 202)); !slices.Equal(icons, []int32{202}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 202)); !slices.Equal(icons, []int32{202}) {
 		t.Fatalf("icons after stronger stacked buff = %v, want lesser canceled [202]", icons)
 	}
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{202}) {
@@ -432,10 +423,10 @@ func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 202, 1)
 	startInWorld(t, c)
 
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 201)); !slices.Equal(icons, []int32{201}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 201)); !slices.Equal(icons, []int32{201}) {
 		t.Fatalf("icons after weaker buff = %v, want [201]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 202)); !slices.Equal(icons, []int32{202}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 202)); !slices.Equal(icons, []int32{202}) {
 		t.Fatalf("icons after stronger stacked buff = %v, want only active [202]", icons)
 	}
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 202}) {
@@ -476,10 +467,10 @@ func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 301, 1)
 	startInWorld(t, c)
 
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 201)); !slices.Equal(icons, []int32{201}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 201)); !slices.Equal(icons, []int32{201}) {
 		t.Fatalf("icons after buff = %v, want [201]", icons)
 	}
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 301)); !slices.Equal(icons, []int32{301}) {
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 301)); !slices.Equal(icons, []int32{301}) {
 		t.Fatalf("icons after same-stack debuff = %v, want only active [301]", icons)
 	}
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 301}) {
@@ -525,8 +516,8 @@ func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 302, 1)
 	startInWorld(t, c)
 
-	castSlotBuff(t, c, objID, 203)
-	castSlotBuff(t, c, objID, 302)
+	castSlotBuff(t, srv, objID, 203)
+	castSlotBuff(t, srv, objID, 302)
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{203, 302}) {
 		t.Fatalf("held effects after same-stack debuff = %v, want buff victim still held [203 302]", ids)
 	}
@@ -574,9 +565,9 @@ func TestMixedPolarityHeldVictimCountsForDoesStack(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 307, 1)
 	startInWorld(t, c)
 
-	castSlotBuff(t, c, objID, 304)
-	castSlotBuff(t, c, objID, 305)
-	castSlotBuff(t, c, objID, 306)
+	castSlotBuff(t, srv, objID, 304)
+	castSlotBuff(t, srv, objID, 305)
+	castSlotBuff(t, srv, objID, 306)
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{304, 305, 306}) {
 		t.Fatalf("held effects at cap = %v, want [304 305 306]", ids)
 	}
@@ -584,7 +575,7 @@ func TestMixedPolarityHeldVictimCountsForDoesStack(t *testing.T) {
 	// 307 is weaker than the active blocker (306) in the same stack, so
 	// cancel-lesser cancels 307 itself. doesStack must see the held 305 and
 	// skip cap eviction — 304 (unrelated buff-slot buff) must survive.
-	castSlotBuff(t, c, objID, 307)
+	castSlotBuff(t, srv, objID, 307)
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{304, 305, 306}) {
 		t.Fatalf("held effects after weaker same-stack cast = %v, want unrelated buff kept [304 305 306]", ids)
 	}
@@ -619,8 +610,8 @@ func TestMultiTemplateSkillAtCapUsesFirstTemplateStackType(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 403, 1)
 	startInWorld(t, c)
 
-	castSlotBuff(t, c, objID, 401)
-	castSlotBuff(t, c, objID, 402)
+	castSlotBuff(t, srv, objID, 401)
+	castSlotBuff(t, srv, objID, 402)
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{401, 402}) {
 		t.Fatalf("held effects at cap = %v, want [401 402]", ids)
 	}
@@ -628,7 +619,7 @@ func TestMultiTemplateSkillAtCapUsesFirstTemplateStackType(t *testing.T) {
 	// The hero_buff effect cancels 402 through its stack group; the second
 	// effect's own stack type is new, but the skill's first template says
 	// hero_buff, which is now held, so 401 must survive the cap check.
-	castSlotBuff(t, c, objID, 403)
+	castSlotBuff(t, srv, objID, 403)
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{401, 403, 403}) {
 		t.Fatalf("held effects after multi-template cast at cap = %v, want unrelated buff kept [401 403 403]", ids)
 	}
@@ -654,8 +645,10 @@ func TestHeldStackedEffectAnswersSkillIDLookup(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 202, 3)
 	startInWorld(t, c)
 
-	castSlotBuff(t, c, objID, 201)
+	castSlotBuff(t, srv, objID, 201)
 	c.Send(encodeRequestMagicSkillUse(202, false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "stronger cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 202}) {
 		t.Fatalf("held effects with cancel-lesser off = %v, want queued lesser [201 202]", ids)

@@ -1,0 +1,36 @@
+# In Search of Fragments of Dimension (Q634): a monster drops fragments only for a draw under 900000, the scenario's monsters have no level, so one each.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q634_in_search_of_fragments_of_dimension_hunt.golden
+character Hero 20
+quest Q634_InSearchOfFragmentsOfDimension <cond>=1 <state>=STARTED
+random 0 0 0 900000 0 0 0 0
+script quest.Q634_InSearchOfFragmentsOfDimension
+item 7079
+page default/31494.htm
+page default/31507.htm
+page script/quest/Q634_InSearchOfFragmentsOfDimension/
+npc gate1 31494 Folk 10 0 0
+npc gate14 31507 Folk 20 0 0
+npc m1 21208 Monster 40 0 0
+npc m2 21255 Monster 50 0 0
+npc m3 21255 Monster 60 0 0
+npc m4 21233 Monster 70 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7079
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7079=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 7079=1
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7079
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7079=2
+kill m4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7079
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7079=3

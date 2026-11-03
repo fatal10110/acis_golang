@@ -1,0 +1,81 @@
+# Saga of the Hierophant (Q086) from cond 18: the sixth tablet takes the sixth amulet;
+# Hollint ends the saga at level 76: adena, the Book of Giants and experience, the quest
+# completed, the Prophet made a Hierophant (the class change's own animation and message,
+# then the saga's animation on the player and on Hollint); after a relog Hollint only says the
+# quest is done. Expectations are the reference trace's (the relog's rows and state
+# derived from ThirdClassQuest.java and Q086_SagaOfTheHierophant.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q086_saga_of_the_hierophant_finish.golden
+character Prophet 76
+class 17
+quest Q086_SagaOfTheHierophant <state>=STARTED <cond>=18
+script quest.Q086_SagaOfTheHierophant
+item 7089 7439 6622
+page villagemaster/30191.htm
+page default/31659.htm
+page script/quest/Q086_SagaOfTheHierophant/
+npc hollint 30191 VillageMasterPriest 10 0 0
+npc tablet6 31659 Folk 30 0 0
+
+action tablet6
+action tablet6
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet6 item=0 page=default/31659.htm
+  S ActionFailed
+bypass npc_{tablet6}_Quest
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q086_SagaOfTheHierophant/10-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q086_SagaOfTheHierophant 10-2
+  S QuestList 86:0x8007ffff
+  S ExShowQuestMark quest=86
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S MagicSkillUse caster=player target=player skill=4546-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=tablet6 target=tablet6 skill=4546-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q086_SagaOfTheHierophant/10-06.htm
+  S ActionFailed
+  Q upsert Q086_SagaOfTheHierophant | <cond> | 19
+action tablet6
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet6 item=0 page=default/31659.htm
+  S ActionFailed
+bypass npc_{tablet6}_Quest
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q086_SagaOfTheHierophant/10-07.htm
+  S ActionFailed
+  S ActionFailed
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q086_SagaOfTheHierophant/0-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q086_SagaOfTheHierophant 0-2
+  S SystemMessage id=52 6:5000000
+  S SystemMessage id=54 3:6622
+  S SystemMessage id=45 1:2299404
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 86:0x00000000
+  S MagicSkillUse caster=player target=player skill=5103-1 hit=1000 reuse=0 success=0
+  S SystemMessage id=1606
+  S MagicSkillUse caster=player target=player skill=4339-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=hollint target=hollint skill=4339-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q086_SagaOfTheHierophant/0-07.htm
+  S ActionFailed
+  Q upsert Q086_SagaOfTheHierophant | <state> | COMPLETED
+  Q delete-except-state Q086_SagaOfTheHierophant
+  items 6622=1
+  state Q086_SagaOfTheHierophant COMPLETED
+relog
+  state Q086_SagaOfTheHierophant COMPLETED
+  rows Q086_SagaOfTheHierophant <state>=COMPLETED
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

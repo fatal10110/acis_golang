@@ -1,0 +1,13 @@
+# AzitWateringTreasureBox (35595) hit by the character's servitor (a siege golem): a servitor holds
+# no weapon, so its blows count as barehanded and take the box's hit points through its script: of
+# its 440, 22 and 417 leave 1, and the hit of 1 that would take the last kills it.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.AzitWateringTreasureBox
+npc box 35595 Monster 40 0 0
+summon golem 14768
+
+hit box 22 by golem
+hit box 417 by golem
+hit box 1 by golem
+  S SystemMessage id=95 1:0 1:0

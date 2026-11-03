@@ -12,6 +12,21 @@ type SpawnSlot interface {
 	// Scratch returns the script memory of the slot's NPC. It is the same
 	// value for every NPC the slot spawns.
 	Scratch() *Scratch
+	// Row returns the persisted row of a database-tracked spawn; nil for
+	// a spawn with none.
+	Row() SpawnRow
+}
+
+// SpawnRow is the spawn_data row of a database-tracked spawn, as its NPC's
+// scripts see it.
+type SpawnRow interface {
+	// DBValue returns the script value the row keeps; SetDBValue stores
+	// one, saved with the row.
+	DBValue() int
+	SetDBValue(v int)
+	// DBLoaded reports whether the spawn's NPC was placed from a live row:
+	// its saved HP, MP and position.
+	DBLoaded() bool
 }
 
 // spawnBinding is what a live NPC keeps of its spawn slot. It is set
@@ -22,23 +37,31 @@ type spawnBinding struct {
 	template *Template
 	spawn    AIParams
 	scratch  *Scratch
+	row      SpawnRow
 }
 
-// newSpawnBinding binds an NPC of tmpl to no spawn: no spawn parameters
-// and a script memory of its own.
-func newSpawnBinding(tmpl *Template) spawnBinding {
-	return spawnBinding{template: tmpl, scratch: NewScratch()}
+// newSpawnBinding binds an NPC of inst to the slot placing it: the slot's
+// spawn parameters, row and script memory. With no slot, or one with no
+// script memory, the NPC gets a script memory of its own here, before it can
+// be published.
+func newSpawnBinding(inst *Instance) spawnBinding {
+	b := spawnBinding{template: inst.Template}
+	if slot := inst.Slot; slot != nil {
+		b.spawn = slot.AIParams()
+		b.row = slot.Row()
+		b.scratch = slot.Scratch()
+	}
+	if b.scratch == nil {
+		b.scratch = NewScratch()
+	}
+	return b
 }
 
-// bindSpawn binds the NPC to slot; a nil slot keeps the current binding.
-func (b *spawnBinding) bindSpawn(slot SpawnSlot) {
-	if slot == nil {
-		return
-	}
-	b.spawn = slot.AIParams()
-	if s := slot.Scratch(); s != nil {
-		b.scratch = s
-	}
+// SpawnParam returns the AI parameter name its spawn sets, ignoring the
+// template's; ok is false when the spawn does not set it.
+func (b *spawnBinding) SpawnParam(name string) (v string, ok bool) {
+	v, ok = b.spawn[name]
+	return v, ok
 }
 
 func (b *spawnBinding) templateParams() AIParams {
@@ -72,4 +95,10 @@ func (b *spawnBinding) AISkill(name string) (ref skill.Ref, ok bool, err error) 
 // one.
 func (b *spawnBinding) Scratch() *Scratch {
 	return b.scratch
+}
+
+// SpawnRow returns the persisted row of the NPC's spawn; nil when its spawn
+// keeps none.
+func (b *spawnBinding) SpawnRow() SpawnRow {
+	return b.row
 }

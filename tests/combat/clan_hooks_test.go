@@ -69,7 +69,8 @@ func (l *hookLog) clanBehavior(ids ...int32) func() script.Script {
 }
 
 // folkBehavior is a behavior bound to civilian ids that records the
-// attacked, clan-attacked and clan-died hooks: a civilian NPC has no party.
+// attacked, clan-attacked and clan-died hooks: no party hook is raised on
+// a civilian NPC.
 func (l *hookLog) folkBehavior(ids ...int32) func() script.Script {
 	return func() script.Script {
 		base := l.behavior(ids...)()
@@ -232,10 +233,18 @@ func checkMasters(t *testing.T, sc clanScene, r scriptcontract.Row) {
 			continue
 		}
 		minion, master, _ := strings.Cut(a, ".master=")
-		if h := sc.hostile[minion]; h == nil || h.Master() != sc.hostile[master] {
+		if h := sc.hostile[minion]; h == nil || !masterIs(h, sc.hostile[master]) {
 			t.Fatalf("after: %s.master is not %s", minion, master)
 		}
 	}
+}
+
+// masterIs reports whether h's master is want, none for a nil want.
+func masterIs(h, want *npc.Hostile) bool {
+	if want == nil {
+		return h.Master() == nil
+	}
+	return h.Master() == npc.PartyMember(want)
 }
 
 // replayRows runs the rows of table that keep, with srv booted once. act

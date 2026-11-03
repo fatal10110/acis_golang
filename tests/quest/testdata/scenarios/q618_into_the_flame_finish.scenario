@@ -1,0 +1,32 @@
+# Into The Flame (Q618): Klein takes the vacualite for a floating stone and the quest ends.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q618_into_the_flame_finish.golden
+character Hero 60
+quest Q618_IntoTheFlame <cond>=4 <state>=STARTED
+hold 7266 1
+script quest.Q618_IntoTheFlame
+item 7265 7266 7267
+page default/31540.htm
+page script/quest/Q618_IntoTheFlame/
+npc klein 31540 Folk 10 0 0
+
+action klein
+action klein
+  S ActionFailed
+  S NpcHtmlMessage obj=klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{klein}_Quest
+  S NpcHtmlMessage obj=klein item=0 page=script/quest/Q618_IntoTheFlame/31540-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q618_IntoTheFlame 31540-05.htm
+  S SystemMessage id=302 3:7266
+  S SystemMessage id=54 3:7267
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=klein item=0 page=script/quest/Q618_IntoTheFlame/31540-05.htm
+  S ActionFailed
+  Q delete-quest Q618_IntoTheFlame
+  rows Q618_IntoTheFlame -
+  state Q618_IntoTheFlame -
+  items 7266=0 7267=1

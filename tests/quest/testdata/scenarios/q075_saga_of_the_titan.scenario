@@ -1,0 +1,109 @@
+# Saga of the Titan (Q075) on the saga core, played by a level 76 Destroyer from
+# the start: Tazki offers it and gives the main item; Lakan sends the player to Donath,
+# who asks for what the player does not hold; Tazki has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q075_SagaOfTheTitan.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q075_saga_of_the_titan.golden
+character Destroyer 76
+class 46
+script quest.Q075_SagaOfTheTitan
+item 7098
+page trainer/31327.htm
+page trainer/31289.htm
+page default/31624.htm
+page script/quest/Q075_SagaOfTheTitan/
+npc tazki 31327 Trainer 10 0 0
+npc lakan 31289 Trainer -10 0 0
+npc donath 31624 Folk 0 10 0
+
+action tazki
+action tazki
+  S ActionFailed
+  S NpcHtmlMessage obj=tazki item=0 page=trainer/31327.htm
+  S ActionFailed
+bypass npc_{tazki}_Quest
+  S NpcHtmlMessage obj=tazki item=0 page=script/quest/Q075_SagaOfTheTitan/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q075_SagaOfTheTitan 0-1
+  S NpcHtmlMessage obj=tazki item=0 page=script/quest/Q075_SagaOfTheTitan/0-05.htm
+  S ActionFailed
+bypass Quest Q075_SagaOfTheTitan accept
+  S QuestList 75:0x80000001
+  S ExShowQuestMark quest=75
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7098
+  S NpcHtmlMessage obj=tazki item=0 page=script/quest/Q075_SagaOfTheTitan/0-03.htm
+  S ActionFailed
+  Q upsert Q075_SagaOfTheTitan | <state> | STARTED
+  Q upsert Q075_SagaOfTheTitan | <cond> | 1
+  items 7098=1
+  state Q075_SagaOfTheTitan STARTED
+action tazki
+  S ActionFailed
+  S NpcHtmlMessage obj=tazki item=0 page=trainer/31327.htm
+  S ActionFailed
+bypass npc_{tazki}_Quest
+  S NpcHtmlMessage obj=tazki item=0 page=script/quest/Q075_SagaOfTheTitan/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action lakan
+action lakan
+  S ActionFailed
+  S NpcHtmlMessage obj=lakan item=0 page=trainer/31289.htm
+  S ActionFailed
+bypass npc_{lakan}_Quest
+  S NpcHtmlMessage obj=lakan item=0 page=script/quest/Q075_SagaOfTheTitan/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q075_SagaOfTheTitan 2-1
+  S QuestList 75:0x80000003
+  S ExShowQuestMark quest=75
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=lakan item=0 page=script/quest/Q075_SagaOfTheTitan/2-05.htm
+  S ActionFailed
+  Q upsert Q075_SagaOfTheTitan | <cond> | 2
+action lakan
+  S ActionFailed
+  S NpcHtmlMessage obj=lakan item=0 page=trainer/31289.htm
+  S ActionFailed
+bypass npc_{lakan}_Quest
+  S NpcHtmlMessage obj=lakan item=0 page=script/quest/Q075_SagaOfTheTitan/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action donath
+action donath
+  S ActionFailed
+  S NpcHtmlMessage obj=donath item=0 page=default/31624.htm
+  S ActionFailed
+bypass npc_{donath}_Quest
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q075_SagaOfTheTitan/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q075_SagaOfTheTitan 1-3
+  S QuestList 75:0x80000007
+  S ExShowQuestMark quest=75
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q075_SagaOfTheTitan/1-05.htm
+  S ActionFailed
+  Q upsert Q075_SagaOfTheTitan | <cond> | 3
+action donath
+  S ActionFailed
+  S NpcHtmlMessage obj=donath item=0 page=default/31624.htm
+  S ActionFailed
+bypass npc_{donath}_Quest
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q075_SagaOfTheTitan/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action tazki
+action tazki
+  S ActionFailed
+  S NpcHtmlMessage obj=tazki item=0 page=trainer/31327.htm
+  S ActionFailed
+bypass npc_{tazki}_Quest
+  S NpcHtmlMessage obj=tazki item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q075_SagaOfTheTitan STARTED
+  rows Q075_SagaOfTheTitan <cond>=3 <state>=STARTED

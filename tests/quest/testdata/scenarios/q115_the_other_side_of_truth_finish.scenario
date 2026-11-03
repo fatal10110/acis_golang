@@ -1,0 +1,169 @@
+# The Other Side of Truth (Q115), last part: a level 53 character on cond 9 that lost Kierre's report
+# gets another, gives it to Rafforty (cond 10), has no piece of the tablet (cond 11), takes one from a
+# sculpture (cond 12) and Rafforty finishes the quest with 60040 adena; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q115_the_other_side_of_truth_finish.golden
+character Seeker 53
+quest Q115_TheOtherSideOfTruth <cond>=9 <state>=STARTED
+script quest.Q115_TheOtherSideOfTruth
+item 57 8079 8080 8081 8082
+page default/32018.htm
+page default/32020.htm
+page default/32021.htm
+page default/32022.htm
+page default/32077.htm
+page default/32078.htm
+page default/32079.htm
+page script/quest/Q115_TheOtherSideOfTruth/
+npc rafforty 32020 Folk 10 0 0
+npc misa 32018 Folk 0 10 0
+npc kierre 32022 Folk -10 0 0
+npc s1 32021 Folk 0 -10 0
+npc s2 32077 Folk 20 0 0
+npc s3 32078 Folk 0 20 0
+npc s4 32079 Folk -20 0 0
+
+# Kierre gives the lost report again, then has nothing more.
+action kierre
+action kierre
+  S ActionFailed
+  S NpcHtmlMessage obj=kierre item=0 page=default/32022.htm
+  S ActionFailed
+bypass npc_{kierre}_Quest
+  S SystemMessage id=54 3:8082
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kierre item=0 page=script/quest/Q115_TheOtherSideOfTruth/32022-04.htm
+  S ActionFailed
+  S ActionFailed
+action kierre
+  S ActionFailed
+  S NpcHtmlMessage obj=kierre item=0 page=default/32022.htm
+  S ActionFailed
+bypass npc_{kierre}_Quest
+  S NpcHtmlMessage obj=kierre item=0 page=script/quest/Q115_TheOtherSideOfTruth/32022-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rafforty takes it.
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-22.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-23.htm
+  S QuestList 115:0x800003ff
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8082
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-23.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 10
+  rows Q115_TheOtherSideOfTruth <cond>=10 <state>=STARTED
+
+# A sculpture has nothing on cond 10.
+action s1
+action s1
+  S ActionFailed
+  S NpcHtmlMessage obj=s1 item=0 page=default/32021.htm
+  S ActionFailed
+bypass npc_{s1}_Quest
+  S NpcHtmlMessage obj=s1 item=0 page=script/quest/Q115_TheOtherSideOfTruth/sculpture-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Without a piece of the tablet, Rafforty sends the character back.
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-24.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-27.htm
+  S QuestList 115:0x800007ff
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-27.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 11
+  rows Q115_TheOtherSideOfTruth <cond>=11 <state>=STARTED
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-29.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kierre has nothing on cond 11; a sculpture gives the piece.
+action kierre
+action kierre
+  S ActionFailed
+  S NpcHtmlMessage obj=kierre item=0 page=default/32022.htm
+  S ActionFailed
+bypass npc_{kierre}_Quest
+  S NpcHtmlMessage obj=kierre item=0 page=script/quest/Q115_TheOtherSideOfTruth/32022-05.htm
+  S ActionFailed
+  S ActionFailed
+action s2
+action s2
+  S ActionFailed
+  S NpcHtmlMessage obj=s2 item=0 page=default/32077.htm
+  S ActionFailed
+bypass npc_{s2}_Quest
+  S QuestList 115:0x80000fff
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8081
+  S NpcHtmlMessage obj=s2 item=0 page=script/quest/Q115_TheOtherSideOfTruth/sculpture-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 12
+  rows Q115_TheOtherSideOfTruth <cond>=12 <state>=STARTED
+action s2
+  S ActionFailed
+  S NpcHtmlMessage obj=s2 item=0 page=default/32077.htm
+  S ActionFailed
+bypass npc_{s2}_Quest
+  S NpcHtmlMessage obj=s2 item=0 page=script/quest/Q115_TheOtherSideOfTruth/sculpture-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rafforty finishes the quest.
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S SystemMessage id=302 3:8081
+  S SystemMessage id=52 6:60040
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 115:0x00000000
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-30.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <state> | COMPLETED
+  Q delete-except-state Q115_TheOtherSideOfTruth
+  items 57=60040 8081=0 8082=0
+  rows Q115_TheOtherSideOfTruth <state>=COMPLETED
+
+# Relog.
+relog
+  rows Q115_TheOtherSideOfTruth <state>=COMPLETED
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

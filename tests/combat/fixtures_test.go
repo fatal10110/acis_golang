@@ -3,7 +3,6 @@ package combat
 import (
 	"context"
 	"testing"
-	"time"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
@@ -26,10 +25,6 @@ const (
 	hostileX = 60
 	hostileY = 20
 	hostileZ = 30
-
-	// readQuietWindow is how long a stream must stay silent before a
-	// drainUntilQuiet-style wait accepts quietness.
-	readQuietWindow = 700 * time.Millisecond
 )
 
 // mustRead reads the next frame or fails the test.

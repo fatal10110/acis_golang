@@ -1,0 +1,102 @@
+# Testimony Of Prosperity (Q221), Mion and Maryse: a level 38 Scavenger at cond 1 with the licence and a hundred animal skins takes Mion's contribution and
+# Maryse's, and Balanki gives the second receipt for the pair.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q221_testimony_of_prosperity_maryse.golden
+character Dwarf 38
+class 54
+quest Q221_TestimonyOfProsperity <state>=STARTED <cond>=1
+hold 3239 1
+hold 3246 1
+hold 1867 100
+script quest.Q221_TestimonyOfProsperity
+item 3023 3030 3238 3239 3240 3241 3242 3243 3244 3245 3246 3247 3248 3249 3250 3251 3252 3253 3254 3255 3256 3257 3258 3259 3260 3261 3262 3263 3264 3265 3266 3267 3268 3269 3270 3271 3272 3273 3274 3275 3428 1867 57 7562
+page merchant/30519.htm
+page default/30553.htm
+page default/30533.htm
+page script/quest/Q221_TestimonyOfProsperity/
+npc mion 30519 Merchant 10 0 0
+npc maryse 30553 Folk -10 0 0
+npc balanki 30533 Folk -20 0 0
+
+action mion
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3253
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q221_TestimonyOfProsperity/30519-01.htm
+  S ActionFailed
+  S ActionFailed
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q221_TestimonyOfProsperity/30519-02.htm
+  S ActionFailed
+  S ActionFailed
+action maryse
+action maryse
+  S ActionFailed
+  S NpcHtmlMessage obj=maryse item=0 page=default/30553.htm
+  S ActionFailed
+bypass npc_{maryse}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3255
+  S NpcHtmlMessage obj=maryse item=0 page=script/quest/Q221_TestimonyOfProsperity/30553-01.htm
+  S ActionFailed
+  S ActionFailed
+action maryse
+  S ActionFailed
+  S NpcHtmlMessage obj=maryse item=0 page=default/30553.htm
+  S ActionFailed
+bypass npc_{maryse}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1867 6:100
+  S SystemMessage id=302 3:3255
+  S SystemMessage id=54 3:3254
+  S NpcHtmlMessage obj=maryse item=0 page=script/quest/Q221_TestimonyOfProsperity/30553-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 1867=0 3254=1 3255=0
+action maryse
+  S ActionFailed
+  S NpcHtmlMessage obj=maryse item=0 page=default/30553.htm
+  S ActionFailed
+bypass npc_{maryse}_Quest
+  S NpcHtmlMessage obj=maryse item=0 page=script/quest/Q221_TestimonyOfProsperity/30553-04.htm
+  S ActionFailed
+  S ActionFailed
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3254
+  S SystemMessage id=302 3:3253
+  S SystemMessage id=54 3:3259
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q221_TestimonyOfProsperity/30533-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 3259=1 3253=0 3254=0
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q221_TestimonyOfProsperity/30533-04.htm
+  S ActionFailed
+  S ActionFailed
+action mion
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S NpcHtmlMessage obj=mion item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed

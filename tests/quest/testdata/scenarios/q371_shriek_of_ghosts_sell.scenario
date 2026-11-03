@@ -1,0 +1,39 @@
+# Shriek of Ghosts (Q371): a character holding three urns sells them to Reva, asks again with none left,
+# and gives the quest up. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q371_shriek_of_ghosts_sell.golden
+character Ghosts 59
+quest Q371_ShriekOfGhosts <cond>=1 <state>=STARTED
+hold 5903 3
+script quest.Q371_ShriekOfGhosts
+item 57 5903 6002 6003 6004 6005 6006
+page trainer/30867.htm
+page default/30929.htm
+page script/quest/Q371_ShriekOfGhosts/
+npc reva 30867 Trainer 10 0 0
+
+action reva
+action reva
+  S ActionFailed
+  S NpcHtmlMessage obj=reva item=0 page=trainer/30867.htm
+  S ActionFailed
+bypass npc_{reva}_Quest
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q371_ShriekOfGhosts 30867-07.htm
+  S SystemMessage id=301 3:5903 6:3
+  S SystemMessage id=52 6:10000
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-07.htm
+  S ActionFailed
+  items 5903=0 57=10000
+bypass Quest Q371_ShriekOfGhosts 30867-10.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-10.htm
+  S ActionFailed
+  Q delete-quest Q371_ShriekOfGhosts
+  state Q371_ShriekOfGhosts -
+  rows Q371_ShriekOfGhosts -
+relog
+  rows Q371_ShriekOfGhosts -
+  items 57=10000

@@ -1,0 +1,52 @@
+# Second class change (SecondClassChange): a level 40 human Warrior holding the marks of
+# Challenger, Trust and Duelist asks Grand Master Hannavalt about the Gladiator and changes
+# profession: the three marks are taken, fifteen C-grade coupons given, the fanfare played, then
+# the class change's own animation and message, and the congratulation page. After a relog the
+# character plays the Gladiator, so Hannavalt says it has already made its second change.
+# Expectations are the reference trace's (SecondClassChange.onTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/second_class_change_gladiator.golden
+character Fighter 40
+class 1
+hold 2627 1
+hold 2734 1
+hold 2762 1
+script script.feature.SecondClassChange
+item 2627 2734 2762 8870
+page villagemaster/30109.htm
+page script/feature/SecondClassChange/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest SecondClassChange
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-29.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest SecondClassChange master_human_elf_fighter-30.htm
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-30.htm
+  S ActionFailed
+bypass Quest SecondClassChange GL
+  S SystemMessage id=302 3:2627
+  S SystemMessage id=302 3:2734
+  S SystemMessage id=302 3:2762
+  S SystemMessage id=53 3:8870 6:15
+  S PlaySound type=0 file=ItemSound.quest_fanfare_2 bind=0 obj=0 loc=0,0,0 delay=0
+  S MagicSkillUse caster=player target=player skill=5103-1 hit=1000 reuse=0 success=0
+  S SystemMessage id=1308
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-71.htm
+  S ActionFailed
+  items 2627=0 2734=0 2762=0 8870=15
+relog
+  items 2627=0 2734=0 2762=0 8870=15
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest SecondClassChange
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-77.htm
+  S ActionFailed
+  S ActionFailed

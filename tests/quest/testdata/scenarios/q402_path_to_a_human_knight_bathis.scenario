@@ -1,0 +1,116 @@
+# Path to a Human Knight (Q402), level 19, quest started: Bathis gives the mark of the Gludio guard, the bugbear raiders drop ten necklaces for it and Bathis pays the first coin. A kill without a mark drops nothing first. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q402_path_to_a_human_knight_bathis.golden
+character Knight 19
+quest Q402_PathToAHumanKnight <cond>=1 <state>=STARTED
+hold 1271 1
+script quest.Q402_PathToAHumanKnight
+item 1161 1162 1163 1164 1165 1166 1167 1168 1169 1170 1171 1172 1173 1174 1175 1176 1177 1178 1179 1271
+page default/30417.htm
+page guard/30332.htm
+page villagemaster/30289.htm
+page guard/30379.htm
+page villagemaster/30037.htm
+page guard/30039.htm
+page villagemaster/30031.htm
+page default/30653.htm
+page script/quest/Q402_PathToAHumanKnight/
+npc klaus 30417 Folk 10 0 0
+npc bathis 30332 Guard -10 0 0
+npc raymond 30289 VillageMasterPriest 20 0 0
+npc bezique 30379 Guard -20 0 0
+npc levian 30037 VillageMasterPriest 30 0 0
+npc gilbert 30039 Guard -30 0 0
+npc biotin 30031 VillageMasterPriest 15 10 0
+npc aaron 30653 Folk -15 10 0
+npc bugbear 20775 Monster 40 0 0
+npc priest 27024 Monster 45 0 0
+npc spider 20038 Monster 50 0 0
+npc lizard 20024 Monster 55 0 0
+npc giant 20103 Monster 60 0 0
+npc horror 20404 Monster 65 0 0
+
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  items 1271=1
+  rows Q402_PathToAHumanKnight <cond>=1 <state>=STARTED
+  state Q402_PathToAHumanKnight STARTED
+action bathis
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q402_PathToAHumanKnight/30332-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q402_PathToAHumanKnight 30332-02.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1168
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q402_PathToAHumanKnight/30332-02.htm
+  S ActionFailed
+  items 1168=1
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q402_PathToAHumanKnight/30332-03.htm
+  S ActionFailed
+  S ActionFailed
+kill bugbear x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1169
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1169=10
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1169 6:10
+  S SystemMessage id=302 3:1168
+  S SystemMessage id=54 3:1162
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q402_PathToAHumanKnight/30332-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 1162=1 1168=0 1169=0
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q402_PathToAHumanKnight/30332-05.htm
+  S ActionFailed
+  S ActionFailed

@@ -60,12 +60,12 @@ func NewCrestsIn(dir string) *Crests {
 // are saved there too. A crest file whose size does not match its family is
 // deleted and skipped, and its name is returned in deleted.
 //
-// The load stops at the first file it cannot handle (an id that is not a
-// number, an unreadable file, an undeletable invalid file), as the
-// reference does. It then returns the cache holding the crests read before
-// that file together with a non-nil error saying why it stopped, so the
-// caller can keep the partial cache and report the failure. A nil cache
-// with an error means the directory itself could not be read.
+// The load stops at the first file it cannot handle (an id that is not a number,
+// an unreadable file, an undeletable invalid file). It then returns the cache
+// holding the crests read before that file together with a non-nil error saying
+// why it stopped, so the caller can keep the partial cache and report the
+// failure. A nil cache with an error means the directory itself could not be
+// read.
 func LoadCrests(dir string) (c *Crests, deleted []string, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -181,7 +181,7 @@ func (c *Crests) Remove(typ CrestType, id int) error {
 	return nil
 }
 
-// Replace swaps c's crests for a copy of from's: CrestCache.reload. c keeps
+// Replace swaps c's crests for a copy of from's, as a crest reload does. c keeps
 // its own directory.
 func (c *Crests) Replace(from *Crests) {
 	from.mu.RLock()

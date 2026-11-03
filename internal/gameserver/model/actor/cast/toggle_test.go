@@ -24,12 +24,12 @@ func toggleDef() modelskill.Definition {
 func TestCanCastToggleOnlyChecksBlanketLockAndReuseDelay(t *testing.T) {
 	def := toggleDef()
 	actor := &testActor{mp: 0, hp: 0}
-	if err := NewController(actor, nil).CanCastToggle(def); err != nil {
+	if err := NewController(actor, nil).CanCastToggle(&def); err != nil {
 		t.Fatalf("CanCastToggle() error = %v, want nil despite empty resources", err)
 	}
 
-	actor.disabledKeys = map[int32]bool{ReuseKey(def): true}
-	if err := NewController(actor, nil).CanCastToggle(def); !errors.Is(err, ErrSkillDisabled) {
+	actor.disabledKeys = map[int32]bool{ReuseKey(&def): true}
+	if err := NewController(actor, nil).CanCastToggle(&def); !errors.Is(err, ErrSkillDisabled) {
 		t.Fatalf("CanCastToggle() error = %v, want ErrSkillDisabled", err)
 	}
 }
@@ -43,7 +43,7 @@ func TestCanCastToggleOnlyChecksBlanketLockAndReuseDelay(t *testing.T) {
 func TestCanCastToggleRejectsAllSkillsDisabled(t *testing.T) {
 	def := toggleDef()
 	actor := &testActor{mp: 100, hp: 100, allDisabled: true}
-	if err := NewController(actor, nil).CanCastToggle(def); !errors.Is(err, ErrAllSkillsDisabled) {
+	if err := NewController(actor, nil).CanCastToggle(&def); !errors.Is(err, ErrAllSkillsDisabled) {
 		t.Fatalf("CanCastToggle() error = %v, want ErrAllSkillsDisabled", err)
 	}
 }
@@ -66,12 +66,12 @@ func (a *groundTestActor) GroundTargetUnset() bool { return a.gx == 0 && a.gy ==
 func TestCanAttemptCastRejectsUnsetGroundTarget(t *testing.T) {
 	def := modelskill.Definition{ID: 5, Level: 1, Target: modelskill.TargetGround}
 	actor := &groundTestActor{testActor: &testActor{}}
-	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, def); !errors.Is(err, ErrGroundTargetUnset) {
+	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, &def); !errors.Is(err, ErrGroundTargetUnset) {
 		t.Fatalf("CanAttemptCast() error = %v, want ErrGroundTargetUnset", err)
 	}
 
 	actor.gx, actor.gy, actor.gz = 1000, 2000, 300
-	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, def); err != nil {
+	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, &def); err != nil {
 		t.Fatalf("CanAttemptCast() error = %v, want nil once the signet point is set", err)
 	}
 }
@@ -83,7 +83,7 @@ func TestCanAttemptCastRejectsUnsetGroundTarget(t *testing.T) {
 func TestCanAttemptCastSkipsGroundGateForNonGroundTargeter(t *testing.T) {
 	def := modelskill.Definition{ID: 5, Level: 1, Target: modelskill.TargetGround}
 	actor := &testActor{}
-	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, def); err != nil {
+	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, &def); err != nil {
 		t.Fatalf("CanAttemptCast() error = %v, want nil for a caster with no GroundTarget surface", err)
 	}
 }
@@ -93,7 +93,7 @@ func TestCanCastToggleRejectsNonToggleSkill(t *testing.T) {
 	def.Activation = modelskill.ActivationActive
 
 	actor := &testActor{mp: 100, hp: 100}
-	if err := NewController(actor, nil).CanCastToggle(def); err == nil {
+	if err := NewController(actor, nil).CanCastToggle(&def); err == nil {
 		t.Fatal("CanCastToggle() error = nil, want an error for a non-toggle skill")
 	}
 }
@@ -103,7 +103,7 @@ func TestCastToggleDeactivatesAnAlreadyActiveInstanceAtNoCost(t *testing.T) {
 	def := toggleDef()
 	def.HPConsume = 3
 
-	activated, err := NewController(actor, nil).CastToggle(true, def)
+	activated, err := NewController(actor, nil).CastToggle(true, &def)
 	if err != nil {
 		t.Fatalf("CastToggle() error: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestCastToggleActivatesAndPaysMPAndHP(t *testing.T) {
 	def := toggleDef()
 	def.HPConsume = 3
 
-	activated, err := NewController(actor, nil).CastToggle(false, def)
+	activated, err := NewController(actor, nil).CastToggle(false, &def)
 	if err != nil {
 		t.Fatalf("CastToggle() error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestCastToggleFailsWithoutConsumingWhenResourcesAreInsufficient(t *testing.
 		def := toggleDef()
 		def.HPConsume = 3
 
-		if _, err := NewController(actor, nil).CastToggle(false, def); !errors.Is(err, ErrNotEnoughMP) {
+		if _, err := NewController(actor, nil).CastToggle(false, &def); !errors.Is(err, ErrNotEnoughMP) {
 			t.Fatalf("CastToggle() error = %v, want ErrNotEnoughMP", err)
 		}
 		if actor.mp != 5 || actor.hp != 10 {
@@ -154,7 +154,7 @@ func TestCastToggleFailsWithoutConsumingWhenResourcesAreInsufficient(t *testing.
 		def := toggleDef()
 		def.HPConsume = 3
 
-		if _, err := NewController(actor, nil).CastToggle(false, def); !errors.Is(err, ErrNotEnoughHP) {
+		if _, err := NewController(actor, nil).CastToggle(false, &def); !errors.Is(err, ErrNotEnoughHP) {
 			t.Fatalf("CastToggle() error = %v, want ErrNotEnoughHP", err)
 		}
 		if actor.mp != 8 || actor.hp != 2 {
@@ -168,7 +168,7 @@ func TestCastToggleNeverInstallsAReuseDelay(t *testing.T) {
 	def := toggleDef()
 	def.ReuseDelay = 60000
 
-	if _, err := NewController(actor, nil).CastToggle(false, def); err != nil {
+	if _, err := NewController(actor, nil).CastToggle(false, &def); err != nil {
 		t.Fatalf("CastToggle() error: %v", err)
 	}
 	if len(actor.disabled) != 0 || len(actor.reuses) != 0 {

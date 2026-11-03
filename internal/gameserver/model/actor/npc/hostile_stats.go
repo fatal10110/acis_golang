@@ -3,6 +3,7 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -18,8 +19,22 @@ const maxBuffCount = 20
 // all-or-nothing to readers must serialize at a higher level (see
 // effect.List, which does this for effect-driven adds through
 // AttachStatFuncs and StatFuncsAttached).
+//
+// A func whose attached condition fails for h is left out.
 func (h *Hostile) AddStatFuncs(fns []effect.Mod) {
+	fns = effect.Attachable(fns, h.ConditionActor())
 	h.AttachStatFuncs(fns)
+	h.StatFuncsAttached(fns)
+}
+
+// attachPassives gives h the template passives that attach to it and
+// reports the change. It runs at construction, before any stat chain is
+// changed, so every slot created afterwards starts from them.
+func (h *Hostile) attachPassives(passives *compiledPassives) {
+	fns, byStat := passives.attached(h.ConditionActor())
+	h.statMu.Lock()
+	h.passives = byStat
+	h.statMu.Unlock()
 	h.StatFuncsAttached(fns)
 }
 
@@ -43,15 +58,10 @@ func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
 	}
-	h.statMu.RLock()
-	calcs := h.statCalcs
-	h.statMu.RUnlock()
 	var modified []stat.Stat
-	for s, calc := range calcs {
-		if calc != nil {
-			if calc.RemoveOwner(owner) > 0 {
-				modified = append(modified, stat.Stat(s))
-			}
+	for s, calc := range h.ownerCalcs(owner) {
+		if calc != nil && calc.RemoveOwner(owner) > 0 {
+			modified = append(modified, stat.Stat(s))
 		}
 	}
 	if owner.Stripped() {
@@ -104,42 +114,46 @@ func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {
 	h.emit(event.Status{Attrs: attrs})
 }
 
-// SetMaxBuffsAmount records the players.properties base buff-slot count.
-func (h *Hostile) SetMaxBuffsAmount(amount int) {
-	if h != nil {
-		h.maxBuffsAmount.Store(int32(amount))
-	}
-}
-
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs h can
-// hold at once: the configured base plus its template's Divine Inspiration.
+// hold at once: the base in force (Limits) plus its template's Divine
+// Inspiration.
 func (h *Hostile) MaxBuffCount() int {
 	if h == nil {
 		return maxBuffCount
 	}
-	return int(h.maxBuffsAmount.Load()) + h.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
+	return h.Instance.maxBuffsBase() + h.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
 }
 
-// statCalc returns s's live Calculator, creating it (with its builtin
-// finalize step) on first touch. The common warm case only takes statMu's
-// read lock; the slot is created at most once per Stat per Hostile.
-func (h *Hostile) statCalc(s stat.Stat) *effect.Calculator {
+// ownerCalcs returns h's stat slots, with one created for every Stat a
+// template passive of owner modifies so that its Mods can be dropped.
+func (h *Hostile) ownerCalcs(owner effect.ModOwner) [stat.Count]*effect.Calculator {
 	h.statMu.RLock()
-	if calc := h.statCalcs[s]; calc != nil {
-		h.statMu.RUnlock()
-		return calc
-	}
+	passives := h.passives
 	h.statMu.RUnlock()
-	return h.statCalcOrCreate(s)
+	for s := range passives.StatsOwnedBy(owner) {
+		h.statCalcOrCreate(s)
+	}
+	h.statMu.RLock()
+	defer h.statMu.RUnlock()
+	if h.statCalcs == nil {
+		return [stat.Count]*effect.Calculator{}
+	}
+	return *h.statCalcs
 }
 
+// statCalcOrCreate returns s's Calculator, creating it from s's template
+// passives and builtin finalize step on first use; the slot is created at
+// most once per Stat per Hostile.
 func (h *Hostile) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 	h.statMu.Lock()
 	defer h.statMu.Unlock()
+	if h.statCalcs == nil {
+		h.statCalcs = new([stat.Count]*effect.Calculator)
+	}
 	if calc := h.statCalcs[s]; calc != nil {
 		return calc
 	}
-	calc := effect.NewCalculator(defaultBuiltin(s))
+	calc := h.passives.NewCalculator(s, defaultBuiltin(s))
 	h.statCalcs[s] = &calc
 	return &calc
 }
@@ -148,7 +162,26 @@ func (h *Hostile) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 // plus any buff/debuff funcs an active effect has added) starting from
 // base, flooring a non-positive stat that can't go negative at one.
 func (h *Hostile) calcStat(s stat.Stat, base float64) float64 {
-	value := h.statCalc(s).Calc(hostileStatActor{h: h}, base)
+	return h.calcFor(s, base, nil, nil)
+}
+
+// calcFor is calcStat for a calculation against target run for skill (nil
+// for none).
+func (h *Hostile) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	h.statMu.RLock()
+	var calc *effect.Calculator
+	if h.statCalcs != nil {
+		calc = h.statCalcs[s]
+	}
+	passives := h.passives
+	h.statMu.RUnlock()
+	actor := hostileStatActor{h: h}
+	var value float64
+	if calc != nil {
+		value = calc.Calc(actor, base, target, skill)
+	} else {
+		value = passives.Calc(s, defaultBuiltin(s), actor, base, target, skill)
+	}
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}

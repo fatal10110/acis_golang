@@ -1,0 +1,22 @@
+# Supplier of Reagents (Q373), level 56: Wesley turns the character away. Expectations replay the reference trace
+# of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q373_supplier_of_reagents_low_level.golden
+character Reagents 56
+script quest.Q373_SupplierOfReagents
+item 57 5904 6317 6007 6008 6009 6010 6011 6012 6013 6014 6015 6016 6017 6018 6019 6020 6021 6022 6023 6024 6025 6026 6027 6028 6029 6030 6031 6032 6033 6034 6320
+page merchant/30166.htm
+page default/31149.htm
+page script/quest/Q373_SupplierOfReagents/
+npc wesley 30166 Merchant 10 0 0
+npc urn 31149 Folk -10 0 0
+
+action wesley
+action wesley
+  S ActionFailed
+  S NpcHtmlMessage obj=wesley item=0 page=merchant/30166.htm
+  S ActionFailed
+bypass npc_{wesley}_Quest
+  S NpcHtmlMessage obj=wesley item=0 page=script/quest/Q373_SupplierOfReagents/30166-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q373_SupplierOfReagents -

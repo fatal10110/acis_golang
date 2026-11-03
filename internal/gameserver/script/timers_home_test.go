@@ -173,30 +173,6 @@ func TestTimerHookPanicIsRecovered(t *testing.T) {
 	}
 }
 
-// TestTimerAnswerIsNotShownYet: a timer bound to a player that answers
-// with a page is logged, as showing an answer is the dialog path's; one
-// bound to no player shows nothing and logs nothing.
-func TestTimerAnswerIsNotShownYet(t *testing.T) {
-	logs := &logBuffer{}
-	clock := sim.NewInline(time.UnixMilli(0))
-	catalog := Catalog{"quest.Pages": func() Script {
-		return Script{Hooks: Hooks{OnTimer: func(*Script, Timer) string { return "page.htm" }}}
-	}}
-	r := Build(listOf("quest.Pages"), catalog, Config{KindOf: allTemplates, Log: zerolog.New(logs), Queue: clock.NewQueue("script-timers")})
-	s := r.entries[0].script
-	p := &Player{self: &timerPlayerFake{combatant: combatant{objectID: 1}, queue: clock.NewQueue("p")}}
-	s.StartTimer("none", nil, nil, 0)
-	clock.Advance(0)
-	if logs.String() != "" && strings.Contains(logs.String(), "not shown") {
-		t.Fatalf("a timer bound to no player logged its answer: %s", logs.String())
-	}
-	s.StartTimer("player", nil, p, 0)
-	clock.Advance(0)
-	if !strings.Contains(logs.String(), `"timer":"player","message":"script: timer answer not shown"`) {
-		t.Fatalf("answer for a player not logged: %s", logs.String())
-	}
-}
-
 // TestBehaviorTimersNeedTheDecayRemoval: a behavior that sets the timer
 // hook registers only on NPC kinds whose decay stops its timers; a plain
 // script's timers need no such seam.

@@ -1,0 +1,13 @@
+# RoyalRushMissionNpc (18150), a Royal Rush victim: created, it looks around and names the
+# character it sees in its first line (sent as the NPC lines' NPCs spawn, before the first
+# step), and calls for help every 5 s from then on.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.RoyalRushMissionNpc
+npc victim 18150 Monster 40 0 0
+
+advance 4s
+advance 1s
+  S NpcSay obj=victim type=0 npc=1018150 text="Help me!!"
+advance 5s
+  S NpcSay obj=victim type=0 npc=1018150 text="Help me!!"

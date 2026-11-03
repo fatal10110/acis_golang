@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -15,10 +13,9 @@ const OpcodeItemList = 0x1b
 // FrameItemList builds the ItemList packet for everything a character is
 // carrying: inventory items and, marked equipped, whatever sits on the
 // paperdoll. Items in any other container (warehouse, freight, a pet's own
-// hold) are a different list and don't belong here. templates must have an
-// entry for every item's template id; a carried item with no loaded
-// template is reported as an error rather than encoded around. On error no
-// frame is returned and nothing needs releasing.
+// hold) are a different list and don't belong here. An item whose template
+// templates no longer holds (one a reload removed) is left out of the list.
+// On error no frame is returned and nothing needs releasing.
 func FrameItemList(items []*item.Instance, templates *item.Table, showWindow bool) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeItemList)
 	if err := writeItemList(w, items, templates, showWindow); err != nil {
@@ -42,7 +39,7 @@ func writeItemList(w *wire.Writer, items []*item.Instance, templates *item.Table
 
 		tmpl, ok := templates.Get(it.TemplateID)
 		if !ok {
-			return fmt.Errorf("serverpackets: ItemList: no template loaded for item template %d", it.TemplateID)
+			continue
 		}
 		category, subCategory := tmpl.Category()
 

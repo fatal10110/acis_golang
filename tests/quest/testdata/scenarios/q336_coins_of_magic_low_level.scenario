@@ -1,0 +1,21 @@
+# Coins of Magic (Q336), the level refusal: a level 39 character asks Sorint for the quest and is
+# turned away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q336_coins_of_magic_low_level.golden
+character Collector 39
+script quest.Q336_CoinsOfMagic
+item 132 206 233 303 472 852 855 886 916 2414 2435 2459 3472 3473 3474 3475 3476 3477 3478 3479 3480 3481 3482 3483 3484 3485 3486 3487 3488 3489 3490 3491 3492 3493 3494 3495 3496 3497 3498 3811 3812 3813 3814 3815
+page warehouse/30232.htm
+page script/quest/Q336_CoinsOfMagic/
+npc sorint 30232 WarehouseKeeper 10 0 0
+
+action sorint
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q336_CoinsOfMagic CREATED
+  rows Q336_CoinsOfMagic -

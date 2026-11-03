@@ -1,0 +1,36 @@
+# An Ice Merchant's Dream (Q648): at cond 2 the silver hemocyte drops too, where the monster has a chance for it.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q648_an_ice_merchants_dream_hunt_cond2.golden
+character Hero 53
+quest Q648_AnIceMerchantsDream <cond>=2 <state>=STARTED
+random 0 0 0 0 0 0 0 999999
+script quest.Q648_AnIceMerchantsDream
+item 8057 8077 8078 57
+page default/32020.htm
+page default/32023.htm
+page script/quest/Q648_AnIceMerchantsDream/
+npc rafforty 32020 Folk 10 0 0
+npc shelf 32023 Folk 20 0 0
+npc m1 22080 Monster 40 0 0
+npc m2 22081 Monster 50 0 0
+npc m3 22098 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8057
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8077=1 8057=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8077=2 8057=1
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8077=3 8057=1
+  rows Q648_AnIceMerchantsDream <cond>=2 <state>=STARTED
+  state Q648_AnIceMerchantsDream STARTED

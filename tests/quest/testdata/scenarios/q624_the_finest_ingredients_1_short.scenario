@@ -1,0 +1,23 @@
+# The Finest Ingredients - Part 1 (Q624): a character at cond 2 short of one ingredient is told to bring more.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q624_the_finest_ingredients_1_short.golden
+character Hero 73
+quest Q624_TheFinestIngredients_Part1 <cond>=2 <state>=STARTED
+hold 7202 50
+hold 7203 50
+hold 7204 49
+script quest.Q624_TheFinestIngredients_Part1
+item 7202 7203 7204 7080 7205
+page default/31521.htm
+page script/quest/Q624_TheFinestIngredients_Part1/
+npc jeremy 31521 Folk 10 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q624_TheFinestIngredients_Part1/31521-07.htm
+  S ActionFailed
+  S ActionFailed

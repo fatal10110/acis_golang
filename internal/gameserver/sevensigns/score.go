@@ -30,7 +30,7 @@ func StoneScore(blue, green, red int) int {
 // roundFloat rounds f half up to an int, saturating at the int32 range, the
 // way single-precision scores are rounded everywhere in this system.
 func roundFloat(f float32) int {
-	return int(commons.JavaInt(float64(commons.JavaRound(float64(f)))))
+	return int(commons.TruncInt32Sat(float64(commons.RoundHalfUp(float64(f)))))
 }
 
 // share is part/whole scaled to scale, computed in single precision.

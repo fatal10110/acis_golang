@@ -1,0 +1,108 @@
+# Fruit of the Mothertree (Q161): an elven fighter of level 10 accepts at Andellia with her
+# letter, Thalia takes it for the Mother Tree's fruit, and Andellia takes the fruit for adena and
+# experience; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q161_fruit_of_the_mother_tree.golden
+character Envoy 10
+class 18
+script quest.Q161_FruitOfTheMotherTree
+item 1036 1037 57
+page default/30362.htm
+page default/30371.htm
+page script/quest/Q161_FruitOfTheMotherTree/
+npc andellia 30362 Folk 10 0 0
+npc thalia 30371 Folk 20 0 0
+
+# Andellia: accept with her letter.
+action andellia
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q161_FruitOfTheMotherTree/30362-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q161_FruitOfTheMotherTree CREATED
+bypass Quest Q161_FruitOfTheMotherTree 30362-04.htm
+  S QuestList 161:0x80000001
+  S ExShowQuestMark quest=161
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1036
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q161_FruitOfTheMotherTree/30362-04.htm
+  S ActionFailed
+  Q upsert Q161_FruitOfTheMotherTree | <state> | STARTED
+  Q upsert Q161_FruitOfTheMotherTree | <cond> | 1
+  state Q161_FruitOfTheMotherTree STARTED
+  rows Q161_FruitOfTheMotherTree <cond>=1 <state>=STARTED
+  items 1036=1
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q161_FruitOfTheMotherTree/30362-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Thalia: the letter for the Mother Tree's fruit.
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S QuestList 161:0x80000003
+  S ExShowQuestMark quest=161
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1036
+  S SystemMessage id=54 3:1037
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q161_FruitOfTheMotherTree/30371-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q161_FruitOfTheMotherTree | <cond> | 2
+  items 1036=0 1037=1
+  rows Q161_FruitOfTheMotherTree <cond>=2 <state>=STARTED
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q161_FruitOfTheMotherTree/30371-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Andellia: the fruit for adena and experience; the quest completes.
+action andellia
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S SystemMessage id=302 3:1037
+  S SystemMessage id=52 6:1000
+  S SystemMessage id=45 1:1000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 161:0x00000000
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q161_FruitOfTheMotherTree/30362-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q161_FruitOfTheMotherTree | <state> | COMPLETED
+  Q delete-except-state Q161_FruitOfTheMotherTree
+  items 1037=0 57=1000
+  state Q161_FruitOfTheMotherTree COMPLETED
+  rows Q161_FruitOfTheMotherTree <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q161_FruitOfTheMotherTree COMPLETED
+  rows Q161_FruitOfTheMotherTree <state>=COMPLETED
+  items 57=1000
+action andellia
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S NpcHtmlMessage obj=andellia item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

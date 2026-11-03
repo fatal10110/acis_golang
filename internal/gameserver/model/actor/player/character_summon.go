@@ -41,6 +41,11 @@ func (c *Character) ControlItemInUse(objectID int32) bool {
 	if !ok {
 		return false
 	}
-	controlled, ok := obj.(interface{ ControlItemID() int32 })
+	controlled, ok := obj.(controlledSummon)
 	return ok && controlled.ControlItemID() == objectID
+}
+
+// controlledSummon is a summon called up by an item: a pet.
+type controlledSummon interface {
+	ControlItemID() int32
 }

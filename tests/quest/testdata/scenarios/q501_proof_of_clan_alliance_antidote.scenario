@@ -1,0 +1,97 @@
+# Proof Of Clan Alliance (Q501): the leader holds three Symbols of Loyalty and has three sacrifices on record, so Kalis takes the
+# symbols and sets the antidote errand with her poison. The leader fetches the herbs from the shamans (a drop that cannot miss with
+# the draw pinned to 0) and Kalis asks for the Blood of Eva. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q501_proof_of_clan_alliance_antidote.golden
+character Leader 40
+clan 3
+quest Q501_ProofOfClanAlliance <cond>=2 sacrificed=3 <state>=STARTED
+random always 0
+hold 3837 3
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page default/30757.htm
+page default/30759.htm
+page default/30758.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+npc statue 30757 Folk 20 0 0
+npc kalis 30759 Folk 30 0 0
+npc athrea 30758 Folk 40 0 0
+npc vanor 20685 Monster 50 0 0
+npc harit 20644 Monster 60 0 0
+npc oel 20576 Monster 70 0 0
+
+action kalis
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q501_ProofOfClanAlliance 30759-07.htm
+  S QuestList 501:0x80000007
+  S ExShowQuestMark quest=501
+  S SystemMessage id=302 3:3837
+  S SystemMessage id=302 3:3837
+  S SystemMessage id=302 3:3837
+  S SystemMessage id=54 3:3872
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-07.htm
+  S ActionFailed
+  Q upsert Q501_ProofOfClanAlliance | 3832 | true
+  Q upsert Q501_ProofOfClanAlliance | 3833 | true
+  Q upsert Q501_ProofOfClanAlliance | 3834 | true
+  Q upsert Q501_ProofOfClanAlliance | 3835 | true
+  Q upsert Q501_ProofOfClanAlliance | <cond> | 3
+  Q delete-var Q501_ProofOfClanAlliance | sacrificed
+  items 3837=0 3872=1
+  rows Q501_ProofOfClanAlliance 3832=true 3833=true 3834=true 3835=true <cond>=3 <state>=STARTED
+kill vanor
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3833
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q delete-var Q501_ProofOfClanAlliance | 3833
+  items 3833=1
+  rows Q501_ProofOfClanAlliance 3832=true 3834=true 3835=true <cond>=3 <state>=STARTED
+kill harit
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3832
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q delete-var Q501_ProofOfClanAlliance | 3832
+  items 3832=1
+  rows Q501_ProofOfClanAlliance 3834=true 3835=true <cond>=3 <state>=STARTED
+kill oel
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3834
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q delete-var Q501_ProofOfClanAlliance | 3834
+  items 3834=1
+  rows Q501_ProofOfClanAlliance 3835=true <cond>=3 <state>=STARTED
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S QuestList
+  S SystemMessage id=302 3:3832
+  S SystemMessage id=302 3:3833
+  S SystemMessage id=302 3:3834
+  S SystemMessage id=302 3:3872
+  S QuestList 501:0x80000001
+  S ExShowQuestMark quest=501
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q501_ProofOfClanAlliance
+  Q upsert Q501_ProofOfClanAlliance | <state> | STARTED
+  Q upsert Q501_ProofOfClanAlliance | <cond> | 1
+  items 3832=0 3833=0 3834=0 3872=0
+  rows Q501_ProofOfClanAlliance <cond>=1 <state>=STARTED

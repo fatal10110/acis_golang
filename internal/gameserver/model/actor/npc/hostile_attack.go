@@ -1,7 +1,6 @@
 package npc
 
 import (
-	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
@@ -13,9 +12,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
+
+var _ attack.Target = (*Hostile)(nil)
 
 // AttackDisabled reports whether this NPC is unable to start an attack:
 // dead, held by stun, sleep, paralysis, fear, or an immobile-until-attacked
@@ -135,15 +137,16 @@ func (h *Hostile) CollisionHeight() float64 {
 	return h.Instance.Template.CollisionHeight
 }
 
-// AttackType returns this NPC's attack style, resolved from the weapon
-// Attach resolved. Unarmed (WeaponFist) when Attach found no
-// right-hand weapon — the common case, since the overwhelming majority of
-// monster templates carry no weapon item id in the shipped data.
+// AttackType returns this NPC's attack style, resolved from the weapon in
+// its right hand. Unarmed (WeaponFist) when it holds no weapon — the
+// common case, since the overwhelming majority of monster templates carry
+// no weapon item id in the shipped data.
 func (h *Hostile) AttackType() item.WeaponType {
-	if h.weapon == nil {
+	weapon := h.hands().weapon
+	if weapon == nil {
 		return item.WeaponFist
 	}
-	return h.weapon.Type
+	return weapon.Type
 }
 
 // AttackSpeed returns this NPC's physical attack speed stat.
@@ -161,31 +164,33 @@ func (h *Hostile) MagicAttackSpeed() int {
 // ActiveWeaponItem returns this NPC's resolved right-hand weapon, nil when
 // it is unarmed.
 func (h *Hostile) ActiveWeaponItem() *item.WeaponDetail {
-	return h.weapon
+	return h.hands().weapon
 }
 
 // WeaponReuseDelay returns this NPC's weapon reuse delay; only read for a
 // bow attacker. Zero when unarmed or not wielding a template-defined
 // weapon.
 func (h *Hostile) WeaponReuseDelay() time.Duration {
-	if h.weapon == nil {
+	weapon := h.hands().weapon
+	if weapon == nil {
 		return 0
 	}
-	return time.Duration(h.weapon.ReuseDelay) * time.Millisecond
+	return time.Duration(weapon.ReuseDelay) * time.Millisecond
 }
 
 // ConsumeBowMP spends the right-hand weapon's MP cost at bow fire time.
 func (h *Hostile) ConsumeBowMP() {
-	if h.weapon == nil || h.weapon.MPConsume <= 0 {
+	weapon := h.hands().weapon
+	if weapon == nil || weapon.MPConsume <= 0 {
 		return
 	}
-	h.ReduceMP(float64(h.weapon.MPConsume))
+	h.ReduceMP(float64(weapon.MPConsume))
 }
 
-// WeaponGrade returns this NPC's resolved right-hand weapon's crystal
-// grade, resolved by Attach. Zero (CrystalNone) when unarmed.
+// WeaponGrade returns the crystal grade of this NPC's right-hand weapon.
+// Zero (CrystalNone) when unarmed.
 func (h *Hostile) WeaponGrade() int {
-	return int(h.weaponCrystal)
+	return int(h.hands().weaponCrystal)
 }
 
 func (h *Hostile) SoulshotCharged() bool {
@@ -228,43 +233,18 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 	if physical && h.currentSoulshots > 0 && h.shotsMask&item.ShotSoul.Mask() == 0 {
 		h.currentSoulshots--
 		h.shotsMask |= item.ShotSoul.Mask()
-		skills = append(skills, 2154)
+		skills = append(skills, shotRechargeSoulSkill)
 	}
 	if magic && h.currentSpiritshots > 0 && h.shotsMask&item.ShotSpirit.Mask() == 0 {
 		h.currentSpiritshots--
 		h.shotsMask |= item.ShotSpirit.Mask()
-		skills = append(skills, 2061)
+		skills = append(skills, shotRechargeSpiritSkill)
 	}
 	h.shotsMu.Unlock()
 
 	for _, skillID := range skills {
 		h.broadcastShotRecharge(skillID)
 	}
-}
-
-// RollAttackedShotRecharge is the generic monster AI's attacked-hook shot
-// roll (the MonsterBehavior, WarriorBase and WizardBase scripts): on every
-// landed hit, an NPC configured with a nonzero
-// SoulShot/SpiritShot AI parameter rolls its matching *Rate parameter
-// (percent, [0,100), the spawn's value before the template's) and
-// recharges that shot type on success. Callers are the same three
-// HP-reduction paths that record attacker hate — TakeDamage, ReduceHP, and
-// ReduceHPByDOT — since every HP reduction (DOT included) records hate and
-// then runs the attacked hook. They roll it only for an NPC with no bound
-// behavior, whose attacked hook rolls it otherwise.
-func (h *Hostile) RollAttackedShotRecharge() {
-	physical := h.CurrentSoulshotCount() > 0 && h.rollShotRate("SoulShotRate")
-	magic := h.CurrentSpiritshotCount() > 0 && h.rollShotRate("SpiritShotRate")
-	if physical || magic {
-		h.RechargeShots(physical, magic)
-	}
-}
-
-// rollShotRate reads the percent AI parameter name and rolls it. A rate of
-// zero or less never rolls.
-func (h *Hostile) rollShotRate(name string) bool {
-	rate := int(h.AIInt(name, 0))
-	return rate > 0 && h.Roll(100) < rate
 }
 
 func (h *Hostile) broadcastShotRecharge(skillID int32) {
@@ -283,22 +263,18 @@ func (h *Hostile) SetHeadingTo(target attackable.Combatant) {
 // calculator (level scaling plus any active buff/debuff) from the template
 // base, scaled by the raid defence multiplier while raid related, and
 // truncated to a whole number.
-func (h *Hostile) PDef() float64 {
-	return math.Trunc(h.calcStat(stat.PowerDefence, h.Instance.Template.PDef*h.raidBaseMultipliers().Defence))
-}
+func (h *Hostile) PDef() float64 { return hostileSkillStats{h: h}.PDef() }
 
 // Evasion returns this NPC's physical evasion rating (per-mille), finalized
 // through its stat calculator (base DEX/level plus any active buff/debuff).
-func (h *Hostile) Evasion() int {
-	return int(h.calcStat(stat.EvasionRate, 0))
-}
+func (h *Hostile) Evasion() int { return hostileSkillStats{h: h}.Evasion() }
 
 // MakeAttackHit resolves one physical attack against target: a hit/miss
 // roll, a critical roll, and a damage roll through the shared
 // physical-damage formula. A target that can't exchange physical damage (no
 // formula stats) always misses.
 func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	hit := attack.Hit{TargetID: target.ObjectID()}
 
 	// Folding this needs the world known-list to hand out formula operands.
 	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
@@ -313,9 +289,8 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		return hit
 	}
 
-	tpl := h.Instance.Template
 	accuracy := int(h.calcStat(stat.AccuracyCombat, 0))
-	evasion := other.Evasion()
+	evasion := other.Against(h.ConditionActor(), nil).Evasion()
 
 	_, _, sz := h.Position()
 	_, _, tz := other.Position()
@@ -326,8 +301,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		return hit
 	}
 
-	critRate := float64(min(int(h.calcStat(stat.CriticalRate, tpl.CritRate)), 500))
-	crit := formulas.CritSucceeds(critRate, h.roll(1000))
+	crit := formulas.CritSucceeds(h.Against(conditions.ActorOf(other), nil).CriticalRate(), h.roll(1000))
 	in, shield := creature.ResolvePhysicalAttackInput(h, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit
@@ -400,15 +374,30 @@ func (h *Hostile) BroadcastStatus() {
 	h.SettleRegen()
 }
 
-// AttackableBy reports whether attacker may physically attack this NPC.
+// AttackableBy reports whether attacker may physically attack this NPC. A
+// Monster-family NPC refuses a player, or a player's summon, of the clan it
+// stands for (Instance.NPCClanID). A siege guard may be attacked only by a player, or a player's summon, whose
+// clan attacks the siege in progress of the castle, or the siegable hall,
+// the guard belongs to.
 func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
-	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()
+	if attacker == nil || attacker.ObjectID() == h.ObjectID() || h.AlikeDead() {
+		return false
+	}
+	if h.MonsterKind() {
+		if clanID, ok := actingClanID(attacker); ok && clanID > 0 && clanID == h.Instance.NPCClanID() {
+			return false
+		}
+	}
+	if !h.SiegeGuard() {
+		return true
+	}
+	clanID, ok := actingClanID(attacker)
+	return ok && h.guarded != nil && h.guarded.Attacking(clanID)
 }
 
 // AttackableWithoutForceBy reports whether a playable may attack this NPC
-// without Ctrl: only a Monster-family NPC that caster may attack. A town
-// Guard and a FriendlyMonster always need Ctrl, and so does a SiegeGuard,
-// which needs a siege in progress (none runs yet) to be attacked at all.
+// without Ctrl: a Monster-family NPC or a siege guard that caster may
+// attack. A town Guard and a FriendlyMonster always need Ctrl.
 func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
-	return h.MonsterKind() && h.AttackableBy(caster)
+	return (h.MonsterKind() || h.SiegeGuard()) && h.AttackableBy(caster)
 }

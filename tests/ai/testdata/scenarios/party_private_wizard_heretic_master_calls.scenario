@@ -1,0 +1,32 @@
+# PartyPrivateWizardHereticDD2Curse (22165, a private of a master), every draw 0, holding an attack desire on the
+# character: its master's call for help (10033) on the character drops its attack desires, sets its engaged flag
+# (int slot 4) and enters the character in its hate list by 200; its master's call to walk home (10035) clears the
+# flag and wants it home (100); its master's shouted target (10002) adds 200 more to the hate list. A call naming
+# another sender, or no creature, changes nothing.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Curse
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2Curse
+npc master 20003 Monster 300 0 0
+npc priv 22165 Monster 200 0 0 walks master master
+
+want priv player 500
+  desires priv attack(player)=500
+event priv 10033 character master
+  mem priv i_ai4=1
+  desires priv -
+jump priv 100 0 0
+event priv 10035 0 master
+  mem priv i_ai4=0
+  desires priv move_to(200,0,0)=100
+event priv 10002 character master
+  mem priv i_ai4=0
+event priv 10033 character character
+  mem priv i_ai4=0
+event priv 10033 0 master
+  mem priv i_ai4=0

@@ -1,0 +1,26 @@
+# Tarantula's Spider Silk (Q296), refused: a level 15 character with neither ring cannot accept at
+# Mion, and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q296_tarantulas_spider_silk_no_ring.golden
+character Spinner 15
+script quest.Q296_TarantulasSpiderSilk
+item 1493 1494
+page merchant/30519.htm
+page script/quest/Q296_TarantulasSpiderSilk/
+npc mion 30519 Merchant 10 0 0
+
+# Mion: no ring.
+action mion
+action mion
+  S ActionFailed
+  S NpcHtmlMessage obj=mion item=0 page=merchant/30519.htm
+  S ActionFailed
+bypass npc_{mion}_Quest
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q296_TarantulasSpiderSilk CREATED
+bypass Quest Q296_TarantulasSpiderSilk 30519-03.htm
+  S NpcHtmlMessage obj=mion item=0 page=script/quest/Q296_TarantulasSpiderSilk/30519-03a.htm
+  S ActionFailed
+  state Q296_TarantulasSpiderSilk CREATED
+  rows Q296_TarantulasSpiderSilk -

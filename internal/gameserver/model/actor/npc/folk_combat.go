@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -42,16 +43,30 @@ type folkCombat struct {
 	// it out of the world for DeleteNow; nil decays it with no respawn.
 	scripts ScriptHooks
 	remover FolkRemover
+	// ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	ground GroundTaker
+	// landing is FolkRuntime.Landing, set by Attach.
+	landing move.LandingGeo
+	// sight is what the NPC's tick scan has told its see-creature scripts
+	// about; seeDistance is its see range, zero for the shipped default.
+	sight       sight
+	seeDistance int
 	// heldMask is the item-type bits of the template's weapon and shield.
 	heldMask int32
+	// regenSettings is FolkRuntime.Regen, set by Attach.
+	regenSettings RegenSettings
+	// roll overrides the combat random source; nil draws at random.
+	roll func(n int) int
 
-	effects  *effect.List
-	maxBuffs atomic.Int32
+	effects *effect.List
 
-	// statMu guards statCalcs slot creation; each Calculator guards its own
-	// mods.
+	// statMu guards statCalcs, its slots and passives; each Calculator
+	// guards its own mods. A Stat without a slot computes from passives,
+	// the template's shared Mods.
 	statMu    sync.RWMutex
-	statCalcs [stat.Count]*effect.Calculator
+	statCalcs *[stat.Count]*effect.Calculator
+	passives  *effect.StatMods
 	// speedMu orders move-speed hand-offs to a walking NPC's movement.
 	speedMu sync.Mutex
 
@@ -60,6 +75,8 @@ type folkCombat struct {
 	abnormalEffect atomic.Int32
 	invul          atomic.Bool
 	immobilized    atomic.Bool
+	// paralyzed is the transient paralysis lock a GM sets; see SetParalyzed.
+	paralyzed atomic.Bool
 
 	// vitalsMu guards hp, mp and the death state: dead, decayed and the
 	// corpse's decay deadline (zero while none is registered).
@@ -85,9 +102,6 @@ type FolkRuntime struct {
 	Sink  event.Sink
 	// Effects is the server's effect-list context.
 	Effects effect.Env
-	// MaxBuffsAmount is the configured base buff-slot count; zero keeps the
-	// shipped default.
-	MaxBuffsAmount int
 	// AI is the AI task the NPC's spawner put it on, which it leaves when
 	// it dies; nil for none.
 	AI FolkAI
@@ -102,14 +116,27 @@ type FolkRuntime struct {
 	// Zones are the zones the NPC's membership follows; nil leaves it in
 	// none.
 	Zones *zone.Index
-	// Slot is the spawn slot that placed the NPC; nil leaves it with no
-	// spawn parameters and a script memory of its own.
-	Slot SpawnSlot
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts ScriptHooks
 	// Remover takes the NPC out of the world for DeleteNow; nil decays it
 	// with no respawn.
 	Remover FolkRemover
+	// Ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	Ground GroundTaker
+	// Landing is the geodata the teleports of an NPC with no movement land
+	// through (move.Land); nil lands them where they aim. An NPC that can
+	// move lands through its movement's geodata instead.
+	Landing move.LandingGeo
+	// SeeRange is the configured see range (DefaultSeeRange); zero keeps
+	// the shipped default.
+	SeeRange int
+	// Tower is a control tower's siege and working form; a control tower
+	// without them stands dead for good. Any other NPC ignores it.
+	Tower TowerRuntime
+	// Regen answers the base regeneration multipliers in force; nil takes
+	// the shipped ones.
+	Regen RegenSettings
 }
 
 // FolkRemover takes a civilian NPC out of the world at once, with no
@@ -124,13 +151,15 @@ func folkAdmits(e *effect.Effect) bool {
 	return e.Type == effect.TypeBuff || e.Type == effect.TypeDebuff
 }
 
-// initCombat settles the NPC's stats from its template passives mods and
-// fills its HP and MP.
-func (f *Folk) initCombat(mods []effect.Mod) {
+// initCombat settles the NPC's stats from its template passives and fills
+// its HP and MP.
+func (f *Folk) initCombat(passives *compiledPassives) {
 	f.effects = effect.NewList(f, effect.WithAdmission(folkAdmits))
-	f.maxBuffs.Store(maxBuffCount)
-	f.running.Store(!f.Instance.WalkMode)
-	f.AttachStatFuncs(mods)
+	f.running.Store(true)
+	_, byStat := passives.attached(f.ConditionActor())
+	f.statMu.Lock()
+	f.passives = byStat
+	f.statMu.Unlock()
 	f.hp = float64(f.MaxHP())
 	f.mp = math.Trunc(f.MaxMPValue())
 	f.hpBar.Calibrate(float64(f.MaxHP()))
@@ -143,16 +172,20 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 		return errors.New("npc: folk runtime needs a queue")
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
-	f.scripts, f.remover = rt.Scripts, rt.Remover
+	f.scripts, f.remover, f.ground, f.landing = rt.Scripts, rt.Remover, rt.Ground, rt.Landing
+	f.seeDistance = rt.SeeRange
+	f.regenSettings = rt.Regen
+	if f.Tower() {
+		f.towerState.siege, f.towerState.working = rt.Tower.Siege, rt.Tower.Working
+	}
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
-	f.bindSpawn(rt.Slot)
+	f.Scratch().setLife(f)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
-	if rt.MaxBuffsAmount > 0 {
-		f.maxBuffs.Store(int32(rt.MaxBuffsAmount))
-	}
+	f.resolveWeapon(rt.Items)
 	f.effects = effect.NewList(f, effect.WithEnv(rt.Effects), effect.WithAdmission(folkAdmits))
 	f.effects.SetQueue(rt.Queue)
+	f.keepTerritory()
 	return nil
 }
 
@@ -166,9 +199,12 @@ func (f *Folk) emit(ev event.Event) {
 }
 
 // OnInactiveRegion stops every effect the NPC holds once no player is near
-// its region. The departing player's goroutine calls it, so the stop runs
-// on the NPC's own queue, and only if the region is still inactive then.
+// its region, and puts its AI to sleep unless it is a noSleepMode NPC or
+// stands outside its territory. The departing player's goroutine calls it,
+// so the stop runs on the NPC's own queue, and only if the region is still
+// inactive then.
 func (f *Folk) OnInactiveRegion() {
+	f.aiSleep.settle(f.world, f)
 	if f.queue == nil {
 		return
 	}
@@ -180,6 +216,18 @@ func (f *Folk) OnInactiveRegion() {
 		}
 		f.effects.StopAll()
 	})
+}
+
+// OnActiveRegion wakes the NPC's AI once players wake its region.
+func (f *Folk) OnActiveRegion() { f.aiSleep.settle(f.world, f) }
+
+// OnRegionArrival decides the NPC's AI sleep when it comes onto the grid, as
+// OnInactiveRegion and OnActiveRegion do. Walking or teleporting into
+// another region leaves it as it was.
+func (f *Folk) OnRegionArrival(_, joined bool) {
+	if joined {
+		f.aiSleep.settle(f.world, f)
+	}
 }
 
 // CharacterName returns the template name.
@@ -197,10 +245,10 @@ func (f *Folk) FakeDeath() bool { return false }
 // RecentFakeDeath reports false: NPCs never feign death.
 func (f *Folk) RecentFakeDeath() bool { return false }
 
-// MovementDisabled reports a template that cannot move, an immobilized or
-// dead NPC, or a teleport under way.
+// MovementDisabled reports a template that cannot move, an immobilized,
+// paralyzed or dead NPC, or a teleport under way.
 func (f *Folk) MovementDisabled() bool {
-	return !f.Instance.Template.CanMove || f.immobilized.Load() || f.Dead() || (f.motion != nil && f.motion.teleporting.Load())
+	return !f.Instance.Template.CanMove || f.immobilized.Load() || f.Paralyzed() || f.Dead() || (f.motion != nil && f.motion.teleporting.Load())
 }
 
 // SilentMoving reports whether an effect lets the NPC move unseen.
@@ -211,6 +259,16 @@ func (f *Folk) SilentMoving() bool { return f.effects.IsAffected(effect.FlagSile
 func (f *Folk) Knows(other attackable.Combatant) bool {
 	tracked, ok := other.(world.Tracked)
 	return ok && world.Knows(f, tracked) && !attackable.HiddenActingPlayer(other)
+}
+
+// inWorld reports whether target is still registered in f's world. With no
+// world attached, nothing has left it.
+func (f *Folk) inWorld(target attackable.Combatant) bool {
+	if f.world == nil {
+		return true
+	}
+	_, ok := f.world.Object(target.ObjectID())
+	return ok
 }
 
 // SpawnProtected reports false: spawn protection is a player state.
@@ -228,13 +286,13 @@ func (f *Folk) SiegeGuard() bool { return false }
 // Guard reports false: a civilian NPC is no guard.
 func (f *Folk) Guard() bool { return false }
 
-// Attackable reports false: a civilian NPC keeps no hate or aggro, so the
-// aggro controls below do nothing.
+// Attackable reports false: a civilian NPC is no attackable NPC, so the
+// aggro controls that act only on one do nothing on it.
 func (f *Folk) Attackable() bool { return false }
 
 // Running reports the NPC's run stance: it spawns running, or walking
-// for a route walker in walk mode; a hit or a cast desire it acts on
-// switches it to run, and its AI going idle back to walk.
+// for a route walker in walk mode; a hit, or an attack or cast desire it
+// acts on, switches it to run, and its AI going idle back to walk.
 func (f *Folk) Running() bool { return f.running.Load() }
 
 // InCombat reports whether the NPC holds an attack stance.
@@ -267,6 +325,17 @@ func (f *Folk) SetRunStance(run bool) {
 	f.forceWalkStance()
 }
 
+// SetRunning puts f in its run stance, or its walk stance, and reports
+// whether the stance changed. The movement takes the stance's speed; the
+// players around f are not told.
+func (f *Folk) SetRunning(running bool) bool {
+	if !f.running.CompareAndSwap(!running, running) {
+		return false
+	}
+	f.refreshMoveSpeed()
+	return true
+}
+
 // forceRunStance switches a walking NPC to its run stance, as any hit
 // does: the movement speeds up, and observers see the stance change and
 // the NPC's info again.
@@ -295,12 +364,23 @@ func (f *Folk) forceWalkStance() {
 	f.emit(event.NPCInfoChanged{})
 }
 
-// Roll draws a uniform random integer in [0, n).
+// Roll draws a uniform random integer in [0, n) from f's combat random
+// source.
 func (f *Folk) Roll(n int) int {
 	if n <= 0 {
 		return 0
 	}
+	if f.roll != nil {
+		return f.roll(n)
+	}
 	return rand.Intn(n)
+}
+
+// SetRollSource overrides the combat random source Roll draws from (the
+// skill landing rolls, the hit and critical rolls), for deterministic
+// tests. Set it on the NPC's queue.
+func (f *Folk) SetRollSource(roll func(n int) int) {
+	f.roll = roll
 }
 
 // AbnormalEffect returns the NPC's client-visible abnormal-effect bits.
@@ -336,4 +416,10 @@ func (f *Folk) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Comb
 			fn(combatant)
 		}
 	})
+}
+
+// ForEachKnownHitTargetInRadius is ForEachKnownCombatantInRadius: an NPC
+// never hits a door.
+func (f *Folk) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	f.ForEachKnownCombatantInRadius(radius, fn)
 }

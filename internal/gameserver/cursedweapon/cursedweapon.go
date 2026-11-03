@@ -138,7 +138,7 @@ func New(table *entity.CursedWeaponTable, store Store, writes Writer, log zerolo
 }
 
 // weapons returns the weapons of table, none of them out yet, by id and in
-// the reference's order.
+// hash order.
 func weapons(table *entity.CursedWeaponTable) (map[int32]*weapon, []*weapon) {
 	byID := map[int32]*weapon{}
 	var order []*weapon
@@ -154,8 +154,8 @@ func weapons(table *entity.CursedWeaponTable) (map[int32]*weapon, []*weapon) {
 	return byID, order
 }
 
-// hashOrder lists ids in the iteration order of a hash map the reference
-// filled with them: buckets of a table of 16 doubled whenever it gets three
+// hashOrder lists ids in the iteration order of a hash map filled with
+// them: buckets of a table of 16 doubled whenever it gets three
 // quarters full, a bucket being the low bits of the id folded with its high
 // half, and ids sharing a bucket in ascending order.
 func hashOrder(ids []int32) []int32 {

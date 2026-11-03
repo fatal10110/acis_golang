@@ -1,0 +1,16 @@
+# WizardHereticPriestAggressive (22143), settled (nine AI cycles) in its territory with an empty hate list, free to move,
+# every draw 0: the character (a warrior, in no party) it sees 100 away gets its short range DD magic (4629-9),
+# closing in, 1000000; no hold magic, as the character is no paladin, phoenix knight or cleric.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1000 0 0 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9
+
+tick x9
+approach priest
+  S MagicSkillUse caster=priest target=player skill=4629-9 hit=10571 reuse=21142 success=0
+  desires priest cast(player,4629,move)=1000000

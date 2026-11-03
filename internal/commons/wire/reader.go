@@ -123,7 +123,10 @@ func (r *Reader) ReadBytes(n int) []byte {
 }
 
 // ReadString reads a null-terminated UTF-16LE string: 16-bit code units up
-// to but excluding the trailing 0x0000 unit, which is consumed.
+// to but excluding the trailing 0x0000 unit, which is consumed. A valid
+// surrogate pair reads as its supplementary character and an unpaired
+// surrogate as U+FFFD, so each unit still counts one toward the string's
+// UTF-16 length.
 //
 // The terminator is located before anything is allocated, so a field with
 // no terminator (ErrShortPacket) or with more than MaxStringUnits code units
@@ -154,9 +157,9 @@ func (r *Reader) ReadString() string {
 	return decodeUTF16LE(rest[:2*units])
 }
 
-// decodeUTF16LE converts an even-length UTF-16LE byte run to a string,
-// replacing unpaired surrogates with U+FFFD as utf16.Decode does. It sizes
-// the result exactly first so the string is built in one allocation.
+// decodeUTF16LE converts an even-length UTF-16LE byte run to a string, an
+// unpaired surrogate as U+FFFD. It sizes the result exactly first so the
+// string is built in one allocation.
 func decodeUTF16LE(b []byte) string {
 	size := 0
 	for i := 0; i < len(b); {
@@ -175,7 +178,8 @@ func decodeUTF16LE(b []byte) string {
 }
 
 // utf16LERune decodes the code point starting at b and reports how many
-// bytes it spans: 4 for a valid surrogate pair, otherwise 2.
+// bytes it spans: 4 for a valid surrogate pair, otherwise 2. An unpaired
+// surrogate is returned as U+FFFD.
 func utf16LERune(b []byte) (rune, int) {
 	c := rune(binary.LittleEndian.Uint16(b))
 	if !utf16.IsSurrogate(c) {

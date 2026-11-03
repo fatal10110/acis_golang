@@ -1,0 +1,22 @@
+# Deliver Supplies (Q168), refused: a human fighter of level 3 is turned away by Jenna, who takes
+# dark elves only, and the quest is not started. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q168_deliver_supplies_wrong_race.golden
+character Stranger 3
+script quest.Q168_DeliverSupplies
+item 1153
+page guard/30349.htm
+page script/quest/Q168_DeliverSupplies/
+npc jenna 30349 Guard 10 0 0
+
+action jenna
+action jenna
+  S ActionFailed
+  S NpcHtmlMessage obj=jenna item=0 page=guard/30349.htm
+  S ActionFailed
+bypass npc_{jenna}_Quest
+  S NpcHtmlMessage obj=jenna item=0 page=script/quest/Q168_DeliverSupplies/30349-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q168_DeliverSupplies CREATED
+  rows Q168_DeliverSupplies -

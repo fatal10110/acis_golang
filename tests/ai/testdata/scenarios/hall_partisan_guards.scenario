@@ -1,0 +1,36 @@
+# The Partisan Hideaway's standing guards, Agit01Stand1 (35370 and 35374), and Bloody Lord Nurka,
+# BloodyLordNurka1 (35368), of one clan within 300: the second guard stands out of Nurka's reach.
+# Nurka stands 250 from the character, outside the 200 of his territory, so his appearance sends
+# it nowhere. A fixture monster has 440 hit points and level 1: a hit of 22 is a twentieth of them.
+# Every guard fights from where it stands. The hit guard wants to attack the character by 100 and
+# the hit's clan calls, its own first, add 100 to each guard; Nurka answers the call with his
+# strike 4042 (a draw under 2), which he starts casting at once, and by 5000. Hit himself by a
+# character more than 8 levels above him, Nurka wants his debuff 5456 on it, which the shipped
+# skills do not hold (no desire), and stops hating it, which drops the call's 5000. He wants his
+# strike again (a draw under 10) and to attack it by 10000, and his own clan call adds 5000 and his
+# strike once more; the guard beside him answers his call by 100. Seen, each guard wants to attack
+# the character by 200 more.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.Agit01Stand1.Agit01Stand1
+script script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1
+npc guard 35370 Monster 100 0 0 clan partisan_clan 300
+npc guard2 35374 Monster 0 100 0 clan partisan_clan 300
+npc nurka 35368 Monster 0 -250 0 clan partisan_clan 300 skill DD_MAGIC 4042 1
+
+hit guard 22
+  S MagicSkillUse caster=nurka target=player skill=4042-1 hit=10571 reuse=0 success=0
+  desires guard attack(player)=200
+  desires guard2 attack(player)=100
+  desires nurka cast(player,4042)=1000000 attack(player)=5000
+
+hit nurka 22
+  desires guard attack(player)=300
+  desires guard2 attack(player)=100
+  desires nurka cast(player,4042)=3000000 attack(player)=15000
+
+approach guard2
+  desires guard attack(player)=500
+  desires guard2 attack(player)=300
+  desires nurka cast(player,4042)=3000000 attack(player)=15000

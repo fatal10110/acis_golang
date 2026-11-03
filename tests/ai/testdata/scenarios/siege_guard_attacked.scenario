@@ -1,0 +1,34 @@
+# The attacked and clan-attacked hooks of GludioHold (a knight, 35235, and a court guard,
+# 35238) and GludioBowGuard (35241), Aden's guards, of the clan aden_siege_clan within 300.
+# A fixture guard has 440 hit points: a hit of 22 is a twentieth of them. The knight's own
+# attacked hook wants to attack the character by 100 for it, and the hit's clan calls, which
+# reach the knight itself first, then its clan mates in range, add 50 each: to the knight,
+# the court guard (GludioHold's clan-attacked hook) and the bow guard (its own). The built-in
+# attacked hate stays off for a bound id, so the hate is the hooks' weights alone. A second
+# such hit, on the bow guard, adds its own 100 and 50, and 50 to each clan mate. None of it
+# sends a packet.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioBowGuard
+script script.ai.siegeguards.GludioHold.GludioCourtGuard
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 100 0 0 walks clan aden_siege_clan 300
+npc court 35238 SiegeGuard 0 100 0 walks clan aden_siege_clan 300
+npc bow 35241 SiegeGuard 0 -100 0 walks clan aden_siege_clan 300
+
+hit knight 22
+  hate knight 150
+  hate court 50
+  hate bow 50
+  desires knight attack(player)=150
+  desires court attack(player)=50
+  desires bow attack(player)=50
+
+hit bow 22
+  hate knight 200
+  hate court 100
+  hate bow 200
+  desires knight attack(player)=200
+  desires court attack(player)=100
+  desires bow attack(player)=200

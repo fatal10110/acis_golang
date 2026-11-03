@@ -1,0 +1,109 @@
+# Saga of the Spectral Dancer (Q096) on the saga core, played by a level 76 Bladedancer from
+# the start: Mordred offers it and gives the main item; Elena sends the player to Bavarin,
+# who asks for what the player does not hold; Mordred has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q096_SagaOfTheSpectralDancer.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q096_saga_of_the_spectral_dancer.golden
+character Bladedancer 76
+class 34
+script quest.Q096_SagaOfTheSpectralDancer
+item 7092
+page trainer/31582.htm
+page merchant/31284.htm
+page default/31623.htm
+page script/quest/Q096_SagaOfTheSpectralDancer/
+npc mordred 31582 Trainer 10 0 0
+npc elena 31284 Merchant -10 0 0
+npc bavarin 31623 Folk 0 10 0
+
+action mordred
+action mordred
+  S ActionFailed
+  S NpcHtmlMessage obj=mordred item=0 page=trainer/31582.htm
+  S ActionFailed
+bypass npc_{mordred}_Quest
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q096_SagaOfTheSpectralDancer 0-1
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/0-05.htm
+  S ActionFailed
+bypass Quest Q096_SagaOfTheSpectralDancer accept
+  S QuestList 96:0x80000001
+  S ExShowQuestMark quest=96
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7092
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/0-03.htm
+  S ActionFailed
+  Q upsert Q096_SagaOfTheSpectralDancer | <state> | STARTED
+  Q upsert Q096_SagaOfTheSpectralDancer | <cond> | 1
+  items 7092=1
+  state Q096_SagaOfTheSpectralDancer STARTED
+action mordred
+  S ActionFailed
+  S NpcHtmlMessage obj=mordred item=0 page=trainer/31582.htm
+  S ActionFailed
+bypass npc_{mordred}_Quest
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action elena
+action elena
+  S ActionFailed
+  S NpcHtmlMessage obj=elena item=0 page=merchant/31284.htm
+  S ActionFailed
+bypass npc_{elena}_Quest
+  S NpcHtmlMessage obj=elena item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q096_SagaOfTheSpectralDancer 2-1
+  S QuestList 96:0x80000003
+  S ExShowQuestMark quest=96
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=elena item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/2-05.htm
+  S ActionFailed
+  Q upsert Q096_SagaOfTheSpectralDancer | <cond> | 2
+action elena
+  S ActionFailed
+  S NpcHtmlMessage obj=elena item=0 page=merchant/31284.htm
+  S ActionFailed
+bypass npc_{elena}_Quest
+  S NpcHtmlMessage obj=elena item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action bavarin
+action bavarin
+  S ActionFailed
+  S NpcHtmlMessage obj=bavarin item=0 page=default/31623.htm
+  S ActionFailed
+bypass npc_{bavarin}_Quest
+  S NpcHtmlMessage obj=bavarin item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q096_SagaOfTheSpectralDancer 1-3
+  S QuestList 96:0x80000007
+  S ExShowQuestMark quest=96
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bavarin item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/1-05.htm
+  S ActionFailed
+  Q upsert Q096_SagaOfTheSpectralDancer | <cond> | 3
+action bavarin
+  S ActionFailed
+  S NpcHtmlMessage obj=bavarin item=0 page=default/31623.htm
+  S ActionFailed
+bypass npc_{bavarin}_Quest
+  S NpcHtmlMessage obj=bavarin item=0 page=script/quest/Q096_SagaOfTheSpectralDancer/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action mordred
+action mordred
+  S ActionFailed
+  S NpcHtmlMessage obj=mordred item=0 page=trainer/31582.htm
+  S ActionFailed
+bypass npc_{mordred}_Quest
+  S NpcHtmlMessage obj=mordred item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q096_SagaOfTheSpectralDancer STARTED
+  rows Q096_SagaOfTheSpectralDancer <cond>=3 <state>=STARTED

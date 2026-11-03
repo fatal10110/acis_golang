@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -40,6 +41,7 @@ func encodeAction(objectID int32) []byte {
 // /friendlist shows it online; it is not spawned yet, so the friend neither sees nor can click it,
 // and its friends hear of it only when it enters.
 func TestSelectedCharacterIsFoundBeforeEnterWorld(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)
 	startInWorld(t, p.alice)
@@ -95,6 +97,7 @@ func TestSelectedCharacterIsFoundBeforeEnterWorld(t *testing.T) {
 // is closed, its row is marked offline, and its friends get the offline
 // status a logout sends.
 func TestDisconnectBeforeEnterWorldLeavesNothingRegistered(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)
 	startInWorld(t, p.alice)
@@ -162,12 +165,11 @@ func TestSelectionSeesCharacterStillEntering(t *testing.T) {
 	// The takeover closes the entering session; its detach waits on the
 	// held queue, so the character stays registered.
 	c := p.srv.DialClient(t, "player2", 1)
-	if !p.bobby.AwaitClose(silenceWindow * 10) {
+	if !p.bobby.AwaitClose(3 * time.Second) {
 		t.Fatal("account takeover left the entering session open")
 	}
 	c.Send(encodeRequestGameStart(0))
-	p.srv.AwaitHandled(t)
-	if frames := drainFrames(t, c); len(frames) != 0 {
+	if frames := p.srv.ReadHandled(t, c); len(frames) != 0 {
 		t.Fatalf("selection with the character still entering answered %x, want nothing", opcodes(frames))
 	}
 

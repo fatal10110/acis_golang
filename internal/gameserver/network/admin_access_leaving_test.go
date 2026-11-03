@@ -77,9 +77,9 @@ func TestAdminBanOfLeavingPlayerIsStored(t *testing.T) {
 
 			state := world.New()
 			gm := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
-			gm.Name = "GM"
+			gm.SetName("GM")
 			target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
-			target.Name = "Leaver"
+			target.SetName("Leaver")
 			target.SetTitle("Away")
 			state.Spawn(target, 100, 0, 0, 0)
 			state.AddPlayer(target)
@@ -87,7 +87,7 @@ func TestAdminBanOfLeavingPlayerIsStored(t *testing.T) {
 			// queue refuses new tasks.
 			target.Queue().Close()
 
-			l := &GameClientLink{world: state, log: zerolog.Nop(), admin: levels, persist: worker, accessLevels: store}
+			l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), Admin: levels, Persist: worker, AccessLevels: store})
 			tc.run(l, gm, tc.line)
 			if err := worker.Flush(context.Background(), target.ObjectID()); err != nil {
 				t.Fatalf("flush: %v", err)

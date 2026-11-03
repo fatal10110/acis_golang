@@ -1,0 +1,30 @@
+# Song of the Hunter (Q335), level 50: Tor's request of the second license completed. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_tor_payout_2.golden
+character Hunter 50
+quest Q335_SongOfTheHunter <cond>=3 <state>=STARTED tor=3748
+hold 3748 1
+hold 3790 40
+script quest.Q335_SongOfTheHunter
+item 57 3694 3748 3790
+page default/30745.htm
+page script/quest/Q335_SongOfTheHunter/
+npc tor 30745 Folk 10 0 0
+
+action tor
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S SystemMessage id=302 3:3748
+  S SystemMessage id=301 3:3790 6:40
+  S SystemMessage id=54 3:3694
+  S SystemMessage id=52 6:6850
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-06b.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | tor | 0
+  Q upsert Q335_SongOfTheHunter | torOffer | 0
+  items 3748=0 3790=0 3694=1 57=6850
+  rows Q335_SongOfTheHunter <cond>=3 <state>=STARTED tor=0 torOffer=0

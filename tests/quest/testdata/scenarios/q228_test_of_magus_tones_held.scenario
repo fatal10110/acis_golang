@@ -1,0 +1,72 @@
+# Test Of Magus (Q228), the tones already given: a level 39 Human Wizard at cond 5 holds the four
+# tones and no charm; each elemental tells the traveller the test is done with him and gives
+# nothing more.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q228_test_of_magus_tones_held.golden
+character Magus 39
+class 11
+quest Q228_TestOfMagus <state>=STARTED <cond>=5
+hold 2856 1
+hold 2857 1
+hold 2858 1
+hold 2859 1
+script quest.Q228_TestOfMagus
+item 2840 2841 2842 2843 2844 2845 2846 2847 2848 2849 2850 2851 2852 2853 2854 2855 2856 2857 2858 2859 2860 2861 2862 2863 7562
+page default/30409.htm
+page default/30411.htm
+page default/30412.htm
+page default/30413.htm
+page script/quest/Q228_TestOfMagus/
+npc snake 30409 Folk 0 -10 0
+npc salamander 30411 Folk 10 10 0
+npc sylph 30412 Folk -10 10 0
+npc undine 30413 Folk 10 -10 0
+
+action undine
+action undine
+  S ActionFailed
+  S NpcHtmlMessage obj=undine item=0 page=default/30413.htm
+  S ActionFailed
+bypass npc_{undine}_Quest
+  S NpcHtmlMessage obj=undine item=0 page=script/quest/Q228_TestOfMagus/30413-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 2862=0 2856=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action salamander
+action salamander
+  S ActionFailed
+  S NpcHtmlMessage obj=salamander item=0 page=default/30411.htm
+  S ActionFailed
+bypass npc_{salamander}_Quest
+  S NpcHtmlMessage obj=salamander item=0 page=script/quest/Q228_TestOfMagus/30411-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 2860=0 2857=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action sylph
+action sylph
+  S ActionFailed
+  S NpcHtmlMessage obj=sylph item=0 page=default/30412.htm
+  S ActionFailed
+bypass npc_{sylph}_Quest
+  S NpcHtmlMessage obj=sylph item=0 page=script/quest/Q228_TestOfMagus/30412-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 2861=0 2858=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5
+action snake
+action snake
+  S ActionFailed
+  S NpcHtmlMessage obj=snake item=0 page=default/30409.htm
+  S ActionFailed
+bypass npc_{snake}_Quest
+  S NpcHtmlMessage obj=snake item=0 page=script/quest/Q228_TestOfMagus/30409-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 2863=0 2859=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=5

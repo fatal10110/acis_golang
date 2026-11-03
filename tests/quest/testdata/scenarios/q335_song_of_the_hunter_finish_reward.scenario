@@ -1,0 +1,36 @@
+# Song of the Hunter (Q335), level 50: The end of the hunter quest with twenty laurel leaf pins: Grey pays 20000 adena and the quest is over. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_finish_reward.golden
+character Hunter 50
+quest Q335_SongOfTheHunter <cond>=3 <state>=STARTED
+hold 3694 20
+hold 3693 1
+script quest.Q335_SongOfTheHunter
+item 57 3693 3694
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-14.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30744-15.htm
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-15.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30744-16.htm
+  S SystemMessage id=52 6:20000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:3693
+  S SystemMessage id=301 3:3694 6:20
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-17.htm
+  S ActionFailed
+  Q delete-quest Q335_SongOfTheHunter
+  items 57=20000 3694=0
+  state Q335_SongOfTheHunter -
+  rows Q335_SongOfTheHunter -

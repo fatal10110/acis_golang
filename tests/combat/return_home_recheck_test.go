@@ -21,7 +21,7 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			srv := gameservertest.Boot(t,
+			srv := gameservertest.Boot(t, withWarriorBehavior(),
 				gameservertest.WithCharacter("Newbie", 5, 0),
 				gameservertest.WithWantChars(1),
 			)
@@ -35,7 +35,7 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 			if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 				t.Fatalf("CurrentIntention() = %v, want wander", got)
 			}
-			assertChangeMoveType(t, mustRead(t, c, "wander walk stance"), hostile.ObjectID(), false)
+			assertStanceShown(t, c, "wander walk stance", hostile.ObjectID(), false)
 			assertFrameOpcode(t, mustRead(t, c, "wander move"), serverpackets.OpcodeMoveToLocation, "wander move")
 			if !hostile.IsMoving() {
 				t.Fatal("IsMoving() = false before return home")
@@ -75,8 +75,8 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 			srv.Advance(t, 5*time.Second)
 			if tc.wantRecheck {
 				assertFrameOpcode(t, mustRead(t, c, "wander recheck"), serverpackets.OpcodeMoveToLocation, "wander recheck")
-			} else if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-				t.Fatalf("unexpected frame after recovery teleport: opcode %#x", frame[0])
+			} else if frames := c.ReadQueued(); len(frames) != 0 {
+				t.Fatalf("unexpected frame after recovery teleport: opcode %#x", frames[0][0])
 			}
 		})
 	}
@@ -87,7 +87,7 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 // teleport aborts the NPC's cast. The tick must finish and observers must see
 // the teleport.
 func TestReturnHomeRecoveryFromThinkLoop(t *testing.T) {
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -123,13 +123,14 @@ func TestReturnHomeRecoveryFromThinkLoop(t *testing.T) {
 		panic("think loop deadlocked on the recovery teleport")
 	}
 
-	// The wander step forces walk stance first; skip to the teleport.
+	// The wander step forces walk stance first, shown with ChangeMoveType
+	// and NpcInfo; skip to the teleport.
 	for {
 		frame := c.ReadWithTimeout(time.Second)
 		if frame == nil {
 			t.Fatal("TeleportToLocation never arrived")
 		}
-		if frame[0] != serverpackets.OpcodeChangeMoveType {
+		if frame[0] != serverpackets.OpcodeChangeMoveType && frame[0] != serverpackets.OpcodeNPCInfo {
 			assertNPCTeleportFrames(t, c, frame, hostile.ObjectID(), home)
 			break
 		}
@@ -142,7 +143,7 @@ func TestReturnHomeRecoveryFromThinkLoop(t *testing.T) {
 // A teleport that starts while another is still in progress is dropped: no
 // frames, no movement, and the geo-path fail streak is left alone.
 func TestNPCTeleportDroppedWhileAnotherInProgress(t *testing.T) {
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -160,8 +161,8 @@ func TestNPCTeleportDroppedWhileAnotherInProgress(t *testing.T) {
 		t.Fatal("SetTeleporting(true) on an idle NPC reported no change")
 	}
 	hostile.TeleportTo(location.Location{X: home.X, Y: home.Y + 300, Z: home.Z})
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("dropped teleport sent opcode %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("dropped teleport sent opcode %#x", queued[0][0])
 	}
 	if x, y, z := hostile.Position(); (location.Location{X: x, Y: y, Z: z}) != home {
 		t.Fatalf("position after dropped teleport = (%d,%d,%d), want %+v", x, y, z, home)

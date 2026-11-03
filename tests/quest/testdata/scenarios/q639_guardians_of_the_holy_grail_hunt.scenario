@@ -1,0 +1,32 @@
+# Guardians of the Holy Grail (Q639): a scripture drops for a draw under the monster's own chance.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q639_guardians_of_the_holy_grail_hunt.golden
+character Hero 73
+quest Q639_GuardiansOfTheHolyGrail <cond>=1 <state>=STARTED
+random 0 760000 0 0 0 229999
+script quest.Q639_GuardiansOfTheHolyGrail
+item 8069 8070 8071 57 959 960
+page default/31350.htm
+page default/32008.htm
+page default/32028.htm
+page script/quest/Q639_GuardiansOfTheHolyGrail/
+npc dominic 31350 Folk 10 0 0
+npc gremory 32008 Folk 20 0 0
+npc grail 32028 Folk 30 0 0
+npc m1 22122 Monster 40 0 0
+npc m2 22128 Monster 50 0 0
+npc m3 22134 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 8069=0
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8069
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8069=1
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8069
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8069=2

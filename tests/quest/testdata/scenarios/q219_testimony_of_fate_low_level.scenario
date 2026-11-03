@@ -1,0 +1,22 @@
+# Testimony Of Fate (Q219), refused: a level 36 Palus Knight is told by Kaira to come back at level 37, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q219_testimony_of_fate_low_level.golden
+character Scholar 36
+class 32
+script quest.Q219_TestimonyOfFate
+item 3172 3173 3174 3175 3176 3177 3178 3179 3180 3181 3182 3183 3184 3185 3186 3187 3188 3189 3190 3191 3192 3193 3194 3195 3196 3197 3198 3199 3200 3201 3202 7562
+page trainer/30476.htm
+page script/quest/Q219_TestimonyOfFate/
+npc kaira 30476 Trainer -20 10 0
+
+action kaira
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q219_TestimonyOfFate CREATED
+  rows Q219_TestimonyOfFate -

@@ -76,7 +76,7 @@ type signetUnsummonable interface {
 
 type signetHandler struct {
 	defs          Definitions
-	magicFailures bool
+	magicFailures *magicFailureSwitch
 	templates     signetTemplates
 	ids           objectIDAllocator
 	world         *world.State
@@ -188,7 +188,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 		queue.Close()
 		return nil, false
 	}
-	point.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(point)})
+	point.Attach(npc.Runtime{World: h.world, Sink: h.newSink(point)})
 	point.SetZones(h.zones)
 
 	pos, ok := caster.(signetPositioned)
@@ -256,7 +256,7 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 		}
 		var ids []int32
 		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
-			applyEffects(actor, target, sub, sub.Effects)
+			applyEffects(actor, target, *sub, sub.Effects)
 			if ct := target; ct != nil {
 				actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
 				ids = append(ids, ct.ObjectID())
@@ -370,25 +370,26 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			return false
 		}
 		if float64(def.MPConsume) > mp.MPValue() {
-			if n, ok := caster.(lackMPNotifier); ok {
-				n.NotifyEffectRemovedDueLackMP(ef)
+			if p, ok := asPlayer(caster); ok {
+				p.NotifyEffectRemovedDueLackMP(ef)
 			}
 			return false
 		}
 		mp.ReduceMP(float64(def.MPConsume))
 
 		var ids []int32
+		failures := h.magicFailures.enabled()
 		h.forEachSignetTarget(point, def.Radius, func(target Actor) {
 			dmgTarget, ok := asCreature(target)
 			if !ok {
 				return
 			}
-			in, ok := dmgTarget.MagicDamageInput(caster, def, h.magicFailures)
+			in, ok := dmgTarget.MagicDamageInput(caster, def, failures)
 			if !ok {
 				return
 			}
 			deliverMagicFailure(caster, target, def, in.Failure)
-			damage := javaInt(formulas.MagicDamage(in))
+			damage := truncDamage(formulas.MagicDamage(in))
 			// A summon in the signet republishes its status on every tick,
 			// whether or not the tick then hurts it.
 			if target.Kind() == actor.KindSummon {
@@ -429,12 +430,6 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 type mpPayer interface {
 	MPValue() float64
 	ReduceMP(float64) float64
-}
-
-// lackMPNotifier is implemented by a caster told that its SignetMDam
-// effect ended because a tick could not pay its MP cost.
-type lackMPNotifier interface {
-	NotifyEffectRemovedDueLackMP(*effect.Effect)
 }
 
 // forEachSignetTarget calls fn for every living, non-peace-zone object

@@ -1,0 +1,22 @@
+# Pursuit Of Clan Ambition (Q503): a level 4 clan whose leader holds the Seal of Aspiration is turned away by Sir Gustav Athebaldt. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q503_pursuit_of_clan_ambition_seal_held.golden
+character Leader 40
+clan 4
+random always 0
+hold 3870 1
+script quest.Q503_PursuitOfClanAmbition
+item 3870
+page default/30760.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc gustav 30760 Folk 10 0 0
+
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-03.htm
+  S ActionFailed
+  S ActionFailed

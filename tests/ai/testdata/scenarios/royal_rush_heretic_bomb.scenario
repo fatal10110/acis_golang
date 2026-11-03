@@ -1,0 +1,22 @@
+# RoyalRushHereticBomb2 (22195) and RoyalRushHereticBomb (22145), every draw 0, both walking:
+# moved off its spawn point with nothing to do, the RoyalRushHereticBomb2 wants to walk back to it
+# (weight 30) where the RoyalRushHereticBomb, which keeps its parent's no-desire hook, wanders.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2
+npc bomb2 22195 Monster -600 0 0 walks
+npc bomb 22145 Monster -600 400 0 walks
+
+jump bomb2 -400 0 0
+  desires bomb2 -
+jump bomb -400 400 0
+  desires bomb -
+tick x3
+  desires bomb2 move_to(-600,0,0)=30
+  desires bomb wander()=5

@@ -1,0 +1,23 @@
+# Daimon The White-Eyed, Part 2 (Q604): a level 72 character is told it is too young and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q604_daimon_the_white_eyed_part2_low_level.golden
+character Hero 72
+script quest.Q604_DaimonTheWhiteEyed_Part2
+item 7192 7193 7194 4595 4596 4597 4598 4599 4600
+page default/31683.htm
+page default/31541.htm
+page script/quest/Q604_DaimonTheWhiteEyed_Part2/
+npc eye 31683 Folk 10 0 0
+npc altar 31541 Folk 20 0 0
+
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q604_DaimonTheWhiteEyed_Part2/31683-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q604_DaimonTheWhiteEyed_Part2 CREATED
+  rows Q604_DaimonTheWhiteEyed_Part2 -

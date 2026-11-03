@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -48,8 +47,8 @@ func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 
 		c.Send(encodeRequestMagicSkillUse(corpsePetSkillID, false, false))
 		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-		if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("living corpse-pet rejection extra opcode = %#x, want no MoveToPawn", extra[0])
+		if queued := c.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("living corpse-pet rejection extra opcode = %#x, want no MoveToPawn", queued[0][0])
 		}
 	})
 
@@ -72,11 +71,11 @@ func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 
 		healer.Send(encodeRequestMagicSkillUse(corpsePetSkillID, false, false))
 		assertSystemMessageSkillFrame(t, healer.Read(), serverpackets.SystemMessageS1CannotBeUsed, corpsePetSkillID, 1)
-		if extra := healer.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("dead non-pet corpse-pet rejection extra opcode = %#x, want no MoveToPawn", extra[0])
+		if queued := healer.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("dead non-pet corpse-pet rejection extra opcode = %#x, want no MoveToPawn", queued[0][0])
 		}
-		if extra := patient.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("dead non-pet corpse-pet rejection observer opcode = %#x, want none", extra[0])
+		if queued := patient.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("dead non-pet corpse-pet rejection observer opcode = %#x, want none", queued[0][0])
 		}
 	})
 }

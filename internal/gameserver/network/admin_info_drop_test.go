@@ -13,7 +13,7 @@ import (
 // for their kinds, and for a normal drop the item rate, or the raid item
 // rate on a raid or grand boss.
 func TestNpcDropContentIterationsRate(t *testing.T) {
-	l := &GameClientLink{itemTemplates: item.NewTable([]*item.Template{{ID: 1, Name: "Pelt", Kind: item.KindEtcItem}})}
+	l := newBareGameClientLink(t, GameClientLinkConfig{ItemTemplates: item.NewTable([]*item.Template{{ID: 1, Name: "Pelt", Kind: item.KindEtcItem}})})
 	drop := []item.Drop{{ItemID: 1, Min: 1, Max: 1, Chance: 50}}
 	tmpl := &npc.Template{ID: 1, Drops: []item.DropCategory{
 		{Kind: item.DropNormal, Chance: 70, Drops: drop},

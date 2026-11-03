@@ -1,0 +1,58 @@
+# An Elder Sows Seeds (Q370): a level 28 character accepts at Casian and kills a Hallate's monster (the
+# roll pinned to succeed) for a spellbook page; then relog. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q370_an_elder_sows_seeds.golden
+character Seeds 28
+random always 0
+script quest.Q370_AnElderSowsSeeds
+item 57 5916 5917 5918 5919 5920
+page default/30612.htm
+page script/quest/Q370_AnElderSowsSeeds/
+npc casian 30612 Folk 10 0 0
+npc ogre 20082 Monster 40 0 0
+
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q370_AnElderSowsSeeds 30612-1.htm
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-1.htm
+  S ActionFailed
+bypass Quest Q370_AnElderSowsSeeds 30612-2.htm
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-2.htm
+  S ActionFailed
+bypass Quest Q370_AnElderSowsSeeds 30612-3.htm
+  S QuestList 370:0x80000001
+  S ExShowQuestMark quest=370
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-3.htm
+  S ActionFailed
+  Q upsert Q370_AnElderSowsSeeds | <state> | STARTED
+  Q upsert Q370_AnElderSowsSeeds | <cond> | 1
+  rows Q370_AnElderSowsSeeds <cond>=1 <state>=STARTED
+  state Q370_AnElderSowsSeeds STARTED
+kill ogre
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5916
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5916=1
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-4.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q370_AnElderSowsSeeds <cond>=1 <state>=STARTED
+  items 5916=1

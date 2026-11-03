@@ -1,0 +1,172 @@
+# Mass of Darkness (Q166): a dark elven fighter of level 10 accepts at Undrias with his letter;
+# Iria gives the ceremonial dagger and has nothing more when asked again, Dorankus the dreviant
+# wine, and Trudy the scripture, which moves the cond; Undrias takes the three and his letter
+# for adena and experience; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q166_mass_of_darkness.golden
+character Acolyte 10
+class 31
+script quest.Q166_MassOfDarkness
+item 1088 1089 1090 1091 57
+page default/30130.htm
+page merchant/30135.htm
+page warehouse/30139.htm
+page trainer/30143.htm
+page script/quest/Q166_MassOfDarkness/
+npc undrias 30130 Folk 10 0 0
+npc iria 30135 Merchant 20 0 0
+npc dorankus 30139 WarehouseKeeper 0 20 0
+npc trudy 30143 Trainer -10 0 0
+
+# Undrias: accept with his letter.
+action undrias
+action undrias
+  S ActionFailed
+  S NpcHtmlMessage obj=undrias item=0 page=default/30130.htm
+  S ActionFailed
+bypass npc_{undrias}_Quest
+  S NpcHtmlMessage obj=undrias item=0 page=script/quest/Q166_MassOfDarkness/30130-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q166_MassOfDarkness CREATED
+bypass Quest Q166_MassOfDarkness 30130-04.htm
+  S QuestList 166:0x80000001
+  S ExShowQuestMark quest=166
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1088
+  S NpcHtmlMessage obj=undrias item=0 page=script/quest/Q166_MassOfDarkness/30130-04.htm
+  S ActionFailed
+  Q upsert Q166_MassOfDarkness | <state> | STARTED
+  Q upsert Q166_MassOfDarkness | <cond> | 1
+  state Q166_MassOfDarkness STARTED
+  rows Q166_MassOfDarkness <cond>=1 <state>=STARTED
+  items 1088=1
+action undrias
+  S ActionFailed
+  S NpcHtmlMessage obj=undrias item=0 page=default/30130.htm
+  S ActionFailed
+bypass npc_{undrias}_Quest
+  S NpcHtmlMessage obj=undrias item=0 page=script/quest/Q166_MassOfDarkness/30130-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Iria: the ceremonial dagger; asked again, she has nothing more.
+action iria
+action iria
+  S ActionFailed
+  S NpcHtmlMessage obj=iria item=0 page=merchant/30135.htm
+  S ActionFailed
+bypass npc_{iria}_Quest
+  S SystemMessage id=54 3:1089
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=iria item=0 page=script/quest/Q166_MassOfDarkness/30135-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1089=1
+  rows Q166_MassOfDarkness <cond>=1 <state>=STARTED
+action iria
+  S ActionFailed
+  S NpcHtmlMessage obj=iria item=0 page=merchant/30135.htm
+  S ActionFailed
+bypass npc_{iria}_Quest
+  S NpcHtmlMessage obj=iria item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Dorankus: the dreviant wine.
+action dorankus
+action dorankus
+  S ActionFailed
+  S NpcHtmlMessage obj=dorankus item=0 page=warehouse/30139.htm
+  S ActionFailed
+bypass npc_{dorankus}_Quest
+  S SystemMessage id=54 3:1090
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dorankus item=0 page=script/quest/Q166_MassOfDarkness/30139-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1090=1
+  rows Q166_MassOfDarkness <cond>=1 <state>=STARTED
+
+# Trudy: the scripture, the last of the three, moves the cond.
+action trudy
+action trudy
+  S ActionFailed
+  S NpcHtmlMessage obj=trudy item=0 page=trainer/30143.htm
+  S ActionFailed
+bypass npc_{trudy}_Quest
+  S SystemMessage id=54 3:1091
+  S QuestList 166:0x80000003
+  S ExShowQuestMark quest=166
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=trudy item=0 page=script/quest/Q166_MassOfDarkness/30143-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q166_MassOfDarkness | <cond> | 2
+  items 1091=1
+  rows Q166_MassOfDarkness <cond>=2 <state>=STARTED
+action trudy
+  S ActionFailed
+  S NpcHtmlMessage obj=trudy item=0 page=trainer/30143.htm
+  S ActionFailed
+bypass npc_{trudy}_Quest
+  S NpcHtmlMessage obj=trudy item=0 page=script/quest/Q166_MassOfDarkness/30143-02.htm
+  S ActionFailed
+  S ActionFailed
+action iria
+action iria
+  S ActionFailed
+  S NpcHtmlMessage obj=iria item=0 page=merchant/30135.htm
+  S ActionFailed
+bypass npc_{iria}_Quest
+  S NpcHtmlMessage obj=iria item=0 page=script/quest/Q166_MassOfDarkness/30135-02.htm
+  S ActionFailed
+  S ActionFailed
+action dorankus
+action dorankus
+  S ActionFailed
+  S NpcHtmlMessage obj=dorankus item=0 page=warehouse/30139.htm
+  S ActionFailed
+bypass npc_{dorankus}_Quest
+  S NpcHtmlMessage obj=dorankus item=0 page=script/quest/Q166_MassOfDarkness/30139-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Undrias: the three gifts and the letter for adena and experience; the quest completes.
+action undrias
+action undrias
+  S ActionFailed
+  S NpcHtmlMessage obj=undrias item=0 page=default/30130.htm
+  S ActionFailed
+bypass npc_{undrias}_Quest
+  S SystemMessage id=302 3:1089
+  S SystemMessage id=302 3:1090
+  S SystemMessage id=302 3:1091
+  S SystemMessage id=302 3:1088
+  S SystemMessage id=52 6:500
+  S SystemMessage id=45 1:500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 166:0x00000000
+  S NpcHtmlMessage obj=undrias item=0 page=script/quest/Q166_MassOfDarkness/30130-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q166_MassOfDarkness | <state> | COMPLETED
+  Q delete-except-state Q166_MassOfDarkness
+  items 1088=0 1089=0 1090=0 1091=0 57=500
+  state Q166_MassOfDarkness COMPLETED
+  rows Q166_MassOfDarkness <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q166_MassOfDarkness COMPLETED
+  rows Q166_MassOfDarkness <state>=COMPLETED
+  items 57=500
+action undrias
+action undrias
+  S ActionFailed
+  S NpcHtmlMessage obj=undrias item=0 page=default/30130.htm
+  S ActionFailed
+bypass npc_{undrias}_Quest
+  S NpcHtmlMessage obj=undrias item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

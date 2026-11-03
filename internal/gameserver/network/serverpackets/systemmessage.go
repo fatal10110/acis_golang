@@ -19,6 +19,8 @@ const (
 	SystemMessageCannotResMaster                   = 1514
 	SystemMessageCannotResPet2                     = 1515
 	SystemMessageCannotBeResurrectedDuringSiege    = 1053
+	SystemMessageNoResurrectionWithoutBaseCamp     = 716
+	SystemMessageTowerDestroyedNoResurrection      = 717
 	SystemMessageDeathPenaltyLifted                = 1917
 	SystemMessageUseS1                             = 46
 	SystemMessageS1PreparedForReuse                = 48
@@ -91,6 +93,7 @@ const (
 	SystemMessageLethalStrike                      = 1667
 	SystemMessageLethalStrikeSuccessful            = 1668
 	SystemMessageInvalidTarget                     = 109
+	SystemMessageApplicantInformationIncorrect     = 12
 	SystemMessageSweeperFailedTargetNotSpoiled     = 343
 	SystemMessageSweepNotAllowed                   = 683
 	SystemMessageHarvestFailedSeedNotSown          = 893
@@ -127,9 +130,13 @@ const (
 	SystemMessagePetCannotSentBackDuringBattle     = 579
 	SystemMessageDeadPetCannotBeReturned           = 589
 	SystemMessageCannotGiveItemsToDeadPet          = 590
+	SystemMessageStarvingPetHasLeft                = 593
 	SystemMessageYouCannotRestoreHungryPets        = 594
+	SystemMessageYourPetIsVeryHungry               = 595
 	SystemMessageYourPetAteALittleButIsStillHungry = 596
+	SystemMessageYourPetIsVeryHungryBeCareful      = 597
 	SystemMessageOutOfFeedMountCanceled            = 1248
+	SystemMessageOnlyRideWyvernFromStrider         = 1249
 	SystemMessagePetTookS1BecauseHeWasHungry       = 1527
 	SystemMessageItemNotForPets                    = 544
 	SystemMessagePetCannotCarryMoreItems           = 545
@@ -175,6 +182,7 @@ const (
 	SystemMessageExchangeHasEnded                  = 1266
 	SystemMessagePetRefusingOrder                  = 1864
 	SystemMessagePetTooHighToControl               = 1918
+	SystemMessageSealOfStrifeForbidsSummoning      = 1925 // no parameter
 	SystemMessageS1                                = 1987
 	SystemMessageCreateLvlTooLowToRegister         = 404
 	SystemMessageItemMixingFailed                  = 719
@@ -217,6 +225,7 @@ const (
 	SystemMessageNamingAlreadyInUseByAnotherPet    = 584
 	SystemMessageNamingPetnameContainsInvalidChars = 591
 	SystemMessageNamingYouCannotSetNameOfThePet    = 695
+	SystemMessageIncorrectNameTryAgain             = 204
 	SystemMessageDistTooFarCastingStopped          = 748
 
 	// Experience, SP and level change feedback.

@@ -18,7 +18,9 @@ type recallTraveler interface {
 	Flying() bool
 	SetIn7sDungeon(in bool)
 	TeleportTo(x, y, z, radius int)
+	TeleportOnQueue(x, y, z, radius int)
 	Recall(dest modelskill.RecallType)
+	RecallOnQueue(dest modelskill.RecallType)
 }
 
 // recallScatter is the random offset around a recall's destination.
@@ -34,7 +36,9 @@ func (recallHandler) Types() []string { return []string{"RECALL", "TELEPORT"} }
 // nobody and keeps its spiritshot. A target at the festival, jailed,
 // duelling, riding or flying stays; so does one other than the caster at an
 // Olympiad match or in a boss zone. Every player sent away leaves any Seven
-// Signs dungeon. The caster's spiritshot is spent whoever moved.
+// Signs dungeon. The caster's spiritshot is spent whoever moved. The cast
+// runs on the caster's queue: the caster moves inside it, any other target
+// on its own queue once the cast's task is done.
 func (recallHandler) Use(cast Cast) {
 	if p, ok := asPlayer(cast.Caster); ok {
 		c, ok := p.(recallCaster)
@@ -56,17 +60,21 @@ func (recallHandler) Use(cast Cast) {
 		if target.FestivalParticipant() || traveler.Jailed() || traveler.InDuel() || traveler.Riding() || traveler.Flying() {
 			continue
 		}
-		if cast.Caster == nil || target.ObjectID() != cast.Caster.ObjectID() {
-			if target.OlympiadMode() || traveler.InBossZone() {
-				continue
-			}
-		}
-		traveler.SetIn7sDungeon(false)
-		if at := cast.Skill.TeleCoords; at != nil {
-			traveler.TeleportTo(at.X, at.Y, at.Z, recallScatter)
+		self := cast.Caster != nil && target.ObjectID() == cast.Caster.ObjectID()
+		if !self && (target.OlympiadMode() || traveler.InBossZone()) {
 			continue
 		}
-		traveler.Recall(cast.Skill.RecallType)
+		traveler.SetIn7sDungeon(false)
+		switch at := cast.Skill.TeleCoords; {
+		case at != nil && self:
+			traveler.TeleportOnQueue(at.X, at.Y, at.Z, recallScatter)
+		case at != nil:
+			traveler.TeleportTo(at.X, at.Y, at.Z, recallScatter)
+		case self:
+			traveler.RecallOnQueue(cast.Skill.RecallType)
+		default:
+			traveler.Recall(cast.Skill.RecallType)
+		}
 	}
 
 	writeSpiritshot(cast.Caster, bsps, cast.Skill.StaticReuse)

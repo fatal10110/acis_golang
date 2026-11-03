@@ -1,7 +1,9 @@
 package gameservertest
 
 import (
+	"cmp"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,7 +20,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -77,26 +78,35 @@ func (s *Server) SpawnHostileNPCTemplateAt(t *testing.T, tmpl *npc.Template, at 
 // kill rewards and party loot.
 const fixturePartyRange = 1500
 
-// killRewards is the fixture kill-reward config: the suite's level table
-// and exp/sp rates, stock x1 drop rates, the shipped MultipleItemDrop, the
-// stock party range and party exp rules, the suite's drop gates, and the
+// fixtureKillRewards are the fixture kill reward settings: the suite's
+// exp/sp rates, stock x1 drop rates, MultipleItemDrop (on as shipped unless
+// WithSingleItemDrop), the stock party range
+// and party exp rules, and the suite's drop gates.
+func fixtureKillRewards(o *options) gamemanager.KillRewardSettings {
+	return gamemanager.KillRewardSettings{
+		Rates:             item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
+		PartyRange:        cmp.Or(o.partyRange, fixturePartyRange),
+		RateXP:            o.rateXP,
+		RateSP:            o.rateSP,
+		PartyXP:           player.PartyXPRules{Cutoff: player.PartyXPCutoffLevel, CutoffLevel: 20, CutoffPercent: 3, RateXP: 1, RateSP: 1},
+		DeepBlueDropRules: o.deepBlueDropRules,
+		AutoLoot:          o.autoLoot,
+		AutoLootRaid:      o.autoLootRaid,
+		MultipleItemDrop:  !o.singleItemDrop,
+	}
+}
+
+// killRewards is the fixture kill-reward config: the settings the server
+// shares with the link and the scripts, the suite's level table, and the
 // server's parties.
 func (s *Server) killRewards() gamemanager.KillRewardConfig {
 	return gamemanager.KillRewardConfig{
-		PlayerLevels:      s.levelTable,
-		Rates:             item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
-		PartyRange:        fixturePartyRange,
-		RateXP:            s.rateXP,
-		RateSP:            s.rateSP,
-		PartyXP:           player.PartyXPRules{Cutoff: player.PartyXPCutoffLevel, CutoffLevel: 20, CutoffPercent: 3, RateXP: 1, RateSP: 1},
-		Parties:           s.rewardParties,
-		RaidKills:         s.raidKills,
-		Channels:          s.lootChannels,
-		CursedWeapons:     s.cursedLink,
-		DeepBlueDropRules: s.deepBlueDrops,
-		AutoLoot:          s.autoLoot,
-		AutoLootRaid:      s.autoLootRaid,
-		MultipleItemDrop:  true,
+		Settings:      s.rewardBook,
+		PlayerLevels:  s.levelTable,
+		Parties:       s.rewardParties,
+		RaidKills:     s.raidKills,
+		Channels:      s.lootChannels,
+		CursedWeapons: s.cursedLink,
 	}
 }
 
@@ -131,15 +141,22 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
 	s.installZones(hostile)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
-	hostile.Attach(npc.Runtime{
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems, s.decay)
+	rt := npc.Runtime{
 		World:   s.State,
 		Items:   s.itemTable,
 		Rewards: rewards,
 		Hits:    hits,
-		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
+		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
-	})
+		Ground:  s.groundTaker,
+		Regen:   s.playerRules,
+		Party:   s.rewardBook,
+	}
+	if hostile.SiegeGuard() {
+		rt.Guarded = s.guardedSiege(inst)
+	}
+	hostile.Attach(rt)
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	hostile.EnterZones()
 	return hostile
@@ -162,6 +179,7 @@ func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs a
 func (s *Server) installCastSeam(hostile *npc.Hostile, defs actorcast.Definitions) *actorcast.AIController {
 	ctl := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, castCanceledBroadcast{hostile})
 	ctl.SetQueue(hostile.Queue())
+	ctl.OutliveQueueClose()
 	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Effects: s.castEffects, Caster: hostile, OnHitResult: s.castEffects.OnHitResult}
 	hostile.AI().SetCastController(aiCtl)
 	hostile.SetCastController(ctl)
@@ -180,7 +198,7 @@ func (c castCanceledBroadcast) Emit(ev event.Event) {
 	case event.CastAborted:
 		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
 	case event.CastFinished:
-		_ = c.hostile.CastFinished(e.Interrupted)
+		_ = c.hostile.CastFinished(e)
 	}
 }
 
@@ -197,9 +215,9 @@ type AttackingHostile struct {
 }
 
 // attackFinishedSignal is the attack controller sink of an AttackingHostile:
-// it signals every finished swing on its channel, and enters the stance and
-// runs the chance procs of every landed hit, as production's hostile
-// controller sink does.
+// it signals every finished swing on its channel, and raises the
+// attack-finished hooks, enters the stance and runs the chance procs of
+// every landed hit, as production's hostile controller sink does.
 type attackFinishedSignal struct {
 	finished chan struct{}
 	chance   *actorcast.ChanceProcs
@@ -213,6 +231,8 @@ func (c *attackFinishedSignal) Emit(ev event.Event) {
 		case c.finished <- struct{}{}:
 		default:
 		}
+	case event.AttackEnded:
+		c.hostile.AttackEnded(e.Target)
 	case event.AttackStanceRequested:
 		c.hostile.EnterAttackStance()
 	case event.HitLanded:
@@ -412,9 +432,17 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	inst.Kind = npc.InstanceKind(tmpl.Type)
 	inst.HasHome = true
 	inst.Home = home
+	return s.spawnMovingHostileInstance(t, inst, at, geo)
+}
+
+// spawnMovingHostileInstance is spawnMovingHostile for an instance the
+// caller built, its home set.
+func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, geo move.Geo) *npc.Hostile {
+	t.Helper()
+	tmpl := inst.Template
+	inst.Kind = npc.InstanceKind(tmpl.Type)
 	statRef := &movingHostileStatRef{}
 	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, effect.WithEnv(s.effectEnv))
 	if err != nil {
@@ -441,19 +469,26 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
 	control.hostile, control.move = hostile, moveCtl
+	s.hostileControls.Store(hostile, control)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems, s.decay)
 	rt := npc.Runtime{
 		World:   s.State,
 		Items:   s.itemTable,
 		Rewards: rewards,
 		Hits:    hits,
-		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
+		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
+		Ground:  s.groundTaker,
+		Regen:   s.playerRules,
+		Party:   s.rewardBook,
 	}
 	// Production takes line of sight from the same geodata (npcs_spawn.go).
 	if los, ok := geo.(npc.LineOfSight); ok {
 		rt.LOS = los
+	}
+	if hostile.SiegeGuard() {
+		rt.Guarded = s.guardedSiege(inst)
 	}
 	hostile.Attach(rt)
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
@@ -469,6 +504,9 @@ type movingHostileControl struct {
 	server  *Server
 	hostile *npc.Hostile
 	move    *move.Controller
+	// rethinks counts the AttackRethink events handled, each once its
+	// desire selection has run.
+	rethinks atomic.Int64
 }
 
 func (c *movingHostileControl) Emit(ev event.Event) {
@@ -480,6 +518,8 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()
+	case event.AttackEnded:
+		c.hostile.AttackEnded(e.Target)
 	case event.AttackFinished:
 		if e.BowReuse {
 			c.server.think(c.hostile)
@@ -490,11 +530,26 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 		}
 	case event.AttackRethink:
 		c.server.runAI(c.hostile)
+		c.rethinks.Add(1)
 	case event.AttackStanceRequested:
 		c.hostile.EnterAttackStance()
 	case event.HitLanded:
 		c.server.castEffects.Chance.AttackHit(c.hostile, e)
 	}
+}
+
+// HostileRethinks counts the desire selections the moving fixture hostile h
+// has re-run on its attack's phases: a bow shot landing and a hit animation
+// ending, each once it has run. On the wall clock those phases fire on timers
+// that can land after an Advance meant to pass them, so a test that changes
+// h's desires once they have run waits on this count.
+func (s *Server) HostileRethinks(tb testing.TB, h *npc.Hostile) int64 {
+	tb.Helper()
+	control, ok := s.hostileControls.Load(h)
+	if !ok {
+		tb.Fatalf("hostile %d is not a moving fixture hostile", h.ObjectID())
+	}
+	return control.(*movingHostileControl).rethinks.Load()
 }
 
 func (s *Server) think(hostile *npc.Hostile) {
@@ -541,11 +596,17 @@ func (s *Server) TickEffects() {
 // wall clock, and the updates since a move started at least as many
 // intervals.
 func (s *Server) TickPositions() {
+	if err := s.TryTickPositions(); err != nil {
+		panic(err)
+	}
+}
+
+// TryTickPositions is TickPositions reporting a failure instead of
+// panicking, for a goroutine other than the test's: there a panic takes the
+// whole test binary down, and failing the test is not allowed.
+func (s *Server) TryTickPositions() error {
 	if s.queues.advanceThen != nil {
-		if err := s.tickPositionsDriven(move.PositionUpdateInterval); err != nil {
-			panic(err)
-		}
-		return
+		return s.tickPositionsDriven(move.PositionUpdateInterval)
 	}
 	s.positionTicks.Lock()
 	next := s.positionTicks.last.Add(move.PositionUpdateInterval)
@@ -554,14 +615,13 @@ func (s *Server) TickPositions() {
 	}
 	time.Sleep(time.Until(next))
 	if err := s.awaitHandled(); err != nil {
-		panic(err)
+		s.positionTicks.Unlock()
+		return err
 	}
 	s.positionTicks.last = time.Now()
 	s.positions.Tick()
 	s.positionTicks.Unlock()
-	if err := s.queues.settle(); err != nil {
-		panic(err)
-	}
+	return s.queues.settle()
 }
 
 // TickPositionsAfter is TickPositions on the driven clock with d, rather
@@ -596,11 +656,12 @@ type parkedMove struct{}
 func (parkedMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }
-func (parkedMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
-func (parkedMove) CanMoveTo(location.Location) bool               { return true }
-func (parkedMove) MoveHome(location.Location) error               { return nil }
-func (parkedMove) Stop()                                          {}
-func (parkedMove) CancelFollow()                                  {}
+func (parkedMove) MoveToLocation(location.Location) (bool, error)         { return false, nil }
+func (parkedMove) MoveStraightToLocation(location.Location) (bool, error) { return false, nil }
+func (parkedMove) CanMoveTo(location.Location) bool                       { return true }
+func (parkedMove) MoveHome(location.Location) error                       { return nil }
+func (parkedMove) Stop()                                                  {}
+func (parkedMove) CancelFollow()                                          {}
 
 // parkedAttack is an AttackController that never attacks.
 type parkedAttack struct{}
@@ -664,18 +725,7 @@ func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Lo
 // effects dispatched through the link's NPC cast seam.
 func (s *Server) SpawnCastingFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location, defs actorcast.Definitions) *npc.Folk {
 	t.Helper()
-	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
-	if err != nil {
-		t.Fatalf("new npc instance: %v", err)
-	}
-	inst.Home, inst.HasHome = at, true
-	spawner := s.folkSpawner(nil, Geo{})
-	spawner.Skills = defs
-	f, err := spawner.Spawn(inst, at, 0, nil)
-	if err != nil {
-		t.Fatalf("spawn folk npc: %v", err)
-	}
-	return f
+	return s.SpawnCastingFolkNPCOfMakerAt(t, tmpl, at, defs, nil)
 }
 
 // folkSpawner is the production civilian spawner over this server's world,
@@ -695,17 +745,21 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		Decay:               s.decay,
 		Effects:             s.effectEnv,
 		MaxGeoPathFailCount: s.maxGeoPathFail,
-		Log:                 s.log,
+		Log:                 &s.log,
 		Scripts:             s.quests.registry,
+		Ground:              s.groundTaker,
+		Regen:               s.playerRules,
 	}
 }
 
 // SpawnRouteFolkNPCAt places a civilian NPC built from tmpl at at through
 // the production civilian spawner, with routes as the walker route data, and
 // returns it with the route walker task it walks under. A template whose
-// alias names a route in routes walks it from the moment it spawns,
-// shown to its observers. walkMode puts it in walk stance, as the spawner
-// does for the reference's walking ids.
+// alias names a route in routes is given the route desire a walker
+// behavior's created hook asks for, and walks that route from the moment it
+// spawns, shown to its observers, so route tests need no AI ticks to start
+// it. walkMode puts it in walk stance, as a walker behavior does for its
+// walking ids.
 func (s *Server) SpawnRouteFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location, routes route.WalkerRoutes, walkMode bool) (*npc.Folk, *task.Walker) {
 	t.Helper()
 	return s.SpawnRouteFolkNPC(t, RouteFolkSpawn{Template: tmpl, At: at, Routes: routes, WalkMode: walkMode})
@@ -719,7 +773,8 @@ type RouteFolkSpawn struct {
 	Heading int
 	// Routes is the walker route data.
 	Routes route.WalkerRoutes
-	// WalkMode puts the NPC in walk stance.
+	// WalkMode puts the NPC in its walk stance as it spawns, as a walker
+	// behavior does for its walking ids.
 	WalkMode bool
 	// Geo is the geodata the NPC walks and teleports on; nil for the
 	// always-passable Geo.
@@ -756,7 +811,7 @@ func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	inst.Home, inst.HasHome, inst.WalkMode = spec.At, true, spec.WalkMode
+	inst.Home, inst.HasHome = spec.At, true
 	inst.SpawnHeading = spec.Heading
 	spawner := s.folkSpawner(walker, geo)
 	spawner.Skills = spec.Skills
@@ -764,5 +819,20 @@ func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}
+	// As a walker behavior's created hook does: the walk stance first,
+	// shown to the players around, then the route desire. The AI task is
+	// driven by hand, so nothing else thinks for f yet.
+	if spec.WalkMode {
+		f.SetRunStance(false)
+	}
+	if alias := spec.Template.Alias; alias != "" && walker.HasRoute(alias, alias) {
+		f.AddMoveRouteDesire(alias, routeFolkWeight)
+		f.StartRoute(alias)
+	}
 	return f, walker
 }
+
+// routeFolkWeight is the weight of the route desire SpawnRouteFolkNPC
+// queues: the town walkers' own, which nothing they otherwise want
+// outweighs.
+const routeFolkWeight = 1_000_000

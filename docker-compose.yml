@@ -12,6 +12,8 @@
 #                          it with ops/docker/init-config.sh
 #   ACIS_LOG_DIR           log root (default ./log); each server logs under
 #                          its own loginserver/ or gameserver/ subdirectory
+#   ACIS_CACHE_DIR         game server cache directory (default ./cache); it
+#                          keeps the packed geodata cache across restarts
 #   ACIS_DB_ROOT_PASSWORD  MariaDB root password (default 123321); must match
 #                          Password in both .properties files
 #   ACIS_DB_BIND           host address the database port is published on
@@ -19,8 +21,8 @@
 #   ACIS_DB_PORT           host port for the database (default 3306)
 #   ACIS_MARIADB_TAG       mariadb image tag (default 11, the version CI tests)
 #   ACIS_UID, ACIS_GID     host user the servers run as (default 1000); must
-#                          be able to write the config, log and datapack
-#                          data/crests directories
+#                          be able to write the config, log, cache and
+#                          datapack data/crests directories
 #   TZ                     server time zone (default UTC); Seven Signs,
 #                          Olympiad, sieges and other timers run on local time
 
@@ -51,7 +53,22 @@ services:
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/sql:/acis/sql:ro
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/tools:/acis/tools:ro
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      # A restarted server skips the first-start schema load, so it must not
+      # report healthy over an empty or partial acis database.
+      # ops/docker/initdb/10-acis-schema.sh leaves the marker behind when
+      # that load fails. A first start killed before the script ran leaves
+      # no marker, and no tables: MariaDB keeps one .frm file per table in
+      # the database's directory.
+      test:
+        - CMD-SHELL
+        - >-
+          if [ -e /var/lib/mysql/.acis-schema-incomplete ]; then
+          echo 'acis schema load did not finish; see Failure modes in docs/ops/docker.md';
+          exit 1; fi;
+          if ! ls /var/lib/mysql/acis/*.frm >/dev/null 2>&1; then
+          echo 'acis database has no tables; see Failure modes in docs/ops/docker.md';
+          exit 1; fi;
+          healthcheck.sh --connect --innodb_initialized
       interval: 5s
       timeout: 5s
       retries: 30
@@ -74,7 +91,9 @@ services:
 
   gameserver:
     <<: *acis-server
-    command: ["gameserver"]
+    # The packed geodata cache needs a directory the server user can write;
+    # /opt/acis itself belongs to root.
+    command: ["gameserver", "-geodata-cache", "cache/geodata.cache"]
     depends_on:
       db:
         condition: service_healthy
@@ -86,6 +105,7 @@ services:
       - ${ACIS_CONFIG_DIR:-./config}:/opt/acis/config
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/data:/opt/acis/data
       - ${ACIS_LOG_DIR:-./log}/gameserver:/opt/acis/log
+      - ${ACIS_CACHE_DIR:-./cache}:/opt/acis/cache
     # Docker's default 10s stop grace SIGKILLs a shutdown that is still
     # saving players and world state. Keep this above gameServerStopTimeout
     # (cmd/gameserver/main.go); TestComposeStopGraceCoversGameServerStop

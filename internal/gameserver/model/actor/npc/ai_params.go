@@ -2,9 +2,9 @@ package npc
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -21,7 +21,7 @@ func (p AIParams) Int(name string, def int32) (int32, error) {
 	if !ok {
 		return def, nil
 	}
-	n, err := commons.ParseInt(v, 32)
+	n, err := strconv.ParseInt(v, 10, 32)
 	if err != nil {
 		return 0, fmt.Errorf("npc: AI parameter %q: %w", name, err)
 	}
@@ -61,8 +61,8 @@ func resolveAIString(spawn, tmpl AIParams, name, def string) string {
 // resolveAISkill reads name, resolved as resolveAIString does, as an
 // "id-level" skill reference. ok is false when neither set holds name. A
 // value with fewer than two '-'-separated fields, or a field that is not
-// an int, is an error. Fields past the second are ignored. The reference
-// is not checked against the skill table.
+// an int, is an error. Fields past the second are ignored. The parsed
+// skill reference is not checked against the skill table.
 func resolveAISkill(spawn, tmpl AIParams, name string) (ref skill.Ref, ok bool, err error) {
 	v, found := spawn[name]
 	if !found {
@@ -79,11 +79,11 @@ func resolveAISkill(spawn, tmpl AIParams, name string) (ref skill.Ref, ok bool, 
 	if len(fields) < 2 {
 		return skill.Ref{}, false, fmt.Errorf("npc: AI skill parameter %q: %q is not id-level", name, v)
 	}
-	id, err := commons.ParseInt(fields[0], 32)
+	id, err := strconv.ParseInt(fields[0], 10, 32)
 	if err != nil {
 		return skill.Ref{}, false, fmt.Errorf("npc: AI skill parameter %q: %w", name, err)
 	}
-	level, err := commons.ParseInt(fields[1], 32)
+	level, err := strconv.ParseInt(fields[1], 10, 32)
 	if err != nil {
 		return skill.Ref{}, false, fmt.Errorf("npc: AI skill parameter %q: %w", name, err)
 	}

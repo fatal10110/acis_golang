@@ -1,0 +1,72 @@
+# Devil's Legacy (Q365), level 39: Randolf offers the quest, the character accepts, hears Collob, kills a zombie for a chest, sells it and relogs. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q365_devils_legacy_accept.golden
+character Raider 39
+random always 0
+script quest.Q365_DevilsLegacy
+item 57 5873 951 952 955 956 1868 1872 1879 1880 1881 1882 1884
+page warehouse/30095.htm
+page warehouse/30092.htm
+page script/quest/Q365_DevilsLegacy/
+npc randolf 30095 WarehouseKeeper 10 0 0
+npc collob 30092 WarehouseKeeper -10 0 0
+npc zombie 20836 Monster 40 0 0
+npc captain 21629 Monster 50 0 0
+
+action randolf
+action randolf
+  S ActionFailed
+  S NpcHtmlMessage obj=randolf item=0 page=warehouse/30095.htm
+  S ActionFailed
+bypass npc_{randolf}_Quest
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q365_DevilsLegacy 30095-02.htm
+  S QuestList 365:0x80000001
+  S ExShowQuestMark quest=365
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-02.htm
+  S ActionFailed
+  Q upsert Q365_DevilsLegacy | <state> | STARTED
+  Q upsert Q365_DevilsLegacy | <cond> | 1
+  state Q365_DevilsLegacy STARTED
+  rows Q365_DevilsLegacy <cond>=1 <state>=STARTED
+action randolf
+  S ActionFailed
+  S NpcHtmlMessage obj=randolf item=0 page=warehouse/30095.htm
+  S ActionFailed
+bypass npc_{randolf}_Quest
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-03.htm
+  S ActionFailed
+  S ActionFailed
+action collob
+action collob
+  S ActionFailed
+  S NpcHtmlMessage obj=collob item=0 page=warehouse/30092.htm
+  S ActionFailed
+bypass npc_{collob}_Quest
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q365_DevilsLegacy/30092-01.htm
+  S ActionFailed
+  S ActionFailed
+kill zombie
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5873
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5873=1
+action randolf
+action randolf
+  S ActionFailed
+  S NpcHtmlMessage obj=randolf item=0 page=warehouse/30095.htm
+  S ActionFailed
+bypass npc_{randolf}_Quest
+  S SystemMessage id=302 3:5873
+  S SystemMessage id=52 6:20200
+  S NpcHtmlMessage obj=randolf item=0 page=script/quest/Q365_DevilsLegacy/30095-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=20200 5873=0
+relog
+  items 57=20200 5873=0
+  state Q365_DevilsLegacy STARTED
+  rows Q365_DevilsLegacy <cond>=1 <state>=STARTED

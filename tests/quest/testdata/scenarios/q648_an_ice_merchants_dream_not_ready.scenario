@@ -1,0 +1,42 @@
+# An Ice Merchant's Dream (Q648): a level 53 character that did not do The Other Side of Truth accepts the quest at cond 1.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q648_an_ice_merchants_dream_not_ready.golden
+character Hero 53
+script quest.Q648_AnIceMerchantsDream
+item 8057 8077 8078 57
+page default/32020.htm
+page default/32023.htm
+page script/quest/Q648_AnIceMerchantsDream/
+npc rafforty 32020 Folk 10 0 0
+npc shelf 32023 Folk 20 0 0
+
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q648_AnIceMerchantsDream 32020-04.htm
+  S QuestList 648:0x80000001
+  S ExShowQuestMark quest=648
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-04.htm
+  S ActionFailed
+  Q upsert Q648_AnIceMerchantsDream | <state> | STARTED
+  Q upsert Q648_AnIceMerchantsDream | <cond> | 1
+  rows Q648_AnIceMerchantsDream <cond>=1 <state>=STARTED
+  state Q648_AnIceMerchantsDream STARTED
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q648_AnIceMerchantsDream/32020-08.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q648_AnIceMerchantsDream <cond>=1 <state>=STARTED
+  state Q648_AnIceMerchantsDream STARTED

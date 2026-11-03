@@ -65,9 +65,10 @@ func TestBossZoneRestoredPermissionLapsesAtEntry(t *testing.T) {
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	c.Send(encodeEnterWorld())
-	frames := append(readEnterWorldBurst(t, c), readUntilQuiet(c)...)
+	if to := gameservertest.AssertSpawnTeleport(t, readUntilQuiet(c), objID); to != oust {
+		t.Fatalf("ejected to %+v, want %+v", to, oust)
+	}
 	waitForWorldPosition(t, srv, objID, oust)
-	assertEjectFrame(t, frames, objID, oust.X, oust.X)
 	if got := boss.AllowedPlayers(); len(got) != 0 {
 		t.Fatalf("allowed players after the lapsed entry = %v, want none", got)
 	}

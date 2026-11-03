@@ -30,6 +30,12 @@ type Desire struct {
 
 	Skill    skill.Ref
 	Location location.Location
+	// Standing marks a MoveTo's Location as the place a creature stands,
+	// its position or spawn point, facing Heading, rather than a bare
+	// point. An actor already standing there, facing Heading, finishes the
+	// MoveTo without a walk; a bare point is walked to even from on it.
+	Standing bool
+	Heading  int
 
 	CtrlPressed  bool
 	ShiftPressed bool

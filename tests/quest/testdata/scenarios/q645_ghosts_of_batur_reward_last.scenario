@@ -1,0 +1,35 @@
+# Ghosts of Batur (Q645): a hundred and eighty goods pay the last item of the list.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q645_ghosts_of_batur_reward_last.golden
+character Hero 23
+quest Q645_GhostsOfBatur <cond>=2 <state>=STARTED
+hold 8089 180
+script quest.Q645_GhostsOfBatur
+item 8089 1878 1879 1880 1881 1882 1883
+page default/32017.htm
+page script/quest/Q645_GhostsOfBatur/
+npc karuda 32017 Folk 10 0 0
+
+action karuda
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q645_GhostsOfBatur/32017-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q645_GhostsOfBatur 32017-06.htm
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q645_GhostsOfBatur/32017-06.htm
+  S ActionFailed
+bypass Quest Q645_GhostsOfBatur 5
+  S SystemMessage id=301 3:8089 6:180
+  S SystemMessage id=53 3:1883 6:2
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q645_GhostsOfBatur/32017-07.htm
+  S ActionFailed
+  Q delete-quest Q645_GhostsOfBatur
+  items 8089=0 1883=2
+  rows Q645_GhostsOfBatur -
+  state Q645_GhostsOfBatur -

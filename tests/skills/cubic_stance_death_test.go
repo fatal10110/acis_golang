@@ -103,6 +103,7 @@ func TestStormCubicKeepsFiringAcrossTeleportUntilStanceExpires(t *testing.T) {
 	t.Parallel()
 	var nowMS atomic.Int64
 	srv, c, objID := bootStanceCubicSummoner(t, &nowMS)
+	skipOnWallClock(t, srv)
 	summonStormCubic(t, srv, c, objID)
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
@@ -167,6 +168,7 @@ func TestOwnerDeathRemovesIdleStormCubic(t *testing.T) {
 	t.Parallel()
 	var nowMS atomic.Int64
 	srv, c, objID := bootStanceCubicSummoner(t, &nowMS)
+	skipOnWallClock(t, srv)
 	summonStormCubic(t, srv, c, objID)
 	if inAttackStance(t, srv, objID) {
 		t.Fatal("player in attack stance before the death; the case needs an idle cubic")
@@ -199,6 +201,7 @@ func TestOwnerDeathRemovesIdleStormCubic(t *testing.T) {
 func TestOwnerDeathRemovesLifeCubicSilently(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := bootCubicSummoner(t, 900*time.Second, 900*time.Second)
+	skipOnWallClock(t, srv)
 	c.Send(encodeRequestMagicSkillUse(summonLifeCubicSkill, false, false))
 	srv.Advance(t, time.Second)
 	drainUntilQuiet(t, c)

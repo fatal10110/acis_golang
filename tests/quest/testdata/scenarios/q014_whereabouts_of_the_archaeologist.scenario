@@ -1,0 +1,82 @@
+# Whereabouts of the Archaeologist (Q014): a level 74 character accepts at Liesel with her
+# letter, which the ghost of an adventurer takes for adena; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q014_whereabouts_of_the_archaeologist.golden
+character Seeker 74
+script quest.Q014_WhereaboutsOfTheArchaeologist
+item 7253
+page merchant/31263.htm
+page default/31538.htm
+page script/quest/Q014_WhereaboutsOfTheArchaeologist/
+npc liesel 31263 Merchant 10 0 0
+npc ghost 31538 Folk 20 0 0
+
+# Liesel: accept with the letter.
+action liesel
+action liesel
+  S ActionFailed
+  S NpcHtmlMessage obj=liesel item=0 page=merchant/31263.htm
+  S ActionFailed
+bypass npc_{liesel}_Quest
+  S NpcHtmlMessage obj=liesel item=0 page=script/quest/Q014_WhereaboutsOfTheArchaeologist/31263-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q014_WhereaboutsOfTheArchaeologist CREATED
+bypass Quest Q014_WhereaboutsOfTheArchaeologist 31263-2.htm
+  S QuestList 14:0x80000001
+  S ExShowQuestMark quest=14
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7253
+  S NpcHtmlMessage obj=liesel item=0 page=script/quest/Q014_WhereaboutsOfTheArchaeologist/31263-2.htm
+  S ActionFailed
+  Q upsert Q014_WhereaboutsOfTheArchaeologist | <state> | STARTED
+  Q upsert Q014_WhereaboutsOfTheArchaeologist | <cond> | 1
+  state Q014_WhereaboutsOfTheArchaeologist STARTED
+  rows Q014_WhereaboutsOfTheArchaeologist <cond>=1 <state>=STARTED
+  items 7253=1
+action liesel
+  S ActionFailed
+  S NpcHtmlMessage obj=liesel item=0 page=merchant/31263.htm
+  S ActionFailed
+bypass npc_{liesel}_Quest
+  S NpcHtmlMessage obj=liesel item=0 page=script/quest/Q014_WhereaboutsOfTheArchaeologist/31263-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# The ghost takes the letter: adena; the quest completes.
+action ghost
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31538.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q014_WhereaboutsOfTheArchaeologist/31538-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q014_WhereaboutsOfTheArchaeologist 31538-1.htm
+  S SystemMessage id=302 3:7253
+  S SystemMessage id=52 6:113228
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 14:0x00000000
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q014_WhereaboutsOfTheArchaeologist/31538-1.htm
+  S ActionFailed
+  Q upsert Q014_WhereaboutsOfTheArchaeologist | <state> | COMPLETED
+  Q delete-except-state Q014_WhereaboutsOfTheArchaeologist
+  state Q014_WhereaboutsOfTheArchaeologist COMPLETED
+  rows Q014_WhereaboutsOfTheArchaeologist <state>=COMPLETED
+  items 7253=0 57=113228
+
+# Relog: the completed quest loads from its one row, and the adena stays.
+relog
+  state Q014_WhereaboutsOfTheArchaeologist COMPLETED
+  rows Q014_WhereaboutsOfTheArchaeologist <state>=COMPLETED
+  items 57=113228
+action ghost
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31538.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

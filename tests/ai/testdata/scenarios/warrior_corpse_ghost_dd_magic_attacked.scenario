@@ -1,0 +1,17 @@
+# WarriorCorpseGhostDDMagic (21556, level 65, damage magic 4596-6; its self buff skill is left off its line,
+# so it casts nothing at first), every draw 0: the hit that makes the character its most hated, from 300
+# away, wants no damage magic; the next, by its most hated, wants it on the character (1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseGhostDDMagic.WarriorCorpseGhostDDMagic
+npc ghost 21556 Monster 300 0 0 level 65 skill DD_MAGIC 4596 6
+roll ghost 99
+
+hit ghost 1
+  desires ghost attack(player)=1.3888888888888888
+hit ghost 1
+  desires ghost attack(player)=2.7777777777777777 cast(player,4596,move)=1000000

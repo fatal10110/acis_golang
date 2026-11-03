@@ -1,0 +1,47 @@
+# In Search of the Nest (Q109), finished: a level 66 character holding a Golden Ram recruit badge,
+# on cond 3 (Pierce has read the memo), reports to Kahman, who pays adena, and the quest completes;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q109_in_search_of_the_nest_finish.golden
+character Mercenary 66
+quest Q109_InSearchOfTheNest <cond>=3 <state>=STARTED
+hold 7246 1
+script quest.Q109_InSearchOfTheNest
+item 8083 7246 7247 57
+page default/31554.htm
+page script/quest/Q109_InSearchOfTheNest/
+npc kahman 31554 Folk 30 0 0
+
+# Kahman pays.
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=default/31554.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q109_InSearchOfTheNest/31554-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q109_InSearchOfTheNest 31554-02.htm
+  S SystemMessage id=52 6:5168
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 109:0x00000000
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q109_InSearchOfTheNest/31554-02.htm
+  S ActionFailed
+  Q upsert Q109_InSearchOfTheNest | <state> | COMPLETED
+  Q delete-except-state Q109_InSearchOfTheNest
+  state Q109_InSearchOfTheNest COMPLETED
+  rows Q109_InSearchOfTheNest <state>=COMPLETED
+  items 57=5168 7246=1
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=default/31554.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 57=5168 7246=1
+  state Q109_InSearchOfTheNest COMPLETED
+  rows Q109_InSearchOfTheNest <state>=COMPLETED

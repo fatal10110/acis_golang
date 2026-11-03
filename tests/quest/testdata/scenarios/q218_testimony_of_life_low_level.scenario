@@ -1,0 +1,23 @@
+# Testimony of Life (Q218), refused: a level 36 Elven Knight is turned away by Cardien until
+# level 37, and the quest is not started. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q218_testimony_of_life_low_level.golden
+character Sapling 36
+class 19
+script quest.Q218_TestimonyOfLife
+item 3026 3140 3141 3142 3143 3144 3145 3146 3147 3148 3149 3150 3151 3152 3153 3154 3155 3156 3157 3158 3159 3160 3161 3162 3163 3164 3165 3166 3167 3168 3169 3170 3171 7562
+page trainer/30460.htm
+page script/quest/Q218_TestimonyOfLife/
+npc cardien 30460 Trainer 10 0 0
+
+action cardien
+action cardien
+  S ActionFailed
+  S NpcHtmlMessage obj=cardien item=0 page=trainer/30460.htm
+  S ActionFailed
+bypass npc_{cardien}_Quest
+  S NpcHtmlMessage obj=cardien item=0 page=script/quest/Q218_TestimonyOfLife/30460-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q218_TestimonyOfLife CREATED
+  rows Q218_TestimonyOfLife -

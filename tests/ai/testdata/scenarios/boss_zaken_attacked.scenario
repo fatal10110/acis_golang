@@ -1,0 +1,26 @@
+# Zaken (29022), a level 1 grand boss of 440 max HP standing 200 from the level 1 character, hit for 10
+# at a time before any of its timers comes due. Each hit adds damage / max HP / 0.05 * 20000, unrounded,
+# to its attack desire, which makes the character its top desire target at once; then, on a draw of 0
+# of 10, it picks a skill on a draw of 225: under 1 Scatter Enemy (4216), under 2 its mass teleport
+# (4217), under 4 its 4219, under 8 its 4218, under 15 its 4221 on itself only for an attacker within
+# 100 that is not its top desire target (nothing here), and then, the character being its top desire
+# target, its 4220 on a draw of 0 of 2. A draw of 1 of 10 picks nothing. Every hit leaves it over 3 of
+# its 4 HP quarters, so neither game hour moves it.
+character Hunter 1
+random 0 0 0 0 1 1 0 2 1 0 4 1 0 8 1 1
+script script.ai.individual.DefaultNpc
+script script.ai.boss.zaken.Zaken
+npc zaken 29022 GrandBoss 200 0 0 skill BUFF 4216 1 skill BUFF1 4217 1 skill BUFF2 4218 1 skill BUFF3 4219 1 skill BUFF4 4221 1
+
+hit zaken 10
+  desires zaken attack(player)=9090.90909090909 cast(player,4216,move)=1000000 cast(player,4220,move)=1000000
+hit zaken 10
+  desires zaken attack(player)=18181.81818181818 cast(player,4216,move)=1000000 cast(player,4220,move)=1000000 cast(player,4217,move)=1000000
+hit zaken 10
+  desires zaken attack(player)=27272.727272727272 cast(player,4216,move)=1000000 cast(player,4220,move)=1000000 cast(player,4217,move)=1000000 cast(player,4219,move)=1000000
+hit zaken 10
+  desires zaken attack(player)=36363.63636363636 cast(player,4216,move)=1000000 cast(player,4220,move)=1000000 cast(player,4217,move)=1000000 cast(player,4219,move)=1000000 cast(player,4218,move)=1000000
+hit zaken 10
+  desires zaken attack(player)=45454.54545454545 cast(player,4216,move)=1000000 cast(player,4220,move)=1000000 cast(player,4217,move)=1000000 cast(player,4219,move)=1000000 cast(player,4218,move)=1000000
+hit zaken 10
+  desires zaken attack(player)=54545.45454545454 cast(player,4216,move)=1000000 cast(player,4220,move)=1000000 cast(player,4217,move)=1000000 cast(player,4219,move)=1000000 cast(player,4218,move)=1000000

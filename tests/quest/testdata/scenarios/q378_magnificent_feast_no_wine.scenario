@@ -1,0 +1,55 @@
+# Magnificent Feast (Q378), a character at the first step has no wine, and follows the unhandled link. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q378_magnificent_feast_no_wine.golden
+character Magnificent 20
+quest Q378_MagnificentFeast <cond>=1 <state>=STARTED
+script quest.Q378_MagnificentFeast
+item 57 5956 5957 5958 4421 1455 1456 1457 5959 847 846 909 879 890 910 848
+page villagemaster/30594.htm
+page script/quest/Q378_MagnificentFeast/
+npc ranspo 30594 VillageMasterDwarf 10 0 0
+
+action ranspo
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q378_MagnificentFeast 30594-4a.htm
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-4.htm
+  S ActionFailed
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q378_MagnificentFeast 30594-4b.htm
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-4.htm
+  S ActionFailed
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q378_MagnificentFeast 30594-4c.htm
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-4.htm
+  S ActionFailed
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q378_MagnificentFeast 30594-4d.htm
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-4d.htm
+  S ActionFailed

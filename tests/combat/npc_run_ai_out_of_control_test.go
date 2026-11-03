@@ -51,7 +51,7 @@ func removeHeldEffect(t *testing.T, target effectHolder, e *effect.Effect) {
 // its last executed desire is a wander.
 func spawnLatchMonster(t *testing.T) (*gameservertest.Server, *npc.Hostile, attackable.Combatant) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -128,14 +128,7 @@ func TestStunnedMonsterTakesLatchOnFirstPassAfterStun(t *testing.T) {
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(hostile.AttackSpeed())) * time.Millisecond
 	decayAttackDesire(t, hostile)
 
-	srv.Advance(t, attackTime+10*time.Millisecond)
-	readAttackWithout(t, srv, serverpackets.OpcodeChangeMoveType, "latched second swing")
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() after the latched runAI = %v, want %v", got, ai.IntentionAttack)
-	}
-
-	intentionAfter(t, srv, hostile, attackTime, "once the latched swing finished, want idle", intentionIs(ai.IntentionIdle))
-	assertNoSwingFor(t, srv, attackTime)
+	assertLatchedSwingThenIdle(t, srv, hostile, attackTime)
 }
 
 // TestConfusedMonsterSelectsNoHeavierDesire pins confusion as part of
@@ -145,7 +138,7 @@ func TestStunnedMonsterTakesLatchOnFirstPassAfterStun(t *testing.T) {
 // by event or periodic passes.
 func TestConfusedMonsterSelectsNoHeavierDesire(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, withWarriorBehavior(), gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	startInWorld(t, c)
 	px, py, pz := srv.PlayerPosition(t, srv.SoleObjectID(t))
@@ -263,8 +256,10 @@ func TestStunnedMonsterIdlesPastLatchAndSwingsItAfter(t *testing.T) {
 		t.Fatal("no ChangeMoveType on the stunned periodic idle, want the walk stance")
 	}
 	assertChangeMoveType(t, walk, hostile.ObjectID(), false)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after the stunned periodic idle = %v, want %v", got, ai.IntentionIdle)
+	// The cycle's own idle keeps the intention; only desire selection,
+	// which a stunned monster skips, switches to idle.
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after the stunned periodic idle = %v, want %v kept", got, ai.IntentionAttack)
 	}
 
 	removeHeldEffect(t, hostile, stun)

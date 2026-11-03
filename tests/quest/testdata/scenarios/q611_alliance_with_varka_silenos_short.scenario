@@ -1,0 +1,22 @@
+# Alliance with Varka Silenos (Q611), stage 2 short of badges: 99 officer badges buy nothing, and Naran says so. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q611_alliance_with_varka_silenos_short.golden
+character Ally 74
+quest Q611_AllianceWithVarkaSilenos <cond>=2 <state>=STARTED
+hold 7226 200
+hold 7227 99
+script quest.Q611_AllianceWithVarkaSilenos
+item 7221 7222 7223 7224 7225 7226 7227 7228 7229 7230 7234
+page npcdefault.htm
+page script/quest/Q611_AllianceWithVarkaSilenos/
+npc naran 31378 Folk 10 0 0
+
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-12.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q611_AllianceWithVarkaSilenos <cond>=2 <state>=STARTED

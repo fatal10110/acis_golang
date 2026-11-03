@@ -1,5 +1,7 @@
 package event
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
 // ItemsTaken reports units of ItemID a script took from the character, with
 // the chat line naming them; Short reports a take that found too few units
 // and removed nothing.
@@ -23,3 +25,65 @@ func (UnequipRequested) event() {}
 type SoundPlayed struct{ File string }
 
 func (SoundPlayed) event() {}
+
+// SkillCalled reports a script making the character use Skill on the
+// creature TargetID at once: the cast animation shows, and the skill's
+// effects land with no cast time, cost, reuse or target check. OwnQueue
+// is as for TeleportRequested.
+type SkillCalled struct {
+	TargetID int32
+	Skill    modelskill.Ref
+	OwnQueue bool
+}
+
+func (SkillCalled) event() {}
+
+// HennaListShown asks for the character's dye list to be shown to it, its
+// dyes' stat bonuses just recomputed.
+type HennaListShown struct{}
+
+func (HennaListShown) event() {}
+
+// NobleGranted asks for the character to become a noblesse: the noble
+// skills, its skill list and UserInfo showing them, the status stored at
+// once.
+type NobleGranted struct{}
+
+func (NobleGranted) event() {}
+
+// ScreenMessageShown reports Text shown at the top center of the
+// character's screen for DurationMs milliseconds.
+type ScreenMessageShown struct {
+	Text       string
+	DurationMs int32
+}
+
+func (ScreenMessageShown) event() {}
+
+// GroupScreenMessageShown reports Text shown at the top center of the
+// screen of every member of the character's party, or of the command
+// channel that party is in when Channel is set, for DurationMs
+// milliseconds. The members are the group's as the event is handled.
+type GroupScreenMessageShown struct {
+	Text       string
+	DurationMs int32
+	Channel    bool
+}
+
+func (GroupScreenMessageShown) event() {}
+
+// MultisellRequested asks for the multisell list List to be shown to the
+// character as the civilian NPC ObjectID offers it.
+type MultisellRequested struct {
+	ObjectID int32
+	List     string
+}
+
+func (MultisellRequested) event() {}
+
+// WarehouseWithdrawOpened asks for the character's private warehouse to
+// become its active one and for its withdrawal window to open, after its
+// client is released.
+type WarehouseWithdrawOpened struct{}
+
+func (WarehouseWithdrawOpened) event() {}

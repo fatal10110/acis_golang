@@ -1,0 +1,22 @@
+# Necromancer's Request (Q632): an undead drops a brain only for a draw under 330000, and drops no heart.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q632_necromancers_request_hunt_undead.golden
+character Hero 63
+quest Q632_NecromancersRequest <cond>=1 <state>=STARTED
+random 0 0 0 330000
+script quest.Q632_NecromancersRequest
+item 7542 7543 57
+page default/31522.htm
+page script/quest/Q632_NecromancersRequest/
+npc wizard 31522 Folk 10 0 0
+npc m1 21547 Monster 40 0 0
+npc m2 21579 Monster 50 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7543
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7543=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 7543=1

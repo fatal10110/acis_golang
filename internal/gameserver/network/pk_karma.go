@@ -217,10 +217,13 @@ func (l *GameClientLink) applyPKKarmaSideEffects(live *livePlayer) {
 	l.queuePvPChange(live, pvpChange{reset: true})
 }
 
+// runPKKarmaSideEffects runs that work. A use condition test that aborts
+// ends only the item sweep: the flag still resets, so an item condition
+// that cannot be tested never leaves a fresh PKer flagged.
 func (l *GameClientLink) runPKKarmaSideEffects(live *livePlayer) {
 	l.unequipRestrictedItems(live)
-	if l.pvpFlags != nil {
-		l.pvpFlags.Remove(live.Character, true)
+	if l.combat.pvpFlags != nil {
+		l.combat.pvpFlags.Remove(live.Character, true)
 	}
 }
 
@@ -233,7 +236,7 @@ func (l *GameClientLink) runPKKarmaSideEffects(live *livePlayer) {
 // flags first and ends unflagged, a lethal skill flags after and ends
 // flagged.
 func (l *GameClientLink) applyPvPFlag(live *livePlayer, e event.PvPFlagged) {
-	if l.pvpFlags == nil {
+	if l.combat.pvpFlags == nil {
 		return
 	}
 	if e.ByServitor || !live.pvpChanges.empty() {
@@ -244,21 +247,22 @@ func (l *GameClientLink) applyPvPFlag(live *livePlayer, e event.PvPFlagged) {
 }
 
 func (l *GameClientLink) startPvPFlag(live *livePlayer, useFlaggedDuration bool) {
-	if l.pvpFlags == nil {
+	if l.combat.pvpFlags == nil {
 		return
 	}
 	if useFlaggedDuration {
-		l.pvpFlags.AddFlagged(live.Character)
+		l.combat.pvpFlags.AddFlagged(live.Character)
 		return
 	}
-	l.pvpFlags.AddNormal(live.Character)
+	l.combat.pvpFlags.AddNormal(live.Character)
 }
 
 // unequipRestrictedItems takes off, through the UseItem equip toggle, every
 // paperdoll item whose use conditions live fails or that its Olympiad match
 // bars; a barred item is announced just before it comes off. Taking off a weapon also
 // aborts the attack in progress. An item an earlier removal in the same
-// pass already took off is not toggled back on.
+// pass already took off is not toggled back on. A use condition test that
+// aborts ends the pass, leaving that item and the rest worn.
 func (l *GameClientLink) unequipRestrictedItems(live *livePlayer) {
 	inv := live.Inventory()
 	if inv == nil || l.inventory == nil {
@@ -266,9 +270,15 @@ func (l *GameClientLink) unequipRestrictedItems(live *livePlayer) {
 	}
 	for _, inst := range inv.PaperdollItems() {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
-		if !ok || !inst.Equipped() || itemRestrictionHolds(live, tmpl) {
+		if !ok || !inst.Equipped() {
 			continue
 		}
-		l.toggleEquipItem(live, inv, inst, tmpl, tmpl.Kind == item.KindWeapon)
+		holds, aborted := itemRestrictionHolds(live, tmpl)
+		if aborted {
+			return
+		}
+		if !holds {
+			l.toggleEquipItem(live, inv, inst, tmpl, tmpl.Kind == item.KindWeapon)
+		}
 	}
 }

@@ -1,0 +1,9 @@
+# AreadataSwitch (32058): a Triol's Revelation says its line as it appears, before the first
+# step, as the NPC lines' NPCs spawn (tests/ai/individual8_test.go checks the line); the area it
+# names is switched by nothing, and nothing more answers.
+character Hunter 20
+script script.ai.individual.AreadataSwitch
+script script.ai.individual.DefaultNpc
+npc switch 32058 Folk 40 0 0
+
+advance 10s

@@ -1,0 +1,35 @@
+# Hunting Leto Lizardman (Q300), the bone prize: a character at cond 2 with sixty bracelets reports
+# to Rath; the prize roll pinned to 2 gives fifty animal bones, and the quest ends. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q300_hunting_leto_lizardman_bones.golden
+character Leto 34
+quest Q300_HuntingLetoLizardman <cond>=2 <state>=STARTED
+hold 7139 60
+random 2
+script quest.Q300_HuntingLetoLizardman
+item 7139 1867 1872 57
+page guard/30126.htm
+page script/quest/Q300_HuntingLetoLizardman/
+npc rath 30126 Guard 10 0 0
+
+# Rath: the bracelets are all there.
+action rath
+action rath
+  S ActionFailed
+  S NpcHtmlMessage obj=rath item=0 page=guard/30126.htm
+  S ActionFailed
+bypass npc_{rath}_Quest
+  S NpcHtmlMessage obj=rath item=0 page=script/quest/Q300_HuntingLetoLizardman/30126-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q300_HuntingLetoLizardman 30126-05.htm
+  S SystemMessage id=301 3:7139 6:60
+  S SystemMessage id=53 3:1872 6:50
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rath item=0 page=script/quest/Q300_HuntingLetoLizardman/30126-06.htm
+  S ActionFailed
+  Q delete-quest Q300_HuntingLetoLizardman
+  items 7139=0 1872=50
+  state Q300_HuntingLetoLizardman -
+  rows Q300_HuntingLetoLizardman -

@@ -209,10 +209,8 @@ func (b *Book) Invite(kind RequestKind, requesterID, targetID int32, checkReques
 // expire; friend, party and command channel answers reach the departed
 // requester and stop its clock all the same.
 //
-// The reference tells a requester that left from one that is online by
-// looking its id up in the world, so a relog under the same id still stops
-// the earlier login's clock there. Here a left login stays left whatever a
-// later login under its id does.
+// A left login stays left whatever a later login under its id does: a
+// relog under the same id does not stop the earlier login's clock.
 func answerReachesLeftRequester(kind RequestKind) bool {
 	return kind != KindTrade && kind != KindPartyRoom
 }

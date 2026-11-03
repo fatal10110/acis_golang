@@ -1,0 +1,139 @@
+# An Arrogant Search (Q348), level 60: the holy arks trade the keys for the saints' relics, and Hanellin takes the relics for the white fabric. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q348_an_arrogant_search_arks.golden
+character Dragoon 60
+quest Q348_AnArrogantSearch <cond>=11 <state>=STARTED points=0
+hold 4291 1
+hold 4292 1
+hold 4293 1
+script quest.Q348_AnArrogantSearch
+item 4287 4288 4289 4290 4291 4292 4293 4397 4398 4399 4294 4295 1831 1061
+page default/30977.htm
+page default/30978.htm
+page default/30979.htm
+page trainer/30864.htm
+page script/quest/Q348_AnArrogantSearch/
+npc ark1 30977 Folk 10 0 0
+npc ark2 30978 Folk 20 0 0
+npc ark3 30979 Folk 30 0 0
+npc hanellin 30864 Trainer 40 0 0
+
+action ark1
+action ark1
+  S ActionFailed
+  S NpcHtmlMessage obj=ark1 item=0 page=default/30977.htm
+  S ActionFailed
+bypass npc_{ark1}_Quest
+  S QuestList 348:0x800807ff
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4291
+  S SystemMessage id=54 3:4398
+  S NpcHtmlMessage obj=ark1 item=0 page=script/quest/Q348_AnArrogantSearch/30977-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <flags> | -2146957313
+  Q upsert Q348_AnArrogantSearch | <cond> | 20
+action ark1
+  S ActionFailed
+  S NpcHtmlMessage obj=ark1 item=0 page=default/30977.htm
+  S ActionFailed
+action ark1
+  S ActionFailed
+  S NpcHtmlMessage obj=ark1 item=0 page=default/30977.htm
+  S ActionFailed
+bypass npc_{ark1}_Quest
+  S NpcHtmlMessage obj=ark1 item=0 page=script/quest/Q348_AnArrogantSearch/30978-03.htm
+  S ActionFailed
+  S ActionFailed
+action ark2
+action ark2
+  S ActionFailed
+  S NpcHtmlMessage obj=ark2 item=0 page=default/30978.htm
+  S ActionFailed
+bypass npc_{ark2}_Quest
+  S QuestList 348:0x800007ff
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4292
+  S SystemMessage id=54 3:4397
+  S NpcHtmlMessage obj=ark2 item=0 page=script/quest/Q348_AnArrogantSearch/30978-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <flags> | -2147481601
+  Q upsert Q348_AnArrogantSearch | <cond> | 12
+action ark2
+  S ActionFailed
+  S NpcHtmlMessage obj=ark2 item=0 page=default/30979.htm
+  S ActionFailed
+action ark2
+  S ActionFailed
+  S NpcHtmlMessage obj=ark2 item=0 page=default/30978.htm
+  S ActionFailed
+bypass npc_{ark2}_Quest
+  S NpcHtmlMessage obj=ark2 item=0 page=script/quest/Q348_AnArrogantSearch/30977-03.htm
+  S ActionFailed
+  S ActionFailed
+action ark3
+action ark3
+  S ActionFailed
+  S NpcHtmlMessage obj=ark3 item=0 page=default/30978.htm
+  S ActionFailed
+bypass npc_{ark3}_Quest
+  S QuestList 348:0x800087ff
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4293
+  S SystemMessage id=54 3:4399
+  S QuestList 348:0x801087ff
+  S ExShowQuestMark quest=348
+  S NpcHtmlMessage obj=ark3 item=0 page=script/quest/Q348_AnArrogantSearch/30979-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <flags> | -2147448833
+  Q upsert Q348_AnArrogantSearch | <cond> | 16
+  Q upsert Q348_AnArrogantSearch | <flags> | -2146400257
+  Q upsert Q348_AnArrogantSearch | <cond> | 21
+action ark3
+  S ActionFailed
+  S NpcHtmlMessage obj=ark3 item=0 page=default/30978.htm
+  S ActionFailed
+action ark3
+  S ActionFailed
+  S NpcHtmlMessage obj=ark3 item=0 page=default/30978.htm
+  S ActionFailed
+bypass npc_{ark3}_Quest
+  S NpcHtmlMessage obj=ark3 item=0 page=script/quest/Q348_AnArrogantSearch/30978-03.htm
+  S ActionFailed
+  S ActionFailed
+action hanellin
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+bypass npc_{hanellin}_Quest
+  S QuestList 348:0x803087ff
+  S ExShowQuestMark quest=348
+  S SystemMessage id=302 3:4397
+  S SystemMessage id=302 3:4398
+  S SystemMessage id=302 3:4399
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-29.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <flags> | -2144303105
+  Q upsert Q348_AnArrogantSearch | <cond> | 22
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+bypass npc_{hanellin}_Quest
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-30.htm
+  S ActionFailed
+  S ActionFailed
+  items 4291=0 4292=0 4293=0 4397=0 4398=0 4399=0
+  state Q348_AnArrogantSearch STARTED
+  rows Q348_AnArrogantSearch <cond>=22 <flags>=-2144303105 <state>=STARTED points=0

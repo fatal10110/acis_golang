@@ -1,0 +1,162 @@
+# Covert Business (Q294): a dwarven fighter of level 10 accepts at Keef. Twenty-four barded bats give
+# four bat fangs each (roll pinned to 5: 1 + 3), a blade bat three (roll 4: 1 + 2) and another one
+# (roll 9), the hundredth fang moving the quest on. Keef takes them for a ring of raccoon and 600 SP,
+# and the repeatable quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q294_covert_business.golden
+character Covert 10
+class 53
+random 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 5 0 4 0 9 0
+script quest.Q294_CovertBusiness
+item 1491 1508
+page default/30534.htm
+page script/quest/Q294_CovertBusiness/
+npc keef 30534 Folk 10 0 0
+npc barded 20370 Monster 40 0 0
+npc blade 20480 Monster 0 40 0
+
+# Keef: accept.
+action keef
+action keef
+  S ActionFailed
+  S NpcHtmlMessage obj=keef item=0 page=default/30534.htm
+  S ActionFailed
+bypass npc_{keef}_Quest
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q294_CovertBusiness/30534-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q294_CovertBusiness CREATED
+bypass Quest Q294_CovertBusiness 30534-03.htm
+  S QuestList 294:0x80000001
+  S ExShowQuestMark quest=294
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q294_CovertBusiness/30534-03.htm
+  S ActionFailed
+  Q upsert Q294_CovertBusiness | <state> | STARTED
+  Q upsert Q294_CovertBusiness | <cond> | 1
+  state Q294_CovertBusiness STARTED
+  rows Q294_CovertBusiness <cond>=1 <state>=STARTED
+
+# Keef: not enough fangs.
+action keef
+  S ActionFailed
+  S NpcHtmlMessage obj=keef item=0 page=default/30534.htm
+  S ActionFailed
+bypass npc_{keef}_Quest
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q294_CovertBusiness/30534-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# A hundred fangs.
+kill barded x24
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1491=96
+kill blade
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1491 6:3
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1491=99
+kill blade
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1491
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 294:0x80000003
+  S ExShowQuestMark quest=294
+  Q upsert Q294_CovertBusiness | <cond> | 2
+  items 1491=100
+  rows Q294_CovertBusiness <cond>=2 <state>=STARTED
+
+# Keef: the fangs for a ring of raccoon; the quest ends.
+action keef
+  S ActionFailed
+  S NpcHtmlMessage obj=keef item=0 page=default/30534.htm
+  S ActionFailed
+bypass npc_{keef}_Quest
+  S SystemMessage id=301 3:1491 6:100
+  S SystemMessage id=54 3:1508
+  S SystemMessage id=331 1:600
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q294_CovertBusiness/30534-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q294_CovertBusiness
+  items 1491=0 1508=1
+  state Q294_CovertBusiness -
+  rows Q294_CovertBusiness -
+
+# Relog: the quest is gone, and the ring stays.
+relog
+  state Q294_CovertBusiness -
+  rows Q294_CovertBusiness -
+  items 1508=1

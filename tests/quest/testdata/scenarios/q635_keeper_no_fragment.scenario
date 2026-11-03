@@ -1,0 +1,18 @@
+# In the Dimensional Rift (Q635): a level 20 character holding no dimension fragment is told to find one. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q635_keeper_no_fragment.golden
+character Hero 20
+script quest.Q635_InTheDimensionalRift
+item 7079
+page default/31494.htm
+page script/quest/Q635_InTheDimensionalRift/
+npc keeper 31494 Folk 10 0 0
+
+action keeper
+action keeper
+  S ActionFailed
+  S NpcHtmlMessage obj=keeper item=0 page=default/31494.htm
+  S ActionFailed
+bypass npc_{keeper}_Quest Q635_InTheDimensionalRift
+  S NpcHtmlMessage obj=keeper item=0 page=script/quest/Q635_InTheDimensionalRift/dimension_keeper_03.htm
+  S ActionFailed
+  S ActionFailed

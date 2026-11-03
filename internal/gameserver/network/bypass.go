@@ -1,10 +1,10 @@
 package network
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -52,12 +52,12 @@ func (w *bypassWhitelist) record(html string) {
 			continue
 		}
 		if dollar := strings.IndexByte(html[start:end], '$'); dollar >= 0 {
-			if p := strings.TrimFunc(html[start:start+dollar], javaSpace); p != "" {
+			if p := strings.TrimFunc(html[start:start+dollar], isCtrlOrSpace); p != "" {
 				w.prefix = append(w.prefix, p)
 			}
 			continue
 		}
-		w.exact = append(w.exact, strings.TrimFunc(html[start:end], javaSpace))
+		w.exact = append(w.exact, strings.TrimFunc(html[start:end], isCtrlOrSpace))
 	}
 }
 
@@ -78,9 +78,9 @@ func (w *bypassWhitelist) allows(command string) bool {
 	return false
 }
 
-// javaSpace is the set trimmed around a bypass command: every character up
+// isCtrlOrSpace is the set trimmed around a bypass command: every character up
 // to and including the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }
 
 // sendValidatedHTML opens an HTML window on live showing html, a page sent
 // as loaded or built, with the page limit applied to it, and makes its
@@ -102,12 +102,12 @@ var bypassRoutes = []bypassRoute{
 	{[]string{"admin_"}, (*GameClientLink).bypassAdmin},
 	{[]string{"player_help "}, (*GameClientLink).bypassPlayerHelp},
 	{[]string{"npc_"}, (*GameClientLink).bypassNpc},
-	{[]string{"manor_menu_select?"}, unportedBypass("manor (#240)")},
+	{[]string{"manor_menu_select?"}, (*GameClientLink).bypassManorMenu},
 	{[]string{"bbs_", "_bbs", "_friend", "_mail", "_block"}, (*GameClientLink).boardCommand},
 	{[]string{"Quest "}, (*GameClientLink).bypassQuest},
 	{[]string{"_match"}, (*GameClientLink).bypassHeroFights},
 	{[]string{"_diary"}, (*GameClientLink).bypassHeroDiary},
-	{[]string{"arenachange"}, unportedBypass("olympiad observation (#3356)")},
+	{[]string{"arenachange"}, (*GameClientLink).bypassArenaChange},
 }
 
 // requestBypassToServer routes a clicked HTML link to its command family.
@@ -123,15 +123,6 @@ func (l *GameClientLink) requestBypassToServer(live *livePlayer, req clientpacke
 				return
 			}
 		}
-	}
-}
-
-// unportedBypass answers a command family whose system is not in place
-// yet: the gap is logged and the client released.
-func unportedBypass(system string) func(*GameClientLink, *livePlayer, string) {
-	return func(l *GameClientLink, live *livePlayer, command string) {
-		l.log.Debug().Str("command", command).Str("system", system).Msg("bypass: command family not modeled")
-		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 }
 
@@ -158,7 +149,7 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 	if end > 0 {
 		idText = command[4:end]
 	}
-	id, err := commons.ParseInt(idText, 32)
+	id, err := strconv.ParseInt(idText, 10, 32)
 	if err != nil {
 		return
 	}
@@ -170,8 +161,8 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 					return
 				}
 			case *npc.Hostile:
-				if l.playerCanDoInteract(live, target) {
-					l.hostileBypass(live, target, command[end+1:])
+				if l.playerCanDoInteract(live, target) && !l.hostileBypass(live, target, command[end+1:]) {
+					return
 				}
 			default:
 				l.log.Debug().Int32("object_id", obj.ObjectID()).Str("command", command).Msg("bypass: dialog of a non-civilian NPC not modeled")
@@ -184,7 +175,12 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 // folkBypass runs command on f for live. It reports false when the command
 // aborted, so that nothing more is sent.
 func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command string) bool {
-	rules := l.playerConfig.chatRules()
+	return l.runFolkReply(live, f, command, l.folkReply(live, f, command))
+}
+
+// folkReply is f's answer to command, sent by live.
+func (l *GameClientLink) folkReply(live *livePlayer, f *npc.Folk, command string) npc.BypassReply {
+	rules := l.chatRules()
 	rules.AllowWear = l.merchant.Config().AllowWear
 	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
 	talker.InactiveHero = l.heroes != nil && l.heroes.IsInactive(live.ObjectID())
@@ -193,8 +189,17 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	classLevel, _ := player.ClassLevel(live.ClassID())
 	talker.ThirdClass = classLevel >= 3
 	talker.CurrentFolk = live.currentFolk.Load() == f
-	talker.SevenSigns = folkChatState{l: l, live: live}.SevenSigns
-	reply := f.Bypass(setPages{l.html}, rules, talker, command)
+	talker.Trading = l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())
+	talker.MountNPCID, talker.MountLevel = live.MountNPCID(), live.MountLevel()
+	talker.SevenSigns = folkChatState{l: l, live: live, f: f}.SevenSigns
+	talker.Residence = folkChatState{l: l, live: live, f: f}.Residence
+	talker.FestivalNotice = folkChatState{l: l, live: live, f: f}.FestivalNotice
+	return f.Bypass(setPages{l.html}, rules, talker, command)
+}
+
+// runFolkReply carries out reply, f's answer to command, for live. It
+// reports false when the command aborted, so that nothing more is sent.
+func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command string, reply npc.BypassReply) bool {
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
@@ -276,19 +281,51 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	case npc.BypassAuction:
 		l.auctioneerBypass(live, f, command)
 	case npc.BypassClanHallManager:
-		l.clanHallManagerBypass(live, f, command)
+		return l.clanHallManagerBypass(live, f, command)
 	case npc.BypassOlympiadNoble:
 		l.olympiadNobleBypass(live, f, reply.Index)
 	case npc.BypassClassRanking:
 		l.showClassRanking(live, f, reply.Index)
+	case npc.BypassOlympiadStadiums:
+		l.showOlympiadStadiums(live, f)
 	case npc.BypassSevenSigns:
 		return l.sevenSignsBypass(live, f, command, reply.DawnPriest)
 	case npc.BypassSignsChat:
 		sendFolkChat(live, f, reply.HTML, reply.Chat)
 	case npc.BypassTerritoryStatus:
-		l.showTerritoryStatus(live, f)
+		l.showTerritoryStatus(live, f.ObjectID(), f.Instance)
 	case npc.BypassQuest:
 		l.questWindow(live, f, command)
+	case npc.BypassDungeonEnter:
+		l.dungeonGate(live, f, true)
+	case npc.BypassDungeonExit:
+		l.dungeonGate(live, f, false)
+	case npc.BypassDungeonRefused:
+		dungeonRefusal(live, f, reply)
+	case npc.BypassChatAs:
+		sendFolkChat(live, f, reply.HTML, reply.Chat)
+	case npc.BypassDoors:
+		return l.doormanDoors(live, f, reply)
+	case npc.BypassDoorsBusy:
+		doormanBusy(live, f, reply.HTML)
+	case npc.BypassClanGate:
+		l.clanGate(live, f, reply.HTML)
+	case npc.BypassMassTeleport:
+		l.massTeleport(live, f, reply)
+	case npc.BypassMercenaryHire:
+		l.mercenaryHire(live, f, reply)
+	case npc.BypassWyvernNoStrider:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyRideWyvernFromStrider))
+		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case npc.BypassWyvernRide:
+		l.rideWyvernAtNpc(live, f, reply)
+	case npc.BypassAlreadyTrading:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
+	case npc.BypassChamberlain:
+		return l.chamberlainBypass(live, f, command, reply.Standing)
+	case npc.BypassFestival:
+		return l.festivalGuideBypass(live, f, command, reply.Index, reply.FestivalDesc)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:
@@ -296,15 +333,30 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	return true
 }
 
-// hostileBypass runs command on the hostile NPC h for live: a "Quest"
-// command opens its quest windows; the rest of a hostile NPC's dialog is
-// not modeled yet and is logged.
-func (l *GameClientLink) hostileBypass(live *livePlayer, h *npc.Hostile, command string) {
-	if strings.HasPrefix(command, "Quest") {
+// hostileBypass runs command on the hostile NPC h for live, a town guard or
+// a friendly monster in the shipped pages: TerritoryStatus shows its
+// castle's territory, Quest opens its quest windows, Chat <n> its chat page
+// n and Link <path> a datapack page. The rest of a hostile NPC's dialog is
+// not modeled and is logged. It reports false when the command aborted, so
+// that nothing more is sent.
+func (l *GameClientLink) hostileBypass(live *livePlayer, h *npc.Hostile, command string) bool {
+	reply := npc.ParseDialogCommand(command)
+	switch reply.Command {
+	case npc.DialogTerritoryStatus:
+		l.showTerritoryStatus(live, h.ObjectID(), h.Instance)
+	case npc.DialogQuest:
 		l.questWindow(live, h, command)
-		return
+	case npc.DialogChat:
+		l.openHostileChat(live, h, reply.Val)
+	case npc.DialogLink:
+		l.sendNPCPage(live, h.ObjectID(), reply.Path)
+	case npc.DialogAborted:
+		return false
+	case npc.DialogRefused:
+	case npc.DialogOther:
+		l.log.Debug().Int("npc_id", h.NpcID()).Str("command", command).Msg("bypass: dialog of a hostile NPC not modeled")
 	}
-	l.log.Debug().Int("npc_id", h.NpcID()).Str("command", command).Msg("bypass: dialog of a hostile NPC not modeled")
+	return true
 }
 
 // cpRecovery has arena manager f restore live's CP for its fee: the fee
@@ -316,7 +368,7 @@ func cpRecovery(live *livePlayer, f *npc.Folk) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
 	case npc.CPRecoveryPaid:
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, npc.CPRecoveryFee))
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CPWillBeRestored, live.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CPWillBeRestored, live.CharacterName()))
 	case npc.CPRecoveryUnpaid:
 	}
 }
@@ -341,6 +393,8 @@ func (l *GameClientLink) showTeleports(live *livePlayer, objectID int32, npcID i
 func (l *GameClientLink) departFromNpc(live *livePlayer, trip gatekeeper.Trip) {
 	for _, n := range trip.Notices {
 		switch n := n.(type) {
+		case gatekeeper.CastleBesieged:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPortVillageInSiege))
 		case gatekeeper.NotEnoughAdena:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
 		case gatekeeper.AdenaSpent:

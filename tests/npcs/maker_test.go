@@ -170,12 +170,13 @@ type makerWorld struct {
 	change func()
 }
 
-// shown returns the template ids of the NpcInfo frames among frames,
-// sorted.
+// shown returns the template ids of the NPCs the NpcInfo frames among frames
+// show appearing, sorted. The NpcInfo that follows a ChangeMoveType is the
+// same NPC's info again after it takes its run stance, not another NPC.
 func shown(frames [][]byte) []int {
 	var out []int
-	for _, frame := range frames {
-		if frame[0] != serverpackets.OpcodeNPCInfo {
+	for i, frame := range frames {
+		if frame[0] != serverpackets.OpcodeNPCInfo || (i > 0 && frames[i-1][0] == serverpackets.OpcodeChangeMoveType) {
 			continue
 		}
 		r := wire.NewReader(frame[1:])
@@ -265,10 +266,10 @@ func TestDefaultMakerRespawnsADeletedNPC(t *testing.T) {
 		t.Fatalf("deleted objects = %v, want [%d]", got, old.ObjectID())
 	}
 	const key = "default_m#0#0"
-	if !w.srv.NpcRespawns.Tracked(key) {
+	if !w.srv.RespawnArmed(t, key) {
 		t.Fatal("deleted default maker NPC armed no respawn")
 	}
-	w.srv.NpcSpawns.Respawn(key)
+	w.srv.RespawnSlot(t, key)
 	w.srv.Settle(t)
 	if got := shown(drainFrames(t, c)); !slices.Equal(got, []int{makerDefaultID}) {
 		t.Fatalf("NPCs shown after the respawn = %v, want [%d]", got, makerDefaultID)
@@ -298,10 +299,8 @@ func TestDefaultMakerScriptEvents(t *testing.T) {
 	if got := deleted(drainFrames(t, c)); !slices.Equal(got, objectIDs(group)) {
 		t.Fatalf("deleted objects after 1000 = %v, want %v", got, objectIDs(group))
 	}
-	for i := range 3 {
-		if key := fmt.Sprintf("group_m#0#%d", i); w.srv.NpcRespawns.Tracked(key) {
-			t.Fatalf("slot %s armed a respawn after 1000", key)
-		}
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("after 1000: respawns armed = %d, want none", n)
 	}
 
 	npcs.MakerEvent("group_m", "1001", 2, 0)
@@ -410,7 +409,11 @@ func TestMakerHooksRaceRespawnAndPeriodChange(t *testing.T) {
 					h.DeleteMe()
 				}
 				for i := range 64 {
-					npcs.Respawn(fmt.Sprintf("ssq_ev#0#%d", i))
+					// Whichever slots are live this round: the race
+					// drops and remakes them.
+					if id, ok := npcs.SlotID(fmt.Sprintf("ssq_ev#0#%d", i)); ok {
+						npcs.Respawn(id)
+					}
 				}
 			}
 			<-done

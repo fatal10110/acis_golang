@@ -28,7 +28,7 @@ func TestFlushWaitsForARequeuedItemWrite(t *testing.T) {
 			t.Errorf("close persistence worker: %v", err)
 		}
 	})
-	link := &GameClientLink{persist: worker, itemWrites: order, log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Persist: worker, ItemWrites: order, Log: zerolog.Nop()})
 
 	const ownerID, objectID int32 = 1, 900
 	held, release := make(chan struct{}), make(chan struct{})
@@ -83,7 +83,7 @@ func TestPanickingItemWriteDoesNotWedgeItsLane(t *testing.T) {
 			t.Errorf("close persistence worker: %v", err)
 		}
 	})
-	link := &GameClientLink{persist: worker, itemWrites: order, log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Persist: worker, ItemWrites: order, Log: zerolog.Nop()})
 
 	const ownerID, objectID int32 = 1, 910
 	link.queueItemWrite(order.Reserve(objectID), func([]int32) error { panic("store driver blew up") }, ownerID)
@@ -118,7 +118,7 @@ func TestFlushWaitsForAWriteOwedByAnotherLane(t *testing.T) {
 			t.Errorf("close persistence worker: %v", err)
 		}
 	})
-	link := &GameClientLink{persist: worker, itemWrites: order, log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Persist: worker, ItemWrites: order, Log: zerolog.Nop()})
 
 	// Owners 1 and 2 map to different lanes.
 	const writer, other, objectID int32 = 1, 2, 920

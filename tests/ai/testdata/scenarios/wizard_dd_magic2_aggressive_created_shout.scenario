@@ -1,0 +1,15 @@
+# WizardDDMagic2Aggressive (21311), the control of wizard_hall_dd_magic2_created: with a ShoutMsg1 it shouts as a fresh one appears.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+npc wiz 21311 Monster 300 0 0 ai ShoutMsg1=1000290 skill W_LONG_RANGE_DD_MAGIC 4158 8 skill W_SHORT_RANGE_DD_MAGIC 4160 8
+
+kill wiz x2
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=wiz type=1 npc=1021311 text="Dear ultimate power!!!"
+  S SystemMessage id=95 1:0 1:0

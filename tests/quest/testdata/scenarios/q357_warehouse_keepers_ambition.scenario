@@ -1,0 +1,93 @@
+# Warehouse Keeper's Ambition (Q357): a level 47 character accepts at Silva through her pages;
+# she has no crystal to buy; two forest runners give a crystal each (every roll pinned to
+# succeed); Silva buys them, then the character quits and the quest ends; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q357_warehouse_keepers_ambition.golden
+character Silva 47
+random always 0
+script quest.Q357_WarehouseKeepersAmbition
+item 57 5867
+page warehouse/30686.htm
+page script/quest/Q357_WarehouseKeepersAmbition/
+npc silva 30686 WarehouseKeeper 10 0 0
+npc runner 20594 Monster 40 0 0
+
+# Silva: accept through 30686-1, then 30686-3.
+action silva
+action silva
+  S ActionFailed
+  S NpcHtmlMessage obj=silva item=0 page=warehouse/30686.htm
+  S ActionFailed
+bypass npc_{silva}_Quest
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q357_WarehouseKeepersAmbition 30686-1.htm
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-1.htm
+  S ActionFailed
+bypass Quest Q357_WarehouseKeepersAmbition 30686-2.htm
+  S QuestList 357:0x80000001
+  S ExShowQuestMark quest=357
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-2.htm
+  S ActionFailed
+  Q upsert Q357_WarehouseKeepersAmbition | <state> | STARTED
+  Q upsert Q357_WarehouseKeepersAmbition | <cond> | 1
+  rows Q357_WarehouseKeepersAmbition <cond>=1 <state>=STARTED
+  state Q357_WarehouseKeepersAmbition STARTED
+bypass Quest Q357_WarehouseKeepersAmbition 30686-3.htm
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-3.htm
+  S ActionFailed
+action silva
+  S ActionFailed
+  S NpcHtmlMessage obj=silva item=0 page=warehouse/30686.htm
+  S ActionFailed
+action silva
+  S ActionFailed
+  S NpcHtmlMessage obj=silva item=0 page=warehouse/30686.htm
+  S ActionFailed
+bypass npc_{silva}_Quest
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-4.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two forest runners: a crystal each.
+kill runner x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5867
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5867
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5867=2
+
+# Silva buys the crystals; the character quits.
+action silva
+  S ActionFailed
+  S NpcHtmlMessage obj=silva item=0 page=warehouse/30686.htm
+  S ActionFailed
+action silva
+  S ActionFailed
+  S NpcHtmlMessage obj=silva item=0 page=warehouse/30686.htm
+  S ActionFailed
+bypass npc_{silva}_Quest
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-6.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q357_WarehouseKeepersAmbition 30686-7.htm
+  S SystemMessage id=301 3:5867 6:2
+  S SystemMessage id=52 6:4350
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-7.htm
+  S ActionFailed
+  items 5867=0 57=4350
+bypass Quest Q357_WarehouseKeepersAmbition 30686-8.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-8.htm
+  S ActionFailed
+  Q delete-quest Q357_WarehouseKeepersAmbition
+  state Q357_WarehouseKeepersAmbition -
+  rows Q357_WarehouseKeepersAmbition -
+relog
+  rows Q357_WarehouseKeepersAmbition -
+  items 57=4350

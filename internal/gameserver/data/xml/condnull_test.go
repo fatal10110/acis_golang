@@ -11,7 +11,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // TestSkillCondThatHoldsNoConditionReadsNoFeedback: the reference reads a
@@ -44,7 +43,7 @@ func TestSkillCondThatHoldsNoConditionReadsNoFeedback(t *testing.T) {
 			if c.MessageID != 0 || c.AddName || c.Message != "" || !conditions.IsNull(c.Root) {
 				t.Errorf("%s: level %d clause = %+v, want a null root with no feedback", name, level, c)
 			}
-			if failed, ok := conditions.EvaluateSkill(def, caster, nil); ok || failed.MessageID != 0 {
+			if failed, ok := conditions.EvaluateSkill(*def, caster, nil); ok || failed.MessageID != 0 {
 				t.Errorf("%s: level %d cast = (%+v, %v), want refused with no feedback", name, level, failed, ok)
 			}
 		}
@@ -60,7 +59,7 @@ func TestSkillCondThatHoldsNoConditionReadsNoFeedback(t *testing.T) {
 	if len(def.Conditions) != 1 || def.Conditions[0].MessageID != 113 {
 		t.Fatalf("<player bogus level=1>: conditions = %+v, want one clause with msgId 113", def.Conditions)
 	}
-	if _, ok := conditions.EvaluateSkill(def, caster, nil); !ok {
+	if _, ok := conditions.EvaluateSkill(*def, caster, nil); !ok {
 		t.Error("<player bogus level=1> at level 40: cast refused, want allowed")
 	}
 }
@@ -184,14 +183,14 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 	for _, tpl := range items.All() {
 		where := fmt.Sprintf("item %d", tpl.ID)
 		for _, uc := range tpl.UseConditions {
-			check(where+" cond", effect.ItemCondition(uc.Root))
+			check(where+" cond", conditions.ItemCondition(uc.Root))
 		}
 		for _, mod := range tpl.Modifiers {
 			if mod.Condition != nil {
-				check(where+" func "+mod.Stat, effect.ItemCondition(*mod.Condition))
+				check(where+" func "+mod.Stat, conditions.ItemCondition(*mod.Condition))
 			}
 			if mod.AttachCondition != nil {
-				check(where+" func "+mod.Stat+" attach", effect.ItemCondition(mod.AttachCondition.Root))
+				check(where+" func "+mod.Stat+" attach", conditions.ItemCondition(mod.AttachCondition.Root))
 			}
 		}
 	}
@@ -202,7 +201,7 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 	// The item loader drops a top-level or <for>-leading <cond> that holds no
 	// condition, so the walk above cannot see one: read the raw elements and
 	// require each of them to build a condition.
-	docs, err := loadXMLDocuments[itemFile](datapackPath(t, filepath.Join("data", "xml", "items")), "item template")
+	docs, err := loadTemplateDocuments[itemFile](datapackPath(t, filepath.Join("data", "xml", "items")), "item template")
 	if err != nil {
 		t.Fatalf("loadXMLDocuments: %v", err)
 	}
@@ -219,12 +218,15 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 		for _, el := range doc.Data.Items {
 			id := newAttrValues(foldAttrs(el.Attrs), "item").int32("id")
 			where := fmt.Sprintf("%s item %d", filepath.Base(doc.Path), id)
-			for _, c := range el.Cond {
-				rawCond(where+" cond", id, c.Attrs, c.Children)
-			}
-			for _, forEl := range el.For {
-				for i, op := range forEl.Ops {
-					if tag := op.XMLName.Local; strings.EqualFold(tag, "cond") && leadsWithCond(tag, i, forEl.LeadingNode) {
+			for _, c := range el.Children {
+				if c.Cond != nil {
+					rawCond(where+" cond", id, c.Cond.Attrs, c.Cond.Children)
+				}
+				if c.For == nil {
+					continue
+				}
+				for i, op := range c.For.Ops {
+					if tag := op.XMLName.Local; strings.EqualFold(tag, "cond") && leadsWithCond(tag, i, c.For.LeadingNode) {
 						rawCond(where+" for cond", id, op.Attrs, op.Children)
 					}
 				}

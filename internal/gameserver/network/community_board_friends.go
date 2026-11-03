@@ -1,9 +1,9 @@
 package network
 
 import (
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -78,7 +78,7 @@ func boardSelection(command string) (string, int32, bool) {
 	if tokens[1] != "select" && tokens[1] != "deselect" {
 		return tokens[1], 0, true
 	}
-	id, err := commons.ParseInt(tokens[2], 32)
+	id, err := strconv.ParseInt(tokens[2], 10, 32)
 	if err != nil {
 		return "", 0, false
 	}
@@ -116,7 +116,7 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 			// removal runs the two are no longer friends.
 			if friend, online := l.livePlayerByID(friendID); online {
 				if l.relations.RemoveFriend(friendID, live.ObjectID()) {
-					friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, live.Name))
+					friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, live.CharacterName()))
 				}
 				friend.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(friendID)))
 			}

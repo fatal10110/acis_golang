@@ -1,0 +1,71 @@
+# Shriek of Ghosts (Q371): a level 59 character accepts at Reva, kills two Hallate's ghosts (the first
+# roll gives an urn, the second the porcelain) and asks Reva about them; then relog. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q371_shriek_of_ghosts.golden
+character Ghosts 59
+random 0 0 0 0 40 0
+script quest.Q371_ShriekOfGhosts
+item 57 5903 6002 6003 6004 6005 6006
+page trainer/30867.htm
+page default/30929.htm
+page script/quest/Q371_ShriekOfGhosts/
+npc reva 30867 Trainer 10 0 0
+npc patrin 30929 Folk -10 0 0
+npc ghost 20818 Monster 40 0 0
+
+action reva
+action reva
+  S ActionFailed
+  S NpcHtmlMessage obj=reva item=0 page=trainer/30867.htm
+  S ActionFailed
+bypass npc_{reva}_Quest
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q371_ShriekOfGhosts 30867-03.htm
+  S QuestList 371:0x80000001
+  S ExShowQuestMark quest=371
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-03.htm
+  S ActionFailed
+  Q upsert Q371_ShriekOfGhosts | <state> | STARTED
+  Q upsert Q371_ShriekOfGhosts | <cond> | 1
+  rows Q371_ShriekOfGhosts <cond>=1 <state>=STARTED
+  state Q371_ShriekOfGhosts STARTED
+kill ghost
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5903
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5903=1 6002=0
+action reva
+  S ActionFailed
+  S NpcHtmlMessage obj=reva item=0 page=trainer/30867.htm
+  S ActionFailed
+action reva
+  S ActionFailed
+  S NpcHtmlMessage obj=reva item=0 page=trainer/30867.htm
+  S ActionFailed
+bypass npc_{reva}_Quest
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-04.htm
+  S ActionFailed
+  S ActionFailed
+kill ghost
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:6002
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5903=1 6002=1
+action reva
+  S ActionFailed
+  S NpcHtmlMessage obj=reva item=0 page=trainer/30867.htm
+  S ActionFailed
+action reva
+  S ActionFailed
+  S NpcHtmlMessage obj=reva item=0 page=trainer/30867.htm
+  S ActionFailed
+bypass npc_{reva}_Quest
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-05.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q371_ShriekOfGhosts <cond>=1 <state>=STARTED
+  items 5903=1 6002=1

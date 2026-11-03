@@ -1,0 +1,63 @@
+# Second class change (SecondClassChange): a level 40 human Wizard holding the marks of Scholar,
+# Trust and Magus. Hannavalt, who changes only fighters, turns it away; Grand Magister Jurek opens
+# the nuker mystics' pages and makes it a Sorcerer: the marks taken, fifteen C-grade coupons
+# given, the fanfare, the class change's animation and message, and the congratulation page,
+# whose page family the Sorcerer's parent class decides. After a relog Jurek says it has already
+# made its second change. Expectations are the reference trace's (SecondClassChange.onTalk,
+# onAdvEvent, getClassHtml).
+trace internal/gameserver/script/testdata/oracle/scenarios/second_class_change_sorcerer.golden
+character Mystic 40
+class 11
+hold 2674 1
+hold 2734 1
+hold 2840 1
+script script.feature.SecondClassChange
+item 2674 2734 2840 8870
+page villagemaster/30109.htm
+page villagemaster/30115.htm
+page script/feature/SecondClassChange/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+npc jurek 30115 VillageMasterMystic -10 0 0
+
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest SecondClassChange
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-78.htm
+  S ActionFailed
+  S ActionFailed
+action jurek
+action jurek
+  S ActionFailed
+  S NpcHtmlMessage obj=jurek item=0 page=villagemaster/30115.htm
+  S ActionFailed
+bypass npc_{jurek}_Quest SecondClassChange
+  S NpcHtmlMessage obj=jurek item=0 page=script/feature/SecondClassChange/master_human_elf_mystic-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest SecondClassChange master_human_elf_mystic-09.htm
+  S NpcHtmlMessage obj=jurek item=0 page=script/feature/SecondClassChange/master_human_elf_mystic-09.htm
+  S ActionFailed
+bypass Quest SecondClassChange HS
+  S SystemMessage id=302 3:2674
+  S SystemMessage id=302 3:2734
+  S SystemMessage id=302 3:2840
+  S SystemMessage id=53 3:8870 6:15
+  S PlaySound type=0 file=ItemSound.quest_fanfare_2 bind=0 obj=0 loc=0,0,0 delay=0
+  S MagicSkillUse caster=player target=player skill=5103-1 hit=1000 reuse=0 success=0
+  S SystemMessage id=1308
+  S NpcHtmlMessage obj=jurek item=0 page=script/feature/SecondClassChange/master_human_elf_mystic-29.htm
+  S ActionFailed
+  items 2674=0 2734=0 2840=0 8870=15
+relog
+action jurek
+action jurek
+  S ActionFailed
+  S NpcHtmlMessage obj=jurek item=0 page=villagemaster/30115.htm
+  S ActionFailed
+bypass npc_{jurek}_Quest SecondClassChange
+  S NpcHtmlMessage obj=jurek item=0 page=script/feature/SecondClassChange/master_human_elf_mystic-39.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,49 @@
+# Light and Darkness (Q017), given up: a level 61 character on the quest's first step holds no
+# blood of saint; the first altar of saints refuses the blessing, and the hierarch ends the quest,
+# which leaves no row. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q017_light_and_darkness_no_blood.golden
+character Blesser 61
+quest Q017_LightAndDarkness <cond>=1 <state>=STARTED
+script quest.Q017_LightAndDarkness
+item 7168
+page default/31517.htm
+page default/31508.htm
+page script/quest/Q017_LightAndDarkness/
+npc hierarch 31517 Folk 10 0 0
+npc altar1 31508 Folk 20 0 0
+
+# The first altar: no blood to bless it with.
+action altar1
+action altar1
+  S ActionFailed
+  S NpcHtmlMessage obj=altar1 item=0 page=default/31508.htm
+  S ActionFailed
+bypass npc_{altar1}_Quest
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q017_LightAndDarkness/31508-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q017_LightAndDarkness STARTED
+bypass Quest Q017_LightAndDarkness 31508-02.htm
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q017_LightAndDarkness/31508-03.htm
+  S ActionFailed
+  rows Q017_LightAndDarkness <cond>=1 <state>=STARTED
+
+# The hierarch ends the quest.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S QuestList
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q017_LightAndDarkness/31517-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q017_LightAndDarkness
+  state Q017_LightAndDarkness -
+  rows Q017_LightAndDarkness -
+
+# Relog: nothing is left of the quest.
+relog
+  state Q017_LightAndDarkness -
+  rows Q017_LightAndDarkness -

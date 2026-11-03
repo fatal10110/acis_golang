@@ -1,0 +1,17 @@
+# TyrannoPrimeval (22215, a tyrannosaurus, its shipped buffs and long range magic), every draw 0.
+# Its hit point rates are percents its hit point ratio (at most 1) is compared with, so at full
+# hit points a hit wants its second self buff (5087-2) on itself, weight 1000000, which the hit's
+# desire selection casts; farther than LongRangeSkillDist (0) from the character, a draw of 0
+# (at most ProbLongRangeDDMagic1 0 x 1) also wants its long range magic (5120) on the character.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval
+npc rex 22215 Monster 300 0 0 skill SELF_BUFF1 5087 1 skill SELF_BUFF2 5087 2 skill LONG_RANGE_DD_MAGIC1 5120 1
+
+hit rex 22
+  S MagicSkillUse caster=rex target=rex skill=5087-2 hit=5285 reuse=0 success=0
+  desires rex attack(player)=275 cast(player,5120,move)=1000000 cast(rex,5087,move)=1000000

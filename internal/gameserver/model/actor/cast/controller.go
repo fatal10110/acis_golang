@@ -72,8 +72,8 @@ type Actor interface {
 
 	MP() int
 	HP() int
-	MPInitialCost(modelskill.Definition) int
-	MPCost(modelskill.Definition) int
+	MPInitialCost(*modelskill.Definition) int
+	MPCost(*modelskill.Definition) int
 	ReduceMP(int)
 	ReduceHP(int)
 
@@ -85,7 +85,7 @@ type Actor interface {
 	PhysicalMuted() bool
 	SpiritshotCharged() bool
 	BlessedSpiritshotCharged() bool
-	SkillMastery(modelskill.Definition) bool
+	SkillMastery(*modelskill.Definition) bool
 
 	ItemCount(itemID int) int
 	ConsumeItem(itemID, count int) bool
@@ -166,7 +166,7 @@ type Controller struct {
 
 	mu             sync.RWMutex
 	casting        bool
-	current        modelskill.Definition
+	current        *modelskill.Definition
 	target         Target
 	plan           Plan
 	startedAt      time.Time
@@ -175,6 +175,10 @@ type Controller struct {
 	// one target. A naturally finished offensive cast that had any puts its
 	// caster in attack stance.
 	hasTargets bool
+	// launchFirst is the first creature the latest AI launch resolved, nil
+	// when it resolved none. The cast's clear leaves it, so the launch's
+	// targets outlive the cast: CastFinished reports it.
+	launchFirst attackable.Combatant
 
 	// castSeq increments every time the active cast is cleared (Stop,
 	// Finish, or the start of a fresh cast), so a scheduled Launch/Hit/
@@ -191,7 +195,10 @@ type Controller struct {
 	finishHolds int
 	finishArm   func()
 	queue       *sim.Queue
-	sink        event.Sink
+	// pastClose arms the cast's steps so that they still run once the
+	// queue closes (OutliveQueueClose).
+	pastClose bool
+	sink      event.Sink
 }
 
 // NewController returns a cast controller for actor. sink receives, each
@@ -235,6 +242,17 @@ func (c *Controller) SetQueue(q *sim.Queue) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.queue = q
+}
+
+// OutliveQueueClose lets a cast in flight run its remaining steps to their
+// end after the controller's queue closes, as they would on an open one. It
+// is for a caster whose removal from the world closes its queue without
+// stopping its cast: a deleted NPC's launched skill still lands, and a cast
+// not launched yet stops on its lost target.
+func (c *Controller) OutliveQueueClose() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pastClose = true
 }
 
 // Now reads the clock the controller's queue runs on, the one its cast
@@ -302,25 +320,25 @@ func (c *Controller) CastingNow() bool {
 
 // CurrentSkill returns the active skill definition and whether a cast is
 // active.
-func (c *Controller) CurrentSkill() (modelskill.Definition, bool) {
+func (c *Controller) CurrentSkill() (*modelskill.Definition, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if !c.casting {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return c.current, true
 }
 
 // InFlight returns the skill and target of the cast in flight, and whether
 // one is in flight at all.
-func (c *Controller) InFlight() (modelskill.Definition, Target, bool) {
+func (c *Controller) InFlight() (*modelskill.Definition, Target, bool) {
 	if c == nil {
-		return modelskill.Definition{}, nil, false
+		return nil, nil, false
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if !c.casting {
-		return modelskill.Definition{}, nil, false
+		return nil, nil, false
 	}
 	return c.current, c.target, true
 }
@@ -328,7 +346,7 @@ func (c *Controller) InFlight() (modelskill.Definition, Target, bool) {
 // CanAttemptCast is the pre-movement gate: already casting, every skill
 // disabled, and per-skill reuse. Callers that stop a walk for a long hit
 // time must run this first so those rejections leave movement alone.
-func (c *Controller) CanAttemptCast(target Target, def modelskill.Definition) error {
+func (c *Controller) CanAttemptCast(target Target, def *modelskill.Definition) error {
 	if err := c.canAttemptShared(target, def); err != nil {
 		return err
 	}
@@ -337,7 +355,7 @@ func (c *Controller) CanAttemptCast(target Target, def modelskill.Definition) er
 
 // canAttemptShared is the part of the pre-attempt gate every caster runs
 // before any caster-specific rule.
-func (c *Controller) canAttemptShared(target Target, def modelskill.Definition) error {
+func (c *Controller) canAttemptShared(target Target, def *modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -350,7 +368,7 @@ func (c *Controller) canAttemptShared(target Target, def modelskill.Definition) 
 // canAttemptSkill is the skill half of the pre-attempt gate: every skill
 // disabled, then def's own reuse. It leaves an in-flight cast to the caller,
 // which may queue the request behind it instead of refusing it.
-func (c *Controller) canAttemptSkill(def modelskill.Definition) error {
+func (c *Controller) canAttemptSkill(def *modelskill.Definition) error {
 	if c.actor.AllSkillsDisabled() {
 		return ErrAllSkillsDisabled
 	}
@@ -362,7 +380,7 @@ func (c *Controller) canAttemptSkill(def modelskill.Definition) error {
 
 // groundTargetGate refuses a ground-targeted skill before a signet point is
 // set.
-func (c *Controller) groundTargetGate(def modelskill.Definition) error {
+func (c *Controller) groundTargetGate(def *modelskill.Definition) error {
 	if def.Target == modelskill.TargetGround && c.actor.GroundTargetUnset() {
 		return ErrGroundTargetUnset
 	}
@@ -373,7 +391,7 @@ func (c *Controller) groundTargetGate(def modelskill.Definition) error {
 // MP/HP, mute state, the weapon or shield the skill needs, the skill's
 // <cond> clauses and the Olympiad skill ban (for a caster that evaluates
 // them), required skill items, and a player's servitor summon slot.
-func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
+func (c *Controller) CanCast(target Target, def *modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -428,10 +446,10 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	return nil
 }
 
-// MeetsHPMPDisabled checks HP, MP, and mute gates for target and def. It
-// does not apply reuse, item, or line-of-sight checks; those belong to
-// CanCast at commit time.
-func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition) error {
+// MeetsHPMP checks the MP and HP gates of def's cast at target: the MP
+// its cast and hit take together, then the HP it consumes. Only a missing
+// target is refused for the target's sake.
+func (c *Controller) MeetsHPMP(target Target, def *modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -442,6 +460,16 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 	}
 	if def.HPConsume > 0 && c.actor.HP() <= def.HPConsume {
 		return ErrNotEnoughHP
+	}
+	return nil
+}
+
+// MeetsHPMPDisabled checks HP, MP, and mute gates for target and def. It
+// does not apply reuse, item, or line-of-sight checks; those belong to
+// CanCast at commit time.
+func (c *Controller) MeetsHPMPDisabled(target Target, def *modelskill.Definition) error {
+	if err := c.MeetsHPMP(target, def); err != nil {
+		return err
 	}
 	if def.Magic {
 		if c.actor.MagicMuted() {
@@ -458,7 +486,7 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 // sight to a target other than the caster when the skill has a cast range,
 // then the rest of CanCast. A GROUND skill targets its caster, so its point
 // sight is left to its own gate.
-func (c *Controller) CanCastSighted(caster LaunchCaster, target Target, def modelskill.Definition) error {
+func (c *Controller) CanCastSighted(caster LaunchCaster, target Target, def *modelskill.Definition) error {
 	if err := c.MeetsHPMPDisabled(target, def); err != nil {
 		return err
 	}
@@ -475,7 +503,7 @@ func (c *Controller) CanCastSighted(caster LaunchCaster, target Target, def mode
 // charged before the cast is claimed, and the skill item after it — and
 // Start reports ErrNotCasting so the caller does not announce a cast
 // that is already cancelled.
-func (c *Controller) Start(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
+func (c *Controller) Start(now time.Time, target Target, def *modelskill.Definition) (Plan, error) {
 	return c.StartCarried(now, target, def, nil)
 }
 
@@ -487,7 +515,7 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 // paid, a failed own consume item no longer refuses the cast: it runs with
 // Plan.ItemCharge set to ItemChargeShort. A nil consumeCarrier makes it
 // Start.
-func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.Definition, consumeCarrier func() error) (Plan, error) {
+func (c *Controller) StartCarried(now time.Time, target Target, def *modelskill.Definition, consumeCarrier func() error) (Plan, error) {
 	if err := c.CanCast(target, def); err != nil {
 		return Plan{}, err
 	}
@@ -497,14 +525,7 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 		c.mu.Unlock()
 		return Plan{}, ErrAlreadyCasting
 	}
-	plan := c.buildPlan(def)
-	c.casting = true
-	c.current = def
-	c.target = target
-	c.plan = plan
-	c.startedAt = now
-	c.interruptUntil = now.Add(plan.InterruptAfter)
-	seq := c.castSeq
+	plan, seq := c.claimLocked(now, target, def)
 	c.mu.Unlock()
 
 	if consumeCarrier != nil {
@@ -556,6 +577,43 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 		}
 	}
 
+	return c.chargeStart(seq, def, plan)
+}
+
+// StartUnchecked starts def's cast at target past every gate CanCast runs
+// (reuse, MP, HP, mutes, weapon, conditions, items), and takes no consume
+// item. A cast already in flight is replaced: its pending steps never run
+// and nothing reports its end. The cast is charged its reuse and initial MP
+// as any cast is, and its hit still checks the final MP and HP it takes.
+func (c *Controller) StartUnchecked(now time.Time, target Target, def *modelskill.Definition) (Plan, error) {
+	if c.actor == nil || target == nil {
+		return Plan{}, ErrInvalidTarget
+	}
+	c.mu.Lock()
+	if c.casting {
+		c.clearLocked()
+	}
+	plan, seq := c.claimLocked(now, target, def)
+	c.mu.Unlock()
+	return c.chargeStart(seq, def, plan)
+}
+
+// claimLocked marks def's cast at target in flight from now and returns its
+// plan and the sequence that identifies it.
+func (c *Controller) claimLocked(now time.Time, target Target, def *modelskill.Definition) (Plan, uint64) {
+	plan := c.buildPlan(def)
+	c.casting = true
+	c.current = def
+	c.target = target
+	c.plan = plan
+	c.startedAt = now
+	c.interruptUntil = now.Add(plan.InterruptAfter)
+	return plan, c.castSeq
+}
+
+// chargeStart charges the claimed cast seq its mastery proc or reuse, then
+// its initial MP, and reports ErrNotCasting when a cost ended it.
+func (c *Controller) chargeStart(seq uint64, def *modelskill.Definition, plan Plan) (Plan, error) {
 	if plan.SkillMastery {
 		// A mastery proc tells the caster before the initial MP charge
 		// and before the caller announces the cast.
@@ -686,6 +744,7 @@ func (c *Controller) abortLocked() (func(), func(bool)) {
 	aborted := c.casting
 	current := c.current
 	target, _ := c.target.(attackable.Combatant)
+	first := c.launchFirst
 	fusionEnd := c.fusionEnd
 	c.clearLocked()
 	if !aborted {
@@ -697,7 +756,7 @@ func (c *Controller) abortLocked() (func(), func(bool)) {
 			}
 			c.emit(event.CastAborted{})
 		}, func(interrupted bool) {
-			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current, Target: target})
+			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current, Target: target, LaunchTarget: first})
 		}
 }
 
@@ -707,6 +766,7 @@ func (c *Controller) finishLocked() func(bool) {
 	}
 	current := c.current
 	target, _ := c.target.(attackable.Combatant)
+	first := c.launchFirst
 	fusionEnd := c.fusionEnd
 	stance := current.Offensive && c.hasTargets
 	// A fusion channel closes without the finalizer that charges shots.
@@ -725,7 +785,7 @@ func (c *Controller) finishLocked() func(bool) {
 		if stance && !aborted {
 			c.emit(event.AttackStanceRequested{})
 		}
-		c.emit(event.CastFinished{Interrupted: aborted, Skill: current, Target: target})
+		c.emit(event.CastFinished{Interrupted: aborted, Skill: current, Target: target, LaunchTarget: first})
 	}
 }
 
@@ -737,6 +797,17 @@ func (c *Controller) SetLaunchTargets(n int) {
 	defer c.mu.Unlock()
 	if c.casting {
 		c.hasTargets = n > 0
+	}
+}
+
+// setLaunchFirst records first as the first creature the active cast's
+// launch resolved, nil when it resolved none. It does nothing when no cast
+// is in flight.
+func (c *Controller) setLaunchFirst(first attackable.Combatant) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.casting {
+		c.launchFirst = first
 	}
 }
 
@@ -834,7 +905,7 @@ func (c *Controller) InterruptOnDamage(now time.Time, d DamageInterrupt) bool {
 
 	c.mu.RLock()
 	casting := c.casting
-	magic := c.current.Magic
+	magic := casting && c.current.Magic
 	c.mu.RUnlock()
 	if !casting || !magic {
 		return false
@@ -851,7 +922,7 @@ func (c *Controller) InterruptOnDamage(now time.Time, d DamageInterrupt) bool {
 // is the lightweight pre-movement cast gate an AI loop checks before
 // committing to close distance on a target, ahead of the fuller CanCast
 // check run immediately before the cast itself starts.
-func (c *Controller) SkillOnCooldown(def modelskill.Definition) bool {
+func (c *Controller) SkillOnCooldown(def *modelskill.Definition) bool {
 	if c.actor == nil {
 		return false
 	}
@@ -860,7 +931,7 @@ func (c *Controller) SkillOnCooldown(def modelskill.Definition) bool {
 
 // ReuseKey returns the cooldown key for def, using a shared-reuse reference
 // when one is configured.
-func ReuseKey(def modelskill.Definition) int32 {
+func ReuseKey(def *modelskill.Definition) int32 {
 	ref := modelskill.Ref{ID: def.ID, Level: def.Level}
 	if def.SharedReuse != nil {
 		ref = *def.SharedReuse
@@ -873,11 +944,11 @@ func ReuseKey(def modelskill.Definition) int32 {
 // channel or a SIGNET_CASTTIME signet. Such a cast lands its effect when it
 // starts, keeps the template hit time, cool time and reuse unscaled, and
 // takes nothing for the skill's consume item, which it only has to hold.
-func FusionTimeline(def modelskill.Definition) bool {
+func FusionTimeline(def *modelskill.Definition) bool {
 	return def.SkillType == "FUSION" || def.SkillType == "SIGNET_CASTTIME"
 }
 
-func (c *Controller) buildPlan(def modelskill.Definition) Plan {
+func (c *Controller) buildPlan(def *modelskill.Definition) Plan {
 	// A fusion-timeline cast reads its hit time, cool time and reuse delay
 	// raw, with no attack-speed, spiritshot or reuse-rate scaling: its
 	// length, gauge, interrupt window and reuse are fixed for every caster.
@@ -921,14 +992,25 @@ func (c *Controller) buildPlan(def modelskill.Definition) Plan {
 			plan.FinalDelay = plan.CoolTime
 		}
 	}
+	if _, ok := c.actor.(npcCaster); ok {
+		plan.FinalDelay = plan.CoolTime + npcFinishPad
+	}
 	return plan
 }
+
+// npcFinishPad is how much longer than its cool time an NPC's cast stays in
+// flight after its hit, whatever its hit and cool times.
+const npcFinishPad = 250 * time.Millisecond
+
+// npcCaster marks the NPC casters, whose cast finishes npcFinishPad past
+// its cool time after the hit.
+type npcCaster interface{ npcCaster() }
 
 // claimToggle marks an instantaneous toggle cast as in flight so the abort
 // funnel has a cast to report, and returns the sequence the release must
 // match. It reports false when a cast is already in flight, which keeps its
 // own claim and its own abort.
-func (c *Controller) claimToggle(def modelskill.Definition) (uint64, bool) {
+func (c *Controller) claimToggle(def *modelskill.Definition) (uint64, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.casting {
@@ -958,7 +1040,7 @@ func (c *Controller) clearLocked() {
 	c.finishArm = nil
 	c.castSeq++
 	c.casting = false
-	c.current = modelskill.Definition{}
+	c.current = nil
 	c.target = nil
 	c.plan = Plan{}
 	c.startedAt = time.Time{}
@@ -975,6 +1057,10 @@ func (c *Controller) stopTimersLocked() {
 }
 
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
+	if c.pastClose {
+		c.timers = append(c.timers, c.queue.AfterPastClose(delay, f))
+		return
+	}
 	c.timers = append(c.timers, c.queue.After(delay, f))
 }
 

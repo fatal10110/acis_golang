@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -19,6 +17,9 @@ const (
 	// OpcodePetDelete tells the owner to remove a pet/servitor object from
 	// the client.
 	OpcodePetDelete = 0xb6
+	// OpcodeSetSummonRemainTime is the wire opcode for a servitor's
+	// remaining-lifetime bar.
+	OpcodeSetSummonRemainTime = 0xd1
 )
 
 // FramePetStatusShow builds a PetStatusShow packet for summonType.
@@ -36,7 +37,17 @@ func FramePetDelete(summonType int, objectID int32) wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// FramePetItemList builds a full pet inventory snapshot.
+// FrameSetSummonRemainTime builds a SetSummonRemainTime packet: the
+// servitor's total and remaining lifetime, in ms.
+func FrameSetSummonRemainTime(total, remaining int32) wire.Frame {
+	w := newFrameWriter(OpcodeSetSummonRemainTime)
+	w.WriteInt32(total)
+	w.WriteInt32(remaining)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FramePetItemList builds a full pet inventory snapshot. An item whose
+// template templates no longer holds (one a reload removed) is left out.
 func FramePetItemList(items []*item.Instance, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePetItemList)
 	if err := writePetItemList(w, items, templates); err != nil {
@@ -47,92 +58,53 @@ func FramePetItemList(items []*item.Instance, templates *item.Table) (wire.Frame
 }
 
 func writePetItemList(w *wire.Writer, items []*item.Instance, templates *item.Table) error {
-	count, err := wire.Uint16Count(len(items))
+	countOffset, err := reserveUint16Count(w, len(items))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(count)
+	var written int
 	for _, inst := range items {
-		if err := writePetItem(w, inst, templates, itemcontainer.Update{ObjectID: inst.ObjectID}); err != nil {
-			return err
+		if inst == nil {
+			continue
 		}
+		tmpl, ok := templates.Get(inst.TemplateID)
+		if !ok {
+			continue
+		}
+		writeUpdatedItem(w, itemcontainer.NewUpdate(inst.Snapshot(), 0), tmpl)
+		written++
 	}
+	w.PatchUint16(countOffset, uint16(written))
 	return nil
 }
 
 // FramePetInventoryUpdate builds a PetInventoryUpdate packet for queued pet
-// inventory changes.
-func FramePetInventoryUpdate(updates []itemcontainer.Update, items []*item.Instance, templates *item.Table) (wire.Frame, error) {
+// inventory changes, each entry written from the instance state its update
+// carries. An entry whose template templates no longer holds is left out.
+func FramePetInventoryUpdate(updates []itemcontainer.Update, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePetInventoryUpdate)
-	if err := writePetInventoryUpdate(w, updates, items, templates); err != nil {
+	if err := writePetInventoryUpdate(w, updates, templates); err != nil {
 		releaseFrameWriter(w)
 		return wire.Frame{}, err
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
-func writePetInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, items []*item.Instance, templates *item.Table) error {
-	byObjectID := make(map[int32]*item.Instance, len(items))
-	for _, inst := range items {
-		if inst != nil {
-			byObjectID[inst.ObjectID] = inst
-		}
-	}
-
-	count, err := wire.Uint16Count(len(updates))
+func writePetInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, templates *item.Table) error {
+	countOffset, err := reserveUint16Count(w, len(updates))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(count)
+	var written int
 	for _, update := range updates {
-		inst := byObjectID[update.ObjectID]
+		tmpl, ok := templates.Get(update.TemplateID)
+		if !ok {
+			continue
+		}
 		w.WriteUint16(uint16(update.State))
-		if err := writePetItem(w, inst, templates, update); err != nil {
-			return err
-		}
+		writeUpdatedItem(w, update, tmpl)
+		written++
 	}
-	return nil
-}
-
-func writePetItem(w *wire.Writer, inst *item.Instance, templates *item.Table, update itemcontainer.Update) error {
-	templateID := update.TemplateID
-	count := update.Count
-	var st item.InstanceState
-	if inst != nil {
-		st = inst.Snapshot()
-		templateID = st.TemplateID
-		if count == 0 {
-			count = st.Count
-		}
-	}
-
-	tmpl, ok := templates.Get(templateID)
-	if !ok {
-		return fmt.Errorf("serverpackets: pet item: no template loaded for item template %d", templateID)
-	}
-	category, subCategory := tmpl.Category()
-	objectID := update.ObjectID
-	if inst != nil {
-		objectID = inst.ObjectID
-	}
-
-	w.WriteUint16(uint16(category))
-	w.WriteInt32(objectID)
-	w.WriteInt32(templateID)
-	w.WriteInt32(int32(count))
-	w.WriteUint16(uint16(subCategory))
-	if inst == nil {
-		w.WriteUint16(0)
-		w.WriteUint16(0)
-		w.WriteInt32(int32(tmpl.Slot))
-		w.WriteUint16(0)
-		w.WriteUint16(0)
-		return nil
-	}
-	w.WriteUint16(uint16(st.CustomType1))
-	w.WriteUint16(uint16(boolInt32(st.Location == item.LocationPetEquip)))
-	w.WriteInt32(int32(tmpl.Slot))
-	w.WriteUint16(uint16(st.EnchantLevel))
-	w.WriteUint16(uint16(st.CustomType2))
+	w.PatchUint16(countOffset, uint16(written))
 	return nil
 }

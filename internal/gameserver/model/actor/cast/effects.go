@@ -60,12 +60,6 @@ type SkillCaster interface {
 	NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
 }
 
-// skillAttackedTarget is an NPC that reacts to being hit by an offensive
-// debuff or a skill with aggro points.
-type skillAttackedTarget interface {
-	SkillAttacked(caster attackable.Combatant, def modelskill.Definition)
-}
-
 // ApplyEffects resolves def's affected target set from caster and the
 // already cast-validated single selection, then routes the skill's effects
 // to the resolved set. It reports whether a skill handler actually ran.
@@ -141,6 +135,16 @@ func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resol
 // caster/target, no registered handler, or an empty affected set);
 // affected is nil in that case.
 func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
+	affected, ok = resolveLaunchTargets(handlers, caster, resolved, def)
+	if !ok {
+		return nil, false
+	}
+	return nonEmpty(affected)
+}
+
+// resolveLaunchTargets is ResolveAffected keeping an empty affected set:
+// ok is true whenever def's target handler ran, whatever it found.
+func resolveLaunchTargets(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
 	if caster == nil || handlers.Targets == nil {
 		return nil, false
 	}
@@ -152,7 +156,7 @@ func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved
 	if !ok {
 		return nil, false
 	}
-	return nonEmpty(handler.Targets(caster, selected, &def))
+	return handler.Targets(caster, selected, &def), true
 }
 
 // ApplyResolvedEffectsResult dispatches def's effects to affected — an
@@ -167,8 +171,13 @@ func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Acto
 // ApplyResolvedItemEffectsResult is ApplyResolvedEffectsResult for a cast
 // that carries the item it was cast with (e.g. a seed's SOW cast), threading
 // item through to the skill handler as handlerskill.Cast.Item.
+//
+// A launch that resolved no target still runs the skill's handler, with no
+// targets: the handler's caster-side work (self effects, the shot it
+// spends) happens whoever it hit, and a player's skill, or its summon's, is
+// still seen by the NPCs around its caster.
 func ApplyResolvedItemEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {
-	if handlers.Skills == nil || len(affected) == 0 {
+	if handlers.Skills == nil {
 		return EffectResult{}
 	}
 	return dispatchEffects(handlers, caster, affected, def, item)
@@ -201,12 +210,8 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 		case "AGGREDUCE", "AGGREMOVE", "AGGREDUCE_CHAR":
 		default:
 			for _, target := range affected {
-				if recorder, ok := target.(interface{ RecordAttacker(attackable.Combatant) }); ok {
-					recorder.RecordAttacker(castCaster)
-				}
-				if attacked, ok := target.(interface{ NotifyAttacked(attackable.Combatant) }); ok {
-					attacked.NotifyAttacked(castCaster)
-				}
+				target.RecordAttacker(castCaster)
+				target.NotifyAttacked(castCaster)
 			}
 		}
 	}
@@ -230,17 +235,42 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 	// each NPC it hit once its effects applied, dead or not.
 	if def.Offensive && (def.Debuff || def.AggroPoints > 0) {
 		for _, target := range affected {
-			if attacked, ok := target.(skillAttackedTarget); ok {
-				attacked.SkillAttacked(castCaster, def)
-			}
+			target.SkillAttacked(castCaster, def)
 		}
 	}
 	// PvP flagging follows the skill's effects, so a skill that makes its
 	// caster a PKer flags it again after the kill ended its flag.
 	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
+	// A player's skill, or its summon's, then reaches the NPCs whose
+	// scripts watch spells: the targets it landed on, then the NPCs around
+	// the caster.
+	if player, isPet, acting := actingPlayer(caster); acting {
+		spelled(player, def, affected)
+		seeSpell(castCaster, player, def, affected, isPet)
+	}
 	if !ok {
 		return EffectResult{}
 	}
+	return effectResultOf(result)
+}
+
+// CallSkill lands def's effects from caster on target alone, through def's
+// skill handler, as a script makes a creature use a skill: no target
+// resolution, cost, chance procs, aggression or PvP flagging. Handlers'
+// Sink takes the handler's messages.
+func CallSkill(handlers EffectHandlers, caster handlerskill.Creature, target handlerskill.Actor, def modelskill.Definition) EffectResult {
+	if handlers.Skills == nil {
+		return EffectResult{}
+	}
+	result, ok := handlers.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}, Sink: handlers.Sink})
+	if !ok {
+		return EffectResult{}
+	}
+	return effectResultOf(result)
+}
+
+// effectResultOf is the caster-visible part of a handler's result.
+func effectResultOf(result handlerskill.Result) EffectResult {
 	return EffectResult{
 		Handled:           true,
 		Messages:          result.Messages,

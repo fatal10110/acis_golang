@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -26,12 +25,13 @@ func (f *Folk) Decayed() bool {
 }
 
 // die runs the NPC's death once and reports whether this call ran it: its
-// HP drops to zero, observers see the empty health bar, its walk and cast
-// stop and its cast desires drop, every effect that does not last through
+// HP drops to zero, observers see the empty health bar, its walk, swing and
+// cast stop and its desires drop, every effect that does not last through
 // death ends, observers see it die and leave its attack stance, and its
 // corpse is registered for decay after the template corpse time. A
 // civilian NPC pays no reward. Its dying script hooks are scheduled, then
-// its clan members in range are told.
+// its party is told, then its clan members in range. A siege headquarters
+// then leaves its clan, which takes it out of the world.
 func (f *Folk) die(killer attackable.Combatant) bool {
 	f.vitalsMu.Lock()
 	if f.dead {
@@ -41,9 +41,11 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 	f.hp = 0
 	f.dead = true
 	f.vitalsMu.Unlock()
+	f.aiSleep.sleep()
 
 	f.BroadcastStatus()
 	f.stopMoving()
+	f.stopAttack()
 	f.AbortCast()
 	f.effects.StopAllExceptThoseThatLastThroughDeath()
 	f.BroadcastStatus()
@@ -54,7 +56,11 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 	}
 	f.scheduleDecay()
 	f.raiseDying(killer)
+	partyDied(f.scripts, f)
 	raiseClanDied(f.scripts, f.world, f, killer)
+	if f.SiegeFlag() {
+		f.headquartersDied()
+	}
 	return true
 }
 
@@ -115,6 +121,7 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 	f.decayed, f.dead = true, true
 	f.corpseDeadline = time.Time{}
 	f.vitalsMu.Unlock()
+	f.aiSleep.sleep()
 	var respawn func()
 	if respawnFor != nil {
 		respawn = respawnFor(f.ObjectID())
@@ -122,8 +129,7 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 	f.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.
-	x, y, z := f.Position()
-	f.zones.leave(location.Location{X: x, Y: y, Z: z})
+	f.zones.leave()
 	if worldState != nil {
 		worldState.Despawn(f)
 	}
@@ -142,9 +148,17 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 	return true
 }
 
+// DeleteMe takes the NPC out of the world on its own queue, leaving no
+// corpse; see DeleteNow.
+func (f *Folk) DeleteMe() {
+	f.Queue().Post(f.DeleteNow)
+}
+
 // DeleteNow takes the NPC out of the world at once, leaving no corpse, on
 // the calling goroutine, and answers its spawn as for a decayed corpse: it
-// is out of the world when it returns.
+// is out of the world when it returns. It does not wait for a task this
+// NPC's queue is running; see the package doc for what keeps that task from
+// acting.
 func (f *Folk) DeleteNow() {
 	if f.remover != nil {
 		f.remover.RemoveFolk(f)

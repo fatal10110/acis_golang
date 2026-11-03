@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -29,7 +30,7 @@ const (
 
 // summonCreatureSkillRef is the fixed SUMMON_CREATURE skill id/level every
 // pet-collar item casts, independent of which collar was used — the collar
-// only selects the npc template via SummonItemData.
+// only selects the npc template through its summon-items entry.
 var summonCreatureSkillRef = skillref.Ref{ID: 2046, Level: 1}
 
 // useSummonItem triggers the SUMMON_CREATURE cast for a pet-collar item,
@@ -42,14 +43,14 @@ var summonCreatureSkillRef = skillref.Ref{ID: 2046, Level: 1}
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
 func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance) bool {
-	if live == nil || inv == nil || inst == nil || l.summonItems == nil {
+	if live == nil || inv == nil || inst == nil || l.summoning.items == nil {
 		return false
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
 	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Handler != SummonItemsHandler {
 		return false
 	}
-	summonItem, ok := l.summonItems.Item(inst.TemplateID)
+	summonItem, ok := l.summoning.items.Item(inst.TemplateID)
 	if !ok {
 		return false
 	}
@@ -145,7 +146,7 @@ var errCollarGone = errors.New("summon: collar no longer in inventory")
 // itself, answering a refusal, and returns the cast's Schedule, or nil when
 // it was refused. A collar that left inv since it was used refuses the cast
 // with NOT_ENOUGH_ITEMS.
-func (l *GameClientLink) beginSummonCreatureCast(live *livePlayer, inv *itemcontainer.Inventory, collar *item.Instance, def skillref.Definition) func() {
+func (l *GameClientLink) beginSummonCreatureCast(live *livePlayer, inv *itemcontainer.Inventory, collar *item.Instance, def *skillref.Definition) func() {
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Controller:  controller,
@@ -210,7 +211,7 @@ func (l *GameClientLink) beginSummonCreatureCast(live *livePlayer, inv *itemcont
 				// resolves the item back to a pet template and spawns it —
 				// ApplyEffectsResult drives that the same way it drives every
 				// other skill's Hit-phase effects.
-				result := actorcast.ApplyItemEffectsResult(l.castEffects(), live.Character, target, def, collar)
+				result := actorcast.ApplyItemEffectsResult(l.castEffects(), live.Character, target, *def, collar)
 				l.sendSkillHandlerResult(live, result)
 				l.syncCubicTargets(live, result, def)
 			},
@@ -231,7 +232,7 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	var duplicate *npc.Decoration
 	l.world.ForEachKnownInRadius(live, decorativeSummonRadius, func(obj world.Tracked) {
-		if decoration, ok := obj.(*npc.Decoration); ok && decoration.Instance.Kind == npc.InstanceKind("ChristmasTree") && duplicate == nil {
+		if decoration, ok := obj.(*npc.Decoration); ok && decoration.Instance.Kind == npc.ChristmasTree && duplicate == nil {
 			duplicate = decoration
 		}
 	})
@@ -244,16 +245,17 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	live.move.Stop()
 	x, y, z := live.Position()
-	if !l.placeDecoration(template, live.Character.Name, x, y, z, live.Heading()) {
+	if !l.placeDecoration(template, live.Character.CharacterName(), x, y, z, live.Heading(), 0) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 	}
 	return true
 }
 
 // placeDecoration places a decoration NPC of template, titled title, at
-// (x, y) on the ground height below z, facing heading. It reports false,
+// (x, y) on the ground height below z, facing heading, its spawn declaring
+// the respawn delay respawn. It reports false,
 // placing nothing, when the NPC cannot be built.
-func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int) bool {
+func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int, respawn time.Duration) bool {
 	if l.geo != nil {
 		z = int(l.geo.Height(x, y, z))
 	}
@@ -269,25 +271,28 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 	if err != nil {
 		return false
 	}
-	decoration.Attach(npc.DecorationRuntime{World: l.world, Zones: l.zones, Sink: &decorationSink{world: l.world, d: decoration}})
+	decoration.RespawnDelay = respawn
+	decoration.Attach(npc.DecorationRuntime{World: l.world, Zones: l.zones, Sink: &decorationSink{world: l.world, d: decoration, link: l}})
 	decoration.Spawn(x, y, z, heading)
 	return true
 }
 
-// mountWyvern puts live on the wyvern npcID called by its collar
-// controlItemID. Both hands are emptied first; a weapon that cannot be taken
-// off refuses the mount with no packet, as specified, and a
-// use-item request leaves no client action pending. The rider is then
-// forced to run and loses its toggles before the wyvern's skill list, the
-// Ride, the speed refresh and the feed gauge go out.
-func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int32) {
+// mountWyvern puts live on the mount npcID called by its collar
+// controlItemID, 0 for a mount no collar called, and reports whether it
+// did: a wyvern, or the strider a game master's //ride calls. Both hands
+// are emptied first; a weapon that cannot be taken off refuses the mount
+// with no packet, as specified, and a use-item request leaves no client
+// action pending. The rider is then forced to run and loses its toggles
+// before the mount's skill list, the Ride, the speed refresh and the feed
+// gauge go out.
+func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int32) bool {
 	if !l.disarm(live, true) {
-		return
+		return false
 	}
 	l.changeLiveMoveType(live, true)
 	live.Character.EffectList().StopAllToggles()
 	if !live.Character.Mount(npcID, controlItemID) {
-		return
+		return false
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -295,6 +300,7 @@ func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int3
 	})
 	l.broadcastCharacterInfo(live)
 	live.Character.StartMountFeed()
+	return true
 }
 
 // disarm takes live's weapon off, and its shield too when leftHandIncluded,

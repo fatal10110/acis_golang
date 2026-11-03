@@ -1,0 +1,40 @@
+# Help the Sister! (Q043), without the crafted dagger: a level 26 character accepts at Cooper, who asks for the crafted dagger
+# again while it is not held; the quest stays at its first cond.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q043_help_the_sister_no_dagger.golden
+character Helper 26
+script quest.Q043_HelpTheSister
+item 220 7550 7551 7584
+page merchant/30829.htm
+page script/quest/Q043_HelpTheSister/
+npc cooper 30829 Merchant 10 0 0
+
+action cooper
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 page=merchant/30829.htm
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q043_HelpTheSister CREATED
+bypass Quest Q043_HelpTheSister 30829-01.htm
+  S QuestList 43:0x80000001
+  S ExShowQuestMark quest=43
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-01.htm
+  S ActionFailed
+  Q upsert Q043_HelpTheSister | <state> | STARTED
+  Q upsert Q043_HelpTheSister | <cond> | 1
+  state Q043_HelpTheSister STARTED
+  rows Q043_HelpTheSister <cond>=1 <state>=STARTED
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 page=merchant/30829.htm
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-01a.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q043_HelpTheSister <cond>=1 <state>=STARTED

@@ -76,8 +76,8 @@ func (s *Service) WarListing(cl *Clan, kind WarListKind) []Info {
 func (cl *Clan) warRows() map[int32]bool {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	rows := make(map[int32]bool, len(cl.wars)+len(cl.warPenalties))
-	for id := range cl.wars {
+	rows := make(map[int32]bool, cl.wars.len()+len(cl.warPenalties))
+	for _, id := range cl.wars.order() {
 		rows[id] = true
 	}
 	for id := range cl.warPenalties {

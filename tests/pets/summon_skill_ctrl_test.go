@@ -152,8 +152,20 @@ func TestQueuedSummonStrikeKeepsCtrl(t *testing.T) {
 			}
 
 			// The first cast ends and runs the queued one.
+			// On the wall clock the first cast's end can fire just after
+			// its hit time, so read on until the queued strike is judged.
 			h.srv.Advance(t, hitTime*time.Millisecond)
-			frames := drainFrames(t, h.client)
+			var frames [][]byte
+			h.srv.AdvanceUntil(t, "queued strike judged", func() bool {
+				frames = append(frames, drainFrames(t, h.client)...)
+				for _, f := range frames {
+					if f[0] == serverpackets.OpcodeMagicSkillUse || (f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == serverpackets.SystemMessageInvalidTarget) {
+						return true
+					}
+				}
+				return false
+			})
+			frames = append(frames, drainFrames(t, h.client)...)
 			if tc.ctrl {
 				requireSummonStrikeStarted(t, frames, petActor, bystanderID)
 			} else {

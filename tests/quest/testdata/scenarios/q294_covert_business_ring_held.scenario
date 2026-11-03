@@ -1,0 +1,34 @@
+# Covert Business (Q294), the ring already held: a dwarf at cond 2 with a hundred bat fangs and a ring
+# of raccoon gets 2400 adena and 600 SP from Keef instead of a second ring, and the quest ends.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q294_covert_business_ring_held.golden
+character Covert 10
+class 53
+quest Q294_CovertBusiness <cond>=2 <state>=STARTED
+hold 1491 100
+hold 1508 1
+script quest.Q294_CovertBusiness
+item 1491 1508
+page default/30534.htm
+page script/quest/Q294_CovertBusiness/
+npc keef 30534 Folk 10 0 0
+
+# Keef: adena for the fangs.
+action keef
+action keef
+  S ActionFailed
+  S NpcHtmlMessage obj=keef item=0 page=default/30534.htm
+  S ActionFailed
+bypass npc_{keef}_Quest
+  S SystemMessage id=301 3:1491 6:100
+  S SystemMessage id=52 6:2400
+  S SystemMessage id=331 1:600
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q294_CovertBusiness/30534-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q294_CovertBusiness
+  items 1491=0 1508=1 57=2400
+  state Q294_CovertBusiness -
+  rows Q294_CovertBusiness -

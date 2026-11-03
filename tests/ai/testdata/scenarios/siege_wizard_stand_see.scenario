@@ -1,0 +1,13 @@
+# GludioWizardStand's see-creature hook on Aden's standing wizard (35249), whose DD_MAGIC is
+# the shipped Aden Flame (4114): the wizard that sees the character wants to cast it on the
+# character from where it stands, weight 1000000, and casts it at its next think.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioWizardStand
+npc wizard 35249 SiegeGuard 150 0 0 walks clan aden_siege_clan 300 skill DD_MAGIC 4114 1
+
+approach wizard
+  desires wizard cast(player,4114)=1000000
+
+tick x2
+  S MagicSkillUse caster=wizard target=player skill=4114-1 hit=10571 reuse=39642 success=0

@@ -9,21 +9,30 @@ import (
 	"time"
 )
 
-// parkedForLeakCheck blocks until release closes; its name marks the stack
-// the leak dump must show.
-func parkedForLeakCheck(release <-chan struct{}, done chan<- struct{}) {
+// parkedForLeakCheck reports through started that it runs, then blocks until
+// release closes; its name marks the stack the leak dump must show.
+func parkedForLeakCheck(started chan<- struct{}, release <-chan struct{}, done chan<- struct{}) {
+	close(started)
 	<-release
 	close(done)
 }
 
 func TestAwaitGoroutinesReportsLeakedStack(t *testing.T) {
 	baseline := runtime.NumGoroutine()
-	release, done := make(chan struct{}), make(chan struct{})
-	go parkedForLeakCheck(release, done)
+	started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	go parkedForLeakCheck(started, release, done)
+	// A goroutine that has not been scheduled yet has no frames in the dump.
+	<-started
 
-	n, dump := awaitGoroutines(baseline, 100*time.Millisecond)
-	if n <= baseline {
-		t.Fatalf("goroutines = %d, want above baseline %d while one is parked", n, baseline)
+	// Unrelated goroutines counted in baseline may end at any moment, so the
+	// parked one alone does not keep the count above baseline. Only this
+	// goroutine and the parked one are known to be alive, so a floor of one
+	// is exceeded however other goroutines start or end; a zero grace takes
+	// the dump on the first sample.
+	const floor = 1
+	n, dump := awaitGoroutines(floor, 0)
+	if n <= floor || dump == "" {
+		t.Fatalf("goroutines = %d with an empty dump, want above floor %d with a dump while one is parked", n, floor)
 	}
 	if !strings.Contains(dump, "parkedForLeakCheck") {
 		t.Errorf("leak dump does not name the parked goroutine:\n%s", dump)

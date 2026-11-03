@@ -99,6 +99,12 @@ func addPlayer(t *testing.T, srv *gameservertest.Server, account, name string, l
 // is quiet.
 func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
+	enterWorldFrames(t, c)
+}
+
+// enterWorldFrames is enterWorld returning the frames the entry produced.
+func enterWorldFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
+	t.Helper()
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
 	w.WriteInt32(0)
 	w.WriteUint16(0)
@@ -107,18 +113,14 @@ func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	w.WriteInt32(0)
 	c.Send(w.Bytes())
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	drain(t, c)
+	return c.ReadQueued()
 }
 
-// drain reads until the client has received nothing for 300ms.
+// drain reads every frame the server has queued to the client once it has
+// caught up.
 func drain(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for range 200 {
-		if c.ReadWithTimeout(300*time.Millisecond) == nil {
-			return
-		}
-	}
-	t.Fatal("client kept receiving frames after 200 drains")
+	c.ReadQueued()
 }
 
 func encodeBuildCmd(command string) []byte {

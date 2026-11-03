@@ -12,12 +12,17 @@ type CastAborted struct{}
 // CastFinished reports an in-flight cast ending, Interrupted by an abort or
 // completed naturally. Broken marks an abort that went through the
 // window-gated interrupt path. Target is the cast's final target when it is
-// a creature, nil otherwise.
+// a creature, nil otherwise. LaunchTarget is the first creature the
+// caster's latest AI-driven launch resolved, nil when it resolved none or
+// no AI cast launched yet: like a launch's target list, it outlives
+// its cast, so a cast that ends before its launch reports the previous
+// launch's.
 type CastFinished struct {
-	Interrupted bool
-	Broken      bool
-	Skill       modelskill.Definition
-	Target      attackable.Combatant
+	Interrupted  bool
+	Broken       bool
+	Skill        *modelskill.Definition
+	Target       attackable.Combatant
+	LaunchTarget attackable.Combatant
 }
 
 // CastStopAck reports a cast stop request, whether or not a cast was in
@@ -39,13 +44,18 @@ type SkillMasteryProc struct{}
 // a swing.
 type AttackFinished struct{ BowReuse bool }
 
+// AttackEnded reports, from an attackable NPC's attack controller only, that
+// its attack on Target ended: a swing finished, or a bow shot landed (not
+// its reuse delay). It precedes everything else that end reports.
+type AttackEnded struct{ Target attackable.Combatant }
+
 // BowShotFinished reports a player's bow shot ending while the bow's reuse
 // delay still runs; AttackFinished with BowReuse follows once the reuse
 // ends. A shot with no reuse delay reports that AttackFinished alone. Only
 // player attack controllers emit it.
 type BowShotFinished struct{}
 
-// AttackRethink reports a hostile NPC's attack reaching a point where its AI
+// AttackRethink reports an NPC's attack reaching a point where its AI
 // re-runs desire selection: the hit animation ending or a bow shot landing.
 // A finished swing reports AttackFinished instead. Only NPC attack
 // controllers emit it.
@@ -65,8 +75,9 @@ type ShotsRechargeRequested struct{ Physical, Magic bool }
 // against a target, for the attacking side's damage feedback. Only a player
 // or a summon reports it; a summon reports neither a miss nor a hit on its
 // own owner. Blocked marks an invulnerable target and Petrified one that is
-// also paralyzed.
+// also paralyzed. TargetID is the object id of the target hit.
 type HitDealt struct {
+	TargetID  int32
 	Damage    int
 	Crit      bool
 	Miss      bool
@@ -121,6 +132,7 @@ func (CastFinished) event()           {}
 func (CastStopAck) event()            {}
 func (SkillMasteryProc) event()       {}
 func (AttackFinished) event()         {}
+func (AttackEnded) event()            {}
 func (AttackRethink) event()          {}
 func (ShotsRechargeRequested) event() {}
 func (BowShotFinished) event()        {}

@@ -1,0 +1,37 @@
+# Method to Raise the Dead (Q345), bills: at cond 7 with no piece, Dorothy pays 3040 and, on a
+# roll of 10, five bills, and the quest ends. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q345_method_to_raise_the_dead_bills.golden
+character Dorothy 35
+quest Q345_MethodToRaiseTheDead <cond>=7 <state>=STARTED
+random 10
+script quest.Q345_MethodToRaiseTheDead
+item 57 4274 4275 4276 4277 4278 4280 4281 4310 3456
+page default/30970.htm
+page trainer/30912.htm
+page default/30973.htm
+page default/30971.htm
+page script/quest/Q345_MethodToRaiseTheDead/
+npc dorothy 30970 Folk 10 0 0
+npc xenovia 30912 Trainer -10 0 0
+npc jar 30973 Folk 0 10 0
+npc orpheus 30971 Folk 0 -10 0
+
+# Dorothy: 3040 adena and five bills.
+action dorothy
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S SystemMessage id=52 6:3040
+  S SystemMessage id=53 3:4310 6:5
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q345_MethodToRaiseTheDead
+  items 57=3040 3456=0 4310=5
+  state Q345_MethodToRaiseTheDead -
+  rows Q345_MethodToRaiseTheDead -

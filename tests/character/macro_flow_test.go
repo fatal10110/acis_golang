@@ -206,8 +206,8 @@ func TestMacroFlowRestoresEditsDeletesAndReloads(t *testing.T) {
 
 	// Deleting an unknown id answers nothing.
 	c.Send(encodeRequestDeleteMacro(4242))
-	if frame := c.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("delete of an unknown macro answered %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("delete of an unknown macro answered %#x", queued[0][0])
 	}
 
 	// Deleting the stored macro drops its shortcut, then resends the list.

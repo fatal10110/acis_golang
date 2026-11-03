@@ -55,12 +55,12 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 				(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
 				 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel, online, lastAccess)
 			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.AccountName, c.ID, c.Name, c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
+		c.AccountName, c.ID, c.CharacterName(), c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex()), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
 		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID(), c.Title(), c.AccessLevel, 0, time.Now().UnixMilli(),
 	)
 	if err != nil {
-		return fmt.Errorf("create character %q: %w", c.Name, err)
+		return fmt.Errorf("create character %q: %w", c.CharacterName(), err)
 	}
 	return nil
 }
@@ -68,11 +68,13 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // Save persists a character's progress — the active and base classes, the base
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
 // karma/pvpkills/pkkills, death_penalty_level, the accumulated session
-// playtime, the personal-surrender flag, the noblesse status, the Seven Signs dungeon membership, the Ketra/Varka faction standing and each subclass's progression — so a later reload reflects everything gained
-// since the last save instead of the row's creation-time values. Location and
-// appearance columns are not written here. The row is also marked online:
-// Save only runs for characters currently in game. Online is 1, or 2 for a
-// character lingering after its connection dropped (Player.isOnlineInt).
+// playtime, the personal-surrender flag, the noblesse status, the Seven Signs
+// dungeon membership, the Ketra/Varka faction standing and each subclass's
+// progression — so a later reload reflects everything gained since the last
+// save instead of the row's creation-time values. Location and appearance
+// columns are not written here. The row is also marked online: Save only runs
+// for characters currently in game. Online is 1, or 2 for a character lingering
+// after its connection dropped.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
@@ -91,7 +93,7 @@ func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 }
 
 // onlineColumn is the characters.online value of a character in game: 1,
-// or 2 once its client detached (Player.isOnlineInt).
+// or 2 once its client detached.
 func onlineColumn(clientDetached bool) int {
 	if clientDetached {
 		return 2
@@ -151,7 +153,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var deathPenaltyLevel, onlineTime int
 	var recHave, recLeft int
 	var clanID int32
-	var title string
+	var name, title string
 	var clanJoinExpiry, clanCreateExpiry int64
 	var punishLevel int
 	var punishTimer int64
@@ -162,7 +164,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var baseClassID int
 
 	err := row.Scan(
-		&c.ID, &c.AccountName, &c.Name,
+		&c.ID, &c.AccountName, &name,
 		&c.CharLevel, &maxHP, &curHP, &maxCP, &curCP, &maxMP, &curMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
@@ -177,6 +179,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.SetName(name)
 	c.SetSex(player.Sex(sex))
 	c.SetClanID(clanID)
 	c.SetTitle(title)
@@ -287,8 +290,8 @@ const petItemsOf = "SELECT pet.object_id FROM items AS pet JOIN items AS collar 
 // cancellation partway through leaves all of them in place instead of
 // orphaning owned rows behind a deleted character.
 //
-// A pet's items are saved under its collar rather than under the character
-// (the reference keys them on the player), so they are found through the
+// A pet's items are saved under its collar rather than under the character,
+// so they are found through the
 // character's collars: their augmentations and pets rows, then the items
 // themselves, go first, while the collar rows still stand. Pets and
 // augmentations of the character's own items are deleted before those items

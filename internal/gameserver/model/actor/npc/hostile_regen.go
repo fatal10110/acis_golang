@@ -8,26 +8,40 @@ import (
 )
 
 // HPRegenRate returns this NPC's HP regeneration per tick: the template
-// base, scaled by the raid HP regen multiplier while raid related, finalized
-// through the stat calculator.
+// base, scaled by the raid HP regen multiplier while raid related and by
+// the configured one otherwise, finalized through the stat calculator.
 func (h *Hostile) HPRegenRate() float64 {
-	return h.calcStat(stat.RegenerateHPRate, h.Instance.Template.HPRegen*h.raidBaseMultipliers().HPRegen)
+	hp, _ := h.regenBase()
+	return h.calcStat(stat.RegenerateHPRate, h.Instance.Template.HPRegen*hp)
 }
 
 // MPRegenRate returns this NPC's MP regeneration per tick: the template
-// base, scaled by the raid MP regen multiplier while raid related, finalized
-// through the stat calculator.
+// base, scaled by the raid MP regen multiplier while raid related and by
+// the configured one otherwise, finalized through the stat calculator.
 func (h *Hostile) MPRegenRate() float64 {
-	return h.calcStat(stat.RegenerateMPRate, h.Instance.Template.MPRegen*h.raidBaseMultipliers().MPRegen)
+	_, mp := h.regenBase()
+	return h.calcStat(stat.RegenerateMPRate, h.Instance.Template.MPRegen*mp)
 }
 
-// TickRegen applies one HP/MP regeneration step (CreatureStatus.
-// doRegeneration: each resource short of its calculated max gains at least
-// 1, then the resulting HP is broadcast to known observers) and is a no-op
-// once this NPC has died. A kill landing from another queue after the
-// liveness check still stops the tick: neither write touches a corpse, and
-// a tick that wrote nothing reports nothing. Either way the task is then
-// settled, so a tick that fills the NPC, or finds it dead, stops it.
+// regenBase returns the multipliers h's base HP and MP regeneration take:
+// the raid ones while h is raid related, in place of the configured ones
+// it takes otherwise.
+func (h *Hostile) regenBase() (hp, mp float64) {
+	if h.RaidRelated() {
+		m := h.raidBaseMultipliers()
+		return m.HPRegen, m.MPRegen
+	}
+	m := regenInForce(h.regenSettings)
+	return m.HP, m.MP
+}
+
+// TickRegen applies one HP/MP regeneration step (each resource short of its
+// calculated max gains at least 1, then the resulting HP is broadcast to
+// known observers) and is a no-op once this NPC has died. A kill landing
+// from another queue after the liveness check still stops the tick: neither
+// write touches a corpse, and a tick that wrote nothing reports nothing.
+// Either way the task is then settled, so a tick that fills the NPC, or
+// finds it dead, stops it.
 func (h *Hostile) TickRegen() {
 	if h.AlikeDead() {
 		h.SettleRegen()
@@ -53,13 +67,13 @@ func (h *Hostile) Regen() *creature.Regen { return &h.regen }
 
 // SettleRegen arms this NPC's regeneration task when it is spawned, alive
 // and short of HP or MP, its first tick one period from now, and disarms
-// it otherwise (CreatureStatus.setHp/setMp's start and stop).
+// it otherwise; every HP or MP change settles it so.
 func (h *Hostile) SettleRegen() {
-	h.regen.Settle(h.Queue(), h.regenShort)
+	h.regen.Settle(h.Queue(), h.RegenShort)
 }
 
-// regenShort reports whether this NPC regenerates: spawned (on the grid or
+// RegenShort reports whether this NPC regenerates: spawned (on the grid or
 // off it mid-relocation), not dead, and below its maximum HP or MP.
-func (h *Hostile) regenShort() bool {
+func (h *Hostile) RegenShort() bool {
 	return h.Spawned() && !h.Dead() && (h.HP() < h.MaxHPValue() || h.MPValue() < h.MaxMPValue())
 }

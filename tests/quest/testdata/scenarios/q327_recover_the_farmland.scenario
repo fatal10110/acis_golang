@@ -1,0 +1,296 @@
+# Recover the Farmland (Q327), from Leikan: a level 25 character accepts at Leikan and carries
+# his letter to Piotur, whose accept page then starts nothing; five Turek archers and five shamans give five dogtags, five medallions and
+# ten clay urn fragments (every roll pinned to succeed, so each relic piece is a clay urn
+# fragment); Piotur pays 40 a dogtag, 50 a medallion and 619 more for ten or more, and Leikan moves
+# the quest on; Asha restores two ancient clay urns from the fragments and, without brass pieces,
+# leaves her page as it is; Iris has no fragment left to buy; Nestle trades one urn for D-grade
+# soulshots and has nothing for a missing tiara; Iris buys the other urn for experience, then has
+# nothing; then the player quits at Piotur; then relog. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q327_recover_the_farmland.golden
+character Farmer 25
+random always 0
+script quest.Q327_RecoverTheFarmland
+item 5012 1846 1847 1848 1849 1850 1851 1852 1853 1854 1855 1463 2510 1061 734 735 736 737
+page default/30597.htm
+page guard/30382.htm
+page trainer/30034.htm
+page merchant/30313.htm
+page merchant/30314.htm
+page script/quest/Q327_RecoverTheFarmland/
+npc leikan 30382 Guard 10 0 0
+npc piotur 30597 Folk -10 0 0
+npc iris 30034 Trainer 0 10 0
+npc asha 30313 Merchant 0 -10 0
+npc nestle 30314 Merchant 10 10 0
+npc archer 20496 Monster 40 0 0
+npc shaman 20501 Monster 0 40 0
+
+# Leikan: accept; his letter.
+action leikan
+action leikan
+  S ActionFailed
+  S NpcHtmlMessage obj=leikan item=0 page=guard/30382.htm
+  S ActionFailed
+bypass npc_{leikan}_Quest
+  S NpcHtmlMessage obj=leikan item=0 page=script/quest/Q327_RecoverTheFarmland/30382-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q327_RecoverTheFarmland CREATED
+bypass Quest Q327_RecoverTheFarmland 30382-03.htm
+  S QuestList 327:0x80000003
+  S ExShowQuestMark quest=327
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:5012
+  S NpcHtmlMessage obj=leikan item=0 page=script/quest/Q327_RecoverTheFarmland/30382-03.htm
+  S ActionFailed
+  Q upsert Q327_RecoverTheFarmland | <state> | STARTED
+  Q upsert Q327_RecoverTheFarmland | <cond> | 2
+  items 5012=1
+  state Q327_RecoverTheFarmland STARTED
+  rows Q327_RecoverTheFarmland <cond>=2 <state>=STARTED
+action leikan
+  S ActionFailed
+  S NpcHtmlMessage obj=leikan item=0 page=guard/30382.htm
+  S ActionFailed
+bypass npc_{leikan}_Quest
+  S NpcHtmlMessage obj=leikan item=0 page=script/quest/Q327_RecoverTheFarmland/30382-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Piotur takes the letter.
+action piotur
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S QuestList 327:0x80000007
+  S ExShowQuestMark quest=327
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:5012
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-03a.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q327_RecoverTheFarmland | <cond> | 3
+  items 5012=0
+  rows Q327_RecoverTheFarmland <cond>=3 <state>=STARTED
+# The accept page again starts nothing.
+bypass Quest Q327_RecoverTheFarmland 30597-03.htm
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-03.htm
+  S ActionFailed
+  rows Q327_RecoverTheFarmland <cond>=3 <state>=STARTED
+
+# Five dogtags, five medallions and ten clay urn fragments.
+kill archer x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1846
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1846
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1846
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1846
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1846
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1846=5 1848=5
+kill shaman x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1847
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1847
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1847
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1847
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1847
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1846=5 1847=5 1848=10
+
+# Piotur: 5 x 40 + 5 x 50 + 619.
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S QuestList 327:0x8000000f
+  S ExShowQuestMark quest=327
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1846 6:5
+  S SystemMessage id=301 3:1847 6:5
+  S SystemMessage id=52 6:1069
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q327_RecoverTheFarmland | <cond> | 4
+  items 1846=0 1847=0 1848=10 57=1069
+  rows Q327_RecoverTheFarmland <cond>=4 <state>=STARTED
+
+# Leikan moves the quest on.
+action leikan
+action leikan
+  S ActionFailed
+  S NpcHtmlMessage obj=leikan item=0 page=guard/30382.htm
+  S ActionFailed
+bypass npc_{leikan}_Quest
+  S QuestList 327:0x8000001f
+  S ExShowQuestMark quest=327
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=leikan item=0 page=script/quest/Q327_RecoverTheFarmland/30382-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q327_RecoverTheFarmland | <cond> | 5
+  rows Q327_RecoverTheFarmland <cond>=5 <state>=STARTED
+
+# Asha: two urns from ten fragments; no brass pieces.
+action asha
+action asha
+  S ActionFailed
+  S NpcHtmlMessage obj=asha item=0 page=merchant/30313.htm
+  S ActionFailed
+bypass npc_{asha}_Quest
+  S NpcHtmlMessage obj=asha item=0 page=script/quest/Q327_RecoverTheFarmland/30313-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30313-02.htm
+  S SystemMessage id=301 3:1848 6:5
+  S SystemMessage id=54 3:1852
+  S NpcHtmlMessage obj=asha item=0 page=script/quest/Q327_RecoverTheFarmland/30313-03.htm
+  S ActionFailed
+  items 1848=5 1852=1
+bypass Quest Q327_RecoverTheFarmland 30313-01.htm
+  S NpcHtmlMessage obj=asha item=0 page=script/quest/Q327_RecoverTheFarmland/30313-01.htm
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30313-02.htm
+  S SystemMessage id=301 3:1848 6:5
+  S SystemMessage id=54 3:1852
+  S NpcHtmlMessage obj=asha item=0 page=script/quest/Q327_RecoverTheFarmland/30313-03.htm
+  S ActionFailed
+  items 1848=0 1852=2
+bypass Quest Q327_RecoverTheFarmland 30313-01.htm
+  S NpcHtmlMessage obj=asha item=0 page=script/quest/Q327_RecoverTheFarmland/30313-01.htm
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30313-04.htm
+  S NpcHtmlMessage obj=asha item=0 page=script/quest/Q327_RecoverTheFarmland/30313-04.htm
+  S ActionFailed
+  items 1849=0 1853=0
+
+# Iris: no fragment to buy.
+action iris
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30034-03.htm
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-02.htm
+  S ActionFailed
+
+# Nestle: soulshots for an urn; no tiara.
+action nestle
+action nestle
+  S ActionFailed
+  S NpcHtmlMessage obj=nestle item=0 page=merchant/30314.htm
+  S ActionFailed
+bypass npc_{nestle}_Quest
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q327_RecoverTheFarmland/30314-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30314-02.htm
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q327_RecoverTheFarmland/30314-02.htm
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30314-03.htm
+  S SystemMessage id=302 3:1852
+  S SystemMessage id=53 3:1463 6:70
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q327_RecoverTheFarmland/30314-03.htm
+  S ActionFailed
+  items 1852=1 1463=70
+bypass Quest Q327_RecoverTheFarmland 30314-08.htm
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q327_RecoverTheFarmland/30314-08.htm
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30314-04.htm
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q327_RecoverTheFarmland/30314-07.htm
+  S ActionFailed
+  items 1852=1 1061=0 734=0 735=0
+
+# Iris: experience for the other urn, then nothing.
+action iris
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30034-07.htm
+  S SystemMessage id=302 3:1852
+  S SystemMessage id=45 1:2766
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-07.htm
+  S ActionFailed
+  items 1852=0
+bypass Quest Q327_RecoverTheFarmland 30034-01.htm
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-01.htm
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30034-07.htm
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q327_RecoverTheFarmland/30034-02.htm
+  S ActionFailed
+
+# Piotur: nothing to pay for; quit.
+action piotur
+action piotur
+  S ActionFailed
+  S NpcHtmlMessage obj=piotur item=0 page=default/30597.htm
+  S ActionFailed
+bypass npc_{piotur}_Quest
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q327_RecoverTheFarmland 30597-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=piotur item=0 page=script/quest/Q327_RecoverTheFarmland/30597-06.htm
+  S ActionFailed
+  Q delete-quest Q327_RecoverTheFarmland
+  state Q327_RecoverTheFarmland -
+  rows Q327_RecoverTheFarmland -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q327_RecoverTheFarmland -
+  rows Q327_RecoverTheFarmland -
+  items 57=1069 1463=70

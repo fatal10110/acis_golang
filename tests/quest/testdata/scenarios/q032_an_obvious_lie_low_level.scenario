@@ -1,0 +1,22 @@
+# An Obvious Lie (Q032), refused: a level 44 character, one short of the quest's level, is turned
+# away by Maximilian and the quest is not started. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q032_an_obvious_lie_low_level.golden
+character Liar 44
+script quest.Q032_AnObviousLie
+item 1866 1868 3031 7165 7166 6843 7680 7683
+page villagemaster/30120.htm
+page script/quest/Q032_AnObviousLie/
+npc maximilian 30120 VillageMasterPriest 10 0 0
+
+action maximilian
+action maximilian
+  S ActionFailed
+  S NpcHtmlMessage obj=maximilian item=0 page=villagemaster/30120.htm
+  S ActionFailed
+bypass npc_{maximilian}_Quest
+  S NpcHtmlMessage obj=maximilian item=0 page=script/quest/Q032_AnObviousLie/30120-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q032_AnObviousLie CREATED
+  rows Q032_AnObviousLie -

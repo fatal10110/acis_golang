@@ -31,6 +31,12 @@ type AIActor interface {
 	TickThink() error
 }
 
+// aiSleepLatched is an actor that keeps its own AI-sleep latch, decided at
+// its lifecycle points; the AI task reads only that.
+type aiSleepLatched interface {
+	AISleeping() bool
+}
+
 // AI runs active actor brains once per tick.
 //
 // Add and Remove are safe to call concurrently with Tick. Tick only ever
@@ -77,10 +83,10 @@ func (a *AI) Remove(actor AIActor) {
 }
 
 // Tick runs one AI cycle, on each actor's queue, for every registered actor
-// in an active region, and for inactive-region actors that explicitly opt
-// out of sleeping. It
-// logs and returns ErrReentrantTick without doing anything else if another Tick call is
-// already in flight.
+// that is awake: an NPC whose AI-sleep latch is awake, or another actor in
+// an active region (or in an inactive one it opts not to sleep in). It
+// logs and returns ErrReentrantTick without doing anything else if another
+// Tick call is already in flight.
 func (a *AI) Tick() error {
 	if !a.beginTick(a.log, "task: AI.Tick") {
 		return ErrReentrantTick
@@ -89,15 +95,12 @@ func (a *AI) Tick() error {
 	defer a.releaseSnapshot()
 
 	for _, actor := range a.snapshot() {
-		placed, active := regionActivity(a.state, actor)
-		switch {
-		case !placed:
-			continue
-		case active:
-		default:
-			if sleepsWhenRegionInactive(actor) {
+		if latched, ok := actor.(aiSleepLatched); ok {
+			if latched.AISleeping() {
 				continue
 			}
+		} else if !canWorkInRegion(a.state, actor) {
+			continue
 		}
 		actor.Queue().Post(func() {
 			actor.Tick()

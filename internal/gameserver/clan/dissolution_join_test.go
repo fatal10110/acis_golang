@@ -46,7 +46,8 @@ func dissolvingJoinWorld(t *testing.T) (*Service, *Clan, *laneWriter) {
 // queued for it.
 func TestJoinDuringDestroyIsRefused(t *testing.T) {
 	s, cl, writes := dissolvingJoinWorld(t)
-	recruit := &player.Character{ID: djRecruit, Name: "Recruit", CharLevel: 40}
+	recruit := &player.Character{ID: djRecruit, CharLevel: 40}
+	recruit.SetName("Recruit")
 	now := time.Now()
 
 	var got JoinRefusal = -1
@@ -73,7 +74,8 @@ func TestJoinDuringDestroyIsRefused(t *testing.T) {
 // privilege by id, so only the destroyed flag refuses it.
 func TestJoinAfterDestroyIsRefused(t *testing.T) {
 	s, cl, writes := dissolvingJoinWorld(t)
-	recruit := &player.Character{ID: djRecruit, Name: "Recruit", CharLevel: 40}
+	recruit := &player.Character{ID: djRecruit, CharLevel: 40}
+	recruit.SetName("Recruit")
 	now := time.Now()
 	if _, ok := s.Destroy(cl, false, nil, now); !ok {
 		t.Fatal("Destroy refused a live clan")

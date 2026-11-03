@@ -1,0 +1,253 @@
+# Go Get the Calculator (Q347): a level 12 character accepts at Brunon through his four pages;
+# Silvera has nothing yet; Balanki takes 100 adena (cond 2) and Spiron finishes the pair (cond
+# 4); both elders then send him on; Silvera asks for crystals (cond 5); Brunon has no calculator
+# yet; ten gemstone beasts give ten crystals (every roll pinned to succeed) and an eleventh
+# nothing; Silvera builds the calculator (cond 6); Brunon trades it for the real one and the
+# quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q347_go_get_the_calculator.golden
+character Calculator 12
+hold 57 1000
+random always 0
+script quest.Q347_GoGetTheCalculator
+item 57 4285 4286 4393
+page trainer/30526.htm
+page trainer/30527.htm
+page default/30532.htm
+page default/30533.htm
+page script/quest/Q347_GoGetTheCalculator/
+npc brunon 30526 Trainer 10 0 0
+npc silvera 30527 Trainer -10 0 0
+npc spiron 30532 Folk 0 10 0
+npc balanki 30533 Folk 0 -10 0
+npc beast 20540 Monster 40 0 0
+
+# Brunon: accept through 30526-02, 03 and 04.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30526-02.htm
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-02.htm
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30526-03.htm
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-03.htm
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30526-04.htm
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-04.htm
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30526-05.htm
+  S QuestList 347:0x80000001
+  S ExShowQuestMark quest=347
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-05.htm
+  S ActionFailed
+  Q upsert Q347_GoGetTheCalculator | <state> | STARTED
+  Q upsert Q347_GoGetTheCalculator | <cond> | 1
+  state Q347_GoGetTheCalculator STARTED
+  rows Q347_GoGetTheCalculator <cond>=1 <state>=STARTED
+
+# Silvera: nothing before cond 4.
+action silvera
+action silvera
+  S ActionFailed
+  S NpcHtmlMessage obj=silvera item=0 page=trainer/30527.htm
+  S ActionFailed
+bypass npc_{silvera}_Quest
+  S NpcHtmlMessage obj=silvera item=0 page=script/quest/Q347_GoGetTheCalculator/30527-00.htm
+  S ActionFailed
+  S ActionFailed
+
+# Balanki: 100 adena, cond 2.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q347_GoGetTheCalculator/30533-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30533-03.htm
+  S SystemMessage id=672 1:100
+  S QuestList 347:0x80000003
+  S ExShowQuestMark quest=347
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q347_GoGetTheCalculator/30533-02.htm
+  S ActionFailed
+  Q upsert Q347_GoGetTheCalculator | <cond> | 2
+  items 57=900
+  rows Q347_GoGetTheCalculator <cond>=2 <state>=STARTED
+
+# Spiron: cond 4.
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q347_GoGetTheCalculator/30532-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30532-02.htm
+  S QuestList 347:0x8000000b
+  S ExShowQuestMark quest=347
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q347_GoGetTheCalculator/30532-02.htm
+  S ActionFailed
+  Q upsert Q347_GoGetTheCalculator | <flags> | -2147483637
+  Q upsert Q347_GoGetTheCalculator | <cond> | 4
+  rows Q347_GoGetTheCalculator <cond>=4 <flags>=-2147483637 <state>=STARTED
+
+# Both elders are done.
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q347_GoGetTheCalculator/30533-04.htm
+  S ActionFailed
+  S ActionFailed
+action spiron
+action spiron
+  S ActionFailed
+  S NpcHtmlMessage obj=spiron item=0 page=default/30532.htm
+  S ActionFailed
+bypass npc_{spiron}_Quest
+  S NpcHtmlMessage obj=spiron item=0 page=script/quest/Q347_GoGetTheCalculator/30532-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Silvera: cond 5, then the crystals she lacks.
+action silvera
+action silvera
+  S ActionFailed
+  S NpcHtmlMessage obj=silvera item=0 page=trainer/30527.htm
+  S ActionFailed
+bypass npc_{silvera}_Quest
+  S QuestList 347:0x8000001b
+  S ExShowQuestMark quest=347
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=silvera item=0 page=script/quest/Q347_GoGetTheCalculator/30527-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q347_GoGetTheCalculator | <flags> | -2147483621
+  Q upsert Q347_GoGetTheCalculator | <cond> | 5
+  rows Q347_GoGetTheCalculator <cond>=5 <flags>=-2147483621 <state>=STARTED
+action silvera
+  S ActionFailed
+  S NpcHtmlMessage obj=silvera item=0 page=trainer/30527.htm
+  S ActionFailed
+bypass npc_{silvera}_Quest
+  S NpcHtmlMessage obj=silvera item=0 page=script/quest/Q347_GoGetTheCalculator/30527-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Brunon: no calculator yet.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten crystals, then the count is reached and an eleventh beast gives none.
+kill beast x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4286
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 4286=10
+kill beast
+  S SystemMessage id=95 1:0 1:0
+  items 4286=10
+
+# Silvera: the calculator (cond 6), then she has nothing more.
+action silvera
+action silvera
+  S ActionFailed
+  S NpcHtmlMessage obj=silvera item=0 page=trainer/30527.htm
+  S ActionFailed
+bypass npc_{silvera}_Quest
+  S QuestList 347:0x8000003b
+  S ExShowQuestMark quest=347
+  S SystemMessage id=301 3:4286 6:10
+  S SystemMessage id=54 3:4285
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=silvera item=0 page=script/quest/Q347_GoGetTheCalculator/30527-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q347_GoGetTheCalculator | <flags> | -2147483589
+  Q upsert Q347_GoGetTheCalculator | <cond> | 6
+  items 4286=0 4285=1
+  rows Q347_GoGetTheCalculator <cond>=6 <flags>=-2147483589 <state>=STARTED
+action silvera
+  S ActionFailed
+  S NpcHtmlMessage obj=silvera item=0 page=trainer/30527.htm
+  S ActionFailed
+bypass npc_{silvera}_Quest
+  S NpcHtmlMessage obj=silvera item=0 page=script/quest/Q347_GoGetTheCalculator/30527-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Brunon: the real calculator.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q347_GoGetTheCalculator 30526-08.htm
+  S SystemMessage id=302 3:4285
+  S SystemMessage id=54 3:4393
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q347_GoGetTheCalculator/30526-08.htm
+  S ActionFailed
+  Q delete-quest Q347_GoGetTheCalculator
+  items 4285=0 4393=1
+  state Q347_GoGetTheCalculator -
+  rows Q347_GoGetTheCalculator -
+
+# Relog: the quest is gone, the calculator stays.
+relog
+  state Q347_GoGetTheCalculator -
+  rows Q347_GoGetTheCalculator -
+  items 4393=1 57=900

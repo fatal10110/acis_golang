@@ -3,7 +3,6 @@ package character
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -62,20 +61,13 @@ func TestDangerZonesDriveTheEtcStatusDangerField(t *testing.T) {
 	}
 	// No damage: the zone's pulse would otherwise hurt the player while
 	// the reads below move the clock.
-	noDamage := commons.NewStatSet()
-	noDamage.Set("hpDamage", "0")
-	damage, err := zone.NewDamage(1, damageForm, noDamage)
-	if err != nil {
-		t.Fatal(err)
-	}
+	damage := zone.NewDamage(1, damageForm)
+	damage.HPDamage = 0
 	effectForm, err := zone.NewCuboid(3_000, 5_000, -1_000, 1_000, -10_000, 10_000)
 	if err != nil {
 		t.Fatal(err)
 	}
-	effectZone, err := zone.NewEffect(2, effectForm, commons.NewStatSet())
-	if err != nil {
-		t.Fatal(err)
-	}
+	effectZone := zone.NewEffect(2, effectForm)
 	zones := zone.NewIndex()
 	zones.Add(damage)
 	zones.Add(effectZone)

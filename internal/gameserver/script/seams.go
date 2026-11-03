@@ -3,16 +3,19 @@ package script
 import (
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 )
 
 // ItemUsed runs the item-use hook of every script bound to itemID, in list
 // order, for which p's quest state is started: p used the item objectID,
-// of template itemID, with target selected. It runs on p's queue, after
-// the item's own use.
+// of template itemID, with target selected. It runs on p's own queue, after
+// the item's own use, and so do the hooks (TeleportTo).
 func (r *Registry) ItemUsed(p *Player, itemID, objectID int32, target attackable.Combatant) {
 	if r == nil {
 		return
@@ -21,14 +24,48 @@ func (r *Registry) ItemUsed(p *Player, itemID, objectID int32, target attackable
 	if len(list) == 0 {
 		return
 	}
-	journal := p.character().Quests()
+	c := p.character()
+	journal := c.Quests()
 	e := ItemUse{Player: p, ItemID: itemID, ObjectID: objectID, Target: creatureOf(target)}
-	for _, s := range list {
-		if st := journal.State(s.Name); st == nil || st.Status() != questlog.StatusStarted {
+	c.RunOnOwnQueue(func() {
+		for _, s := range list {
+			if st := journal.State(s.Name); st == nil || st.Status() != questlog.StatusStarted {
+				continue
+			}
+			r.run(s, hookItemUse, func() { s.Hooks.ItemUse(s, e) })
+		}
+	})
+}
+
+// PlayableDied runs the death hook of each quest of c's journal that has
+// one, in journal order and whatever the quest's status: victim, c itself
+// or its summon, was killed by killer. A death no creature caused (nil
+// killer) passes victim as the killer. It runs on the goroutine running the
+// death, once observers have seen it and before the killer is credited.
+func (r *Registry) PlayableDied(c *player.Character, victim, killer attackable.Combatant) {
+	if r == nil {
+		return
+	}
+	if killer == nil {
+		killer = victim
+	}
+	e := Death{Killer: creatureOf(killer), Player: PlayerOf(c)}
+	for _, q := range c.Quests().Quests() {
+		s := r.byName[strings.ToLower(q.Name)]
+		if s == nil || s.Hooks.OnDeath == nil {
 			continue
 		}
-		r.run(s, hookItemUse, func() { s.Hooks.ItemUse(s, e) })
+		r.run(s, hookDeath, func() { s.Hooks.Death(s, e) })
 	}
+}
+
+var _ player.DeathEvents = (*Registry)(nil)
+
+// Attackable reports whether the NPC is one players attack: a hostile NPC,
+// monster or guard, not a civilian one. A handle on nothing reports false.
+func (n *NPC) Attackable() bool {
+	_, ok := n.combatant().(*npc.Hostile)
+	return ok
 }
 
 // ZoneEnterIDs returns, sorted, the ids of the zones whose entry reaches a
@@ -78,7 +115,30 @@ func (s *Script) BroadcastScriptEventEx(caller *NPC, eventID, arg1, arg2 int32, 
 	s.registry.broadcastScriptEvent(caller, eventID, arg1, arg2, radius)
 }
 
+// ScriptEvent runs the script-event hooks of n, a hostile or a civilian
+// NPC, in the world or not, as SendScriptEvent does.
+func (r *Registry) ScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32) {
+	if r == nil {
+		return
+	}
+	r.scriptEvent(NPCOf(n), eventID, arg1, arg2)
+}
+
+// DeliverScriptEvent is ScriptEvent for a sender that is not a script (a
+// test suite's step): Config.Heard is not told of the event it delivers
+// to n, though it is of those the scripts send in answer.
+func (r *Registry) DeliverScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32) {
+	if r == nil {
+		return
+	}
+	r.deliverScriptEvent(NPCOf(n), eventID, arg1, arg2, false)
+}
+
 func (r *Registry) scriptEvent(n *NPC, eventID, arg1, arg2 int32) {
+	r.deliverScriptEvent(n, eventID, arg1, arg2, true)
+}
+
+func (r *Registry) deliverScriptEvent(n *NPC, eventID, arg1, arg2 int32, tell bool) {
 	if n.combatant() == nil {
 		return
 	}
@@ -88,6 +148,9 @@ func (r *Registry) scriptEvent(n *NPC, eventID, arg1, arg2 int32) {
 	}
 	e := ScriptEvent{NPC: n, EventID: eventID, Arg1: arg1, Arg2: arg2}
 	for _, s := range list {
+		if tell && r.heard != nil {
+			r.heard(n, eventID, arg1, arg2)
+		}
 		r.run(s, hookScriptEvent, func() { s.Hooks.ScriptEvent(s, e) })
 	}
 }

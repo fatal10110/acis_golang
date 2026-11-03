@@ -26,7 +26,7 @@ func (nopDecayEffects) Decay(task.DecayActor) {}
 
 type nopRespawnEffects struct{}
 
-func (nopRespawnEffects) Respawn(string) {}
+func (nopRespawnEffects) Respawn(task.SlotID) {}
 
 // noRouteWalkerPath satisfies task.NewWalker's required WalkerPath: this
 // test's fixture template has no alias, so no route is ever resolved and

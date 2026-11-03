@@ -1,0 +1,14 @@
+# The Queen Ant (29001) and a monster of her clan beside her, every draw 0. The level 1
+# character's hit on the monster calls her: 300 away from the character (over 150, a draw under
+# 3 then one under 80) she wants strike 4018 on it from where she stands, and to attack it by
+# 22 / 440 / 0.05 * 500. She starts the strike at once.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAnt
+npc queen 29001 GrandBoss 300 0 0 clan ant_clan 300 skill BUFF 4017 1 skill DD_MAGIC 4018 1 skill DD_MAGIC_A 4019 1 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+npc guard 20120 Monster 300 50 0 clan ant_clan 300
+
+hit guard 22
+  S MagicSkillUse caster=queen target=player skill=4018-1 hit=2907 reuse=0 success=0
+  desires queen cast(player,4018)=1000000 attack(player)=500

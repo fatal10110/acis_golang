@@ -17,6 +17,7 @@ import (
 // seconds later, and every twelve after, each member gets every member's
 // position.
 func TestInviteFormsParty(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 
@@ -94,6 +95,7 @@ func assertPositions(t *testing.T, frame []byte, ids ...int32) {
 // party keeps the loot rule it formed with, whatever the new invitation
 // offered.
 func TestThirdMemberJoins(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}})
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 	g.invite(t, 0, 1, 1)
@@ -129,6 +131,7 @@ func TestThirdMemberJoins(t *testing.T) {
 // gets JoinParty(0), nobody joins, and the inviter is free to invite again
 // at once.
 func TestDeclineSendsJoinPartyZero(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 
@@ -151,6 +154,7 @@ func TestDeclineSendsJoinPartyZero(t *testing.T) {
 // TestAnswerWithoutInvitationIsSilent pins RequestAnswerJoinParty with no
 // active requester: nothing happens and nothing is sent.
 func TestAnswerWithoutInvitationIsSilent(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	g.players[1].c.Send(encodeAnswerJoinParty(1))
 	assertSilent(t, g.players[1].c, "answer with nothing pending")

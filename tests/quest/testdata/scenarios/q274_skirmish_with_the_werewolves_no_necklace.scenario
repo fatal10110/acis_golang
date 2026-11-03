@@ -1,0 +1,24 @@
+# Skirmish with the Werewolves (Q274), refused: Brukurse sends away an orc of level 9 without a
+# necklace of courage or valor, and the quest is not started. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q274_skirmish_with_the_werewolves_no_necklace.golden
+character Skirmisher 9
+class 44
+script quest.Q274_SkirmishWithTheWerewolves
+item 1477
+page trainer/30569.htm
+page script/quest/Q274_SkirmishWithTheWerewolves/
+npc brukurse 30569 Trainer 10 0 0
+
+# Brukurse: only an orc who proved his valor.
+action brukurse
+action brukurse
+  S ActionFailed
+  S NpcHtmlMessage obj=brukurse item=0 page=trainer/30569.htm
+  S ActionFailed
+bypass npc_{brukurse}_Quest
+  S NpcHtmlMessage obj=brukurse item=0 page=script/quest/Q274_SkirmishWithTheWerewolves/30569-07.htm
+  S ActionFailed
+  S ActionFailed
+  state Q274_SkirmishWithTheWerewolves CREATED
+  rows Q274_SkirmishWithTheWerewolves -

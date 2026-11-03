@@ -362,13 +362,15 @@ type Destination interface {
 // TeleportRefusal is the notice refusing a teleport to partner, "" when
 // the teleport goes ahead: partner stands where no one may be summoned,
 // is jailed, fights in the Olympiad or a duel, takes part in the festival
-// or observes.
-func TeleportRefusal(partner Destination) string {
+// or observes; or else its clan owns a castle whose siege is being fought,
+// as besieged reports.
+func TeleportRefusal(partner Destination, besieged bool) string {
 	if partner.NoSummonFriendZone() || partner.Jailed() || partner.OlympiadMode() || partner.InDuel() || partner.FestivalParticipant() || partner.ObserverMode() {
 		return NoticePartnerStatus
 	}
-	// ponytail: a partner whose clan owns a castle under siege is refused
-	// with NoticePartnerInSiege (#3375).
+	if besieged {
+		return NoticePartnerInSiege
+	}
 	return ""
 }
 

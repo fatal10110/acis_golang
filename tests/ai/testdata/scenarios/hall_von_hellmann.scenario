@@ -1,0 +1,23 @@
+# Agit03Alfred (35630) and Agit03Giselle (35631), the Fortress of the Dead's von Hellmanns,
+# raised bare: each shouts its line as it appears (sent as the NPC lines' NPCs spawn, before
+# the first step), and Aargh...! three seconds after its death. A kill of a dead one kills a
+# fresh one, which shouts as it appears. Their attacked hooks only queue desires, which the
+# format cannot render (tests/ai/hall_agit03_test.go covers them); every draw is 1, so no DD
+# magic is asked. Giselle's 1 s buff asks a skill her fixture template does not list.
+character Hunter 20
+random always 1
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.Agit03Alfred
+script script.ai.siegablehall.Agit03Giselle
+npc alfred 35630 Monster 40 0 0
+npc giselle 35631 Monster 0 40 0
+
+kill alfred x2
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=alfred type=1 npc=1035630 text="Aargh...! If I die, then the magic force field of blood will...!"
+  S NpcSay obj=alfred type=1 npc=1035630 text="Heh Heh... I see that the feast has begun! Be wary! The curse of the Hellmann family has poisoned this land!"
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=alfred type=1 npc=1035630 text="Aargh...! If I die, then the magic force field of blood will...!"
+kill giselle
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=giselle type=1 npc=1035631 text="Aargh...! If I die, then the magic force field of blood will...!"

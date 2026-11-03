@@ -32,7 +32,7 @@ func TestSendSkillHandlerResultDeliversTargetMessagesWithNilCaster(t *testing.T)
 	target := newTestLivePlayer(t, 42, frames)
 	state := world.New()
 	state.AddPlayer(target)
-	l := &GameClientLink{world: state}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state})
 
 	l.sendSkillHandlerResult(nil, actorcast.EffectResult{
 		Messages: []any{
@@ -73,7 +73,7 @@ func TestSendSkillHandlerResultKeepsTargetMessageOrder(t *testing.T) {
 			state.AddPlayer(caster)
 			state.AddPlayer(newTestLivePlayer(t, 2, &testsupport.FrameCapture{}))
 			state.AddPlayer(newTestLivePlayer(t, 3, &testsupport.FrameCapture{}))
-			l := &GameClientLink{world: state}
+			l := newBareGameClientLink(t, GameClientLinkConfig{World: state})
 			l.sendSkillHandlerResult(caster, actorcast.EffectResult{Messages: tc.messages})
 			got := frames.Frames()
 			if len(got) != len(tc.want) {
@@ -129,7 +129,7 @@ func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
 			state := world.New()
 			state.AddPlayer(live)
 			state.AddPlayer(newTestLivePlayer(t, 2, &testsupport.FrameCapture{}))
-			link := &GameClientLink{world: state}
+			link := newBareGameClientLink(t, GameClientLinkConfig{World: state})
 			caster := &orderedSkillActor{id: 1, kind: actor.KindPlayer}
 			target := &orderedSkillActor{
 				id: 2, kind: actor.KindPlayer, effects: effect.NewList(nil), counter: 100,
@@ -173,7 +173,7 @@ func TestDeliverHitResultForwardsToSendSkillHandlerResult(t *testing.T) {
 	target := newTestLivePlayer(t, 43, frames)
 	state := world.New()
 	state.AddPlayer(target)
-	l := &GameClientLink{world: state}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state})
 
 	l.DeliverHitResult(actorcast.EffectResult{
 		Messages: []any{handlerskill.ManaDrain{TargetID: 43, CasterName: "Orc", MP: 12}},
@@ -211,7 +211,7 @@ func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			testsupport.ResetCapture(frames)
-			sendTargetCastRejection(live, tt.rejection, tt.def)
+			sendTargetCastRejection(live, tt.rejection, &tt.def)
 			sendMagicActionFailed(live)
 
 			got := frames.Frames()
@@ -242,8 +242,8 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	l := &GameClientLink{targets: skilltarget.NewRegistry(nil)}
-	target, rejection := l.resolveMagicSkillTarget(live.Character, locked, modelskill.Definition{Target: modelskill.TargetUnlockable}, false)
+	l := newBareGameClientLink(t, GameClientLinkConfig{})
+	target, rejection := l.resolveMagicSkillTarget(live.Character, locked, &modelskill.Definition{Target: modelskill.TargetUnlockable}, false)
 	if target != locked {
 		t.Fatalf("target = %T, want locked door", target)
 	}
@@ -251,7 +251,7 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 		t.Fatalf("rejection = %v, want silent", rejection)
 	}
 	testsupport.ResetCapture(frames)
-	sendTargetCastRejection(live, rejection, modelskill.Definition{})
+	sendTargetCastRejection(live, rejection, &(modelskill.Definition{}))
 	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 0 {
 		t.Fatalf("silent rejection opcodes = %x, want none", got)
 	}
@@ -336,7 +336,7 @@ func TestSkillDamageFrames(t *testing.T) {
 			bystander := &testsupport.FrameCapture{}
 			state.AddPlayer(newTestLivePlayer(t, 1, bystander))
 			tc.m.RecipientID = 9
-			(&GameClientLink{world: state}).sendSkillHandlerResult(nil, actorcast.EffectResult{Messages: []any{tc.m}})
+			newBareGameClientLink(t, GameClientLinkConfig{World: state}).sendSkillHandlerResult(nil, actorcast.EffectResult{Messages: []any{tc.m}})
 			got := frames.Frames()
 			if len(got) != len(tc.want) {
 				t.Fatalf("frame count = %d, want %d", len(got), len(tc.want))
@@ -390,7 +390,7 @@ func TestMdamDamageResistDamageFrameOrder(t *testing.T) {
 	live := newTestLivePlayer(t, 1, frames)
 	state := world.New()
 	state.AddPlayer(live)
-	link := &GameClientLink{world: state}
+	link := newBareGameClientLink(t, GameClientLinkConfig{World: state})
 	in := formulas.MagicDamageInput{MAtk: 400, MDef: 100, SkillPower: 50, PvPMul: 1, ElementalMul: 1}
 	resister := &mdamOrderActor{orderedSkillActor: orderedSkillActor{id: 2, kind: actor.KindNPC, effects: effect.NewList(nil)}, hp: 5000, magic: in}
 	hit := &mdamOrderActor{orderedSkillActor: orderedSkillActor{id: 3, kind: actor.KindNPC, effects: effect.NewList(nil)}, hp: 5000, magic: in, unrollable: true}

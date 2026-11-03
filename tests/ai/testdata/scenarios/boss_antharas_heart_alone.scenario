@@ -1,0 +1,19 @@
+# HeartOfWarding (13001), talked to with no Antharas in the world: its first page 13001-01.htm,
+# then the entry answers 13001-02.htm (global memo keys 4, 5 and 6 unset). Expectations are
+# derived from the reference source (HeartOfWarding.java 36-40, 70-127). The Portal Stone entry,
+# the boss wait and the script event to the small, normal or large Antharas, and the refusals
+# 13001-03.htm and 13001-04.htm are in tests/ai/boss_antharas_heart_test.go: the format declares
+# no npcmaker of its own type, so it places no Antharas with a spawn_data row.
+character Hunter 20
+script script.ai.boss.antharas.HeartOfWarding
+page script/ai/boss/antharas/HeartOfWarding/
+npc heart 13001 Folk 60 0 0
+
+action heart
+action heart
+  S ActionFailed
+  S NpcHtmlMessage obj=heart item=0 page=script/ai/boss/antharas/HeartOfWarding/13001-01.htm
+  S ActionFailed
+bypass Quest HeartOfWarding enter
+  S NpcHtmlMessage obj=heart item=0 page=script/ai/boss/antharas/HeartOfWarding/13001-02.htm
+  S ActionFailed

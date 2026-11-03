@@ -1,0 +1,25 @@
+# First class change (FirstClassChange): a level 19 human fighter without the medallion of the
+# Warrior is told by Ramos it lacks both the level and the token. Expectations are the reference
+# trace's (FirstClassChange.onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/first_class_change_low_level_no_token.golden
+character Fighter 19
+script script.feature.FirstClassChange
+page villagemaster/30373.htm
+page script/feature/FirstClassChange/
+npc ramos 30373 VillageMasterFighter 10 0 0
+
+action ramos
+action ramos
+  S ActionFailed
+  S NpcHtmlMessage obj=ramos item=0 page=villagemaster/30373.htm
+  S ActionFailed
+bypass npc_{ramos}_Quest FirstClassChange
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest FirstClassChange 30373-09.htm
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-09.htm
+  S ActionFailed
+bypass Quest FirstClassChange HW
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-26.htm
+  S ActionFailed

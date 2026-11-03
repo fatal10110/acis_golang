@@ -123,9 +123,36 @@ func (s *Service) setLevelLocked(cl *Clan, level int) int {
 	return level
 }
 
+// ChangeLevel sets cl's level to level, up or down, and stores it. Nothing
+// else about the clan changes: its leader's siege skills and what its
+// members are shown are the caller's.
+func (s *Service) ChangeLevel(cl *Clan, level int) {
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	s.setLevelLocked(cl, level)
+}
+
 // TellsLeaderAboutReputation reports whether reaching level earns the
 // leader the reputation notice.
 func TellsLeaderAboutReputation(level int) bool { return level > reputationLevel }
+
+// StoreRestoredReputations queues the bounded score of each clan in ids,
+// as Table.Restore returned them, over the stored score past the bounds it
+// was restored from. It runs once at boot, before any player connects.
+func (s *Service) StoreRestoredReputations(ids []int32) {
+	for _, id := range ids {
+		cl, ok := s.table.Get(id)
+		if !ok {
+			continue
+		}
+		cl.mu.Lock()
+		score := cl.reputation
+		s.write(cl.id, "update clan reputation", func(ctx context.Context, st Store) error {
+			return st.UpdateReputation(ctx, cl.id, score)
+		})
+		cl.mu.Unlock()
+	}
+}
 
 // addReputationLocked moves cl's reputation by delta; cl.mu is held. A
 // clan below level 5 neither gains nor loses any; it reports no change
@@ -135,8 +162,10 @@ func (s *Service) addReputationLocked(cl *Clan, delta int) (ReputationChanged, b
 		return ReputationChanged{}, false
 	}
 	before := cl.reputation
-	after := clampReputation(before + delta)
-	cl.reputation = after
+	// The score and the change add as 32-bit integers, wrapping past the
+	// int range before the bounds apply.
+	after := clampReputation(int(int32(before) + int32(delta)))
+	cl.reputation, cl.storedReputation = after, after
 	change := ReputationChanged{Score: after}
 	switch {
 	case before > 0 && after <= 0:

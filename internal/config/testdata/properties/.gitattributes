@@ -1,0 +1,2 @@
+# The cases are raw file bytes (CRLF, CR, Latin-1, BOM): never normalize them.
+* -text

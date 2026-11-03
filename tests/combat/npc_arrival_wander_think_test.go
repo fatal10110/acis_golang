@@ -20,7 +20,7 @@ import (
 // one wander timer after the promotion, not one after the sleep ends.
 func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -119,7 +119,7 @@ func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 // goes quiet.
 func assertNoWanderWalk(t *testing.T, c *scriptedClient, after string) {
 	t.Helper()
-	for frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(300 * time.Millisecond) {
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMoveToLocation {
 			t.Fatalf("MoveToLocation after %s", after)
 		}

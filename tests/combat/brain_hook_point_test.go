@@ -34,15 +34,6 @@ func framesOf(frames [][]byte, id int32) []byte {
 	return ops
 }
 
-// readFor collects every frame that arrives within d of quiet.
-func readFor(c *scriptedClient, d time.Duration) [][]byte {
-	var frames [][]byte
-	for f := c.ReadWithTimeout(d); f != nil; f = c.ReadWithTimeout(d) {
-		frames = append(frames, f)
-	}
-	return frames
-}
-
 // monsterFrame is one frame as a scenario pins it: its opcode and leading
 // object id.
 type monsterFrame struct {
@@ -89,7 +80,7 @@ func readUntilFrame(t *testing.T, c *scriptedClient, op byte, id int32, what str
 // home.
 func TestBrainArrivalOutsideTerritoryWalksHome(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithAITask(),
@@ -108,7 +99,7 @@ func TestBrainArrivalOutsideTerritoryWalksHome(t *testing.T) {
 		t.Helper()
 		run()
 		var mine [][]byte
-		for _, f := range readFor(c, 300*time.Millisecond) {
+		for _, f := range c.ReadQueued() {
 			if len(f) >= 5 && int32(binary.LittleEndian.Uint32(f[1:5])) == id {
 				mine = append(mine, f)
 			}
@@ -142,7 +133,7 @@ func TestBrainArrivalOutsideTerritoryWalksHome(t *testing.T) {
 		t.Fatalf("CurrentIntention() after the arrival = %v, want the finished walk kept", got)
 	}
 
-	step("the idle cycle", cycle, serverpackets.OpcodeChangeMoveType)
+	step("the idle cycle", cycle, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() after the idle cycle = %v, want %v", got, ai.IntentionIdle)
 	}
@@ -167,7 +158,7 @@ func assertMoveDestination(t *testing.T, frame []byte, want location.Location) {
 // see-creature point, never idle or walk the fighting monster.
 func TestBrainCyclesDuringAFight(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithAITask(),
@@ -185,7 +176,7 @@ func TestBrainCyclesDuringAFight(t *testing.T) {
 	id := hostile.ObjectID()
 	drainUntilQuiet(t, c)
 	runAICycle(t, srv)
-	if got := framesOf(readFor(c, 300*time.Millisecond), id); len(got) != 0 {
+	if got := framesOf(c.ReadQueued(), id); len(got) != 0 {
 		t.Fatalf("monster frames on the first cycle = % x, want none", got)
 	}
 
@@ -228,12 +219,12 @@ func TestBrainCyclesDuringAFight(t *testing.T) {
 		}
 		cycles <- nil
 	}()
-	during := readFor(c, 300*time.Millisecond)
+	during := c.ReadQueued()
 	if err := <-cycles; err != nil {
 		t.Fatalf("AI.Tick() error: %v", err)
 	}
 	srv.Settle(t)
-	during = append(during, readFor(c, 100*time.Millisecond)...)
+	during = append(during, c.ReadQueued()...)
 	for _, f := range during {
 		if len(f) < 5 || int32(binary.LittleEndian.Uint32(f[1:5])) != id {
 			continue

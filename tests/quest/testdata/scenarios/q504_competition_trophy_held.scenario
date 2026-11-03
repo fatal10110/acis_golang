@@ -1,0 +1,25 @@
+# Competition for the Bandit Stronghold (Q504), the trophy is held: a leader who holds the Trophy of Alliance is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q504_competition_trophy_held.golden
+character Leader 40
+clan 4
+hall 35 waiting date 4102444800000
+hold 5009 1
+script quest.Q504_CompetitionForTheBanditStronghold
+script script.siegablehall.BanditStronghold
+item 4332 4333 5009
+page script/quest/Q504_CompetitionForTheBanditStronghold/
+page script/siegablehall/BanditStronghold/
+npc messenger 35437 Folk 10 0 0
+
+action messenger
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/BanditStronghold/azit_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q504_CompetitionForTheBanditStronghold/35437-07a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q504_CompetitionForTheBanditStronghold CREATED
+  items 5009=1

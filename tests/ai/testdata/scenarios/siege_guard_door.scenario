@@ -1,0 +1,15 @@
+# GludioHold's static-object clan-attacked hook on a knight of Gludio Castle (35066,
+# GludioKnight) of the clan door_clan, standing by a gate (Gludio's outer gate's id,
+# 19210001): a hit on a door calls the door clan's NPCs within 600 of it. The character's hit
+# on the gate for a twentieth of the knight's 440 hit points makes it want to attack the
+# character by 50. No siege runs: the gate loses no hit points, but its call goes out.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+door gate 19210001 100 0 0
+npc knight 35066 SiegeGuard 100 200 0 walks clan door_clan 300
+
+hit gate 22
+  hate knight 50
+  desires knight attack(player)=50

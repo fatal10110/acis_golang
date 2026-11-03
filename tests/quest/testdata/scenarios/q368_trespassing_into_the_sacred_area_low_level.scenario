@@ -1,0 +1,24 @@
+# Trespassing into the Sacred Area (Q368), level 35: Restina turns the character away. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q368_trespassing_into_the_sacred_area_low_level.golden
+character Trespass 35
+script quest.Q368_TrespassingIntoTheSacredArea
+item 57 5881
+page default/30926.htm
+page script/quest/Q368_TrespassingIntoTheSacredArea/
+npc restina 30926 Folk 10 0 0
+npc blade 20794 Monster 40 0 0
+npc worker 20795 Monster 50 0 0
+npc warrior 20796 Monster 60 0 0
+npc drone 20797 Monster -40 0 0
+
+action restina
+action restina
+  S ActionFailed
+  S NpcHtmlMessage obj=restina item=0 page=default/30926.htm
+  S ActionFailed
+bypass npc_{restina}_Quest
+  S NpcHtmlMessage obj=restina item=0 page=script/quest/Q368_TrespassingIntoTheSacredArea/30926-01a.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q368_TrespassingIntoTheSacredArea -

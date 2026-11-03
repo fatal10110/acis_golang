@@ -131,7 +131,8 @@ func TestContainer_Transfer_FullyMergesIntoExistingStack(t *testing.T) {
 	inst := src.AddNew(adenaTemplateID, 100, 0x20000001)
 	dst.AddNew(adenaTemplateID, 5, 0x20000002)
 
-	result, freedID, freed := src.Transfer(inst.ObjectID, 100, dst, 0)
+	ids := &idSource{}
+	result, freedID, freed, _ := src.Transfer(inst.ObjectID, 100, dst, ids.next)
 	if result == nil || result.Count != 105 {
 		t.Fatalf("Transfer() result = %+v, want count 105", result)
 	}
@@ -141,6 +142,9 @@ func TestContainer_Transfer_FullyMergesIntoExistingStack(t *testing.T) {
 	if src.Size() != 0 {
 		t.Errorf("source Size() = %d, want 0", src.Size())
 	}
+	if ids.taken != 0 {
+		t.Errorf("merging into a held stack took %d object ids, want none", ids.taken)
+	}
 }
 
 func TestContainer_Transfer_PartialCreatesNewInstance(t *testing.T) {
@@ -149,7 +153,7 @@ func TestContainer_Transfer_PartialCreatesNewInstance(t *testing.T) {
 
 	inst := src.AddNew(adenaTemplateID, 100, 0x20000001)
 
-	result, _, freed := src.Transfer(inst.ObjectID, 30, dst, 0x30000001)
+	result, _, freed, _ := src.Transfer(inst.ObjectID, 30, dst, (&idSource{ids: []int32{0x30000001}}).next)
 	if result == nil || result.Count != 30 || result.ObjectID != 0x30000001 {
 		t.Fatalf("Transfer() result = %+v, want a new instance with count 30", result)
 	}
@@ -167,7 +171,7 @@ func TestContainer_Transfer_FullyMovesNonStackableWithoutNewID(t *testing.T) {
 
 	inst := src.AddNew(daggerTemplateID, 1, 0x20000001)
 
-	result, _, freed := src.Transfer(inst.ObjectID, 1, dst, 0)
+	result, _, freed, _ := src.Transfer(inst.ObjectID, 1, dst, nil)
 	if result != inst {
 		t.Fatalf("Transfer() of a whole non-stackable item should move the same instance, got %+v", result)
 	}
@@ -190,7 +194,8 @@ func TestContainer_Transfer_UsesInventoryAddHooks(t *testing.T) {
 	dst.DrainUpdates()
 	inst := src.AddNew(adenaTemplateID, 100, 0x20000001)
 
-	result, freedID, freed := src.Transfer(inst.ObjectID, 40, dst, 0)
+	ids := &idSource{}
+	result, freedID, freed, _ := src.Transfer(inst.ObjectID, 40, dst, ids.next)
 	if result == nil || result.Count != 45 {
 		t.Fatalf("Transfer() result = %+v, want destination count 45", result)
 	}
@@ -201,6 +206,9 @@ func TestContainer_Transfer_UsesInventoryAddHooks(t *testing.T) {
 	if len(updates) != 1 || updates[0].ObjectID != result.ObjectID || updates[0].State != UpdateModified || updates[0].Count != 45 {
 		t.Fatalf("destination updates = %+v, want one MODIFIED update with count 45", updates)
 	}
+	if ids.taken != 0 {
+		t.Errorf("a split merging into a held stack took %d object ids, want none", ids.taken)
+	}
 }
 
 func TestContainer_Transfer_UsesNewObjectIDWhenTargetStackDisappears(t *testing.T) {
@@ -210,12 +218,12 @@ func TestContainer_Transfer_UsesNewObjectIDWhenTargetStackDisappears(t *testing.
 	dst.AddNew(adenaTemplateID, 5, 0x20000002)
 	inst := src.AddNew(adenaTemplateID, 100, 0x20000001)
 
-	result, _, freed := src.Transfer(inst.ObjectID, 40, dst, 0x30000001)
+	result, _, freed, _ := src.Transfer(inst.ObjectID, 40, dst, (&idSource{ids: []int32{0x30000001}}).next)
 	if result == nil {
 		t.Fatalf("Transfer() returned nil")
 	}
 	if result.ObjectID != 0x30000001 {
-		t.Fatalf("Transfer() result object id = %#x, want newObjectID", result.ObjectID)
+		t.Fatalf("Transfer() result object id = %#x, want the late id", result.ObjectID)
 	}
 	if dst.ItemByObjectID(0) != nil {
 		t.Fatalf("destination contains item with object id 0")
@@ -246,7 +254,7 @@ func TestContainer_Transfer_UsesFreightVisibleTownHooks(t *testing.T) {
 	dst.ActiveLocation = 2
 	inst := src.AddNew(freightTestStackableID, 5, 0x20000001)
 
-	result, _, freed := src.Transfer(inst.ObjectID, 5, dst, 0)
+	result, _, freed, _ := src.Transfer(inst.ObjectID, 5, dst, nil)
 	if result == nil {
 		t.Fatalf("Transfer() returned nil")
 	}

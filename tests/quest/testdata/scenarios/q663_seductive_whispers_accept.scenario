@@ -1,0 +1,41 @@
+# Seductive Whispers (Q663), level 50: the character accepts, is told to bring the beads and relogs. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_accept.golden
+character Gambler 50
+script quest.Q663_SeductiveWhispers
+item 8766 57
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-01a.htm
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-01a.htm
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-03.htm
+  S QuestList 663:0x80000001
+  S ExShowQuestMark quest=663
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-03.htm
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | <state> | STARTED
+  Q upsert Q663_SeductiveWhispers | <cond> | 1
+  Q upsert Q663_SeductiveWhispers | state | 1
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1
+  state Q663_SeductiveWhispers STARTED

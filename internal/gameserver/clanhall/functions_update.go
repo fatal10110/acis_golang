@@ -2,6 +2,7 @@ package clanhall
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
@@ -29,7 +30,12 @@ func (f *Functions) Get(hallID int32, funcType int) (Function, bool) {
 // rents is removed when level and lease are both 0, and otherwise takes
 // the new level and lease and starts a new term now, as long as its own
 // first one, its next fee due when it ends. Each change is stored.
-func (f *Functions) Update(hallID int32, funcType, level, lease int, rate int64) {
+//
+// paid, nil for nothing paid, lands the renter's adena row as the payment
+// left it. It runs ahead of the function's row, in the same lane job, and a
+// failed write of it stores no row, so no crash leaves the renter both the
+// adena and the term it paid for (#3712).
+func (f *Functions) Update(hallID int32, funcType, level, lease int, rate int64, paid Landing) {
 	if f == nil {
 		return
 	}
@@ -47,7 +53,7 @@ func (f *Functions) Update(hallID int32, funcType, level, lease int, rate int64)
 		}
 		fn = &rented{Function: Function{Type: funcType, Level: level, Lease: lease, Rate: rate, EndTime: nowMs + rate}}
 		f.hallLocked(hallID)[funcType] = fn
-		f.saveLocked(hallID, fn)
+		f.saveLocked(hallID, fn, paid)
 		if owned {
 			f.scheduleLocked(hallID, fn, fn.EndTime-nowMs)
 		}
@@ -55,13 +61,16 @@ func (f *Functions) Update(hallID int32, funcType, level, lease int, rate int64)
 		f.stopLocked(fn)
 		delete(f.byHall[hallID], funcType)
 		f.write("remove clan hall function", hallID, func(ctx context.Context, st Store) error {
+			if err := land(ctx, paid); err != nil {
+				return fmt.Errorf("write the fee paid: %w", err)
+			}
 			return st.DeleteFunction(ctx, hallID, funcType)
 		})
 	default:
 		f.stopLocked(fn)
 		fn.Lease, fn.Level = lease, level
 		fn.EndTime = nowMs + fn.Rate
-		f.saveLocked(hallID, fn)
+		f.saveLocked(hallID, fn, paid)
 		f.scheduleLocked(hallID, fn, fn.Rate)
 	}
 }
@@ -86,10 +95,14 @@ func (f *Functions) stopLocked(fn *rented) {
 	fn.gen++
 }
 
-// saveLocked stores fn as it is now.
-func (f *Functions) saveLocked(hallID int32, fn *rented) {
+// saveLocked stores fn as it is now, once paid, the write landing what was
+// paid for it (nil for none), has landed.
+func (f *Functions) saveLocked(hallID int32, fn *rented, paid Landing) {
 	saved := fn.Function
 	f.write("store clan hall function", hallID, func(ctx context.Context, st Store) error {
+		if err := land(ctx, paid); err != nil {
+			return fmt.Errorf("write the fee paid: %w", err)
+		}
 		return st.SaveFunction(ctx, hallID, saved)
 	})
 }

@@ -15,7 +15,7 @@ rotation generation and `%u` is always `0`. With the shipped file and `-log-root
 | error | `net.sf.l2j.commons.logging.handler.ErrorLogHandler` | `log/gameserver/log/error/error_0.txt` | process events at or above `ErrorLogHandler.level` that carry an `error` field. This is the Go form of Java's `ErrorFilter`, which keeps records with a throwable. |
 | chat | `...ChatLogHandler` | `log/gameserver/log/chat/chat_0.txt` | chat lines, only when `server.properties` `LogChat = True` |
 | gmaudit | `...GMAuditLogHandler` | `log/gameserver/log/gmaudit/gmaudit_0.txt` | admin commands, only when `server.properties` `GMAudit = True` |
-| item | `...ItemLogHandler` | `log/gameserver/log/item/item_0.txt` | opened but not written yet: `LogItems` is not ported (#3466) |
+| item | `...ItemLogHandler` | `log/gameserver/log/item/item_0.txt` | one record per add, change or removal of a non-stackable item in a player's or pet's inventory, only when `server.properties` `LogItems = True` |
 
 Process events at or above `java.util.logging.ConsoleHandler.level` also go to stderr. The
 loginserver opens the same five files under its own `-log-root`. Only its console and error files
@@ -72,6 +72,13 @@ The Go logger reads only the level, pattern, limit, count and append keys above.
 is fixed and they change nothing. Any other key is ignored. At boot the server logs it once as a
 `warn` event with message `logging.properties keys not supported; ignored` and a `keys` array.
 The shipped file produces no such event.
+
+An item record's `msg` is the change, `ADDED`, `MODIFIED` or `REMOVED`, and it carries `owner`
+(the character's name; for a pet's inventory, the name of the character it was called out for),
+`owner_id` (the character's object id, or the pet collar's), `item` (the template name),
+`object_id`, `item_id`, `location` (the `items.loc` spelling after the change, `VOID` for a drop),
+`count` and `enchant`. Equipping or unequipping is `MODIFIED`, and so is each worn item put back on
+the paperdoll at login. Stackable items are never recorded.
 
 ## Metrics Endpoint
 

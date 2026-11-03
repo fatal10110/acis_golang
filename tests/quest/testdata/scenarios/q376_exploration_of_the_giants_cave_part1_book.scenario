@@ -1,0 +1,61 @@
+# Exploration of the Giants' Cave, Part 1 (Q376), a character holding the mysterious book takes it to Cliff, who reads it. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q376_exploration_of_the_giants_cave_part1_book.golden
+character Exploration 51
+quest Q376_ExplorationOfTheGiantsCave_Part1 <cond>=1 <state>=STARTED
+hold 5890 1
+script quest.Q376_ExplorationOfTheGiantsCave_Part1
+item 5890 5891 5892 5944 5937 5938 5939 5940 5941 5932 5933 5934 5935 5936 5922 5923 5924 5925 5926 5927 5928 5929 5930 5931 5346 5354 5332 5334 5416 5418 5424 5340
+page default/31147.htm
+page warehouse/30182.htm
+page script/quest/Q376_ExplorationOfTheGiantsCave_Part1/
+npc sobling 31147 Folk 10 0 0
+npc cliff 30182 WarehouseKeeper 20 0 0
+npc m47 20647 Monster 40 0 0
+npc m48 20648 Monster 50 0 0
+npc m49 20649 Monster 60 0 0
+npc m50 20650 Monster 70 0 0
+
+action sobling
+action sobling
+  S ActionFailed
+  S NpcHtmlMessage obj=sobling item=0 page=default/31147.htm
+  S ActionFailed
+bypass npc_{sobling}_Quest
+  S QuestList 376:0x80000003
+  S ExShowQuestMark quest=376
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sobling item=0 page=script/quest/Q376_ExplorationOfTheGiantsCave_Part1/31147-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q376_ExplorationOfTheGiantsCave_Part1 | <cond> | 2
+  rows Q376_ExplorationOfTheGiantsCave_Part1 <cond>=2 <state>=STARTED
+action cliff
+action cliff
+  S ActionFailed
+  S NpcHtmlMessage obj=cliff item=0 page=warehouse/30182.htm
+  S ActionFailed
+bypass npc_{cliff}_Quest
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q376_ExplorationOfTheGiantsCave_Part1/30182-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q376_ExplorationOfTheGiantsCave_Part1 30182-02.htm
+  S QuestList 376:0x80000007
+  S ExShowQuestMark quest=376
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:5890
+  S SystemMessage id=54 3:5892
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q376_ExplorationOfTheGiantsCave_Part1/30182-02.htm
+  S ActionFailed
+  Q upsert Q376_ExplorationOfTheGiantsCave_Part1 | <cond> | 3
+  rows Q376_ExplorationOfTheGiantsCave_Part1 <cond>=3 <state>=STARTED
+  items 5890=0 5892=1
+action cliff
+  S ActionFailed
+  S NpcHtmlMessage obj=cliff item=0 page=warehouse/30182.htm
+  S ActionFailed
+bypass npc_{cliff}_Quest
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q376_ExplorationOfTheGiantsCave_Part1/30182-03.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q376_ExplorationOfTheGiantsCave_Part1 <cond>=3 <state>=STARTED

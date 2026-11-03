@@ -1,0 +1,19 @@
+# Song of the Hunter (Q335), level 34: level 34: Grey refuses the character and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_low_level.golden
+character Hunter 34
+script quest.Q335_SongOfTheHunter
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q335_SongOfTheHunter CREATED
+  rows Q335_SongOfTheHunter -

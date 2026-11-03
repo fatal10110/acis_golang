@@ -73,6 +73,7 @@ func castleColumns(t *testing.T, db *sql.DB, id int) [5]int64 {
 // rate in force; Dion Castle, free, loses its treasury and has both rates
 // back at its default. Both rows are stored.
 func TestCastleTaxRefreshRunsDaily(t *testing.T) {
+	t.Parallel()
 	datapack.Require(t)
 	castles, err := gamexml.LoadCastles(datapack.Path(t, "data", "xml", "castles.xml"))
 	if err != nil {
@@ -123,6 +124,7 @@ func TestCastleTaxRefreshRunsDaily(t *testing.T) {
 // period, and the festival scores too, except in the seal validation
 // period.
 func TestSevenSignsUpdateRunsHourly(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name          string
 		period        sevensigns.Period

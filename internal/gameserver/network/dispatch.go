@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -33,19 +33,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
@@ -67,10 +64,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
-	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/shutdown"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -109,8 +107,6 @@ type hennaStore interface {
 	Delete(ctx context.Context, ownerID int32, classIndex, slot int) error
 }
 
-// recipeBookStore reads and writes the character_recipebook rows of one
-// player's recipe book.
 // subclassStore is the character_subclasses persistence a class change
 // writes. Satisfied by *sql.SubclassStore.
 type subclassStore interface {
@@ -118,18 +114,12 @@ type subclassStore interface {
 	Delete(ctx context.Context, charID int32, index int) error
 }
 
+// recipeBookStore reads and writes the character_recipebook rows of one
+// player's recipe book.
 type recipeBookStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]int, error)
 	Insert(ctx context.Context, ownerID int32, recipeID int) error
 	Delete(ctx context.Context, ownerID int32, recipeID int) error
-}
-
-// petStore is the narrow persistence surface a pet-collar restore needs:
-// the saved row for a collar's pet, if any (data/sql.PetStore.Get).
-type petStore interface {
-	Get(ctx context.Context, itemObjectID int32) (petmodel.State, bool, error)
-	Save(ctx context.Context, itemObjectID int32, state petmodel.State) error
-	SaveFed(ctx context.Context, itemObjectID int32, fed int) error
 }
 
 // AttackStanceTracker owns combat-stance membership. It is exported so the
@@ -147,6 +137,8 @@ type idAllocator interface {
 type groundItemDropper interface {
 	Drop(*grounditem.Item, task.DropOptions)
 	Remove(*grounditem.Item)
+	SetKept(func(itemID int32, x, y, z int) bool)
+	Each(func(*grounditem.Item))
 }
 
 const (
@@ -168,6 +160,10 @@ type PlayerConfig struct {
 	// StorageSlots is the base warehouse, freight, private store and recipe
 	// book size.
 	StorageSlots player.StorageSlots
+	// Regen scales the base HP, MP and CP regeneration of every creature
+	// that is not raid related: the characters, their summons, the NPCs
+	// and the doors.
+	Regen creature.RegenMultipliers
 	// Freight holds the freight service settings; nil uses the shipped
 	// defaults.
 	Freight *FreightConfig
@@ -241,6 +237,9 @@ type PlayerConfig struct {
 	// GMHeroAura is players.properties GMHeroAura: a game master shows the
 	// hero aura.
 	GMHeroAura bool
+	// DefaultAccessLevel is players.properties DefaultAccessLevel: the access
+	// level every new character is granted.
+	DefaultAccessLevel int
 	// CraftingDisabled is players.properties CraftingEnabled inverted, so
 	// the zero value keeps crafting on as the shipped config does.
 	CraftingDisabled bool
@@ -250,9 +249,24 @@ type PlayerConfig struct {
 	// MultisellDelay is the reuse delay between two multisell exchanges on
 	// one client session.
 	MultisellDelay time.Duration
+	// ManorDelay is the reuse delay between two seed purchases on one
+	// client session.
+	ManorDelay time.Duration
 	// RollDiceDelay is the reuse delay between two dice throws on one
 	// client session.
 	RollDiceDelay time.Duration
+	// SocialDelay is the reuse delay between two emote requests on one
+	// client session.
+	SocialDelay time.Duration
+	// DropItemDelay is the reuse delay between two item drops on one
+	// client session.
+	DropItemDelay time.Duration
+	// WarehouseDisabled is server.properties AllowWarehouse inverted: when
+	// set, a warehouse deposit request is ignored without being read.
+	WarehouseDisabled bool
+	// FakeDeathUpProtection is how long, after a Fake Death ends, hostile
+	// NPCs do not aggro the player.
+	FakeDeathUpProtection time.Duration
 	// SubclassDelay is the reuse delay between two subclass add, change or
 	// replace actions of one player.
 	SubclassDelay time.Duration
@@ -263,9 +277,32 @@ type PlayerConfig struct {
 	// inverted, so the zero value takes every ingredient as the shipped
 	// config does.
 	KeepMaintainedIngredients bool
-	// PartyRange is how near the loot a party member must be to share it,
-	// body to body; -1 is unlimited. It is the kill reward's party range.
-	PartyRange int
+	// KillRewards, when set, are the kill reward settings to put in force
+	// whole with the rest: the rates, the auto-loot, the party range party
+	// loot reads too, and the multiple item drop rule every item creation
+	// reads. Nil leaves the ones in force as they are.
+	KillRewards *manager.KillRewardSettings
+	// Events, when set, are the event settings the event quests read, put
+	// in force whole with the rest. Nil leaves the ones in force as they
+	// are.
+	Events *script.EventRules
+	// QuestRates, when set, are the quest drop and reward rates the
+	// scripts read, put in force whole with the rest. Nil leaves the ones
+	// in force as they are.
+	QuestRates *script.Rates
+	// PvPFlagTimes, when set, are the PvP flag durations //reload config
+	// puts in force whole: a flag started afterwards lasts the new
+	// duration, one already running keeps its deadline. Nil leaves the ones
+	// in force as they are.
+	PvPFlagTimes *task.PvPFlagTimes
+	// NPCLimits, when set, are the NPC base buff-slot count and drift range
+	// //reload config puts in force whole for every NPC, those already in
+	// the world included. Nil leaves the ones in force as they are.
+	NPCLimits *npc.Limits
+	// ShowNPCLevel is npcs.properties ShowNpcLevel: when true, a monster's
+	// NpcInfo title starts with its level and, when it is aggressive, a
+	// star. An NpcInfo already sent keeps the title it had.
+	ShowNPCLevel bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -273,18 +310,12 @@ type PlayerConfig struct {
 // against the login server, character list/create/delete/restore, and
 // character select through to world entry.
 type GameClientLink struct {
-	validator *SessionValidator
 	// clients is the process-owned account-to-connection registry: a second
 	// AuthLogin for an account already claimed evicts the prior connection
 	// instead of being rejected.
 	clients       *ClientRegistry
 	loginLink     func() *LoginLink
 	roster        *manager.Roster
-	items         itemStore
-	shortcuts     shortcutStore
-	hennas        hennaStore
-	hennaTable    *henna.Table
-	recipeBooks   recipeBookStore
 	subclasses    subclassStore
 	craft         *craft.Service
 	merchant      *merchant.Service
@@ -303,60 +334,60 @@ type GameClientLink struct {
 	cursed        *cursedweapon.Manager // the cursed weapons' lifecycle; nil when disabled
 	world         *world.State
 	npcs          *npc.Table
-	summonItems   *item.SummonItemTable
 	doors         WorldDoors
-	petStore      petStore
 	geo           move.Geo
 	zones         *zone.Index
 	ids           idAllocator
-	groundItems   groundItemDropper
-	attackStance  AttackStanceTracker
-	ai            AIRegistry
-	pvpFlags      *task.PvPFlags
-	// decay removes a dead summon's corpse at its deadline; nil leaves
-	// summon corpses in the world.
-	decay       *task.Decay
-	effects     effect.Env
-	positions   *task.PositionUpdates
-	playerClock *task.PlayerClock
-	gameClock   *task.GameClock
-	sevenSigns  *sevensigns.State
-	festival    *festival.Manager
-	olympiad    *olympiad.Olympiad
-	heroes      *hero.Manager
-	raidPoints  *raidpoint.Points
-	water       *task.Water
-	shadowItems *task.ShadowItems
-	autosave    *task.Autosave
-	// inventoryUpdates batches InventoryUpdate packets for inventory
-	// changes the server makes on its own, outside a client request.
-	inventoryUpdates *task.InventoryUpdates
-	// itemInstances lazily persists item rows whose live state changed,
-	// so a mutation made outside a client request still reaches the
-	// items table.
-	itemInstances *task.ItemInstances
+	effects       effect.Env
+	positions     *task.PositionUpdates
+	gameClock     *task.GameClock
+	shutdown      *shutdown.Countdown
+	loginStatus   *LoginStatus
+	sevenSigns    *sevensigns.State
+	festival      *festival.Manager
+	olympiad      *olympiad.Olympiad
+	heroes        *hero.Manager
+	raidPoints    *raidpoint.Points
+	water         *task.Water
+	shadowItems   *task.ShadowItems
 	// persist runs this link's database writes for detached players, pets
 	// and containers on per-owner lanes.
 	persist *persist.Worker
 	// itemWrites orders the writes of one items row against each other, which
 	// the lanes alone cannot: a row outlives its owner's lane (see
 	// applyPersistActions).
-	itemWrites       *persist.Order
-	persistWait      time.Duration
-	queues           Queues
-	queuedPets       queuedPets
-	selections       selectingOwners
-	restarts         *restart.Table
-	observers        *observer.Table
-	clanHallData     *hallmodel.Table
-	castleData       *castledata.Table
-	levels           *player.LevelTable
-	admin            *admin.Data
-	playerConfig     PlayerConfig
-	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
+	itemWrites   *persist.Order
+	persistWait  time.Duration
+	queues       Queues
+	restarts     *restart.Table
+	observers    *observer.Table
+	clanHallData *hallmodel.Table
+	castleData   *castledata.Table
+	levels       *player.LevelTable
+	admin        *admin.Data
+	// playerSettings holds the PlayerConfig in force; //reload config
+	// swaps it whole, so each read sees one config or the other.
+	playerSettings atomic.Pointer[PlayerConfig]
+	// playerRules holds the rules every character and summon reads, from
+	// the PlayerConfig in force; //reload config sets them with it.
+	playerRules *player.RuleBook
+	// killRewards holds the kill reward settings in force, shared with the
+	// kill rewards and the scripts; //reload config sets them whole.
+	killRewards *manager.KillRewardBook
+	// events holds the event settings in force, shared with the scripts;
+	// //reload config sets them whole.
+	events *script.EventBook
+	// questRates holds the quest rates in force, shared with the scripts;
+	// //reload config sets them whole.
+	questRates *script.RateBook
+	// playerConfigMu serializes the //reload config puts, so the settings
+	// and the rules and switches built from them come from one reload.
+	playerConfigMu   sync.Mutex
 	disableRaidCurse bool
+	showNPCCrest     bool
+	showSummonCrest  bool
+	wyvern           npc.WyvernRules
 	inventory        *invops.Service
-	petItems         *petitem.Service
 	trades           *tradebook.Book
 	parties          *partyRegistry
 	rooms            *roomRegistry
@@ -367,29 +398,21 @@ type GameClientLink struct {
 	castleManor      *castlemanor.Manager
 	sieges           *siege.Engine
 	clanWarehouses   clanWarehouseBook
-	enchantState     *enchantflow.State
-	enchant          *enchantflow.Service
-	targets          *skilltarget.Registry
-	skillHandlers    *handlerskill.Registry
-	chance           *actorcast.ChanceProcs
+	flow             characterFlow
+	belongings       belongings
+	enchanting       enchanting
+	summoning        summoning
+	combat           combat
 	log              zerolog.Logger
-
-	// newCipherKey supplies each connection's XOR cipher key; overridden in
-	// tests for a deterministic handshake.
-	newCipherKey func() ([]byte, error)
-	noCipher     bool
 
 	// now supplies wall time for packet accounting; nil falls back to
 	// time.Now at the call site. Overridden in tests for deterministic
 	// flood windows.
 	now func() time.Time
 
-	// enchantRoll supplies enchant dice rolls; overridden in tests.
-	enchantRoll func() float64
-
-	// skillEnchantRoll supplies skill-enchant dice rolls in [0,99];
-	// overridden in tests for a deterministic outcome.
-	skillEnchantRoll func() int
+	// olympiadDraw is the random source of the Olympiad's draws and of the
+	// spot its competitors return to; nil uses the random source.
+	olympiadDraw func(n int) int
 
 	// fishing is the fish table and dice a cast line draws from; see
 	// fishing.go.
@@ -435,6 +458,9 @@ type GameClientLink struct {
 	// gmAudit records every admin command run; the zero logger records
 	// nothing.
 	gmAudit zerolog.Logger
+	// itemLog records every change to a non-stackable item a player or pet
+	// carries; the zero logger records nothing.
+	itemLog zerolog.Logger
 	// chat is the chat settings: log, bot filter and reuse delays.
 	chat ChatConfig
 	// announcements are the server announcements: read at login, repeated
@@ -461,6 +487,9 @@ type GameClientLink struct {
 	// derby is the monster race track the race managers answer for; nil
 	// runs no race.
 	derby *derby.Track
+	// boats is the scheduled boat fleet //reload boat rebuilds; nil has
+	// no reload.
+	boats *boat.Fleet
 	// fences are the fences the admin fence commands place and remove.
 	fences *fence.Manager
 	// npcSpawns is the live NPC population the admin spawn commands use;
@@ -477,6 +506,17 @@ type GameClientLink struct {
 	// reloads re-read the data tables //reload and //respawnall name; see
 	// admin_reload.go.
 	reloads DataReloads
+	// bossZones keeps who may enter the boss zones across a zone reload;
+	// nil keeps nobody.
+	bossZones BossZoneStore
+	// zoneReloadMu runs one //reload zone at a time.
+	zoneReloadMu sync.Mutex
+	// stadiums are the stadium zones of the zone set the link holds, in
+	// stadium order; see stadiumZones.
+	stadiums atomic.Pointer[stadiumZoneSet]
+	// zonePulses runs the effect and damage zones' pulses, those of every
+	// zone set the link wired.
+	zonePulses *sim.Queue
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -493,16 +533,23 @@ type Queues interface {
 
 // GameClientLinkConfig contains the collaborators required by GameClientLink.
 type GameClientLinkConfig struct {
-	Validator *SessionValidator
-	// NoCipher keeps game packets cleartext after VersionCheck.
-	NoCipher    bool
-	LoginLink   func() *LoginLink
-	Roster      *manager.Roster
-	Items       itemStore
-	Shortcuts   shortcutStore
-	Hennas      hennaStore
-	HennaTable  *henna.Table
-	RecipeBooks recipeBookStore
+	// Flow is what the character flow, from AuthLogin to detach, runs on.
+	Flow CharacterFlowConfig
+	// Belongings is what characters own and carry: item, shortcut, henna
+	// and recipe book rows, ground items and inventory update tasks.
+	Belongings BelongingsConfig
+	// Combat is what attacks, casts and PvP run on: attack stances, AI
+	// registrations, PvP flags and the spiritshot heal corrections.
+	Combat CombatConfig
+	// Summoning is what pets and servitors are called out with: summon
+	// items, pet rows and settings, their dice and feeding pace, and the
+	// corpse decay.
+	Summoning SummoningConfig
+	// Enchanting is what item enchants roll and grant: the enchant and
+	// skill-enchant dice and the armor sets.
+	Enchanting EnchantingConfig
+	LoginLink  func() *LoginLink
+	Roster     *manager.Roster
 	// Subclasses writes the subclass rows a village master's subclass
 	// commands add and replace.
 	Subclasses subclassStore
@@ -520,31 +567,19 @@ type GameClientLinkConfig struct {
 	Skills        *skillstate.Persistence
 	Spellbooks    modelskill.BookPolicy
 	SkillTrees    *modelskill.Trees
-	// HealSps holds the spiritshot heal corrections; nil gives a charged
-	// heal no correction term.
-	HealSps       *modelskill.HealSpsTable
 	CursedWeapons *entity.CursedWeaponTable
 	CursedRuntime *cursedweapon.Manager // the cursed weapons' lifecycle; nil when disabled
 	World         *world.State
 	NPCs          *npc.Table
-	SummonItems   *item.SummonItemTable
 	Doors         WorldDoors
-	PetStore      petStore
 	Geo           move.Geo
 	Zones         *zone.Index
 	IDs           idAllocator
-	GroundItems   groundItemDropper
-	AttackStance  AttackStanceTracker
-	AI            AIRegistry
-	PvPFlags      *task.PvPFlags
 	// Fences are the fences //spawnfence places; without them the link
 	// places fences on no geodata.
-	Fences *fence.Manager
-	// Decay removes a dead summon's corpse once its decay delay has passed.
-	Decay       *task.Decay
-	Effects     effect.Env // Activity required: without it no effect expires
-	Positions   *task.PositionUpdates
-	PlayerClock *task.PlayerClock
+	Fences    *fence.Manager
+	Effects   effect.Env // Activity required: without it no effect expires
+	Positions *task.PositionUpdates
 	// GameClock is the server's in-game clock; CharSelected reports its
 	// current minute of day. Nil is tolerated (tests) and reports 0.
 	GameClock *task.GameClock
@@ -561,12 +596,6 @@ type GameClientLinkConfig struct {
 	SignsPriest *signspriest.Config
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
-	Autosave    *task.Autosave
-	// InventoryUpdates batches InventoryUpdate packets for inventory
-	// changes the server makes on its own, outside a client request.
-	InventoryUpdates *task.InventoryUpdates
-	// ItemInstances lazily persists item rows whose live state changed.
-	ItemInstances *task.ItemInstances
 	// Persist runs detach, pet and container saves; nil writes inline.
 	Persist *persist.Worker
 	// ItemWrites orders one items row's writes; the item persistence task
@@ -596,10 +625,21 @@ type GameClientLinkConfig struct {
 	Levels       *player.LevelTable
 	Admin        *admin.Data
 	PlayerConfig PlayerConfig
-	PetConfig    petmodel.Config
 	// DisableRaidCurse is npcs.properties DisableRaidCurse: when true, raid
 	// petrification and anti-strider curses never apply.
 	DisableRaidCurse bool
+	// ShowNPCCrest is npcs.properties ShowNpcCrest: when true, an NPC's
+	// NpcInfo shows the clan and alliance crests of the clan owning the
+	// residence it serves.
+	ShowNPCCrest bool
+	// ShowSummonCrest is npcs.properties ShowSummonCrest: when true, a
+	// summon's NpcInfo shows its owner's clan and alliance crests, and its
+	// owner is sent that NpcInfo too when the summon spawns or lands from a
+	// teleport.
+	ShowSummonCrest bool
+	// Wyvern is the npcs.properties wyvern ride settings; nil reads their
+	// defaults.
+	Wyvern *npc.WyvernRules
 	// Teleports and InstantTeleports are the destinations civilian NPCs
 	// offer; nil offers none. FreeTeleport is npcs.properties FreeTeleport:
 	// when true, no destination is charged for. TeleportClock is the local
@@ -635,16 +675,13 @@ type GameClientLinkConfig struct {
 	// Petitions holds the petitions players send the game masters; nil
 	// starts with none and refuses every new one.
 	Petitions *petition.Manager
-	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
-	// the random source. Behavior harnesses inject a deterministic roll.
-	EnchantRoll func() float64
-	// SkillEnchantRoll supplies skill-enchant dice rolls in [0,99]; nil
-	// falls back to the random source. Behavior harnesses inject a
-	// deterministic roll.
-	SkillEnchantRoll func() int
 	// CraftRoll supplies craft success rolls in [0,n); nil falls back to
 	// the random source.
 	CraftRoll func(n int) int
+	// OlympiadDraw supplies the dice of the Olympiad's draws and of the
+	// spot its competitors return to in [0,n); nil falls back to the
+	// random source.
+	OlympiadDraw func(n int) int
 	// Fish is the loaded fish table a cast line draws its fish from; nil
 	// draws none, so every line comes back empty.
 	Fish *fish.Table
@@ -660,10 +697,6 @@ type GameClientLinkConfig struct {
 	// AugmentRoll draws the uniform ints a refine rolls, both ends
 	// inclusive; nil falls back to the random source.
 	AugmentRoll augmentation.Rand
-	// ArmorSets is the loaded armor set data whose +6 skill an armor
-	// enchant grants and revokes; nil grants none. The equip-time set
-	// skills come from the skill persistence's own table.
-	ArmorSets *armorset.Table
 	// Manor is what the seed and harvester items and the harvest read; the
 	// zero value turns the manor off.
 	Manor ManorConfig
@@ -685,6 +718,10 @@ type GameClientLinkConfig struct {
 	// GMAudit records every admin command run (server.properties GMAudit);
 	// the zero logger records nothing.
 	GMAudit zerolog.Logger
+	// ItemLog records every add, change and removal of a non-stackable item
+	// in a player's or pet's inventory (server.properties LogItems); the
+	// zero logger records nothing.
+	ItemLog zerolog.Logger
 	// Chat is the chat settings of server.properties; the zero value logs
 	// nothing and rate-limits nothing.
 	Chat ChatConfig
@@ -735,9 +772,33 @@ type GameClientLinkConfig struct {
 	FishingChampionship *fishchamp.Championship
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
+	// Boats is the scheduled boat fleet //reload boat rebuilds; nil leaves
+	// that reload not ported.
+	Boats *boat.Fleet
 	// Reloads re-read the data tables //reload and //respawnall name; a
 	// nil hook leaves its table as booted.
 	Reloads DataReloads
+	// KillRewards holds the kill reward settings in force, the same book
+	// the kill rewards and the scripts read; nil gives the link its own,
+	// holding PlayerConfig.KillRewards or else the zero settings.
+	KillRewards *manager.KillRewardBook
+	// Events holds the event settings in force, the same book the scripts
+	// read; nil gives the link its own, holding PlayerConfig.Events or
+	// else the shipped settings.
+	Events *script.EventBook
+	// QuestRates holds the quest rates in force, the same book the scripts
+	// read; nil gives the link its own, holding PlayerConfig.QuestRates or
+	// else the shipped rates.
+	QuestRates *script.RateBook
+	// BossZones saves and restores who may enter the boss zones around a
+	// zone reload; nil keeps nobody's permission across one.
+	BossZones BossZoneStore
+	// Shutdown is the timed shutdown //server starts and aborts; required
+	// for //server.
+	Shutdown *shutdown.Countdown
+	// LoginStatus is the status the login server lists the server under;
+	// required for //server.
+	LoginStatus *LoginStatus
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -752,15 +813,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		return nil, errors.New("network: GameClientLinkConfig.Effects.Activity is required")
 	}
 	link := &GameClientLink{
-		validator:     cfg.Validator,
 		clients:       NewClientRegistry(),
 		loginLink:     cfg.LoginLink,
 		roster:        cfg.Roster,
-		items:         cfg.Items,
-		shortcuts:     cfg.Shortcuts,
-		hennas:        cfg.Hennas,
-		hennaTable:    cfg.HennaTable,
-		recipeBooks:   cfg.RecipeBooks,
 		subclasses:    cfg.Subclasses,
 		merchant:      cfg.Merchant,
 		templates:     cfg.Templates,
@@ -774,21 +829,15 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		cursed:        cfg.CursedRuntime,
 		world:         cfg.World,
 		npcs:          cfg.NPCs,
-		summonItems:   cfg.SummonItems,
 		doors:         cfg.Doors,
-		petStore:      cfg.PetStore,
 		geo:           cfg.Geo,
 		zones:         cfg.Zones,
 		ids:           cfg.IDs,
-		groundItems:   cfg.GroundItems,
-		attackStance:  cfg.AttackStance,
-		ai:            cfg.AI,
-		pvpFlags:      cfg.PvPFlags,
-		decay:         cfg.Decay,
 		effects:       cfg.Effects,
 		positions:     cfg.Positions,
-		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
+		shutdown:      cfg.Shutdown,
+		loginStatus:   cfg.LoginStatus,
 		sevenSigns:    cfg.SevenSigns,
 		festival:      cfg.Festival,
 		olympiad:      cfg.Olympiad,
@@ -796,10 +845,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		raidPoints:    cfg.RaidPoints,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
-		autosave:      cfg.Autosave,
 
-		inventoryUpdates: cfg.InventoryUpdates,
-		itemInstances:    cfg.ItemInstances,
 		persist:          cfg.Persist,
 		itemWrites:       cfg.ItemWrites,
 		persistWait:      cfg.PersistWait,
@@ -811,15 +857,14 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,
+		itemLog:          cfg.ItemLog,
 		chat:             cfg.Chat,
-		playerConfig:     cfg.PlayerConfig,
-		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,
-		enchantRoll:      cfg.EnchantRoll,
-		skillEnchantRoll: cfg.SkillEnchantRoll,
+		showNPCCrest:     cfg.ShowNPCCrest,
+		showSummonCrest:  cfg.ShowSummonCrest,
+		wyvern:           wyvernRules(cfg.Wyvern),
 		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},
 		inventory:        invops.NewService(cfg.IDs),
-		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(cfg.TradeClock),
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
 		rooms:            partymatch.NewRegistry[*livePlayer](),
@@ -830,41 +875,49 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		characterEdits:   cfg.CharacterEdits,
 		punishments:      cfg.Punishments,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
-		enchantState:     enchantflow.NewState(),
-		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
-		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{
-			Templates: cfg.NPCs,
-			IDs:       cfg.IDs,
-			World:     cfg.World,
-			NewSink:   EffectPointSinks(cfg.World),
-			Zones:     cfg.Zones,
-			Effects:   cfg.Effects,
-			Queues:    cfg.Queues,
-			Log:       cfg.Log,
-
-			ManorCropRate: cfg.Manor.CropRate,
-		}),
-		log:          cfg.Log,
-		now:          cfg.Now,
-		newCipherKey: randomCipherKey,
-		noCipher:     cfg.NoCipher,
+		flow:             newCharacterFlow(cfg.Flow),
+		belongings:       newBelongings(cfg.Belongings),
+		enchanting:       newEnchanting(cfg),
+		summoning:        newSummoning(cfg),
+		combat:           newCombat(cfg),
+		log:              cfg.Log,
+		now:              cfg.Now,
+	}
+	playerConfig := cfg.PlayerConfig
+	link.playerSettings.Store(&playerConfig)
+	link.playerRules = player.NewRuleBook(link.characterRules(&playerConfig))
+	link.killRewards = cfg.KillRewards
+	if link.killRewards == nil {
+		link.killRewards = manager.NewKillRewardBook(manager.KillRewardSettings{})
+	}
+	if playerConfig.KillRewards != nil {
+		link.killRewards.Set(*playerConfig.KillRewards)
+	}
+	link.events = cfg.Events
+	if link.events == nil {
+		link.events = script.NewEventBook(script.DefaultEventRules())
+	}
+	if playerConfig.Events != nil {
+		link.events.Set(*playerConfig.Events)
+	}
+	link.questRates = cfg.QuestRates
+	if link.questRates == nil {
+		link.questRates = script.NewRateBook(script.DefaultRates())
+	}
+	if playerConfig.QuestRates != nil {
+		link.questRates.Set(*playerConfig.QuestRates)
 	}
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor
 	link.classMaster = cfg.ClassMaster
 	link.reloads = cfg.Reloads
+	link.bossZones = cfg.BossZones
 	link.recommendations = cfg.Recommendations
 	link.quests, link.scripts, link.journals = cfg.Quests, cfg.Scripts, cfg.Journals
 	link.memos = cfg.Memos
-	// Built here, not lazily: every client goroutine shares this link.
-	enchantCfg := enchantflow.DefaultConfig()
-	if cfg.PlayerConfig.Enchant != nil {
-		enchantCfg = *cfg.PlayerConfig.Enchant
-	}
-	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
-	link.enchant.SetArmorSets(cfg.ArmorSets)
-	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
+	link.symbols = symbolmaker.NewService(cfg.Belongings.HennaTable, link.nextObjectID)
 	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
+	link.gatekeeper.SetCastleSieges(link.castleBesieged)
 	if cfg.SevenSigns != nil {
 		link.gatekeeper.SetGnosisFollower(cfg.SevenSigns.GnosisFollower)
 		signsCfg := signspriest.DefaultConfig()
@@ -884,6 +937,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.schemeBuffer = cfg.SchemeBuffer
 	link.derby = cfg.Derby
+	link.boats = cfg.Boats
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
 	}
@@ -922,38 +976,25 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		clans := link.clans
 		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })
 	}
-	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
-	if link.zones != nil {
-		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {
-			boss.Eject = func(a zone.Actor) { link.ejectBossPlayer(boss, a) }
-		}
-	}
-	link.wireZoneOccupantHooks()
-	link.wireScriptZones()
-	link.wireClanHallZones()
-	link.wireSiegeZones()
-	link.wireZonePulses()
+	link.combat.skillHandlers.Register(takeCastleHandler{l: link})
+	link.combat.skillHandlers.Register(siegeFlagHandler{l: link})
+	link.combat.skillHandlers.Register(handlerskill.NewStriderSiegeAssault(link.siegeAssaultCheck))
+	link.combat.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.combat.targets, Skills: link.combat.skillHandlers, Deliver: link.deliverChanceCast}
+	link.wireZones(link.zones)
+	link.wireCastleTickets()
+	link.olympiadDraw = cfg.OlympiadDraw
+	link.bindOlympiadStadiums(cfg.OlympiadDraw)
 	return link, nil
 }
 
-// newPet builds a pet with the shared effect, config and skill wiring. A live
-// pet inventory must be constructed with
-// itemcontainer.NewPetInventoryWithDelivery (delivery and persistence) before
-// calling this method; NewPetInventory has neither.
-func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
-	cfg.Effects = l.effects
-	cfg.Config = &l.petConfig
-	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
-	cfg.RespawnRestoreHP = l.playerConfig.RespawnRestoreHP
-	if cfg.SkillDefs == nil {
-		cfg.SkillDefs = l.skills
+// playerConfig is the PlayerConfig in force. A caller reading several of
+// its settings for one action takes it once, so a reload between two reads
+// cannot mix the old settings with the new.
+func (l *GameClientLink) playerConfig() *PlayerConfig {
+	if settings := l.playerSettings.Load(); settings != nil {
+		return settings
 	}
-	pet, err := summon.NewPet(cfg)
-	if err != nil {
-		return nil, err
-	}
-	pet.SetRaidCursesDisabled(l.disableRaidCurse)
-	return pet, nil
+	return &PlayerConfig{}
 }
 
 // nextObjectID allocates a new world object id.
@@ -962,13 +1003,6 @@ func (l *GameClientLink) nextObjectID() (int32, error) {
 		return 0, errors.New("network: no object id allocator")
 	}
 	return l.ids.NextID()
-}
-
-func (l *GameClientLink) rollEnchantSkill() int {
-	if l.skillEnchantRoll != nil {
-		return l.skillEnchantRoll()
-	}
-	return rnd.Get(100)
 }
 
 func randomCipherKey() ([]byte, error) {

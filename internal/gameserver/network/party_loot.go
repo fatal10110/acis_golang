@@ -10,19 +10,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 )
 
-// inPartyLootRange reports whether m is within party range of origin, body
-// to body in 3D.
-func (l *GameClientLink) inPartyLootRange(origin party.LootOrigin, m *livePlayer) bool {
-	return party.InRange(l.playerConfig.PartyRange, origin, m)
-}
-
 // partyLootEligible accepts a member that may take one itemID from origin
 // under a random or by-turn loot rule: alive, with room for it, and within
-// party range of origin.
-func (l *GameClientLink) partyLootEligible(itemID int32, origin party.LootOrigin) func(*livePlayer) bool {
+// partyRange of origin, body to body in 3D.
+func partyLootEligible(partyRange int, itemID int32, origin party.LootOrigin) func(*livePlayer) bool {
 	return func(m *livePlayer) bool {
 		inv := m.Inventory()
-		return !m.Dead() && inv != nil && inv.ValidateCapacityByItemID(itemID, 1) && l.inPartyLootRange(origin, m)
+		return !m.Dead() && inv != nil && inv.ValidateCapacityByItemID(itemID, 1) && party.InRange(partyRange, origin, m)
 	}
 }
 
@@ -39,10 +33,11 @@ func (l *GameClientLink) partyMembers(p *livePlayer) ([]*livePlayer, bool) {
 // origin whose adena is not already at its cap; the remainder of the
 // division is lost. Each one hears what it earned, even nothing.
 func (l *GameClientLink) shareAdena(members []*livePlayer, adena int, origin party.LootOrigin) {
+	partyRange := l.killRewards.PartyRange()
 	var rewarded []*livePlayer
 	for _, m := range members {
 		inv := m.Inventory()
-		if inv == nil || inv.Adena() == math.MaxInt32 || !l.inPartyLootRange(origin, m) {
+		if inv == nil || inv.Adena() == math.MaxInt32 || !party.InRange(partyRange, origin, m) {
 			continue
 		}
 		rewarded = append(rewarded, m)
@@ -56,12 +51,7 @@ func (l *GameClientLink) shareAdena(members []*livePlayer, adena int, origin par
 			m.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, 0))
 			continue
 		}
-		id, err := l.nextObjectID()
-		if err != nil {
-			l.log.Error().Err(err).Msg("allocate shared adena")
-			continue
-		}
-		m.AddRewardItem(item.AdenaID, share, id)
+		m.AddRewardItem(item.AdenaID, share, false, l.nextObjectID)
 	}
 }
 
@@ -70,7 +60,7 @@ func (l *GameClientLink) shareAdena(members []*livePlayer, adena int, origin par
 // reads as swept up.
 func sendPartyLootNotice(members []*livePlayer, looter *livePlayer, spoil bool, itemID int32, count, enchant int) {
 	broadcastFrame(func() wire.Frame {
-		return partyLootNoticeFrame(looter.Name, spoil, itemID, count, enchant)
+		return partyLootNoticeFrame(looter.CharacterName(), spoil, itemID, count, enchant)
 	}, func(send func(frameReceiver)) {
 		for _, m := range members {
 			if m != looter {
@@ -112,16 +102,15 @@ func (l *GameClientLink) lootForParty(picker *livePlayer, itemID int32, count in
 		}
 		return ok
 	}
-	looter, members, ok := l.parties.Looter(picker.ObjectID(), spoil, l.partyLootEligible(itemID, origin))
+	rewards := l.killRewards.Settings()
+	looter, members, ok := l.parties.Looter(picker.ObjectID(), spoil, partyLootEligible(rewards.PartyRange, itemID, origin))
 	if !ok {
 		return false
 	}
 	if spoil {
 		looter.AddEarnedItem(itemID, count, l.nextObjectID)
-	} else if id, err := l.nextObjectID(); err == nil {
-		looter.AddRewardItem(itemID, count, id)
 	} else {
-		l.log.Error().Err(err).Msg("allocate party loot")
+		looter.AddRewardItem(itemID, count, rewards.MultipleItemDrop, l.nextObjectID)
 	}
 	sendPartyLootNotice(members, looter, spoil, itemID, count, 0)
 	return true

@@ -1,0 +1,18 @@
+# GludioWizardStand's clan-attacked hook on Aden's standing wizard (35249), before it has
+# seen anyone: a hit on a clan mate, the knight (35235), calls it, and on a draw of 10 it
+# stays idle; on the next hit's draw of 0 (under 10) it wants to cast its DD magic, the
+# shipped Aden Flame (4114), on the character from where it stands, weight 1000000.
+character Hunter 20
+random 10 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioWizardStand
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 100 0 0 walks clan aden_siege_clan 300
+npc wizard 35249 SiegeGuard 100 150 0 walks clan aden_siege_clan 300 skill DD_MAGIC 4114 1
+
+hit knight 22
+  desires wizard -
+
+hit knight 22
+  desires wizard cast(player,4114)=1000000

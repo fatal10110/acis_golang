@@ -55,6 +55,8 @@ func (s *Service) SellableItems(inv *itemcontainer.Inventory, summonedControl fu
 // the rows before the overflowing one included. Every row is checked before
 // the first is taken, so a refused sale never takes items it does not pay
 // for. Adena paid on top of a full stack caps it at the largest int32.
+// An error once rows were taken, when no object id could be had for new
+// adena, comes back with what the sale took.
 func (s *Service) Sell(inv *itemcontainer.Inventory, rows []SaleRow, bound func(objectID int32) bool) (SaleResult, bool, error) {
 	if inv == nil {
 		return SaleResult{}, false, nil
@@ -65,8 +67,9 @@ func (s *Service) Sell(inv *itemcontainer.Inventory, rows []SaleRow, bound func(
 		price int64
 	}
 	var (
-		sales []sale
-		total int64
+		sales  []sale
+		total  int64
+		nextID func() (int32, error)
 	)
 	left := make(map[int32]int, len(rows))
 	for _, row := range rows {
@@ -98,16 +101,16 @@ func (s *Service) Sell(inv *itemcontainer.Inventory, rows []SaleRow, bound func(
 		sales = append(sales, sale{inst: inst, count: row.Count, price: pay})
 	}
 
-	adenaID := int32(0)
 	if total > 0 {
-		id, ok, err := s.nextID()
+		grant, ok, err := s.reserveGrant(inv, item.AdenaID)
 		if err != nil {
 			return SaleResult{}, false, err
 		}
 		if !ok {
 			return SaleResult{}, false, errNoIDAllocator
 		}
-		adenaID = id
+		defer grant.release()
+		nextID = grant.next
 	}
 
 	var res SaleResult
@@ -124,7 +127,9 @@ func (s *Service) Sell(inv *itemcontainer.Inventory, rows []SaleRow, bound func(
 		res.Adena += int(sl.price)
 	}
 	if res.Adena > 0 {
-		inv.AddNew(item.AdenaID, res.Adena, adenaID)
+		if _, err := inv.AddCreated(item.AdenaID, res.Adena, nextID); err != nil {
+			return res, true, err
+		}
 	}
 	return res, true, nil
 }

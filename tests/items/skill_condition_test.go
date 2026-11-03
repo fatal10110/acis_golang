@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -91,8 +90,8 @@ func bootShippedConditionItems(t *testing.T, known map[int]int) *gameservertest.
 // alone, with no ActionFailed and no cast broadcast.
 func assertConditionRejectionOnly(t *testing.T, srv *gameservertest.Server, what string) {
 	t.Helper()
-	if frame := srv.Client.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("%s sent extra opcode %#x after the condition message", what, frame[0])
+	if queued := srv.Client.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s sent extra opcode %#x after the condition message", what, queued[0][0])
 	}
 }
 

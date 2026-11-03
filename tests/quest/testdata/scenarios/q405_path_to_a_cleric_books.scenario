@@ -1,0 +1,147 @@
+# Path to a Cleric (Q405), level 19, quest started: Simplon gives three books, Vivyan his book, Praga a necklace that a ruin zombie turns into the pendant (the second kill gives nothing), and Praga gives his book for both; Zigaunt then trades the books for the second letter. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q405_path_to_a_cleric_books.golden
+character Cleric 19
+class 10
+quest Q405_PathToACleric <cond>=1 <state>=STARTED
+hold 1191 1
+script quest.Q405_PathToACleric
+item 1191 1192 1193 1194 1195 1196 1197 1198 1199 1200 1201
+page trainer/30022.htm
+page merchant/30253.htm
+page guard/30333.htm
+page trainer/30030.htm
+page default/30408.htm
+page default/30017.htm
+page script/quest/Q405_PathToACleric/
+npc zigaunt 30022 Trainer 10 0 0
+npc simplon 30253 Merchant -10 0 0
+npc praga 30333 Guard 20 0 0
+npc vivyan 30030 Trainer -20 0 0
+npc lionel 30408 Folk 30 0 0
+npc gallint 30017 Folk -30 0 0
+npc leader 20029 Monster 40 0 0
+npc zombie 20026 Monster 50 0 0
+
+action simplon
+  items 1191=1
+  rows Q405_PathToACleric <cond>=1 <state>=STARTED
+  state Q405_PathToACleric STARTED
+action simplon
+  S ActionFailed
+  S NpcHtmlMessage obj=simplon item=0 page=merchant/30253.htm
+  S ActionFailed
+bypass npc_{simplon}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:1195 6:3
+  S NpcHtmlMessage obj=simplon item=0 page=script/quest/Q405_PathToACleric/30253-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1195=3
+action simplon
+  S ActionFailed
+  S NpcHtmlMessage obj=simplon item=0 page=merchant/30253.htm
+  S ActionFailed
+bypass npc_{simplon}_Quest
+  S NpcHtmlMessage obj=simplon item=0 page=script/quest/Q405_PathToACleric/30253-02.htm
+  S ActionFailed
+  S ActionFailed
+action vivyan
+action vivyan
+  S ActionFailed
+  S NpcHtmlMessage obj=vivyan item=0 page=trainer/30030.htm
+  S ActionFailed
+bypass npc_{vivyan}_Quest
+  S SystemMessage id=54 3:1194
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q405_PathToACleric/30030-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1194=1
+action vivyan
+  S ActionFailed
+  S NpcHtmlMessage obj=vivyan item=0 page=trainer/30030.htm
+  S ActionFailed
+bypass npc_{vivyan}_Quest
+  S NpcHtmlMessage obj=vivyan item=0 page=script/quest/Q405_PathToACleric/30030-02.htm
+  S ActionFailed
+  S ActionFailed
+action praga
+action praga
+  S ActionFailed
+  S NpcHtmlMessage obj=praga item=0 page=guard/30333.htm
+  S ActionFailed
+bypass npc_{praga}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1199
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q405_PathToACleric/30333-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1199=1
+action praga
+  S ActionFailed
+  S NpcHtmlMessage obj=praga item=0 page=guard/30333.htm
+  S ActionFailed
+bypass npc_{praga}_Quest
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q405_PathToACleric/30333-02.htm
+  S ActionFailed
+  S ActionFailed
+kill leader
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1198
+  items 1198=1
+kill zombie
+  S SystemMessage id=95 1:0 1:0
+action praga
+  S ActionFailed
+  S NpcHtmlMessage obj=praga item=0 page=guard/30333.htm
+  S ActionFailed
+bypass npc_{praga}_Quest
+  S SystemMessage id=302 3:1199
+  S SystemMessage id=302 3:1198
+  S SystemMessage id=54 3:1196
+  S QuestList 405:0x80000003
+  S ExShowQuestMark quest=405
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q405_PathToACleric/30333-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q405_PathToACleric | <cond> | 2
+  items 1196=1 1198=0 1199=0
+  rows Q405_PathToACleric <cond>=2 <state>=STARTED
+action praga
+  S ActionFailed
+  S NpcHtmlMessage obj=praga item=0 page=guard/30333.htm
+  S ActionFailed
+bypass npc_{praga}_Quest
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q405_PathToACleric/30333-04.htm
+  S ActionFailed
+  S ActionFailed
+action zigaunt
+action zigaunt
+  S ActionFailed
+  S NpcHtmlMessage obj=zigaunt item=0 page=trainer/30022.htm
+  S ActionFailed
+bypass npc_{zigaunt}_Quest
+  S QuestList 405:0x80000007
+  S ExShowQuestMark quest=405
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1196
+  S SystemMessage id=302 3:1194
+  S SystemMessage id=301 3:1195 6:3
+  S SystemMessage id=302 3:1191
+  S SystemMessage id=54 3:1192
+  S NpcHtmlMessage obj=zigaunt item=0 page=script/quest/Q405_PathToACleric/30022-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q405_PathToACleric | <cond> | 3
+  items 1191=0 1192=1 1194=0 1195=0 1196=0
+  rows Q405_PathToACleric <cond>=3 <state>=STARTED
+action zigaunt
+  S ActionFailed
+  S NpcHtmlMessage obj=zigaunt item=0 page=trainer/30022.htm
+  S ActionFailed
+bypass npc_{zigaunt}_Quest
+  S NpcHtmlMessage obj=zigaunt item=0 page=script/quest/Q405_PathToACleric/30022-07.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,21 @@
+# The Leader and the Follower (Q123), seven legs: Newyear sends a level 19 character on cond 7 back for the
+# eighth. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q123_the_leader_and_the_follower_few_legs.golden
+character Pupil 19
+quest Q123_TheLeaderAndTheFollower <cond>=7 <state>=STARTED state=4 stateEx=1
+hold 8550 7
+script quest.Q123_TheLeaderAndTheFollower
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8549 8550
+page villagemaster/31961.htm
+page script/quest/Q123_TheLeaderAndTheFollower/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q123_TheLeaderAndTheFollower/31961-16.htm
+  S ActionFailed
+  S ActionFailed

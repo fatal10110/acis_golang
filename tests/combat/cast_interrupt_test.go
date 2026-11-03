@@ -41,7 +41,7 @@ func TestTargetCancelAbortsCastInsideInterruptWindow(t *testing.T) {
 	assertFrameOpcode(t, mustRead(t, c, "MagicSkillCanceled"), serverpackets.OpcodeMagicSkillCanceled, "MagicSkillCanceled")
 	assertFrameOpcode(t, mustRead(t, c, "cancel ActionFailed"), serverpackets.OpcodeActionFailed, "cancel ActionFailed")
 
-	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
-		t.Fatalf("post-cancel frame opcode %#x, want silence (aborted cast never launches)", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("post-cancel frame opcode %#x, want silence (aborted cast never launches)", queued[0][0])
 	}
 }

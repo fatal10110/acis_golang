@@ -1,0 +1,25 @@
+# Test of the Healer (Q226), the orphan girl: a level 39 Cleric at cond 1 is greeted by her with
+# the fifth of her five pages (the script roll pinned to its largest); it changes nothing.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q226_test_of_the_healer_orphan_girl.golden
+character Healer 39
+class 15
+quest Q226_TestOfTheHealer <state>=STARTED <cond>=1
+random 4
+script quest.Q226_TestOfTheHealer
+item 2810 2811 2812 2813 2814 2815 2816 2817 2818 2819 2820 57 7562
+page default/30659.htm
+page script/quest/Q226_TestOfTheHealer/
+npc orphan 30659 Folk -10 10 0
+
+action orphan
+action orphan
+  S ActionFailed
+  S NpcHtmlMessage obj=orphan item=0 page=default/30659.htm
+  S ActionFailed
+bypass npc_{orphan}_Quest
+  S NpcHtmlMessage obj=orphan item=0 page=script/quest/Q226_TestOfTheHealer/30659-05.htm
+  S ActionFailed
+  S ActionFailed
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=1

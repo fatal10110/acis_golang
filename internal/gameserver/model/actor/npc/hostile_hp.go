@@ -6,8 +6,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// MaxHP returns this NPC's calculated maximum hit points (CreatureStatus.
-// getMaxHp: calcStat(MAX_HP, template base) — not the raw template value).
+// MaxHP returns this NPC's calculated maximum hit points: the template base
+// run through the MAX_HP stat calculation, not the raw template value.
 func (h *Hostile) MaxHP() int {
 	return int(h.MaxHPValue())
 }
@@ -80,7 +80,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	h.testOverhit(attacker, float64(dmg))
 	if dmg > 0 {
 		h.RecordAttacker(attacker)
-		h.registerHit(attacker, float64(dmg), false, skill.Ref{})
+		h.registerHit(attacker, float64(dmg), skill.Ref{})
 	}
 	if h.Invul() || !creature.CanDealDamage(attacker) {
 		return false
@@ -93,5 +93,5 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if !newlyDead {
 		return false
 	}
-	return h.Die(attacker, h.rewards)
+	return h.Die(attacker, h.deathRewards())
 }

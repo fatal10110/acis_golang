@@ -1,0 +1,75 @@
+# Test of Witchcraft (Q229), Iker's count: with 59 of the fangs, charms and heartstones Iker asks for more; the
+# 60th, from a heartstone, makes him take the list and the items and give the first gem, which, with the
+# other two held and the sixth memo, moves the quest on.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q229_test_of_witchcraft_iker_count.golden
+character Witch 39
+class 11
+quest Q229_TestOfWitchcraft <state>=STARTED <cond>=2 gem456=6
+script quest.Q229_TestOfWitchcraft
+hold 3310 1
+hold 3311 20
+hold 3312 20
+hold 3313 19
+hold 3318 1
+hold 3319 1
+item 3308 3309 3310 3311 3312 3313 3314 3315 3316 3317 3318 3319 3320 3321 3322 3323 3324 3325 3326 3327 3328 3329 3330 3331 3332 3333 3334 3335 3029 3307 7562
+page trainer/30110.htm
+page script/quest/Q229_TestOfWitchcraft/
+npc iker 30110 Trainer 10 0 0
+npc golem 20565 Monster 40 0 0
+
+action iker
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+kill golem
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3313
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S SystemMessage id=302 3:3310
+  S SystemMessage id=301 3:3311 6:20
+  S SystemMessage id=301 3:3313 6:20
+  S SystemMessage id=301 3:3312 6:20
+  S SystemMessage id=54 3:3317
+  S QuestList 229:0x80000007
+  S ExShowQuestMark quest=229
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <cond> | 3
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=3 <state>=STARTED gem456=6
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-06.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=3 <state>=STARTED gem456=6

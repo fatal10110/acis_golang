@@ -1,0 +1,20 @@
+# WarriorPhysicalSpecialShotRangeDebuffAggressive (22054, its shipped skills), every draw 99, 40 away
+# from the character; a level 1 monster of 440 HP. The hook reads its HP before the hit's damage: a hit
+# of 300 finds it whole and wants no debuff. The next finds it below a third of its HP (140): it draws
+# 99 against 60 (no first debuff) and 99 twice against 50, and wants its fifth debuff, weight
+# 1000000: a self shield (4029), so aimed at itself. Its parent's two draws want no physical special.
+character Hunter 20
+random always 99
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRange
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRangeAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecialShotRange.WarriorPhysicalSpecialShotRangeDebuffAggressive
+npc golem 22054 Monster 40 0 0 skill PHYSICAL_SPECIAL 4032 6 skill SELF_RANGE_PHYSICAL_SPECIAL 4232 5 skill DEBUFF2 4037 1 skill DEBUFF3 4054 2 skill DEBUFF4 4028 2 skill DEBUFF5 4029 2
+
+hit golem 300
+  desires golem attack(player)=3750
+hit golem 1
+  desires golem attack(player)=3762.5 cast(golem,4029,move)=1000000

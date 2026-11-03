@@ -72,12 +72,21 @@ type Clan struct {
 	allyPenaltyType   int
 	charPenaltyExpiry int64
 	dissolvingExpiry  int64
+	// storedReputation is the score the clan's row holds once its queued
+	// writes land: the ladder orders the clans by it. It differs from
+	// reputation only for a clan restored below level 5 with a score in its
+	// row, until its row is next written.
+	storedReputation int
 	// destroyed marks a clan dissolved for good (Service.Destroy).
 	destroyed bool
 	board     board
 
-	members    map[int32]*Member
-	privileges map[int]int32
+	members map[int32]*Member
+	// loginGrades holds the stored power grade of an offline member whose
+	// roster entry still shows an older one; the entry takes it when the
+	// member logs in.
+	loginGrades map[int32]int
+	privileges  map[int]int32
 	// skills maps each skill the clan learnt to its level.
 	skills map[int]int
 	// subunits are the academy, royal guards and knight orders the clan
@@ -86,9 +95,11 @@ type Clan struct {
 	// wars are the clans this clan declared war on; attackers the clans
 	// that declared war on it; warPenalties when this clan may declare
 	// war again on a clan it stopped a war with, in epoch milliseconds.
-	wars         map[int32]struct{}
-	attackers    map[int32]struct{}
+	wars         warSet
+	attackers    warSet
 	warPenalties map[int32]int64
+	// headquarters is the siege headquarters the clan put up; nil for none.
+	headquarters Headquarters
 }
 
 // newClan returns a clan with empty rosters and registries.
@@ -96,11 +107,10 @@ func newClan(id int32, name string, leaderID int32) *Clan {
 	return &Clan{
 		id: id, name: name, leaderID: leaderID,
 		members:      map[int32]*Member{},
+		loginGrades:  map[int32]int{},
 		privileges:   map[int]int32{},
 		skills:       map[int]int{},
 		subunits:     map[int]*SubPledge{},
-		wars:         map[int32]struct{}{},
-		attackers:    map[int32]struct{}{},
 		warPenalties: map[int32]int64{},
 	}
 }
@@ -174,7 +184,7 @@ func (cl *Clan) infoLocked() Info {
 		DissolvingExpiry: cl.dissolvingExpiry,
 		AllyID:           cl.allyID, AllyName: cl.allyName, AllyCrestID: cl.allyCrestID,
 		AllyPenaltyExpiry: cl.allyPenaltyExpiry, AllyPenaltyType: cl.allyPenaltyType,
-		AtWar: len(cl.wars) > 0,
+		AtWar: cl.wars.len() > 0,
 	}
 	if leader, ok := cl.members[cl.leaderID]; ok {
 		info.LeaderName = leader.Name
@@ -342,7 +352,8 @@ func (cl *Clan) PowerGradeCounts() [10]int {
 }
 
 // SetOnline marks objectID online with its live values, reporting whether
-// it is a member.
+// it is a member. A stored power grade its entry did not show yet shows
+// from now on.
 func (cl *Clan) SetOnline(objectID int32, live Member) bool {
 	return cl.setPresence(objectID, live, true)
 }
@@ -362,6 +373,10 @@ func (cl *Clan) setPresence(objectID int32, live Member, online bool) bool {
 	}
 	m.Title, m.Level, m.ClassID, m.Sex, m.Race = live.Title, live.Level, live.ClassID, live.Sex, live.Race
 	m.Online = online
+	if grade, ok := cl.loginGrades[objectID]; ok && online {
+		m.PowerGrade = grade
+		delete(cl.loginGrades, objectID)
+	}
 	return true
 }
 
@@ -373,6 +388,18 @@ func (cl *Clan) RefreshLevel(objectID int32, level int) bool {
 	m, ok := cl.members[objectID]
 	if ok {
 		m.Level = level
+	}
+	return ok
+}
+
+// RefreshName records objectID's new name, reporting whether it is a
+// member.
+func (cl *Clan) RefreshName(objectID int32, name string) bool {
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	m, ok := cl.members[objectID]
+	if ok {
+		m.Name = name
 	}
 	return ok
 }

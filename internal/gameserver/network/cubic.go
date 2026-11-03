@@ -14,11 +14,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// cubicCastDelay is Cubic.CAST_DELAY: the fixed delay between a cubic's
-// visible MagicSkillUse broadcast and its effect actually landing.
+// cubicCastDelay is the fixed delay between a cubic's visible MagicSkillUse
+// broadcast and its effect actually landing.
 const cubicCastDelay = 2 * time.Second
 
-func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.EffectResult, def modelskill.Definition) {
+func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.EffectResult, def *modelskill.Definition) {
 	if result.CubicTouched {
 		l.syncCubicRuntime(caster, result.CubicID, def)
 	}
@@ -38,9 +38,8 @@ func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.E
 }
 
 // syncCubicRuntime (re)synchronizes live's live cubic runtime for id after a
-// SUMMON cubic cast touched its cubic list, matching
-// CubicList.addOrRefreshCubic: a brand new id gets a fresh Runtime (self-
-// starting immediately for the Life Cubic, matching Cubic's constructor;
+// SUMMON cubic cast touched its cubic list: a brand new id gets a fresh
+// Runtime (self-starting immediately for the Life Cubic;
 // every other kind waits for the owner's next combat-stance entry via
 // Cubics()/AttackStance.Add), while an already-active id only has its
 // disappear timer reset, its original granting level and fire behavior left
@@ -51,7 +50,7 @@ func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.E
 // runtime change happens under cubicsMu: whichever sync runs last sees the
 // final list, stops every runtime it no longer holds, and never starts a
 // runtime for an id that was evicted meanwhile.
-func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def modelskill.Definition) {
+func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def *modelskill.Definition) {
 	if live == nil {
 		return
 	}
@@ -78,7 +77,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 	runtime, exists := live.cubics[id]
 	if !exists {
 		interval := time.Duration(def.CubicActivationTime) * time.Second
-		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(def), def.CubicActivationChance, interval, func() {
+		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(*def), def.CubicActivationChance, interval, func() {
 			l.fireCubic(live, id, runtime)
 		}, func() {
 			l.expireCubic(live, id, runtime)
@@ -97,8 +96,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 
 // expireCubic runs when a cubic's granted lifetime elapses: it drops the id
 // from the owner's cubic list and live runtime map and refreshes the
-// character info the client sees, matching Cubic.stop() removing itself
-// from CubicList and broadcasting. runtime is the cubic that expired: once
+// character info the client sees. runtime is the cubic that expired: once
 // it has been stopped or replaced (evicted, then the same id granted again),
 // its late timer only stops it and leaves the current cubic of that id alone.
 func (l *GameClientLink) expireCubic(live *livePlayer, id cubic.ID, runtime *cubic.Runtime) {
@@ -160,17 +158,16 @@ func (live *livePlayer) cubicStillActive(id cubic.ID, runtime *cubic.Runtime) bo
 	return live.cubics[id] == runtime
 }
 
-// fireCubic runs one action tick for live's cubic id, matching
-// Cubic.fireAction: a dead owner stops the cubic outright rather than
-// firing; for a non-Life cubic, going out of combat stance stops the action
-// tick outright (StopAction) rather than firing, otherwise the granting
-// skill's activation chance, a random skill among the cubic's fixed set,
-// and the target are resolved by cast.DecideCubicFire. The Life Cubic
-// instead always tries its single heal skill against cast.DecideLifeCubicTarget
-// and ignores the combat-stance gate entirely. Target selection, activation
-// rolls, and the heal formula are domain decisions (model/actor/cast); this
-// function only resolves session/world context, calls those decisions, and
-// translates the outcome into packets.
+// fireCubic runs one action tick for live's cubic id: a dead owner stops the
+// cubic outright rather than firing; for a non-Life cubic, going out of combat
+// stance stops the action tick outright (StopAction) rather than firing,
+// otherwise the granting skill's activation chance, a random skill among the
+// cubic's fixed set, and the target are resolved by cast.DecideCubicFire. The
+// Life Cubic instead always tries its single heal skill against
+// cast.DecideLifeCubicTarget and ignores the combat-stance gate entirely.
+// Target selection, activation rolls, and the heal formula are domain decisions
+// (model/actor/cast); this function only resolves session/world context, calls
+// those decisions, and translates the outcome into packets.
 func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic.Runtime) {
 	if live == nil || runtime == nil {
 		return
@@ -183,8 +180,8 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		return
 	}
 	if live.Character.Dead() {
-		// Matches Cubic.fireAction's own isDead()/isOnline() self-check:
-		// a dead owner stops the cubic outright rather than firing.
+		// The tick checks its owner itself: a dead owner stops the cubic
+		// outright rather than firing.
 		l.expireCubic(live, id, runtime)
 		return
 	}
@@ -205,7 +202,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		skillID = skillIDs[0]
 		target, ok = actorcast.DecideLifeCubicTarget(owner, l.lifeCubicParty(live))
 	} else {
-		if l.attackStance == nil || !l.attackStance.InAttackStance(live) {
+		if l.combat.attackStance == nil || !l.combat.attackStance.InAttackStance(live) {
 			runtime.StopAction()
 			return
 		}
@@ -222,8 +219,8 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 
 	broadcastLevel := def.Level
 	if id == cubic.Life && broadcastLevel == 8 {
-		// Cubic.fireAction's Life-branch broadcast quirk: the granted
-		// level-8 heal skill displays as level 20 on the client.
+		// Life Cubic broadcast quirk: the granted level-8 heal skill displays
+		// as level 20 on the client.
 		broadcastLevel = 20
 	}
 
@@ -262,15 +259,14 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id, runtime) {
 			return
 		}
-		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
+		actorcast.ApplyCubicEffect(l.combat.skillHandlers, live, *def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }
 
 // cubicHealMessageTarget is the narrow surface a Life Cubic heal target
 // sends the REJUVENATING_HP feedback message to; only a player-shaped
-// target gets it, matching Cubic.useHealSkill's
-// `if (target instanceof Player)` guard.
+// target gets it.
 type cubicHealMessageTarget interface {
 	SendFrame(wire.Frame) bool
 }

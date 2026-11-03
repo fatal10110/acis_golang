@@ -36,14 +36,12 @@ func isAttackBy(frame []byte, attackerID int32) bool {
 	return frame[0] == serverpackets.OpcodeAttack && wire.NewReader(frame[1:]).ReadInt32() == attackerID
 }
 
-// assertNoAttackBy fails when attackerID starts a swing or shot within d.
-func assertNoAttackBy(t *testing.T, c *testsupport.ScriptedClient, attackerID int32, d time.Duration, what string) {
+// assertNoAttackBy lets d pass and fails when attackerID started a swing or
+// shot meanwhile.
+func assertNoAttackBy(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, attackerID int32, d time.Duration, what string) {
 	t.Helper()
-	for end := c.Now().Add(d); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(end.Sub(c.Now()))
-		if frame == nil {
-			return
-		}
+	srv.Advance(t, d)
+	for _, frame := range c.ReadQueued() {
 		if isAttackBy(frame, attackerID) {
 			t.Fatalf("the owner attacked again %s", what)
 		}
@@ -123,11 +121,8 @@ func TestOwnedPetInteractDuringBowReuseEndsTheAttack(t *testing.T) {
 	selectPetNow(t, h, pet)
 
 	// Wait into the reuse: past the shot, well before the next one.
-	for reuse := shotAt.Add(gauge * 3 / 4); h.client.Now().Before(reuse); {
-		frame := h.client.ReadWithTimeout(reuse.Sub(h.client.Now()))
-		if frame == nil {
-			break
-		}
+	h.srv.Advance(t, shotAt.Add(gauge*3/4).Sub(h.client.Now()))
+	for _, frame := range h.client.ReadQueued() {
 		if isAttackBy(frame, h.ownerID) {
 			t.Fatal("the bow fired again before its reuse ended")
 		}
@@ -137,7 +132,7 @@ func TestOwnedPetInteractDuringBowReuseEndsTheAttack(t *testing.T) {
 	if !hasOpcode(frames, serverpackets.OpcodePetStatusShow) {
 		t.Fatalf("pet click during the bow reuse = opcodes %x, want the status window at once", frameOpcodes(frames))
 	}
-	assertNoAttackBy(t, h.client, h.ownerID, 2*gauge, "after its pet interact replaced the attack")
+	assertNoAttackBy(t, h.srv, h.client, h.ownerID, 2*gauge, "after its pet interact replaced the attack")
 }
 
 // TestOwnedPetInteractDuringChaseEndsTheAttack is the same for a bare-handed
@@ -240,7 +235,7 @@ func TestOwnedPetInteractDuringChaseEndsTheAttack(t *testing.T) {
 			}
 			stoppedAt := location.Location{}
 			stoppedAt.X, stoppedAt.Y, stoppedAt.Z = h.srv.PlayerPosition(t, h.ownerID)
-			assertNoAttackBy(t, h.client, h.ownerID, 4*time.Second, "after its pet interact replaced the chase")
+			assertNoAttackBy(t, h.srv, h.client, h.ownerID, 4*time.Second, "after its pet interact replaced the chase")
 			ox, oy, oz := h.srv.PlayerPosition(t, h.ownerID)
 			if at := (location.Location{X: ox, Y: oy, Z: oz}); at != stoppedAt {
 				t.Fatalf("the owner moved from %+v to %+v after its pet interact", stoppedAt, at)
@@ -349,11 +344,8 @@ func TestOwnedPetInteractDropsGroundCastApproach(t *testing.T) {
 
 	h.client.Send(encodeRequestMagicSkillUse(replaceSelfSkillID))
 	selfCast := false
-	for end := h.client.Now().Add(4 * time.Second); h.client.Now().Before(end); {
-		frame := h.client.ReadWithTimeout(end.Sub(h.client.Now()))
-		if frame == nil {
-			break
-		}
+	h.srv.Advance(t, 4*time.Second)
+	for _, frame := range h.client.ReadQueued() {
 		if skill, ok := magicSkillUseID(frame, h.ownerID); ok {
 			if skill == replaceGroundSkillID {
 				t.Fatal("the ground cast the pet interact replaced ran after the self cast")

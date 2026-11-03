@@ -100,7 +100,7 @@ func onZoneEnter(s *script.Script, e script.ZoneEnter) {
 	if !ok {
 		return
 	}
-	if s.DestroyItems(p, visitorMark, 1) {
+	if s.DestroyItems(p, visitorMark, 1, false) {
 		s.AddItems(p, fadedVisitorMark, 1)
 	}
 }

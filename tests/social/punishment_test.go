@@ -26,6 +26,7 @@ const (
 // EtcStatusUpdate clearing the flag, the notice and the sound, after which
 // the row is clear and the player speaks again.
 func TestChatBanFromStoredRow(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	if _, err := p.srv.DB.ExecContext(context.Background(), "UPDATE characters SET punish_level = 1, punish_timer = 4000 WHERE obj_Id = ?", p.bobbyID); err != nil {
 		t.Fatalf("seed chat ban: %v", err)

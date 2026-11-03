@@ -1,0 +1,49 @@
+# Aiding the Floran Village (Q660): a level 30 character accepts at Alex without Maria, finds nothing to sell and keeps the quest through a relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q660_aiding_the_floran_village_alex_accept.golden
+character Hero 30
+script quest.Q660_AidingTheFloranVillage
+item 8074 8075 8076 57 955 956
+page default/30608.htm
+page guard/30291.htm
+page script/quest/Q660_AidingTheFloranVillage/
+npc maria 30608 Folk 10 0 0
+npc alex 30291 Guard -10 0 0
+npc watchman 21102 Monster 40 0 0
+npc golem 21103 Monster 50 0 0
+npc supplier 21104 Monster 60 0 0
+npc agent 21105 Monster 70 0 0
+npc seer 21106 Monster 80 0 0
+npc commander 21107 Monster 90 0 0
+npc shaman 20781 Monster 100 0 0
+
+action alex
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q660_AidingTheFloranVillage/30291-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q660_AidingTheFloranVillage 30291-02.htm
+  S QuestList 660:0x80000003
+  S ExShowQuestMark quest=660
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q660_AidingTheFloranVillage/30291-02.htm
+  S ActionFailed
+  Q upsert Q660_AidingTheFloranVillage | <state> | STARTED
+  Q upsert Q660_AidingTheFloranVillage | <cond> | 2
+  rows Q660_AidingTheFloranVillage <cond>=2 <state>=STARTED
+  state Q660_AidingTheFloranVillage STARTED
+action alex
+  S ActionFailed
+  S NpcHtmlMessage obj=alex item=0 page=guard/30291.htm
+  S ActionFailed
+bypass npc_{alex}_Quest
+  S NpcHtmlMessage obj=alex item=0 page=script/quest/Q660_AidingTheFloranVillage/30291-05a.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q660_AidingTheFloranVillage <cond>=2 <state>=STARTED
+  state Q660_AidingTheFloranVillage STARTED

@@ -62,10 +62,10 @@ func (l *GameClientLink) clanWarehouse(clanID int32) (*itemcontainer.Container, 
 		return e.wh, nil
 	}
 	wh := itemcontainer.NewContainerWithPersister(clanID, item.LocationClanWarehouse, l.itemTemplates, l.itemPersister(clanID))
-	if l.items != nil {
+	if l.belongings.items != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), clanWarehouseRestoreTimeout)
 		defer cancel()
-		rows, err := l.items.ListByOwner(ctx, clanID)
+		rows, err := l.belongings.items.ListByOwner(ctx, clanID)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +84,7 @@ func (l *GameClientLink) activateClanWarehouse(live *livePlayer, cl *clan.Clan) 
 		l.log.Error().Err(err).Int32("clan_id", cl.ID()).Msg("warehouse: restore clan warehouse")
 		return nil, false
 	}
-	limit := l.playerConfig.StorageSlots.ClanWarehouseSlots()
+	limit := l.playerConfig().StorageSlots.ClanWarehouseSlots()
 	live.storage.active = activeStore{store: wh, clanID: cl.ID(), fits: func(slots int) bool {
 		return fitsLimit(wh.Size(), slots, limit)
 	}}

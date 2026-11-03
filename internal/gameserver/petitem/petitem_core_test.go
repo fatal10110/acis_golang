@@ -3,6 +3,7 @@ package petitem
 import (
 	"testing"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -11,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -547,28 +549,55 @@ func TestUseItemRejectsIneligibleFood(t *testing.T) {
 func (*pickupTestOwner) ServitorVanished()                          {}
 func (*pickupTestOwner) PvPFlagState() task.PvPFlagState            { return task.PvPFlagNone }
 func (*pickupTestOwner) AwardSummonKillKarma(attackable.Combatant)  {}
+func (*pickupTestOwner) SummonDied(_, _ attackable.Combatant)       {}
 func (*pickupTestOwner) OfferSummonRevive()                         {}
 func (*pickupTestOwner) Invul() bool                                { return false }
 func (*pickupTestOwner) HP() float64                                { return 0 }
 func (*pickupTestOwner) MaxHPValue() float64                        { return 0 }
 func (*pickupTestOwner) ClearReviveOffer()                          {}
+func (*pickupTestOwner) ReviveOffer() (bool, bool)                  { return false, false }
 func (*pickupTestOwner) InDuel() bool                               { return false }
 func (*pickupTestOwner) NoteServitorPvPAttack(attackable.Combatant) {}
 func (*pickupTestOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {
 }
 
 // TestPetLevelConditionReadsIntegerLiterals: the reference reads a <player
-// level> use condition with Integer.decode, so hex, "#" hex, leading-zero
-// octal and non-ASCII digits all name a level (Java probe, OpenJDK
-// 21.0.11: "0x32", "#32", "062" and fullwidth "５０" are 50, "0x33" is 51).
+// level> use condition with Integer.decode, so hex, "#" hex and
+// leading-zero octal all name a level (Java probe, OpenJDK 21.0.11: "0x32",
+// "#32" and "062" are 50, "0x33" is 51). Only ASCII digits read: fullwidth
+// "５０" names none.
 func TestPetLevelConditionReadsIntegerLiterals(t *testing.T) {
 	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Level: 50})
 	for raw, want := range map[string]bool{
-		"50": true, "0x32": true, "#32": true, "062": true, "５０": true,
+		"50": true, "0x32": true, "#32": true, "062": true, "５０": false,
 		"0x33": false, "063": false, "08": false, "0b1": false,
 	} {
-		if got := petPlayerConditionHolds(pet, map[string]string{"level": raw}); got != want {
+		uses := []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": raw}}}}
+		if got, _ := checkUseConditions(pet, uses); got != want {
 			t.Errorf("level=%q on a level 50 pet holds = %v, want %v", raw, got, want)
 		}
 	}
+}
+
+// The fake owner is in no duel, party, clan or alliance, does not see
+// invisible creatures, and leaves every social rule undecided.
+func (*pickupTestOwner) DuelID() int32                        { return 0 }
+func (*pickupTestOwner) DuelTeam() int                        { return 0 }
+func (*pickupTestOwner) OlympiadMode() bool                   { return false }
+func (*pickupTestOwner) SeesInvisible() bool                  { return false }
+func (*pickupTestOwner) IsInParty() bool                      { return false }
+func (*pickupTestOwner) IsInSameParty(skilltarget.Actor) bool { return false }
+func (*pickupTestOwner) IsInSameClan(skilltarget.Actor) bool  { return false }
+func (*pickupTestOwner) IsInSameAlly(skilltarget.Actor) bool  { return false }
+func (*pickupTestOwner) HasClan() bool                        { return false }
+func (*pickupTestOwner) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
+	return true
+}
+
+func (*pickupTestOwner) OffensiveCastAllowed(attackable.ArenaMember, skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
+	return true
+}
+
+func (*pickupTestOwner) SocialWithoutForce(attackable.ArenaMember, skilltarget.Actor) (allowed, decided bool) {
+	return false, false
 }

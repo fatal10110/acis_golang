@@ -6,15 +6,20 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/testsupport/vitals"
 )
 
 // killPetExp is the level-79 wolf's experience: well inside level 79, so one
 // death penalty neither empties it nor takes the level down.
 const killPetExp = wolfExpLevel79 + 10_000_000
 
-// killPetPenalty is the level-79 wolf's death penalty:
-// round((555934039 - 480562077) * (6.5 - 0.07*79) / 100) = round(731108.03).
-const killPetPenalty int64 = 731108
+// killPetPenalty is the level-79 wolf's death penalty, as the reference
+// computes it (testdata/vitals.golden; the experience of the level below is
+// the probe's own row and does not matter, as the level is kept).
+func killPetPenalty(t *testing.T) int64 {
+	t.Helper()
+	return vitals.PetDeath(t, 79, 400000000, wolfExpLevel79, 555934039, killPetExp).Lost
+}
 
 // newKillPet returns a live, owned level-79 wolf pet with a recorder
 // attached, so its death sequence runs in full: the owner's kill hooks,
@@ -51,8 +56,8 @@ func assertOneDeath(t *testing.T, pet *Actor, rec *event.Recorder) {
 	if n := event.Count[event.DeathSettled](rec); n != 1 {
 		t.Fatalf("DeathSettled events = %d, want 1", n)
 	}
-	if got := pet.Exp(); got != killPetExp-killPetPenalty {
-		t.Fatalf("pet exp = %d, want one penalty off: %d", got, killPetExp-killPetPenalty)
+	if got, want := pet.Exp(), killPetExp-killPetPenalty(t); got != want {
+		t.Fatalf("pet exp = %d, want one penalty off: %d", got, want)
 	}
 	pet.statusMu.Lock()
 	before := pet.expBeforeDeath

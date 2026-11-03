@@ -46,6 +46,10 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 		// A target that died after the cast resolved it still goes through
 		// the reflect, immunity and success rolls below; only the effects
 		// themselves are refused on landing.
+		if d, ok := asDoor(obj); ok {
+			continuousOnDoor(cast, d, def, bsps, &result)
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok {
 			continue
@@ -61,11 +65,10 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 			if hasEffectType(effected.EffectList(), "BLOCK_BUFF") {
 				continue
 			}
-			// A cursed-weapon holder can neither receive nor bestow buffs;
-			// a clan hall manager's buffs are exempt. The caster's cursed
-			// state resolves through its acting player in the reference;
-			// this layer reads it from the caster directly.
-			if !clanHallManager(cast.Caster) && !sameObject(cast.Caster, effected) && (cursed(effected) || cursed(cast.Caster)) {
+			// A cursed-weapon holder can neither receive nor bestow buffs,
+			// through its summon either; a clan hall manager's buffs are
+			// exempt.
+			if !clanHallManager(cast.Caster) && !sameObject(cast.Caster, effected) && (cursed(effected) || actingCursed(cast.Caster)) {
 				continue
 			}
 		case "HOT", "MPHOT":
@@ -134,7 +137,7 @@ func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Def
 		level = 1
 	}
 	if resolved, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.EffectID), Level: level}); ok {
-		return resolved
+		return *resolved
 	}
 	return def
 }

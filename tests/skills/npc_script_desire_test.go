@@ -37,6 +37,7 @@ func TestScriptCastDesireLandsOnPlayer(t *testing.T) {
 	player := worldCombatant(t, srv, objID)
 	before := srv.PlayerCurrentHP(t, objID)
 
+	firstCycleOnNPCQueue(t, caster)
 	caster.AI().AddCastDesire(player, modelskill.Ref{ID: realDamageProbe, Level: 1}, 1000, true, true)
 	thinkOnNPCQueue(t, caster)
 
@@ -113,10 +114,10 @@ type laterDefinitions struct {
 	table atomic.Pointer[modelskill.Table]
 }
 
-func (d *laterDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (d *laterDefinitions) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	table := d.table.Load()
 	if table == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return table.Definition(ref)
 }

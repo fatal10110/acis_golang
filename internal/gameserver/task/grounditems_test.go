@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -58,7 +60,7 @@ func TestGroundItemsLoadClearsPersistedLootProtectionOwner(t *testing.T) {
 		Instance: item.Instance{ObjectID: 1, TemplateID: 57, Count: 1, OwnerID: 42, Location: item.LocationVoid},
 		X:        1, Y: 1, Z: 1,
 	}}
-	if err := g.Load(rows, templates); err != nil {
+	if err := g.Load(rows, templates, zerolog.Nop()); err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
 

@@ -3,7 +3,6 @@ package derby
 import (
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -219,7 +218,7 @@ func (d dialog) showOdds() Reply {
 		page = replace(page, "Mob"+n, name)
 		odd := "&$804;"
 		if t.odds[i] > 0 {
-			odd = commons.JavaFixed(t.odds[i], 1)
+			odd = commons.FormatFixed(t.odds[i], 1)
 		}
 		page = replace(page, "Odd"+n, odd)
 	}
@@ -255,7 +254,7 @@ func (d dialog) showTicket(holder Holder, command string) Reply {
 	}
 	odd := "0.01"
 	if ticket.Lane == h.First+1 {
-		odd = commons.JavaFixed(h.OddRate, 2)
+		odd = commons.FormatFixed(h.OddRate, 2)
 	}
 	page := d.load(8)
 	page = replace(page, "%raceId%", strconv.Itoa(ticket.Race))
@@ -284,7 +283,7 @@ func (d dialog) calculateWin(holder Holder, command string) Reply {
 	if ticket.Lane == h.First+1 {
 		rate = h.OddRate
 	}
-	payout := commons.JavaInt(float64(ticket.Hundreds*100) * rate)
+	payout := commons.TruncInt32Sat(float64(ticket.Hundreds*100) * rate)
 	return Reply{Redeem: &Redemption{ObjectID: ticket.ObjectID, Payout: payout}, Chat: true}
 }
 
@@ -317,7 +316,7 @@ func (d dialog) viewHistory() Reply {
 		}
 		rows.WriteString(`<tr><td><font color="LEVEL">` + strconv.Itoa(h.RaceID) + `</font> th</td><td><font color="LEVEL">` + strconv.Itoa(first) +
 			`</font> Lane </td><td><font color="LEVEL">` + strconv.Itoa(second) + `</font> Lane</td><td align=right><font color=00ffff>` +
-			commons.JavaFixed(h.OddRate, 2) + `</font> Times</td></tr>`)
+			commons.FormatFixed(h.OddRate, 2) + `</font> Times</td></tr>`)
 	}
 	page := replace(d.load(9), "%infos%", rows.String())
 	return Reply{Page: d.fill(page)}
@@ -377,11 +376,11 @@ func itoa32(n int32) string { return strconv.Itoa(int(n)) }
 // unit). ok is false when the command is too short or the rest is no
 // number.
 func commandInt(command string, begin int) (int, bool) {
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if begin > len(units) {
 		return 0, false
 	}
-	n, err := commons.ParseInt(string(utf16.Decode(units[begin:])), 32)
+	n, err := strconv.ParseInt(commons.UTF16String(units[begin:]), 10, 32)
 	if err != nil {
 		return 0, false
 	}

@@ -1,0 +1,22 @@
+# Help the Son! (Q044), refused: a level 23 character, one short of the quest's level, is turned
+# away by Lundy and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q044_help_the_son_low_level.golden
+character Helper 23
+script quest.Q044_HelpTheSon
+item 168 7552 7553 7585
+page merchant/30827.htm
+page script/quest/Q044_HelpTheSon/
+npc lundy 30827 Merchant 10 0 0
+
+action lundy
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 page=merchant/30827.htm
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-00a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q044_HelpTheSon CREATED
+  rows Q044_HelpTheSon -

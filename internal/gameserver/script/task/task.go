@@ -114,3 +114,24 @@ func placeReputation(place int) int {
 	}
 	return 12
 }
+
+// shutdownPeriod is the seconds the shutdown and restart tasks count down.
+const shutdownPeriod = 600
+
+// ServerShutdown shuts the server down after a ten-minute countdown.
+func ServerShutdown() script.Script {
+	return script.Script{Hooks: script.Hooks{
+		OnStart: func(_ *script.Script, e script.Start) {
+			e.Server.Shutdown(shutdownPeriod, false)
+		},
+	}}
+}
+
+// ServerRestart restarts the server after a ten-minute countdown.
+func ServerRestart() script.Script {
+	return script.Script{Hooks: script.Hooks{
+		OnStart: func(_ *script.Script, e script.Start) {
+			e.Server.Shutdown(shutdownPeriod, true)
+		},
+	}}
+}

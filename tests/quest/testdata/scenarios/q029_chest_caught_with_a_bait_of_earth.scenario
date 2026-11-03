@@ -1,0 +1,133 @@
+# Chest caught with a bait of earth (Q029): a level 48 character who completed Willie's Special
+# Bait (Q052) and holds a small purple treasure chest accepts at the fisherman, who opens the
+# chest and finds a small glass box; Anabel trades it for a plated leather gloves and the quest
+# completes; then relog. The fisherman's quest link lists both his quests. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q029_chest_caught_with_a_bait_of_earth.golden
+character Angler 48
+quest Q052_WilliesSpecialBait <state>=COMPLETED
+hold 6507 1
+script quest.Q029_ChestCaughtWithABaitOfEarth
+script quest.Q052_WilliesSpecialBait
+item 6507 7627 2455
+page fisherman/31574.htm
+page trainer/30909.htm
+page script/quest/Q029_ChestCaughtWithABaitOfEarth/
+npc willie 31574 Fisherman 10 0 0
+npc anabel 30909 Trainer 20 0 0
+
+# The fisherman: accept.
+action willie
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 html="<html><body><a action=\"bypass -h npc_{willie}_Quest Q052_WilliesSpecialBait\">[Willie's Special Bait (Done)]</a><br><a action=\"bypass -h npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth\">[Chest caught with a bait of earth]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q029_ChestCaughtWithABaitOfEarth/31574-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q029_ChestCaughtWithABaitOfEarth CREATED
+bypass Quest Q029_ChestCaughtWithABaitOfEarth 31574-04.htm
+  S QuestList 52:0x00000000 29:0x80000001
+  S ExShowQuestMark quest=29
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q029_ChestCaughtWithABaitOfEarth/31574-04.htm
+  S ActionFailed
+  Q upsert Q029_ChestCaughtWithABaitOfEarth | <state> | STARTED
+  Q upsert Q029_ChestCaughtWithABaitOfEarth | <cond> | 1
+  state Q029_ChestCaughtWithABaitOfEarth STARTED
+  rows Q029_ChestCaughtWithABaitOfEarth <cond>=1 <state>=STARTED
+
+# Anabel has nothing for the quest before the small glass box.
+action anabel
+action anabel
+  S ActionFailed
+  S NpcHtmlMessage obj=anabel item=0 page=trainer/30909.htm
+  S ActionFailed
+bypass npc_{anabel}_Quest
+  S NpcHtmlMessage obj=anabel item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# The fisherman opens the chest.
+action willie
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 html="<html><body><a action=\"bypass -h npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth\">[Chest caught with a bait of earth (In Progress)]</a><br><a action=\"bypass -h npc_{willie}_Quest Q052_WilliesSpecialBait\">[Willie's Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q029_ChestCaughtWithABaitOfEarth/31574-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q029_ChestCaughtWithABaitOfEarth 31574-07.htm
+  S QuestList 52:0x00000000 29:0x80000003
+  S ExShowQuestMark quest=29
+  S SystemMessage id=302 3:6507
+  S SystemMessage id=54 3:7627
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q029_ChestCaughtWithABaitOfEarth/31574-07.htm
+  S ActionFailed
+  Q upsert Q029_ChestCaughtWithABaitOfEarth | <cond> | 2
+  rows Q029_ChestCaughtWithABaitOfEarth <cond>=2 <state>=STARTED
+  items 6507=0 7627=1
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 html="<html><body><a action=\"bypass -h npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth\">[Chest caught with a bait of earth (In Progress)]</a><br><a action=\"bypass -h npc_{willie}_Quest Q052_WilliesSpecialBait\">[Willie's Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q029_ChestCaughtWithABaitOfEarth/31574-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Anabel trades the small glass box; the quest completes.
+action anabel
+action anabel
+  S ActionFailed
+  S NpcHtmlMessage obj=anabel item=0 page=trainer/30909.htm
+  S ActionFailed
+bypass npc_{anabel}_Quest
+  S NpcHtmlMessage obj=anabel item=0 page=script/quest/Q029_ChestCaughtWithABaitOfEarth/30909-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q029_ChestCaughtWithABaitOfEarth 30909-02.htm
+  S SystemMessage id=302 3:7627
+  S SystemMessage id=54 3:2455
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 52:0x00000000 29:0x00000000
+  S NpcHtmlMessage obj=anabel item=0 page=script/quest/Q029_ChestCaughtWithABaitOfEarth/30909-02.htm
+  S ActionFailed
+  Q upsert Q029_ChestCaughtWithABaitOfEarth | <state> | COMPLETED
+  Q delete-except-state Q029_ChestCaughtWithABaitOfEarth
+  state Q029_ChestCaughtWithABaitOfEarth COMPLETED
+  rows Q029_ChestCaughtWithABaitOfEarth <state>=COMPLETED
+  items 7627=0 2455=1
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q029_ChestCaughtWithABaitOfEarth COMPLETED
+  rows Q029_ChestCaughtWithABaitOfEarth <state>=COMPLETED
+  items 2455=1
+action willie
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 html="<html><body><a action=\"bypass -h npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth\">[Chest caught with a bait of earth (Done)]</a><br><a action=\"bypass -h npc_{willie}_Quest Q052_WilliesSpecialBait\">[Willie's Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{willie}_Quest Q029_ChestCaughtWithABaitOfEarth
+  S NpcHtmlMessage obj=willie item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

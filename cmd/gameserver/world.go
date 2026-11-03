@@ -12,8 +12,10 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -22,9 +24,10 @@ import (
 	"go.uber.org/fx"
 )
 
-func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, subclasses *gamesql.SubclassStore, ids *idfactory.Allocator) *manager.Roster {
+func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, subclasses *gamesql.SubclassStore, ids *idfactory.Allocator, log zerolog.Logger) *manager.Roster {
 	roster := manager.NewRoster(characters, items, shortcuts, data.Players, data.Items, data.NPCs, ids, cfg.CharacterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
+	roster.SetAccessLevels(data.Admin, log)
 	return roster
 }
 
@@ -32,23 +35,26 @@ func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.Cha
 // state at boot, applying closed doors to geodata immediately, and wires the
 // door-timer task's late-bound hook to it — manager.WorldObjects needs
 // *task.Door to schedule timers with, so that task's own effects can only
-// point back at WorldObjects after it exists.
-func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, doorRegen *task.DoorRegen, log zerolog.Logger) (*manager.WorldObjects, error) {
+// point back at WorldObjects after it exists. The doors' defences read the
+// Seal of Strife from sevenSigns.
+func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, doorRegen *task.DoorRegen, sevenSigns *sevensigns.State, log zerolog.Logger) (*manager.WorldObjects, error) {
 	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers, doorRegen, network.DoorSinks(state), log)
 	if err != nil {
 		return nil, err
 	}
+	objs.SetStrife(sevenSigns)
 	doorHooks.SetHook(objs.ToggleDoor)
 	return objs, nil
 }
 
 // provideBoats spawns one scheduled boat per boatRoutes.xml itinerary, unless
-// AllowBoat turns boats off; it then returns a nil fleet.
+// AllowBoat turns boats off; the fleet is then empty until //reload boat
+// reads the routes.
 func provideBoats(cfg gameServerConfig, paths gameServerPaths, ids *idfactory.Allocator, state *world.State, log zerolog.Logger) (*boat.Fleet, error) {
 	if !cfg.AllowBoat {
-		return nil, nil
+		return boat.New(nil, ids, state, network.BoatSinks(state))
 	}
-	itineraries, err := gamexml.LoadBoatRoutes(filepath.Join(paths.DataRoot, "data", "xml", "boatRoutes.xml"))
+	itineraries, err := loadBoatRoutes(paths)
 	if err != nil {
 		return nil, err
 	}
@@ -60,11 +66,14 @@ func provideBoats(cfg gameServerConfig, paths gameServerPaths, ids *idfactory.Al
 	return fleet, nil
 }
 
-// startBoats runs the boats' schedules and movement while the server runs.
+// loadBoatRoutes reads the boat itineraries of boatRoutes.xml.
+func loadBoatRoutes(paths gameServerPaths) ([]route.BoatItinerary, error) {
+	return gamexml.LoadBoatRoutes(filepath.Join(paths.DataRoot, "data", "xml", "boatRoutes.xml"))
+}
+
+// startBoats runs the boats' schedules and movement while the server runs,
+// an empty fleet's too: //reload boat may launch it.
 func startBoats(lc fx.Lifecycle, fleet *boat.Fleet, log zerolog.Logger) {
-	if fleet == nil {
-		return
-	}
 	startTicker(lc, log, fleet.Start)
 }
 
@@ -91,24 +100,31 @@ func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, log zer
 }
 
 // provideNpcs builds the NPC population, wires the decay/respawn tasks'
-// late-bound hooks and the link to it — manager.Npcs needs *task.Decay and
+// late-bound hooks, the script spawner and the link to it — manager.Npcs needs *task.Decay and
 // *task.Respawn to register actors with, so those tasks' own effects can
 // only point back at Npcs after it exists — and only then instantiates
 // every "on start" spawn entry into state: each NPC's created script hooks
 // run as it spawns, against a population already wired.
-func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker, link *network.GameClientLink, attackStance *task.AttackStance, effects effect.Env, pool *sim.Pool, makers *script.Makers, scripts *script.Registry) (*manager.Npcs, error) {
+func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker, link *network.GameClientLink, attackStance *task.AttackStance, effects effect.Env, pool *sim.Pool, makers *script.Makers, scripts *script.Registry, spawner *script.Spawner) (*manager.Npcs, error) {
 	rewards.Parties = link
 	rewards.RaidKills = link
 	rewards.Channels = link
 	rewards.CursedWeapons = link
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), link.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, gameplay.SpawnEvents, effects, pool, makers, scripts, data.Zones)
+		data.Skills, link.HostileCastEffects(), walker, link.HostileSinks(state, attackStance), link.FolkSinks(state, attackStance), npcLimits(gameplay), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, gameplay.SpawnEvents, effects, pool, makers, scripts, data.Zones)
 	if err != nil {
 		return nil, err
 	}
+	npcs.SetGroundTaker(link)
+	npcs.SetGuardedSieges(link.GuardedSiege)
+	npcs.SetResidenceOwners(link.NPCResidenceOwner)
+	npcs.SetSpawnTimes(network.SpawnTimes(link))
+	npcs.SetRegenSettings(link.PlayerRules())
 	decayHooks.SetRespawnHook(npcs.RespawnHook)
 	respawnHooks.SetHook(npcs.Respawn)
+	spawner.Bind(npcs)
 	link.SetNpcSpawns(npcs)
+	npcs.SetNoSpawns(bool(gameplay.NoSpawns))
 	npcs.SpawnOnStart()
 	return npcs, nil
 }

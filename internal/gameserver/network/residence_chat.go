@@ -1,0 +1,88 @@
+package network
+
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+)
+
+// npcResidence returns the residence inst serves: a castle, or else a clan
+// hall. A mercenary serves the castle whose siege hired it, a control
+// tower the castle it was placed for, a holy artifact the castle that
+// placed it. A maker whose spawn time names a castle or a
+// siegable hall gives its NPCs that residence; otherwise the NPC serves the
+// first castle whose npcs list holds its template id, else the first clan
+// hall's.
+func (l *GameClientLink) npcResidence(inst *npc.Instance) (*castle.Castle, *hallmodel.Hall) {
+	if inst == nil || inst.Template == nil {
+		return nil, nil
+	}
+	if c, ok := l.castles.Get(inst.CastleID); ok {
+		return c, nil
+	}
+	if c, ok := l.castles.ByArtifact(inst.ObjectID); ok {
+		return c, nil
+	}
+	if id, ok := inst.Maker.ResidenceParam(); ok {
+		if c, ok := l.castles.Get(id); ok {
+			return c, nil
+		}
+		if l.clanHallData != nil {
+			if h, ok := l.clanHallData.Get(id); ok && h.IsSiegable() {
+				return nil, h
+			}
+		}
+	}
+	if c, ok := l.castles.ByNPC(inst.Template.ID); ok {
+		return c, nil
+	}
+	if l.clanHallData == nil {
+		return nil, nil
+	}
+	if h, ok := l.hallOfManager(inst.Template.ID); ok {
+		return nil, h
+	}
+	return nil, nil
+}
+
+// residenceTalk is what live sees of the residence f serves, as its chat
+// window reads it.
+func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.ResidenceTalk {
+	var r npc.ResidenceTalk
+	c, h := l.npcResidence(f.Instance)
+	switch {
+	case c != nil:
+		r.CastleID, r.OwnerID, r.CastleName = c.ID, c.OwnerID(), c.Name
+		if s, ok := l.castleSiege(int32(c.ID)); ok {
+			r.SiegeInProgress = s.InProgress()
+			if field := s.Battlefield(); field != nil {
+				r.BattlefieldActive = field.Active()
+			}
+		}
+		r.LifeTowers = c.AliveLifeTowers(r.SiegeInProgress)
+	case h != nil:
+		r.HallID, r.Siegable, r.HallName = h.ID, h.IsSiegable(), h.Name
+		r.SiegeInProgress = l.halls.SiegeInProgress(int32(h.ID))
+		if v, ok := l.halls.View(int32(h.ID)); ok {
+			r.OwnerID = v.OwnerID
+		}
+	}
+	if r.OwnerID != 0 {
+		if owner, ok := l.clanService().Table().Get(r.OwnerID); ok {
+			info := owner.Info()
+			r.OwnerName, r.OwnerLeader = info.Name, info.LeaderName
+		}
+	}
+	if cl, ok := l.clanService().ClanOf(live.Character); ok {
+		r.ClanID, r.ClanLeader = cl.ID(), cl.IsLeader(live.ObjectID())
+		r.Privileges = clan.Privilege(cl.MemberPrivileges(live.ObjectID()))
+	}
+	if l.sevenSigns != nil {
+		r.StrifeOwner = l.sevenSigns.SealOwners()[sevensigns.Strife-sevensigns.Avarice]
+		r.SealValidation = l.sevenSigns.CurrentPeriod() == sevensigns.SealValidation
+	}
+	r.Flying = live.Flying()
+	return r
+}

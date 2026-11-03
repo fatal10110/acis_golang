@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -43,10 +42,7 @@ func TestEnteringPlayerSeesCastInFlight(t *testing.T) {
 	for frame := observer.Read(); frame[0] != serverpackets.OpcodeCharSelected; frame = observer.Read() {
 	}
 	observer.Send(encodeEnterWorld())
-	var frames [][]byte
-	for frame := observer.ReadWithTimeout(500 * time.Millisecond); frame != nil; frame = observer.ReadWithTimeout(500 * time.Millisecond) {
-		frames = append(frames, frame)
-	}
+	frames := observer.ReadQueued()
 
 	var next []byte
 	for i, frame := range frames {

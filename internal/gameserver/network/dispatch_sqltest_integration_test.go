@@ -28,12 +28,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-// newLinkedSQLGameClientFull is the SQL-store counterpart of the fake-store
-// newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog: it wires a
-// GameClientLink whose roster, item, and shortcut persistence are real
-// gamesql stores on a shared MariaDB container, dials a fake game client
-// through VersionCheck and a successful AuthLogin, and returns it positioned
-// right after the initial (empty) CharSelectInfo.
+// newLinkedSQLGameClientFull wires a GameClientLink whose roster, item, and
+// shortcut persistence are real gamesql stores on the test's pooled
+// database, with a running player clock and Seven Signs state, dials a fake
+// game client through VersionCheck and a successful AuthLogin, and returns
+// it positioned right after the initial (empty) CharSelectInfo.
 func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*gamesql.ShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, karmaPlayerCanTeleport bool, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, knownSkills *gamesql.CharacterSkillStore, state *world.State) {
 	t.Helper()
 
@@ -85,32 +84,33 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	t.Cleanup(sevenSigns.Stop)
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl, err := NewGameClientLink(GameClientLinkConfig{
-		Validator:        validator,
-		LoginLink:        func() *LoginLink { return loginLink },
-		Roster:           roster,
-		Items:            items,
-		Shortcuts:        shortcuts,
-		Templates:        templates,
-		ItemTemplates:    itemTemplates,
-		HTML:             testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"}),
-		Crests:           crests,
-		Skills:           skills,
-		Spellbooks:       spellbooks,
-		SkillTrees:       trees,
-		CursedWeapons:    cursed,
-		World:            state,
-		Geo:              testGeo{},
-		IDs:              ids,
-		GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now),
-		Positions:        task.NewPositionUpdates(state),
-		PlayerClock:      playerClock,
-		SevenSigns:       sevenSigns,
-		InventoryUpdates: inventoryUpdates,
-		PlayerConfig:     PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, MaxBuffsAmount: 20},
-		PetConfig:        petmodel.DefaultConfig(),
-		Queues:           testQueues(t),
-		Effects:          effect.Env{Activity: task.NewEffects()},
-		Log:              zerolog.Nop(),
+		Flow: CharacterFlowConfig{Validator: validator, PlayerClock: playerClock},
+		Belongings: BelongingsConfig{
+			Items:            items,
+			Shortcuts:        shortcuts,
+			GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now),
+			InventoryUpdates: inventoryUpdates,
+		},
+		LoginLink:     func() *LoginLink { return loginLink },
+		Roster:        roster,
+		Templates:     templates,
+		ItemTemplates: itemTemplates,
+		HTML:          testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"}),
+		Crests:        crests,
+		Skills:        skills,
+		Spellbooks:    spellbooks,
+		SkillTrees:    trees,
+		CursedWeapons: cursed,
+		World:         state,
+		Geo:           testGeo{},
+		IDs:           ids,
+		Positions:     task.NewPositionUpdates(state),
+		SevenSigns:    sevenSigns,
+		PlayerConfig:  PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, MaxBuffsAmount: 20},
+		Summoning:     SummoningConfig{Config: petmodel.DefaultConfig()},
+		Queues:        testQueues(t),
+		Effects:       effect.Env{Activity: task.NewEffects()},
+		Log:           zerolog.Nop(),
 	})
 	if err != nil {
 		t.Fatalf("new game client link: %v", err)

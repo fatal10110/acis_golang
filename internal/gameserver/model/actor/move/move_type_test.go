@@ -347,7 +347,7 @@ func TestChaseIntoWaterRetimesArrival(t *testing.T) {
 }
 
 // The arrival-timer fallback of a swimming or flying tracking walk
-// (runOutPawnLegLocked) ends at the first step strictly within the offset
+// (runOutLegLocked) ends at the first step strictly within the offset
 // of a creature pawn measured in 3D, as the position updates do
 // (TestChasePawnStopMeasuresByMoveType), moves its height along the line,
 // and no closed ground line blocks it.

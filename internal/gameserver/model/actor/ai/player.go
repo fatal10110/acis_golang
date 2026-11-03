@@ -228,6 +228,15 @@ func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift, stopp
 	return actionFailed
 }
 
+// HasNext reports whether an attack is the next intention: one queued
+// behind a swing, a bow reuse or a cast, or one requested mid-cast that
+// waits for the cast to end.
+func (p *PlayerAttack) HasNext() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.next != nil || p.deferred
+}
+
 // Stop clears the attack intention and stops any movement toward it.
 func (p *PlayerAttack) Stop() {
 	p.mu.Lock()
@@ -377,7 +386,7 @@ func (p *PlayerAttack) thinkLocked(castStopping bool) (accepted, actionFailed bo
 		return false, true, nil
 	}
 
-	if p.refusesAttackLocked(p.target) {
+	if refusesAttack(p.attack, p.target) {
 		p.stopLocked()
 		return false, true, nil
 	}
@@ -387,19 +396,19 @@ func (p *PlayerAttack) thinkLocked(castStopping bool) (accepted, actionFailed bo
 }
 
 // attackRefuser is the optional AttackController capability that refuses an
-// attack as CanAttack does and tells the player when the active weapon is
-// why.
+// attack as CanAttack does and tells the player why when the reason is one
+// the player is told of.
 type attackRefuser interface {
 	RefuseAttack(attackable.Combatant) bool
 }
 
-// refusesAttackLocked runs the attack gate for the think about to swing at
-// target, telling the player a weapon refusal once per think.
-func (p *PlayerAttack) refusesAttackLocked(target attackable.Combatant) bool {
-	if r, ok := p.attack.(attackRefuser); ok {
+// refusesAttack runs ctrl's attack gate for a think about to swing at target,
+// telling the player a told-of refusal once per think.
+func refusesAttack(ctrl AttackController, target attackable.Combatant) bool {
+	if r, ok := ctrl.(attackRefuser); ok {
 		return r.RefuseAttack(target)
 	}
-	return !p.attack.CanAttack(target)
+	return !ctrl.CanAttack(target)
 }
 
 func (p *PlayerAttack) stopLocked() {

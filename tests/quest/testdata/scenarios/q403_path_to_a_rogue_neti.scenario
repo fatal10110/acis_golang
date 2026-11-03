@@ -1,0 +1,45 @@
+# Path to a Rogue (Q403), level 19, quest started: Neti gives the bow and the dagger for the letter. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q403_path_to_a_rogue_neti.golden
+character Rogue 19
+quest Q403_PathToARogue <cond>=1 <state>=STARTED
+hold 1180 1
+script quest.Q403_PathToARogue
+item 1180 1181 1182 1183 1184 1185 1186 1187 1188 1189 1190
+page guard/30379.htm
+page default/30425.htm
+page script/quest/Q403_PathToARogue/
+npc bezique 30379 Guard 10 0 0
+npc neti 30425 Folk -10 0 0
+npc skel 20035 Monster 40 0 0
+npc bandit 27038 Monster 50 0 0
+
+action neti
+  items 1180=1
+  rows Q403_PathToARogue <cond>=1 <state>=STARTED
+  state Q403_PathToARogue STARTED
+action neti
+  S ActionFailed
+  S NpcHtmlMessage obj=neti item=0 page=default/30425.htm
+  S ActionFailed
+bypass npc_{neti}_Quest
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q403_PathToARogue 30425-05.htm
+action neti
+  S ActionFailed
+  S NpcHtmlMessage obj=neti item=0 page=default/30425.htm
+  S ActionFailed
+bypass npc_{neti}_Quest
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-01.htm
+  S ActionFailed
+  S ActionFailed
+action bezique
+action bezique
+  S ActionFailed
+  S NpcHtmlMessage obj=bezique item=0 page=guard/30379.htm
+  S ActionFailed
+bypass npc_{bezique}_Quest
+  S NpcHtmlMessage obj=bezique item=0 page=script/quest/Q403_PathToARogue/30379-07.htm
+  S ActionFailed
+  S ActionFailed

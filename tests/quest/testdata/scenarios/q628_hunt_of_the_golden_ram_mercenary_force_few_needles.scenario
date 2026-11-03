@@ -1,0 +1,25 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): a hundred splinters and five needles fall short of the swap.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_few_needles.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+hold 7246 1
+hold 7248 100
+hold 7249 5
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31554.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc kahman 31554 Folk 10 0 0
+
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-09.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-04a.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+  items 7246=1 7247=0 7248=100 7249=5

@@ -1,0 +1,81 @@
+# Prove your courage! (Q613) for a level 75 Varka ally of level 3 holding the level 3 alliance mark: Ashas Varka Durai
+# offers the quest and the player takes it. Hekaton's death gives the head (cond 2, the middle sound first), and Ashas trades it
+# for the Feather of Valor and 10000 experience, ending the quest. Holding the feather he is no longer offered it. The head
+# going to every ally of the killer's party is in varka_party_test.go. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q613_prove_your_courage_ally.golden
+character Ally 75
+standing -3
+hold 7223 1
+script quest.Q613_ProveYourCourage
+item 7240 7229 7223
+page npcdefault.htm
+page script/quest/Q613_ProveYourCourage/
+npc ashas 31377 Folk 10 0 0
+npc hekaton 25299 Monster 40 0 0
+
+action ashas
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q613_ProveYourCourage/31377-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q613_ProveYourCourage 31377-04.htm
+  Q upsert Q613_ProveYourCourage | <state> | STARTED
+  Q upsert Q613_ProveYourCourage | <cond> | 1
+  S QuestList 613:0x80000001
+  S ExShowQuestMark quest=613
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q613_ProveYourCourage/31377-04.htm
+  S ActionFailed
+  rows Q613_ProveYourCourage <cond>=1 <state>=STARTED
+  state Q613_ProveYourCourage STARTED
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q613_ProveYourCourage/31377-06.htm
+  S ActionFailed
+  S ActionFailed
+kill hekaton
+  S SystemMessage id=95 1:0 1:0
+  Q upsert Q613_ProveYourCourage | <cond> | 2
+  S QuestList 613:0x80000003
+  S ExShowQuestMark quest=613
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7240
+  rows Q613_ProveYourCourage <cond>=2 <state>=STARTED
+  items 7240=1
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q613_ProveYourCourage/31377-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q613_ProveYourCourage 31377-07.htm
+  S SystemMessage id=302 3:7240
+  S SystemMessage id=54 3:7229
+  S SystemMessage id=45 1:10000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  Q delete-quest Q613_ProveYourCourage
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q613_ProveYourCourage/31377-07.htm
+  S ActionFailed
+  items 7240=0 7229=1 7223=1
+  rows Q613_ProveYourCourage -
+  state Q613_ProveYourCourage -
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q613_ProveYourCourage/31377-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q613_ProveYourCourage CREATED

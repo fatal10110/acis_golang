@@ -4,7 +4,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -100,12 +99,8 @@ func TestSwampSlowsTheMoveSpeedMultiplier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := commons.NewStatSet()
-	set.Set("move_bonus", -80)
-	swamp, err := zone.NewSwamp(1, form, set)
-	if err != nil {
-		t.Fatal(err)
-	}
+	swamp := zone.NewSwamp(1, form)
+	swamp.MoveBonus = -80
 	zones := zone.NewIndex()
 	zones.Add(swamp)
 	srv, character, objID := bootInZones(t, zones)

@@ -1,0 +1,135 @@
+# Crystals of Fire and Ice (Q306): a level 17 character accepts at Katerina (a merchant); six
+# salamanders give six flame shards and five undines five ice shards (every roll pinned to
+# succeed); Katerina pays 30 per shard and 5000 more for over ten; one more flame shard is paid 30
+# with no bonus; the player keeps going once, then quits the repeatable quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q306_crystals_of_fire_and_ice.golden
+character Crystal 17
+random always 0
+script quest.Q306_CrystalsOfFireAndIce
+item 1020 1021
+page merchant/30004.htm
+page script/quest/Q306_CrystalsOfFireAndIce/
+npc katerina 30004 Merchant 10 0 0
+npc salamander 20109 Monster 40 0 0
+npc undine 20110 Monster 0 40 0
+
+# Katerina: accept.
+action katerina
+action katerina
+  S ActionFailed
+  S NpcHtmlMessage obj=katerina item=0 page=merchant/30004.htm
+  S ActionFailed
+bypass npc_{katerina}_Quest
+  S NpcHtmlMessage obj=katerina item=0 page=script/quest/Q306_CrystalsOfFireAndIce/30004-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q306_CrystalsOfFireAndIce CREATED
+bypass Quest Q306_CrystalsOfFireAndIce 30004-03.htm
+  S QuestList 306:0x80000001
+  S ExShowQuestMark quest=306
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=katerina item=0 page=script/quest/Q306_CrystalsOfFireAndIce/30004-03.htm
+  S ActionFailed
+  Q upsert Q306_CrystalsOfFireAndIce | <state> | STARTED
+  Q upsert Q306_CrystalsOfFireAndIce | <cond> | 1
+  state Q306_CrystalsOfFireAndIce STARTED
+  rows Q306_CrystalsOfFireAndIce <cond>=1 <state>=STARTED
+
+# No shards yet.
+action katerina
+  S ActionFailed
+  S NpcHtmlMessage obj=katerina item=0 page=merchant/30004.htm
+  S ActionFailed
+bypass npc_{katerina}_Quest
+  S NpcHtmlMessage obj=katerina item=0 page=script/quest/Q306_CrystalsOfFireAndIce/30004-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Six flame shards and five ice shards.
+kill salamander x6
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1020
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1020
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1020
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1020
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1020
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1020
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1020=6
+kill undine x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1021
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1021
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1021
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1021
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1021
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1021=5
+
+# Katerina: 11 x 30 + 5000; then keep going.
+action katerina
+  S ActionFailed
+  S NpcHtmlMessage obj=katerina item=0 page=merchant/30004.htm
+  S ActionFailed
+bypass npc_{katerina}_Quest
+  S SystemMessage id=301 3:1020 6:6
+  S SystemMessage id=301 3:1021 6:5
+  S SystemMessage id=52 6:5330
+  S NpcHtmlMessage obj=katerina item=0 page=script/quest/Q306_CrystalsOfFireAndIce/30004-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1020=0 1021=0 57=5330
+  rows Q306_CrystalsOfFireAndIce <cond>=1 <state>=STARTED
+bypass Quest Q306_CrystalsOfFireAndIce 30004-07.htm
+  S NpcHtmlMessage obj=katerina item=0 page=script/quest/Q306_CrystalsOfFireAndIce/30004-07.htm
+  S ActionFailed
+
+# One more flame shard: 30, no bonus; then quit.
+kill salamander
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1020
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1020=1
+action katerina
+  S ActionFailed
+  S NpcHtmlMessage obj=katerina item=0 page=merchant/30004.htm
+  S ActionFailed
+bypass npc_{katerina}_Quest
+  S SystemMessage id=302 3:1020
+  S SystemMessage id=52 6:30
+  S NpcHtmlMessage obj=katerina item=0 page=script/quest/Q306_CrystalsOfFireAndIce/30004-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1020=0 57=5360
+bypass Quest Q306_CrystalsOfFireAndIce 30004-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=katerina item=0 page=script/quest/Q306_CrystalsOfFireAndIce/30004-06.htm
+  S ActionFailed
+  Q delete-quest Q306_CrystalsOfFireAndIce
+  state Q306_CrystalsOfFireAndIce -
+  rows Q306_CrystalsOfFireAndIce -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q306_CrystalsOfFireAndIce -
+  rows Q306_CrystalsOfFireAndIce -
+  items 57=5360

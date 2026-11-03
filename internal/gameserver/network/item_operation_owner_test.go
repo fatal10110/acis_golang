@@ -58,7 +58,7 @@ func TestSettleConfirmedTradeHoldsBothTradersOwners(t *testing.T) {
 func TestPickupOfBoundGroundItemHoldsTheGroupsOwners(t *testing.T) {
 	link, _, _, _, first, second := newDirectTradeFixture(t)
 	probe := newGateProbe(link)
-	link.groundItems = task.NewGroundItems(link.world, task.DefaultGroundItemOptions(), nil)
+	link.belongings.groundItems = task.NewGroundItems(link.world, task.DefaultGroundItemOptions(), nil)
 
 	const heldStack, groundObject, giverStack, giver int32 = 5700, 5701, 5702, 7700
 	addProbedStack(link, probe, first.ObjectID(), first.Inventory().AddNew(item.AdenaID, 40, heldStack))

@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -54,23 +53,68 @@ doors:
 	return table, nil
 }
 
+// buildDoorTemplate folds a <door> element's own, <position>, <stats> and
+// <function> attributes, in that order with later ones winning, and reads
+// the template from them. The position coordinates are integer literals;
+// the function attributes default to a closed, NPC-opened door with no
+// residence link or timers.
 func buildDoorTemplate(el doorElement) (*door.Template, error) {
-	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	set.MergeXMLAttrs(el.Position.Attrs)
-	if err := decodeLiteralAttrs(set, "x", "y", "z"); err != nil {
+	vals := foldAttrs(el.Attrs)
+	for k, v := range foldAttrs(el.Position.Attrs) {
+		vals[k] = v
+	}
+	if err := canonicalizeLiteralAttrs(vals, "x", "y", "z"); err != nil {
 		return nil, fmt.Errorf("door position: %w", err)
 	}
-	set.MergeXMLAttrs(el.Stats.Attrs)
-	set.MergeXMLAttrs(el.Function.Attrs)
+	for _, attrs := range [][]xml.Attr{el.Stats.Attrs, el.Function.Attrs} {
+		for k, v := range foldAttrs(attrs) {
+			vals[k] = v
+		}
+	}
 
-	coords := make([]location.Point, 0, len(el.Coordinates))
-	for _, coord := range el.Coordinates {
-		point, err := coord.point()
+	a := newAttrValues(vals, "door: template")
+	id := a.int("id")
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	a.prefix = fmt.Sprintf("door: template %d", id)
+
+	t := &door.Template{
+		ID:       id,
+		Name:     a.strDefault("name", ""),
+		Kind:     attrEnum(a, "type", door.ParseKind),
+		Level:    a.int("level"),
+		Position: location.Location{X: a.int("x"), Y: a.int("y"), Z: a.int("z")},
+
+		HP:     a.int("hp"),
+		PDef:   a.int("pDef"),
+		MDef:   a.int("mDef"),
+		Height: a.int("height"),
+
+		CastleID:    a.intDefault("castle", 0),
+		ClanHallID:  a.intDefault("clanHall", 0),
+		TriggeredID: a.intDefault("triggeredId", 0),
+		Opened:      a.boolDefault("opened", false),
+		OpenKind:    attrEnumDefault(a, "openType", door.ParseOpenKind, door.OpenNPC),
+		OpenTime:    a.intDefault("openTime", 0),
+		RandomTime:  a.intDefault("randomTime", 0),
+		CloseTime:   a.intDefault("closeTime", 0),
+	}
+	if t.Name == "" {
+		a.fail(fmt.Errorf("name is required"))
+	}
+	for _, c := range el.Coordinates {
+		point, err := c.point()
 		if err != nil {
 			return nil, err
 		}
-		coords = append(coords, point)
+		t.Coordinates = append(t.Coordinates, point)
 	}
-	set.Set("coords", coords)
-	return door.NewTemplate(set)
+	if len(t.Coordinates) < 3 {
+		a.fail(fmt.Errorf("coords requires at least 3 points"))
+	}
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	return t, nil
 }

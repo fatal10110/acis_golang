@@ -1,0 +1,20 @@
+# Gather the Flames (Q617): Hilda answers a character that holds the quest with her fourth page.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q617_gather_the_flames_hilda_started.golden
+character Hero 74
+quest Q617_GatherTheFlames <cond>=1 <state>=STARTED
+script quest.Q617_GatherTheFlames
+item 7264 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page trainer/31271.htm
+page script/quest/Q617_GatherTheFlames/
+npc hilda 31271 Trainer 10 0 0
+
+action hilda
+action hilda
+  S ActionFailed
+  S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
+  S ActionFailed
+bypass npc_{hilda}_Quest
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q617_GatherTheFlames/31271-04.htm
+  S ActionFailed
+  S ActionFailed

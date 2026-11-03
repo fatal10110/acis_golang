@@ -1,0 +1,19 @@
+# ValakasPrivateLavasaurus (29029, its shipped Magma Attack 4607), every draw 0, raised by nobody
+# (its spawn names no target), 1500 away from the character, out of its 1000 sight. The character
+# coming within 400 draws its magic strike on it from where it stands, weight 1000000, and a held
+# attack at 50, which has it take up the strike at once. A hit while it casts at its top desire
+# target adds the attack alone, 100; no clan call reaches it in its first AI cycles.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold
+script script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus
+script script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive
+npc lava 29029 Monster 1500 0 0 skill DD_MAGIC 4607 1
+
+approach lava 400
+  S MagicSkillUse caster=lava target=player skill=4607-1 hit=1982 reuse=0 success=0
+  desires lava attack(player)=50 cast(player,4607)=1000000
+hit lava 22
+  desires lava attack(player)=150 cast(player,4607)=1000000

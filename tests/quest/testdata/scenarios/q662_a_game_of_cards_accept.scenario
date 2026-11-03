@@ -1,0 +1,39 @@
+# A Game Of Cards (Q662), level 61: the character accepts, is told to bring the gems and relogs. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q662_a_game_of_cards_accept.golden
+character Gambler 61
+script quest.Q662_AGameOfCards
+item 8765 959 729 947 951 955 956 8868
+page villagemaster/30845.htm
+page script/quest/Q662_AGameOfCards/
+npc klump 30845 VillageMasterDwarf 10 0 0
+
+action klump
+action klump
+  S ActionFailed
+  S NpcHtmlMessage obj=klump item=0 page=villagemaster/30845.htm
+  S ActionFailed
+bypass npc_{klump}_Quest
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q662_AGameOfCards 30845-03.htm
+  S QuestList 662:0x80000001
+  S ExShowQuestMark quest=662
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-03.htm
+  S ActionFailed
+  Q upsert Q662_AGameOfCards | <state> | STARTED
+  Q upsert Q662_AGameOfCards | <cond> | 1
+  Q upsert Q662_AGameOfCards | state | 0
+  Q upsert Q662_AGameOfCards | stateEx | 0
+action klump
+  S ActionFailed
+  S NpcHtmlMessage obj=klump item=0 page=villagemaster/30845.htm
+  S ActionFailed
+bypass npc_{klump}_Quest
+  S NpcHtmlMessage obj=klump item=0 page=script/quest/Q662_AGameOfCards/30845-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q662_AGameOfCards <cond>=1 <state>=STARTED state=0 stateEx=0
+  state Q662_AGameOfCards STARTED

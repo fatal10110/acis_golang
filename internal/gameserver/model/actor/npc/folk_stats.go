@@ -3,38 +3,84 @@ package npc
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 var _ effect.StatOwner = (*Folk)(nil)
 
-// statCalc returns s's live Calculator, creating it on first touch.
+// statCalc returns s's Calculator, creating it from s's template passives
+// and builtin finalize step on first use.
 func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
-	f.statMu.RLock()
-	if calc := f.statCalcs[s]; calc != nil {
-		f.statMu.RUnlock()
-		return calc
-	}
-	f.statMu.RUnlock()
 	f.statMu.Lock()
 	defer f.statMu.Unlock()
+	if f.statCalcs == nil {
+		f.statCalcs = new([stat.Count]*effect.Calculator)
+	}
 	if calc := f.statCalcs[s]; calc != nil {
 		return calc
 	}
-	calc := effect.NewCalculator(defaultBuiltin(s))
+	calc := f.passives.NewCalculator(s, f.builtin(s))
 	f.statCalcs[s] = &calc
 	return &calc
 }
 
+// builtin returns s's builtin finalize step for the NPC, nil for none.
+func (f *Folk) builtin(s stat.Stat) funcs.Func {
+	if f.SiegeFlag() {
+		// A siege headquarters has none of a creature's built-in bonuses.
+		return nil
+	}
+	return defaultBuiltin(s)
+}
+
+// ownerCalcs returns the NPC's stat slots, with one created for every Stat
+// a template passive of owner modifies so that its Mods can be dropped.
+func (f *Folk) ownerCalcs(owner effect.ModOwner) [stat.Count]*effect.Calculator {
+	f.statMu.RLock()
+	passives := f.passives
+	f.statMu.RUnlock()
+	for s := range passives.StatsOwnedBy(owner) {
+		f.statCalc(s)
+	}
+	f.statMu.RLock()
+	defer f.statMu.RUnlock()
+	if f.statCalcs == nil {
+		return [stat.Count]*effect.Calculator{}
+	}
+	return *f.statCalcs
+}
+
 // CalcStat finalizes base for s through the NPC's builtin funcs, template
-// passives and the funcs of the effects it holds, flooring a non-positive
-// stat that can't go negative at one.
+// passives and the funcs of the effects it holds, against no target and no
+// skill.
 func (f *Folk) CalcStat(s stat.Stat, base float64) float64 {
-	value := f.statCalc(s).Calc(templateStatActor{t: f.Instance.Template}, base)
+	return f.calcFor(s, base, nil, nil)
+}
+
+// calcFor is CalcStat for a calculation against target run for skill: a
+// conditional func tests f against them. A non-positive stat that can't go
+// negative is floored at one.
+func (f *Folk) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	f.statMu.RLock()
+	var calc *effect.Calculator
+	if f.statCalcs != nil {
+		calc = f.statCalcs[s]
+	}
+	passives := f.passives
+	f.statMu.RUnlock()
+	var value float64
+	if calc != nil {
+		value = calc.Calc(f.statActor(), base, target, skill)
+	} else {
+		value = passives.Calc(s, f.builtin(s), f.statActor(), base, target, skill)
+	}
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -65,11 +111,8 @@ func (f *Folk) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
 	}
-	f.statMu.RLock()
-	calcs := f.statCalcs
-	f.statMu.RUnlock()
 	var modified []stat.Stat
-	for s, calc := range calcs {
+	for s, calc := range f.ownerCalcs(owner) {
 		if calc != nil && calc.RemoveOwner(owner) > 0 {
 			modified = append(modified, stat.Stat(s))
 		}
@@ -108,10 +151,10 @@ func (f *Folk) broadcastModifiedStats(stats []stat.Stat) {
 	}
 }
 
-// MaxBuffCount is the configured buff-slot count plus the template's
-// Divine Inspiration.
+// MaxBuffCount is the base buff-slot count in force (Limits) plus the
+// template's Divine Inspiration.
 func (f *Folk) MaxBuffCount() int {
-	return int(f.maxBuffs.Load()) + f.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
+	return f.Instance.maxBuffsBase() + f.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
 }
 
 // UpdateEffectIcons does nothing: NPCs show no effect icons.
@@ -148,45 +191,37 @@ func (f *Folk) WIT() int { return f.Instance.Template.WIT }
 func (f *Folk) MEN() int { return f.Instance.Template.MEN }
 
 // PAtk returns the physical attack, truncated to a whole number.
-func (f *Folk) PAtk() float64 {
-	return math.Trunc(f.CalcStat(stat.PowerAttack, f.Instance.Template.PAtk))
-}
+func (f *Folk) PAtk() float64 { return folkSkillStats{f: f}.PAtk() }
 
 // PDef returns the physical defence, truncated to a whole number.
-func (f *Folk) PDef() float64 {
-	return math.Trunc(f.CalcStat(stat.PowerDefence, f.Instance.Template.PDef))
-}
+func (f *Folk) PDef() float64 { return folkSkillStats{f: f}.PDef() }
 
 // MAtk returns the magic attack, truncated to a whole number.
-func (f *Folk) MAtk() float64 {
-	return math.Trunc(f.CalcStat(stat.MagicAttack, positiveStat(f.Instance.Template.MAtk)))
-}
+func (f *Folk) MAtk() float64 { return folkSkillStats{f: f}.MAtk() }
 
 // MDef returns the magic defence, truncated to a whole number.
-func (f *Folk) MDef() float64 {
-	return math.Trunc(f.CalcStat(stat.MagicDefence, positiveStat(f.Instance.Template.MDef)))
-}
+func (f *Folk) MDef() float64 { return folkSkillStats{f: f}.MDef() }
+
+// CriticalRate returns the physical critical rate, capped at 500.
+func (f *Folk) CriticalRate() float64 { return folkSkillStats{f: f}.CriticalRate() }
 
 // MagicCriticalRate returns the magic critical rate.
-func (f *Folk) MagicCriticalRate() float64 { return f.CalcStat(stat.MCriticalRate, 8) }
+func (f *Folk) MagicCriticalRate() float64 { return folkSkillStats{f: f}.MagicCriticalRate() }
 
 // Evasion returns the physical evasion.
-func (f *Folk) Evasion() int { return int(f.CalcStat(stat.EvasionRate, 0)) }
+func (f *Folk) Evasion() int { return folkSkillStats{f: f}.Evasion() }
 
-// LethalRate returns the lethal-strike rate multiplier.
-func (f *Folk) LethalRate() float64 { return f.CalcStat(stat.LethalRate, 1) }
+// AttackType returns the kind of the template's right-hand weapon, a fist
+// when it holds none.
+func (f *Folk) AttackType() item.WeaponType {
+	if f.fight.weapon == nil {
+		return item.WeaponFist
+	}
+	return f.fight.weapon.Type
+}
 
-// AttackType reports a fist: a civilian NPC never attacks, so its weapon
-// takes part in no formula.
-func (f *Folk) AttackType() item.WeaponType { return item.WeaponFist }
-
-// SoulshotCharged reports false: a civilian NPC never attacks.
-func (f *Folk) SoulshotCharged() bool { return false }
-
-// SpiritshotCharged reports false: a civilian NPC never casts.
-func (f *Folk) SpiritshotCharged() bool { return false }
-
-// BlessedSpiritshotCharged reports false: a civilian NPC never casts.
+// BlessedSpiritshotCharged reports false: an NPC charges plain spiritshots
+// only.
 func (f *Folk) BlessedSpiritshotCharged() bool { return false }
 
 // WeaponGradePenalty reports false: NPCs carry no weapon grade.
@@ -224,14 +259,16 @@ func (f *Folk) MaxMPValue() float64 {
 	return math.Trunc(f.CalcStat(stat.MaxMP, f.Instance.Template.MPMax))
 }
 
-// HPRegenRate returns the HP regenerated per tick.
+// HPRegenRate returns the HP regenerated per tick: the configured multiple
+// of the template base, through the stat calculator.
 func (f *Folk) HPRegenRate() float64 {
-	return f.CalcStat(stat.RegenerateHPRate, f.Instance.Template.HPRegen)
+	return f.CalcStat(stat.RegenerateHPRate, f.Instance.Template.HPRegen*regenInForce(f.regenSettings).HP)
 }
 
-// MPRegenRate returns the MP regenerated per tick.
+// MPRegenRate returns the MP regenerated per tick: the configured multiple
+// of the template base, through the stat calculator.
 func (f *Folk) MPRegenRate() float64 {
-	return f.CalcStat(stat.RegenerateMPRate, f.Instance.Template.MPRegen)
+	return f.CalcStat(stat.RegenerateMPRate, f.Instance.Template.MPRegen*regenInForce(f.regenSettings).MP)
 }
 
 // MoveSpeed is the current move speed: the template run or walk speed the
@@ -267,4 +304,51 @@ func (f *Folk) refreshMoveSpeed() {
 	f.speedMu.Lock()
 	defer f.speedMu.Unlock()
 	f.motion.move.SetSpeed(f.MoveSpeed())
+}
+
+// Against is f's stats read for a calculation against target run for
+// skill: a conditional func of f's tests them.
+func (f *Folk) Against(target conditions.Actor, skill conditions.Skill) creature.SkillStats {
+	return folkSkillStats{f: f, target: target, skill: skill}
+}
+
+// folkSkillStats is a civilian NPC's stats read against one target and
+// skill (none for its plain stats).
+type folkSkillStats struct {
+	f      *Folk
+	target conditions.Actor
+	skill  conditions.Skill
+}
+
+func (s folkSkillStats) CalcStat(st stat.Stat, base float64) float64 {
+	return s.f.calcFor(st, base, s.target, s.skill)
+}
+
+func (s folkSkillStats) PAtk() float64 {
+	return math.Trunc(s.f.calcFor(stat.PowerAttack, s.f.Instance.Template.PAtk, s.target, nil))
+}
+
+func (s folkSkillStats) PDef() float64 {
+	return math.Trunc(s.f.calcFor(stat.PowerDefence, s.f.Instance.Template.PDef, s.target, nil))
+}
+
+func (s folkSkillStats) MAtk() float64 {
+	return math.Trunc(s.f.calcFor(stat.MagicAttack, positiveStat(s.f.Instance.Template.MAtk), s.target, s.skill))
+}
+
+func (s folkSkillStats) MDef() float64 {
+	return math.Trunc(s.f.calcFor(stat.MagicDefence, positiveStat(s.f.Instance.Template.MDef), s.target, s.skill))
+}
+
+func (s folkSkillStats) Evasion() int {
+	return int(s.f.calcFor(stat.EvasionRate, 0, s.target, nil))
+}
+
+// CriticalRate is the physical critical rate, capped at 500.
+func (s folkSkillStats) CriticalRate() float64 {
+	return float64(min(int(s.f.calcFor(stat.CriticalRate, s.f.Instance.Template.CritRate, s.target, nil)), 500))
+}
+
+func (s folkSkillStats) MagicCriticalRate() float64 {
+	return s.f.calcFor(stat.MCriticalRate, 8, s.target, s.skill)
 }

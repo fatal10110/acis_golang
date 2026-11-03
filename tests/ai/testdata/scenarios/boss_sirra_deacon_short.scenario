@@ -1,0 +1,19 @@
+# FreyaDeacon (32029), free, asked to let in a party whose leader, the first member in party order,
+# holds no Silver Hemocyte: the leader is shown freya_deacon_q0656_03.htm with its own name in
+# %name% and its client released, and the entry answers nothing more. Expectations are derived
+# from the reference source (FreyaDeacon.java 92-110).
+character Hunter 20
+member Mate 20
+script script.ai.individual.DefaultNpc
+script script.ai.boss.sirra.FreyaDeacon
+page script/ai/boss/sirra/FreyaDeacon/
+npc deacon 32029 Folk 60 0 0
+
+action deacon
+action deacon
+  S ActionFailed
+  S NpcHtmlMessage obj=deacon item=0 page=script/ai/boss/sirra/FreyaDeacon/freya_deacon001.htm
+  S ActionFailed
+bypass Quest FreyaDeacon enter
+  S NpcHtmlMessage obj=deacon item=0 html="<html><body>Steward:<br>\nRafferty has probably briefed you already, but to summarize: If you want to go on this quest, you and your companions must each present us with 10 Silver Hemocytes as a sign of your good faith. This means everyone in the party must have at least 10 Silver Hemocytes in order to participate; outsiders are not welcome. Currently, <font color=\"LEVEL\">Hunter </font> is not in possession of Silver Hemocytes.\n</body></html>\n"
+  S ActionFailed

@@ -1,0 +1,16 @@
+# TyrannoPrimeval (22216, the soul) with CollectGhost 1 and CollectGhostDespawnTime 1, out of combat: it leaves the
+# world a minute after it appeared, not before.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval
+npc ghost 22216 Monster 1500 0 0 skill SELF_BUFF1 5087 1 skill SELF_BUFF2 5087 2 skill DEBUFF1 5098 1 skill DEBUFF2 5098 2 skill CAPTURE_CANCEL_A 5099 1 skill CAPTURE_CANCEL_B 5100 1 skill CAPTURE_CANCEL_C 5101 1 skill CAPTURE_CANCEL_ALL 5102 1 skill LONG_RANGE_DD_MAGIC1 5120 1 ai CollectGhost=1,CollectGhostDespawnTime=1
+
+advance 59s
+  inworld ghost yes
+advance 1s
+  S DeleteObject obj=ghost
+  inworld ghost no

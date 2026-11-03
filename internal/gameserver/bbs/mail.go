@@ -354,13 +354,13 @@ type Sender struct {
 // every check but the invalid target. Only a mail whose fields fit their
 // columns is stored; one that does not reaches its recipients for the run
 // but files no sent-box copy. It still counts against the sender's daily
-// limit, which the reference reaches only by storing a truncated row.
+// limit, as a stored mail does.
 func (m *Mailbox) Send(sender Sender, recipients []Recipient, list, subject, message string, now time.Time) ([]Delivery, bool) {
 	subject = trimOr(subject, subjectLength, noSubject)
 	message = strings.ReplaceAll(message, "\n", "<br1>")
-	stored := utf8.RuneCountInString(list) <= recipientsColumnWidth &&
-		utf8.RuneCountInString(subject) <= subjectColumnWidth &&
-		utf8.RuneCountInString(message) <= messageColumnWidth
+	stored := columnLen(list) <= recipientsColumnWidth &&
+		columnLen(subject) <= subjectColumnWidth &&
+		columnLen(message) <= messageColumnWidth
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -420,4 +420,9 @@ func (m *Mailbox) fileLocked(mail Mail, stored bool) {
 		row := mail
 		m.write(row.ID, "insert mail", func(ctx context.Context, st MailStore) error { return st.InsertMail(ctx, row) })
 	}
+}
+
+// columnLen is how many characters s takes in its column once stored.
+func columnLen(s string) int {
+	return utf8.RuneCountInString(s)
 }

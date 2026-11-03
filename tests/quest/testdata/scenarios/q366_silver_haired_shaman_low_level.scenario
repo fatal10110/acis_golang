@@ -1,0 +1,23 @@
+# Silver Haired Shaman (Q366), level 47: Dieter turns the character away. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q366_silver_haired_shaman_low_level.golden
+character Shaman 47
+script quest.Q366_SilverHairedShaman
+item 57 5874
+page trainer/30111.htm
+page script/quest/Q366_SilverHairedShaman/
+npc dieter 30111 Trainer 10 0 0
+npc sairon 20986 Monster 40 0 0
+npc doll 20987 Monster 50 0 0
+npc puppet 20988 Monster 60 0 0
+
+action dieter
+action dieter
+  S ActionFailed
+  S NpcHtmlMessage obj=dieter item=0 page=trainer/30111.htm
+  S ActionFailed
+bypass npc_{dieter}_Quest
+  S NpcHtmlMessage obj=dieter item=0 page=script/quest/Q366_SilverHairedShaman/30111-0.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q366_SilverHairedShaman -

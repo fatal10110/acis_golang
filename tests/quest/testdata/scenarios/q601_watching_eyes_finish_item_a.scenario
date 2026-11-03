@@ -1,0 +1,36 @@
+# Watching Eyes (Q601): the character hands in 100 proofs and the reward draw is 10: adena, five items and experience.
+# The quest ends. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q601_watching_eyes_finish_item_a.golden
+character Hero 72
+quest Q601_WatchingEyes <cond>=2 <state>=STARTED
+hold 7188 100
+random 10
+script quest.Q601_WatchingEyes
+item 7188 6699 6698 6700 57
+page default/31683.htm
+page script/quest/Q601_WatchingEyes/
+npc eye 31683 Folk 10 0 0
+npc disciple 21306 Monster 40 0 0
+
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q601_WatchingEyes/31683-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q601_WatchingEyes 31683-07.htm
+  S SystemMessage id=301 3:7188 6:100
+  S SystemMessage id=52 6:90000
+  S SystemMessage id=53 3:6699 6:5
+  S SystemMessage id=95 1:120000 1:10000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q601_WatchingEyes/31683-07.htm
+  S ActionFailed
+  Q delete-quest Q601_WatchingEyes
+  items 7188=0 57=90000 6699=5
+  state Q601_WatchingEyes -
+  rows Q601_WatchingEyes -

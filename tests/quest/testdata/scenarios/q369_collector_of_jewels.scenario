@@ -1,0 +1,58 @@
+# Collector of Jewels (Q369): a level 25 character accepts at Nell, kills a Lakin Salamander and a Lakin Undine
+# (every roll pinned to succeed); then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q369_collector_of_jewels.golden
+character Jewels 25
+random always 0
+script quest.Q369_CollectorOfJewels
+item 57 5882 5883
+page trainer/30376.htm
+page script/quest/Q369_CollectorOfJewels/
+npc nell 30376 Trainer 10 0 0
+npc lakin 20609 Monster 40 0 0
+npc rowin 20612 Monster 50 0 0
+npc deathfire 20749 Monster 60 0 0
+npc undine 20616 Monster -40 0 0
+npc rowinundine 20619 Monster -50 0 0
+npc roxide 20747 Monster -60 0 0
+
+action nell
+action nell
+  S ActionFailed
+  S NpcHtmlMessage obj=nell item=0 page=trainer/30376.htm
+  S ActionFailed
+bypass npc_{nell}_Quest
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q369_CollectorOfJewels 30376-03.htm
+  S QuestList 369:0x80000001
+  S ExShowQuestMark quest=369
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-03.htm
+  S ActionFailed
+  Q upsert Q369_CollectorOfJewels | <state> | STARTED
+  Q upsert Q369_CollectorOfJewels | <cond> | 1
+  state Q369_CollectorOfJewels STARTED
+  rows Q369_CollectorOfJewels <cond>=1 <state>=STARTED
+action nell
+  S ActionFailed
+  S NpcHtmlMessage obj=nell item=0 page=trainer/30376.htm
+  S ActionFailed
+bypass npc_{nell}_Quest
+  S NpcHtmlMessage obj=nell item=0 page=script/quest/Q369_CollectorOfJewels/30376-04.htm
+  S ActionFailed
+  S ActionFailed
+kill lakin
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5882
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5882=1
+kill undine
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5883
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5883=1
+relog
+  rows Q369_CollectorOfJewels <cond>=1 <state>=STARTED
+  items 5882=1 5883=1

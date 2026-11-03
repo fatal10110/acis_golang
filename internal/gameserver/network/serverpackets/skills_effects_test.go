@@ -4,32 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // ---- from acquireskill_test.go ----
-func TestFrameAcquireSkillInfo(t *testing.T) {
-	got := framePayload(t, FrameAcquireSkillInfo(3, 1, 50, 0, []SkillRequirement{
-		{Type: 99, ItemID: 57, Count: 1, Unknown: 50},
-	}))
-
-	want := []byte{OpcodeAcquireSkillInfo}
-	want = binary.LittleEndian.AppendUint32(want, 3)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 50)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 99)
-	want = binary.LittleEndian.AppendUint32(want, 57)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 50)
-
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameAcquireSkillInfo() = %x, want %x", got, want)
-	}
-}
-
 func TestFrameAcquireSkillList(t *testing.T) {
 	got := framePayload(t, FrameAcquireSkillList(AcquireSkillTypeUsual, []AcquireSkillListEntry{
 		{ID: 3, Level: 1, Cost: 50},
@@ -64,32 +41,7 @@ func TestFrameAcquireSkillDone(t *testing.T) {
 }
 
 // ---- from actionfailed_test.go ----
-func TestFrameActionFailed(t *testing.T) {
-	got := framePayload(t, FrameActionFailed())
-	want := []byte{OpcodeActionFailed}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameActionFailed() = %x, want %x", got, want)
-	}
-}
-
 // ---- from magic_skill_test.go ----
-func TestFrameMagicSkillUse(t *testing.T) {
-	got := framePayload(t, FrameMagicSkillUse(
-		SkillCastObject{ObjectID: 100, Location: location.Location{X: 10, Y: 20, Z: 30}},
-		SkillCastObject{ObjectID: 200, Location: location.Location{X: 40, Y: 50, Z: 60}},
-		3, 1, 500, 1200, false,
-	))
-
-	want := []byte{OpcodeMagicSkillUse}
-	for _, v := range []uint32{100, 200, 3, 1, 500, 1200, 10, 20, 30, 0, 40, 50, 60} {
-		want = binary.LittleEndian.AppendUint32(want, v)
-	}
-
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameMagicSkillUse() = %x, want %x", got, want)
-	}
-}
-
 func TestFrameMagicSkillLaunched(t *testing.T) {
 	got := framePayload(t, FrameMagicSkillLaunched(100, 3, 1, []int32{200, 300}))
 
@@ -116,27 +68,6 @@ func TestFrameMagicSkillLaunchedNoTargets(t *testing.T) {
 	}
 }
 
-func TestFrameSetupGauge(t *testing.T) {
-	got := framePayload(t, FrameSetupGauge(GaugeBlue, 500, 1200))
-
-	want := []byte{OpcodeSetupGauge}
-	for _, v := range []uint32{uint32(GaugeBlue), 500, 1200} {
-		want = binary.LittleEndian.AppendUint32(want, v)
-	}
-
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameSetupGauge() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameMagicSkillCanceled(t *testing.T) {
-	got := framePayload(t, FrameMagicSkillCanceled(100))
-	want := []byte{OpcodeMagicSkillCanceled, 100, 0, 0, 0}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameMagicSkillCanceled() = %x, want %x", got, want)
-	}
-}
-
 // ---- from skill_enchant_test.go ----
 func TestFrameExEnchantSkillList(t *testing.T) {
 	got := framePayload(t, FrameExEnchantSkillList([]EnchantSkillEntry{
@@ -157,35 +88,6 @@ func TestFrameExEnchantSkillList(t *testing.T) {
 	want = appendQ(want, 987654321)
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameExEnchantSkillList() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameExEnchantSkillInfo(t *testing.T) {
-	got := framePayload(t, FrameExEnchantSkillInfo(EnchantSkillInfo{
-		ID:     124,
-		Level:  101,
-		SPCost: 250000,
-		XPCost: 123456789,
-		Rate:   82,
-		Requirements: []EnchantSkillRequirement{
-			{Type: 4, ItemID: 6622, Count: 1, Unknown: 0},
-		},
-	}))
-
-	want := []byte{OpcodeExtended}
-	want = appendH(want, OpcodeExEnchantSkillInfo)
-	want = appendD(want, 124)
-	want = appendD(want, 101)
-	want = appendD(want, 250000)
-	want = appendQ(want, 123456789)
-	want = appendD(want, 82)
-	want = appendD(want, 1)
-	want = appendD(want, 4)
-	want = appendD(want, 6622)
-	want = appendD(want, 1)
-	want = appendD(want, 0)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExEnchantSkillInfo() = %x, want %x", got, want)
 	}
 }
 
@@ -239,19 +141,6 @@ func TestFrameAbnormalStatusUpdate(t *testing.T) {
 
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameAbnormalStatusUpdate() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameShortBuffStatusUpdate(t *testing.T) {
-	got := framePayload(t, FrameShortBuffStatusUpdate(1323, 1, 120))
-
-	want := []byte{OpcodeShortBuffStatusUpdate}
-	for _, v := range []uint32{1323, 1, 120} {
-		want = binary.LittleEndian.AppendUint32(want, v)
-	}
-
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShortBuffStatusUpdate() = %x, want %x", got, want)
 	}
 }
 

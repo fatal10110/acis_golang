@@ -8,7 +8,7 @@ import (
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 )
 
-// gateTreasury blocks inside PayHallFee until released, then answers pay;
+// gateTreasury blocks inside TakeAdena until released, then answers pay;
 // it records every fee asked.
 type gateTreasury struct {
 	entered chan struct{}
@@ -19,13 +19,13 @@ type gateTreasury struct {
 	asked []int
 }
 
-func (t *gateTreasury) PayHallFee(_ int32, adena int) bool {
+func (t *gateTreasury) TakeAdena(_ int32, adena int) (Landing, bool) {
 	t.mu.Lock()
 	t.asked = append(t.asked, adena)
 	t.mu.Unlock()
 	t.entered <- struct{}{}
 	<-t.release
-	return t.pay
+	return nil, t.pay
 }
 
 func (t *gateTreasury) fees() []int {
@@ -49,7 +49,7 @@ func TestUpdateDuringFeeKeepsChangedFunction(t *testing.T) {
 		f.treasury = treasury
 		f.mu.Unlock()
 
-		f.Update(feeHall, hallmodel.FuncRestoreHP, 80, 1000, day.Milliseconds())
+		f.Update(feeHall, hallmodel.FuncRestoreHP, 80, 1000, day.Milliseconds(), nil)
 		f.mu.Lock()
 		fn := f.byHall[feeHall][hallmodel.FuncRestoreHP]
 		gen := fn.gen
@@ -70,7 +70,7 @@ func TestUpdateDuringFeeKeepsChangedFunction(t *testing.T) {
 		}
 
 		// The leader pays for a change meanwhile.
-		f.Update(feeHall, hallmodel.FuncRestoreHP, 140, 1750, day.Milliseconds())
+		f.Update(feeHall, hallmodel.FuncRestoreHP, 140, 1750, day.Milliseconds(), nil)
 		changedEnd := clock.Now().Add(day).UnixMilli()
 		savesBefore := store.saved()
 		close(treasury.release)

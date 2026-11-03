@@ -4,15 +4,15 @@ import "testing"
 
 // TestFolkKindLeavesOutClickInertCivilians pins which civilian types spawn
 // as a talkable Folk. ChristmasTree answers every click with ActionFailed
-// alone (no selection, no talk), and HolyThing belongs to the siege
-// runtime, so neither is a Folk; a plain service type such as Merchant is.
+// alone (no selection, no talk), so it is no Folk; a plain service type
+// such as Merchant is, and so is the castle holy artifact (HolyThing).
 func TestFolkKindLeavesOutClickInertCivilians(t *testing.T) {
 	for _, tc := range []struct {
 		kind string
 		folk bool
 	}{
 		{"ChristmasTree", false},
-		{"HolyThing", false},
+		{"HolyThing", true},
 		{"Merchant", true},
 	} {
 		inst, err := NewInstance(1, &Template{ID: 13006, TemplateID: 13006, Type: tc.kind, Level: 1, HPMax: 100})

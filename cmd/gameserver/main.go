@@ -102,6 +102,7 @@ type gameServerPaths struct {
 	PlayersConfigPath string
 	HexIDPath         string
 	GeoConfigPath     string
+	GeoCachePath      string
 	NpcsConfigPath    string
 	ClansConfigPath   string
 	EventsConfigPath  string
@@ -123,6 +124,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.PlayersConfigPath, "players-config", "config/players.properties", "player properties file")
 	flag.StringVar(&paths.HexIDPath, "hexid", "config/hexid.txt", "game server hexid properties file")
 	flag.StringVar(&paths.GeoConfigPath, "geo-config", "config/geoengine.properties", "geoengine properties file")
+	flag.StringVar(&paths.GeoCachePath, "geodata-cache", "geodata.cache", "packed geodata cache file, built from the region files when missing or stale; empty loads the region files onto the heap")
 	flag.StringVar(&paths.NpcsConfigPath, "npcs-config", "config/npcs.properties", "npc properties file")
 	flag.StringVar(&paths.ClansConfigPath, "clans-config", "config/clans.properties", "clan properties file")
 	flag.StringVar(&paths.EventsConfigPath, "events-config", "config/events.properties", "events properties file")
@@ -172,6 +174,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			gamesql.NewMemoStore,
 			gamesql.NewSubclassStore,
 			gamesql.NewPetStore,
+			gamesql.NewBossZoneStore,
 			provideIDAllocator,
 			loadClanConfig,
 			provideClans,
@@ -212,14 +215,19 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideEffectEnv,
 			provideNPCRegen,
 			provideKillRewardConfig,
+			provideEventBook,
+			provideQuestRates,
 			provideSpellbookPolicy,
 			provideNpcs,
 			provideScripts,
 			provideScriptEnv,
+			provideScriptSpawner,
 			provideQuestJournals,
 			provideMakers,
 			network.NewSessionValidator,
 			provideLoginLinkState,
+			provideLoginStatus,
+			provideShutdown,
 			provideSkillPersistence,
 			providePlayerClock,
 			provideMerchant,
@@ -238,8 +246,9 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideDataReloads,
 			provideGameClientLink,
 		),
+		fx.Invoke(reportConfigKeys),
 		fx.Invoke(buildScripts),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startCastleArtifacts, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, startGameServer),
 	}
 }

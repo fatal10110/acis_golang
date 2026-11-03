@@ -1,0 +1,73 @@
+# Song of the Hunter (Q335), level 45: Grey's second test at level 45: Grey offers it, the character takes it with the items held, and passes it. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_test2_pass.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+hold 3692 1
+hold 3717 20
+hold 3718 20
+hold 3719 30
+hold 3720 19
+script quest.Q335_SongOfTheHunter
+item 3692 3693 3696 3717 3718 3719 3720
+page default/30744.htm
+page script/quest/Q335_SongOfTheHunter/
+npc grey 30744 Folk 10 0 0
+
+action grey
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-08.htm
+  S ActionFailed
+  S ActionFailed
+  state Q335_SongOfTheHunter STARTED
+bypass Quest Q335_SongOfTheHunter 30744-09.htm
+  S SystemMessage id=54 3:3696
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-09.htm
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | grey2 | 1
+  items 3696=1
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED grey2=1
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S QuestList 335:0x80000007
+  S ExShowQuestMark quest=335
+  S SystemMessage id=301 3:3717 6:20
+  S SystemMessage id=301 3:3718 6:20
+  S SystemMessage id=301 3:3719 6:30
+  S SystemMessage id=301 3:3720 6:19
+  S SystemMessage id=302 3:3696
+  S SystemMessage id=302 3:3692
+  S SystemMessage id=54 3:3693
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-12.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | <cond> | 3
+  Q delete-var Q335_SongOfTheHunter | grey2
+  state Q335_SongOfTheHunter STARTED
+  items 3692=0 3693=1 3696=0 3717=0 3718=0 3719=0 3720=0
+  rows Q335_SongOfTheHunter <cond>=3 <state>=STARTED
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+action grey
+  S ActionFailed
+  S NpcHtmlMessage obj=grey item=0 page=default/30744.htm
+  S ActionFailed
+bypass npc_{grey}_Quest
+  S NpcHtmlMessage obj=grey item=0 page=script/quest/Q335_SongOfTheHunter/30744-14.htm
+  S ActionFailed
+  S ActionFailed
+  items 3693=1

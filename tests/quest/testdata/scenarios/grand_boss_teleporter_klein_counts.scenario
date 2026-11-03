@@ -1,0 +1,103 @@
+# Klein (GrandBossTeleporter) counts the players he sends into the Lair of Valakas: his page is
+# 31540-01.htm below 50 entries and 31540-02.htm from 50 on (onTalk); a character without a floating
+# stone is refused with 31540-06.htm (onAdvEvent); the count starts over when Valakas dies
+# (onMyDying). The character holds 50 stones, sends itself in 50 times and talks to a Klein
+# standing in the lair, as the first Klein is out of its reach. Expectations are derived from the
+# reference source; the reference probe replays one trip (grand_boss_teleporter_klein).
+character Pilgrim 60
+hold 7267 50
+item 7267
+script script.teleport.GrandBossTeleporter
+page default/31540.htm
+page script/teleport/GrandBossTeleporter/
+npc klein 31540 Folk 10 0 0
+npc lair_klein 31540 Folk 183823 -115177 -3333
+npc valakas 29028 RaidBoss 183853 -115177 -3333
+
+action klein
+action klein
+  S ActionFailed
+  S NpcHtmlMessage obj=klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{klein}_Quest GrandBossTeleporter
+  S NpcHtmlMessage obj=klein item=0 page=script/teleport/GrandBossTeleporter/31540-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest GrandBossTeleporter 31540
+  S SystemMessage id=302 3:7267
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=183813,-115157,-3303 fast=0
+  S DeleteObject obj=klein
+  items 7267=49
+appear
+action lair_klein
+action lair_klein
+  S ActionFailed
+  S NpcHtmlMessage obj=lair_klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{lair_klein}_Quest GrandBossTeleporter
+  S NpcHtmlMessage obj=lair_klein item=0 page=script/teleport/GrandBossTeleporter/31540-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest GrandBossTeleporter 31540 x48
+  S SystemMessage id=302 3:7267
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=183813,-115157,-3303 fast=0
+  S DeleteObject obj=lair_klein
+  S DeleteObject obj=valakas
+  items 7267=1
+appear
+action lair_klein
+action lair_klein
+  S ActionFailed
+  S NpcHtmlMessage obj=lair_klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{lair_klein}_Quest GrandBossTeleporter
+  S NpcHtmlMessage obj=lair_klein item=0 page=script/teleport/GrandBossTeleporter/31540-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest GrandBossTeleporter 31540
+  S SystemMessage id=302 3:7267
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=183813,-115157,-3303 fast=0
+  S DeleteObject obj=lair_klein
+  S DeleteObject obj=valakas
+  items 7267=0
+appear
+action lair_klein
+action lair_klein
+  S ActionFailed
+  S NpcHtmlMessage obj=lair_klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{lair_klein}_Quest GrandBossTeleporter
+  S NpcHtmlMessage obj=lair_klein item=0 page=script/teleport/GrandBossTeleporter/31540-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest GrandBossTeleporter 31540
+  S NpcHtmlMessage obj=lair_klein item=0 page=script/teleport/GrandBossTeleporter/31540-06.htm
+  S ActionFailed
+  items 7267=0
+kill valakas
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+action lair_klein
+  S ActionFailed
+  S NpcHtmlMessage obj=lair_klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{lair_klein}_Quest GrandBossTeleporter
+  S NpcHtmlMessage obj=lair_klein item=0 page=script/teleport/GrandBossTeleporter/31540-01.htm
+  S ActionFailed
+  S ActionFailed

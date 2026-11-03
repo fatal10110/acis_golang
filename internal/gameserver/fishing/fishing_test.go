@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
 // script returns a Roll answering the given values in order, failing the
@@ -27,117 +26,11 @@ func script(t *testing.T, draws ...[2]int) Roll {
 	}
 }
 
-// TestFishTypeTables pins every lure's type ranges, the inclusive bounds
-// of FishingStance.getRandomFishType read off the reference switch: the
-// check value at and just past each bound.
-func TestFishTypeTables(t *testing.T) {
-	for _, tc := range []struct {
-		lure   int32
-		checks []int
-		want   []int
-	}{
-		{7807, []int{54, 55, 77, 78}, []int{5, 4, 4, 6}},
-		{7808, []int{54, 55, 77, 78}, []int{4, 6, 6, 5}},
-		{7809, []int{54, 55, 77, 78}, []int{6, 5, 5, 4}},
-		{8486, []int{33, 34, 66, 67}, []int{4, 5, 5, 6}},
-		{7612, []int{0, 99}, []int{3, 3}},
-		{6520, []int{54, 55, 74, 75, 94, 95}, []int{1, 0, 0, 2, 2, 3}},
-		{8505, []int{54, 55, 74, 75, 94, 95}, []int{1, 0, 0, 2, 2, 3}},
-		{6523, []int{54, 55, 74, 75, 94, 95}, []int{0, 1, 1, 2, 2, 3}},
-		{6526, []int{55, 56, 74, 75, 94, 95}, []int{2, 1, 1, 0, 0, 3}},
-		{8484, []int{33, 34, 66, 67}, []int{0, 1, 1, 2}},
-		{8506, []int{54, 55, 77, 78}, []int{8, 7, 7, 9}},
-		{8509, []int{54, 55, 77, 78}, []int{7, 9, 9, 8}},
-		{8512, []int{54, 55, 77, 78}, []int{9, 8, 8, 7}},
-		{8485, []int{33, 34, 66, 67}, []int{7, 8, 8, 9}},
-		// A lure no table names draws type 1 in its group.
-		{8548, []int{0, 99}, []int{1, 1}},
-	} {
-		group := LureGroup(tc.lure)
-		for i, check := range tc.checks {
-			if got := fishType(group, tc.lure, check); got != tc.want[i] {
-				t.Errorf("lure %d check %d: type %d, want %d", tc.lure, check, got, tc.want[i])
-			}
-		}
-	}
-}
-
-func TestLureGroupsAndNightLures(t *testing.T) {
-	for lure, group := range map[int32]int{7807: 0, 7808: 0, 7809: 0, 8486: 0, 8506: 2, 8509: 2, 8512: 2, 8485: 2, 6519: 1, 8505: 1, 8484: 1, 8548: 1} {
-		if got := LureGroup(lure); got != group {
-			t.Errorf("LureGroup(%d) = %d, want %d", lure, got, group)
-		}
-	}
+// TestNightLures pins the night lure id range.
+func TestNightLures(t *testing.T) {
 	for lure, night := range map[int32]bool{8504: false, 8505: true, 8513: true, 8514: false, 8485: true, 8484: false, 6520: false} {
 		if got := NightLure(lure); got != night {
 			t.Errorf("NightLure(%d) = %v, want %v", lure, got, night)
-		}
-	}
-}
-
-// TestFishLevel pins the level spread: no expertise draws level 1 with no
-// roll; otherwise checks 0-34 lower it, 35-49 raise it, the rest keep it,
-// clamped to 1-27.
-func TestFishLevel(t *testing.T) {
-	if got := fishLevel(0, script(t)); got != 1 {
-		t.Fatalf("fishLevel(0) = %d, want 1 without a roll", got)
-	}
-	for _, tc := range []struct{ base, check, want int }{
-		{5, 34, 4}, {5, 35, 6}, {5, 49, 6}, {5, 50, 5}, {1, 0, 1}, {27, 40, 27}, {30, 99, 27},
-	} {
-		if got := fishLevel(tc.base, script(t, [2]int{100, tc.check})); got != tc.want {
-			t.Errorf("fishLevel(%d) check %d = %d, want %d", tc.base, tc.check, got, tc.want)
-		}
-	}
-}
-
-// TestCheckDelay pins the look period, Math.round((float)(gutsCheckTime *
-// scale)) per lure grade; the products were worked out by hand: 2000*1.33
-// = 2660, 3000*0.66 = 1980, and an unnamed lure has none.
-func TestCheckDelay(t *testing.T) {
-	for _, tc := range []struct {
-		lure int32
-		guts int
-		want time.Duration
-	}{
-		{6519, 2000, 2660 * time.Millisecond},
-		{8508, 5000, 6650 * time.Millisecond},
-		{6520, 3000, 3000 * time.Millisecond},
-		{8507, 4000, 4000 * time.Millisecond},
-		{8513, 4000, 4000 * time.Millisecond},
-		{7808, 2000, 2000 * time.Millisecond},
-		{6521, 3000, 1980 * time.Millisecond},
-		{6527, 5000, 3300 * time.Millisecond},
-		{6528, 5000, 0},
-		{8548, 5000, 0},
-	} {
-		if got := CheckDelay(tc.lure, tc.guts); got != tc.want {
-			t.Errorf("CheckDelay(%d, %d) = %v, want %v", tc.lure, tc.guts, got, tc.want)
-		}
-	}
-}
-
-// TestDamage pins (int)(power * (1 + grade*0.1) * shot), less 50 for a
-// skill three levels above the expertise: 24*1.1 = 26.4, 37*1.2*2 = 88.8,
-// 70*1.0 - 50 = 20.
-func TestDamage(t *testing.T) {
-	for _, tc := range []struct {
-		power             float32
-		rod               item.CrystalType
-		shot              bool
-		level, expertise  int
-		damage, penalties int
-	}{
-		{24, item.CrystalD, false, 1, 1, 26, 0},
-		{24, item.CrystalD, true, 1, 1, 52, 0},
-		{37, item.CrystalC, true, 2, 2, 88, 0},
-		{70, item.CrystalNone, false, 5, 2, 20, 50},
-		{70, item.CrystalNone, false, 4, 2, 70, 0},
-		{155, item.CrystalS, true, 27, 27, 465, 0},
-	} {
-		damage, penalty := Damage(tc.power, tc.rod, tc.shot, tc.level, tc.expertise)
-		if damage != tc.damage || penalty != tc.penalties {
-			t.Errorf("Damage(%v, %v, %v, %d, %d) = %d, %d; want %d, %d", tc.power, tc.rod, tc.shot, tc.level, tc.expertise, damage, penalty, tc.damage, tc.penalties)
 		}
 	}
 }

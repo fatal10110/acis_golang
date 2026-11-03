@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -80,11 +79,7 @@ func TestLifeDrainFeedsTheCasterFromTheDrainedHP(t *testing.T) {
 	// status is the last one ahead of the damage message.
 	var absorbStatus map[int32]int32
 	statusAttrs, sawDamage := 0, false
-	for range 50 {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		r := wireReader(frame[1:])
 		switch frame[0] {
 		case serverpackets.OpcodeSystemMessage:
@@ -156,11 +151,7 @@ func TestLifeDrainHalfFailureSendsDrainHalfSuccessful(t *testing.T) {
 	srv.AdvanceUntil(t, "Life Drain half hit", func() bool { return hostile.HP() < monsterBefore })
 
 	found := false
-	for range 50 {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}

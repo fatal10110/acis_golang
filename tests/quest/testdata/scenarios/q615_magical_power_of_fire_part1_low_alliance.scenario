@@ -1,0 +1,23 @@
+# Magical Power of Fire, part 1 (Q615): a level 74 Varka ally of level 1 is turned away by Naran. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q615_magical_power_of_fire_part1_low_alliance.golden
+character Ally 74
+standing -1
+script quest.Q615_MagicalPowerOfFire_Part1
+item 1661 7242 7243 7081
+page npcdefault.htm
+page default/31559.htm
+page script/quest/Q615_MagicalPowerOfFire_Part1/
+npc naran 31378 Folk 10 0 0
+npc udan 31379 Folk 20 0 0
+npc box 31559 Folk 30 0 0
+
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q615_MagicalPowerOfFire_Part1/31378-02.htm
+  S ActionFailed
+  S ActionFailed

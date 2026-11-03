@@ -65,8 +65,12 @@ type Flight struct {
 }
 
 // Teleported is a discontinuous jump to To, announced before the actor
-// leaves its old surroundings.
-type Teleported struct{ To location.Location }
+// leaves its old surroundings. Instant marks a jump that keeps the actor on
+// the grid, which the client shows without its teleport fade.
+type Teleported struct {
+	To      location.Location
+	Instant bool
+}
 
 // MoveToPawn is a target-relative approach or a rotation-only turn toward
 // TargetID from Origin, Distance away.

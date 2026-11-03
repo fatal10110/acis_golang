@@ -1,13 +1,15 @@
 // Package castle holds the castles' live state: the clan owning each, its
 // tax rates, treasury, tax revenue and seed income, its left certificates
 // and its stored siege date, restored from the castle table at boot and
-// written back as they change.
+// written back as they change, and the holy artifacts and control towers
+// placed for it.
 package castle
 
 import (
 	"context"
 	"math"
 	"sync"
+	"time"
 
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 )
@@ -22,6 +24,9 @@ type Castle struct {
 	parent *Castle
 	m      *Manager
 
+	// purchase serializes the castle's purchases; see Purchase.
+	purchase sync.Mutex
+
 	mu                sync.Mutex
 	ownerID           int32
 	currentTaxPercent int
@@ -33,6 +38,21 @@ type Castle struct {
 	leftCertificates  int
 	siegeDate         int64
 	regTimeOver       bool
+	// artifacts are the object ids of the holy artifacts placed for the
+	// castle at boot (SpawnArtifacts).
+	artifacts []int32
+	// trapLevels are the upgrade levels of the traps of the castle's
+	// control towers, in castles.xml order.
+	trapLevels []int
+	// towers are the control towers placed for the castle at boot
+	// (SpawnTowers), in castles.xml order.
+	towers []Tower
+	// droppedTickets are the mercenary tickets lying on the castle's
+	// grounds, by ground item object id.
+	droppedTickets map[int32]DroppedTicket
+	// mercenaries are the object ids of the NPCs the castle's siege hired
+	// from its dropped tickets, in hiring order.
+	mercenaries []int32
 }
 
 // Row is a castle table row.
@@ -140,6 +160,21 @@ func (c *Castle) SetTimeRegistrationOver(over bool) {
 	c.regTimeOver = over
 }
 
+// SetSiegeHour moves the siege to hour on its day, in the server's time
+// zone, an hour past 23 rolling into the next day, closes the date to
+// change and stores both.
+func (c *Castle) SetSiegeHour(hour int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	t := time.UnixMilli(c.siegeDate)
+	t = time.Date(t.Year(), t.Month(), t.Day(), hour, t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+	c.siegeDate, c.regTimeOver = t.UnixMilli(), true
+	date := c.siegeDate
+	c.write("update siege info", func(ctx context.Context, st Store) error {
+		return st.UpdateSiegeInfo(ctx, c.id(), date, true)
+	})
+}
+
 // SaveSiegeInfo stores the siege date and whether it is still open to
 // change, as they stand.
 func (c *Castle) SaveSiegeInfo() {
@@ -213,6 +248,19 @@ func (c *Castle) SetLeftCertificates(n int, save bool) {
 			return st.UpdateCertificates(ctx, c.id(), n)
 		})
 	}
+}
+
+// TakeCertificates takes n of the certificates the castle has left, stores
+// what is left and returns it.
+func (c *Castle) TakeCertificates(n int) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.leftCertificates -= n
+	left := c.leftCertificates
+	c.write("update certificates", func(ctx context.Context, st Store) error {
+		return st.UpdateCertificates(ctx, c.id(), left)
+	})
+	return left
 }
 
 // EditTreasury adds amount, negative to take some out, to the treasury of
@@ -312,7 +360,7 @@ func (c *Castle) tax(amount int64) int64 {
 		amount = int64(float64(amount) - float64(sysget)/100.0*float64(amount))
 	}
 	if tribute := c.Tax.TributeRate; c.ParentID > 0 && tribute > 0 && c.parent != nil {
-		if share := javaInt(float64(tribute) / 100.0 * float64(amount)); share > 0 {
+		if share := truncInt32(float64(tribute) / 100.0 * float64(amount)); share > 0 {
 			c.parent.riseTaxRevenue(share, true)
 			amount -= share
 		}
@@ -356,9 +404,9 @@ func (c *Castle) resetFinancesLocked() {
 	})
 }
 
-// javaInt narrows v to an int32 as a Java (int) cast does: toward zero,
+// truncInt32 narrows v to an int32 as an int cast does: toward zero,
 // saturating at the int32 range.
-func javaInt(v float64) int64 {
+func truncInt32(v float64) int64 {
 	switch {
 	case math.IsNaN(v):
 		return 0

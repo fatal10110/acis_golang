@@ -35,7 +35,7 @@ func TestRootedNPCDoesNotChaseOutOfRangeTarget(t *testing.T) {
 				drainUntilQuiet(t, c)
 			}
 
-			chaser.AddCombatDamageHate(target, 50)
+			chaser.AddAttackDesire(target, 50)
 
 			if got := chaser.AI().CurrentIntention(); got != ai.IntentionAttack {
 				t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionAttack)

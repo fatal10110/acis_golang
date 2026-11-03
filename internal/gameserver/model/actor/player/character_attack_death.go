@@ -148,7 +148,7 @@ func (c *Character) revive() (revived, blessed bool) {
 		c.writeHPLocked(res.MaxHP)
 		c.curMP = res.MaxMP
 	} else {
-		c.writeHPLocked(min(res.MaxHP*c.respawnRestoreHP, res.MaxHP))
+		c.writeHPLocked(min(res.MaxHP*c.rules().RespawnRestoreHP, res.MaxHP))
 	}
 	c.vitalsMu.Unlock()
 	c.reviveRequested, c.revivePower = false, 0
@@ -175,8 +175,9 @@ func (c *Character) finishRevive(blessed bool) {
 // cast and the reset of its target (abortAllOnDeath), then the death packet
 // broadcast to this
 // player's own session and every observer, so the corpse-fall animation
-// plays live and reaches clients before any death side effect's updates. A
-// rider's mount stops eating. The killer's PK/PvP credit follows (a
+// plays live and reaches clients before any death side effect's updates.
+// The player's quests then hear of the death (DeathEvents), and a rider's
+// mount stops eating. The killer's PK/PvP credit follows (a
 // killer holding a cursed weapon feeds the weapon instead), then this
 // player's own costs: charges, a further get-up out of fake death for a
 // player that was playing dead (the stripped Fake Death sent its own get-up
@@ -213,10 +214,10 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	}
 	c.BroadcastStatus()
 	c.BroadcastDie()
+	c.notifyDeath(c.combatant(), killer)
 	c.stopMountFeed()
 	if !c.creditCursedWeaponKill(killer) {
-		c.awardKillerPKKarma(killer)
-		c.awardKillerPvPKill(killer)
+		c.creditKill(killer, false)
 	}
 	c.ClearCharges()
 	if fakeDead {
@@ -231,7 +232,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.emit(event.DeathSettled{})
 	if c.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
-		c.ReviveRequest(c, 0, false)
+		c.ReviveRequest(c.selfReviver(), 0, false)
 	}
 	// The retained effects' icons are resent once the death has settled,
 	// unless no effect was ever held.

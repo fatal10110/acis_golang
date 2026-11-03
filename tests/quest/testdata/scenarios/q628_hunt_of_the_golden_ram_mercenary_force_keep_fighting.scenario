@@ -1,0 +1,26 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): a soldier asks to return to the fight and keeps the quest and the badge.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_keep_fighting.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
+hold 7247 1
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31554.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc kahman 31554 Folk 10 0 0
+
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-09.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-05a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 31554-05b.htm
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-05b.htm
+  S ActionFailed
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
+  items 7247=1

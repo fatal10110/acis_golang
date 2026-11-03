@@ -1,0 +1,45 @@
+# Testimony Of Fate (Q219), the instruction: a level 38 Palus Knight at cond 14, who holds Kaira's instructions and the
+# manuscript, is given the recommendation by Kaira (a level 37 one is sent to gain a level at 30476-14).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q219_testimony_of_fate_instruction.golden
+character Scholar 38
+class 32
+quest Q219_TestimonyOfFate <state>=STARTED <cond>=14
+hold 3188 1
+hold 3187 1
+script quest.Q219_TestimonyOfFate
+item 3172 3173 3174 3175 3176 3177 3178 3179 3180 3181 3182 3183 3184 3185 3186 3187 3188 3189 3190 3191 3192 3193 3194 3195 3196 3197 3198 3199 3200 3201 3202 7562
+page trainer/30476.htm
+page script/quest/Q219_TestimonyOfFate/
+npc kaira 30476 Trainer -20 10 0
+
+action kaira
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S QuestList 219:0x80007fff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3188
+  S SystemMessage id=302 3:3187
+  S SystemMessage id=54 3:3189
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-12.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 15
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=15 <state>=STARTED
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-16.htm
+  S ActionFailed
+  S ActionFailed

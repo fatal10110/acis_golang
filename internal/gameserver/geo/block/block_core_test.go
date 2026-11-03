@@ -541,9 +541,26 @@ func TestNull(t *testing.T) {
 
 // ---- from region_test.go ----
 func TestRegionQueriesPackedBlocks(t *testing.T) {
-	r := NewRegion()
+	b := NewRegionBuilder()
+	b.SetFlat(0, -32)
 
-	r.SetFlat(0, -32)
+	var complex [CellCount]Cell
+	complex[cellIndex(2, 3)] = Cell{Height: 64, NSWE: North | East}
+	b.SetComplex(1, complex)
+
+	var multi [CellCount][]Cell
+	for i := range multi {
+		multi[i] = []Cell{{Height: 0, NSWE: AllDirections}}
+	}
+	multi[cellIndex(4, 5)] = []Cell{
+		{Height: -16, NSWE: West},
+		{Height: 48, NSWE: South | East},
+	}
+	if err := b.SetMultilayer(2, multi); err != nil {
+		t.Fatalf("SetMultilayer: %v", err)
+	}
+	r := b.Build()
+
 	if got := r.KindAt(0, 0); got != KindFlat {
 		t.Fatalf("flat kind = %v, want flat", got)
 	}
@@ -554,11 +571,6 @@ func TestRegionQueriesPackedBlocks(t *testing.T) {
 		t.Fatalf("flat nswe = %v, want all", got)
 	}
 
-	var complex [CellCount]Cell
-	complex[cellIndex(2, 3)] = Cell{Height: 64, NSWE: North | East}
-	if err := r.SetComplex(1, complex); err != nil {
-		t.Fatalf("SetComplex: %v", err)
-	}
 	if got := r.KindAt(0, 1); got != KindComplex {
 		t.Fatalf("complex kind = %v, want complex", got)
 	}
@@ -569,17 +581,6 @@ func TestRegionQueriesPackedBlocks(t *testing.T) {
 		t.Fatalf("complex nswe = %v, want NE", got)
 	}
 
-	var multi [CellCount][]Cell
-	for i := range multi {
-		multi[i] = []Cell{{Height: 0, NSWE: AllDirections}}
-	}
-	multi[cellIndex(4, 5)] = []Cell{
-		{Height: -16, NSWE: West},
-		{Height: 48, NSWE: South | East},
-	}
-	if err := r.SetMultilayer(2, multi); err != nil {
-		t.Fatalf("SetMultilayer: %v", err)
-	}
 	if got := r.KindAt(0, 2); got != KindMultilayer {
 		t.Fatalf("multilayer kind = %v, want multilayer", got)
 	}
@@ -605,7 +606,7 @@ func TestRegionQueriesPackedBlocks(t *testing.T) {
 }
 
 func TestRegionMultilayerAboveSelectsLowestQualifyingLayer(t *testing.T) {
-	r := NewRegion()
+	b := NewRegionBuilder()
 
 	var multi [CellCount][]Cell
 	for i := range multi {
@@ -616,9 +617,10 @@ func TestRegionMultilayerAboveSelectsLowestQualifyingLayer(t *testing.T) {
 		{Height: 0, NSWE: North},
 		{Height: 40, NSWE: South | East},
 	}
-	if err := r.SetMultilayer(0, multi); err != nil {
+	if err := b.SetMultilayer(0, multi); err != nil {
 		t.Fatalf("SetMultilayer: %v", err)
 	}
+	r := b.Build()
 
 	layer := r.Above(0, 0, 4, 5, -20)
 	if got := r.Height(0, 0, layer); got != -16 {
@@ -646,13 +648,5 @@ func TestNewRegionFromBlocks(t *testing.T) {
 	}
 	if got := r.KindAt(0, 1); got != KindNull {
 		t.Fatalf("nil block kind = %v, want null", got)
-	}
-}
-
-func TestRegionRejectsPackedDataOverflow(t *testing.T) {
-	r := NewRegion()
-
-	if _, err := r.appendData(regionValueMask + 1); err == nil {
-		t.Fatal("appendData overflow error = nil, want error")
 	}
 }

@@ -1,0 +1,149 @@
+# Subjugation of Lizardmen (Q340), level 20: the relics drop, Adonius, Levian and the chest of Bifrons send the character to Weisz, who pays 14700 adena; then relog. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q340_subjugation_of_lizardmen_relics.golden
+character Hunter 20
+quest Q340_SubjugationOfLizardmen <cond>=3 <state>=STARTED
+random always 0
+script quest.Q340_SubjugationOfLizardmen
+item 57 4255 4256 4257 4258
+page guard/30385.htm
+page trainer/30375.htm
+page villagemaster/30037.htm
+page default/30989.htm
+page script/quest/Q340_SubjugationOfLizardmen/
+npc weisz 30385 Guard 10 0 0
+npc adonius 30375 Trainer -10 0 0
+npc levian 30037 VillageMasterPriest 20 0 0
+npc chest 30989 Folk -20 0 0
+npc cargo 20008 Monster 40 0 0
+npc relic 20024 Monster 50 0 0
+
+action adonius
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+bypass npc_{adonius}_Quest
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q340_SubjugationOfLizardmen/30375-03.htm
+  S ActionFailed
+  S ActionFailed
+kill relic
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4256
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4257
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 4256=1 4257=1
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+bypass npc_{adonius}_Quest
+  S QuestList 340:0x8000000f
+  S ExShowQuestMark quest=340
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4256
+  S SystemMessage id=302 3:4257
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q340_SubjugationOfLizardmen/30375-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q340_SubjugationOfLizardmen | <cond> | 4
+  items 4256=0 4257=0
+  state Q340_SubjugationOfLizardmen STARTED
+  rows Q340_SubjugationOfLizardmen <cond>=4 <state>=STARTED
+action levian
+action levian
+  S ActionFailed
+  S NpcHtmlMessage obj=levian item=0 page=villagemaster/30037.htm
+  S ActionFailed
+bypass npc_{levian}_Quest
+  S NpcHtmlMessage obj=levian item=0 page=script/quest/Q340_SubjugationOfLizardmen/30037-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q340_SubjugationOfLizardmen 30037-02.htm
+  S QuestList 340:0x8000001f
+  S ExShowQuestMark quest=340
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=levian item=0 page=script/quest/Q340_SubjugationOfLizardmen/30037-02.htm
+  S ActionFailed
+  Q upsert Q340_SubjugationOfLizardmen | <cond> | 5
+  state Q340_SubjugationOfLizardmen STARTED
+  rows Q340_SubjugationOfLizardmen <cond>=5 <state>=STARTED
+action chest
+action chest
+  S ActionFailed
+  S NpcHtmlMessage obj=chest item=0 page=default/30989.htm
+  S ActionFailed
+bypass npc_{chest}_Quest
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q340_SubjugationOfLizardmen/30989-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q340_SubjugationOfLizardmen 30989-02.htm
+  S QuestList 340:0x8000003f
+  S ExShowQuestMark quest=340
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4258
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q340_SubjugationOfLizardmen/30989-02.htm
+  S ActionFailed
+  Q upsert Q340_SubjugationOfLizardmen | <cond> | 6
+  items 4256=0 4257=0 4258=1
+  state Q340_SubjugationOfLizardmen STARTED
+  rows Q340_SubjugationOfLizardmen <cond>=6 <state>=STARTED
+action levian
+action levian
+  S ActionFailed
+  S NpcHtmlMessage obj=levian item=0 page=villagemaster/30037.htm
+  S ActionFailed
+bypass npc_{levian}_Quest
+  S QuestList 340:0x8000007f
+  S ExShowQuestMark quest=340
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4258
+  S NpcHtmlMessage obj=levian item=0 page=script/quest/Q340_SubjugationOfLizardmen/30037-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q340_SubjugationOfLizardmen | <cond> | 7
+  items 4256=0 4257=0 4258=0
+  state Q340_SubjugationOfLizardmen STARTED
+  rows Q340_SubjugationOfLizardmen <cond>=7 <state>=STARTED
+action levian
+  S ActionFailed
+  S NpcHtmlMessage obj=levian item=0 page=villagemaster/30037.htm
+  S ActionFailed
+bypass npc_{levian}_Quest
+  S NpcHtmlMessage obj=levian item=0 page=script/quest/Q340_SubjugationOfLizardmen/30037-05.htm
+  S ActionFailed
+  S ActionFailed
+action weisz
+action weisz
+  S ActionFailed
+  S NpcHtmlMessage obj=weisz item=0 page=guard/30385.htm
+  S ActionFailed
+bypass npc_{weisz}_Quest
+  S SystemMessage id=52 6:14700
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 340:0x00000000
+  S NpcHtmlMessage obj=weisz item=0 page=script/quest/Q340_SubjugationOfLizardmen/30385-13.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q340_SubjugationOfLizardmen | <state> | COMPLETED
+  Q delete-except-state Q340_SubjugationOfLizardmen
+  items 57=14700 4256=0 4257=0 4258=0
+  state Q340_SubjugationOfLizardmen COMPLETED
+  rows Q340_SubjugationOfLizardmen <state>=COMPLETED
+action weisz
+  S ActionFailed
+  S NpcHtmlMessage obj=weisz item=0 page=guard/30385.htm
+  S ActionFailed
+bypass npc_{weisz}_Quest
+  S NpcHtmlMessage obj=weisz item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  items 57=14700 4256=0 4257=0 4258=0
+  state Q340_SubjugationOfLizardmen COMPLETED
+  rows Q340_SubjugationOfLizardmen <state>=COMPLETED

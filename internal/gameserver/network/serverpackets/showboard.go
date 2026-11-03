@@ -2,8 +2,8 @@ package serverpackets
 
 import (
 	"strings"
-	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
 
@@ -50,13 +50,26 @@ func FrameShowBoardFields(fields []string) wire.Frame {
 }
 
 func frameShowBoard(content string) wire.Frame {
+	w := showBoardWriter()
+	w.WriteString(content)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// frameShowBoardUnits is frameShowBoard over content's UTF-16 code units,
+// written as they are.
+func frameShowBoardUnits(content []uint16) wire.Frame {
+	w := showBoardWriter()
+	w.WriteUTF16(content)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func showBoardWriter() *wire.Writer {
 	w := newFrameWriter(OpcodeShowBoard)
 	w.WriteUint8(1)
 	for _, tab := range showBoardTabs {
 		w.WriteString(tab)
 	}
-	w.WriteString(content)
-	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+	return w
 }
 
 // The board page limits, in UTF-16 code units.
@@ -74,14 +87,17 @@ const (
 // 102 and 103, each holding up to 4090 UTF-16 code units in order; a part
 // html does not reach carries ShowBoardNoPage. A page of 12270 units or
 // more is not shown: nil. A character whose two code units straddle a cut
-// reaches the client as two replacement characters.
+// reaches the client as its two halves, one ending a part and one starting
+// the next.
 func FramesShowBoardPage(html string) []wire.Frame {
-	units := utf16.Encode([]rune(html))
+	units := commons.UTF16Units(html)
 	n := len(units)
 	if n >= showBoardPageLength {
 		return nil
 	}
-	part := func(from, to int) string { return string(utf16.Decode(units[from:to])) }
+	part := func(id string, from, to int) wire.Frame {
+		return frameShowBoardUnits(append(commons.UTF16Units(id+showBoardSeparator), units[from:to]...))
+	}
 	switch {
 	case n < showBoardPartLength:
 		return []wire.Frame{
@@ -91,15 +107,15 @@ func FramesShowBoardPage(html string) []wire.Frame {
 		}
 	case n < showBoardEditLength:
 		return []wire.Frame{
-			FrameShowBoard("101", part(0, showBoardPartLength)),
-			FrameShowBoard("102", part(showBoardPartLength, n)),
+			part("101", 0, showBoardPartLength),
+			part("102", showBoardPartLength, n),
 			FrameShowBoard("103", ShowBoardNoPage),
 		}
 	default:
 		return []wire.Frame{
-			FrameShowBoard("101", part(0, showBoardPartLength)),
-			FrameShowBoard("102", part(showBoardPartLength, showBoardEditLength)),
-			FrameShowBoard("103", part(showBoardEditLength, n)),
+			part("101", 0, showBoardPartLength),
+			part("102", showBoardPartLength, showBoardEditLength),
+			part("103", showBoardEditLength, n),
 		}
 	}
 }
@@ -108,7 +124,7 @@ func FramesShowBoardPage(html string) []wire.Frame {
 // reports false, building nothing, for a page of 8180 UTF-16 code units or
 // more.
 func FrameShowBoardEdit(html string) (wire.Frame, bool) {
-	if len(utf16.Encode([]rune(html))) >= showBoardEditLength {
+	if commons.UTF16Len(html) >= showBoardEditLength {
 		return wire.Frame{}, false
 	}
 	return FrameShowBoard("1001", html), true

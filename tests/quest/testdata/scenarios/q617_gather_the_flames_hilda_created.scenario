@@ -1,0 +1,22 @@
+# Gather the Flames (Q617): the first two pages of Hilda are not valid UTF-8 and so are not served; the notice has no accept link and the accept event is refused.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q617_gather_the_flames_hilda_created.golden
+character Hero 74
+script quest.Q617_GatherTheFlames
+item 7264 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page trainer/31271.htm
+page script/quest/Q617_GatherTheFlames/
+npc hilda 31271 Trainer 10 0 0
+
+action hilda
+action hilda
+  S ActionFailed
+  S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
+  S ActionFailed
+bypass npc_{hilda}_Quest
+  S NpcHtmlMessage obj=hilda item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q617_GatherTheFlames/31271-01.htm</body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q617_GatherTheFlames 31271-03.htm
+  state Q617_GatherTheFlames CREATED
+  rows Q617_GatherTheFlames -

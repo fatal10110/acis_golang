@@ -44,6 +44,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -79,6 +80,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -109,6 +111,9 @@ type options struct {
 	// sieges is the castle siege configuration (WithSieges); nil runs no
 	// siege.
 	sieges *siege.Config
+	// hallSieges are the hall siege settings (WithHallSiegeScript,
+	// WithHallSiegeConfig).
+	hallSieges hallSiegeOptions
 	// castleManor is the manor (WithCastleManor); nil runs none.
 	castleManor *castleManorOptions
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
@@ -122,6 +127,7 @@ type options struct {
 	questLoadErr           error
 	subclassFault          SubclassFault
 	petNameLookupErr       error
+	characterNameFault     CharacterNameFault
 	captureLog             bool
 	account                string
 	characters             []characterSpec
@@ -132,15 +138,20 @@ type options struct {
 	crests                 *datacache.Crests
 	cursedWeapons          []*entity.CursedWeaponTable
 	cursedWeaponClock      func() time.Time
+	gameClockNow           func() time.Time
+	drivenStart            time.Time
 	karmaPlayerCanTeleport bool
+	awardPKKillPVPPoint    bool
 	karmaServiceGates      [3]bool
 	htmlPages              map[string]string
 	karmaPlayerCanTrade    bool
 	admin                  *admin.Data
 	gmStartupUnlisted      bool
+	defaultAccessLevel     int
 	gmStartupModes         [3]bool
 	gmHeroAura             bool
 	gmAudit                zerolog.Logger
+	itemLog                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
 	clanHallData           *hallmodel.Table
@@ -149,6 +160,9 @@ type options struct {
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
+	showNPCCrest           bool
+	showNPCLevel           bool
+	maxDriftRange          int
 	teleportClock          func() time.Time
 	tradeClock             func() time.Time
 	zones                  *zone.Index
@@ -160,9 +174,13 @@ type options struct {
 	pvpFlags               *task.PvPFlags
 	decay                  *task.Decay
 	npcSpawns              *spawn.Table
+	spawnData              bool
+	makerCatalog           script.MakerCatalog
+	makerHeard             func(maker, event string, int1, int2 int)
 	dataReloads            network.DataReloads
 	npcDropRates           item.Rates
 	walkerRoutes           route.WalkerRoutes
+	npcSpawnSkills         actorcast.Definitions
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -171,6 +189,7 @@ type options struct {
 	deepBlueDropRules      bool
 	autoLoot               bool
 	autoLootRaid           bool
+	singleItemDrop         bool
 	rateKarmaExpLost       float64
 	rateXP, rateSP         float64
 	deathDrop              player.DeathDropRules
@@ -180,6 +199,9 @@ type options struct {
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
+	regenMultipliers       creature.RegenMultipliers
+	partyRange             int
+	eventRules             *script.EventRules
 	inventorySlots         player.InventorySlots
 	storageSlots           player.StorageSlots
 	freight                *network.FreightConfig
@@ -192,9 +214,13 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
+	seedSpawnData          func(*gamesql.SpawnStore)
 	sevenSignsTimer        func(time.Duration, func()) *time.Timer
+	sevenSignsClock        func() time.Time
 	seedFestival           func(*gamesql.FestivalStore)
 	festivalClock          func() time.Time
+	festivalTimer          func(time.Duration, func()) *time.Timer
+	festivalConfig         *festival.Config
 	clanConfig             *clan.Config
 	seedClans              func(db *sql.DB)
 	clanHalls              *hallmodel.Table
@@ -203,6 +229,8 @@ type options struct {
 	seedBoard              func(db *sql.DB)
 	seedOlympiad           func(db *sql.DB)
 	olympiadWindow         *olympiadWindow
+	olympiadConfig         func(*olympiad.Config)
+	olympiadDraw           func(n int) int
 	seedBoss               func(db *sql.DB)
 	serverNews             bool
 	announcements          string
@@ -210,6 +238,7 @@ type options struct {
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
 	wantChars              int
+	objectIDStart          int32
 	enchantRoll            func() float64
 	recipes                *recipe.Table
 	hennas                 *henna.Table
@@ -219,9 +248,14 @@ type options struct {
 	craftRoll              func(n int) int
 	fish                   *fish.Table
 	fishingRoll            func(n int) int
+	petRoll                func(n int) int
+	petFeedPeriod          time.Duration
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
+	manorDelay             time.Duration
 	rollDiceDelay          time.Duration
+	socialDelay            time.Duration
+	configKeys             configKeyOptions
 	keepMaintained         bool
 	augmentations          *augmentation.Table
 	armorSets              *armorset.Table
@@ -264,6 +298,9 @@ type characterSpec struct {
 	level int
 	sp    int
 	sex   player.Sex
+	// class is the class template the character is created from, and so
+	// its race.
+	class int
 }
 
 // WithAccount sets the login account the scripted client authenticates as
@@ -308,10 +345,33 @@ func WithCursedWeaponClock(now func() time.Time) Option {
 	return func(o *options) { o.cursedWeaponClock = now }
 }
 
+// WithGameClockNow sets the wall clock the in-game clock reads, and with it
+// the uptime the scripts count game ticks from (default time.Now), so a
+// suite can move the ticks along with Advance.
+func WithGameClockNow(now func() time.Time) Option {
+	return func(o *options) { o.gameClockNow = now }
+}
+
+// WithDrivenClockStart starts the clock Advance moves (the one the scripts'
+// Now reads) at start, and makes the in-game clock read it, so the uptime the
+// scripts count game ticks from moves with Advance too. Only the inline
+// executor has a driven clock: on the real pool both read the wall clock
+// (check DrivesClock). It replaces WithGameClockNow.
+func WithDrivenClockStart(start time.Time) Option {
+	return func(o *options) { o.drivenStart = start }
+}
+
 // WithKarmaTeleport sets the players.properties KarmaPlayerCanTeleport gate
 // (default true).
 func WithKarmaTeleport(allowed bool) Option {
 	return func(o *options) { o.karmaPlayerCanTeleport = allowed }
+}
+
+// WithAwardPKKillPVPPoint sets the players.properties AwardPKKillPVPPoint
+// option (default false): killing a karma-holding player then awards the
+// killer a PvP point.
+func WithAwardPKKillPVPPoint(award bool) Option {
+	return func(o *options) { o.awardPKKillPVPPoint = award }
 }
 
 // WithKarmaServiceGates sets the players.properties KarmaPlayerCanShop,
@@ -356,6 +416,13 @@ func WithGMStartupModes(invulnerable, invisible, blockAll bool) Option {
 	return func(o *options) { o.gmStartupModes = [3]bool{invulnerable, invisible, blockAll} }
 }
 
+// WithDefaultAccessLevel sets players.properties DefaultAccessLevel: the
+// access level every character created through the client is granted
+// (default 0).
+func WithDefaultAccessLevel(level int) Option {
+	return func(o *options) { o.defaultAccessLevel = level }
+}
+
 // WithGMHeroAura sets players.properties GMHeroAura = True: a game master
 // shows the hero aura.
 func WithGMHeroAura() Option { return func(o *options) { o.gmHeroAura = true } }
@@ -363,6 +430,11 @@ func WithGMHeroAura() Option { return func(o *options) { o.gmHeroAura = true } }
 // WithGMAudit records every admin command run to log (server.properties
 // GMAudit = True); by default nothing is recorded.
 func WithGMAudit(log zerolog.Logger) Option { return func(o *options) { o.gmAudit = log } }
+
+// WithItemLog records every change to a non-stackable item a player or pet
+// carries to log (server.properties LogItems = True); by default nothing is
+// recorded.
+func WithItemLog(log zerolog.Logger) Option { return func(o *options) { o.itemLog = log } }
 
 // WithChat sets the server.properties chat settings: the chat log, the bot
 // whisper filter and the chat reuse delays (default: nothing logged,
@@ -616,6 +688,15 @@ func WithCharacterSex(name string, level, sp int, sex player.Sex) Option {
 	}
 }
 
+// WithClassCharacter seeds a selectable character of class: created from
+// that class template, which the table must hold (WithClassTemplates), so
+// it has that class's race.
+func WithClassCharacter(name string, level, sp, class int) Option {
+	return func(o *options) {
+		o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp, sex: player.SexMale, class: class})
+	}
+}
+
 // WithShortcutSeed inserts shortcut rows before the client dials.
 func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
 	return func(o *options) { o.seedShortcuts = seed }
@@ -697,6 +778,18 @@ func WithFestivalClock(now func() time.Time) Option {
 	return func(o *options) { o.festivalClock = now }
 }
 
+// WithFestivalTimer schedules the Festival of Darkness's timers through
+// afterFunc instead of real timers, so a test can fire each at will.
+func WithFestivalTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
+	return func(o *options) { o.festivalTimer = afterFunc }
+}
+
+// WithFestivalConfig runs the Festival of Darkness on cfg instead of the
+// shipped settings.
+func WithFestivalConfig(cfg festival.Config) Option {
+	return func(o *options) { o.festivalConfig = &cfg }
+}
+
 // WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
 // Signs calendar restores it, so boot-time period catch-up can be exercised.
 func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
@@ -707,6 +800,12 @@ func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
 // afterFunc instead of a real timer, so a test can fire one at will.
 func WithSevenSignsTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
 	return func(o *options) { o.sevenSignsTimer = afterFunc }
+}
+
+// WithSevenSignsClock runs the Seven Signs calendar on now instead of the
+// wall clock, so the period end it reports follows a test's clock.
+func WithSevenSignsClock(now func() time.Time) Option {
+	return func(o *options) { o.sevenSignsClock = now }
 }
 
 // WithNPCs supplies the NPC template table wired into the link (and the
@@ -723,6 +822,11 @@ func WithSummonItems(items *item.SummonItemTable) Option {
 // WithWantChars asserts how many characters CharSelectInfo reports after the
 // handshake.
 func WithWantChars(n int) Option { return func(o *options) { o.wantChars = n } }
+
+// WithObjectIDsAfter makes the object id sequence hand out the ids after
+// start (default: after 100), so a suite can keep its objects' ids out of
+// the range of the small numbers a page or packet carries.
+func WithObjectIDsAfter(start int32) Option { return func(o *options) { o.objectIDStart = start } }
 
 // WithEnchantConfig sets the players.properties scroll-of-enchant rates and
 // limits; without it the shipped defaults apply.
@@ -765,6 +869,19 @@ func WithFish(table *fish.Table) Option {
 	return func(o *options) { o.fish = table }
 }
 
+// WithPetRoll supplies the dice of every pet called out, in [0,n) (default:
+// the random source), so a pet's hunger is deterministic.
+func WithPetRoll(roll func(n int) int) Option {
+	return func(o *options) { o.petRoll = roll }
+}
+
+// WithPetFeedPeriod makes every pet called out eat every period (default:
+// ten seconds), so a long exchange on the wall clock is not cut by a meal's
+// status refresh.
+func WithPetFeedPeriod(period time.Duration) Option {
+	return func(o *options) { o.petFeedPeriod = period }
+}
+
 // WithFishingRoll supplies the fishing dice in [0,n) (default: the random
 // source), so a fishing run is deterministic.
 func WithFishingRoll(roll func(n int) int) Option {
@@ -780,6 +897,18 @@ func WithMultisells(table *multisell.Table) Option {
 // client session. The default 0 leaves throws ungated.
 func WithRollDiceDelay(d time.Duration) Option {
 	return func(o *options) { o.rollDiceDelay = d }
+}
+
+// WithSocialDelay sets the reuse delay between two emote requests on one
+// client session; the default 0 never gates them.
+func WithSocialDelay(d time.Duration) Option {
+	return func(o *options) { o.socialDelay = d }
+}
+
+// WithManorDelay sets the reuse delay between two seed purchases on one
+// client session; the default 0 never gates them.
+func WithManorDelay(d time.Duration) Option {
+	return func(o *options) { o.manorDelay = d }
 }
 
 // WithMultisellDelay sets the reuse delay between two multisell exchanges
@@ -920,9 +1049,12 @@ func bootGeo(geo move.Geo) move.Geo {
 
 // Server is a booted gameserver stack plus its first connected client.
 type Server struct {
-	Client *testsupport.ScriptedClient
-	State  *world.State
-	DB     *sql.DB
+	// effectRest is the part of a second AdvanceWithEffects has passed
+	// since its last effect sweep; only the test goroutine touches it.
+	effectRest time.Duration
+	Client     *testsupport.ScriptedClient
+	State      *world.State
+	DB         *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
 	RaidPoints *raidpoint.Points
 	// Olympiad is the Olympiad, its records restored at boot and its
@@ -954,7 +1086,7 @@ type Server struct {
 	BuyListRows         *gamesql.BuyListStore
 	WorldObjects        *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	doors               *doorHarness              // geodata and regeneration of WithDoors' doors
-	Boats               *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
+	Boats               *boat.Fleet               // boats sailing WithBoats' itineraries; empty otherwise
 	Derby               *derby.Track              // race track of WithDerbyTrack; nil otherwise
 	NpcSpawns           *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
 	NpcRespawns         *task.Respawn             // respawn timers of NpcSpawns; they never fire on their own
@@ -974,26 +1106,27 @@ type Server struct {
 	SevenSigns          *sevensigns.State
 	Festival            *festival.Manager
 	AnnounceFile        string // the announcements.xml the server reads and rewrites
+	shutdown            *shutdownHarness
 	account             string
 	templates           *player.TemplateTable
 	itemTable           *item.Table
 	levelTable          *player.LevelTable
-	deepBlueDrops       bool
-	autoLoot            bool
-	autoLootRaid        bool
-	rateXP, rateSP      float64
-	ids                 *sequentialIDs
-	positions           *task.PositionUpdates
-	addr                net.Addr
-	sessions            *manager.SessionStore
-	groundStore         *gamesql.GroundItemStore
-	cursedWeapons       *entity.CursedWeaponTable
-	autosave            *task.Autosave
-	gameClock           *task.GameClock
-	autosaveClock       *autosaveClock
-	persist             *persist.Worker
-	quests              *questBoot
-	logs                *lockedBuffer
+	// rewardBook holds the kill reward settings the hostiles, the link
+	// and the scripts share, which //reload config sets.
+	rewardBook    *gamemanager.KillRewardBook
+	ids           *sequentialIDs
+	positions     *task.PositionUpdates
+	addr          net.Addr
+	sessions      *manager.SessionStore
+	groundStore   *gamesql.GroundItemStore
+	spawnStore    *gamesql.SpawnStore
+	cursedWeapons *entity.CursedWeaponTable
+	autosave      *task.Autosave
+	gameClock     *task.GameClock
+	autosaveClock *autosaveClock
+	persist       *persist.Worker
+	quests        *questBoot
+	logs          *lockedBuffer
 	// positionTicks is when TickPositions last posted a tick on the real
 	// pool, guarded by its mutex.
 	positionTicks struct {
@@ -1007,6 +1140,20 @@ type Server struct {
 	// folkSinks builds the sinks fixture civilian NPCs report to, carrying
 	// out a clan hall manager's AI requests through the link.
 	folkSinks func(*npc.Folk) event.Sink
+	// hostileSinks builds the sinks fixture hostile NPCs report to, showing
+	// their views with the link's crests.
+	hostileSinks func(*npc.Hostile) event.Sink
+	// hostileControls maps each moving fixture hostile to the controller
+	// event handler it reports to (see HostileRethinks).
+	hostileControls sync.Map // *npc.Hostile -> *movingHostileControl
+	// guardedSiege resolves the siege a fixture siege guard defends.
+	guardedSiege func(*npc.Instance) npc.GuardedSiege
+	// groundTaker takes the items fixture NPCs pick up out of the world,
+	// as it does the population's.
+	groundTaker npc.GroundTaker
+	// playerRules is the link's rule book, whose regeneration multipliers
+	// the fixture NPCs read as the spawned ones do.
+	playerRules *player.RuleBook
 	// rewardParties resolves a kill's party for the hostiles the suite spawns.
 	rewardParties gamemanager.RewardParties
 	// raidKills credits the raid boss kills of the hostiles the suite
@@ -1015,9 +1162,6 @@ type Server struct {
 	// lootChannels resolves the command channel that wins a raid boss's
 	// loot rights for the hostiles the suite spawns.
 	lootChannels gamemanager.LootChannels
-	// stance is the stance tracker the link was wired with, nil when none
-	// was; fixture NPCs report their attack stances to it.
-	stance network.AttackStanceTracker
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
 	// decay is the corpse-decay task WithDecay supplied; nil when none was.
@@ -1512,17 +1656,17 @@ func (s *Server) skipCursedGroundItem(itemID int32) bool {
 // production stop hooks giving their last-chance writes their own budget.
 const shutdownDrainTimeout = 10 * time.Second
 
-// Shutdown drains every pending persistence batch exactly the way the
-// production stop hooks do — pending item mutations through one final
-// ItemInstances save, tracked ground items back into items_on_ground — and
-// then tears the stack down. Restart tests call it on the first Boot cycle
-// so the second Boot restores what the first died holding.
+// Drain runs the production stop hooks' final saves without stopping the
+// server — pending item mutations through one final ItemInstances save,
+// sealed quest journals and every persistence lane, tracked ground items
+// back into items_on_ground, spawn data — while connected players stay in
+// game, so none of their logout saves has written anything yet.
 //
 // It first settles, as the production stop order closes the listener and
 // stops the actor pool before those saves: a request still being handled —
 // a drop whose DropItem frame is already out but whose ground item is not
 // yet tracked — finishes before anything is snapshotted.
-func (s *Server) Shutdown(tb testing.TB) {
+func (s *Server) Drain(tb testing.TB) {
 	tb.Helper()
 	s.Settle(tb)
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
@@ -1537,8 +1681,30 @@ func (s *Server) Shutdown(tb testing.TB) {
 	if err := s.groundStore.Save(ctx, s.GroundItems.Snapshots(s.skipCursedGroundItem)); err != nil {
 		tb.Fatalf("shutdown ground-item save: %v", err)
 	}
-	s.Close()
-	// Boot's own t.Cleanup(taskEffects.Reset) only fires at the end of the
+	if s.spawnStore != nil {
+		s.NpcSpawns.SyncPersistedState()
+		if err := s.NpcSpawns.Spawns().Save(ctx, s.spawnStore); err != nil {
+			tb.Fatalf("shutdown spawn data save: %v", err)
+		}
+	}
+}
+
+// Shutdown drains every pending persistence batch the way the production
+// stop hooks do (Drain), then stops serving and tears the stack down.
+// Restart tests call it on the first Boot cycle so the second Boot restores
+// what the first died holding.
+//
+// It returns only once every connection handler has returned (Stop), so each
+// connected player's detach save has landed: a detach still running after
+// Shutdown would write this stack's state over whatever a second Boot on the
+// same database writes next. That detach save also writes the player's final
+// inventory, so a test proving the drain alone lands state checks the rows
+// after Drain, before Shutdown.
+func (s *Server) Shutdown(tb testing.TB) {
+	tb.Helper()
+	s.Drain(tb)
+	s.Stop()
+	// Boot's own taskEffects.Reset cleanup only fires at the end of the
 	// whole test function, not between two Boot calls a restart test makes
 	// within one function — reset explicitly here too, so the second
 	// Boot's Effects.Tick doesn't also carry this server's leftovers.
@@ -1609,7 +1775,7 @@ func (s *Server) HoldPersistenceLane(tb testing.TB, ownerID int32) (release func
 			close(held)
 		})
 	}
-	tb.Cleanup(release)
+	cleanup(tb, release)
 	return release
 }
 
@@ -1690,12 +1856,13 @@ func (s *Server) Close() {
 // stores: Boot reserves the stored ids before allocating and again around
 // every seed hook that runs once allocation has begun.
 //
-// mu guards next and reserved.
+// mu guards next, reserved and issued.
 type sequentialIDs struct {
 	mu       sync.Mutex
 	start    int32 // ids up to start are never handed out
 	next     int32 // last id handed out (start before the first)
 	reserved map[int32]struct{}
+	issued   int // ids handed out
 }
 
 func newSequentialIDs(start int32) *sequentialIDs {
@@ -1708,6 +1875,7 @@ func (s *sequentialIDs) NextID() (int32, error) {
 	for {
 		s.next++
 		if _, ok := s.reserved[s.next]; !ok {
+			s.issued++
 			return s.next, nil
 		}
 	}
@@ -1857,15 +2025,16 @@ func Boot(t *testing.T, opts ...Option) *Server {
 
 	loginAddr, servers, sessions := startLoginServerAcceptor(t, loginsql.NewAccountStore(db))
 	servers.Register(1, HexID)
+	shutdownState := newShutdownHarness(servers)
 
 	validator := network.NewSessionValidator()
 	loginLink, err := network.DialLoginLink(context.Background(), loginAddr,
 		network.LoginServerAuth{ServerID: 1, HexID: HexID, HostName: "*", Port: 7777, MaxPlayers: 300},
-		network.LoginLinkHandlers{PlayerAuthResponse: validator.Resolve}, zerolog.Nop())
+		network.LoginLinkHandlers{PlayerAuthResponse: shutdownState.authResponse(validator.Resolve)}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
-	t.Cleanup(func() { loginLink.Close() })
+	cleanup(t, func() { loginLink.Close() })
 
 	state := world.New()
 	taskEffects := task.NewEffects()
@@ -1876,11 +2045,23 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// registered without a clean teardown (an NPC or EffectPoint the test
 	// never decayed or despawned), so the next Boot in this process starts
 	// from an empty registry instead of also ticking this test's leftovers.
-	t.Cleanup(taskEffects.Reset)
+	cleanup(t, taskEffects.Reset)
 	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
-	clock := task.NewGameClock(time.Now)
+	gameNow := o.gameClockNow
+	var drivenNow atomic.Pointer[func() time.Time]
+	if !o.drivenStart.IsZero() {
+		// The sim clock exists once the queues start: until then the
+		// clock reads its start.
+		gameNow = func() time.Time {
+			if f := drivenNow.Load(); f != nil {
+				return (*f)()
+			}
+			return o.drivenStart
+		}
+	}
+	clock := task.NewGameClock(gameNow)
 	playerClock, err := task.NewPlayerClock(clock, state, network.NewPlayerClockEffects(state))
 	if err != nil {
 		t.Fatalf("new player clock: %v", err)
@@ -1899,7 +2080,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if itemTemplates == nil {
 		itemTemplates = ItemTemplates()
 	}
-	ids := newSequentialIDs(100)
+	idStart := o.objectIDStart
+	if idStart == 0 {
+		idStart = 100
+	}
+	ids := newSequentialIDs(idStart)
 	ids.reserveStored(t, db)
 	var worldObjects *gamemanager.WorldObjects
 	var doors *doorHarness
@@ -1929,7 +2114,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Known-skill writes run on the worker in production too, so suites see
 	// the same ordering (FlushPersistence waits for them).
 	o.skills.SetPersistWorker(persistWorker, o.log)
-	t.Cleanup(func() {
+	cleanup(t, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 		defer cancel()
 		if err := persistWorker.Close(ctx); err != nil {
@@ -1939,7 +2124,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Registered after the persistence worker and before the listener, so
 	// it stops once every connection has detached on its queue and before
 	// the worker drains.
-	queues := startQueues(t, o.log, o.realPool)
+	queues := startQueues(t, o.log, o.realPool, o.drivenStart)
+	if !o.drivenStart.IsZero() {
+		now := time.Now
+		if queues.inline != nil {
+			now = queues.inline.Now
+		}
+		drivenNow.Store(&now)
+	}
 	// Both writers of the items table share one ordering, as production does.
 	itemWrites := persist.NewOrder()
 	var itemFlusher task.ItemFlusher = gamesql.NewItemFlushStore(db)
@@ -1956,10 +2148,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedSevenSigns != nil {
 		o.seedSevenSigns(sevenSignsStore)
 	}
-	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, time.Now, o.sevenSignsTimer)
+	sevenSignsClock := time.Now
+	if o.sevenSignsClock != nil {
+		sevenSignsClock = o.sevenSignsClock
+	}
+	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, sevenSignsClock, o.sevenSignsTimer)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
+	worldObjects.SetStrife(sevenSigns)
 	festivalStore := gamesql.NewFestivalStore(db)
 	if o.seedFestival != nil {
 		o.seedFestival(festivalStore)
@@ -1968,15 +2165,19 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.festivalClock != nil {
 		festivalClock = o.festivalClock
 	}
-	fest := festival.New(festival.DefaultConfig(), festivalStore, sevenSigns, o.log, festivalClock, nil)
+	festivalConfig := festival.DefaultConfig()
+	if o.festivalConfig != nil {
+		festivalConfig = *o.festivalConfig
+	}
+	fest := festival.New(festivalConfig, festivalStore, sevenSigns, o.log, festivalClock, o.festivalTimer)
 	if err := fest.Restore(context.Background(), sevenSigns.CurrentCycle()); err != nil {
 		t.Fatalf("restore festival: %v", err)
 	}
 	sevenSigns.SetFestival(fest)
 	fest.Start()
-	t.Cleanup(fest.Stop)
+	cleanup(t, fest.Stop)
 	sevenSigns.Start()
-	t.Cleanup(sevenSigns.Stop)
+	cleanup(t, sevenSigns.Stop)
 
 	// Restore the ground items the previous session saved at shutdown,
 	// mirroring the production boot: hydrate into world state, then clear
@@ -1985,7 +2186,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("load ground items: %v", err)
 	}
-	if err := groundItems.Load(rows, itemTemplates); err != nil {
+	if err := groundItems.Load(rows, itemTemplates, o.log); err != nil {
 		t.Fatalf("restore ground items: %v", err)
 	}
 	if err := groundStore.Clear(context.Background()); err != nil {
@@ -1998,6 +2199,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold}, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
+	if o.admin != nil {
+		roster.SetAccessLevels(o.admin, o.log)
+	}
 	effects.SetAutosave(roster, o.skills, petStore, persistWorker, zerolog.Nop())
 	autosaveClock := &autosaveClock{now: time.Now()}
 	autosave, err := task.NewAutosave(effects, autosaveClock.Now)
@@ -2017,55 +2221,80 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	buyListStore := gamesql.NewBuyListStore(db)
 	shops, stock := bootMerchant(t, o.merchant, buyListStore, persistWorker, ids, o.log)
+	killRewards := gamemanager.NewKillRewardBook(fixtureKillRewards(o))
+	events := script.NewEventBook(fixtureEventRules(o))
+	questRates := script.NewRateBook(script.DefaultRates())
+	if r := o.scriptHelpers().rates; r != nil {
+		questRates.Set(*r)
+	}
 	gclConfig := network.GameClientLinkConfig{
+		Flow: network.CharacterFlowConfig{Validator: validator, PlayerClock: playerClock, Autosave: autosave},
+		Belongings: network.BelongingsConfig{
+			Items:            items,
+			Shortcuts:        shortcuts,
+			Hennas:           hennas,
+			HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
+			RecipeBooks:      recipeBooks,
+			GroundItems:      groundItems,
+			InventoryUpdates: inventoryUpdates,
+			ItemInstances:    itemInstances,
+		},
+		Combat: network.CombatConfig{
+			PvPFlags: task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
+			HealSps:  o.healSps,
+		},
+		Summoning: network.SummoningConfig{
+			Items:      o.summonItems,
+			Store:      petStore,
+			Config:     petmodel.DefaultConfig(),
+			Roll:       o.petRoll,
+			FeedPeriod: o.petFeedPeriod,
+			Decay:      o.decay,
+		},
+		Enchanting: network.EnchantingConfig{
+			Roll:      o.enchantRoll,
+			SkillRoll: o.skillEnchantRoll,
+			ArmorSets: o.armorSets,
+		},
+		KillRewards:      killRewards,
+		Events:           events,
+		QuestRates:       questRates,
 		Merchant:         shops,
-		Validator:        validator,
 		Effects:          effectEnv,
 		LoginLink:        func() *network.LoginLink { return loginLink },
 		Roster:           roster,
-		Items:            items,
-		Shortcuts:        shortcuts,
-		Hennas:           hennas,
-		HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
-		RecipeBooks:      recipeBooks,
 		Subclasses:       subclasses,
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
 		Multisells:       o.multisells,
 		CraftRoll:        o.craftRoll,
 		Fish:             o.fish,
 		FishingRoll:      o.fishingRoll,
+		OlympiadDraw:     o.olympiadDraw,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
 		Reloads:          o.dataReloads,
+		Boats:            boats,
+		BossZones:        gamesql.NewBossZoneStore(db),
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
 		SkillTrees:       o.trees,
-		HealSps:          o.healSps,
 		CursedWeapons:    cursed,
 		World:            state,
 		NPCs:             o.npcs,
-		SummonItems:      o.summonItems,
-		PetStore:         petStore,
 		Geo:              bootGeo(o.geo),
 		IDs:              ids,
-		GroundItems:      groundItems,
 		Positions:        positions,
-		PlayerClock:      playerClock,
 		GameClock:        task.NewGameClock(time.Now),
-		PvPFlags:         task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
 		SevenSigns:       sevenSigns,
 		Festival:         fest,
-		InventoryUpdates: inventoryUpdates,
-		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
 		ItemWrites:       itemWrites,
 		PersistWait:      o.persistWait,
 		Queues:           queues,
 		ShadowItems:      shadowItems,
-		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, Regen: o.regenMultipliers, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, ShowNPCLevel: o.showNPCLevel},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
@@ -2073,15 +2302,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,
+		ShowNPCCrest:     o.showNPCCrest,
 		TeleportClock:    o.teleportClock,
 		TradeClock:       o.tradeClock,
 		Zones:            o.zones,
-		PetConfig:        petmodel.DefaultConfig(),
-		EnchantRoll:      o.enchantRoll,
-		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
 		Admin:            o.admin,
 		GMAudit:          o.gmAudit,
+		ItemLog:          o.itemLog,
 		Chat:             o.chat,
 		Log:              o.log,
 	}
@@ -2105,20 +2333,24 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Favorites = bbs.NewFavorites(favoriteStore, persistWorker, o.log)
 	}
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
+	gclConfig.PlayerConfig.AwardPKKillPVPPoint = o.awardPKKillPVPPoint
 	if o.respawnRestoreHP != 0 {
 		gclConfig.PlayerConfig.RespawnRestoreHP = o.respawnRestoreHP
 	}
 	gclConfig.ClassMaster = o.classMaster
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
 	gclConfig.PlayerConfig.GMHeroAura = o.gmHeroAura
+	o.configKeys.apply(&gclConfig)
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
-	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
 	gclConfig.SchemeBuffer = o.schemeBuffer
 	gclConfig.Derby = derbyTrack
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	gclConfig.CharacterEdits = chars
+	if f := o.characterNameFault; f.Lookup != nil || f.Store != nil {
+		gclConfig.CharacterEdits = faultyCharacterNameStore{CharacterStore: chars, fault: o.characterNameFault}
+	}
 	gclConfig.Punishments = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions
@@ -2126,9 +2358,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), o)
+	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, questRates, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
-	gclConfig.Memos = memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
+	quests.memos = &memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
+	gclConfig.Memos = quests.memos
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances
@@ -2146,15 +2379,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Subclasses = faultySubclassStore{SubclassStore: subclasses, fault: o.subclassFault}
 	}
 	if o.slowStores > 0 {
-		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
-		gclConfig.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
-		gclConfig.PetStore = slowPetStore{PetStore: petStore, delay: o.slowStores}
+		gclConfig.Belongings.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
+		gclConfig.Belongings.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
+		gclConfig.Summoning.Store = slowPetStore{PetStore: petStore, delay: o.slowStores}
 	}
 	if o.petNameLookupErr != nil {
 		if o.slowStores > 0 {
 			t.Fatal("gameservertest: WithPetNameLookupError cannot be combined with WithSlowStores")
 		}
-		gclConfig.PetStore = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr}
+		gclConfig.Summoning.Store = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr}
 	}
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat
@@ -2174,16 +2407,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("WithAttackStance and WithAttackStanceTracker both set: they wire the same link collaborator")
 	}
 	if o.attackStanceTracker != nil {
-		gclConfig.AttackStance = o.attackStanceTracker
+		gclConfig.Combat.AttackStance = o.attackStanceTracker
 	} else if attackStance != nil {
-		gclConfig.AttackStance = attackStance
+		gclConfig.Combat.AttackStance = attackStance
 	}
 	if o.pvpFlags != nil {
-		gclConfig.PvPFlags = o.pvpFlags
+		gclConfig.Combat.PvPFlags = o.pvpFlags
 	}
-	gclConfig.Decay = o.decay
 	if ai != nil {
-		gclConfig.AI = ai
+		gclConfig.Combat.AI = ai
 	}
 	if worldObjects != nil {
 		gclConfig.Doors = worldObjects
@@ -2194,7 +2426,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), hero.TableNames{NPCs: o.npcs, Castles: gclConfig.Castles}, persistWorker, HeroMinMatches, time.Now, o.log)
 	gclConfig.Heroes = heroes
 	olympiadQueue := queues.NewQueue("olympiad")
-	olympiadState := olympiad.New(o.olympiadWindow.config(olympiadQueue.Now()), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, olympiadQueue, o.log)
+	olympiadCfg := o.olympiadWindow.config(olympiadQueue.Now())
+	if o.olympiadConfig != nil {
+		o.olympiadConfig(&olympiadCfg)
+	}
+	olympiadState := olympiad.New(olympiadCfg, gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, olympiadQueue, o.log)
 	gclConfig.Olympiad = olympiadState
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints
@@ -2209,25 +2445,49 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	fishChampState := o.fishChamp.newChampionship(db, persistWorker, queues, o.log)
 	gclConfig.FishingChampionship = fishChampState
 	gclConfig.Sieges = newSieges(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker)
+	quests.bindResidences(worldObjects, gclConfig.Castles, o.clanHallData, gclConfig.Sieges, halls, gclConfig.Clans.Table())
 	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
+	gclConfig.LoginStatus, gclConfig.Shutdown = shutdownState.wire(loginLink, 300, queues, network.NewShutdownNotices(state), o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
 	}
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
+	if worldObjects != nil {
+		worldObjects.SetRegenSettings(gcl.PlayerRules())
+	}
 	// Production hands the link over before the period-change timer is
 	// armed; here the link exists only now, so a change firing earlier
 	// reaches no player, as none is online yet.
 	sevenSigns.SetOnline(gcl)
+	fest.SetWorld(gcl.FestivalWorld())
 	sevenSigns.SetCastles(gclConfig.Castles)
 	var npcSpawns *gamemanager.Npcs
 	var npcRespawns *task.Respawn
+	var spawnStore *gamesql.SpawnStore
+	if o.npcSpawns != nil && o.spawnData {
+		spawnStore = gamesql.NewSpawnStore(db)
+		if o.seedSpawnData != nil {
+			o.seedSpawnData(spawnStore)
+		}
+	}
 	if o.npcSpawns != nil {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
+			spawnStore: spawnStore, makerCatalog: o.makerCatalog, makerHeard: o.makerHeard, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
-			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
-			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, routes: o.walkerRoutes,
+			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.Combat.AttackStance, log: o.log, makers: o.npcSpawns, channels: o.lootChannels(gcl),
+			dropRates: o.npcDropRates, partyRange: o.partyRange, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes,
+			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange, noSpawns: o.configKeys.noSpawns,
 		})
+		// As the game server does once the spawns are up, every castle's
+		// control towers, then its holy artifacts, are placed, the
+		// artifacts built from the WithNPCs templates.
+		if gclConfig.Castles != nil {
+			gclConfig.Castles.SpawnTowers(func(castleID int, t castledata.ControlTower) (castle.Tower, bool) {
+				return npcSpawns.SpawnTower(castleID, t)
+			})
+			gclConfig.Castles.SpawnArtifacts(npcSpawns.SpawnArtifact)
+		}
 	}
 	if o.productionTickers {
 		for _, start := range []func(zerolog.Logger) *scheduler.Ticker{
@@ -2239,7 +2499,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			ai.Start,
 			task.NewNPCRegen(state).Start,
 		} {
-			t.Cleanup(start(o.log).StopAndWait)
+			cleanup(t, start(o.log).StopAndWait)
 		}
 	}
 
@@ -2260,7 +2520,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			handlersDone.Wait()
 		}
 	}
-	t.Cleanup(func() {
+	cleanup(t, func() {
 		cancel()
 		ln.Close()
 		waitHandlers()
@@ -2268,14 +2528,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	sendObserver := new(atomic.Pointer[func(payload []byte)])
 	frames := new(traffic)
 	serve := func(ctx context.Context, conn *network.Conn) {
-		sent, closed := frames.track(conn)
-		defer closed()
-		conn.ObserveSends(func(payload []byte) {
-			sent()
-			if observe := sendObserver.Load(); observe != nil {
-				(*observe)(payload)
-			}
-		})
+		// Counted first so the count drops last: once Stop sees every
+		// handler returned, each connection already reads as closed to
+		// awaitFrame, which otherwise lets a read's whole wait pass on the
+		// driven clock and report a timeout instead of the close.
 		handlers.Lock()
 		handlers.count++
 		handlers.Unlock()
@@ -2285,15 +2541,23 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			handlersDone.Broadcast()
 			handlers.Unlock()
 		}()
+		sent, closed := frames.track(conn)
+		defer closed()
+		conn.ObserveSends(func(payload []byte) {
+			sent()
+			if observe := sendObserver.Load(); observe != nil {
+				(*observe)(payload)
+			}
+		})
 		gcl.Handle(ctx, conn)
 	}
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
 	go func() { _ = network.Serve(ctx, ln, serve, zerolog.Nop()) }()
 
 	for _, spec := range o.characters {
-		tmpl, ok := templates.Get(0)
+		tmpl, ok := templates.Get(spec.class)
 		if !ok {
-			t.Fatal("missing test class template")
+			t.Fatalf("missing test class template %d", spec.class)
 		}
 		ch, err := player.NewCharacter(ids.nextID(), tmpl, o.account, spec.name, 1, 0, 0, spec.sex)
 		if err != nil {
@@ -2324,7 +2588,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			return o.skills.HasDefinition(modelskill.Ref{ID: modelskill.ID(sk.ID), Level: sk.Level})
 		})
 	}
-	gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
+	clampedClans := gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
+	gclConfig.Clans.StoreRestoredReputations(clampedClans)
 	hallOwners, err := clanStore.LoadHallOwners(context.Background())
 	if err != nil {
 		t.Fatalf("load clan hall owners: %v", err)
@@ -2343,21 +2608,24 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore clan hall functions: %v", err)
 	}
 	hallFees := queues.NewQueue("clanhall-functions")
-	t.Cleanup(hallFees.Close)
+	cleanup(t, hallFees.Close)
 	hallFunctions.Start(hallFees, gcl)
 	if err := halls.Restore(context.Background()); err != nil {
 		t.Fatalf("restore clan halls: %v", err)
 	}
+	restoreHallSieges(t, db, halls)
 	hallQueue := queues.NewQueue("clanhalls")
-	t.Cleanup(hallQueue.Close)
+	cleanup(t, hallQueue.Close)
 	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl), network.ClanHallGrounds(gcl))
-	restoreCastles(t, db, gclConfig.Castles)
+	quests.registry.BindHallSieges()
+	startHallSieges(t, o, halls, gcl)
+	restoreCastles(t, db, gclConfig.Castles, worldObjects)
 	castleManorClock := startCastleManor(t, gclConfig.CastleManor, o, gcl)
 	startSieges(t, gclConfig.Sieges, queues.NewQueue("sieges"), gcl)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
 	clanDissolutions := queues.NewQueue("clan-dissolution")
-	t.Cleanup(clanDissolutions.Close)
+	cleanup(t, clanDissolutions.Close)
 	gclConfig.Clans.StartDissolutions(clanDissolutions, gcl)
 	if o.seedBoard != nil {
 		ids.seed(t, db, func() { o.seedBoard(db) })
@@ -2378,7 +2646,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore heroes: %v", err)
 	}
 	heroes.Start(gcl)
-	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
+	cleanup(t, func() { olympiadState.Stop(context.Background()) })
 	o.lottery.start(t, db, ids, lotteryState)
 	o.fishChamp.start(t, db, ids, fishChampState)
 	if o.seedBoss != nil {
@@ -2420,6 +2688,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	readCharSelectInfo(t, c, o.account, o.wantChars)
 
 	srv := &Server{
+		shutdown:            shutdownState,
 		Client:              c,
 		State:               state,
 		WorldObjects:        worldObjects,
@@ -2438,11 +2707,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Festival:            fest,
 		itemTable:           itemTemplates,
 		levelTable:          levels,
-		deepBlueDrops:       o.deepBlueDropRules,
-		autoLoot:            o.autoLoot,
-		autoLootRaid:        o.autoLootRaid,
-		rateXP:              o.rateXP,
-		rateSP:              o.rateSP,
+		rewardBook:          killRewards,
 		DB:                  db,
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,
@@ -2472,16 +2737,20 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Effects:             taskEffects,
 		effectEnv:           effectEnv,
 		castEffects:         gcl.HostileCastEffects(),
-		folkSinks:           gcl.FolkSinks(state, gclConfig.AttackStance),
+		folkSinks:           gcl.FolkSinks(state, gclConfig.Combat.AttackStance),
+		hostileSinks:        gcl.HostileSinks(state, gclConfig.Combat.AttackStance),
+		guardedSiege:        gcl.GuardedSiege,
+		groundTaker:         gcl,
+		playerRules:         gcl.PlayerRules(),
 		rewardParties:       o.rewardParties(gcl),
 		raidKills:           gcl,
 		lootChannels:        o.lootChannels(gcl),
-		stance:              gclConfig.AttackStance,
 		maxGeoPathFail:      o.maxGeoPathFailCount,
 		zones:               o.zones,
 		decay:               o.decay,
 		AI:                  ai,
 		NpcSpawns:           npcSpawns,
+		spawnStore:          spawnStore,
 		NpcRespawns:         npcRespawns,
 		HTML:                gclConfig.HTML,
 		Water:               water,
@@ -2521,7 +2790,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 func (s *Server) ObserveSends(tb testing.TB, fn func(payload []byte)) {
 	tb.Helper()
 	s.sendObserver.Store(&fn)
-	tb.Cleanup(func() { s.sendObserver.Store(nil) })
+	cleanup(tb, func() { s.sendObserver.Store(nil) })
 }
 
 // sharedRSAKeys is the GS-LS link key pool every Boot in the process shares.
@@ -2564,7 +2833,7 @@ func startLoginServerAcceptor(t *testing.T, accounts *loginsql.AccountStore) (ad
 		t.Fatalf("listen: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	cleanup(t, cancel)
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
 	go func() { _ = gsLink.Serve(ctx, ln) }()
 

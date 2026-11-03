@@ -1,0 +1,21 @@
+# A Game Of Cards (Q662), level 61: a monster kill drops a red gem for a draw under its chance. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q662_a_game_of_cards_drops.golden
+character Gambler 61
+quest Q662_AGameOfCards <cond>=1 <state>=STARTED
+random 0 900000 0 100000
+script quest.Q662_AGameOfCards
+item 8765 959 729 947 951 955 956 8868
+page villagemaster/30845.htm
+page script/quest/Q662_AGameOfCards/
+npc klump 30845 VillageMasterDwarf 10 0 0
+npc m1 21116 Monster 40 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8765
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8765=1
+  rows Q662_AGameOfCards <cond>=1 <state>=STARTED
+  state Q662_AGameOfCards STARTED

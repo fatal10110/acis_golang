@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // OpcodeCharInfo is the wire opcode for a visible player other than self.
@@ -22,9 +23,16 @@ type CharInfoSnapshot struct {
 	// Hidden tells the viewer to draw Character invisible: it is invisible
 	// and the viewer is no game master.
 	Hidden bool
+	// Revealed shows an invisible Character to a viewer who is a game
+	// master: drawn in stealth under the title "Invisible".
+	Revealed bool
 	// HeroAura shows the hero aura on a Character that is no hero: a game
 	// master while GMHeroAura is set.
 	HeroAura bool
+	// SpawnProtectedTeam shows Character in the blue team (teamBlue) in
+	// place of its duel team: spawn protection is active and a protection
+	// window is configured.
+	SpawnProtectedTeam bool
 }
 
 // FrameCharInfo builds a CharInfo packet for a visible player.
@@ -53,7 +61,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(z))
 	w.WriteInt32(c.BoatObjectID())
 	w.WriteInt32(c.ObjectID())
-	w.WriteString(c.Name)
+	w.WriteString(c.CharacterName())
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex()))
 	w.WriteInt32(int32(c.VisibleBaseClassID()))
@@ -106,7 +114,13 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(c.HairStyle))
 	w.WriteInt32(int32(c.HairColor))
 	w.WriteInt32(int32(c.Face))
-	w.WriteString(c.Title())
+	title := c.Title()
+	abnormal := c.AbnormalEffect()
+	if s.Revealed {
+		title = invisibleTitle
+		abnormal |= skill.AbnormalStealth
+	}
+	w.WriteString(title)
 	w.WriteInt32(c.ClanID())
 	w.WriteInt32(s.Clan.CrestID)
 	w.WriteInt32(s.Clan.AllyID)
@@ -129,14 +143,18 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 		w.WriteUint16(uint16(id))
 	}
 	w.WriteUint8(boolUint8(c.PartyRoom() > 0))
-	w.WriteInt32(int32(c.AbnormalEffect()))
+	w.WriteInt32(int32(abnormal))
 	w.WriteUint8(uint8(c.RecommendationsLeft()))
 	w.WriteUint16(uint16(c.RecommendationsHave()))
 	w.WriteInt32(int32(c.ClassID()))
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))
-	w.WriteUint8(0) // enchant effect
-	w.WriteUint8(uint8(c.DuelTeam()))
+	w.WriteUint8(uint8(enchantEffect(c, paperdoll)))
+	if s.SpawnProtectedTeam {
+		w.WriteUint8(teamBlue)
+	} else {
+		w.WriteUint8(uint8(c.DuelTeam()))
+	}
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
 	w.WriteUint8(boolUint8(c.IsHero() || s.HeroAura))
@@ -152,6 +170,18 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(c.TitleColor())
 	w.WriteInt32(c.CursedWeaponStage())
 	return nil
+}
+
+// invisibleTitle is the title a game master sees on an invisible player.
+const invisibleTitle = "Invisible"
+
+// enchantEffect is the enchant glow the client draws on c: its weapon's
+// enchant level up to maxDisplayedEnchant, none while mounted.
+func enchantEffect(c *player.Character, paperdoll [item.PaperdollSlots]item.PaperdollEntry) int {
+	if c.MountType() != 0 {
+		return 0
+	}
+	return min(paperdoll[rhandPaperdollIndex].EnchantLevel, maxDisplayedEnchant)
 }
 
 func boolUint8(v bool) uint8 {

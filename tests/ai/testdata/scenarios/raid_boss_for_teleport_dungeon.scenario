@@ -1,0 +1,21 @@
+# RaidBossForTeleportDungeon (25333, Anakazel), placed by an npcmaker whose territory holds
+# it, level 1 like the level 1 character. A hit of 22 inside its territory runs its parents:
+# RaidBossStandard wants the character at 22 / (1 + 7) * 20000. Jumped out of its territory,
+# the next hit goes unanswered: its desire stays. Its maker script events (2 as it appears
+# and on its 3 minute check, 3 on a check with no hit for 180 s and as it dies) are in
+# tests/ai/raid_boss5_test.go: the format renders no maker event.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossForTeleportDungeon
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1
+territory rift -200 -200 400 200 -100 100
+npc boss 25333 RaidBoss 100 0 0 maker rift
+
+hit boss 22
+  desires boss attack(player)=55000
+jump boss 2000 0 0
+hit boss 22
+  desires boss attack(player)=55000

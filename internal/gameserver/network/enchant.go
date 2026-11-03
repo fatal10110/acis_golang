@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -15,25 +16,49 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
-func (l *GameClientLink) enchantStateStore() *enchantflow.State {
-	if l.enchantState == nil {
-		l.enchantState = enchantflow.NewState()
-	}
-	return l.enchantState
+// EnchantingConfig holds the collaborators of item and skill enchants: their
+// dice and the armor sets an enchant can complete.
+type EnchantingConfig struct {
+	// Roll supplies enchant dice rolls in [0,1); nil falls back to the
+	// random source. Behavior harnesses inject a deterministic roll.
+	Roll func() float64
+	// SkillRoll supplies skill-enchant dice rolls in [0,99]; nil falls back
+	// to the random source. Behavior harnesses inject a deterministic roll.
+	SkillRoll func() int
+	// ArmorSets is the loaded armor set data whose +6 skill an armor
+	// enchant grants and revokes; nil grants none. The equip-time set
+	// skills come from the skill persistence's own table.
+	ArmorSets *armorset.Table
 }
 
-func (l *GameClientLink) enchantService() *enchantflow.Service {
-	if l.enchant == nil {
-		l.enchant = enchantflow.NewService(l.enchantStateStore(), l.ids, l.rollEnchant, enchantflow.DefaultConfig())
+// enchanting is the enchant feature: the scroll each player has chosen,
+// the service that enchants an item with it, and the skill-enchant dice.
+// NewGameClientLink builds it whole and nothing in it is replaced
+// afterwards, so every client goroutine reads it without a lock.
+type enchanting struct {
+	scrolls   *enchantflow.State
+	items     *enchantflow.Service
+	skillRoll func() int
+}
+
+// newEnchanting builds the enchant feature from cfg's rates, armor sets and
+// dice; a nil roll draws from the random source.
+func newEnchanting(cfg GameClientLinkConfig) enchanting {
+	scrolls := enchantflow.NewState()
+	items := enchantflow.NewService(scrolls, cfg.IDs, cfg.Enchanting.Roll, enchantRates(&cfg.PlayerConfig))
+	items.SetArmorSets(cfg.Enchanting.ArmorSets)
+	skillRoll := cfg.Enchanting.SkillRoll
+	if skillRoll == nil {
+		skillRoll = func() int { return rnd.Get(100) }
 	}
-	return l.enchant
+	return enchanting{scrolls: scrolls, items: items, skillRoll: skillRoll}
 }
 
 func (l *GameClientLink) useEnchantScroll(live *livePlayer, scroll *item.Instance) bool {
 	if live == nil || scroll == nil {
 		return false
 	}
-	result, ok := l.enchantService().UseScroll(live.ObjectID(), live.Inventory(), scroll)
+	result, ok := l.enchanting.items.UseScroll(live.ObjectID(), live.Inventory(), scroll)
 	if !ok {
 		return false
 	}
@@ -56,9 +81,9 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	}
 
 	playerID := live.ObjectID()
-	end := l.itemInstances.BeginOperation(inv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
-	result, err := l.enchantService().EnchantItem(enchantflow.Request{
+	result, err := l.enchanting.items.EnchantItem(enchantflow.Request{
 		PlayerID: playerID,
 		Inv:      inv,
 		ObjectID: req.ObjectID,
@@ -84,7 +109,7 @@ func (l *GameClientLink) cancelActiveEnchant(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	result := l.enchantService().Cancel(live.ObjectID(), live.Inventory())
+	result := l.enchanting.items.Cancel(live.ObjectID(), live.Inventory())
 	l.applyEnchantSteps(live, result.Steps)
 }
 
@@ -258,7 +283,7 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // operation reads the row before this one changed it or after this write
 // bound and placed it, and then widens to the whole group.
 func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
-	if l.items == nil {
+	if l.belongings.items == nil {
 		return
 	}
 	// A row can be named twice — a stack that gives on one leg of a trade and
@@ -300,8 +325,8 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	// holds every row of the groups the write widened to, so it alone
 	// stands for them.
 	var carried task.BoundGroups
-	if l.itemInstances != nil {
-		widened, _ := l.itemInstances.Widen(order)
+	if l.belongings.itemInstances != nil {
+		widened, _ := l.belongings.itemInstances.Widen(order)
 		for _, bound := range widened {
 			row := rowAction{inst: bound.Inst, ownerID: bound.OwnerID, widened: true}
 			if bound.Inst == nil {
@@ -320,7 +345,7 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 				}
 				bound = append(bound, task.BoundRow{ObjectID: objectID, OwnerID: ownerID, Inst: row.inst})
 			}
-			carried = l.itemInstances.Bind(bound)
+			carried = l.belongings.itemInstances.Bind(bound)
 		}
 	}
 
@@ -351,12 +376,12 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 			owners = append(owners, row.ownerID)
 		}
 	}
-	instances := l.itemInstances
+	instances := l.belongings.itemInstances
 	l.queueItemWrite(reserved, func(keep []int32) error {
 		batch := keptRows(batch, keep)
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := l.items.WriteBatch(ctx, batch); err != nil {
+		if err := l.belongings.items.WriteBatch(ctx, batch); err != nil {
 			l.log.Error().Err(err).Int("saves", len(batch.Saves)).Int("deletes", len(batch.Deletes)).
 				Msg("write item rows")
 			return err
@@ -470,11 +495,4 @@ func (l *GameClientLink) queueItemWrite(reserved *persist.Write, write func(keep
 		reserved.Cancel()
 		settleAll()
 	}
-}
-
-func (l *GameClientLink) rollEnchant() float64 {
-	if l.enchantRoll != nil {
-		return l.enchantRoll()
-	}
-	return rnd.GetFloat(1)
 }

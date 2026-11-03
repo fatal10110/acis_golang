@@ -1,0 +1,21 @@
+# Andreas van Halter (29062, RaidBossType4AndreasAggressive), level 1 like the level 1
+# character. Its spawn names no privates here, so it places none. The character hits it for
+# 22: RaidBossType4's attacked hooks run before and after Andreas's own, each wanting to
+# attack the character at 22 / (1 + 7) * 20000, and the character, now its top desire target,
+# becomes its foe. The hit, one on its party too, reaches RaidBossType4's party-attacked hook:
+# the character being its top desire target, it wants neither ranged debuff, and the fixture
+# lists no DD magic. Its see-creature hook, privates, timers, script events, teleports, maker
+# events and dying are in tests/ai/raid_boss7_test.go: a raid boss sees no approach step, and
+# the format sets no spawn parameters, sends no script event and declares no npcmaker.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossParty
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4
+script script.ai.individual.Monster.RaidBoss.RaidBossParty.RaidBossType4AndreasAggressive
+npc boss 29062 RaidBoss 250 0 0
+
+hit boss 22
+  desires boss attack(player)=110000

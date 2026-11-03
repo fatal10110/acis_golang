@@ -25,7 +25,7 @@ func TestFirstCombatHateAttacksWithoutAITick(t *testing.T) {
 		t.Fatalf("CurrentIntention() before hate = %v, want %v", got, ai.IntentionIdle)
 	}
 
-	defender.AddCombatDamageHate(attacker, 50)
+	defender.AddAttackDesire(attacker, 50)
 
 	if got := defender.AI().CurrentIntention(); got != ai.IntentionAttack {
 		t.Fatalf("CurrentIntention() after first combat hate = %v, want %v (must not wait for AI tick)", got, ai.IntentionAttack)

@@ -1,0 +1,25 @@
+# Ketra Orc support (KetraOrcSupport): a Ketra ally of level 5 holding 6 horns buys Haste from the soul guide;
+# Asefa answers the bought page, takes the 6 horns and, on a later AI tick, casts Haste (4357, level 1) on the
+# ally. The soul guide is a civilian with the MP the blessing costs (a civilian's maximum is the npc line's mp).
+# Expectations are derived from the reference source (KetraOrcSupport.onAdvEvent).
+character Ally 40
+standing 5
+hold 7186 6
+script script.feature.KetraOrcSupport
+item 7186
+page script/feature/KetraOrcSupport/
+npc asefa 31372 Folk 20 0 0 mp 1493
+
+action asefa
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=script/feature/KetraOrcSupport/31372-4.htm
+  S ActionFailed
+bypass Quest KetraOrcSupport 7
+  S SystemMessage id=301 3:7186 6:6
+  S NpcHtmlMessage obj=asefa item=0 page=script/feature/KetraOrcSupport/31372-4.htm
+  S ActionFailed
+  items 7186=0
+tick x3
+  S MagicSkillUse caster=asefa target=player skill=4357-1 hit=0 reuse=0 success=0
+  S SystemMessage id=110 4:4357,1

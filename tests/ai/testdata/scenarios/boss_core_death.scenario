@@ -1,0 +1,32 @@
+# Core (29006), a level 1 grand boss, killed twice by the level 1 character, every draw 50. Its
+# lethal hit, its first, makes it speak its two opening lines; the grand boss's death sends the
+# raid success message and sound, then its dying hook plays BS02_D and speaks its three last
+# lines. The fresh Core that replaces it plays BS01_A as it appears, and
+# its own first hit, the second kill, speaks the opening lines again. The two teleport cubes it
+# leaves are in tests/ai/boss_core_test.go: the format renders no spawned NPC.
+character Hunter 1
+random always 50
+script script.ai.individual.DefaultNpc
+script script.ai.boss.core.Core
+npc core 29006 GrandBoss 100 0 0
+
+kill core x2
+  S NpcSay obj=core type=0 npc=1029006 text="A non-permitted target has been discovered."
+  S NpcSay obj=core type=0 npc=1029006 text="Intruder removal system initiated."
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=1 file=BS02_D bind=1 obj=core loc=110,20,30 delay=0
+  S NpcSay obj=core type=0 npc=1029006 text="A fatal error has occurred."
+  S NpcSay obj=core type=0 npc=1029006 text="System is being shut down..."
+  S NpcSay obj=core type=0 npc=1029006 text="......"
+  S PlaySound type=1 file=BS01_A bind=1 obj=core loc=110,20,30 delay=0
+  S NpcSay obj=core type=0 npc=1029006 text="A non-permitted target has been discovered."
+  S NpcSay obj=core type=0 npc=1029006 text="Intruder removal system initiated."
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=1 file=BS02_D bind=1 obj=core loc=110,20,30 delay=0
+  S NpcSay obj=core type=0 npc=1029006 text="A fatal error has occurred."
+  S NpcSay obj=core type=0 npc=1029006 text="System is being shut down..."
+  S NpcSay obj=core type=0 npc=1029006 text="......"

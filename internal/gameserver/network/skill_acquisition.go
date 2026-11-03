@@ -91,11 +91,11 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 // not ask whether trainer trains live's profession; the list it reopens
 // does. A skill that is not the next learnable level answers nothing.
 func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc.Folk, req clientpackets.RequestAcquireSkill) {
-	_, status, err := skillstate.LearnGeneral(live.Character, live.Template(), l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	_, status, err := skillstate.LearnGeneral(live.Character, live.Template(), l.skills, l.spellbooks, payTrainerItem(live), int(req.SkillID), int(req.Level))
 	if err != nil {
 		// The skill is learned and paid for; only its passive stats failed to
-		// build from a malformed definition. The reference cannot fail here
-		// (Player.addSkill), so the client gets the full learn reply.
+		// build from a malformed definition, which a learn never rejects, so the
+		// client gets the full learn reply.
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill: bad passive definition")
 	}
 	switch status {
@@ -112,10 +112,19 @@ func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc
 		return
 	}
 
+	// Adding the skill re-points the shortcuts bound to it, so their
+	// ShortCutRegister precedes the learned message.
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	l.showSkillList(live, trainer)
+}
+
+// payTrainerItem pays a trainer learn's or skill enchant's item out of
+// live's inventory, naming what went or what live lacks ahead of the
+// trainer's own reply.
+func payTrainerItem(live *livePlayer) skillstate.PayItem {
+	return func(itemID int32, count int) bool { return destroyItemByItemID(live, itemID, count) }
 }
 
 func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
@@ -129,7 +138,7 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 }
 
 func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
-	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
+	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, payTrainerItem(live), int(req.SkillID), int(req.Level))
 	if err != nil {
 		// As in learnGeneralAcquireSkill: the learn stands, the definition is bad.
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill: bad passive definition")
@@ -144,12 +153,12 @@ func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpa
 		return
 	}
 
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	if result.StorageSync {
 		live.SendFrame(serverpackets.FrameExStorageMaxCount(live.Character))
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	l.showFishSkillList(live)
 }
 

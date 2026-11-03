@@ -1,0 +1,390 @@
+# Acts of Evil (Q171), through cond 10: a level 27 human fighter accepts at Alvah; Arodin sends
+# it to Tyra, who wants twenty blade molds; with eighteen held, a Turek orc archer drops the
+# nineteenth (the support troop's 25% roll misses) and another the twentieth; Tyra's bill goes back
+# to Arodin; Alvah asks for the ranger reports, which the Tumran bugbears give (the first always,
+# the others at 20%); an Ol Mahum general gives the weapon trade contract and attack directives;
+# Neti, Rolento and Burai pass the hunter on to the Ol Mahum captains, the first of which misses its
+# head and the second drops it; then relog. Expectations replay the reference trace of this
+# scenario; the support troop is the Boot test's (q171_troop_test.go).
+trace internal/gameserver/script/testdata/oracle/scenarios/q171_acts_of_evil.golden
+character Hunter 27
+hold 4239 18
+random 0 99 0 99 0 0 0 0 999999 0
+script quest.Q171_ActsOfEvil
+item 4239 4240 4241 4242 4243 4244 4245 4246 4247 4248 4249 57
+page guard/30381.htm
+page merchant/30207.htm
+page merchant/30420.htm
+page merchant/30437.htm
+page default/30425.htm
+page default/30617.htm
+page script/quest/Q171_ActsOfEvil/
+npc alvah 30381 Guard 10 0 0
+npc arodin 30207 Merchant 20 0 0
+npc tyra 30420 Merchant 30 0 0
+npc rolento 30437 Merchant -10 0 0
+npc neti 30425 Folk -20 0 0
+npc burai 30617 Folk -30 0 0
+npc archer 20496 Monster 40 0 0
+npc bugbear 20062 Monster 0 40 0
+npc general 20438 Monster 0 -40 0
+npc captain 20066 Monster 40 40 0
+
+# Alvah: accept; she has nothing more to say before Tyra's bill reaches Arodin.
+action alvah
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q171_ActsOfEvil CREATED
+bypass Quest Q171_ActsOfEvil 30381-02.htm
+  S QuestList 171:0x80000001
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-02.htm
+  S ActionFailed
+  Q upsert Q171_ActsOfEvil | <state> | STARTED
+  Q upsert Q171_ActsOfEvil | <cond> | 1
+  state Q171_ActsOfEvil STARTED
+  rows Q171_ActsOfEvil <cond>=1 <state>=STARTED
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-02a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Arodin sends the hunter to Tyra, who wants twenty blade molds.
+action arodin
+action arodin
+  S ActionFailed
+  S NpcHtmlMessage obj=arodin item=0 page=merchant/30207.htm
+  S ActionFailed
+bypass npc_{arodin}_Quest
+  S NpcHtmlMessage obj=arodin item=0 page=script/quest/Q171_ActsOfEvil/30207-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30207-02.htm
+  S QuestList 171:0x80000003
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=arodin item=0 page=script/quest/Q171_ActsOfEvil/30207-02.htm
+  S ActionFailed
+  Q upsert Q171_ActsOfEvil | <cond> | 2
+action arodin
+  S ActionFailed
+  S NpcHtmlMessage obj=arodin item=0 page=merchant/30207.htm
+  S ActionFailed
+bypass npc_{arodin}_Quest
+  S NpcHtmlMessage obj=arodin item=0 page=script/quest/Q171_ActsOfEvil/30207-01a.htm
+  S ActionFailed
+  S ActionFailed
+action tyra
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q171_ActsOfEvil/30420-01b.htm
+  S ActionFailed
+  S ActionFailed
+
+# Turek orc archers: the nineteenth mold, the troop roll missing; then the twentieth.
+kill archer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4239
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4239=19
+kill archer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4239
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 4239=20
+  rows Q171_ActsOfEvil <cond>=2 <state>=STARTED
+
+# Tyra takes the molds for her bill; Arodin takes the bill.
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S QuestList 171:0x80000007
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:4239 6:20
+  S SystemMessage id=54 3:4240
+  Q upsert Q171_ActsOfEvil | <cond> | 3
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q171_ActsOfEvil/30420-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 4239=0 4240=1
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q171_ActsOfEvil/30420-01a.htm
+  S ActionFailed
+  S ActionFailed
+action arodin
+action arodin
+  S ActionFailed
+  S NpcHtmlMessage obj=arodin item=0 page=merchant/30207.htm
+  S ActionFailed
+bypass npc_{arodin}_Quest
+  S QuestList 171:0x8000000f
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4240
+  Q upsert Q171_ActsOfEvil | <cond> | 4
+  S NpcHtmlMessage obj=arodin item=0 page=script/quest/Q171_ActsOfEvil/30207-03.htm
+  S ActionFailed
+  S ActionFailed
+action arodin
+  S ActionFailed
+  S NpcHtmlMessage obj=arodin item=0 page=merchant/30207.htm
+  S ActionFailed
+bypass npc_{arodin}_Quest
+  S NpcHtmlMessage obj=arodin item=0 page=script/quest/Q171_ActsOfEvil/30207-03a.htm
+  S ActionFailed
+  S ActionFailed
+action tyra
+action tyra
+  S ActionFailed
+  S NpcHtmlMessage obj=tyra item=0 page=merchant/30420.htm
+  S ActionFailed
+bypass npc_{tyra}_Quest
+  S NpcHtmlMessage obj=tyra item=0 page=script/quest/Q171_ActsOfEvil/30420-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Alvah asks for the four ranger reports.
+action alvah
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30381-04.htm
+  S QuestList 171:0x8000001f
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-04.htm
+  S ActionFailed
+  Q upsert Q171_ActsOfEvil | <cond> | 5
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-04a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Tumran bugbears: the first report always; the next at 20%, a miss first.
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4241
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  items 4241=1 4242=0
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4242
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4243
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4244
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4241=1 4242=1 4243=1 4244=1
+
+# Alvah takes the reports, then wants the Ol Mahum's weapon trade.
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S QuestList 171:0x8000003f
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4241
+  S SystemMessage id=302 3:4242
+  S SystemMessage id=302 3:4243
+  S SystemMessage id=302 3:4244
+  Q upsert Q171_ActsOfEvil | <cond> | 6
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 4241=0 4242=0 4243=0 4244=0
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-05a.htm
+  S ActionFailed
+  S ActionFailed
+
+# An Ol Mahum general: the contract and the directives.
+kill general
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4245
+  S SystemMessage id=54 3:4246
+  items 4245=1 4246=1
+
+# Alvah keeps the contract and sends the hunter to Neti.
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30381-07.htm
+  S QuestList 171:0x8000007f
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4245
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-07.htm
+  S ActionFailed
+  Q upsert Q171_ActsOfEvil | <cond> | 7
+  items 4245=0 4246=1
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-07a.htm
+  S ActionFailed
+  S ActionFailed
+action neti
+action neti
+  S ActionFailed
+  S NpcHtmlMessage obj=neti item=0 page=default/30425.htm
+  S ActionFailed
+bypass npc_{neti}_Quest
+  S QuestList 171:0x800000ff
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q171_ActsOfEvil | <cond> | 8
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q171_ActsOfEvil/30425-01.htm
+  S ActionFailed
+  S ActionFailed
+action neti
+  S ActionFailed
+  S NpcHtmlMessage obj=neti item=0 page=default/30425.htm
+  S ActionFailed
+bypass npc_{neti}_Quest
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q171_ActsOfEvil/30425-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rolento hears of the invasion plans and gives the cargo box and the certificate for Burai.
+action rolento
+action rolento
+  S ActionFailed
+  S NpcHtmlMessage obj=rolento item=0 page=merchant/30437.htm
+  S ActionFailed
+bypass npc_{rolento}_Quest
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q171_ActsOfEvil/30437-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30437-02.htm
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q171_ActsOfEvil/30437-02.htm
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30437-03.htm
+  S QuestList 171:0x800001ff
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4248
+  S SystemMessage id=54 3:4247
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q171_ActsOfEvil/30437-03.htm
+  S ActionFailed
+  Q upsert Q171_ActsOfEvil | <cond> | 9
+  items 4246=1 4247=1 4248=1
+action rolento
+  S ActionFailed
+  S NpcHtmlMessage obj=rolento item=0 page=merchant/30437.htm
+  S ActionFailed
+bypass npc_{rolento}_Quest
+  S NpcHtmlMessage obj=rolento item=0 page=script/quest/Q171_ActsOfEvil/30437-03a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Burai hears the hunter out, takes the directives, the box and the certificate, and wants
+# thirty Ol Mahum heads.
+action burai
+action burai
+  S ActionFailed
+  S NpcHtmlMessage obj=burai item=0 page=default/30617.htm
+  S ActionFailed
+bypass npc_{burai}_Quest
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q171_ActsOfEvil/30617-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30617-02.htm
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q171_ActsOfEvil/30617-02.htm
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30617-03.htm
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q171_ActsOfEvil/30617-03.htm
+  S ActionFailed
+bypass Quest Q171_ActsOfEvil 30617-04.htm
+  S QuestList 171:0x800003ff
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4246
+  S SystemMessage id=302 3:4248
+  S SystemMessage id=302 3:4247
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q171_ActsOfEvil/30617-04.htm
+  S ActionFailed
+  Q upsert Q171_ActsOfEvil | <cond> | 10
+  items 4246=0 4247=0 4248=0
+action burai
+  S ActionFailed
+  S NpcHtmlMessage obj=burai item=0 page=default/30617.htm
+  S ActionFailed
+bypass npc_{burai}_Quest
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q171_ActsOfEvil/30617-04a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ol Mahum captains: the first misses its head, the second drops it.
+kill captain
+  S SystemMessage id=95 1:0 1:0
+  items 4249=0
+kill captain
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4249
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4249=1
+
+# Relog: the started quest loads from its rows.
+relog
+  state Q171_ActsOfEvil STARTED
+  rows Q171_ActsOfEvil <cond>=10 <state>=STARTED
+  items 4249=1
+action burai
+action burai
+  S ActionFailed
+  S NpcHtmlMessage obj=burai item=0 page=default/30617.htm
+  S ActionFailed
+bypass npc_{burai}_Quest
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q171_ActsOfEvil/30617-04a.htm
+  S ActionFailed
+  S ActionFailed

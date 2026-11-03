@@ -1,0 +1,93 @@
+# The Clan's Prestige (Q509): the leader of a level 6 clan picks Daimon the White-Eyed
+# (raid 1) at Valdis, kills him for the Daimon's eyes and trades them for 180 + a draw of
+# 0 to 35 reputation points (the draw pinned to 10: 190 points), then quits the
+# repeatable quest. The first draw is the always-drop's roll, which cannot miss.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q509_the_clans_prestige.golden
+character Leader 40
+clan 6
+random 0 10
+script quest.Q509_TheClansPrestige
+item 8489
+page villagemaster/31331.htm
+page script/quest/Q509_TheClansPrestige/
+npc valdis 31331 VillageMasterMystic 10 0 0
+npc daimon 25290 RaidBoss 40 0 0
+
+action valdis
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-0c.htm
+  S ActionFailed
+  S ActionFailed
+  state Q509_TheClansPrestige CREATED
+bypass Quest Q509_TheClansPrestige 31331-0.htm
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-0.htm
+  S ActionFailed
+
+# Raid 1: the quest starts on Themis, with her radar mark.
+bypass Quest Q509_TheClansPrestige 1
+  S QuestList 509:0x80000001
+  S ExShowQuestMark quest=509
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S RadarControl show=2 type=2 loc=186320,-43904,-3175
+  S RadarControl show=0 type=1 loc=186320,-43904,-3175
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-1.htm
+  S ActionFailed
+  Q upsert Q509_TheClansPrestige | <state> | STARTED
+  Q upsert Q509_TheClansPrestige | <cond> | 1
+  Q upsert Q509_TheClansPrestige | raid | 1
+  rows Q509_TheClansPrestige <cond>=1 <state>=STARTED raid=1
+
+# Relog: the started quest and its chosen raid come back from character_quests.
+relog
+  state Q509_TheClansPrestige STARTED
+  rows Q509_TheClansPrestige <cond>=1 <state>=STARTED raid=1
+
+# No proof yet: the reloaded raid still picks Themis's page.
+action valdis
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Daimon dies (the raid-success line is the raid boss's own); his eyes go to the clan
+# leader, completing the one needed.
+kill daimon
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8489
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 8489=1
+
+# The eyes for 180 + 10 reputation points. The seeded clan starts at 0 reputation, so the
+# gain also reactivates its clan skills (Clan.setReputationScore).
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S SystemMessage id=302 3:8489
+  S SystemMessage id=1862
+  S SystemMessage id=1777 1:190
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-1b.htm
+  S ActionFailed
+  S ActionFailed
+  items 8489=0
+
+bypass Quest Q509_TheClansPrestige 31331-6.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-6.htm
+  S ActionFailed
+  Q delete-quest Q509_TheClansPrestige
+  state Q509_TheClansPrestige -
+  rows Q509_TheClansPrestige -

@@ -18,12 +18,16 @@ type characterEditStore interface {
 	SetTitle(ctx context.Context, objectID int32, title string) error
 	SetClanPenalties(ctx context.Context, objectID int32, joinExpiry, createExpiry int64) error
 	SetSex(ctx context.Context, objectID int32, sex byte) error
+	SetName(ctx context.Context, objectID int32, name string) error
+	// NameTaken reports whether a character, online or not, is named name,
+	// matched case-insensitively.
+	NameTaken(ctx context.Context, name string) (bool, error)
 }
 
 // adminSet answers //set <field> [value] for gm's selection, gm itself
 // without one. //set access is adminSetAccess; the other fields change a
 // selected player and tell gm, and a selection that is no player answers
-// nothing, as the reference does: a chat command leaves no client action
+// nothing on purpose: a chat command leaves no client action
 // pending. A missing or malformed value answers the field's usage.
 // //set name and //set title also name a selected NPC; see
 // admin_set_fields.go.
@@ -69,13 +73,13 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			}
 			target.SetColors(color, target.TitleColor())
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set color name of "+target.Name+".")
+			sendText(gm, "You successfully set color name of "+target.CharacterName()+".")
 		})
 	case "tcolor":
 		edit(func() {
 			// The color is read from the 17th character of the command on,
 			// the space before the value included, which no hexadecimal
-			// number parses: the reference answers the usage every time.
+			// number parses: the usage answers every time.
 			color, ok := int32(0), false
 			if len(line) >= len("admin_set tcolor") {
 				var err error
@@ -88,22 +92,22 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			}
 			target.SetColors(target.NameColor(), color)
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set title color name of "+target.Name+".")
+			sendText(gm, "You successfully set title color name of "+target.CharacterName()+".")
 		})
 	case "exp":
 		edit(func() {
-			exp, err := commons.ParseInt(value, 64)
+			exp, err := strconv.ParseInt(value, 10, 64)
 			if !hasValue || err != nil {
 				sendText(gm, "Usage: //set exp <number>")
 				return
 			}
 			l.setExp(target, exp)
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set "+target.Name+"'s XP to "+strconv.FormatInt(exp, 10)+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s XP to "+strconv.FormatInt(exp, 10)+".")
 		})
 	case "karma":
 		edit(func() {
-			karma, ok := parseJavaInt(value)
+			karma, ok := parseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set karma <number>")
 				return
@@ -113,11 +117,11 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 				return
 			}
 			target.SetKarma(int(karma))
-			sendText(gm, "You successfully set "+target.Name+"'s karma to "+strconv.Itoa(int(karma))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s karma to "+strconv.Itoa(int(karma))+".")
 		})
 	case "level":
 		edit(func() {
-			level, ok := parseJavaInt(value)
+			level, ok := parseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set level <number>")
 				return
@@ -132,34 +136,34 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 				return
 			}
 			l.setExp(target, row.RequiredExpToLevelUp)
-			sendText(gm, "You successfully set "+target.Name+"'s level to "+strconv.Itoa(int(level))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s level to "+strconv.Itoa(int(level))+".")
 		})
 	case "noble":
 		edit(func() {
 			l.toggleNoble(target)
-			sendText(gm, "You have modified "+target.Name+"'s noble status.")
+			sendText(gm, "You have modified "+target.CharacterName()+"'s noble status.")
 		})
 	case "rec":
 		edit(func() {
-			rec, ok := parseJavaInt(value)
+			rec, ok := parseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set rec <number>")
 				return
 			}
 			target.SetRecommendationsHave(int(rec))
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set "+target.Name+" to "+strconv.Itoa(int(rec))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+" to "+strconv.Itoa(int(rec))+".")
 		})
 	case "sp":
 		edit(func() {
-			sp, ok := parseJavaInt(value)
+			sp, ok := parseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set sp <number>")
 				return
 			}
 			l.setSP(target, sp)
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set "+target.Name+"'s SP to "+strconv.Itoa(int(sp))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s SP to "+strconv.Itoa(int(sp))+".")
 		})
 	case "title":
 		l.adminSetTitle(gm, value, hasValue)

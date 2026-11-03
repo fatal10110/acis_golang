@@ -188,6 +188,7 @@ func TestOffensiveCastPutsCasterInAttackStance(t *testing.T) {
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeRequestMagicSkillUse(stanceNukeID, false, false))
+	srv.Settle(t)
 	srv.AdvanceUntil(t, "nuke cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	frames := readQuiet(c)
 	launched := indexOf(frames, 0, serverpackets.OpcodeMagicSkillLaunched, objID)

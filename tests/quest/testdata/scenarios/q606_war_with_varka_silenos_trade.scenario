@@ -1,0 +1,39 @@
+# War with Varka Silenos (Q606), started with 150 Varka manes: Kadun Zu Ketra trades 100 of them for 20 Horns of
+# Buffalo and, when the quest is dropped, takes the 50 left. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q606_war_with_varka_silenos_trade.golden
+character Ally 74
+standing 1
+quest Q606_WarWithVarkaSilenos <cond>=1 <state>=STARTED
+hold 7233 150
+script quest.Q606_WarWithVarkaSilenos
+item 7233 7186
+page npcdefault.htm
+page script/quest/Q606_WarWithVarkaSilenos/
+npc kadun 31370 Folk 10 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q606_WarWithVarkaSilenos 31370-07.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7233 6:100
+  S SystemMessage id=53 3:7186 6:20
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-07.htm
+  S ActionFailed
+  items 7233=50 7186=20
+  rows Q606_WarWithVarkaSilenos <cond>=1 <state>=STARTED
+bypass Quest Q606_WarWithVarkaSilenos 31370-09.htm
+  S SystemMessage id=301 3:7233 6:50
+  S QuestList
+  Q delete-quest Q606_WarWithVarkaSilenos
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q606_WarWithVarkaSilenos/31370-09.htm
+  S ActionFailed
+  items 7233=0 7186=20
+  rows Q606_WarWithVarkaSilenos -
+  state Q606_WarWithVarkaSilenos -

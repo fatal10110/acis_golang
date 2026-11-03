@@ -26,13 +26,13 @@ const (
 // character, online or not. A character set below 0 is banned and
 // disconnected.
 //
-// Any other number of arguments answers nothing, as the reference does; a
-// chat command leaves no client action pending.
+// Any other number of arguments answers nothing on purpose; a chat
+// command leaves no client action pending.
 func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 	const usage = "Usage: //set access <level> | <name> <level>"
 	switch len(args) {
 	case 1:
-		level, ok := parseJavaInt(args[0])
+		level, ok := parseInt32(args[0])
 		if !ok {
 			sendText(gm, usage)
 			return
@@ -43,18 +43,18 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 			return
 		}
 		l.changeAccessLevel(gm, target, int(level), func() {
-			sendText(gm, target.Name+"'s access level is now set to "+strconv.Itoa(int(level))+".")
+			sendText(gm, target.CharacterName()+"'s access level is now set to "+strconv.Itoa(int(level))+".")
 		})
 	case 2:
 		name := args[0]
-		level, ok := parseJavaInt(args[1])
+		level, ok := parseInt32(args[1])
 		if !ok {
 			sendText(gm, usage)
 			return
 		}
 		if target, ok := l.livePlayerByName(name); ok {
 			l.changeAccessLevel(gm, target, int(level), func() {
-				sendText(gm, target.Name+"'s access level is now set to "+strconv.Itoa(int(level))+".")
+				sendText(gm, target.CharacterName()+"'s access level is now set to "+strconv.Itoa(int(level))+".")
 			})
 			return
 		}
@@ -104,7 +104,7 @@ func (l *GameClientLink) changeAccessLevel(gm, target *livePlayer, level int, re
 func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 	minutes := int32(1)
 	if args := handleradmin.Args(line); len(args) > 0 {
-		if v, ok := parseJavaInt(args[0]); ok {
+		if v, ok := parseInt32(args[0]); ok {
 			minutes = v
 		} else {
 			sendText(gm, "Invalid timer set for //gm ; default time is used.")
@@ -129,8 +129,8 @@ func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 // else the offline account or character. A chat ban lasts the minutes
 // given, without end by default; see adminBanChat.
 //
-// An unknown kind answers nothing, as the reference does; a chat command
-// leaves no client action pending.
+// An unknown kind answers nothing on purpose; a chat command leaves no
+// client action pending.
 func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 	const usage = "Usage : //ban account|chat|player [name [time]]"
 	args := handleradmin.Args(line)
@@ -149,7 +149,7 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 		target, _ = l.livePlayerByName(name)
 		if len(args) > 2 {
 			var ok bool
-			if minutes, ok = parseJavaInt(args[2]); !ok {
+			if minutes, ok = parseInt32(args[2]); !ok {
 				sendText(gm, usage)
 				return
 			}
@@ -188,8 +188,8 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 // or character gets its access back; an online one is not banned. A chat
 // unban lifts the named player's chat ban; see adminUnbanChat.
 //
-// An unknown kind answers nothing, as the reference does; a chat command
-// leaves no client action pending.
+// An unknown kind answers nothing on purpose; a chat command leaves no
+// client action pending.
 func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) == 0 {
@@ -212,16 +212,16 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 	switch kind {
 	case "account":
 		if target != nil {
-			sendText(gm, target.Name+" account isn't actually banned.")
+			sendText(gm, target.CharacterName()+" account isn't actually banned.")
 			return
 		}
 		l.sendAccountAccessLevel(name, accountUnbannedLevel)
-		sendText(gm, "Unban request sent for account "+javaString(name)+".")
+		sendText(gm, "Unban request sent for account "+orNull(name)+".")
 	case "chat":
 		l.adminUnbanChat(gm, target, name)
 	case "player":
 		if target != nil {
-			sendText(gm, target.Name+" player isn't actually banned.")
+			sendText(gm, target.CharacterName()+" player isn't actually banned.")
 			return
 		}
 		l.changeCharAccessLevel(gm, nil, name, characterUnbannedLevel)
@@ -239,7 +239,7 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 		}) {
 			l.storeLeavingAccessLevel(target, level)
 		}
-		sendText(gm, target.Name+" has been banned.")
+		sendText(gm, target.CharacterName()+" has been banned.")
 		return
 	}
 	if name == "" {
@@ -260,9 +260,9 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 	}
 }
 
-// javaString is s as string concatenation prints it in the reference, where
-// a missing argument is null.
-func javaString(s string) string {
+// orNull is s as an admin message prints it, where a missing argument
+// is null.
+func orNull(s string) string {
 	if s == "" {
 		return "null"
 	}

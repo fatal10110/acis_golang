@@ -55,17 +55,12 @@ func TestTeleportKeepsAttackStanceUntilItsTimeout(t *testing.T) {
 	var frames [][]byte
 	sawTeleport := false
 	collect := func() {
-		for i := 0; i < 200; i++ {
-			frame := c.ReadWithTimeout(300 * time.Millisecond)
-			if frame == nil {
-				return
-			}
+		for _, frame := range c.ReadQueued() {
 			if frame[0] == serverpackets.OpcodeTeleportToLocation {
 				sawTeleport = true
 			}
 			frames = append(frames, frame)
 		}
-		t.Fatal("client kept receiving frames after 200 reads")
 	}
 	collect()
 	if !sawTeleport {

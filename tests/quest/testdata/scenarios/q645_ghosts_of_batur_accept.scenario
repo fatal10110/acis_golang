@@ -1,0 +1,40 @@
+# Ghosts of Batur (Q645): a level 23 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q645_ghosts_of_batur_accept.golden
+character Hero 23
+script quest.Q645_GhostsOfBatur
+item 8089 1878 1879 1880 1881 1882 1883
+page default/32017.htm
+page script/quest/Q645_GhostsOfBatur/
+npc karuda 32017 Folk 10 0 0
+
+action karuda
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q645_GhostsOfBatur/32017-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q645_GhostsOfBatur 32017-03.htm
+  S QuestList 645:0x80000001
+  S ExShowQuestMark quest=645
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q645_GhostsOfBatur/32017-03.htm
+  S ActionFailed
+  Q upsert Q645_GhostsOfBatur | <state> | STARTED
+  Q upsert Q645_GhostsOfBatur | <cond> | 1
+  rows Q645_GhostsOfBatur <cond>=1 <state>=STARTED
+  state Q645_GhostsOfBatur STARTED
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q645_GhostsOfBatur/32017-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q645_GhostsOfBatur <cond>=1 <state>=STARTED
+  state Q645_GhostsOfBatur STARTED

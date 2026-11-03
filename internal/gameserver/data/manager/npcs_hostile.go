@@ -124,45 +124,116 @@ func (r *walkerActorRef) TeleportTo(target location.Location) {
 	r.Hostile.TeleportTo(target)
 }
 
-// routeAwareMoveController wraps a Hostile's ai.MoveController so that any
-// AI-initiated movement other than route walking (offensive-follow chase,
-// leash return-home, random walk and escort moves) clears routeMove before it starts — otherwise the
+// routeAwareMoveController wraps a Hostile's ai.AttackableMoveController so
+// that any AI-initiated movement other than route walking (offensive-follow
+// chase, leash return-home, random walk, escort and pick-up moves) clears routeMove before it starts — otherwise the
 // arrived hook would treat that move's completion as a route arrival too,
 // since it fires through the same move.Controller and task.Walker.Arrived
 // has no intention of its own to check.
 type routeAwareMoveController struct {
-	ai.MoveController
+	ai.AttackableMoveController
 	routeMove *atomic.Bool
 }
 
 func (r routeAwareMoveController) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
 	r.routeMove.Store(false)
-	return r.MoveController.MaybeStartOffensiveFollow(target, attackRange)
+	return r.AttackableMoveController.MaybeStartOffensiveFollow(target, attackRange)
 }
 
 func (r routeAwareMoveController) MoveHome(home location.Location) error {
 	r.routeMove.Store(false)
-	return r.MoveController.MoveHome(home)
+	return r.AttackableMoveController.MoveHome(home)
 }
 
 func (r routeAwareMoveController) MoveToLocation(dest location.Location) (bool, error) {
 	r.routeMove.Store(false)
-	return r.MoveController.MoveToLocation(dest)
+	return r.AttackableMoveController.MoveToLocation(dest)
+}
+
+func (r routeAwareMoveController) MoveStraightToLocation(dest location.Location) (bool, error) {
+	r.routeMove.Store(false)
+	return r.AttackableMoveController.MoveStraightToLocation(dest)
 }
 
 func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
-	g, ok := r.MoveController.(*move.Controller)
+	g, ok := r.AttackableMoveController.(*move.Controller)
 	return !ok || g.CanMoveTo(target)
 }
 
+// hostileWiring is every adapter newLiveHostile wires one live Hostile
+// with, in a single allocation: each controller holds a pointer into it.
+// It is also the NPC's ai.CombatParts: castDefs and castEffects, shared by
+// every NPC, build its cast controller.
+type hostileWiring struct {
+	control     hostileControl
+	stat        statOwnerRef
+	located     locatedRef
+	actor       creatureActorRef
+	walker      walkerActorRef
+	moveCtl     routeAwareMoveController
+	route       hostileRoute
+	routeMove   atomic.Bool
+	castDefs    actorcast.Definitions
+	castEffects *actorcast.EffectHandlers
+}
+
+// NewAttack builds the NPC's attack controller on its own queue.
+func (w *hostileWiring) NewAttack() ai.AttackController {
+	ctl := attack.NewAttackable(&w.actor, &w.control)
+	ctl.SetQueue(w.control.hostile.Queue())
+	return ctl
+}
+
+// NewCast builds the NPC's AI cast controller on its own queue, nil when
+// no skill data is loaded (a harness that loads none): the AI loop then
+// casts nothing, as for an actor with no skills.
+func (w *hostileWiring) NewCast() ai.CastController {
+	if w.castDefs == nil {
+		return nil
+	}
+	hostile := w.control.hostile
+	castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, &w.control)
+	castController.SetQueue(hostile.Queue())
+	// A delete closes the NPC's queue without stopping its cast.
+	castController.OutliveQueueClose()
+	return &hostileCast{AIController: actorcast.AIController{
+		Controller:  castController,
+		Definitions: w.castDefs,
+		Effects:     *w.castEffects,
+		Caster:      hostile,
+		// A packet sent to a non-Player, non-Summon-owner caster goes
+		// nowhere, so caster-addressed messages (ATTACK_FAILED,
+		// MISSED_TARGET, ...) still have no forward target here. But
+		// target-addressed messages (MagicResist, ManaDrain) are delivered
+		// by ID lookup against the real target independent of caster type,
+		// so OnHitResult is wired to the boot-provided delivery hook (issue
+		// #2350) rather than left unset.
+		OnHitResult: w.castEffects.OnHitResult,
+	}}
+}
+
+// hostileCast is a hostile NPC's AI cast controller, holding the live cast
+// controller its damage and crowd control stop or break.
+type hostileCast struct {
+	actorcast.AIController
+}
+
+// CastControl returns the live cast controller.
+func (c *hostileCast) CastControl() npc.CastControl { return c.Controller }
+
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
-// controller (over the Hostile's lifetime movement state) and a real attack
-// controller, resolving their mutual construction-order dependency on the
-// finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
-	control := &hostileControl{walker: walker, log: log, chance: castEffects.Chance}
-	statRef := &statOwnerRef{}
-	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithEnv(effects))
+// controller (over the Hostile's lifetime movement state), resolving their
+// mutual construction-order dependency on the finished Hostile via
+// locatedRef/creatureActorRef/statOwnerRef. Its attack and cast
+// controllers and its effect list (built with effectOpts) are built the
+// first time it needs each. log, castDefs, castEffects and effectOpts are
+// shared by every NPC.
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log *zerolog.Logger, castDefs actorcast.Definitions, castEffects *actorcast.EffectHandlers, walker *task.Walker, maxGeoPathFailCount int, zones *zone.Index, effectOpts []effect.Option, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
+	w := &hostileWiring{castDefs: castDefs, castEffects: castEffects}
+	control := &w.control
+	control.walker, control.log, control.chance = walker, log, castEffects.Chance
+	statRef := &w.stat
+	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effectOpts...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -174,23 +245,20 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		live.Move().UseCreatureZoneSwim()
 	}
 
-	locRef := &locatedRef{}
+	locRef := &w.located
 	moveCtl, err := move.NewController(live.Move(), locRef, control)
 	if err != nil {
 		return nil, nil, err
 	}
 	moveCtl.SetPositionUpdates(positions)
 
-	actorRef := &creatureActorRef{}
-	attackCtl := attack.NewAttackable(actorRef, control)
-	attackCtl.SetQueue(queue)
-
-	routeMove := &atomic.Bool{}
-	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{MoveController: moveCtl, routeMove: routeMove}, attackCtl, castDefs)
+	actorRef := &w.actor
+	routeMove := &w.routeMove
+	w.moveCtl = routeAwareMoveController{AttackableMoveController: moveCtl, routeMove: routeMove}
+	hostile, err := npc.NewHostileWithParts(inst, live, &w.moveCtl, w, castDefs)
 	if err != nil {
 		return nil, nil, err
 	}
-	hostile.SetMaxBuffsAmount(maxBuffsAmount)
 	hostile.SetMaxGeoPathFailCount(maxGeoPathFailCount)
 	if zones != nil {
 		hostile.SetWaterZone(func(at location.Location) bool {
@@ -204,36 +272,11 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
 
-	// Wire the AI-cast seam (issue #1612): a nil castDefs (an existing
-	// harness that hasn't loaded skill data) leaves the AI loop with no
-	// CastController, matching ai.Attackable's existing "no skills to
-	// cast" no-op contract for IntentionCast — the same nil-safe pattern
-	// SummonActor's caller relies on before l.skills is ready.
-	if castDefs != nil {
-		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, control)
-		castController.SetQueue(queue)
-		aiController := &actorcast.AIController{
-			Controller:  castController,
-			Definitions: castDefs,
-			Effects:     castEffects,
-			Caster:      hostile,
-			// A packet sent to a non-Player, non-Summon-owner caster goes
-			// nowhere, so caster-addressed messages (ATTACK_FAILED,
-			// MISSED_TARGET, ...) still have no forward target here. But
-			// target-addressed messages (MagicResist, ManaDrain) are
-			// delivered by ID lookup against the real target independent of
-			// caster type,
-			// so OnHitResult is wired to the boot-provided delivery hook
-			// (issue #2350) rather than left unset.
-			OnHitResult: castEffects.OnHitResult,
-		}
-		hostile.AI().SetCastController(aiController)
-		hostile.SetCastController(castController)
-	}
-
-	walkerRef := &walkerActorRef{Hostile: hostile, moveCtl: moveCtl, routeMove: routeMove}
+	walkerRef := &w.walker
+	walkerRef.Hostile, walkerRef.moveCtl, walkerRef.routeMove = hostile, moveCtl, routeMove
 	if walker != nil {
-		hostile.AI().SetRoute(hostileRoute{walker: walker, ref: walkerRef, log: log})
+		w.route = hostileRoute{walker: walker, ref: walkerRef, log: log}
+		hostile.AI().SetRoute(&w.route)
 	}
 
 	control.hostile, control.move, control.walkerRef, control.routeMove = hostile, moveCtl, walkerRef, routeMove
@@ -254,7 +297,7 @@ type hostileControl struct {
 	walker    *task.Walker
 	walkerRef *walkerActorRef
 	routeMove *atomic.Bool
-	log       zerolog.Logger
+	log       *zerolog.Logger
 	// chance runs the chance procs of the NPC's landed hits.
 	chance *actorcast.ChanceProcs
 }
@@ -273,18 +316,24 @@ func (c *hostileControl) Emit(ev event.Event) {
 		c.hostile.SyncPosition(c.move.Position())
 		// A move's end revalidates the zones at once.
 		c.hostile.SettleZones()
+		// The AI settles the arrival before any route step: it drops the
+		// arrival desire, faces the spawn heading on the spawn point and
+		// raises the out-of-territory point.
+		c.hostile.AI().Arrived()
 		// Only an arrival the walker task itself just moved toward counts as
 		// a route arrival — offensive-follow chase and MoveHome arrive the
-		// same way and must not advance/reissue the patrol route.
+		// same way and must not advance/reissue the patrol route. It is read
+		// after the AI's arrival, whose hook may have started another move.
 		if c.walker != nil && c.routeMove.Load() {
 			if err := c.walker.Arrived(c.walkerRef); err != nil {
 				c.log.Warn().Err(err).Msg("task: walker arrived")
 			}
 		}
-		c.hostile.AI().Arrived()
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()
+	case event.AttackEnded:
+		c.hostile.AttackEnded(e.Target)
 	case event.AttackFinished:
 		// A swing finishing re-runs desire selection, then continues an
 		// out-of-control NPC's current intention; a bow's reuse ending only
@@ -299,7 +348,7 @@ func (c *hostileControl) Emit(ev event.Event) {
 	case event.AttackRethink:
 		c.runAI()
 	case event.CastFinished:
-		if err := c.hostile.CastFinished(e.Interrupted); err != nil {
+		if err := c.hostile.CastFinished(e); err != nil {
 			c.log.Warn().Err(err).Msg("ai: hostile cast finished")
 		}
 	case event.CastAborted:
@@ -330,62 +379,19 @@ func (c *hostileControl) runAI() {
 type hostileRoute struct {
 	walker *task.Walker
 	ref    *walkerActorRef
-	log    zerolog.Logger
+	log    *zerolog.Logger
 }
 
 // Walk puts the NPC on route name; a route with no node for the NPC moves
 // it nowhere.
-func (r hostileRoute) Walk(name string) {
+func (r *hostileRoute) Walk(name string) {
 	if err := r.walker.Walk(r.ref, name, r.ref.Instance.Template.Alias); err != nil {
 		r.log.Debug().Err(err).Str("route", name).Msg("npc: route walk")
 	}
 }
 
 // Leave takes the NPC off its route.
-func (r hostileRoute) Leave() { r.walker.LeaveRoute(r.ref) }
-
-// walkerWalkModeIDs are the walker template ids that spawn in walk stance
-// instead of every other NPC's default run stance. A stand-in for the
-// walker script: read only while routeStandIn holds for the id.
-var walkerWalkModeIDs = map[int32]bool{
-	31357: true, 31358: true, 31359: true, 31360: true, 31362: true,
-	31364: true, 31365: true, 31525: true, 32072: true, 32128: true,
-}
-
-// standInRouteWeight is the weight of the route desire the walker alias
-// rule queues for a civilian NPC: the walker script's.
-const standInRouteWeight = 1_000_000
-
-// routeStandIn reports whether the walker alias rule, and the walk stance
-// of walkerWalkModeIDs, still stand in for the NPC template id: no
-// behavior is bound to it and no script reacts to its creation, which is
-// where a script asks an NPC to walk its route. Once one does, the NPC
-// walks only the routes its scripts ask for.
-func routeStandIn(scripts npc.ScriptHooks, id int32) bool {
-	return scripts == nil || (!scripts.Behaves(id) && !scripts.ReactsToCreated(id))
-}
-
-// startWalkerRoute registers ref for route walking if inst's template alias
-// resolves in walkerRoutes.xml and the alias rule stands in for its id
-// (routeStandIn): every such NPC walks the route from the moment it
-// spawns, outside its desires; both the route name and its per-NPC key are
-// that alias. The caller must have
-// already placed ref's Hostile into world.State — Walker only ticks actors
-// it can find in-region, so calling this before the spawn lands is a
-// silent no-op forever, not a delayed start. Most templates have no alias,
-// or an alias with no route data — those are skipped silently via HasRoute.
-// Past that check StartRoute fails only on the first move; the route stays
-// registered and Walker's tick retries it, logging at Error if it keeps
-// failing.
-func startWalkerRoute(walker *task.Walker, ref *walkerActorRef, inst *npc.Instance, scripts npc.ScriptHooks, log zerolog.Logger) {
-	alias := inst.Template.Alias
-	if walker == nil || alias == "" || !walker.HasRoute(alias, alias) || !routeStandIn(scripts, int32(inst.Template.ID)) {
-		return
-	}
-	if err := walker.StartRoute(ref, alias, alias); err != nil {
-		log.Debug().Err(err).Str("alias", alias).Msg("npc: walker route first move failed, retrying on tick")
-	}
-}
+func (r *hostileRoute) Leave() { r.walker.LeaveRoute(r.ref) }
 
 // deathRewards applies one victim's live death rewards at its position at
 // the moment of death, rather than a position fixed when it spawned —

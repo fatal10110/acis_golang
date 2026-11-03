@@ -1,12 +1,17 @@
 package itemcontainer
 
 import (
+	"errors"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
+
+// errNoObjectID is AddCreated's refusal of a zero object id: an instance
+// needs a world id to be held.
+var errNoObjectID = errors.New("itemcontainer: zero object id")
 
 // nowMillis stamps an item as it enters a container. Containers order their
 // contents newest-first, so this is the ordering key, not just bookkeeping.
@@ -41,7 +46,7 @@ func byContainerOrder(a, b orderedItem) int {
 // slices.SortFunc does not fault on a key that moves mid-sort, it just
 // returns a wrong order, which leaves as a silently wrong ItemList. Copying
 // the key also keeps Items() to one instance RLock per item rather than one
-// per comparison, on a path FrameInventoryUpdate walks per item mutation.
+// per comparison.
 func sortContainerOrder(items []*item.Instance) {
 	order := make([]orderedItem, len(items))
 	for i, inst := range items {
@@ -75,8 +80,9 @@ func cmpDesc(a, b int64) int {
 // doesn't load config itself. A player inventory takes its live limit from
 // its owner instead (Inventory.SetLimiter).
 //
-// mu guards the membership map. Mutable item fields are guarded by
-// item.Instance once an instance is visible outside construction/restore code.
+// mu guards the membership map and its template index. Mutable item fields
+// are guarded by item.Instance once an instance is visible outside
+// construction/restore code.
 type Container struct {
 	ownerID   int32
 	location  item.Location
@@ -84,20 +90,73 @@ type Container struct {
 
 	SlotLimit int
 
-	mu      sync.RWMutex
-	items   map[int32]*item.Instance
-	persist item.Persister
+	mu    sync.RWMutex
+	items map[int32]*item.Instance
+	// byTemplate indexes items by template id, so template lookups touch
+	// only that template's instances. A bucket is unordered: readers order
+	// it themselves, since entry times move after insertion. Only
+	// membership writes touch it (a template id never changes), and every
+	// one goes through putLocked, dropLocked or clearLocked.
+	byTemplate map[int32][]*item.Instance
+	persist    item.Persister
 }
 
 // NewContainer returns an empty container owned by ownerID, holding items
 // at location, resolving templates against templates.
 func NewContainer(ownerID int32, location item.Location, templates *item.Table) *Container {
 	return &Container{
-		ownerID:   ownerID,
-		location:  location,
-		templates: templates,
-		items:     make(map[int32]*item.Instance),
+		ownerID:    ownerID,
+		location:   location,
+		templates:  templates,
+		items:      make(map[int32]*item.Instance),
+		byTemplate: make(map[int32][]*item.Instance),
 	}
+}
+
+// putLocked makes inst the instance held under its object id. The caller
+// holds c.mu for writing.
+func (c *Container) putLocked(inst *item.Instance) {
+	if old, ok := c.items[inst.ObjectID]; ok {
+		if old == inst {
+			return
+		}
+		c.unindexLocked(old)
+	}
+	c.items[inst.ObjectID] = inst
+	c.byTemplate[inst.TemplateID] = append(c.byTemplate[inst.TemplateID], inst)
+}
+
+// dropLocked removes the instance held under objectID, if any. The caller
+// holds c.mu for writing.
+func (c *Container) dropLocked(objectID int32) {
+	inst, ok := c.items[objectID]
+	if !ok {
+		return
+	}
+	delete(c.items, objectID)
+	c.unindexLocked(inst)
+}
+
+func (c *Container) unindexLocked(inst *item.Instance) {
+	bucket := c.byTemplate[inst.TemplateID]
+	i := slices.Index(bucket, inst)
+	if i < 0 {
+		return
+	}
+	last := len(bucket) - 1
+	bucket[i] = bucket[last]
+	bucket[last] = nil
+	if last == 0 {
+		delete(c.byTemplate, inst.TemplateID)
+		return
+	}
+	c.byTemplate[inst.TemplateID] = bucket[:last]
+}
+
+// clearLocked empties the container. The caller holds c.mu for writing.
+func (c *Container) clearLocked() {
+	clear(c.items)
+	clear(c.byTemplate)
 }
 
 // NewContainerWithPersister returns an empty container whose items persist
@@ -160,21 +219,6 @@ func (c *Container) Items() []*item.Instance {
 	return c.itemsLocked()
 }
 
-// ItemsUnordered returns the container's contents in no particular order,
-// for callers that index them rather than list them. InventoryUpdate builds
-// a lookup map from the result and never reads the sequence, so paying for
-// byContainerOrder there would sort a slice purely to iterate it once — on a
-// path that runs per item mutation.
-func (c *Container) ItemsUnordered() []*item.Instance {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	out := make([]*item.Instance, 0, len(c.items))
-	for _, inst := range c.items {
-		out = append(out, inst)
-	}
-	return out
-}
-
 func (c *Container) itemsLocked() []*item.Instance {
 	out := make([]*item.Instance, 0, len(c.items))
 	for _, inst := range c.items {
@@ -185,25 +229,21 @@ func (c *Container) itemsLocked() []*item.Instance {
 }
 
 // HasItem reports whether the container holds any instance of templateID.
-// It answers from the first match rather than through ItemByTemplateID:
-// existence doesn't depend on which instance is found, and HasItems /
-// HasAnyItem / quest conditions call it per template id.
+// Quest conditions ask it per template id on every hit, so it answers from
+// the template index without looking at any instance.
 func (c *Container) HasItem(templateID int32) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	for _, inst := range c.items {
-		if inst.TemplateID == templateID {
-			return true
-		}
-	}
-	return false
+	return len(c.byTemplate[templateID]) > 0
 }
 
 // HasItems reports whether the container holds at least one instance of
 // every id in templateIDs.
 func (c *Container) HasItems(templateIDs ...int32) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, id := range templateIDs {
-		if !c.HasItem(id) {
+		if len(c.byTemplate[id]) == 0 {
 			return false
 		}
 	}
@@ -213,8 +253,10 @@ func (c *Container) HasItems(templateIDs ...int32) bool {
 // HasAnyItem reports whether the container holds at least one instance of
 // any id in templateIDs.
 func (c *Container) HasAnyItem(templateIDs ...int32) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, id := range templateIDs {
-		if c.HasItem(id) {
+		if len(c.byTemplate[id]) > 0 {
 			return true
 		}
 	}
@@ -226,12 +268,11 @@ func (c *Container) HasAnyItem(templateIDs ...int32) bool {
 func (c *Container) ItemsByTemplateID(templateID int32) []*item.Instance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	var out []*item.Instance
-	for _, inst := range c.items {
-		if inst.TemplateID == templateID {
-			out = append(out, inst)
-		}
+	bucket := c.byTemplate[templateID]
+	if len(bucket) == 0 {
+		return nil
 	}
+	out := slices.Clone(bucket)
 	sortContainerOrder(out)
 	return out
 }
@@ -252,10 +293,7 @@ func (c *Container) ItemByTemplateID(templateID int32) *item.Instance {
 // that only want one instance don't pay for a slice and a sort.
 func (c *Container) itemByTemplateIDLocked(templateID int32) *item.Instance {
 	var best orderedItem
-	for _, inst := range c.items {
-		if inst.TemplateID != templateID {
-			continue
-		}
+	for _, inst := range c.byTemplate[templateID] {
 		if cand := keyed(inst); best.inst == nil || byContainerOrder(cand, best) < 0 {
 			best = cand
 		}
@@ -283,10 +321,7 @@ func (c *Container) ItemCount(templateID int32, enchantLevel int, includeEquippe
 	defer c.mu.RUnlock()
 
 	count := 0
-	for _, inst := range c.items {
-		if inst.TemplateID != templateID {
-			continue
-		}
+	for _, inst := range c.byTemplate[templateID] {
 		st := inst.Snapshot()
 		if enchantLevel >= 0 && st.EnchantLevel != enchantLevel {
 			continue
@@ -347,7 +382,7 @@ func (c *Container) insertLocked(inst *item.Instance) {
 	// never unregisters an item.
 	inst.BindPersister(c.persist)
 	inst.EnterContainer(c.ownerID, c.location, 0, nowMillis())
-	c.items[inst.ObjectID] = inst
+	c.putLocked(inst)
 }
 
 // AddNew creates a new instance of templateID, using objectID as its
@@ -357,9 +392,10 @@ func (c *Container) insertLocked(inst *item.Instance) {
 //
 // It always creates exactly one instance: a stackable template gets count
 // units on it, a non-stackable one gets a single unit regardless of count.
-// Splitting a non-stackable count > 1 across several freshly created
-// instances under the MultipleItemDrop setting is not done here; auto-loot
-// still needs it (#3379).
+// When the units join a stack the container already holds, objectID is not
+// used: the returned instance carries another id, and the caller must give
+// objectID back to its allocator. AddCreated takes an id only when one is
+// needed.
 func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.Instance {
 	inst, ok := newInstance(c.templates, templateID, count, objectID)
 	if !ok {
@@ -369,23 +405,65 @@ func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.In
 	return result
 }
 
+// AddCreated creates count units of templateID the way AddNew does, but
+// takes the new instance's object id from nextID only when an instance is
+// created: units of a stackable template the container already holds join
+// that stack and take no id. It returns nil and no error when templateID
+// isn't a loaded template, and nil with nextID's error when no id could be
+// taken.
+func (c *Container) AddCreated(templateID int32, count int, nextID func() (int32, error)) (*item.Instance, error) {
+	result, _, err := c.addCreated(templateID, count, nextID)
+	return result, err
+}
+
+// addCreated is AddCreated, also reporting whether the units joined a held
+// stack. The held-stack check and the insert share one critical section, so
+// an id is taken exactly when a new instance goes in.
+func (c *Container) addCreated(templateID int32, count int, nextID func() (int32, error)) (result *item.Instance, joined bool, err error) {
+	tmpl, ok := c.templates.Get(templateID)
+	if !ok || nextID == nil {
+		return nil, false, nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if tmpl.Stackable {
+		if held := c.itemByTemplateIDLocked(templateID); held != nil {
+			held.AddCount(max(count, 1))
+			return held, true, nil
+		}
+	}
+	id, err := nextID()
+	if err != nil {
+		return nil, false, err
+	}
+	if id == 0 {
+		return nil, false, errNoObjectID
+	}
+	inst := buildInstance(tmpl, count, id)
+	c.insertLocked(inst)
+	return inst, false, nil
+}
+
 func newInstance(templates *item.Table, templateID int32, count int, objectID int32) (*item.Instance, bool) {
 	tmpl, ok := templates.Get(templateID)
 	if !ok {
 		return nil, false
 	}
-	if count < 1 {
-		count = 1
-	}
-	if !tmpl.Stackable {
+	return buildInstance(tmpl, count, objectID), true
+}
+
+// buildInstance is a fresh instance of tmpl under objectID: count units,
+// at least one, and exactly one for a template that does not stack.
+func buildInstance(tmpl *item.Template, count int, objectID int32) *item.Instance {
+	if count < 1 || !tmpl.Stackable {
 		count = 1
 	}
 	return &item.Instance{
 		ObjectID:   objectID,
-		TemplateID: templateID,
+		TemplateID: tmpl.ID,
 		Count:      count,
 		ManaLeft:   tmpl.InitialManaLeft(),
-	}, true
+	}
 }
 
 // Remove removes inst from the container, leaving its ownership and
@@ -397,7 +475,7 @@ func (c *Container) Remove(inst *item.Instance) bool {
 	c.mu.Lock()
 	_, ok := c.items[inst.ObjectID]
 	if ok {
-		delete(c.items, inst.ObjectID)
+		c.dropLocked(inst.ObjectID)
 	}
 	c.mu.Unlock()
 	return ok
@@ -423,7 +501,7 @@ func (c *Container) DestroyItem(inst *item.Instance, count int) *item.Instance {
 		return nil
 	}
 	return destroyItemCore(inst, count, func(inst *item.Instance) bool {
-		delete(c.items, inst.ObjectID)
+		c.dropLocked(inst.ObjectID)
 		return true
 	}, nil)
 }
@@ -473,47 +551,54 @@ func (c *Container) DestroyAll(inst *item.Instance) *item.Instance {
 func (c *Container) DestroyAllItems() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for objectID, inst := range c.items {
-		delete(c.items, objectID)
+	for _, inst := range c.items {
 		inst.DestroyState()
 	}
+	c.clearLocked()
 }
 
-// Receiver is a container a transfer moves items into: a stackable item
-// merges into the stack ItemByTemplateID names, anything else arrives
-// through Add or AddNew. A freight container answers both by its active
-// town.
+// Receiver is a container a transfer moves items into: a whole instance
+// arrives through Add, split-off units through AddCreated, and a stackable
+// item merges into the stack ItemByTemplateID names. A freight container
+// answers all three by its active town.
 type Receiver interface {
 	Add(inst *item.Instance) (result *item.Instance, absorbed bool)
-	AddNew(templateID int32, count int, objectID int32) *item.Instance
+	AddCreated(templateID int32, count int, nextID func() (int32, error)) (*item.Instance, error)
 	ItemByTemplateID(templateID int32) *item.Instance
 }
 
+// noObjectID is the nextID of a transfer given none: a move that needs a new
+// instance in its target fails instead of creating one under id 0.
+func noObjectID() (int32, error) { return 0, errNoObjectID }
+
 // Transfer moves count units of the instance identified by objectID from
 // c into target, merging into an existing stack in target when the item
-// is stackable and target already holds one. newObjectID supplies the
-// pre-allocated world id for a brand new instance in target, used only
-// when one must be created (a non-stackable item, or a partial-count
-// transfer of a stackable item into a target that holds none yet);
-// otherwise it's unused. It returns the resulting instance in target
-// (nil if objectID isn't held by c), and reports via freed/freedObjectID
-// an object id the caller must now release — either objectID itself
-// (fully absorbed into an existing target stack or fully destroyed here)
-// or none.
+// is stackable and target already holds one. nextID is asked for an object
+// id only when target must take a new instance (a partial-count transfer
+// of a stackable item into a target that holds none), so units joining a
+// held stack take none; a nil nextID refuses that case. It returns the
+// resulting instance in target (nil if objectID isn't held by c, or with
+// nextID's error when the units left c but no id could be taken for
+// them), and reports via freed/freedObjectID an object id the caller must
+// now release — either objectID itself (fully absorbed into an existing
+// target stack or fully destroyed here) or none.
 //
 // The caller remains responsible for undoing any life-stone augmentation
 // bonus a transferred instance was granting its previous owner — that's
 // stat-engine behavior this package doesn't own.
-func (c *Container) Transfer(objectID int32, count int, target Receiver, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+func (c *Container) Transfer(objectID int32, count int, target Receiver, nextID func() (int32, error)) (result *item.Instance, freedObjectID int32, freed bool, err error) {
 	if target == nil || count <= 0 {
-		return nil, 0, false
+		return nil, 0, false, nil
+	}
+	if nextID == nil {
+		nextID = noObjectID
 	}
 
 	c.mu.Lock()
 	src := c.items[objectID]
 	if src == nil {
 		c.mu.Unlock()
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	st := src.Snapshot()
 	templateID := st.TemplateID
@@ -534,41 +619,44 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, newObje
 	src = c.items[objectID]
 	if src == nil {
 		c.mu.Unlock()
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	st = src.Snapshot()
 	if st.TemplateID != templateID || st.Count != sourceCount {
 		c.mu.Unlock()
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	if count > st.Count {
 		count = st.Count
 	}
 	if st.Count == count && targetItem == nil {
-		delete(c.items, objectID)
+		c.dropLocked(objectID)
 		c.mu.Unlock()
-		result, _ = target.Add(src)
-		return result, 0, false
+		// A stack target gained since the check absorbs src, whose id is
+		// then free.
+		result, absorbed := target.Add(src)
+		if absorbed {
+			return result, objectID, true, nil
+		}
+		return result, 0, false, nil
 	}
 
 	if st.Count > count {
 		if _, ok := src.ReduceCount(count); !ok {
 			c.mu.Unlock()
-			return nil, 0, false
+			return nil, 0, false, nil
 		}
 	} else {
-		delete(c.items, objectID)
+		c.dropLocked(objectID)
 		src.DestroyState()
 		freedObjectID, freed = objectID, true
 	}
 	c.mu.Unlock()
 
-	if targetItem != nil {
-		result, _ = target.Add(&item.Instance{ObjectID: newObjectID, TemplateID: templateID, Count: count, ManaLeft: -1})
-		return result, freedObjectID, freed
-	}
-
-	return target.AddNew(templateID, count, newObjectID), freedObjectID, freed
+	// The units join target's stack when it still holds one, and only a new
+	// instance takes an id.
+	result, err = target.AddCreated(templateID, count, nextID)
+	return result, freedObjectID, freed, err
 }
 
 // Restore replaces c's contents with persisted item rows at c's location,
@@ -580,7 +668,7 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, newObje
 func (c *Container) Restore(items []*item.Instance) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	clear(c.items)
+	c.clearLocked()
 	restoredAt := nowMillis()
 	for _, inst := range items {
 		if inst == nil {
@@ -602,7 +690,7 @@ func (c *Container) Restore(items []*item.Instance) {
 				continue
 			}
 		}
-		c.items[inst.ObjectID] = inst
+		c.putLocked(inst)
 	}
 	for _, inst := range c.items {
 		inst.BindPersister(c.persist)

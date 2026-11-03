@@ -15041,9 +15041,9 @@ class quest.Q620_FourGoblets extends Quest
   string "SpawnZ2"
   string "SpawnZ3"
   string "completed"
-  call ?.allowPlayerEntry 1
   call AbstractGroup.isLeader 1
   call ArraysUtil.contains 1
+  call BossZone.allowPlayerEntry 1
   call Creature.instantTeleportTo 1
   call Door.closeMe 3
   call Door.openMe 1
@@ -29258,10 +29258,6 @@ class script.siegablehall.FlagWar extends ClanHallSiege
   string "onSiegeStart"
   string "siegablehall"
   string "teleporter_notyet.htm"
-  call ?.getClan 2
-  call ?.getObjectId 2
-  call ?.getZ 1
-  call ?.teleportTo 1
   call ASpawn.doSpawn 4
   call ASpawn.getMemo 1
   call CLogger.error 9
@@ -29296,8 +29292,9 @@ class script.siegablehall.FlagWar extends ClanHallSiege
   call NpcMaker.getMaker 1
   call NpcTemplate.getAiParams 1
   call Player.broadcastUserInfo 1
+  call Player.getClan 2
   call Player.setSiegeState 1
-  call Player.teleportTo 1
+  call Player.teleportTo 2
   call Player.updatePvPStatus 1
   call Quest.addCreated 1
   call Quest.addFirstTalkId 2
@@ -29336,7 +29333,8 @@ class script.siegablehall.FlagWar extends ClanHallSiege
   call World.getPlayer 1
   call World.toAllOnlinePlayers 4
   call WorldObject.forEachKnownTypeInRadius 1
-  call WorldObject.getZ 1
+  call WorldObject.getObjectId 2
+  call WorldObject.getZ 2
   call ZoneType.getKnownTypeInside 3
   hook canPlantFlag none
   hook doorIsAutoAttackable none

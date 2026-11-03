@@ -1,0 +1,21 @@
+# Bring Out the Flavor of Ingredients! (Q380), level 23: Rollant turns the character away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q380_bring_out_the_flavor_of_ingredients_low_level.golden
+character Flavor 23
+script quest.Q380_BringOutTheFlavorOfIngredients
+item 1831 5895 5896 5897 5959 5960
+page trainer/30069.htm
+page script/quest/Q380_BringOutTheFlavorOfIngredients/
+npc rollant 30069 Trainer 10 0 0
+npc wolf 20205 Monster 40 0 0
+npc werewolf 20206 Monster 50 0 0
+npc leech 20225 Monster 60 0 0
+
+action rollant
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q380_BringOutTheFlavorOfIngredients/30069-00.htm
+  S ActionFailed
+  S ActionFailed

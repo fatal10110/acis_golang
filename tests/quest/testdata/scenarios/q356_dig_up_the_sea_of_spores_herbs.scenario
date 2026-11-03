@@ -1,0 +1,88 @@
+# Dig Up the Sea of Spores (Q356), herb spores first: at cond 1 holding 49 herb spores, a rotting
+# tree gives the fiftieth (cond 2); Gauen takes the herb spores for experience; then the carnivore
+# spores: holding 49, a spore zombie gives the fiftieth (cond 3); Gauen takes them for experience and
+# skill points and the quest ends; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q356_dig_up_the_sea_of_spores_herbs.golden
+character Gauen 43
+quest Q356_DigUpTheSeaOfSpores <cond>=1 <state>=STARTED
+hold 5866 49
+hold 5865 49
+random always 0
+script quest.Q356_DigUpTheSeaOfSpores
+item 57 5865 5866
+page trainer/30717.htm
+page script/quest/Q356_DigUpTheSeaOfSpores/
+npc gauen 30717 Trainer 10 0 0
+npc tree 20558 Monster 40 0 0
+npc zombie 20562 Monster -40 0 0
+
+# The fiftieth herb spore (cond 2).
+kill tree
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5866
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 356:0x80000003
+  S ExShowQuestMark quest=356
+  Q upsert Q356_DigUpTheSeaOfSpores | <cond> | 2
+  items 5866=50
+  rows Q356_DigUpTheSeaOfSpores <cond>=2 <state>=STARTED
+
+# Gauen: experience for the herb spores.
+action gauen
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q356_DigUpTheSeaOfSpores 30717-12.htm
+  S SystemMessage id=301 3:5866 6:50
+  S SystemMessage id=45 1:24500
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-12.htm
+  S ActionFailed
+  items 5866=0 5865=49
+  rows Q356_DigUpTheSeaOfSpores <cond>=2 <state>=STARTED
+bypass Quest Q356_DigUpTheSeaOfSpores 30717-11.htm
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-11.htm
+  S ActionFailed
+
+# The fiftieth carnivore spore (cond 3).
+kill zombie
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5865
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 356:0x80000007
+  S ExShowQuestMark quest=356
+  Q upsert Q356_DigUpTheSeaOfSpores | <cond> | 3
+  items 5865=50
+  rows Q356_DigUpTheSeaOfSpores <cond>=3 <state>=STARTED
+
+# Gauen: experience and skill points, the quest ends.
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-10.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q356_DigUpTheSeaOfSpores 30717-14.htm
+  S SystemMessage id=301 3:5865 6:50
+  S SystemMessage id=95 1:35000 1:2600
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-14.htm
+  S ActionFailed
+  Q delete-quest Q356_DigUpTheSeaOfSpores
+  items 5865=0 5866=0
+  state Q356_DigUpTheSeaOfSpores -
+  rows Q356_DigUpTheSeaOfSpores -
+relog
+  rows Q356_DigUpTheSeaOfSpores -

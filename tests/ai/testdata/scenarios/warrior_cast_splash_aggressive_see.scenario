@@ -1,0 +1,16 @@
+# WarriorCastSplashAggressive (20212, level 34, self range DD 4033-3), every draw 0: a character it sees
+# 300 away is attacked (200); it casts nothing of its own on sight.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplash
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplashAggressive
+npc splash 20212 Monster 300 0 0 level 34 aggro 1000 skill SELF_RANGE_DD_MAGIC 4033 3
+roll splash 99
+
+away
+approach splash 300
+  desires splash attack(player)=200

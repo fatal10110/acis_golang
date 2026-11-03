@@ -18,6 +18,7 @@ import (
 //	script <path>                    one block per listed script, in list order
 //	  kind behavior|quest|scheduled|script
 //	  hooks <method>,...             the hooks the script's own constructor sets
+//	  on death                       a quest its player's death reaches
 //	  bind <EVENT>,... <npc ids>     events with identical id sets share a line
 //	  scheduled                      a scheduled task its entry schedules
 //	script <path> missing|refused    not registered
@@ -42,6 +43,9 @@ func (r *Registry) Dump(w io.Writer) error {
 		fmt.Fprintf(bw, "script %s\n  kind %s\n", e.path, kindOf(e.script))
 		if own := hookNames(e.script.Hooks.ownSet()); len(own) > 0 {
 			fmt.Fprintf(bw, "  hooks %s\n", strings.Join(own, ","))
+		}
+		if e.script.Hooks.OnDeath != nil {
+			fmt.Fprint(bw, "  on death\n")
 		}
 		for _, g := range byIDs(e.bound) {
 			fmt.Fprintf(bw, "  bind %s %s\n", g.events, g.ids)

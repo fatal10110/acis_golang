@@ -1,0 +1,21 @@
+# Meeting the Elroki (Q124), refused: a level 74 character, one short of the quest's level, is
+# turned away by Marquez and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q124_meeting_the_elroki_low_level.golden
+character Explorer 74
+script quest.Q124_MeetingTheElroki
+item 8778
+page default/32113.htm
+page script/quest/Q124_MeetingTheElroki/
+npc marquez 32113 Folk 10 0 0
+
+action marquez
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q124_MeetingTheElroki/32113-01a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q124_MeetingTheElroki CREATED
+  rows Q124_MeetingTheElroki -

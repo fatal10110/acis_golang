@@ -1,0 +1,52 @@
+# Resurrection of an Old Manager (Q114) on the third story (choice 3): Wendy at cond 6 tells it
+# (talk 1, then talk 2). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager_third_story.golden
+character Manager 49
+quest Q114_ResurrectionOfAnOldManager <cond>=6 <state>=STARTED choice=3 talk=0
+script quest.Q114_ResurrectionOfAnOldManager
+item 57 8090 8091 8287 8288 8289
+page default/32047.htm
+page script/quest/Q114_ResurrectionOfAnOldManager/
+npc wendy 32047 Folk 20 0 0
+
+action wendy
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-14.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-15.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-15.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 1
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-20.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-20.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 2
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-20.htm
+  S ActionFailed
+  S ActionFailed

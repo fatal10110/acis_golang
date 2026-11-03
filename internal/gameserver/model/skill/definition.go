@@ -2,9 +2,9 @@ package skill
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -121,6 +121,10 @@ type Definition struct {
 	SuicideAttack    bool
 	SiegeSummonSkill bool
 
+	// Advanced marks a SIEGE_FLAG skill putting up an advanced siege
+	// headquarters, with twice the HP.
+	Advanced bool
+
 	// IsCubic and NpcID select the cubic branch of a SUMMON skill: NpcID is
 	// the cubic type id (matching cubic.ID) the skill grants when IsCubic
 	// is set. The same NpcID attribute also carries a servitor's spawn
@@ -140,6 +144,16 @@ type Definition struct {
 	// ExpPenalty is the share of kill exp a servitor summoned by this skill
 	// withholds from its owner.
 	ExpPenalty float32
+	// SummonTimeLostIdle and SummonTimeLostActive are the lifetime, in ms,
+	// a servitor summoned by this skill loses each second out of and in
+	// combat. ItemConsumeIDOT and ItemConsumeCountOT are the upkeep item
+	// its owner pays at each of ItemConsumeSteps checkpoints of that
+	// lifetime.
+	SummonTimeLostIdle   int
+	SummonTimeLostActive int
+	ItemConsumeIDOT      int
+	ItemConsumeCountOT   int
+	ItemConsumeSteps     int
 
 	// WeaponsAllowed is the raw comma-separated weapon/armor type list a
 	// level restricts casting to, or "" when unrestricted. Resolving a name
@@ -284,6 +298,8 @@ type DefinitionAttrs struct {
 	SuicideAttack    bool
 	SiegeSummonSkill bool
 
+	Advanced bool
+
 	IsCubic bool
 	NpcID   int
 
@@ -291,6 +307,11 @@ type DefinitionAttrs struct {
 	CubicActivationChance int
 	SummonTotalLifeTime   int
 	ExpPenalty            float32
+	SummonTimeLostIdle    int
+	SummonTimeLostActive  int
+	ItemConsumeIDOT       int
+	ItemConsumeCountOT    int
+	ItemConsumeSteps      int
 
 	WeaponsAllowed string
 
@@ -412,6 +433,8 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 		SuicideAttack:    a.SuicideAttack,
 		SiegeSummonSkill: a.SiegeSummonSkill,
 
+		Advanced: a.Advanced,
+
 		IsCubic: a.IsCubic,
 		NpcID:   a.NpcID,
 
@@ -419,6 +442,11 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 		CubicActivationChance: a.CubicActivationChance,
 		SummonTotalLifeTime:   a.SummonTotalLifeTime,
 		ExpPenalty:            a.ExpPenalty,
+		SummonTimeLostIdle:    a.SummonTimeLostIdle,
+		SummonTimeLostActive:  a.SummonTimeLostActive,
+		ItemConsumeIDOT:       a.ItemConsumeIDOT,
+		ItemConsumeCountOT:    a.ItemConsumeCountOT,
+		ItemConsumeSteps:      a.ItemConsumeSteps,
 
 		WeaponsAllowed: a.WeaponsAllowed,
 
@@ -485,8 +513,7 @@ func isTypeOffensive(skillType string) bool {
 	return offensiveSkillTypes[skillType]
 }
 
-// IsDamage reports whether d is a skill type that deals damage, mirroring
-// L2Skill.isDamage.
+// IsDamage reports whether d is a skill type that deals damage.
 func (d Definition) IsDamage() bool {
 	switch d.SkillType {
 	case "PDAM", "MDAM", "DRAIN", "BLOW", "CPDAMPERCENT", "DEATHLINK", "CHARGEDAM", "FATAL", "SIGNET_CASTTIME":
@@ -531,11 +558,11 @@ func ParseRef(raw string) (Ref, error) {
 		return Ref{}, fmt.Errorf("want \"skillId-level\"")
 	}
 	id, level := parts[0], parts[1]
-	rawID, err := commons.ParseInt(id, 32)
+	rawID, err := strconv.ParseInt(id, 10, 32)
 	if err != nil {
 		return Ref{}, err
 	}
-	lvl, err := commons.Atoi(level)
+	lvl, err := strconv.Atoi(level)
 	if err != nil {
 		return Ref{}, err
 	}

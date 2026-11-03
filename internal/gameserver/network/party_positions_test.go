@@ -36,7 +36,7 @@ func positionQueues(l *GameClientLink) int {
 // that no longer exists.
 func TestPartyPositionsDispersedBeforeFormedLeavesNoQueue(t *testing.T) {
 	in := sim.NewInline(time.Unix(0, 0))
-	link := &GameClientLink{log: zerolog.Nop(), queues: in, parties: party.NewRegistry[*livePlayer](in.Now)}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), Queues: in, TradeClock: in.Now})
 	leader := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 

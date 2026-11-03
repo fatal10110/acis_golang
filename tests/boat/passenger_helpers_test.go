@@ -19,9 +19,11 @@ import (
 // stackable item the test catalog carries.
 const ticketID = 20
 
-// Rune dock geometry, hand-derived from the reference BoatDock.RUNE lines
-// with the reference Line2D/Point2D arithmetic (rounding half up, the
-// intersection truncated):
+// Rune dock geometry. Every point below is a line of
+// internal/gameserver/boat/testdata/dock.golden, the output of the reference
+// BoatDock and Line2D classes run unmodified by testdata/oracle/run.sh (the
+// "board RUNE" and "convert RUNE" lines of the walks named here), which
+// internal/gameserver/boat's TestDocksMatchReferenceProbe replays:
 //   - deck point (100, -200) lies at world (34332, -37894);
 //   - from (34600, -38100) the walk to deck point (0, -100), at world
 //     (34335, -37764), crosses the entrance at (34466, -37930); nine tenths

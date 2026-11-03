@@ -1,0 +1,23 @@
+# Trial of the Seeker (Q213), refused: a level 34 Rogue is too young for Dufner's trial,
+# and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q213_trial_of_the_seeker_low_level.golden
+character Rookie 34
+class 7
+script quest.Q213_TrialOfTheSeeker
+item 2647
+page trainer/30106.htm
+page script/quest/Q213_TrialOfTheSeeker/
+npc dufner 30106 Trainer 10 0 0
+
+action dufner
+action dufner
+  S ActionFailed
+  S NpcHtmlMessage obj=dufner item=0 page=trainer/30106.htm
+  S ActionFailed
+bypass npc_{dufner}_Quest
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q213_TrialOfTheSeeker CREATED
+  rows Q213_TrialOfTheSeeker -

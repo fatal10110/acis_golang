@@ -1,0 +1,51 @@
+# Testimony of Trust (Q217) at cond 10, played by a level 37 Knight holding Hollint's letter
+# to Seresin: Seresin turns the traveller away until level 38 and moves the quest to cond
+# 11, keeping the letter; asked again at cond 11, the same page and nothing changes. A
+# dryad and a lirein killed at cond 10 call no guardian. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q217_testimony_of_trust_seresin_low_level.golden
+character Envoy 37
+class 4
+quest Q217_TestimonyOfTrust <state>=STARTED <cond>=10
+hold 2739 1
+script quest.Q217_TestimonyOfTrust
+item 2734 2735 2736 2737 2738 2739 2740 2741 2742 2743 2744 2745 2746 2747 2748 2749 2750 2751 2752 2753 2754 2755 2756 2757 2758 2759 2760 2761 7562
+page default/30657.htm
+page script/quest/Q217_TestimonyOfTrust/
+npc seresin 30657 Folk 10 0 0
+npc dryad 20013 Monster 40 0 0
+npc lirein 20036 Monster -40 0 0
+
+kill dryad
+  S SystemMessage id=95 1:0 1:0
+kill lirein
+  S SystemMessage id=95 1:0 1:0
+action seresin
+action seresin
+  S ActionFailed
+  S NpcHtmlMessage obj=seresin item=0 page=default/30657.htm
+  S ActionFailed
+bypass npc_{seresin}_Quest
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30657-03.htm
+  S QuestList 217:0x800007ff
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-02.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <cond> | 11
+action seresin
+  S ActionFailed
+  S NpcHtmlMessage obj=seresin item=0 page=default/30657.htm
+  S ActionFailed
+bypass npc_{seresin}_Quest
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30657-03.htm
+  S NpcHtmlMessage obj=seresin item=0 page=script/quest/Q217_TestimonyOfTrust/30657-02.htm
+  S ActionFailed
+  rows Q217_TestimonyOfTrust <state>=STARTED <cond>=11
+  items 2737=0 2738=0 2739=1

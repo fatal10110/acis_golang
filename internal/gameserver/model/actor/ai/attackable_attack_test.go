@@ -40,29 +40,6 @@ func TestAttackableAIAddAttackDesireFeedsThreatTable(t *testing.T) {
 	}
 }
 
-// TestAttackableAICombatDamageHateUsesCallerWeightNotDamage pins #2340:
-// Npc.reduceCurrentHp's own addDamageHate(attacker, damage, 0) call never
-// raises hate (Npc.java:395); real hate comes only from the ATTACKED-event
-// attack Desire queued alongside it, at whatever weight the caller derived
-// (the per-script onAttacked formula — see Hostile.attackedHateWeight, which
-// this generic AI layer does not know about). AddCombatDamageHate's
-// resulting threat hate must equal that caller-supplied weight, not the raw
-// damage passed for the threat table's damage bookkeeping.
-func TestAttackableAICombatDamageHateUsesCallerWeightNotDamage(t *testing.T) {
-	owner := actor(1)
-	target := actor(2)
-	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-
-	ai.AddCombatDamageHate(target, 9999, 42)
-
-	if got := ai.Threats().Hate(target); got != 42 {
-		t.Fatalf("hate = %v, want caller-supplied weight 42, not raw damage", got)
-	}
-	if threat, ok := ai.Threats().Get(target); !ok || threat.Damage != 9999 {
-		t.Fatalf("threat = (%+v, %v), want damage 9999 preserved", threat, ok)
-	}
-}
-
 func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
 	owner := actor(1)
 	low := actor(2)

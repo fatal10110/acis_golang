@@ -1,0 +1,43 @@
+# Path To An Orc Shaman (Q416), an orc mystic holding the Mask of Medium is told he has it. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q416_path_to_an_orc_shaman_has_mask.golden
+character Mystic 19
+class 49
+hold 1631 1
+script quest.Q416_PathToAnOrcShaman
+item 1616 1617 1618 1619 1620 1621 1622 1623 1624 1625 1626 1627 1628 1629 1630 1631
+page default/30585.htm
+page trainer/30502.htm
+page default/30592.htm
+page default/30593.htm
+page trainer/31979.htm
+page default/32057.htm
+page default/32090.htm
+page script/quest/Q416_PathToAnOrcShaman/
+npc tataru 30585 Folk 10 0 0
+npc umos 30502 Trainer -20 0 0
+npc hestui 30592 Folk 30 0 0
+npc duda 30593 Folk -40 0 0
+npc moira 31979 Trainer 50 0 0
+npc gandi 32057 Folk -60 0 0
+npc carcass 32090 Folk 70 0 0
+npc spider 20038 Monster -80 0 0
+npc tracker 20043 Monster 90 0 0
+npc grizzly 20335 Monster -100 0 0
+npc salamander 20415 Monster 110 0 0
+npc blade 20478 Monster -120 0 0
+npc bear 20479 Monster 130 0 0
+npc durka 27056 Monster -140 0 0
+npc leopard 27319 Monster 150 0 0
+
+action tataru
+action tataru
+  S ActionFailed
+  S NpcHtmlMessage obj=tataru item=0 page=default/30585.htm
+  S ActionFailed
+bypass npc_{tataru}_Quest
+  S NpcHtmlMessage obj=tataru item=0 page=script/quest/Q416_PathToAnOrcShaman/30585-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q416_PathToAnOrcShaman 30585-05.htm
+  S NpcHtmlMessage obj=tataru item=0 page=script/quest/Q416_PathToAnOrcShaman/30585-04.htm
+  S ActionFailed

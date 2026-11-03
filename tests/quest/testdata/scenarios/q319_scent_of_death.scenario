@@ -1,0 +1,97 @@
+# Scent of Death (Q319): a level 11 character accepts at Minaless (a merchant); three zombies and
+# two rotting corpses give five zombie skins (every roll pinned to succeed), the fifth moving the
+# quest on; Minaless takes them for 3350 adena and a healing potion, and the repeatable quest ends;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q319_scent_of_death.golden
+character Scenter 11
+random always 0
+script quest.Q319_ScentOfDeath
+item 1045 1060
+page merchant/30138.htm
+page script/quest/Q319_ScentOfDeath/
+npc minaless 30138 Merchant 10 0 0
+npc zombie 20015 Monster 40 0 0
+npc corpse 20020 Monster 0 40 0
+
+# Minaless: accept.
+action minaless
+action minaless
+  S ActionFailed
+  S NpcHtmlMessage obj=minaless item=0 page=merchant/30138.htm
+  S ActionFailed
+bypass npc_{minaless}_Quest
+  S NpcHtmlMessage obj=minaless item=0 page=script/quest/Q319_ScentOfDeath/30138-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q319_ScentOfDeath CREATED
+bypass Quest Q319_ScentOfDeath 30138-04.htm
+  S QuestList 319:0x80000001
+  S ExShowQuestMark quest=319
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=minaless item=0 page=script/quest/Q319_ScentOfDeath/30138-04.htm
+  S ActionFailed
+  Q upsert Q319_ScentOfDeath | <state> | STARTED
+  Q upsert Q319_ScentOfDeath | <cond> | 1
+  state Q319_ScentOfDeath STARTED
+  rows Q319_ScentOfDeath <cond>=1 <state>=STARTED
+
+# Three zombies: a skin each.
+kill zombie x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1045
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1045
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1045
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1045=3
+  rows Q319_ScentOfDeath <cond>=1 <state>=STARTED
+action minaless
+  S ActionFailed
+  S NpcHtmlMessage obj=minaless item=0 page=merchant/30138.htm
+  S ActionFailed
+bypass npc_{minaless}_Quest
+  S NpcHtmlMessage obj=minaless item=0 page=script/quest/Q319_ScentOfDeath/30138-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two more from the other kind; the fifth completes the set.
+kill corpse x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1045
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1045
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 319:0x80000003
+  S ExShowQuestMark quest=319
+  Q upsert Q319_ScentOfDeath | <cond> | 2
+  items 1045=5
+  rows Q319_ScentOfDeath <cond>=2 <state>=STARTED
+
+# Minaless: the skins for adena and a potion; the quest ends.
+action minaless
+  S ActionFailed
+  S NpcHtmlMessage obj=minaless item=0 page=merchant/30138.htm
+  S ActionFailed
+bypass npc_{minaless}_Quest
+  S SystemMessage id=301 3:1045 6:5
+  S SystemMessage id=52 6:3350
+  S SystemMessage id=54 3:1060
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=minaless item=0 page=script/quest/Q319_ScentOfDeath/30138-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q319_ScentOfDeath
+  items 1045=0 57=3350 1060=1
+  state Q319_ScentOfDeath -
+  rows Q319_ScentOfDeath -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q319_ScentOfDeath -
+  rows Q319_ScentOfDeath -
+  items 57=3350 1060=1

@@ -1,0 +1,23 @@
+# Curse of the Underground Fortress (Q162), refused: a dark elven fighter of level 12 is turned
+# away by Unoren, and the quest is not started. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q162_curse_of_the_underground_fortress_wrong_race.golden
+character Stranger 12
+class 31
+script quest.Q162_CurseOfTheUndergroundFortress
+item 1158 1159 625
+page merchant/30147.htm
+page script/quest/Q162_CurseOfTheUndergroundFortress/
+npc unoren 30147 Merchant 10 0 0
+
+action unoren
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q162_CurseOfTheUndergroundFortress/30147-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q162_CurseOfTheUndergroundFortress CREATED
+  rows Q162_CurseOfTheUndergroundFortress -

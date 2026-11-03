@@ -1,0 +1,40 @@
+# A Looter and a Railroad Man (Q649): a level 30 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q649_a_looter_and_a_railroad_man_accept.golden
+character Hero 30
+script quest.Q649_ALooterAndARailroadMan
+item 8099 57
+page default/32052.htm
+page script/quest/Q649_ALooterAndARailroadMan/
+npc obi 32052 Folk 10 0 0
+
+action obi
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q649_ALooterAndARailroadMan/32052-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q649_ALooterAndARailroadMan 32052-1.htm
+  S QuestList 649:0x80000001
+  S ExShowQuestMark quest=649
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q649_ALooterAndARailroadMan/32052-1.htm
+  S ActionFailed
+  Q upsert Q649_ALooterAndARailroadMan | <state> | STARTED
+  Q upsert Q649_ALooterAndARailroadMan | <cond> | 1
+  rows Q649_ALooterAndARailroadMan <cond>=1 <state>=STARTED
+  state Q649_ALooterAndARailroadMan STARTED
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q649_ALooterAndARailroadMan/32052-2a.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q649_ALooterAndARailroadMan <cond>=1 <state>=STARTED
+  state Q649_ALooterAndARailroadMan STARTED

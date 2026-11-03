@@ -50,20 +50,10 @@ var literalValues = []struct {
 	{in: " 10 ", lit: "ERR", dec: "ERR"},
 	{in: "2147483648", lit: "ERR", dec: "ERR"},
 	{in: "0x80000000", lit: "ERR", dec: "ERR"},
-	// Both grammars read any BMP Unicode decimal digit (Character.digit):
-	// Arabic-Indic and fullwidth digits below. A base prefix and a sign stay
-	// ASCII, so an ASCII "0" before fullwidth digits is still octal, while a
-	// fullwidth zero is just a digit.
-	{in: "\u0661\u0662", lit: "12", dec: "12"},
-	{in: "\uFF11\uFF12", lit: "12", dec: "12"},
-	{in: "0\uFF11\uFF10", lit: "8", dec: "10"},
-	{in: "\uFF10\uFF11\uFF10", lit: "10", dec: "10"},
-	{in: "#\uFF11\uFF10", lit: "16", dec: "ERR"},
-	{in: "0x\uFF11\uFF10", lit: "16", dec: "ERR"},
-	{in: "-\uFF11\uFF16", lit: "-16", dec: "-16", signed: true},
-	{in: "\uFF0B\uFF11\uFF12", lit: "ERR", dec: "ERR"},
-	{in: "\uFF11\uFF12\u00A0", lit: "ERR", dec: "ERR"},
-	{in: "\uFF12\uFF11\uFF14\uFF17\uFF14\uFF18\uFF13\uFF16\uFF14\uFF18", lit: "ERR", dec: "ERR"},
+	// Both grammars read ASCII digits only.
+	{in: "\u0661\u0662", lit: "ERR", dec: "ERR"},
+	{in: "\uFF11\uFF12", lit: "ERR", dec: "ERR"},
+	{in: "0x\uFF11\uFF10", lit: "ERR", dec: "ERR"},
 }
 
 // probeInt returns the first candidate value for which found reports a hit.

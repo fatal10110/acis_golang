@@ -9,7 +9,8 @@ import (
 )
 
 // TestEveryHooksFieldNamesAReferenceHook keeps the Go field to reference
-// hook naming in step with the engine's Hooks struct: each OnX field must
+// hook naming in step with the engine's Hooks and MakerHooks structs: each
+// OnX field must
 // name a hook some reference class overrides, or Check would report every
 // port of that hook twice.
 func TestEveryHooksFieldNamesAReferenceHook(t *testing.T) {
@@ -36,6 +37,20 @@ func TestEveryHooksFieldNamesAReferenceHook(t *testing.T) {
 	}
 	if fields == 0 {
 		t.Fatal("script.Hooks has no OnX field")
+	}
+	makerFields := 0
+	for f := range reflect.TypeFor[script.MakerHooks]().Fields() {
+		invoker, ok := strings.CutPrefix(f.Name, "On")
+		if !ok || !f.IsExported() {
+			continue
+		}
+		makerFields++
+		if name := hookName(invoker, renamedMakerHooks); !overridden[name] {
+			t.Errorf("MakerHooks.%s maps to %s, which no reference class overrides", f.Name, name)
+		}
+	}
+	if makerFields == 0 {
+		t.Fatal("script.MakerHooks has no OnX field")
 	}
 	if got := referenceHookName("Event"); got != "onAdvEvent" {
 		t.Errorf("OnEvent maps to %s, want onAdvEvent", got)

@@ -3,7 +3,6 @@ package skills
 import (
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -76,20 +75,11 @@ func trainerBypass(t *testing.T, c *testsupport.ScriptedClient, f *npc.Folk, com
 	return readUntilQuiet(t, c)
 }
 
-// readUntilQuiet collects every frame the client receives until the server
-// stays quiet for a full read timeout, in arrival order.
+// readUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func readUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 func frameOpcodes(frames [][]byte) []byte {

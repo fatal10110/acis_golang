@@ -292,13 +292,18 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 	}
 
 	if increased {
-		if idx := c.CharLevel - 1; tmpl != nil && idx >= 0 && idx < len(tmpl.HPTable) && idx < len(tmpl.MPTable) && idx < len(tmpl.CPTable) {
+		idx := c.CharLevel - 1
+		refill := tmpl != nil && idx >= 0 && idx < len(tmpl.HPTable) && idx < len(tmpl.MPTable) && idx < len(tmpl.CPTable)
+		if refill {
 			hp, mp, cp := tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx]
-			hooks.add(func() { c.refillResources(hp, mp, cp) })
+			hooks.add(func() { c.refillForLevel(hp, mp, cp) })
 		}
-		// The tutorial hears of a level gain, never of a loss, ahead of the
-		// level-up announcement.
+		// The tutorial hears of a level gain, never of a loss, between the
+		// HP/MP refill and the CP refill, ahead of the level-up announcement.
 		hooks.add(func() { c.NotifyTutorial(tutorialLeveledUp) })
+		if refill {
+			hooks.add(c.refillCPForLevel)
+		}
 		hooks.add(c.announceLevelUp)
 	}
 
@@ -307,7 +312,7 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 	// UserInfo send below — the weight limit is CON-derived and therefore
 	// level-dependent.
 	hooks.add(c.RefreshWeightPenalty)
-	// The expertise penalty follows the weight penalty (PlayerStatus.addLevel):
+	// The expertise penalty follows the weight penalty on a level change:
 	// the level's skill grant above may have moved Expertise, and a flipped
 	// penalty's SkillList and EtcStatusUpdate trail the level's own SkillList
 	// and precede UserInfo.

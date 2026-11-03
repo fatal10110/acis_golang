@@ -1,0 +1,33 @@
+# Attack Sailren! (Q641): thirty fragments pay a Gazkh while the statue casts.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q641_attack_sailren_finish.golden
+character Hero 77
+quest Q641_AttackSailren <cond>=2 <state>=STARTED
+hold 8782 30
+script quest.Q641_AttackSailren
+item 8782 8784
+page default/32109.htm
+page script/quest/Q641_AttackSailren/
+npc statue 32109 Folk 10 0 0
+
+action statue
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q641_AttackSailren/32109-7.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q641_AttackSailren 32109-8.htm
+  S MagicSkillUse caster=statue target=player skill=5089-1 hit=3000 reuse=0 success=0
+  S SystemMessage id=301 3:8782 6:30
+  S SystemMessage id=54 3:8784
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q641_AttackSailren/32109-8.htm
+  S ActionFailed
+  Q delete-quest Q641_AttackSailren
+  items 8782=0 8784=1
+  rows Q641_AttackSailren -
+  state Q641_AttackSailren -

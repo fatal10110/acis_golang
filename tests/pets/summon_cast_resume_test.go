@@ -74,7 +74,8 @@ func requireKeepsAttacking(t *testing.T, h *petWorld, petActor *summon.Actor) {
 	if got := petActor.Intent(); got != summon.IntentAttackTarget {
 		t.Fatalf("pet intent = %v after the strike was broken, want attack-target resumed", got)
 	}
-	if n := petAttacks(advanceCollecting(t, h, 3*time.Second), petActor); n < 2 {
+	// Two of the pet's swings take longer than 3s.
+	if n := petAttacks(advanceCollecting(t, h, 4*time.Second), petActor); n < 2 {
 		t.Fatalf("pet swings after the broken strike = %d, want it to keep attacking the monster", n)
 	}
 }

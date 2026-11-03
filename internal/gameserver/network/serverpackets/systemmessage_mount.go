@@ -9,3 +9,7 @@ const (
 	SystemMessageStriderCanBeRiddenOnlyWhileStanding = 1013
 	SystemMessageTooFarAwayFromStriderToMount        = 1846
 )
+
+// SystemMessageNoWyvernArea warns a wyvern rider that the area it entered
+// is closed to wyverns; no parameter.
+const SystemMessageNoWyvernArea = 1687

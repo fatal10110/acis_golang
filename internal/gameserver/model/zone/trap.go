@@ -3,8 +3,6 @@ package zone
 import (
 	"sync/atomic"
 	"time"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Trap ties a zone to a castle defense device. A castle-linked trap is
@@ -13,31 +11,32 @@ import (
 type Trap struct {
 	// CastleID links the trap to a castle; 0 means unlinked (always live).
 	CastleID int
-	// EventID is the client effect trigger fired when the trap arms; 0
-	// means none. Broadcasting it belongs to the visibility layer.
+	// EventID is the client map effect the trap shows while armed; 0
+	// means none. A player whose surroundings stop including a region the
+	// trap touches has the effect turned off, armed or not; one whose
+	// surroundings come to include it has it turned on only while armed.
 	EventID int
-	// Armed reports whether the castle owner armed the trap.
+	// Armed reports whether the castle owner armed the trap. Nothing arms
+	// a castle trap: a flame tower never arms its zones, whatever the
+	// castle's trap upgrades, so a castle-linked trap stays dormant.
 	// Unsynchronized: dormant() may run on any actor goroutine that
-	// crosses the zone, and on the damage pulse's queue. No production
-	// writer exists yet (FlameTower zone enabling, #465); the trap-arming
-	// port must switch this to atomic.Bool (or equivalent) before a
-	// concurrent writer lands.
+	// crosses the zone, and on the damage pulse's queue; a writer added
+	// later must switch this to atomic.Bool (or equivalent) first.
 	Armed bool
 	// SiegeActive reports whether the linked castle's siege is running;
 	// nil reads as not running. The game server wires it at boot.
 	SiegeActive func() bool
 }
 
-func newTrap(set *commons.StatSet) (Trap, error) {
-	f := commons.NewFields(set, "zone: trap")
-	t := Trap{
-		CastleID: f.IntDefault("castleId", 0),
-		EventID:  f.IntDefault("eventId", 0),
+// TrapOf returns k's castle trap, nil when k is no trap zone.
+func TrapOf(k Kind) *Trap {
+	switch z := k.(type) {
+	case *Damage:
+		return &z.Trap
+	case *Swamp:
+		return &z.Trap
 	}
-	if err := f.Err(); err != nil {
-		return Trap{}, err
-	}
-	return t, nil
+	return nil
 }
 
 // dormant reports whether the trap's effect is currently suppressed.
@@ -69,26 +68,16 @@ type Damage struct {
 	pulsing atomic.Bool
 }
 
-// NewDamage builds a damage trap zone from its data settings.
-func NewDamage(id int, form Form, set *commons.StatSet) (*Damage, error) {
-	trap, err := newTrap(set)
-	if err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(set, "zone: damage trap")
-	hp := f.IntDefault("hpDamage", 200)
-	initial := f.IntDefault("initialDelay", 1000)
-	reuse := f.IntDefault("reuseDelay", 5000)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
+// NewDamage builds an unlinked damage trap dealing 200 HP every 5 seconds
+// after a 1 second delay; the loader overrides these from the zone's data
+// settings before publishing it.
+func NewDamage(id int, form Form) *Damage {
 	return &Damage{
 		Zone:         newZone(id, form),
-		Trap:         trap,
-		HPDamage:     hp,
-		InitialDelay: time.Duration(initial) * time.Millisecond,
-		ReuseDelay:   time.Duration(reuse) * time.Millisecond,
-	}, nil
+		HPDamage:     200,
+		InitialDelay: time.Second,
+		ReuseDelay:   5 * time.Second,
+	}
 }
 
 // Core exposes the shared zone state.
@@ -150,7 +139,8 @@ func exitDanger(a Actor) {
 }
 
 // Live reports whether the damage pulse keeps running: the zone deals
-// damage and is not a dormant castle trap (DamageZone's task stop rule).
+// damage and is not a dormant castle trap. The damage task stops once this
+// is false.
 func (z *Damage) Live() bool { return z.HPDamage > 0 && !z.dormant() }
 
 // PulseStopped resets the pulse latch; the damage task calls it when it
@@ -180,17 +170,11 @@ type Wader interface {
 	SwampStateChanged(z *Swamp)
 }
 
-// NewSwamp builds a swamp trap zone from its data settings.
-func NewSwamp(id int, form Form, set *commons.StatSet) (*Swamp, error) {
-	trap, err := newTrap(set)
-	if err != nil {
-		return nil, err
-	}
-	bonus, err := set.GetIntDefault("move_bonus", -50)
-	if err != nil {
-		return nil, err
-	}
-	return &Swamp{Zone: newZone(id, form), Trap: trap, MoveBonus: bonus}, nil
+// NewSwamp builds an unlinked swamp trap slowing movement by 50 percent;
+// the loader overrides these from the zone's data settings before
+// publishing it.
+func NewSwamp(id int, form Form) *Swamp {
+	return &Swamp{Zone: newZone(id, form), MoveBonus: -50}
 }
 
 // Core exposes the shared zone state.

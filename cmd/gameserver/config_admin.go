@@ -5,8 +5,9 @@ import "github.com/fatal10110/acis_golang/internal/config"
 // adminConfig holds the game-master settings: whether admin commands are
 // audited (server.properties GMAudit) and the modes a game master logs in
 // with (players.properties GMStartup*): invulnerable, invisible, blocking
-// everything, and on the /gmlist list; and whether a game master shows the
-// hero aura (players.properties GMHeroAura).
+// everything, and on the /gmlist list; whether a game master shows the hero
+// aura (players.properties GMHeroAura); and the access level every new
+// character is granted (players.properties DefaultAccessLevel).
 type adminConfig struct {
 	GMAudit               bool
 	GMStartupInvulnerable bool
@@ -14,6 +15,7 @@ type adminConfig struct {
 	GMStartupBlockAll     bool
 	GMStartupAutoList     bool
 	GMHeroAura            bool
+	DefaultAccessLevel    int
 }
 
 func loadAdminConfig(paths gameServerPaths) (adminConfig, error) {
@@ -34,6 +36,7 @@ func loadAdminConfig(paths gameServerPaths) (adminConfig, error) {
 		GMStartupBlockAll:     pf.Bool("GMStartupBlockAll", false),
 		GMStartupAutoList:     pf.Bool("GMStartupAutoList", true),
 		GMHeroAura:            pf.Bool("GMHeroAura", false),
+		DefaultAccessLevel:    pf.Int("DefaultAccessLevel", 0),
 	}
 	if err := sf.Err(); err != nil {
 		return adminConfig{}, err

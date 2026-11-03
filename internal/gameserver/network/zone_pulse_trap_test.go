@@ -96,7 +96,7 @@ func TestTrapTrippedTellsTheDefendingClans(t *testing.T) {
 		testsupport.ResetCapture(c)
 	}
 
-	link := &GameClientLink{world: state, sieges: sieges, log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{World: state, Sieges: sieges, Log: zerolog.Nop()})
 	link.trapTripped(1)
 	clock.Run()
 

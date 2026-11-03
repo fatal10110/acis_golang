@@ -1,0 +1,39 @@
+# Seductive Whispers (Q663), a small game won by the fifth card of the player pays no adena. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q663_seductive_whispers_small_win_else.golden
+character Gambler 50
+quest Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1
+hold 8766 1
+random 1 0 0 4
+script quest.Q663_SeductiveWhispers
+item 8766 57
+page trainer/30846.htm
+page script/quest/Q663_SeductiveWhispers/
+npc wilbert 30846 Trainer 10 0 0
+
+action wilbert
+action wilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=wilbert item=0 page=trainer/30846.htm
+  S ActionFailed
+bypass npc_{wilbert}_Quest
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q663_SeductiveWhispers 30846-22.htm
+  S SystemMessage id=302 3:8766
+  S NpcHtmlMessage obj=wilbert item=0 page=script/quest/Q663_SeductiveWhispers/30846-22.htm
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 1005
+bypass Quest Q663_SeductiveWhispers 30846-25.htm
+  S NpcHtmlMessage obj=wilbert item=0 html="<html><body>Blacksmith Wilbert:<br>\nWhew! Thankfully, it's my turn again. The card you drew is: <font color=\"LEVEL\"><font color=\"fff802\"> Moon Card: 1 </font></font>. The cards on the table are:<br>\n<table border=\"0\" border color=\"white\" width=\"230\" height=\"60\">\n<tr><td width=\"80\" height=\"20\" align=\"center\">[Wilbert]</td><td width=\"150\" height=\"20\" align=\"center\">[ Gambler ]</td></tr>\n<tr><td width=\"80\" height=\"30\" align=\"center\">No such card</td><td width=\"150\" height=\"30\" align=\"center\"><font color=\"fff802\"> Moon Card: 1 </font></td></tr>\n</table><br>\n<br>\nCan I draw my card now?<br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-29.htm\">Tell him to draw a card.</a>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 1006
+  Q upsert Q663_SeductiveWhispers | stateEx | 21
+bypass Quest Q663_SeductiveWhispers 30846-29.htm
+  S NpcHtmlMessage obj=wilbert item=0 html="<html><body>Blacksmith Wilbert:<br>\nI drew <font color=\"LEVEL\"><font color=\"ff453d\"> Sun Card: 5 </font></font>. The cards on the table are:<br>\n<table border=\"0\" border color=\"white\" width=\"230\" height=\"60\">\n<tr><td width=\"80\" height=\"20\" align=\"center\">[Wilbert]</td><td width=\"150\" height=\"20\" align=\"center\">[ Gambler ]</td></tr>\n<tr><td width=\"80\" height=\"30\" align=\"center\"><font color=\"ff453d\"> Sun Card: 5 </font></td><td width=\"150\" height=\"30\" align=\"center\"><font color=\"fff802\"> Moon Card: 1 </font></td></tr>\n</table>\n<br>\nWhat luck! Looks like I win. Still, it was a pretty exciting practice run, eh? If you want to play again, feel free to challenge me.<br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-22.htm\">\"I'd like to keep practicing.\"</a><br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-09.htm\">\"I want to play the game now.\"</a><br>\n<a action=\"bypass -h Quest Q663_SeductiveWhispers 30846-31.htm\">\"I want to quit.\"</a>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q663_SeductiveWhispers | state | 1
+  Q upsert Q663_SeductiveWhispers | stateEx | 0
+  items 8766=0 57=0
+  rows Q663_SeductiveWhispers <cond>=1 <state>=STARTED state=1 stateEx=0
+  state Q663_SeductiveWhispers STARTED

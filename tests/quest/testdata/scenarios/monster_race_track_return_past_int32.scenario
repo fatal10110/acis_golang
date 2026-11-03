@@ -1,0 +1,17 @@
+# The Monster Race Track trip back (MonsterRaceTrack) from a memo past int32 (2^32 and Trisha's
+# id): the race manager (30995, a DerbyTrackManagerNpc) fails the parse, so the talk aborts before
+# the trip and the memo stays (onTalk). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/monster_race_track_return_past_int32.golden
+character Gambler 20
+memo MonsterRaceTrack_Npc 4294997355
+script script.teleport.MonsterRaceTrack
+page default/30995.htm
+npc manager 30995 DerbyTrackManagerNpc 10 0 0
+
+action manager
+action manager
+  S ActionFailed
+  S NpcHtmlMessage obj=manager item=0 page=default/30995.htm
+  S ActionFailed
+bypass npc_{manager}_Quest MonsterRaceTrack
+  S ActionFailed

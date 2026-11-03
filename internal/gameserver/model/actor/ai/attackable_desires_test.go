@@ -124,7 +124,6 @@ func TestAddCastDesireNeedsTargetAndCaster(t *testing.T) {
 func TestAddAttackDesireDamageRecordsDamageAndHate(t *testing.T) {
 	owner := actor(1)
 	attacker := actor(2)
-	owner.known[attacker.ObjectID()] = false
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
 	brain.AddAttackDesireDamage(attacker, 1, 200)
@@ -153,6 +152,7 @@ func TestDesirePromotionOrderMixedKinds(t *testing.T) {
 	attack := &recordingAttack{canAttack: true}
 	cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
 	brain := NewAttackable(owner, move, attack)
+	pastFirstCycle(t, brain)
 	brain.SetCastController(cast)
 
 	brain.AddDoNothingDesire(40, 500)
@@ -218,7 +218,7 @@ func TestDoNothingDesireKeepsTheActorStill(t *testing.T) {
 
 	// 1 - 0.5 - 0.5 leaves 0; the next decay would go below zero and drops it.
 	for range 9 {
-		brain.Tick()
+		tickDecay(brain)
 	}
 	if n := brain.Desires().Len(); n != 0 {
 		t.Fatalf("desires after the do-nothing weight decayed = %d, want 0", n)
@@ -238,6 +238,7 @@ func TestScriptDesiresQueueConcurrently(t *testing.T) {
 	owner := actor(1)
 	leader := actor(3)
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	brain.SetCastController(&recordingCast{canAttempt: true, canCast: true})
 
 	const workers = 16

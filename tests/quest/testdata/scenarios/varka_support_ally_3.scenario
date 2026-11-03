@@ -1,0 +1,60 @@
+# Varka Silenos support (VarkaSilenosSupport): the village folk of a Varka Silenos ally of level 3, each first talk answering by the level.
+# Killing a soldier of the side breaks the alliance, the level 3 badge becoming the level 2 one.
+# Expectations are derived from the reference source (VarkaSilenosSupport.onFirstTalk, onAdvEvent,
+# onMyDying) and replay the reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/varka_support_ally_3.golden
+character Ally 40
+standing -3
+hold 7223 1
+script script.feature.VarkaSilenosSupport
+item 7223 7222 7187
+page script/feature/VarkaSilenosSupport/
+npc ashas 31377 Folk 10 0 0
+npc naran 31378 Folk 0 10 0
+npc udan 31379 Folk -10 0 0
+npc diyabu 31380 Merchant 0 -10 0
+npc hagos 31381 WarehouseKeeper 10 10 0
+npc shikon 31382 Merchant -10 -10 0
+npc teranu 31383 Gatekeeper 10 -10 0
+npc recruit 21350 Monster 40 0 0
+
+action ashas
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=script/feature/VarkaSilenosSupport/31377-friend.htm
+  S ActionFailed
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=script/feature/VarkaSilenosSupport/31378-friend.htm
+  S ActionFailed
+action diyabu
+action diyabu
+  S ActionFailed
+  S NpcHtmlMessage obj=diyabu item=0 page=script/feature/VarkaSilenosSupport/31380-2.htm
+  S ActionFailed
+action shikon
+action shikon
+  S ActionFailed
+  S NpcHtmlMessage obj=shikon item=0 page=script/feature/VarkaSilenosSupport/31382-2.htm
+  S ActionFailed
+action teranu
+action teranu
+  S ActionFailed
+  S NpcHtmlMessage obj=teranu item=0 page=script/feature/VarkaSilenosSupport/31383-1.htm
+  S ActionFailed
+action hagos
+action hagos
+  S ActionFailed
+  S NpcHtmlMessage obj=hagos item=0 page=script/feature/VarkaSilenosSupport/31381-2.htm
+  S ActionFailed
+action udan
+action udan
+  S ActionFailed
+  S NpcHtmlMessage obj=udan item=0 page=script/feature/VarkaSilenosSupport/31379-2.htm
+  S ActionFailed
+
+kill recruit
+  S SystemMessage id=302 3:7223
+  S SystemMessage id=54 3:7222
+  items 7223=0 7222=1

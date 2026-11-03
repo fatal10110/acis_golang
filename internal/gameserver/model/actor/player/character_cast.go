@@ -71,7 +71,7 @@ func (c *Character) StopCast() {
 }
 
 // CanAbortCast reports whether c's active cast is still inside its
-// interrupt window, matching CreatureCast.canAbortCast().
+// interrupt window.
 func (c *Character) CanAbortCast() bool {
 	cast := c.castController()
 	return cast != nil && cast.CanAbortCast()

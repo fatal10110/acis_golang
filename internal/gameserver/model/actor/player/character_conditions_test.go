@@ -379,7 +379,7 @@ func TestCharacterRecentFakeDeathTracksGracePeriodAfterMarking(t *testing.T) {
 	}
 
 	// The grace runs on the character's queue clock, not the wall clock.
-	clock.Advance(recentFakeDeathGrace - time.Millisecond)
+	clock.Advance(DefaultFakeDeathUpProtection - time.Millisecond)
 	if !c.RecentFakeDeath() {
 		t.Fatal("RecentFakeDeath() = false before the grace period elapsed on the queue clock")
 	}

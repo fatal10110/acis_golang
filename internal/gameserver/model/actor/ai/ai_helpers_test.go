@@ -32,6 +32,19 @@ func addAttackHate(ai *Attackable, attacker attackable.Combatant, damage, hate f
 	})
 }
 
+// pastFirstCycle runs a fresh brain's first periodic cycle on an empty
+// queue, so later event passes may take up any desire: before that cycle
+// they take up nothing unless an attack desire is queued.
+func pastFirstCycle(t *testing.T, ai *Attackable) {
+	t.Helper()
+	if n := ai.Desires().Len(); n != 0 {
+		t.Fatalf("pastFirstCycle: %d desires queued, want an empty queue", n)
+	}
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("first TickThink() error: %v", err)
+	}
+}
+
 func tickThinkIdle(ai *Attackable) error {
 	if err := ai.TickThink(); err != nil {
 		return err
@@ -52,18 +65,19 @@ func thinkWanderOnce(ai *Attackable) error {
 type fakeActor struct {
 	attackabletest.Combatant
 	world.Presence
-	id              int32
-	siegeGuard      bool
-	alikeDead       bool
-	denyAction      bool
-	confused        bool
-	attackRange     int
-	known           map[int32]bool
+	id          int32
+	siegeGuard  bool
+	alikeDead   bool
+	denyAction  bool
+	confused    bool
+	attackRange int
+	known       map[int32]bool
+	// gone lists the targets that left the world.
+	gone            map[int32]bool
 	inTerritory     bool
 	returnHome      bool
 	returnHomeCalls int
 	moving          bool
-	idleWander      bool
 	moveSpeed       float64
 	wanderCalls     int
 	wanderOffset    int
@@ -83,6 +97,11 @@ type fakeActor struct {
 	immobile bool
 	sleeping bool
 	socials  []int
+	// ground is where each ground item the actor may pick up lies; picked
+	// records each pickup, and onPickUp runs inside one.
+	ground   map[int32]location.Location
+	picked   []int32
+	onPickUp func()
 }
 
 func actor(id int32) *fakeActor {
@@ -101,6 +120,11 @@ func (a *fakeActor) OutOfControl() bool { return a.denyAction || a.confused }
 func (a *fakeActor) Knows(target attackable.Combatant) bool {
 	known, ok := a.known[target.ObjectID()]
 	return !ok || known
+}
+
+// InWorld reports a target not listed in gone as still in the world.
+func (a *fakeActor) InWorld(target attackable.Combatant) bool {
+	return !a.gone[target.ObjectID()]
 }
 func (a *fakeActor) PhysicalAttackRange() int { return a.attackRange }
 func (a *fakeActor) ReturnHome() bool {
@@ -121,7 +145,6 @@ func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target
 }
-func (a *fakeActor) ShouldIdleWander() bool       { return a.idleWander }
 func (a *fakeActor) ForceWalkStance()             { a.walkStanceCalls++ }
 func (a *fakeActor) ForceRunStance()              { a.runStanceCalls++ }
 func (a *fakeActor) RestoreSpawnHeadingIfAtHome() { a.headingRestores++ }
@@ -198,7 +221,9 @@ type recordingMove struct {
 	followCalls   int
 	stopCount     int
 	home          location.Location
-	denyMove      bool
+	// moveTo is the last MoveToLocation destination.
+	moveTo   location.Location
+	denyMove bool
 	// outOfReach is what HoldOffensiveFollow reports; holdCalls counts it.
 	outOfReach bool
 	holdCalls  int
@@ -339,11 +364,6 @@ func (c *recordingCast) Stop() {
 	}
 }
 
-func tickOOTSweepDue(ai *Attackable, at time.Time) {
-	ai.now = func() time.Time { return at }
-	ai.Tick()
-}
-
 type summonMove struct {
 	recordingMove
 	friendlyTarget attackable.Combatant
@@ -361,9 +381,14 @@ func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 	return true, nil
 }
 
-func (recordingMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (m *recordingMove) MoveToLocation(dest location.Location) (bool, error) {
+	m.moveTo = dest
+	return false, nil
+}
 
-func (*fakeActor) IdleFollowTarget() attackable.Combatant { return nil }
+func (recordingMove) MoveStraightToLocation(location.Location) (bool, error) {
+	return false, nil
+}
 
 func (*fakeActor) ThinkFollow(attackable.Combatant, bool) bool { return false }
 

@@ -149,5 +149,5 @@ func TestBowMidShotPickupRunsAtShotEnd(t *testing.T) {
 	readUntilSlow(t, b.c, serverpackets.OpcodeActionFailed, "queued pickup ActionFailed")
 	readUntilSlow(t, b.c, serverpackets.OpcodeGetItem, "queued pickup GetItem")
 	b.assertBeforeReuseEnd(t, b.c.Now(), "queued pickup GetItem")
-	assertNoSwingBy(t, b.c, b.objID, 2*b.period, "after the queued pickup")
+	assertNoSwingBy(t, b.srv, b.c, b.objID, 2*b.period, "after the queued pickup")
 }

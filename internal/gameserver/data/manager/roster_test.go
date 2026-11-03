@@ -78,7 +78,7 @@ func TestRoster_Create(t *testing.T) {
 	if outcome != CreateOK {
 		t.Fatalf("Create() outcome = %v, want CreateOK", outcome)
 	}
-	if c.Name != "Newbie" || c.ClassID() != 0 || c.Race != player.RaceHuman {
+	if c.CharacterName() != "Newbie" || c.ClassID() != 0 || c.Race != player.RaceHuman {
 		t.Fatalf("Create() character = %+v", c)
 	}
 	if c.Location != (location.Location{X: 10, Y: 20, Z: 30}) {
@@ -354,8 +354,8 @@ func TestRoster_Create_AcceptsValidNonNPCName(t *testing.T) {
 	if outcome != CreateOK {
 		t.Fatalf("Create() outcome = %v, want CreateOK", outcome)
 	}
-	if c.Name != "Newbie" {
-		t.Fatalf("Create() character name = %q, want Newbie", c.Name)
+	if c.CharacterName() != "Newbie" {
+		t.Fatalf("Create() character name = %q, want Newbie", c.CharacterName())
 	}
 }
 

@@ -1,0 +1,82 @@
+# Path to a Rogue (Q403), level 19 with the bow in hand: the skeleton drops the tenth bone to the character that alone fights it, and Neti trades the bones for the horseshoe, which Bezique trades for the list. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q403_path_to_a_rogue_bones.golden
+character Rogue 19
+quest Q403_PathToARogue <cond>=2 <state>=STARTED
+hold 1182 1
+hold 1183 9
+equip 1181
+random 0
+script quest.Q403_PathToARogue
+item 1180 1181 1182 1183 1184 1185 1186 1187 1188 1189 1190
+page guard/30379.htm
+page default/30425.htm
+page script/quest/Q403_PathToARogue/
+npc bezique 30379 Guard 10 0 0
+npc neti 30425 Folk -10 0 0
+npc skel 20035 Monster 40 0 0
+npc bandit 27038 Monster 50 0 0
+
+hit skel 5
+  items 1181=1 1182=1 1183=9
+  rows Q403_PathToARogue <cond>=2 <state>=STARTED
+  state Q403_PathToARogue STARTED
+kill skel
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1183
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 403:0x80000007
+  S ExShowQuestMark quest=403
+  Q upsert Q403_PathToARogue | <cond> | 3
+  items 1183=10
+  rows Q403_PathToARogue <cond>=3 <state>=STARTED
+action neti
+action neti
+  S ActionFailed
+  S NpcHtmlMessage obj=neti item=0 page=default/30425.htm
+  S ActionFailed
+bypass npc_{neti}_Quest
+  S QuestList 403:0x8000000f
+  S ExShowQuestMark quest=403
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1183 6:10
+  S SystemMessage id=54 3:1184
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q403_PathToARogue | <cond> | 4
+  items 1183=0 1184=1
+  rows Q403_PathToARogue <cond>=4 <state>=STARTED
+action neti
+  S ActionFailed
+  S NpcHtmlMessage obj=neti item=0 page=default/30425.htm
+  S ActionFailed
+bypass npc_{neti}_Quest
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-08.htm
+  S ActionFailed
+  S ActionFailed
+action bezique
+action bezique
+  S ActionFailed
+  S NpcHtmlMessage obj=bezique item=0 page=guard/30379.htm
+  S ActionFailed
+bypass npc_{bezique}_Quest
+  S QuestList 403:0x8000001f
+  S ExShowQuestMark quest=403
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1184
+  S SystemMessage id=54 3:1185
+  S NpcHtmlMessage obj=bezique item=0 page=script/quest/Q403_PathToARogue/30379-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q403_PathToARogue | <cond> | 5
+  items 1184=0 1185=1
+  rows Q403_PathToARogue <cond>=5 <state>=STARTED
+bypass Quest Q403_PathToARogue 30379-08.htm
+action bezique
+  S ActionFailed
+  S NpcHtmlMessage obj=bezique item=0 page=guard/30379.htm
+  S ActionFailed
+bypass npc_{bezique}_Quest
+  S NpcHtmlMessage obj=bezique item=0 page=script/quest/Q403_PathToARogue/30379-11.htm
+  S ActionFailed
+  S ActionFailed

@@ -79,8 +79,8 @@ func NewData(levels []AccessLevel, commands []Command) (*Data, error) {
 	return d, nil
 }
 
-// Replace swaps d's tables for from's, at once for every holder of d:
-// AdminData.reload. A character keeps the access level it plays under
+// Replace swaps d's tables for from's, at once for every holder of d, as an
+// admin reload does. A character keeps the access level it plays under
 // until that level is resolved again.
 func (d *Data) Replace(from *Data) {
 	d.cur.Store(from.cur.Load())

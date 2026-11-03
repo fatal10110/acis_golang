@@ -1,0 +1,33 @@
+# Path to an Elven Knight (Q406), a level 20 human fighter is turned away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q406_path_to_an_elven_knight_other_class.golden
+character Knight 20
+script quest.Q406_PathToAnElvenKnight
+item 1202 1203 1204 1205 1206 1276
+page trainer/30327.htm
+page trainer/30317.htm
+page script/quest/Q406_PathToAnElvenKnight/
+npc sorius 30327 Trainer 10 0 0
+npc kluto 30317 Trainer -10 0 0
+npc tracker 20035 Monster 40 0 0
+npc leader 20042 Monster 45 0 0
+npc scout 20045 Monster 50 0 0
+npc bowman 20051 Monster 55 0 0
+npc spartoi 20054 Monster 60 0 0
+npc raging 20060 Monster 65 0 0
+npc novice 20782 Monster 70 0 0
+
+action sorius
+  rows Q406_PathToAnElvenKnight -
+  state Q406_PathToAnElvenKnight -
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+bypass npc_{sorius}_Quest
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q406_PathToAnElvenKnight/30327-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q406_PathToAnElvenKnight CREATED
+bypass Quest Q406_PathToAnElvenKnight 30327-05.htm
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q406_PathToAnElvenKnight/30327-02.htm
+  S ActionFailed

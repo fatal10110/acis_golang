@@ -1,0 +1,26 @@
+# Gariachin (ElrokiTeleporter) sends a character back whether it holds an attack stance or not
+# (onTalk): only Orahochin's refusal asks isInCombat. Replayed by the reference probe
+# (stance step, attack stance task).
+trace internal/gameserver/script/testdata/oracle/scenarios/elroki_teleporter_gariachin_in_combat.golden
+character Islander 40
+script script.teleport.ElrokiTeleporter
+page default/32112.htm
+page script/teleport/ElrokiTeleporter/
+npc gariachin 32112 Folk 10 0 0
+
+action gariachin
+action gariachin
+  S ActionFailed
+  S NpcHtmlMessage obj=gariachin item=0 page=default/32112.htm
+  S ActionFailed
+stance player on
+  stance player on
+bypass npc_{gariachin}_Quest ElrokiTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=7557,-5513,-3221 fast=0
+  S DeleteObject obj=gariachin
+  S ActionFailed

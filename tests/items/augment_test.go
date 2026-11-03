@@ -540,7 +540,7 @@ func TestAugmentActiveSkillKeepsReuseAcrossReequip(t *testing.T) {
 	if !ok {
 		t.Fatalf("smith %T exposes no SkillDisabled", live)
 	}
-	key := actorcast.ReuseKey(def)
+	key := actorcast.ReuseKey(&def)
 
 	equipped := s.send(t, encodeUseItem(sword, false))
 	list := mustFindFrame(t, equipped, 0, serverpackets.OpcodeSkillList, 0, "equip SkillList")

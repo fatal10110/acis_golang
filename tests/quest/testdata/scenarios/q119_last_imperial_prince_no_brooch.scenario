@@ -1,0 +1,37 @@
+# Last Imperial Prince (Q119), without the brooch: a level 74 character on cond 1 that no longer
+# holds the antique brooch reads Devorin's first page; the next answers with a page the datapack
+# does not ship (the missing-page notice) and the quest is dropped. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q119_last_imperial_prince_no_brooch.golden
+character Prince 74
+quest Q119_LastImperialPrince <cond>=1 <state>=STARTED
+script quest.Q119_LastImperialPrince
+item 7262
+page default/32009.htm
+page script/quest/Q119_LastImperialPrince/
+npc devorin 32009 Folk 20 0 0
+
+action devorin
+action devorin
+  S ActionFailed
+  S NpcHtmlMessage obj=devorin item=0 page=default/32009.htm
+  S ActionFailed
+bypass npc_{devorin}_Quest
+  S NpcHtmlMessage obj=devorin item=0 page=script/quest/Q119_LastImperialPrince/32009-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q119_LastImperialPrince STARTED
+bypass Quest Q119_LastImperialPrince 32009-02.htm
+  S QuestList
+  S NpcHtmlMessage obj=devorin item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q119_LastImperialPrince/31453-02a.htm</body></html>"
+  S ActionFailed
+  Q delete-quest Q119_LastImperialPrince
+  state Q119_LastImperialPrince -
+  rows Q119_LastImperialPrince -
+action devorin
+  S ActionFailed
+  S NpcHtmlMessage obj=devorin item=0 page=default/32009.htm
+  S ActionFailed
+bypass npc_{devorin}_Quest
+  S NpcHtmlMessage obj=devorin item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed

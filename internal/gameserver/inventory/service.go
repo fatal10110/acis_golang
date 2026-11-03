@@ -403,18 +403,15 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 		targetStack = receiver.ItemByTemplateID(st.TemplateID)
 	}
 
-	newObjectID := int32(0)
-	if st.Count > count || targetStack != nil {
-		id, ok, err := s.nextID()
-		if err != nil || !ok {
-			return TransferResult{}, false, err
-		}
-		newObjectID = id
+	id, ok, err := s.reserveMove(st.Count > count && targetStack == nil)
+	if err != nil || !ok {
+		return TransferResult{}, false, err
 	}
+	defer id.release()
 
-	result, freedObjectID, freed := source.TransferItem(objectID, count, receiver, newObjectID)
+	result, freedObjectID, freed, err := source.TransferItem(objectID, count, receiver, id.next)
 	if result == nil {
-		return TransferResult{}, false, nil
+		return TransferResult{}, false, err
 	}
 
 	out := TransferResult{Item: result}
@@ -424,7 +421,7 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	if freed {
 		out.Persist = append(out.Persist, Delete(source.OwnerID(), freedObjectID))
 	}
-	if newObjectID != 0 && result.ObjectID == newObjectID {
+	if id.created(result) {
 		out.Persist = append(out.Persist, Save(result))
 	} else {
 		out.Persist = append(out.Persist, Update(result))
@@ -446,46 +443,216 @@ type Move struct {
 // does can land between the check and the last move. It reports false,
 // having changed nothing, when check vetoes. A move failing after the check
 // approved is a broken check; it reports false with the persistence of the
-// moves already made, so the caller still writes what did happen.
+// moves already made, so the caller still writes what did happen. Only a row
+// that splits an instance into a receiver holding no stack of it takes an
+// object id; when those ids cannot be had, it reports the error having
+// changed nothing.
 func (s *Service) Exchange(a, b *itemcontainer.Inventory, aOut, bOut []Move, check func(a, b itemcontainer.Held) bool) (Result, bool, error) {
 	if a == nil || b == nil || a == b {
 		return Result{}, false, nil
 	}
-	// Ids come from outside the inventory locks, and whether a row splits is
-	// only known under them, so every row gets one up front. A move that
-	// could not get its id would fail after earlier rows had landed, so no
-	// allocator means no exchange at all.
-	// ponytail: a row that needs no id burns its id; the allocator never
-	// reuses an id behind its cursor, so handing it back would buy nothing.
-	ids := make([]int32, len(aOut)+len(bOut))
-	for i := range ids {
-		id, ok, err := s.nextID()
-		if err != nil {
-			return Result{}, false, err
-		}
-		if !ok {
-			return Result{}, false, errNoIDAllocator
-		}
-		ids[i] = id
-	}
-
-	var res Result
-	ok := false
+	var (
+		res Result
+		ok  bool
+		err error
+	)
 	itemcontainer.Exchange(a, b, func(heldA, heldB itemcontainer.Held) {
 		if check != nil && !check(heldA, heldB) {
 			return
 		}
-		ok = moveAll(&res, heldA, heldB, a.OwnerID(), aOut, ids) &&
-			moveAll(&res, heldB, heldA, b.OwnerID(), bOut, ids[len(aOut):])
+		// Whether a row splits is only known under the locks, so the ids are
+		// taken here, all of them before the first move: an allocator failing
+		// halfway would leave earlier rows landed. The allocator's lock is a
+		// leaf, so taking it under the inventory locks is safe.
+		var ids exchangeIDs
+		ids, err = s.takeExchangeIDs(splitsAhead(heldA, heldB, aOut, bOut))
+		if err != nil {
+			return
+		}
+		defer ids.release()
+		ok = moveAll(&res, heldA, heldB, a.OwnerID(), aOut, &ids) &&
+			moveAll(&res, heldB, heldA, b.OwnerID(), bOut, &ids)
 	})
-	return res, ok, nil
+	return res, ok, err
 }
 
-// moveAll transfers every row from source to receiver, row i splitting off
-// under ids[i] when it has to.
-func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids []int32) bool {
-	for i, row := range rows {
-		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids[i])
+// exchangeIDs holds the ids an exchange took for the rows that split.
+type exchangeIDs struct {
+	s    *Service
+	pool []int32
+}
+
+// takeExchangeIDs takes n ids, or none and an error.
+func (s *Service) takeExchangeIDs(n int) (exchangeIDs, error) {
+	ids := exchangeIDs{s: s}
+	for range n {
+		id, ok, err := s.nextID()
+		if err == nil && !ok {
+			err = errNoIDAllocator
+		}
+		if err != nil {
+			ids.release()
+			return exchangeIDs{}, err
+		}
+		ids.pool = append(ids.pool, id)
+	}
+	return ids, nil
+}
+
+// peek is the id the next splitting row takes, or 0 when none is left; a
+// row given 0 that has to split fails without changing anything, and is
+// retried with a late id.
+func (ids *exchangeIDs) peek() int32 {
+	if len(ids.pool) == 0 {
+		return 0
+	}
+	return ids.pool[0]
+}
+
+// late takes one more id after the count fell short, reporting whether it
+// got one, so a miscount costs a late allocation instead of an exchange
+// stranded halfway.
+func (ids *exchangeIDs) late() bool {
+	id, ok, err := ids.s.nextID()
+	if err != nil || !ok {
+		return false
+	}
+	ids.pool = append(ids.pool, id)
+	return true
+}
+
+// use marks the id peek returned as spent.
+func (ids *exchangeIDs) use() {
+	ids.pool = ids.pool[1:]
+}
+
+// release gives back the ids no row spent; an allocator that cannot take
+// ids back keeps them.
+func (ids *exchangeIDs) release() {
+	if ids.s == nil {
+		return
+	}
+	// accepted: releasing ids is an optional allocator capability.
+	r, ok := ids.s.ids.(interface{ ReleaseID(int32) })
+	for _, id := range ids.pool {
+		if ok {
+			r.ReleaseID(id)
+		}
+	}
+	ids.pool = nil
+}
+
+// splitsAhead counts the rows that will split an instance into a receiver
+// holding no stack of it when aOut moves from a to b and then bOut from b to
+// a, playing the rows in that order on what a and b hold now: a row that
+// starts or grows the receiver's stack lets later rows of that item land on
+// it, or move it out whole, and a row that takes the sender's whole stack
+// away makes a later row into the sender start a new one. A row the moves
+// will refuse counts nothing.
+func splitsAhead(a, b itemcontainer.Held, aOut, bOut []Move) int {
+	type stackKey struct {
+		side       int
+		templateID int32
+	}
+	// played is an object as the rows have left it: which side holds it (-1
+	// once it merged into a stack and is gone), its item and its units.
+	type played struct {
+		side       int
+		templateID int32
+		count      int
+	}
+	held := [2]itemcontainer.Held{a, b}
+	objects := make(map[int32]*played)
+	lookup := func(side int, inst *item.Instance) *played {
+		if p, ok := objects[inst.ObjectID]; ok {
+			return p
+		}
+		st := inst.Snapshot()
+		p := &played{side: side, templateID: st.TemplateID, count: st.Count}
+		objects[inst.ObjectID] = p
+		return p
+	}
+	// stacks names the object holding a side's stack of an item, once a row
+	// changed it; 0 is none. A created instance has no id yet, so it goes
+	// by a negative stand-in no row can name.
+	stacks := make(map[stackKey]int32)
+	stackOf := func(side int, templateID int32) *played {
+		id, ok := stacks[stackKey{side, templateID}]
+		if !ok {
+			inst := held[side].ItemByTemplateID(templateID)
+			if inst == nil {
+				return nil
+			}
+			return lookup(side, inst)
+		}
+		if id == 0 {
+			return nil
+		}
+		return objects[id]
+	}
+	splits := 0
+	play := func(from int, rows []Move) {
+		to := 1 - from
+		for _, row := range rows {
+			if row.Count <= 0 {
+				continue
+			}
+			obj, ok := objects[row.ObjectID]
+			if !ok {
+				src := held[from].ItemByObjectID(row.ObjectID)
+				if src == nil {
+					continue
+				}
+				obj = lookup(from, src)
+			}
+			tmpl, ok := held[from].Templates().Get(obj.templateID)
+			if obj.side != from || obj.count <= 0 || !ok {
+				continue
+			}
+			var stack *played
+			if tmpl.Stackable {
+				stack = stackOf(to, obj.templateID)
+			}
+			moved := min(row.Count, obj.count)
+			whole := moved == obj.count
+			obj.count -= moved
+			switch {
+			case stack != nil:
+				stack.count += moved
+				if whole {
+					obj.side = -1
+				}
+			case whole:
+				obj.count, obj.side = moved, to
+				if tmpl.Stackable {
+					stacks[stackKey{to, obj.templateID}] = row.ObjectID
+				}
+			default:
+				splits++
+				if tmpl.Stackable {
+					created := -int32(splits)
+					objects[created] = &played{side: to, templateID: obj.templateID, count: moved}
+					stacks[stackKey{to, obj.templateID}] = created
+				}
+			}
+			if whole && tmpl.Stackable {
+				stacks[stackKey{from, obj.templateID}] = 0
+			}
+		}
+	}
+	play(0, aOut)
+	play(1, bOut)
+	return splits
+}
+
+// moveAll transfers every row from source to receiver, a row that splits
+// into a receiver holding none of it spending the next of ids.
+func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids *exchangeIDs) bool {
+	for _, row := range rows {
+		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids.peek())
+		if !ok && ids.peek() == 0 && ids.late() {
+			m, ok = source.Transfer(row.ObjectID, row.Count, receiver, ids.peek())
+		}
 		if !ok {
 			return false
 		}
@@ -496,6 +663,7 @@ func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int
 			res.Persist = append(res.Persist, Delete(sourceOwnerID, m.FreedObjectID))
 		}
 		if m.Created {
+			ids.use()
 			res.Persist = append(res.Persist, Save(m.Item))
 		} else {
 			res.Persist = append(res.Persist, Update(m.Item))
@@ -534,10 +702,11 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	if _, ok := inv.Templates().Get(crystalItemID); !ok {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
-	crystalObjectID, ok, err := s.nextID()
+	grant, ok, err := s.reserveGrant(inv, crystalItemID)
 	if err != nil || !ok {
 		return CrystallizeResult{}, CrystallizeNoop, err
 	}
+	defer grant.release()
 
 	if count > st.Count {
 		count = st.Count
@@ -547,16 +716,105 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	if inv.DestroyItem(inst, count) == nil {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
-	if inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID) == nil {
-		return CrystallizeResult{}, CrystallizeNoop, nil
+	taken := Result{EquipmentChanged: wasEquipped, Changed: changed}
+	crystals, err := inv.AddCreated(crystalItemID, int(crystalCount), grant.next)
+	if crystals == nil {
+		// The source is gone either way: report what came off with it.
+		return CrystallizeResult{Result: taken}, CrystallizeNoop, err
 	}
 	return CrystallizeResult{
-		Result:             Result{EquipmentChanged: wasEquipped, Changed: changed},
+		Result:             taken,
 		SourceItemID:       st.TemplateID,
 		SourceEnchantLevel: st.EnchantLevel,
 		CrystalItemID:      crystalItemID,
 		CrystalCount:       int(crystalCount),
 	}, CrystallizeOK, nil
+}
+
+// grantID is the object id of an item granted after its source is
+// destroyed, or of the instance a move creates in its target. It is taken
+// before anything changes, so that running out of ids refuses the request
+// instead of taking the source unpaid, unless the units join a stack the
+// receiver already holds: the allocator never hands out an id behind its
+// cursor again, so an id taken for nothing is spent for the rest of the
+// session.
+type grantID struct {
+	s      *Service
+	id     int32 // 0 once handed out, or when none was taken
+	issued int32 // the id next handed out, or 0
+}
+
+// reserveGrant takes the id a grant of templateID into inv may need. It
+// reports false, taking nothing, when s has no allocator.
+func (s *Service) reserveGrant(inv *itemcontainer.Inventory, templateID int32) (*grantID, bool, error) {
+	if s == nil || s.ids == nil {
+		return nil, false, nil
+	}
+	g := &grantID{s: s}
+	if tmpl, ok := inv.Templates().Get(templateID); ok && tmpl.Stackable && inv.ItemByTemplateID(templateID) != nil {
+		return g, true, nil
+	}
+	id, _, err := s.nextID()
+	if err != nil {
+		return nil, false, err
+	}
+	g.id = id
+	return g, true, nil
+}
+
+// reserveMove takes the id a move needs when split, that is when it leaves
+// part of its source behind in a receiver holding no stack of it. A move
+// that takes its source whole, or lands on a held stack, takes none up
+// front. It reports false, taking nothing, when a split move finds s
+// without an allocator.
+func (s *Service) reserveMove(split bool) (*grantID, bool, error) {
+	g := &grantID{s: s}
+	if !split {
+		return g, true, nil
+	}
+	id, ok, err := s.nextID()
+	if err != nil || !ok {
+		return nil, false, err
+	}
+	g.id = id
+	return g, true, nil
+}
+
+// next is the nextID of the grant's AddCreated: the reserved id, or a late
+// one when the held stack the reservation counted on has gone since.
+func (g *grantID) next() (int32, error) {
+	id := g.id
+	g.id = 0
+	if id == 0 {
+		late, ok, err := g.s.nextID()
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			return 0, errNoIDAllocator
+		}
+		id = late
+	}
+	g.issued = id
+	return id, nil
+}
+
+// created reports whether inst is the new instance next named.
+func (g *grantID) created(inst *item.Instance) bool {
+	return g.issued != 0 && inst != nil && inst.ObjectID == g.issued
+}
+
+// release gives back a reserved id the grant never used; an allocator that
+// cannot take ids back keeps it.
+func (g *grantID) release() {
+	if g.id == 0 {
+		return
+	}
+	// accepted: releasing ids is an optional allocator capability.
+	if r, ok := g.s.ids.(interface{ ReleaseID(int32) }); ok {
+		r.ReleaseID(g.id)
+	}
+	g.id = 0
 }
 
 func (s *Service) nextID() (int32, bool, error) {

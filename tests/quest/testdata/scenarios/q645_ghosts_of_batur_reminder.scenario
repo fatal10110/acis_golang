@@ -1,0 +1,21 @@
+# Ghosts of Batur (Q645): a character at cond 2 is told to choose its reward.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q645_ghosts_of_batur_reminder.golden
+character Hero 23
+quest Q645_GhostsOfBatur <cond>=2 <state>=STARTED
+hold 8089 180
+script quest.Q645_GhostsOfBatur
+item 8089 1878 1879 1880 1881 1882 1883
+page default/32017.htm
+page script/quest/Q645_GhostsOfBatur/
+npc karuda 32017 Folk 10 0 0
+
+action karuda
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q645_GhostsOfBatur/32017-05.htm
+  S ActionFailed
+  S ActionFailed

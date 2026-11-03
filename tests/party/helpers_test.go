@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
@@ -17,8 +16,6 @@ import (
 func TestMain(m *testing.M) {
 	os.Exit(dbtest.Main(m))
 }
-
-const quiet = 300 * time.Millisecond
 
 // player is one dialed client and its character's object id.
 type player struct {
@@ -139,31 +136,18 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	drainFrames(t, c)
 }
 
-// drainFrames collects every frame the client receives until the server
-// goes quiet, in arrival order.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for range 200 {
-		frame := c.ReadWithTimeout(quiet)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 200 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 // assertSilent asserts c receives nothing but the party's periodic
 // position reports.
 func assertSilent(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	for {
-		frame := c.ReadWithTimeout(quiet)
-		if frame == nil {
-			return
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodePartyMemberPosition {
 			t.Fatalf("%s: received %#x, want silence", what, frame[0])
 		}

@@ -13,6 +13,7 @@ import (
 // hears nothing. The refusal records no request, so once the target lifts
 // the block the same requester's next request goes through.
 func TestTradeRequestRefusedWhileTargetBlocksEverything(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 
@@ -40,6 +41,7 @@ func TestTradeRequestRefusedWhileTargetBlocksEverything(t *testing.T) {
 // naming the target, and the target hears nothing. The block is one way: the
 // blocker can still ask the player it blocks.
 func TestTradeRequestRefusedByTargetBlockList(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 
@@ -62,6 +64,7 @@ func TestTradeRequestRefusedByTargetBlockList(t *testing.T) {
 // S1_IS_BUSY_TRY_LATER even while it blocks everything, since the busy check
 // comes first.
 func TestTradeRequestBusyTargetAnsweredBeforeBlock(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 	carol, _ := p.third(t, "player3", "Carol")

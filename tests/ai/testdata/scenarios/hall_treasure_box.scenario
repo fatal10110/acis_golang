@@ -1,0 +1,18 @@
+# AzitWateringTreasureBox (35595), a Rainbow Springs treasure box, invulnerable from the moment it
+# appears. The character's barehanded blows take their hit points through its script: of its 440,
+# a hit of 22 leaves 418 and one of 417 leaves 1, and the hit of 1 that would take the last kills
+# it. Three seconds after its death it drops letters to its killer: a draw of 1 makes two drops,
+# the first draw of 6 (over 5, up to 10) the letter 8036, the second of 99 (over 95) nothing.
+character Hunter 20
+random 1 6 99
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.AzitWateringTreasureBox
+item 8036
+npc box 35595 Monster 40 0 0
+
+hit box 22
+hit box 417
+hit box 1
+  S SystemMessage id=95 1:0 1:0
+advance 3s
+  S DropItem by=box item=8036 count=1 stackable=1 animate=1

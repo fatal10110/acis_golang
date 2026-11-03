@@ -17,7 +17,8 @@ type TutorialEvents interface {
 const (
 	// TutorialEnterWorld: the character entered the world.
 	TutorialEnterWorld = "UC"
-	// tutorialDied: HP damage killed the character outside the Olympiad.
+	// tutorialDied: HP damage killed the character outside an Olympiad
+	// match.
 	tutorialDied = "CE30"
 	// tutorialLeveledUp: the character's level went up.
 	tutorialLeveledUp = "CE40"
@@ -40,10 +41,20 @@ func (c *Character) NotifyTutorial(name string) {
 	}
 }
 
+// NotifyTutorialOnQueue is NotifyTutorial for a caller running a task of
+// c's own queue: the tutorial's hook runs as a hook on that queue (see
+// RunOnOwnQueue), so what it asks of c runs inside the call.
+func (c *Character) NotifyTutorialOnQueue(name string) {
+	c.RunOnOwnQueue(func() { c.NotifyTutorial(name) })
+}
+
 // writeHPLocked is the one place c's current HP is written, except the HP
 // clear of a character restored dead (MarkDead). It marks the write for
-// lowHPNotice, which every writer reaches after it releases vitalsMu
-// (SettleRegen runs it). The caller holds vitalsMu.
+// lowHPNotice, which SettleRegen runs after vitalsMu is released. A writer
+// that reports its own status reaches it after that report. AddHP, SetHP and
+// ReduceCurrentHP leave it to their caller's status report (BroadcastStatus),
+// so the event follows the StatusUpdate, as a reported HP write raises it.
+// The caller holds vitalsMu.
 func (c *Character) writeHPLocked(hp float64) {
 	c.curHP = hp
 	c.hpWritten.Store(true)
@@ -57,6 +68,20 @@ func (c *Character) lowHPNotice() {
 		return
 	}
 	if res := c.ResourceValues(); res.CurrentHP/res.MaxHP < lowHPRatio {
+		c.NotifyTutorial(tutorialLowHP)
+	}
+}
+
+// NotifyRestoredHP raises tutorialLowHP when hp, the HP c's selection
+// restored, is below lowHPRatio of c's maximum HP, dead or not. Restoring
+// the saved HP measures it against the maximum the restored equipment and
+// effects make, so it runs once both apply. Its caller keeps the tutorial's
+// answer from the client; the journal writes stay.
+func (c *Character) NotifyRestoredHP(hp float64) {
+	if c.tutorial == nil {
+		return
+	}
+	if maxHP := c.ResourceValues().MaxHP; min(hp, maxHP)/maxHP < lowHPRatio {
 		c.NotifyTutorial(tutorialLowHP)
 	}
 }
@@ -103,15 +128,17 @@ func (c *Character) Memos() *memo.Memos {
 	return &c.memos
 }
 
-// DieFromDamage runs Die for HP damage that emptied c's HP, then, outside
-// the Olympiad, hands c's tutorial quest the death event. It reports
-// whether this call killed c.
+// DieFromDamage runs Die for HP damage that emptied c's HP, then hands c's
+// tutorial quest the death event. A competitor of an Olympiad match only
+// falls (fallInOlympiad): no death sequence and no tutorial event. It
+// reports whether this call killed c.
 func (c *Character) DieFromDamage(killer attackable.Combatant) bool {
+	if c.OlympiadMode() {
+		return c.fallInOlympiad()
+	}
 	if !c.Die(killer) {
 		return false
 	}
-	if !c.OlympiadMode() {
-		c.NotifyTutorial(tutorialDied)
-	}
+	c.NotifyTutorial(tutorialDied)
 	return true
 }

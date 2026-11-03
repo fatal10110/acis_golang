@@ -61,11 +61,27 @@ func (n *Npcs) placeStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 	if heading < 0 {
 		heading = rnd.Get(65536)
 	}
-	return n.spawnStandalone(tmpl, x, y, z, heading, summoner)
+	return n.spawnStandalone(tmpl, x, y, z, heading, 0, summoner, 0, 0)
+}
+
+// SpawnForClan places one NPC of template npcID at (x, y, z) facing
+// heading, on the ground below it, as a standalone spawn that never
+// respawns, belonging to the clan clanID: it stands for that clan before
+// any residence it serves. A negative heading faces a random way.
+func (n *Npcs) SpawnForClan(npcID int32, x, y, z, heading int, clanID int32) (attackable.Combatant, error) {
+	tmpl, ok := n.templates.Get(int(npcID))
+	if !ok {
+		return nil, fmt.Errorf("%w: %d", npc.ErrNoTemplate, npcID)
+	}
+	if heading < 0 {
+		heading = rnd.Get(65536)
+	}
+	return n.spawnStandalone(tmpl, x, y, z, heading, 0, nil, 0, clanID)
 }
 
 // CreatePrivate places one NPC of template npcID as a private of master
-// and returns it. The private stands around master, as a private of a
+// and returns it. Either may be a hostile or a civilian NPC. The private
+// stands around master, as a private of a
 // spawn list entry does, or at *at facing heading when at is set, on the
 // ground below it. Its script memory starts with params as its three spawn
 // parameters. It never respawns on its own: a script brings it back
@@ -73,9 +89,9 @@ func (n *Npcs) placeStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 // left the world by then.
 //
 // A private follows its master: it is deleted with it, and one that cannot
-// respawn leaves master's privates when it decays. Only a hostile private
-// can be placed yet (#3530); any other reports ErrNotPlaceable.
-func (n *Npcs) CreatePrivate(master *npc.Hostile, npcID int32, at *location.Location, heading int, despawn time.Duration, params [3]int32) (*npc.Hostile, error) {
+// respawn leaves master's privates when it decays. A template that spawns
+// as neither kind reports ErrNotPlaceable.
+func (n *Npcs) CreatePrivate(master npc.PartyMember, npcID int32, at *location.Location, heading int, despawn time.Duration, params [3]int32) (npc.PartyMember, error) {
 	tmpl, ok := n.templates.Get(int(npcID))
 	if !ok {
 		return nil, fmt.Errorf("%w: %d", npc.ErrNoTemplate, npcID)
@@ -89,7 +105,7 @@ func (n *Npcs) CreatePrivate(master *npc.Hostile, npcID int32, at *location.Loca
 // point its declaration gives. master first forgets the privates it had;
 // they stay in the world. A declaration naming an NPC id no template has
 // stops the placement with an error, the privates before it placed.
-func (n *Npcs) CreatePrivates(master *npc.Hostile) error {
+func (n *Npcs) CreatePrivates(master npc.PartyMember) error {
 	privates := n.privatesOf(master)
 	if len(privates) == 0 {
 		return nil
@@ -111,15 +127,18 @@ func (n *Npcs) CreatePrivates(master *npc.Hostile) error {
 
 // privatesOf returns the privates master's spawn entry declares, or its
 // template's when the entry declares none.
-func (n *Npcs) privatesOf(master *npc.Hostile) []spawn.Private {
+func (n *Npcs) privatesOf(master npc.PartyMember) []spawn.Private {
 	n.mu.Lock()
 	key := n.live[master.ObjectID()]
-	entry := n.slot[key].entry
-	n.mu.Unlock()
-	if len(entry.Privates) > 0 {
-		return entry.Privates
+	var privates []spawn.Private
+	if entry := n.slot[key].entry; entry != nil {
+		privates = entry.Privates
 	}
-	declared := master.Instance.Template.Privates
+	n.mu.Unlock()
+	if len(privates) > 0 {
+		return privates
+	}
+	declared := master.Template().Privates
 	out := make([]spawn.Private, 0, len(declared))
 	for _, p := range declared {
 		out = append(out, spawn.Private{NPCID: int32(p.NpcID), Weight: p.Weight, RespawnDelay: p.RespawnDelay})
@@ -129,32 +148,31 @@ func (n *Npcs) privatesOf(master *npc.Hostile) []spawn.Private {
 
 // createPrivate places one private of tmpl for master under a slot of its
 // own that respawns after respawn, when a script asks it to.
-func (n *Npcs) createPrivate(master *npc.Hostile, tmpl *npc.Template, at *location.Location, heading int, despawn time.Duration, params [3]int32, respawn time.Duration) (*npc.Hostile, error) {
+func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *location.Location, heading int, despawn time.Duration, params [3]int32, respawn time.Duration) (npc.PartyMember, error) {
 	if master == nil {
 		return nil, fmt.Errorf("%w: npc %d has no master", ErrNotPlaceable, tmpl.ID)
 	}
-	if probe := (&npc.Instance{Template: tmpl}); npc.FolkKind(probe) || !npc.Attackable(probe) {
-		return nil, fmt.Errorf("%w: private npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
-	}
 
-	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
-	slot := slotInfo{entry: entry, masterID: master.ObjectID(), tmpl: tmpl, scripted: true, memory: newSlotMemory(entry)}
+	entry := &spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
+	slot := slotInfo{entry: entry, master: master, tmpl: tmpl, scripted: true, memory: newSlotMemory(entry, nil)}
 	for i, p := range params {
 		slot.memory.scratch.SetInt(npc.IntParam1+npc.IntSlot(i), p)
 	}
-	slot.key = fmt.Sprintf("private#%d", n.fixedSeq.Add(1))
-	n.mu.Lock()
-	n.slot[slot.key] = slot
-	n.mu.Unlock()
-
 	loc, face := n.privateSpawnLocation(master, tmpl), master.Heading()
 	if at != nil {
+		// A private created at a point respawns there too.
 		loc, face = location.Location{X: at.X, Y: at.Y, Z: int(n.geo.Height(at.X, at.Y, at.Z))}, heading
+		slot.placed, slot.at, slot.heading = true, loc, face
 	}
-	private, _ := n.instantiate(slot.key, entry, tmpl, loc, face, fullHP, fullMP, master).(*npc.Hostile)
+	slot.key, slot.seq = n.newSlotID(), n.fixedSeq.Add(1)
+	n.mu.Lock()
+	n.addSlotLocked(slot)
+	n.mu.Unlock()
+
+	private, _ := n.instantiate(slot.key, *entry, tmpl, loc, face, fullHP, fullMP, master).(npc.PartyMember)
 	if private == nil {
 		n.mu.Lock()
-		delete(n.slot, slot.key)
+		n.dropSlotLocked(slot.key)
 		n.mu.Unlock()
 		return nil, fmt.Errorf("%w: private npc %d", ErrNotPlaceable, tmpl.ID)
 	}

@@ -1,0 +1,26 @@
+# WarriorCastDDMagic (20037, Mana Seeker, level 18, DD magic 4039-1), every draw 0 and its skills never
+# landing: the first hit arms its 2001 timer (i_ai1); the second, by the creature it hates most, marks
+# the next tick to cast nothing (i_ai2) and wants its DD magic on the attacker (1000000). A clan
+# member 400 away wants it too when told of a hit, once settled.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagic
+npc seeker 20037 Monster 300 0 0 level 18 skill DD_MAGIC 4039 1 clan npc_clan_20037 300
+npc mate 20037 Monster 400 0 0 level 18 skill DD_MAGIC 4039 1 clan npc_clan_20037 300
+roll seeker 99
+roll mate 99
+
+tick x8
+hit seeker 10
+  S MagicSkillUse caster=mate target=player skill=4039-1 hit=10571 reuse=21142 success=0
+  mem seeker i_ai1=1 i_ai2=0
+  desires mate attack(player)=40 cast(player,4039,move)=1000000 wander()=5
+hit seeker 10
+  mem seeker i_ai1=1 i_ai2=1
+  desires seeker attack(player)=160 cast(player,4039,move)=1000000 wander()=5
+advance 5s
+  mem seeker i_ai1=1 i_ai2=0

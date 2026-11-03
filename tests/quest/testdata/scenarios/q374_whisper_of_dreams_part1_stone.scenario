@@ -1,0 +1,67 @@
+# Whisper of Dreams, Part 1 (Q374), a character holding the sealed stone goes to Torai, who opens it. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q374_whisper_of_dreams_part1_stone.golden
+character Whisper 56
+quest Q374_WhisperOfDreams_Part1 <cond>=1 <state>=STARTED condStone=1
+hold 5886 1
+script quest.Q374_WhisperOfDreams_Part1
+item 57 5884 5885 5886 5887 5486 5487 5488 5485 5489
+page trainer/30515.htm
+page default/30557.htm
+page script/quest/Q374_WhisperOfDreams_Part1/
+npc manakia 30515 Trainer 10 0 0
+npc torai 30557 Folk 20 0 0
+npc beast 20620 Monster 40 0 0
+npc wave 20621 Monster 50 0 0
+
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S QuestList 374:0x80000003
+  S ExShowQuestMark quest=374
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q374_WhisperOfDreams_Part1/30515-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q374_WhisperOfDreams_Part1 | <cond> | 2
+  rows Q374_WhisperOfDreams_Part1 <cond>=2 <state>=STARTED condStone=1
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q374_WhisperOfDreams_Part1/30515-10.htm
+  S ActionFailed
+  S ActionFailed
+action torai
+action torai
+  S ActionFailed
+  S NpcHtmlMessage obj=torai item=0 page=default/30557.htm
+  S ActionFailed
+bypass npc_{torai}_Quest
+  S NpcHtmlMessage obj=torai item=0 page=script/quest/Q374_WhisperOfDreams_Part1/30557-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q374_WhisperOfDreams_Part1 30557-02.htm
+  S QuestList 374:0x80000007
+  S ExShowQuestMark quest=374
+  S SystemMessage id=302 3:5886
+  S SystemMessage id=54 3:5887
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=torai item=0 page=script/quest/Q374_WhisperOfDreams_Part1/30557-02.htm
+  S ActionFailed
+  Q upsert Q374_WhisperOfDreams_Part1 | <cond> | 3
+  rows Q374_WhisperOfDreams_Part1 <cond>=3 <state>=STARTED condStone=1
+  items 5886=0 5887=1
+action torai
+  S ActionFailed
+  S NpcHtmlMessage obj=torai item=0 page=default/30557.htm
+  S ActionFailed
+bypass npc_{torai}_Quest
+  S NpcHtmlMessage obj=torai item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q374_WhisperOfDreams_Part1 <cond>=3 <state>=STARTED condStone=1

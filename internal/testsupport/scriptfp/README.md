@@ -10,7 +10,11 @@ V1 and the proof batch). It holds:
   the Go name `apimap.txt` gives it.
 - `apimap.txt`: the hand-kept Go name of each census row. It starts empty; a slice that
   builds the Go call for a row adds the row. The script-facing API is frozen when the
-  census has no unmapped row.
+  census has no unmapped row. A row marked `exempt` does not count: the freeze leaves it
+  out because only siegable-hall classes make it (`ExemptCaller`: the siegable-hall
+  scripts and behaviors, the AgitWarrior subtree, Q504 and Q655). The hall port (#3502,
+  with the hall siege runtime of #244) gives those rows their Go names.
+  `TestCommittedGoldensAreConsistent` fails when any other class makes an exempt call.
 - `Check`: compares a Go script package with the fingerprints of the classes it ports.
 
 Fingerprints are read from source text. Nothing is compiled or run.
@@ -51,7 +55,10 @@ class <key> [extends <parent>]      key: path below scripting/, '.'-separated, a
 - **Calls**: a call whose declaration is in a reference class outside the script trees.
   Receivers are typed statically: parameters, locals, fields, casts, pattern variables,
   the return types of reference methods, and the elements of library collections and maps
-  (for-each variables and lambda parameters included). A row is `Owner.method`, with the
+  (for-each variables and lambda parameters included). A method type variable that a class
+  literal argument binds is that class, for the call's result and for the parameters of a
+  lambda passed as a library functional interface over it
+  (`getKnownTypeInside(Player.class, p -> ...)` walks players). A row is `Owner.method`, with the
   declaring class (`WorldObject.getObjectId` for a player's object id); `Owner.new` for a
   constructor. A method inherited from a library class is counted on the reference class
   that extends it (`MemoSet.get` for a quest state's variable). Calls to library (JDK)
@@ -71,11 +78,12 @@ shapes.
 ## census.golden
 
 ```
-classes <n> sites <n> rows <n> mapped <n> inline <n> unmapped <n> unresolved <n>
-call <row> classes <n> sites <n> go <Go name>|inline|-
+classes <n> sites <n> rows <n> mapped <n> inline <n> exempt <n> unmapped <n> unresolved <n>
+call <row> classes <n> sites <n> go <Go name>[,<Go name>...]|inline|exempt|-
 ```
 
-`-` marks an unmapped row; `?.` rows are the calls the extractor could not resolve.
+`-` marks an unmapped row; `exempt` a row the freeze leaves out (`Check` reports it as a
+problem for a package that ports a class making it); `?.` rows are the calls the extractor could not resolve.
 
 ## Check
 
@@ -89,7 +97,9 @@ A family package names every class it ports; their fingerprints are compared as 
 
 - a number, string or char literal on one side only;
 - a call of the classes with no `apimap.txt` row, or whose Go name the package never
-  calls (matched on the name after its last `.`); a call mapped from a `Quest` helper row
+  calls (matched on the name after its last `.`). A row whose overloads are separate Go
+  calls lists them comma-separated (`DoorData.getDoor script.Script.Door,script.Script.DoorByID`),
+  and a call of any of them matches; a call mapped from a `Quest` helper row
   that none of the classes makes;
 - an `on*` hook whose name or shape differs. The Go hook is the `OnX` field of a `Hooks`
   composite literal (a function literal or a package function), named `onX` except

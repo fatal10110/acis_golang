@@ -30,8 +30,9 @@ const staleThreatAge = 90 * time.Second
 // stale-hate sweep after an arrival that found the owner outside territory.
 const ootSweepInitialDelay = 100 * time.Millisecond
 
-// ootSweepPeriod is the interval between later out-of-territory stale-hate
-// sweeps. In-territory firings skip the sweep but keep this phase.
+// ootSweepPeriod is the fixed rate of the later out-of-territory stale-hate
+// sweeps. A firing that finds the owner in territory skips its sweep but
+// keeps this phase.
 const ootSweepPeriod = 10 * time.Second
 
 // AttackableActor is the actor state used by the hostile NPC intention loop.
@@ -52,13 +53,9 @@ type AttackableActor interface {
 	// observers still see the actor face its target.
 	BroadcastMoveToPawn(target attackable.Combatant)
 
-	// IdleFollowTarget is the master an escorting NPC follows when idle; nil
-	// when it escorts no one.
-	IdleFollowTarget() attackable.Combatant
 	// ThinkFollow runs one escort-follow step and reports whether the follow
 	// desire should be cleared.
 	ThinkFollow(target attackable.Combatant, lastWasFollow bool) (clearDesire bool)
-	ShouldIdleWander() bool
 	ForceWalkStance()
 	ForceRunStance()
 	RestoreSpawnHeadingIfAtHome()
@@ -69,7 +66,8 @@ type AttackableActor interface {
 	Now() time.Time
 	// After runs fn as a task on the actor's queue once d has elapsed on
 	// that clock, unless the returned timer is stopped first. The wander
-	// chain's firings use it.
+	// chain's firings and the out-of-territory stale-hate sweep use it; the
+	// queue closing when the actor leaves the world cancels both.
 	After(d time.Duration, fn func()) Timer
 	// AtHookPoint gives the behavior bound to the actor's template its turn
 	// at p, on the goroutine that reached p, with the AI loop unlocked (see
@@ -80,6 +78,20 @@ type AttackableActor interface {
 	AISleeping() bool
 	// SocialAction shows observers the actor playing social animation id.
 	SocialAction(id int)
+	// InWorld reports whether target is still in the world: an object that
+	// left it (a logged-out player, a decayed NPC) is a lost target even for
+	// a cast that does not need the actor to know it.
+	InWorld(target attackable.Combatant) bool
+	// PickUpTarget returns where the ground item itemObjectID lies, ok
+	// false once the actor can no longer pick it up: it left the world or
+	// the ground, or the actor does not know it.
+	PickUpTarget(itemObjectID int32) (at location.Location, ok bool)
+	// PickUp picks up the ground item itemObjectID: it takes the item
+	// before any other pickup can, gives the behavior bound to the actor's
+	// template its picked-item turn, then takes the item out of the world.
+	// The AI loop is unlocked for the call. It reports false, having done
+	// nothing, when the item is gone or another pickup holds it.
+	PickUp(itemObjectID int32) bool
 }
 
 // Timer is a pending one-shot task armed by AttackableActor.After.
@@ -102,6 +114,16 @@ type MoveController interface {
 	Stop()
 }
 
+// AttackableMoveController is the MoveController of a hostile NPC's AI
+// loop, which also walks to ground items.
+type AttackableMoveController interface {
+	MoveController
+	// MoveStraightToLocation walks straight for a point with path-finding
+	// off: a closed line ends the walk blocked instead of being routed
+	// around.
+	MoveStraightToLocation(location.Location) (bool, error)
+}
+
 // AttackController controls attack requests emitted by the AI loop.
 type AttackController interface {
 	BowCoolingDown() bool
@@ -117,6 +139,29 @@ type AttackController interface {
 // promoted.
 type hitAnimationReporter interface {
 	InHitAnimation() bool
+}
+
+// CombatParts builds the combat-only controllers of an NPC, each the first
+// time the NPC needs it, so an NPC nobody fights holds none. Each call
+// returns a new controller wired to the NPC's queue and event sink, with no
+// work scheduled; one built by a goroutine that loses the race to publish
+// it is dropped unused.
+type CombatParts interface {
+	NewAttack() AttackController
+	// NewCast returns nil for an NPC with no cast runtime.
+	NewCast() CastController
+}
+
+// attackControl is a published attack controller and its hit-animation
+// report, nil when it does not track one.
+type attackControl struct {
+	ctl          AttackController
+	hitAnimation hitAnimationReporter
+}
+
+func newAttackControl(ctl AttackController) *attackControl {
+	hit, _ := ctl.(hitAnimationReporter)
+	return &attackControl{ctl: ctl, hitAnimation: hit}
 }
 
 // CastController controls skill-cast requests emitted by the AI loop,
@@ -172,13 +217,17 @@ type intention struct {
 	ctrl bool
 	// loc is a walk's destination, or where a flee started.
 	loc location.Location
+	// standing and heading mark a walk's destination as a creature's
+	// position or spawn point (Desire.Standing).
+	standing bool
+	heading  int
 	// timer is a wander's chain period in seconds, or a social's hold in
 	// milliseconds.
 	timer int
 	// distance is how far a flee runs from its start.
 	distance int
-	// socialID is a social's animation id.
-	socialID int32
+	// itemObjectID is a pick-up's item, or a social's animation id.
+	itemObjectID int32
 	// moveToTarget is an attack or cast intention's desire to close in on
 	// its target; every other kind never moves toward one.
 	moveToTarget bool
@@ -202,21 +251,27 @@ type intention struct {
 // A pass releases mu at each HookPoint, so another entry point may run a
 // whole pass there; the pass re-reads what mu guards after each point.
 type Attackable struct {
-	actor  AttackableActor
-	move   MoveController
-	attack AttackController
-	// hitAnimation is attack's hit-animation report, nil when attack does
-	// not track one.
-	hitAnimation hitAnimationReporter
-	threats      *attackable.ThreatTable
-	hates        *attackable.HateTable
-	desires      *DesireQueue
+	actor AttackableActor
+	move  AttackableMoveController
+	// parts builds the attack and cast controllers on first use; nil for
+	// a loop handed its attack controller (and its cast one, if any).
+	parts CombatParts
+	// attack, threats, hates and desires are built on first use and
+	// published once by compare-and-swap, whichever goroutine needs one
+	// first: an attacker's hit reaches them from the attacker's queue.
+	// Until then each is nil, and a read sees an empty one. None is
+	// released again.
+	attack  atomic.Pointer[attackControl]
+	threats atomic.Pointer[attackable.ThreatTable]
+	hates   atomic.Pointer[attackable.HateTable]
+	desires atomic.Pointer[DesireQueue]
 	// route is the walker route route desires walk, nil for none; set once
 	// before the actor is published.
 	route Route
 
 	// cast is read without mu so AbortAll can run from inside the think
-	// loop, which holds mu (a return-home teleport aborts the actor).
+	// loop, which holds mu (a return-home teleport aborts the actor). A loop
+	// with parts builds it on first use, as attack.
 	cast atomic.Pointer[CastController]
 
 	// currentMovesToTarget mirrors current.moveToTarget for the movement
@@ -227,12 +282,18 @@ type Attackable struct {
 	current intention
 	next    intention
 	step    int
-	// ootSweep is armed only by Arrived while the owner is out of territory
-	// and cancelled by Arrived back in territory. Tick never arms or
-	// cancels it, so a stationary out-of-territory mob does not decay hate
-	// and a brief in-territory tick does not reset the sweep phase.
-	ootSweep     bool
-	nextOOTSweep time.Time
+	// territory is the actor's out-of-territory state, kept across its
+	// lives: whether its last arrival was outside its territory, and the
+	// deadline of the out-of-territory stale-hate sweep's next firing on its
+	// fixed-rate grid. The first such arrival arms the sweep, and only an
+	// arrival back in territory ends it. ootSweep is this life's pending
+	// firing (nil for none), and ootSeq the generation a firing must match
+	// to run. The sweep runs on the actor's queue, apart from the AI task: a
+	// stationary actor out of territory never arms it, and an inactive
+	// region does not stall it.
+	territory *TerritoryMemory
+	ootSweep  Timer
+	ootSeq    uint64
 	// lastKind is the intention kind Think was running before the latest
 	// promote, used so escort follow can tell a fresh FOLLOW from a
 	// continuing one.
@@ -247,6 +308,10 @@ type Attackable struct {
 	// reports that no periodic pass has consumed it yet.
 	tickStep int
 	ticked   bool
+	// cycleDecayDue reports that the latest Tick reached every third step:
+	// that cycle's hate refresh and weight decay run once its periodic pass
+	// has selected, so they shape the next cycle's selection, not this one's.
+	cycleDecayDue bool
 	// onRoute reports that the actor walks its route: a route intention
 	// stepped since the AI last took up another desire.
 	onRoute bool
@@ -267,6 +332,11 @@ type Attackable struct {
 	// is set the empty-queue idle waits. kind is IntentionIdle when unset.
 	// A respawn builds a new loop, so it starts unset.
 	latched intention
+	// topDesireTarget is the final target of the desire desire selection
+	// last took up, nil for a desire with none. Only the periodic cycle's
+	// empty-queue idle clears it; the event idle and a desire leaving the
+	// queue leave it as it is.
+	topDesireTarget attackable.Combatant
 	// wanderTask is the wander chain's pending firing, nil when no chain
 	// runs. The chain is a self-rescheduling task on the actor's queue,
 	// independent of desire selection: each firing rolls randomWalkRate,
@@ -291,22 +361,59 @@ type Attackable struct {
 	lifeTime atomic.Int32
 }
 
-// NewAttackable builds an idle hostile NPC AI loop.
-func NewAttackable(actor AttackableActor, move MoveController, attack AttackController) *Attackable {
-	a := &Attackable{
+// NewAttackable builds an idle hostile NPC AI loop driving attack.
+func NewAttackable(actor AttackableActor, move AttackableMoveController, attack AttackController) *Attackable {
+	a := newAttackable(actor, move)
+	a.attack.Store(newAttackControl(attack))
+	return a
+}
+
+// NewAttackableWithParts builds an idle hostile NPC AI loop whose attack
+// and cast controllers parts builds the first time the loop needs each.
+func NewAttackableWithParts(actor AttackableActor, move AttackableMoveController, parts CombatParts) *Attackable {
+	a := newAttackable(actor, move)
+	a.parts = parts
+	return a
+}
+
+func newAttackable(actor AttackableActor, move AttackableMoveController) *Attackable {
+	return &Attackable{
 		actor:          actor,
 		move:           move,
-		attack:         attack,
-		hates:          attackable.NewHateTable(actor),
-		desires:        NewDesireQueue(),
 		current:        intention{kind: IntentionIdle},
 		now:            actor.Now,
 		randomWalkRate: defaultRandomWalkRate,
 		roll:           rnd.Get,
 	}
-	a.hitAnimation, _ = attack.(hitAnimationReporter)
-	a.threats = attackable.NewThreatTable(actor, func() time.Time { return a.now() })
-	return a
+}
+
+// attackController returns the attack controller, building it first when
+// none exists yet; nil when the loop has none and nothing to build one.
+func (a *Attackable) attackController() AttackController {
+	if c := a.attack.Load(); c != nil {
+		return c.ctl
+	}
+	if a.parts == nil {
+		return nil
+	}
+	a.attack.CompareAndSwap(nil, newAttackControl(a.parts.NewAttack()))
+	return a.attack.Load().ctl
+}
+
+// builtAttack returns the attack controller, nil while none exists: an NPC
+// that never attacked has no swing to stop, track or cool down.
+func (a *Attackable) builtAttack() AttackController {
+	if c := a.attack.Load(); c != nil {
+		return c.ctl
+	}
+	return nil
+}
+
+// stopAttack aborts the attack in flight, if any.
+func (a *Attackable) stopAttack() {
+	if c := a.builtAttack(); c != nil {
+		c.Stop()
+	}
 }
 
 // SetRandomWalkRate records npcs.properties RandomWalkRate for subsequent
@@ -351,37 +458,70 @@ func (a *Attackable) SetCastController(controller CastController) {
 // order. Intentions and desires are left as they are: the crowd-control
 // state that asked for the abort keeps the think loop from acting on them.
 func (a *Attackable) AbortAll() {
-	cast := a.CastController()
+	cast := a.CastControllerIfBuilt()
 	a.move.Stop()
-	a.attack.Stop()
+	a.stopAttack()
 	if cast != nil {
 		cast.Stop()
 	}
 }
 
 // StopAttack stops the attack cycle; intentions are left as they are.
-func (a *Attackable) StopAttack() { a.attack.Stop() }
+func (a *Attackable) StopAttack() { a.stopAttack() }
 
-// CastController returns the currently wired skill-cast handler, or nil if
-// none was set. Exposed alongside Threats/Hates/Desires so tests can drive
-// or inspect the cast wiring directly instead of through full aggro
-// decision-making.
+// CastController returns the skill-cast handler, building it first when
+// the loop's parts build one and none exists yet; nil when there is none.
+// Exposed alongside Threats/Hates/Desires so tests can drive or inspect the
+// cast wiring directly instead of through full aggro decision-making.
 func (a *Attackable) CastController() CastController {
+	if cast := a.CastControllerIfBuilt(); cast != nil || a.parts == nil {
+		return cast
+	}
+	built := a.parts.NewCast()
+	if built == nil {
+		return nil
+	}
+	a.cast.CompareAndSwap(nil, &built)
+	return *a.cast.Load()
+}
+
+// CastControllerIfBuilt is CastController without building one: nil while
+// none exists, as for an NPC that never needed to cast and so has no cast
+// in flight to report, stop or break.
+func (a *Attackable) CastControllerIfBuilt() CastController {
 	if cast := a.cast.Load(); cast != nil {
 		return *cast
 	}
 	return nil
 }
 
-// Threats returns the physical-attack threat table.
+// Threats returns the physical-attack threat table, building it first when
+// none exists yet.
 func (a *Attackable) Threats() *attackable.ThreatTable {
-	return a.threats
+	if t := a.threats.Load(); t != nil {
+		return t
+	}
+	a.threats.CompareAndSwap(nil, attackable.NewThreatTable(a.actor, func() time.Time { return a.now() }))
+	return a.threats.Load()
 }
 
-// Hates returns the skill-cast hate table.
+// ThreatsIfBuilt is Threats without building one: nil, an empty table,
+// until the first threat.
+func (a *Attackable) ThreatsIfBuilt() *attackable.ThreatTable { return a.threats.Load() }
+
+// Hates returns the skill-cast hate table, building it first when none
+// exists yet.
 func (a *Attackable) Hates() *attackable.HateTable {
-	return a.hates
+	if h := a.hates.Load(); h != nil {
+		return h
+	}
+	a.hates.CompareAndSwap(nil, attackable.NewHateTable(a.actor))
+	return a.hates.Load()
 }
+
+// HatesIfBuilt is Hates without building one: nil, an empty table, until
+// the first hate.
+func (a *Attackable) HatesIfBuilt() *attackable.HateTable { return a.hates.Load() }
 
 // Desires returns the queue of weighted candidate intentions. Attack threat
 // populates it automatically; a Cast desire is queued by whatever decides
@@ -390,34 +530,20 @@ func (a *Attackable) Hates() *attackable.HateTable {
 // queued desire currently outweighs the rest. Think only continues the
 // current intention and never takes a queued desire up.
 func (a *Attackable) Desires() *DesireQueue {
-	return a.desires
+	if q := a.desires.Load(); q != nil {
+		return q
+	}
+	a.desires.CompareAndSwap(nil, NewDesireQueue())
+	return a.desires.Load()
 }
+
+// DesiresIfBuilt is Desires without building one: nil, an empty queue,
+// until the first desire.
+func (a *Attackable) DesiresIfBuilt() *DesireQueue { return a.desires.Load() }
 
 // AddDamageHate records an attacker in the physical threat table.
 func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
-	a.threats.AddDamage(attacker, damage, hate)
-}
-
-// AddCombatDamageHate records attacker's raw combat damage in the physical
-// threat table at zero hate weight — hate is never derived from damage
-// dealt here. weight is the ATTACKED-event attack Desire queued alongside
-// it, which feeds its own hate into the same threat table (see
-// addAttackDesireWithMove) — a separate attack-desire add made by the NPC's
-// assigned individual AI script when it is attacked (e.g. the Warrior
-// script).
-// That per-script formula lives in the domain layer (see
-// Hostile.attackedHateWeight), not here: this generic AI plumbing only
-// applies whatever weight it is given. When the threat table had no
-// most-hated attacker, the AI loop runs immediately so the first reaction
-// does not wait for the next tick.
-func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage, weight float64) {
-	_, hadMostHated := a.threats.MostHated()
-	a.threats.AddDamage(attacker, damage, 0)
-	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
-		return
-	}
-	a.addAttackDesire(attacker, weight)
-	a.thinkIfNoMostHated(hadMostHated, attacker)
+	a.Threats().AddDamage(attacker, damage, hate)
 }
 
 // AddAttackDesire queues an attack intention that closes on the target.
@@ -443,24 +569,10 @@ func (a *Attackable) queueAttackDesire(attacker attackable.Combatant, damage, ha
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
-	_, hadMostHated := a.threats.MostHated()
+	_, hadMostHated := a.threats.Load().MostHated()
 	a.queueAttackDesireOnly(attacker, hate, moveToTarget)
-	a.threats.AddDamage(attacker, damage, hate)
-	a.thinkIfNoMostHated(hadMostHated, attacker)
-}
-
-func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
-	a.addAttackDesireWithMove(attacker, hate, true)
-}
-
-// addAttackDesireWithMove queues the attack Desire and, since an attack
-// desire updates aggro by default (every public entry point here uses that
-// default; none use the no-aggro-update variant), feeds the same weight
-// into the physical threat table at zero extra damage — the paired
-// hate-list add.
-func (a *Attackable) addAttackDesireWithMove(attacker attackable.Combatant, hate float64, moveToTarget bool) {
-	a.queueAttackDesireOnly(attacker, hate, moveToTarget)
-	a.threats.AddDamage(attacker, 0, hate)
+	a.Threats().AddDamage(attacker, damage, hate)
+	a.thinkIfNoMostHated(hadMostHated)
 }
 
 // addAttackDesireNoAggro queues the attack Desire without touching the
@@ -473,7 +585,7 @@ func (a *Attackable) addAttackDesireNoAggro(attacker attackable.Combatant, hate 
 }
 
 func (a *Attackable) queueAttackDesireOnly(attacker attackable.Combatant, hate float64, moveToTarget bool) {
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:         IntentionAttack,
 		FinalTarget:  attacker,
 		Weight:       hate,
@@ -482,13 +594,8 @@ func (a *Attackable) queueAttackDesireOnly(attacker attackable.Combatant, hate f
 	})
 }
 
-const escortFollowWeight = 5
-
 // defaultWanderTimer is addWanderDesire's timer argument in seconds.
 const defaultWanderTimer = 5
-
-// defaultWanderWeight is addWanderDesire's weight argument.
-const defaultWanderWeight = 5
 
 // defaultRandomWalkRate is npcs.properties RandomWalkRate's shipped default.
 const defaultRandomWalkRate = 30
@@ -499,15 +606,22 @@ const defaultRandomWalkRate = 30
 // one whose move controller reports the destination unreachable, drops the
 // request.
 func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool {
-	if a.actor.MovementDisabled() || !a.move.CanMoveTo(loc) {
+	return a.addMoveToDesire(&Desire{Kind: IntentionMoveTo, Location: loc, Weight: weight})
+}
+
+// AddMoveToPositionDesire is AddMoveToDesire to a creature's position or
+// spawn point, facing heading: standing there, facing heading, the actor
+// finishes the walk without moving.
+func (a *Attackable) AddMoveToPositionDesire(loc location.Location, heading int, weight float64) bool {
+	return a.addMoveToDesire(&Desire{Kind: IntentionMoveTo, Location: loc, Standing: true, Heading: heading, Weight: weight})
+}
+
+func (a *Attackable) addMoveToDesire(d *Desire) bool {
+	if a.actor.MovementDisabled() || !a.move.CanMoveTo(d.Location) {
 		return false
 	}
-	a.desires.AddOrUpdate(&Desire{
-		Kind:     IntentionMoveTo,
-		Location: loc,
-		Weight:   weight,
-		QueuedAt: a.now(),
-	})
+	d.QueuedAt = a.now()
+	a.Desires().AddOrUpdate(d)
 	return true
 }
 
@@ -517,7 +631,7 @@ func (a *Attackable) AddFollowDesire(target attackable.Combatant, weight float64
 	if target == nil {
 		return
 	}
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:        IntentionFollow,
 		FinalTarget: target,
 		Weight:      weight,
@@ -529,12 +643,13 @@ func (a *Attackable) AddFollowDesire(target attackable.Combatant, weight float64
 func (a *Attackable) thinkIdle() { a.idleStep(true) }
 
 // idleStep aborts every action, switches to walk stance and opens the
-// no-desire point. toIdle also makes idle the current intention; the
-// periodic cycle's idle under a held selection leaves the current one.
+// no-desire point. toIdle also makes idle the current intention, as desire
+// selection's idle does; the periodic cycle's own idle leaves the current
+// one.
 func (a *Attackable) idleStep(toIdle bool) {
 	a.move.Stop()
-	a.attack.Stop()
-	if cast := a.CastController(); cast != nil {
+	a.stopAttack()
+	if cast := a.CastControllerIfBuilt(); cast != nil {
 		cast.Stop()
 	}
 	a.actor.ForceWalkStance()
@@ -544,34 +659,22 @@ func (a *Attackable) idleStep(toIdle bool) {
 	a.atHookPoint(HookNoDesire)
 }
 
-func (a *Attackable) queueIdleFollow() {
-	a.AddFollowDesire(a.actor.IdleFollowTarget(), escortFollowWeight)
-}
-
-func (a *Attackable) queueIdleWander() {
-	if !a.actor.ShouldIdleWander() {
-		return
-	}
-	a.AddWanderDesire(defaultWanderTimer, defaultWanderWeight)
-}
-
 func (a *Attackable) thinkFollow() error {
 	if a.passStep%2 == 0 {
 		return nil
 	}
 	if a.actor.ThinkFollow(a.current.target, a.lastKind == IntentionFollow) {
-		a.desires.Remove(IntentionFollow, a.current.target)
+		a.desires.Load().Remove(IntentionFollow, a.current.target)
 		a.setCurrent(intention{kind: IntentionIdle})
 	}
 	return nil
 }
 
 // thinkIfNoMostHated re-runs desire selection (RunAI) immediately for a
-// first attack desire. An attacker the actor does not know is skipped
-// because the attack step drops unknown targets, so an unseen target keeps
-// its queued desire for a later tick instead of being wiped here.
-func (a *Attackable) thinkIfNoMostHated(hadMostHated bool, attacker attackable.Combatant) {
-	if hadMostHated || attacker == nil || !a.actor.Knows(attacker) {
+// first attack desire, whoever it is aimed at: the selection's prune drops
+// the desire of an attacker the actor does not know.
+func (a *Attackable) thinkIfNoMostHated(hadMostHated bool) {
+	if hadMostHated {
 		return
 	}
 	_ = a.RunAI()
@@ -587,12 +690,12 @@ func (a *Attackable) RandomizeHate(valid func(attackable.Combatant) bool, pick f
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if !a.threats.RandomizeAttack(valid, pick) {
+	if !a.threats.Load().RandomizeAttack(valid, pick) {
 		return false
 	}
 
-	a.desires.RemoveKind(IntentionAttack)
-	for _, t := range a.threats.Snapshot() {
+	a.desires.Load().RemoveKind(IntentionAttack)
+	for _, t := range a.threats.Load().Snapshot() {
 		a.addAttackDesireNoAggro(t.Attacker, t.Hate)
 	}
 	return true
@@ -612,97 +715,85 @@ func (a *Attackable) ReconsiderTarget(inRange func(attackable.Combatant) bool, v
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	prev, chosen, ok := a.threats.ReconsiderTarget(inRange, valid)
+	prev, chosen, ok := a.threats.Load().ReconsiderTarget(inRange, valid)
 	if !ok {
 		return nil, false
 	}
 
 	if prev != nil {
-		a.desires.Remove(IntentionAttack, prev)
+		a.desires.Load().Remove(IntentionAttack, prev)
 	}
 	return chosen, true
 }
 
 // AddHate records an attacker in the skill-cast hate table.
 func (a *Attackable) AddHate(attacker attackable.Combatant, hate float64) {
-	a.hates.Add(attacker, hate)
+	a.Hates().Add(attacker, hate)
 }
 
 // AddDefaultHate records the default skill-cast hate for an attacker this
 // actor has noticed.
 func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
-	a.hates.AddDefault(attacker, a.actor.InTerritory())
+	a.Hates().AddDefault(attacker, a.actor.InTerritory())
 }
 
-// SetBackToPeace clears combat memory and cancels the current action, except
-// a walk on the actor's route, whose desire stays queued. It does not start a
-// return-home walk; an out-of-territory owner stays idle until a later Think
-// queues a new desire.
+// SetBackToPeace clears both hate tables. The desire queue, the current and
+// next intentions and movement stay as they are: queued attack desires decay
+// or are pruned on later passes, and every other desire stays until its own
+// rule removes it.
 func (a *Attackable) SetBackToPeace() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.setBackToPeaceLocked()
 }
 
-// StopAggroHate mirrors AggroList.stopHate: zeroes target's threat hate,
-// drops its queued attack desire, and returns to peace when neither hate
-// table still has a most-hated entry.
+// StopAggroHate zeroes target's threat hate, drops its queued attack desire,
+// and returns to peace when neither hate table still has a most-hated entry.
 func (a *Attackable) StopAggroHate(target attackable.Combatant) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.stopAggroHateLocked(target)
 }
 
-// ReduceAllAggroHate mirrors AggroList.reduceAllHate: subtracts amount from
-// every threat entry and returns to peace when neither hate table still has
-// a most-hated entry.
+// ReduceAllAggroHate subtracts amount from every threat entry and returns to
+// peace when neither hate table still has a most-hated entry.
 func (a *Attackable) ReduceAllAggroHate(amount float64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.reduceAllAggroHateLocked(amount)
 }
 
-// setBackToPeaceLocked ends combat. The route desire outlives it: an actor
-// walking its route walks on, and one that left its route for a fight goes
-// back to it on its next pass.
+// setBackToPeaceLocked ends combat memory: it clears both hate tables and
+// nothing else.
 func (a *Attackable) setBackToPeaceLocked() {
-	a.threats.Clear()
-	a.hates.Clear()
-	a.desires.RemoveIf(func(d *Desire) bool { return d.Kind != IntentionMoveRoute })
-	a.next = intention{}
-	a.stopWanderChain()
-	if a.current.kind == IntentionMoveRoute {
-		return
-	}
-	a.leaveRoute()
-	a.setCurrent(intention{kind: IntentionIdle})
-	a.move.Stop()
+	a.threats.Load().Clear()
+	a.hates.Load().Clear()
 }
 
 func (a *Attackable) maybeBackToPeaceLocked() {
-	if _, ok := a.threats.MostHated(); ok {
+	if _, ok := a.threats.Load().MostHated(); ok {
 		return
 	}
-	if _, ok := a.hates.MostHated(); ok {
+	if _, ok := a.hates.Load().MostHated(); ok {
 		return
 	}
 	a.setBackToPeaceLocked()
 }
 
 func (a *Attackable) stopAggroHateLocked(target attackable.Combatant) {
-	if target == nil || a.threats.IsEmpty() {
+	if target == nil || a.threats.Load().IsEmpty() {
 		return
 	}
-	a.threats.StopHate(target)
-	a.desires.Remove(IntentionAttack, target)
+	a.threats.Load().StopHate(target)
+	a.desires.Load().Remove(IntentionAttack, target)
 	a.maybeBackToPeaceLocked()
 }
 
 func (a *Attackable) reduceAllAggroHateLocked(amount float64) {
-	if a.threats.IsEmpty() {
+	if a.threats.Load().IsEmpty() {
 		return
 	}
-	a.threats.ReduceAllHate(amount)
+	a.threats.Load().ReduceAllHate(amount)
 	a.maybeBackToPeaceLocked()
 }
 
@@ -726,18 +817,23 @@ func (a *Attackable) setCurrent(next intention) {
 	a.currentMovesToTarget.Store(next.moveToTarget)
 }
 
-// TopDesireTarget is the creature the currently executing attack or cast
-// intention is aimed at. Idle and follow intentions have no top desire
-// target.
+// TopDesireTarget is the final target of the desire desire selection last
+// took up: the creature an attack, cast, flee or follow it took up is aimed
+// at, nil once it took up a desire with no target. It outlives that
+// desire and the event idle; the periodic cycle's empty-queue idle clears
+// it.
 func (a *Attackable) TopDesireTarget() attackable.Combatant {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	switch a.current.kind {
-	case IntentionAttack, IntentionCast:
-		return a.current.target
-	default:
-		return nil
-	}
+	return a.topDesireTarget
+}
+
+// SetTopDesireTarget replaces the top desire target until desire selection
+// next takes up a desire or the periodic cycle idles.
+func (a *Attackable) SetTopDesireTarget(target attackable.Combatant) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.topDesireTarget = target
 }
 
 // NextIntention returns the queued intention, if one exists.
@@ -773,7 +869,8 @@ const (
 // a control effect ending; an arrival does not think. It never selects a
 // queued desire, even from idle, follow or wander, and never idles a busy
 // actor on an empty queue: RunAI and TickThink do both. An actor already
-// idle repeats its idle step and opens the no-desire point. A walk an arrival
+// idle repeats its idle step and opens the no-desire point. An attack, cast
+// or walk steps whether or not its desire is still queued: a walk an arrival
 // finished is still current, so Think steps it again; a wander it finished
 // takes no step. A non-nil return
 // reports that an intention step ran but a broadcast within it failed; the
@@ -785,9 +882,10 @@ func (a *Attackable) Think() error {
 // RunAI re-runs desire selection on an event. After the first periodic
 // cycle, an actor that is not casting, has an empty desire queue and is
 // not idle aborts everything and goes idle; otherwise it makes the
-// heaviest queued desire current and steps it. An out-of-control actor
-// does neither, and neither runs while a social's hold or a flee holds the
-// selection (selectionHeld).
+// heaviest queued desire current and steps it. Before the first periodic
+// cycle it takes up nothing unless an ATTACK desire is queued. An
+// out-of-control actor does neither, and neither runs while a social's hold
+// or a flee holds the selection (selectionHeld).
 func (a *Attackable) RunAI() error {
 	return a.think(thinkEvent)
 }
@@ -806,6 +904,8 @@ func (a *Attackable) TickThink() error {
 // stepped a busy intention; one left idle, whether it was idle already or
 // the selection's empty-queue idle idled it, runs the idle step again, so
 // the no-desire point opens once more, and queues no idle follow or wander.
+// Before the first periodic cycle the selection takes up nothing unless an
+// ATTACK desire is queued, and the think steps the current intention.
 // An out-of-control actor selects nothing and takes that think as a
 // continue pass: a confused actor keeps swinging at its current target
 // while a stunned one does nothing.
@@ -823,18 +923,8 @@ func (a *Attackable) ClearCurrentDesire() {
 }
 
 func (a *Attackable) castingNow() bool {
-	cast := a.CastController()
+	cast := a.CastControllerIfBuilt()
 	return cast != nil && cast.CastingNow()
-}
-
-func (a *Attackable) canPromote(updateTick bool, instantRun bool) bool {
-	if a.castingNow() {
-		return false
-	}
-	if !updateTick {
-		return true
-	}
-	return a.lifeTime.Load() > 0 || instantRun
 }
 
 func (a *Attackable) think(mode thinkMode) error {
@@ -842,12 +932,16 @@ func (a *Attackable) think(mode thinkMode) error {
 	defer a.mu.Unlock()
 
 	updateTick := mode == thinkTick
+	if updateTick {
+		// Runs before mu is released, after the pass's selection and idle.
+		defer a.cycleDecayLocked()
+	}
 	// Only an actor idle when the pass starts repeats its idle step on a
 	// continue pass; one this pass drops to idle takes no step.
 	idleAtStart := a.current.kind == IntentionIdle
 	// The first-cycle promotion gate is decided before the see-creature
 	// point: an attack desire queued there does not open it.
-	instantRun := a.lifeTime.Load() == 0 && a.desires.hasKind(IntentionAttack)
+	instantRun := a.lifeTime.Load() == 0 && a.desires.Load().hasKind(IntentionAttack)
 	if updateTick {
 		a.atHookPoint(HookSeeCreature)
 	}
@@ -857,8 +951,11 @@ func (a *Attackable) think(mode thinkMode) error {
 		a.ticked = false
 	}
 	outOfControl := a.actor.OutOfControl()
-	a.refreshCombatMemory()
-	a.pruneDesires(outOfControl)
+	// Only desire selection's passes prune: the continue pass never reads
+	// the queue.
+	if mode != thinkContinue {
+		a.pruneDesires(outOfControl)
+	}
 	held := a.selectionHeld()
 	onEvent := mode == thinkEvent || mode == thinkAttackFinished
 	if onEvent && !outOfControl && !held && a.idleOnEmptyQueue() {
@@ -866,44 +963,51 @@ func (a *Attackable) think(mode thinkMode) error {
 		return nil
 	}
 	// busy is whether the actor is doing something as desire selection
-	// starts; an intention dropped below for its lost desire still counts.
+	// starts. Selection never idles an intention whose desire left the
+	// queue: only the empty-queue idle and a promotion change it.
 	busy := a.current.kind != IntentionIdle
-	if !outOfControl {
-		a.dropCurrentIfUnqueued(mode)
-	}
-	canPromote := a.canPromote(updateTick, instantRun)
+	notCasting := !a.castingNow()
+	// canSelect is the first-cycle gate on every selection pass, on an event
+	// as on the periodic cycle: nothing is taken up before the first cycle
+	// has run unless an ATTACK desire was queued as the pass started. It is
+	// read before the cycle counts itself.
+	canSelect := a.lifeTime.Load() > 0 || instantRun
 	// idleAfterLatch is the periodic cycle's empty-queue idle deferred past
 	// a latched attack: the latched step runs first and the idle then
 	// aborts it, as the cycle's idle does not wait for the latch.
 	idleAfterLatch := false
 	if updateTick {
 		idled := false
-		if _, ok := a.desires.Peek(); !ok && a.lifeTime.Load() > 0 && !a.castingNow() {
+		if _, ok := a.desires.Load().Peek(); !ok && a.lifeTime.Load() > 0 && !a.castingNow() {
 			switch {
 			case held:
 				// The cycle's idle does not wait for a held selection,
 				// but only the selection switches to idle.
 				a.idleStep(false)
-				a.queueIdleStandIns()
 				idled = true
 			case a.hasLatch():
 				idleAfterLatch = true
-			default:
+			case !outOfControl && busy:
 				// An in-control actor that is not idle yet is idled by
 				// the selection first; the cycle's own idle then runs
 				// again unless the first queued a desire, so the
 				// no-desire point opens twice.
-				again := !outOfControl && busy
 				a.thinkIdle()
-				a.queueIdleStandIns()
-				if _, ok := a.desires.Peek(); again && !ok {
+				if _, ok := a.desires.Load().Peek(); !ok {
 					a.idleStep(false)
 				}
+				idled = true
+			default:
+				// Only the selection switches to idle: an idle actor
+				// stays so, and an out-of-control one, which selects
+				// nothing, keeps its intention for when control returns.
+				a.idleStep(false)
 				idled = true
 			}
 		}
 		a.lifeTime.Add(1)
 		if idled {
+			a.topDesireTarget = nil
 			return nil
 		}
 	}
@@ -915,26 +1019,30 @@ func (a *Attackable) think(mode thinkMode) error {
 	// intention, as its think does not go through desire selection.
 	if outOfControl && mode != thinkContinue {
 		if idleAfterLatch {
-			a.idleAndRequeue()
+			a.idleStep(false)
+			a.topDesireTarget = nil
 		}
-		if mode == thinkAttackFinished && canPromote {
+		if mode == thinkAttackFinished && notCasting {
 			return a.continueCurrent(idleAtStart)
 		}
 		return nil
 	}
 	if mode == thinkContinue {
-		if !canPromote {
+		if !notCasting {
 			return nil
 		}
 		return a.continueCurrent(idleAtStart)
 	}
 	var err error
-	if canPromote && !held {
-		err = a.promoteAndStep()
+	if notCasting && !held {
+		// Before the first cycle the selection takes up nothing; a finished
+		// swing's own think still steps the current intention.
+		err = a.promoteAndStep(mode, canSelect)
 	}
 	if idleAfterLatch {
-		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
-			a.idleAndRequeue()
+		if _, ok := a.desires.Load().Peek(); !ok && !a.castingNow() {
+			a.idleStep(false)
+			a.topDesireTarget = nil
 		}
 	}
 	a.idleAfterFinishedAttack(mode, idleAtStart)
@@ -957,7 +1065,7 @@ func (a *Attackable) selectionHeld() bool {
 	if a.current.kind != IntentionFlee {
 		return false
 	}
-	return a.desires.anyMatch(func(d *Desire) bool {
+	return a.desires.Load().anyMatch(func(d *Desire) bool {
 		return d.Kind == IntentionFlee && sameCombatant(d.FinalTarget, a.current.target) &&
 			d.Location == a.current.loc && d.Distance == a.current.distance
 	})
@@ -965,30 +1073,12 @@ func (a *Attackable) selectionHeld() bool {
 
 // idleAfterFinishedAttack is the finished attack's think on an in-control
 // actor, after desire selection: an actor left idle runs the idle step
-// again, so the no-desire point opens, and queues no idle follow or wander.
+// again, so the no-desire point opens.
 // wasIdle reports that the actor was idle when the pass started or that the
-// selection's empty-queue idle idled it; an attack or cast the pass silently
-// dropped to idle was neither and takes no idle step.
+// selection's empty-queue idle idled it.
 func (a *Attackable) idleAfterFinishedAttack(mode thinkMode, wasIdle bool) {
 	if mode == thinkAttackFinished && wasIdle && a.current.kind == IntentionIdle {
 		a.thinkIdle()
-	}
-}
-
-// idleAndRequeue is the empty-queue idle: abort everything, go idle, and
-// queue the idle stand-ins.
-func (a *Attackable) idleAndRequeue() {
-	a.thinkIdle()
-	a.queueIdleStandIns()
-}
-
-// queueIdleStandIns queues, after the no-desire point, the idle follow,
-// else the idle wander: what an NPC no behavior is bound to does with
-// nothing to do. The actor refuses both when a behavior is bound to it.
-func (a *Attackable) queueIdleStandIns() {
-	a.queueIdleFollow()
-	if _, ok := a.desires.Peek(); !ok {
-		a.queueIdleWander()
 	}
 }
 
@@ -1009,82 +1099,83 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 			a.thinkIdle()
 		}
 	case IntentionAttack:
-		_, err := a.thinkAttack()
-		return err
+		return a.thinkAttack()
 	case IntentionCast:
-		_, err := a.thinkCast()
-		return err
+		return a.thinkCast()
 	case IntentionFollow:
 		return a.thinkFollow()
 	case IntentionMoveTo:
 		a.thinkMoveTo()
 	case IntentionMoveRoute:
 		a.thinkMoveRoute()
+	case IntentionPickUp:
+		a.thinkPickUp()
 	}
 	return nil
 }
 
 // promoteAndStep promotes the next desire and runs one step of the current
-// intention. A lost attack or cast target re-promotes at once, except for a
-// latched attack, which is the whole pass.
-func (a *Attackable) promoteAndStep() error {
-	for attempts := 0; attempts <= maxDesires; attempts++ {
-		latched, promoted := a.promoteNext()
-		switch a.current.kind {
-		case IntentionAttack:
-			again, err := a.thinkAttack()
-			if again && !latched {
-				continue
-			}
-			a.lastDesire = IntentionAttack
-			return err
-		case IntentionCast:
-			again, err := a.thinkCast()
-			if again {
-				continue
-			}
-			a.lastDesire = IntentionCast
-			return err
-		case IntentionFollow:
-			a.lastDesire = IntentionFollow
-			return a.thinkFollow()
-		case IntentionNothing:
-			// Doing nothing has no step: the actor keeps still while the
-			// desire outweighs the rest.
-			a.lastDesire = IntentionNothing
-		case IntentionFlee:
-			// A flee steps once, on the pass that promotes it; while its
-			// desire stays queued, the selection holds.
-			if !promoted {
-				return nil
-			}
-			a.thinkFlee()
-			a.lastDesire = IntentionFlee
-		case IntentionSocial:
-			if !promoted {
-				return nil
-			}
-			a.thinkSocial()
-			a.lastDesire = IntentionSocial
-		case IntentionWander:
-			// A wander steps only on the pass that promotes it; while it
-			// stays current, its chain fires on its own.
-			if !promoted || !a.currentQueued() {
-				return nil
-			}
-			a.thinkWander()
-			a.lastDesire = IntentionWander
-		case IntentionMoveTo:
-			if !a.currentQueued() {
-				return nil
-			}
-			a.thinkMoveTo()
-			a.lastDesire = IntentionMoveTo
-		case IntentionMoveRoute:
-			a.thinkMoveRoute()
-			a.lastDesire = IntentionMoveRoute
-		}
+// intention. A lost attack or cast target ends the step; the pass does not
+// re-select. With nothing promoted (see promoteNext), or selection closed
+// (canSelect false) before the first periodic cycle, the current intention
+// takes no step, except on a finished swing, whose own think steps it; that
+// think has no route-walk step.
+func (a *Attackable) promoteAndStep(mode thinkMode, canSelect bool) error {
+	promoted := canSelect && a.promoteNext()
+	if !promoted && mode != thinkAttackFinished {
 		return nil
+	}
+	switch a.current.kind {
+	case IntentionAttack:
+		a.lastDesire = IntentionAttack
+		return a.thinkAttack()
+	case IntentionCast:
+		a.lastDesire = IntentionCast
+		return a.thinkCast()
+	case IntentionFollow:
+		a.lastDesire = IntentionFollow
+		return a.thinkFollow()
+	case IntentionNothing:
+		// Doing nothing has no step: the actor keeps still while the
+		// desire outweighs the rest.
+		a.lastDesire = IntentionNothing
+	case IntentionFlee:
+		// A flee steps once, on the pass that promotes it; while its
+		// desire stays queued, the selection holds.
+		if !promoted {
+			return nil
+		}
+		a.thinkFlee()
+		a.lastDesire = IntentionFlee
+	case IntentionSocial:
+		if !promoted {
+			return nil
+		}
+		a.thinkSocial()
+		a.lastDesire = IntentionSocial
+	case IntentionWander:
+		// A wander steps only on the pass that promotes it; while it
+		// stays current, its chain fires on its own.
+		if !promoted || !a.currentQueued() {
+			return nil
+		}
+		a.thinkWander()
+		a.lastDesire = IntentionWander
+	case IntentionMoveTo:
+		if !a.currentQueued() {
+			return nil
+		}
+		a.thinkMoveTo()
+		a.lastDesire = IntentionMoveTo
+	case IntentionMoveRoute:
+		if !promoted {
+			return nil
+		}
+		a.thinkMoveRoute()
+		a.lastDesire = IntentionMoveRoute
+	case IntentionPickUp:
+		a.thinkPickUp()
+		a.lastDesire = IntentionPickUp
 	}
 	return nil
 }
@@ -1094,7 +1185,7 @@ func (a *Attackable) promoteAndStep() error {
 // queued desire, so one an arrival finished waits, still current, for the
 // idle or the next promotion instead of setting off again.
 func (a *Attackable) currentQueued() bool {
-	return a.desires.Has(&Desire{Kind: a.current.kind, Location: a.current.loc})
+	return a.desires.Load().Has(&Desire{Kind: a.current.kind, Location: a.current.loc})
 }
 
 // idleOnEmptyQueue runs the event-driven empty-queue idle: once the first
@@ -1106,16 +1197,17 @@ func (a *Attackable) idleOnEmptyQueue() bool {
 	if a.lifeTime.Load() == 0 || a.current.kind == IntentionIdle || a.hasLatch() || a.castingNow() {
 		return false
 	}
-	if _, ok := a.desires.Peek(); ok {
+	if _, ok := a.desires.Load().Peek(); ok {
 		return false
 	}
-	a.idleAndRequeue()
+	a.thinkIdle()
 	return true
 }
 
 // inHitAnimation reports whether the attack's hit animation window is open.
 func (a *Attackable) inHitAnimation() bool {
-	return a.hitAnimation != nil && a.hitAnimation.InHitAnimation()
+	c := a.attack.Load()
+	return c != nil && c.hitAnimation != nil && c.hitAnimation.InHitAnimation()
 }
 
 // hasLatch reports whether a latched attack waits for the next pass.
@@ -1124,10 +1216,9 @@ func (a *Attackable) hasLatch() bool {
 }
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
-// and updates the latch from it. It reports whether the pick was the
-// latched attack, and whether anything was promoted: nothing is during the
-// hit animation, with no promotable desire, or when a wander is current
-// and the pick is a wander too.
+// and updates the latch from it. It reports whether anything was promoted:
+// nothing is during the hit animation, with no promotable desire, or when a
+// wander is current and the pick is a wander too.
 //
 // Desire selection always makes the pick current, whatever the current
 // intention is, so a heavier attack on another target, a cast or a walk
@@ -1135,16 +1226,16 @@ func (a *Attackable) hasLatch() bool {
 // one drops any follow task and the queued next intention the old one left
 // behind. Taking up any desire but a route walk takes the actor off its
 // route.
-func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
+func (a *Attackable) promoteNext() bool {
 	if a.inHitAnimation() {
-		return false, false
+		return false
 	}
-	next, fromLatch, ok := a.nextToDo()
+	next, ok := a.nextToDo()
 	if !ok {
-		return false, false
+		return false
 	}
 	if a.current.kind == IntentionWander && next.kind == IntentionWander {
-		return false, false
+		return false
 	}
 	if next.kind != IntentionMoveRoute {
 		a.leaveRoute()
@@ -1160,26 +1251,27 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	}
 	a.lastKind = a.current.kind
 	a.setCurrent(next)
-	return fromLatch, true
+	a.topDesireTarget = next.target
+	return true
 }
 
 // same reports whether o is the same intention as i: same kind, aimed at
 // the same target with the same skill, or walking to the same location or
 // route.
 func (i intention) same(o intention) bool {
-	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.socialID == o.socialID && i.route == o.route
+	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.itemObjectID == o.itemObjectID && i.route == o.route
 }
 
 // nextToDo returns the latched attack when one is set, else the heaviest
 // queued desire as an intention. ok is false when there is neither or the
 // heaviest desire's kind is not promotable.
-func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
+func (a *Attackable) nextToDo() (next intention, ok bool) {
 	if a.hasLatch() {
-		return a.latched, true, true
+		return a.latched, true
 	}
-	desire, ok := a.desires.Peek()
+	desire, ok := a.desires.Load().Peek()
 	if !ok {
-		return intention{}, false, false
+		return intention{}, false
 	}
 	switch desire.Kind {
 	case IntentionAttack:
@@ -1195,91 +1287,158 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 	case IntentionFlee:
 		next = intention{kind: IntentionFlee, target: desire.FinalTarget, loc: desire.Location, distance: desire.Distance}
 	case IntentionSocial:
-		next = intention{kind: IntentionSocial, socialID: desire.ItemObjectID, timer: desire.Timer}
+		next = intention{kind: IntentionSocial, itemObjectID: desire.ItemObjectID, timer: desire.Timer}
+	case IntentionPickUp:
+		next = intention{kind: IntentionPickUp, itemObjectID: desire.ItemObjectID}
 	case IntentionMoveTo:
-		next = intention{kind: IntentionMoveTo, loc: desire.Location}
+		next = intention{kind: IntentionMoveTo, loc: desire.Location, standing: desire.Standing, heading: desire.Heading}
 	case IntentionMoveRoute:
 		next = intention{kind: IntentionMoveRoute, route: desire.RouteName}
 	default:
-		return intention{}, false, false
+		return intention{}, false
 	}
-	return next, false, true
+	return next, true
 }
 
-// Tick advances the AI clock and applies periodic attack, cast, and
-// nothing-desire weight decay.
+// Tick advances the AI clock. Every third step it marks the cycle's hate
+// refresh and attack, cast, and nothing-desire weight decay due; the cycle's
+// TickThink runs them after its selection. A decay a previous cycle left
+// due, because no TickThink followed its Tick, runs first.
 func (a *Attackable) Tick() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	a.tickOutOfTerritory()
-
+	a.cycleDecayLocked()
 	a.tickStep, a.ticked = a.step, true
 	a.step++
 	if a.step%3 != 0 {
 		return
 	}
-	a.refreshCombatMemory()
-	a.reduceAllAggroHateLocked(attackHateDecay)
-	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
-	a.desires.DecreaseWeightByType(IntentionCast, castDesireDecay)
-	a.desires.DecreaseWeightByType(IntentionNothing, nothingDesireDecay)
+	a.cycleDecayDue = true
 	a.step = 0
 }
 
-// tickOutOfTerritory runs the arrival-armed out-of-territory stale-hate
-// sweep. Arrived starts the schedule (100ms then every 10s) when the owner
-// is outside territory and cancels it on an in-territory arrival. A Tick
-// while in territory skips that firing but keeps the phase, so oscillating
-// across the territory edge still sweeps. A stationary out-of-territory
-// owner that never arrives never arms the sweep.
-func (a *Attackable) tickOutOfTerritory() {
-	if !a.ootSweep {
+// cycleDecayLocked runs the periodic hate refresh and weight decay if a Tick
+// marked them due.
+func (a *Attackable) cycleDecayLocked() {
+	if !a.cycleDecayDue {
 		return
 	}
-	now := a.now()
-	if now.Before(a.nextOOTSweep) {
-		return
-	}
-	for !a.nextOOTSweep.After(now) {
-		a.nextOOTSweep = a.nextOOTSweep.Add(ootSweepPeriod)
-	}
-	if a.actor.InTerritory() {
-		return
-	}
-
-	for _, t := range a.threats.Snapshot() {
-		if now.Sub(t.Timestamp) < staleThreatAge {
-			continue
-		}
-		a.desires.Remove(IntentionAttack, t.Attacker)
-		a.threats.StopHate(t.Attacker)
-	}
+	a.cycleDecayDue = false
+	a.refreshCombatMemory()
+	a.reduceAllAggroHateLocked(attackHateDecay)
+	a.desires.Load().DecreaseWeightByType(IntentionAttack, attackHateDecay)
+	a.desires.Load().DecreaseWeightByType(IntentionCast, castDesireDecay)
+	a.desires.Load().DecreaseWeightByType(IntentionNothing, nothingDesireDecay)
 }
 
-// syncOOTSweepLocked disarms the out-of-territory stale-hate sweep on an
-// arrival inside territory, and arms it on the first one outside, after
-// the out-of-territory point.
-func (a *Attackable) syncOOTSweepLocked() {
-	if a.actor.InTerritory() {
-		a.ootSweep = false
-		a.nextOOTSweep = time.Time{}
+// KeepTerritory makes m the actor's out-of-territory state, the one its
+// earlier lives left: when the last of their arrivals was outside, the
+// stale-hate sweep goes on, on its grid, on this life's queue, and the next
+// arrival outside opens no out-of-territory point. Call it once, before the
+// actor is published.
+func (a *Attackable) KeepTerritory(m *TerritoryMemory) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.territory = m
+	outside, due := m.Load()
+	if !outside {
 		return
 	}
-	if a.ootSweep {
+	next, d := NextOnGrid(due, a.now(), ootSweepPeriod)
+	a.territory.Store(true, next)
+	a.armOOTSweepAt(d)
+}
+
+// syncOOTSweepLocked settles the out-of-territory state on an arrival. One
+// inside territory disarms the stale-hate sweep. The first one outside opens
+// the out-of-territory point, then arms the sweep: 100 ms later, then every
+// 10 s on a fixed grid. Nothing else disarms it; the actor's queue closing
+// when it leaves the world cancels this life's firing, and the next life
+// resumes it on its grid (KeepTerritory).
+func (a *Attackable) syncOOTSweepLocked() {
+	if a.actor.InTerritory() {
+		a.territoryLocked().Store(false, time.Time{})
+		a.stopOOTSweep()
+		return
+	}
+	if outside, _ := a.territoryLocked().Load(); outside {
 		return
 	}
 	a.atHookPoint(HookOutOfTerritory)
-	a.ootSweep = true
-	a.nextOOTSweep = a.now().Add(ootSweepInitialDelay)
+	a.stopOOTSweep()
+	a.armOOTSweep(ootSweepInitialDelay)
 }
 
-// pruneDesires drops invalid cast desires, then flee desires from a
+// stopOOTSweep cancels the stale-hate sweep's pending firing, if any.
+func (a *Attackable) stopOOTSweep() {
+	a.ootSeq++
+	if a.ootSweep != nil {
+		a.ootSweep.Stop()
+		a.ootSweep = nil
+	}
+}
+
+// armOOTSweep schedules the next stale-hate sweep d from now on the actor's
+// queue and records the actor outside with that deadline.
+func (a *Attackable) armOOTSweep(d time.Duration) {
+	a.territoryLocked().Store(true, a.now().Add(d))
+	a.armOOTSweepAt(d)
+}
+
+// territoryLocked returns the actor's out-of-territory state: an actor no
+// KeepTerritory handed one keeps its own from its first use. The caller
+// holds a.mu.
+func (a *Attackable) territoryLocked() *TerritoryMemory {
+	if a.territory == nil {
+		a.territory = &TerritoryMemory{}
+	}
+	return a.territory
+}
+
+// armOOTSweepAt schedules this life's next stale-hate sweep firing d from
+// now on the actor's queue.
+func (a *Attackable) armOOTSweepAt(d time.Duration) {
+	seq := a.ootSeq
+	a.ootSweep = a.actor.After(d, func() { a.sweepStaleThreats(seq) })
+}
+
+// sweepStaleThreats is one firing of the out-of-territory stale-hate sweep:
+// it re-arms on the fixed-rate grid, then, while the actor stands outside
+// its territory, stops the hate of each threat entry whose last damage is
+// staleThreatAge old or more and drops the attack desire on it. A firing of
+// a sweep since disarmed does nothing.
+func (a *Attackable) sweepStaleThreats(seq uint64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if seq != a.ootSeq {
+		return
+	}
+	now := a.now()
+	_, due := a.territoryLocked().Load()
+	_, d := NextOnGrid(due.Add(ootSweepPeriod), now, ootSweepPeriod)
+	a.armOOTSweep(d)
+	if a.actor.InTerritory() {
+		return
+	}
+	for _, t := range a.threats.Load().Snapshot() {
+		if now.Sub(t.Timestamp) < staleThreatAge {
+			continue
+		}
+		a.desires.Load().Remove(IntentionAttack, t.Attacker)
+		a.threats.Load().StopHate(t.Attacker)
+	}
+}
+
+// pruneDesires drops invalid cast desires, then every desire aimed at a
 // creature the actor no longer knows or that is dead, then, unless the actor
 // is out of control, attack desires whose target is beyond
-// attackDesireRange.
+// attackDesireRange. It only drops desires: hate, the current intention and
+// the next one stay as they are. No queued kind carries a non-creature
+// target: a pick-up names its item by object id only, so the unknown-object
+// prune never drops one, and one whose item is gone stays queued.
 func (a *Attackable) pruneDesires(outOfControl bool) {
-	a.desires.RemoveIf(func(d *Desire) bool {
+	a.desires.Load().RemoveIf(func(d *Desire) bool {
 		if d.Kind != IntentionCast {
 			return false
 		}
@@ -1289,15 +1448,15 @@ func (a *Attackable) pruneDesires(outOfControl bool) {
 		cast := a.CastController()
 		return cast != nil && !cast.MeetsHPMPDisabled(d.FinalTarget, d.Skill)
 	})
-	a.desires.RemoveIf(func(d *Desire) bool {
-		return d.Kind == IntentionFlee && d.FinalTarget != nil && (!a.actor.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
+	a.desires.Load().RemoveIf(func(d *Desire) bool {
+		return d.FinalTarget != nil && (!a.actor.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
 	})
 	if outOfControl {
 		return
 	}
 	ox, oy, oz := a.actor.Position()
 	origin := location.Location{X: ox, Y: oy, Z: oz}
-	a.desires.RemoveIf(func(d *Desire) bool {
+	a.desires.Load().RemoveIf(func(d *Desire) bool {
 		if d.Kind != IntentionAttack || d.FinalTarget == nil {
 			return false
 		}
@@ -1306,98 +1465,74 @@ func (a *Attackable) pruneDesires(outOfControl bool) {
 	})
 }
 
-// dropCurrentIfUnqueued idles an attack, cast or walk whose desire is no
-// longer queued, unless an action is in flight. The caller skips it while
-// the actor is out of control. The continue pass keeps a desire-less walk:
-// it steps the current walk as it stands, so one an arrival left short of
-// its destination sets off again.
-func (a *Attackable) dropCurrentIfUnqueued(mode thinkMode) {
-	if a.attack.AttackingNow() {
-		return
-	}
-	if a.castingNow() {
-		return
-	}
-	switch a.current.kind {
-	case IntentionAttack, IntentionCast:
-		probe := &Desire{Kind: a.current.kind, FinalTarget: a.current.target, Skill: a.current.skill}
-		if !a.desires.Has(probe) {
-			a.setCurrent(intention{kind: IntentionIdle})
-		}
-	case IntentionMoveTo:
-		if mode == thinkContinue {
-			return
-		}
-		probe := &Desire{Kind: IntentionMoveTo, Location: a.current.loc}
-		if !a.desires.Has(probe) {
-			a.setCurrent(intention{kind: IntentionIdle})
-		}
-	}
-}
-
-// thinkAttack advances one IntentionAttack step. The first return reports
-// whether RunAI / TickThink desire selection (promoteAndStep) should
-// immediately re-promote and continue (true) or stop for this cycle (false);
-// continueCurrent (Think) ignores it and never re-selects. The second is any
-// broadcast error from a synchronous call this step made, only meaningful
-// when the first is false.
-func (a *Attackable) thinkAttack() (bool, error) {
+// thinkAttack advances one IntentionAttack step. A lost target (see
+// targetLost) ends the step with nothing changed: the intention, hate and
+// desires stay as they are, and the next desire selection decides. A dead
+// target the actor still knows is not lost: the follow and attack gates
+// refuse it. The return is any broadcast error from a synchronous call this
+// step made.
+func (a *Attackable) thinkAttack() error {
 	if a.actor.DenyAIAction() {
-		return false, nil
+		return nil
 	}
 
 	target := a.current.target
-	if a.dropLostTarget(target) {
-		return true, nil
+	if a.targetLost(target, "") {
+		return nil
 	}
 
 	following, err := a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange())
 	if following {
-		return false, err
+		return err
 	}
 
-	if a.attack.BowCoolingDown() || a.attack.AttackingNow() {
+	attack := a.attackController()
+	if attack == nil {
+		return nil
+	}
+	if attack.BowCoolingDown() || attack.AttackingNow() {
 		a.next = a.current
-		return false, nil
+		return nil
 	}
 
-	if !a.attack.CanAttack(target) {
-		return false, nil
+	if !attack.CanAttack(target) {
+		return nil
 	}
 
 	a.move.Stop()
-	a.attack.DoAttack(target)
-	return false, nil
+	attack.DoAttack(target)
+	return nil
 }
 
 // thinkCast advances an IntentionCast desire once it has been promoted to
 // the current intention: pre-movement validation, closing distance on the
 // target, planting and facing it once the cast animation is long enough to
 // warrant it, then the final cast attempt. It mirrors thinkAttack's shape
-// for skill casts instead of physical attacks.
-func (a *Attackable) thinkCast() (bool, error) {
+// for skill casts instead of physical attacks; a lost target ends the step
+// with nothing changed, as there.
+func (a *Attackable) thinkCast() error {
 	cast := a.CastController()
 	if a.actor.DenyAIAction() || cast == nil {
-		return false, nil
+		return nil
 	}
 	if cast.Disabled() {
-		return false, nil
+		return nil
 	}
 
 	target := a.current.target
 	ref := a.current.skill
-	if a.dropLostCastTarget(target, cast.SkillType(ref)) {
-		return true, nil
+	if a.targetLost(target, cast.SkillType(ref)) {
+		return nil
 	}
 
 	if !cast.CanAttempt(target, ref) {
-		return false, nil
+		return nil
 	}
 
 	following, err := a.move.MaybeStartOffensiveFollow(target, cast.Range(ref))
 	if following {
 		a.actor.ForceRunStance()
-		return false, err
+		return err
 	}
 
 	if cast.StopsMovement(ref) {
@@ -1411,26 +1546,39 @@ func (a *Attackable) thinkCast() (bool, error) {
 		if target.ObjectID() != a.actor.ObjectID() {
 			a.actor.BroadcastMoveToPawn(target)
 		}
-		return false, nil
+		return nil
 	}
 
 	cast.Cast(target, ref)
-	return false, nil
+	return nil
 }
 
+// thinkMoveTo is the walk step. Standing on a creature's position or spawn
+// point, facing its heading, the actor opens the move-finished point and
+// drops the desire, whether or not it can act or move. Otherwise an actor
+// that can act and move walks there with path-finding, and with no
+// teleport however many path-finding moves failed before. Standing on a
+// bare point already still walks there: a zero-length move that arrives on
+// the next move tick.
 func (a *Attackable) thinkMoveTo() {
+	if a.current.standing && a.standsOn(a.current.loc, a.current.heading) {
+		a.atHookPoint(HookMoveFinished)
+		a.clearCurrentDesire()
+		return
+	}
 	if a.actor.DenyAIAction() {
 		return
 	}
 	if a.actor.MovementDisabled() {
 		return
 	}
-	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
-		a.atHookPoint(HookMoveFinished)
-		a.clearCurrentDesire()
-		return
-	}
-	_ = a.move.MoveHome(a.current.loc)
+	_, _ = a.move.MoveToLocation(a.current.loc)
+}
+
+// standsOn reports whether the actor stands on loc facing heading.
+func (a *Attackable) standsOn(loc location.Location, heading int) bool {
+	x, y, z := a.actor.Position()
+	return (location.Location{X: x, Y: y, Z: z}) == loc && a.actor.Heading() == heading
 }
 
 // Arrived drops the queued MOVE_TO, FLEE, or WANDER desire when movement
@@ -1477,8 +1625,8 @@ func (a *Attackable) clearArrivalDesire() {
 }
 
 func (a *Attackable) clearCurrentDesire() {
-	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.socialID, RouteName: a.current.route}
-	a.desires.RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
+	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.itemObjectID, RouteName: a.current.route}
+	a.desires.Load().RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
 }
 
 // thinkFlee is the flee step: the actor runs, in run stance, its distance
@@ -1513,7 +1661,7 @@ func (a *Attackable) thinkSocial() {
 	}
 	a.socialHold = a.now().Add(time.Duration(a.current.timer) * time.Millisecond)
 	a.move.Stop()
-	a.actor.SocialAction(int(a.current.socialID))
+	a.actor.SocialAction(int(a.current.itemObjectID))
 }
 
 // thinkWander is the wander step: the promotion of a WANDER desire and
@@ -1607,57 +1755,33 @@ func (a *Attackable) doWanderMove() {
 	a.actor.MoveFromSpawnUsingRandomOffset(int(a.actor.RealMoveSpeed()) * 3)
 }
 
+// refreshCombatMemory is the periodic hate-table refresh: an empty threat
+// table drops every attack desire; otherwise a dead attacker's threat hate
+// stops, an attacker the actor no longer knows leaves the table, and either
+// loses its attack desire. The skill hate table drops both kinds of entry.
+// Not knowing an attacker covers one that is off the grid and one whose
+// acting player is invisible.
 func (a *Attackable) refreshCombatMemory() {
-	if a.threats.IsEmpty() {
-		a.desires.RemoveKind(IntentionAttack)
+	if a.threats.Load().IsEmpty() {
+		a.desires.Load().RemoveKind(IntentionAttack)
+	} else {
+		for _, target := range a.threats.Load().Refresh(a.actor.Knows) {
+			a.desires.Load().Remove(IntentionAttack, target)
+		}
 	}
-	for _, target := range a.threats.Refresh(a.actor.Knows) {
-		a.desires.RemoveFinalTarget(target)
-		a.clearIntentionsFor(target)
-	}
-	for _, target := range a.hates.Refresh(a.actor.Knows) {
-		a.desires.RemoveFinalTarget(target)
-		a.clearIntentionsFor(target)
-	}
+	a.hates.Load().Refresh(a.actor.Knows)
 }
 
-func (a *Attackable) dropLostTarget(target attackable.Combatant) bool {
-	return a.dropLostCastTarget(target, "")
-}
-
-// dropLostCastTarget is dropLostTarget's cast-path variant: a SUMMON_FRIEND
-// cast's target is exempt from the "not known" drop (the rotation-target
-// bypass of the target-lost check).
-func (a *Attackable) dropLostCastTarget(target attackable.Combatant, skillType string) bool {
-	if target == nil {
-		a.setCurrent(intention{kind: IntentionIdle})
-		return true
-	}
-	if target.AlikeDead() {
-		a.threats.StopHate(target)
-		a.hates.StopHate(target)
-		a.desires.RemoveFinalTarget(target)
-		a.clearIntentionsFor(target)
+// targetLost reports whether an attack or cast step has lost target: there
+// is none, it is no longer in the world, or the actor does not know it. A
+// SUMMON_FRIEND cast (skillType) keeps a target the actor does not know. It
+// changes nothing.
+func (a *Attackable) targetLost(target attackable.Combatant, skillType string) bool {
+	if target == nil || !a.actor.InWorld(target) {
 		return true
 	}
 	if skillType == "SUMMON_FRIEND" {
 		return false
 	}
-	if !a.actor.Knows(target) {
-		a.threats.Remove(target)
-		a.hates.StopHate(target)
-		a.desires.RemoveFinalTarget(target)
-		a.clearIntentionsFor(target)
-		return true
-	}
-	return false
-}
-
-func (a *Attackable) clearIntentionsFor(target attackable.Combatant) {
-	if sameCombatant(a.current.target, target) {
-		a.setCurrent(intention{kind: IntentionIdle})
-	}
-	if sameCombatant(a.next.target, target) {
-		a.next = intention{}
-	}
+	return !a.actor.Knows(target)
 }

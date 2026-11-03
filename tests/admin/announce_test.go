@@ -286,8 +286,9 @@ func TestAnnounceAutomatic(t *testing.T) {
 	} else if heard[1]-heard[0] < 900*time.Millisecond {
 		t.Fatalf("automatic announcements heard after %v, want the second about a second after the first", heard)
 	}
-	if frame := user.ReadWithTimeout(1500 * time.Millisecond); frame != nil {
-		t.Fatalf("frame %#x after the limit, want none", frame[0])
+	srv.Advance(t, 1500*time.Millisecond)
+	if frames := user.ReadQueued(); len(frames) != 0 {
+		t.Fatalf("frame %#x after the limit, want none", frames[0][0])
 	}
 	drain(t, gm)
 
@@ -324,7 +325,8 @@ func TestAnnounceAutomatic(t *testing.T) {
 	assertSay(t, user.ReadWithTimeout(3*time.Second), 0, sayAnnouncement, "", "Forever")
 	exchange(t, gm, encodeBuildCmd("announce del 2"))
 	drain(t, user)
-	if frame := user.ReadWithTimeout(1500 * time.Millisecond); frame != nil {
-		t.Fatalf("frame %#x after deletion, want none", frame[0])
+	srv.Advance(t, 1500*time.Millisecond)
+	if frames := user.ReadQueued(); len(frames) != 0 {
+		t.Fatalf("frame %#x after deletion, want none", frames[0][0])
 	}
 }

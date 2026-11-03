@@ -1,0 +1,13 @@
+# WizardHereticPriestAggressive (22143), every draw 0: as it appears, and each time it has nothing left to do, it
+# wants to walk to its spawn point, weight 30.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1000 0 0 walks skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9
+
+tick
+  desires priest move_to(1000,0,0)=30

@@ -28,7 +28,7 @@ const tradeChaoticRefusal = "You cannot trade in a chaotic state."
 // Each call reads them as they stand then.
 func (l *GameClientLink) boundItems(live *livePlayer) tradebook.BoundItems {
 	return func(objectID int32) bool {
-		return live.ControlItemInUse(objectID) || objectID == l.enchantStateStore().Active(live.ObjectID()) ||
+		return live.ControlItemInUse(objectID) || objectID == l.enchanting.scrolls.Active(live.ObjectID()) ||
 			l.cursedItem(live.Inventory(), objectID)
 	}
 }
@@ -60,7 +60,7 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeOlympiadRefusal))
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanTrade && (live.Karma() > 0 || target.Karma() > 0) {
+	if !l.playerConfig().KarmaPlayerCanTrade && (live.Karma() > 0 || target.Karma() > 0) {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeChaoticRefusal))
 		return
 	}
@@ -81,15 +81,15 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 		return
 	case tradebook.RequestTargetBusy:
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	case tradebook.RequestRefused:
-		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.CharacterName()))
 		return
 	}
 
 	target.SendFrame(serverpackets.FrameSendTradeRequest(live.ObjectID()))
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageRequestS1ForTrade, target.Name))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageRequestS1ForTrade, target.CharacterName()))
 }
 
 // blockRefusal is the system message refusing live's trade or party
@@ -137,7 +137,7 @@ func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpa
 	// the denial is the asker's, and it is gone.
 	if result.Status == tradebook.AnswerDenied {
 		if !result.RequesterLeft {
-			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeniedTradeRequest, live.Name))
+			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeniedTradeRequest, live.CharacterName()))
 		}
 		return
 	}
@@ -362,7 +362,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 
 	status := tradebook.SettlementEmpty
 	if !session.Empty() {
-		end := l.itemInstances.BeginOperation(first.Inventory().OwnerID(), second.Inventory().OwnerID())
+		end := l.belongings.itemInstances.BeginOperation(first.Inventory().OwnerID(), second.Inventory().OwnerID())
 		defer end()
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
@@ -420,7 +420,7 @@ func (l *GameClientLink) leaveActiveTrade(live *livePlayer) {
 }
 
 // holdsActiveRequester reports whether live holds a request of any kind it
-// has not answered yet (the reference's active requester). A request that
+// has not answered yet (its active requester). A request that
 // timed out still counts while live has a trade window open.
 func (l *GameClientLink) holdsActiveRequester(live *livePlayer) bool {
 	return l.trades != nil && l.trades.HoldsRequest(live.ObjectID())
@@ -451,10 +451,10 @@ func (l *GameClientLink) announceTradeCanceled(session tradebook.Session, cancel
 	cancellerID := canceller.ObjectID()
 	if partnerID, ok := session.PartnerID(cancellerID); ok && !session.PartnerLeft(cancellerID) {
 		if partner, ok := l.livePlayerByID(partnerID); ok {
-			sendTradeCancel(partner, canceller.Name)
+			sendTradeCancel(partner, canceller.CharacterName())
 		}
 	}
-	sendTradeCancel(canceller, canceller.Name)
+	sendTradeCancel(canceller, canceller.CharacterName())
 }
 
 func sendTradeCancel(live *livePlayer, cancellerName string) {
@@ -477,7 +477,7 @@ func (l *GameClientLink) finishTrade(first, second *livePlayer, success bool) {
 }
 
 func (l *GameClientLink) sendTradeStart(live, partner *livePlayer) bool {
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageBeginTradeWithS1, partner.Name))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageBeginTradeWithS1, partner.CharacterName()))
 	frame, err := serverpackets.FrameTradeStart(partner.ObjectID(), live.Inventory().Items(), live.Inventory().Templates())
 	if err != nil {
 		l.log.Error().Err(err).Msg("build TradeStart")
@@ -488,7 +488,7 @@ func (l *GameClientLink) sendTradeStart(live, partner *livePlayer) bool {
 }
 
 func (l *GameClientLink) sendTradeConfirmed(confirmer, partner *livePlayer) {
-	partner.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1ConfirmedTrade, confirmer.Name))
+	partner.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1ConfirmedTrade, confirmer.CharacterName()))
 	confirmer.SendFrame(serverpackets.FrameTradePressOwnOk())
 	partner.SendFrame(serverpackets.FrameTradePressOtherOk())
 }

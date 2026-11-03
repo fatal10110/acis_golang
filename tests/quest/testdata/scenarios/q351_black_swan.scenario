@@ -1,0 +1,175 @@
+# Black Swan (Q351): a level 32 character accepts at Gosta and gets his order; Roman has no
+# business yet; Heine has nothing to buy; two Tasaba lizardmen give a fang and a barrel each (every
+# roll pinned to succeed); Heine buys the fangs, then the barrels for adena and bills (cond 2);
+# Roman sees the bills; with neither item left Heine ends the quest; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q351_black_swan.golden
+character Swan 32
+random always 0
+script quest.Q351_BlackSwan
+item 57 4296 4297 4298 4310
+page guard/30916.htm
+page default/30969.htm
+page villagemaster/30897.htm
+page script/quest/Q351_BlackSwan/
+npc gosta 30916 Guard 10 0 0
+npc iason 30969 Folk -10 0 0
+npc roman 30897 VillageMasterDwarf 0 10 0
+npc lizard 20784 Monster 40 0 0
+
+# Gosta: accept through 30916-02.
+action gosta
+action gosta
+  S ActionFailed
+  S NpcHtmlMessage obj=gosta item=0 page=guard/30916.htm
+  S ActionFailed
+bypass npc_{gosta}_Quest
+  S NpcHtmlMessage obj=gosta item=0 page=script/quest/Q351_BlackSwan/30916-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30916-02.htm
+  S NpcHtmlMessage obj=gosta item=0 page=script/quest/Q351_BlackSwan/30916-02.htm
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30916-03.htm
+  S QuestList 351:0x80000001
+  S ExShowQuestMark quest=351
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4296
+  S NpcHtmlMessage obj=gosta item=0 page=script/quest/Q351_BlackSwan/30916-03.htm
+  S ActionFailed
+  Q upsert Q351_BlackSwan | <state> | STARTED
+  Q upsert Q351_BlackSwan | <cond> | 1
+  items 4296=1
+  rows Q351_BlackSwan <cond>=1 <state>=STARTED
+  state Q351_BlackSwan STARTED
+action gosta
+  S ActionFailed
+  S NpcHtmlMessage obj=gosta item=0 page=guard/30916.htm
+  S ActionFailed
+action gosta
+  S ActionFailed
+  S NpcHtmlMessage obj=gosta item=0 page=guard/30916.htm
+  S ActionFailed
+bypass npc_{gosta}_Quest
+  S NpcHtmlMessage obj=gosta item=0 page=script/quest/Q351_BlackSwan/30916-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Roman: no bill yet.
+action roman
+action roman
+  S ActionFailed
+  S NpcHtmlMessage obj=roman item=0 page=villagemaster/30897.htm
+  S ActionFailed
+bypass npc_{roman}_Quest
+  S NpcHtmlMessage obj=roman item=0 page=script/quest/Q351_BlackSwan/30897-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Heine: no fangs to buy.
+action iason
+action iason
+  S ActionFailed
+  S NpcHtmlMessage obj=iason item=0 page=default/30969.htm
+  S ActionFailed
+bypass npc_{iason}_Quest
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30969-02a.htm
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-02a.htm
+  S ActionFailed
+  items 57=0
+
+# Two lizardmen: a fang and a barrel each.
+kill lizard x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4297
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4298
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4297
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4298
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4297=2 4298=2
+
+# Heine buys the fangs, then the barrels (cond 2).
+action iason
+  S ActionFailed
+  S NpcHtmlMessage obj=iason item=0 page=default/30969.htm
+  S ActionFailed
+action iason
+  S ActionFailed
+  S NpcHtmlMessage obj=iason item=0 page=default/30969.htm
+  S ActionFailed
+bypass npc_{iason}_Quest
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30969-02a.htm
+  S SystemMessage id=301 3:4297 6:2
+  S SystemMessage id=52 6:40
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-02.htm
+  S ActionFailed
+  items 4297=0 57=40
+bypass Quest Q351_BlackSwan 30969-04.htm
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-04.htm
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30969-03a.htm
+  S SystemMessage id=301 3:4298 6:2
+  S SystemMessage id=53 3:4310 6:2
+  S SystemMessage id=52 6:40
+  S QuestList 351:0x80000003
+  S ExShowQuestMark quest=351
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-03.htm
+  S ActionFailed
+  Q upsert Q351_BlackSwan | <cond> | 2
+  items 4298=0 4310=2 57=80
+  rows Q351_BlackSwan <cond>=2 <state>=STARTED
+
+# Roman: the bills.
+action roman
+action roman
+  S ActionFailed
+  S NpcHtmlMessage obj=roman item=0 page=villagemaster/30897.htm
+  S ActionFailed
+bypass npc_{roman}_Quest
+  S NpcHtmlMessage obj=roman item=0 page=script/quest/Q351_BlackSwan/30897-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# Heine: nothing left, the quest ends.
+action iason
+action iason
+  S ActionFailed
+  S NpcHtmlMessage obj=iason item=0 page=default/30969.htm
+  S ActionFailed
+bypass npc_{iason}_Quest
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30969-02a.htm
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-02a.htm
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30969-04.htm
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-04.htm
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30969-05.htm
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-05.htm
+  S ActionFailed
+bypass Quest Q351_BlackSwan 30969-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:4296
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q351_BlackSwan/30969-07.htm
+  S ActionFailed
+  Q delete-quest Q351_BlackSwan
+  items 4296=0 4310=2 57=80
+  state Q351_BlackSwan -
+  rows Q351_BlackSwan -
+relog
+  rows Q351_BlackSwan -
+  items 4310=2 57=80

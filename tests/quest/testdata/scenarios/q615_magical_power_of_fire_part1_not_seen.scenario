@@ -1,0 +1,19 @@
+# Magical Power of Fire, part 1 (Q615) at cond 1: a Varka warrior that sees the thief calls no one, since the thief has not
+# been sent to the Asefa Box yet. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q615_magical_power_of_fire_part1_not_seen.golden
+character Ally 74
+standing -2
+quest Q615_MagicalPowerOfFire_Part1 <cond>=1 spawned=0 <state>=STARTED
+script quest.Q615_MagicalPowerOfFire_Part1
+item 1661 7242 7243 7081
+page npcdefault.htm
+page default/31559.htm
+page script/quest/Q615_MagicalPowerOfFire_Part1/
+npc naran 31378 Folk 10 0 0
+npc udan 31379 Folk 20 0 0
+npc box 31559 Folk 30 0 0
+npc mob 21350 Monster 3000 0 0
+
+tick
+approach mob
+  rows Q615_MagicalPowerOfFire_Part1 <cond>=1 <state>=STARTED spawned=0

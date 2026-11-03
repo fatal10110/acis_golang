@@ -1,0 +1,21 @@
+# Into The Flame (Q618), refused: a level 59 character is turned away.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q618_into_the_flame_low_level.golden
+character Hero 59
+script quest.Q618_IntoTheFlame
+item 7265 7266 7267
+page default/31540.htm
+page script/quest/Q618_IntoTheFlame/
+npc klein 31540 Folk 10 0 0
+
+action klein
+action klein
+  S ActionFailed
+  S NpcHtmlMessage obj=klein item=0 page=default/31540.htm
+  S ActionFailed
+bypass npc_{klein}_Quest
+  S NpcHtmlMessage obj=klein item=0 page=script/quest/Q618_IntoTheFlame/31540-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q618_IntoTheFlame CREATED
+  rows Q618_IntoTheFlame -

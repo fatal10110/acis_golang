@@ -1,0 +1,18 @@
+# A golem crafter (FollowerMovingAroundMaster): as he appears his golem appears where he
+# stands (onCreated); five seconds later, then every five seconds, the golem is asked to
+# walk to a point within 50 of him, drawn on the x then the y axis (onTimer). The golem's
+# appearance and walks send none of the rendered packets; the draws pin the timer's
+# offsets, two a tick, and no draw happens as the master appears. The golem line is the
+# template the script spawns from (it walks); its own golem stands apart, bound to nothing.
+# Expectations are derived from the reference source (FollowerMovingAroundMaster.java).
+character Seeker 20
+random 100 0 0 100
+script script.ai.group.FollowerMovingAroundMaster
+npc telson 31592 Folk 100 0 0
+npc dorothy 31593 MutedFolk 400 0 0 walks
+
+advance 4999ms
+advance 1ms
+tick x3
+advance 5s
+tick x3

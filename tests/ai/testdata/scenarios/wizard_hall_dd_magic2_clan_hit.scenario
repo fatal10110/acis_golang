@@ -1,0 +1,16 @@
+# WizardHallDDMagic2Aggressive (18330) in a clan, every draw 0: a hit by the character on a clan member 300 from it wants its
+# long range DD magic on the character, weight 1000000, once.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHallDDMagic2Aggressive
+npc hall 18330 Monster 0 300 0 clan hall_clan 500 skill W_LONG_RANGE_DD_MAGIC 4137 9 skill W_SHORT_RANGE_DD_MAGIC 4560 9
+npc mate 20003 Monster 150 150 0 clan hall_clan 500
+
+hit mate 10
+  desires hall cast(player,4137,move)=1000000

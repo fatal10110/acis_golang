@@ -225,13 +225,13 @@ func TestLoadAgainStopsDroppedSchedules(t *testing.T) {
 
 // A limit out of the 32-bit range, which no caller passes today, clamps to
 // the nearest bound instead of wrapping to the other sign.
-func TestJavaIntClampsOutOfRange(t *testing.T) {
+func TestClampInt32ClampsOutOfRange(t *testing.T) {
 	for _, c := range []struct {
 		in   int
 		want int32
 	}{{-2, -2}, {math.MaxInt32, math.MaxInt32}, {math.MaxInt32 + 1, math.MaxInt32}, {math.MinInt32 - 1, math.MinInt32}} {
-		if got := javaInt(c.in); got != c.want {
-			t.Errorf("javaInt(%d) = %d, want %d", c.in, got, c.want)
+		if got := clampInt32(c.in); got != c.want {
+			t.Errorf("clampInt32(%d) = %d, want %d", c.in, got, c.want)
 		}
 	}
 }

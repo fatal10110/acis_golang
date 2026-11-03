@@ -51,9 +51,9 @@ func TestAdminBanAccountOfLeavingPlayerReachesLogin(t *testing.T) {
 	state := world.New()
 	gmCap := &testsupport.FrameCapture{}
 	gm := newTestLivePlayer(t, 1, gmCap)
-	gm.Name = "Admin"
+	gm.SetName("Admin")
 	target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
-	target.Name = "Leaver"
+	target.SetName("Leaver")
 	target.Character.AccountName = "leaveracct"
 	state.Spawn(target, 100, 0, 0, 0)
 	state.AddPlayer(target)
@@ -61,7 +61,7 @@ func TestAdminBanAccountOfLeavingPlayerReachesLogin(t *testing.T) {
 	// refuses new tasks.
 	target.Queue().Close()
 
-	l := &GameClientLink{world: state, log: zerolog.Nop(), loginLink: func() *LoginLink { return loginLink }}
+	l := newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop(), LoginLink: func() *LoginLink { return loginLink }})
 	l.adminBan(gm, "admin_ban account Leaver")
 
 	select {

@@ -1,0 +1,14 @@
+# DoormanOfDrain (18343, level 78), every draw 0: a hit of 10 runs its parent twice and, with the character its top
+# desire target, wants its DD magic on the character (1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain
+npc door 18343 Monster 1500 0 0 level 78 skill DD_MAGIC 5043 10 skill MAGIC_HEAL 1011 6
+
+top door player
+hit door 10
+  desires door cast(player,5043,move)=1000000

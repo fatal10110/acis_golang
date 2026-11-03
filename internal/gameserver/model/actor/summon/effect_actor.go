@@ -102,10 +102,13 @@ func (a *Actor) FearImmune() bool { return a.SiegeSummon() }
 // summon's current intention, the way a move request does. A summon that
 // could not take AI actions before the effect in progress landed, which
 // includes one already afraid, stays put; one that cannot move goes idle.
-// Summons are always in run stance, so no stance change is sent; hungry-pet
-// walk stance arrives with the feed tick (#2378).
+// Whichever it does, a walking (hungry) pet is put in its run stance first.
 func (a *Actor) FleeFrom(effector effect.Actor, distance int) {
-	if effector == nil || effector.ObjectID() == a.ObjectID() || distance < 10 || a.brain == nil {
+	if effector == nil || effector.ObjectID() == a.ObjectID() || distance < 10 {
+		return
+	}
+	a.forceRunStance()
+	if a.brain == nil {
 		return
 	}
 	if a.aiDeniedBeforeEffect() {
@@ -188,6 +191,14 @@ func (a *Actor) BroadcastPosition() {
 // UpdateEffectIcons reports that the summon's effect icons changed: its
 // owner's party, or its owner alone, is shown them.
 func (a *Actor) UpdateEffectIcons() { a.emit(event.EffectIconsChanged{}) }
+
+// StopAllEffects ends every effect a holds, running each exit hook; each
+// one's end refreshes a's icons. Its owner is then shown the pet window and,
+// once a ever held an effect, the icon list the window clears.
+func (a *Actor) StopAllEffects() {
+	a.EffectList().StopAll()
+	a.emit(event.OwnerInfoChanged{})
+}
 
 // NotifyEffectWornOff does nothing: effect expiry messages go to players.
 func (a *Actor) NotifyEffectWornOff(modelskill.ID, int) {}

@@ -1,0 +1,163 @@
+# Shards of Golem (Q152): a level 10 character accepts at Harris with his first receipt, which
+# Altran exchanges for the second; five stone golems give five shards (every roll pinned to
+# succeed), Altran takes them for a tool box, and Harris takes the box and receipt for a wooden
+# breastplate and experience; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q152_shards_of_golem.golden
+character Golemer 10
+random always 0
+script quest.Q152_ShardsOfGolem
+item 1008 1009 1010 1011 23
+page trainer/30035.htm
+page default/30283.htm
+page script/quest/Q152_ShardsOfGolem/
+npc harris 30035 Trainer 10 0 0
+npc altran 30283 Folk 20 0 0
+npc golem 20016 Monster 40 0 0
+
+# Harris: accept with his first receipt.
+action harris
+action harris
+  S ActionFailed
+  S NpcHtmlMessage obj=harris item=0 page=trainer/30035.htm
+  S ActionFailed
+bypass npc_{harris}_Quest
+  S NpcHtmlMessage obj=harris item=0 page=script/quest/Q152_ShardsOfGolem/30035-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q152_ShardsOfGolem CREATED
+bypass Quest Q152_ShardsOfGolem 30035-02.htm
+  S QuestList 152:0x80000001
+  S ExShowQuestMark quest=152
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1008
+  S NpcHtmlMessage obj=harris item=0 page=script/quest/Q152_ShardsOfGolem/30035-02.htm
+  S ActionFailed
+  Q upsert Q152_ShardsOfGolem | <state> | STARTED
+  Q upsert Q152_ShardsOfGolem | <cond> | 1
+  state Q152_ShardsOfGolem STARTED
+  rows Q152_ShardsOfGolem <cond>=1 <state>=STARTED
+  items 1008=1
+action harris
+  S ActionFailed
+  S NpcHtmlMessage obj=harris item=0 page=trainer/30035.htm
+  S ActionFailed
+bypass npc_{harris}_Quest
+  S NpcHtmlMessage obj=harris item=0 page=script/quest/Q152_ShardsOfGolem/30035-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Altran: the first receipt for the second.
+action altran
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q152_ShardsOfGolem/30283-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q152_ShardsOfGolem 30283-02.htm
+  S QuestList 152:0x80000003
+  S ExShowQuestMark quest=152
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1008
+  S SystemMessage id=54 3:1009
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q152_ShardsOfGolem/30283-02.htm
+  S ActionFailed
+  Q upsert Q152_ShardsOfGolem | <cond> | 2
+  items 1008=0 1009=1
+  rows Q152_ShardsOfGolem <cond>=2 <state>=STARTED
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q152_ShardsOfGolem/30283-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Five stone golems: a shard each; the fifth completes the set.
+kill golem x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1010
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1010
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1010
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1010
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1010
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 152:0x80000007
+  S ExShowQuestMark quest=152
+  Q upsert Q152_ShardsOfGolem | <cond> | 3
+  items 1010=5
+  rows Q152_ShardsOfGolem <cond>=3 <state>=STARTED
+
+# Altran: the shards for the tool box.
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S QuestList 152:0x8000000f
+  S ExShowQuestMark quest=152
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1010 6:5
+  S SystemMessage id=54 3:1011
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q152_ShardsOfGolem/30283-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q152_ShardsOfGolem | <cond> | 4
+  items 1010=0 1011=1
+  rows Q152_ShardsOfGolem <cond>=4 <state>=STARTED
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q152_ShardsOfGolem/30283-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Harris: the box and receipt for the breastplate; the quest completes.
+action harris
+action harris
+  S ActionFailed
+  S NpcHtmlMessage obj=harris item=0 page=trainer/30035.htm
+  S ActionFailed
+bypass npc_{harris}_Quest
+  S SystemMessage id=302 3:1009
+  S SystemMessage id=302 3:1011
+  S SystemMessage id=54 3:23
+  S SystemMessage id=45 1:5000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 152:0x00000000
+  S NpcHtmlMessage obj=harris item=0 page=script/quest/Q152_ShardsOfGolem/30035-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q152_ShardsOfGolem | <state> | COMPLETED
+  Q delete-except-state Q152_ShardsOfGolem
+  items 1009=0 1011=0 23=1
+  state Q152_ShardsOfGolem COMPLETED
+  rows Q152_ShardsOfGolem <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q152_ShardsOfGolem COMPLETED
+  rows Q152_ShardsOfGolem <state>=COMPLETED
+  items 23=1
+action harris
+action harris
+  S ActionFailed
+  S NpcHtmlMessage obj=harris item=0 page=trainer/30035.htm
+  S ActionFailed
+bypass npc_{harris}_Quest
+  S NpcHtmlMessage obj=harris item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

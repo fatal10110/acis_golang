@@ -1,0 +1,18 @@
+# Elcroki (22214, level 80; the npc line gives the buff 5080 and the long range DD 4151
+# the template lists), every draw 0: a hit above 60% of its hit points wants only the long range DD
+# at the character 300 away; a hit under 60% also wants the self range buff on itself (1000000), and the
+# DD's weight adds up to 2000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki
+npc elcroki 22214 Monster 300 0 0 level 80 skill LONG_RANGE_DD_MAGIC1 4151 10 skill SELF_RANGE_DEBUFF1 4486 10 skill SELF_RANGE_BUFF1 5080 1 skill SELF_RANGE_DD_MAGIC1 5178 1 ai LongRangeSkillDist=100,ProbSelfRangeDeBuff1=30,BroadCastRange=100
+
+hit elcroki 10
+  desires elcroki cast(player,4151,move)=1000000
+hp elcroki 100
+hit elcroki 10
+  desires elcroki cast(elcroki,5080,move)=1000000 cast(player,4151,move)=2000000

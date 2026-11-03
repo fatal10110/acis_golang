@@ -1,0 +1,20 @@
+# WizardHallDDMagic2Aggressive (18330): it sees a cleric (class 15) cast Might (1068) on a monster beside it, on a draw of 50:
+# nothing happens (the draw must be under 50).
+character Hunter 20
+class 15
+skill 1068 1
+random always 50
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardHallDDMagic2Aggressive
+npc hall 18330 Monster 300 0 0 skill W_LONG_RANGE_DD_MAGIC 4137 9 skill W_SHORT_RANGE_DD_MAGIC 4560 9
+npc wolf 20120 Monster 60 100 0
+
+cast wolf 1068
+  S MagicSkillUse caster=player target=wolf skill=1068-1 hit=10015 reuse=15022 success=0
+  S SystemMessage id=46 4:1068,1
+  desires hall -

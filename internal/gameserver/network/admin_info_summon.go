@@ -70,7 +70,7 @@ func (l *GameClientLink) petMaxMeal(s *summon.Actor) int {
 	return tmpl.Pet.Levels[s.Level()].MaxMeal
 }
 
-// summonClassName names the reference class s is an instance of.
+// summonClassName is the instance class name admin pages print for s.
 func summonClassName(s *summon.Actor) string {
 	switch {
 	case s.IsBabyPet():
@@ -84,8 +84,8 @@ func summonClassName(s *summon.Actor) string {
 	}
 }
 
-// summonIntentionName is the reference name of the intention s's AI is
-// running, IDLE when it has no AI.
+// summonIntentionName is the upper-case name admin pages print for the
+// intention s's AI is running, IDLE when it has no AI.
 func summonIntentionName(s *summon.Actor) string {
 	brain, ok := s.AI().(*ai.Summon)
 	if !ok {

@@ -4,7 +4,8 @@ import "time"
 
 // Reuse-gate identifiers, one per client action that carries a per-client
 // reuse delay. Only the gates the current milestone wires exist (character selection
-// family, server bypass, crafting, multisell, dice and chat), so the set grows as later
+// family, server bypass, crafting, multisell, dice, chat, seed purchase,
+// emotes and item drops), so the set grows as later
 // systems port their own gated actions.
 const (
 	floodProtectorCharacterSelect = iota
@@ -15,6 +16,9 @@ const (
 	floodProtectorGlobalChat
 	floodProtectorTradeChat
 	floodProtectorHeroVoice
+	floodProtectorManor
+	floodProtectorSocial
+	floodProtectorDropItem
 	numFloodProtectors
 )
 
@@ -22,7 +26,7 @@ const (
 // may run at now, extending its reuse deadline when allowed. A delay of 0
 // (or less) means the action is never rate-limited. While the deadline set
 // by a previous allowed call still holds, the action is refused without
-// touching it. Mirrors GameClient.performAction.
+// touching it.
 func (c *Client) performFloodProtected(protector int, delay time.Duration, now time.Time) bool {
 	if delay <= 0 {
 		return true

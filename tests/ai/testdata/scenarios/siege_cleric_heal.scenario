@@ -1,0 +1,26 @@
+# GludioCleric's clan-attacked hook on Aden's cleric (35237), whose MAGIC_HEAL is the shipped
+# Aden Heal (4115). A hit's clan calls run before the hit lowers the knight's hit points, so
+# the cleric reads what the knight (35235) had before it: at full hit points, and then at 270
+# of 440 (61%), the calls leave it idle; at 260 (59%), with a draw under 20, it wants to cast
+# its heal on the knight, walking to it, weight 1000000, and casts it at its next think (an
+# NPC first idles on its second cycle).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioCleric
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 100 0 0 walks clan aden_siege_clan 300
+npc cleric 35237 SiegeGuard 100 150 0 walks clan aden_siege_clan 300 skill MAGIC_HEAL 4115 1
+
+hit knight 170
+  desires cleric -
+
+hit knight 10
+  desires cleric -
+
+hit knight 10
+  desires cleric cast(knight,4115,move)=1000000
+
+tick x2
+  S MagicSkillUse caster=cleric target=knight skill=4115-1 hit=13214 reuse=26428 success=0

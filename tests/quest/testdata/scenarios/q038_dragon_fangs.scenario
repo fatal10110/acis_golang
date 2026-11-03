@@ -1,0 +1,231 @@
+# Dragon Fangs (Q038): a level 19 character holding 99 feather ornaments and 49 dragon teeth accepts
+# at Luis. One Langk sentinel brings the hundredth ornament (the cond moves); Luis trades them for a
+# tooth of totem, which Iris trades for her letter, which Rohmer trades for his; Iris takes it. One
+# Langk shaman brings the fiftieth tooth (both drop rolls pinned to land); Iris takes the teeth and
+# pays the reward the pinned roll picks (index 2: a 1123 and 3200 adena); the quest completes; then
+# relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q038_dragon_fangs.golden
+character Fang 19
+hold 7173 99
+hold 7175 49
+random 0 0 2
+script quest.Q038_DragonFangs
+item 7173 7174 7175 7176 7177 45 627 1123 605
+page guard/30386.htm
+page trainer/30034.htm
+page trainer/30344.htm
+page script/quest/Q038_DragonFangs/
+npc luis 30386 Guard 10 0 0
+npc iris 30034 Trainer 20 0 0
+npc rohmer 30344 Trainer -20 0 0
+npc sentinel 21100 Monster 0 40 0
+npc shaman 21101 Monster 0 -40 0
+
+# Luis: accept.
+action luis
+action luis
+  S ActionFailed
+  S NpcHtmlMessage obj=luis item=0 page=guard/30386.htm
+  S ActionFailed
+bypass npc_{luis}_Quest
+  S NpcHtmlMessage obj=luis item=0 page=script/quest/Q038_DragonFangs/30386-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q038_DragonFangs CREATED
+bypass Quest Q038_DragonFangs 30386-02.htm
+  S QuestList 38:0x80000001
+  S ExShowQuestMark quest=38
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=luis item=0 page=script/quest/Q038_DragonFangs/30386-02.htm
+  S ActionFailed
+  Q upsert Q038_DragonFangs | <state> | STARTED
+  Q upsert Q038_DragonFangs | <cond> | 1
+  state Q038_DragonFangs STARTED
+  rows Q038_DragonFangs <cond>=1 <state>=STARTED
+action luis
+  S ActionFailed
+  S NpcHtmlMessage obj=luis item=0 page=guard/30386.htm
+  S ActionFailed
+bypass npc_{luis}_Quest
+  S NpcHtmlMessage obj=luis item=0 page=script/quest/Q038_DragonFangs/30386-02a.htm
+  S ActionFailed
+  S ActionFailed
+
+# A sentinel brings the hundredth feather ornament.
+kill sentinel
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7173
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 38:0x80000003
+  S ExShowQuestMark quest=38
+  Q upsert Q038_DragonFangs | <cond> | 2
+  items 7173=100
+  rows Q038_DragonFangs <cond>=2 <state>=STARTED
+
+# Luis takes the ornaments for a tooth of totem.
+action luis
+  S ActionFailed
+  S NpcHtmlMessage obj=luis item=0 page=guard/30386.htm
+  S ActionFailed
+bypass npc_{luis}_Quest
+  S NpcHtmlMessage obj=luis item=0 page=script/quest/Q038_DragonFangs/30386-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q038_DragonFangs 30386-04.htm
+  S QuestList 38:0x80000007
+  S ExShowQuestMark quest=38
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7173 6:100
+  S SystemMessage id=54 3:7174
+  S NpcHtmlMessage obj=luis item=0 page=script/quest/Q038_DragonFangs/30386-04.htm
+  S ActionFailed
+  Q upsert Q038_DragonFangs | <cond> | 3
+  items 7173=0 7174=1
+  rows Q038_DragonFangs <cond>=3 <state>=STARTED
+action luis
+  S ActionFailed
+  S NpcHtmlMessage obj=luis item=0 page=guard/30386.htm
+  S ActionFailed
+bypass npc_{luis}_Quest
+  S NpcHtmlMessage obj=luis item=0 page=script/quest/Q038_DragonFangs/30386-03a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Iris trades the tooth for her letter.
+action iris
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q038_DragonFangs 30034-02a.htm
+  S QuestList 38:0x8000000f
+  S ExShowQuestMark quest=38
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7174
+  S SystemMessage id=54 3:7176
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-02.htm
+  S ActionFailed
+  Q upsert Q038_DragonFangs | <cond> | 4
+  items 7174=0 7176=1
+  rows Q038_DragonFangs <cond>=4 <state>=STARTED
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-02b.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rohmer trades Iris's letter for his.
+action rohmer
+action rohmer
+  S ActionFailed
+  S NpcHtmlMessage obj=rohmer item=0 page=trainer/30344.htm
+  S ActionFailed
+bypass npc_{rohmer}_Quest
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q038_DragonFangs/30344-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q038_DragonFangs 30344-02a.htm
+  S QuestList 38:0x8000001f
+  S ExShowQuestMark quest=38
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7176
+  S SystemMessage id=54 3:7177
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q038_DragonFangs/30344-02.htm
+  S ActionFailed
+  Q upsert Q038_DragonFangs | <cond> | 5
+  items 7176=0 7177=1
+  rows Q038_DragonFangs <cond>=5 <state>=STARTED
+action rohmer
+  S ActionFailed
+  S NpcHtmlMessage obj=rohmer item=0 page=trainer/30344.htm
+  S ActionFailed
+bypass npc_{rohmer}_Quest
+  S NpcHtmlMessage obj=rohmer item=0 page=script/quest/Q038_DragonFangs/30344-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Iris takes Rohmer's letter.
+action iris
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q038_DragonFangs 30034-04a.htm
+  S QuestList 38:0x8000003f
+  S ExShowQuestMark quest=38
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7177
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-04.htm
+  S ActionFailed
+  Q upsert Q038_DragonFangs | <cond> | 6
+  items 7177=0
+  rows Q038_DragonFangs <cond>=6 <state>=STARTED
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-05a.htm
+  S ActionFailed
+  S ActionFailed
+
+# A shaman brings the fiftieth dragon tooth.
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7175
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 38:0x8000007f
+  S ExShowQuestMark quest=38
+  Q upsert Q038_DragonFangs | <cond> | 7
+  items 7175=50
+  rows Q038_DragonFangs <cond>=7 <state>=STARTED
+
+# Iris takes the teeth and pays the picked reward; the quest completes.
+action iris
+  S ActionFailed
+  S NpcHtmlMessage obj=iris item=0 page=trainer/30034.htm
+  S ActionFailed
+bypass npc_{iris}_Quest
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q038_DragonFangs 30034-06a.htm
+  S SystemMessage id=301 3:7175 6:50
+  S SystemMessage id=54 3:1123
+  S SystemMessage id=52 6:3200
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 38:0x00000000
+  S NpcHtmlMessage obj=iris item=0 page=script/quest/Q038_DragonFangs/30034-06.htm
+  S ActionFailed
+  Q upsert Q038_DragonFangs | <state> | COMPLETED
+  Q delete-except-state Q038_DragonFangs
+  state Q038_DragonFangs COMPLETED
+  rows Q038_DragonFangs <state>=COMPLETED
+  items 7175=0 1123=1 57=3200
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q038_DragonFangs COMPLETED
+  rows Q038_DragonFangs <state>=COMPLETED
+  items 1123=1 57=3200
+action luis
+action luis
+  S ActionFailed
+  S NpcHtmlMessage obj=luis item=0 page=guard/30386.htm
+  S ActionFailed
+bypass npc_{luis}_Quest
+  S NpcHtmlMessage obj=luis item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,223 @@
+# The Wishing Potion (Q334), the wishes that answer on the spot: a started character holding
+# five wish potions and Matild's orb. Each wish takes a potion (page 13 first, whose link the
+# wish bypass needs); three seconds later Matild speaks, four seconds after that again, and four
+# after that a third time, then the wish comes true: a certificate of royalty (wish 3, draw 0), an
+# ancient crown (wish 3, draw 2), 10000 adena twice (wish 2, draws 1 and 2) and, for wish 4 with
+# draw 0, one item of each of the three skill lists and a heart of Paagrio (draw 0 of three).
+# The wishes that call something out (a fairy, demons, a chest) are in tests/quest/q334_spawns_test.go:
+# a scenario cannot see or talk to an NPC a script spawns (#4020 item 5). Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q334_the_wishing_potion_wishes.golden
+character Seeker 30
+quest Q334_TheWishingPotion <state>=STARTED <cond>=5
+hold 3467 5
+hold 3682 1
+random 0 2 1 2 0 5 7 3 0
+script quest.Q334_TheWishingPotion
+item 57 3467 3468 3680 3681 3469 3077 3682 3942 3943 4200
+page default/30738.htm
+page script/quest/Q334_TheWishingPotion/
+npc matild 30738 Folk 10 0 0
+
+# Matild offers the recipes again only to a character without a potion: with one, the page is
+# the event page itself and nothing is given.
+action matild
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-15a.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-15a.htm
+  S ActionFailed
+  items 3680=0 3681=0
+
+# Wish 3, draw 0: the certificate of royalty.
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-14.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-13.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 0
+bypass Quest Q334_TheWishingPotion 30738-18.htm
+  S SystemMessage id=302 3:3467
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-18.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 3
+  Q upsert Q334_TheWishingPotion | exchange | 3
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED exchange=3 wish=3
+advance 3s
+  S NpcSay obj=matild type=0 npc=1030738 text="OK, everybody pray fervently!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="Both hands to heaven! Everybody yell together!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="One! Two! May your dreams come true!"
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3469
+  Q upsert Q334_TheWishingPotion | wish | 0
+  Q upsert Q334_TheWishingPotion | choice | 0
+  Q upsert Q334_TheWishingPotion | exchange | 0
+  items 3469=1 3467=4
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=0 wish=0
+# Wish 3, draw 2: the ancient crown.
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-14.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-13.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 0
+bypass Quest Q334_TheWishingPotion 30738-18.htm
+  S SystemMessage id=302 3:3467
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-18.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 3
+  Q upsert Q334_TheWishingPotion | exchange | 3
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=3 wish=3
+advance 3s
+  S NpcSay obj=matild type=0 npc=1030738 text="OK, everybody pray fervently!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="Both hands to heaven! Everybody yell together!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="One! Two! May your dreams come true!"
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3468
+  Q upsert Q334_TheWishingPotion | wish | 0
+  Q upsert Q334_TheWishingPotion | choice | 0
+  Q upsert Q334_TheWishingPotion | exchange | 0
+  items 3468=1 3467=3
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=0 wish=0
+# Wish 2, draw 1: 10000 adena.
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-14.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-13.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 0
+bypass Quest Q334_TheWishingPotion 30738-17.htm
+  S SystemMessage id=302 3:3467
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-17.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 2
+  Q upsert Q334_TheWishingPotion | exchange | 2
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=2 wish=2
+advance 3s
+  S NpcSay obj=matild type=0 npc=1030738 text="OK, everybody pray fervently!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="Both hands to heaven! Everybody yell together!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="One! Two! May your dreams come true!"
+  S SystemMessage id=52 6:10000
+  Q upsert Q334_TheWishingPotion | wish | 0
+  Q upsert Q334_TheWishingPotion | choice | 0
+  Q upsert Q334_TheWishingPotion | exchange | 0
+  items 57=10000 3467=2
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=0 wish=0
+# Wish 2, draw 2: 10000 adena again.
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-14.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-13.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 0
+bypass Quest Q334_TheWishingPotion 30738-17.htm
+  S SystemMessage id=302 3:3467
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-17.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 2
+  Q upsert Q334_TheWishingPotion | exchange | 2
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=2 wish=2
+advance 3s
+  S NpcSay obj=matild type=0 npc=1030738 text="OK, everybody pray fervently!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="Both hands to heaven! Everybody yell together!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="One! Two! May your dreams come true!"
+  S SystemMessage id=52 6:10000
+  Q upsert Q334_TheWishingPotion | wish | 0
+  Q upsert Q334_TheWishingPotion | choice | 0
+  Q upsert Q334_TheWishingPotion | exchange | 0
+  items 57=20000 3467=1
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=0 wish=0
+# Wish 4, draw 0: three skill items and the heart.
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q334_TheWishingPotion 30738-14.htm
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-13.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 0
+bypass Quest Q334_TheWishingPotion 30738-19.htm
+  S SystemMessage id=302 3:3467
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q334_TheWishingPotion/30738-19.htm
+  S ActionFailed
+  Q upsert Q334_TheWishingPotion | wish | 4
+  Q upsert Q334_TheWishingPotion | exchange | 4
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=4 wish=4
+advance 3s
+  S NpcSay obj=matild type=0 npc=1030738 text="OK, everybody pray fervently!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="Both hands to heaven! Everybody yell together!"
+advance 4s
+  S NpcSay obj=matild type=0 npc=1030738 text="One! Two! May your dreams come true!"
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3077
+  S SystemMessage id=54 3:4200
+  S SystemMessage id=54 3:3942
+  S SystemMessage id=54 3:3943
+  Q upsert Q334_TheWishingPotion | wish | 0
+  Q upsert Q334_TheWishingPotion | choice | 0
+  Q upsert Q334_TheWishingPotion | exchange | 0
+  items 3077=1 4200=1 3942=1 3943=1 3467=0
+  rows Q334_TheWishingPotion <cond>=5 <state>=STARTED choice=0 exchange=0 wish=0

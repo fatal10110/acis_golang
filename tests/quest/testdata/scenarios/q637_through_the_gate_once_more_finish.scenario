@@ -1,0 +1,32 @@
+# Through the Gate Once More (Q637): ten hearts and the mark pay a pagan mark and ten scrolls.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q637_through_the_gate_once_more_finish.golden
+character Hero 73
+quest Q637_ThroughTheGateOnceMore <cond>=2 <state>=STARTED
+hold 8065 1
+hold 8066 10
+script quest.Q637_ThroughTheGateOnceMore
+item 8065 8066 8067 8273
+page default/32010.htm
+page script/quest/Q637_ThroughTheGateOnceMore/
+npc flauron 32010 Folk 10 0 0
+
+action flauron
+action flauron
+  S ActionFailed
+  S NpcHtmlMessage obj=flauron item=0 page=default/32010.htm
+  S ActionFailed
+bypass npc_{flauron}_Quest
+  S SystemMessage id=302 3:8065
+  S SystemMessage id=301 3:8066 6:10
+  S SystemMessage id=54 3:8067
+  S SystemMessage id=53 3:8273 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=flauron item=0 page=script/quest/Q637_ThroughTheGateOnceMore/32010-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q637_ThroughTheGateOnceMore
+  items 8065=0 8066=0 8067=1 8273=10
+  rows Q637_ThroughTheGateOnceMore -
+  state Q637_ThroughTheGateOnceMore -

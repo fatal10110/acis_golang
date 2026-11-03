@@ -129,9 +129,9 @@ func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time,
 	return w, nil
 }
 
-// SetRoutes replaces the walker routes with routes: WalkerRouteData.reload.
-// Like the reference's walkers, which look their route up at every node, a
-// walker already on a route takes its next node from the new routes.
+// SetRoutes replaces the walker routes with routes. A walker looks its
+// route up at every node, so one already on a route takes its next node
+// from the new routes.
 func (w *Walker) SetRoutes(routes route.WalkerRoutes) {
 	w.routes.Store(&routes)
 }

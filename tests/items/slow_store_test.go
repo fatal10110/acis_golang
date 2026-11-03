@@ -46,7 +46,7 @@ func TestSlowItemStoreKeepsQueuesFree(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeUserInfo, "success UserInfo")
 
 	srv.Settle(t)
-	if lines := srv.SlowTaskLogs(); len(lines) != 0 {
+	if lines := srv.SlowTaskLogs(slowStoreDelay); len(lines) != 0 {
 		t.Fatalf("queue task blocked on the item store: %v", lines)
 	}
 

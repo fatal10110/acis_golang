@@ -1,6 +1,8 @@
 package network
 
 import (
+	"sync"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -17,7 +19,7 @@ import (
 // detached it releases frame and reports false. While frames wait for the
 // player's PvP flag changes, frame waits behind them (sendBehindPvPChanges).
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
-	if p.session == nil || p.SessionDetached() {
+	if p.session == nil || p.SessionDetached() || p.deathOnLoadingScreen() {
 		frame.Release()
 		return false
 	}
@@ -34,11 +36,75 @@ func (p *livePlayer) sendFrameNow(frame wire.Frame, visibility bool) bool {
 	if visibility {
 		send = p.visibilitySend
 	}
-	if send == nil || (p.Character != nil && p.SessionDetached()) {
+	if send == nil || (p.Character != nil && (p.SessionDetached() || p.deathOnLoadingScreen())) {
 		frame.Release()
 		return false
 	}
 	return send(frame)
+}
+
+// deathOnLoadingScreen reports whether p died in the effect replay of a
+// player not yet in the world: a restored damage-over-time tick due on the
+// loading screen killed it. That death runs silently; the EnterWorld burst
+// shows it.
+func (p *livePlayer) deathOnLoadingScreen() bool {
+	return p.replayMayDie.Load() && p.Dead()
+}
+
+// loadingDeathEvents is the list a death on the loading screen holds back
+// for the EnterWorld burst. Its own mutex guards it: the replay's goroutine
+// fills it while another may emit to the same player.
+type loadingDeathEvents struct {
+	mu     sync.Mutex
+	events []event.Event
+}
+
+// holdForEnterWorld keeps ev for the EnterWorld burst instead of sending it,
+// when p died on the loading screen and ev asks its client for an answer or
+// shows it a mark whose state the death keeps: the resurrection offer, which
+// stays open until answered, and the tutorial's answer to the death, whose
+// memo stops it from ever being shown again. The burst carries neither, so
+// it emits them after its Die frame (releaseHeldForEnterWorld).
+func (p *livePlayer) holdForEnterWorld(ev event.Event) bool {
+	if _, revive := ev.(event.ReviveRequested); !revive && !tutorialAnswer(ev) {
+		return false
+	}
+	if !p.deathOnLoadingScreen() {
+		return false
+	}
+	p.loadingDeath.mu.Lock()
+	p.loadingDeath.events = append(p.loadingDeath.events, ev)
+	p.loadingDeath.mu.Unlock()
+	return true
+}
+
+// tutorialAnswer reports whether ev is a frame a tutorial step sends.
+func tutorialAnswer(ev event.Event) bool {
+	switch ev.(type) {
+	case event.SoundPlayed,
+		event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
+		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
+		return true
+	}
+	return false
+}
+
+// takeHeldForEnterWorld returns and clears the events holdForEnterWorld
+// kept.
+func (p *livePlayer) takeHeldForEnterWorld() []event.Event {
+	p.loadingDeath.mu.Lock()
+	defer p.loadingDeath.mu.Unlock()
+	held := p.loadingDeath.events
+	p.loadingDeath.events = nil
+	return held
+}
+
+// releaseHeldForEnterWorld emits, in the order they were raised, the events
+// a death on the loading screen held back.
+func (p *livePlayer) releaseHeldForEnterWorld() {
+	for _, ev := range p.takeHeldForEnterWorld() {
+		p.Emit(ev)
+	}
 }
 
 // sendHeldFrame sends a frame that waited behind the player's PvP flag
@@ -64,9 +130,9 @@ func sessionOnly(ev event.Event) bool {
 		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.ServitorDamageShared, event.SkillDamageDealt, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
 		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge,
-		event.ItemsTaken, event.SoundPlayed,
+		event.ItemsTaken, event.SoundPlayed, event.ScenePlayed, event.ScreenMessageShown, event.EarthquakeStarted, event.MultisellRequested, event.WarehouseWithdrawOpened,
 		event.DialogPageShown, event.DialogReleased, event.ScriptMessage, event.QuestOverweight,
-		event.SystemMessageShown, event.TeleportWindowShown:
+		event.SystemMessageShown, event.TeleportWindowShown, event.NPCChatShown:
 		return true
 	}
 	return false
@@ -85,6 +151,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 		p.removeAllCubics()
 	}
 	if p.SessionDetached() && sessionOnly(ev) {
+		return
+	}
+	if p.quietTutorial.Load() && tutorialAnswer(ev) {
+		return
+	}
+	if p.holdForEnterWorld(ev) {
 		return
 	}
 	l, live := p.link, p
@@ -112,7 +184,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		// hit sends.
 		l.settlePvPChanges(live)
 	case event.HitLanded:
-		l.chance.AttackHit(live.Character, e)
+		l.combat.chance.AttackHit(live, e)
 	case event.ShotsRechargeRequested:
 		l.rechargeShots(live, live.Inventory(), e.Physical, e.Magic)
 	case event.Move:
@@ -129,7 +201,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.Stopped:
 		// Stopping a move revalidates the zones at once, before observers
 		// see the stop.
-		l.revalidateZones(live, live.CurrentLocation(), revalidateForce)
+		l.revalidateZones(live, revalidateStop)
 		x, y, z := live.Position()
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	case event.AutoAttackStopped:
@@ -160,12 +232,15 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(reviveRefusalMessage(e.Reason)))
 	case event.Died:
 		l.broadcastLiveDie(live)
+		l.stopLiveAttackStance(live)
 	case event.FusionCastersStopRequested:
 		l.abortFusionTargeting(live)
 	case event.DeathItemDrop:
 		l.dropItemsOnDeath(live, e)
 	case event.ClanKill:
 		l.creditClanKill(live, e)
+	case event.SiegeKill:
+		l.sieges.RecordKill(e.KillerClanID, e.VictimClanID)
 	case event.DeathSettled:
 		if l.water != nil {
 			l.water.Remove(live)
@@ -300,12 +375,19 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.showTeleports(live, e.ObjectID, e.NpcID, e.Kind)
 	case event.DialogReleased:
 		live.SendFrame(serverpackets.FrameActionFailed())
+	case event.NPCChatShown:
+		l.showNPCChat(live, e.ObjectID)
+	case event.SkillCalled:
+		// A script calls it from any queue (an NPC hook, a dying hook):
+		// the skill's handlers own the caster's state, so the cast runs on
+		// live's own queue, inside the call from a hook on that queue.
+		onOwnQueue(live, e.OwnQueue, func() { l.callSkill(live, e) })
 	case event.ScriptMessage:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, e.Text))
 	case event.QuestOverweight:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInventoryLessThan80Percent))
 	case event.SystemMessageShown:
-		live.SendFrame(serverpackets.FrameSystemMessage(e.ID))
+		live.SendFrame(systemMessageNumbersFrame(e.ID, e.Numbers))
 	case event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
 		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
 		l.sendTutorial(live, e)
@@ -315,6 +397,22 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.unequipTakenItem(live, e.ObjectID)
 	case event.SoundPlayed:
 		live.SendFrame(serverpackets.FramePlaySound(e.File))
+	case event.ScreenMessageShown:
+		live.SendFrame(serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs))
+	case event.GroupScreenMessageShown:
+		l.showGroupScreenMessage(live, e)
+	case event.EarthquakeStarted:
+		live.SendFrame(serverpackets.FrameEarthquake(e.At.X, e.At.Y, e.At.Z, e.Intensity, e.Duration, false))
+	case event.MultisellRequested:
+		l.showScriptMultisell(live, e.ObjectID, e.List)
+	case event.WarehouseWithdrawOpened:
+		l.openScriptWithdraw(live)
+	case event.ScenePlayed:
+		live.SendFrame(serverpackets.FrameExPlayScene())
+	case event.HennaListShown:
+		live.SendFrame(serverpackets.FrameHennaInfo(live.HennaSnapshot()))
+	case event.NobleGranted:
+		l.makeNoble(live)
 	case event.ServitorVanished:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
 	case event.ShieldBlocked:
@@ -331,6 +429,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			return
 		}
 		sendDamageMessage(live, hitDamage(e, skillhandler.DamageByPlayer))
+		l.notifyCompetitorDamage(live, e.TargetID, e.Damage)
 	case event.SkillResisted:
 		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, e.TargetName, int32(e.SkillID), int32(e.Level)))
 	case event.MagicResisted:
@@ -344,10 +443,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 			Source: skillhandler.DamageByPlayer, Amount: int32(e.Amount),
 			MagicCrit: e.MagicCrit, Blocked: e.Blocked, Petrified: e.Petrified,
 		})
+		l.notifyCompetitorDamage(live, e.TargetID, e.Amount)
 	case event.AttackTargetRefused:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
-	case event.AttackWeaponRefused:
-		live.SendFrame(serverpackets.FrameSystemMessage(attackWeaponRefusalMessage(e.Reason)))
+	case event.AttackRefused:
+		live.SendFrame(serverpackets.FrameSystemMessage(attackRefusalMessage(e.Reason)))
 	case event.AttackRequested:
 		if e.Target != nil {
 			// An attack an effect forces on the player holds no shift.
@@ -377,15 +477,24 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.SummonConfirmRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:
-		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
+		at := location.Location{X: e.X, Y: e.Y, Z: e.Z}
+		radius := e.Radius
+		onOwnQueue(live, e.OwnQueue, func() { l.teleportLivePlayer(live, at, radius) })
+	case event.InstantTeleportRequested:
+		// A script asks it from any queue (a swap moves two players from
+		// an NPC hook): the jump runs on live's own queue, inside the call
+		// from a hook on that queue.
+		j := e.Jump
+		onOwnQueue(live, e.OwnQueue, func() { l.instantTeleportLivePlayer(live, j) })
 	case event.RecallRequested:
-		l.recallLivePlayer(live, e.Destination)
+		dest := e.Destination
+		onOwnQueue(live, e.OwnQueue, func() { l.recallLivePlayer(live, dest) })
 	case event.Relocated:
 		reason := revalidateStep
 		if e.Placed {
 			reason = revalidatePlaced
 		}
-		l.revalidateZones(live, e.Previous, reason)
+		l.revalidateZones(live, reason)
 	case event.AttackStanceRequested:
 		l.startLiveAutoAttack(live)
 	case event.Attacked:
@@ -460,6 +569,14 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 	case event.ServitorSummonRequested:
 		(&gameSummonSpawner{link: l, live: live}).SpawnServitor(live.Character, e.Skill)
+	case event.SocialAction:
+		l.broadcastLiveFrame(live, func() wire.Frame { return serverpackets.FrameSocialAction(live.ObjectID(), e.ID) })
+	case event.ClanReputationAdded:
+		l.addScriptClanReputation(live, e.Points)
+	case event.ClanInfoBroadcast:
+		l.broadcastScriptClanInfo(live)
+	case event.ClassChangeRequested, event.BaseClassChangeRequested, event.UserInfoBroadcast:
+		l.applyScriptClassEvent(live, e)
 	}
 }
 
@@ -560,7 +677,7 @@ func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
 // finds the cast in flight: it swings nothing, and a target in reach is
 // answered with ActionFailed. Any other queued intention runs as usual; the
 // stop's own idle (endCastStop) then ends whatever walk it started.
-func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant, stopped bool) {
+func (l *GameClientLink) finishLiveCast(live *livePlayer, def *modelskill.Definition, target attackable.Combatant, stopped bool) {
 	if stopped && live.dropDeferredCast() {
 		sendMagicActionFailed(live)
 		return
@@ -647,7 +764,7 @@ func (l *GameClientLink) runDeferredAction(live *livePlayer, busy func(*livePlay
 // target when live may attack it without force, held with the cast's shift
 // modifier; anything else, a toggle included, goes idle. A stopped cast
 // still counts as in flight for that attack (attackAfterCast).
-func (live *livePlayer) endCastIntention(def modelskill.Definition, target attackable.Combatant, stopped bool) {
+func (live *livePlayer) endCastIntention(def *modelskill.Definition, target attackable.Combatant, stopped bool) {
 	if live.combat == nil {
 		return
 	}
@@ -664,7 +781,7 @@ func (live *livePlayer) endCastIntention(def modelskill.Definition, target attac
 // walks. It reports false, starting nothing, for any other skill, or a
 // target live may not attack without force. After a stopped cast the attack
 // is thought as if the cast were still in flight: it swings nothing.
-func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant, shift, stopped bool) bool {
+func (live *livePlayer) attackAfterCast(def *modelskill.Definition, target attackable.Combatant, shift, stopped bool) bool {
 	if live.combat == nil || !def.NextActionIsAttack || target == nil {
 		return false
 	}

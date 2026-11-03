@@ -1,0 +1,90 @@
+# Seed of Evil (Q158): a level 21 character accepts at Biotin; Nerkas cries out at the first hit
+# only, and dying gives the clay tablet with his last words; Biotin takes the tablet for a scroll
+# of enchant armor (D grade); then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q158_seed_of_evil.golden
+character Seeker 21
+script quest.Q158_SeedOfEvil
+item 1025 956
+page villagemaster/30031.htm
+page script/quest/Q158_SeedOfEvil/
+npc biotin 30031 VillageMasterPriest 10 0 0
+npc nerkas 27016 Monster 40 0 0
+
+# Biotin: accept.
+action biotin
+action biotin
+  S ActionFailed
+  S NpcHtmlMessage obj=biotin item=0 page=villagemaster/30031.htm
+  S ActionFailed
+bypass npc_{biotin}_Quest
+  S NpcHtmlMessage obj=biotin item=0 page=script/quest/Q158_SeedOfEvil/30031-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q158_SeedOfEvil CREATED
+bypass Quest Q158_SeedOfEvil 30031-04.htm
+  S QuestList 158:0x80000001
+  S ExShowQuestMark quest=158
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=biotin item=0 page=script/quest/Q158_SeedOfEvil/30031-04.htm
+  S ActionFailed
+  Q upsert Q158_SeedOfEvil | <state> | STARTED
+  Q upsert Q158_SeedOfEvil | <cond> | 1
+  state Q158_SeedOfEvil STARTED
+  rows Q158_SeedOfEvil <cond>=1 <state>=STARTED
+action biotin
+  S ActionFailed
+  S NpcHtmlMessage obj=biotin item=0 page=villagemaster/30031.htm
+  S ActionFailed
+bypass npc_{biotin}_Quest
+  S NpcHtmlMessage obj=biotin item=0 page=script/quest/Q158_SeedOfEvil/30031-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Nerkas: a cry at the first hit only; the tablet as he dies.
+hit nerkas 10
+  S NpcSay obj=nerkas type=0 npc=1027016 text="... How dare you challenge me!"
+hit nerkas 10
+kill nerkas
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 158:0x80000003
+  S ExShowQuestMark quest=158
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1025
+  S NpcSay obj=nerkas type=0 npc=1027016 text="The power of Lord Beleth rules the whole world...!"
+  Q upsert Q158_SeedOfEvil | <cond> | 2
+  items 1025=1
+  rows Q158_SeedOfEvil <cond>=2 <state>=STARTED
+
+# Biotin: the tablet for the scroll; the quest completes.
+action biotin
+  S ActionFailed
+  S NpcHtmlMessage obj=biotin item=0 page=villagemaster/30031.htm
+  S ActionFailed
+bypass npc_{biotin}_Quest
+  S SystemMessage id=302 3:1025
+  S SystemMessage id=54 3:956
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 158:0x00000000
+  S NpcHtmlMessage obj=biotin item=0 page=script/quest/Q158_SeedOfEvil/30031-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q158_SeedOfEvil | <state> | COMPLETED
+  Q delete-except-state Q158_SeedOfEvil
+  items 1025=0 956=1
+  state Q158_SeedOfEvil COMPLETED
+  rows Q158_SeedOfEvil <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q158_SeedOfEvil COMPLETED
+  rows Q158_SeedOfEvil <state>=COMPLETED
+  items 956=1
+action biotin
+action biotin
+  S ActionFailed
+  S NpcHtmlMessage obj=biotin item=0 page=villagemaster/30031.htm
+  S ActionFailed
+bypass npc_{biotin}_Quest
+  S NpcHtmlMessage obj=biotin item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,60 @@
+# Ketra Orc support (KetraOrcSupport): the village folk of a Ketra Orc ally of level 2, each first talk answering by the level.
+# Killing a soldier of the side breaks the alliance, the level 2 badge becoming the level 1 one.
+# Expectations are derived from the reference source (KetraOrcSupport.onFirstTalk, onAdvEvent,
+# onMyDying) and replay the reference trace.
+trace internal/gameserver/script/testdata/oracle/scenarios/ketra_support_ally_2.golden
+character Ally 40
+standing 2
+hold 7212 1
+script script.feature.KetraOrcSupport
+item 7212 7211 7186
+page script/feature/KetraOrcSupport/
+npc kadun 31370 Folk 10 0 0
+npc wahkan 31371 Folk 0 10 0
+npc asefa 31372 Folk -10 0 0
+npc atan 31373 Merchant 0 -10 0
+npc jaff 31374 WarehouseKeeper 10 10 0
+npc jumara 31375 Merchant -10 -10 0
+npc kurfa 31376 Gatekeeper 10 -10 0
+npc footman 21324 Monster 40 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=script/feature/KetraOrcSupport/31370-friend.htm
+  S ActionFailed
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=script/feature/KetraOrcSupport/31371-friend.htm
+  S ActionFailed
+action atan
+action atan
+  S ActionFailed
+  S NpcHtmlMessage obj=atan item=0 page=script/feature/KetraOrcSupport/31373-1.htm
+  S ActionFailed
+action jumara
+action jumara
+  S ActionFailed
+  S NpcHtmlMessage obj=jumara item=0 page=script/feature/KetraOrcSupport/31375-1.htm
+  S ActionFailed
+action kurfa
+action kurfa
+  S ActionFailed
+  S NpcHtmlMessage obj=kurfa item=0 page=script/feature/KetraOrcSupport/31376-1.htm
+  S ActionFailed
+action jaff
+action jaff
+  S ActionFailed
+  S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-2.htm
+  S ActionFailed
+action asefa
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=script/feature/KetraOrcSupport/31372-1.htm
+  S ActionFailed
+
+kill footman
+  S SystemMessage id=302 3:7212
+  S SystemMessage id=54 3:7211
+  items 7212=0 7211=1

@@ -1,0 +1,21 @@
+# GludioHold's no-desire and move-finished hooks on a knight (35235): standing off its post,
+# out of the character's sight, with nothing to do, it wants to walk back to its spawn point
+# with weight 30 (an NPC first idles on its second cycle), and walks there on the cycle
+# after; arriving, it wants to do nothing for 40 with weight 30.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 700 0 0 walks clan aden_siege_clan 300
+
+jump knight 800 0 0
+  at knight 800 0 0
+  desires knight -
+
+tick x2
+  desires knight move_to(700,0,0)=30
+
+tick
+walk knight
+  at knight 700 0 0
+  desires knight nothing(40)=30

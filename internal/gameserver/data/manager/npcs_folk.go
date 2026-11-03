@@ -1,8 +1,7 @@
 package manager
 
 import (
-	"fmt"
-
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -17,14 +16,14 @@ import (
 )
 
 // FolkSpawner places civilian NPCs in the world, each on a queue of its
-// own that its regeneration, effects, AI and walks run on, and on the AI
-// task. A civilian whose template alias names a walker route
+// own that its regeneration, effects, AI, swings and walks run on, and on
+// the AI task, each with the attack controller its attack desires swing
+// with. A civilian whose template alias names a walker route
 // (walkerRoutes.xml, keyed by that alias for both the route and the NPC)
-// is given movement and walks its route desires on the walker task; while
-// the walker alias rule stands in for its id (routeStandIn) it walks that
-// route from the moment it spawns. Every other one stands at its spawn
-// point; one whose template can move is given movement too, to walk toward
-// the target of a cast desire.
+// is given movement and walks its route desires on the walker task. Every
+// other one stands at its spawn point; one whose template can move is given
+// movement too, to walk toward the target of an attack or cast desire and to
+// flee and follow.
 type FolkSpawner struct {
 	State  *world.State
 	Walker *task.Walker
@@ -39,7 +38,8 @@ type FolkSpawner struct {
 	// Skills resolves template passives into the NPC's stats and the skills
 	// it casts; nil leaves it without a cast runtime.
 	Skills actorcast.Definitions
-	// CastEffects dispatches the effects of the NPC's casts.
+	// CastEffects dispatches the effects of the NPC's casts, and runs the
+	// chance procs of its casts and of the hits it lands.
 	CastEffects actorcast.EffectHandlers
 	// AI ticks the NPC once a second while its region is active; nil
 	// leaves it without an AI.
@@ -49,37 +49,56 @@ type FolkSpawner struct {
 	// Decay removes a dead NPC's corpse; nil leaves corpses in place.
 	Decay *task.Decay
 	// Effects is the server's effect-list context.
-	Effects effect.Env
-	// MaxBuffsAmount is the configured base buff-slot count.
-	MaxBuffsAmount      int
+	Effects             effect.Env
 	MaxGeoPathFailCount int
-	Log                 zerolog.Logger
+	// Log is the logger every civilian NPC shares.
+	Log *zerolog.Logger
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts npc.ScriptHooks
 	// Remover takes the NPC out of the world for a script delete; nil
 	// decays it with no respawn.
 	Remover npc.FolkRemover
+	// Ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	Ground npc.GroundTaker
+	// SeeRange is the configured NPC see range; zero keeps the shipped
+	// default.
+	SeeRange int
+	// Regen answers the NPC's base regeneration multipliers; nil gives the
+	// shipped ones.
+	Regen npc.RegenSettings
 }
 
 // Spawn builds a civilian NPC from inst, places it at (loc, heading) and
 // on the AI task, and starts its route walk when it has one. slot is the
 // spawn slot placing it; nil for none.
 func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) (*npc.Folk, error) {
+	return s.spawn(inst, loc, heading, slot, nil, npc.TowerRuntime{})
+}
+
+// spawn is Spawn for a private of master, which a nil master spawns none
+// for: the NPC is linked to master before it enters the world. tower is
+// what a control tower works with.
+func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember, tower npc.TowerRuntime) (*npc.Folk, error) {
+	inst.Slot = slot
 	f, err := npc.NewFolk(inst, s.Skills)
 	if err != nil {
 		return nil, err
 	}
 	rt := npc.FolkRuntime{
-		World:          s.State,
-		Queue:          s.Queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)),
-		Effects:        s.Effects,
-		MaxBuffsAmount: s.MaxBuffsAmount,
-		Items:          s.Items,
-		Decay:          s.Decay,
-		Zones:          s.Zones,
-		Slot:           slot,
-		Scripts:        s.Scripts,
-		Remover:        s.Remover,
+		World:    s.State,
+		Queue:    s.Queues.NewQueue("npc").Serial(inst.ObjectID),
+		Effects:  s.Effects,
+		Items:    s.Items,
+		Decay:    s.Decay,
+		Zones:    s.Zones,
+		Scripts:  s.Scripts,
+		Remover:  s.Remover,
+		Ground:   s.Ground,
+		Landing:  s.Geo,
+		SeeRange: s.SeeRange,
+		Tower:    tower,
+		Regen:    s.Regen,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)
@@ -93,9 +112,14 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 	if err := f.Attach(rt); err != nil {
 		return nil, err
 	}
+	swing := attack.NewNPC(f, folkAttackEvents{ai: f.AttackEvents(), f: f, chance: s.CastEffects.Chance})
+	swing.SetQueue(rt.Queue)
+	f.SetAttacker(swing)
 	if s.Skills != nil {
 		ctl := actorcast.NewController(actorcast.FolkActor{Folk: f}, f.CastEvents())
 		ctl.SetQueue(rt.Queue)
+		// A delete closes the NPC's queue without stopping its cast.
+		ctl.OutliveQueueClose()
 		f.SetCaster(ctl, &actorcast.AIController{
 			Controller:  ctl,
 			Definitions: s.Skills,
@@ -123,20 +147,42 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 			control.ref = walker
 		}
 	}
+	// A respawned private is still the private it was: its slot kept its
+	// master link and its place among master's privates.
+	if master != nil && f.SpawnMaster() == nil {
+		f.SetMaster(master)
+		master.AddMinion(f)
+	}
+	// An NPC enters the world walking, so the players who see it appear
+	// are shown it so, then enters the zones at its position (water shows
+	// it swimming), and then takes its run stance (ChangeMoveType, then its
+	// info again).
+	f.SetRunning(false)
 	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
 	f.EnterZones()
-	// The AI and walker tasks only work actors already in the world grid;
-	// the alias rule's walk starts before the AI task holds the NPC.
-	if control != nil && routeStandIn(s.Scripts, int32(inst.Template.ID)) {
-		// The alias rule: the route desire the walker script would queue,
-		// with the walk started at once rather than on the AI's first act.
-		f.AddMoveRouteDesire(alias, standInRouteWeight)
-		f.StartRoute(alias)
-	}
+	f.SetRunStance(true)
+	f.SettleRegen() // vitals below max regenerate one period from the spawn
 	if s.AI != nil {
 		s.AI.Add(f)
 	}
 	return f, nil
+}
+
+// folkAttackEvents hands a civilian NPC's attack controller events to its
+// AI, and runs the chance procs of each hit it lands, on the NPC's queue in
+// the hit's own call.
+type folkAttackEvents struct {
+	ai     event.Sink
+	f      *npc.Folk
+	chance *actorcast.ChanceProcs
+}
+
+func (e folkAttackEvents) Emit(ev event.Event) {
+	if hit, ok := ev.(event.HitLanded); ok {
+		e.chance.AttackHit(e.f, hit)
+		return
+	}
+	e.ai.Emit(ev)
 }
 
 // movement is what the NPC rt runs moves with.
@@ -165,7 +211,7 @@ func (s FolkSpawner) movement(rt npc.FolkRuntime) npc.FolkMovement {
 type folkControl struct {
 	walker *task.Walker
 	ref    *npc.FolkWalker
-	log    zerolog.Logger
+	log    *zerolog.Logger
 }
 
 // Emit advances the NPC's route on each arrival, and ends it when the NPC

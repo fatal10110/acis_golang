@@ -37,7 +37,7 @@ func TestUpdateRentsChangesAndCancels(t *testing.T) {
 	store := &feeStore{}
 	f, clock, treasury := startedFunctions(t, store, start)
 
-	f.Update(feeHall, hallmodel.FuncRestoreHP, 80, 1000, 3*day.Milliseconds())
+	f.Update(feeHall, hallmodel.FuncRestoreHP, 80, 1000, 3*day.Milliseconds(), nil)
 	got, ok := f.Get(feeHall, hallmodel.FuncRestoreHP)
 	want := Function{Type: hallmodel.FuncRestoreHP, Level: 80, Lease: 1000, Rate: 3 * day.Milliseconds(), EndTime: start.Add(3 * day).UnixMilli()}
 	if !ok || got != want {
@@ -48,7 +48,7 @@ func TestUpdateRentsChangesAndCancels(t *testing.T) {
 	}
 
 	clock.Advance(day)
-	f.Update(feeHall, hallmodel.FuncRestoreHP, 140, 1750, day.Milliseconds())
+	f.Update(feeHall, hallmodel.FuncRestoreHP, 140, 1750, day.Milliseconds(), nil)
 	got, _ = f.Get(feeHall, hallmodel.FuncRestoreHP)
 	want = Function{Type: hallmodel.FuncRestoreHP, Level: 140, Lease: 1750, Rate: 3 * day.Milliseconds(), EndTime: start.Add(4 * day).UnixMilli()}
 	if got != want {
@@ -64,7 +64,7 @@ func TestUpdateRentsChangesAndCancels(t *testing.T) {
 		t.Fatalf("fees at the new term's end = %v, want [1750]", treasury.paid)
 	}
 
-	f.Update(feeHall, hallmodel.FuncRestoreHP, 0, 0, 0)
+	f.Update(feeHall, hallmodel.FuncRestoreHP, 0, 0, 0, nil)
 	if _, ok := f.Get(feeHall, hallmodel.FuncRestoreHP); ok {
 		t.Fatal("cancelled function still rented")
 	}
@@ -86,7 +86,7 @@ func TestUpdateLevelZeroRentsNothing(t *testing.T) {
 	t.Parallel()
 	store := &feeStore{}
 	f, clock, _ := startedFunctions(t, store, time.Unix(1_700_000_000, 0))
-	f.Update(feeHall, hallmodel.FuncTeleport, 0, 0, 0)
+	f.Update(feeHall, hallmodel.FuncTeleport, 0, 0, 0, nil)
 	if _, ok := f.Get(feeHall, hallmodel.FuncTeleport); ok {
 		t.Fatal("a level 0 function was rented")
 	}
@@ -111,7 +111,7 @@ func TestUpdateOnFreeHallChargesNothing(t *testing.T) {
 	clock := sim.NewInline(start)
 	treasury := &feeTreasury{}
 	f.Start(clock.NewQueue("clanhall-functions"), treasury)
-	f.Update(99, hallmodel.FuncDecoCurtains, 1, 2000, time.Hour.Milliseconds())
+	f.Update(99, hallmodel.FuncDecoCurtains, 1, 2000, time.Hour.Milliseconds(), nil)
 	if _, ok := f.Get(99, hallmodel.FuncDecoCurtains); !ok {
 		t.Fatal("function on a free hall not kept")
 	}

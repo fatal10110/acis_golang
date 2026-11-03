@@ -1,0 +1,30 @@
+# Warehouse Keeper's Ambition (Q357), a hundred crystals: at cond 1 holding a hundred crystals,
+# Silva pays the bonus. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q357_warehouse_keepers_ambition_bonus.golden
+character Silva 47
+quest Q357_WarehouseKeepersAmbition <cond>=1 <state>=STARTED
+hold 5867 100
+script quest.Q357_WarehouseKeepersAmbition
+item 57 5867
+page warehouse/30686.htm
+page script/quest/Q357_WarehouseKeepersAmbition/
+npc silva 30686 WarehouseKeeper 10 0 0
+npc runner 20594 Monster 40 0 0
+
+# Silva: a hundred crystals.
+action silva
+action silva
+  S ActionFailed
+  S NpcHtmlMessage obj=silva item=0 page=warehouse/30686.htm
+  S ActionFailed
+bypass npc_{silva}_Quest
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-6.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q357_WarehouseKeepersAmbition 30686-7.htm
+  S SystemMessage id=301 3:5867 6:100
+  S SystemMessage id=52 6:53400
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-7.htm
+  S ActionFailed
+  items 5867=0 57=53400
+  rows Q357_WarehouseKeepersAmbition <cond>=1 <state>=STARTED

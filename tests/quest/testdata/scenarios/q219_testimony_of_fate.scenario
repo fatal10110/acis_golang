@@ -1,0 +1,232 @@
+# Testimony Of Fate (Q219), a second class-change test for dark elves, first part: a level 38 Palus Knight, who already holds
+# the ingredients Ixia asks for but the tenth marsh spider fluid, is sent by Kaira to Metheus (who pays the diamonds of the
+# level 37 set), kills the Hangman Tree for the remains, takes the textbook to Ixia, kills the marsh spider whose fluid completes
+# the list, hands the list in for the belladonna and takes it to Metheus; then relog, and Metheus, who has done his part, says so.
+# Every script roll is pinned to 1, so every drop lands. Kaira calls the Alder spirit at the next visit, which a Boot test plays.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q219_testimony_of_fate.golden
+character Scholar 38
+class 32
+random always 1
+hold 3180 10
+hold 3181 10
+hold 3178 10
+hold 3182 10
+hold 3179 9
+script quest.Q219_TestimonyOfFate
+item 3172 3173 3174 3175 3176 3177 3178 3179 3180 3181 3182 3183 3184 3185 3186 3187 3188 3189 3190 3191 3192 3193 3194 3195 3196 3197 3198 3199 3200 3201 3202 7562
+page default/30614.htm
+page trainer/30463.htm
+page trainer/30476.htm
+page script/quest/Q219_TestimonyOfFate/
+npc kaira 30476 Trainer -20 10 0
+npc metheus 30614 Folk -10 10 0
+npc ixia 30463 Trainer 0 10 0
+npc hangman 20144 Monster -60 0 0
+npc spider 20233 Monster -70 0 0
+
+action kaira
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q219_TestimonyOfFate CREATED
+  rows Q219_TestimonyOfFate -
+bypass Quest Q219_TestimonyOfFate 30476-04.htm
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-04.htm
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30476-05.htm
+  S QuestList 219:0x80000001
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3173
+  S SystemMessage id=53 3:7562 6:98
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-05a.htm
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <state> | STARTED
+  Q upsert Q219_TestimonyOfFate | <cond> | 1
+  M set secondClassChange37 | true
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=1 <state>=STARTED
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-06.htm
+  S ActionFailed
+  S ActionFailed
+action metheus
+action metheus
+  S ActionFailed
+  S NpcHtmlMessage obj=metheus item=0 page=default/30614.htm
+  S ActionFailed
+bypass npc_{metheus}_Quest
+  S QuestList 219:0x80000003
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3173
+  S SystemMessage id=54 3:3174
+  S NpcHtmlMessage obj=metheus item=0 page=script/quest/Q219_TestimonyOfFate/30614-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 2
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=2 <state>=STARTED
+kill hangman
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 219:0x80000007
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3174
+  S SystemMessage id=54 3:3175
+  Q upsert Q219_TestimonyOfFate | <cond> | 3
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=3 <state>=STARTED
+action metheus
+  S ActionFailed
+  S NpcHtmlMessage obj=metheus item=0 page=default/30614.htm
+  S ActionFailed
+action metheus
+  S ActionFailed
+  S NpcHtmlMessage obj=metheus item=0 page=default/30614.htm
+  S ActionFailed
+bypass npc_{metheus}_Quest
+  S QuestList 219:0x8000000f
+  S ExShowQuestMark quest=219
+  S QuestList 219:0x8000001f
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3175
+  S SystemMessage id=54 3:3176
+  S NpcHtmlMessage obj=metheus item=0 page=script/quest/Q219_TestimonyOfFate/30614-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 4
+  Q upsert Q219_TestimonyOfFate | <cond> | 5
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=5 <state>=STARTED
+action ixia
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+bypass npc_{ixia}_Quest
+  S QuestList 219:0x8000003f
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3176
+  S SystemMessage id=54 3:3177
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 6
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=6 <state>=STARTED
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+bypass npc_{ixia}_Quest
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30463-02a.htm
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-02a.htm
+  S ActionFailed
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3179
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 219:0x8000007f
+  S ExShowQuestMark quest=219
+  Q upsert Q219_TestimonyOfFate | <cond> | 7
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=7 <state>=STARTED
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+bypass npc_{ixia}_Quest
+  S QuestList 219:0x800000ff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3177
+  S SystemMessage id=301 3:3180 6:10
+  S SystemMessage id=301 3:3179 6:10
+  S SystemMessage id=301 3:3178 6:10
+  S SystemMessage id=301 3:3182 6:10
+  S SystemMessage id=301 3:3181 6:10
+  S SystemMessage id=54 3:3183
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 8
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=8 <state>=STARTED
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+bypass npc_{ixia}_Quest
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-04.htm
+  S ActionFailed
+  S ActionFailed
+action metheus
+action metheus
+  S ActionFailed
+  S NpcHtmlMessage obj=metheus item=0 page=default/30614.htm
+  S ActionFailed
+bypass npc_{metheus}_Quest
+  S QuestList 219:0x800001ff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3183
+  S SystemMessage id=54 3:3184
+  S NpcHtmlMessage obj=metheus item=0 page=script/quest/Q219_TestimonyOfFate/30614-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 9
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=9 <state>=STARTED
+relog
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=9 <state>=STARTED
+action metheus
+action metheus
+  S ActionFailed
+  S NpcHtmlMessage obj=metheus item=0 page=default/30614.htm
+  S ActionFailed
+bypass npc_{metheus}_Quest
+  S NpcHtmlMessage obj=metheus item=0 page=script/quest/Q219_TestimonyOfFate/30614-06.htm
+  S ActionFailed
+  S ActionFailed
+action ixia
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+bypass npc_{ixia}_Quest
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-05.htm
+  S ActionFailed
+  S ActionFailed

@@ -31,17 +31,17 @@ func liveCubicRuntime(live *livePlayer, id cubic.ID) *cubic.Runtime {
 // caster's queue before live's own cast syncs that cubic's runtime. The
 // late sync must not start a runtime for a cubic the list no longer holds.
 func TestSyncCubicRuntimeSkipsACubicEvictedBeforeTheSync(t *testing.T) {
-	link := &GameClientLink{log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 
 	live.Character.AddOrRefreshCubic(cubic.Life, false)
 	live.Character.AddOrRefreshCubic(cubic.Storm, true) // no mastery: evicts Life
 
-	link.syncCubicRuntime(live, cubic.Life, cubicRuntimeDef(cubic.Life))
+	link.syncCubicRuntime(live, cubic.Life, new(cubicRuntimeDef(cubic.Life)))
 	if r := liveCubicRuntime(live, cubic.Life); r != nil {
 		t.Fatal("late sync started a runtime for the evicted Life Cubic")
 	}
-	link.syncCubicRuntime(live, cubic.Storm, cubicRuntimeDef(cubic.Storm))
+	link.syncCubicRuntime(live, cubic.Storm, new(cubicRuntimeDef(cubic.Storm)))
 	if r := liveCubicRuntime(live, cubic.Storm); r == nil {
 		t.Fatal("Storm Cubic, still listed, has no runtime")
 	}
@@ -51,17 +51,17 @@ func TestSyncCubicRuntimeSkipsACubicEvictedBeforeTheSync(t *testing.T) {
 // again: its pending cast effect does not land and its late disappear timer
 // leaves the new cubic of that id alone.
 func TestEvictedCubicRuntimeDoesNotActForARegrantedID(t *testing.T) {
-	link := &GameClientLink{log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 
 	live.Character.AddOrRefreshCubic(cubic.Life, false)
-	link.syncCubicRuntime(live, cubic.Life, cubicRuntimeDef(cubic.Life))
+	link.syncCubicRuntime(live, cubic.Life, new(cubicRuntimeDef(cubic.Life)))
 	evicted := liveCubicRuntime(live, cubic.Life)
 
 	live.Character.AddOrRefreshCubic(cubic.Storm, false)
-	link.syncCubicRuntime(live, cubic.Storm, cubicRuntimeDef(cubic.Storm))
+	link.syncCubicRuntime(live, cubic.Storm, new(cubicRuntimeDef(cubic.Storm)))
 	live.Character.AddOrRefreshCubic(cubic.Life, false)
-	link.syncCubicRuntime(live, cubic.Life, cubicRuntimeDef(cubic.Life))
+	link.syncCubicRuntime(live, cubic.Life, new(cubicRuntimeDef(cubic.Life)))
 	regranted := liveCubicRuntime(live, cubic.Life)
 
 	if regranted == nil || regranted == evicted {
@@ -89,20 +89,20 @@ func TestEvictedCubicRuntimeDoesNotActForARegrantedID(t *testing.T) {
 // longer shows.
 func TestStaleCubicTickDoesNotFire(t *testing.T) {
 	const healSkill = 4051
-	link := &GameClientLink{
-		log:    zerolog.Nop(),
-		skills: skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: healSkill, Level: 1, Power: 10})),
-	}
+	link := newBareGameClientLink(t, GameClientLinkConfig{
+		Log:    zerolog.Nop(),
+		Skills: skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: healSkill, Level: 1, Power: 10})),
+	})
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetRollSource(func(int) int { return 0 })
 	live.Character.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 20, MaxMP: 30, CurrentMP: 30})
 
 	live.Character.AddOrRefreshCubic(cubic.Life, false)
-	link.syncCubicRuntime(live, cubic.Life, cubicRuntimeDef(cubic.Life))
+	link.syncCubicRuntime(live, cubic.Life, new(cubicRuntimeDef(cubic.Life)))
 	evicted := liveCubicRuntime(live, cubic.Life)
 	live.Character.AddOrRefreshCubic(cubic.Storm, false)
-	link.syncCubicRuntime(live, cubic.Storm, cubicRuntimeDef(cubic.Storm))
+	link.syncCubicRuntime(live, cubic.Storm, new(cubicRuntimeDef(cubic.Storm)))
 
 	evicted.Action() // the late combat-stance restart
 	link.fireCubic(live, cubic.Life, evicted)
@@ -121,7 +121,7 @@ func cubicOwnerOnClock(t *testing.T, link *GameClientLink, id int32, lifetime ti
 	def := cubicRuntimeDef(cubic.Storm)
 	def.SummonTotalLifeTime = int(lifetime / time.Millisecond)
 	live.Character.AddOrRefreshCubic(cubic.Storm, false)
-	link.syncCubicRuntime(live, cubic.Storm, def)
+	link.syncCubicRuntime(live, cubic.Storm, &def)
 	return live, in
 }
 
@@ -130,7 +130,7 @@ func cubicOwnerOnClock(t *testing.T, link *GameClientLink, id int32, lifetime ti
 // path that stops them: no timer of a logged-out player's cubic runs.
 func TestCubicsStopOnDetachButNotOnTeleportHalt(t *testing.T) {
 	const lifetime = 10 * time.Second
-	link := &GameClientLink{log: zerolog.Nop()}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 
 	halted, in := cubicOwnerOnClock(t, link, 1, lifetime)
 	sim.RunOwned(halted.Queue(), halted.Stop)

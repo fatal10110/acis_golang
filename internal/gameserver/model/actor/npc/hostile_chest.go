@@ -37,7 +37,7 @@ func (h *Hostile) ClaimInteraction() bool { return h.interacted.CompareAndSwap(f
 
 // Kill runs this NPC's death sequence with its own kill rewards, as a
 // killing blow would, and reports whether the death was newly applied.
-func (h *Hostile) Kill(killer attackable.Combatant) bool { return h.Die(killer, h.rewards) }
+func (h *Hostile) Kill(killer attackable.Combatant) bool { return h.Die(killer, h.deathRewards()) }
 
 // DeleteMe removes this NPC from the world at once, leaving no corpse, and
 // arms its spawn's respawn. The removal runs on this NPC's own queue, the
@@ -47,7 +47,8 @@ func (h *Hostile) DeleteMe() {
 }
 
 // DeleteNow is DeleteMe run on the calling goroutine: the NPC is out of
-// the world when it returns.
+// the world when it returns. It does not wait for a task this NPC's queue
+// is running; see the package doc for what keeps that task from acting.
 func (h *Hostile) DeleteNow() {
 	if h.remover != nil {
 		h.remover.Remove(h)

@@ -1,0 +1,53 @@
+# Conquest of Alligator Island (Q354), the map: at cond 1 holding ten fragments and a hundred
+# teeth, Kluck makes a pirate treasure map of the fragments, then buys the teeth with the bonus.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q354_conquest_of_alligator_island_map.golden
+character Kluck 38
+quest Q354_ConquestOfAlligatorIsland <cond>=1 <state>=STARTED
+hold 5863 100
+hold 5864 10
+script quest.Q354_ConquestOfAlligatorIsland
+item 57 5863 5864 5915
+page warehouse/30895.htm
+page script/quest/Q354_ConquestOfAlligatorIsland/
+npc kluck 30895 WarehouseKeeper 10 0 0
+npc crokian 20804 Monster 40 0 0
+
+# Kluck: the map.
+action kluck
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+bypass npc_{kluck}_Quest
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-03a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-07.htm
+  S SystemMessage id=301 3:5864 6:10
+  S SystemMessage id=54 3:5915
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-08.htm
+  S ActionFailed
+  items 5864=0 5915=1
+
+# Kluck: a hundred teeth.
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+action kluck
+  S ActionFailed
+  S NpcHtmlMessage obj=kluck item=0 page=warehouse/30895.htm
+  S ActionFailed
+bypass npc_{kluck}_Quest
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q354_ConquestOfAlligatorIsland 30895-05.htm
+  S SystemMessage id=301 3:5863 6:100
+  S SystemMessage id=52 6:32700
+  S NpcHtmlMessage obj=kluck item=0 page=script/quest/Q354_ConquestOfAlligatorIsland/30895-05b.htm
+  S ActionFailed
+  items 5863=0 57=32700
+  rows Q354_ConquestOfAlligatorIsland <cond>=1 <state>=STARTED

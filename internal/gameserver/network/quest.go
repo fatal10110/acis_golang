@@ -22,8 +22,12 @@ type scriptRegistry interface {
 	// JournalQuest resolves a journal row's quest name.
 	JournalQuest(name string) (questlog.Quest, bool)
 	player.TutorialEvents
+	player.DeathEvents
 	// PlayerDetached stops the script timers bound to c as it leaves.
 	PlayerDetached(c *player.Character)
+	// ScriptRuns counts the hook invocations in flight, which a player's
+	// departure waits out once they wrote it.
+	ScriptRuns() *player.ScriptRuns
 	// CharacterCreated gives a character just created its creation-time
 	// quest state.
 	CharacterCreated(c *player.Character)
@@ -38,6 +42,9 @@ type scriptRegistry interface {
 	// see zone_scripts.go.
 	ZoneEnterIDs() []int32
 	ZoneEntered(zoneID int32, c attackable.Combatant)
+	// npcScriptInfo is what the //info NPC script pages read; see
+	// admin_info_script.go.
+	npcScriptInfo
 }
 
 // questJournals writes the quest journals, and aborts and exits quests.
@@ -51,7 +58,7 @@ type questJournals interface {
 
 // abortQuest answers RequestQuestAbort: the first quest of live's journal
 // with the quest id is exited as repeatable. An id live has no quest of
-// answers nothing, as in the reference; the client sends the request once
+// answers nothing on purpose; the client sends the request once
 // the player confirmed the abort, and waits on no answer.
 func (l *GameClientLink) abortQuest(live *livePlayer, questID int32) {
 	if l.journals == nil {
@@ -97,7 +104,7 @@ func (l *GameClientLink) restoreQuests(ctx context.Context, c *player.Character)
 		resolve = l.scripts.JournalQuest
 	}
 	for _, name := range c.Quests().Restore(rows, resolve) {
-		l.log.Warn().Str("quest", name).Str("player", c.Name).Msg("select character: unknown quest in journal; skipped")
+		l.log.Warn().Str("quest", name).Str("player", c.CharacterName()).Msg("select character: unknown quest in journal; skipped")
 	}
 	return nil
 }

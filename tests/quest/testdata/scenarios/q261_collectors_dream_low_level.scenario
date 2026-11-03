@@ -1,0 +1,22 @@
+# Collector's Dream (Q261), refused: a level 14 character is too young for Alshupes, and the
+# quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q261_collectors_dream_low_level.golden
+character Collector 14
+script quest.Q261_CollectorsDream
+item 1087
+page default/30222.htm
+page script/quest/Q261_CollectorsDream/
+npc alshupes 30222 Folk 10 0 0
+
+# Alshupes: too young.
+action alshupes
+action alshupes
+  S ActionFailed
+  S NpcHtmlMessage obj=alshupes item=0 page=default/30222.htm
+  S ActionFailed
+bypass npc_{alshupes}_Quest
+  S NpcHtmlMessage obj=alshupes item=0 page=script/quest/Q261_CollectorsDream/30222-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q261_CollectorsDream CREATED
+  rows Q261_CollectorsDream -

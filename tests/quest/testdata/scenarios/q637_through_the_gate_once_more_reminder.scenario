@@ -1,0 +1,22 @@
+# Through the Gate Once More (Q637): a character at cond 1 is told to bring the hearts.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q637_through_the_gate_once_more_reminder.golden
+character Hero 73
+quest Q637_ThroughTheGateOnceMore <cond>=1 <state>=STARTED
+hold 8065 1
+hold 8066 3
+script quest.Q637_ThroughTheGateOnceMore
+item 8065 8066 8067 8273
+page default/32010.htm
+page script/quest/Q637_ThroughTheGateOnceMore/
+npc flauron 32010 Folk 10 0 0
+
+action flauron
+action flauron
+  S ActionFailed
+  S NpcHtmlMessage obj=flauron item=0 page=default/32010.htm
+  S ActionFailed
+bypass npc_{flauron}_Quest
+  S NpcHtmlMessage obj=flauron item=0 page=script/quest/Q637_ThroughTheGateOnceMore/32010-05.htm
+  S ActionFailed
+  S ActionFailed

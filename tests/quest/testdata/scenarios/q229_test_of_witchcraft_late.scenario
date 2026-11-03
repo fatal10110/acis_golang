@@ -1,0 +1,292 @@
+# Test of Witchcraft (Q229), the letters and the sword: Orim sends the traveller off with the instructions and
+# two letters (cond 6); Vasper gives the letter for Vadin; Vadin the crucifix, and, with 20 amulets (19 held,
+# the last from a Tamlin orc), the sanctions; Vasper the Sword of Binding; Iker the soultrap crystal; Orim
+# sends the traveller to Evert. Orim's and Evert's Zeruels are script-spawned and are not reachable in a
+# scenario: the Boot tests play them.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q229_test_of_witchcraft_late.golden
+character Witch 39
+class 11
+quest Q229_TestOfWitchcraft <state>=STARTED <cond>=5
+script quest.Q229_TestOfWitchcraft
+hold 3323 1
+hold 3329 19
+random always 0
+item 3308 3309 3310 3311 3312 3313 3314 3315 3316 3317 3318 3319 3320 3321 3322 3323 3324 3325 3326 3327 3328 3329 3330 3331 3332 3333 3334 3335 3029 3307 7562
+page default/30630.htm
+page default/30417.htm
+page trainer/30188.htm
+page trainer/30110.htm
+page default/30633.htm
+page script/quest/Q229_TestOfWitchcraft/
+npc orim 30630 Folk 10 0 0
+npc vasper 30417 Folk -10 0 0
+npc vadin 30188 Trainer 0 10 0
+npc iker 30110 Trainer 0 -10 0
+npc evert 30633 Folk 10 10 0
+npc tamlin 20601 Monster 40 0 0
+
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-15.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=5 <state>=STARTED
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-15.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=5 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30630-16.htm
+  S QuestList 229:0x8000003f
+  S ExShowQuestMark quest=229
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3323
+  S SystemMessage id=54 3:3324
+  S SystemMessage id=54 3:3325
+  S SystemMessage id=54 3:3326
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-16.htm
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <cond> | 6
+  items 3323=0 3324=1 3325=1 3326=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-17.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action vasper
+action vasper
+  S ActionFailed
+  S NpcHtmlMessage obj=vasper item=0 page=default/30417.htm
+  S ActionFailed
+bypass npc_{vasper}_Quest
+  S NpcHtmlMessage obj=vasper item=0 page=script/quest/Q229_TestOfWitchcraft/30417-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30417-02.htm
+  S NpcHtmlMessage obj=vasper item=0 page=script/quest/Q229_TestOfWitchcraft/30417-02.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30417-03.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3325
+  S SystemMessage id=54 3:3327
+  S NpcHtmlMessage obj=vasper item=0 page=script/quest/Q229_TestOfWitchcraft/30417-03.htm
+  S ActionFailed
+  items 3325=0 3327=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action vasper
+  S ActionFailed
+  S NpcHtmlMessage obj=vasper item=0 page=default/30417.htm
+  S ActionFailed
+action vasper
+  S ActionFailed
+  S NpcHtmlMessage obj=vasper item=0 page=default/30417.htm
+  S ActionFailed
+bypass npc_{vasper}_Quest
+  S NpcHtmlMessage obj=vasper item=0 page=script/quest/Q229_TestOfWitchcraft/30417-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action vadin
+action vadin
+  S ActionFailed
+  S NpcHtmlMessage obj=vadin item=0 page=trainer/30188.htm
+  S ActionFailed
+bypass npc_{vadin}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3327
+  S SystemMessage id=54 3:3328
+  S NpcHtmlMessage obj=vadin item=0 page=script/quest/Q229_TestOfWitchcraft/30188-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action vadin
+  S ActionFailed
+  S NpcHtmlMessage obj=vadin item=0 page=trainer/30188.htm
+  S ActionFailed
+action vadin
+  S ActionFailed
+  S NpcHtmlMessage obj=vadin item=0 page=trainer/30188.htm
+  S ActionFailed
+bypass npc_{vadin}_Quest
+  S NpcHtmlMessage obj=vadin item=0 page=script/quest/Q229_TestOfWitchcraft/30188-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+kill tamlin
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3329
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3329=20
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action vadin
+  S ActionFailed
+  S NpcHtmlMessage obj=vadin item=0 page=trainer/30188.htm
+  S ActionFailed
+action vadin
+  S ActionFailed
+  S NpcHtmlMessage obj=vadin item=0 page=trainer/30188.htm
+  S ActionFailed
+bypass npc_{vadin}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3329 6:20
+  S SystemMessage id=302 3:3328
+  S SystemMessage id=54 3:3330
+  S NpcHtmlMessage obj=vadin item=0 page=script/quest/Q229_TestOfWitchcraft/30188-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 3328=0 3329=0 3330=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action vadin
+  S ActionFailed
+  S NpcHtmlMessage obj=vadin item=0 page=trainer/30188.htm
+  S ActionFailed
+action vadin
+  S ActionFailed
+  S NpcHtmlMessage obj=vadin item=0 page=trainer/30188.htm
+  S ActionFailed
+bypass npc_{vadin}_Quest
+  S NpcHtmlMessage obj=vadin item=0 page=script/quest/Q229_TestOfWitchcraft/30188-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action vasper
+action vasper
+  S ActionFailed
+  S NpcHtmlMessage obj=vasper item=0 page=default/30417.htm
+  S ActionFailed
+bypass npc_{vasper}_Quest
+  S SystemMessage id=302 3:3330
+  S SystemMessage id=54 3:3029
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=vasper item=0 page=script/quest/Q229_TestOfWitchcraft/30417-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 3330=0 3029=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+action iker
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-07.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=6 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30110-08.htm
+  S SystemMessage id=302 3:3326
+  S SystemMessage id=54 3:3331
+  S SystemMessage id=54 3:3332
+  S QuestList 229:0x8000007f
+  S ExShowQuestMark quest=229
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-08.htm
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <cond> | 7
+  items 3326=0 3331=1 3332=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=7 <state>=STARTED
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-09.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=7 <state>=STARTED
+action vasper
+action vasper
+  S ActionFailed
+  S NpcHtmlMessage obj=vasper item=0 page=default/30417.htm
+  S ActionFailed
+bypass npc_{vasper}_Quest
+  S NpcHtmlMessage obj=vasper item=0 page=script/quest/Q229_TestOfWitchcraft/30417-06.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=7 <state>=STARTED
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S QuestList 229:0x800000ff
+  S ExShowQuestMark quest=229
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-18.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <cond> | 8
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=8 <state>=STARTED
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-18.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=8 <state>=STARTED
+action evert
+action evert
+  S ActionFailed
+  S NpcHtmlMessage obj=evert item=0 page=default/30633.htm
+  S ActionFailed
+bypass npc_{evert}_Quest
+  S NpcHtmlMessage obj=evert item=0 page=script/quest/Q229_TestOfWitchcraft/30633-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=8 <state>=STARTED

@@ -2,7 +2,6 @@ package clan
 
 import (
 	"context"
-	"sort"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -43,8 +42,8 @@ func (t *Table) restoreWars(rows []WarRow, nowMs int64) {
 		if !ok {
 			continue
 		}
-		cl.wars[r.TargetID] = struct{}{}
-		target.attackers[r.ClanID] = struct{}{}
+		cl.wars.add(r.TargetID)
+		target.attackers.add(r.ClanID)
 	}
 }
 
@@ -52,8 +51,7 @@ func (t *Table) restoreWars(rows []WarRow, nowMs int64) {
 func (cl *Clan) AtWarWith(clanID int32) bool {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	_, ok := cl.wars[clanID]
-	return ok
+	return cl.wars.has(clanID)
 }
 
 // WarList returns the clans this clan declared war on, in the order the
@@ -61,7 +59,7 @@ func (cl *Clan) AtWarWith(clanID int32) bool {
 func (cl *Clan) WarList() []int32 {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	return hashSetOrder(cl.wars)
+	return cl.wars.order()
 }
 
 // AttackerList returns the clans that declared war on this clan, in the
@@ -69,41 +67,7 @@ func (cl *Clan) WarList() []int32 {
 func (cl *Clan) AttackerList() []int32 {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	return hashSetOrder(cl.attackers)
-}
-
-// hashSetOrder lists ids in the order the reference's war sets hold them
-// right after boot: hash-bucket order of a table of 16 buckets doubled
-// whenever it is three quarters full, a bucket being the low bits of the
-// id folded with its high half, and ids sharing a bucket in ascending
-// order. It drifts from the reference later in two ways, both cosmetic
-// (only the order of clans in the war window): the reference table never
-// shrinks, so a clan that once held 12 or more wars keeps its larger
-// table after they end, where this recomputes the size from the current
-// count; and inside a bucket the reference keeps insertion order, which
-// is ascending only for the rows restored at boot, while a war declared
-// later sorts here by id rather than after its bucket-mates.
-func hashSetOrder(ids map[int32]struct{}) []int32 {
-	buckets := uint32(16)
-	for len(ids) >= int(buckets-buckets/4) {
-		buckets *= 2
-	}
-	bucket := func(id int32) uint32 {
-		h := uint32(id)
-		return ((h ^ (h >> 16)) & 0x7fffffff) & (buckets - 1)
-	}
-	out := make([]int32, 0, len(ids))
-	for id := range ids {
-		out = append(out, id)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		bi, bj := bucket(out[i]), bucket(out[j])
-		if bi != bj {
-			return bi < bj
-		}
-		return out[i] < out[j]
-	})
-	return out
+	return cl.attackers.order()
 }
 
 // lockPair write-locks a and b, in id order so two clans acting on each
@@ -192,10 +156,9 @@ func (s *Service) DeclareWar(c *player.Character, targetName string, now time.Ti
 		// Dissolved since it was looked up.
 		return War{}, WarNoSuchClan
 	}
-	_, attacked := cl.attackers[target.id]
-	_, atWar := cl.wars[target.id]
+	attacked, atWar := cl.attackers.has(target.id), cl.wars.has(target.id)
 	switch {
-	case len(cl.wars) >= maxWars:
+	case cl.wars.len() >= maxWars:
 		return War{}, WarTooMany
 	case cl.level < minWarLevel || len(cl.members) < s.cfg.MembersForWar:
 		return War{}, WarTooWeak
@@ -210,8 +173,8 @@ func (s *Service) DeclareWar(c *player.Character, targetName string, now time.Ti
 	case cl.warPenalties[target.id] > now.UnixMilli():
 		return War{Clan: cl, Target: target}, WarPenalty
 	}
-	cl.wars[target.id] = struct{}{}
-	target.attackers[cl.id] = struct{}{}
+	cl.wars.add(target.id)
+	target.attackers.add(cl.id)
 	clanID, targetID := cl.id, target.id
 	s.write(clanID, "store clan war", func(ctx context.Context, st Store) error { return st.InsertWar(ctx, clanID, targetID) })
 	return War{Clan: cl, Target: target}, WarDone
@@ -277,11 +240,11 @@ func (s *Service) EndWar(cl, target *Clan, now time.Time) bool {
 
 // endWarLocked is EndWar with both clans' mu held.
 func (s *Service) endWarLocked(cl, target *Clan, now time.Time) bool {
-	if _, ok := cl.wars[target.id]; !ok {
+	if !cl.wars.has(target.id) {
 		return false
 	}
-	delete(cl.wars, target.id)
-	delete(target.attackers, cl.id)
+	cl.wars.remove(target.id)
+	target.attackers.remove(cl.id)
 	var expiry int64
 	if s.cfg.WarPenaltyDays > 0 {
 		expiry = now.UnixMilli() + int64(s.cfg.WarPenaltyDays)*dayMillis

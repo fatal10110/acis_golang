@@ -2,7 +2,9 @@ package world
 
 import (
 	"fmt"
+	"iter"
 	"slices"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
@@ -37,6 +39,18 @@ type Observer interface {
 	Discover(obj Tracked)
 	// Forget tells the observer that obj just left its visible range.
 	Forget(obj Tracked)
+}
+
+// RegionWatcher is implemented by tracked players that react when a region
+// enters or leaves their surroundings, the 3x3 block of regions around
+// their own: on every grid move, spawn, teleport, Leave, Rejoin and
+// Despawn. Each crossing region is told before the objects in it are
+// discovered or forgotten, on the same goroutine and under the same rules
+// as Observer's callbacks.
+type RegionWatcher interface {
+	// RegionCrossed tells the watcher r entered its surroundings, or left
+	// them when entered is false.
+	RegionCrossed(r *Region, entered bool)
 }
 
 // Player is a tracked player character. Only objects of KindPlayer keep a
@@ -122,6 +136,28 @@ func (s *State) Move(t Tracked, x, y, z int) error {
 	}
 	s.relocateAndUnlock(t, next, false, nil)
 	return nil
+}
+
+// SetPosition changes t's position and nothing else: t stays in the region
+// holding it, so what it knows, who sees it and the region scans that find
+// it follow that region until a later Move or Teleport puts it in the
+// region of its position. It delivers nothing.
+func (s *State) SetPosition(t Tracked, x, y, z int) {
+	p := t.presence()
+	if p.tryLatch() {
+		if !p.busy.Load() {
+			p.setPosition(x, y, z)
+			p.releaseLatch()
+			return
+		}
+		p.releaseLatch()
+	}
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	p.setPosition(x, y, z)
+	p.releaseLatch()
+	s.mu.Unlock()
 }
 
 // Teleport moves t to (x, y, z) as a discontinuous relocation: t leaves the
@@ -255,7 +291,7 @@ func (s *State) DespawnAll(ts []Tracked) {
 				}
 				for _, t := range left {
 					if o.ObjectID() != t.ObjectID() {
-						notifications = append(notifications, visibilityNotification{w, t, false})
+						notifications = append(notifications, visibilityNotification{observer: w, object: t})
 					}
 				}
 			}
@@ -338,8 +374,11 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	p.knownFrom.Store(prev)
 	p.region.Store(next)
 	// A non-player entering a region that was already active or inactive
-	// sees no setActive transition, so it is notified directly.
-	notifyArrival := next != nil && !tIsPlayer && prev != nil
+	// sees no setActive transition, so it is notified directly. One that
+	// takes arrivals on their own is told of joining the grid too.
+	_, arrivalActor := t.(regionArrivalActor)
+	joined := prev == nil
+	notifyArrival := next != nil && !tIsPlayer && (!joined || arrivalActor)
 
 	var notificationBuf [16]visibilityNotification
 	var notifications []visibilityNotification
@@ -349,30 +388,31 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 		if owner, ok := t.(relocateScratchOwner); ok {
 			scratch = owner.relocateScratch()
 		}
-		// Same unshared-region skip as appendCrossing.
+		// Same unshared-region skip as appendCrossing: two notifications
+		// per object, and the region's own crossing.
 		for _, r := range oldAreas {
 			if !containsRegion(oldShared, r) {
-				n += len(r.objects)
+				n += 2*len(r.objects) + 1
 			}
 		}
 		for _, r := range newAreas {
 			if !containsRegion(newShared, r) {
-				n += len(r.objects)
+				n += 2*len(r.objects) + 1
 			}
 		}
 	}
 	// The scratch and stack-buffer paths keep separate slice variables so
 	// the stack buffer never flows into the heap-resident scratch.
 	if scratch != nil {
-		if cap(scratch.notifications) < n*2 {
-			scratch.notifications = make([]visibilityNotification, 0, n*2)
+		if cap(scratch.notifications) < n {
+			scratch.notifications = make([]visibilityNotification, 0, n)
 		}
 		scratch.notifications = appendCrossing(scratch.notifications[:0], t, oldAreas, oldShared, newAreas, newShared)
 		notifications = scratch.notifications
 	} else {
 		buf := notificationBuf[:0]
-		if cap(buf) < n*2 {
-			buf = make([]visibilityNotification, 0, n*2)
+		if cap(buf) < n {
+			buf = make([]visibilityNotification, 0, n)
 		}
 		notifications = appendCrossing(buf, t, oldAreas, oldShared, newAreas, newShared)
 	}
@@ -421,7 +461,7 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 		s.mu.Unlock()
 	}()
 	if notifyArrival {
-		s.notifyArrivalActivity(next, t, arrival)
+		s.notifyArrivalActivity(next, t, arrival, joined)
 	}
 	for _, tg := range toggles {
 		s.notifyActivity(tg.region, tg.active)
@@ -442,36 +482,52 @@ func appendCrossing(notes []visibilityNotification, t Tracked, oldAreas, oldShar
 	return appendRegionChange(notes, t, newAreas, newShared, true)
 }
 
-// appendRegionChange appends, for every object in areas outside shared, the
-// notification to that object about t and then t's own about that object.
+// appendRegionChange appends, for every region of areas outside shared,
+// the crossing of that region told to t when t is a RegionWatcher player,
+// then for every object in it the notification to that object about t and
+// then t's own about that object.
 func appendRegionChange(notes []visibilityNotification, t Tracked, areas, shared []*Region, discover bool) []visibilityNotification {
 	tObs, tObserves := t.(Observer)
+	watcher, watches := t.(RegionWatcher)
+	watches = watches && isPlayer(t)
 	for _, r := range areas {
 		if containsRegion(shared, r) {
 			continue
+		}
+		if watches {
+			notes = append(notes, visibilityNotification{watcher: watcher, region: r, discover: discover})
 		}
 		for _, o := range r.objects {
 			if o.ObjectID() == t.ObjectID() {
 				continue
 			}
 			if w, ok := o.(Observer); ok {
-				notes = append(notes, visibilityNotification{w, t, discover})
+				notes = append(notes, visibilityNotification{observer: w, object: t, discover: discover})
 			}
 			if tObserves {
-				notes = append(notes, visibilityNotification{tObs, o, discover})
+				notes = append(notes, visibilityNotification{observer: tObs, object: o, discover: discover})
 			}
 		}
 	}
 	return notes
 }
 
+// visibilityNotification is one callback a placement delivers: observer
+// told about object, or, when watcher is set, watcher told about region
+// crossing its surroundings.
 type visibilityNotification struct {
 	observer Observer
 	object   Tracked
+	watcher  RegionWatcher
+	region   *Region
 	discover bool
 }
 
 func (n visibilityNotification) notify() {
+	if n.watcher != nil {
+		n.watcher.RegionCrossed(n.region, n.discover)
+		return
+	}
 	if n.discover {
 		n.observer.Discover(n.object)
 		return
@@ -500,16 +556,22 @@ func (s *State) notifyActivity(r *Region, active bool) {
 
 // notifyArrivalActivity tells obj, which arrival placed in r, the activity r
 // had then — unless a toggle landed or is still pending since, in which case
-// that toggle's notifyActivity reaches obj instead.
-func (s *State) notifyArrivalActivity(r *Region, obj Tracked, arrival regionActivityArrival) {
+// that toggle's notifyActivity reaches obj instead. joined reports that the
+// arrival brought obj onto the grid.
+func (s *State) notifyArrivalActivity(r *Region, obj Tracked, arrival regionActivityArrival, joined bool) {
 	s.mu.RLock()
 	changed := r.activityVersion != arrival.version
 	pending := r.activityPending != 0
 	active := r.Active()
 	s.mu.RUnlock()
-	if !arrival.pending && !changed && !pending {
-		notifyObjectActivity(obj, active)
+	if arrival.pending || changed || pending {
+		return
 	}
+	if actor, ok := obj.(regionArrivalActor); ok {
+		actor.OnRegionArrival(active, joined)
+		return
+	}
+	notifyObjectActivity(obj, active)
 }
 
 // regionNeighborhoodEmpty reports whether r and its 3x3 neighborhood
@@ -517,7 +579,7 @@ func (s *State) notifyArrivalActivity(r *Region, obj Tracked, arrival regionActi
 func (s *State) regionNeighborhoodEmpty(r *Region) bool {
 	var buf [9]*Region
 	for _, n := range s.AppendNeighbors(buf[:0], r, 1) {
-		if n.playersCount != 0 {
+		if len(n.players) != 0 {
 			return false
 		}
 	}
@@ -590,6 +652,56 @@ func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
 	var regionBuf [9]*Region
 	for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
 		out = region.appendObjectsExcept(out, t.ObjectID())
+	}
+	return out
+}
+
+// KnownPlayers yields every player in t's surrounding regions, excluding t
+// itself: the recipients of a broadcast about t. It yields nothing when t is
+// off the grid, and follows the same surroundings as AppendKnown. The
+// players are collected into pooled scratch first, so no region lock is held
+// while the loop body runs, and a broadcast keeps no known-list storage of
+// its own.
+func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
+	return func(yield func(Tracked) bool) {
+		r := t.presence().knownRegion()
+		if r == nil {
+			return
+		}
+		scratch := knownPlayersScratch.Get().(*[]Tracked)
+		players := (*scratch)[:0]
+		var regionBuf [9]*Region
+		for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
+			players = region.appendPlayersExcept(players, t.ObjectID())
+		}
+		defer func() {
+			clear(players)
+			*scratch = players[:0]
+			knownPlayersScratch.Put(scratch)
+		}()
+		for _, p := range players {
+			if !yield(p) {
+				return
+			}
+		}
+	}
+}
+
+// knownPlayersScratch holds the reusable collection slices of KnownPlayers;
+// each one serves a single iteration at a time.
+var knownPlayersScratch = sync.Pool{New: func() any { return new([]Tracked) }}
+
+// AppendAround appends every object in the regions surrounding the one
+// holding (x, y) to out, excluding the object except: what an object in
+// that region knows. It does nothing for a point off the grid.
+func (s *State) AppendAround(out []Tracked, x, y int, except int32) []Tracked {
+	r, ok := s.RegionAt(x, y)
+	if !ok {
+		return out
+	}
+	var regionBuf [9]*Region
+	for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
+		out = region.appendObjectsExcept(out, except)
 	}
 	return out
 }

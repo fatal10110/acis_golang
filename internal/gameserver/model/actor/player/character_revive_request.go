@@ -78,7 +78,7 @@ func (c *Character) ReviveOffer() (pending, forPet bool) {
 // OfferSummonRevive offers this character the resurrection of its summon,
 // which just died under a Phoenix Blessing.
 func (c *Character) OfferSummonRevive() {
-	c.ReviveRequest(c, 0, true)
+	c.ReviveRequest(c.selfReviver(), 0, true)
 }
 
 // ReviveAnswer applies this character's answer to its pending resurrection
@@ -175,4 +175,13 @@ func (c *Character) deadSummon() (reviveSummon, bool) {
 		return nil, false
 	}
 	return summon, true
+}
+
+// selfReviver returns c as the world registers it, the reviver of the
+// resurrection a Phoenix Blessing offers c for itself or its summon.
+func (c *Character) selfReviver() Reviver {
+	if r, ok := c.tracked().(Reviver); ok {
+		return r
+	}
+	return c
 }

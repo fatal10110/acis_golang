@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/testsupport/vitals"
 )
 
 // ---- from feed_test.go ----
@@ -103,33 +104,32 @@ func TestExpForLevel(t *testing.T) {
 	}
 }
 
-// Expected values below were computed independently from the specified
-// formula (percentLost = -0.07*level + 6.5; Java Math.round), not copied from
-// this package's own implementation.
+// The expected losses come from testdata/vitals.golden, the reference's own
+// death penalty (percentLost = -0.07*level + 6.5, rounded half up).
 func TestDeathPenaltyExpLoss(t *testing.T) {
 	tests := []struct {
-		name  string
-		level int
-		cur   int64
-		next  int64
-		want  int64
+		name            string
+		level           int
+		prev, cur, next int64
+		exp             int64
 	}{
-		{"level 44", 44, 800000, 1000000, 6840},
-		{"level 10", 10, 1000, 2500, 87},
-		{"level 1", 1, 0, 136, 9},
+		{"level 44", 44, 700000, 800000, 1000000, 900000},
+		{"level 10", 10, 900, 1000, 2500, 1500},
+		{"level 1", 1, 0, 0, 136, 100},
 		// Past level ~93 the formula goes negative: a death at this level
 		// grants exp instead of costing it. That's an intentional artifact
 		// of the specified linear formula, preserved as-is.
-		{"level 99 goes negative", 99, 5000000, 5200000, -860},
+		{"level 99 goes negative", 99, 4900000, 5000000, 5200000, 5100000},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			want := vitals.PetDeath(t, tt.level, tt.prev, tt.cur, tt.next, tt.exp).Lost
 			data := &npc.PetData{Levels: map[int]npc.PetLevelStats{
 				tt.level:     {MaxExp: tt.cur},
 				tt.level + 1: {MaxExp: tt.next},
 			}}
-			if got := DeathPenaltyExpLoss(data, tt.level); got != tt.want {
-				t.Errorf("DeathPenaltyExpLoss(level=%d) = %d, want %d", tt.level, got, tt.want)
+			if got := DeathPenaltyExpLoss(data, tt.level); got != want {
+				t.Errorf("DeathPenaltyExpLoss(level=%d) = %d, want %d", tt.level, got, want)
 			}
 		})
 	}

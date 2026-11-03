@@ -1,0 +1,21 @@
+# Status of the Beacon Tower (Q113), refused: a level 39 character, one short of the quest's
+# level, is turned away by Moira and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q113_status_of_the_beacon_tower_low_level.golden
+character Keeper 39
+script quest.Q113_StatusOfTheBeaconTower
+item 8086
+page trainer/31979.htm
+page script/quest/Q113_StatusOfTheBeaconTower/
+npc moira 31979 Trainer 10 0 0
+
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q113_StatusOfTheBeaconTower/31979-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q113_StatusOfTheBeaconTower CREATED
+  rows Q113_StatusOfTheBeaconTower -

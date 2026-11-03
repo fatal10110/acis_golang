@@ -1,0 +1,18 @@
+# Core (29006), a grand boss whose template lists two Core Guards (29993): its created hook
+# leads both as it appears, beside a third guard the scenario raises as its private (master),
+# so it leads three. The third guard's death, while Core lives, leaves the two live ones; its
+# party-died call asks the guard back only after 280 s plus a draw of 40 (tests/ai/
+# boss_core_test.go pins that wait on the respawn clock, which the format does not read).
+character Hunter 1
+random always 39
+script script.ai.individual.DefaultNpc
+script script.ai.boss.core.Core
+npc core 29006 GrandBoss 400 0 0 privates 29993:1,29993:1
+npc guard 29993 Monster 600 0 0 master core
+
+advance 1s
+  master guard core
+  privates core 29993=3
+kill guard
+  S SystemMessage id=95 1:0 1:0
+  privates core 29993=2

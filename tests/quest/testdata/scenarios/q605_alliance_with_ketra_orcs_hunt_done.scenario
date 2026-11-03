@@ -1,0 +1,17 @@
+# Alliance with Ketra Orcs (Q605) at cond 6: no Varka warrior drops a badge any more. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q605_alliance_with_ketra_orcs_hunt_done.golden
+character Ally 74
+quest Q605_AllianceWithKetraOrcs <cond>=6 <state>=STARTED
+random 0
+script quest.Q605_AllianceWithKetraOrcs
+item 7211 7212 7213 7214 7215 7216 7217 7218 7219 7220 7233
+page npcdefault.htm
+page script/quest/Q605_AllianceWithKetraOrcs/
+npc wahkan 31371 Folk 10 0 0
+npc soldier 21350 Monster 40 0 0
+npc officer 21357 Monster 40 0 0
+npc captain 21365 Monster 40 0 0
+
+kill soldier
+  S SystemMessage id=95 1:0 1:0
+  items 7216=0

@@ -1,0 +1,72 @@
+# Path to an Elven Knight (Q406), level 19, quest started: each of the six skeletons drops a topaz piece (the first draw misses) and Sorius sees them. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q406_path_to_an_elven_knight_skeletons.golden
+character Knight 19
+class 18
+quest Q406_PathToAnElvenKnight <cond>=1 <state>=STARTED
+random 999999 0 0 0 0 0 0
+script quest.Q406_PathToAnElvenKnight
+item 1202 1203 1204 1205 1206 1276
+page trainer/30327.htm
+page trainer/30317.htm
+page script/quest/Q406_PathToAnElvenKnight/
+npc sorius 30327 Trainer 10 0 0
+npc kluto 30317 Trainer -10 0 0
+npc tracker 20035 Monster 40 0 0
+npc leader 20042 Monster 45 0 0
+npc scout 20045 Monster 50 0 0
+npc bowman 20051 Monster 55 0 0
+npc spartoi 20054 Monster 60 0 0
+npc raging 20060 Monster 65 0 0
+npc novice 20782 Monster 70 0 0
+
+action sorius
+  rows Q406_PathToAnElvenKnight <cond>=1 <state>=STARTED
+  state Q406_PathToAnElvenKnight STARTED
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+bypass npc_{sorius}_Quest
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q406_PathToAnElvenKnight/30327-07.htm
+  S ActionFailed
+  S ActionFailed
+kill tracker
+  S SystemMessage id=95 1:0 1:0
+kill tracker
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1205
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1205=1
+kill leader
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1205
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1205=2
+kill scout
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1205
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1205=3
+kill bowman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1205
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1205=4
+kill spartoi
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1205
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1205=5
+kill raging
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1205
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1205=6
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+bypass npc_{sorius}_Quest
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q406_PathToAnElvenKnight/30327-08.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,36 @@
+# Path to an Elven Wizard (Q408), a level 19 elven mystic with the Eternity Diamond already is refused. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q408_path_to_an_elven_wizard_has_diamond.golden
+character Wizard 19
+class 25
+hold 1230 1
+script quest.Q408_PathToAnElvenWizard
+item 1218 1219 1220 1221 1222 1223 1224 1225 1226 1229 1230 1272 1273 1274
+page default/30414.htm
+page trainer/30157.htm
+page default/30371.htm
+page default/30423.htm
+page script/quest/Q408_PathToAnElvenWizard/
+npc rosella 30414 Folk 10 0 0
+npc greenis 30157 Trainer -10 0 0
+npc thalia 30371 Folk 20 0 0
+npc northwind 30423 Folk -20 0 0
+npc sukar 20047 Monster 40 0 0
+npc dryad 20019 Monster 50 0 0
+npc spider 20466 Monster 60 0 0
+
+action rosella
+  items 1230=1
+  rows Q408_PathToAnElvenWizard -
+  state Q408_PathToAnElvenWizard -
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q408_PathToAnElvenWizard CREATED
+bypass Quest Q408_PathToAnElvenWizard 30414-06.htm
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-05.htm
+  S ActionFailed

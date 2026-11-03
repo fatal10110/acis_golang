@@ -32,7 +32,7 @@ func TestInventoryLimitFollowsConfigAndStat(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &Character{Race: tc.race}
-			c.Configure(Runtime{Rules: Rules{InventorySlots: tc.slots}})
+			c.Configure(Runtime{Rules: NewRuleBook(Rules{InventorySlots: tc.slots})})
 			if tc.add != 0 {
 				c.AddStatFuncs([]effect.Mod{{Stat: stat.InvLim, Op: effect.OpAdd, Value: tc.add}})
 			}
@@ -50,7 +50,7 @@ func TestAttachedInventoryCapacityFollowsInventoryLimit(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindWeapon, Weapon: &item.WeaponDetail{}}}))
 	c := &Character{Race: RaceHuman}
 	c.AttachRuntime(&Template{}, inv)
-	c.Configure(Runtime{Rules: Rules{InventorySlots: InventorySlots{NoDwarf: 2, Dwarf: 5, Configured: true}}})
+	c.Configure(Runtime{Rules: NewRuleBook(Rules{InventorySlots: InventorySlots{NoDwarf: 2, Dwarf: 5, Configured: true}})})
 	inv.AddNew(1, 1, 101)
 
 	if !inv.ValidateCapacity(1) {

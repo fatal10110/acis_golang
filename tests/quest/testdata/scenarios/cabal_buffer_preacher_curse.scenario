@@ -1,0 +1,18 @@
+# A Preacher of Doom (CabalBuffer) beside a character of Dusk while Dawn leads the Seven Signs:
+# seeing him, holding no curse, it draws 100 then 10000 and, the draw of 10000 being 0, says
+# its rare line and curses him with the fighter curse at level 1 (onSeeCreature). Its landing
+# rolls are pinned to 0: the curse lands, and the character feels it.
+# Expectations are derived from the reference source (CabalBuffer.java); the reference probe
+# cannot pin the world's landing roll.
+character Seeker 20
+cabal dusk gnosis
+festival 100 0
+random 50 0
+script script.feature.CabalBuffer
+npc preacher 31093 Folk 100 0 0
+roll preacher 0
+
+tick x4
+  S NpcSay obj=preacher type=0 npc=1031093 text="You don't have any hope! Your end has come!"
+  S MagicSkillUse caster=preacher target=player skill=4361-1 hit=0 reuse=0 success=0
+  S SystemMessage id=110 4:4361,1

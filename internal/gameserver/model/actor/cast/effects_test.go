@@ -354,7 +354,7 @@ func TestApplyEffectsRejectsNonCreatureSelection(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 106, Target: modelskill.TargetOne, SkillType: "DUMMY"}
 
-	if _, ok := SelectTarget(caster, door, def); !ok {
+	if _, ok := SelectTarget(caster, door, &def); !ok {
 		t.Fatal("SelectTarget(door) ok = false, want true: a non-creature Tracked value still selects")
 	}
 	if ApplyEffects(handlers, caster, door, def) {
@@ -442,7 +442,7 @@ func TestApplyEffectsAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
 		{"monster rejected", monster, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			selected, ok := SelectTarget(caster, tc.target, tc.def)
+			selected, ok := SelectTarget(caster, tc.target, &tc.def)
 			if !ok {
 				t.Fatal("SelectTarget() ok = false, want true")
 			}
@@ -485,6 +485,9 @@ func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) 
 func (castHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (castHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (castHostileMove) MoveStraightToLocation(location.Location) (bool, error) {
+	return false, nil
+}
 
 func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 

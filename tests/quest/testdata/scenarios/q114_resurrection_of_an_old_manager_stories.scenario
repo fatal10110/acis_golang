@@ -1,0 +1,170 @@
+# Resurrection of an Old Manager (Q114), cond 1 (talk 1) to 6: Yumi sends the character to Wendy,
+# who tells both stories (talk, talk1) before the character picks the first story (cond 3);
+# Yumi tells it again and sends the character back to Wendy (cond 6). Then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager_stories.golden
+character Manager 49
+quest Q114_ResurrectionOfAnOldManager <cond>=1 <state>=STARTED talk=1
+script quest.Q114_ResurrectionOfAnOldManager
+item 57 8090 8091 8287 8288 8289
+page default/32041.htm
+page default/32047.htm
+page script/quest/Q114_ResurrectionOfAnOldManager/
+npc yumi 32041 Folk 10 0 0
+npc wendy 32047 Folk 20 0 0
+
+# Yumi again, mid-story (talk 1).
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-07.htm
+  S QuestList 114:0x80000003
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-07.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 2
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 0
+  rows Q114_ResurrectionOfAnOldManager <cond>=2 <state>=STARTED talk=0
+
+# Wendy: the first story (talk), the second (talk1), then the choice.
+action wendy
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-02.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-02.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 1
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-01.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-01.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-03.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-03.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk1 | 1
+  rows Q114_ResurrectionOfAnOldManager <cond>=2 <state>=STARTED talk=1 talk1=1
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-01.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-04.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-05.htm
+  S QuestList 114:0x80000007
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-05.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 3
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 0
+  Q upsert Q114_ResurrectionOfAnOldManager | choice | 1
+  Q delete-var Q114_ResurrectionOfAnOldManager | talk1
+  rows Q114_ResurrectionOfAnOldManager <cond>=3 <state>=STARTED choice=1 talk=0
+bypass Quest Q114_ResurrectionOfAnOldManager 32047-08.htm
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-08.htm
+  S ActionFailed
+
+# Wendy, once the story is chosen.
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 html="<html><body>Wendy:<br>\nWelcome to Dr. Chaos's lab.<br>\nPlease observe proper precautions. If you do not, you may die.<br>\n<a action=\"bypass -h npc_{wendy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Yumi tells the first story (choice 1).
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-10.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-10.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-11.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-11.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 1
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-12.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-12.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-13.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-13.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-14.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-14.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-15.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-15.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-16.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-16.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-17.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-17.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-18.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-18.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 2
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-19.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-19.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-20.htm
+  S QuestList 114:0x80000027
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-20.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2147483609
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 6
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 0
+  rows Q114_ResurrectionOfAnOldManager <cond>=6 <flags>=-2147483609 <state>=STARTED choice=1 talk=0
+
+# Yumi, once the story is told; then relog.
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>Collector Yumi:<br>\nThis area is know as the Ruins of Pavel. It is one of the research labs the Giants established in the distant past. I've come here to research the Starstones that are being produced in this area.<br>\nThe roaming golems make it very risky to go outside of the barracks, however. In addition, the remnants of ancient old experiments, vile and disgusting, add to the danger.<br>\n<a action=\"bypass -h npc_{yumi}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-21.htm
+  S ActionFailed
+  S ActionFailed
+
+relog
+  state Q114_ResurrectionOfAnOldManager STARTED
+  rows Q114_ResurrectionOfAnOldManager <cond>=6 <flags>=-2147483609 <state>=STARTED choice=1 talk=0
+
+# Wendy goes on with the first story.
+action wendy
+action wendy
+  S ActionFailed
+  S NpcHtmlMessage obj=wendy item=0 page=default/32047.htm
+  S ActionFailed
+bypass npc_{wendy}_Quest
+  S NpcHtmlMessage obj=wendy item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32047-10.htm
+  S ActionFailed
+  S ActionFailed

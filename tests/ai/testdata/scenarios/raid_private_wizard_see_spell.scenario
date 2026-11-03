@@ -1,0 +1,19 @@
+# RaidPrivateWizard (25002, level 1), every draw 0: a level 20 character, more than 8 levels above it,
+# casts Ultimate Debuff (4694) on a monster beside it: it wants its magic strike and its debuff at 1000000 and,
+# beside them, the raid curse on the character (4515-1, 1000000).
+character Hunter 20
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard
+npc master 20003 Monster 400 0 0
+npc wizard1 25002 Monster 100 0 0 skill DD_MAGIC_A 4191 2 skill DEBUFF_A 4198 2 master master
+npc wolf 20120 Monster 150 0 0
+
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires wizard1 cast(player,4191,move)=1000000 cast(player,4198,move)=1000000 cast(player,4515,move)=1000000

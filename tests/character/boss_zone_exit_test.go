@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -21,12 +20,8 @@ func bootInBossZone(t *testing.T) (*gameservertest.Server, *zone.Boss, int32) {
 	if err != nil {
 		t.Fatalf("build zone form: %v", err)
 	}
-	set := commons.NewStatSet()
-	set.Set("InvadeTime", "600000")
-	boss, err := zone.NewBoss(1, form, set)
-	if err != nil {
-		t.Fatalf("build boss zone: %v", err)
-	}
+	boss := zone.NewBoss(1, form)
+	boss.InvadeWindow = 10 * time.Minute
 	zones := zone.NewIndex()
 	zones.Add(boss)
 	srv := gameservertest.Boot(t,
@@ -61,8 +56,10 @@ func TestBossZoneTeleportOutRevokesPermission(t *testing.T) {
 	}
 	x, y, z := srv.PlayerPosition(t, objID)
 
-	// The teleport runs to completion on this goroutine, zone exit included.
+	// The teleport runs to completion on the player's queue, zone exit
+	// included.
 	player.TeleportTo(x+5000, y, z, 0)
+	srv.Settle(t)
 	if slices.Contains(boss.AllowedPlayers(), objID) {
 		t.Fatal("player teleported out of the boss zone kept its entry permission")
 	}

@@ -1,0 +1,21 @@
+# Orfen (29014), a level 1 grand boss standing 100 from the level 1 character, killed twice, every
+# draw 99. Its lethal hit, landing while it stands whole (its HP read before the hit's damage),
+# neither sends it to rest nor pulls the character; the grand boss's death sends the raid success
+# message and sound, then its dying hook plays BS02_D. The fresh Orfen that replaces it plays
+# BS01_A as it appears.
+character Hunter 1
+random always 99
+script script.ai.individual.DefaultNpc
+script script.ai.boss.orfen.Orfen
+npc orfen 29014 GrandBoss 100 0 0
+
+kill orfen x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=1 file=BS02_D bind=1 obj=orfen loc=110,20,30 delay=0
+  S PlaySound type=1 file=BS01_A bind=1 obj=orfen loc=110,20,30 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=1 file=BS02_D bind=1 obj=orfen loc=110,20,30 delay=0

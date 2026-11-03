@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	commonsdb "github.com/fatal10110/acis_golang/internal/commons/db"
 )
 
 const defaultRootDSN = "root:test@tcp(127.0.0.1:3307)/"
@@ -48,7 +50,7 @@ func Open(ctx context.Context, name string, schemaStmts ...string) (*sql.DB, err
 		return nil, fmt.Errorf("create database %s: %w", name, err)
 	}
 
-	db, err := sql.Open("mysql", rootDSN()+name)
+	db, err := commonsdb.OpenDSN(rootDSN() + name)
 	if err != nil {
 		return nil, fmt.Errorf("open db %s: %w", name, err)
 	}

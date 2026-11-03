@@ -1,0 +1,78 @@
+# Testimony Of Prosperity (Q221), Keef: a level 38 Scavenger at cond 1 with the licence and the third notice hands it to Keef, gets Torocco's procuration and
+# pays the 5000 adena and is given the third receipt.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q221_testimony_of_prosperity_keef.golden
+character Dwarf 38
+class 54
+quest Q221_TestimonyOfProsperity <state>=STARTED <cond>=1
+hold 3239 1
+hold 3246 1
+hold 3249 1
+hold 57 5000
+script quest.Q221_TestimonyOfProsperity
+item 3023 3030 3238 3239 3240 3241 3242 3243 3244 3245 3246 3247 3248 3249 3250 3251 3252 3253 3254 3255 3256 3257 3258 3259 3260 3261 3262 3263 3264 3265 3266 3267 3268 3269 3270 3271 3272 3273 3274 3275 3428 1867 57 7562
+page default/30534.htm
+page default/30555.htm
+page script/quest/Q221_TestimonyOfProsperity/
+npc keef 30534 Folk 10 0 0
+npc torocco 30555 Folk -10 0 0
+
+action keef
+action keef
+  S ActionFailed
+  S NpcHtmlMessage obj=keef item=0 page=default/30534.htm
+  S ActionFailed
+bypass npc_{keef}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3249
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q221_TestimonyOfProsperity/30534-01.htm
+  S ActionFailed
+  S ActionFailed
+action torocco
+action torocco
+  S ActionFailed
+  S NpcHtmlMessage obj=torocco item=0 page=default/30555.htm
+  S ActionFailed
+bypass npc_{torocco}_Quest
+  S NpcHtmlMessage obj=torocco item=0 page=script/quest/Q221_TestimonyOfProsperity/30555-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30555-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3263
+  S NpcHtmlMessage obj=torocco item=0 page=script/quest/Q221_TestimonyOfProsperity/30555-02.htm
+  S ActionFailed
+  items 3263=1
+action torocco
+  S ActionFailed
+  S NpcHtmlMessage obj=torocco item=0 page=default/30555.htm
+  S ActionFailed
+bypass npc_{torocco}_Quest
+  S NpcHtmlMessage obj=torocco item=0 page=script/quest/Q221_TestimonyOfProsperity/30555-03.htm
+  S ActionFailed
+  S ActionFailed
+action keef
+action keef
+  S ActionFailed
+  S NpcHtmlMessage obj=keef item=0 page=default/30534.htm
+  S ActionFailed
+bypass npc_{keef}_Quest
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q221_TestimonyOfProsperity/30534-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q221_TestimonyOfProsperity 30534-03a.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:5000
+  S SystemMessage id=302 3:3263
+  S SystemMessage id=54 3:3260
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q221_TestimonyOfProsperity/30534-03b.htm
+  S ActionFailed
+  items 57=0 3260=1
+action keef
+  S ActionFailed
+  S NpcHtmlMessage obj=keef item=0 page=default/30534.htm
+  S ActionFailed
+bypass npc_{keef}_Quest
+  S NpcHtmlMessage obj=keef item=0 page=script/quest/Q221_TestimonyOfProsperity/30534-04.htm
+  S ActionFailed
+  S ActionFailed

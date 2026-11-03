@@ -18,6 +18,9 @@ import (
 const (
 	spawnBrokenCaptainID = 20133
 	spawnMissingID       = 4242
+	// spawnTreeID is a Christmas tree, which a script spawns as no NPC
+	// kind.
+	spawnTreeID = 13006
 )
 
 // brokenCaptainTemplates is the script spawn table with the broken captain.
@@ -83,7 +86,7 @@ func TestScriptCreatePrivatesPanicsOnMissingTemplate(t *testing.T) {
 	mustPanic(t, "privates naming a missing template", func() { w.spawner.CreatePrivates(master) })
 
 	pup := spawnedNPC(t, w, spawnPupID).(*npc.Hostile)
-	if pup.Master() != captain || !slices.Equal(captain.Minions(), []*npc.Hostile{pup}) {
+	if pup.Master() != captain || !slices.Equal(captain.Minions(), []npc.PartyMember{pup}) {
 		t.Fatalf("captain's privates = %d, want the pup alone, linked", len(captain.Minions()))
 	}
 	if _, ok := w.srv.State.Object(wolf.ObjectID()); !ok {
@@ -91,46 +94,32 @@ func TestScriptCreatePrivatesPanicsOnMissingTemplate(t *testing.T) {
 	}
 }
 
-// Only a hostile NPC keeps privates: a civilian private is refused with no
-// handle, and a civilian master panics.
+// A private whose template spawns as neither a hostile nor a civilian NPC
+// is refused with no handle and logged, and its master keeps no private.
 func TestScriptPrivateKindRefusals(t *testing.T) {
 	t.Parallel()
-	w := bootScriptSpawns(t)
+	tree := gameservertest.FolkTemplate("ChristmasTree", spawnTreeID)
+	w := bootScriptSpawns(t, gameservertest.WithNPCs(npc.NewTable([]*npc.Template{
+		spawnMonster(spawnWolfID, "Wolf"),
+		gameservertest.FolkTemplate("Merchant", spawnGrocerID),
+		tree,
+	})))
 	var logged bytes.Buffer
 	spawner := script.NewSpawner(w.srv.NpcSpawns, zerolog.New(&logged))
 
-	master := spawner.AddSpawn(spawnWolfID, script.Loc{X: w.at.X + 50, Y: w.at.Y, Z: w.at.Z}, false, 0)
-	boss := spawnedNPC(t, w, spawnWolfID).(*npc.Hostile)
-	if h := spawner.CreateOnePrivate(master, spawnGrocerID, 0); h != nil {
-		t.Fatalf("civilian private returned %v, want no handle", h)
-	}
-	if h := spawner.CreateOnePrivateEx(master, spawnGrocerID, script.Loc{X: w.at.X + 70, Y: w.at.Y, Z: w.at.Z}, 0, script.Params{}); h != nil {
-		t.Fatalf("civilian private at a point returned %v, want no handle", h)
-	}
-	if len(boss.Minions()) != 0 {
-		t.Fatalf("master's privates = %d after refusals, want none", len(boss.Minions()))
-	}
-	for _, obj := range w.srv.State.Objects() {
-		if f, ok := obj.(*npc.Folk); ok && f.Instance.Template.ID == spawnGrocerID {
-			t.Fatalf("a civilian private was placed: %d", f.ObjectID())
+	for _, id := range []int32{spawnWolfID, spawnGrocerID} {
+		master := spawner.AddSpawn(id, script.Loc{X: w.at.X + 50, Y: w.at.Y, Z: w.at.Z}, false, 0)
+		if h := spawner.CreateOnePrivate(master, spawnTreeID, 0); h != nil {
+			t.Fatalf("tree private of %d returned %v, want no handle", id, h)
+		}
+		if h := spawner.CreateOnePrivateEx(master, spawnTreeID, script.Loc{X: w.at.X + 70, Y: w.at.Y, Z: w.at.Z}, 0, script.Params{}); h != nil {
+			t.Fatalf("tree private of %d at a point returned %v, want no handle", id, h)
+		}
+		if live := spawnedNPC(t, w, int(id)).(npc.PartyMember); len(live.Minions()) != 0 {
+			t.Fatalf("master %d privates = %d after refusals, want none", id, len(live.Minions()))
 		}
 	}
-	if got := strings.Count(logged.String(), "spawn placed nothing"); got != 2 {
-		t.Fatalf("refusals logged %d times, want 2: %s", got, logged.String())
-	}
-
-	grocer := spawner.AddSpawn(spawnGrocerID, script.Loc{X: w.at.X - 50, Y: w.at.Y, Z: w.at.Z}, false, 0)
-	if grocer == nil {
-		t.Fatal("civilian spawn returned no handle")
-	}
-	mustPanic(t, "a private of a civilian master", func() { spawner.CreateOnePrivate(grocer, spawnPupID, 0) })
-	mustPanic(t, "a private at a point of a civilian master", func() {
-		spawner.CreateOnePrivateEx(grocer, spawnPupID, script.Loc{X: w.at.X, Y: w.at.Y, Z: w.at.Z}, 0, script.Params{})
-	})
-	mustPanic(t, "privates of a civilian master", func() { spawner.CreatePrivates(grocer) })
-	for _, obj := range w.srv.State.Objects() {
-		if h, ok := obj.(*npc.Hostile); ok && h.Instance.Template.ID == spawnPupID {
-			t.Fatalf("a private of a civilian master was placed: %d", h.ObjectID())
-		}
+	if got := strings.Count(logged.String(), "spawn placed nothing"); got != 4 {
+		t.Fatalf("refusals logged %d times, want 4: %s", got, logged.String())
 	}
 }

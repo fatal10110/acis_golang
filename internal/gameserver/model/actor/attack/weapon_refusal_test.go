@@ -33,7 +33,7 @@ func TestRefuseAttackTellsWeaponRefusal(t *testing.T) {
 		arrows    bool
 		mpConsume int
 		mp        int
-		want      event.AttackWeaponRefusal
+		want      event.AttackRefusal
 	}{
 		{"fishing rod", item.WeaponFishingRod, true, 0, 100, event.AttackRefusedFishingRod},
 		{"bow without arrows", item.WeaponBow, false, 1, 100, event.AttackRefusedNoArrows},
@@ -65,8 +65,8 @@ func TestRefuseAttackTellsWeaponRefusal(t *testing.T) {
 				}
 				return
 			}
-			if len(events) != 1 || events[0] != (event.AttackWeaponRefused{Reason: tc.want}) {
-				t.Fatalf("RefuseAttack() emitted %v, want one AttackWeaponRefused{%d}", events, tc.want)
+			if len(events) != 1 || events[0] != (event.AttackRefused{Reason: tc.want}) {
+				t.Fatalf("RefuseAttack() emitted %v, want one AttackRefused{%d}", events, tc.want)
 			}
 		})
 	}

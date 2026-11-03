@@ -1,0 +1,189 @@
+# Make a Pair of Dress Shoes (Q033): a level 60 character whose formal wear (Q037) is at its seventh
+# step accepts at Woodley, has Leikar take the measure (her quest link lists both her quests),
+# brings Woodley two hundred leather, six hundred threads and 200,000 adena, pays Ian 300,000 adena
+# for his work, and Woodley hands over the dress shoes box and the quest completes; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q033_make_a_pair_of_dress_shoes.golden
+character Cobbler 60
+quest Q037_MakeFormalWear <cond>=7 <state>=STARTED
+hold 1882 200
+hold 1868 600
+hold 57 500000
+script quest.Q033_MakeAPairOfDressShoes
+script quest.Q037_MakeFormalWear
+item 1882 1868 57 7113
+page merchant/30838.htm
+page merchant/30164.htm
+page default/31520.htm
+page script/quest/Q033_MakeAPairOfDressShoes/
+npc woodley 30838 Merchant 10 0 0
+npc ian 30164 Merchant 20 0 0
+npc leikar 31520 Folk -20 0 0
+
+# Woodley: accept.
+action woodley
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q033_MakeAPairOfDressShoes CREATED
+bypass Quest Q033_MakeAPairOfDressShoes 30838-1.htm
+  S QuestList 37:0x8000007f 33:0x80000001
+  S ExShowQuestMark quest=33
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-1.htm
+  S ActionFailed
+  Q upsert Q033_MakeAPairOfDressShoes | <state> | STARTED
+  Q upsert Q033_MakeAPairOfDressShoes | <cond> | 1
+  state Q033_MakeAPairOfDressShoes STARTED
+  rows Q033_MakeAPairOfDressShoes <cond>=1 <state>=STARTED
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-1.htm
+  S ActionFailed
+  S ActionFailed
+
+# Leikar takes the measure.
+action leikar
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 html="<html><body><a action=\"bypass -h npc_{leikar}_Quest Q033_MakeAPairOfDressShoes\">[Make a Pair of Dress Shoes (In Progress)]</a><br><a action=\"bypass -h npc_{leikar}_Quest Q037_MakeFormalWear\">[Make Formal Wear (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{leikar}_Quest Q033_MakeAPairOfDressShoes
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q033_MakeAPairOfDressShoes/31520-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q033_MakeAPairOfDressShoes 31520-1.htm
+  S QuestList 37:0x8000007f 33:0x80000003
+  S ExShowQuestMark quest=33
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q033_MakeAPairOfDressShoes/31520-1.htm
+  S ActionFailed
+  Q upsert Q033_MakeAPairOfDressShoes | <cond> | 2
+  rows Q033_MakeAPairOfDressShoes <cond>=2 <state>=STARTED
+
+# Woodley lists the materials.
+action woodley
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q033_MakeAPairOfDressShoes 30838-3.htm
+  S QuestList 37:0x8000007f 33:0x80000007
+  S ExShowQuestMark quest=33
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-3.htm
+  S ActionFailed
+  Q upsert Q033_MakeAPairOfDressShoes | <cond> | 3
+  rows Q033_MakeAPairOfDressShoes <cond>=3 <state>=STARTED
+
+# Woodley takes the materials and the adena.
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q033_MakeAPairOfDressShoes 30838-5.htm
+  S QuestList 37:0x8000007f 33:0x8000000f
+  S ExShowQuestMark quest=33
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:200000
+  S SystemMessage id=301 3:1882 6:200
+  S SystemMessage id=301 3:1868 6:600
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-5.htm
+  S ActionFailed
+  Q upsert Q033_MakeAPairOfDressShoes | <cond> | 4
+  items 57=300000 1882=0 1868=0
+  rows Q033_MakeAPairOfDressShoes <cond>=4 <state>=STARTED
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-5a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ian is paid for his work.
+action ian
+action ian
+  S ActionFailed
+  S NpcHtmlMessage obj=ian item=0 page=merchant/30164.htm
+  S ActionFailed
+bypass npc_{ian}_Quest
+  S NpcHtmlMessage obj=ian item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30164-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q033_MakeAPairOfDressShoes 30164-1.htm
+  S QuestList 37:0x8000007f 33:0x8000001f
+  S ExShowQuestMark quest=33
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:300000
+  S NpcHtmlMessage obj=ian item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30164-1.htm
+  S ActionFailed
+  Q upsert Q033_MakeAPairOfDressShoes | <cond> | 5
+  items 57=0
+  rows Q033_MakeAPairOfDressShoes <cond>=5 <state>=STARTED
+action ian
+  S ActionFailed
+  S NpcHtmlMessage obj=ian item=0 page=merchant/30164.htm
+  S ActionFailed
+bypass npc_{ian}_Quest
+  S NpcHtmlMessage obj=ian item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30164-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Woodley hands over the dress shoes box; the quest completes.
+action woodley
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-6.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q033_MakeAPairOfDressShoes 30838-7.htm
+  S SystemMessage id=54 3:7113
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x8000007f 33:0x00000000
+  S NpcHtmlMessage obj=woodley item=0 page=script/quest/Q033_MakeAPairOfDressShoes/30838-7.htm
+  S ActionFailed
+  Q upsert Q033_MakeAPairOfDressShoes | <state> | COMPLETED
+  Q delete-except-state Q033_MakeAPairOfDressShoes
+  state Q033_MakeAPairOfDressShoes COMPLETED
+  rows Q033_MakeAPairOfDressShoes <state>=COMPLETED
+  items 7113=1
+
+# Relog: the completed quest loads from its one row, and the box stays.
+relog
+  state Q033_MakeAPairOfDressShoes COMPLETED
+  rows Q033_MakeAPairOfDressShoes <state>=COMPLETED
+  items 7113=1
+action woodley
+action woodley
+  S ActionFailed
+  S NpcHtmlMessage obj=woodley item=0 page=merchant/30838.htm
+  S ActionFailed
+bypass npc_{woodley}_Quest
+  S NpcHtmlMessage obj=woodley item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

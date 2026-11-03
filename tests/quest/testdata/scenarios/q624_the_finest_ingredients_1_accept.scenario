@@ -1,0 +1,40 @@
+# The Finest Ingredients - Part 1 (Q624): a level 73 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q624_the_finest_ingredients_1_accept.golden
+character Hero 73
+script quest.Q624_TheFinestIngredients_Part1
+item 7202 7203 7204 7080 7205
+page default/31521.htm
+page script/quest/Q624_TheFinestIngredients_Part1/
+npc jeremy 31521 Folk 10 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q624_TheFinestIngredients_Part1/31521-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q624_TheFinestIngredients_Part1 31521-02.htm
+  S QuestList 624:0x80000001
+  S ExShowQuestMark quest=624
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q624_TheFinestIngredients_Part1/31521-02.htm
+  S ActionFailed
+  Q upsert Q624_TheFinestIngredients_Part1 | <state> | STARTED
+  Q upsert Q624_TheFinestIngredients_Part1 | <cond> | 1
+  rows Q624_TheFinestIngredients_Part1 <cond>=1 <state>=STARTED
+  state Q624_TheFinestIngredients_Part1 STARTED
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q624_TheFinestIngredients_Part1/31521-06.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q624_TheFinestIngredients_Part1 <cond>=1 <state>=STARTED
+  state Q624_TheFinestIngredients_Part1 STARTED

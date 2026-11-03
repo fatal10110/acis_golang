@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -107,11 +106,11 @@ func TestDestroyInStoreModeIsRefused(t *testing.T) {
 
 	c.Send(encodeRequestDestroyItem(sword, 1))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotTradeDiscardDropInShopMode)
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the store-mode refusal")
+	assertNoFrame(t, c, "after the store-mode refusal")
 
 	c.Send(encodeRequestDestroyItem(sword+1_000_000, 1))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotTradeDiscardDropInShopMode)
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the unknown-item store-mode refusal")
+	assertNoFrame(t, c, "after the unknown-item store-mode refusal")
 
 	assertItemCount(t, srv, objID, sword, 1)
 }

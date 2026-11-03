@@ -1,0 +1,22 @@
+# Go to the Pastureland! (Q019), refused: a level 62 character, one short of the quest's level, is
+# turned away by Vladimir and the quest is not started. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q019_go_to_the_pastureland_low_level.golden
+character Herder 62
+script quest.Q019_GoToThePastureland
+item 7547 57
+page merchant/31302.htm
+page script/quest/Q019_GoToThePastureland/
+npc vladimir 31302 Merchant 10 0 0
+
+action vladimir
+action vladimir
+  S ActionFailed
+  S NpcHtmlMessage obj=vladimir item=0 page=merchant/31302.htm
+  S ActionFailed
+bypass npc_{vladimir}_Quest
+  S NpcHtmlMessage obj=vladimir item=0 page=script/quest/Q019_GoToThePastureland/31302-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q019_GoToThePastureland CREATED
+  rows Q019_GoToThePastureland -

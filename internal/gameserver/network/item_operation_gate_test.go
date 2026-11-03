@@ -100,9 +100,9 @@ func (discardFlusher) Flush(context.Context, item.FlushBatch) error { return nil
 // probes it.
 func newGateProbe(link *GameClientLink) *gateProbe {
 	instances := task.NewItemInstances(discardFlusher{}, link.itemTemplates, nil, link.itemWrites, zerolog.Nop())
-	link.itemInstances = instances
+	link.belongings.itemInstances = instances
 	probe := &gateProbe{instances: instances}
-	link.items = probingItemStore{itemStore: link.items, probe: probe}
+	link.belongings.items = probingItemStore{itemStore: link.belongings.items, probe: probe}
 	return probe
 }
 
@@ -156,7 +156,7 @@ func TestPickupEndsOperationBeforeTheBroadcasts(t *testing.T) {
 	link, _, _, _, first, _ := newDirectTradeFixture(t)
 	probe := newGateProbe(link)
 	removes := &probingGroundItems{groundItemDropper: task.NewGroundItems(link.world, task.DefaultGroundItemOptions(), nil), probe: probe}
-	link.groundItems = removes
+	link.belongings.groundItems = removes
 
 	const heldStack, groundObject int32 = 5500, 5501
 	addProbedStack(link, probe, first.ObjectID(), first.Inventory().AddNew(item.AdenaID, 40, heldStack))

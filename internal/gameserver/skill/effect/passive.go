@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 )
 
 // PassiveFuncs builds the stat functions a passive skill contributes for as
@@ -32,12 +33,12 @@ func PassiveFuncs(def modelskill.Definition) ([]Mod, error) {
 // ActivationPassive.
 func SkillStatFuncs(def modelskill.Definition) ([]Mod, error) {
 	owner := ModOwnerSkill(modelskill.Ref{ID: def.ID, Level: def.Level})
-	return statFuncs(owner, def.Funcs, nil)
+	return statFuncs(owner, def.Funcs, conditions.SkillOf(def.Stat))
 }
 
 // skillLookup resolves a loaded skill definition by id and level.
 type skillLookup interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // TemplatePassiveMods resolves passives through lookup and builds each
@@ -54,7 +55,7 @@ func TemplatePassiveMods(lookup skillLookup, passives []modelskill.Ref) ([]Mod, 
 		if !ok {
 			continue
 		}
-		fns, err := SkillStatFuncs(def)
+		fns, err := SkillStatFuncs(*def)
 		if err != nil {
 			if errors.Is(err, ErrEnchantNeedsItem) {
 				continue

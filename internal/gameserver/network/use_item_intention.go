@@ -109,6 +109,12 @@ const (
 	// heldUseItem is an equip toggle left current because it replaced a
 	// cast approach, a cast that ended, or another toggle.
 	heldUseItem
+	// heldSit and heldStand are a sit or stand request the player's AI
+	// carries out, current until the sit-down or stand-up it started ends.
+	// A sit or stand that comes from anything else (a private store, an
+	// effect, a fake death ending on its own) records none.
+	heldSit
+	heldStand
 )
 
 // heldIntention is a player's current intention when it is one no other
@@ -141,7 +147,29 @@ func (p *livePlayer) holdUseItem(objectID int32) {
 	p.held = heldIntention{kind: heldUseItem, itemID: objectID}
 }
 
-// dropHeldIntention drops a held walk or toggle.
+// holdPosture records a sit (stand false) or stand request as the current
+// intention.
+func (p *livePlayer) holdPosture(stand bool) {
+	kind := heldSit
+	if stand {
+		kind = heldStand
+	}
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.held = heldIntention{kind: kind}
+}
+
+// dropHeldPosture drops a held sit or stand request, the current intention
+// a sit-down or stand-up ending gives up.
+func (p *livePlayer) dropHeldPosture() {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	if p.held.kind == heldSit || p.held.kind == heldStand {
+		p.held = heldIntention{}
+	}
+}
+
+// dropHeldIntention drops a held walk, toggle, sit or stand.
 func (p *livePlayer) dropHeldIntention() {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
@@ -155,11 +183,13 @@ func (p *livePlayer) heldIntention() heldIntention {
 }
 
 // arriveHeldIntention answers an arrival for a held intention: a walk to a
-// point ends idle, and a toggle left current toggles its item again.
+// point runs the intention queued behind it (a sit made during the walk),
+// else ends idle, and a toggle left current toggles its item again.
 func (l *GameClientLink) arriveHeldIntention(live *livePlayer) {
 	switch held := live.heldIntention(); held.kind {
 	case heldMoveTo:
 		live.dropHeldIntention()
+		l.finishDeferredAction(live)
 	case heldUseItem:
 		l.toggleHeldItem(live, held.itemID)
 	}

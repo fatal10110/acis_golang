@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
-	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -25,23 +24,11 @@ const castleCertificates = 300
 //
 // Each then opens the castle's page; an unknown action is answered with
 // the usage first. Without exactly one or two arguments, or with an alias
-// no castle has, the castle list would open instead.
+// no castle has, the castle list opens instead.
 func (l *GameClientLink) adminCastle(gm *livePlayer, line string) {
-	args := handleradmin.Args(line)
-	var param string
-	var c *castle.Castle
-	switch len(args) {
-	case 1:
-		c, _ = l.castles.ByAlias(args[0])
-	case 2:
-		param = args[0]
-		c, _ = l.castles.ByAlias(args[1])
-	}
+	param, c := l.adminCastleArgs(line)
 	if c == nil {
-		// ponytail: the castle list shows each castle's siege status
-		// (#3376).
-		l.log.Warn().Str("command", "admin_castle").Msg("admin: castle list not implemented yet")
-		gm.SendFrame(serverpackets.FrameActionFailed())
+		l.showAdminCastles(gm)
 		return
 	}
 	switch param {
@@ -66,6 +53,22 @@ func (l *GameClientLink) adminCastle(gm *livePlayer, line string) {
 	l.showAdminCastle(gm, c)
 }
 
+// adminCastleArgs reads the [action] <alias> arguments //castle and
+// //siege take: the action ("" without one) and the castle the alias
+// names, nil unless there are exactly one or two arguments and the alias
+// names a castle.
+func (l *GameClientLink) adminCastleArgs(line string) (param string, c *castle.Castle) {
+	args := handleradmin.Args(line)
+	switch len(args) {
+	case 1:
+		c, _ = l.castles.ByAlias(args[0])
+	case 2:
+		param = args[0]
+		c, _ = l.castles.ByAlias(args[1])
+	}
+	return param, c
+}
+
 // adminCastleSet gives c to the clan of gm's selected player. A selection
 // that is no player in a clan is refused as an incorrect target.
 func (l *GameClientLink) adminCastleSet(gm *livePlayer, c *castle.Castle) {
@@ -80,28 +83,20 @@ func (l *GameClientLink) adminCastleSet(gm *livePlayer, c *castle.Castle) {
 		return
 	}
 	if !l.setCastleOwner(gm, c, cl) {
-		sendText(gm, target.Name+"'s clan already owns a castle.")
+		sendText(gm, target.CharacterName()+"'s clan already owns a castle.")
 	}
 }
 
-// showAdminCastle opens c's page for gm.
-//
-// The page counts the life control towers standing, which outside a siege
-// is every one the castle has. During a siege only those still alive
-// count; tracking them needs the control towers (#465). No mercenary ticket
-// can be dropped yet (#238), so the dropped ticket count is 0.
+// showAdminCastle opens c's page for gm. The page counts the life control
+// towers standing: every one placed outside a siege, the working ones while
+// it is fought.
 func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 	const file = "data/html/admin/castle.htm"
 	page, ok := l.html.Get(file)
 	if !ok {
 		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
 	}
-	lifeTowers := 0
-	for _, t := range c.ControlTowers {
-		if t.Type == castledata.TowerLifeControl {
-			lifeTowers++
-		}
-	}
+	lifeTowers := c.AliveLifeTowers(l.castleBesieged(c.ID))
 	var artifacts, towers strings.Builder
 	for i, a := range c.Artifacts {
 		adminTeleportLink(&artifacts, i+1, a.Position.X, a.Position.Y, a.Position.Z, a.Heading)
@@ -114,7 +109,7 @@ func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 		"%castleAlias%", c.Alias,
 		"%circletId%", strconv.Itoa(c.CircletID),
 		"%ticketsNumber%", strconv.Itoa(len(c.Tickets)),
-		"%droppedTicketsNumber%", "0",
+		"%droppedTicketsNumber%", strconv.Itoa(c.DroppedTickets()),
 		"%npcsNumber%", strconv.Itoa(len(c.NPCs)),
 		"%certificates%", strconv.Itoa(c.LeftCertificates()),
 		"%parent%", strconv.Itoa(c.ParentID),

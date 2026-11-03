@@ -1,0 +1,21 @@
+# LV3Summoner (27313, level 76), raised for the character (spawn parameters 0, character, owner) and
+# remembering it in CAI0, every draw 0: its 3 s timer 4001, with IntAI0 clear and the draw under 50, clears
+# its desires, wants its buff (BUFF1) on itself at 1000000 and attacks the character at 200; the buff
+# lands nothing here, so its 1 s timer 4000 clears IntAI0 again (checked one second later, since the
+# two timers share the 3 s instant).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3Summoner
+npc owner 20003 Monster 600 0 0
+npc summoner 27313 Monster 300 0 0 level 76 skill PHYSICAL_SPECIAL1 4032 8 skill PHYSICAL_SPECIAL2 4076 3 skill PHYSICAL_SPECIAL3 4032 7 skill BUFF1 4532 1 mem c_ai0=player params 0 character owner master owner
+
+advance 3s
+  S MagicSkillUse caster=summoner target=summoner skill=4532-1 hit=0 reuse=0 success=0
+  desires summoner attack(player)=200 cast(summoner,4532,move)=1000000
+
+advance 1s
+  mem summoner i_ai0=0

@@ -1,0 +1,39 @@
+# Hunt of the Golden Ram Mercenary Force (Q628): a hundred splinters and needles are traded for the badge of a soldier.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_badge_swap.golden
+character Recruit 66
+quest Q628_HuntOfTheGoldenRamMercenaryForce <cond>=2 <state>=STARTED
+hold 7246 1
+hold 7248 100
+hold 7249 100
+script quest.Q628_HuntOfTheGoldenRamMercenaryForce
+item 7246 7247 7248 7249 7251
+page default/31554.htm
+page script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/
+npc kahman 31554 Folk 10 0 0
+
+action kahman
+action kahman
+  S ActionFailed
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-09.htm
+  S ActionFailed
+bypass npc_{kahman}_Quest
+  S QuestList 628:0x80000007
+  S ExShowQuestMark quest=628
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7248 6:100
+  S SystemMessage id=301 3:7249 6:100
+  S SystemMessage id=302 3:7246
+  S SystemMessage id=54 3:7247
+  S NpcHtmlMessage obj=kahman item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q628_HuntOfTheGoldenRamMercenaryForce | <cond> | 3
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
+  items 7246=0 7247=1 7248=0 7249=0
+advance 1s
+bypass npc_{kahman}_Quest
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
+relog
+  rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
+  items 7246=0 7247=1 7248=0 7249=0

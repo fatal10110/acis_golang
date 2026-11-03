@@ -10,18 +10,16 @@ import (
 )
 
 // WithBoats spawns one boat per itinerary at boot through the production
-// fleet, with the production boat sinks. The fleet's ticker is never
-// started: a suite drives the boats with Server.Boats.Tick, one position
-// update (a tenth of a second) per call.
+// fleet, with the production boat sinks. Without it the fleet is empty, as
+// with AllowBoat off, until //reload boat launches one. The fleet's ticker
+// is never started: a suite drives the boats with Server.Boats.Tick, one
+// position update (a tenth of a second) per call.
 func WithBoats(itineraries ...route.BoatItinerary) Option {
 	return func(o *options) { o.boats = append(o.boats, itineraries...) }
 }
 
 func bootBoats(t *testing.T, itineraries []route.BoatItinerary, ids *sequentialIDs, state *world.State) *boat.Fleet {
 	t.Helper()
-	if len(itineraries) == 0 {
-		return nil
-	}
 	fleet, err := boat.New(itineraries, ids, state, network.BoatSinks(state))
 	if err != nil {
 		t.Fatalf("boat fleet: %v", err)

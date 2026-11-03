@@ -2,7 +2,6 @@ package combat
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
@@ -35,7 +34,7 @@ func tickThinkWander(t *testing.T, h interface{ TickThink() error }) {
 // home (offset = walk speed * 3) on each axis.
 func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -51,7 +50,7 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
 
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	move := mustRead(t, c, "MoveToLocation")
 	dest := moveToLocationDest(t, move)
 	offset := 60 * 3
@@ -69,7 +68,7 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 // its own spawn point.
 func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -89,7 +88,7 @@ func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
 
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), minion.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", minion.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	offset := 60 * 3
 	if absInt(dest.X-current.X) > offset || absInt(dest.Y-current.Y) > offset || dest.Z != current.Z {
@@ -109,7 +108,7 @@ func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 // its current XY even when both actors are far from spawn home.
 func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -132,7 +131,7 @@ func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander after master death", got)
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), minion.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", minion.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	offset := 60 * 3
 	if absInt(dest.X-current.X) > offset || absInt(dest.Y-current.Y) > offset || dest.Z != current.Z {
@@ -145,7 +144,7 @@ func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 // hate while its living master is in territory.
 func TestMinionOpeningHateUsesMasterTerritory(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -166,8 +165,8 @@ func TestMinionOpeningHateUsesMasterTerritory(t *testing.T) {
 	}
 }
 
-// TestGuardDoesNotIdleWander pins hold-position kinds: a Guard with an empty
-// desire queue stays idle instead of rolling a random walk.
+// TestGuardDoesNotIdleWander: a Guard no behavior binds, with an empty
+// desire queue, stays idle instead of rolling a random walk.
 func TestGuardDoesNotIdleWander(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -214,7 +213,7 @@ func TestIdleHostileWanderArrivedBlockedClearsDesire(t *testing.T) {
 
 func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -232,7 +231,7 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
 		t.Fatal("wander desire missing after Think, want it queued before arrival")
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	_ = mustRead(t, c, "MoveToLocation")
 	if !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false after wander Think, want an in-flight walk")
@@ -259,8 +258,8 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
 		t.Fatal("wander desire missing after arrival TickThink")
 	}
-	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
-		t.Fatalf("unexpected packet after arrival queue tick: %#x", f[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unexpected packet after arrival queue tick: %#x", queued[0][0])
 	}
 
 	if err := hostile.TickThink(); err != nil {
@@ -269,8 +268,8 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() after promote = %v, want wander", got)
 	}
-	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
-		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", f[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", queued[0][0])
 	}
 }
 
@@ -279,7 +278,7 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 // and is an offset sample, not the triangle-center fallback.
 func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -299,7 +298,7 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	tickThinkWander(t, hostile)
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	if !poly.Contains(dest.X, dest.Y, dest.Z) {
 		t.Fatalf("maker wander dest = %+v, want inside territory", dest)
@@ -323,7 +322,7 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 // (55+65+60)/3, (15+15+28)/3.
 func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -341,7 +340,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	tickThinkWander(t, hostile)
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	want := geometry.Point{X: (55 + 65 + 60) / 3, Y: (15 + 15 + 28) / 3}
 	if dest.X != want.X || dest.Y != want.Y || dest.Z != home.Z {
@@ -357,7 +356,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 // it: walk stance, and the idle wander queued again.
 func TestMakerIdleWanderOutOfTerritoryKeepsWanderCurrent(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

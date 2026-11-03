@@ -1,0 +1,34 @@
+# A priest of dawn, asked through his Seven Signs pages for the Oracle of Dawn, sends the character into
+# the Dawn necropolis of the festival and marks it inside a Seven Signs dungeon (OracleTeleporter
+# onTalk, setIsIn7sDungeon). The reference probe reads the dungeon flag
+# and replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/oracle_teleporter_dawn_dungeon.golden
+character Pilgrim 40
+script script.teleport.OracleTeleporter
+page seven_signs/
+npc dawn 31078 DawnPriest 10 0 0
+
+action dawn
+action dawn
+  S ActionFailed
+  S ActionFailed
+  S NpcHtmlMessage obj=dawn item=0 page=seven_signs/dawn_priest_1.htm
+bypass npc_{dawn}_SevenSignsDesc 16
+  S NpcHtmlMessage obj=dawn item=0 page=seven_signs/desc_16.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{dawn}_SevenSigns 8 2
+  S NpcHtmlMessage obj=dawn item=0 page=seven_signs/signs_8_dawn.htm
+  S ActionFailed
+  S ActionFailed
+bypass npc_{dawn}_Quest OracleTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=-80157,111344,-4901 fast=0
+  S DeleteObject obj=dawn
+  S ActionFailed
+  M set OracleTeleport_Npc | 31078
+  dungeon yes

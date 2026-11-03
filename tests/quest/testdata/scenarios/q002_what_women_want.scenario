@@ -1,0 +1,191 @@
+# What Women Want (Q002): a human of level 2 accepts at Arujien and carries her letter to
+# Mirabel, then Herbiel; back at Arujien the player sends the poetry book to Greenis, whose
+# letter back to Arujien earns the mystic's earring; then relog. Expectations replay the
+# reference trace of this scenario (oracle/scenarios).
+trace internal/gameserver/script/testdata/oracle/scenarios/q002_what_women_want.golden
+character Talker 2
+script quest.Q002_WhatWomenWant
+item 1092 1093 1094 689 693 113
+page default/30223.htm
+page gatekeeper/30146.htm
+page merchant/30150.htm
+page trainer/30157.htm
+page script/quest/Q002_WhatWomenWant/
+npc arujien 30223 Folk 10 0 0
+npc mirabel 30146 Gatekeeper 20 0 0
+npc herbiel 30150 Merchant 30 0 0
+npc greenis 30157 Trainer 40 0 0
+
+# Arujien: her quest window creates the quest; the second page accepts it with her letter.
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q002_WhatWomenWant CREATED
+  rows Q002_WhatWomenWant -
+bypass Quest Q002_WhatWomenWant 30223-03.htm
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-03.htm
+  S ActionFailed
+bypass Quest Q002_WhatWomenWant 30223-04.htm
+  S QuestList 2:0x80000001
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1092
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-04.htm
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <state> | STARTED
+  Q upsert Q002_WhatWomenWant | <cond> | 1
+  state Q002_WhatWomenWant STARTED
+  rows Q002_WhatWomenWant <cond>=1 <state>=STARTED
+  items 1092=1
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mirabel: the first letter becomes the second.
+action mirabel
+action mirabel
+  S ActionFailed
+  S NpcHtmlMessage obj=mirabel item=0 page=gatekeeper/30146.htm
+  S ActionFailed
+bypass npc_{mirabel}_Quest
+  S QuestList 2:0x80000003
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1092
+  S SystemMessage id=54 3:1093
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q002_WhatWomenWant/30146-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <cond> | 2
+  items 1092=0 1093=1
+
+# Greenis has nothing for the player yet.
+action greenis
+action greenis
+  S ActionFailed
+  S NpcHtmlMessage obj=greenis item=0 page=trainer/30157.htm
+  S ActionFailed
+bypass npc_{greenis}_Quest
+  S NpcHtmlMessage obj=greenis item=0 page=script/quest/Q002_WhatWomenWant/30157-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# Herbiel: the second letter becomes the third.
+action herbiel
+action herbiel
+  S ActionFailed
+  S NpcHtmlMessage obj=herbiel item=0 page=merchant/30150.htm
+  S ActionFailed
+bypass npc_{herbiel}_Quest
+  S QuestList 2:0x80000007
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1093
+  S SystemMessage id=54 3:1094
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q002_WhatWomenWant/30150-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <cond> | 3
+  items 1093=0 1094=1
+
+# Arujien: the player chooses to send the poetry book to Greenis.
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q002_WhatWomenWant 30223-08.htm
+  S QuestList 2:0x8000000f
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1094
+  S SystemMessage id=54 3:689
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-08.htm
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <cond> | 4
+  items 1094=0 689=1
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-11.htm
+  S ActionFailed
+  S ActionFailed
+
+# Greenis: the poetry book for her letter.
+action greenis
+action greenis
+  S ActionFailed
+  S NpcHtmlMessage obj=greenis item=0 page=trainer/30157.htm
+  S ActionFailed
+bypass npc_{greenis}_Quest
+  S QuestList 2:0x8000001f
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:689
+  S SystemMessage id=54 3:693
+  S NpcHtmlMessage obj=greenis item=0 page=script/quest/Q002_WhatWomenWant/30157-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <cond> | 5
+  rows Q002_WhatWomenWant <cond>=5 <state>=STARTED
+  items 689=0 693=1
+action greenis
+  S ActionFailed
+  S NpcHtmlMessage obj=greenis item=0 page=trainer/30157.htm
+  S ActionFailed
+bypass npc_{greenis}_Quest
+  S NpcHtmlMessage obj=greenis item=0 page=script/quest/Q002_WhatWomenWant/30157-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Arujien: Greenis's letter for the earring; the quest completes.
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S SystemMessage id=302 3:693
+  S SystemMessage id=54 3:113
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 2:0x00000000
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <state> | COMPLETED
+  Q delete-except-state Q002_WhatWomenWant
+  state Q002_WhatWomenWant COMPLETED
+  rows Q002_WhatWomenWant <state>=COMPLETED
+  items 693=0 113=1
+
+# Relog: the completed quest loads from its one row, and the earring stays.
+relog
+  state Q002_WhatWomenWant COMPLETED
+  rows Q002_WhatWomenWant <state>=COMPLETED
+  items 113=1
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -13,11 +13,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
-	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -30,11 +28,11 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 	firstDelivery := &playerInventoryDelivery{updates: updates}
 	first := newTestLivePlayer(t, 1, firstCap, firstDelivery)
 	firstDelivery.live, firstDelivery.character = first, first.Character
-	first.Name = "TraderOne"
+	first.SetName("TraderOne")
 	secondDelivery := &playerInventoryDelivery{updates: updates}
 	second := newTestLivePlayer(t, 2, secondCap, secondDelivery)
 	secondDelivery.live, secondDelivery.character = second, second.Character
-	second.Name = "TraderTwo"
+	second.SetName("TraderTwo")
 	state.Spawn(first, 0, 0, 0, 0)
 	state.AddPlayer(first)
 	state.Spawn(second, 100, 0, 0, 0)
@@ -43,17 +41,15 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 
 	store := gamesql.NewItemStore(sqltest.SharedDB(t))
 	ids := &sequentialIDs{next: 1000}
-	link := &GameClientLink{
-		world:            state,
-		itemTemplates:    testItemTemplates(),
-		items:            store,
-		itemWrites:       persist.NewOrder(),
-		ids:              ids,
-		inventory:        invops.NewService(ids),
-		trades:           tradebook.NewBook(time.Now),
-		inventoryUpdates: updates,
-		log:              zerolog.Nop(),
-	}
+	link := newBareGameClientLink(t, GameClientLinkConfig{
+		Belongings:    BelongingsConfig{Items: store, InventoryUpdates: updates},
+		World:         state,
+		ItemTemplates: testItemTemplates(),
+		ItemWrites:    persist.NewOrder(),
+		IDs:           ids,
+		TradeClock:    time.Now,
+		Log:           zerolog.Nop(),
+	})
 	return link, store, firstCap, secondCap, first, second
 }
 

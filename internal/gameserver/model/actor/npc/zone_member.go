@@ -76,9 +76,9 @@ func (m *zoneMember) enter() {
 	}
 }
 
-func (m *zoneMember) step(previous location.Location) {
+func (m *zoneMember) step() {
 	if m != nil {
-		m.Step(m.ix, m, previous)
+		m.Step(m.ix, m)
 	}
 }
 
@@ -88,14 +88,14 @@ func (m *zoneMember) settle() {
 	}
 }
 
-func (m *zoneMember) place(previous location.Location) {
+func (m *zoneMember) place() {
 	if m != nil {
-		m.Place(m.ix, m, previous)
+		m.Place(m.ix, m)
 	}
 }
 
-func (m *zoneMember) leave(at location.Location) {
+func (m *zoneMember) leave() {
 	if m != nil {
-		m.Leave(m.ix, m, at.X, at.Y)
+		m.Leave(m.ix, m)
 	}
 }

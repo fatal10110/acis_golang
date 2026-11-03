@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -289,7 +288,7 @@ func TestWorkshopOrderRefusals(t *testing.T) {
 		drainUntilQuiet(t, w.customer)
 		w.customer.Send(encodeRecipeShopOrder(clientpackets.OpcodeRequestRecipeShopMakeItem, w.crafterID, commonRecipeID))
 		w.customer.Send(encodeRecipeShopOrder(clientpackets.OpcodeRequestRecipeShopMakeInfo, w.crafterID, commonRecipeID))
-		assertNoFrameFor(t, w.customer, 300*time.Millisecond, "orders to a closed workshop")
+		assertNoFrame(t, w.customer, "orders to a closed workshop")
 	})
 }
 
@@ -312,7 +311,7 @@ func TestWorkshopRefusesUnlistedRecipe(t *testing.T) {
 	mpBefore := w.srv.PlayerCurrentMP(t, w.crafterID)
 
 	w.customer.Send(encodeRecipeShopOrder(clientpackets.OpcodeRequestRecipeShopMakeItem, w.crafterID, unlistedRecipeID))
-	assertNoFrameFor(t, w.customer, 300*time.Millisecond, "an order for an unlisted recipe")
+	assertNoFrame(t, w.customer, "an order for an unlisted recipe")
 	if got := keepWorkshopFrames(collectUntilQuiet(t, w.crafter)); len(got) != 0 {
 		t.Fatalf("crafter got %d workshop frames for an unlisted order", len(got))
 	}

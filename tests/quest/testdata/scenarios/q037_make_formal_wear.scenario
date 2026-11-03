@@ -1,0 +1,211 @@
+# Make Formal Wear (Q037), first part: a level 60 character accepts at Alexis; Leikar gives a signet
+# ring, which Jeremy trades for ice wine; Mist takes the wine; Jeremy then bakes a box of cookies,
+# which Leikar takes, and the quest waits at its sixth step for the cloth, jewel box and sewing kit
+# of the helper quests; then relog. The character holds adena and soulshots, which the quest never
+# reads, so no NPC of the scenario gets object id 103, a number Alexis's own page lists as a buy
+# list. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q037_make_formal_wear.golden
+character Tailor 60
+hold 57 1000
+hold 1835 100
+script quest.Q037_MakeFormalWear
+item 7076 7077 7078 7113 7164 7160 7159 6408 57 1835
+page merchant/30842.htm
+page default/31520.htm
+page default/31521.htm
+page default/31627.htm
+page script/quest/Q037_MakeFormalWear/
+npc alexis 30842 Merchant 10 0 0
+npc leikar 31520 Folk 20 0 0
+npc jeremy 31521 Folk -20 0 0
+npc mist 31627 Folk 0 20 0
+
+# Alexis: accept.
+action alexis
+action alexis
+  S ActionFailed
+  S NpcHtmlMessage obj=alexis item=0 page=merchant/30842.htm
+  S ActionFailed
+bypass npc_{alexis}_Quest
+  S NpcHtmlMessage obj=alexis item=0 page=script/quest/Q037_MakeFormalWear/30842-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q037_MakeFormalWear CREATED
+bypass Quest Q037_MakeFormalWear 30842-1.htm
+  S QuestList 37:0x80000001
+  S ExShowQuestMark quest=37
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=alexis item=0 page=script/quest/Q037_MakeFormalWear/30842-1.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <state> | STARTED
+  Q upsert Q037_MakeFormalWear | <cond> | 1
+  state Q037_MakeFormalWear STARTED
+  rows Q037_MakeFormalWear <cond>=1 <state>=STARTED
+action alexis
+  S ActionFailed
+  S NpcHtmlMessage obj=alexis item=0 page=merchant/30842.htm
+  S ActionFailed
+bypass npc_{alexis}_Quest
+  S NpcHtmlMessage obj=alexis item=0 page=script/quest/Q037_MakeFormalWear/30842-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Leikar gives the signet ring.
+action leikar
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q037_MakeFormalWear 31520-1.htm
+  S QuestList 37:0x80000003
+  S ExShowQuestMark quest=37
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7164
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-1.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <cond> | 2
+  items 7164=1
+  rows Q037_MakeFormalWear <cond>=2 <state>=STARTED
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Jeremy trades the ring for ice wine.
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q037_MakeFormalWear/31521-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q037_MakeFormalWear 31521-1.htm
+  S QuestList 37:0x80000007
+  S ExShowQuestMark quest=37
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7164
+  S SystemMessage id=54 3:7160
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q037_MakeFormalWear/31521-1.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <cond> | 3
+  items 7164=0 7160=1
+  rows Q037_MakeFormalWear <cond>=3 <state>=STARTED
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q037_MakeFormalWear/31521-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mist takes the wine.
+action mist
+action mist
+  S ActionFailed
+  S NpcHtmlMessage obj=mist item=0 page=default/31627.htm
+  S ActionFailed
+bypass npc_{mist}_Quest
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q037_MakeFormalWear/31627-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q037_MakeFormalWear 31627-1.htm
+  S QuestList 37:0x8000000f
+  S ExShowQuestMark quest=37
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7160
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q037_MakeFormalWear/31627-1.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <cond> | 4
+  items 7160=0
+  rows Q037_MakeFormalWear <cond>=4 <state>=STARTED
+action mist
+  S ActionFailed
+  S NpcHtmlMessage obj=mist item=0 page=default/31627.htm
+  S ActionFailed
+bypass npc_{mist}_Quest
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q037_MakeFormalWear/31627-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Jeremy bakes a box of cookies.
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q037_MakeFormalWear/31521-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q037_MakeFormalWear 31521-3.htm
+  S QuestList 37:0x8000001f
+  S ExShowQuestMark quest=37
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7159
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q037_MakeFormalWear/31521-3.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <cond> | 5
+  items 7159=1
+  rows Q037_MakeFormalWear <cond>=5 <state>=STARTED
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q037_MakeFormalWear/31521-3a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Leikar takes the cookies; without the cloth, jewel box and sewing kit she waits.
+action leikar
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q037_MakeFormalWear 31520-3.htm
+  S QuestList 37:0x8000003f
+  S ExShowQuestMark quest=37
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7159
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-3.htm
+  S ActionFailed
+  Q upsert Q037_MakeFormalWear | <cond> | 6
+  items 7159=0
+  rows Q037_MakeFormalWear <cond>=6 <state>=STARTED
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-3a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Relog: the quest loads at its sixth step.
+relog
+  state Q037_MakeFormalWear STARTED
+  rows Q037_MakeFormalWear <cond>=6 <state>=STARTED
+action leikar
+action leikar
+  S ActionFailed
+  S NpcHtmlMessage obj=leikar item=0 page=default/31520.htm
+  S ActionFailed
+bypass npc_{leikar}_Quest
+  S NpcHtmlMessage obj=leikar item=0 page=script/quest/Q037_MakeFormalWear/31520-3a.htm
+  S ActionFailed
+  S ActionFailed

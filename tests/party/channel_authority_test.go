@@ -241,6 +241,7 @@ func assertPartyInfoUpdate(t *testing.T, frames [][]byte, name string, leaderID,
 // joining, its dismissal, and the leading party dispersing, which
 // disbands the channel. Nothing is taken from the leader.
 func TestChannelFormsWithClanImperium(t *testing.T) {
+	t.Parallel()
 	g, _ := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}, {"Fifth", 30}, {"Sixth", 30}},
 		authorityClan{level: 5, leads: true, skills: []int{clanImperiumID}}, 0)
 	g.invite(t, 0, 1, 0)
@@ -296,6 +297,7 @@ func TestChannelFormsWithClanImperium(t *testing.T) {
 // invitation and destroyed, with its notice and inventory update, ahead of
 // the formation.
 func TestChannelFormsWithStrategyGuide(t *testing.T) {
+	t.Parallel()
 	g, guideID := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}},
 		authorityClan{level: 5, leads: true}, 1)
 	g.invite(t, 0, 1, 0)
@@ -348,6 +350,7 @@ func heldGuides(t *testing.T, g *group) int {
 // nothing. A leader whose last guide went on the formation can invite no
 // one more.
 func TestChannelGuidePaidOnlyOnFormation(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		guides int
@@ -398,6 +401,7 @@ func TestChannelGuidePaidOnlyOnFormation(t *testing.T) {
 // destroyed before the answer leaves nothing to pay with; the leader is
 // told so twice over and no channel forms.
 func TestChannelGuideGoneByTheAnswer(t *testing.T) {
+	t.Parallel()
 	g, guideID := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}},
 		authorityClan{level: 5, leads: true}, 1)
 	g.invite(t, 0, 1, 0)
@@ -432,6 +436,7 @@ func TestChannelGuideGoneByTheAnswer(t *testing.T) {
 // of a level 4 clan even holding a guide, is told only a level 5 clan
 // leader may. Nobody is asked.
 func TestChannelAuthorityRefusals(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		clan   authorityClan

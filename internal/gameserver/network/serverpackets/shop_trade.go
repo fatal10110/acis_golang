@@ -50,7 +50,8 @@ type TradeItemUpdateEntry struct {
 
 // FrameBuyList builds the BuyList packet for a merchant buylist. count
 // gives each product's current stock; a limited product at 0 is left out,
-// though the header still counts every product of the list. Each price
+// though the header still counts it. A product whose template templates no
+// longer holds (one a reload removed) is left out of both. Each price
 // carries taxRate, and a siege guard ticket's also siegeGuardsPriceRate
 // (RateSiegeGuardsPrice).
 func FrameBuyList(list buylist.List, count func(buylist.Product) int, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) (wire.Frame, error) {
@@ -65,31 +66,35 @@ func FrameBuyList(list buylist.List, count func(buylist.Product) int, currentMon
 func writeBuyList(w *wire.Writer, list buylist.List, count func(buylist.Product) int, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) error {
 	w.WriteInt32(int32(currentMoney))
 	w.WriteInt32(int32(list.ID))
-	n, err := wire.Uint16Count(len(list.Products))
+	countOffset, err := reserveUint16Count(w, len(list.Products))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(n)
+	counted := 0
 	for _, product := range list.Products {
 		stock := count(product)
 		if stock <= 0 && product.LimitedStock() {
+			counted++ // sold out: counted, not written
 			continue
 		}
 		tmpl, ok := templates.Get(product.ItemID)
 		if !ok {
-			return fmt.Errorf("serverpackets: BuyList: no template loaded for item template %d", product.ItemID)
+			continue
 		}
+		counted++
 		price := float64(product.Price) * (1 + taxRate)
 		if product.SiegeGuardTicket() {
 			price = float64(product.Price) * siegeGuardsPriceRate * (1 + taxRate)
 		}
-		writeShopItem(w, tmpl, product.ItemID, product.ItemID, max(stock, 0), 0, 0, 0, commons.JavaInt(price))
+		writeShopItem(w, tmpl, product.ItemID, product.ItemID, max(stock, 0), 0, 0, 0, commons.TruncInt32Sat(price))
 	}
+	w.PatchUint16(countOffset, uint16(counted))
 	return nil
 }
 
 // FrameSellList builds the SellList packet for items the player can offer
-// to a merchant.
+// to a merchant. An item whose template templates no longer holds (one a
+// reload removed) is left out.
 func FrameSellList(currentMoney int, items []*item.Instance, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeSellList)
 	if err := writeSellList(w, currentMoney, items, templates); err != nil {
@@ -102,19 +107,21 @@ func FrameSellList(currentMoney int, items []*item.Instance, templates *item.Tab
 func writeSellList(w *wire.Writer, currentMoney int, items []*item.Instance, templates *item.Table) error {
 	w.WriteInt32(int32(currentMoney))
 	w.WriteInt32(0)
-	count, err := wire.Uint16Count(len(items))
+	countOffset, err := reserveUint16Count(w, len(items))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(count)
+	var written int
 	for _, inst := range items {
 		st := inst.Snapshot()
 		tmpl, ok := templates.Get(st.TemplateID)
 		if !ok {
-			return fmt.Errorf("serverpackets: SellList: no template loaded for item template %d", st.TemplateID)
+			continue
 		}
 		writeShopItem(w, tmpl, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel, st.CustomType1, st.CustomType2, tmpl.ReferencePrice/2)
+		written++
 	}
+	w.PatchUint16(countOffset, uint16(written))
 	return nil
 }
 
@@ -147,7 +154,8 @@ func FrameTradePressOtherOk() wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// FrameTradeStart builds the initial direct-trade item list.
+// FrameTradeStart builds the initial direct-trade item list. An item whose
+// template templates no longer holds (one a reload removed) is left out.
 func FrameTradeStart(partnerID int32, items []*item.Instance, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeTradeStart)
 	if err := writeTradeStart(w, partnerID, items, templates); err != nil {
@@ -158,10 +166,7 @@ func FrameTradeStart(partnerID int32, items []*item.Instance, templates *item.Ta
 }
 
 func writeTradeStart(w *wire.Writer, partnerID int32, items []*item.Instance, templates *item.Table) error {
-	available, err := availableTradeStartItems(items, templates)
-	if err != nil {
-		return err
-	}
+	available := availableTradeStartItems(items, templates)
 	w.WriteInt32(partnerID)
 	count, err := wire.Uint16Count(len(available))
 	if err != nil {
@@ -172,7 +177,7 @@ func writeTradeStart(w *wire.Writer, partnerID int32, items []*item.Instance, te
 		inst := row.inst
 		tmpl := row.tmpl
 		st := inst.Snapshot()
-		writeTradeItem(w, tmpl, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel)
+		writeTradeItem(w, tmpl, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel, st.CustomType1, st.CustomType2)
 	}
 	return nil
 }
@@ -199,11 +204,13 @@ func FrameTradeUpdate(it TradeItemSnapshot, quantity int, templates *item.Table)
 	}
 	w.WriteUint16(1)
 	w.WriteUint16(tradeUpdateMode(tmpl, quantity))
-	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel)
+	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel, 0, 0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
 // FrameTradeItemUpdate builds the full direct-trade availability refresh.
+// An entry whose template templates no longer holds (one a reload removed)
+// is left out.
 func FrameTradeItemUpdate(entries []TradeItemUpdateEntry, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeTradeItemUpdate)
 	if err := writeTradeItemUpdate(w, entries, templates); err != nil {
@@ -214,16 +221,17 @@ func FrameTradeItemUpdate(entries []TradeItemUpdateEntry, templates *item.Table)
 }
 
 func writeTradeItemUpdate(w *wire.Writer, entries []TradeItemUpdateEntry, templates *item.Table) error {
-	count, err := wire.Uint16Count(len(entries))
+	countOffset, err := reserveUint16Count(w, len(entries))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(count)
+	var written int
 	for _, entry := range entries {
 		tmpl, ok := templates.Get(entry.Item.TemplateID)
 		if !ok {
-			return fmt.Errorf("serverpackets: TradeItemUpdate: no template loaded for item template %d", entry.Item.TemplateID)
+			continue
 		}
+		written++
 		available := entry.AvailableCount
 		stackable := tmpl.Stackable
 		if available == 0 {
@@ -235,8 +243,9 @@ func writeTradeItemUpdate(w *wire.Writer, entries []TradeItemUpdateEntry, templa
 			mode = 3
 		}
 		w.WriteUint16(mode)
-		writeTradeItem(w, tmpl, entry.Item.ObjectID, entry.Item.TemplateID, available, entry.Item.EnchantLevel)
+		writeTradeItem(w, tmpl, entry.Item.ObjectID, entry.Item.TemplateID, available, entry.Item.EnchantLevel, 0, 0)
 	}
+	w.PatchUint16(countOffset, uint16(written))
 	return nil
 }
 
@@ -248,7 +257,7 @@ func frameTradeAdd(opcode byte, it TradeItemSnapshot, quantity int, templates *i
 		return wire.Frame{}, fmt.Errorf("serverpackets: TradeAdd: no template loaded for item template %d", it.TemplateID)
 	}
 	w.WriteUint16(1)
-	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel)
+	writeTradeItem(w, tmpl, it.ObjectID, it.TemplateID, quantity, it.EnchantLevel, 0, 0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
@@ -274,17 +283,17 @@ func writeShopItem(w *wire.Writer, tmpl *item.Template, objectID, templateID int
 	w.WriteInt32(price)
 }
 
-func writeTradeItem(w *wire.Writer, tmpl *item.Template, objectID, templateID int32, count, enchant int) {
+func writeTradeItem(w *wire.Writer, tmpl *item.Template, objectID, templateID int32, count, enchant, custom1, custom2 int) {
 	category, subCategory := tmpl.Category()
 	w.WriteUint16(uint16(category))
 	w.WriteInt32(objectID)
 	w.WriteInt32(templateID)
 	w.WriteInt32(int32(count))
 	w.WriteUint16(uint16(subCategory))
-	w.WriteUint16(0)
+	w.WriteUint16(uint16(custom1))
 	w.WriteInt32(int32(tmpl.Slot))
 	w.WriteUint16(uint16(enchant))
-	w.WriteUint16(0)
+	w.WriteUint16(uint16(custom2))
 	w.WriteUint16(0)
 }
 
@@ -293,7 +302,7 @@ type tradeStartItem struct {
 	tmpl *item.Template
 }
 
-func availableTradeStartItems(items []*item.Instance, templates *item.Table) ([]tradeStartItem, error) {
+func availableTradeStartItems(items []*item.Instance, templates *item.Table) []tradeStartItem {
 	out := make([]tradeStartItem, 0, len(items))
 	for _, inst := range items {
 		if inst == nil {
@@ -304,13 +313,10 @@ func availableTradeStartItems(items []*item.Instance, templates *item.Table) ([]
 			continue
 		}
 		tmpl, ok := templates.Get(st.TemplateID)
-		if !ok {
-			return nil, fmt.Errorf("serverpackets: TradeStart: no template loaded for item template %d", st.TemplateID)
-		}
-		if !inst.Tradable(tmpl) || inst.QuestItem(tmpl) {
+		if !ok || !inst.Tradable(tmpl) || inst.QuestItem(tmpl) {
 			continue
 		}
 		out = append(out, tradeStartItem{inst: inst, tmpl: tmpl})
 	}
-	return out, nil
+	return out
 }

@@ -1,0 +1,41 @@
+# Proof Of Clan Alliance (Q501): the leader holds three Symbols of Loyalty with fewer than three sacrifices on record, so Kalis
+# starts the quest over. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q501_proof_of_clan_alliance_reset.golden
+character Leader 40
+clan 3
+quest Q501_ProofOfClanAlliance <cond>=2 <state>=STARTED
+random always 0
+hold 3837 3
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page default/30757.htm
+page default/30759.htm
+page default/30758.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+npc statue 30757 Folk 20 0 0
+npc kalis 30759 Folk 30 0 0
+npc athrea 30758 Folk 40 0 0
+
+action kalis
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S QuestList
+  S SystemMessage id=302 3:3837
+  S SystemMessage id=302 3:3837
+  S SystemMessage id=302 3:3837
+  S QuestList 501:0x80000001
+  S ExShowQuestMark quest=501
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q501_ProofOfClanAlliance
+  Q upsert Q501_ProofOfClanAlliance | <state> | STARTED
+  Q upsert Q501_ProofOfClanAlliance | <cond> | 1
+  items 3837=0
+  rows Q501_ProofOfClanAlliance <cond>=1 <state>=STARTED

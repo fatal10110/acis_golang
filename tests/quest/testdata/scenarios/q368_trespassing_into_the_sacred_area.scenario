@@ -1,0 +1,106 @@
+# Trespassing into the Sacred Area (Q368): a level 36 character accepts at Restina, kills eleven Blade Stakatos
+# (every roll pinned to succeed) and sells the fangs for the bonus page's 8480 adena, then quits; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q368_trespassing_into_the_sacred_area.golden
+character Trespass 36
+random always 0
+script quest.Q368_TrespassingIntoTheSacredArea
+item 57 5881
+page default/30926.htm
+page script/quest/Q368_TrespassingIntoTheSacredArea/
+npc restina 30926 Folk 10 0 0
+npc blade 20794 Monster 40 0 0
+npc worker 20795 Monster 50 0 0
+npc warrior 20796 Monster 60 0 0
+npc drone 20797 Monster -40 0 0
+
+action restina
+action restina
+  S ActionFailed
+  S NpcHtmlMessage obj=restina item=0 page=default/30926.htm
+  S ActionFailed
+bypass npc_{restina}_Quest
+  S NpcHtmlMessage obj=restina item=0 page=script/quest/Q368_TrespassingIntoTheSacredArea/30926-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q368_TrespassingIntoTheSacredArea 30926-02.htm
+  S QuestList 368:0x80000001
+  S ExShowQuestMark quest=368
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=restina item=0 page=script/quest/Q368_TrespassingIntoTheSacredArea/30926-02.htm
+  S ActionFailed
+  Q upsert Q368_TrespassingIntoTheSacredArea | <state> | STARTED
+  Q upsert Q368_TrespassingIntoTheSacredArea | <cond> | 1
+  state Q368_TrespassingIntoTheSacredArea STARTED
+  rows Q368_TrespassingIntoTheSacredArea <cond>=1 <state>=STARTED
+action restina
+  S ActionFailed
+  S NpcHtmlMessage obj=restina item=0 page=default/30926.htm
+  S ActionFailed
+bypass npc_{restina}_Quest
+  S NpcHtmlMessage obj=restina item=0 page=script/quest/Q368_TrespassingIntoTheSacredArea/30926-03.htm
+  S ActionFailed
+  S ActionFailed
+kill blade x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5881=3
+kill worker x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5881=6
+kill warrior x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5881=9
+kill drone x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5881
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 5881=11
+action restina
+  S ActionFailed
+  S NpcHtmlMessage obj=restina item=0 page=default/30926.htm
+  S ActionFailed
+bypass npc_{restina}_Quest
+  S SystemMessage id=301 3:5881 6:11
+  S SystemMessage id=52 6:8480
+  S NpcHtmlMessage obj=restina item=0 page=script/quest/Q368_TrespassingIntoTheSacredArea/30926-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 5881=0 57=8480
+bypass Quest Q368_TrespassingIntoTheSacredArea 30926-05.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=restina item=0 page=script/quest/Q368_TrespassingIntoTheSacredArea/30926-05.htm
+  S ActionFailed
+  Q delete-quest Q368_TrespassingIntoTheSacredArea
+  state Q368_TrespassingIntoTheSacredArea -
+  rows Q368_TrespassingIntoTheSacredArea -
+relog
+  rows Q368_TrespassingIntoTheSacredArea -
+  items 57=8480

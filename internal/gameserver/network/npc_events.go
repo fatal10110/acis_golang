@@ -1,6 +1,8 @@
 package network
 
 import (
+	"iter"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -9,6 +11,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
 
 // shotRechargeRadius is how far an NPC's shot-recharge animation reaches.
@@ -21,12 +25,19 @@ func HostileSinks(state *world.State, stance AttackStanceTracker) func(*npc.Host
 	return func(h *npc.Hostile) event.Sink { return &hostileSink{world: state, stance: stance, h: h} }
 }
 
+// HostileSinks is the package HostileSinks whose sinks show the NPCs' views
+// with the crest l adds to them.
+func (l *GameClientLink) HostileSinks(state *world.State, stance AttackStanceTracker) func(*npc.Hostile) event.Sink {
+	return func(h *npc.Hostile) event.Sink { return &hostileSink{world: state, stance: stance, h: h, link: l} }
+}
+
 // hostileSink maps one hostile NPC's events to packets for its observers.
 type hostileSink struct {
 	world  *world.State
 	stance AttackStanceTracker
 	h      *npc.Hostile
-	known  world.KnownBuffer
+	// link adds the crest to the NPC's view; nil adds none.
+	link *GameClientLink
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -75,22 +86,20 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.HPChanged:
 		s.broadcastHP()
 	case event.AbnormalEffectChanged:
-		s.broadcast(func() wire.Frame { return frames.Info(h.NPCInfoSnapshot()) })
+		broadcastNPCView(s.link, s.world, h, false)
 	case event.NPCInfoChanged:
-		if e.ServerObject {
-			s.broadcast(func() wire.Frame { return frames.ObjectInfo(h.ServerObjectInfoSnapshot()) })
-			return
-		}
-		s.broadcast(func() wire.Frame { return frames.Info(h.NPCInfoSnapshot()) })
+		broadcastNPCView(s.link, s.world, h, e.ServerObject)
+	case event.NPCInfoShown:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameNPCInfo(npcSnapshot(s.link, h, false)) })
 	case event.MoveTypeChanged:
-		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(h.ObjectID(), e.Running) })
+		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(h.ObjectID(), e.Running, h.InsideZone(zone.FlagWater)) })
 	case event.Flight:
 		x, y, z := h.Position()
 		s.broadcast(func() wire.Frame {
 			return frames.FlyTo(h.ObjectID(), e.Dest, location.Location{X: x, Y: y, Z: z}, e.Flight)
 		})
 	case event.Teleported:
-		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(h.ObjectID(), e.To, false) })
+		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(h.ObjectID(), e.To, e.Instant) })
 	case event.PositionCorrected:
 		x, y, z := h.Position()
 		s.broadcast(func() wire.Frame {
@@ -99,7 +108,19 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.SocialAction:
 		s.broadcast(func() wire.Frame { return frames.SocialAction(h.ObjectID(), e.ID) })
 	case event.NpcSay:
-		s.broadcast(func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text) })
+		s.broadcast(func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text, e.Shout) })
+	case event.CameraShotPlayed:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameSpecialCamera(h.ObjectID(), e.Shot) })
+	case event.NpcShout:
+		broadcastInRadius(s.world, h, e.Radius, func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text, true) })
+	case event.NpcSystemMessage:
+		broadcastInRadius(s.world, h, e.Radius, func() wire.Frame { return frameNpcSystemMessage(e) })
+	case event.MusicPlayed:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameMusicAt(h.ObjectID(), e.File, e.At) })
+	case event.EarthquakeStarted:
+		s.broadcast(func() wire.Frame {
+			return serverpackets.FrameEarthquake(e.At.X, e.At.Y, e.At.Z, e.Intensity, e.Duration, true)
+		})
 	case event.OnScreenMessage:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs) })
 	case event.ShotRecharged:
@@ -143,17 +164,13 @@ func (s *hostileSink) stopAttackStance() {
 
 // broadcast fans one lazily built frame out to the NPC's observers.
 func (s *hostileSink) broadcast(build func() wire.Frame) {
-	broadcastKnown(&s.known, s.world, s.h, build)
+	broadcastKnown(s.world, s.h, build)
 }
 
-// broadcastKnown fans one lazily built frame out over a detached snapshot of
-// t's known list, taken through buf, so no region lock is held while frames
-// are sent.
-func broadcastKnown(buf *world.KnownBuffer, state *world.State, t world.Tracked, build func() wire.Frame) {
-	known := buf.SnapshotCopy(state, t)
-	defer known.Release()
+// broadcastKnown fans one lazily built frame out to the players that know t.
+func broadcastKnown(state *world.State, t world.Tracked, build func() wire.Frame) {
 	broadcastFrame(build, func(send func(frameReceiver)) {
-		for _, o := range known.Tracked() {
+		for o := range state.KnownPlayers(t) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
@@ -163,9 +180,7 @@ func broadcastKnown(buf *world.KnownBuffer, state *world.State, t world.Tracked,
 
 // broadcastHP sends the NPC's current HP to the known players targeting it.
 func (s *hostileSink) broadcastHP() {
-	known := s.known.SnapshotCopy(s.world, s.h)
-	defer known.Release()
-	sendHPToWatchers(known.Tracked(), s.h.ObjectID(), s.h.PublishHP)
+	sendHPToWatchers(s.world.KnownPlayers(s.h), s.h.ObjectID(), s.h.PublishHP)
 }
 
 // sendHPToWatchers sends the current HP of creature id to the players in
@@ -176,9 +191,9 @@ func (s *hostileSink) broadcastHP() {
 // the HP under the creature's bar lock, and the frame is queued to every
 // watcher inside that hand-over, so two concurrent HP changes cannot reach
 // a watcher in the reverse order of their reads.
-func sendHPToWatchers(known []world.Tracked, id int32, publish func(send func(hp int))) {
+func sendHPToWatchers(known iter.Seq[world.Tracked], id int32, publish func(send func(hp int))) {
 	var watchers []frameReceiver
-	for _, o := range known {
+	for o := range known {
 		p, ok := o.(*livePlayer)
 		if !ok {
 			continue
@@ -228,7 +243,6 @@ func EffectPointSinks(state *world.State) func(*npc.EffectPoint) event.Sink {
 type effectPointSink struct {
 	world *world.State
 	ep    *npc.EffectPoint
-	known world.KnownBuffer
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -240,8 +254,12 @@ func (s *effectPointSink) Emit(ev event.Event) {
 		frame = frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
 	case event.SkillLaunched:
 		frame = frames.SkillLaunched(s.ep.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
+	case event.MoveTypeChanged:
+		frame = frames.ChangeMoveType(s.ep.ObjectID(), e.Running, s.ep.InsideZone(zone.FlagWater))
 	case event.NPCInfoChanged:
-		broadcastKnown(&s.known, s.world, s.ep, func() wire.Frame { return npcViewFrame(s.ep, e.ServerObject) })
+		// A signet point's template serves no residence: its view carries
+		// no crest.
+		broadcastNPCView(nil, s.world, s.ep, e.ServerObject)
 		return
 	default:
 		return
@@ -255,33 +273,24 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	})
 }
 
-// npcView is an NPC with both client views.
-type npcView interface {
-	NPCInfoSnapshot() npcinfo.Snapshot
-	ServerObjectInfoSnapshot() npcinfo.Snapshot
-}
-
-// npcViewFrame is v's stationary view when serverObject is set, its full
-// view otherwise.
-func npcViewFrame(v npcView, serverObject bool) wire.Frame {
-	frames := serverpackets.NpcFrameBuilder{}
-	if serverObject {
-		return frames.ObjectInfo(v.ServerObjectInfoSnapshot())
-	}
-	return frames.Info(v.NPCInfoSnapshot())
-}
-
-// decorationSink shows one placed decoration's observers its view again.
+// decorationSink shows one placed decoration's observers its view again
+// and its stance changes.
 type decorationSink struct {
 	world *world.State
 	d     *npc.Decoration
-	known world.KnownBuffer
+	link  *GameClientLink
 }
 
-// Emit sends every known observer the decoration's view ev asks for.
+// Emit sends every known observer the decoration's view or stance ev asks
+// for.
 func (s *decorationSink) Emit(ev event.Event) {
-	if e, ok := ev.(event.NPCInfoChanged); ok {
-		broadcastKnown(&s.known, s.world, s.d, func() wire.Frame { return npcViewFrame(s.d, e.ServerObject) })
+	switch e := ev.(type) {
+	case event.NPCInfoChanged:
+		broadcastNPCView(s.link, s.world, s.d, e.ServerObject)
+	case event.MoveTypeChanged:
+		broadcastKnown(s.world, s.d, func() wire.Frame {
+			return serverpackets.NpcFrameBuilder{}.ChangeMoveType(s.d.ObjectID(), e.Running, s.d.InsideZone(zone.FlagWater))
+		})
 	}
 }
 
@@ -294,7 +303,6 @@ func DoorSinks(state *world.State) func(*door.Object) event.Sink {
 type doorSink struct {
 	world *world.State
 	door  *door.Object
-	known world.KnownBuffer
 }
 
 // Emit sends the door's status (open/close state, HP and damage stage) or
@@ -303,19 +311,11 @@ func (s *doorSink) Emit(ev event.Event) {
 	var build func() wire.Frame
 	switch ev.(type) {
 	case event.StatusChanged:
-		build = func() wire.Frame { return serverpackets.DoorFrameBuilder{}.StatusUpdate(s.door, false) }
+		build = func() wire.Frame { return serverpackets.DoorFrameBuilder{}.StatusUpdate(s.door, s.door.ShowsHP()) }
 	case event.Revived:
 		build = func() wire.Frame { return serverpackets.FrameRevive(s.door.ObjectID()) }
 	default:
 		return
 	}
-	known := s.known.SnapshotCopy(s.world, s.door)
-	defer known.Release()
-	broadcastFrame(build, func(send func(frameReceiver)) {
-		for _, o := range known.Tracked() {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		}
-	})
+	broadcastKnown(s.world, s.door, build)
 }

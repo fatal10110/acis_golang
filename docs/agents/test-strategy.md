@@ -60,8 +60,10 @@ Rules:
   advance to the next timer while no frame is on its way. Before the clock moves, the server has
   handled every client frame and the persistence lanes have run their jobs, so hold a lane
   (`HoldPersistenceLane`) to keep a database round trip outstanding — a slow store does not.
-  `ACIS_SIM_EXECUTOR=pool` runs the same suite on the real pool, where those calls wait for real;
-  `WithRealPool()` pins one test there (pool task-panic recovery, the slow-task watchdog, perf).
+  `ACIS_SIM_EXECUTOR=pool` runs the same suite on the real pool, where those calls wait for real,
+  except that a single `Advance` over 30 s skips the rest of its test there (the inline pass pins
+  long timers); `WithRealPool()` pins one test there (pool task-panic recovery, the slow-task
+  watchdog, perf), and its waits are never cut.
 - Per-script behavior (a quest's dialog, an NPC behavior's reactions) is a scenario file, not Go
   code: `tests/quest/testdata/scenarios/*.scenario` or `tests/ai/testdata/scenarios/*.scenario`,
   run by each suite's `TestScenarios` (format: package `internal/testsupport/scenario`). A ported

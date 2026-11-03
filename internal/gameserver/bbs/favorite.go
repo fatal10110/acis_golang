@@ -82,9 +82,8 @@ func (f *Favorites) List(playerID int32) []Favorite {
 
 // favoriteLimit is how many favorites a character keeps: the most added
 // favorites the shipped favorites board can show, since with 22 rows the
-// page is too long for the board window and shows nothing. The reference
-// has no limit, so one player could grow the favorite table without bound
-// (#3262).
+// page is too long for the board window and shows nothing. Without a limit
+// one player could grow the favorite table without bound (#3262).
 const favoriteLimit = 21
 
 // Add stores the home board as a new favorite of playerID, dated now. A

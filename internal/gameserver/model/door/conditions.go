@@ -16,7 +16,10 @@ type doorConditionActor struct{ o *Object }
 
 var _ conditions.Actor = doorConditionActor{}
 
-func (d doorConditionActor) DoorID() int { return d.o.DoorID() }
+// TargetID is the door id a target npcId condition matches; a door has no
+// race.
+func (d doorConditionActor) TargetID() (int, bool)  { return d.o.DoorID(), true }
+func (doorConditionActor) RaceOrdinal() (int, bool) { return 0, false }
 
 func (d doorConditionActor) Level() int { return d.o.Template.Level }
 

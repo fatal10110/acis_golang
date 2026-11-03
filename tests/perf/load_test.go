@@ -53,7 +53,9 @@ const probeTimeout = 5 * time.Second
 // two loopback hops. A probe that needs no character (such as
 // RequestManorList) could be answered ahead of a step queued for the
 // character and would stop measuring it. Reported: process CPU time (server and clients share the process), step
-// latency p50/p99/max, GC count, pauses and CPU share, heap and goroutines
+// latency p50/p99/max, selection latency p50/p99/max (each client's
+// RequestGameStart to CharSelected, one client at a time while the clients
+// already selected stay in the world), GC count, pauses and CPU share, heap and goroutines
 // at the end of the window, frames received.
 //
 // The run fails unless every client stayed connected, never timed out, never
@@ -85,10 +87,12 @@ func TestLoadBaseline(t *testing.T) {
 	}
 
 	readers := make([]*frameReader, clients)
+	selections := make([]time.Duration, clients)
 	for i, c := range conns {
-		enterWorld(t, c)
+		selections[i] = enterWorld(t, c)
 		readers[i] = startReader(c, ids[i])
 	}
+	slices.Sort(selections)
 	readersStopped := false
 	stopReaders := func() {
 		if readersStopped {
@@ -187,6 +191,7 @@ func TestLoadBaseline(t *testing.T) {
 	t.Logf("load baseline: clients=%d duration=%s GOMAXPROCS=%d", clients, elapsed.Round(time.Millisecond), runtime.GOMAXPROCS(0))
 	t.Logf("  disconnected=%d steps=%d timeouts=%d frames_received=%d (%.0f/s)", disconnected, len(all), timeouts.Load(), frames, float64(frames)/elapsed.Seconds())
 	t.Logf("  step latency p50=%s p99=%s max=%s", percentile(all, 50), percentile(all, 99), all[len(all)-1])
+	t.Logf("  selection latency p50=%s p99=%s max=%s", percentile(selections, 50), percentile(selections, 99), selections[len(selections)-1])
 	t.Logf("  process CPU=%s (%.2f cores)", cpu.Round(time.Millisecond), cpu.Seconds()/elapsed.Seconds())
 	t.Logf("  GC count=%d pause_total=%s pause_max=%s", gcs, time.Duration(memAfter.PauseTotalNs-memBefore.PauseTotalNs), maxPause(&memAfter, gcs))
 	t.Logf("  GC CPU=%s (%.1f%% of process CPU) allocated=%dMiB heap_alloc=%dMiB heap_sys=%dMiB goroutines=%d", gcCPU.Round(time.Millisecond), 100*gcCPU.Seconds()/cpu.Seconds(), (memAfter.TotalAlloc-memBefore.TotalAlloc)>>20, memAfter.HeapAlloc>>20, memAfter.HeapSys>>20, goroutinesUnderLoad)
@@ -321,8 +326,10 @@ func (r *frameReader) stop() {
 }
 
 // enterWorld selects the account's only character and drains the EnterWorld
-// burst plus whatever the arrival triggers.
-func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
+// burst plus whatever the arrival triggers. It returns the selection's
+// latency, from sending RequestGameStart to reading CharSelected: the wait for
+// the character's queued saves on its persistence lane plus the restore.
+func enterWorld(t *testing.T, c *testsupport.ScriptedClient) time.Duration {
 	t.Helper()
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
 	w.WriteInt32(0)
@@ -330,6 +337,7 @@ func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	w.WriteInt32(0)
+	start := time.Now()
 	c.Send(w.Bytes())
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
@@ -337,9 +345,10 @@ func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
+	selected := time.Since(start)
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	for c.ReadWithTimeout(300*time.Millisecond) != nil {
-	}
+	c.ReadQueued()
+	return selected
 }
 
 func encodeAction(objectID int32, origin location.Location) []byte {

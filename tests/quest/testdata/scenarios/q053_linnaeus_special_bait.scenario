@@ -1,0 +1,103 @@
+# Linnaues' Special Bait (Q053): a level 60 character holding 98 crimson drake hearts accepts
+# at Linnaeus, kills three crimson drakes (the first drop roll pinned to miss, the next two to
+# land; the third kill makes a hundred crimson drake hearts and completes the quest's first
+# step); Linnaeus takes the hundred for four lures, and the quest completes; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q053_linnaeus_special_bait.golden
+character Lurer 60
+hold 7624 98
+random 999999 0 0
+script quest.Q053_LinnaeusSpecialBait
+item 7624 7613
+page fisherman/31577.htm
+page script/quest/Q053_LinnaeusSpecialBait/
+npc linnaeus 31577 Fisherman 10 0 0
+npc drake 20670 Monster 40 0 0
+
+# Linnaeus: accept.
+action linnaeus
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q053_LinnaeusSpecialBait/31577-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q053_LinnaeusSpecialBait CREATED
+bypass Quest Q053_LinnaeusSpecialBait 31577-03.htm
+  S QuestList 53:0x80000001
+  S ExShowQuestMark quest=53
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q053_LinnaeusSpecialBait/31577-03.htm
+  S ActionFailed
+  Q upsert Q053_LinnaeusSpecialBait | <state> | STARTED
+  Q upsert Q053_LinnaeusSpecialBait | <cond> | 1
+  state Q053_LinnaeusSpecialBait STARTED
+  rows Q053_LinnaeusSpecialBait <cond>=1 <state>=STARTED
+
+# Short of a hundred: Linnaeus sends the player back out.
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q053_LinnaeusSpecialBait/31577-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The kills.
+kill drake
+  S SystemMessage id=95 1:0 1:0
+  items 7624=98
+kill drake
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7624
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7624=99
+kill drake
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7624
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 53:0x80000003
+  S ExShowQuestMark quest=53
+  Q upsert Q053_LinnaeusSpecialBait | <cond> | 2
+  rows Q053_LinnaeusSpecialBait <cond>=2 <state>=STARTED
+  items 7624=100
+
+# A hundred: Linnaeus trades them for four lures; the quest completes.
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q053_LinnaeusSpecialBait/31577-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q053_LinnaeusSpecialBait 31577-07.htm
+  S SystemMessage id=301 3:7624 6:100
+  S SystemMessage id=53 3:7613 6:4
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 53:0x00000000
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q053_LinnaeusSpecialBait/31577-06.htm
+  S ActionFailed
+  Q upsert Q053_LinnaeusSpecialBait | <state> | COMPLETED
+  Q delete-except-state Q053_LinnaeusSpecialBait
+  state Q053_LinnaeusSpecialBait COMPLETED
+  rows Q053_LinnaeusSpecialBait <state>=COMPLETED
+  items 7624=0 7613=4
+
+# Relog: the completed quest loads from its one row, and the lures stay.
+relog
+  state Q053_LinnaeusSpecialBait COMPLETED
+  rows Q053_LinnaeusSpecialBait <state>=COMPLETED
+  items 7613=4
+action linnaeus
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

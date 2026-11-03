@@ -1,0 +1,38 @@
+# Relics of the Old Empire (Q619): a thousand relic parts pay the last recipe of the draw; with none left the page says so.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q619_relics_of_the_old_empire_reward.golden
+character Hero 74
+quest Q619_RelicsOfTheOldEmpire <cond>=1 <state>=STARTED
+hold 7254 1000
+random 9
+script quest.Q619_RelicsOfTheOldEmpire
+item 7254 7075 6881 6883 6885 6887 6891 6893 6895 6897 6899 7580
+page default/31538.htm
+page script/quest/Q619_RelicsOfTheOldEmpire/
+npc ghost 31538 Folk 10 0 0
+
+action ghost
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31538.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q619_RelicsOfTheOldEmpire/31538-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q619_RelicsOfTheOldEmpire 31538-09.htm
+  S SystemMessage id=301 3:7254 6:1000
+  S SystemMessage id=54 3:7580
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q619_RelicsOfTheOldEmpire/31538-09.htm
+  S ActionFailed
+  items 7254=0 7580=1
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/31538.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q619_RelicsOfTheOldEmpire/31538-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q619_RelicsOfTheOldEmpire 31538-09.htm
+  items 7254=0 7580=1

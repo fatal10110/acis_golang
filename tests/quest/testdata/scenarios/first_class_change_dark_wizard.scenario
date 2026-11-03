@@ -1,0 +1,47 @@
+# First class change (FirstClassChange): a level 20 dark elf mystic holding the jewel of
+# darkness. Ramos, who changes only human and elf fighters, turns it away; Grand Master Xenos
+# opens the dark elf mystic's pages and makes it a Dark Wizard: the jewel taken, fifteen D-grade
+# coupons given, the fanfare, the class change's animation and message, and the congratulation
+# page. Expectations are the reference trace's (FirstClassChange.onTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/first_class_change_dark_wizard.golden
+character Mystic 20
+class 38
+hold 1261 1
+script script.feature.FirstClassChange
+item 1261 8869
+page villagemaster/30373.htm
+page villagemaster/30290.htm
+page script/feature/FirstClassChange/
+npc ramos 30373 VillageMasterFighter 10 0 0
+npc xenos 30290 VillageMasterDElf -10 0 0
+
+action ramos
+action ramos
+  S ActionFailed
+  S NpcHtmlMessage obj=ramos item=0 page=villagemaster/30373.htm
+  S ActionFailed
+bypass npc_{ramos}_Quest FirstClassChange
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-40.htm
+  S ActionFailed
+  S ActionFailed
+action xenos
+action xenos
+  S ActionFailed
+  S NpcHtmlMessage obj=xenos item=0 page=villagemaster/30290.htm
+  S ActionFailed
+bypass npc_{xenos}_Quest FirstClassChange
+  S NpcHtmlMessage obj=xenos item=0 page=script/feature/FirstClassChange/30290-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest FirstClassChange 30290-09.htm
+  S NpcHtmlMessage obj=xenos item=0 page=script/feature/FirstClassChange/30290-09.htm
+  S ActionFailed
+bypass Quest FirstClassChange DW
+  S SystemMessage id=302 3:1261
+  S SystemMessage id=53 3:8869 6:15
+  S PlaySound type=0 file=ItemSound.quest_fanfare_2 bind=0 obj=0 loc=0,0,0 delay=0
+  S MagicSkillUse caster=player target=player skill=5103-1 hit=1000 reuse=0 success=0
+  S SystemMessage id=1308
+  S NpcHtmlMessage obj=xenos item=0 page=script/feature/FirstClassChange/30290-26.htm
+  S ActionFailed
+  items 1261=0 8869=15

@@ -1,8 +1,6 @@
 package skill
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -13,17 +11,6 @@ const (
 	restoredHP restoredResource = iota
 	restoredMP
 	restoredCP
-)
-
-// expSPTarget is a creature that gains experience and SP: a player, or a
-// pet. Any other creature ignores a grant.
-type expSPTarget interface {
-	AddExpAndSp(exp int64, sp int)
-}
-
-var (
-	_ expSPTarget = (*player.Character)(nil)
-	_ expSPTarget = (*summon.Actor)(nil)
 )
 
 // healHandler restores HP after landing the skill's effects through the
@@ -286,9 +273,12 @@ func (giveSPHandler) Types() []string { return []string{"GIVE_SP"} }
 
 func (giveSPHandler) Use(cast Cast) {
 	sp := int(cast.Skill.Power)
+	// Only a player or a summon gains SP; any other creature ignores a grant.
 	for _, obj := range cast.Targets {
-		if target, ok := obj.(expSPTarget); ok {
-			target.AddExpAndSp(0, sp)
+		if p, ok := asPlayer(obj); ok {
+			p.AddExpAndSp(0, sp)
+		} else if s, ok := asSummon(obj); ok {
+			s.AddExpAndSp(0, sp)
 		}
 	}
 }
@@ -297,13 +287,17 @@ type realDamageHandler struct{}
 
 func (realDamageHandler) Types() []string { return []string{"REAL_DAMAGE"} }
 
-// Use takes the skill's power straight off each live creature target's HP.
-// It is not a hit: CP, invulnerability, damage permission, hate and the
-// wake-up side effects of damage play no part. A target the loss leaves at
-// or below zero HP dies to the caster; any other target has its HP set and
-// its status reported.
+// Use takes the skill's power straight off each live creature target's HP,
+// a door's included. It is not a hit: CP, invulnerability, damage
+// permission, hate and the wake-up side effects of damage play no part. A
+// target the loss leaves at or below zero HP dies to the caster; any other
+// target has its HP set and its status reported.
 func (realDamageHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
+		if d, ok := asDoor(obj); ok {
+			d.TakeHP(float64(cast.Skill.Power))
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue

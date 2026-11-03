@@ -1,0 +1,18 @@
+# RaidPrivateHealer (25008, level 1), every draw 0: a level 20 character casts Ultimate Debuff (4694) on a
+# monster beside it: it wants nothing, not even the raid curse its parent would.
+character Hunter 20
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateHealer
+npc master 20003 Monster 400 0 0
+npc healer1 25008 Monster 100 0 0 skill HEAL_MAGIC_A 4780 3 skill SELF_RANGE_BUFF_A 4214 3 master master
+npc wolf 20120 Monster 150 0 0
+
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires healer1 -

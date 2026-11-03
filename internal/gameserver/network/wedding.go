@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 )
@@ -99,7 +100,7 @@ func (l *GameClientLink) askWedding(live *livePlayer, f *npc.Folk, command strin
 		l.sendWeddingPage(live, f, page)
 		return
 	}
-	partner.SendFrame(serverpackets.FrameConfirmDlgEngageRequest(wedding.RequestText(live.Name)))
+	partner.SendFrame(serverpackets.FrameConfirmDlgEngageRequest(wedding.RequestText(live.CharacterName())))
 }
 
 // tokenizerSpace is the default delimiter set of a command's words: space,
@@ -123,7 +124,8 @@ func (l *GameClientLink) divorce(live *livePlayer) {
 }
 
 // goToLove teleports live next to its spouse, unless live is not married,
-// the spouse is offline or the spouse's state refuses it.
+// the spouse is offline, or the spouse's state or its clan's castle under
+// siege refuses it.
 func (l *GameClientLink) goToLove(live *livePlayer) {
 	partnerID := l.wedding.PartnerID(live.ObjectID())
 	if partnerID == 0 {
@@ -135,12 +137,12 @@ func (l *GameClientLink) goToLove(live *livePlayer) {
 		sendText(live, wedding.NoticePartnerOffline)
 		return
 	}
-	if notice := wedding.TeleportRefusal(partner.Character); notice != "" {
+	if notice := wedding.TeleportRefusal(partner.Character, l.ownCastleBesieged(partner.ClanID())); notice != "" {
 		sendText(live, notice)
 		return
 	}
 	x, y, z := partner.Position()
-	live.Character.TeleportTo(x, y, z, 20)
+	l.teleportLivePlayer(live, location.Location{X: x, Y: y, Z: z}, 20)
 }
 
 // engageAnswer is live's answer to a marriage request; answer 1 accepts.
@@ -178,8 +180,8 @@ func (l *GameClientLink) engageAnswer(live *livePlayer, answer int32) {
 // have each paid the price: each is congratulated, each shows the wedding march then
 // the fireworks to everyone watching, and every player online hears of it.
 func (l *GameClientLink) celebrateWedding(requester, partner *livePlayer) {
-	sendText(requester, wedding.MarriedNotice(partner.Name))
-	sendText(partner, wedding.MarriedNotice(requester.Name))
+	sendText(requester, wedding.MarriedNotice(partner.CharacterName()))
+	sendText(partner, wedding.MarriedNotice(requester.CharacterName()))
 	for _, skillID := range []int32{wedding.MarchSkillID, wedding.FireworksSkillID} {
 		for _, spouse := range []*livePlayer{requester, partner} {
 			l.broadcastLiveFrame(spouse, func() wire.Frame {
@@ -188,5 +190,5 @@ func (l *GameClientLink) celebrateWedding(requester, partner *livePlayer) {
 			})
 		}
 	}
-	announceToOnline(l.world, wedding.MarriedAnnouncement(requester.Name, partner.Name), false)
+	announceToOnline(l.world, wedding.MarriedAnnouncement(requester.CharacterName(), partner.CharacterName()), false)
 }

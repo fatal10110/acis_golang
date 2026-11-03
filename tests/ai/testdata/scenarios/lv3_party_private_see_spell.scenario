@@ -1,0 +1,27 @@
+# LV3PartyPrivateMonster (27261, level 76) spawned on its own (no master), whose template hates the human race at 20%
+# (SetHateRace @race_human, ratio 20), every draw 0: the character casts Ultimate Debuff (4694, aggro points above 0) on a
+# monster beside it. While the private is not swinging, nothing changes; while it swings at that monster, its top desire
+# target, it gains the formula aggro / (76 + 7) + 20 / 100 * aggro / (76 + 7), times 150.
+character Hunter 20
+skill 4694 1
+roll player 0
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster
+npc priv 27261 Monster 60 0 0 level 76 walks ai SetHateRace=@race_human,SetHateRaceRatio=20
+npc wolf 20120 Monster 60 100 0
+
+want priv wolf 100
+  desires priv attack(wolf)=100
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires priv attack(wolf)=100
+swing priv
+cast wolf 4694
+  S MagicSkillUse caster=player target=wolf skill=4694-1 hit=0 reuse=0 success=0
+  S SystemMessage id=46 4:4694,1
+  desires priv attack(player)=216.8674698795181 attack(wolf)=100

@@ -42,6 +42,7 @@ func TestPickupRefusedAtConfiguredInventoryLimit(t *testing.T) {
 	c.Send(encodeAction(adenaID, spawnX, spawnY, spawnZ, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pickup release")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeGetItem, "GetItem")
+	srv.SettlePickup(t, objID)
 	drainUntilQuiet(t, c)
 	if _, ok := srv.State.Object(adenaID); ok {
 		t.Fatal("stackable adena stayed on the ground although it needs no new slot")

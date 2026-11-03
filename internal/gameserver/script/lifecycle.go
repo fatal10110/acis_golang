@@ -41,6 +41,12 @@ func (r *Registry) HostileDecayed(h *npc.Hostile) {
 	r.timers.npcDecayed(h.Scratch())
 }
 
+// HostileHidden stops the timers bound to h whose script is a behavior
+// bound to h's template, as its decay would: a script hid h. No hook runs.
+func (r *Registry) HostileHidden(h *npc.Hostile) {
+	r.timers.npcDecayed(h.Scratch())
+}
+
 // FolkDecayed is HostileDecayed for the civilian NPC f.
 func (r *Registry) FolkDecayed(f *npc.Folk) {
 	r.decayed(int32(f.NpcID()), f)

@@ -78,15 +78,32 @@ func (l List) FindProduct(itemID int32) (Product, bool) {
 // Table stores buylists keyed by list id.
 type Table struct {
 	byID map[int]List
+	// ids are the list ids in load order, each where it first appeared.
+	ids []int
 }
 
-// NewTable builds a buylist lookup table.
+// NewTable builds a buylist lookup table from lists in load order. A later
+// list with the id of an earlier one replaces it in that list's place.
 func NewTable(lists []List) *Table {
 	t := &Table{byID: make(map[int]List, len(lists))}
 	for _, l := range lists {
+		if _, ok := t.byID[l.ID]; !ok {
+			t.ids = append(t.ids, l.ID)
+		}
 		t.byID[l.ID] = l
 	}
 	return t
+}
+
+// ForNPC returns the lists npcID sells from, in load order.
+func (t *Table) ForNPC(npcID int) []List {
+	var out []List
+	for _, id := range t.ids {
+		if l := t.byID[id]; l.AllowsNPC(npcID) {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // Len returns the number of buylists keyed by list id.

@@ -46,7 +46,7 @@ func (l *GameClientLink) restoreHeroStatus(c *player.Character) {
 // heroAura reports whether live, a game master, shows the hero aura
 // GMHeroAura gives game masters.
 func (l *GameClientLink) heroAura(live *livePlayer) bool {
-	return l != nil && l.playerConfig.GMHeroAura && live.accessLevel().IsGM
+	return l != nil && l.playerConfig().GMHeroAura && live.accessLevel().IsGM
 }
 
 // unwearHeroItems puts every hero item of ownerID's carried inventory back

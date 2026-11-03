@@ -20,6 +20,7 @@ type adminCommand func(l *GameClientLink, gm *livePlayer, line string)
 var adminCommands = map[string]adminCommand{
 	"admin_admin":        (*GameClientLink).adminMainPage,
 	"admin_camera":       (*GameClientLink).adminCamera,
+	"admin_polymorph":    (*GameClientLink).adminPolymorph,
 	"admin_gmlist":       (*GameClientLink).adminToggleGMList,
 	"admin_link":         (*GameClientLink).adminLink,
 	"admin_msg":          (*GameClientLink).adminSystemMessage,
@@ -40,8 +41,10 @@ var adminCommands = map[string]adminCommand{
 	"admin_atmosphere":   (*GameClientLink).adminAtmosphere,
 	"admin_hide":         (*GameClientLink).adminHide,
 	"admin_invul":        (*GameClientLink).adminInvul,
+	"admin_para":         (*GameClientLink).adminPara,
 	"admin_skill":        (*GameClientLink).adminSkill,
 	"admin_clan_skill":   (*GameClientLink).adminClanSkill,
+	"admin_pledge":       (*GameClientLink).adminPledge,
 	"admin_help":         (*GameClientLink).adminHelp,
 
 	// Spawns; see admin_spawn.go and admin_spawn_all.go.
@@ -56,6 +59,12 @@ var adminCommands = map[string]adminCommand{
 
 	// Cursed weapons; see admin_cursed.go.
 	"admin_cw": (*GameClientLink).adminCursedWeapons,
+
+	// Mounts and summons; see admin_summon.go.
+	"admin_ride":     (*GameClientLink).adminRide,
+	"admin_unride":   (*GameClientLink).adminUnride,
+	"admin_unsummon": (*GameClientLink).adminUnsummon,
+	"admin_summon":   (*GameClientLink).adminSummon,
 
 	// Fences; see admin_fence.go.
 	"admin_spawnfence":  (*GameClientLink).adminSpawnFence,
@@ -73,8 +82,15 @@ var adminCommands = map[string]adminCommand{
 	"admin_party_info": (*GameClientLink).adminPartyInfo,
 	"admin_remove":     (*GameClientLink).adminRemove,
 
-	// Castles; see admin_castle.go.
+	// Castles and sieges; see admin_castle.go and admin_siege.go.
 	"admin_castle": (*GameClientLink).adminCastle,
+	"admin_siege":  (*GameClientLink).adminSiege,
+
+	// Clan halls; see admin_clanhall.go.
+	"admin_ch": (*GameClientLink).adminClanHall,
+
+	// Manor; see admin_manor.go.
+	"admin_manor": (*GameClientLink).adminManor,
 
 	// Olympiad and heroes; see admin_olympiad.go.
 	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
@@ -85,6 +101,9 @@ var adminCommands = map[string]adminCommand{
 	"admin_ann":      (*GameClientLink).adminAnnounceText,
 	"admin_say":      (*GameClientLink).adminAnnounceText,
 	"admin_gmchat":   (*GameClientLink).adminGMChat,
+
+	// Server maintenance; see admin_server.go.
+	"admin_server": (*GameClientLink).adminServer,
 }
 
 // adminEntry is one of the two ways a command reaches the server; they
@@ -121,7 +140,7 @@ func (l *GameClientLink) sendBypassBuildCmd(live *livePlayer, req clientpackets.
 	if live == nil {
 		return
 	}
-	text := strings.TrimFunc(req.Command, javaSpace)
+	text := strings.TrimFunc(req.Command, isCtrlOrSpace)
 	word, _, _ := strings.Cut(text, " ")
 	l.runAdminCommand(live, adminChatEntry, "admin_"+word, "admin_"+text, text)
 }
@@ -146,10 +165,10 @@ func (l *GameClientLink) runAdminCommand(gm *livePlayer, entry adminEntry, word,
 			l.log.Warn().Str("command", word).Msg("admin: no rights defined for admin command")
 		}
 		sendText(gm, entry.refusal)
-		l.log.Warn().Str("player", gm.Name).Str("command", word).Msg("admin: " + entry.logText)
+		l.log.Warn().Str("player", gm.CharacterName()).Str("command", word).Msg("admin: " + entry.logText)
 		return
 	}
-	l.gmAudit.Info().Msgf("%s [%d] used '%s' command on: %s", gm.Name, gm.ObjectID(), audited, trackedName(gm.Target()))
+	l.gmAudit.Info().Msgf("%s [%d] used '%s' command on: %s", gm.CharacterName(), gm.ObjectID(), audited, trackedName(gm.Target()))
 	if !ported {
 		l.log.Warn().Str("command", word).Msg("admin: command not implemented yet")
 		gm.SendFrame(serverpackets.FrameActionFailed())

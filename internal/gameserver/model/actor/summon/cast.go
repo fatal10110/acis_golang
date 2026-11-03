@@ -26,7 +26,7 @@ type CastControl interface {
 	InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool
 	// SkillOnCooldown reports whether def is still waiting for its reuse
 	// delay.
-	SkillOnCooldown(def modelskill.Definition) bool
+	SkillOnCooldown(def *modelskill.Definition) bool
 }
 
 // CastControl returns a's cast controller, nil when it has none.

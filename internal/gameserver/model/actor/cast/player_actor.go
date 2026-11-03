@@ -3,11 +3,12 @@ package cast
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 // PlayerActor adapts a live player character to the cast controller's actor
@@ -45,7 +46,7 @@ func (a PlayerActor) HP() int {
 }
 
 // MPInitialCost is def's up-front MP cost, scaled by the caster's skill MP-consume rate.
-func (a PlayerActor) MPInitialCost(def modelskill.Definition) int {
+func (a PlayerActor) MPInitialCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPInitialConsume)
 }
 
@@ -53,7 +54,7 @@ func (a PlayerActor) MPInitialCost(def modelskill.Definition) int {
 // extra danceCount * def.NextDanceCost surcharge for each dance/song
 // already active on the caster, then the whole sum is scaled by the
 // caster's dance MP-consume rate: casting more dances costs more MP.
-func (a PlayerActor) MPCost(def modelskill.Definition) int {
+func (a PlayerActor) MPCost(def *modelskill.Definition) int {
 	mp := def.MPConsume
 	if def.Dance {
 		if dc := a.danceCount(); dc > 0 {
@@ -70,7 +71,7 @@ func (a PlayerActor) danceCount() int {
 	return a.Character.EffectList().DanceCount()
 }
 
-func (a PlayerActor) scaleMP(def modelskill.Definition, mp int) int {
+func (a PlayerActor) scaleMP(def *modelskill.Definition, mp int) int {
 	if a.Character == nil {
 		return mp
 	}
@@ -115,7 +116,12 @@ func (a PlayerActor) ReduceHP(amount int) {
 	dead := a.Character.ReduceCurrentHP(amount)
 	a.Character.BroadcastStatus()
 	if dead {
-		a.Character.DieFromDamage(a.Character)
+		// The killer is the caster as the world registers it.
+		killer, ok := a.Character.WorldHandle().(attackable.Combatant)
+		if !ok {
+			killer = a.Character
+		}
+		a.Character.DieFromDamage(killer)
 	}
 }
 
@@ -150,15 +156,12 @@ func (PlayerActor) SpiritshotCharged() bool { return false }
 
 func (PlayerActor) BlessedSpiritshotCharged() bool { return false }
 
-func (a PlayerActor) SkillMastery(def modelskill.Definition) bool {
+func (a PlayerActor) SkillMastery(def *modelskill.Definition) bool {
 	if a.Character == nil || def.SkillType == "FISHING" {
 		return false
 	}
-	statMul := statbonus.STRBonus[statbonus.ClampIndex(a.Character.STR())]
-	if player.ClassMage(a.Character.ClassID()) {
-		statMul = statbonus.INTBonus[statbonus.ClampIndex(a.Character.INT())]
-	}
-	return a.Character.RollFloat(100) < a.Character.CalcStat(stat.SkillMastery, 0)*statMul
+	rate := formulas.SkillMasteryRate(a.Character.CalcStat(stat.SkillMastery, 0), player.ClassMage(a.Character.ClassID()), a.Character.INT(), a.Character.STR())
+	return a.Character.RollFloat(100) < rate
 }
 
 func (a PlayerActor) ItemCount(itemID int) int {

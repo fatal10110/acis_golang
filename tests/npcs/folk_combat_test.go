@@ -32,7 +32,7 @@ func TestForcedClickAttacksFolk(t *testing.T) {
 
 	w.c.Send(encodeAttackRequest(f.ObjectID(), w.at))
 	var frames [][]byte
-	w.srv.AdvanceUntil(t, "a swing landing on the merchant", func() bool {
+	advanceUntilSwingLands(t, w.srv, "a swing landing on the merchant", func() bool {
 		frames = append(frames, drainFrames(t, w.c)...)
 		return f.CurrentHP() < maxHP
 	})

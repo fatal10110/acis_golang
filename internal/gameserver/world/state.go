@@ -82,6 +82,15 @@ func (s *State) AppendObjects(dst []Tracked) []Tracked {
 	return s.objects.appendAll(dst)
 }
 
+// FindObject returns the first tracked object match accepts, in no fixed
+// order, without copying the tracked set; nil when match accepts none.
+// match runs under the object registry's read lock, so it must not add or
+// remove tracked objects, and should only inspect the object.
+func (s *State) FindObject(match func(Tracked) bool) Tracked {
+	obj, _ := s.objects.find(match)
+	return obj
+}
+
 // AddPlayer marks obj online, unless a player with the same id is already
 // tracked, and indexes its name for PlayerByName lookups. The registry and
 // name-index updates happen under one lock so a concurrent RemovePlayer for
@@ -112,6 +121,32 @@ func (s *State) RemovePlayer(id int32) {
 	}
 
 	s.players.remove(id)
+}
+
+// RenamePlayer runs rename, which changes the name of the online player
+// with the given id to name, and re-keys its PlayerByName entry, under the
+// same lock as AddPlayer and RemovePlayer, so neither sees the name and the
+// index disagree. It refuses, without running rename, a name another
+// online player is indexed under, matched case-insensitively.
+func (s *State) RenamePlayer(id int32, name string, rename func()) bool {
+	s.playersMu.Lock()
+	defer s.playersMu.Unlock()
+
+	to := strings.ToLower(name)
+	if owner, taken := s.playerNames[to]; taken && owner != id {
+		return false
+	}
+	obj, ok := s.players.get(id)
+	if !ok {
+		rename()
+		return true
+	}
+	if from := strings.ToLower(obj.CharacterName()); s.playerNames[from] == id {
+		delete(s.playerNames, from)
+	}
+	rename()
+	s.playerNames[to] = id
+	return true
 }
 
 // Player returns the online player with the given id, if any.

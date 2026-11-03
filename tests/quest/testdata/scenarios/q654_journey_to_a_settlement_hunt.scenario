@@ -1,0 +1,31 @@
+# Journey to a Settlement (Q654): the first skin drops for a draw under the chance and moves the quest to cond 3.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q654_journey_to_a_settlement_hunt.golden
+character Hero 74
+quest Q119_LastImperialPrince <state>=COMPLETED
+quest Q654_JourneyToASettlement <cond>=2 <state>=STARTED
+random 0
+script quest.Q119_LastImperialPrince
+script quest.Q654_JourneyToASettlement
+item 8072 8073
+page default/31453.htm
+page script/quest/Q654_JourneyToASettlement/
+npc spirit 31453 Folk 10 0 0
+npc m1 21294 Monster 40 0 0
+npc m2 21295 Monster 50 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8072
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 119:0x00000000 654:0x80000007
+  S ExShowQuestMark quest=654
+  Q upsert Q654_JourneyToASettlement | <cond> | 3
+  items 8072=1
+  rows Q654_JourneyToASettlement <cond>=3 <state>=STARTED
+  state Q654_JourneyToASettlement STARTED
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  items 8072=1
+  rows Q654_JourneyToASettlement <cond>=3 <state>=STARTED
+  state Q654_JourneyToASettlement STARTED

@@ -56,7 +56,7 @@ func dissolveDelay(s *Service) time.Duration {
 func TestRequestedDissolutionComesDue(t *testing.T) {
 	s, in, r := dissolutionTimerWorld(t, 0)
 	leader := inClan(dtLeader, "Leader", dtClan)
-	if _, got := s.RequestDissolve(leader, in.Now()); got != DissolveScheduled {
+	if _, got := s.RequestDissolve(leader, in.Now(), nil); got != DissolveScheduled {
 		t.Fatalf("RequestDissolve = %d, want DissolveScheduled", got)
 	}
 	delay := dissolveDelay(s)
@@ -83,7 +83,7 @@ func TestRequestedDissolutionComesDue(t *testing.T) {
 func TestRecoveredDissolutionNeverComesDue(t *testing.T) {
 	s, in, r := dissolutionTimerWorld(t, 0)
 	leader := inClan(dtLeader, "Leader", dtClan)
-	if _, got := s.RequestDissolve(leader, in.Now()); got != DissolveScheduled {
+	if _, got := s.RequestDissolve(leader, in.Now(), nil); got != DissolveScheduled {
 		t.Fatalf("RequestDissolve = %d, want DissolveScheduled", got)
 	}
 	in.Advance(time.Hour)
@@ -107,7 +107,7 @@ func TestRerequestedDissolutionComesDueAtTheSecondDeadline(t *testing.T) {
 	s, in, r := dissolutionTimerWorld(t, 0)
 	leader := inClan(dtLeader, "Leader", dtClan)
 	delay := dissolveDelay(s)
-	if _, got := s.RequestDissolve(leader, in.Now()); got != DissolveScheduled {
+	if _, got := s.RequestDissolve(leader, in.Now(), nil); got != DissolveScheduled {
 		t.Fatalf("first RequestDissolve = %d, want DissolveScheduled", got)
 	}
 	in.Advance(30 * time.Minute)
@@ -115,7 +115,7 @@ func TestRerequestedDissolutionComesDueAtTheSecondDeadline(t *testing.T) {
 		t.Fatalf("RecoverClan = %d, want Recovered", got)
 	}
 	in.Advance(30 * time.Minute)
-	if _, got := s.RequestDissolve(leader, in.Now()); got != DissolveScheduled {
+	if _, got := s.RequestDissolve(leader, in.Now(), nil); got != DissolveScheduled {
 		t.Fatalf("second RequestDissolve = %d, want DissolveScheduled", got)
 	}
 
@@ -145,7 +145,7 @@ func TestRequestReplacesARestoredTimer(t *testing.T) {
 	s, in, r := dissolutionTimerWorld(t, dtStart.Add(-time.Hour).UnixMilli())
 	leader := inClan(dtLeader, "Leader", dtClan)
 	in.Advance(30 * time.Second)
-	if _, got := s.RequestDissolve(leader, in.Now()); got != DissolveScheduled {
+	if _, got := s.RequestDissolve(leader, in.Now(), nil); got != DissolveScheduled {
 		t.Fatalf("RequestDissolve over a lapsed expiry = %d, want DissolveScheduled", got)
 	}
 

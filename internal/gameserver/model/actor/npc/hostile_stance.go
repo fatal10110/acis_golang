@@ -26,7 +26,7 @@ func (h *Hostile) SetRunning(running bool) bool {
 }
 
 // ForceWalkStance switches to walk stance and broadcasts when the stance
-// changes and this NPC can move.
+// changes.
 func (h *Hostile) ForceWalkStance() {
 	if !h.Running() {
 		return
@@ -35,7 +35,7 @@ func (h *Hostile) ForceWalkStance() {
 }
 
 // ForceRunStance switches to run stance and broadcasts when the stance
-// changes and this NPC can move.
+// changes.
 func (h *Hostile) ForceRunStance() {
 	if h.Running() {
 		return
@@ -43,14 +43,16 @@ func (h *Hostile) ForceRunStance() {
 	h.setWalkOrRun(true)
 }
 
+// setWalkOrRun switches the stance to running. A change shows observers
+// ChangeMoveType when this NPC can move, then its NpcInfo again.
 func (h *Hostile) setWalkOrRun(running bool) {
 	if !h.SetRunning(running) {
 		return
 	}
-	if h.MoveSpeed() == 0 {
-		return
+	if h.MoveSpeed() != 0 {
+		h.emit(event.MoveTypeChanged{Running: h.Running()})
 	}
-	h.emit(event.MoveTypeChanged{Running: h.Running()})
+	h.emit(event.NPCInfoChanged{})
 }
 
 // MoveSpeed is this NPC's current move speed: the template run or walk

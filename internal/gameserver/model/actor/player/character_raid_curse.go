@@ -10,7 +10,7 @@ import (
 var _ creature.RaidCurseAttacker = (*Character)(nil)
 
 type skillDefinitions interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // TestCursesOnAttack applies this player's raid petrification and mounted
@@ -21,11 +21,11 @@ func (c *Character) TestCursesOnAttack(target attackable.Combatant) bool {
 		return false
 	}
 	c.stateMu.RLock()
-	disabled := c.raidCursesDisabled
+	disabled := c.rules().RaidCursesDisabled
 	skills := c.skillDefs
 	c.stateMu.RUnlock()
 	return creature.TestCursesOnAttack(creature.RaidCurseInput{
-		Attacker: c,
+		Attacker: c.curseSubject(),
 		Target:   target,
 		NPCID:    creature.NPCIDOf(target),
 		Mounted:  c.Mounted(),
@@ -43,7 +43,7 @@ func (c *Character) TestCursesOnSkillSee(def modelskill.Definition, targets []ta
 		return false
 	}
 	c.stateMu.RLock()
-	disabled := c.raidCursesDisabled
+	disabled := c.rules().RaidCursesDisabled
 	skills := c.skillDefs
 	c.stateMu.RUnlock()
 
@@ -63,7 +63,7 @@ func (c *Character) TestCursesOnSkillSee(def modelskill.Definition, targets []ta
 		})
 	}
 	return creature.TestCursesOnSkillSee(creature.RaidCurseSkillInput{
-		Caster:    c,
+		Caster:    c.curseSubject(),
 		Offensive: def.Offensive,
 		Debuff:    def.Debuff,
 		Targets:   converted,
@@ -72,4 +72,13 @@ func (c *Character) TestCursesOnSkillSee(def modelskill.Definition, targets []ta
 		Skills:    skills,
 		Sink:      c.sink,
 	})
+}
+
+// curseSubject returns c as the world registers it: the creature a raid
+// curse lands on and the raid stops hating.
+func (c *Character) curseSubject() creature.RaidCurseAttacker {
+	if a, ok := c.tracked().(creature.RaidCurseAttacker); ok {
+		return a
+	}
+	return c
 }

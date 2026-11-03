@@ -1,0 +1,28 @@
+# Through the Gate Once More (Q637): a character at cond 2 short of a heart goes back to cond 1.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q637_through_the_gate_once_more_short.golden
+character Hero 73
+quest Q637_ThroughTheGateOnceMore <cond>=2 <state>=STARTED
+hold 8065 1
+hold 8066 9
+script quest.Q637_ThroughTheGateOnceMore
+item 8065 8066 8067 8273
+page default/32010.htm
+page script/quest/Q637_ThroughTheGateOnceMore/
+npc flauron 32010 Folk 10 0 0
+
+action flauron
+action flauron
+  S ActionFailed
+  S NpcHtmlMessage obj=flauron item=0 page=default/32010.htm
+  S ActionFailed
+bypass npc_{flauron}_Quest
+  S QuestList 637:0x80000001
+  S ExShowQuestMark quest=637
+  S NpcHtmlMessage obj=flauron item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q637_ThroughTheGateOnceMore | <cond> | 1
+  rows Q637_ThroughTheGateOnceMore <cond>=1 <state>=STARTED
+  state Q637_ThroughTheGateOnceMore STARTED
+  items 8066=9

@@ -53,6 +53,7 @@ func (f zoneForm) IntersectsRect(x1, x2, y1, y2 int) bool {
 // the shape" containment case a real query never triggers at that
 // height.
 func degenerateShapeIntersectsRect(s geometry.Shape, x1, x2, y1, y2 int) bool {
+	// accepted: only a vertex-ring shape lists its vertices.
 	v, ok := s.(interface{ Vertices() []geometry.Point })
 	if !ok {
 		// Not vertex-ring backed (a Circle): circular forms never had

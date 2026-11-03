@@ -1,0 +1,15 @@
+# WarriorFlee (20002, Rabbit): hit, it wants to flee the attacker for the drift range (200) at weight
+# 30.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorFlee
+npc rabbit 20002 Monster 50 0 0 walks
+
+tick
+  desires rabbit -
+hit rabbit 1
+  desires rabbit flee(player,200)=30

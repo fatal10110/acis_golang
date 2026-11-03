@@ -1,0 +1,73 @@
+# AgitWarriorFlee (35429, Oel Mahum Scouts), AgitThief (35432) and AgitWizardFlee (35431), all
+# walking. A fixture monster has 440 hit points; the attacked hooks read the hit points from
+# before the hit. Each notices the character on the first AI tick: attack by 200, which the hits
+# add to. Above half its hit points a hit adds its weight (100 per twentieth) cut to a whole
+# number, so the scout's first hit of 23 makes 200 + int(104.5...) = 304; above 30% it does so on
+# a draw under 90 (0) and else (95) breaks off: it drops every attack desire and, 5 s on, timer
+# 3001 makes it fight again; at 30% or less it breaks off for good. Broken off, a hit makes it
+# want to flee the character by its drift range (200), weight 10000; the thief also drops its
+# attack desires and wants its hold (4047) on a draw under 10, the cleric its heal (4065) on
+# itself. The second scout, broken off above 30%, fights again once timer 3001 fires.
+character Hunter 20
+random 0 95 0 95 0 95 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitThief
+script script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWarriorFlee
+script script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWizardFlee
+npc scout 35429 Monster 100 0 0 walks
+npc thief 35432 Monster -100 0 0 walks skill DD_MAGIC 4047 6
+npc cleric 35431 Monster 0 100 0 walks skill DD_MAGIC 4065 6
+npc scout2 35429 Monster 0 -100 0 walks
+
+tick
+  desires scout attack(player)=200
+  desires thief attack(player)=200
+  desires cleric attack(player)=200
+  desires scout2 attack(player)=200
+
+hit scout 23
+  desires scout attack(player)=304
+
+hit scout 220
+  desires scout attack(player)=1304
+
+hit scout 22
+  desires scout attack(player)=1404
+
+hit scout 22
+  desires scout -
+
+hit scout 50
+  desires scout flee(player,200)=10000
+
+hit thief 110
+  desires thief attack(player)=700
+
+hit thief 220
+  desires thief attack(player)=1700
+
+hit thief 22
+  desires thief -
+
+hit thief 22
+  desires thief flee(player,200)=10000 cast(player,4047,move)=1000000
+
+hit cleric 300
+  desires cleric attack(player)=1563
+
+hit cleric 22
+  desires cleric -
+
+hit cleric 22
+  desires cleric flee(player,200)=10000 cast(cleric,4065,move)=1000000
+
+hit scout2 230
+  desires scout2 attack(player)=1245
+
+hit scout2 22
+  desires scout2 -
+
+advance 5s
+
+hit scout2 22
+  desires scout2 attack(player)=100

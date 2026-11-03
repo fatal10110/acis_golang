@@ -65,7 +65,7 @@ func (o *petInventoryOwner) SendInventoryUpdate(updates []itemcontainer.Update) 
 	if inv == nil {
 		return
 	}
-	frame, err := serverpackets.FramePetInventoryUpdate(updates, inv.ItemsUnordered(), inv.Templates())
+	frame, err := serverpackets.FramePetInventoryUpdate(updates, inv.Templates())
 	if err != nil {
 		o.log.Error().Err(err).Msg("build PetInventoryUpdate")
 		return
@@ -81,7 +81,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if !ok {
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanTrade && live.Karma() > 0 {
+	if !l.playerConfig().KarmaPlayerCanTrade && live.Karma() > 0 {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeChaoticRefusal))
 		return
 	}
@@ -97,7 +97,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if playerInv == nil {
 		return
 	}
-	switch failure := l.petItems.CheckGive(playerInv, petInv, pet, live, req.ObjectID, int(req.Count)); failure {
+	switch failure := l.summoning.petItems.CheckGive(playerInv, petInv, pet, live, req.ObjectID, int(req.Count)); failure {
 	case petitem.GiveNoop:
 		return
 	case petitem.GiveItemNotForPets:
@@ -130,9 +130,9 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 		return
 	}
 
-	end := l.itemInstances.BeginOperation(playerInv.OwnerID(), petInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(playerInv.OwnerID(), petInv.OwnerID())
 	defer end()
-	res, ok, err := l.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
+	res, ok, err := l.summoning.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
 		return
@@ -165,9 +165,9 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	// whether objectID resolves or the transfer subsequently fails.
 	l.cancelActiveEnchant(live)
 
-	end := l.itemInstances.BeginOperation(petInv.OwnerID(), playerInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(petInv.OwnerID(), playerInv.OwnerID())
 	defer end()
-	res, ok, err := l.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
+	res, ok, err := l.summoning.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item from pet")
 		return
@@ -192,7 +192,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	if live == nil {
 		return
 	}
-	if l.world == nil || l.groundItems == nil {
+	if l.world == nil || l.belongings.groundItems == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -255,7 +255,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	// The ground item's row comes from outside the pet's inventory, and may
 	// still be bound to the trade that gave it to its dropper, so the
 	// operation names it too.
-	end := l.itemInstances.BeginOperationTaking([]int32{ground.Instance.ObjectID}, petInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperationTaking([]int32{ground.Instance.ObjectID}, petInv.OwnerID())
 	defer end()
 	var persist []invops.Persist
 	if !herb {
@@ -269,7 +269,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 
 	l.broadcastGroundPickup(ground, pet.ObjectID())
 	tutorialPickedUp(live, ground.ItemID())
-	l.groundItems.Remove(ground)
+	l.belongings.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	l.broadcastPetPickupAttention(live, ground)
 
@@ -301,14 +301,14 @@ func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *
 		if st.EnchantLevel > 0 {
 			return serverpackets.FrameSystemMessageStringNumberItemName(
 				serverpackets.SystemMessageAttentionS1PetPickedUpS2S3,
-				owner.Name,
+				owner.CharacterName(),
 				int32(st.EnchantLevel),
 				st.TemplateID,
 			)
 		}
 		return serverpackets.FrameSystemMessageStringItemName(
 			serverpackets.SystemMessageAttentionS1PetPickedUpS2,
-			owner.Name,
+			owner.CharacterName(),
 			st.TemplateID,
 		)
 	}
@@ -316,9 +316,8 @@ func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *
 }
 
 // petPickedFrame is the line a pet's owner reads when the pet keeps a ground
-// item it picked up (Pet.addItem with sendMessage): adena by amount, then
-// enchanted gear by enchant level, then a stack by count, else the item
-// alone.
+// item it picked up: adena by amount, then enchanted gear by enchant level,
+// then a stack by count, else the item alone.
 func petPickedFrame(st item.InstanceState) wire.Frame {
 	switch {
 	case st.TemplateID == item.AdenaID:
@@ -337,7 +336,7 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	if !ok {
 		return
 	}
-	end := l.itemInstances.BeginOperation(petInv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(petInv.OwnerID())
 	defer end()
 	res, failure := petitem.UseItem(pet, petInv, req.ObjectID, live == nil || live.AlikeDead())
 	switch failure {
@@ -363,7 +362,11 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPutOnS1, res.ItemID))
 }
 
+// broadcastGroundPickup shows every viewer of ground pickerID picking it
+// up. A mercenary ticket picked up off a castle's grounds no longer counts
+// there.
 func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {
+	l.forgetPickedTicket(ground)
 	if l.world == nil {
 		return
 	}

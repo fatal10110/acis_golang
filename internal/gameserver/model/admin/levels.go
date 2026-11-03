@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/rs/zerolog"
 )
 
 // The name and title colors an access level takes when its entry leaves
@@ -25,6 +26,19 @@ func (d *Data) DefinesLevel(level int) bool {
 	}
 	_, ok := d.load().accessLevels[level]
 	return ok
+}
+
+// Grant returns the access level the character named character plays under
+// once given level, as Resolve does, logging a level the table does not
+// define, which reads as the user level, and the master level.
+func (d *Data) Grant(level int, character string, log zerolog.Logger) AccessLevel {
+	if !d.DefinesLevel(level) {
+		log.Warn().Int("level", level).Str("player", character).Msg("access level: undefined level granted, reset to the user level")
+	}
+	if level > 0 && level == d.MasterLevel() {
+		log.Info().Str("player", character).Msg("access level: logged in with master access level")
+	}
+	return d.Resolve(level)
 }
 
 // MasterLevel is the highest level the table defines, 0 when it defines

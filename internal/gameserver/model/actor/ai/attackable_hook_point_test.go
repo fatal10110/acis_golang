@@ -15,6 +15,16 @@ type hookRecorder struct {
 	at func(HookPoint)
 }
 
+// wanderOnNoDesire has owner's no-desire point queue brain a wander with
+// an empty queue, as a behavior's no-desire hook does.
+func wanderOnNoDesire(owner *fakeActor, brain *Attackable) {
+	owner.hooks.at = func(p HookPoint) {
+		if _, ok := brain.Desires().Peek(); p == HookNoDesire && !ok {
+			brain.AddWanderDesire(defaultWanderTimer, 5)
+		}
+	}
+}
+
 func (a *fakeActor) AtHookPoint(p HookPoint) {
 	a.hooks.points = append(a.hooks.points, p)
 	if a.hooks.at != nil {
@@ -39,11 +49,10 @@ func assertHookPoints(t *testing.T, owner *fakeActor, what string, want ...HookP
 }
 
 // TestHookPointNoDesireClosesTheIdle pins the no-desire point at the end of
-// the idle: after the abort, the walk stance and the switch to idle, before
-// the idle wander is queued, with the brain mutex released.
+// the idle: after the abort, the walk stance and the switch to idle, with
+// the brain mutex released. The idle queues nothing of its own.
 func TestHookPointNoDesireClosesTheIdle(t *testing.T) {
 	owner := actor(1)
-	owner.idleWander = true
 	move := &recordingMove{}
 	strike := &recordingAttack{}
 	brain := NewAttackable(owner, move, strike)
@@ -60,7 +69,7 @@ func TestHookPointNoDesireClosesTheIdle(t *testing.T) {
 			t.Fatalf("CurrentIntention() at the no-desire point = %v, want idle", got)
 		}
 		if got := brain.Desires().Len(); got != 0 {
-			t.Fatalf("queued desires at the no-desire point = %d, want the idle wander still unqueued", got)
+			t.Fatalf("queued desires at the no-desire point = %d, want none", got)
 		}
 	}
 
@@ -68,8 +77,8 @@ func TestHookPointNoDesireClosesTheIdle(t *testing.T) {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	assertHookPoints(t, owner, "after two cycles", HookSeeCreature, HookSeeCreature, HookNoDesire)
-	if !brain.Desires().Has(&Desire{Kind: IntentionWander}) {
-		t.Fatal("idle wander not queued after the no-desire point")
+	if got := brain.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires after the idle = %d, want none", got)
 	}
 }
 
@@ -137,9 +146,9 @@ func TestHookPointSeeCreatureOpensOnlyThePeriodicCycle(t *testing.T) {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	assertHookPoints(t, owner, "on the periodic cycle", HookSeeCreature)
-	if got := brain.CurrentIntention(); got != IntentionMoveTo || move.home != dest {
+	if got := brain.CurrentIntention(); got != IntentionMoveTo || move.moveTo != dest {
 		t.Fatalf("after a walk queued at the see-creature point: intention %v walking to %+v, want %v to %+v",
-			got, move.home, IntentionMoveTo, dest)
+			got, move.moveTo, IntentionMoveTo, dest)
 	}
 }
 
@@ -214,6 +223,8 @@ func TestHookPointMoveFinishedPrecedesDesireDrop(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
+	owner.hooks.points = nil // the first cycle's see-creature point
 	dest := location.Location{X: 300}
 	walk := &Desire{Kind: IntentionMoveTo, Location: dest}
 	brain.AddMoveToDesire(dest, 1_000)
@@ -246,11 +257,15 @@ func TestHookPointMoveFinishedPrecedesDesireDrop(t *testing.T) {
 }
 
 // TestHookPointMoveFinishedAtDestination pins the move-finished point on a
-// walk step that finds the actor already at its destination.
+// walk step that finds the actor already at its destination: the step walks
+// a zero-length move with no point, and the point opens on its arrival.
 func TestHookPointMoveFinishedAtDestination(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
-	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	move := &recordingMove{}
+	brain := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, brain)
+	owner.hooks.points = nil // the first cycle's see-creature point
 	here := location.Location{X: 100}
 	owner.hooks.at = func(p HookPoint) {
 		assertBrainUnlocked(t, brain, p)
@@ -263,7 +278,12 @@ func TestHookPointMoveFinishedAtDestination(t *testing.T) {
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	assertHookPoints(t, owner, "on a walk at its destination", HookMoveFinished)
+	assertHookPoints(t, owner, "on a walk step at its destination")
+	if move.moveTo != here {
+		t.Fatalf("MoveToLocation = %#v, want the zero-length move to %#v", move.moveTo, here)
+	}
+	brain.Arrived()
+	assertHookPoints(t, owner, "on the zero-length walk's arrival", HookMoveFinished)
 	if got := brain.Desires().Len(); got != 0 {
 		t.Fatalf("queued desires after the walk = %d, want its desire dropped", got)
 	}
@@ -278,13 +298,15 @@ func TestHookPointOutOfTerritoryOnFirstOutsideArrival(t *testing.T) {
 	owner.x = 100
 	owner.inTerritory = false
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
+	owner.hooks.points = nil // the first cycle's see-creature point
 	owner.hooks.at = func(p HookPoint) {
 		assertBrainUnlocked(t, brain, p)
 		if p != HookOutOfTerritory {
 			return
 		}
 		brain.mu.Lock()
-		armed := brain.ootSweep
+		armed := brain.ootSweep != nil
 		brain.mu.Unlock()
 		if armed {
 			t.Fatal("stale-hate sweep armed before the out-of-territory point")
@@ -300,7 +322,12 @@ func TestHookPointOutOfTerritoryOnFirstOutsideArrival(t *testing.T) {
 	assertHookPoints(t, owner, "on the first outside arrival", HookMoveFinished, HookOutOfTerritory)
 
 	// Idle, so later arrivals finish no walk.
-	brain.SetBackToPeace()
+	if err := tickThinkIdle(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("intention after the idle cycles = %v, want idle", got)
+	}
 	owner.hooks.points = nil
 	brain.Arrived()
 	assertHookPoints(t, owner, "on a second outside arrival")

@@ -3,6 +3,8 @@ package script
 import (
 	"runtime/debug"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
 // ResultKind is what a string hook's answer asks the engine to send.
@@ -48,7 +50,19 @@ func Classify(answer string) Result {
 // run calls fn, one invocation of s's hook h, and reports whether it
 // returned. A panic is recovered and logged with its stack; nothing is
 // disabled, so the next hook and the next invocation run as usual.
+//
+// Every invocation but a start is counted as running until it returns, so a
+// player it wrote leaves the world only after that (Character.WhileAttached).
+// A start is not counted: it is handed no player, and it may hold the
+// database for long (a daily refresh of every player's recommendations, the
+// Seven Signs saves), which would hold every player written meanwhile, from
+// any script, and the actor queue detaching it. Each write a start makes to
+// a player still counts itself while it runs.
 func (r *Registry) run(s *Script, h hook, fn func()) (ok bool) {
+	if h != hookStart {
+		epoch := r.runs.Begin()
+		defer r.runs.End(epoch)
+	}
 	defer func() {
 		if p := recover(); p != nil {
 			r.log.Error().Str("script", s.path).Str("hook", h.String()).Interface("panic", p).Str("stack", string(debug.Stack())).Msg("script: hook panicked")
@@ -73,6 +87,15 @@ func (r *Registry) Invoke(name string, fn func(s *Script)) bool {
 	return r.run(s, hookEvent, func() { fn(s) })
 }
 
+// ScriptRuns returns the count of the hook invocations in flight, nil for a
+// nil registry.
+func (r *Registry) ScriptRuns() *player.ScriptRuns {
+	if r == nil {
+		return nil
+	}
+	return &r.runs
+}
+
 // answer calls fn, one invocation of s's string hook h, and classifies its
 // answer; a panic gives ResultAborted.
 func (r *Registry) answer(s *Script, h hook, fn func() string) Result {
@@ -95,10 +118,10 @@ func (r *Registry) FirstTalk(npcID int32, e FirstTalk) (s *Script, res Result, b
 	return s, r.answer(s, hookFirstTalk, func() string { return s.Hooks.FirstTalk(s, e) }), true
 }
 
-// AbnormalStatusChanged runs the abnormal-status hook of every script that
+// abnormalStatusChanged runs the abnormal-status hook of every script that
 // sees spells on the NPC with id npcID, in list order: the hook is
 // dispatched over the see-spell list, not over its own registrations.
-func (r *Registry) AbnormalStatusChanged(npcID int32, e AbnormalStatusChanged) {
+func (r *Registry) abnormalStatusChanged(npcID int32, e AbnormalStatusChanged) {
 	for _, s := range r.scripts(npcID, EventSeeSpell) {
 		r.run(s, hookAbnormalStatusChanged, func() { s.Hooks.AbnormalStatusChanged(s, e) })
 	}

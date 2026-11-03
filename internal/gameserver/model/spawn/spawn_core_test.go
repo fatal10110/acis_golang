@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -175,31 +174,23 @@ func TestStateSetStatsSkipsDeadRows(t *testing.T) {
 }
 
 // ---- from territory_test.go ----
-func testTerritorySet(name string, minZ, maxZ int) *commons.StatSet {
-	set := commons.NewStatSetWithCapacity(3)
-	set.Set("name", name)
-	set.Set("minZ", minZ)
-	set.Set("maxZ", maxZ)
-	return set
-}
-
 func TestNewTerritoryRejectsTooFewNodes(t *testing.T) {
 	nodes := []Node{{X: 0, Y: 0}, {X: 10, Y: 0}}
-	if _, err := NewTerritory(testTerritorySet("t", 0, 100), nodes); err == nil {
+	if _, err := NewTerritory("t", 0, 100, nodes); err == nil {
 		t.Error("NewTerritory with 2 nodes succeeded, want error")
 	}
 }
 
 func TestNewTerritoryRejectsInvertedZRange(t *testing.T) {
 	nodes := []Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 0, Y: 10}}
-	if _, err := NewTerritory(testTerritorySet("t", 100, 0), nodes); err == nil {
+	if _, err := NewTerritory("t", 100, 0, nodes); err == nil {
 		t.Error("NewTerritory with maxZ < minZ succeeded, want error")
 	}
 }
 
 func TestTerritoryGeometryMatchesFields(t *testing.T) {
 	nodes := []Node{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 100, Y: 100}, {X: 0, Y: 100}}
-	tr, err := NewTerritory(testTerritorySet("t1", -50, 50), nodes)
+	tr, err := NewTerritory("t1", -50, 50, nodes)
 	if err != nil {
 		t.Fatalf("NewTerritory: %v", err)
 	}
@@ -225,7 +216,7 @@ func TestTerritoryGeometryMatchesFields(t *testing.T) {
 		t.Errorf("Area() = %v, want %v", got, want)
 	}
 
-	other, err := NewTerritory(testTerritorySet("t2", -50, 50), []Node{{X: 50, Y: 50}, {X: 150, Y: 50}, {X: 150, Y: 150}, {X: 50, Y: 150}})
+	other, err := NewTerritory("t2", -50, 50, []Node{{X: 50, Y: 50}, {X: 150, Y: 50}, {X: 150, Y: 150}, {X: 50, Y: 150}})
 	if err != nil {
 		t.Fatalf("NewTerritory: %v", err)
 	}
@@ -270,12 +261,7 @@ func TestTerritoryContainsUsesTriangulationNotRayCasting(t *testing.T) {
 		{X: 122600, Y: -69800},
 		{X: 122600, Y: -70000},
 	}
-	set := commons.NewStatSet()
-	set.Set("name", "godard01_npc2315_04")
-	set.Set("minZ", "-3250")
-	set.Set("maxZ", "-3100")
-
-	territory, err := NewTerritory(set, nodes)
+	territory, err := NewTerritory("godard01_npc2315_04", -3250, -3100, nodes)
 	if err != nil {
 		t.Fatalf("NewTerritory() error = %v", err)
 	}

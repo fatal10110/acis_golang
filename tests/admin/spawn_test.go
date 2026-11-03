@@ -22,25 +22,26 @@ import (
 
 // Template ids of the spawn fixtures.
 const (
-	wolfID     = 20120
-	grocerID   = 30001
-	artifactID = 35063
-	treeID     = 13006
+	wolfID   = 20120
+	grocerID = 30001
+	towerID  = 13002
+	treeID   = 13006
 )
 
-// spawnTemplates are a monster, a merchant, a castle artifact (no live
-// model yet) and a Christmas tree.
+// spawnTemplates are a monster, a merchant, a control tower and a
+// Christmas tree.
 func spawnTemplates() *npc.Table {
 	tmpl := func(id int, typ, name string) *npc.Template {
 		return &npc.Template{ID: id, TemplateID: id, Type: typ, Name: name, Level: 1, HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true}
 	}
 	wolf := tmpl(wolfID, "Monster", "Wolf")
-	// A wolf leads the privates its spawn declares.
+	// A wolf is a party leader; the privates its spawn declares are
+	// created by the behavior withPartyLeader binds.
 	wolf.AIParams = npc.AIParams{"Party_Type": "2"}
 	return npc.NewTable([]*npc.Template{
 		wolf,
 		tmpl(grocerID, "Merchant", "Grocer Lector"),
-		tmpl(artifactID, "HolyThing", "Artifact"),
+		tmpl(towerID, "LifeTower", "Life Control Tower"),
 		tmpl(treeID, "ChristmasTree", "Christmas Tree"),
 	})
 }
@@ -49,7 +50,7 @@ func spawnTemplates() *npc.Table {
 // spawnTemplates spawning makers (none when nil).
 func bootSpawnAdmin(t *testing.T, makers *spawn.Table) (*gameservertest.Server, int32) {
 	t.Helper()
-	srv, gmID := bootAdmin(t, adminLevel, gameservertest.WithNPCs(spawnTemplates()), gameservertest.WithNpcSpawns(makers))
+	srv, gmID := bootAdmin(t, adminLevel, gameservertest.WithNPCs(spawnTemplates()), gameservertest.WithNpcSpawns(makers), withPartyLeader(wolfID))
 	enterWorld(t, srv.Client)
 	return srv, gmID
 }
@@ -138,15 +139,12 @@ func TestAdminSpawn(t *testing.T) {
 			t.Fatalf("//%s frames = %x, want the spawns.htm page", cmd, testsupport.FrameOpcodes(frames))
 		}
 	}
-	for _, cmd := range []string{"spawn 4242", "spawn No_Such_Npc", "spawn 35063"} {
+	for _, cmd := range []string{"spawn 4242", "spawn No_Such_Npc"} {
 		frames := exchange(t, gm, encodeBuildCmd(cmd))
 		if len(frames) != 1 {
 			t.Fatalf("//%s frames = %x, want APPLICANT_INFORMATION_INCORRECT", cmd, testsupport.FrameOpcodes(frames))
 		}
 		assertStatic(t, frames[0], 12)
-	}
-	if got := npcsOf(srv, artifactID); len(got) != 0 {
-		t.Fatalf("refused //spawn placed %d artifacts", len(got))
 	}
 
 	frames := exchange(t, gm, encodeBuildCmd("spawn 20120 30"))
@@ -190,15 +188,27 @@ func TestAdminSpawn(t *testing.T) {
 	} else if _, ok := trees[0].(*npc.Decoration); !ok {
 		t.Fatalf("tree is %T, want a decoration", trees[0])
 	}
+
+	// A control tower is placed as any other NPC, belonging to no castle.
+	frames = exchange(t, gm, encodeBuildCmd("spawn 13002"))
+	if got := textsIn(t, frames); !slices.Equal(got, []string{"You spawned Life Control Tower. - Cmd: admin_spawn"}) {
+		t.Fatalf("//spawn 13002 messages = %q, want the spawn notice", got)
+	}
+	if towers := npcsOf(srv, towerID); len(towers) != 1 {
+		t.Fatalf("towers in the world = %d, want 1", len(towers))
+	} else if f, ok := towers[0].(*npc.Folk); !ok || !f.Tower() || f.TowerWorking() || f.Instance.CastleID != 0 {
+		t.Fatalf("tower is %T, want a dead control tower of no castle", towers[0])
+	}
 }
 
 // TestAdminDelete pins AdminSpawn.java's //delete: only an NPC of a
 // standalone spawn — a //spawn, or an item's decoration — is removed, for
 // good, with "You deleted <name>."; no selection, or an NPC no such spawn
-// placed, is INVALID_TARGET (109) and stays.
+// placed, is INVALID_TARGET (109) and stays. A tree, which a click never
+// selects, is targeted without one.
 func TestAdminDelete(t *testing.T) {
 	t.Parallel()
-	srv, _ := bootSpawnAdmin(t, nil)
+	srv, gmID := bootSpawnAdmin(t, nil)
 	gm := srv.Client
 
 	assertInvalidTarget := func(cmd string) {
@@ -237,7 +247,11 @@ func TestAdminDelete(t *testing.T) {
 		if target == nil {
 			t.Fatalf("no spawned %s", tc.name)
 		}
-		exchange(t, gm, encodeAction(target.ObjectID()))
+		if tc.id == treeID {
+			retarget(t, srv, gm, gmID, target)
+		} else {
+			exchange(t, gm, encodeAction(target.ObjectID()))
+		}
 		frames := exchange(t, gm, encodeBuildCmd("delete"))
 		if got := textsIn(t, frames); !slices.Equal(got, []string{"You deleted " + tc.name + "."}) {
 			t.Fatalf("//delete %s messages = %q (frames %x), want the delete notice", tc.name, got, testsupport.FrameOpcodes(frames))

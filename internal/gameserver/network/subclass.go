@@ -199,7 +199,7 @@ func (l *GameClientLink) subclassMenuAllowed(live *livePlayer) bool {
 // actions: one per SubclassDelay. A refused action answers nothing of its
 // own.
 func (l *GameClientLink) subclassActionAllowed(live *livePlayer) bool {
-	delay := l.playerConfig.SubclassDelay
+	delay := l.playerConfig().SubclassDelay
 	if delay <= 0 {
 		return true
 	}
@@ -223,7 +223,7 @@ func (l *GameClientLink) mayAddSubclass(live *livePlayer, subs []player.SubClass
 			return false
 		}
 	}
-	if l.playerConfig.SubclassWithoutQuests || live.IsNoble() {
+	if l.playerConfig().SubclassWithoutQuests || live.IsNoble() {
 		return true
 	}
 	return questCompleted(live.Character, fatesWhisperQuest) && questCompleted(live.Character, mimirsElixirQuest)
@@ -250,7 +250,7 @@ func questCompleted(c *player.Character, name string) bool {
 // new class's reads on live's persistence lane. The connection then waits
 // for them (finishPendingClassChange) before the switch runs on live's
 // queue again. A lock already held, or a class with no template, ends the
-// request as the reference's refused change does.
+// request as a refused change does.
 func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) bool {
 	classID := ch.sub.ClassID
 	if ch.kind == classChangeSwitch {
@@ -305,8 +305,8 @@ func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) boo
 	return false
 }
 
-// refusedClassChange answers a change whose lock is already held, as the
-// reference answers its refused add, switch and replace.
+// refusedClassChange answers a change whose lock is already held, as a
+// refused add, switch and replace are answered.
 func (l *GameClientLink) refusedClassChange(live *livePlayer, ch *classChange) {
 	switch ch.kind {
 	case classChangeSwitch:
@@ -383,18 +383,18 @@ func (l *GameClientLink) readClassRows(ctx context.Context, charID int32, index 
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: load skills")
 		}
 	}
-	if l.shortcuts != nil {
-		if rows.shortcuts, err = l.shortcuts.ListByOwner(ctx, charID, index); err != nil {
+	if l.belongings.shortcuts != nil {
+		if rows.shortcuts, err = l.belongings.shortcuts.ListByOwner(ctx, charID, index); err != nil {
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: list shortcuts")
 		}
 	}
-	if l.hennas != nil {
-		if rows.hennas, err = l.hennas.ListByOwner(ctx, charID, index); err != nil {
+	if l.belongings.hennas != nil {
+		if rows.hennas, err = l.belongings.hennas.ListByOwner(ctx, charID, index); err != nil {
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: list hennas")
 		}
 	}
-	if index == 0 && l.recipeBooks != nil {
-		if rows.recipes, err = l.recipeBooks.ListByOwner(ctx, charID); err != nil {
+	if index == 0 && l.belongings.recipeBooks != nil {
+		if rows.recipes, err = l.belongings.recipeBooks.ListByOwner(ctx, charID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", charID).Msg("class change: list recipe book")
 		}
 	}
@@ -468,7 +468,7 @@ func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, 
 // and the new class's skills, hennas, shortcuts, effects and reuse timers
 // come in its place, the recipe book with the base class alone; the party's
 // level follows the new class's level and the clan's skills come back. The
-// client is shown the result in the order the reference sends it.
+// client is shown the result in a fixed packet order.
 func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChangeRows) {
 	c := live.Character
 	classID := c.BaseClassID()
@@ -519,8 +519,7 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		// which does not show them: a noble's skills, with its skill list
 		// and UserInfo; a hero's skills on the base class, which the
 		// status takes away on a subclass, with its skill list; then the
-		// clan's skills, and a clan leader's siege skills after them once
-		// sieges exist (#3150).
+		// clan's skills, and a clan leader's siege skills after them.
 		if c.IsNoble() {
 			l.giveNobleSkills(c)
 			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(c, l.skills)))
@@ -531,15 +530,18 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		}
 		if cl, ok := l.clanService().ClanOf(c); ok {
 			l.giveClanSkills(live, cl, c.PledgeClass())
+			if l.leadsSiegeClan(live, cl) {
+				l.giveSiegeSkills(live)
+			}
 		}
 		// The death penalty's passive stats are not a learned skill's:
-		// they stay through the change, as the reference gives them back.
+		// they stay through the change, given back after it.
 		l.equipItemStats(live, inv)
 	}
 	c.ClearDisabledSkills()
 	if l.skills != nil {
 		l.skills.StageClassSkillState(c, rows.skills)
-		l.skills.ReplayEffects(c)
+		l.skills.ReplayEffects(c, nil)
 	}
 	if c.EffectList().HasHeld() {
 		l.updateEffectIcons(live)
@@ -550,7 +552,9 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 	if l.journals != nil {
 		l.journals.Exit(c, repentYourSinsQuest, true)
 	}
-	c.ClampResources()
+	// The new class's maxima bound the current values, and their changes
+	// are reported ahead of the refreshes below.
+	c.SettleMaxima()
 	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
 	c.RefreshHennaStats()
@@ -581,7 +585,7 @@ func (l *GameClientLink) unequipItemStats(live *livePlayer) {
 		return
 	}
 	for _, inst := range inv.PaperdollItems() {
-		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
+		if tmpl, ok := skillstate.WornTemplate(live.Character, inv, inst); ok {
 			l.skills.UnequipItemStats(live.Character, inv, inst, tmpl)
 		}
 	}
@@ -596,7 +600,7 @@ func (l *GameClientLink) equipItemStats(live *livePlayer, inv *itemcontainer.Inv
 	}
 	changed := false
 	for _, inst := range inv.PaperdollItems() {
-		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		tmpl, ok := skillstate.WornTemplate(live.Character, inv, inst)
 		if !ok {
 			continue
 		}

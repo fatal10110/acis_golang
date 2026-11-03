@@ -1,0 +1,18 @@
+# WarriorCorpseZombiePhysicalSpecial (21578, its shipped skills), every draw 0, 100 away from the
+# character. The hit that makes the character its most hated wants no physical special; the second,
+# by its most hated, wants its physical special (4073) on the character, weight 1000000, queued beside
+# the Warrior's hate while it already attacks.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombie
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCorpseZombie.WarriorCorpseZombiePhysicalSpecial
+npc zombie 21578 Monster 100 0 0 skill PHYSICAL_SPECIAL 4073 7 skill SELF_RANGE_DEBUFF 4649 7
+
+hit zombie 22
+  desires zombie attack(player)=275
+hit zombie 22
+  desires zombie attack(player)=550 cast(player,4073,move)=1000000

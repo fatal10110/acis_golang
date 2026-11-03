@@ -10,7 +10,9 @@ type Hooks struct {
 	OnClanAttacked             func(*Script, ClanAttacked)
 	OnClanDied                 func(*Script, ClanDied)
 	OnCreated                  func(*Script, Created)
+	OnDeath                    func(*Script, Death)
 	OnDecayed                  func(*Script, Decayed)
+	OnDoorChange               func(*Script, DoorChange)
 	OnEvent                    func(*Script, Event) string
 	OnFirstTalk                func(*Script, FirstTalk) string
 	OnItemUse                  func(*Script, ItemUse)
@@ -26,7 +28,7 @@ type Hooks struct {
 	OnSeeItem                  func(*Script, SeeItem)
 	OnSeeSpell                 func(*Script, SeeSpell)
 	OnSpelled                  func(*Script, Spelled)
-	OnStart                    func(*Script, Start)
+	OnStart                    func(*Script, Start) // handed a script that finds no world; see Start
 	OnStaticObjectClanAttacked func(*Script, StaticObjectClanAttacked)
 	OnTalk                     func(*Script, Talk) string
 	OnTimer                    func(*Script, Timer) string
@@ -38,6 +40,22 @@ type Hooks struct {
 	// they set.
 	own     hookSet
 	derived bool
+	// class is the class name these hooks are the hooks of, as Named
+	// set it; "" until named. With does not carry it over.
+	class string
+	// ancestors are the named classes With derived these hooks from,
+	// nearest first, root last.
+	ancestors []string
+}
+
+// Named returns h as the hooks of the class name. Hooks a child derives
+// from them with With list name among their ancestors, which the //info AI
+// page prints as the class chain, so every
+// class a child derives from names its hooks. A script's own class is its
+// Name and needs no naming.
+func (h Hooks) Named(name string) Hooks {
+	h.class = name
+	return h
 }
 
 // hook names one Hooks field, in field order.
@@ -50,7 +68,9 @@ const (
 	hookClanAttacked
 	hookClanDied
 	hookCreated
+	hookDeath
 	hookDecayed
+	hookDoorChange
 	hookEvent
 	hookFirstTalk
 	hookItemUse
@@ -84,7 +104,9 @@ var hookMethods = [hookCount]string{
 	hookClanAttacked:             "onClanAttacked",
 	hookClanDied:                 "onClanDied",
 	hookCreated:                  "onCreated",
+	hookDeath:                    "onDeath",
 	hookDecayed:                  "onDecayed",
+	hookDoorChange:               "onDoorChange",
 	hookEvent:                    "onAdvEvent",
 	hookFirstTalk:                "onFirstTalk",
 	hookItemUse:                  "onItemUse",
@@ -129,7 +151,9 @@ func (h *Hooks) set() hookSet {
 	add(h.OnClanAttacked != nil, hookClanAttacked)
 	add(h.OnClanDied != nil, hookClanDied)
 	add(h.OnCreated != nil, hookCreated)
+	add(h.OnDeath != nil, hookDeath)
 	add(h.OnDecayed != nil, hookDecayed)
+	add(h.OnDoorChange != nil, hookDoorChange)
 	add(h.OnEvent != nil, hookEvent)
 	add(h.OnFirstTalk != nil, hookFirstTalk)
 	add(h.OnItemUse != nil, hookItemUse)
@@ -164,7 +188,8 @@ func (h *Hooks) ownSet() hookSet {
 }
 
 // With returns h with every hook o sets replaced by o's: a child behavior
-// overriding its parent's handlers.
+// overriding its parent's handlers. The result descends from h's class
+// when h is named (see Named), and is itself unnamed.
 func (h Hooks) With(o Hooks) Hooks {
 	pick := func(dst *Hooks) {
 		if o.OnAbnormalStatusChanged != nil {
@@ -185,8 +210,14 @@ func (h Hooks) With(o Hooks) Hooks {
 		if o.OnCreated != nil {
 			dst.OnCreated = o.OnCreated
 		}
+		if o.OnDeath != nil {
+			dst.OnDeath = o.OnDeath
+		}
 		if o.OnDecayed != nil {
 			dst.OnDecayed = o.OnDecayed
+		}
+		if o.OnDoorChange != nil {
+			dst.OnDoorChange = o.OnDoorChange
 		}
 		if o.OnEvent != nil {
 			dst.OnEvent = o.OnEvent
@@ -256,6 +287,10 @@ func (h Hooks) With(o Hooks) Hooks {
 	pick(&out)
 	out.own = o.set()
 	out.derived = true
+	out.class = ""
+	if h.class != "" {
+		out.ancestors = append([]string{h.class}, h.ancestors...)
+	}
 	return out
 }
 
@@ -299,9 +334,21 @@ func (h *Hooks) Created(s *Script, e Created) {
 	}
 }
 
+func (h *Hooks) Death(s *Script, e Death) {
+	if h.OnDeath != nil {
+		h.OnDeath(s, e)
+	}
+}
+
 func (h *Hooks) Decayed(s *Script, e Decayed) {
 	if h.OnDecayed != nil {
 		h.OnDecayed(s, e)
+	}
+}
+
+func (h *Hooks) DoorChange(s *Script, e DoorChange) {
+	if h.OnDoorChange != nil {
+		h.OnDoorChange(s, e)
 	}
 }
 

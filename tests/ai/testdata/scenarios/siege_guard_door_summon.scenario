@@ -1,0 +1,23 @@
+# GludioHold's static-object clan-attacked hook on a siege summon's hit: the character's
+# Siege Golem (a fixture siege summon of 14737, on a siege battlefield in progress) hits a
+# gate (Gludio's outer gate's id, 19210001), and the knight of Gludio Castle (35066,
+# GludioKnight, of door_clan) by it draws: under 10 it wants to attack the golem's owner with
+# weight 5000, otherwise the golem itself with weight 1000.
+character Hunter 20
+random 9 10
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+door gate 19210001 100 0 0
+npc knight 35066 SiegeGuard 100 200 0 walks clan door_clan 300
+summon golem 14737
+
+hit gate 100 by golem
+  hate knight 5000
+  hate knight 0 golem
+  desires knight attack(player)=5000
+
+hit gate 100 by golem
+  hate knight 5000
+  hate knight 1000 golem
+  desires knight attack(player)=5000 attack(golem)=1000

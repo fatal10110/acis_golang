@@ -3,7 +3,6 @@ package skills
 import (
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -87,15 +86,10 @@ func TestFearLethalRollsAfterFailedLanding(t *testing.T) {
 func drainSystemMessageIDs(t *testing.T, c *testsupport.ScriptedClient) []int32 {
 	t.Helper()
 	var ids []int32
-	for range 100 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return ids
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeSystemMessage {
 			ids = append(ids, wireReader(frame[1:]).ReadInt32())
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
-	return nil
+	return ids
 }

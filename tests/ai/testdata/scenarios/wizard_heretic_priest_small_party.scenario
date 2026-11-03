@@ -1,0 +1,14 @@
+# WizardHereticPriestAggressive (22143) with party_members 2 and TelPosX1 100, every draw 0: the character, in a party of
+# two (no more than its party_members) in its spawn territory, is not sent away.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1000 0 0 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9 ai party_members=2,TelPosX1=100
+member Mate 20 -1500 0 0
+
+approach priest
+  at player 900 0 0

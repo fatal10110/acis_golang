@@ -1,0 +1,43 @@
+# Grave Robber Annihilation (Q644): the goods drop for a draw under the chance; the hundred and twentieth moves the quest to cond 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q644_grave_robber_annihilation_hunt.golden
+character Hero 20
+quest Q644_GraveRobberAnnihilation <cond>=1 <state>=STARTED
+hold 8088 118
+random 0 500000 0 0 0 0
+script quest.Q644_GraveRobberAnnihilation
+item 8088 1865 1867 1872 1871 1870 1869
+page default/32017.htm
+page script/quest/Q644_GraveRobberAnnihilation/
+npc karuda 32017 Folk 10 0 0
+npc m1 22003 Monster 40 0 0
+npc m2 22004 Monster 50 0 0
+npc m3 22008 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 8088=118
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8088
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8088=119
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8088
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 644:0x80000003
+  S ExShowQuestMark quest=644
+  Q upsert Q644_GraveRobberAnnihilation | <cond> | 2
+  items 8088=120
+  rows Q644_GraveRobberAnnihilation <cond>=2 <state>=STARTED
+  state Q644_GraveRobberAnnihilation STARTED
+action karuda
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q644_GraveRobberAnnihilation/32017-07.htm
+  S ActionFailed
+  S ActionFailed

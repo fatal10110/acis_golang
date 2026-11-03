@@ -1,0 +1,21 @@
+# I'd Rather Be Collecting Fairy Breath (Q659): a character with fairy breath is told to sell it.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q659_id_rather_be_collecting_fairy_breath_reminder.golden
+character Hero 26
+quest Q659_IdRatherBeCollectingFairyBreath <cond>=1 <state>=STARTED
+hold 8286 3
+script quest.Q659_IdRatherBeCollectingFairyBreath
+item 8286 57
+page default/30634.htm
+page script/quest/Q659_IdRatherBeCollectingFairyBreath/
+npc galatea 30634 Folk 10 0 0
+
+action galatea
+action galatea
+  S ActionFailed
+  S NpcHtmlMessage obj=galatea item=0 page=default/30634.htm
+  S ActionFailed
+bypass npc_{galatea}_Quest
+  S NpcHtmlMessage obj=galatea item=0 page=script/quest/Q659_IdRatherBeCollectingFairyBreath/30634-05.htm
+  S ActionFailed
+  S ActionFailed

@@ -37,7 +37,7 @@ func shippedSkill(t *testing.T, id modelskill.ID, level int) modelskill.Definiti
 	if !ok {
 		t.Fatalf("shipped skill %d level %d missing", id, level)
 	}
-	return def
+	return *def
 }
 
 // TestPlayerCastEvaluatesSkillCondition pins PlayableCast.canCast's

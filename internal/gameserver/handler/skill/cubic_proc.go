@@ -5,6 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -45,11 +46,11 @@ func (r *Registry) useCubicOn(cast Cast, target Creature, mAtk float64, result *
 	case "PARALYZE", "STUN", "ROOT", "AGGDAMAGE":
 		cubicDisable(cast, target, mAtk)
 	case "MDAM":
-		cubicMdam(cast, target, mAtk, r.magicFailures, result)
+		cubicMdam(cast, target, mAtk, r.magicFailures.enabled(), result)
 	case "POISON", "DEBUFF", "DOT":
 		cubicContinuous(cast, target, mAtk, result)
 	case "DRAIN":
-		cubicDrain(cast, target, r.magicFailures, result)
+		cubicDrain(cast, target, r.magicFailures.enabled(), result)
 	}
 }
 
@@ -112,14 +113,14 @@ func cubicContinuous(cast Cast, target Creature, mAtk float64, result *Result) {
 // cubicStrike rolls the owner's magic critical and the target's shield,
 // then the cubic strike damage, reporting any magic failure first.
 func cubicStrike(cast Cast, target Creature, magicFailures bool, result *Result) (damage int, crit bool, shield formulas.ShieldDefense) {
-	crit = formulas.MCritSucceeds(int(cast.Caster.MagicCriticalRate()), cast.Caster.Roll(1000))
+	crit = formulas.MCritSucceeds(int(cast.Caster.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).MagicCriticalRate()), cast.Caster.Roll(1000))
 	shield = resolveShieldDefense(cast.Caster, target, cast.Skill)
 	in, ok := creature.ResolveCubicMagicDamageInput(cast.Caster, target, cast.Skill, crit, shield, magicFailures)
 	if !ok {
 		return 0, crit, shield
 	}
 	reportMagicFailure(cast, target, in.Failure, result)
-	return javaInt(formulas.CubicMagicDamage(in)), crit, shield
+	return truncDamage(formulas.CubicMagicDamage(in)), crit, shield
 }
 
 // cubicMdam is a cubic's MDAM proc. A reflected strike deals nothing. A hit

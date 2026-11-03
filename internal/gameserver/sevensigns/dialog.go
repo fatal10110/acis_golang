@@ -22,6 +22,19 @@ func (s *State) WinningCabal() Cabal {
 	return s.winningCabalLocked()
 }
 
+// LosingCabal returns the cabal behind on total score, NoCabal on a tie.
+func (s *State) LosingCabal() Cabal {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch s.winningCabalLocked() {
+	case Dawn:
+		return Dusk
+	case Dusk:
+		return Dawn
+	}
+	return NoCabal
+}
+
 // SealOwners returns each seal's owner, in Seals order.
 func (s *State) SealOwners() [3]Cabal {
 	s.mu.Lock()
@@ -31,8 +44,7 @@ func (s *State) SealOwners() [3]Cabal {
 
 // GnosisFollower reports whether objectID travels for the base ancient
 // adena price: during seal validation, signed up for the cabal owning the
-// Seal of Gnosis and having chosen that seal
-// (TeleportLocation.getCalculatedPriceCount).
+// Seal of Gnosis and having chosen that seal.
 func (s *State) GnosisFollower(objectID int32) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

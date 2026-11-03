@@ -1,0 +1,16 @@
+# Path To Become A Scavenger (Q417), the honey bear the character spoiled drops a honey jar at cond 5. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q417_path_to_become_a_scavenger_honey_spoiled.golden
+character Scavenger 19
+class 53
+quest Q417_PathToBecomeAScavenger <cond>=5 <state>=STARTED
+script quest.Q417_PathToBecomeAScavenger
+item 1655 1656
+npc honey 27058 Monster 40 0 0
+spoil honey
+
+kill honey
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1655
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1655=1
+  rows Q417_PathToBecomeAScavenger <cond>=5 <state>=STARTED

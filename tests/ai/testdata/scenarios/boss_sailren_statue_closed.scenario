@@ -1,0 +1,19 @@
+# StatueOfShilen (32109), talked to by the leader of a party while Sailren does not wait in the
+# nest (no script event 11041 since it appeared): the entry answers statue_of_shilen005.htm.
+# Expectations are derived from the reference source (StatueOfShilen.java 47-112).
+character Hunter 20
+member Mate 20
+script script.ai.individual.DefaultNpc
+script script.ai.boss.sailren.StatueOfShilen
+page default/32109.htm
+page script/ai/boss/sailren/StatueOfShilen/
+npc statue 32109 Folk 60 0 0
+
+action statue
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/32109.htm
+  S ActionFailed
+bypass Quest StatueOfShilen enter
+  S NpcHtmlMessage obj=statue item=0 page=script/ai/boss/sailren/StatueOfShilen/statue_of_shilen005.htm
+  S ActionFailed

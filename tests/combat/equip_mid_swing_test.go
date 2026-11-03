@@ -103,11 +103,8 @@ func TestQueuedWeaponDestroyedMidSwingIsDroppedWithTheAttack(t *testing.T) {
 	// Three seconds of clock let the swing end; the resumed attack would
 	// swing again well inside them. The hostile's own swings back do not
 	// count.
-	for end := c.Now().Add(3 * time.Second); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(end.Sub(c.Now()))
-		if frame == nil {
-			break
-		}
+	srv.Advance(t, 3*time.Second)
+	for _, frame := range c.ReadQueued() {
 		switch {
 		case frame[0] == serverpackets.OpcodeAttack && wireReader(frame[1:]).ReadInt32() == objID:
 			t.Fatal("the attack resumed after the queued sword was destroyed")

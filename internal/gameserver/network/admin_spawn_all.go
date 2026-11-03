@@ -34,7 +34,7 @@ func (l *GameClientLink) adminUnspawnAll(_ *livePlayer, _ string) {
 // game master online, hidden ones too, is told the respawn is complete. The
 // standalone spawns are gone afterwards. When the templates or the spawn
 // list cannot be read, the failure is logged, the NPCs stay despawned and
-// no game master is told anything, as the reference's exception does. One
+// no game master is told anything. One
 // //respawnall or //unspawnall runs at a time: a second one waits for the
 // first to finish, so it despawns what the first placed.
 func (l *GameClientLink) adminRespawnAll(_ *livePlayer, _ string) {
@@ -67,8 +67,7 @@ func (l *GameClientLink) adminRespawnAll(_ *livePlayer, _ string) {
 	l.messageGMs("NPCs' respawn is now complete.")
 }
 
-// messageGMs tells every game master online, hidden ones too, text:
-// AdminData.broadcastMessageToGMs.
+// messageGMs tells every game master online, hidden ones too, text.
 func (l *GameClientLink) messageGMs(text string) {
 	broadcastFrame(func() wire.Frame {
 		return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, text)

@@ -15,17 +15,17 @@ const (
 	exitBlockClassChange
 	exitBlockNoRestartZone
 	exitBlockAttackStance
+	exitBlockFestival
 )
 
 // exitBlockReason reports why a live player may not restart or log out right
 // now. A selected enchant scroll the player still holds refuses silently; every later reason
 // carries its own system message.
 //
-// Exit is also refused while the character's subclass lock is held and
-// while an initialized festival of darkness holds the player; neither system
-// is ported yet, so both conditions are unreachable here.
+// Exit is also refused while the character's subclass lock is held; that
+// system is not ported yet, so the condition is unreachable here.
 func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
-	if l.enchantService().Selected(live.ObjectID(), live.Inventory()) {
+	if l.enchanting.items.Selected(live.ObjectID(), live.Inventory()) {
 		return exitBlockEnchant
 	}
 	if live.ClassChangeLocked() {
@@ -34,8 +34,11 @@ func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
 	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoRestart) {
 		return exitBlockNoRestartZone
 	}
-	if l.attackStance != nil && l.attackStance.InAttackStance(live) {
+	if l.combat.attackStance != nil && l.combat.attackStance.InAttackStance(live) {
 		return exitBlockAttackStance
+	}
+	if l.festival != nil && live.FestivalParticipant() && l.festival.Initialized() {
+		return exitBlockFestival
 	}
 	return exitAllowed
 }
@@ -56,7 +59,7 @@ func (l *GameClientLink) refuseExit(session *Session, live *livePlayer, block ex
 
 func (b exitBlock) systemMessage(restart bool) (int, bool) {
 	switch b {
-	case exitBlockNoRestartZone:
+	case exitBlockNoRestartZone, exitBlockFestival:
 		if restart {
 			return serverpackets.SystemMessageNoRestartHere, true
 		}

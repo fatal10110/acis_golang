@@ -1,0 +1,33 @@
+# AzitWateringRecycleCan (35600), the Rainbow Springs sweeper, a civilian. Talked to, it says
+# NpcString 1010639 and releases the client (the talk's leading ActionFailed, its line, the
+# release). It looks for ground items as it appears, before the ground lines are laid, and then
+# every 30 s within 450 of it, asking to pick each one up: the letter 160 away at the first look,
+# the Zariche 600 away only once the sweeper has walked to the letter. Picking the Zariche up, it
+# shouts NpcString 1800023 before the weapon leaves the world and ends its life; the letter it
+# picks up silently. Its pick-up weights and its departure 5 minutes after it appears are in
+# tests/ai/hall_watering_test.go, as the format renders no civilian's desires.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.AzitWateringRecycleCan
+item 8035
+npc can 35600 Folk 40 0 0 walks
+ground letter 8035 1 200 0 0
+ground zariche 8190 1 640 0 0 cursed
+
+action can
+action can
+  S ActionFailed
+  S NpcSay obj=can type=0 npc=1035600 text="Grarr! For the next 2 minutes or so, the game arena are will be cleaned. Throw any items you don't need to the floor now."
+  S ActionFailed
+advance 30s
+tick x2
+walk can
+tick
+  S DeleteObject obj=letter
+advance 30s
+tick x2
+walk can
+tick
+  S NpcSay obj=can type=0 npc=1035600 text="It's a weapon surrounded by an ominous aura. I'll discard it because it may be dangerous. Miss...!"
+  S DeleteObject obj=zariche
+  S SystemMessage id=1818 3:8190

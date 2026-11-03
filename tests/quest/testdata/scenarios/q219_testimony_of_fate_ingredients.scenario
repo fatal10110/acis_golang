@@ -1,0 +1,84 @@
+# Testimony Of Fate (Q219), the ingredients: a level 38 Palus Knight at cond 6 holding 9 of each of Ixia's ingredients
+# completes four of them with a kingpin, a worker, a seeker and a medusa, and the marsh spider that completes the fifth sets cond 7.
+# Every script roll is pinned to 1, so every drop lands.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q219_testimony_of_fate_ingredients.golden
+character Scholar 38
+class 32
+random always 1
+quest Q219_TestimonyOfFate <state>=STARTED <cond>=6
+hold 3180 9
+hold 3181 9
+hold 3178 9
+hold 3182 9
+hold 3179 9
+script quest.Q219_TestimonyOfFate
+item 3172 3173 3174 3175 3176 3177 3178 3179 3180 3181 3182 3183 3184 3185 3186 3187 3188 3189 3190 3191 3192 3193 3194 3195 3196 3197 3198 3199 3200 3201 3202 7562
+page trainer/30463.htm
+page script/quest/Q219_TestimonyOfFate/
+npc ixia 30463 Trainer -20 10 0
+npc kingpin 20193 Monster -60 0 0
+npc worker 20230 Monster -70 0 0
+npc seeker 20202 Monster -80 0 0
+npc medusa 20158 Monster -90 0 0
+npc spider 20233 Monster -100 0 0
+
+action ixia
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+bypass npc_{ixia}_Quest
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-02.htm
+  S ActionFailed
+  S ActionFailed
+kill kingpin
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3181
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill worker
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3182
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill seeker
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3180
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill medusa
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3178
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=6 <state>=STARTED
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3179
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 219:0x8000007f
+  S ExShowQuestMark quest=219
+  Q upsert Q219_TestimonyOfFate | <cond> | 7
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=7 <state>=STARTED
+  items 3180=10 3181=10 3178=10 3182=10 3179=10
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+action ixia
+  S ActionFailed
+  S NpcHtmlMessage obj=ixia item=0 page=trainer/30463.htm
+  S ActionFailed
+bypass npc_{ixia}_Quest
+  S QuestList 219:0x800000ff
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3180 6:10
+  S SystemMessage id=301 3:3179 6:10
+  S SystemMessage id=301 3:3178 6:10
+  S SystemMessage id=301 3:3182 6:10
+  S SystemMessage id=301 3:3181 6:10
+  S SystemMessage id=54 3:3183
+  S NpcHtmlMessage obj=ixia item=0 page=script/quest/Q219_TestimonyOfFate/30463-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <cond> | 8

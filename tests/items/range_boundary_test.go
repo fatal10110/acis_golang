@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -68,8 +67,8 @@ func TestPickupAtExactPickupDistanceNeedsApproach(t *testing.T) {
 	onBoundary := dropAt(spawnX + pickupDistance)
 	c.Send(encodeAction(onBoundary, spawnX, spawnY, spawnZ, true))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "boundary pickup pending-action release")
-	if frame := c.ReadWithTimeout(500 * time.Millisecond); frame != nil {
-		t.Fatalf("boundary shift-click pickup sent opcode 0x%02x, want nothing after ActionFailed", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("boundary shift-click pickup sent opcode 0x%02x, want nothing after ActionFailed", queued[0][0])
 	}
 	if _, ok := srv.State.Object(onBoundary); !ok {
 		t.Fatalf("ground item %d exactly %d units away was collected", onBoundary, pickupDistance)

@@ -2,12 +2,17 @@
 #
 #   <row> <Go name>    the Go call a port makes for that row; Check matches the
 #                      name after its last '.' against the package's calls
+#   <row> <a>,<b>      the row stands for overloads the port calls under
+#                      separate Go names; Check accepts a call of any
 #   <row> inline       the row has no Go call of its own (a getter the Go
 #                      handle folds into the next call)
+#   <row> exempt       the API freeze leaves the row out: only siegable-hall
+#                      classes make it (scriptfp.ExemptCaller), and the hall
+#                      port gives it its Go name
 #
 # A row is a census row: Owner.method, Owner.new for a constructor. Rows are
 # added by the slices that build the matching Go call; the script-facing API
-# is frozen when census.golden has no unmapped row. A row that is no longer
+# is frozen when census.golden has no unmapped row; exempt rows do not count. A row that is no longer
 # in the census fails TestCommittedGoldensAreConsistent.
 Npc.deleteMe DeleteMe
 Npc.getPrivateData CreatePrivates
@@ -68,6 +73,19 @@ Quest.showTutorialHTML ShowTutorialHTML
 RadarList.addMarker AddRadarMarker
 RadarList.removeMarker RemoveRadarMarker
 
+# Global memo, spawn db value and DB-loaded mark (#3499). The global memo is
+# the Script handle's; its remove is the map's own, counted as the memo
+# set's. The spawn data row is a getter the NPC handle folds into its db
+# value calls; a maker clears the mark through its spawn.
+ASpawn.getDBLoaded script.NPC.DBLoaded
+ASpawn.getSpawnData inline
+ASpawn.setDBLoaded ClearDBLoaded
+GlobalMemo.getCreature script.GlobalMemo.Creature
+GlobalMemo.getInstance script.Script.GlobalMemo
+MemoSet.remove script.GlobalMemo.Remove
+SpawnData.getDBValue script.NPC.DBValue
+SpawnData.setDBValue script.NPC.SetDBValue
+
 # Script helpers (E4). The helpers are methods of the registered script, so a
 # port keeps the reference's arguments: s.GiveItems(player, id, count). The
 # condition and variable overloads of a party lookup are one call taking
@@ -125,6 +143,21 @@ Quest.startQuestTimerAtFixedRate script.Script.StartTimerAtFixedRate
 NpcAI.addFleeDesire AddFleeDesire
 NpcAI.addSocialDesire AddSocialDesire
 
+# Folk-side desires (A14): the walk to a point, on both NPC kinds.
+NpcAI.addMoveToDesire script.NPC.AddMoveToDesire
+
+# Party leader and private (A12, #3602). The master and the privates are
+# read on the NPC handle. A private's respawn and the hide of an NPC go
+# through the spawner, as its despawn does: the spawn's respawn delay is
+# read there, in seconds.
+ASpawn.getRespawnDelay script.Spawner.RespawnDelay
+Npc.getMaster script.NPC.Master
+Npc.hasMaster script.NPC.HasMaster
+Npc.isMaster script.NPC.IsMaster
+Npc.scheduleRespawn script.Spawner.ScheduleRespawn
+NpcAI.addFollowDesire AddFollowDesire
+WorldObject.decayMe script.Spawner.DecayMe
+
 # Tutorial script (U2). The class id, the inventory and a reference location
 # are folded into the handle calls and plain Go values; a quest state's
 # variables are set through its handle, which also reads them as numbers.
@@ -168,6 +201,33 @@ Player.reduceDeathPenaltyBuffLevel script.Player.ReduceDeathPenaltyLevel
 Quest.addEventIds inline
 StringUtil.isDigit script.IsDigit
 
+# Handle operations of the first proof quests (#3569). A packet a script
+# sends or broadcasts is named by the handle call that builds it, so the
+# send and broadcast calls and a packet's builder fold into it; the player's
+# clan is read through the Player handle.
+Clan.addReputationScore script.Player.AddClanReputation
+Clan.broadcastToMembers script.Player.BroadcastClanInfo
+Clan.getLevel script.Player.ClanLevel
+Creature.broadcastPacket inline
+ItemContainer.getItemCount script.Player.ItemCount
+Npc.broadcastNpcSay script.NPC.Say
+Npc.getScriptValue script.NPC.ScriptValue
+Npc.isScriptValue script.NPC.IsScriptValue
+Npc.setScriptValue script.NPC.SetScriptValue
+NpcStringId.getMessage script.NpcString
+Player.getClan inline
+Player.sendPacket inline
+PledgeShowInfoUpdate.new inline
+Quest.rewardNewbieShots script.Script.RewardNewbieShots
+SocialAction.new script.Player.SocialAction
+SystemMessage.addNumber script.Player.SystemMessageNumbers
+SystemMessage.getSystemMessage inline
+
+# Cutscene camera (#3500). The shot is always centred on the NPC that
+# broadcasts it, so the object id is the NPC handle's; the scene a quest
+# plays for one player is a static packet, PlayScene on the player handle.
+SpecialCamera.new script.NPC.SpecialCamera
+
 # Route desire and the walker script (A13). The NPC handle stands for the
 # NPC, its AI and its template; a created binding is a field of the script;
 # an id list is a Go slice.
@@ -178,3 +238,703 @@ Npc.setWalkOrRun script.NPC.SetRunning
 NpcAI.addMoveRouteDesire script.NPC.AddMoveRouteDesire
 NpcTemplate.getAlias script.NPC.Alias
 Quest.addCreated inline
+
+# Newbie helper (U3). The registration calls are fields of the script; the
+# newbie buff table is handed to the script's constructor, so its lookup
+# and a buff's skill are plain Go values, and a frequent skill is a skill
+# reference literal. The pooled delayed task runs on the player's queue.
+# The item check is on every creature handle: a player and a pet answer
+# from their inventories; a servitor, an NPC or a door has none and panics.
+ClassId.getLevel script.Player.ClassLevel
+Creature.teleportTo TeleportTo,TeleportNear
+ItemContainer.hasAtLeastOneItem script.Creature.HasAtLeastOneItem
+MemoSet.unset script.QuestState.Unset
+NewbieBuff.getSkill inline
+NewbieBuffData.getInstance inline
+NewbieBuffData.getLowestBuffLevel skill.NewbieBuffTable.LowestBuffLevel
+NewbieBuffData.getValidBuffs skill.NewbieBuffTable.ValidBuffs
+Npc.dropItem script.NPC.DropItem
+Npc.getSpawnLocation script.NPC.SpawnLocation
+Npc.showChatWindow script.NPC.ShowChatWindow
+NpcTemplate.getRace script.NPC.Race
+Player.isCursedWeaponEquipped script.Player.CursedWeaponEquipped
+Player.isNewbie script.Player.IsNewbie
+Quest.addFirstTalkId inline
+Quest.addMyDying inline
+Quest.callSkill script.Script.CallSkill,script.NPC.CallSkill
+Quest.newQuestState script.Script.NewQuestState
+QuestState.isCompleted script.QuestState.IsCompleted
+SkillTable.FrequentSkill.getSkill inline
+ThreadPool.schedule script.Player.After,script.Hall.Schedule
+World.getNpc script.Script.WorldNPC
+WorldObject.getActingPlayer script.ActingPlayer
+
+# See-creature (A10). The look-neighbour throttle is a call on the NPC handle.
+Npc.lookNeighbor script.NPC.LookNeighbor
+
+# Behavior base and the Warrior chain (A11). The AI parameters, the hate
+# list, the NPC's state and its skills are read through the NPC handle; the
+# getters that lead to them (spawn, template, status, move, attack, AI,
+# aggro list, positions) fold into those calls. A skill is a reference the
+# script reads with Script.Skill; an effect's level is Script.AbnormalLevel.
+ASpawn.getMemo inline
+ASpawn.isInMyTerritory script.NPC.InSpawnTerritory
+AbstractAI.getCurrentIntention script.NPC.Intention
+AbstractEffect.getSkill inline
+AbstractEffect.getTemplate inline
+AggroList.getMostHatedCreature script.NPC.MostHated
+AggroList.stopHate script.NPC.StopHate
+ClassId.getType script.ClassTypeOf
+ClassId.isInGroup script.Player.InClassGroup
+ClassId.isSameOccupation script.Player.SameOccupation
+ClassRace.isSameRace script.Player.SameRace
+Creature.abortAll AbortAll
+Creature.getAllEffects inline
+Creature.getAttack inline
+Creature.getMove inline
+Creature.getStatus inline
+Creature.instantTeleportTo InstantTeleportTo,InstantTeleportNear
+Creature.isDead Dead
+Creature.isParalyzed script.NPC.Paralyzed
+Creature.isStunned script.NPC.Stunned
+CreatureAttack.canAttack script.NPC.CanAttack
+CreatureMove.getGeoPathFailCount script.NPC.GeoPathFailCount
+CreatureStatus.getHpRatio HPRatio
+CreatureStatus.getLevel Level
+EffectTemplate.getStackOrder inline
+EffectTemplate.getStackType inline
+GameTimeTaskManager.getGameHour script.Script.GameHour
+GameTimeTaskManager.getInstance inline
+Intention.getType inline
+L2Skill.getAbnormalLvl inline
+L2Skill.getAggroPoints script.SkillInfo.AggroPoints
+L2Skill.getEffectTemplates inline
+L2Skill.getId inline
+L2Skill.getPower script.SkillInfo.Power
+L2Skill.isOffensive script.SkillInfo.Offensive
+MemoSet.getInteger inline
+MemoSet.getOrDefault inline
+Npc.broadcastNpcShout script.NPC.Shout
+Npc.doDie script.NPC.DoDie
+Npc.getSpawn inline
+Npc.getStatus inline
+Npc.instantTeleportTo InstantTeleportTo
+Npc.isInMyTerritory script.NPC.InMyTerritory
+Npc.rechargeShots script.NPC.RechargeShots
+Npc.removeAllAttackDesire script.NPC.RemoveAllAttackDesire
+NpcAI.addAttackDesire AddAttackDesire
+NpcAI.addCastDesire AddCastDesire
+NpcAI.addWanderDesire AddWanderDesire
+NpcAI.getAggroList inline
+NpcAI.getLifeTime script.NPC.LifeTime
+NpcStatus.getLevel Level
+NpcStringId.getNpcMessage script.NpcString
+NpcTemplate.getAiParams inline
+NpcTemplate.getClans script.NPC.Clans
+NpcTemplate.getSkill script.NPC.SkillByType
+Player.isAlliedWithKetra script.Player.AlliedWithKetra
+Player.isAlliedWithVarka script.Player.AlliedWithVarka
+Quest.broadcastScriptEvent script.Script.BroadcastScriptEvent
+SkillTable.getInfo inline
+SkillTable.getInstance inline
+SpawnLocation.clone inline
+World.getObject script.Script.Object
+WorldObject.distance2D script.NPC.Distance2D
+WorldObject.getHeading inline
+WorldObject.getName Name
+WorldObject.getObjectId ObjectID
+WorldObject.getPosition inline
+WorldObject.getX inline
+WorldObject.getY inline
+WorldObject.getZ inline
+WorldObject.isBehind script.NPC.Behind
+WorldObject.isIn2DRadius script.NPC.InRadius2D
+
+# Proof quests, first group (#175). A quest's attacked binding is an entry
+# of its Bind table, and its started test reads the state's status.
+Quest.addAttacked inline
+QuestState.isStarted inline
+
+# Proof quests, second group (#175). A spawn spot is a script.Loc literal.
+SpawnLocation.new inline
+
+# Behavior spine, the Warrior children (A12, #3495). A point's distance to
+# another is the NPC's distance to that point; an NpcString id is the
+# number script.NpcString formats.
+NpcAI.addDoNothingDesire script.NPC.AddDoNothingDesire
+NpcStringId.get script.NpcString
+Point2D.distance2D script.NPC.Distance2D
+
+# Ketra/Varka alliance level (#3595): the stored standing, positive Ketra,
+# negative Varka.
+Player.getAllianceWithVarkaKetra script.Player.VarkaKetraAlliance
+
+# Third-class saga core (#3598). The class change, the cast helper's two
+# animations, the raw party and world lookups and a state's quest are calls
+# on the handles; Player.setClassId runs the whole occupation change. The
+# NPC's AI is the NPC handle, the decayed and see-spell bindings are entries
+# of the script's Bind table, and a spawn spot's coordinates and heading are
+# fields of a script.Loc literal. The script's own name is its Name field
+# (or its package's quest-name constant). The last quest NPC is set by the
+# engine on every interact before the first talk hook runs (section 7 of
+# docs/script-engine-plan.md), so the hook's own set of the same NPC is a
+# no-op.
+Attackable.getAI inline
+ClassId.getParent script.ClassParent
+Location.getZ inline
+MagicSkillUse.new script.Player.BroadcastMagicSkillUse
+Party.getMembers script.Player.PartyMembers
+Player.broadcastUserInfo script.Player.BroadcastUserInfo
+Player.getBaseClass script.Player.BaseClass
+Player.getParty inline
+Player.isInParty script.Player.InParty
+Player.isSubClassActive script.Player.SubClassActive
+Player.setBaseClass script.Player.SetBaseClass
+Player.setClassId script.Player.SetClassID
+Point2D.getX inline
+Point2D.getY inline
+Quest.addDecayed inline
+Quest.addSeeSpell inline
+Quest.getName inline
+QuestList.setLastQuestNpcObjectId inline
+QuestState.getQuest script.QuestState.Quest
+SpawnLocation.getHeading inline
+World.getPlayer script.Script.WorldPlayer
+
+# The X1 quests Q234, Q235 and Q422 (#3617). A page's text is read from
+# the script's page directory; an item template's name is a script helper;
+# the active weapon, the PK count, the summon and an item's enchant level
+# are calls on the player handle, and a summon's template id is read from
+# its creature handle. The getters in front of them (the item table, the
+# weapon template, the inventory's item lookup) fold into those calls.
+ItemContainer.getItemByItemId inline
+ItemContainer.hasItems script.Player.HasItems
+ItemData.getInstance inline
+ItemData.getTemplate inline
+Item.getItemId inline
+Item.getName script.Script.ItemName
+ItemInstance.getEnchantLevel script.Player.ItemEnchantLevel
+Player.getActiveWeaponItem script.Player.ActiveWeaponItemID
+Player.getPkKills script.Player.PkKills
+Player.getSummon script.Player.ActiveSummon
+Player.setPkKills script.Player.SetPkKills
+Quest.getHtmlText script.Script.HTMLText
+Summon.getNpcId script.SummonNpcID
+UserInfo.new script.Player.SendUserInfo
+# Test of the Summoner (#3567). Setting the death hook (Hooks.OnDeath) is
+# what makes a quest one its player's death reaches. Its duel records the
+# summon of the creature that started it, a summon, which has no summon of
+# its own: the recorded summon is always none, so the foul test reduces to
+# whether the attacker is a summon (Creature.Summon) and reads no summon.
+Creature.getSummon inline
+Quest.setTriggeredOnDeath inline
+
+# Wizard chain (A12, #3603). The NPC's hate list, the one its spells are
+# aimed by, is a view the NPC handle returns; its operations are the view's.
+# The mute check is read on the NPC handle.
+Creature.isMuted script.NPC.Muted
+HateList.addHateInfo script.HateList.Add
+HateList.clear script.HateList.Clear
+HateList.getMostHatedCreature script.HateList.MostHated
+HateList.isEmpty script.HateList.Empty
+HateList.refresh script.HateList.Refresh
+HateList.removeIfOutOfRange script.HateList.RemoveIfOutOfRange
+NpcAI.getHateList script.NPC.HateList
+
+# Cabal buffer and Primeval summoner (#176). The cabals are read on the
+# script, the access level, the visibility, a held effect and the adena
+# payment on the player handle. A page file sent through the NPC is shown
+# on the player handle, its release included; the page path reads the
+# script's directory, and a creature's party is the player handle's.
+Creature.getFirstEffect script.Player.HasEffect
+Creature.getParty inline
+Creature.sendPacket inline
+NpcHtmlMessage.new inline
+NpcHtmlMessage.setFile script.Player.ShowPage
+Player.isGM script.Player.IsGM
+Player.reduceAdena script.Player.ReduceAdena
+Player.teleportTo script.Player.TeleportTo
+Quest.addUseSkillFinished inline
+Quest.getDescr inline
+SevenSignsManager.getLosingCabal script.Script.LosingCabal
+SevenSignsManager.getPlayerCabal script.Script.PlayerCabal
+SevenSignsManager.getWinningCabal script.Script.WinningCabal
+WorldObject.isVisible script.Player.Visible
+
+# RaidPrivateStandard (A12, #2162). The top desire target is the AI's own
+# field, set by every promotion and cleared by the periodic idle (#3545).
+# The hit points and the zone check are read on the NPC handle; the attack
+# reshuffle is the randomize-hate effect's.
+AggroList.randomizeAttack script.NPC.RandomizeAttack
+Creature.isInsideZone script.NPC.InsideZone
+CreatureStatus.getHp script.NPC.HP
+CreatureStatus.getMaxHp script.NPC.MaxHP
+NpcAI.getTopDesireTarget script.NPC.TopDesireTarget
+NpcAI.setTopDesireTarget script.NPC.SetTopDesireTarget
+
+# Guard, GuardStand and GuardMoveAround (A12, #2240). Guard teleports the NPC
+# home through Creature.teleportTo, mapped above as TeleportTo: the NPC handle
+# has it as the player handle does.
+Player.getKarma script.Player.Karma
+
+# MonsterBehavior, WarriorBehavior and WizardBehavior (A12, #3628). The
+# attack stance, the cast in flight, the root, the automatic attack check
+# and the drop of one attack desire are read and done on the NPC handle; the
+# cast controller is folded into its cast check. The held attack desire and
+# the extended script event broadcast were built before.
+Creature.isInCombat script.NPC.InCombat
+Creature.isRooted script.NPC.Rooted
+CreatureCast.isCastingNow script.NPC.CastingNow
+HateList.size script.HateList.Size
+Npc.canAutoAttack script.NPC.CanAutoAttack
+Npc.getCast inline
+Npc.removeAttackDesire script.NPC.RemoveAttackDesire
+NpcAI.addAttackDesireHold AddAttackDesireHold
+Quest.broadcastScriptEventEx script.Script.BroadcastScriptEventEx
+
+# The DefaultNpc helpers makeAttackEvent, openCloseDoor and
+# getPledgeCastleState (#3597), and the cast animation shown around an NPC
+# (#3609). The animation from an NPC has the player handle's name, mapped
+# above for MagicSkillUse.new. The privates of an NPC's party are read on
+# its handle. The script's own attacked hook is re-entered through
+# Script.RunAttacked, and the party-attacked hooks bound to a called NPC's
+# template (its template's script list folded in) run through
+# Script.RaisePartyAttacked. A door is found by name on the script and
+# opened or closed on its handle. The castle an NPC belongs to is found on
+# the script; its siege is read on the castle handle, which checks a
+# player's clan for the siege sides; the castle a player's clan owns is
+# read on the player handle.
+Castle.getSiege inline
+Clan.getCastleId script.Player.ClanCastleID
+Door.closeMe script.Door.Close
+Door.openMe script.Door.Open
+DoorData.getDoor script.Script.Door,script.Script.DoorByID
+DoorData.getInstance inline
+Npc.getCastle script.Script.Castle
+Npc.getMinions script.NPC.Minions
+NpcTemplate.getEventQuests inline
+Quest.onAttacked script.Script.RunAttacked
+Quest.onPartyAttacked script.Script.RaisePartyAttacked
+Residence.getId script.Castle.ID
+Siege.checkSides script.Castle.OnSiegeSide
+Siege.isInProgress script.Castle.SiegeInProgress
+
+# Ground items (#3498). A look for ground items and a pick-up desire are
+# calls on the NPC handle; the items a look finds and the item picked up are
+# values on the hook's payload, whose ids are fields.
+ItemInstance.getItemId inline
+Npc.lookItem script.NPC.LookItem
+NpcAI.addPickUpDesire script.NPC.AddPickUpDesire
+
+# NPC, spawn and maker rows of the API freeze (#3748). A maker reads its
+# npcmaker and spawns on the spawn.Group its hooks receive: the maker memo
+# and the maximum are fields of the declaration, the maker of an npcmaker is
+# the group itself, and a spawn's template is its entry's NPC id. A maker
+# script event goes to an npcmaker by name, from a maker through its group
+# and from a behavior or a quest through the script's spawner; the
+# npcmaker lookup and its maker fold into that call, and the npcmaker that
+# placed an NPC is read by name on the NPC handle. A script's own record of
+# values (EchoCrystal's scores) is a Go struct of the script's. The desire
+# queue is cleared, or cleared of one kind, on the NPC handle. The NPC's own
+# teleport wakes no AI task: an NPC out of its territory never sleeps. A
+# monster's soul crystal record and its registration flag are read on the
+# NPC handle.
+ASpawn.calculateRespawnDelay spawn.CalculateRespawnDelay
+ASpawn.doSpawn spawn.GroupSpawn.Spawn
+ASpawn.getTemplate inline
+AbsorbInfo.isRegistered inline
+AbsorbInfo.isValid script.AbsorbInfo.Valid
+AggroList.cleanAllHate script.NPC.CleanAllHate
+AggroList.remove script.NPC.RemoveAggro
+Attackable.getStatus inline
+HateList.addDefaultHateInfo script.HateList.AddDefault
+HateList.cleanAllHate script.HateList.CleanAll
+HateList.stopHate script.HateList.StopHate
+Monster.addAbsorber script.NPC.AddAbsorber
+Monster.getAbsorbInfo script.NPC.Absorber
+MultiSpawn.doRespawn spawn.GroupSpawn.Respawn
+MultiSpawn.getDecayed spawn.GroupSpawn.Decayed
+MultiSpawn.getNpcMaker script.NPC.MakerName
+MultiSpawn.getNpcs spawn.GroupSpawn.NPCs
+MultiSpawn.getSpawned spawn.GroupSpawn.Spawned
+MultiSpawn.getTotal spawn.GroupSpawn.Total
+MultiSpawn.loadDBNpcInfo spawn.GroupSpawn.LoadDBInfo
+Npc.broadcastOnScreen script.NPC.BroadcastOnScreen
+Npc.disableCoreAi script.NPC.DisableCoreAI
+Npc.getNeighborHero script.Script.NeighborHero
+Npc.isAISleeping script.NPC.AISleeping
+Npc.removeAllDesire script.NPC.RemoveAllDesire
+Npc.sendScriptEvent script.Script.SendScriptEvent
+Npc.teleportTo TeleportTo,TeleportNear
+NpcAI.addCastDesireHold AddCastDesireHold
+NpcAI.getDesireQueue inline
+NpcMaker.deleteAll spawn.Group.DeleteAll
+NpcMaker.getMaker inline
+NpcMaker.getMakerMemo inline
+NpcMaker.getMaximumNpc inline
+NpcMaker.getNpcsAlive spawn.Group.Alive
+NpcMaker.getSpawns spawn.Group.Spawns
+NpcMaker.isOnStart spawn.Maker.OnStart
+ScoreData.crystalId inline
+ScoreData.new inline
+ScoreData.noAdenaMsg inline
+ScoreData.noScoreMsg inline
+ScoreData.okMsg inline
+SpawnMaker.checkHasSpawnCondition spawn.Group.Held
+SpawnMaker.onMakerScriptEvent script.Spawner.SendMakerEvent
+SpawnManager.getInstance inline
+SpawnManager.getNpcMaker script.Spawner.HasMaker,script.Spawner.SendMakerEvent
+
+# Script-facing API freeze, player, creature and skill rows (#3748). A
+# binding is a field of the script (Bind, UsedItems, EnteredZones). The soul
+# crystal data is the table the catalog hands the quest, whose crystal and
+# leveling rows are fields. A quest state's variable reads (MemoSet.get,
+# its presence) go through Get; a creature's inventory is the player
+# handle's; a skill level is a field of
+# its skill.Ref. An NPC's summon animation flag shows in no NPC view, so
+# setting it is no call. Music an NPC plays is bound to it and heard by the
+# players around it. A creature's attack type, strider ride, pet control
+# item and 3D range are package functions over any creature; a party's
+# leader and size are read on a member's player handle.
+AbstractGroup.getLeader script.Player.PartyLeader
+AbstractGroup.getLeaderObjectId script.Player.PartyLeader
+AbstractGroup.isLeader script.Player.IsPartyLeader
+Creature.forceRunStance script.NPC.SetRunning
+Creature.getAttackType script.AttackType
+Creature.getInventory inline
+Creature.isPhysicalMuted script.NPC.PhysicalMuted
+Creature.isRiding script.Riding
+Creature.setRunning script.NPC.SetRunningQuietly
+Creature.setShowSummonAnimation inline
+CreatureAttack.isAttackingNow script.NPC.AttackingNow
+CreatureAttack.stop script.NPC.StopAttack
+CreatureCast.meetsHpMpConditions script.NPC.MeetsHPMPConditions
+CreatureCast.meetsHpMpDisabledConditions script.NPC.MeetsHPMPDisabledConditions
+CreatureStatus.getMaxMp script.NPC.MaxMP
+Inventory.getItemIdFrom script.Player.RightHandItemID
+Item.isStackable script.Script.ItemStackable
+ItemContainer.getItems script.Player.HeldItems
+ItemInstance.getCount script.Player.FirstItemCount
+L2Skill.getEffectId script.SkillInfo.EffectID
+L2Skill.getEffects script.Script.ApplyEffects
+L2Skill.getElement script.SkillInfo.Element
+L2Skill.getLevel inline
+L2Skill.isMagic script.SkillInfo.Magic
+LevelingInfo.absorbCrystalType inline
+LevelingInfo.chanceBreak inline
+LevelingInfo.chanceStage inline
+LevelingInfo.isSkillRequired inline
+LevelingInfo.levelList inline
+MemoSet.containsKey script.QuestState.Get
+MemoSet.get script.QuestState.Get
+MemoSet.getBool script.QuestState.GetBool
+Monster.getSpoilState inline
+Party.getMembersCount script.Player.PartyMembers
+Pet.getControlItemId script.PetControlItemID
+PlaySound.new script.NPC.PlayMusic
+Player.addItem script.Script.AddItems
+Player.destroyItemByItemId script.Script.DestroyItems
+Player.getActingPlayer script.ActingPlayer
+Player.getActiveWeaponInstance script.Player.RightHandItemID
+Player.getApprentice script.Player.Apprentice
+Player.getAttackType script.AttackType
+Player.getClanId script.Player.ClanID
+Player.getMountType script.Player.MountType
+Player.getSponsor script.Player.Sponsor
+Player.isFlying script.Player.Flying
+Player.isHero script.Player.IsHero
+Player.isOverweight script.Player.Overweight
+Player.refreshHennaList script.Player.RefreshHennaList
+Player.setAllianceWithVarkaKetra script.Player.SetVarkaKetraAlliance
+Player.setIsIn7sDungeon script.Player.SetIn7sDungeon
+Player.setNoble script.Player.MakeNoble
+Quest.addItemUse inline
+Quest.addSeeCreature inline
+Quest.addZoneEnter inline
+Quest.getApprentice script.Script.ApprenticeInRange
+Quest.getElapsedTicks script.Script.ElapsedTicks
+Quest.getMemoState script.Script.MemoState
+Quest.getMemoStateEx script.Script.MemoStateEx
+Quest.getSponsor script.Script.SponsorInRange
+Quest.setMemoState script.Script.SetMemoState
+Quest.setMemoStateEx script.Script.SetMemoStateEx
+QuestList.getAllQuests script.Player.StartedQuests
+QuestState.getBool script.QuestState.GetBool
+SoulCrystal.brokenItemId inline
+SoulCrystal.initialItemId inline
+SoulCrystal.level inline
+SoulCrystal.stagedItemId inline
+SoulCrystalData.getInstance inline
+SoulCrystalData.getLevelingInfos item.SoulCrystalTable.LevelingInfo
+SoulCrystalData.getSoulCrystals item.SoulCrystalTable.Crystal
+SpoilState.isActualSpoiler script.NPC.ActualSpoiler
+Summon.getControlItemId script.PetControlItemID
+WorldObject.distance3D script.NPC.Distance3D
+WorldObject.isIn3DRadius script.InRadius3D,script.Script.InPartyRange
+# The NPC chat line a teleport dungeon NPC shouts to the players within a
+# radius of it is one call on the NPC handle (ShoutInRadius); a system
+# message a siegable-hall NPC sends to the players within a radius of it is
+# another (SystemMessageInRadius: FlagWar's messenger, and Rainbow Springs'
+# caretaker once its script is ported, #3502). A binding a siegable-hall
+# script registers is a field of the script.
+Creature.broadcastPacketInRadius script.NPC.ShoutInRadius,script.NPC.SystemMessageInRadius
+NpcSay.new script.NPC.ShoutInRadius
+Quest.addClanAttacked inline
+Quest.addNoDesire inline
+Quest.addPartyAttacked inline
+Quest.addPartyDied inline
+
+# Clan reads of the API freeze, residence lane (#3748). The clan and its
+# leader's member record fold into the Player handle calls; the leader is
+# the online player, nil while offline. A clan looked up by id reads its
+# hall on the clan handle (FlagWar.registerClan).
+Clan.getClanHallId script.Player.ClanHallID,script.ClanHandle.ClanHallID
+Clan.getLeader inline
+ClanMember.getPlayerInstance script.Player.ClanLeader,script.ClanHandle.ClanLeader
+
+# Script-facing API freeze, finishing lane (#3748). A script neither logs
+# nor holds a database connection: the domain operation it calls reads,
+# writes and logs its own failures. A maker template's base HP and MP are
+# read inside the spawn data's alive check (#3800). The game tick is the
+# server's uptime in seconds; a maker reads the time of day on its own
+# handle, and its fixed-rate timer is the group's Every. The map, page,
+# multisell, zone and seven signs singletons are the lookups the Script
+# handle stands for. Location.getClosestPositionList sorts by descending
+# distance, so its Go name says what it returns. A page a script fills
+# itself is shown with ShowHTML. An earthquake is felt by one player, or
+# by the players around a hostile NPC. A flee desire's location is a clone
+# of a location built fresh on each flee lookup, so the arrival hook's
+# removal by identity matches nothing; the desire goes when the arrival
+# clears the current desire after the hook returns.
+BossZone.allowPlayerEntry script.Zone.AllowPlayerEntry
+CLogger.error inline
+CLogger.info inline
+CLogger.warn inline
+ConnectionPool.getConnection inline
+CreatureTemplate.getBaseHpMax inline
+CreatureTemplate.getBaseMpMax inline
+Door.isOpened script.Door.Opened
+Earthquake.new Earthquake
+ExShowScreenMessage.new script.Player.ShowScreenMessage
+GameTimeTaskManager.getCurrentTick script.Script.CurrentTick
+GameTimeTaskManager.isNight script.Maker.IsNight
+HtmCache.getHtm script.Script.Page
+HtmCache.getInstance inline
+Intention.getLoc inline
+Location.getClosestPosition script.Closest
+Location.getClosestPositionList script.Farthest
+MathUtil.calculateAngleFrom script.AngleFrom
+MathUtil.checkIfInRange script.InRange
+MultisellData.getInstance inline
+MultisellData.separateAndSend script.Player.ShowMultisell
+NpcHtmlMessage.replace script.Player.ShowHTML
+Point2D.addRandomOffset script.Script.RandomOffset
+SevenSignsManager.getCurrentPeriod script.Script.SevenSignsPeriod
+SevenSignsManager.getSealOwner script.Script.SealOwner
+StringUtil.scrambleString script.Script.Scramble
+ThreadPool.scheduleAtFixedRate spawn.Group.Every
+ZoneManager.getInstance inline
+ZoneManager.getZone script.Script.BossZoneAt
+ZoneManager.getZoneById script.Script.Zone
+ZoneType.isInsideZone script.Zone.Contains
+
+# Spawn operations on the spawn that placed an NPC (#3800, #3739, #3809).
+# DefaultNpc's setRespawnDelay folds into Spawner.CreatePrivates, which
+# gives each private its declared delay; a script that changes a private's
+# delay afterwards calls Spawner.SetRespawnDelay. Zaken's setXYZ moves the
+# private before its respawn, which places it at its spawn's own point.
+ASpawn.doRespawn script.Spawner.DoRespawn
+ASpawn.getFleeLocation script.NPC.FleeLocation
+ASpawn.getSpawnLocation script.Spawner.DrawSpawnLocation
+ASpawn.instantTeleportInMyTerritory script.Script.TeleportPlayersInTerritory
+ASpawn.setRespawnDelay script.Spawner.SetRespawnDelay
+WorldObject.setXYZ script.NPC.SetXYZ
+
+# The unchecked cast start (#3809): WizardCorpseNecroSummon's doCast starts
+# a cast past every gate of the cast's start, replacing a cast in flight.
+CreatureCast.doCast script.NPC.CastUnchecked
+
+# Small freeze handles (#3801, #3807, #3836). A hostile NPC's weapon swap,
+# enchant glow and last attacker. The private warehouse is a getter the
+# Player handle folds into its size read and its withdrawal window, which
+# also makes it the active warehouse. The shutdown and restart tasks start
+# their countdown through Server.Shutdown.
+Npc.equipItem script.NPC.EquipItem
+Npc.getLastAttacker script.NPC.LastAttacker
+Npc.setEnchantEffect script.NPC.SetEnchantEffect
+ItemContainer.getSize script.Player.WarehouseSize
+Player.getWarehouse inline
+Player.setActiveWarehouse script.Player.OpenWarehouseWithdraw
+WarehouseWithdrawList.new script.Player.OpenWarehouseWithdraw
+Shutdown.new inline
+Shutdown.start script.Server.Shutdown
+
+# Command channel reads and group screen messages (#3808). The Player handle
+# reads the channel its party is in, so the party's channel getter folds
+# into each read; the channel's own getLeader is Player.ChannelLeader. The
+# one packet a script hands a party is the screen message.
+CommandChannel.broadcastOnScreen script.Player.ShowChannelScreenMessage
+CommandChannel.getMembers script.Player.ChannelMembers
+CommandChannel.getParties script.Player.ChannelParties
+Party.broadcastOnScreen script.Player.ShowPartyScreenMessage
+Party.broadcastPacket script.PartyCell.ShowScreenMessage
+Party.getCommandChannel inline
+
+# The Dimensional Rift room (#3802): the room cell a script builds with
+# Script.NewRoom. A room has no party handle to return: its party getter
+# folds into the cell's party reads (leader, members, the identity compare
+# HoldsPartyOf, the copy SetPartyFrom).
+RoomInfo.clear script.RoomCell.Clear
+RoomInfo.getIndex script.RoomCell.Index
+RoomInfo.getMemberIds script.RoomCell.MemberIDs
+RoomInfo.getParty inline
+RoomInfo.getTime script.RoomCell.Time
+RoomInfo.isLocked script.RoomCell.Locked
+RoomInfo.isPartyChanged script.RoomCell.PartyChanged
+RoomInfo.new script.Script.NewRoom
+RoomInfo.setLock script.RoomCell.SetLock
+RoomInfo.setParty script.RoomCell.SetParty
+
+# Maker spawn operations and population spawn lookups (#3800). A maker acts
+# on its spawns through the spawn.GroupSpawn its group gives: the spawn's
+# database row is read through the spawn, which reads the template's base
+# HP and MP for the alive check itself. A maker finds a spawn of any
+# npcmaker by its template alias through its group; any other script finds
+# one by NPC id through its spawner, and draws its point on the Spawn it
+# gets. The spawn-time starts go through the spawner.
+MultiSpawn.doDelete spawn.GroupSpawn.DeleteNPCs
+MultiSpawn.getNpc spawn.GroupSpawn.FirstNPC
+MultiSpawn.getSpawnLocation spawn.GroupSpawn.DrawSpawnLocation
+MultiSpawn.sendScriptEvent spawn.GroupSpawn.SendScriptEvent
+SpawnData.checkAlive spawn.GroupSpawn.CheckAlive
+SpawnData.checkDead spawn.GroupSpawn.CheckDead
+SpawnManager.getSpawn script.Spawner.FindSpawn
+SpawnManager.startSpawnTime script.Spawner.StartSpawnTime
+SpawnManager.stopSpawnTime script.Spawner.StopSpawnTime
+
+# What a maker hook reads besides its group (#3961, #3962, #3975). The rows
+# are mapped above by their script-side names, which Check matches on the
+# last segment: a maker reads the alias of a hook NPC's template, or of a
+# spawn's, as spawn.GroupSpawn.Alias (NpcTemplate.getAlias, every NPC of a
+# spawn has the spawn's template), and draws Rnd.get as script.Maker.Rnd,
+# from the scripts' random source. The local wall clock (Calendar, a JDK
+# type with no census row) is script.Maker.Now for a maker and
+# script.Script.Now for a behavior, each read from the clock its timers run
+# on.
+
+# The castle siege rows of the siege maker (#3805). A maker finds a castle
+# by id and registers its npcmaker on the castle's siege; each later status
+# change of the siege runs the maker's siege event hook with the castle
+# handle and the new status. The siege's castle is that handle, on which
+# the maker reads the siege's status and the castle's standing life
+# control towers.
+Castle.getAliveLifeTowerCount script.Castle.AliveLifeTowers
+CastleManager.getCastleById script.Maker.Castle
+Siege.addMakerEvent script.Castle.AddMakerEvent
+Siege.getCastle inline
+Siege.getStatus script.Castle.SiegeStatus
+
+# The door rows of the door change (#3809). A script lists the door ids
+# whose opening or closing reaches its door-change hook in
+# Script.ChangedDoors; the door owner runs the hook after the door's status
+# broadcast and before the door it triggers changes. A maker finds a door
+# by name on its own handle (Maker.Door) and registers its npcmaker on the
+# door; each later opening or closing runs the maker's door event hook,
+# after the scripts' hooks.
+Door.addMakerEvent script.Door.AddMakerEvent
+Quest.addDoorChange inline
+
+# Siegable-hall rows the hall port has named (#3502). An NPC's cast check
+# of a skill's reuse is CanAttemptCast on its handle.
+CreatureCast.canAttemptCast script.NPC.CanAttemptCast
+# A treasure chest is invulnerable from the start (SetInvul) and takes the
+# hit points of a barehanded blow (HoldsWeapon on the attacker) through its
+# own script (SetHP).
+Creature.getActiveWeaponInstance script.Creature.HoldsWeapon
+Creature.setInvul script.NPC.SetInvul
+CreatureStatus.setHp script.NPC.SetHP
+
+# The siegable-hall rows (#3502): the hall and its siege as the hall scripts,
+# behaviors and the two quests reading hall siege state run them (script.Hall,
+# bound by Script.BindHallSiege), the clans they read, the NPC clan id and the
+# clan-bound spawn. A hall getter the Go handle folds in is inline;
+# ReleaseAttackers folds the end of a siege's attacker loop. A hall's
+# message to every player is Announce, to the members of chosen clans
+# TellClans (Rainbow Springs).
+Clan.getClanId script.ClanHandle.ID
+Clan.getDissolvingExpiryTime script.ClanHandle.DissolvingExpiry
+Clan.getLeaderId script.ClanHandle.LeaderID
+Clan.getLeaderName script.ClanHandle.LeaderName
+Clan.getMembersCount script.ClanHandle.MembersCount
+Clan.getName script.ClanHandle.Name
+Clan.getOnlineMembers script.ClanHandle.OnlineMembers
+Clan.hasClanHall script.ClanHandle.HasHall
+Clan.setClanHallId inline
+Clan.setFlag script.Hall.ReleaseAttackers
+ClanHall.banishForeigners script.Hall.BanishForeigners
+ClanHall.free script.Hall.Free
+ClanHall.getZone inline
+ClanHall.setOwner script.Hall.SetOwner
+ClanHallManager.getInstance inline
+ClanHallManager.getSiegableHall script.Script.SiegableHall
+ClanHallSiege.cancelSiegeTask script.Hall.CancelSiegeTask
+ClanHallSiege.endSiege script.Hall.EndSiege
+ClanHallSiege.getAttackerClans script.Hall.Attackers
+ClanHallSiege.unspawnNpcs inline
+ClanTable.getClan script.Script.Clan
+Creature.doDie script.NPC.DoDie
+GameTimeTaskManager.getGameTime script.Script.GameHour
+Npc.getClanId script.NPC.ClanID
+Npc.getSiegableHall script.Script.HallOf
+Player.destroyItem script.Script.DestroyItems
+Player.setSiegeState script.Hall.ReleaseAttackers
+Player.teleToLocation script.Player.TeleportTo
+Player.updatePvPStatus script.Hall.ReleaseAttackers
+Residence.closeDoor script.Hall.CloseDoor
+Residence.getName script.Hall.Name
+Residence.getOwnerId script.Hall.OwnerID
+Residence.getRndSpawn script.Hall.RandomSpawn
+Residence.isFree script.Hall.Unowned
+Residence.openDoor script.Hall.OpenDoor
+SiegableHall.addAttacker script.Hall.AddAttacker
+SiegableHall.getNextSiegeTime script.Hall.SiegeDate
+SiegableHall.getSiege inline
+SiegableHall.getSiegeDate script.Hall.SiegeDate
+SiegableHall.getSiegeLength script.Hall.SiegeLength
+SiegableHall.getSiegeZone inline
+SiegableHall.isInSiege script.Hall.InSiege
+SiegableHall.isRegistering script.Hall.Registering
+SiegableHall.isWaitingBattle script.Hall.WaitingBattle
+SiegableHall.setSiege script.Script.BindHallSiege
+SiegableHall.spawnDoor script.Hall.RespawnDoors
+SiegableHall.updateNextSiege script.Hall.UpdateNextSiege
+SiegableHall.updateSiegeStatus script.Hall.SetSiegeStatus
+SiegeZone.setActive script.Hall.SetBattlefieldActive
+Spawn.new script.Spawner.SpawnForClan
+Spawn.setLoc inline
+SystemMessage.addFortId script.Hall.Announce,script.Hall.TellClans
+SystemMessage.addString script.Hall.Announce
+World.toAllOnlinePlayers script.Hall.Announce
+WorldObject.forEachKnownTypeInRadius script.NPC.PlayersInRadius
+ZoneType.getKnownTypeInside script.Hall.PlayersInside
+
+# Teleport rows (#4128, #4083). An NPC turns where it stands on its handle,
+# with nothing sent, before or after its teleport, which keeps the way it
+# faces; a heading set on a copied position is a field of the script's Loc
+# (Zaken), so that port exempts the row. The ordinary teleport of any
+# creature handle, a summon's included, is script.TeleportTo, under the
+# Go name Creature.teleportTo already has; the one with a random offset is
+# script.Script.TeleportNear (#4210).
+SpawnLocation.setHeading script.NPC.SetHeading
+
+# Siegable-hall rows, exempt from the freeze, named by the Rainbow Springs
+# hall script, their only caller (#3502). The arena entry strips a member's
+# effects on the player handle and dismisses its summon through a function
+# of the summon's handle; its pool tasks, the game's end run at once among
+# them, are steps armed on the hall handle (Hall.Schedule, also the second
+# Go name of ThreadPool.schedule); the players on the hall's battlefield are
+# read on the hall handle.
+Player.stopAllEffects script.Player.StopAllEffects
+Summon.unSummon script.Unsummon
+ThreadPool.execute script.Hall.Schedule
+ZoneType.getCreatures script.Hall.PlayersOnBattlefield

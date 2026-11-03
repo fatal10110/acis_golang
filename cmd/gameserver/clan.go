@@ -22,7 +22,7 @@ import (
 // loadClanConfig reads the clans.properties clan and alliance penalties,
 // dissolution delay, alliance size and clan warehouse withdrawal right the
 // clan core uses and the players.properties clan skill item switch,
-// defaulting as the reference does when a key is missing.
+// with the shipped defaults for a missing key.
 func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error) {
 	props, err := config.LoadFile(paths.ClansConfigPath)
 	if err != nil {
@@ -73,7 +73,7 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 		return ok
 	})
 	table := clan.NewTable()
-	table.Restore(snap, now, cfg.JoinDays)
+	clamped := table.Restore(snap, now, cfg.JoinDays)
 	halls, err := store.LoadHallOwners(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("restore clans: %w", err)
@@ -84,6 +84,7 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 	})
 	log.Info().Int("clans", table.Len()).Msg("clans loaded")
 	service := clan.NewService(table, store, worker, ids, cfg, time.Now, log)
+	service.StoreRestoredReputations(clamped)
 	service.DropMissingCrests(crests)
 	service.DropDanglingAlliances()
 	return service, nil

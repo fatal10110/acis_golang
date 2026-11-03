@@ -31,7 +31,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))})
 	castable := known && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle)
 	if known {
-		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
+		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig().KarmaPlayerCanTeleport) {
 			sendMagicActionFailed(live)
 			return
 		}
@@ -71,7 +71,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 
 // castMagicSkill starts a skill request that has cleared its request-time
 // gates, fresh or resumed, against selected.
-func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.RequestMagicSkillUse, def modelskill.Definition, known bool, selected world.Tracked) {
+func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.RequestMagicSkillUse, def *modelskill.Definition, known bool, selected world.Tracked) {
 	// The request is the CAST intention now, whatever its outcome: the attack
 	// intention it replaced swings again only if the cast ends with
 	// nextActionAttack.
@@ -100,13 +100,20 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	controller := l.castController(live)
 	// The pre-attempt gate above ran before this GROUND approach walk, so a
 	// recast still on cooldown never starts walking toward the signet.
-	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, selected, def.CastRange) {
+	if known && def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, selected, def.CastRange) {
 		return
 	}
 
 	var afterCanCast func() error
-	if known && def.Target == modelskill.TargetGround {
+	switch {
+	case known && def.Target == modelskill.TargetGround:
 		afterCanCast = l.groundCastAfterCanCast(live, def)
+	case known && def.SkillType == "TAKE_CASTLE":
+		afterCanCast = l.takeCastleAfterCanCast(live, *def, l.magicSkillFinalTarget(live, def, selected))
+	case known && def.SkillType == "SIEGE_FLAG":
+		afterCanCast = l.siegeFlagAfterCanCast(live)
+	case known:
+		afterCanCast = l.siegeCastAfterCanCast(live, *def, func() skilltarget.Actor { return l.magicSkillFinalTarget(live, def, selected) })
 	}
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
 		Controller:  controller,
@@ -123,7 +130,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		},
 	})
 	if err != nil {
-		if errors.Is(err, errGroundCastRejected) {
+		if errors.Is(err, errGroundCastRejected) || errors.Is(err, errTakeCastleRefused) || errors.Is(err, errSiegeFlagRefused) || errors.Is(err, errSiegeCastRefused) {
 			return
 		}
 		// A nextActionAttack skill refused at its cost and condition checks
@@ -191,16 +198,16 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	})
 }
 
-// castCombatant is a cast's final target as a creature, nil when it is not
-// one.
+// castCombatant is a cast's final target as the creature a follow-up attack
+// hits, nil when it is neither a creature nor a door.
 func castCombatant(target actorcast.Target) attackable.Combatant {
-	combatant, _ := target.(attackable.Combatant)
+	combatant, _ := hitTarget(target)
 	return combatant
 }
 
 // broadcastCastStart sends a player's cast-start MagicSkillUse to everyone
 // watching, then USE_S1 to the caster.
-func (l *GameClientLink) broadcastCastStart(live *livePlayer, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
+func (l *GameClientLink) broadcastCastStart(live *livePlayer, target actorcast.Target, def *modelskill.Definition, plan actorcast.Plan) {
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -221,19 +228,19 @@ func (l *GameClientLink) broadcastCastStart(live *livePlayer, target actorcast.T
 // channel opens, before the caster's MagicSkillUse, USE_S1 and gauge go out.
 // The gauge is sent whatever the hit time: a channel has no short-cast
 // cutoff.
-func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast.Controller, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
+func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast.Controller, target actorcast.Target, def *modelskill.Definition, plan actorcast.Plan) {
 	live.setFusionTarget(target.ObjectID())
 	finishFusion := func() {
 		// Only a creature carries the triggered fusion effect to decrease.
 		if effected, ok := target.(attackable.Combatant); ok {
-			skillhandler.DecreaseFusion(l.skills, live.Character, effected, def)
+			skillhandler.DecreaseFusion(l.skills, live, effected, *def)
 		}
 		live.clearFusionTarget(target.ObjectID())
 	}
 	// The force lands on the target the cast committed to, its conditions
 	// not judged again.
 	if effected, ok := target.(attackable.Combatant); ok {
-		skillhandler.StartFusion(l.skills, live.Character, effected, def)
+		skillhandler.StartFusion(l.skills, live, effected, *def)
 	}
 
 	l.broadcastCastStart(live, target, def, plan)
@@ -251,10 +258,10 @@ func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast
 // the hit time. The launch broadcasts MagicSkillLaunched with no mid-cast
 // revalidation, then the controller charges shots and the final MP, and the
 // cast ends with no cool phase (Controller.ScheduleSignetCast).
-func (l *GameClientLink) startSignetCast(live *livePlayer, controller *actorcast.Controller, handlers actorcast.EffectHandlers, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
+func (l *GameClientLink) startSignetCast(live *livePlayer, controller *actorcast.Controller, handlers actorcast.EffectHandlers, target actorcast.Target, def *modelskill.Definition, plan actorcast.Plan) {
 	if resolved, ok := target.(skilltarget.Actor); ok {
 		handlers.Sink = l.playerMessageSink(live, nil)
-		result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, []skilltarget.Actor{resolved}, def)
+		result := actorcast.ApplyResolvedEffectsResult(handlers, live, []skilltarget.Actor{resolved}, *def)
 		l.settlePvPChanges(live)
 		l.syncCubicTargets(live, result, def)
 	}
@@ -274,7 +281,7 @@ func (l *GameClientLink) startSignetCast(live *livePlayer, controller *actorcast
 // MagicSkillLaunched and returned for the hit to reuse as is. A creature
 // that dies or moves between launch and hit is left to each skill handler's
 // own per-target checks. ok is false when the cast must stop.
-func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
+func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Target, def *modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
 	if reason := actorcast.RevalidateLaunch(live.Character, target, def); reason != actorcast.LaunchAbortNone {
 		sendLaunchAbort(live, reason)
 		return nil, false
@@ -289,8 +296,8 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 // broadcastLaunchTargets resolves def's affected set from target and
 // broadcasts it in MagicSkillLaunched. ok is false when no set can be
 // resolved.
-func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorcast.Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
-	handler, ok := l.targets.Handler(def.Target)
+func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorcast.Target, def *modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
+	handler, ok := l.combat.targets.Handler(def.Target)
 	if !ok {
 		return nil, false
 	}
@@ -298,7 +305,7 @@ func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorca
 	if !ok {
 		return nil, false
 	}
-	affected = handler.Targets(live.Character, resolvedTarget, &def)
+	affected = handler.Targets(live, resolvedTarget, def)
 	targetIDs := make([]int32, 0, len(affected))
 	for _, affectedTarget := range affected {
 		targetIDs = append(targetIDs, affectedTarget.ObjectID())
@@ -317,16 +324,16 @@ func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorca
 // happens, so the hit sends none of its own. A PK kill the hit made, and
 // the flag the skill raised after it, settle before anything else the hit
 // sends.
-func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
+func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def *modelskill.Definition) {
 	l.applyItemCastHit(live, handlers, affected, def, nil)
 }
 
 // applyItemCastHit is applyCastHit for a cast that hands item to its skill
 // handler.
-func (l *GameClientLink) applyItemCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition, item any) {
+func (l *GameClientLink) applyItemCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def *modelskill.Definition, item any) {
 	actorcast.RefreshSummonTargets(affected)
 	handlers.Sink = l.playerMessageSink(live, nil)
-	result := actorcast.ApplyResolvedItemEffectsResult(handlers, live.Character, affected, def, item)
+	result := actorcast.ApplyResolvedItemEffectsResult(handlers, live, affected, *def, item)
 	l.settlePvPChanges(live)
 	l.syncCubicTargets(live, result, def)
 }
@@ -336,7 +343,7 @@ func (l *GameClientLink) applyItemCastHit(live *livePlayer, handlers actorcast.E
 // dead caster and a request with no final target get a bare ActionFailed;
 // a gate failure gets its reason and ActionFailed. It reports whether the
 // request may go on.
-func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def modelskill.Definition, selected world.Tracked) bool {
+func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def *modelskill.Definition, selected world.Tracked) bool {
 	if live.Character.Dead() {
 		sendMagicActionFailed(live)
 		return false
@@ -355,7 +362,7 @@ func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def modelskill.Defi
 
 // magicSkillFinalTarget is the creature def would be cast on given the
 // caster's selection, before any cast condition is checked.
-func (l *GameClientLink) magicSkillFinalTarget(live *livePlayer, def modelskill.Definition, selected world.Tracked) skilltarget.Actor {
+func (l *GameClientLink) magicSkillFinalTarget(live *livePlayer, def *modelskill.Definition, selected world.Tracked) skilltarget.Actor {
 	return l.skillFinalTarget(live, selected, def)
 }
 
@@ -387,10 +394,10 @@ func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() {
 
 var errGroundCastRejected = errors.New("ground cast rejected")
 
-func (l *GameClientLink) groundCastAfterCanCast(live *livePlayer, def modelskill.Definition) func() error {
+func (l *GameClientLink) groundCastAfterCanCast(live *livePlayer, def *modelskill.Definition) func() error {
 	return func() error {
 		x, y, z := live.GroundTarget()
-		switch skilltarget.GroundCastFailureFor(live.Character, &def) {
+		switch skilltarget.GroundCastFailureFor(live.Character, def) {
 		case skilltarget.GroundCastNoLineOfSight:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
 			sendMagicActionFailed(live)
@@ -497,27 +504,27 @@ func refuseCastTooFar(live *livePlayer) {
 	}
 }
 
-func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def modelskill.Definition, ctrl bool) (actorcast.Target, skilltarget.CastRejection) {
+func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def *modelskill.Definition, ctrl bool) (actorcast.Target, skilltarget.CastRejection) {
 	casterCreature, ok := caster.(skilltarget.Actor)
 	if !ok {
 		return nil, skilltarget.CastRejectNone
 	}
 	selectedCreature, _ := selected.(skilltarget.Actor)
-	handler, ok := l.targets.Handler(def.Target)
+	handler, ok := l.combat.targets.Handler(def.Target)
 	if !ok {
 		return nil, skilltarget.CastRejectNone
 	}
-	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, &def)
+	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, def)
 	// A classified rejection keeps finalTarget so the cast stops the caster
 	// and checks costs and line of sight before reporting it.
-	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
+	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, def, ctrl); rejection != skilltarget.CastRejectNone {
 		return finalTarget, rejection
 	}
 	// Ground LOS/peace/heading run after cost validation via AfterCanCast.
 	return finalTarget, skilltarget.CastRejectNone
 }
 
-func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejection, def modelskill.Definition) {
+func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejection, def *modelskill.Definition) {
 	if live == nil {
 		return
 	}
@@ -605,7 +612,7 @@ func (l *GameClientLink) resumeMagicSkill(live *livePlayer, queued deferredMagic
 
 // restoringServitor reports whether def summons a servitor while live's
 // pets-row read is still in flight.
-func (l *GameClientLink) restoringServitor(live *livePlayer, def modelskill.Definition) bool {
+func (l *GameClientLink) restoringServitor(live *livePlayer, def *modelskill.Definition) bool {
 	return actorcast.ServitorSummon(def) && l.restoringSummon(live)
 }
 
@@ -631,7 +638,7 @@ func (l *GameClientLink) resumeServitorAfterRestore(live *livePlayer) {
 // or the caster's surroundings (an invisible player only a game master
 // knows). A summon-friend skill reaches a target
 // anywhere in the world.
-func (l *GameClientLink) magicTargetLost(live *livePlayer, target skilltarget.Actor, def modelskill.Definition) bool {
+func (l *GameClientLink) magicTargetLost(live *livePlayer, target skilltarget.Actor, def *modelskill.Definition) bool {
 	tracked, ok := target.(world.Tracked)
 	if !ok || l.resolveTarget(target.ObjectID()) == nil {
 		return true
@@ -709,7 +716,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			Definitions: l.skills,
 		},
 		l.stopMovementForCast(live),
-		func(accepted modelskill.Definition) {
+		func(accepted *modelskill.Definition) {
 			selfObject := skillCastObject(live)
 			l.broadcastLiveFrame(live, func() wire.Frame {
 				return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(accepted.ID), int32(accepted.Level), 0, 0, false)
@@ -733,7 +740,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	if activated {
 		// Each cost CastToggle paid already sent its own status.
 		handlers.Sink = l.playerMessageSink(live, nil)
-		result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
+		result := actorcast.ApplyEffectsResult(handlers, live, target, *def)
 		l.syncCubicTargets(live, result, def)
 	} else {
 		skillhandler.StopEffect(live.Character, def.ID)
@@ -766,7 +773,7 @@ func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {
 
 // sendMagicCastFailure rejects a cast that never started: the reason, then
 // the action-failed acknowledgement releasing the client's pending action.
-func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error) {
+func sendMagicCastFailure(live *livePlayer, def *modelskill.Definition, err error) {
 	sendMagicCastFailureReason(live, def, err)
 	sendMagicActionFailed(live)
 }
@@ -787,7 +794,7 @@ func sendItemConsumeFailure(live *livePlayer) {
 // once the cast has been announced: the item that disappeared, or, for an
 // item-carried cast that could no longer pay it, that there were not enough.
 // Adena reads as adena spent, and a shadow item as its mana running out.
-func sendSkillItemCharge(live *livePlayer, def modelskill.Definition, charge actorcast.ItemCharge) {
+func sendSkillItemCharge(live *livePlayer, def *modelskill.Definition, charge actorcast.ItemCharge) {
 	if live == nil || charge == actorcast.ItemChargeNone {
 		return
 	}
@@ -826,7 +833,7 @@ func shadowTemplate(live *livePlayer, templateID int32) bool {
 // sendMagicCastFailureReason sends the reason alone, for a cast that failed
 // mid-flight: the abort funnel that cancels it owns the action-failed
 // acknowledgement, so sending one here would duplicate it.
-func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err error) {
+func sendMagicCastFailureReason(live *livePlayer, def *modelskill.Definition, err error) {
 	if live == nil {
 		return
 	}
@@ -873,6 +880,10 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 	case errors.Is(err, actorcast.ErrSiegeSummonUnavailable):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	case errors.Is(err, actorcast.ErrSiegeSummonInCastle):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotCallPetFromThisLocation))
+	case errors.Is(err, actorcast.ErrStrifeForbidsSummoning):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSealOfStrifeForbidsSummoning))
 	}
 }
 
@@ -962,7 +973,7 @@ func (l *GameClientLink) playerMessageSink(live *livePlayer, onStatus func()) sk
 // link's target and skill registries and its chance procs, all read-only
 // after construction and shared by every actor's queue.
 func (l *GameClientLink) castEffects() actorcast.EffectHandlers {
-	return actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers, Chance: l.chance}
+	return actorcast.EffectHandlers{Targets: l.combat.targets, Skills: l.combat.skillHandlers, Chance: l.combat.chance}
 }
 
 // frameSender sends frame to recipient's client.
@@ -992,17 +1003,19 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			if live != nil {
 				send(live, liveStatusFrame(live))
 				statusSent = true
+				// The HP write's low-HP tutorial event follows its status.
+				live.SettleRegen()
 			}
 		case skillhandler.Counterattack:
 			attacker, attackerOnline := l.livePlayerByID(m.AttackerID)
 			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
 			attackerName := m.AttackerName
 			if attackerOnline {
-				attackerName = attacker.Name
+				attackerName = attacker.CharacterName()
 			}
 			defenderName := m.DefenderName
 			if defenderOnline {
-				defenderName = defender.Name
+				defenderName = defender.CharacterName()
 			}
 			if defenderOnline {
 				send(defender, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, attackerName))
@@ -1015,11 +1028,11 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
 			attackerName := m.AttackerName
 			if attackerOnline {
-				attackerName = attacker.Name
+				attackerName = attacker.CharacterName()
 			}
 			defenderName := m.DefenderName
 			if defenderOnline {
-				defenderName = defender.Name
+				defenderName = defender.CharacterName()
 			}
 			if attackerOnline {
 				send(attacker, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))
@@ -1037,6 +1050,7 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 		case skillhandler.Damage:
 			if recipient, online := l.livePlayerByID(m.RecipientID); online {
 				sendDamageMessageVia(send, recipient, m)
+				l.notifyCompetitorDamage(recipient, m.TargetID, int(m.Amount))
 			}
 		case skillhandler.DamageReceived:
 			if target, online := l.livePlayerByID(m.TargetID); online {

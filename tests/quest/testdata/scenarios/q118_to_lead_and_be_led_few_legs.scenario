@@ -1,0 +1,21 @@
+# To Lead and Be Led (Q118), seven legs: Pinter sends a level 19 character on cond 7 back for the
+# eighth. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q118_to_lead_and_be_led_few_legs.golden
+character Pupil 19
+quest Q118_ToLeadAndBeLed <cond>=7 <state>=STARTED state=4 stateEx=1
+hold 8063 7
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-16.htm
+  S ActionFailed
+  S ActionFailed

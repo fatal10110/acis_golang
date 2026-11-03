@@ -1,0 +1,118 @@
+# Path to an Elven Wizard (Q408), level 19, quest started: Rosella gives the letter, Greenis takes it for the charm, the pincer spiders drop the fifth red down, and Greenis trades the charm and the down for the ruby. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q408_path_to_an_elven_wizard_grain.golden
+character Wizard 19
+class 25
+quest Q408_PathToAnElvenWizard <cond>=1 <state>=STARTED
+hold 1229 1
+hold 1219 4
+random 0
+script quest.Q408_PathToAnElvenWizard
+item 1218 1219 1220 1221 1222 1223 1224 1225 1226 1229 1230 1272 1273 1274
+page default/30414.htm
+page trainer/30157.htm
+page default/30371.htm
+page default/30423.htm
+page script/quest/Q408_PathToAnElvenWizard/
+npc rosella 30414 Folk 10 0 0
+npc greenis 30157 Trainer -10 0 0
+npc thalia 30371 Folk 20 0 0
+npc northwind 30423 Folk -20 0 0
+npc sukar 20047 Monster 40 0 0
+npc dryad 20019 Monster 50 0 0
+npc spider 20466 Monster 60 0 0
+
+action rosella
+  items 1219=4 1229=1
+  rows Q408_PathToAnElvenWizard <cond>=1 <state>=STARTED
+  state Q408_PathToAnElvenWizard STARTED
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q408_PathToAnElvenWizard 30414-07.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1218
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-07.htm
+  S ActionFailed
+  items 1218=1
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-08.htm
+  S ActionFailed
+  S ActionFailed
+action greenis
+action greenis
+  S ActionFailed
+  S NpcHtmlMessage obj=greenis item=0 page=trainer/30157.htm
+  S ActionFailed
+bypass npc_{greenis}_Quest
+  S NpcHtmlMessage obj=greenis item=0 page=script/quest/Q408_PathToAnElvenWizard/30157-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q408_PathToAnElvenWizard 30157-02.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1218
+  S SystemMessage id=54 3:1272
+  S NpcHtmlMessage obj=greenis item=0 page=script/quest/Q408_PathToAnElvenWizard/30157-02.htm
+  S ActionFailed
+  items 1218=0 1272=1
+action greenis
+  S ActionFailed
+  S NpcHtmlMessage obj=greenis item=0 page=trainer/30157.htm
+  S ActionFailed
+bypass npc_{greenis}_Quest
+  S NpcHtmlMessage obj=greenis item=0 page=script/quest/Q408_PathToAnElvenWizard/30157-03.htm
+  S ActionFailed
+  S ActionFailed
+action rosella
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-09.htm
+  S ActionFailed
+  S ActionFailed
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1219
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1219=5
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-25.htm
+  S ActionFailed
+  S ActionFailed
+action greenis
+action greenis
+  S ActionFailed
+  S NpcHtmlMessage obj=greenis item=0 page=trainer/30157.htm
+  S ActionFailed
+bypass npc_{greenis}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1272
+  S SystemMessage id=301 3:1219 6:5
+  S SystemMessage id=54 3:1220
+  S NpcHtmlMessage obj=greenis item=0 page=script/quest/Q408_PathToAnElvenWizard/30157-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 1219=0 1220=1 1272=0
+action rosella
+action rosella
+  S ActionFailed
+  S NpcHtmlMessage obj=rosella item=0 page=default/30414.htm
+  S ActionFailed
+bypass npc_{rosella}_Quest
+  S NpcHtmlMessage obj=rosella item=0 page=script/quest/Q408_PathToAnElvenWizard/30414-11.htm
+  S ActionFailed
+  S ActionFailed

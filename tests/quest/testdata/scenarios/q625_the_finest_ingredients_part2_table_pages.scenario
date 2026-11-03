@@ -1,0 +1,37 @@
+# The Finest Ingredients, Part 2 (Q625): on cond 1 the Eye talks of the Yeti's table, which says nothing of it and refuses the call without the summon item.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q625_the_finest_ingredients_part2_table_pages.golden
+character Hero 73
+quest Q625_TheFinestIngredients_Part2 <cond>=1 <state>=STARTED
+script quest.Q625_TheFinestIngredients_Part2
+item 7205 7209 7210 4589 4590 4591 4592 4593 4594
+page default/31521.htm
+page default/31542.htm
+page script/quest/Q625_TheFinestIngredients_Part2/
+npc jeremy 31521 Folk 10 0 0
+npc table 31542 Folk 20 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q625_TheFinestIngredients_Part2/31521-05.htm
+  S ActionFailed
+  S ActionFailed
+action table
+action table
+  S ActionFailed
+  S NpcHtmlMessage obj=table item=0 page=default/31542.htm
+  S ActionFailed
+bypass npc_{table}_Quest
+  S NpcHtmlMessage obj=table item=0 page=script/quest/Q625_TheFinestIngredients_Part2/31542-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q625_TheFinestIngredients_Part2 31542-02.htm
+  S NpcHtmlMessage obj=table item=0 page=script/quest/Q625_TheFinestIngredients_Part2/31542-03.htm
+  S ActionFailed
+  items 7209=0
+  state Q625_TheFinestIngredients_Part2 STARTED
+  rows Q625_TheFinestIngredients_Part2 <cond>=1 <state>=STARTED

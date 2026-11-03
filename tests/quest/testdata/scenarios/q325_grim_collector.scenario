@@ -1,0 +1,246 @@
+# Grim Collector (Q325): a level 15 character accepts at Curtis (a guard) and gets the anatomy
+# diagram from Samed; Varsak has nothing to assemble without the five bones. Five kills of the
+# same skeleton give the five bones (each kill roll pinned inside one part's range, each drop roll
+# to 0); Varsak's first assembly fails (roll 9 of 10) and eats them, five more bones assemble a
+# complete skeleton (roll 0). Two zombies: a head, then a roll past every chance. Samed buys the
+# skeleton (543 + 341), then the head (30); one more skull is bought as the player quits (100),
+# giving the diagram back; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q325_grim_collector.golden
+character Collector 15
+random 0 0 10 0 25 0 30 0 50 0 9 0 0 10 0 25 0 30 0 50 0 0 0 0 99 0 0
+script quest.Q325_GrimCollector
+item 1349 1350 1351 1352 1353 1354 1355 1356 1357 1358
+page guard/30336.htm
+page default/30434.htm
+page default/30342.htm
+page script/quest/Q325_GrimCollector/
+npc curtis 30336 Guard 10 0 0
+npc samed 30434 Folk 20 0 0
+npc varsak 30342 Folk 30 0 0
+npc skeleton 20514 Monster 40 0 0
+npc zombie 20026 Monster 0 40 0
+
+# Curtis: accept; he has nothing more until the player has the diagram.
+action curtis
+action curtis
+  S ActionFailed
+  S NpcHtmlMessage obj=curtis item=0 page=guard/30336.htm
+  S ActionFailed
+bypass npc_{curtis}_Quest
+  S NpcHtmlMessage obj=curtis item=0 page=script/quest/Q325_GrimCollector/30336-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q325_GrimCollector CREATED
+bypass Quest Q325_GrimCollector 30336-03.htm
+  S QuestList 325:0x80000001
+  S ExShowQuestMark quest=325
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=curtis item=0 page=script/quest/Q325_GrimCollector/30336-03.htm
+  S ActionFailed
+  Q upsert Q325_GrimCollector | <state> | STARTED
+  Q upsert Q325_GrimCollector | <cond> | 1
+  state Q325_GrimCollector STARTED
+  rows Q325_GrimCollector <cond>=1 <state>=STARTED
+action curtis
+  S ActionFailed
+  S NpcHtmlMessage obj=curtis item=0 page=guard/30336.htm
+  S ActionFailed
+bypass npc_{curtis}_Quest
+  S NpcHtmlMessage obj=curtis item=0 page=script/quest/Q325_GrimCollector/30336-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Samed: the anatomy diagram.
+action samed
+action samed
+  S ActionFailed
+  S NpcHtmlMessage obj=samed item=0 page=default/30434.htm
+  S ActionFailed
+bypass npc_{samed}_Quest
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q325_GrimCollector 30434-02.htm
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-02.htm
+  S ActionFailed
+bypass Quest Q325_GrimCollector 30434-03.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1349
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-03.htm
+  S ActionFailed
+  items 1349=1
+action curtis
+action curtis
+  S ActionFailed
+  S NpcHtmlMessage obj=curtis item=0 page=guard/30336.htm
+  S ActionFailed
+bypass npc_{curtis}_Quest
+  S NpcHtmlMessage obj=curtis item=0 page=script/quest/Q325_GrimCollector/30336-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Samed: nothing to buy yet.
+action samed
+action samed
+  S ActionFailed
+  S NpcHtmlMessage obj=samed item=0 page=default/30434.htm
+  S ActionFailed
+bypass npc_{samed}_Quest
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Varsak: the five bones are missing.
+action varsak
+action varsak
+  S ActionFailed
+  S NpcHtmlMessage obj=varsak item=0 page=default/30342.htm
+  S ActionFailed
+bypass npc_{varsak}_Quest
+  S NpcHtmlMessage obj=varsak item=0 page=script/quest/Q325_GrimCollector/30342-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q325_GrimCollector 30342-03.htm
+  S NpcHtmlMessage obj=varsak item=0 page=script/quest/Q325_GrimCollector/30342-02.htm
+  S ActionFailed
+
+# Five skeletons: a skull, a rib bone, a spine, an arm bone and a thigh bone.
+kill skeleton x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1353
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1354
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1355
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1356
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1357
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1353=1 1354=1 1355=1 1356=1 1357=1
+
+# Varsak: the assembly fails, and the bones are gone.
+action varsak
+  S ActionFailed
+  S NpcHtmlMessage obj=varsak item=0 page=default/30342.htm
+  S ActionFailed
+bypass npc_{varsak}_Quest
+  S NpcHtmlMessage obj=varsak item=0 page=script/quest/Q325_GrimCollector/30342-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q325_GrimCollector 30342-03.htm
+  S SystemMessage id=302 3:1355
+  S SystemMessage id=302 3:1353
+  S SystemMessage id=302 3:1356
+  S SystemMessage id=302 3:1354
+  S SystemMessage id=302 3:1357
+  S NpcHtmlMessage obj=varsak item=0 page=script/quest/Q325_GrimCollector/30342-04.htm
+  S ActionFailed
+  items 1353=0 1354=0 1355=0 1356=0 1357=0 1358=0
+
+# Five more bones; this time the skeleton holds together.
+kill skeleton x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1353
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1354
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1355
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1356
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1357
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1353=1 1354=1 1355=1 1356=1 1357=1
+action varsak
+  S ActionFailed
+  S NpcHtmlMessage obj=varsak item=0 page=default/30342.htm
+  S ActionFailed
+bypass npc_{varsak}_Quest
+  S NpcHtmlMessage obj=varsak item=0 page=script/quest/Q325_GrimCollector/30342-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q325_GrimCollector 30342-03.htm
+  S SystemMessage id=302 3:1355
+  S SystemMessage id=302 3:1353
+  S SystemMessage id=302 3:1356
+  S SystemMessage id=302 3:1354
+  S SystemMessage id=302 3:1357
+  S SystemMessage id=54 3:1358
+  S NpcHtmlMessage obj=varsak item=0 page=script/quest/Q325_GrimCollector/30342-03.htm
+  S ActionFailed
+  items 1353=0 1354=0 1355=0 1356=0 1357=0 1358=1
+
+# Two zombies: a head, then a roll past every part.
+kill zombie x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1350
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  items 1350=1
+
+# Samed: the skeleton for 543 + 341, then the head for 30.
+action samed
+action samed
+  S ActionFailed
+  S NpcHtmlMessage obj=samed item=0 page=default/30434.htm
+  S ActionFailed
+bypass npc_{samed}_Quest
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q325_GrimCollector 30434-09.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1358
+  S SystemMessage id=52 6:884
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-09.htm
+  S ActionFailed
+  items 1358=0 57=884
+bypass Quest Q325_GrimCollector 30434-07.htm
+  S SystemMessage id=302 3:1350
+  S SystemMessage id=52 6:30
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-07.htm
+  S ActionFailed
+  items 1350=0 57=914
+  rows Q325_GrimCollector <cond>=1 <state>=STARTED
+
+# One more skull; Samed buys it as the player quits, and the diagram goes back.
+kill skeleton
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1353
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1353=1
+action samed
+  S ActionFailed
+  S NpcHtmlMessage obj=samed item=0 page=default/30434.htm
+  S ActionFailed
+bypass npc_{samed}_Quest
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q325_GrimCollector 30434-06.htm
+  S SystemMessage id=302 3:1349
+  S SystemMessage id=302 3:1353
+  S SystemMessage id=52 6:100
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=samed item=0 page=script/quest/Q325_GrimCollector/30434-06.htm
+  S ActionFailed
+  Q delete-quest Q325_GrimCollector
+  items 1353=0 1349=0 57=1014
+  state Q325_GrimCollector -
+  rows Q325_GrimCollector -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q325_GrimCollector -
+  rows Q325_GrimCollector -
+  items 57=1014 1349=0

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -15,13 +14,16 @@ import (
 
 // castCollectingEffectFeedback casts skillID on the caster and returns, in
 // arrival order, the skill-name system messages ("sm:<msg>:<skill>") and
-// icon refreshes ("icons:[...]") that follow the launch.
-func castCollectingEffectFeedback(t *testing.T, c *testsupport.ScriptedClient, skillID int32) []string {
+// icon refreshes ("icons:[...]") that follow the launch, once the cast has
+// ended.
+func castCollectingEffectFeedback(t *testing.T, srv *gameservertest.Server, objID, skillID int32) []string {
 	t.Helper()
+	c := srv.Client
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, skillID, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	return drainEffectFeedback(t, c)
 }
 
@@ -31,11 +33,7 @@ func castCollectingEffectFeedback(t *testing.T, c *testsupport.ScriptedClient, s
 func drainEffectFeedback(t *testing.T, c *testsupport.ScriptedClient) []string {
 	t.Helper()
 	var got []string
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return got
-		}
+	for _, frame := range c.ReadQueued() {
 		switch frame[0] {
 		case serverpackets.OpcodeSystemMessage:
 			r := wire.NewReader(frame[1:])
@@ -47,7 +45,6 @@ func drainEffectFeedback(t *testing.T, c *testsupport.ScriptedClient) []string {
 			got = append(got, fmt.Sprintf("icons:%v", buffSlotIDs(readAbnormalStatusUpdateEntriesFromFrame(t, frame))))
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
 	return got
 }
 
@@ -79,7 +76,7 @@ func TestStackChangeAnnouncesDisappearedThenFelt(t *testing.T) {
 		{skill: 202, want: []string{fmt.Sprintf("sm:%d:201", gone), fmt.Sprintf("sm:%d:202", felt), "icons:[202]"}},
 		{skill: 202, want: []string{fmt.Sprintf("sm:%d:202", gone), fmt.Sprintf("sm:%d:202", felt), "icons:[202]"}},
 	} {
-		if got := castCollectingEffectFeedback(t, c, step.skill); !slices.Equal(got, step.want) {
+		if got := castCollectingEffectFeedback(t, srv, objID, step.skill); !slices.Equal(got, step.want) {
 			t.Fatalf("feedback after casting %d = %v, want %v", step.skill, got, step.want)
 		}
 	}
@@ -104,8 +101,8 @@ func TestLowerStackedBuffIsNotAnnounced(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 202, 1)
 	startInWorld(t, c)
 
-	castCollectingEffectFeedback(t, c, 202)
-	if got := castCollectingEffectFeedback(t, c, 201); !slices.Equal(got, []string{"icons:[202]"}) {
+	castCollectingEffectFeedback(t, srv, objID, 202)
+	if got := castCollectingEffectFeedback(t, srv, objID, 201); !slices.Equal(got, []string{"icons:[202]"}) {
 		t.Fatalf("feedback after lower buff = %v, want only the icon refresh", got)
 	}
 }

@@ -1,0 +1,47 @@
+# Necromancer's Request (Q632): a vampire drops a heart at cond 1 only for a draw under 500000; the two hundredth moves the quest to cond 2, where none drops.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q632_necromancers_request_hunt_vampire.golden
+character Hero 63
+quest Q632_NecromancersRequest <cond>=1 <state>=STARTED
+hold 7542 198
+random 0 500000 0 0 0 0 0
+script quest.Q632_NecromancersRequest
+item 7542 7543 57
+page default/31522.htm
+page script/quest/Q632_NecromancersRequest/
+npc wizard 31522 Folk 10 0 0
+npc m1 21568 Monster 40 0 0
+npc m2 21585 Monster 50 0 0
+npc m3 21595 Monster 60 0 0
+npc m4 21573 Monster 70 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 7542=198
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7542
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7542=199
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7542
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 632:0x80000003
+  S ExShowQuestMark quest=632
+  Q upsert Q632_NecromancersRequest | <cond> | 2
+  rows Q632_NecromancersRequest <cond>=2 <state>=STARTED
+  state Q632_NecromancersRequest STARTED
+  items 7542=200
+kill m4
+  S SystemMessage id=95 1:0 1:0
+  items 7542=200
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q632_NecromancersRequest/31522-05.htm
+  S ActionFailed
+  S ActionFailed

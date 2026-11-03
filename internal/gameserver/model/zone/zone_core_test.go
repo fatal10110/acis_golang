@@ -166,7 +166,7 @@ func TestNewCylinderRejectsOutOfInt32Range(t *testing.T) {
 	ix.Add(NewFishing(1, far))
 	for rx := range world.RegionsX {
 		for ry := range world.RegionsY {
-			if len(ix.byRegion[rx][ry]) != 0 {
+			if len(ix.set().byRegion[rx][ry]) != 0 {
 				t.Fatalf("far cylinder attached to region %d,%d", rx, ry)
 			}
 		}
@@ -257,7 +257,7 @@ func TestIndexAttachesEveryRegionIntersectsRectReports(t *testing.T) {
 			for ry := range world.RegionsY {
 				y1 := world.MinY + ry*regionEdge
 				want := form.IntersectsRect(x1, x1+regionEdge, y1, y1+regionEdge)
-				if got := len(ix.byRegion[rx][ry]) == 1; got != want {
+				if got := len(ix.set().byRegion[rx][ry]) == 1; got != want {
 					t.Fatalf("%s: region %d,%d attached = %v, IntersectsRect = %v", name, rx, ry, got, want)
 				}
 				if want && (x1+regionEdge < minX || x1 > maxX) {

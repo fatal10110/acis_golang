@@ -1,0 +1,22 @@
+# Test of the Champion (Q223), refused: a level 39 Elven Knight is not of the classes the test is
+# open to, and Ascalon turns it away. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q223_test_of_the_champion_wrong_class.golden
+character Sentinel 39
+class 19
+script quest.Q223_TestOfTheChampion
+item 3276 3277 3278 3279 3280 3281 3282 3283 3284 3285 3286 3287 3288 3289 3290 3291 3292 7562
+page default/30624.htm
+page script/quest/Q223_TestOfTheChampion/
+npc ascalon 30624 Folk 10 0 0
+
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q223_TestOfTheChampion CREATED
+  rows Q223_TestOfTheChampion -

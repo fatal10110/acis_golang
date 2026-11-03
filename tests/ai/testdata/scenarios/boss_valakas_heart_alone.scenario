@@ -1,0 +1,21 @@
+# HeartOfVolcano (31385), talked to with no Valakas in the world: its first page
+# heart_of_volcano001.htm, then the entry answers heart_of_volcano002.htm (global memo key 3
+# unset). Expectations are derived from the reference source (HeartOfVolcano.java 33-82). Its
+# count of entrants, the teleport to its TelPos, the script event to Valakas, the refusals
+# heart_of_volcano003.htm and heart_of_volcano004.htm and its minute timer are in
+# tests/ai/boss_valakas_heart_test.go: the format declares no npcmaker of its own type, so it
+# places neither the Heart nor Valakas with a spawn_data row.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.boss.valakas.HeartOfVolcano
+page script/ai/boss/valakas/HeartOfVolcano/
+npc heart 31385 Folk 60 0 0
+
+action heart
+action heart
+  S ActionFailed
+  S NpcHtmlMessage obj=heart item=0 page=script/ai/boss/valakas/HeartOfVolcano/heart_of_volcano001.htm
+  S ActionFailed
+bypass Quest HeartOfVolcano enter
+  S NpcHtmlMessage obj=heart item=0 page=script/ai/boss/valakas/HeartOfVolcano/heart_of_volcano002.htm
+  S ActionFailed

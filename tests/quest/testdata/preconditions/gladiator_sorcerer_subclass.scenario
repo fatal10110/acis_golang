@@ -1,0 +1,20 @@
+# A level 76 Gladiator playing its level 50 Sorcerer subclass: the probe's page shows the
+# Sorcerer played at level 50 on the Gladiator base class, a subclass active; after a relog the
+# character still plays it.
+character Gladiator 76
+class 2
+subclass 12 50
+script test.SubclassProbe
+npc probe 30003 Folk 10 0 0
+
+action probe
+action probe
+  S ActionFailed
+  S NpcHtmlMessage obj=probe item=0 html="<html><body>class=12 base=2 level=50 subclass=true</body></html>"
+  S ActionFailed
+relog
+action probe
+action probe
+  S ActionFailed
+  S NpcHtmlMessage obj=probe item=0 html="<html><body>class=12 base=2 level=50 subclass=true</body></html>"
+  S ActionFailed

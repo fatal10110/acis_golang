@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -138,10 +137,7 @@ func TestPetDeathPenaltyInsideCombatZones(t *testing.T) {
 	}{
 		{"arena", func(t *testing.T) zone.Kind { return zone.NewArena(1, wholeWorldForm(t)) }, 700},
 		{"active siege", func(t *testing.T) zone.Kind {
-			siege, err := zone.NewSiege(1, wholeWorldForm(t), commons.NewStatSet())
-			if err != nil {
-				t.Fatalf("siege zone: %v", err)
-			}
+			siege := zone.NewSiege(1, wholeWorldForm(t))
 			siege.SetActive(true)
 			return siege
 		}, 671},

@@ -115,6 +115,8 @@ type gameData struct {
 	// SoulCrystals are the soul crystals and the monsters that charge
 	// them.
 	SoulCrystals *item.SoulCrystalTable
+	// NewbieBuffs are the buffs the newbie guides cast.
+	NewbieBuffs *skill.NewbieBuffTable
 }
 
 type geodata struct {
@@ -178,6 +180,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		return nil, err
 	}
 	soulCrystals, err := gamexml.LoadSoulCrystalData(filepath.Join(xmlRoot, "soulCrystals.xml"))
+	if err != nil {
+		return nil, err
+	}
+	newbieBuffs, err := gamexml.LoadNewbieBuffs(filepath.Join(xmlRoot, "newbieBuffs.xml"))
 	if err != nil {
 		return nil, err
 	}
@@ -275,6 +281,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		NPCs:             npcs,
 		SummonItems:      summonItems,
 		SoulCrystals:     soulCrystals,
+		NewbieBuffs:      newbieBuffs,
 		Doors:            doors,
 		Statics:          statics,
 		Restarts:         restarts,
@@ -306,11 +313,18 @@ func applyTownCombatRule(index *zone.Index, rule int) {
 	}
 }
 
-func loadHTMLCache(paths gameServerPaths) (*datacache.HTML, error) {
-	return datacache.LoadHTML(filepath.Join(paths.DataRoot, "data", "html"))
+// loadHTMLCache loads the datapack HTML pages. A page that is not valid
+// UTF-8 is logged at error level and left out, so every send of it shows
+// the missing-page notice.
+func loadHTMLCache(paths gameServerPaths, log zerolog.Logger) (*datacache.HTML, error) {
+	html, undecodable, err := datacache.LoadHTML(filepath.Join(paths.DataRoot, "data", "html"))
+	for _, name := range undecodable {
+		log.Error().Str("page", name).Msg("error caching html page: not valid UTF-8; it is treated as missing")
+	}
+	return html, err
 }
 
-// loadCrestCache loads the datapack crest images. As in the reference, a
+// loadCrestCache loads the datapack crest images. A
 // crest load that stops early keeps the crests read so far and the server
 // boots on: the failure is logged at error level, each deleted invalid
 // crest file is warned about, and the loaded count is reported. A missing
@@ -336,7 +350,8 @@ func loadCrestCache(paths gameServerPaths, log zerolog.Logger) (*datacache.Crest
 
 // loadGeodata loads exactly the region files geoengine.properties lists by
 // their "X_Y" keys; unlisted tiles stay null-block. A listed region that
-// fails to load fails boot, as the reference GeoEngine exits the server.
+// fails to load fails boot: the server does not run on partial geodata.
+// With a cache path the regions are served from that packed cache file.
 func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	props, err := config.LoadFile(paths.GeoConfigPath)
 	if err != nil {
@@ -353,31 +368,19 @@ func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	}
 
 	geo := &geodata{
-		Dir:           resolveGeodataDir(paths.DataRoot, props.String("GeoDataPath", "")),
+		Dir:           probe.ResolveDir(paths.DataRoot, props.String("GeoDataPath", "")),
 		Type:          probe.GeoType(props.String("GeoDataType", string(probe.L2OFF))),
 		EngineOptions: engineOptions,
 		Pathfind:      pathOptions,
 	}
-	geo.Engine, err = probe.LoadRegions(geo.Dir, geo.Type, probe.ListedRegions(props), log, geo.EngineOptions)
+	if paths.GeoCachePath != "" {
+		geo.Engine, err = probe.LoadRegionsCached(geo.Dir, geo.Type, probe.ListedRegions(props), paths.GeoCachePath, log, geo.EngineOptions)
+	} else {
+		geo.Engine, err = probe.LoadRegions(geo.Dir, geo.Type, probe.ListedRegions(props), log, geo.EngineOptions)
+	}
 	if err != nil {
 		return nil, err
 	}
 	geo.Finder = pathfind.New(geo.Engine, geo.Pathfind)
 	return geo, nil
-}
-
-func resolveGeodataDir(dataRoot, configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured == "" {
-		return filepath.Join(dataRoot, "data", "geodata")
-	}
-	if filepath.IsAbs(configured) {
-		return configured
-	}
-
-	clean := filepath.Clean(configured)
-	if clean == "data" || strings.HasPrefix(clean, "data"+string(os.PathSeparator)) {
-		return filepath.Join(dataRoot, clean)
-	}
-	return clean
 }

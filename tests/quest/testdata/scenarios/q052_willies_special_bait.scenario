@@ -1,0 +1,103 @@
+# Willie's Special Bait (Q052): a level 48 character holding 98 tarlk eyes accepts at Willie,
+# kills three tarlk basilisks (the first drop roll pinned to miss, the next two to land; the
+# third kill makes a hundred tarlk eyes and completes the quest's first step); Willie takes
+# the hundred for four lures, and the quest completes; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q052_willies_special_bait.golden
+character Baiter 48
+hold 7623 98
+random 999999 0 0
+script quest.Q052_WilliesSpecialBait
+item 7623 7612
+page fisherman/31574.htm
+page script/quest/Q052_WilliesSpecialBait/
+npc willie 31574 Fisherman 10 0 0
+npc basilisk 20573 Monster 40 0 0
+
+# Willie: accept.
+action willie
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q052_WilliesSpecialBait/31574-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q052_WilliesSpecialBait CREATED
+bypass Quest Q052_WilliesSpecialBait 31574-03.htm
+  S QuestList 52:0x80000001
+  S ExShowQuestMark quest=52
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q052_WilliesSpecialBait/31574-03.htm
+  S ActionFailed
+  Q upsert Q052_WilliesSpecialBait | <state> | STARTED
+  Q upsert Q052_WilliesSpecialBait | <cond> | 1
+  state Q052_WilliesSpecialBait STARTED
+  rows Q052_WilliesSpecialBait <cond>=1 <state>=STARTED
+
+# Short of a hundred: Willie sends the player back out.
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q052_WilliesSpecialBait/31574-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The kills.
+kill basilisk
+  S SystemMessage id=95 1:0 1:0
+  items 7623=98
+kill basilisk
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7623
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7623=99
+kill basilisk
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7623
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 52:0x80000003
+  S ExShowQuestMark quest=52
+  Q upsert Q052_WilliesSpecialBait | <cond> | 2
+  rows Q052_WilliesSpecialBait <cond>=2 <state>=STARTED
+  items 7623=100
+
+# A hundred: Willie trades them for four lures; the quest completes.
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q052_WilliesSpecialBait/31574-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q052_WilliesSpecialBait 31574-07.htm
+  S SystemMessage id=301 3:7623 6:100
+  S SystemMessage id=53 3:7612 6:4
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 52:0x00000000
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q052_WilliesSpecialBait/31574-06.htm
+  S ActionFailed
+  Q upsert Q052_WilliesSpecialBait | <state> | COMPLETED
+  Q delete-except-state Q052_WilliesSpecialBait
+  state Q052_WilliesSpecialBait COMPLETED
+  rows Q052_WilliesSpecialBait <state>=COMPLETED
+  items 7623=0 7612=4
+
+# Relog: the completed quest loads from its one row, and the lures stay.
+relog
+  state Q052_WilliesSpecialBait COMPLETED
+  rows Q052_WilliesSpecialBait <state>=COMPLETED
+  items 7612=4
+action willie
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

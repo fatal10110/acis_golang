@@ -50,8 +50,8 @@ func EditFields(name string, objectID int32, account, text, title, date string) 
 // line breaks become <br>; the window's substitution reads a backslash as
 // quoting the character after it, which it keeps alone, and keeps a
 // backslash ending the notice. The words "action" and "bypass" are then
-// taken out until none is left, so the notice carries no link. The
-// reference removes each word once, before the substitution, which lets
+// taken out until none is left, so the notice carries no link. Removing
+// each word only once, or before the substitution, would let
 // "acactiontion" or "a\ction" through as a live link the window's
 // clicker would run (#3214).
 func NoticeText(notice string) string {

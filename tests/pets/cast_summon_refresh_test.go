@@ -88,6 +88,7 @@ func TestPlayerBuffOnPetRefreshesItsStatus(t *testing.T) {
 
 	h.client.Send(encodeRequestMagicSkillUse(petBuffSkill))
 	h.srv.Advance(t, petBuffHitAndFinish)
+	h.srv.AdvanceUntil(t, "pet buff cast end", func() bool { return !h.srv.PlayerCastingNow(t, h.ownerID) })
 	ownerFrames := drainFrames(t, h.client)
 
 	launched := skillLaunchedAt(ownerFrames, h.ownerID, petBuffSkill)

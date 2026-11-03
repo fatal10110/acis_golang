@@ -139,8 +139,8 @@ func (m *Manager) walk(fn func(k pair, rel int32)) {
 	}
 }
 
-// AddFriend puts a and b on each other's friend list. The reference answer
-// to an invitation adds the pair once from each side: the second update
+// AddFriend puts a and b on each other's friend list. An accepted
+// invitation adds the pair once from each side: the second update
 // changes no flags but counts for the order (see pairTable).
 func (m *Manager) AddFriend(a, b int32) {
 	m.update(a, b, flagFriends, true)

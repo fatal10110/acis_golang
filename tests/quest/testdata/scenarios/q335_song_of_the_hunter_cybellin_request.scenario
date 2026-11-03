@@ -1,0 +1,80 @@
+# Song of the Hunter (Q335), level 45: Cybellin's request: taken with the dagger and the first crystal, taken again, then dropped. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_cybellin_request.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+script quest.Q335_SongOfTheHunter
+item 3471 3697 3698 3708
+page default/30746.htm
+page script/quest/Q335_SongOfTheHunter/
+npc cybellin 30746 Folk 10 0 0
+
+action cybellin
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+bypass npc_{cybellin}_Quest
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q335_SongOfTheHunter STARTED
+bypass Quest Q335_SongOfTheHunter 30746-03.htm
+  S SystemMessage id=54 3:3697
+  S SystemMessage id=54 3:3471
+  S SystemMessage id=54 3:3698
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-03.htm
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | cybellin | 1
+  items 3697=1 3471=1 3698=1
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED cybellin=1
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+bypass npc_{cybellin}_Quest
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30746-03.htm
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-03.htm
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | cybellin | 1
+  items 3697=1 3471=1 3698=1
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+bypass npc_{cybellin}_Quest
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30746-10.htm
+  S SystemMessage id=302 3:3698
+  S SystemMessage id=302 3:3697
+  S SystemMessage id=302 3:3471
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-10.htm
+  S ActionFailed
+  Q delete-var Q335_SongOfTheHunter | cybellin
+  items 3697=0 3471=0 3698=0
+  rows Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+bypass npc_{cybellin}_Quest
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-02.htm
+  S ActionFailed
+  S ActionFailed

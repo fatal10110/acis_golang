@@ -1,0 +1,21 @@
+# WizardUseSkill (20216, Ricenseo) is hit by the character standing 400 away. WizardBehavior
+# puts the character in its empty hate list at 10 per point of damage plus the opening 300,
+# so the character is its most hated. Its first skill (SKILL01_ID), a main attack by
+# default, aims at the most hated from 300 up to 2000 away, always: it wants it there at
+# 1000000000. Its AI's next ticks cast it, the desire kept. Its other hooks need what the
+# format still lacks, AI parameters and privates (#4052): tests/ai/wizard_use_skill_test.go
+# covers them.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.MonsterBehavior.MonsterBehavior
+script script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior
+script script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill
+npc wizard 20216 Monster 400 0 0 walks skill SKILL01_ID 4157 4
+
+hit wizard 22
+  desires wizard cast(player,4157,move)=1000000000
+tick x2
+  S MagicSkillUse caster=wizard target=player skill=4157-4 hit=10571 reuse=0 success=0
+  desires wizard cast(player,4157,move)=1000000000

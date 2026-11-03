@@ -1,0 +1,43 @@
+# In the Forgotten Village (Q633): a skeleton drops a rib bone at cond 1 only for a draw under its own chance; the two hundredth moves the quest to cond 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q633_in_the_forgotten_village_hunt_bones.golden
+character Hero 65
+quest Q633_InTheForgottenVillage <cond>=1 <state>=STARTED
+hold 7544 198
+random 0 328000 0 0 0 0
+script quest.Q633_InTheForgottenVillage
+item 7544 7545 57
+page default/31388.htm
+page script/quest/Q633_InTheForgottenVillage/
+npc mina 31388 Folk 10 0 0
+npc m1 21557 Monster 40 0 0
+npc m2 21559 Monster 50 0 0
+npc m3 21584 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 7544=198
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7544
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7544=199
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7544
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 633:0x80000003
+  S ExShowQuestMark quest=633
+  Q upsert Q633_InTheForgottenVillage | <cond> | 2
+  rows Q633_InTheForgottenVillage <cond>=2 <state>=STARTED
+  state Q633_InTheForgottenVillage STARTED
+  items 7544=200
+action mina
+action mina
+  S ActionFailed
+  S NpcHtmlMessage obj=mina item=0 page=default/31388.htm
+  S ActionFailed
+bypass npc_{mina}_Quest
+  S NpcHtmlMessage obj=mina item=0 page=script/quest/Q633_InTheForgottenVillage/31388-05.htm
+  S ActionFailed
+  S ActionFailed

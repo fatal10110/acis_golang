@@ -1,0 +1,113 @@
+# An Arrogant Search (Q348), level 60: Harne, Claudia and Martien take their letters, send the character on and point it to the arks. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q348_an_arrogant_search_letters.golden
+character Dragoon 60
+quest Q348_AnArrogantSearch <cond>=5 <state>=STARTED points=0
+hold 4288 1
+hold 4289 1
+hold 4290 1
+script quest.Q348_AnArrogantSearch
+item 4287 4288 4289 4290 4291 4292 4293 4397 4398 4399 4294 4295 1831 1061
+page trainer/30144.htm
+page default/31001.htm
+page default/30645.htm
+page script/quest/Q348_AnArrogantSearch/
+npc harne 30144 Trainer 10 0 0
+npc claudia 31001 Folk 20 0 0
+npc martien 30645 Folk 30 0 0
+
+action harne
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S QuestList 348:0x8001001f
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4288
+  S RadarControl show=2 type=2 loc=-2908,44128,-2712
+  S RadarControl show=0 type=1 loc=-2908,44128,-2712
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q348_AnArrogantSearch/30144-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <flags> | -2147418081
+  Q upsert Q348_AnArrogantSearch | <cond> | 17
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S RadarControl show=2 type=2 loc=-2908,44128,-2712
+  S RadarControl show=0 type=1 loc=-2908,44128,-2712
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q348_AnArrogantSearch/30144-03.htm
+  S ActionFailed
+  S ActionFailed
+action claudia
+action claudia
+  S ActionFailed
+  S NpcHtmlMessage obj=claudia item=0 page=default/31001.htm
+  S ActionFailed
+bypass npc_{claudia}_Quest
+  S QuestList 348:0x8000001f
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4289
+  S RadarControl show=2 type=2 loc=181472,7158,-2725
+  S RadarControl show=0 type=1 loc=181472,7158,-2725
+  S NpcHtmlMessage obj=claudia item=0 page=script/quest/Q348_AnArrogantSearch/31001-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <flags> | -2147483617
+  Q upsert Q348_AnArrogantSearch | <cond> | 9
+action claudia
+  S ActionFailed
+  S NpcHtmlMessage obj=claudia item=0 page=default/31001.htm
+  S ActionFailed
+action claudia
+  S ActionFailed
+  S NpcHtmlMessage obj=claudia item=0 page=default/31001.htm
+  S ActionFailed
+bypass npc_{claudia}_Quest
+  S RadarControl show=2 type=2 loc=181472,7158,-2725
+  S RadarControl show=0 type=1 loc=181472,7158,-2725
+  S NpcHtmlMessage obj=claudia item=0 page=script/quest/Q348_AnArrogantSearch/31001-03.htm
+  S ActionFailed
+  S ActionFailed
+action martien
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S QuestList 348:0x8000101f
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4290
+  S RadarControl show=2 type=2 loc=50693,158674,376
+  S RadarControl show=0 type=1 loc=50693,158674,376
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q348_AnArrogantSearch/30645-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <flags> | -2147479521
+  Q upsert Q348_AnArrogantSearch | <cond> | 13
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S RadarControl show=2 type=2 loc=50693,158674,376
+  S RadarControl show=0 type=1 loc=50693,158674,376
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q348_AnArrogantSearch/30645-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 4288=0 4289=0 4290=0
+  state Q348_AnArrogantSearch STARTED
+  rows Q348_AnArrogantSearch <cond>=13 <flags>=-2147479521 <state>=STARTED points=0

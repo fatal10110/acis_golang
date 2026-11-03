@@ -1,0 +1,23 @@
+# The Finest Food (Q623): with 99 of one food Jeremy sends the player back.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q623_the_finest_food_short.golden
+character Hero 71
+quest Q623_TheFinestFood <cond>=2 <state>=STARTED
+hold 7199 100
+hold 7200 99
+hold 7201 100
+script quest.Q623_TheFinestFood
+item 7199 7200 7201 57 6847 6849 6851
+page default/31521.htm
+page script/quest/Q623_TheFinestFood/
+npc jeremy 31521 Folk 10 0 0
+
+action jeremy
+action jeremy
+  S ActionFailed
+  S NpcHtmlMessage obj=jeremy item=0 page=default/31521.htm
+  S ActionFailed
+bypass npc_{jeremy}_Quest
+  S NpcHtmlMessage obj=jeremy item=0 page=script/quest/Q623_TheFinestFood/31521-07.htm
+  S ActionFailed
+  S ActionFailed

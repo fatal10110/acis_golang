@@ -138,6 +138,19 @@ func (t *Table) CropIDs() []int {
 	return hashOrder(ids)
 }
 
+// CropIDsWhere returns the crop ids keep accepts, ordered as a hash table
+// holding only them iterates: by id modulo that table's size, then in
+// CropIDs order within a slot.
+func (t *Table) CropIDsWhere(keep func(cropID int) bool) []int {
+	var ids []int
+	for _, id := range t.CropIDs() {
+		if keep(id) {
+			ids = append(ids, id)
+		}
+	}
+	return hashOrder(ids)
+}
+
 // SeedReward returns reward item 1 of the first seed growing cropID when
 // rewardType is 1, its reward item 2 otherwise, and 0 when no seed grows
 // cropID.

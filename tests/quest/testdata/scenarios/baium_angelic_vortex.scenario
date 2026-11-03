@@ -1,0 +1,21 @@
+# The Angelic Vortex up to Baium's lair (BaiumAngelicVortex) with no Baium in the world: its first
+# page is 31862-00.htm (onFirstTalk); its entry finds global memo key 2 empty and answers
+# 31862-04.htm, whose link answers the story 31862-02.htm (onAdvEvent). The entry gate on Baium's
+# db value, the Blooded Fabric and the wyvern are in tests/ai/boss_baium_angels_test.go: Baium's
+# created hook needs a spawn_data row, which an npc line has none of.
+character Pilgrim 60
+script script.ai.boss.baium.BaiumAngelicVortex
+page script/ai/boss/baium/BaiumAngelicVortex/
+npc vortex 31862 Folk 10 0 0
+
+action vortex
+action vortex
+  S ActionFailed
+  S NpcHtmlMessage obj=vortex item=0 page=script/ai/boss/baium/BaiumAngelicVortex/31862-00.htm
+  S ActionFailed
+bypass Quest BaiumAngelicVortex enter
+  S NpcHtmlMessage obj=vortex item=0 page=script/ai/boss/baium/BaiumAngelicVortex/31862-04.htm
+  S ActionFailed
+bypass Quest BaiumAngelicVortex baium_story
+  S NpcHtmlMessage obj=vortex item=0 page=script/ai/boss/baium/BaiumAngelicVortex/31862-02.htm
+  S ActionFailed

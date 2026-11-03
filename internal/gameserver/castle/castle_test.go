@@ -72,6 +72,22 @@ func (s *recordingStore) UpdateOwner(_ context.Context, id, clanID int32) error 
 	return s.add("owner %d=%d", id, clanID)
 }
 
+func (s *recordingStore) SaveDoorUpgrade(_ context.Context, u DoorUpgrade) error {
+	return s.add("doorUpgrade %d/%d=%d", u.CastleID, u.DoorID, u.Ratio)
+}
+
+func (s *recordingStore) DeleteDoorUpgrades(_ context.Context, id int32) error {
+	return s.add("deleteDoorUpgrades %d", id)
+}
+
+func (s *recordingStore) SaveTrapUpgrade(_ context.Context, u TrapUpgrade) error {
+	return s.add("trapUpgrade %d/%d=%d", u.CastleID, u.TowerIndex, u.Level)
+}
+
+func (s *recordingStore) DeleteTrapUpgrades(_ context.Context, id int32) error {
+	return s.add("deleteTrapUpgrades %d", id)
+}
+
 func (s *recordingStore) UnequipCirclets(_ context.Context, circlet, owner int32) error {
 	return s.add("circlets %d of %d", circlet, owner)
 }

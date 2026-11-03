@@ -115,8 +115,9 @@ func (l *idleLog) hostileBehavior(wanderer int32, ids ...int32) func() script.Sc
 }
 
 // folkBehavior returns the catalog entry of a behavior bound to the
-// civilian ids that records its no-desire hook: a civilian NPC raises no
-// arrival hook, so a behavior bound to one that sets them would be refused.
+// civilian ids that records its no-desire hook: a civilian NPC keeps no
+// territory, so a behavior bound to one that waits on leaving it would be
+// refused. Its walks and move-finished hook are covered in tests/ai.
 func (l *idleLog) folkBehavior(ids ...int32) func() script.Script {
 	return func() script.Script {
 		return script.Script{Behavior: true, NPCs: ids, Hooks: script.Hooks{OnNoDesire: l.noDesire(0)}}
@@ -152,14 +153,14 @@ func idleTemplate(id int32, params npc.AIParams) *npc.Template {
 	return tmpl
 }
 
-// TestNoDesireRunsBoundBehaviorsInsteadOfIdleStandIns pins the no-desire
+// TestNoDesireRunsOnlyBoundBehaviors pins the no-desire
 // dispatch per NPC id on the periodic AI cycle. An NPC with nothing to do,
 // hostile or civilian, runs its bound behavior's no-desire hook once per
 // cycle from its second one on, already in its walk stance and idle; what
-// the hook queues is what the NPC does next. A bound NPC queues no built-in
-// idle wander or escort follow; an unbound one still does. Both executors
-// run it: the hooks run on each NPC's own queue.
-func TestNoDesireRunsBoundBehaviorsInsteadOfIdleStandIns(t *testing.T) {
+// the hook queues is what the NPC does next. Nothing else queues an idle
+// wander or escort follow, so an NPC no behavior binds, private or not,
+// stays put. Both executors run it: the hooks run on each NPC's own queue.
+func TestNoDesireRunsOnlyBoundBehaviors(t *testing.T) {
 	t.Parallel()
 	for _, exec := range []struct {
 		name string
@@ -231,8 +232,8 @@ func noDesireScenario(t *testing.T, opts ...gameservertest.Option) {
 		"stander":   nil,
 		"boundPriv": nil,
 		"wanderer":  {Kind: ai.IntentionWander, Timer: 7, Weight: 9},
-		"unbound":   {Kind: ai.IntentionWander, Timer: 5, Weight: 5},
-		"freePriv":  {Kind: ai.IntentionFollow, FinalTarget: hostiles["master"]},
+		"unbound":   nil,
+		"freePriv":  nil,
 	} {
 		d, ok := hostiles[name].AI().Desires().Peek()
 		switch {

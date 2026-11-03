@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -25,8 +26,12 @@ func newCubicProcOwner() *cubicProcOwner {
 	return &cubicProcOwner{skillTarget: skillTarget{fakeActor: fakeActor{objectID: 1}, isPlayer: true, name: "Owner", hp: 100, maxHP: 1000}, level: 80, mAtk: 5000}
 }
 
-func (o *cubicProcOwner) Level() int    { return o.level }
+func (o *cubicProcOwner) Level() int { return o.level }
+
 func (o *cubicProcOwner) MAtk() float64 { return o.mAtk }
+
+func (o *cubicProcOwner) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return o }
+
 func (o *cubicProcOwner) Roll(n int) int {
 	if len(o.rolls) == 0 {
 		return n - 1
@@ -50,8 +55,12 @@ func newCubicProcTarget() *cubicProcTarget {
 	return &cubicProcTarget{skillTarget: skillTarget{fakeActor: fakeActor{objectID: 2}, name: "Target", hp: 100000, maxHP: 100000, effects: newTestList(nil)}, level: 40, mDef: 385}
 }
 
-func (t *cubicProcTarget) Level() int    { return t.level }
+func (t *cubicProcTarget) Level() int { return t.level }
+
 func (t *cubicProcTarget) MDef() float64 { return t.mDef }
+
+func (t *cubicProcTarget) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return t }
+
 func (t *cubicProcTarget) Attackable() bool {
 	return t.attackable
 }
@@ -95,7 +104,7 @@ func TestCubicMdamDamageComesFromTheCubicFormula(t *testing.T) {
 	if !slices.Equal(target.hitLog, []string{"cast break", "hp -567 with 0 effects"}) {
 		t.Fatalf("hit log = %v, want the cast break before the HP", target.hitLog)
 	}
-	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, Amount: want}}) {
+	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, TargetID: target.objectID, Amount: want}}) {
 		t.Fatalf("messages = %+v, want the owner's damage report only", result.Messages)
 	}
 	if len(owner.shots) != 0 {
@@ -116,14 +125,15 @@ func TestCubicMdamCriticalQuadruples(t *testing.T) {
 	if got := target.maxHP - target.hp; got != want {
 		t.Fatalf("target lost %v HP, want %d", got, want)
 	}
-	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, Amount: want, MagicCrit: true}}) {
+	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, TargetID: target.objectID, Amount: want, MagicCrit: true}}) {
 		t.Fatalf("messages = %+v, want a critical damage report", result.Messages)
 	}
 }
 
 type critCubicOwner struct{ *cubicProcOwner }
 
-func (critCubicOwner) MagicCriticalRate() float64 { return 1 }
+func (critCubicOwner) MagicCriticalRate() float64                                       { return 1 }
+func (o critCubicOwner) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return o }
 
 // TestCubicMdamReflectDealsNothing: a reflected strike deals no damage and
 // reports nothing.
@@ -274,7 +284,7 @@ func TestCubicDrainFeedsOwnerFromFullDamage(t *testing.T) {
 	if !slices.Equal(target.hitLog, []string{"hp -1234 with 0 effects", "cast break"}) {
 		t.Fatalf("hit log = %v, want the HP before the cast break", target.hitLog)
 	}
-	want := []any{CasterVitalsChanged{}, Damage{RecipientID: owner.objectID, Amount: damage}}
+	want := []any{CasterVitalsChanged{}, Damage{RecipientID: owner.objectID, TargetID: target.objectID, Amount: damage}}
 	if !slices.Equal(result.Messages, want) {
 		t.Fatalf("messages = %+v, want %+v", result.Messages, want)
 	}

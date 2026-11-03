@@ -4,6 +4,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -23,13 +25,15 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 
 	if obj, ok := n.state.Object(actorID); ok {
-		if h, ok := obj.(*npc.Hostile); ok {
-			n.despawnMinions(h)
+		if m, ok := obj.(npc.PartyMember); ok {
 			// A one-time private leaves its spawn master's minions, even
 			// when that master's death already unlinked it.
-			if master := h.SpawnMaster(); master != nil && slot.entry.RespawnDelay <= 0 {
-				master.RemoveMinion(actorID)
-				h.SetMaster(nil)
+			if master := m.SpawnMaster(); master != nil && slot.entry.RespawnDelay <= 0 {
+				master.RemoveMinion(m)
+				m.SetMaster(nil)
+			}
+			if m.SpawnedPrivates() {
+				n.dropGoneScriptPrivates(m)
 			}
 		}
 	}
@@ -47,15 +51,16 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		return func() { n.groupNPCDeleted(g, slot) }
 	}
 
-	delay := spawn.CalculateRespawnDelay(slot.entry)
-	if delay <= 0 {
-		n.mu.Lock()
-		delete(n.slot, key)
-		n.mu.Unlock()
-		return nil
-	}
 	if slot.scripted {
 		// The script that created the private brings it back, if ever.
+		n.dropOrphanScriptSlot(key, slot)
+		return nil
+	}
+	delay := spawn.CalculateRespawnDelay(*slot.entry)
+	if delay <= 0 || slot.fixed {
+		n.mu.Lock()
+		n.dropSlotLocked(key)
+		n.mu.Unlock()
 		return nil
 	}
 
@@ -69,10 +74,17 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 //
 // An NPC that leaves during its slot's first placement, before the maker
 // counts it as one of its spawn's NPCs, is not reported to the maker, and
-// its slot stays, decayed, whatever the respawn delay.
+// its slot stays, decayed, whatever the respawn delay. A spawn that never
+// respawns drops the slot of an NPC its maker armed a respawn for anyway
+// from its list: the slot lives on as an orphan.
 func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
+	if slot.orphan {
+		n.orphanNPCDeleted(g, slot)
+		return
+	}
 	if !slot.first {
-		g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: slot.key})
+		scope := &hookScope{}
+		g.behavior.NPCDeleted(g.in(scope), groupSpawn{g: g, i: slot.spawnIdx, scope: scope}, groupNPC{n: n, slot: slot, scope: scope})
 	}
 
 	now := n.now()
@@ -80,7 +92,7 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 	defer n.mu.Unlock()
 	if slot.entry.RespawnDelay <= 0 {
 		if !slot.first {
-			n.dropGroupSlotLocked(g, slot)
+			n.unlistGroupSlotLocked(g, slot)
 		}
 		return
 	}
@@ -90,17 +102,44 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 	if _, ok := n.slot[slot.key]; !ok {
 		return
 	}
-	if state, ok := n.spawns.State(slot.dbName); ok {
-		state.SetRespawn(spawn.CalculateRespawnDelay(slot.entry), now)
-	}
+	n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(*slot.entry), now)
 }
 
-// dropGroupSlotLocked drops the slot of g. The caller holds n.mu.
-func (n *Npcs) dropGroupSlotLocked(g *makerGroup, slot slotInfo) {
+// orphanNPCDeleted answers the NPC of an orphan slot of g leaving the
+// world: no maker hook runs, it no longer counts alive, a database-tracked
+// row records a respawn time when the spawn respawns at all, and the slot
+// goes unless a respawn is armed for it.
+func (n *Npcs) orphanNPCDeleted(g *makerGroup, slot slotInfo) {
+	now := n.now()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if _, ok := n.slot[slot.key]; !ok {
 		return
 	}
-	delete(n.slot, slot.key)
+	g.orphansAlive--
+	if slot.dbName != "" && slot.entry.RespawnDelay > 0 {
+		n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(*slot.entry), now)
+	}
+	if !n.respawn.Tracked(slot.key) {
+		n.dropSlotLocked(slot.key)
+	}
+}
+
+// unlistGroupSlotLocked takes the slot of g off its spawn's list: dropped,
+// or kept as an orphan, its armed respawn moved along, when a respawn is
+// armed for it. The caller holds n.mu.
+func (n *Npcs) unlistGroupSlotLocked(g *makerGroup, slot slotInfo) {
+	current, ok := n.slot[slot.key]
+	if !ok || current.serial != slot.serial {
+		return
+	}
+	n.dropSlotLocked(slot.key)
+	if deadline, armed := n.respawn.Deadline(slot.key); armed {
+		n.respawn.Cancel(slot.key)
+		if key, ok := n.adoptOrphanLocked(current); ok {
+			n.respawn.Add(key, deadline)
+		}
+	}
 	keys := g.keys[slot.spawnIdx]
 	if i := slices.Index(keys, slot.key); i >= 0 {
 		g.keys[slot.spawnIdx] = slices.Delete(keys, i, i+1)
@@ -129,9 +168,7 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 		return
 	}
 	if slot.dbName != "" {
-		if state, ok := n.spawns.State(slot.dbName); ok {
-			state.SetRespawn(delay, now)
-		}
+		n.spawns.SetRespawn(slot.dbName, delay, now)
 	}
 	n.respawn.Add(slot.key, now.Add(delay))
 }
@@ -141,16 +178,16 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 // resuming through the same persisted-state restore rule used at boot).
 // A slot DespawnAll dropped is not respawned. The NPC is built from the
 // template the slot was declared with, not the one the table holds now:
-// ASpawn keeps its template for life, so //reload npc does not reach the
+// A spawn keeps its template for life, so //reload npc does not reach the
 // respawns of spawns already in place.
-func (n *Npcs) Respawn(key string) {
+func (n *Npcs) Respawn(key task.SlotID) {
 	n.respawnSlot(key)
 }
 
 // respawnSlot brings back the NPC of the slot key, a database-tracked one
 // with its saved respawn time cleared first. A slot whose NPC is in the
 // world, or is being placed, is left alone.
-func (n *Npcs) respawnSlot(key string) {
+func (n *Npcs) respawnSlot(key task.SlotID) {
 	n.mu.Lock()
 	slot, ok := n.slot[key]
 	if !ok || slot.spawning || n.liveLocked(key) {
@@ -166,66 +203,152 @@ func (n *Npcs) respawnSlot(key string) {
 	if tmpl == nil {
 		return
 	}
-	if slot.masterID != 0 {
-		obj, _ := n.state.Object(slot.masterID)
-		master, ok := obj.(*npc.Hostile)
-		if !ok || master.Dead() {
+	if slot.master != nil {
+		// A private comes back only while its master lives, in the
+		// master's current life: around it, or at the private's own point.
+		master := npc.Current(slot.master)
+		if master.Dead() {
 			n.mu.Lock()
-			delete(n.slot, key)
+			n.dropSlotLocked(key)
 			n.mu.Unlock()
 			return
 		}
-		master.RemoveMinion(slot.liveID)
-		n.instantiate(key, slot.entry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
+		at, heading := n.privateSpawnLocation(master, tmpl), master.Heading()
+		if slot.placed {
+			at, heading = slot.at, slot.heading
+		}
+		n.instantiate(key, *slot.entry, tmpl, at, heading, fullHP, fullMP, master)
 		return
 	}
 
 	if slot.dbName != "" {
-		state, ok := n.currentSpawns().State(slot.dbName)
-		if !ok {
-			state = spawn.NewState(slot.dbName)
-		}
-		state.CancelRespawn()
-		n.spawnPersisted(key, slot.maker, slot.entry, tmpl, state)
+		rows := n.currentSpawns()
+		rows.CancelRespawn(slot.dbName)
+		n.spawnPersisted(key, slot.maker, *slot.entry, tmpl, rows, slot.dbName, slot.memory.row)
 		return
 	}
-	pos, ok := n.pickSpawnPosition(slot.maker, slot.entry)
+	pos, ok := n.pickSpawnPosition(slot.maker, *slot.entry)
 	if !ok {
 		n.deferredCount.Add(1)
 		return
 	}
-	n.spawnFresh(key, slot.entry, tmpl, pos)
+	n.spawnFresh(key, *slot.entry, tmpl, pos)
 }
 
-func (n *Npcs) despawnMinions(master *npc.Hostile) {
-	for _, minion := range master.Minions() {
+// despawnMinions takes master's minions out of the world as its spawn is
+// deleted (a fixed spawn's delete, a maker's), each decayed on the calling
+// goroutine without waiting for its own queue (the npc package's off-queue
+// delete contract), and drops their spawn slots, those of the privates
+// spawned for master that are not in the world, and those of the gone
+// privates spawned for one of them. A live private spawned for any of them
+// sits in another party's set and keeps its spawn. An NPC that is no master
+// takes nothing: a linked private's party privates are its master's. A
+// master's decay alone takes none of them.
+func (n *Npcs) despawnMinions(master npc.PartyMember) {
+	if !master.IsMaster() {
+		return
+	}
+	minions := master.Minions()
+	keys := make(map[task.SlotID]bool, len(minions))
+	for _, minion := range minions {
 		id := minion.ObjectID()
-		n.ai.Remove(minion)
 		n.walker.StopRouteByID(id)
-		minion.Decay(n.state, nil)
+		switch o := minion.(type) {
+		case *npc.Hostile:
+			n.ai.Remove(o)
+			o.Decay(n.state, nil)
+		case *npc.Folk:
+			n.ai.Remove(o)
+			o.Decay(n.state, nil)
+		}
 		minion.SetMaster(nil)
-		master.RemoveMinion(id)
+		master.RemoveMinion(minion)
 
 		n.mu.Lock()
-		if _, ok := n.live[id]; ok {
+		if key, ok := n.live[id]; ok {
+			keys[key] = true
 			delete(n.live, id)
 			n.liveCount--
 		}
-		for key, slot := range n.slot {
-			if slot.masterID == master.ObjectID() {
-				delete(n.slot, key)
+		n.mu.Unlock()
+	}
+	if len(minions) == 0 {
+		return
+	}
+	n.dropPrivateSlots(master, minions, keys)
+}
+
+// dropPrivateSlots drops, as master's minions are taken with it, the slots
+// in keys (the taken minions' own), those of the privates spawned for master
+// that are not in the world, and those of the gone privates spawned for one
+// of minions.
+func (n *Npcs) dropPrivateSlots(master npc.PartyMember, minions []npc.PartyMember, keys map[task.SlotID]bool) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for key := range keys {
+		n.dropSlotLocked(key)
+	}
+	for key := range n.privates[master.Scratch()] {
+		// A live one was not taken: it sits in another party's set
+		// (master's own master's, joined before a death let master go)
+		// and stays in the world with its spawn.
+		if !n.liveLocked(key) {
+			n.dropSlotLocked(key)
+		}
+	}
+	// A taken member's private outside master's set (one it created after
+	// master's death let it go) is in the world on its own: only a gone
+	// one's slot goes.
+	for _, m := range minions {
+		for key := range n.privates[m.Scratch()] {
+			if !n.slot[key].spawning && !n.liveLocked(key) && !n.respawn.Tracked(key) {
+				n.dropSlotLocked(key)
 			}
 		}
-		n.mu.Unlock()
+	}
+}
+
+// addSlotLocked records slot under its key, a private's indexed under its
+// master. The caller holds n.mu.
+func (n *Npcs) addSlotLocked(slot slotInfo) {
+	n.slot[slot.key] = slot
+	if slot.master == nil {
+		return
+	}
+	scratch := slot.master.Scratch()
+	keys := n.privates[scratch]
+	if keys == nil {
+		keys = make(map[task.SlotID]struct{})
+		n.privates[scratch] = keys
+	}
+	keys[slot.key] = struct{}{}
+}
+
+// dropSlotLocked drops the slot key, and a private's from its master's
+// index. The caller holds n.mu.
+func (n *Npcs) dropSlotLocked(key task.SlotID) {
+	slot, ok := n.slot[key]
+	if !ok {
+		return
+	}
+	delete(n.slot, key)
+	if slot.master == nil {
+		return
+	}
+	scratch := slot.master.Scratch()
+	keys := n.privates[scratch]
+	delete(keys, key)
+	if len(keys) == 0 {
+		delete(n.privates, scratch)
 	}
 }
 
 // SyncPersistedState writes every live database-tracked slot's current HP,
-// MP, and position back into its spawn.State row, ready for Spawns.Save. Dead
-// rows (mid respawn countdown) are left untouched by State.SetStats itself.
+// MP, and position back into its spawn row, ready for Spawns.Save. Dead rows
+// (mid respawn countdown) are left untouched (Spawns.SetStats).
 func (n *Npcs) SyncPersistedState() {
 	n.mu.Lock()
-	live := make(map[int32]string, len(n.live))
+	live := make(map[int32]task.SlotID, len(n.live))
 	for id, key := range n.live {
 		live[id] = key
 	}
@@ -235,7 +358,7 @@ func (n *Npcs) SyncPersistedState() {
 		n.mu.Lock()
 		slot, ok := n.slot[key]
 		n.mu.Unlock()
-		if !ok || slot.dbName == "" {
+		if !ok || slot.dbName == "" || slot.orphan {
 			continue
 		}
 		obj, ok := n.state.Object(id)
@@ -246,12 +369,8 @@ func (n *Npcs) SyncPersistedState() {
 		if !ok {
 			continue
 		}
-		state, ok := n.currentSpawns().State(slot.dbName)
-		if !ok {
-			continue
-		}
 		x, y, z := hostile.Position()
-		state.SetStats(hostile.CurrentHP(), hostile.CurrentMP(), location.Location{X: x, Y: y, Z: z}, hostile.Heading())
+		n.currentSpawns().SetStats(slot.dbName, hostile.CurrentHP(), hostile.CurrentMP(), location.Location{X: x, Y: y, Z: z}, hostile.Heading())
 	}
 }
 

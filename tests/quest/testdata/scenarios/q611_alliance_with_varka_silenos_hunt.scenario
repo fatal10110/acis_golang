@@ -1,0 +1,29 @@
+# Alliance with Varka Silenos (Q611) at cond 3: a Ketra soldier, officer and captain each drop one badge. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q611_alliance_with_varka_silenos_hunt.golden
+character Ally 74
+quest Q611_AllianceWithVarkaSilenos <cond>=3 <state>=STARTED
+random 0 0 0 0 0 0
+script quest.Q611_AllianceWithVarkaSilenos
+item 7221 7222 7223 7224 7225 7226 7227 7228 7229 7230 7234
+page npcdefault.htm
+page script/quest/Q611_AllianceWithVarkaSilenos/
+npc naran 31378 Folk 10 0 0
+npc soldier 21324 Monster 40 0 0
+npc officer 21331 Monster 40 0 0
+npc captain 21339 Monster 40 0 0
+
+kill soldier
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7226
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7226=1
+kill officer
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7227
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7227=1
+kill captain
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7228
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7228=1

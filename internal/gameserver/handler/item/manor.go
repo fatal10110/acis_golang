@@ -4,7 +4,6 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -58,7 +57,7 @@ type ManorUse struct {
 	Refusal ManorRefusal
 	// Skill is cast on the user's current target, with no modifiers, when
 	// Refusal is ManorAllowed.
-	Skill modelskill.Definition
+	Skill *modelskill.Definition
 	// Carrier reports that the item itself carries the cast: it is spent as
 	// the cast starts and is the seed the sow reads. A harvester's cast is
 	// an ordinary skill cast.
@@ -68,15 +67,6 @@ type ManorUse struct {
 // ManorUser is the player using a manor item.
 type ManorUser interface {
 	Target() world.Tracked
-}
-
-// seedTarget is a monster a seed may be sown on.
-type seedTarget interface {
-	MonsterKind() bool
-	Seedable() bool
-	SpawnLocation() (location.Location, bool)
-	Dead() bool
-	Seeded() bool
 }
 
 // ResolveManorItem decides a seed or harvester use by user against the
@@ -103,7 +93,7 @@ func resolveSeed(tmpl *modelitem.Template, user ManorUser, rules ManorRules, def
 	if !rules.Allowed {
 		return ManorUse{Handled: true, Refusal: ManorSilent}
 	}
-	target, ok := user.Target().(seedTarget)
+	target, ok := user.Target().(skilltarget.Actor)
 	if !ok || !target.MonsterKind() {
 		return ManorUse{Handled: true, Refusal: ManorUnavailableForSeeding}
 	}
@@ -136,7 +126,7 @@ func resolveSeed(tmpl *modelitem.Template, user ManorUser, rules ManorRules, def
 
 // spawnArea is the manor area holding target's spawn point, wherever the
 // target stands now.
-func spawnArea(target seedTarget, areas *manor.AreaIndex) (manor.Area, bool) {
+func spawnArea(target skilltarget.Actor, areas *manor.AreaIndex) (manor.Area, bool) {
 	home, ok := target.SpawnLocation()
 	if !ok {
 		return manor.Area{}, false

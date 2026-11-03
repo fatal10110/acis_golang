@@ -24,7 +24,7 @@ func TestOneTimePrivateDecayLeavesItsDeadMaster(t *testing.T) {
 	if !boss.Die(nil, nil) {
 		t.Fatal("master did not die")
 	}
-	if scout.Master() != nil || scout.SpawnMaster() != boss || !slices.Contains(boss.Minions(), scout) {
+	if scout.Master() != nil || scout.SpawnMaster() != boss || !slices.Contains(boss.Minions(), npc.PartyMember(scout)) {
 		t.Fatal("the master's death did not let its private go while keeping it")
 	}
 	if !scout.Die(nil, nil) {
@@ -35,7 +35,7 @@ func TestOneTimePrivateDecayLeavesItsDeadMaster(t *testing.T) {
 		scout.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(scoutID))
 	})
 	w.srv.Settle(t)
-	if slices.Contains(boss.Minions(), scout) {
+	if slices.Contains(boss.Minions(), npc.PartyMember(scout)) {
 		t.Fatal("the decayed one-time private is still among its dead master's privates")
 	}
 }

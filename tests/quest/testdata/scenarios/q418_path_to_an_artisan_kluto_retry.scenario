@@ -1,0 +1,40 @@
+# Path to an Artisan (Q418), Kluto sends the character on with the letter once more, then finishes the quest for the lesser reward. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q418_path_to_an_artisan_kluto_retry.golden
+character Fighter 19
+class 53
+quest Q418_PathToAnArtisan <cond>=3 <state>=STARTED
+hold 1633 1
+hold 1634 1
+hold 1641 1
+script quest.Q418_PathToAnArtisan
+item 1632 1633 1634 1635 1636 1637 1638 1639 1640 1641
+page trainer/30527.htm
+page trainer/30317.htm
+page trainer/30298.htm
+page default/32052.htm
+page merchant/31963.htm
+page default/30531.htm
+page warehouse/31956.htm
+page script/quest/Q418_PathToAnArtisan/
+npc silvera 30527 Trainer 10 0 0
+npc kluto 30317 Trainer -20 0 0
+npc pinter 30298 Trainer 30 0 0
+npc obi 32052 Folk -40 0 0
+npc hitchi 31963 Merchant 50 0 0
+npc lockirin 30531 Folk -60 0 0
+npc rydel 31956 WarehouseKeeper 70 0 0
+npc ratman 20389 Monster 40 0 0
+npc leader 20390 Monster 50 0 0
+npc thief 20017 Monster 60 0 0
+
+bypass Quest Q418_PathToAnArtisan 30317-07.htm
+action kluto
+action kluto
+  S ActionFailed
+  S NpcHtmlMessage obj=kluto item=0 page=trainer/30317.htm
+  S ActionFailed
+bypass npc_{kluto}_Quest
+  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 30317-12.htm

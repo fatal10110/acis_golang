@@ -50,7 +50,6 @@ func (g *groundsLog) BanishForeigners(hallID, clanID int32) {
 // refusingBank pays no lease.
 type refusingBank struct{}
 
-func (refusingBank) PayHallFee(int32, int) bool           { return false }
 func (refusingBank) TakeAdena(int32, int) (Landing, bool) { return nil, false }
 func (refusingBank) ReturnAdena(int32, int) Landing       { return nil }
 

@@ -16,6 +16,9 @@ const (
 	// RaidAntiStriderSlowSkillID is the mounted-strider slow applied by a
 	// raid-related Attackable that matches the supplied NPC id.
 	RaidAntiStriderSlowSkillID ID = 4258
+	// ContractPaymentSkillID is the upkeep debuff a servitor's owner
+	// carries; it ends when the summon leaves the world.
+	ContractPaymentSkillID ID = 4140
 )
 
 type Spellbook struct {

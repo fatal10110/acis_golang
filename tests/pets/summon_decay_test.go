@@ -320,6 +320,7 @@ func bootServitorOwnerWithItems(t *testing.T, known []modelskill.Definition, see
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable(append([]modelskill.Definition{{
 		ID: killableServitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		SkillType: "SUMMON", NpcID: killableServitorNPCID, SummonTotalLifeTime: 1_200_000,
+		SummonTimeLostIdle: 500, SummonTimeLostActive: 1000,
 		StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
 	}}, known...)), gamesql.NewCharacterSkillStore(db))
 	cat := &npc.Template{

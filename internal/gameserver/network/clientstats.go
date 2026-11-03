@@ -42,7 +42,7 @@ func newClientStats() clientStats {
 // decision: sendActionFailed is true exactly when this frame's arrival
 // detected a new flood or a new second of an ongoing one began (the caller
 // answers ActionFailed), and drop is true when the frame must not be
-// dispatched. Mirrors GameClient.dropPacket + ClientStats.countPacket.
+// dispatched.
 func (s *clientStats) countIncomingPacket(now time.Time) (sendActionFailed, drop bool) {
 	s.processedPackets++
 	if s.countPacket(now) {

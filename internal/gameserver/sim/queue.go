@@ -5,6 +5,7 @@
 package sim
 
 import (
+	"strconv"
 	"sync"
 	"time"
 )
@@ -31,8 +32,10 @@ type clockTimer interface {
 
 // Queue is one owner's FIFO of tasks.
 type Queue struct {
-	id   string
-	exec executor
+	id string
+	// serial, when non-zero, follows id in the queue's name (see Serial).
+	serial int32
+	exec   executor
 
 	// draining is held while q's tasks run; AssertOwner probes it.
 	draining sync.Mutex
@@ -42,6 +45,7 @@ type Queue struct {
 	scheduled bool     // Pool only: q is in the run queue or being drained
 	backlog   bool     // Pool only: pending tasks crossed highWater and have not dropped back below it
 	closed    bool
+	accepted  uint64              // tasks and timer expiries the executor took from q, ever
 	timers    map[*Timer]struct{} // armed timers and tickers, cancelled by Close
 }
 
@@ -51,7 +55,25 @@ type Queue struct {
 func (q *Queue) Post(fn func()) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return !q.closed && q.exec.enqueue(q, fn)
+	return !q.closed && q.enqueue(fn)
+}
+
+// enqueue hands fn to the executor and counts it when taken. Callers hold q.mu.
+func (q *Queue) enqueue(fn func()) bool {
+	if !q.exec.enqueue(q, fn) {
+		return false
+	}
+	q.accepted++
+	return true
+}
+
+// Accepted counts the tasks and timer expiries q has taken since it was
+// created. A test harness compares it across a pass of barrier posts to tell
+// whether any task posted work meanwhile.
+func (q *Queue) Accepted() uint64 {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.accepted
 }
 
 // Now reads the clock q's timers run on: the wall clock on a Pool, the
@@ -59,23 +81,35 @@ func (q *Queue) Post(fn func()) bool {
 // must be taken from it.
 func (q *Queue) Now() time.Time { return q.exec.Now() }
 
-// Close cancels every armed timer and ticker and refuses later posts. Tasks
-// already accepted still run. Safe to call more than once.
+// Close cancels every armed timer and ticker, except those AfterPastClose
+// armed, and refuses later posts. Tasks already accepted still run. Safe to
+// call more than once.
 func (q *Queue) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closed = true
 	for t := range q.timers {
+		if t.pastClose {
+			continue
+		}
 		t.done = true
 		t.ct.Stop()
+		delete(q.timers, t)
 	}
-	q.timers = nil
 }
 
 // After posts fn to q once d has elapsed, unless the timer is stopped or q
 // is closed before fn starts.
 func (q *Queue) After(d time.Duration, fn func()) *Timer {
-	return q.arm(d, 0, fn)
+	return q.arm(d, 0, fn, false)
+}
+
+// AfterPastClose is After for a step that must still run when q closes
+// before it comes due: Close leaves it armed, and it arms on a closed queue
+// too. Its expiry runs as one of q's tasks, behind the ones q accepted
+// before it, unless the timer is stopped or q's pool is stopping.
+func (q *Queue) AfterPastClose(d time.Duration, fn func()) *Timer {
+	return q.arm(d, 0, fn, true)
 }
 
 // Every posts fn to q every d until the ticker is stopped or q is closed.
@@ -87,14 +121,14 @@ func (q *Queue) Every(d time.Duration, fn func()) *Ticker {
 	if d <= 0 {
 		panic("sim: non-positive interval for Queue.Every")
 	}
-	return (*Ticker)(q.arm(d, d, fn))
+	return (*Ticker)(q.arm(d, d, fn, false))
 }
 
-func (q *Queue) arm(d, period time.Duration, fn func()) *Timer {
-	t := &Timer{q: q, fn: fn, period: period}
+func (q *Queue) arm(d, period time.Duration, fn func(), pastClose bool) *Timer {
+	t := &Timer{q: q, fn: fn, period: period, pastClose: pastClose}
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.closed {
+	if q.closed && !pastClose {
 		t.done = true
 		return t
 	}
@@ -116,16 +150,24 @@ type Timer struct {
 	next   time.Time     // deadline of the armed expiry
 	ct     clockTimer
 	done   bool // stopped, cancelled by Close, or a one-shot that ran
-	queued bool // an expiry is posted and has not run yet
+	// ran marks a one-shot whose fn has started and that nothing stopped
+	// since: Rearm may arm it again.
+	ran bool
+	// pastClose marks a timer AfterPastClose armed, which Close leaves.
+	pastClose bool
+	queued    bool   // an expiry is posted and has not run yet
+	post      func() // run as a func value, made at the first expiry
 }
 
 // Stop cancels the timer and reports whether this call kept fn from running.
-// An expiry already posted but not yet run is cancelled too.
+// An expiry already posted but not yet run is cancelled too. A one-shot
+// stopped after its fn ran can no longer be re-armed.
 func (t *Timer) Stop() bool {
 	q := t.q
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if t.done {
+		t.ran = false
 		return false
 	}
 	t.done = true
@@ -153,7 +195,10 @@ func (t *Timer) fire() {
 	if t.queued {
 		return
 	}
-	if !q.exec.enqueue(q, t.run) {
+	if t.post == nil {
+		t.post = t.run
+	}
+	if !q.enqueue(t.post) {
 		t.done = true
 		delete(q.timers, t)
 		t.ct.Stop()
@@ -172,11 +217,30 @@ func (t *Timer) run() {
 	}
 	t.queued = false
 	if t.period == 0 {
-		t.done = true
+		t.done, t.ran = true, true
 		delete(q.timers, t)
 	}
 	q.mu.Unlock()
 	t.fn()
+}
+
+// Rearm arms again a one-shot whose fn has run, from inside fn or later, to
+// run fn once more d from now. It reuses t and its clock timer, so it
+// allocates nothing. It reports false and arms nothing when fn has not run,
+// when t was stopped since, or when q is closed and t is not an
+// AfterPastClose timer.
+func (t *Timer) Rearm(d time.Duration) bool {
+	q := t.q
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if !t.ran || q.closed && !t.pastClose {
+		return false
+	}
+	t.ran, t.done = false, false
+	t.next = q.exec.Now().Add(d)
+	t.ct.Reset(d)
+	q.timers[t] = struct{}{}
+	return true
 }
 
 // Ticker is a periodic callback armed by Queue.Every.
@@ -186,13 +250,28 @@ type Ticker Timer
 // Safe to call more than once.
 func (k *Ticker) Stop() { (*Timer)(k).Stop() }
 
+// Serial makes n part of q's name: its id, a dash, then n, built only
+// when a log line or panic names q. Call it before q is shared.
+func (q *Queue) Serial(n int32) *Queue {
+	q.serial = n
+	return q
+}
+
+// name is what logs and panics call q.
+func (q *Queue) name() string {
+	if q.serial == 0 {
+		return q.id
+	}
+	return q.id + "-" + strconv.FormatInt(int64(q.serial), 10)
+}
+
 // AssertOwner panics unless the caller is running one of q's tasks. Every
 // build catches state touched while q is idle; the simdebug build also
 // catches a caller on another goroutine while q is busy.
 func AssertOwner(q *Queue) {
 	if q.draining.TryLock() {
 		q.draining.Unlock()
-		panic("sim: state of queue " + q.id + " touched off its queue")
+		panic("sim: state of queue " + q.name() + " touched off its queue")
 	}
 	assertDrainer(q)
 }

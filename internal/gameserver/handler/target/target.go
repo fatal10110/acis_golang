@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -56,6 +57,35 @@ type Actor interface {
 	// Spoiled and Seeded bypass the too-old corpse cutoff.
 	Spoiled() bool
 	Seeded() bool
+
+	// Chest reports a treasure chest a key may open, and Interacted whether
+	// an unlock attempt has claimed it already.
+	Chest() bool
+	Interacted() bool
+	// FeedableBeast reports a beast a beast spice may feed.
+	FeedableBeast() bool
+	// Seedable reports a monster a manor seed may be sown on, and
+	// SpawnLocation the spawn point that places it in a manor area.
+	Seedable() bool
+	SpawnLocation() (location.Location, bool)
+
+	// ReviveOffer reports an open resurrection offer and whether it is for
+	// the actor's pet. InSiegeZone, SiegeState and FestivalParticipant are
+	// the siege and festival standing a resurrection scroll checks on a
+	// dead player.
+	ReviveOffer() (pending, forPet bool)
+	InSiegeZone() bool
+	SiegeState() int32
+	FestivalParticipant() bool
+
+	// RecordAttacker, NotifyAttacked and SkillAttacked are an offensive
+	// skill's calls on each actor it affected: a monster lists the caster
+	// among its attackers, a creature reacts to being attacked, and an NPC
+	// answers a debuff or a skill carrying aggro points. A kind with no such
+	// reaction ignores the call.
+	RecordAttacker(attacker attackable.Combatant)
+	NotifyAttacked(attacker attackable.Combatant)
+	SkillAttacked(caster attackable.Combatant, skill modelskill.Definition)
 
 	// Summon returns the actor's active summon.
 	Summon() (Actor, bool)

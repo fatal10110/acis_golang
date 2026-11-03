@@ -1,0 +1,15 @@
+# The same Ketra berserker (21327) meets a character with no alliance: it attacks it on sight (200).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserker
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialStoneAggressive
+npc berserker 21327 Monster 150 0 0 level 78 skill DEBUFF1 4515 1 clan ketra_orc_clan 300
+
+tick x2
+  desires berserker attack(player)=200

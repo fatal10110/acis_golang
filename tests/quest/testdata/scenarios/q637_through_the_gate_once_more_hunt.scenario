@@ -1,0 +1,35 @@
+# Through the Gate Once More (Q637): the necromancers drop a heart for a draw under the chance; the tenth moves the quest to cond 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q637_through_the_gate_once_more_hunt.golden
+character Hero 73
+quest Q637_ThroughTheGateOnceMore <cond>=1 <state>=STARTED
+hold 8065 1
+hold 8066 8
+random 0 400000 0 0 0 0
+script quest.Q637_ThroughTheGateOnceMore
+item 8065 8066 8067 8273
+page default/32010.htm
+page script/quest/Q637_ThroughTheGateOnceMore/
+npc flauron 32010 Folk 10 0 0
+npc m1 21565 Monster 40 0 0
+npc m2 21566 Monster 50 0 0
+npc m3 21567 Monster 60 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  items 8066=8
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8066
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8066=9
+kill m3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8066
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 637:0x80000003
+  S ExShowQuestMark quest=637
+  Q upsert Q637_ThroughTheGateOnceMore | <cond> | 2
+  items 8066=10
+  rows Q637_ThroughTheGateOnceMore <cond>=2 <state>=STARTED
+  state Q637_ThroughTheGateOnceMore STARTED

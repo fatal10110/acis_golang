@@ -41,6 +41,9 @@ func (c *creature) ActiveSkillLevel(id int) (int, bool) {
 	return l, ok
 }
 
+func (*creature) TargetID() (int, bool)    { return 0, false }
+func (*creature) RaceOrdinal() (int, bool) { return 0, false }
+
 func (c *creature) ActiveEffectLevel(id int) (int, bool) {
 	l, ok := c.effects[id]
 	return l, ok
@@ -91,15 +94,16 @@ type npc struct {
 	id, race int
 }
 
-func (n *npc) NpcID() int       { return n.id }
-func (n *npc) RaceOrdinal() int { return n.race }
+func (n *npc) TargetID() (int, bool)    { return n.id, true }
+func (n *npc) RaceOrdinal() (int, bool) { return n.race, true }
 
 type door struct {
 	creature
 	id int
 }
 
-func (d *door) DoorID() int { return d.id }
+func (d *door) TargetID() (int, bool)  { return d.id, true }
+func (*door) RaceOrdinal() (int, bool) { return 0, false }
 
 func leaf(kind string, attrs map[string]string, children ...modelskill.Condition) modelskill.Condition {
 	return modelskill.Condition{Kind: kind, Attrs: attrs, Children: children}
@@ -408,13 +412,15 @@ func TestCompileNamesMatchCaseInsensitively(t *testing.T) {
 	})
 }
 
-func TestCompileRejectsWhatItCannotEvaluate(t *testing.T) {
+func TestCompileRejectsUndecodableValues(t *testing.T) {
 	cases := []struct {
 		name string
 		node modelskill.Condition
 	}{
-		{"player race", leaf("player", map[string]string{"race": "Elf"})},
-		{"skill stat", leaf("skill", map[string]string{"stat": "pAtk"})},
+		{"player race in the wrong case", leaf("player", map[string]string{"race": "Elf"})},
+		{"unknown player race", leaf("player", map[string]string{"race": "GIANT"})},
+		{"skill without stat", leaf("skill", map[string]string{"Stat": "pAtk"})},
+		{"unknown skill stat", leaf("skill", map[string]string{"stat": "PATK"})},
 		{"bad number", leaf("player", map[string]string{"level": "forty"})},
 		{"bad number beside an unknown attribute", leaf("player", map[string]string{"level": "forty", "bogus": "1"})},
 		{"one-value hp_min_max", leaf("target", map[string]string{"hp_min_max": "25"})},

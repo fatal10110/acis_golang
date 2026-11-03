@@ -28,11 +28,11 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 		},
 	}, time.Now(), 1)
 	svc := clan.NewService(table, nil, nil, nil, clan.DefaultConfig(), nil, zerolog.Nop())
-	l := &GameClientLink{log: zerolog.Nop(), clans: svc}
+	l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), Clans: svc})
 
 	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, memberID, capture)
-	live.Character.Name = "Member"
+	live.Character.SetName("Member")
 	live.SetClanID(clanID)
 	activate := func() {
 		live.storage.active = activeStore{store: itemcontainer.NewClanWarehouse(clanID, testItemTemplates()), clanID: clanID}
@@ -45,9 +45,10 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 	}
 
 	activate()
-	leader := &player.Character{ID: leaderID, Name: "Leader"}
+	leader := &player.Character{ID: leaderID}
+	leader.SetName("Leader")
 	leader.SetClanID(clanID)
-	if _, _, res := svc.Oust(leader, "Member", func(int32) *player.Character { return live.Character }, time.Now()); res != clan.Ousted {
+	if _, _, res := svc.Oust(leader, "Member", func(int32) *player.Character { return live.Character }, func(int32) bool { return true }, time.Now()); res != clan.Ousted {
 		t.Fatalf("oust = %v, want Ousted", res)
 	}
 	if live.ClanID() != clanID {

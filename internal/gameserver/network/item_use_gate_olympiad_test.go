@@ -27,7 +27,8 @@ func TestPlayerOlympiadConditionReadsMatchMode(t *testing.T) {
 	} {
 		live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 		live.SetOlympiadMode(tt.inMatch)
-		if got := playerUseConditionHolds(live, map[string]string{"olympiad": tt.raw}); got != tt.want {
+		tmpl := item.Template{ID: 7818, UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"olympiad": tt.raw}}}}}
+		if got, _ := itemRestrictionHolds(live, &tmpl); got != tt.want {
 			t.Errorf("<player olympiad=%q> in a match %v = %v, want %v", tt.raw, tt.inMatch, got, tt.want)
 		}
 	}
@@ -55,7 +56,7 @@ func TestItemRestrictionAnnouncesOlympiadBar(t *testing.T) {
 			capture := &testsupport.FrameCapture{}
 			live := newTestLivePlayer(t, 1, capture)
 			live.SetOlympiadMode(tt.inMatch)
-			if got := itemRestrictionHolds(live, &tt.tmpl); got != tt.holds {
+			if got, _ := itemRestrictionHolds(live, &tt.tmpl); got != tt.holds {
 				t.Fatalf("itemRestrictionHolds = %v, want %v", got, tt.holds)
 			}
 			frames := capture.Frames()

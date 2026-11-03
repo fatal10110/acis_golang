@@ -6,6 +6,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
 
+// TestAttackableAISetBackToPeaceClearsCombatState: back to peace clears both
+// hate tables and nothing else. The queued attack desire, the current attack
+// and movement are left for the desire queue's own decay and prune rules.
 func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
@@ -21,6 +24,7 @@ func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() before reset = %v, want %v", got, IntentionAttack)
 	}
+	stops := move.stopCount
 
 	ai.SetBackToPeace()
 
@@ -30,17 +34,14 @@ func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 	if !ai.Hates().IsEmpty() {
 		t.Fatal("hate table not cleared")
 	}
-	if got := ai.Desires().Len(); got != 0 {
-		t.Fatalf("desires len = %d, want 0", got)
+	if !ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}) {
+		t.Fatal("attack desire dropped by back to peace, want it kept")
 	}
-	if got := ai.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after reset = %v, want %v", got, IntentionIdle)
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after reset = %v, want %v kept", got, IntentionAttack)
 	}
-	if _, _, ok := ai.NextIntention(); ok {
-		t.Fatal("NextIntention() ok = true after reset, want false")
-	}
-	if move.stopCount != 2 {
-		t.Fatalf("stop count = %d, want 2", move.stopCount)
+	if move.stopCount != stops {
+		t.Fatalf("stop count = %d, want %d (back to peace stops no movement)", move.stopCount, stops)
 	}
 }
 
@@ -59,11 +60,14 @@ func TestAttackableAIReduceAllAggroHateReturnsToPeaceWhenExhausted(t *testing.T)
 
 	ai.ReduceAllAggroHate(10)
 
-	if got := ai.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after hate exhausted = %v, want %v", got, IntentionIdle)
+	if !ai.Threats().IsEmpty() {
+		t.Fatal("threat table not cleared once hate ran out")
 	}
-	if got := ai.Desires().Len(); got != 0 {
-		t.Fatalf("desires len = %d, want 0 after peace", got)
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after hate exhausted = %v, want %v kept", got, IntentionAttack)
+	}
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (the attack desire decays on its own)", got)
 	}
 }
 
@@ -82,11 +86,14 @@ func TestAttackableAIStopAggroHateReturnsToPeaceWhenExhausted(t *testing.T) {
 
 	ai.StopAggroHate(target)
 
-	if got := ai.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after stop hate = %v, want %v", got, IntentionIdle)
+	if !ai.Threats().IsEmpty() {
+		t.Fatal("threat table not cleared once no hate remained")
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after stop hate = %v, want %v kept", got, IntentionAttack)
 	}
 	if got := ai.Desires().Len(); got != 0 {
-		t.Fatalf("desires len = %d, want 0 after peace", got)
+		t.Fatalf("desires len = %d, want 0 (stopping hate drops its attack desire)", got)
 	}
 }
 

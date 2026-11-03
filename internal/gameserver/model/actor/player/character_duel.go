@@ -160,6 +160,27 @@ func actingStanding(a actorWithOwner) (duel.Standing, bool) {
 	return s, ok
 }
 
+// inSameActiveOlympiadMatch reports whether c and the player acting through
+// a fight each other in the same started Olympiad match.
+func (c *Character) inSameActiveOlympiadMatch(a actorWithOwner) bool {
+	if a == nil {
+		return false
+	}
+	var p any = a
+	switch a.Kind() {
+	case actor.KindPlayer:
+	case actor.KindSummon:
+		owner, ok := a.Owner()
+		if !ok || owner == nil {
+			return false
+		}
+		p = owner
+	default:
+		return false
+	}
+	return attackable.SameActiveOlympiadMatch(c, p)
+}
+
 // inSameActiveDuel reports whether c and the player acting through a fight
 // each other in the same duel.
 func (c *Character) inSameActiveDuel(a actorWithOwner) bool {

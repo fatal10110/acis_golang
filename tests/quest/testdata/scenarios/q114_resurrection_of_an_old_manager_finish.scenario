@@ -1,0 +1,216 @@
+# Resurrection of an Old Manager (Q114), cond 17 to the end: the detector reacts at the pile of
+# stones (cond 18, no page; its screen message is not compared, the Boot test
+# tests/quest/q114_golem_test.go covers it), the stones (cond 19), Yumi takes the reacting
+# detector and, on the first story, gives the letter (cond 21), Newyear swaps it for the
+# starstone (cond 22), Yumi (cond 27) and the stones complete the quest, the starstone going
+# with it. Then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager_finish.golden
+character Manager 49
+quest Q114_ResurrectionOfAnOldManager <cond>=17 <state>=STARTED choice=1 talk=0
+hold 8090 1
+script quest.Q114_ResurrectionOfAnOldManager
+item 57 8090 8091 8287 8288 8289
+page default/32041.htm
+page default/32046.htm
+page villagemaster/31961.htm
+page script/quest/Q114_ResurrectionOfAnOldManager/
+npc yumi 32041 Folk 10 0 0
+npc stone 32046 Folk 30 0 0
+npc newyear 31961 VillageMasterDwarf 0 20 0
+
+# The pile of stones: the detector reacts.
+action stone
+action stone
+  S ActionFailed
+  S NpcHtmlMessage obj=stone item=0 html="<html><body>A suspicious stack of stones.<br>\n<a action=\"bypass -h npc_{stone}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{stone}_Quest
+  S QuestList 114:0x8003ffff
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8090
+  S SystemMessage id=54 3:8091
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 18
+  rows Q114_ResurrectionOfAnOldManager <cond>=18 <state>=STARTED choice=1 talk=0
+  items 8090=0 8091=1
+action stone
+  S ActionFailed
+  S NpcHtmlMessage obj=stone item=0 html="<html><body>A suspicious stack of stones.<br>\n<a action=\"bypass -h npc_{stone}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action stone
+  S ActionFailed
+  S NpcHtmlMessage obj=stone item=0 html="<html><body>A suspicious stack of stones.<br>\n<a action=\"bypass -h npc_{stone}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{stone}_Quest
+  S NpcHtmlMessage obj=stone item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32046-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32046-02.htm
+  S QuestList 114:0x8007ffff
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=stone item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32046-02.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 19
+  rows Q114_ResurrectionOfAnOldManager <cond>=19 <state>=STARTED choice=1 talk=0
+action stone
+  S ActionFailed
+  S NpcHtmlMessage obj=stone item=0 html="<html><body>A suspicious stack of stones.<br>\n<a action=\"bypass -h npc_{stone}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action stone
+  S ActionFailed
+  S NpcHtmlMessage obj=stone item=0 html="<html><body>A suspicious stack of stones.<br>\n<a action=\"bypass -h npc_{stone}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{stone}_Quest
+  S NpcHtmlMessage obj=stone item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32046-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Yumi takes the detector and gives the letter.
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-27.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-28.htm
+  S SystemMessage id=302 3:8091
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-28.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 1
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-29.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-29.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-30.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-30.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-32.htm
+  S QuestList 114:0x8017ffff
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8288
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-32.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2145910785
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 21
+  rows Q114_ResurrectionOfAnOldManager <cond>=21 <flags>=-2145910785 <state>=STARTED choice=1 talk=1
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>Collector Yumi:<br>\nThis area is know as the Ruins of Pavel. It is one of the research labs the Giants established in the distant past. I've come here to research the Starstones that are being produced in this area.<br>\nThe roaming golems make it very risky to go outside of the barracks, however. In addition, the remnants of ancient old experiments, vile and disgusting, add to the danger.<br>\n<a action=\"bypass -h npc_{yumi}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-33.htm
+  S ActionFailed
+  S ActionFailed
+
+# Newyear swaps the letter for the starstone.
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/31961-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 31961-02.htm
+  S QuestList 114:0x8037ffff
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8288
+  S SystemMessage id=54 3:8289
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/31961-02.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2143813633
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 22
+  rows Q114_ResurrectionOfAnOldManager <cond>=22 <flags>=-2143813633 <state>=STARTED choice=1 talk=1
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 html="<html><body>Head Blacksmith Newyear:<br>\nDo you know what happiest time for blacksmiths of the Schuttgart Territory is? It's the end of each working day, when we we walk out of out shop and breathe in the cold fresh air. After working long hours struggling with scorching heat and banging and clanging, it's relief. We feel as if we are in paradise at that moment.<br>\nHow many occupations offer such a reward? I love my job as I could love no other. I suppose you could say it was my calling in life... well, one of them.<br>\n<a action=\"bypass -h npc_{newyear}_Quest SecondClassChange\">Listen to information about second class transfer</a><br>\n<a action=\"bypass -h npc_{newyear}_Link villagemaster/SubClass.htm\">Sub Class</a><br>\n<a action=\"bypass -h npc_{newyear}_Quest Clan\">Clan</a><br>\n<a action=\"bypass -h npc_{newyear}_Quest Alliance\">Alliance</a><br>\n<a action=\"bypass -h npc_{newyear}_Quest ShadowWeapon\">Use Shadow Weapon Exchange Coupon</a><br>\n<a action=\"bypass -h npc_{newyear}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/31961-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Yumi moves on to cond 27 as she talks.
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S QuestList 114:0x8437ffff
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-34.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <flags> | -2076704769
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 27
+  rows Q114_ResurrectionOfAnOldManager <cond>=27 <flags>=-2076704769 <state>=STARTED choice=1 talk=1
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>Collector Yumi:<br>\nThis area is know as the Ruins of Pavel. It is one of the research labs the Giants established in the distant past. I've come here to research the Starstones that are being produced in this area.<br>\nThe roaming golems make it very risky to go outside of the barracks, however. In addition, the remnants of ancient old experiments, vile and disgusting, add to the danger.<br>\n<a action=\"bypass -h npc_{yumi}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-35.htm
+  S ActionFailed
+  S ActionFailed
+
+# The stones complete the quest.
+action stone
+action stone
+  S ActionFailed
+  S NpcHtmlMessage obj=stone item=0 html="<html><body>A suspicious stack of stones.<br>\n<a action=\"bypass -h npc_{stone}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{stone}_Quest
+  S NpcHtmlMessage obj=stone item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32046-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32046-04.htm
+  S NpcHtmlMessage obj=stone item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32046-04.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32046-05.htm
+  S NpcHtmlMessage obj=stone item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32046-05.htm
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32046-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 114:0x00000000
+  S SystemMessage id=302 3:8289
+  S NpcHtmlMessage obj=stone item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32046-06.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <state> | COMPLETED
+  Q delete-except-state Q114_ResurrectionOfAnOldManager
+  state Q114_ResurrectionOfAnOldManager COMPLETED
+  rows Q114_ResurrectionOfAnOldManager <state>=COMPLETED
+  items 8090=0 8091=0 8288=0 8289=0
+
+relog
+  state Q114_ResurrectionOfAnOldManager COMPLETED
+  rows Q114_ResurrectionOfAnOldManager <state>=COMPLETED
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -59,17 +59,17 @@ func (a hostileStatActor) IsMoving() bool { return a.h.Move().Moving() }
 func (a hostileStatActor) IsRunning() bool { return a.h.Running() }
 
 // IsRiding satisfies conditions.Actor. Always false: NPCs are never
-// mounted, matching Creature.isRiding's un-overridden default.
+// mounted.
 func (a hostileStatActor) IsRiding() bool { return false }
 
 // IsFlying satisfies conditions.Actor. Always false: no shipped NPC
-// overrides Creature.isFlying's default.
+// flies.
 func (a hostileStatActor) IsFlying() bool { return false }
 
 // headingActor is the extra capability IsBehind/IsInFrontOf need beyond
-// conditions.Actor's plain X/Y/Z: the reference position's own heading.
-// conditionGate always tests an owner against itself
-// (conditionGate.Test(actor, actor, nil)), so other is always this same
+// conditions.Actor's plain X/Y/Z: the compared position's own heading.
+// conditionGate always tests an owner against itself (the owner on both
+// sides of the test), so other is always this same
 // hostileStatActor, which implements it via CurrentHeading below.
 // CurrentHeading lets a hostileStatActor serve as the "other" side of its
 // own IsBehind/IsInFrontOf check.
@@ -104,11 +104,11 @@ func (a hostileStatActor) ActiveSkillLevel(id int) (int, bool) {
 	return level, ok
 }
 
-// NpcID is the template id a target npcId condition matches.
-func (a hostileStatActor) NpcID() int { return a.h.NpcID() }
+// TargetID is the template id a target npcId condition matches.
+func (a hostileStatActor) TargetID() (int, bool) { return a.h.NpcID(), true }
 
 // RaceOrdinal is the template race a target race_id condition matches.
-func (a hostileStatActor) RaceOrdinal() int { return int(a.h.Instance.Template.Race) }
+func (a hostileStatActor) RaceOrdinal() (int, bool) { return int(a.h.Instance.Template.Race), true }
 
 // ActiveEffectLevel satisfies conditions.Actor.
 func (a hostileStatActor) ActiveEffectLevel(effectID int) (int, bool) {

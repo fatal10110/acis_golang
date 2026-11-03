@@ -45,7 +45,7 @@ func (l *GameClientLink) changeOccupation(live *livePlayer, classID int, tmpl *p
 		row := liveMemberRow(live.Character, m)
 		l.broadcastToClan(cl, 0, func() wire.Frame { return serverpackets.FramePledgeShowMemberListUpdate(row) })
 	}
-	if l.playerConfig.AutoLearnSkills {
+	if l.playerConfig().AutoLearnSkills {
 		l.rewardLiveSkills(live)
 	}
 	return true

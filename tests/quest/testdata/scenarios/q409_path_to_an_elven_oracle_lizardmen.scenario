@@ -1,0 +1,61 @@
+# Path to an Elven Oracle (Q409), an elven mystic at the lizardmen: each monster speaks when first hit, and the first to die gives the captain's order. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q409_path_to_an_elven_oracle_lizardmen.golden
+character Mystic 19
+class 25
+quest Q409_PathToAnElvenOracle <cond>=2 <state>=STARTED
+hold 1231 1
+script quest.Q409_PathToAnElvenOracle
+item 1231 1232 1233 1234 1235 1236 1275
+page trainer/30293.htm
+page default/30424.htm
+page default/30428.htm
+page script/quest/Q409_PathToAnElvenOracle/
+npc manuel 30293 Trainer 10 0 0
+npc allana 30424 Folk -10 0 0
+npc perrin 30428 Folk 20 0 0
+npc warrior 27032 Monster 40 0 0
+npc scout 27033 Monster 50 0 0
+npc lizard 27034 Monster 60 0 0
+npc tamil 27035 Monster 70 0 0
+
+hit warrior 5
+  S NpcSay obj=warrior type=0 npc=1027032 text="The sacred flame is ours!"
+  items 1231=1
+hit scout 5
+  S NpcSay obj=scout type=0 npc=1027033 text="The sacred flame is ours"
+hit lizard 5
+  S NpcSay obj=lizard type=0 npc=1027034 text="The sacred flame is ours"
+kill scout
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=scout type=0 npc=1027033 text="Arrghh...we shall never.. surrender..."
+  S QuestList 409:0x80000007
+  S ExShowQuestMark quest=409
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1234
+  Q upsert Q409_PathToAnElvenOracle | <cond> | 3
+  items 1231=1 1234=1
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=3 <state>=STARTED
+action manuel
+action manuel
+  S ActionFailed
+  S NpcHtmlMessage obj=manuel item=0 page=trainer/30293.htm
+  S ActionFailed
+bypass npc_{manuel}_Quest
+  S NpcHtmlMessage obj=manuel item=0 page=script/quest/Q409_PathToAnElvenOracle/30293-09.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  items 1231=1 1234=1
+  state Q409_PathToAnElvenOracle STARTED
+  rows Q409_PathToAnElvenOracle <cond>=3 <state>=STARTED
+action manuel
+action manuel
+  S ActionFailed
+  S NpcHtmlMessage obj=manuel item=0 page=trainer/30293.htm
+  S ActionFailed
+bypass npc_{manuel}_Quest
+  S NpcHtmlMessage obj=manuel item=0 page=script/quest/Q409_PathToAnElvenOracle/30293-09.htm
+  S ActionFailed
+  S ActionFailed

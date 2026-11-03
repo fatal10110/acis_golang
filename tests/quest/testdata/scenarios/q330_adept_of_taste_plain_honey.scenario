@@ -1,0 +1,318 @@
+# Adept of Taste (Q330) with plain honey: a level 24 character already holding most of each count
+# accepts at Jonas. Sonia hands out her book and asks for more while one white root is short; her
+# red mandragora sap offer (on a page she never shows) is refused as a bypass the dialog did not
+# offer. A wild sprout past both chances (roll 99), a sapling's white root (roll 90) and a blossom's
+# red root past its count make it forty of each, and Sonia gives the white sap. Jacob makes plain
+# honey from the twenty nectars when the player takes his offer, Pano trades the potato, Glyvka's
+# green moss bundle offer is refused the same way as Sonia's until a giant crimson ant's brown moss
+# (roll 9) gives the brown bundle, and Rollant cuts the meat. With two special ingredients and the
+# even roll pinned to false, Jonas cooks the third steak dish, Mirien reviews it, and Jonas pays for
+# the review with the salad recipe as the repeatable quest ends; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q330_adept_of_taste_plain_honey.golden
+character Cook 24
+hold 1422 40
+hold 1423 39
+hold 1427 20
+hold 1432 30
+hold 1435 20
+hold 1436 19
+hold 1440 30
+random 99 90 0 0 9 0 1
+script quest.Q330_AdeptOfTaste
+item 1420 1421 1422 1423 1424 1425 1426 1427 1428 1429 1430 1431 1432 1433 1434 1435 1436 1437 1438 1439 1440 1441 1442 1443 1444 1445 1446 1447 1448 1449 1450 1451 1455 1456 1457
+page default/30469.htm
+page trainer/30461.htm
+page merchant/30062.htm
+page guard/30073.htm
+page merchant/30078.htm
+page trainer/30067.htm
+page trainer/30069.htm
+page script/quest/Q330_AdeptOfTaste/
+npc jonas 30469 Folk 10 0 0
+npc mirien 30461 Trainer 20 0 0
+npc sonia 30062 Merchant 30 0 0
+npc jacob 30073 Guard -10 0 0
+npc pano 30078 Merchant -20 0 0
+npc glyvka 30067 Trainer -30 0 0
+npc rollant 30069 Trainer 0 10 0
+npc sapling 20155 Monster 0 -40 0
+npc blossom 20156 Monster 40 40 0
+npc wildsprout 20223 Monster -40 40 0
+npc crimsonant 20228 Monster 0 60 0
+
+# Jonas: accept.
+action jonas
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q330_AdeptOfTaste CREATED
+bypass Quest Q330_AdeptOfTaste 30469-03.htm
+  S QuestList 330:0x80000001
+  S ExShowQuestMark quest=330
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1420
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-03.htm
+  S ActionFailed
+  Q upsert Q330_AdeptOfTaste | <state> | STARTED
+  Q upsert Q330_AdeptOfTaste | <cond> | 1
+  state Q330_AdeptOfTaste STARTED
+  rows Q330_AdeptOfTaste <cond>=1 <state>=STARTED
+  items 1420=1
+
+# Sonia: her botany book; one white root short.
+action sonia
+action sonia
+  S ActionFailed
+  S NpcHtmlMessage obj=sonia item=0 page=merchant/30062.htm
+  S ActionFailed
+bypass npc_{sonia}_Quest
+  S SystemMessage id=54 3:1421
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sonia item=0 page=script/quest/Q330_AdeptOfTaste/30062-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1421=1
+action sonia
+  S ActionFailed
+  S NpcHtmlMessage obj=sonia item=0 page=merchant/30062.htm
+  S ActionFailed
+bypass npc_{sonia}_Quest
+  S NpcHtmlMessage obj=sonia item=0 page=script/quest/Q330_AdeptOfTaste/30062-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Her red sap offer is not on the page she showed: refused, nothing taken.
+bypass Quest Q330_AdeptOfTaste 30062-05.htm
+  items 1421=1 1422=40 1423=39 1424=0
+kill wildsprout
+  S SystemMessage id=95 1:0 1:0
+  items 1422=40 1423=39
+kill sapling
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1423
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1422=40 1423=40
+kill blossom
+  S SystemMessage id=95 1:0 1:0
+  items 1422=40 1423=40
+
+# Sonia: forty of each make the white mandragora sap.
+action sonia
+  S ActionFailed
+  S NpcHtmlMessage obj=sonia item=0 page=merchant/30062.htm
+  S ActionFailed
+bypass npc_{sonia}_Quest
+  S SystemMessage id=302 3:1421
+  S SystemMessage id=301 3:1422 6:40
+  S SystemMessage id=301 3:1423 6:40
+  S SystemMessage id=54 3:1425
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sonia item=0 page=script/quest/Q330_AdeptOfTaste/30062-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 1421=0 1422=0 1423=0 1425=1
+
+# Jacob: his insect book; twenty nectars and no royal jelly: the player takes plain honey.
+action jacob
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S SystemMessage id=54 3:1426
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1426=1
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q330_AdeptOfTaste 30073-05.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1426
+  S SystemMessage id=301 3:1427 6:20
+  S SystemMessage id=54 3:1429
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-05.htm
+  S ActionFailed
+  items 1426=0 1427=0 1429=1
+action jacob
+  S ActionFailed
+  S NpcHtmlMessage obj=jacob item=0 page=guard/30073.htm
+  S ActionFailed
+bypass npc_{jacob}_Quest
+  S NpcHtmlMessage obj=jacob item=0 page=script/quest/Q330_AdeptOfTaste/30073-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Pano: his contract; thirty amulets: the Dion potato.
+action pano
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S SystemMessage id=54 3:1431
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q330_AdeptOfTaste/30078-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1431=1
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S SystemMessage id=302 3:1431
+  S SystemMessage id=301 3:1432 6:30
+  S SystemMessage id=54 3:1433
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q330_AdeptOfTaste/30078-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 1431=0 1432=0 1433=1
+
+# Glyvka: her botany book; one brown moss short, and her green bundle offer refused.
+action glyvka
+action glyvka
+  S ActionFailed
+  S NpcHtmlMessage obj=glyvka item=0 page=trainer/30067.htm
+  S ActionFailed
+bypass npc_{glyvka}_Quest
+  S SystemMessage id=54 3:1434
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1434=1
+action glyvka
+  S ActionFailed
+  S NpcHtmlMessage obj=glyvka item=0 page=trainer/30067.htm
+  S ActionFailed
+bypass npc_{glyvka}_Quest
+  S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q330_AdeptOfTaste 30067-05.htm
+  items 1434=1 1435=20 1436=19 1437=0
+kill crimsonant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1436
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1436=20
+
+# Glyvka: the brown moss bundle.
+action glyvka
+  S ActionFailed
+  S NpcHtmlMessage obj=glyvka item=0 page=trainer/30067.htm
+  S ActionFailed
+bypass npc_{glyvka}_Quest
+  S SystemMessage id=302 3:1434
+  S SystemMessage id=301 3:1435 6:20
+  S SystemMessage id=301 3:1436 6:20
+  S SystemMessage id=54 3:1438
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-06.htm
+  S ActionFailed
+  S ActionFailed
+  items 1434=0 1435=0 1436=0 1438=1
+
+# Rollant: his creature book; thirty bodies: the floating eye meat.
+action rollant
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S SystemMessage id=54 3:1439
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q330_AdeptOfTaste/30069-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1439=1
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S SystemMessage id=302 3:1439
+  S SystemMessage id=301 3:1440 6:30
+  S SystemMessage id=54 3:1441
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q330_AdeptOfTaste/30069-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 1439=0 1440=0 1441=1
+
+# Jonas: two special ingredients and the roll on false: the third steak dish.
+action jonas
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1420
+  S SystemMessage id=302 3:1425
+  S SystemMessage id=302 3:1429
+  S SystemMessage id=302 3:1433
+  S SystemMessage id=302 3:1438
+  S SystemMessage id=302 3:1441
+  S SystemMessage id=54 3:1444
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-05t3.htm
+  S ActionFailed
+  S ActionFailed
+  items 1420=0 1425=0 1429=0 1433=0 1438=0 1441=0 1444=1
+
+# Mirien: her review of the third dish.
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1444
+  S SystemMessage id=54 3:1449
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q330_AdeptOfTaste/30461-02t3.htm
+  S ActionFailed
+  S ActionFailed
+  items 1444=0 1449=1
+
+# Jonas: the review pays 5800 adena, the salad recipe and experience; the quest ends.
+action jonas
+action jonas
+  S ActionFailed
+  S NpcHtmlMessage obj=jonas item=0 page=default/30469.htm
+  S ActionFailed
+bypass npc_{jonas}_Quest
+  S SystemMessage id=302 3:1449
+  S SystemMessage id=52 6:5800
+  S SystemMessage id=54 3:1455
+  S SystemMessage id=45 1:9000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=jonas item=0 page=script/quest/Q330_AdeptOfTaste/30469-06t3.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q330_AdeptOfTaste
+  items 1449=0 1455=1 57=5800
+  state Q330_AdeptOfTaste -
+  rows Q330_AdeptOfTaste -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q330_AdeptOfTaste -
+  rows Q330_AdeptOfTaste -
+  items 1455=1 57=5800

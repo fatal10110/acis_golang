@@ -1,0 +1,24 @@
+# LV3Knight (27258, level 76), raised for the character (spawn parameters 0, character, owner), every draw 0:
+# after a hate skill hit (Aggression 28) has set its defence mode (IntAI0 1), a hit that finds it under half
+# its HP wants its crazy mode on itself (1000000), sets IntAI0 to 2 and IntAI1 to 1 and arms the 5 s timer 4001, which
+# clears IntAI0 and wants its defence mode and its crazy mode once more.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3Knight
+npc owner 20003 Monster 600 0 0
+npc knight 27258 Monster 300 0 0 level 76 skill PHYSICAL_SPECIAL1 4032 8 skill PHYSICAL_SPECIAL2 4073 8 skill DEFENCE_MODE 4517 1 skill CRAZY_MODE 4518 1 skill PHYSICAL_SPECIAL3 4572 8 params 0 character owner master owner
+
+hit knight 10 skill 28 1
+  S MagicSkillUse caster=knight target=knight skill=4517-1 hit=0 reuse=0 success=0
+  mem knight i_ai0=1 i_ai1=0
+hp knight 100
+hit knight 10
+  mem knight i_ai0=2 i_ai1=1
+  desires knight attack(player)=48.19277108433735 cast(knight,4517,move)=2000000 cast(knight,4518,move)=1000000
+advance 5s
+  S MagicSkillUse caster=knight target=knight skill=4518-1 hit=0 reuse=0 success=0
+  mem knight i_ai0=0 i_ai1=1
+  desires knight attack(player)=48.19277108433735 cast(knight,4517,move)=1000000 cast(knight,4518,move)=1000000

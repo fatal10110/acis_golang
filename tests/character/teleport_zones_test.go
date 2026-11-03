@@ -92,11 +92,7 @@ func appear(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 }
 
 func readUntilQuiet(c *testsupport.ScriptedClient) [][]byte {
-	var frames [][]byte
-	for f := c.ReadWithTimeout(rejectSilenceWindow); f != nil; f = c.ReadWithTimeout(rejectSilenceWindow) {
-		frames = append(frames, f)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 func firstOpcode(frames [][]byte, op byte) int {
@@ -131,6 +127,7 @@ func TestTeleportInsidePeaceZoneExitsUntilAppearing(t *testing.T) {
 
 	x, y, z := srv.PlayerPosition(t, objID)
 	character.TeleportTo(x+300, y, z, 0)
+	srv.Settle(t)
 	if character.InPeaceZone() {
 		t.Fatal("peace flag still set after the teleport, before Appearing")
 	}

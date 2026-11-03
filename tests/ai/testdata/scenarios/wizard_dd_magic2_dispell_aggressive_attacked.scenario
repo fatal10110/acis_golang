@@ -1,0 +1,16 @@
+# WizardDDMagic2DispellAggressive (21663, level 33, its shipped skills), every draw 0: a hit of 10 by the
+# character from 300 away wants its dispel (4675-1) on the character (1000000) beside the long range DD magic its
+# parents want.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2DispellAggressive
+npc wiz 21663 Monster 300 0 0 level 33 aggro 1000 skill W_LONG_RANGE_DD_MAGIC 4157 3 skill W_SHORT_RANGE_DD_MAGIC 4160 3 skill DISPELL 4675 1
+
+hit wiz 10
+  desires wiz cast(player,4157,move)=2000000 cast(player,4675,move)=1000000

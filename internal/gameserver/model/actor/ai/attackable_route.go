@@ -25,7 +25,7 @@ func (a *Attackable) SetRoute(r Route) {
 // desire never loses weight and stays queued for the actor's life, so the
 // actor walks the route whenever nothing outweighs it.
 func (a *Attackable) AddMoveRouteDesire(name string, weight float64) {
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:      IntentionMoveRoute,
 		RouteName: name,
 		Weight:    weight,

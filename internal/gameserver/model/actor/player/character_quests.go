@@ -29,15 +29,6 @@ func (c *Character) NotifyQuestMarked(questID int32) {
 	c.emit(event.QuestMarked{QuestID: questID})
 }
 
-// MarkDetaching marks c as leaving the world and seals its quest journal:
-// from here on nothing writes its journal, so nothing lands after the final
-// saves of its departure. Detaching reports the mark to the item give and
-// take paths, which must refuse once it is set.
-func (c *Character) MarkDetaching() {
-	c.detaching.Store(true)
-	c.quests.Seal()
-}
-
 // Detaching reports whether MarkDetaching has run.
 func (c *Character) Detaching() bool { return c.detaching.Load() }
 
@@ -71,3 +62,7 @@ func (c *Character) NotifyScriptMessage(text string) {
 
 // NotifyQuestOverweight tells c it carries too much to talk about a quest.
 func (c *Character) NotifyQuestOverweight() { c.emit(event.QuestOverweight{}) }
+
+// ShowNPCChat opens on c the NPC objectID's own chat window, the one it
+// opens when talked to with no script answering.
+func (c *Character) ShowNPCChat(objectID int32) { c.emit(event.NPCChatShown{ObjectID: objectID}) }

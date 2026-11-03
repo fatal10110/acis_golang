@@ -1,0 +1,19 @@
+# WarriorCast3SkillsMagical2StoneAggressive (21331, Ketra Orc Warrior, of the Ketra clan), every
+# draw 0, against a Ketra ally. Seeing the ally it does not attack; the ally's hit makes it want
+# to petrify the ally (4515), weight 1000000 from its attacked hook and as much again from its
+# own clan call, and none of its parent's DD magic or debuff.
+character Hunter 20
+standing 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsMagical2.WarriorCast3SkillsMagical2StoneAggressive
+npc stone 21331 Monster 1500 0 0 clan ketra_orc_clan 300 skill DD_MAGIC1 4078 9 skill DEBUFF 4119 3
+
+approach stone 300
+  desires stone -
+hit stone 80
+  desires stone cast(player,4515,move)=2000000

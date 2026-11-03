@@ -1,0 +1,34 @@
+# Trial of the Guildsman (Q216), refused: a level 35 Scavenger with 1999 adena cannot pay
+# Valkon's 2000 adena fee, so the accept link shows the refusal page and the quest is not
+# started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q216_trial_of_the_guildsman_short_of_adena.golden
+character Scavenger 35
+class 54
+hold 57 1999
+script quest.Q216_TrialOfTheGuildsman
+item 3119 3120 57
+page warehouse/30103.htm
+page script/quest/Q216_TrialOfTheGuildsman/
+npc valkon 30103 WarehouseKeeper 10 0 0
+
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-04.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-04.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-05.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-05.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-06.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-05a.htm
+  S ActionFailed
+  state Q216_TrialOfTheGuildsman CREATED
+  rows Q216_TrialOfTheGuildsman -
+  items 57=1999 3120=0

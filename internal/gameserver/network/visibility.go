@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
@@ -13,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -23,6 +25,24 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.showDerbyRace(f)
 	}
 	p.sendInfoFrom(obj, false)
+}
+
+// RegionCrossed shows p the map effects of the castle traps touching r as
+// r enters or leaves p's surroundings: leaving turns each trap's effect
+// off, and entering turns on an armed trap's. A trap touching several
+// crossing regions is told once per region.
+func (p *livePlayer) RegionCrossed(r *world.Region, entered bool) {
+	if p.link == nil || p.link.zones == nil {
+		return
+	}
+	x, y := r.Origin()
+	for _, k := range p.link.zones.At(x, y) {
+		t := zone.TrapOf(k)
+		if t == nil || t.EventID <= 0 || (entered && !t.Armed) {
+			continue
+		}
+		p.sendVisibilityFrame(serverpackets.FrameEventTrigger(int32(t.EventID), entered))
+	}
 }
 
 // requestRecordInfo answers the client's view resync: live's UserInfo, then
@@ -55,16 +75,24 @@ func (p *livePlayer) refreshInfos(w *world.State) {
 func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 	switch o := obj.(type) {
 	case *livePlayer:
-		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
-			Character: o.Character,
-			Template:  o.Template(),
-			Items:     o.inventoryItems(),
-			Clan:      p.link.clanFields(o.Character),
-			Hidden:    hiddenFrom(o, p),
-			HeroAura:  p.link.heroAura(o),
-		}))
-		if o.throne != nil {
-			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
+		// A polymorphed player is shown as its NPC form, seated or not.
+		if form := o.Polymorph(); form != nil {
+			p.sendVisibilityFrame(serverpackets.FramePcMorphInfo(o.Character, *form))
+		} else {
+			hidden := hiddenFrom(o, p)
+			p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
+				Character:          o.Character,
+				Template:           o.Template(),
+				Items:              o.inventoryItems(),
+				Clan:               p.link.clanFields(o.Character),
+				Hidden:             hidden,
+				Revealed:           o.Invisible() && !hidden,
+				HeroAura:           p.link.heroAura(o),
+				SpawnProtectedTeam: p.link.spawnProtectedTeam(o),
+			}))
+			if o.throne != nil {
+				p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
+			}
 		}
 		// Both players learn their relation to the other: p gets o's (and
 		// its summon's), o gets p's (and its summon's).
@@ -82,12 +110,16 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		}
 		p.describeState(o, o.CastControl())
 	case *npc.Hostile:
-		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 		p.describeState(o, o.CastControl())
 	case *npc.Decoration:
-		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
+	case *npc.EffectPoint:
+		// A signet point never moves, and its casts are its own broadcasts,
+		// not a cast in flight: it is shown with its NpcInfo alone.
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 	case *npc.Folk:
-		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, o.ServerObjectView()))
 		p.describeState(o, o.CastControl())
 	case *summon.Actor:
 		if o.ShownAsOwnedBy(p.ObjectID()) {
@@ -120,7 +152,7 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 			}
 			return
 		}
-		if snap, ok := summonInfoSnapshot(o, p, p.npcs, p.link.summonInCombat(o)); ok {
+		if snap, ok := p.link.summonInfoSnapshot(o, p, p.npcs, p.link.summonInCombat(o)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 			p.describeState(o, o.CastControl())
 		}
@@ -131,8 +163,8 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		}
 		p.sendVisibilityFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
-		p.sendVisibilityFrame(serverpackets.FrameDoorInfo(o, false))
-		p.sendVisibilityFrame(serverpackets.FrameDoorStatusUpdate(o, false))
+		p.sendVisibilityFrame(serverpackets.FrameDoorInfo(o, o.AttackableBy(p.Character)))
+		p.sendVisibilityFrame(serverpackets.FrameDoorStatusUpdate(o, o.ShowsHP()))
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
 	case fenceObject:
@@ -155,7 +187,7 @@ type discoveredCreature interface {
 
 // castInFlight is the cast controller surface describeState reads.
 type castInFlight interface {
-	InFlight() (modelskill.Definition, actorcast.Target, bool)
+	InFlight() (*modelskill.Definition, actorcast.Target, bool)
 }
 
 // Every production cast controller is an *actorcast.Controller; pin that it
@@ -255,7 +287,7 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 		if !ok || a.ShownAsOwnedBy(p.ObjectID()) {
 			return
 		}
-		if snap, ok := summonInfoSnapshot(a, p, p.npcs, l.summonInCombat(a)); ok {
+		if snap, ok := l.summonInfoSnapshot(a, p, p.npcs, l.summonInCombat(a)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	})
@@ -307,6 +339,10 @@ type doorObject interface {
 	MaxHP() int
 	HP() int
 	Damage() int
+	// AttackableBy decides DoorInfo's HP flag for the viewer, ShowsHP
+	// DoorStatusUpdate's.
+	AttackableBy(attacker skilltarget.Actor) bool
+	ShowsHP() bool
 }
 
 type staticObject interface {
@@ -340,7 +376,7 @@ func fenceInfoFrame(obj fenceObject) wire.Frame {
 
 func rendersObject(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, *npc.Hostile, *npc.Decoration, *npc.Folk, *summon.Actor, groundItemObject, doorObject, staticObject, fenceObject, *boat.Boat:
+	case *livePlayer, *npc.Hostile, *npc.Decoration, *npc.EffectPoint, *npc.Folk, *summon.Actor, groundItemObject, doorObject, staticObject, fenceObject, *boat.Boat:
 		return true
 	default:
 		return false
@@ -355,15 +391,16 @@ func (l *GameClientLink) summonInCombat(a *summon.Actor) bool {
 	if !a.OwnerLeft() {
 		return a.InCombat()
 	}
-	return l != nil && l.attackStance != nil && l.attackStance.InAttackStance(a)
+	return l != nil && l.combat.attackStance != nil && l.combat.attackStance.InAttackStance(a)
 }
 
 // summonInfoSnapshot resolves the NpcInfo fields viewer sees for a summon it
 // does not own. Attackable is per viewer: whether viewer may attack a without
 // forcing, which follows a's owner's karma and PvP flag. A nil viewer sees it
 // as not attackable. inCombat is summonInCombat's answer for a. The summon
-// of an invisible player is not shown: it reports false.
-func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, inCombat bool) (serverpackets.NPCInfoSnapshot, bool) {
+// of an invisible player is not shown: it reports false. With
+// ShowSummonCrest it carries its owner's clan and alliance (addSummonCrest).
+func (l *GameClientLink) summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, inCombat bool) (serverpackets.NPCInfoSnapshot, bool) {
 	if npcs == nil {
 		return serverpackets.NPCInfoSnapshot{}, false
 	}
@@ -378,27 +415,31 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		if owner.Invisible() && (viewer == nil || viewer.ObjectID() != owner.ObjectID()) {
 			return serverpackets.NPCInfoSnapshot{}, false
 		}
-		title = owner.Name
+		title = owner.CharacterName()
 		pvpFlag = int(owner.PvPFlagState())
 		karma = owner.Karma()
 		team = owner.DuelTeam()
 	}
 	pAtkSpd := int(a.PAtkSpd(tmpl.AtkSpd))
-	return serverpackets.NPCInfoSnapshot{
+	snap := serverpackets.NPCInfoSnapshot{
 		ObjectID: a.ObjectID(), TemplateID: tmpl.TemplateID,
 		X: x, Y: y, Z: z, Heading: a.Heading(),
 		MAtkSpd: int(a.MAtkSpd()), PAtkSpd: pAtkSpd,
 		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
-		MoveMultiplier:   float64(a.MovementSpeedMultiplier(tmpl.RunSpeed)),
+		MoveMultiplier:   float64(a.MovementSpeedMultiplier()),
 		AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, tmpl.AtkSpd),
 		CollisionRadius:  a.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
-		Running: true, MoveType: int(a.Move().MoveType()),
-		InCombat: inCombat, AlikeDead: a.AlikeDead(),
-		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
-		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
+		Running: a.Running(), MoveType: int(a.Move().MoveType()),
+		// A summon's show-summon-animation flag is set when it is created
+		// and never cleared, so every summon NpcInfo carries 2.
+		InCombat: inCombat, AlikeDead: a.AlikeDead(), SummonAnimation: 2,
+		RightHand: a.WeaponItemID(), Chest: a.ArmorItemID(),
+		Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
 		AbnormalEffect: a.AbnormalEffect(), Team: team,
 		Attackable: viewer != nil && a.AttackableWithoutForceBy(viewer.Character),
-	}, true
+	}
+	l.addSummonCrest(a, &snap)
+	return snap, true
 }
 
 // petInfoSnapshot resolves a's owner-visible PetInfo fields, given owner
@@ -457,7 +498,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		PAtkSpd:           pAtkSpd,
 		RunSpd:            int(tmpl.RunSpeed),
 		WalkSpd:           int(tmpl.WalkSpeed),
-		MoveMultiplier:    float64(a.MovementSpeedMultiplier(tmpl.RunSpeed)),
+		MoveMultiplier:    float64(a.MovementSpeedMultiplier()),
 		AtkSpdMultiplier:  npcinfo.AttackSpeedMultiplier(pAtkSpd, tmpl.AtkSpd),
 		CollisionRadius:   tmpl.CollisionRadius,
 		CollisionHeight:   tmpl.CollisionHeight,
@@ -487,12 +528,14 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		Accuracy:          int(a.Accuracy()),
 		EvasionRate:       int(a.EvasionRate()),
 		CriticalHit:       int(a.CriticalRate(tmpl.CritRate)),
-		MoveSpeed:         int(a.MoveSpeed(tmpl.RunSpeed)),
+		MoveSpeed:         int(a.MoveSpeed()),
 		AbnormalEffect:    petAbnormalEffect(a, owner),
 		Mountable:         petmodel.IsMountable(a.NPCID()),
 		MoveType:          int(a.Move().MoveType()),
 		Team:              owner.DuelTeam(),
 		SoulShotsPerHit:   ssCount,
 		SpiritShotsPerHit: spsCount,
+		Weapon:            a.WeaponItemID(),
+		Armor:             a.ArmorItemID(),
 	}, true
 }

@@ -1,0 +1,39 @@
+# An Elven Fighter leading a level 5 clan, mid-way through Letters of Love (Q001), with
+# pinned script draws: the probe's page shows the class, race, leadership, the seeded Q001
+# state and the three listed draws; Baulro then carries the seeded quest on from cond 3.
+character Elf 20
+class 18
+clan 5
+quest Q001_LettersOfLove <state>=STARTED <cond>=3
+random 0 39 99
+script quest.Q001_LettersOfLove
+script test.PreconditionProbe
+item 1079 1080
+page trainer/30033.htm
+page script/quest/Q001_LettersOfLove/
+npc probe 30001 Folk 10 0 0
+npc baulro 30033 Trainer 20 0 0
+
+action probe
+action probe
+  S ActionFailed
+  S NpcHtmlMessage obj=probe item=0 html="<html><body>class=18 race=Elf leader=true q001=STARTED/3 draws=0,39,99</body></html>"
+  S ActionFailed
+
+action baulro
+action baulro
+  S ActionFailed
+  S NpcHtmlMessage obj=baulro item=0 page=trainer/30033.htm
+  S ActionFailed
+bypass npc_{baulro}_Quest
+  S QuestList 1:0x8000000f
+  S ExShowQuestMark quest=1
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1080
+  S NpcHtmlMessage obj=baulro item=0 page=script/quest/Q001_LettersOfLove/30033-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q001_LettersOfLove | <cond> | 4
+  rows Q001_LettersOfLove <cond>=4 <state>=STARTED
+  state Q001_LettersOfLove STARTED
+  items 1079=0 1080=1

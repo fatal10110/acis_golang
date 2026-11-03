@@ -1,0 +1,53 @@
+# Four Goblets (Q620): a character with the four goblets trades them for the antique brooch. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q620_four_goblets_turn_in.golden
+character Hero 74
+quest Q620_FourGoblets <cond>=1 <state>=STARTED
+random always 0
+hold 7256 1
+hold 7257 1
+hold 7258 1
+hold 7259 1
+script quest.Q620_FourGoblets
+item 7254 7255 7256 7257 7258 7259 7260 7261 7262
+page default/31453.htm
+page script/quest/Q620_FourGoblets/
+npc spirit 31453 Folk 10 0 0
+
+action spirit
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-15a.htm
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-15a.htm
+  S ActionFailed
+bypass Quest Q620_FourGoblets 31453-16.htm
+  S QuestList 620:0x80000003
+  S ExShowQuestMark quest=620
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7256
+  S SystemMessage id=302 3:7257
+  S SystemMessage id=302 3:7258
+  S SystemMessage id=302 3:7259
+  S SystemMessage id=54 3:7262
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-16.htm
+  S ActionFailed
+  Q upsert Q620_FourGoblets | <cond> | 2
+  items 7256=0 7257=0 7258=0 7259=0 7262=1
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=default/31453.htm
+  S ActionFailed
+bypass npc_{spirit}_Quest
+  S NpcHtmlMessage obj=spirit item=0 page=script/quest/Q620_FourGoblets/31453-17.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q620_FourGoblets <cond>=2 <state>=STARTED

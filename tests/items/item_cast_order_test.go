@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -119,7 +118,7 @@ func TestItemCastConsumesItemBeforeMasteryAndInitialMP(t *testing.T) {
 	}
 	assertMagicSkillUseSelf(t, c.Read(), objID, 2031, 1, 500, 3000)
 
-	if !player.SkillDisabled(actorcast.ReuseKey(modelskill.Definition{ID: 2031, Level: 1})) {
+	if !player.SkillDisabled(actorcast.ReuseKey(&modelskill.Definition{ID: 2031, Level: 1})) {
 		t.Fatal("skill 2031 not on reuse after a mastery proc, want the item's 10 s reuse")
 	}
 	srv.InventoryUpdates.Tick()
@@ -153,14 +152,14 @@ func TestItemCastWithItemGoneChargesNothing(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "first MagicSkillLaunched")
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageNotEnoughItems)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "item-gone ActionFailed")
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("item-gone cast extra opcode = %#x, want none", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("item-gone cast extra opcode = %#x, want none", queued[0][0])
 	}
 
 	if got := srv.PlayerCurrentMP(t, objID); got != mp {
 		t.Fatalf("MP after the item-gone cast = %d, want %d unchanged", got, mp)
 	}
-	if player.SkillDisabled(actorcast.ReuseKey(modelskill.Definition{ID: 2015, Level: 1})) {
+	if player.SkillDisabled(actorcast.ReuseKey(&modelskill.Definition{ID: 2015, Level: 1})) {
 		t.Fatal("skill 2015 on reuse after its item was gone, want nothing charged")
 	}
 	if srv.PlayerCastingNow(t, objID) {

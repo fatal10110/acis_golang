@@ -20,7 +20,7 @@ const wanderChainTimer = 5 * time.Second
 // of walking. It returns the time of the promotion.
 func spawnWanderChainMonster(t *testing.T, rate int) (*gameservertest.Server, *npc.Hostile, time.Time) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)

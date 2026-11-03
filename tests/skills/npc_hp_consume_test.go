@@ -90,8 +90,8 @@ func TestCastingNPCDeathCancelsBeforeFinalStatusAndDie(t *testing.T) {
 		}
 	})
 	srv.Advance(t, time.Second)
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("frame after repeated death or canceled cast = %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("frame after repeated death or canceled cast = %#x", queued[0][0])
 	}
 }
 

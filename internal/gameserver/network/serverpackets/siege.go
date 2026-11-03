@@ -128,3 +128,7 @@ const SystemMessageParamCastleName = 5
 func CastleNameParam(castleID int32) SystemMessageParam {
 	return SystemMessageParam{Type: SystemMessageParamCastleName, Value: castleID}
 }
+
+// SystemMessageCannotPortVillageInSiege refuses a teleport to a destination
+// tied to a castle whose siege is being fought.
+const SystemMessageCannotPortVillageInSiege = 707

@@ -1,0 +1,109 @@
+# Guardians of the Holy Grail (Q639): Gremory gives a water bottle, the Holy Grail turns it into holy water, and Gremory takes the bottle back.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q639_guardians_of_the_holy_grail_holy_water.golden
+character Hero 73
+quest Q639_GuardiansOfTheHolyGrail <cond>=1 <state>=STARTED
+script quest.Q639_GuardiansOfTheHolyGrail
+item 8069 8070 8071 57 959 960
+page default/31350.htm
+page default/32008.htm
+page default/32028.htm
+page script/quest/Q639_GuardiansOfTheHolyGrail/
+npc dominic 31350 Folk 10 0 0
+npc gremory 32008 Folk 20 0 0
+npc grail 32028 Folk 30 0 0
+
+action gremory
+action gremory
+  S ActionFailed
+  S NpcHtmlMessage obj=gremory item=0 page=default/32008.htm
+  S ActionFailed
+bypass npc_{gremory}_Quest
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 32008-02.htm
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-02.htm
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 32008-03.htm
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-03.htm
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 32008-04.htm
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-04.htm
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 32008-05.htm
+  S QuestList 639:0x80000003
+  S ExShowQuestMark quest=639
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8070
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-05.htm
+  S ActionFailed
+  Q upsert Q639_GuardiansOfTheHolyGrail | <cond> | 2
+  rows Q639_GuardiansOfTheHolyGrail <cond>=2 <state>=STARTED
+  state Q639_GuardiansOfTheHolyGrail STARTED
+  items 8070=1
+action gremory
+  S ActionFailed
+  S NpcHtmlMessage obj=gremory item=0 page=default/32008.htm
+  S ActionFailed
+bypass npc_{gremory}_Quest
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-06.htm
+  S ActionFailed
+  S ActionFailed
+action grail
+action grail
+  S ActionFailed
+  S NpcHtmlMessage obj=grail item=0 page=default/32028.htm
+  S ActionFailed
+bypass npc_{grail}_Quest
+  S NpcHtmlMessage obj=grail item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32028-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 32028-02.htm
+  S QuestList 639:0x80000007
+  S ExShowQuestMark quest=639
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8070
+  S SystemMessage id=54 3:8071
+  S NpcHtmlMessage obj=grail item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32028-02.htm
+  S ActionFailed
+  Q upsert Q639_GuardiansOfTheHolyGrail | <cond> | 3
+  rows Q639_GuardiansOfTheHolyGrail <cond>=3 <state>=STARTED
+  state Q639_GuardiansOfTheHolyGrail STARTED
+  items 8070=0 8071=1
+action grail
+  S ActionFailed
+  S NpcHtmlMessage obj=grail item=0 page=default/32028.htm
+  S ActionFailed
+bypass npc_{grail}_Quest
+  S NpcHtmlMessage obj=grail item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32028-03.htm
+  S ActionFailed
+  S ActionFailed
+action gremory
+action gremory
+  S ActionFailed
+  S NpcHtmlMessage obj=gremory item=0 page=default/32008.htm
+  S ActionFailed
+bypass npc_{gremory}_Quest
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q639_GuardiansOfTheHolyGrail 32008-09.htm
+  S QuestList 639:0x8000000f
+  S ExShowQuestMark quest=639
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8071
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-09.htm
+  S ActionFailed
+  Q upsert Q639_GuardiansOfTheHolyGrail | <cond> | 4
+  rows Q639_GuardiansOfTheHolyGrail <cond>=4 <state>=STARTED
+  state Q639_GuardiansOfTheHolyGrail STARTED
+  items 8071=0
+action gremory
+  S ActionFailed
+  S NpcHtmlMessage obj=gremory item=0 page=default/32008.htm
+  S ActionFailed
+bypass npc_{gremory}_Quest
+  S NpcHtmlMessage obj=gremory item=0 page=script/quest/Q639_GuardiansOfTheHolyGrail/32008-10.htm
+  S ActionFailed
+  S ActionFailed

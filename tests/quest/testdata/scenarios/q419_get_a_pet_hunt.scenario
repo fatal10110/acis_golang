@@ -1,0 +1,84 @@
+# Get a Pet (Q419), the character brings the fiftieth bloody fang and trades the list and the proofs for the Animal Lover's list. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q419_get_a_pet_hunt.golden
+character Fighter 15
+quest Q419_GetAPet <cond>=1 <state>=STARTED
+hold 3418 1
+hold 3423 48
+random always 0
+script quest.Q419_GetAPet
+item 3417 3418 3419 3420 3421 3422 3423 3424 3425 3426 3427 2375
+page merchant/30731.htm
+page gatekeeper/30256.htm
+page guard/30072.htm
+page merchant/30091.htm
+page script/quest/Q419_GetAPet/
+npc martin 30731 Merchant 10 0 0
+npc bella 30256 Gatekeeper -20 0 0
+npc metty 30072 Guard 30 0 0
+npc ellie 30091 Merchant -40 0 0
+npc fang 20103 Monster 40 0 0
+npc kasha 20476 Monster 50 0 0
+
+action martin
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+bypass npc_{martin}_Quest
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-10.htm
+  S ActionFailed
+  S ActionFailed
+kill fang
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3423
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3423=49
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+bypass npc_{martin}_Quest
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-10.htm
+  S ActionFailed
+  S ActionFailed
+kill fang
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3423
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3423=50
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+bypass npc_{martin}_Quest
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q419_GetAPet 30731-12.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3418
+  S SystemMessage id=301 3:3423 6:50
+  S SystemMessage id=54 3:3417
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-12.htm
+  S ActionFailed
+  items 3417=1 3418=0 3423=0
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+bypass npc_{martin}_Quest
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-16.htm
+  S ActionFailed
+  S ActionFailed

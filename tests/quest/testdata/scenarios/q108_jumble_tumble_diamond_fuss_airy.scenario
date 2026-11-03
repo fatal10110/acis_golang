@@ -1,0 +1,23 @@
+# Jumble, Tumble, Diamond Fuss (Q108), Airy's other answer: a dwarf on cond 11 still hunting the star
+# diamond talks to Airy with the coin draw pinned the other way and gets her second hint. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q108_jumble_tumble_diamond_fuss_airy.golden
+character Jeweler 10
+class 53
+quest Q108_JumbleTumbleDiamondFuss <cond>=11 <state>=STARTED
+random 1
+script quest.Q108_JumbleTumbleDiamondFuss
+item 1570
+page warehouse/30522.htm
+page script/quest/Q108_JumbleTumbleDiamondFuss/
+npc airy 30522 WarehouseKeeper -10 0 0
+
+action airy
+action airy
+  S ActionFailed
+  S NpcHtmlMessage obj=airy item=0 page=warehouse/30522.htm
+  S ActionFailed
+bypass npc_{airy}_Quest
+  S NpcHtmlMessage obj=airy item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30522-04.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q108_JumbleTumbleDiamondFuss <cond>=11 <state>=STARTED

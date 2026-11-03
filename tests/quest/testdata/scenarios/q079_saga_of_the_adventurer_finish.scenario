@@ -1,0 +1,81 @@
+# Saga of the Adventurer (Q079) from cond 18: the sixth tablet takes the sixth amulet;
+# Black Cat ends the saga at level 76: adena, the Book of Giants and experience, the quest
+# completed, the Treasure Hunter made an Adventurer (the class change's own animation and message,
+# then the saga's animation on the player and on Black Cat); after a relog Black Cat only says the
+# quest is done. Expectations are the reference trace's (the relog's rows and state
+# derived from ThirdClassQuest.java and Q079_SagaOfTheAdventurer.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q079_saga_of_the_adventurer_finish.golden
+character TreasureHunter 76
+class 8
+quest Q079_SagaOfTheAdventurer <state>=STARTED <cond>=18
+script quest.Q079_SagaOfTheAdventurer
+item 7102 7432 6622
+page default/31603.htm
+page default/31658.htm
+page script/quest/Q079_SagaOfTheAdventurer/
+npc blackcat 31603 Folk 10 0 0
+npc tablet6 31658 Folk 30 0 0
+
+action tablet6
+action tablet6
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet6 item=0 page=default/31658.htm
+  S ActionFailed
+bypass npc_{tablet6}_Quest
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q079_SagaOfTheAdventurer/10-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q079_SagaOfTheAdventurer 10-2
+  S QuestList 79:0x8007ffff
+  S ExShowQuestMark quest=79
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S MagicSkillUse caster=player target=player skill=4546-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=tablet6 target=tablet6 skill=4546-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q079_SagaOfTheAdventurer/10-06.htm
+  S ActionFailed
+  Q upsert Q079_SagaOfTheAdventurer | <cond> | 19
+action tablet6
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet6 item=0 page=default/31658.htm
+  S ActionFailed
+bypass npc_{tablet6}_Quest
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q079_SagaOfTheAdventurer/10-07.htm
+  S ActionFailed
+  S ActionFailed
+action blackcat
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q079_SagaOfTheAdventurer/0-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q079_SagaOfTheAdventurer 0-2
+  S SystemMessage id=52 6:5000000
+  S SystemMessage id=54 3:6622
+  S SystemMessage id=45 1:2299404
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 79:0x00000000
+  S MagicSkillUse caster=player target=player skill=5103-1 hit=1000 reuse=0 success=0
+  S SystemMessage id=1606
+  S MagicSkillUse caster=player target=player skill=4339-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=blackcat target=blackcat skill=4339-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q079_SagaOfTheAdventurer/0-07.htm
+  S ActionFailed
+  Q upsert Q079_SagaOfTheAdventurer | <state> | COMPLETED
+  Q delete-except-state Q079_SagaOfTheAdventurer
+  items 6622=1
+  state Q079_SagaOfTheAdventurer COMPLETED
+relog
+  state Q079_SagaOfTheAdventurer COMPLETED
+  rows Q079_SagaOfTheAdventurer <state>=COMPLETED
+action blackcat
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

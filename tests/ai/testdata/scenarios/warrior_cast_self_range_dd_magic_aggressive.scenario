@@ -1,0 +1,22 @@
+# WarriorCastSelfRangeDDMagicAggressive (21310, level 76, long range DD 4158-8, self range DD 4599-8),
+# every draw 0: settled (8 AI ticks) and met again after the character stepped away 300 off, the
+# character is struck from afar (4158) and attacked at 200; a mate hitting it within 200 while it
+# fights the character makes it want its self range magic on that attacker (4599), at 1000000.
+character Hunter 20
+random always 0
+member Mate 20 200 0 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSelfRangeDDMagicAggressive
+npc caster 21310 Monster 300 0 0 level 76 aggro 1000 skill W_LONG_RANGE_DD_MAGIC 4158 8 skill SELF_RANGE_DD_MAGIC 4599 8
+roll caster 99
+
+tick x8
+away
+approach caster 300
+  S MagicSkillUse caster=caster target=player skill=4158-8 hit=10571 reuse=0 success=0
+  desires caster attack(player)=200 cast(player,4158,move)=1000000 wander()=5
+hit caster 10 by Mate
+  desires caster attack(Mate)=12.048192771084338 attack(player)=200 cast(Mate,4599,move)=1000000 cast(player,4158,move)=1000000 wander()=5

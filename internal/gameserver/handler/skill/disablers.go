@@ -5,8 +5,10 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // blessedSpiritshotCharged reports whether caster holds a blessed spiritshot
@@ -44,6 +46,10 @@ func (disablersHandler) Use(cast Cast) {
 	bsps := blessedSpiritshotCharged(cast.Caster)
 
 	for _, obj := range cast.Targets {
+		if d, ok := asDoor(obj); ok {
+			disableDoor(cast, d, skillType, bsps)
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok {
 			continue
@@ -252,11 +258,11 @@ func disableConfusion(cast Cast, target Creature, land landing) {
 	land.apply(cast, target)
 }
 
-// disableAggReduce applies the skill's effects and, for a positive skill
-// power, subtracts it from every hate entry the target's threat table
-// holds. A zero-or-negative power should instead subtract a generic
-// AGGRESSION stat delta; that needs a stat
-// resolution this port has no generic model for yet, so it's skipped.
+// disableAggReduce applies the skill's effects and subtracts from every
+// hate entry the target's threat table holds: a positive skill power
+// itself, otherwise how far the target's AGGRESSION stat, calculated for
+// the skill from its hate against the caster, lowers that hate (truncated,
+// and only when it does lower it).
 func disableAggReduce(cast Cast, target Creature, land landing) {
 	// Only an NPC holds the aggro tables this skill reduces.
 	if !target.Attackable() {
@@ -264,7 +270,16 @@ func disableAggReduce(cast Cast, target Creature, land landing) {
 	}
 	land.apply(cast, target)
 	if cast.Skill.Power > 0 {
-		target.ReduceAllAggroHate(float64(cast.Skill.Power))
+		target.ReduceAllAggroHate(float64(truncDamage(float64(cast.Skill.Power))))
+		return
+	}
+	var hate float64
+	if n, ok := asNPC(target); ok {
+		hate = n.AggroHate(cast.Caster)
+	}
+	reduced := target.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).CalcStat(stat.Aggression, hate)
+	if diff := hate - reduced; diff > 0 {
+		target.ReduceAllAggroHate(float64(truncDamage(diff)))
 	}
 }
 

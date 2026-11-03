@@ -38,7 +38,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	if live == nil {
 		return true
 	}
-	if l.world == nil || l.groundItems == nil || ground.Template == nil || ground.Count() <= 0 {
+	if l.world == nil || l.belongings.groundItems == nil || ground.Template == nil || ground.Count() <= 0 {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
@@ -97,10 +97,13 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		taken = true
 		live.SendFrame(serverpackets.FrameActionFailed())
 		l.broadcastGroundPickup(ground, live.ObjectID())
-		l.groundItems.Remove(ground)
+		l.belongings.groundItems.Remove(ground)
 		l.world.Despawn(ground)
-		l.lockPickupParalysis(live)
+		// The herb is used before the pickup lock paralyzes the picker: a
+		// paralyzed character has every skill disabled, which would reject
+		// the herb's skill as still being prepared for reuse.
 		l.consumeHerb(live, ground.ItemID())
+		l.lockPickupParalysis(live)
 		return true
 	}
 
@@ -126,7 +129,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	// has no rows to write. The ground item's row comes from outside the
 	// inventory, and may still be bound to the trade that gave it to its
 	// dropper, so the operation names it too.
-	end := l.itemInstances.BeginOperationTaking([]int32{picked.ObjectID}, inv.OwnerID())
+	end := l.belongings.itemInstances.BeginOperationTaking([]int32{picked.ObjectID}, inv.OwnerID())
 	defer end()
 	res, failure := l.pickupGroundInto(inv, ground, live)
 	l.applyPersistActions(res.Persist)
@@ -148,7 +151,10 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 
 	taken = true
 	l.takeGroundFromWorld(live, ground)
-	live.ItemAdded(obtained)
+	// The pickup runs on live's own queue: a cursed weapon it picks up
+	// expels it from its party, and a festival then takes it out of its
+	// arena inside the call, before the party's notices.
+	live.RunOnOwnQueue(func() { live.ItemAdded(obtained) })
 	l.lockPickupParalysis(live)
 	return true
 }
@@ -192,8 +198,10 @@ func (l *GameClientLink) pickupGroundInto(inv *itemcontainer.Inventory, ground *
 func (l *GameClientLink) takeGroundFromWorld(live *livePlayer, ground *grounditem.Item) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	l.broadcastGroundPickup(ground, live.ObjectID())
-	tutorialPickedUp(live, ground.ItemID())
-	l.groundItems.Remove(ground)
+	// live's own pickup runs on its queue: the tutorial hook runs as a
+	// hook on that queue.
+	live.RunOnOwnQueue(func() { tutorialPickedUp(live, ground.ItemID()) })
+	l.belongings.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	// A cursed weapon is announced by its own activation instead.
 	if !l.isCursedWeapon(ground.ItemID()) {
@@ -267,14 +275,14 @@ func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grou
 		if st.EnchantLevel > 0 {
 			return serverpackets.FrameSystemMessageStringNumberItemName(
 				serverpackets.SystemMessageAttentionS1PickedUpS2S3,
-				live.Name,
+				live.CharacterName(),
 				int32(st.EnchantLevel),
 				st.TemplateID,
 			)
 		}
 		return serverpackets.FrameSystemMessageStringItemName(
 			serverpackets.SystemMessageAttentionS1PickedUpS2,
-			live.Name,
+			live.CharacterName(),
 			st.TemplateID,
 		)
 	}

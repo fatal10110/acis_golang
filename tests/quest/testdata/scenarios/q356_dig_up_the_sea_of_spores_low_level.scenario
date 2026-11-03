@@ -1,0 +1,24 @@
+# Dig Up the Sea of Spores (Q356), refused: a level 42 character is too young for Gauen, and the
+# quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q356_dig_up_the_sea_of_spores_low_level.golden
+character Gauen 42
+script quest.Q356_DigUpTheSeaOfSpores
+item 57 5865 5866
+page trainer/30717.htm
+page script/quest/Q356_DigUpTheSeaOfSpores/
+npc gauen 30717 Trainer 10 0 0
+npc tree 20558 Monster 40 0 0
+npc zombie 20562 Monster -40 0 0
+
+# Gauen: too young.
+action gauen
+action gauen
+  S ActionFailed
+  S NpcHtmlMessage obj=gauen item=0 page=trainer/30717.htm
+  S ActionFailed
+bypass npc_{gauen}_Quest
+  S NpcHtmlMessage obj=gauen item=0 page=script/quest/Q356_DigUpTheSeaOfSpores/30717-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q356_DigUpTheSeaOfSpores CREATED
+  rows Q356_DigUpTheSeaOfSpores -

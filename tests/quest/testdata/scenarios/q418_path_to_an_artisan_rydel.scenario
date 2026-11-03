@@ -1,0 +1,49 @@
+# Path to an Artisan (Q418), Hitchi sends the character to Rydel, who finishes the quest; Hitchi can finish it too. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q418_path_to_an_artisan_rydel.golden
+character Fighter 19
+class 53
+quest Q418_PathToAnArtisan <cond>=11 <state>=STARTED
+hold 1633 1
+hold 1634 1
+hold 1641 1
+script quest.Q418_PathToAnArtisan
+item 1632 1633 1634 1635 1636 1637 1638 1639 1640 1641
+page trainer/30527.htm
+page trainer/30317.htm
+page trainer/30298.htm
+page default/32052.htm
+page merchant/31963.htm
+page default/30531.htm
+page warehouse/31956.htm
+page script/quest/Q418_PathToAnArtisan/
+npc silvera 30527 Trainer 10 0 0
+npc kluto 30317 Trainer -20 0 0
+npc pinter 30298 Trainer 30 0 0
+npc obi 32052 Folk -40 0 0
+npc hitchi 31963 Merchant 50 0 0
+npc lockirin 30531 Folk -60 0 0
+npc rydel 31956 WarehouseKeeper 70 0 0
+npc ratman 20389 Monster 40 0 0
+npc leader 20390 Monster 50 0 0
+npc thief 20017 Monster 60 0 0
+
+bypass Quest Q418_PathToAnArtisan 31963-07.htm
+action hitchi
+action hitchi
+  S ActionFailed
+  S NpcHtmlMessage obj=hitchi item=0 page=merchant/31963.htm
+  S ActionFailed
+bypass npc_{hitchi}_Quest
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-06a.htm
+  S ActionFailed
+  S ActionFailed
+action rydel
+action rydel
+  S ActionFailed
+  S NpcHtmlMessage obj=rydel item=0 page=warehouse/31956.htm
+  S ActionFailed
+bypass npc_{rydel}_Quest
+  S NpcHtmlMessage obj=rydel item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 31956-04.htm

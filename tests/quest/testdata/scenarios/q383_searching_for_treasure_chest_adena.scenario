@@ -1,0 +1,33 @@
+# Searching for Treasure (Q383), level 42 with the key: the chest gives adena at each of its four rolls. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q383_searching_for_treasure_chest_adena.golden
+character Treasure 42
+quest Q383_SearchingForTreasure <cond>=2 <state>=STARTED
+hold 1661 1
+random 99 999 99 99
+script quest.Q383_SearchingForTreasure
+item 57 1661 5915 2450 4481 1337 4408
+page merchant/30890.htm
+page default/31148.htm
+page script/quest/Q383_SearchingForTreasure/
+npc espen 30890 Merchant 10 0 0
+npc chest 31148 Folk -10 0 0
+
+action chest
+action chest
+  S ActionFailed
+  S NpcHtmlMessage obj=chest item=0 page=default/31148.htm
+  S ActionFailed
+bypass npc_{chest}_Quest
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q383_SearchingForTreasure/31148-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q383_SearchingForTreasure 31148-02.htm
+  S SystemMessage id=302 3:1661
+  S SystemMessage id=52 6:1800
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q383_SearchingForTreasure/31148-02.htm
+  S ActionFailed
+  Q delete-quest Q383_SearchingForTreasure
+  items 1661=0 57=1800
+  state Q383_SearchingForTreasure -

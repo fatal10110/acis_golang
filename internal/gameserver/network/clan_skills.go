@@ -23,7 +23,10 @@ func (l *GameClientLink) clanSkillMinClass(sk clan.Skill) (int, bool) {
 		return 0, false
 	}
 	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(sk.ID), Level: sk.Level})
-	return def.MinPledgeClass, ok
+	if !ok {
+		return 0, false
+	}
+	return def.MinPledgeClass, true
 }
 
 // clanSkillRefs is skills as skill references.
@@ -127,9 +130,7 @@ func (l *GameClientLink) broadcastLiveFrameAfterClanQueued(live *livePlayer, cl 
 		if l.world == nil {
 			return
 		}
-		known := live.known.SnapshotCopy(l.world, live)
-		defer known.Release()
-		for _, o := range known.Tracked() {
+		for o := range l.world.KnownPlayers(live) {
 			if viewer, ok := o.(*livePlayer); ok && cl.IsMember(viewer.ObjectID()) {
 				send(queuedMember{actor: live, member: viewer})
 			} else if receiver, ok := o.(frameReceiver); ok {

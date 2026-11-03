@@ -1,0 +1,120 @@
+# What Women Want (Q002), the other ending: after Mirabel and Herbiel, the player gives
+# Arujien the third letter for 450 adena instead of sending the poetry book; the quest
+# completes; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q002_what_women_want_adena.golden
+character Talker 2
+script quest.Q002_WhatWomenWant
+item 1092 1093 1094 689 693 113
+page default/30223.htm
+page gatekeeper/30146.htm
+page merchant/30150.htm
+page script/quest/Q002_WhatWomenWant/
+npc arujien 30223 Folk 10 0 0
+npc mirabel 30146 Gatekeeper 20 0 0
+npc herbiel 30150 Merchant 30 0 0
+
+# Arujien: accept with her first letter.
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q002_WhatWomenWant CREATED
+bypass Quest Q002_WhatWomenWant 30223-03.htm
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-03.htm
+  S ActionFailed
+bypass Quest Q002_WhatWomenWant 30223-04.htm
+  S QuestList 2:0x80000001
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1092
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-04.htm
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <state> | STARTED
+  Q upsert Q002_WhatWomenWant | <cond> | 1
+  state Q002_WhatWomenWant STARTED
+  rows Q002_WhatWomenWant <cond>=1 <state>=STARTED
+
+# Mirabel, then Herbiel: the letter becomes the second, then the third.
+action mirabel
+action mirabel
+  S ActionFailed
+  S NpcHtmlMessage obj=mirabel item=0 page=gatekeeper/30146.htm
+  S ActionFailed
+bypass npc_{mirabel}_Quest
+  S QuestList 2:0x80000003
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1092
+  S SystemMessage id=54 3:1093
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q002_WhatWomenWant/30146-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <cond> | 2
+  items 1092=0 1093=1
+action herbiel
+action herbiel
+  S ActionFailed
+  S NpcHtmlMessage obj=herbiel item=0 page=merchant/30150.htm
+  S ActionFailed
+bypass npc_{herbiel}_Quest
+  S QuestList 2:0x80000007
+  S ExShowQuestMark quest=2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1093
+  S SystemMessage id=54 3:1094
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q002_WhatWomenWant/30150-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <cond> | 3
+  items 1093=0 1094=1
+action herbiel
+  S ActionFailed
+  S NpcHtmlMessage obj=herbiel item=0 page=merchant/30150.htm
+  S ActionFailed
+bypass npc_{herbiel}_Quest
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q002_WhatWomenWant/30150-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Arujien: the third letter for adena; the quest completes.
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q002_WhatWomenWant 30223-09.htm
+  S SystemMessage id=302 3:1094
+  S SystemMessage id=52 6:450
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 2:0x00000000
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-09.htm
+  S ActionFailed
+  Q upsert Q002_WhatWomenWant | <state> | COMPLETED
+  Q delete-except-state Q002_WhatWomenWant
+  state Q002_WhatWomenWant COMPLETED
+  rows Q002_WhatWomenWant <state>=COMPLETED
+  items 1094=0 57=450 689=0 113=0
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q002_WhatWomenWant COMPLETED
+  rows Q002_WhatWomenWant <state>=COMPLETED
+  items 57=450 113=0
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

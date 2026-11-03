@@ -15,17 +15,25 @@ const OpcodeConfirmDlg = 0xed
 // echoes back.
 const ConfirmDlgSummonFriendRequest int32 = 1842
 
-// ConfirmDlgResurrectionRequest is SystemMessageId's
-// RESSURECTION_REQUEST_BY_S1, the resurrection offer's messageId.
+// ConfirmDlgResurrectionRequest is system message RESSURECTION_REQUEST_BY_S1,
+// the resurrection offer's messageId.
 const ConfirmDlgResurrectionRequest int32 = 1510
 
-// ConfirmDlgRestoreRequest is SystemMessageId's DO_YOU_WANT_TO_BE_RESTORED,
+// ConfirmDlgRestoreRequest is system message DO_YOU_WANT_TO_BE_RESTORED,
 // whose answer is handled as a resurrection offer's.
 const ConfirmDlgRestoreRequest int32 = 332
 
 // ConfirmDlgEngageRequest is the wedding manager's marriage request
 // dialog, a message id the client shows its one text parameter for.
 const ConfirmDlgEngageRequest int32 = 1983
+
+// ConfirmDlgOpenGate and ConfirmDlgCloseGate are system messages
+// WOULD_YOU_LIKE_TO_OPEN_THE_GATE and WOULD_YOU_LIKE_TO_CLOSE_THE_GATE, the
+// questions a clan hall door asks its owners.
+const (
+	ConfirmDlgOpenGate  int32 = 1140
+	ConfirmDlgCloseGate int32 = 1141
+)
 
 const (
 	confirmDlgTypeText     = 0
@@ -36,7 +44,7 @@ const (
 // dialog: messageId, the caster's name (TYPE_TEXT), the caster's position
 // (TYPE_ZONE_NAME), the client-UI countdown, and the caster's object id for
 // DlgAnswer's requesterId echo — ConfirmDlg's two-parameter layout followed
-// by the countdown and requester id.
+// by the countdown and requester id, each left out when zero.
 func FrameConfirmDlgSummonFriendRequest(casterName string, casterID int32, x, y, z int32, timeout time.Duration) wire.Frame {
 	w := newFrameWriter(OpcodeConfirmDlg)
 	w.WriteInt32(ConfirmDlgSummonFriendRequest)
@@ -47,15 +55,18 @@ func FrameConfirmDlgSummonFriendRequest(casterName string, casterID int32, x, y,
 	w.WriteInt32(x)
 	w.WriteInt32(y)
 	w.WriteInt32(z)
-	w.WriteInt32(int32(timeout / time.Millisecond))
-	w.WriteInt32(casterID)
+	if ms := int32(timeout / time.Millisecond); ms != 0 {
+		w.WriteInt32(ms)
+	}
+	if casterID != 0 {
+		w.WriteInt32(casterID)
+	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
 // FrameConfirmDlgResurrectionRequest builds the resurrection offer: the
 // message id and the reviver's name as its single TYPE_TEXT parameter, with
-// no countdown or requester id (ConfirmDlg.writeImpl writes neither when
-// they are zero).
+// no countdown or requester id (both are left out when zero).
 func FrameConfirmDlgResurrectionRequest(reviverName string) wire.Frame {
 	w := newFrameWriter(OpcodeConfirmDlg)
 	w.WriteInt32(ConfirmDlgResurrectionRequest)
@@ -74,5 +85,21 @@ func FrameConfirmDlgEngageRequest(text string) wire.Frame {
 	w.WriteInt32(1)
 	w.WriteInt32(confirmDlgTypeText)
 	w.WriteString(text)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameConfirmDlgGate builds a clan hall door's question, whether to open
+// it (open set) or close it: the message id with no parameter, countdown or
+// requester id.
+func FrameConfirmDlgGate(open bool) wire.Frame {
+	id := ConfirmDlgCloseGate
+	if open {
+		id = ConfirmDlgOpenGate
+	}
+	w := newFrameWriter(OpcodeConfirmDlg)
+	w.WriteInt32(id)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

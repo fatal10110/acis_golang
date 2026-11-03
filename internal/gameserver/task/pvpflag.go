@@ -1,6 +1,7 @@
 package task
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -67,11 +68,25 @@ func PvPFlagOptionsFromProperties(props *config.Properties) (PvPFlagOptions, err
 	return opts, nil
 }
 
+// PvPFlagTimes are how long a PvP flag lasts: Normal after attacking a
+// player who is not flagged, Flagged after attacking one who is.
+type PvPFlagTimes struct {
+	Normal, Flagged time.Duration
+}
+
+// Times returns the flag durations of o.
+func (o PvPFlagOptions) Times() PvPFlagTimes {
+	return PvPFlagTimes{Normal: o.Normal, Flagged: o.Flagged}
+}
+
 // PvPFlags tracks timed PvP flags and clears or blinks them on the fixed
 // one-second task.
 type PvPFlags struct {
-	opts PvPFlagOptions
-	now  func() time.Time
+	// times holds the flag durations in force; SetTimes replaces them
+	// whole, so a flag started after it lasts the new duration and one
+	// started before keeps its deadline.
+	times atomic.Pointer[PvPFlagTimes]
+	now   func() time.Time
 
 	*deadlineRegistry[int32, PvPFlagActor]
 }
@@ -81,8 +96,13 @@ func NewPvPFlags(opts PvPFlagOptions, now func() time.Time) *PvPFlags {
 	if now == nil {
 		now = time.Now
 	}
-	return &PvPFlags{opts: opts, now: now, deadlineRegistry: newDeadlineRegistry[int32, PvPFlagActor]()}
+	p := &PvPFlags{now: now, deadlineRegistry: newDeadlineRegistry[int32, PvPFlagActor]()}
+	p.SetTimes(opts.Times())
+	return p
 }
+
+// SetTimes puts t in force in place of the flag durations before.
+func (p *PvPFlags) SetTimes(t PvPFlagTimes) { p.times.Store(&t) }
 
 // Start launches the fixed one-second PvP flag task.
 func (p *PvPFlags) Start(log zerolog.Logger) *scheduler.Ticker {
@@ -91,7 +111,7 @@ func (p *PvPFlags) Start(log zerolog.Logger) *scheduler.Ticker {
 
 // AddNormal tracks actor for the configured normal-player timeout.
 func (p *PvPFlags) AddNormal(actor PvPFlagActor) {
-	p.Add(actor, p.opts.Normal)
+	p.Add(actor, p.times.Load().Normal)
 	if actor != nil {
 		actor.UpdatePvPFlag(PvPFlagOn)
 	}
@@ -99,7 +119,7 @@ func (p *PvPFlags) AddNormal(actor PvPFlagActor) {
 
 // AddFlagged tracks actor for the configured flagged-player timeout.
 func (p *PvPFlags) AddFlagged(actor PvPFlagActor) {
-	p.Add(actor, p.opts.Flagged)
+	p.Add(actor, p.times.Load().Flagged)
 	if actor != nil {
 		actor.UpdatePvPFlag(PvPFlagOn)
 	}

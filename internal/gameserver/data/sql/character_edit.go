@@ -37,3 +37,11 @@ func (s *CharacterStore) SetSex(ctx context.Context, objectID int32, sex byte) e
 	}
 	return nil
 }
+
+// SetName stores objectID's name.
+func (s *CharacterStore) SetName(ctx context.Context, objectID int32, name string) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET char_name = ? WHERE obj_Id = ?", name, objectID); err != nil {
+		return fmt.Errorf("set name for %d: %w", objectID, err)
+	}
+	return nil
+}

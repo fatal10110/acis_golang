@@ -1,0 +1,106 @@
+# Bring Out the Flavor of Ingredients! (Q380), level 24: the character with the ingredients and two antidotes goes through the dialog to the jelly and loses the roll. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q380_bring_out_the_flavor_of_ingredients_chain.golden
+character Flavor 24
+quest Q380_BringOutTheFlavorOfIngredients <cond>=2 <state>=STARTED
+hold 5895 4
+hold 5896 20
+hold 5897 10
+hold 1831 2
+random 99
+script quest.Q380_BringOutTheFlavorOfIngredients
+item 1831 5895 5896 5897 5959 5960
+page trainer/30069.htm
+page script/quest/Q380_BringOutTheFlavorOfIngredients/
+npc rollant 30069 Trainer 10 0 0
+npc wolf 20205 Monster 40 0 0
+npc werewolf 20206 Monster 50 0 0
+npc leech 20225 Monster 60 0 0
+
+action rollant
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S QuestList 380:0x80000007
+  S ExShowQuestMark quest=380
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:5895 6:4
+  S SystemMessage id=301 3:5896 6:20
+  S SystemMessage id=301 3:5897 6:10
+  S SystemMessage id=301 3:1831 6:2
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q380_BringOutTheFlavorOfIngredients/30069-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q380_BringOutTheFlavorOfIngredients | <cond> | 3
+  rows Q380_BringOutTheFlavorOfIngredients <cond>=3 <state>=STARTED
+  items 5895=0 5896=0 5897=0 1831=0
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S QuestList 380:0x8000000f
+  S ExShowQuestMark quest=380
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q380_BringOutTheFlavorOfIngredients/30069-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q380_BringOutTheFlavorOfIngredients | <cond> | 4
+  rows Q380_BringOutTheFlavorOfIngredients <cond>=4 <state>=STARTED
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S QuestList 380:0x8000001f
+  S ExShowQuestMark quest=380
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q380_BringOutTheFlavorOfIngredients/30069-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q380_BringOutTheFlavorOfIngredients | <cond> | 5
+  rows Q380_BringOutTheFlavorOfIngredients <cond>=5 <state>=STARTED
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S QuestList 380:0x8000003f
+  S ExShowQuestMark quest=380
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q380_BringOutTheFlavorOfIngredients/30069-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q380_BringOutTheFlavorOfIngredients | <cond> | 6
+  rows Q380_BringOutTheFlavorOfIngredients <cond>=6 <state>=STARTED
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+action rollant
+  S ActionFailed
+  S NpcHtmlMessage obj=rollant item=0 page=trainer/30069.htm
+  S ActionFailed
+bypass npc_{rollant}_Quest
+  S SystemMessage id=54 3:5960
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rollant item=0 page=script/quest/Q380_BringOutTheFlavorOfIngredients/30069-13.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q380_BringOutTheFlavorOfIngredients
+  items 5960=1
+  state Q380_BringOutTheFlavorOfIngredients -

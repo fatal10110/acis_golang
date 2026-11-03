@@ -4,7 +4,8 @@ import (
 	"cmp"
 	"context"
 	"slices"
-	"unicode/utf16"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // The longest community board texts a clan keeps, in UTF-16 code units.
@@ -23,23 +24,9 @@ type board struct {
 }
 
 func (b *board) restore(r Row) {
-	b.notice = cutUTF16(r.Notice, noticeLength)
+	b.notice = commons.UTF16Cut(r.Notice, noticeLength)
 	b.noticeEnabled = r.NoticeEnabled
-	b.introduction = cutUTF16(r.Introduction, introductionLength)
-}
-
-// cutUTF16 returns the first n UTF-16 code units of s, or s when it is no
-// longer. A character that would straddle the cut is left out.
-func cutUTF16(s string, n int) string {
-	used := 0
-	for i, r := range s {
-		w := utf16.RuneLen(r)
-		if used+w > n {
-			return s[:i]
-		}
-		used += w
-	}
-	return s
+	b.introduction = commons.UTF16Cut(r.Introduction, introductionLength)
 }
 
 // Notice is the clan's notice and whether it shows at login.
@@ -73,7 +60,7 @@ func (s *Service) EnableNotice(cl *Clan, enabled bool) {
 }
 
 func (s *Service) setNoticeLocked(cl *Clan, notice string, enabled bool) {
-	cl.board.notice = cutUTF16(notice, noticeLength)
+	cl.board.notice = commons.UTF16Cut(notice, noticeLength)
 	cl.board.noticeEnabled = enabled
 	id, text := cl.id, cl.board.notice
 	s.write(id, "update clan notice", func(ctx context.Context, st Store) error {
@@ -85,7 +72,7 @@ func (s *Service) setNoticeLocked(cl *Clan, notice string, enabled bool) {
 func (s *Service) SetIntroduction(cl *Clan, introduction string) {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
-	cl.board.introduction = cutUTF16(introduction, introductionLength)
+	cl.board.introduction = commons.UTF16Cut(introduction, introductionLength)
 	id, text := cl.id, cl.board.introduction
 	s.write(id, "update clan introduction", func(ctx context.Context, st Store) error {
 		return st.UpdateIntroduction(ctx, id, text)
@@ -94,7 +81,8 @@ func (s *Service) SetIntroduction(cl *Clan, introduction string) {
 
 // MembersInTableOrder returns the roster in the order of the hash table it
 // is kept in, as Clans orders the registry: the order a clan mail
-// addresses the members in. Like Clans, it approximates that order.
+// addresses the members in and a roster packet lists them in. Like Clans,
+// it approximates that order.
 func (cl *Clan) MembersInTableOrder() []Member {
 	members := cl.Members()
 	buckets := registryBuckets(len(members))
@@ -108,8 +96,9 @@ func (cl *Clan) MembersInTableOrder() []Member {
 // the registry is kept in (an id folded onto its own high half, masked to
 // the table size), lowest bucket first, and by ascending id within a
 // bucket. The order is approximate: the table size is recomputed from the
-// current count, where the reference's table never shrinks after a clan
-// leaves it, and a reference resize can reverse the order within a bucket.
+// current count, where the client-facing order comes from a table that
+// never shrinks after a clan leaves it, and whose resize can reverse the
+// order within a bucket.
 func (t *Table) Clans() []*Clan {
 	clans := t.allClans()
 	buckets := registryBuckets(len(clans))

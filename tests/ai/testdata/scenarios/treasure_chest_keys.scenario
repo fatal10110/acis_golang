@@ -1,0 +1,46 @@
+# TreasureChest (18265), a level 21 chest, hit by the keys the character opens it with: the
+# Unlock skill (27) at level 1 opens it on a draw under 92 (98 less 6 per level of the chest
+# above 16 plus 4), the key (2065) under 28, the deluxe key (2229) under 71. An opened chest
+# dies to the character and stays as a corpse; a chest whose key breaks (the draw at or past
+# the chance) is deleted with no death, and the character hears the broken key sound.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Chests.TreasureChest
+npc unlock_a 18265 Chest 100 100 0 level 21
+npc unlock_b 18265 Chest 150 100 0 level 21
+npc key_a 18265 Chest 200 100 0 level 21
+npc key_b 18265 Chest 250 100 0 level 21
+npc deluxe_a 18265 Chest 300 100 0 level 21
+npc deluxe_b 18265 Chest 350 100 0 level 21
+
+hit unlock_a 1 skill 27 1
+  random 91
+  dead unlock_a yes
+  inworld unlock_a yes
+hit unlock_b 1 skill 27 1
+  random 92
+  S DeleteObject obj=unlock_b
+  S PlaySound type=0 file=ItemSound2.broken_key bind=0 obj=0 loc=0,0,0 delay=0
+  dead unlock_b yes
+  inworld unlock_b no
+hit key_a 1 skill 2065 1
+  random 27
+  dead key_a yes
+  inworld key_a yes
+hit key_b 1 skill 2065 1
+  random 28
+  S DeleteObject obj=key_b
+  S PlaySound type=0 file=ItemSound2.broken_key bind=0 obj=0 loc=0,0,0 delay=0
+  dead key_b yes
+  inworld key_b no
+hit deluxe_a 1 skill 2229 1
+  random 70
+  dead deluxe_a yes
+  inworld deluxe_a yes
+hit deluxe_b 1 skill 2229 1
+  random 71
+  S DeleteObject obj=deluxe_b
+  S PlaySound type=0 file=ItemSound2.broken_key bind=0 obj=0 loc=0,0,0 delay=0
+  dead deluxe_b yes
+  inworld deluxe_b no

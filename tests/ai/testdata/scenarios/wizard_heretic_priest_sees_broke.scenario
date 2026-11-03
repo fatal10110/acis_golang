@@ -1,0 +1,16 @@
+# WizardHereticPriestAggressive (22143) that cannot pay for its magic (0 MP), settled, free to move, with an aggro
+# range of 0 so it may not attack on its own, every draw 0: the character it sees 100 away makes it give up its
+# spells (int slot 0) and still want to attack, weight 1000: this answer alone skips the automatic attack check.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardHereticPriestAggressive
+npc priest 22143 Monster 1000 0 0 mp 0 skill HOLD_MAGIC 4047 9 skill DEBUFF 4466 3 skill W_SHORT_RANGE_DD_MAGIC 4629 9 skill W_LONG_RANGE_DD_MAGIC 4668 9
+
+tick x9
+approach priest
+  mem priest i_ai0=1
+  desires priest attack(player)=1000

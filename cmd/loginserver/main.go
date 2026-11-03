@@ -85,8 +85,15 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 			provideGameServerLink,
 			provideClientLink,
 		),
+		fx.Invoke(reportConfigKeys),
 		fx.Invoke(startDebugHTTP, startLoginServer),
 	)
+}
+
+// reportConfigKeys logs, once per key, every key of loginserver.properties
+// the server does not read (config.ReportUnreadKeys).
+func reportConfigKeys(props *config.Properties, log zerolog.Logger) {
+	config.ReportUnreadKeys(log, config.LoginServer, "loginserver.properties", props)
 }
 
 // loadLoginServerProperties takes the process logger so the fx graph builds

@@ -20,9 +20,18 @@ func clampInt32(value int) int32 {
 }
 
 // statInt32 narrows a live stat value to its wire int the way the client
-// status fields expect: truncated toward zero, saturating at the int32 range.
+// status fields expect: truncated toward zero, saturating at the int32 range,
+// and 0 for NaN.
 func statInt32(value float64) int32 {
-	return clampInt32(int(value))
+	switch {
+	case value != value:
+		return 0
+	case value >= math.MaxInt32:
+		return math.MaxInt32
+	case value <= math.MinInt32:
+		return math.MinInt32
+	}
+	return int32(value)
 }
 
 // OpcodeUserInfo is the wire opcode for UserInfo, the full self-status
@@ -40,12 +49,16 @@ const (
 	weaponEquippedBonusSlots = 40
 )
 
+// crystallizeSkillID is the skill that lets a character crystallize items;
+// the client draws the crystallize entry for whoever has it.
+const crystallizeSkillID = 248
+
 // mountNpcIdOffset is added to a mounted character's mount npc id so the
 // client can distinguish the mount field's id space from regular npc ids;
 // an unmounted character reports 0.
 const mountNpcIdOffset = 1000000
 
-// teamBlue is TeamType.BLUE's wire id, the team byte shown while spawn
+// teamBlue is the blue team's wire id, the team byte shown while spawn
 // protection holds.
 const teamBlue = 1
 
@@ -61,8 +74,8 @@ type UserInfoSnapshot struct {
 	// not merely AccessLevel > 0.
 	IsGM bool
 	// SpawnProtectedTeam reports the team byte the client sees while spawn
-	// protection is active: TeamType.BLUE when spawn protection is enabled
-	// and currently held, the character's duel team otherwise.
+	// protection is active: the blue team (teamBlue) when spawn protection
+	// is enabled and currently held, the character's duel team otherwise.
 	SpawnProtectedTeam bool
 	// Clan is Character's clan as the status window shows it; zero when
 	// clanless.
@@ -149,17 +162,17 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 
 	inventoryLimit := c.InventoryLimit()
 
-	enchantEffect := rhand.EnchantLevel
-	if enchantEffect > maxDisplayedEnchant {
-		enchantEffect = maxDisplayedEnchant
-	}
-
 	w.WriteInt32(int32(x))
 	w.WriteInt32(int32(y))
 	w.WriteInt32(int32(z))
 	w.WriteInt32(int32(c.CurrentHeading()))
 	w.WriteInt32(c.ObjectID())
-	w.WriteString(c.Name)
+	form := c.Polymorph()
+	if form != nil {
+		w.WriteString(form.Name)
+	} else {
+		w.WriteString(c.CharacterName())
+	}
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex()))
 	w.WriteInt32(int32(c.VisibleBaseClassID()))
@@ -242,7 +255,11 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(c.Face))
 	w.WriteInt32(boolInt32(s.IsGM))
 
-	w.WriteString(c.Title())
+	if form != nil {
+		w.WriteString(polymorphTitle)
+	} else {
+		w.WriteString(c.Title())
+	}
 
 	w.WriteInt32(c.ClanID())
 	w.WriteInt32(s.Clan.CrestID)
@@ -251,7 +268,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(userInfoRelation(s.Clan.Leader, c.SiegeState()))
 	w.WriteUint8(uint8(c.MountType()))
 	w.WriteUint8(uint8(c.OperateType()))
-	w.WriteUint8(0) // crystallize flag: not modeled
+	w.WriteUint8(boolUint8(c.HasSkill(crystallizeSkillID)))
 
 	w.WriteInt32(int32(progression.PKKills))
 	w.WriteInt32(int32(progression.PvPKills))
@@ -287,7 +304,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0)
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))
-	w.WriteUint8(byte(enchantEffect))
+	w.WriteUint8(uint8(enchantEffect(c, paperdoll)))
 	if s.SpawnProtectedTeam {
 		w.WriteUint8(teamBlue)
 	} else {

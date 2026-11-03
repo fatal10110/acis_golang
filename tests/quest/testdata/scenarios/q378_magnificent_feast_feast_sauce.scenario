@@ -1,0 +1,87 @@
+# Magnificent Feast (Q378), a character brings the thirty wine and the sauce recipe, and takes the reward of score 18. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q378_magnificent_feast_feast_sauce.golden
+character Magnificent 20
+quest Q378_MagnificentFeast <cond>=1 <state>=STARTED
+hold 5957 1
+hold 4421 1
+hold 1456 1
+hold 5959 1
+script quest.Q378_MagnificentFeast
+item 57 5956 5957 5958 4421 1455 1456 1457 5959 847 846 909 879 890 910 848
+page villagemaster/30594.htm
+page script/quest/Q378_MagnificentFeast/
+npc ranspo 30594 VillageMasterDwarf 10 0 0
+
+action ranspo
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-3.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q378_MagnificentFeast 30594-4b.htm
+  S QuestList 378:0x80000003
+  S ExShowQuestMark quest=378
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:5957
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-4b.htm
+  S ActionFailed
+  Q upsert Q378_MagnificentFeast | <cond> | 2
+  Q upsert Q378_MagnificentFeast | score | 2
+  rows Q378_MagnificentFeast <cond>=2 <state>=STARTED score=2
+  items 5957=0
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-5a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q378_MagnificentFeast 30594-6.htm
+  S QuestList 378:0x80000007
+  S ExShowQuestMark quest=378
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4421
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-6.htm
+  S ActionFailed
+  Q upsert Q378_MagnificentFeast | <cond> | 3
+  rows Q378_MagnificentFeast <cond>=3 <state>=STARTED score=2
+  items 4421=0
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-7.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q378_MagnificentFeast 30594-8b.htm
+  S QuestList 378:0x8000000f
+  S ExShowQuestMark quest=378
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1456
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-8b.htm
+  S ActionFailed
+  Q upsert Q378_MagnificentFeast | <cond> | 4
+  Q upsert Q378_MagnificentFeast | score | 18
+  rows Q378_MagnificentFeast <cond>=4 <state>=STARTED score=18
+  items 1456=0
+action ranspo
+  S ActionFailed
+  S NpcHtmlMessage obj=ranspo item=0 page=villagemaster/30594.htm
+  S ActionFailed
+bypass npc_{ranspo}_Quest
+  S SystemMessage id=302 3:5959
+  S SystemMessage id=54 3:879
+  S SystemMessage id=52 6:6900
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=ranspo item=0 page=script/quest/Q378_MagnificentFeast/30594-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q378_MagnificentFeast
+  rows Q378_MagnificentFeast -
+  state Q378_MagnificentFeast -

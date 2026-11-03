@@ -12,7 +12,7 @@ import (
 // cursedUsage is what //cw answers a command it cannot read.
 const cursedUsage = "Usage: //cw [set|remove|teleportto itemid|name]"
 
-// adminCursedWeapons answers //cw (AdminCursedWeapon.java):
+// adminCursedWeapons answers //cw:
 //
 //	//cw                         the cursed weapons panel
 //	//cw set <id|name>           the weapon, not out yet, given to the selected player, gm without one
@@ -20,8 +20,8 @@ const cursedUsage = "Usage: //cw [set|remove|teleportto itemid|name]"
 //	//cw teleportto <id|name>    gm to the weapon's holder, or to where it lies
 //
 // A name is matched against the weapons' names, underscores read as
-// spaces, ignoring case, the first weapon in the reference's order whose
-// name contains it winning. A weapon no id or name finds is answered as
+// spaces, ignoring case, the first weapon in panel order whose name
+// contains it winning. A weapon no id or name finds is answered as
 // unknown; a command without a weapon, or naming an id that is no int, is
 // answered with the usage. Any other command word only reopens the panel,
 // which every command but those ends on.
@@ -68,7 +68,7 @@ func (l *GameClientLink) adminCursedWeapons(gm *livePlayer, line string) {
 // weapon is.
 func (l *GameClientLink) cursedWeaponNamed(param string) (int32, bool) {
 	if isDigits(param) {
-		return parseJavaInt(param)
+		return parseInt32(param)
 	}
 	name := strings.ToLower(strings.ReplaceAll(param, "_", " "))
 	for _, w := range l.cursed.Weapons() {
@@ -136,9 +136,8 @@ func (l *GameClientLink) adminRemoveCursedWeapon(gm *livePlayer, itemID int32) b
 
 // adminTeleportToCursedWeapon moves gm to itemID's holder, or to where the
 // weapon lies; a weapon not out is answered as not in the world. It
-// reports false for a held weapon whose holder is out of the world, which
-// the reference cannot reach either: CursedWeapon.teleportTo fails on the
-// holder it no longer has.
+// reports false for a held weapon whose holder is out of the world: there
+// is no holder to go to.
 func (l *GameClientLink) adminTeleportToCursedWeapon(gm *livePlayer, itemID int32) bool {
 	for _, w := range l.cursed.Weapons() {
 		if w.ItemID != itemID {
@@ -171,7 +170,7 @@ const (
 )
 
 // sendCursedWeaponsPage sends gm the cursed weapons panel, cwinfo.htm, with
-// every weapon in the reference's order: a held one with its holder (named
+// every weapon in panel order (cursedweapon.Manager.Weapons): a held one with its holder (named
 // while in the world, "null" otherwise), the karma and PK kills the holder
 // gets back, its stage, its time and hunger left and its kills toward the
 // next stage; one on the ground with its time left; one not out with the
@@ -184,14 +183,14 @@ func (l *GameClientLink) sendCursedWeaponsPage(gm *livePlayer) {
 		switch {
 		case !w.Activated && !w.Dropped:
 			// Not out, or reserved by a //cw set whose grant has not reached
-			// the target's queue yet: the reference's set is synchronous and
-			// has no such state, so it keeps the not-out row; its Set button
+			// the target's queue yet: a set is shown as one step with no
+			// in-between state, so it keeps the not-out row; its Set button
 			// answers that the weapon is already active.
 			sb.WriteString("<tr><td>Position:</td><td>Doesn't exist.</td></tr><tr><td>" + cursedButton("Set CW", "set "+id) + "</td><td></td></tr>")
 		case w.Activated:
 			owner := "null"
 			if holder, online := l.livePlayerByID(w.HolderID); online {
-				owner = holder.Name
+				owner = holder.CharacterName()
 			}
 			sb.WriteString("<tr><td>Owner:</td><td>" + owner + "</td></tr>" +
 				"<tr><td>Stored values:</td><td>Karma=" + itoa32(w.Karma) + " PKs=" + itoa32(w.PKKills) + "</td></tr>" +
@@ -217,7 +216,7 @@ func cursedButton(value, command string) string {
 }
 
 // cursedOverallTime is a weapon's time left as the panel shows it, in
-// days, hours and minutes, worked out as the reference does: the seconds
+// days, hours and minutes, worked out so: the seconds
 // past the last whole minute are taken off, then the minutes, hours and
 // days are each the floor of what is left, in floating point.
 func cursedOverallTime(w cursedweapon.Info) string {
@@ -231,13 +230,12 @@ func cursedOverallTime(w cursedweapon.Info) string {
 	return strconv.Itoa(days) + "d. " + strconv.Itoa(hours) + "h. " + strconv.Itoa(mins) + "m."
 }
 
-// reloadCursedWeapons answers //reload cw (CursedWeaponManager.reload):
-// every weapon ends, out or not, each told to every player as it would be
-// at the end of its life, and the weapons are read anew from
-// cursedWeapons.xml, none of them out. A holder has the end applied on its
-// own queue, the game master included. With cursed weapons disabled there
-// is nothing to reload. A file that cannot be read leaves every weapon as
-// it was.
+// reloadCursedWeapons answers //reload cw: every weapon ends, out or not, each
+// told to every player as it would be at the end of its life, and the weapons
+// are read anew from cursedWeapons.xml, none of them out. A holder has the end
+// applied on its own queue, the game master included. With cursed weapons
+// disabled there is nothing to reload. A file that cannot be read leaves every
+// weapon as it was.
 func (l *GameClientLink) reloadCursedWeapons() error {
 	if l.cursed == nil {
 		return nil

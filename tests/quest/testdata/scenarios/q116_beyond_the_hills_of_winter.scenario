@@ -1,0 +1,110 @@
+# Beyond the Hills of Winter (Q116): a level 30 dwarven fighter accepts at Filaur, hands over the
+# bandages, energy stones and thief keys, takes his goods to Obi and chooses the soulshots; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q116_beyond_the_hills_of_winter.golden
+character Hauler 30
+class 53
+hold 1833 20
+hold 5589 5
+hold 1661 10
+script quest.Q116_BeyondTheHillsOfWinter
+item 1833 5589 1661 8098 1463
+page default/30535.htm
+page default/32052.htm
+page script/quest/Q116_BeyondTheHillsOfWinter/
+npc filaur 30535 Folk 10 0 0
+npc obi 32052 Folk 20 0 0
+
+# Filaur: accept.
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/30535-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q116_BeyondTheHillsOfWinter CREATED
+bypass Quest Q116_BeyondTheHillsOfWinter 30535-02.htm
+  S QuestList 116:0x80000001
+  S ExShowQuestMark quest=116
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/30535-02.htm
+  S ActionFailed
+  Q upsert Q116_BeyondTheHillsOfWinter | <state> | STARTED
+  Q upsert Q116_BeyondTheHillsOfWinter | <cond> | 1
+  state Q116_BeyondTheHillsOfWinter STARTED
+  rows Q116_BeyondTheHillsOfWinter <cond>=1 <state>=STARTED
+
+# Filaur takes the supplies, then gives the goods.
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S SystemMessage id=301 3:1833 6:20
+  S SystemMessage id=301 3:5589 6:5
+  S SystemMessage id=301 3:1661 6:10
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/30535-03.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q116_BeyondTheHillsOfWinter <cond>=1 <state>=STARTED
+  items 1833=0 5589=0 1661=0
+bypass Quest Q116_BeyondTheHillsOfWinter 30535-05.htm
+  S QuestList 116:0x80000003
+  S ExShowQuestMark quest=116
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8098
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/30535-05.htm
+  S ActionFailed
+  Q upsert Q116_BeyondTheHillsOfWinter | <cond> | 2
+  rows Q116_BeyondTheHillsOfWinter <cond>=2 <state>=STARTED
+  items 8098=1
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/30535-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Obi takes the goods for soulshots.
+action obi
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/32052-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q116_BeyondTheHillsOfWinter 32052-01.htm
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/32052-01.htm
+  S ActionFailed
+bypass Quest Q116_BeyondTheHillsOfWinter materials
+  S SystemMessage id=302 3:8098
+  S SystemMessage id=53 3:1463 6:1650
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 116:0x00000000
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/32052-02.htm
+  S ActionFailed
+  Q upsert Q116_BeyondTheHillsOfWinter | <state> | COMPLETED
+  Q delete-except-state Q116_BeyondTheHillsOfWinter
+  state Q116_BeyondTheHillsOfWinter COMPLETED
+  rows Q116_BeyondTheHillsOfWinter <state>=COMPLETED
+  items 8098=0 1463=1650
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 1463=1650
+  state Q116_BeyondTheHillsOfWinter COMPLETED
+  rows Q116_BeyondTheHillsOfWinter <state>=COMPLETED

@@ -1,0 +1,17 @@
+# The Queen Ant (29001), a level 1 grand boss in her npcmaker's territory, every draw 0. The
+# level 1 character steps 400 in front of her, inside her territory, and hits her for a
+# twentieth of her HP: over 150 away, a draw under 10 then one under 80 makes her want strike
+# 4018 on the character from where she stands, which she starts casting at once, and to attack
+# it by 220000. The character, her top desire target now and beyond her aggro range, fails her
+# automatic attack check, so she drops her hate of it, and the attack desire with it.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.boss.queenant.QueenAnt
+territory nest 150 -200 900 200 -100 100
+npc queen 29001 GrandBoss 700 0 0 maker nest skill BUFF 4017 1 skill DD_MAGIC 4018 1 skill DD_MAGIC_A 4019 1 skill DEBUFF 4515 1 skill DEBUFF_A 4215 1
+
+approach queen 400
+hit queen 22
+  S MagicSkillUse caster=queen target=player skill=4018-1 hit=2907 reuse=0 success=0
+  desires queen cast(player,4018)=1000000

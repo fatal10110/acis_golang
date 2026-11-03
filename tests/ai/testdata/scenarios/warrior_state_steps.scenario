@@ -1,0 +1,47 @@
+# The state steps of the format on a Warrior (WarriorRunAwayPhysicalSpecial, 21508, walking and
+# attacking), 60 from the character. A hit makes it want to attack the character, and the swing
+# step runs its AI until its swing is in flight. The stance step ends its attack stance and
+# sets it again; the top step makes the character its top desire target, or nothing; the hp
+# steps set the monster's and the character's hit points; the die step kills the character,
+# killed by the monster (its death cuts the character's action short). The land steps put a
+# root on the character from the monster, and a stun and a mute on the monster itself.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorRunAwayPhysicalSpecial.WarriorRunAwayPhysicalSpecial
+npc wolf 21508 Monster 60 0 0 walks
+roll wolf 0
+
+hit wolf 22
+  hp wolf 418
+swing wolf
+stance wolf off
+  stance wolf off
+stance wolf on
+  stance wolf on
+top wolf player
+  top wolf player
+top wolf -
+  top wolf -
+hp wolf 100
+  hp wolf 100
+hp player 5
+  hp player 5
+  dead player no
+land player 1201 1 by wolf
+  S SystemMessage id=110 4:1201,1
+  effect player 1201 held
+land wolf 92 1
+  effect wolf 92 held
+land wolf 1064 1
+  effect wolf 1064 held
+die wolf
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S SystemMessage id=749 4:1201,1
+  dead player yes

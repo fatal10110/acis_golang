@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
 
@@ -35,6 +36,14 @@ type Store interface {
 	// UpdateOwner clears the castle from every clan_data row holding it,
 	// then gives it to clanID's row; 0 gives it to none.
 	UpdateOwner(ctx context.Context, castleID, clanID int32) error
+	// SaveDoorUpgrade replaces the stored upgrade of u's gate.
+	SaveDoorUpgrade(ctx context.Context, u DoorUpgrade) error
+	// DeleteDoorUpgrades deletes every stored gate upgrade of castleID.
+	DeleteDoorUpgrades(ctx context.Context, castleID int32) error
+	// SaveTrapUpgrade replaces the stored upgrade of u's tower trap.
+	SaveTrapUpgrade(ctx context.Context, u TrapUpgrade) error
+	// DeleteTrapUpgrades deletes every stored trap upgrade of castleID.
+	DeleteTrapUpgrades(ctx context.Context, castleID int32) error
 	// UnequipCirclets moves an offline character's equipped circlet
 	// circletID and Lord's Crown back to its inventory.
 	UnequipCirclets(ctx context.Context, circletID, ownerID int32) error
@@ -68,6 +77,9 @@ type Manager struct {
 	store  Store
 	writes Writer
 	log    zerolog.Logger
+	// doors are the world's doors the gate upgrades reach, set once at
+	// boot (SetDoors); nil reaches none.
+	doors Doors
 
 	owners sync.Mutex
 }
@@ -78,7 +90,7 @@ type Manager struct {
 func NewManager(data *castledata.Table, clans Clans, store Store, writes Writer, log zerolog.Logger) *Manager {
 	m := &Manager{byID: map[int]*Castle{}, data: data, clans: clans, store: store, writes: writes, log: log}
 	for _, d := range data.All() {
-		c := &Castle{Castle: d, m: m}
+		c := &Castle{Castle: d, m: m, trapLevels: make([]int, len(d.ControlTowers))}
 		m.byID[d.ID] = c
 		m.order = append(m.order, c)
 	}
@@ -165,6 +177,33 @@ func (m *Manager) ByNPC(npcID int) (*Castle, bool) {
 		}
 	}
 	return nil, false
+}
+
+// ForNPC returns the castle the NPC objectID, of template npcID, belongs
+// to when maker (nil for none) placed it: the castle spawnCastle when a
+// siege gave the NPC one as it spawned (0 for none), else the castle that
+// placed it as one of its holy artifacts, else the castle the residence id
+// of the maker's spawn time names, none when that id names a siegable clan
+// hall instead (as siegableHall, nil for none, reports), else the castle
+// whose residence NPCs include npcID.
+func (m *Manager) ForNPC(objectID int32, npcID, spawnCastle int, maker *spawn.Maker, siegableHall func(id int) bool) (*Castle, bool) {
+	if spawnCastle > 0 {
+		if c, ok := m.Get(spawnCastle); ok {
+			return c, true
+		}
+	}
+	if c, ok := m.ByArtifact(objectID); ok {
+		return c, true
+	}
+	if id, ok := maker.ResidenceParam(); ok {
+		if c, ok := m.Get(id); ok {
+			return c, true
+		}
+		if siegableHall != nil && siegableHall(id) {
+			return nil, false
+		}
+	}
+	return m.ByNPC(npcID)
 }
 
 // SetOwner gives c to cl, unless cl already owns a castle, which it

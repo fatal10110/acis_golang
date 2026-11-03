@@ -1,0 +1,28 @@
+# A Dark Twilight (Q626): only a count of exactly three hundred bloods is paid: one short gets the refusal page.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q626_a_dark_twilight_wrong_count.golden
+character Hero 60
+quest Q626_ADarkTwilight <cond>=2 <state>=STARTED
+hold 7169 299
+script quest.Q626_ADarkTwilight
+item 7169 57
+page default/31517.htm
+page script/quest/Q626_ADarkTwilight/
+npc hierarch 31517 Folk 10 0 0
+
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q626_ADarkTwilight/31517-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q626_ADarkTwilight 31517-06.htm
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q626_ADarkTwilight/31517-06.htm
+  S ActionFailed
+bypass Quest Q626_ADarkTwilight reward1
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q626_ADarkTwilight/31517-08.htm
+  S ActionFailed
+  items 7169=299

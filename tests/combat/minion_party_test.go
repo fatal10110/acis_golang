@@ -17,7 +17,7 @@ func partyParams(partyType int) npc.AIParams {
 
 func TestMinionAssistsMasterOnCombatDamage(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -43,7 +43,7 @@ func TestMinionAssistsMasterOnCombatDamage(t *testing.T) {
 
 func TestPartyPrivateFollowsMasterWhenIdle(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -84,7 +84,7 @@ func liveCombatant(t *testing.T, srv *gameservertest.Server) attackable.Combatan
 
 func TestStationaryMinionHoldsAttackWhenPlayerInRange(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -116,7 +116,7 @@ func TestStationaryMinionHoldsAttackWhenPlayerInRange(t *testing.T) {
 
 func TestStationaryMinionDropsAttackWhenPlayerOutOfRange(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, withWarriorBehavior(),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
@@ -132,7 +132,7 @@ func TestStationaryMinionDropsAttackWhenPlayerOutOfRange(t *testing.T) {
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 
-	minion.AddCombatDamageHate(player, 10)
+	minion.AddAttackDesire(player, 10)
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionAttack {
 		t.Fatalf("CurrentIntention() before assist = %v, want Attack so the player is top desire", got)
 	}

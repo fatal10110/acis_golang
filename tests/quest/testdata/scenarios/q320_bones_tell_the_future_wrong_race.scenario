@@ -1,0 +1,22 @@
+# Bones Tell the Future (Q320), refused: Kaitar sends a human fighter away, and the quest is not
+# started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q320_bones_tell_the_future_wrong_race.golden
+character Bonereader 10
+script quest.Q320_BonesTellTheFuture
+item 809
+page default/30359.htm
+page script/quest/Q320_BonesTellTheFuture/
+npc kaitar 30359 Folk 10 0 0
+
+# Kaitar: dark elves only.
+action kaitar
+action kaitar
+  S ActionFailed
+  S NpcHtmlMessage obj=kaitar item=0 page=default/30359.htm
+  S ActionFailed
+bypass npc_{kaitar}_Quest
+  S NpcHtmlMessage obj=kaitar item=0 page=script/quest/Q320_BonesTellTheFuture/30359-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q320_BonesTellTheFuture CREATED
+  rows Q320_BonesTellTheFuture -

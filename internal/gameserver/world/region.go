@@ -10,20 +10,25 @@ import (
 // Active.
 //
 // State.mu guards every field except active, which State writes under
-// State.mu and anyone may read lock-free through Active. objects and index
-// are also guarded by mu, a leaf lock that lets known-list scans read one
-// region without the world lock: writers hold State.mu and then mu, readers
-// hold either. mu is never held across a call out of the package.
+// State.mu and anyone may read lock-free through Active. objects, index and
+// players are also guarded by mu, a leaf lock that lets known-list scans
+// read one region without the world lock: writers hold State.mu and then mu,
+// readers hold either. mu is never held across a call out of the package.
+//
+// Most of the grid never holds an object, so index and objects are made by
+// the first add; reads of the nil map and slice see an empty region.
 type Region struct {
 	tileX, tileY int
 
 	mu      sync.RWMutex
 	objects []Tracked
 	index   map[int32]int
+	// players is the player-kind subset of objects, in its own order, so a
+	// broadcast reaches its recipients without scanning every object.
+	players []Tracked
 
 	activityVersion uint64
 	activityPending uint64
-	playersCount    int
 	active          atomic.Bool
 }
 
@@ -43,12 +48,24 @@ type inactiveRegionActor interface {
 	OnInactiveRegion()
 }
 
+// regionArrivalActor is told, in place of OnActiveRegion or
+// OnInactiveRegion, the activity of the region an arrival placed it in;
+// joined reports that the arrival brought it onto the grid (a spawn or a
+// rejoin) rather than across from another region. Region toggles still
+// reach it through OnActiveRegion and OnInactiveRegion. The call runs on
+// the goroutine that placed it.
+type regionArrivalActor interface {
+	OnRegionArrival(active, joined bool)
+}
+
 func newRegion(tileX, tileY int) *Region {
-	return &Region{
-		tileX: tileX,
-		tileY: tileY,
-		index: make(map[int32]int),
-	}
+	return &Region{tileX: tileX, tileY: tileY}
+}
+
+// Origin returns the game coordinates of r's lowest corner; every point of
+// r lies within one region edge of it on each axis.
+func (r *Region) Origin() (x, y int) {
+	return MinX + r.tileX*regionSize, MinY + r.tileY*regionSize
 }
 
 // Active reports whether r currently has a Player somewhere in its 3x3
@@ -88,16 +105,20 @@ func notifyObjectActivity(obj Tracked, active bool) {
 func (r *Region) add(obj Tracked) regionActivityArrival {
 	id := obj.ObjectID()
 	r.mu.Lock()
+	if r.index == nil {
+		r.index = make(map[int32]int)
+	}
 	if i, ok := r.index[id]; ok {
+		r.dropPlayer(r.objects[i])
 		r.objects[i] = obj
 	} else {
 		r.index[id] = len(r.objects)
 		r.objects = append(r.objects, obj)
 	}
-	r.mu.Unlock()
 	if isPlayer(obj) {
-		r.playersCount++
+		r.players = append(r.players, obj)
 	}
+	r.mu.Unlock()
 	return regionActivityArrival{r.activityVersion, r.activityPending != 0}
 }
 
@@ -108,13 +129,9 @@ func (r *Region) remove(id int32) {
 	if !ok {
 		return
 	}
-	obj := r.objects[i]
 	r.mu.Lock()
 	r.removeAt(i)
 	r.mu.Unlock()
-	if isPlayer(obj) {
-		r.playersCount--
-	}
 }
 
 // removeIfSame drops the object registered under id only if it is still
@@ -130,14 +147,13 @@ func (r *Region) removeIfSame(id int32, obj Tracked) bool {
 	r.mu.Lock()
 	r.removeAt(i)
 	r.mu.Unlock()
-	if isPlayer(obj) {
-		r.playersCount--
-	}
 	return true
 }
 
+// removeAt swap-removes objects[i]. The caller holds mu for writing.
 func (r *Region) removeAt(i int) {
 	last := len(r.objects) - 1
+	r.dropPlayer(r.objects[i])
 	delete(r.index, r.objects[i].ObjectID())
 	if i != last {
 		moved := r.objects[last]
@@ -167,4 +183,37 @@ func (r *Region) appendObjectsExcept(out []Tracked, except int32) []Tracked {
 		return append(out, r.objects...)
 	}
 	return append(append(out, r.objects[:i]...), r.objects[i+1:]...)
+}
+
+// dropPlayer swap-removes obj from players if it is there. The caller holds
+// mu for writing.
+func (r *Region) dropPlayer(obj Tracked) {
+	if !isPlayer(obj) {
+		return
+	}
+	id := obj.ObjectID()
+	for j, p := range r.players {
+		if p.ObjectID() != id {
+			continue
+		}
+		last := len(r.players) - 1
+		r.players[j] = r.players[last]
+		r.players[last] = nil
+		r.players = r.players[:last]
+		return
+	}
+}
+
+// appendPlayersExcept appends every player currently visible within r but
+// the one registered under except to out and returns the extended slice. It
+// takes only r's own lock, so a caller need not hold State.mu.
+func (r *Region) appendPlayersExcept(out []Tracked, except int32) []Tracked {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, p := range r.players {
+		if p.ObjectID() != except {
+			out = append(out, p)
+		}
+	}
+	return out
 }

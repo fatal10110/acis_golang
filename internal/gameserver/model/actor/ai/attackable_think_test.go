@@ -17,12 +17,23 @@ func tickThinkPromote(ai *Attackable) error {
 
 type followStub struct {
 	*fakeActor
-	idleTarget    attackable.Combatant
 	thinkCalls    int
 	lastWasFollow bool
 }
 
-func (f *followStub) IdleFollowTarget() attackable.Combatant { return f.idleTarget }
+// newFollowStub returns an escort whose no-desire point queues brain's
+// follow of its master, as a behavior's no-desire hook does.
+func newFollowStub(strike *recordingAttack) (*followStub, *Attackable) {
+	owner := &followStub{fakeActor: actor(1)}
+	brain := NewAttackable(owner, &recordingMove{}, strike)
+	master := actor(9)
+	owner.hooks.at = func(p HookPoint) {
+		if p == HookNoDesire {
+			brain.AddFollowDesire(master, 5)
+		}
+	}
+	return owner, brain
+}
 
 func (f *followStub) ThinkFollow(target attackable.Combatant, lastWasFollow bool) bool {
 	f.thinkCalls++
@@ -30,9 +41,10 @@ func (f *followStub) ThinkFollow(target attackable.Combatant, lastWasFollow bool
 	return false
 }
 
+// TestAttackableIdleFollowPromotesOnThink: a follow the no-desire hook
+// queues on the idle is taken up on the next cycle.
 func TestAttackableIdleFollowPromotesOnThink(t *testing.T) {
-	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
-	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	owner, brain := newFollowStub(&recordingAttack{})
 
 	if err := tickThinkPromote(brain); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
@@ -50,8 +62,7 @@ func TestAttackableIdleFollowPromotesOnThink(t *testing.T) {
 // cycles, 1-based, stepped the follow. between runs after every cycle.
 func followTickCycles(t *testing.T, between func(*Attackable)) []int {
 	t.Helper()
-	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
-	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	owner, brain := newFollowStub(&recordingAttack{})
 	if err := tickThinkPromote(brain); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
 	}
@@ -96,11 +107,10 @@ func TestAttackableEscortFollowCadenceIgnoresExtraThink(t *testing.T) {
 }
 
 func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
-	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
+	strike := &recordingAttack{canAttack: true}
+	owner, brain := newFollowStub(strike)
 	target := actor(2)
 	owner.known[target.ObjectID()] = true
-	strike := &recordingAttack{canAttack: true}
-	brain := NewAttackable(owner, &recordingMove{}, strike)
 
 	if err := tickThinkPromote(brain); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
@@ -133,11 +143,11 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 func latchedAttackAI(t *testing.T) (*Attackable, *fakeActor, *recordingAttack) {
 	t.Helper()
 	owner := actor(1)
-	owner.idleWander = true
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
 	strike := &recordingAttack{canAttack: true}
 	a := NewAttackable(owner, &recordingMove{}, strike)
+	wanderOnNoDesire(owner, a)
 	if err := a.TickThink(); err != nil {
 		t.Fatalf("spawn-cycle TickThink() error: %v", err)
 	}
@@ -166,35 +176,40 @@ func TestAttackableTickRunsLatchedAttackThenIdles(t *testing.T) {
 	if strike.stopCalls <= stops {
 		t.Fatal("latched tick did not abort the attack for the empty-queue idle")
 	}
-	if got := a.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
+	// The cycle's own idle aborts the latched step but leaves it current.
+	if got := a.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionAttack)
 	}
 	if !a.Desires().Has(&Desire{Kind: IntentionWander}) {
 		t.Fatal("wander desire missing after the latched tick's idle")
 	}
 }
 
+// TestAttackableThinkNeitherRunsNorClearsLatch pins that Think steps the
+// current attack, whose desire left the queue, without taking or clearing
+// the latch: the next RunAI still takes the latched attack, and the one after
+// idles on the empty queue.
 func TestAttackableThinkNeitherRunsNorClearsLatch(t *testing.T) {
 	a, _, strike := latchedAttackAI(t)
 
 	if err := a.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
-	if strike.doAttackCalls != 1 {
-		t.Fatalf("DoAttack calls after Think = %d, want 1", strike.doAttackCalls)
+	if strike.doAttackCalls != 2 {
+		t.Fatalf("DoAttack calls after Think = %d, want 2", strike.doAttackCalls)
 	}
 
 	if err := a.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	if strike.doAttackCalls != 2 {
-		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 2", strike.doAttackCalls)
+	if strike.doAttackCalls != 3 {
+		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 3", strike.doAttackCalls)
 	}
 	if err := a.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	if strike.doAttackCalls != 2 {
-		t.Fatalf("DoAttack calls after the latch cleared = %d, want 2", strike.doAttackCalls)
+	if strike.doAttackCalls != 3 {
+		t.Fatalf("DoAttack calls after the latch cleared = %d, want 3", strike.doAttackCalls)
 	}
 	if got := a.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
@@ -215,8 +230,8 @@ func TestAttackableThinkLeavesQueuedMoveToAndLatchForRunAI(t *testing.T) {
 	if err := a.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	if strike.doAttackCalls != 2 {
-		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 2", strike.doAttackCalls)
+	if strike.doAttackCalls != 3 {
+		t.Fatalf("DoAttack calls after Think and the latched RunAI = %d, want 3", strike.doAttackCalls)
 	}
 	if got := a.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() after the latched RunAI = %v, want %v", got, IntentionAttack)

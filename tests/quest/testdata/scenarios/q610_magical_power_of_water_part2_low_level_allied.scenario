@@ -1,0 +1,24 @@
+# Magical Power of Water, Part 2 (Q610): a level 74 Ketra ally of level 2 holding the Green Totem is offered the quest: the quest compares the signed standing with 2.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q610_magical_power_of_water_part2_low_level_allied.golden
+character Hero 74
+standing 2
+hold 7238 1
+script quest.Q610_MagicalPowerOfWater_Part2
+item 7238 7239
+page npcdefault.htm
+page default/31560.htm
+page script/quest/Q610_MagicalPowerOfWater_Part2/
+npc asefa 31372 Folk 10 0 0
+npc altar 31560 Folk 20 0 0
+npc raid 25316 RaidBoss 40 0 0
+
+action asefa
+action asefa
+  S ActionFailed
+  S NpcHtmlMessage obj=asefa item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{asefa}_Quest
+  S NpcHtmlMessage obj=asefa item=0 page=script/quest/Q610_MagicalPowerOfWater_Part2/31372-01.htm
+  S ActionFailed
+  S ActionFailed

@@ -74,7 +74,7 @@ func (l *GameClientLink) eatPetFood(live *livePlayer, inv *itemcontainer.Invento
 	if l.skills == nil || l.inventory == nil {
 		return true
 	}
-	amount, ok := petFoodFeedAmount(l.skills, l.petConfig.FoodRate, templateID)
+	amount, ok := petFoodFeedAmount(l.skills, l.summoning.config.FoodRate, templateID)
 	if !ok {
 		return true
 	}

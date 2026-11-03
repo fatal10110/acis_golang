@@ -62,6 +62,10 @@ type Script struct {
 - **Nil-safe invokers:** `func (h *Hooks) Attacked(s, e)`, one per field. A parent call is
   `base.Attacked(s, e)` even when no ancestor reacts, so every parent call ports 1:1.
 - **Derive:** `base.With(Hooks{…})` overlays the non-nil fields.
+- **Class chain:** a class others derive from names its hooks, `base.With(…).Named("Warrior")`,
+  so `Script.Classes()` gives the script's `Name` and then each named ancestor, root last:
+  the class chain the `//info ai` page prints (X3). A `cmd/gameserver` test pins every
+  catalog script the page can print to the manifest's `chain`.
 - **Event set:** a behavior is bound, for each of its own `NPCs`, to every NPC event whose
   field is non-nil after `With`. A parent's ids are never inherited.
 - **Re-entry into the final script:** `s.Attacked(e)`. The reference has 10 such sites (7
@@ -106,7 +110,7 @@ Why this shape:
 | Path → constructor | Go literal catalogs, `map[path]func() script.Script`, joined in `cmd/gameserver` |
 | Listed path with no Go script | logged at error level and skipped; completeness is a test |
 | Catalog entry not listed | never built |
-| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Three ids are claimed by a parent and its child; the child is listed later |
+| One behavior per (npc, event) | registering a behavior removes any other behavior from that list, then appends; the last listed wins. Four ids are bound by a behavior and a later-listed one: 25512, 29062 and 29096 on every event of the earlier one, 35596 on first talk and talk. |
 | Other scripts | accumulate in list order |
 | First talk | one slot: the first registered keeps it, except that a behavior replaces an earlier behavior. It fires only when exactly one script is bound |
 | Abnormal-status hook | dispatched over the see-spell list |
@@ -146,8 +150,10 @@ model/actor/{npc,ai,cast}, model/zone and model/door import nothing from script.
   package-level code, and lanes cannot collide.
 - **Behaviors share family packages.** A child imports its parent's package, so parents-first
   is enforced by the compiler.
-- **Catalog files are pre-created per range or family** (`quests_3xx.go`, `ai_warrior.go`) in
-  one scaffold PR. A content lane edits one catalog file that no other open lane touches.
+- **Catalog files are pre-created, one per owner issue** (`script/catalog/quests_301_up.go`,
+  `ai_individual_1.go`, `makers_2.go`), in one scaffold PR. Each lists its owner's paths or
+  maker types with a nil constructor until ported. A content lane edits only its own catalog
+  file and the handle-operations file generated beside it.
 - **Quest journal:** new leaf package `model/questlog`, held by `player.Character`.
 
 ## 4. Seams
@@ -181,9 +187,11 @@ Hooks run synchronously on the goroutine that raises them, with no lock held.
 | Decayed | right after the decayed flag flips, before world removal | then behavior timers are cancelled, then removal. The script-facing delete is synchronous |
 | Dying | one 3 s timer on an engine-owned queue; all hooks in list order; no state re-check | corpse queues close at decay; 103 templates decay within 3 s |
 | Party died, clan died | killer's queue, inline with the death | |
+| Door clan attacked (static-object clan attacked) | hitter's goroutine, inside the door's hit, after its HP change and any death | every hit routed onto a door except a Swoop Cannon's during its castle's siege in progress, harmless ones included; living NPCs of `door_clan` within 600 (3D, inclusive, both collision radii), dispatched through `door.ClanCall` |
 | Zone enter | mover's goroutine, collected under the zone lock and fired after unlock | one quest uses it |
+| Player and summon death | the goroutine running the death, after the death broadcast and before the killer's karma | every quest of the journal with a death hook, in journal order and any status; no killer passes the one that died |
 | Script event | the sender's goroutine, inline: every receiver's hook runs before the send returns | a radius broadcast passes 0 as the second argument; the extended broadcast and the send to one NPC pass their own |
-| Tutorial HP and level triggers | caller, after the vitals lock is released | |
+| Tutorial HP and level triggers | caller, after the vitals lock is released | an HP write whose status is reported raises CE45 after that StatusUpdate; the restored HP raises it at selection, before the player has an event sink |
 
 Fan-out rules differ per source and each gets its own function and golden:
 
@@ -217,7 +225,8 @@ Each item is a leaf-locked container. Nothing new is queue-owned.
 - Load at character selection: `SELECT name,var,value … WHERE charId=?`. Go adds
   `ORDER BY name,var`, which pins the primary-key order `(charId, name, var)` the reference's
   rows arrive in. Names resolve case-insensitively, first match in list order; unknown names
-  are skipped with a warning.
+  are skipped with a warning. Every row of a resolved quest joins its one state, and
+  reserved values the server never writes read leniently (§9, item 5).
 - Sealed at detach. A dirty sealed journal is drained before the next selection loads; if
   that drain fails, the selection is refused. Nothing else writes a sealed journal.
 - Character purge deletes `character_quests` and `character_memo` rows.
@@ -234,6 +243,25 @@ Seven behaviors and about 21 quests keep state on the script. It lives in engine
 only, with no closure-taking update method. A `go/types` test fails any script package that
 declares a package-level variable, uses `go`, `sync` or `sync/atomic`, or has a hook closure
 referencing a mutable constructor-local.
+
+State a family of scripts shares (the third-class saga core and its 31 sagas keep three
+static maps: class → saga, busy tablet → its spawn, defender → attacker) is a family value
+of a type the family's package declares, holding engine cells only. The catalog builds it
+once and hands it to the constructor of every member, as it hands tables to other
+constructors; a member registers itself in it from its constructor, as the reference's
+constructor does. The same `go/types` test covers it: a family's plain fields can only be
+read, directly, through a local copied from them or through a call. Handing one to a
+function that may write it (a library mutator such as `slices.Sort`, a function value, an
+engine call) or writing through what a call returns from it is a write. A map keyed by NPC is `NPCMapCell`,
+with the reference's removal of a value; its keys and values match by NPC identity, the
+spawn slot's, as the timers' do. A field holding one player is `PlayerCell`; a list is
+`ListCell`, ordered and keeping duplicates, whose creature handles match by the same
+identity (a player's is its character) and other values by `==`. A field holding one
+party is `PartyCell`: it names the party by identity, reaches its members as they are now,
+and reaches no one once the party disbands. A map of integer keys
+a script counts or walks (FlagWar's clans) is `IntMapCell`, which walks in the reference's
+hash-map order. A member reaches another member's helpers through `QuestState.Quest()`,
+the registered script of a state it found.
 
 ### Timers
 
@@ -283,35 +311,83 @@ A nil NPC or player means "bound to none", never a wildcard.
 - Range checks are strict `<`, centre to centre. `party.InRange` (`<=` plus collision radii)
   is not reused.
 
-## 8. Existing stand-ins
+## 8. Stand-ins (deleted)
 
-Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A template
-switches to real behavior when its script registers. The three ids claimed by a parent and a
-child switch only when the child is ported. The walker alias rule and its walk-stance list
-also step aside for an id whose creation any script reacts to: the walker script is a plain
-script in the reference manifest (`kind script`, not a behavior), and the created hook is
-where the reference asks an NPC to walk a route (A13).
+Until #3497 (M12), an NPC id with no bound behavior ran built-in stand-ins: idle wander and
+follow, `attackedHateWeight`, Warrior-style party assist, the shot-recharge roll, the walker
+alias rule and its walk-stance list (and the instance walk-stance flag), `Party_Type` 2 privates, and the master-decay
+`despawnMinions`. They were deleted, not relocated, together with their predicate and the
+behavior claims, once every scripted NPC id had its behavior and every scripted maker type its
+maker. An id no script binds now runs only the built-in attackable AI, as in the reference.
 
-- They are never extended. They are deleted in one PR (#3497, M12) once every scripted NPC id
-  has its behavior, including the siegable-hall behaviors of #3502 (M12), and every scripted
-  maker type has its maker (#211 to #214). No id is exempted, and M10's exit does not include
-  the deletion.
-- The list: idle wander and follow, `attackedHateWeight`, Warrior-style party assist, the
-  shot-recharge roll, the walker alias rule, `Party_Type` 2 privates, `despawnMinions`, and
-  default treatment of the scripted maker type strings (predicate: no maker registered).
+- What stays is reference behavior, not a stand-in: a maker deleting its entries still
+  deletes each master's privates, as does the festival's spawn delete (the reference spawn's
+  delete does; a GM `//delete` or a mercenary despawn deletes the master alone), and a maker type
+  string
+  with no registered maker runs the default maker (the reference maker switch's `default:`
+  case; `default_maker`, `random_spawn_treasurebox` and `random_maker` rely on it).
+- Boot checks keep it that way: the script and maker catalog tests fail on any listed script
+  or scripted maker type without its Go constructor.
 - A script cannot register until every seam it subscribes to, and every handle operation it
-  calls, is implemented for the NPC kinds it is bound to (boot check and test).
+  calls, is implemented for the NPC kinds it is bound to (boot check and test). Handle
+  operations are checked per hook: a hook raised for NPC events against the NPCs bound to
+  those events, any other hook against every NPC the script is bound to.
 
 ## 9. Deliberate differences from the reference
 
 1. A detaching player gets no script give, take or journal write. Enforced by one new flag
    on `player.Character`, set where `markDetaching` runs, before inventory persistence is
-   released. This closes a relog duplication window.
+   released. This closes a relog duplication window. A give or take raised from another queue
+   checks the flag and changes the inventory under a read lock that `MarkDetaching` takes for
+   writing after it sets the flag, so it lands before the final saves or not at all.
 2. A failed quest or memo load refuses the character selection. The reference continues
    with an empty journal or an empty memo set, which lets one-time rewards be taken again
    (memos hold the `<quest>_OneTimeQuestFlag` and class-change flags).
 3. The top-level `Quest` bypass is refused with ActionFailed while the player trades or runs
    a private store. This closes a check-then-take race.
+4. A script's teleport, instant teleport or skill call that moves or casts with a player, asked
+   from a hook on any other queue than that player's, runs on the player's own queue once the
+   calling task is done; the reference runs it inside the call. The packets and the landing are
+   the same, but packets the rest of the hook sends go out first, and code after the call (the
+   rest of the hook, other NPCs' hooks in the same broadcast) still reads the old position or
+   state. Running it inline would write another player's state from the caller's queue while
+   that player's own queue changes it, or wait on that queue, which deadlocks when two players'
+   hooks swap each other (WarriorBase `SwapPosition`): a teleport touches state only that queue
+   owns (#3710), and the skill's handlers own the caster's state, a self-target recall or
+   teleport moving the caster inside the cast (#3843).
+   From a hook the engine runs on that player's own queue, the ordinary teleport
+   (`Player.TeleportTo`, #4046), the instant teleport (`Player.InstantTeleportTo`,
+   `Script.InstantTeleportNear`) and the skill call with that player as caster
+   (`Script.CallSkill`) run inside the call, as in the reference (#4056). The engine marks
+   those hooks on the character with a `sim.Turn`, which only the goroutine running the hook
+   sees held, so a handle stored in a cell or captured by a closure and used from another queue
+   still posts. The marked hooks: the player's talk, quest window and quest event, its item
+   use, a timer whose home queue is the player's, `Player.After`, and the tutorial events the
+   player's own actions raise on its queue (its tutorial requests, its entry, its sit request,
+   the seat of its store opening, its own pickup of adena or a blue gemstone). Not marked, as
+   they run on the goroutine of the damage, kill, reward or effect (an attacker's queue, an
+   effect's tick): the death hook, and the tutorial events a death, a level-up, an HP loss or
+   the restored HP of a selection raise, a seat an effect forces, and a pickup by the player's
+   pet. A summon's instant teleport always runs on the summon's queue: no hook runs there.
+   An NPC's instant teleport, hostile or civilian, stays inline.
+5. Journal rows the server never writes load leniently. Only a hand-edited or migrated
+   `character_quests` row reaches either case.
+   - A row whose quest name differs from the script's name only in case joins that quest's
+     one state. The reference resolves the name case-insensitively but looks up the state by
+     the exact name, so each such row adds another state of the same quest, holding only
+     that row's variable, and the quest window can list the quest more than once.
+   - A `<state>` naming no status is neither started nor completed. In the quest window and in
+     a condition change, a `<cond>` that is not an int reads 0 (a script reading the condition
+     still panics, as the reference throws, and the help page that reads it is not shown). A
+     `<flags>` that is not an int reads as no flags; the quest window then shows the flags
+     `<cond>` gives. In the reference these reads throw. A bad `<state>` aborts the QuestList
+     build: nothing is sent on request, and EnterWorld skips the rest of its burst. A bad
+     `<cond>` or `<flags>` throws while the packet is written, which sends a truncated
+     QuestList. A condition change on such a state aborts before it writes; Go goes ahead.
+   - A bad `<state>` on any real quest makes every QuestList build throw, so in the reference
+     a condition change or quest exit of any quest stops after its variable writes: no quest
+     window, no quest mark, no item take, no exit row update, and the rest of the hook does
+     not run. Go goes ahead.
 
 Everything else follows the reference, including its quirks (abort by id, the 25-quest check
 only at talk, the abnormal-status dispatch list).
@@ -341,6 +417,9 @@ uses.
      placeholders, hashes; no page text).
    - One unit test covers the four hand-kept `Hooks` lists (fields, invokers, `With`, bound
      set).
+   - The kind-specific handle operations each hook reaches, which the handle half of the
+     seam gate reads at boot (`cmd/gameserver/scripts_handleops.go`), equal a `go/types`
+     scan of the script sources.
 3. **Engine contracts, once.** About 45 reference-derived goldens: cond and flags bits; set
    cond and exit packet and SQL order; quest list contents; four drop types with roll counts
    and a fractional rate; range checks; the dialog rules of section 7; the fan-out rules of
@@ -380,10 +459,10 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | A3 | Script spawn API: handle-returning spawn, privates from the template, timed despawn | A2 | #3484 (+#2081, #3306) |
 | A4 | Desires I: cast (with hold and conditions), follow, wander, do-nothing, attack variants | A0, A1 | #3485 |
 | A5 | Desires II: flee with its guard; social with the social-broadcast gate | A4 | #1804 |
-| A6 | Attacked from three sources and party attacked, per called NPC; gates the matching stand-ins | E1, A2 | #3486 |
+| A6 | Attacked from three sources and party attacked, per called NPC | E1, A2 | #3486 |
 | A7 | Clan attacked scan, party died, clan died, folk attacked | A6 | #1800 |
 | A8 | Skill finished, attack finished with target, see-spell, spelled, abnormal status | A6 | #3488 |
-| A9 | No-desire, move finished, out of territory, for hostile and folk; gates idle stand-ins | A4 | #3489 (+#2148, #2162, #2163, #2240) |
+| A9 | No-desire, move finished, out of territory, for hostile and folk | A4 | #3489 (+#2148, #2162, #2163, #2240) |
 | A10 | See-creature tick scan with its gates, look-neighbor throttle, re-fire after teleport | A9 | #3491 |
 | A11 | Behavior base plus the first Warrior chain: Warrior base, Warrior, WarriorAggressive (first cut-over: 514 ids, 299 + 215) | A1–A10, E6, E7, E8 script events, X4 | #3494 |
 | A12 | Rest of the behavior spine (20 classes, about 840 ids in total) | A10, A11 | #3495 (+#2162, #2163, #2240, #3306, #176) |
@@ -421,6 +500,16 @@ skill handler of E8, the diary-write quest of E5, the two subclass-gate quests a
 class-change quest of X1), the tutorial and newbie helper, four features, two teleporters,
 six tasks, three makers and the behavior spine. The API freezes when the census of every
 engine call made by the 857 scripts has no unmapped row.
+
+Owner decision (2026-10-19): rows whose only callers are siegable-hall classes are exempt
+from the freeze and marked `exempt` in `apimap.txt`. They are the siegable-hall scripts and
+behaviors of #3502, the AgitWarrior subtree (#193) and the quests Q504 and Q655 (#184).
+These classes cannot run before the hall siege runtime (#244, M12), so the 64 rows left at
+the decision (siegable hall, clan hall, hall siege, clan, residence and siege-zone calls)
+get their Go names in the hall port. That port is the one place after the freeze that may
+add to the script-facing API, and only for those rows. Every other class must not make an
+exempt call: `TestCommittedGoldensAreConsistent` checks it. The AgitWarrior subtree
+(`Npc.getClanId`) therefore waits for the hall port, like Q504 and Q655.
 
 ### M10: content (about 165–175 PRs)
 

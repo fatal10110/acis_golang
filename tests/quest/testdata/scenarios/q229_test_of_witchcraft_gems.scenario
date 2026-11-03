@@ -1,0 +1,406 @@
+# Test of Witchcraft (Q229), the six Aklantoth gems: Alexandria sends the traveller for them; Nestle and
+# Leopold send it for the skeletal mercenary's three; Lara for the nameless revenant's; Kaira gives one;
+# Iker takes the 60 fangs, charms and heartstones (19 of each held already, the last of each killed). The
+# sixth gem moves the quest to Orim's third step.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q229_test_of_witchcraft_gems.golden
+character Witch 39
+class 11
+quest Q229_TestOfWitchcraft <state>=STARTED <cond>=1
+script quest.Q229_TestOfWitchcraft
+hold 3311 19
+hold 3312 19
+hold 3313 19
+random always 0
+item 3308 3309 3310 3311 3312 3313 3314 3315 3316 3317 3318 3319 3320 3321 3322 3323 3324 3325 3326 3327 3328 3329 3330 3331 3332 3333 3334 3335 3029 3307 7562
+page default/30630.htm
+page merchant/30098.htm
+page merchant/30314.htm
+page default/30435.htm
+page merchant/30063.htm
+page trainer/30476.htm
+page trainer/30110.htm
+page script/quest/Q229_TestOfWitchcraft/
+npc orim 30630 Folk 10 0 0
+npc alexandria 30098 Merchant -10 0 0
+npc nestle 30314 Merchant 0 10 0
+npc leopold 30435 Folk 0 -10 0
+npc lara 30063 Merchant 10 10 0
+npc kaira 30476 Trainer -10 10 0
+npc iker 30110 Trainer 10 -10 0
+npc wyrm 20557 Monster 40 0 0
+npc golem 20565 Monster -40 0 0
+npc lizardman 20577 Monster 0 40 0
+npc skeletal 27100 Monster 0 -40 0
+npc revenant 27099 Monster 40 40 0
+
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-09.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=1 <state>=STARTED
+action alexandria
+action alexandria
+  S ActionFailed
+  S NpcHtmlMessage obj=alexandria item=0 page=merchant/30098.htm
+  S ActionFailed
+bypass npc_{alexandria}_Quest
+  S NpcHtmlMessage obj=alexandria item=0 page=script/quest/Q229_TestOfWitchcraft/30098-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=1 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30098-02.htm
+  S NpcHtmlMessage obj=alexandria item=0 page=script/quest/Q229_TestOfWitchcraft/30098-02.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=1 <state>=STARTED
+bypass Quest Q229_TestOfWitchcraft 30098-03.htm
+  S QuestList 229:0x80000003
+  S ExShowQuestMark quest=229
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3309
+  S NpcHtmlMessage obj=alexandria item=0 page=script/quest/Q229_TestOfWitchcraft/30098-03.htm
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <cond> | 2
+  Q upsert Q229_TestOfWitchcraft | gem456 | 1
+  items 3308=0 3309=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=1
+action alexandria
+  S ActionFailed
+  S NpcHtmlMessage obj=alexandria item=0 page=merchant/30098.htm
+  S ActionFailed
+action alexandria
+  S ActionFailed
+  S NpcHtmlMessage obj=alexandria item=0 page=merchant/30098.htm
+  S ActionFailed
+bypass npc_{alexandria}_Quest
+  S NpcHtmlMessage obj=alexandria item=0 page=script/quest/Q229_TestOfWitchcraft/30098-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=1
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-10.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=1
+action nestle
+action nestle
+  S ActionFailed
+  S NpcHtmlMessage obj=nestle item=0 page=merchant/30314.htm
+  S ActionFailed
+bypass npc_{nestle}_Quest
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q229_TestOfWitchcraft/30314-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=1
+bypass Quest Q229_TestOfWitchcraft 30314-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3315
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q229_TestOfWitchcraft/30314-02.htm
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | gem456 | 2
+  items 3315=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=2
+action nestle
+  S ActionFailed
+  S NpcHtmlMessage obj=nestle item=0 page=merchant/30314.htm
+  S ActionFailed
+action nestle
+  S ActionFailed
+  S NpcHtmlMessage obj=nestle item=0 page=merchant/30314.htm
+  S ActionFailed
+bypass npc_{nestle}_Quest
+  S NpcHtmlMessage obj=nestle item=0 page=script/quest/Q229_TestOfWitchcraft/30314-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=2
+action leopold
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q229_TestOfWitchcraft/30435-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=2
+bypass Quest Q229_TestOfWitchcraft 30435-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3315
+  S SystemMessage id=54 3:3316
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q229_TestOfWitchcraft/30435-02.htm
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | gem456 | 3
+  items 3315=0 3316=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=3
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q229_TestOfWitchcraft/30435-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=3
+kill skeletal x3
+  S NpcSay obj=skeletal type=0 npc=1027100 text="I absolutely cannot give it to you! It is my precious jewel!"
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3320
+  S NpcSay obj=skeletal type=0 npc=1027100 text="I absolutely cannot give it to you! It is my precious jewel!"
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3321
+  S NpcSay obj=skeletal type=0 npc=1027100 text="I absolutely cannot give it to you! It is my precious jewel!"
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:3316
+  S SystemMessage id=54 3:3322
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q229_TestOfWitchcraft | gem456 | 4
+  Q upsert Q229_TestOfWitchcraft | gem456 | 5
+  Q upsert Q229_TestOfWitchcraft | gem456 | 6
+  items 3316=0 3320=1 3321=1 3322=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+action leopold
+  S ActionFailed
+  S NpcHtmlMessage obj=leopold item=0 page=default/30435.htm
+  S ActionFailed
+bypass npc_{leopold}_Quest
+  S NpcHtmlMessage obj=leopold item=0 page=script/quest/Q229_TestOfWitchcraft/30435-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action lara
+action lara
+  S ActionFailed
+  S NpcHtmlMessage obj=lara item=0 page=merchant/30063.htm
+  S ActionFailed
+bypass npc_{lara}_Quest
+  S NpcHtmlMessage obj=lara item=0 page=script/quest/Q229_TestOfWitchcraft/30063-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+bypass Quest Q229_TestOfWitchcraft 30063-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3314
+  S NpcHtmlMessage obj=lara item=0 page=script/quest/Q229_TestOfWitchcraft/30063-02.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action lara
+  S ActionFailed
+  S NpcHtmlMessage obj=lara item=0 page=merchant/30063.htm
+  S ActionFailed
+action lara
+  S ActionFailed
+  S NpcHtmlMessage obj=lara item=0 page=merchant/30063.htm
+  S ActionFailed
+bypass npc_{lara}_Quest
+  S NpcHtmlMessage obj=lara item=0 page=script/quest/Q229_TestOfWitchcraft/30063-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+kill revenant
+  S NpcSay obj=revenant type=0 npc=1027099 text="I absolutely cannot give it to you! It is my precious jewel!"
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:3314
+  S SystemMessage id=54 3:3319
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3314=0 3319=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action lara
+  S ActionFailed
+  S NpcHtmlMessage obj=lara item=0 page=merchant/30063.htm
+  S ActionFailed
+action lara
+  S ActionFailed
+  S NpcHtmlMessage obj=lara item=0 page=merchant/30063.htm
+  S ActionFailed
+bypass npc_{lara}_Quest
+  S NpcHtmlMessage obj=lara item=0 page=script/quest/Q229_TestOfWitchcraft/30063-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action kaira
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q229_TestOfWitchcraft/30476-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+bypass Quest Q229_TestOfWitchcraft 30476-02.htm
+  S SystemMessage id=54 3:3318
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q229_TestOfWitchcraft/30476-02.htm
+  S ActionFailed
+  items 3318=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q229_TestOfWitchcraft/30476-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action iker
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+bypass Quest Q229_TestOfWitchcraft 30110-02.htm
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-02.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+bypass Quest Q229_TestOfWitchcraft 30110-03.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3310
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-03.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+kill wyrm
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3311
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+kill golem
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3313
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+kill lizardman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3312
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3311=20 3312=20 3313=20
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=2 <state>=STARTED gem456=6
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S SystemMessage id=302 3:3310
+  S SystemMessage id=301 3:3311 6:20
+  S SystemMessage id=301 3:3313 6:20
+  S SystemMessage id=301 3:3312 6:20
+  S SystemMessage id=54 3:3317
+  S QuestList 229:0x80000007
+  S ExShowQuestMark quest=229
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q229_TestOfWitchcraft | <cond> | 3
+  items 3310=0 3311=0 3312=0 3313=0 3317=1
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=3 <state>=STARTED gem456=6
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+action iker
+  S ActionFailed
+  S NpcHtmlMessage obj=iker item=0 page=trainer/30110.htm
+  S ActionFailed
+bypass npc_{iker}_Quest
+  S NpcHtmlMessage obj=iker item=0 page=script/quest/Q229_TestOfWitchcraft/30110-06.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=3 <state>=STARTED gem456=6
+action orim
+action orim
+  S ActionFailed
+  S NpcHtmlMessage obj=orim item=0 page=default/30630.htm
+  S ActionFailed
+bypass npc_{orim}_Quest
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-11.htm
+  S ActionFailed
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=3 <state>=STARTED gem456=6
+bypass Quest Q229_TestOfWitchcraft 30630-12.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-12.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=3 <state>=STARTED gem456=6
+bypass Quest Q229_TestOfWitchcraft 30630-13.htm
+  S NpcHtmlMessage obj=orim item=0 page=script/quest/Q229_TestOfWitchcraft/30630-13.htm
+  S ActionFailed
+  state Q229_TestOfWitchcraft STARTED
+  rows Q229_TestOfWitchcraft <cond>=3 <state>=STARTED gem456=6

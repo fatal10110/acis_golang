@@ -1,0 +1,73 @@
+# Resurrection of an Old Manager (Q114): a level 49 character who completed Pavel the Giant
+# (Q121, its journal seeded) accepts at Yumi (cond 1) and hears her out to the page that does
+# not decode; the story starts over on the next talk. Then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager.golden
+character Manager 49
+quest Q121_PavelTheGiant <state>=COMPLETED
+script quest.Q114_ResurrectionOfAnOldManager
+script quest.Q121_PavelTheGiant
+item 57 8090 8091 8287 8288 8289
+page default/32041.htm
+page default/32047.htm
+page script/quest/Q114_ResurrectionOfAnOldManager/
+npc yumi 32041 Folk 10 0 0
+npc wendy 32047 Folk 20 0 0
+
+# Yumi: Pavel the Giant done at level 49, she offers the quest.
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body><a action=\"bypass -h npc_{yumi}_Quest Q121_PavelTheGiant\">[Pavel the Giant (Done)]</a><br><a action=\"bypass -h npc_{yumi}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{yumi}_Quest Q114_ResurrectionOfAnOldManager
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q114_ResurrectionOfAnOldManager CREATED
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-02.htm
+  S QuestList 121:0x00000000 114:0x80000001
+  S ExShowQuestMark quest=114
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-02.htm
+  S ActionFailed
+  Q upsert Q114_ResurrectionOfAnOldManager | <state> | STARTED
+  Q upsert Q114_ResurrectionOfAnOldManager | <cond> | 1
+  Q upsert Q114_ResurrectionOfAnOldManager | talk | 0
+  state Q114_ResurrectionOfAnOldManager STARTED
+  rows Q114_ResurrectionOfAnOldManager <cond>=1 <state>=STARTED talk=0
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-03.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-03.htm
+  S ActionFailed
+
+# The next page does not decode (a stray Latin-1 byte): the server reads it as missing
+# and shows its notice, which leads nowhere, so the story cannot go on; the next talk
+# starts it over.
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-04.htm
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q114_ResurrectionOfAnOldManager/32041-04.htm</body></html>"
+  S ActionFailed
+bypass Quest Q114_ResurrectionOfAnOldManager 32041-05.htm
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>Collector Yumi:<br>\nThis area is know as the Ruins of Pavel. It is one of the research labs the Giants established in the distant past. I've come here to research the Starstones that are being produced in this area.<br>\nThe roaming golems make it very risky to go outside of the barracks, however. In addition, the remnants of ancient old experiments, vile and disgusting, add to the danger.<br>\n<a action=\"bypass -h npc_{yumi}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body><a action=\"bypass -h npc_{yumi}_Quest Q114_ResurrectionOfAnOldManager\">[Resurrection of an Old Manager (In Progress)]</a><br><a action=\"bypass -h npc_{yumi}_Quest Q121_PavelTheGiant\">[Pavel the Giant (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{yumi}_Quest Q114_ResurrectionOfAnOldManager
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-02.htm
+  S ActionFailed
+  S ActionFailed
+
+relog
+  state Q114_ResurrectionOfAnOldManager STARTED
+  rows Q114_ResurrectionOfAnOldManager <cond>=1 <state>=STARTED talk=0

@@ -131,6 +131,7 @@ func gmLevels(t *testing.T) gameservertest.Option {
 // player within 1250 units hear the line, a player further away does not.
 // The line is delivered with every literal backslash-n removed.
 func TestChatAllHeardInRange(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 	carol, _ := p.enterAt(t, "player3", "Carol", farX, 20, gameservertest.SpawnZ)
@@ -148,6 +149,7 @@ func TestChatAllHeardInRange(t *testing.T) {
 // region, however far, and nobody in another region. Players outside every
 // region share one.
 func TestChatShoutAndTradeReachRegion(t *testing.T) {
+	t.Parallel()
 	farTile := location.Point{X: (farX-world.MinX)/world.TileSize + world.TileXMin, Y: (20-world.MinY)/world.TileSize + world.TileYMin}
 	table := &restart.Table{Points: []restart.Point{{Name: "far", MapRegions: []location.Point{farTile}}}}
 	if table.PointIndexAt(location.Location{X: 10, Y: 20}) != -1 {
@@ -185,6 +187,7 @@ func TestChatShoutAndTradeReachRegion(t *testing.T) {
 // one blocking the speaker THE_PERSON_IS_IN_MESSAGE_REFUSAL_MODE. A game
 // master's whisper passes both blocks.
 func TestChatTell(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t, gmLevels(t))
 	carolID := p.srv.SeedCharacterFor(t, "player3", "Carol", 1, 0).ID
 	p.setAccessLevel(t, carolID, 7)
@@ -233,6 +236,7 @@ func TestChatTell(t *testing.T) {
 // cannot name, an announcement from a player that is no game master, and a
 // channel nobody delivers. A 100-character line is said.
 func TestChatDroppedLines(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 
@@ -268,6 +272,7 @@ func TestChatDroppedLines(t *testing.T) {
 // TestChatHeroVoice pins the hero channel: a hero's line reaches every
 // player online, however far.
 func TestChatHeroVoice(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	if _, err := p.srv.DB.ExecContext(context.Background(), "UPDATE characters SET hero = 1 WHERE obj_Id = ?", p.bobbyID); err != nil {
 		t.Fatal(err)
@@ -286,6 +291,7 @@ func TestChatHeroVoice(t *testing.T) {
 // HeroVoiceTime. A line inside its delay is dropped without an answer; the
 // delay is per client.
 func TestChatFloodProtection(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t, gameservertest.WithChat(network.ChatConfig{GlobalDelay: time.Hour, TradeDelay: time.Hour, HeroVoiceDelay: time.Hour}))
 	if _, err := p.srv.DB.ExecContext(context.Background(), "UPDATE characters SET hero = 1 WHERE obj_Id = ?", p.aliceID); err != nil {
 		t.Fatal(err)
@@ -325,6 +331,7 @@ func TestChatFloodProtection(t *testing.T) {
 // starting with a bot script command is dropped without an answer; other
 // channels and other whispers are said.
 func TestChatWalkerProtection(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t, gameservertest.WithChat(network.ChatConfig{WalkerProtection: true}))
 	p.enterAll(t)
 
@@ -345,6 +352,7 @@ func TestChatWalkerProtection(t *testing.T) {
 // speaker included, even one that blocks the speaker; a player outside the
 // party hears nothing.
 func TestChatParty(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 	carol, _ := p.third(t, "player3", "Carol")
@@ -372,6 +380,7 @@ func TestChatParty(t *testing.T) {
 // TestChatClan pins the clan channel: every member in the world hears the
 // line, the speaker included; a player outside the clan hears nothing.
 func TestChatClan(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t, gameservertest.WithClanSeed(func(db *sql.DB) {
 		for _, q := range []string{
 			"UPDATE characters SET clanid = 268435456, power_grade = 0 WHERE char_name = 'Alice'",
@@ -409,6 +418,7 @@ func TestChatClan(t *testing.T) {
 // with its text as said; a delivered friend message is logged as PRIV_MSG.
 // A dropped line is not logged.
 func TestChatLog(t *testing.T) {
+	t.Parallel()
 	var log syncBuffer
 	p := bootPair(t, gameservertest.WithChat(network.ChatConfig{Log: zerolog.New(&log)}))
 	p.enterAll(t)

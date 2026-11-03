@@ -1,0 +1,27 @@
+# CorePrivateWarriorCastDDMagicAggressive (29008, Death Wraith, level 55, DD magic 4001-5), every draw 0:
+# a level 70 character, more than 8 levels above it, that hits it is cursed (4515-1) at 1000000 and
+# adds no hate; a mate of level 40 is not. Perum (29012, level 48, DD 4001-4) has the same hooks and
+# a hate shuffle timer (4001), every 90 to 330 s.
+character Hunter 70
+roll player 0
+random always 0
+member Mate 40 -1500 0 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagic
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.WarriorCastDDMagicAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.CorePrivateWarriorCastDDMagicAggressive.CorePrivateWarriorCastDDMagicAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagic.CorePrivateWarriorCastDDMagicAggressive.CorePrivatePerum
+npc wraith 29008 Monster 300 0 0 level 55 skill DD_MAGIC 4001 5 skill DEBUFF1 4515 1
+npc perum 29012 Monster 300 600 0 level 48 skill DD_MAGIC 4001 4 skill DEBUFF1 4515 1
+
+hit wraith 10 by Mate
+  desires wraith -
+hit wraith 10
+  desires wraith cast(player,4515:1,move)=1000000
+hit perum 10 by Mate
+  desires perum -
+hit perum 10
+  desires perum cast(player,4515,move)=1000000

@@ -24,7 +24,7 @@ func pageButton(label, command string, heroClass, page int32) string {
 // first, ten to a page, under the hero's message. ok is false when the
 // page is not sent: objectID has no diary page or no message, the page
 // starts before the first entry, or it shows an entry without its text.
-// The page numbers are 32-bit, wrapping as the reference's do.
+// The page numbers are 32-bit and wrap.
 func (m *Manager) DiaryPage(template, heroName string, heroClass, objectID, page int32) (string, bool) {
 	m.mu.Lock()
 	_, ok := m.records.diaryHeroes[objectID]
@@ -172,12 +172,11 @@ func replacePlaceholders(html string, pairs ...string) (string, bool) {
 }
 
 // replacePlaceholder replaces every placeholder in html with value the
-// way the reference's page fill does: its '$' are escaped, then the value
+// way the page fill does: its '$' are escaped, then the value
 // is read as a regular-expression replacement, so a backslash takes the
 // next character as it is and "$0" stands for the placeholder itself. ok
 // is false for a value that replacement refuses: one ending in an
-// unpaired backslash, or naming any other group. The reference sends no
-// page then.
+// unpaired backslash, or naming any other group. No page is sent then.
 func replacePlaceholder(html, placeholder, value string) (string, bool) {
 	escaped := strings.ReplaceAll(value, "$", `\$`)
 	var b strings.Builder

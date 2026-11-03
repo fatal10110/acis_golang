@@ -1,0 +1,25 @@
+# GludioClericStand's clan-attacked hook on Aden's standing cleric (35250), whose MAGIC_HEAL
+# is the shipped Aden Heal (4115): as GludioCleric's, but it heals a hurt clan mate only from
+# where it stands. The calls of the hits that leave the knight (35235) at 270 of 440 (61%)
+# leave it idle; at 260 (59%), with a draw under 20, it wants to cast its heal on the knight
+# without walking, weight 1000000, and casts it at its next think.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioClericStand
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 100 0 0 walks clan aden_siege_clan 300
+npc stand 35250 SiegeGuard 100 -150 0 walks clan aden_siege_clan 300 skill MAGIC_HEAL 4115 1
+
+hit knight 170
+  desires stand -
+
+hit knight 10
+  desires stand -
+
+hit knight 10
+  desires stand cast(knight,4115)=1000000
+
+tick x2
+  S MagicSkillUse caster=stand target=knight skill=4115-1 hit=13214 reuse=26428 success=0

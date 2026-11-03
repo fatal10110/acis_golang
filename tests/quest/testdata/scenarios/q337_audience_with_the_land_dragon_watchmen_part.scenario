@@ -1,0 +1,58 @@
+# Audience with the Land Dragon (Q337), one half of what Chakiris and Kaiena ask for is held, and a mark is held: they ask for the other half, and Orven and Kendra, asked for nothing, say how many marks are held. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_watchmen_part.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop3=1 drop4=1
+hold 3855 1
+hold 3854 1
+hold 3864 1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page villagemaster/30857.htm
+page trainer/30851.htm
+page trainer/30705.htm
+page trainer/30720.htm
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc orven 30857 VillageMasterPriest 10 0 0
+npc kendra 30851 Trainer 15 0 0
+npc chakiris 30705 Trainer 20 0 0
+npc kaiena 30720 Trainer 25 0 0
+
+action chakiris
+action chakiris
+  S ActionFailed
+  S NpcHtmlMessage obj=chakiris item=0 page=trainer/30705.htm
+  S ActionFailed
+bypass npc_{chakiris}_Quest
+  S NpcHtmlMessage obj=chakiris item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30705-01.htm
+  S ActionFailed
+  S ActionFailed
+action kaiena
+action kaiena
+  S ActionFailed
+  S NpcHtmlMessage obj=kaiena item=0 page=trainer/30720.htm
+  S ActionFailed
+bypass npc_{kaiena}_Quest
+  S NpcHtmlMessage obj=kaiena item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30720-01.htm
+  S ActionFailed
+  S ActionFailed
+action orven
+action orven
+  S ActionFailed
+  S NpcHtmlMessage obj=orven item=0 page=villagemaster/30857.htm
+  S ActionFailed
+bypass npc_{orven}_Quest
+  S NpcHtmlMessage obj=orven item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30857-03.htm
+  S ActionFailed
+  S ActionFailed
+action kendra
+action kendra
+  S ActionFailed
+  S NpcHtmlMessage obj=kendra item=0 page=trainer/30851.htm
+  S ActionFailed
+bypass npc_{kendra}_Quest
+  S NpcHtmlMessage obj=kendra item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30851-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 3864=1 3855=1 3854=1
+  rows Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop3=1 drop4=1
+  state Q337_AudienceWithTheLandDragon STARTED

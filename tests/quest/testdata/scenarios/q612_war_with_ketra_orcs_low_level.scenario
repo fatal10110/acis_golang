@@ -1,0 +1,21 @@
+# War with Ketra Orcs (Q612): below level 74 a Varka ally is turned away. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q612_war_with_ketra_orcs_low_level.golden
+character Recruit 73
+standing -1
+script quest.Q612_WarWithKetraOrcs
+item 7234 7187
+page npcdefault.htm
+page script/quest/Q612_WarWithKetraOrcs/
+npc ashas 31377 Folk 10 0 0
+
+action ashas
+action ashas
+  S ActionFailed
+  S NpcHtmlMessage obj=ashas item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{ashas}_Quest
+  S NpcHtmlMessage obj=ashas item=0 page=script/quest/Q612_WarWithKetraOrcs/31377-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q612_WarWithKetraOrcs CREATED

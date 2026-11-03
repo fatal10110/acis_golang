@@ -45,7 +45,7 @@ func (l *GameClientLink) adminClanSkill(gm *livePlayer, line string) {
 func (l *GameClientLink) runAdminClanSkill(gm, target *livePlayer, args []string) {
 	cl, ok := l.clanService().ClanOf(target.Character)
 	if !ok || !cl.IsLeader(target.ObjectID()) {
-		gm.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsNotAClanLeader, target.Name))
+		gm.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsNotAClanLeader, target.CharacterName()))
 		l.showAdminSkills(gm, target, 1)
 		return
 	}
@@ -64,7 +64,7 @@ func (l *GameClientLink) runAdminClanSkill(gm, target *livePlayer, args []string
 		if !isDigits(tok) {
 			return true
 		}
-		n, ok := parseJavaInt(tok)
+		n, ok := parseInt32(tok)
 		page = int(n)
 		return ok
 	}
@@ -118,12 +118,12 @@ func (l *GameClientLink) adminClanSkillSet(leader *livePlayer, cl *clan.Clan, ne
 		l.sendClanSkillsRaised(cl, leader)
 		return "You gave all available skills to " + cl.Name() + " clan.", false
 	}
-	id, ok := parseJavaInt(param)
+	id, ok := parseInt32(param)
 	if !ok {
 		return usage, false
 	}
 	levelParam, _ := next()
-	level, ok := parseJavaInt(levelParam)
+	level, ok := parseInt32(levelParam)
 	if !ok {
 		return usage, false
 	}
@@ -163,7 +163,7 @@ func (l *GameClientLink) adminClanSkillRemove(leader *livePlayer, cl *clan.Clan,
 		l.sendClanSkillsRemoved(cl, ids, leader)
 		return "You removed all skills from " + cl.Name() + " clan."
 	}
-	id, ok := parseJavaInt(param)
+	id, ok := parseInt32(param)
 	if !ok {
 		return usage
 	}
@@ -237,7 +237,7 @@ func (l *GameClientLink) clanSkillCatalog() []modelskill.Definition {
 	var out []modelskill.Definition
 	for id := modelskill.ID(firstClanSkillID); id <= lastClanSkillID; id++ {
 		if def, ok := l.skills.Definition(modelskill.Ref{ID: id, Level: l.skills.MaxLevel(id)}); ok {
-			out = append(out, def)
+			out = append(out, *def)
 		}
 	}
 	return out

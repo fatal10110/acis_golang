@@ -1,0 +1,22 @@
+# Orc Subjugation (Q263), refused: Kayleen sends a human fighter away, and the quest is not
+# started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q263_orc_subjugation_wrong_race.golden
+character Subjugator 8
+script quest.Q263_OrcSubjugation
+item 1116
+page guard/30346.htm
+page script/quest/Q263_OrcSubjugation/
+npc kayleen 30346 Guard 10 0 0
+
+# Kayleen: dark elves only.
+action kayleen
+action kayleen
+  S ActionFailed
+  S NpcHtmlMessage obj=kayleen item=0 page=guard/30346.htm
+  S ActionFailed
+bypass npc_{kayleen}_Quest
+  S NpcHtmlMessage obj=kayleen item=0 page=script/quest/Q263_OrcSubjugation/30346-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q263_OrcSubjugation CREATED
+  rows Q263_OrcSubjugation -

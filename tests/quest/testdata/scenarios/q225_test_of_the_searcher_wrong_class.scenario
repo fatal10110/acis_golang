@@ -1,0 +1,23 @@
+# Test of the Searcher (Q225), refused: a level 39 Warrior is turned away by Luther (the test is for
+# rogues, elven scouts, assassins and scavengers), and the quest is not started. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q225_test_of_the_searcher_wrong_class.golden
+character Warrior 39
+class 1
+script quest.Q225_TestOfTheSearcher
+item 2784 2785 2786 2787 2788 2789 2790 2791 2792 2793 2794 2795 2796 2797 2798 2799 2800 2801 2802 2803 2804 2805 2806 2807 2808 2809 7562
+page trainer/30690.htm
+page script/quest/Q225_TestOfTheSearcher/
+npc luther 30690 Trainer 10 0 0
+
+action luther
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+bypass npc_{luther}_Quest
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q225_TestOfTheSearcher CREATED
+  rows Q225_TestOfTheSearcher -

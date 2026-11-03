@@ -76,6 +76,13 @@ func bootPKKillSceneWith(t *testing.T, extra []gameservertest.Option, known ...m
 // count at 0 and the PK-free knife wearable.
 func bootPKKillSceneKarma(t *testing.T, karma int, extra []gameservertest.Option, known ...modelskill.Definition) *pkKillScene {
 	t.Helper()
+	return bootPKKillSceneSeeded(t, karma, extra, nil, known...)
+}
+
+// bootPKKillSceneSeeded is bootPKKillSceneKarma with beforeEnter, when not
+// nil, run against the stored killer before it enters the world.
+func bootPKKillSceneSeeded(t *testing.T, karma int, extra []gameservertest.Option, beforeEnter func(srv *gameservertest.Server, objID int32), known ...modelskill.Definition) *pkKillScene {
+	t.Helper()
 	knife := shippedItemTemplate(t, apprenticeKnifeID)
 	if len(knife.UseConditions) != 1 || knife.UseConditions[0].MessageID != 1685 {
 		t.Fatalf("shipped knife conditions = %+v, want the one pkCount clause with message 1685", knife.UseConditions)
@@ -104,6 +111,9 @@ func bootPKKillSceneKarma(t *testing.T, karma int, extra []gameservertest.Option
 		seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
 	}
 	knifeObjID := srv.GiveItem(t, objID, apprenticeKnifeID, 1)
+	if beforeEnter != nil {
+		beforeEnter(srv, objID)
+	}
 	victim := srv.SeedCharacterFor(t, "victim", "Victim", 1, 0)
 	vc := srv.DialClient(t, "victim", 1)
 	startInWorld(t, vc)

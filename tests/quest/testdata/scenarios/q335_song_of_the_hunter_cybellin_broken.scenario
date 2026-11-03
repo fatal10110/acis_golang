@@ -1,0 +1,33 @@
+# Song of the Hunter (Q335), level 45: Cybellin takes the broken blood and starts again. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q335_song_of_the_hunter_cybellin_broken.golden
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED cybellin=1
+hold 3708 1
+script quest.Q335_SongOfTheHunter
+item 3708
+page default/30746.htm
+page script/quest/Q335_SongOfTheHunter/
+npc cybellin 30746 Folk 10 0 0
+
+action cybellin
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+bypass npc_{cybellin}_Quest
+  S SystemMessage id=302 3:3708
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-09.htm
+  S ActionFailed
+  S ActionFailed
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+action cybellin
+  S ActionFailed
+  S NpcHtmlMessage obj=cybellin item=0 page=default/30746.htm
+  S ActionFailed
+bypass npc_{cybellin}_Quest
+  S NpcHtmlMessage obj=cybellin item=0 page=script/quest/Q335_SongOfTheHunter/30746-08.htm
+  S ActionFailed
+  S ActionFailed

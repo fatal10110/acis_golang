@@ -54,23 +54,22 @@ func (s summonStatActor) Z() int { return s.a.Z() }
 // CreatureMove, so this reports false rather than erroring.
 func (s summonStatActor) IsMoving() bool { return s.a.IsMoving() }
 
-// IsRunning satisfies conditions.Actor. Always true, matching
-// hostileStatActor: a creature's walk/run toggle defaults to run stance
-// and nothing puts a summon back into walk stance.
-func (s summonStatActor) IsRunning() bool { return true }
+// IsRunning satisfies conditions.Actor via Actor.Running: a summon runs
+// unless a hungry pet walks.
+func (s summonStatActor) IsRunning() bool { return s.a.Running() }
 
 // IsRiding satisfies conditions.Actor. Always false: summons are never
-// mounted, matching Creature.isRiding's un-overridden default.
+// mounted.
 func (s summonStatActor) IsRiding() bool { return false }
 
 // IsFlying satisfies conditions.Actor. Always false: no shipped summon
-// overrides Creature.isFlying's default.
+// flies.
 func (s summonStatActor) IsFlying() bool { return false }
 
 // headingActor is the extra capability IsBehind/IsInFrontOf need beyond
-// conditions.Actor's plain X/Y/Z: the reference position's own heading.
-// conditionGate always tests an owner against itself
-// (conditionGate.Test(actor, actor, nil)), so other is always this same
+// conditions.Actor's plain X/Y/Z: the compared position's own heading.
+// conditionGate always tests an owner against itself (the owner on both
+// sides of the test), so other is always this same
 // summonStatActor, which implements it via CurrentHeading below.
 // CurrentHeading lets a summonStatActor serve as the "other" side of its
 // own IsBehind/IsInFrontOf check.
@@ -103,6 +102,11 @@ func (s summonStatActor) ActiveSkillLevel(id int) (int, bool) {
 	ref, ok := s.a.GetSkill(id)
 	return int(ref.Level), ok
 }
+
+// TargetID and RaceOrdinal satisfy conditions.Actor. A summon is no NPC or
+// door: target npcId and race_id conditions never match it.
+func (summonStatActor) TargetID() (int, bool)    { return 0, false }
+func (summonStatActor) RaceOrdinal() (int, bool) { return 0, false }
 
 // ActiveEffectLevel satisfies conditions.Actor.
 func (s summonStatActor) ActiveEffectLevel(effectID int) (int, bool) {

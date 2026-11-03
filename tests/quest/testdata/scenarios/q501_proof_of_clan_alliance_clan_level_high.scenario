@@ -1,0 +1,27 @@
+# Proof Of Clan Alliance (Q501): the leader of a level 4 clan is turned away by Sir Kristof Rodemai. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q501_proof_of_clan_alliance_clan_level_high.golden
+character Leader 40
+clan 4
+random always 0
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page default/30757.htm
+page default/30759.htm
+page default/30758.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+npc statue 30757 Folk 20 0 0
+npc kalis 30759 Folk 30 0 0
+npc athrea 30758 Folk 40 0 0
+
+action kristof
+action kristof
+  S ActionFailed
+  S NpcHtmlMessage obj=kristof item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{kristof}_Quest
+  S NpcHtmlMessage obj=kristof item=0 page=script/quest/Q501_ProofOfClanAlliance/30756-02.htm
+  S ActionFailed
+  S ActionFailed

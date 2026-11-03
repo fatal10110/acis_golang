@@ -65,7 +65,7 @@ func TestDuplicateAuthLoginEvictsPendingConnectionAndValidatesReplacement(t *tes
 	t.Cleanup(func() { loginLink.Close() })
 
 	addr, chars, _, _, _ := newTestGameClientLinkWithSkillsShortcutsAndLog(t, func() *LoginLink { return loginLink }, validator, nil, zerolog.Nop())
-	seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
+	seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
 

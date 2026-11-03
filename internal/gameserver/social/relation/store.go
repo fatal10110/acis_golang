@@ -2,22 +2,21 @@ package relation
 
 import "slices"
 
-// pairTable keeps every pair in the order the reference relation store
-// walks them, the order a friend or block list is gathered in before
-// clientOrder. The store is a concurrent hash table of all pairs held since
-// boot, a pair cleared of every flag included, keyed by the pair's hash
-// (31*low + high folded onto its own high half): 16 bins to start, doubled
-// once it holds three quarters of its size. A bin keeps its pairs in
-// insertion order, but a doubling moves the pairs ahead of the bin's last run
-// of pairs bound for the same half to the front of their half, in reverse
-// (see double). A bin given a ninth pair is turned into a tree when the table
-// has 64 bins or more, and below that grows the table (see treeify); a tree
-// bin takes a new pair at its front.
+// pairTable keeps every pair in the order the relation store walks them, the
+// order a friend or block list is gathered in before clientOrder. The store is a
+// concurrent hash table of all pairs held since boot, a pair cleared of every
+// flag included, keyed by the pair's hash (31*low + high folded onto its own
+// high half): 16 bins to start, doubled once it holds three quarters of its
+// size. A bin keeps its pairs in insertion order, but a doubling moves the pairs
+// ahead of the bin's last run of pairs bound for the same half to the front of
+// their half, in reverse (see double). A bin given a ninth pair is turned into a
+// tree when the table has 64 bins or more, and below that grows the table (see
+// treeify); a tree bin takes a new pair at its front.
 //
 // Every update of a pair counts, not only adding one: an update that finds
 // its pair in eighth place or later of a listed bin treeifies it as above.
-// Updates are modelled one at a time; two racing updates of the reference
-// store can leave it in an order no sequence of them would.
+// Updates are modelled one at a time; two racing updates of a concurrent
+// store could leave it in an order no sequence of them would.
 type pairTable struct {
 	bins []pairBin
 	held int

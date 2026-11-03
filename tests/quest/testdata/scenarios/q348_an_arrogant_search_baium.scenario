@@ -1,0 +1,130 @@
+# An Arrogant Search (Q348), level 60: ten blooded fabrics are shared among Gustav, Hardin and Iason before Hanellin pays. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q348_an_arrogant_search_baium.golden
+character Dragoon 60
+quest Q348_AnArrogantSearch <cond>=26 <state>=STARTED points=0
+hold 4295 10
+script quest.Q348_AnArrogantSearch
+item 4287 4288 4289 4290 4291 4292 4293 4397 4398 4399 4294 4295 1831 1061
+page trainer/30864.htm
+page default/30760.htm
+page default/30832.htm
+page default/30969.htm
+page script/quest/Q348_AnArrogantSearch/
+npc hanellin 30864 Trainer 10 0 0
+npc gustav 30760 Folk 20 0 0
+npc hardin 30832 Folk 30 0 0
+npc iason 30969 Folk 40 0 0
+
+action hanellin
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+bypass npc_{hanellin}_Quest
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-53.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q348_AnArrogantSearch 30864-58.htm
+  S QuestList 348:0x87ffffff
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-58.htm
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <cond> | 27
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+bypass npc_{hanellin}_Quest
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-59.htm
+  S ActionFailed
+  S ActionFailed
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S SystemMessage id=301 3:4295 6:3
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q348_AnArrogantSearch/30760-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | gustav | 1
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q348_AnArrogantSearch/30760-02.htm
+  S ActionFailed
+  S ActionFailed
+action hardin
+action hardin
+  S ActionFailed
+  S NpcHtmlMessage obj=hardin item=0 page=default/30832.htm
+  S ActionFailed
+bypass npc_{hardin}_Quest
+  S SystemMessage id=302 3:4295
+  S NpcHtmlMessage obj=hardin item=0 page=script/quest/Q348_AnArrogantSearch/30832-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | hardin | 1
+action iason
+action iason
+  S ActionFailed
+  S NpcHtmlMessage obj=iason item=0 page=default/30969.htm
+  S ActionFailed
+bypass npc_{iason}_Quest
+  S SystemMessage id=301 3:4295 6:6
+  S NpcHtmlMessage obj=iason item=0 page=script/quest/Q348_AnArrogantSearch/30969-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | iason | 1
+action hanellin
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+bypass npc_{hanellin}_Quest
+  S QuestList 348:0x8fffffff
+  S ExShowQuestMark quest=348
+  S SystemMessage id=52 6:49000
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-60.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <cond> | 28
+bypass Quest Q348_AnArrogantSearch 30864-56.htm
+  S QuestList 348:0x9fffffff
+  S ExShowQuestMark quest=348
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:4294 6:10
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-56.htm
+  S ActionFailed
+  Q upsert Q348_AnArrogantSearch | <cond> | 29
+  Q delete-var Q348_AnArrogantSearch | gustav
+  Q delete-var Q348_AnArrogantSearch | hardin
+  Q delete-var Q348_AnArrogantSearch | iason
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+action hanellin
+  S ActionFailed
+  S NpcHtmlMessage obj=hanellin item=0 page=trainer/30864.htm
+  S ActionFailed
+bypass npc_{hanellin}_Quest
+  S NpcHtmlMessage obj=hanellin item=0 page=script/quest/Q348_AnArrogantSearch/30864-52.htm
+  S ActionFailed
+  S ActionFailed
+  items 4295=0 4294=10
+  state Q348_AnArrogantSearch STARTED
+  rows Q348_AnArrogantSearch <cond>=29 <state>=STARTED points=0

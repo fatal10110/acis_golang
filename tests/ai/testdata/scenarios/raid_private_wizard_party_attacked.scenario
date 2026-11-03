@@ -1,0 +1,14 @@
+# RaidPrivateWizard (25002, level 1), every draw 0: a hit on a wizard by the character (19 over it)
+# has its fellow want the magic strike (1000000) and the debuff (twice over, 2000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard
+script script.ai.individual.Monster.RaidPrivate.RaidPrivateWizard
+npc master 20003 Monster 400 0 0
+npc wizard1 25002 Monster 100 0 0 skill DD_MAGIC_A 4191 2 skill DEBUFF_A 4198 2 master master
+npc wizard2 25002 Monster -100 0 0 skill DD_MAGIC_A 4191 2 skill DEBUFF_A 4198 2 master master
+
+hit wizard1 10
+  desires wizard2 cast(player,4191,move)=1000000 cast(player,4198,move)=2000000

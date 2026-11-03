@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -168,7 +167,7 @@ func (l *List) Check(m Macro, commandText int) Refusal {
 		return NameMissing
 	case l.nameTaken(m):
 		return NameTaken
-	case UTF16Len(m.Description) > maxDescription:
+	case commons.UTF16Len(m.Description) > maxDescription:
 		return DescriptionTooLong
 	}
 	return Accepted
@@ -177,7 +176,7 @@ func (l *List) Check(m Macro, commandText int) Refusal {
 func (l *List) nameTaken(m Macro) bool {
 	for _, id := range l.order {
 		other := l.byID[id]
-		if other.ID != m.ID && equalFoldJava(other.Name, m.Name) {
+		if other.ID != m.ID && equalFoldUTF16(other.Name, m.Name) {
 			return true
 		}
 	}
@@ -230,8 +229,8 @@ func (l *List) NextRevision() int32 {
 
 // EncodeCommands serializes cmds into the persisted command text: each line
 // as type,d1,d2 then ",text" when it has text, closed by ';', and the whole
-// cut to 255 UTF-16 code units. A cut through a surrogate pair drops its
-// leading half.
+// cut to 255 UTF-16 code units. A cut through a surrogate pair leaves
+// U+FFFD in its place.
 func EncodeCommands(cmds []Command) string {
 	var sb strings.Builder
 	for _, c := range cmds {
@@ -246,7 +245,7 @@ func EncodeCommands(cmds []Command) string {
 		}
 		sb.WriteByte(';')
 	}
-	return truncateUTF16(sb.String(), maxStoredCommands)
+	return commons.UTF16Cut(sb.String(), maxStoredCommands)
 }
 
 // DecodeCommands parses persisted command text. Lines are split on ';' and
@@ -263,7 +262,7 @@ func DecodeCommands(s string) ([]Command, error) {
 		}
 		var nums [3]int32
 		for i := range nums {
-			n, err := commons.ParseInt(fields[i], 32)
+			n, err := strconv.ParseInt(fields[i], 10, 32)
 			if err != nil {
 				return nil, errBadCommand(line, err)
 			}
@@ -297,33 +296,11 @@ func tokens(s string, sep byte) []string {
 	return out
 }
 
-// UTF16Len reports how many UTF-16 code units s encodes to: the length the
-// client counts in.
-func UTF16Len(s string) int {
-	n := 0
-	for _, r := range s {
-		n += utf16.RuneLen(r)
-	}
-	return n
-}
-
-func truncateUTF16(s string, limit int) string {
-	n := 0
-	for i, r := range s {
-		w := utf16.RuneLen(r)
-		if n+w > limit {
-			return s[:i]
-		}
-		n += w
-	}
-	return s
-}
-
-// equalFoldJava compares a and b ignoring case code point by code point,
+// equalFoldUTF16 compares a and b ignoring case code point by code point,
 // matching on equal code points, equal upper cases, or equal lower cases
 // of the upper cases; strings of different UTF-16 length never match.
-func equalFoldJava(a, b string) bool {
-	if UTF16Len(a) != UTF16Len(b) {
+func equalFoldUTF16(a, b string) bool {
+	if commons.UTF16Len(a) != commons.UTF16Len(b) {
 		return false
 	}
 	ra, rb := []rune(a), []rune(b)

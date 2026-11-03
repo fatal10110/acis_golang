@@ -82,7 +82,7 @@ func (a characterStatActor) IsRiding() bool { return a.c.MountType() == MountTyp
 func (a characterStatActor) IsFlying() bool { return a.c.Flying() }
 
 // headingActor is the extra capability IsBehind/IsInFrontOf need from other
-// beyond conditions.Actor's plain X/Y/Z: the reference position's own
+// beyond conditions.Actor's plain X/Y/Z: the compared position's own
 // heading, which decides which side of it counts as front. Every conditions
 // caller this codebase's Calc() call sites can produce is, in practice, this
 // same characterStatActor (a stat func's effector and effected both resolve
@@ -117,6 +117,11 @@ func (a characterStatActor) ActiveSkillLevel(id int) (int, bool) {
 	level := a.c.SkillLevel(id)
 	return level, level > 0
 }
+
+// TargetID and RaceOrdinal satisfy conditions.Actor. A player is no NPC or
+// door: target npcId and race_id conditions never match it.
+func (characterStatActor) TargetID() (int, bool)    { return 0, false }
+func (characterStatActor) RaceOrdinal() (int, bool) { return 0, false }
 
 // ActiveEffectLevel satisfies conditions.Actor.
 func (a characterStatActor) ActiveEffectLevel(effectID int) (int, bool) {

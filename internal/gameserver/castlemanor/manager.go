@@ -378,8 +378,9 @@ func (m *Manager) changeMode() {
 		}
 		m.status = StatusModifiable
 	case StatusModifiable:
-		// Approving charges no castle anything: the next period's lists
-		// stand as set.
+		// Approving charges no castle anything and tells no one: the next
+		// period's lists stand as set, whatever the owning clan's warehouse
+		// holds.
 		m.status = StatusApproved
 	}
 	m.scheduleLocked(m.queue.Now())
@@ -496,6 +497,18 @@ func (m *Manager) NextModeChange() time.Time {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.nextChange
+}
+
+// Manages reports whether the manor holds castle castleID's lists: it runs
+// and castleID names a castle.
+func (m *Manager) Manages(castleID int) bool {
+	if !m.Enabled() {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.byCastle[castleID]
+	return ok
 }
 
 // SeedProduction returns castle castleID's seed list for the next period,

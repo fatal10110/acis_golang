@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -25,18 +27,18 @@ func TestMakerCreatedHookDeletesWhileHeld(t *testing.T) {
 	const ssqID, key = 6, "ssq#0#0"
 	f.hostile(t, ssqID).DeleteMe()
 	f.queues.Run()
-	if !f.respawn.Tracked(key) {
+	if !respawnArmed(t, f.npcs, f.respawn, key) {
 		t.Fatal("Seven Signs event NPC armed no respawn in the competition")
 	}
 
 	ss.period = sevensigns.SealValidation
-	f.respawn.Cancel(key)
-	f.npcs.Respawn(key)
+	cancelRespawn(t, f.npcs, f.respawn, key)
+	respawnNamed(t, f.npcs, key)
 	f.queues.Run()
 	if slices.Contains(f.spawnedIDs(), ssqID) {
 		t.Fatal("Seven Signs event NPC stays in the world at seal validation")
 	}
-	if f.respawn.Tracked(key) {
+	if respawnArmed(t, f.npcs, f.respawn, key) {
 		t.Fatal("Seven Signs event NPC deleted by its created hook armed a respawn")
 	}
 }
@@ -50,7 +52,7 @@ func TestEventMakerCreatedHookDeletesWhileUnlisted(t *testing.T) {
 	listed := newEventsFixture(t, eventsTable(t), eventsTemplates(), []string{"18age"})
 	listed.hostile(t, orcID).DeleteMe()
 	listed.queues.Run()
-	if !listed.respawn.Tracked(key) {
+	if !respawnArmed(t, listed.npcs, listed.respawn, key) {
 		t.Fatal("listed event maker NPC armed no respawn")
 	}
 
@@ -63,8 +65,8 @@ func TestEventMakerCreatedHookDeletesWhileUnlisted(t *testing.T) {
 	if slices.Contains(unlisted.spawnedIDs(), orcID) {
 		t.Fatal("unlisted event maker NPC stays in the world after 1001")
 	}
-	if unlisted.respawn.Tracked(key) {
-		t.Fatal("unlisted event maker NPC deleted by its created hook armed a respawn")
+	if n := unlisted.respawn.Len(); n != 0 {
+		t.Fatalf("unlisted event maker NPC deleted by its created hook: respawns armed = %d, want none", n)
 	}
 }
 
@@ -98,7 +100,7 @@ func TestMakerScheduleRespawnKeepsTheEarlierDeadline(t *testing.T) {
 			}
 			fired := &firedRespawns{}
 			f := newEventsFixtureAt(t, eventsTable(t), eventsTemplates(), nil, clock, fired)
-			const key = "plain#0#0"
+			id := mustSlot(t, f.npcs, "plain#0#0")
 			f.hostile(t, 1).DeleteMe()
 			f.queues.Run()
 			if !f.npcs.MakerEvent("plain", "1001", tc.int1, 0) {
@@ -112,8 +114,8 @@ func TestMakerScheduleRespawnKeepsTheEarlierDeadline(t *testing.T) {
 			}
 			set(tc.fires)
 			f.respawn.Tick()
-			if got := fired.take(); !slices.Equal(got, []string{key}) {
-				t.Fatalf("respawns at %v = %v, want [%s]", tc.fires, got, key)
+			if got := fired.take(); !slices.Equal(got, []task.SlotID{id}) {
+				t.Fatalf("respawns at %v = %v, want [%d]", tc.fires, got, id)
 			}
 		})
 	}
@@ -122,16 +124,16 @@ func TestMakerScheduleRespawnKeepsTheEarlierDeadline(t *testing.T) {
 // firedRespawns records the slot keys whose respawn came due.
 type firedRespawns struct {
 	mu   sync.Mutex
-	keys []string
+	keys []task.SlotID
 }
 
-func (r *firedRespawns) Respawn(key string) {
+func (r *firedRespawns) Respawn(key task.SlotID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.keys = append(r.keys, key)
 }
 
-func (r *firedRespawns) take() []string {
+func (r *firedRespawns) take() []task.SlotID {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := r.keys

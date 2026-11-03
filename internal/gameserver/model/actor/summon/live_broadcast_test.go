@@ -4,11 +4,13 @@ import (
 	"reflect"
 	"testing"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -117,12 +119,37 @@ func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
 func (*fakeSummonOwner) ServitorVanished()                          {}
 func (*fakeSummonOwner) PvPFlagState() task.PvPFlagState            { return task.PvPFlagNone }
 func (*fakeSummonOwner) AwardSummonKillKarma(attackable.Combatant)  {}
+func (*fakeSummonOwner) SummonDied(_, _ attackable.Combatant)       {}
 func (*fakeSummonOwner) OfferSummonRevive()                         {}
 func (*fakeSummonOwner) Invul() bool                                { return false }
 func (*fakeSummonOwner) HP() float64                                { return 0 }
 func (*fakeSummonOwner) MaxHPValue() float64                        { return 0 }
 func (*fakeSummonOwner) ClearReviveOffer()                          {}
+func (*fakeSummonOwner) ReviveOffer() (bool, bool)                  { return false, false }
 func (*fakeSummonOwner) InDuel() bool                               { return false }
 func (*fakeSummonOwner) NoteServitorPvPAttack(attackable.Combatant) {}
 func (*fakeSummonOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {
+}
+
+// The fake owner is in no duel, party, clan or alliance, does not see
+// invisible creatures, and leaves every social rule undecided.
+func (*fakeSummonOwner) DuelID() int32                        { return 0 }
+func (*fakeSummonOwner) DuelTeam() int                        { return 0 }
+func (*fakeSummonOwner) OlympiadMode() bool                   { return false }
+func (*fakeSummonOwner) SeesInvisible() bool                  { return false }
+func (*fakeSummonOwner) IsInParty() bool                      { return false }
+func (*fakeSummonOwner) IsInSameParty(skilltarget.Actor) bool { return false }
+func (*fakeSummonOwner) IsInSameClan(skilltarget.Actor) bool  { return false }
+func (*fakeSummonOwner) IsInSameAlly(skilltarget.Actor) bool  { return false }
+func (*fakeSummonOwner) HasClan() bool                        { return false }
+func (*fakeSummonOwner) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
+	return true
+}
+
+func (*fakeSummonOwner) OffensiveCastAllowed(attackable.ArenaMember, skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
+	return true
+}
+
+func (*fakeSummonOwner) SocialWithoutForce(attackable.ArenaMember, skilltarget.Actor) (allowed, decided bool) {
+	return false, false
 }

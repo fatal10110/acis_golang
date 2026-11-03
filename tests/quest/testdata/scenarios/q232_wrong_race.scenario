@@ -1,0 +1,22 @@
+# Test of the Lord (Q232), refused: a level 39 human is not an orc.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q232_wrong_race.golden
+character Fighter 39
+random always 0
+script quest.Q232_TestOfTheLord
+item 1341 3390 3391 3392 3393 3394 3395 3396 3397 3398 3399 3400 3401 3402 3403 3404 3405 3406 3407 3408 3409 3410 3411 3412 3413 3414 3415 3416 7562
+page villagemaster/30565.htm
+page script/quest/Q232_TestOfTheLord/
+npc kakai 30565 VillageMasterOrc 10 0 0
+
+action kakai
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q232_TestOfTheLord CREATED
+  rows Q232_TestOfTheLord -

@@ -1,0 +1,209 @@
+# Skirmish with the Werewolves (Q274): an orc fighter of level 9 holding a necklace of courage
+# accepts at Brukurse (a trainer); a Maraku werewolf chieftain and thirty-nine Maraku werewolves
+# give forty heads (a drop that cannot miss), the fortieth moving the quest on, and the first two
+# kills a wolfmen totem each (their rolls pinned under 6, the others' at 50); Brukurse pays 3500
+# adena and 600 more per totem, and the repeatable quest ends; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q274_skirmish_with_the_werewolves.golden
+character Skirmisher 9
+class 44
+hold 1506 1
+random 0 0 0 0 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50 0 50
+script quest.Q274_SkirmishWithTheWerewolves
+item 1477 1501 1506
+page trainer/30569.htm
+page script/quest/Q274_SkirmishWithTheWerewolves/
+npc brukurse 30569 Trainer 10 0 0
+npc werewolf 20363 Monster 40 0 0
+npc chieftain 20364 Monster 0 40 0
+
+# Brukurse: accept.
+action brukurse
+action brukurse
+  S ActionFailed
+  S NpcHtmlMessage obj=brukurse item=0 page=trainer/30569.htm
+  S ActionFailed
+bypass npc_{brukurse}_Quest
+  S NpcHtmlMessage obj=brukurse item=0 page=script/quest/Q274_SkirmishWithTheWerewolves/30569-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q274_SkirmishWithTheWerewolves CREATED
+bypass Quest Q274_SkirmishWithTheWerewolves 30569-03.htm
+  S QuestList 274:0x80000001
+  S ExShowQuestMark quest=274
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=brukurse item=0 page=script/quest/Q274_SkirmishWithTheWerewolves/30569-03.htm
+  S ActionFailed
+  Q upsert Q274_SkirmishWithTheWerewolves | <state> | STARTED
+  Q upsert Q274_SkirmishWithTheWerewolves | <cond> | 1
+  state Q274_SkirmishWithTheWerewolves STARTED
+  rows Q274_SkirmishWithTheWerewolves <cond>=1 <state>=STARTED
+
+# A chieftain and a werewolf: a head and a totem each.
+kill chieftain
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1501
+  items 1477=1 1501=1
+kill werewolf
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1501
+  items 1477=2 1501=2
+action brukurse
+  S ActionFailed
+  S NpcHtmlMessage obj=brukurse item=0 page=trainer/30569.htm
+  S ActionFailed
+bypass npc_{brukurse}_Quest
+  S NpcHtmlMessage obj=brukurse item=0 page=script/quest/Q274_SkirmishWithTheWerewolves/30569-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Thirty-eight more werewolves: the fortieth head completes the set, and no more totems.
+kill werewolf x38
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1477
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 274:0x80000003
+  S ExShowQuestMark quest=274
+  Q upsert Q274_SkirmishWithTheWerewolves | <cond> | 2
+  items 1477=40 1501=2
+  rows Q274_SkirmishWithTheWerewolves <cond>=2 <state>=STARTED
+
+# Brukurse: 3500 + 2 x 600 adena; the quest ends, and the necklace stays.
+action brukurse
+  S ActionFailed
+  S NpcHtmlMessage obj=brukurse item=0 page=trainer/30569.htm
+  S ActionFailed
+bypass npc_{brukurse}_Quest
+  S SystemMessage id=301 3:1477 6:40
+  S SystemMessage id=301 3:1501 6:2
+  S SystemMessage id=52 6:4700
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=brukurse item=0 page=script/quest/Q274_SkirmishWithTheWerewolves/30569-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q274_SkirmishWithTheWerewolves
+  items 1477=0 1501=0 57=4700 1506=1
+  state Q274_SkirmishWithTheWerewolves -
+  rows Q274_SkirmishWithTheWerewolves -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q274_SkirmishWithTheWerewolves -
+  rows Q274_SkirmishWithTheWerewolves -
+  items 57=4700 1506=1

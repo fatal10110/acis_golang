@@ -60,8 +60,8 @@ func TestPanickingHookIsIsolated(t *testing.T) {
 	}
 	r, logs := build(t, listOf("ai.Panics", "quest.After", "script.Talker"), catalog)
 
-	r.AbnormalStatusChanged(1, AbnormalStatusChanged{})
-	r.AbnormalStatusChanged(1, AbnormalStatusChanged{})
+	r.abnormalStatusChanged(1, AbnormalStatusChanged{})
+	r.abnormalStatusChanged(1, AbnormalStatusChanged{})
 	if calls.Load() != 2 || !slices.Equal(ran, []string{"quest.After", "quest.After"}) {
 		t.Fatalf("panicking hook ran %d times and the next hook ran %v; want 2 and twice", calls.Load(), ran)
 	}
@@ -105,7 +105,7 @@ func TestDispatchFromManyQueues(t *testing.T) {
 		return r, &reached, &talked
 	}
 	dispatch := func(t *testing.T, r *Registry, npc int32) {
-		r.AbnormalStatusChanged(npc, AbnormalStatusChanged{})
+		r.abnormalStatusChanged(npc, AbnormalStatusChanged{})
 		if _, res, bound := r.FirstTalk(3, FirstTalk{}); !bound || res.Kind != ResultPageFile {
 			t.Errorf("first talk = %+v, %v", res, bound)
 		}

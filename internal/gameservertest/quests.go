@@ -7,13 +7,25 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 type scriptOptions struct {
@@ -21,10 +33,14 @@ type scriptOptions struct {
 	catalog script.Catalog
 	rates   *script.Rates
 	rand    func(n int) int
-	// singleItemDrop turns MultipleItemDrop off.
-	singleItemDrop bool
 	// kinds are the NPC ids that have a template, with its kind.
 	kinds map[int32]script.NPCKind
+	// skills are the skill definitions the scripts read.
+	skills []modelskill.Definition
+	// itemIDs wraps the object id allocator of the scripts' gives.
+	itemIDs func(next func() (int32, error)) func() (int32, error)
+	// heard is told of each script event an NPC's script receives.
+	heard func(npcID, objectID, eventID, arg1, arg2 int32)
 }
 
 // WithScripts boots the script registry from list and catalog, as the
@@ -44,17 +60,34 @@ func WithScriptRates(r script.Rates) Option {
 	return func(o *options) { o.scriptHelpers().rates = &r }
 }
 
-// WithScriptRand makes rand the random source of every script draw;
-// without it the draws are random.
+// WithScriptRand makes rand the random source of every script and maker
+// draw; without it the draws are random.
 func WithScriptRand(rand func(n int) int) Option {
 	return func(o *options) { o.scriptHelpers().rand = rand }
 }
 
-// WithScriptSingleItemDrop turns MultipleItemDrop off, so a script give of
-// a non-stackable creates one instance whatever the count; without it the
-// setting is on, as shipped.
+// WithScriptEventsHeard makes heard told of each script event delivered to
+// an NPC's script, before the script runs, from any goroutine: the
+// receiver's template and object id, the event id and its two arguments.
+// What Server.ScriptEvent delivers is not told, as it is the suite's own
+// send; what the scripts send in answer is.
+func WithScriptEventsHeard(heard func(npcID, objectID, eventID, arg1, arg2 int32)) Option {
+	return func(o *options) { o.scriptHelpers().heard = heard }
+}
+
+// WithScriptSingleItemDrop is WithSingleItemDrop, named for the script
+// suites: a script give of a non-stackable creates one instance whatever
+// the count.
 func WithScriptSingleItemDrop() Option {
-	return func(o *options) { o.scriptHelpers().singleItemDrop = true }
+	return WithSingleItemDrop()
+}
+
+// WithScriptItemIDs makes wrap(next) the object id allocator of every
+// script give, where next is the server's own; a suite pauses a give there,
+// past its checks and before the item exists. Without it gives allocate
+// from next.
+func WithScriptItemIDs(wrap func(next func() (int32, error)) func() (int32, error)) Option {
+	return func(o *options) { o.scriptHelpers().itemIDs = wrap }
 }
 
 func (o *options) scriptHelpers() *scriptOptions {
@@ -71,6 +104,15 @@ func WithNPCScripts(kinds map[int32]script.NPCKind, list []script.Listing, catal
 	return func(o *options) {
 		so := o.scriptHelpers()
 		so.list, so.catalog, so.kinds = list, catalog, kinds
+	}
+}
+
+// WithScriptSkills gives the scripts the skill definitions defs to read
+// skill powers, aggro points and effects from (default: none).
+func WithScriptSkills(defs ...modelskill.Definition) Option {
+	return func(o *options) {
+		so := o.scriptHelpers()
+		so.skills = append(so.skills, defs...)
 	}
 }
 
@@ -92,22 +134,66 @@ func WithRespawnRestoreHP(share float64) Option {
 	return func(o *options) { o.respawnRestoreHP = share }
 }
 
-// memoStore is the real memo store, with the read fault a suite sets.
+// memoStore is the real memo store, with the read fault a suite sets and a
+// record of the writes it applied.
 type memoStore struct {
 	*gamesql.MemoStore
 	loadErr error
+
+	mu      sync.Mutex
+	applied []MemoWrite
 }
 
-func (s memoStore) ListMemos(ctx context.Context, ownerID int32) (map[string]string, error) {
+// MemoWrite is one player memo write applied to the database: Key set to
+// Value, or deleted when Unset.
+type MemoWrite struct {
+	Key, Value string
+	Unset      bool
+}
+
+func (s *memoStore) ListMemos(ctx context.Context, ownerID int32) (map[string]string, error) {
 	if s.loadErr != nil {
 		return nil, s.loadErr
 	}
 	return s.MemoStore.ListMemos(ctx, ownerID)
 }
 
+func (s *memoStore) SetMemo(ctx context.Context, ownerID int32, key, value string) error {
+	if err := s.MemoStore.SetMemo(ctx, ownerID, key, value); err != nil {
+		return err
+	}
+	s.record(MemoWrite{Key: key, Value: value})
+	return nil
+}
+
+func (s *memoStore) UnsetMemo(ctx context.Context, ownerID int32, key string) error {
+	if err := s.MemoStore.UnsetMemo(ctx, ownerID, key); err != nil {
+		return err
+	}
+	s.record(MemoWrite{Key: key, Unset: true})
+	return nil
+}
+
+func (s *memoStore) record(w MemoWrite) {
+	s.mu.Lock()
+	s.applied = append(s.applied, w)
+	s.mu.Unlock()
+}
+
+// TakeMemoWrites returns, in order, the player memo writes applied to the
+// database since the last call.
+func (s *Server) TakeMemoWrites() []MemoWrite {
+	s.quests.memos.mu.Lock()
+	defer s.quests.memos.mu.Unlock()
+	out := s.quests.memos.applied
+	s.quests.memos.applied = nil
+	return out
+}
+
 // questBoot is the quest journal wiring Boot hands the link.
 type questBoot struct {
 	store    *journalStore
+	memos    *memoStore
 	registry *script.Registry
 	journals *script.Quests
 	env      *script.Env
@@ -115,32 +201,79 @@ type questBoot struct {
 
 // bootQuests builds the journal store, the journal writer draining on
 // worker, the script helpers' environment allocating item ids from ids,
-// and the script registry, whose own work (the dying hooks, and the timers
-// bound to no NPC or player queue) runs on engine.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, o *options) *questBoot {
+// with a script spawner bootNpcSpawns binds to the NPC population, the
+// item templates items and the link's page cache html, and the script
+// registry, whose own work (the dying hooks, and the timers bound to no NPC
+// or player queue) runs on engine. The scripts read the Seven Signs from
+// sevenSigns, the party range and multiple item drop rule from drops, the
+// event settings from events and the quest rates from rates.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, events *script.EventBook, rates *script.RateBook, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
 	env := &script.Env{
-		Quests:           journals,
-		Rates:            script.Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1},
-		PartyRange:       fixturePartyRange,
-		MultipleItemDrop: !so.singleItemDrop,
-		NewItemID:        ids.NextID,
-		Rand:             rnd.Get,
-	}
-	if so.rates != nil {
-		env.Rates = *so.rates
+		Quests:     journals,
+		Rates:      rates,
+		Drops:      drops,
+		Events:     events,
+		NewItemID:  ids.NextID,
+		Spawner:    script.NewSpawner(nil, o.log),
+		Rand:       rnd.Get,
+		World:      state,
+		Skills:     modelskill.NewTable(so.skills),
+		GameHour:   clock.Hour,
+		Uptime:     clock.Uptime,
+		Now:        engine.Now,
+		Items:      items,
+		Page:       html.Get,
+		SevenSigns: sevenSigns,
+		BossWaits:  script.DefaultBossWaitTimes(),
+		Zones:      o.zones,
 	}
 	if so.rand != nil {
 		env.Rand = so.rand
+	}
+	if so.itemIDs != nil {
+		env.NewItemID = so.itemIDs(ids.NextID)
 	}
 	kindOf := func(id int32) (script.NPCKind, bool) {
 		k, ok := so.kinds[id]
 		return k, ok
 	}
-	registry := script.Build(so.list, so.catalog, script.Config{KindOf: kindOf, Log: o.log, Env: env, Queue: engine})
+	cfg := script.Config{KindOf: kindOf, Log: o.log, Env: env, Queue: engine}
+	if so.heard != nil {
+		cfg.Heard = func(n *script.NPC, eventID, arg1, arg2 int32) {
+			so.heard(n.NpcID(), n.ObjectID(), eventID, arg1, arg2)
+		}
+	}
+	registry := script.Build(so.list, so.catalog, cfg)
 	return &questBoot{store: store, registry: registry, journals: journals, env: env}
+}
+
+// bindResidences gives the scripts the doors they open and close, the
+// castles NPCs belong to with their sieges, the clan halls telling which
+// residence ids name siegable halls, the halls with their sieges, and the
+// clans; a nil one stays unset.
+func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *castle.Manager, halls *hallmodel.Table, sieges *siege.Engine, live *clanhall.Halls, clans *clan.Table) {
+	if doors != nil {
+		q.env.Doors = doors
+		q.registry.WatchDoors(doors)
+	}
+	if castles != nil {
+		q.env.Castles = castles
+	}
+	if halls != nil {
+		q.env.SiegableHall = halls.Siegable
+	}
+	if sieges != nil {
+		q.env.Sieges = sieges
+	}
+	if live != nil {
+		q.env.Halls = live
+	}
+	if clans != nil {
+		q.env.Clans = clans
+	}
 }
 
 // journalStore is the real journal store, with the faults a suite sets and
@@ -222,6 +355,31 @@ func (s *Server) RunScript(tb testing.TB, objID int32, name string, fn func(sc *
 	return s.runScript(tb, s.onlineCharacter(tb, objID), name, func(sc *script.Script) { fn(sc, script.PlayerOf(self)) })
 }
 
+// ScriptOffQueue resolves the online player objID and the script
+// WithScripts registered under name now, and returns a func that runs fn as
+// one invocation of that script on the calling goroutine, off the player's
+// queue, the way a hook raised on another queue (a killer's, the engine's)
+// runs. The func may be called from any goroutine, after the player has
+// left too; it reports whether fn returned.
+func (s *Server) ScriptOffQueue(tb testing.TB, objID int32, name string) func(fn func(sc *script.Script, p *script.Player)) bool {
+	tb.Helper()
+	if _, ok := s.quests.registry.JournalQuest(name); !ok {
+		tb.Fatalf("no script %q registered", name)
+	}
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	self, ok := obj.(attackable.Combatant)
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T is not a combatant", objID, obj)
+	}
+	registry := s.quests.registry
+	return func(fn func(sc *script.Script, p *script.Player)) bool {
+		return registry.Invoke(name, func(sc *script.Script) { fn(sc, script.PlayerOf(self)) })
+	}
+}
+
 // runScript runs fn on c's queue as one invocation of the script name and
 // waits for it, reporting whether fn returned.
 func (s *Server) runScript(tb testing.TB, c *player.Character, name string, fn func(sc *script.Script)) bool {
@@ -252,4 +410,12 @@ func (s *Server) QuestVars(tb testing.TB, objID int32, name string) map[string]s
 func (s *Server) PlayerItemCount(tb testing.TB, objID, templateID int32) int {
 	tb.Helper()
 	return s.onlineCharacter(tb, objID).ItemCount(int(templateID))
+}
+
+// PlayerDetaching resolves the online player objID now and returns a
+// report of whether it has started leaving the world. The report keeps
+// answering after the player is gone from the world, from any goroutine.
+func (s *Server) PlayerDetaching(tb testing.TB, objID int32) func() bool {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).Detaching
 }

@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -47,6 +48,8 @@ func inEffectRange(effector, effected Actor, effectRange int) bool {
 
 // Attach names e's participants and hosts e on its owner's effect list: the
 // effector's for a self-target kind, the effected's for every other kind.
+// When the owner's list admits e and the effected is an NPC, the NPC's
+// abnormal-status hooks run first.
 // It reports false, leaving e unattached, when that owner is missing or has
 // no effect list.
 func Attach(e *Effect, effector, effected Actor) bool {
@@ -63,6 +66,18 @@ func Attach(e *Effect, effector, effected Actor) bool {
 	}
 	e.Effector = effector
 	e.Effected = effected
+	if list.Admits(e) {
+		if n, ok := effected.(abnormalWatcher); ok {
+			caster, _ := effector.(attackable.Combatant)
+			n.AbnormalStatusChanged(caster, modelskill.Ref{ID: e.Skill.ID, Level: e.Skill.Level})
+		}
+	}
 	list.Add(e)
 	return true
+}
+
+// abnormalWatcher is an NPC whose scripts are told of every effect about
+// to land on it.
+type abnormalWatcher interface {
+	AbnormalStatusChanged(caster attackable.Combatant, sk modelskill.Ref)
 }

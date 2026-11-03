@@ -1,0 +1,96 @@
+# Path to a Dark Wizard (Q412), level 19: Annika gives the candle, the knee bones drop from the three monsters (the first draw misses) and she trades them for the seed of horror. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q412_path_to_a_dark_wizard_annika.golden
+character Fighter 19
+class 38
+quest Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+hold 1254 1
+random 999999 0 0
+script quest.Q412_PathToADarkWizard
+item 1253 1254 1255 1256 1257 1258 1259 1260 1261 1277 1278 1279
+page default/30421.htm
+page default/30415.htm
+page default/30418.htm
+page default/30419.htm
+page script/quest/Q412_PathToADarkWizard/
+npc varika 30421 Folk 10 0 0
+npc charkeren 30415 Folk -10 0 0
+npc annika 30418 Folk 20 0 0
+npc arkenia 30419 Folk -20 0 0
+npc remains 20015 Monster 40 0 0
+npc bone1 20022 Monster 45 0 0
+npc bone2 20517 Monster 50 0 0
+npc bone3 20518 Monster 55 0 0
+npc heart 20045 Monster 60 0 0
+
+kill bone1
+  S SystemMessage id=95 1:0 1:0
+  items 1259=0
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action annika
+action annika
+  S ActionFailed
+  S NpcHtmlMessage obj=annika item=0 page=default/30418.htm
+  S ActionFailed
+bypass npc_{annika}_Quest
+  S NpcHtmlMessage obj=annika item=0 page=script/quest/Q412_PathToADarkWizard/30418-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q412_PathToADarkWizard 30418-02.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1278
+  S NpcHtmlMessage obj=annika item=0 page=script/quest/Q412_PathToADarkWizard/30418-02.htm
+  S ActionFailed
+  items 1278=1
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action annika
+  S ActionFailed
+  S NpcHtmlMessage obj=annika item=0 page=default/30418.htm
+  S ActionFailed
+bypass npc_{annika}_Quest
+  S NpcHtmlMessage obj=annika item=0 page=script/quest/Q412_PathToADarkWizard/30418-03.htm
+  S ActionFailed
+  S ActionFailed
+kill bone1
+  S SystemMessage id=95 1:0 1:0
+  items 1259=0
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+kill bone2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1259
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1259=1
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+kill bone3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1259
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1259=2
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action annika
+  S ActionFailed
+  S NpcHtmlMessage obj=annika item=0 page=default/30418.htm
+  S ActionFailed
+bypass npc_{annika}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1278
+  S SystemMessage id=301 3:1259 6:2
+  S SystemMessage id=54 3:1255
+  S NpcHtmlMessage obj=annika item=0 page=script/quest/Q412_PathToADarkWizard/30418-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 1259=0 1278=0 1255=1
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action annika
+  S ActionFailed
+  S NpcHtmlMessage obj=annika item=0 page=default/30418.htm
+  S ActionFailed
+bypass npc_{annika}_Quest
+  S NpcHtmlMessage obj=annika item=0 page=script/quest/Q412_PathToADarkWizard/30418-04.htm
+  S ActionFailed
+  S ActionFailed

@@ -3,7 +3,6 @@ package trade
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -13,8 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
-
-const silenceWindow = 300 * time.Millisecond
 
 // TestTeleportCancelsOpenTrade pins Player.teleportTo: an accepted teleport
 // cancels the teleported player's open trade after the jump, so both
@@ -223,8 +220,8 @@ func assertNoTradeClose(t *testing.T, frames [][]byte, what string) {
 
 func assertSilent(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	if frame := c.ReadWithTimeout(silenceWindow); frame != nil {
-		t.Fatalf("%s: received %#x, want silence", what, frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s: received %#x, want silence", what, queued[0][0])
 	}
 }
 

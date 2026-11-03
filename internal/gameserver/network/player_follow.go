@@ -27,7 +27,7 @@ func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctr
 		return false
 	}
 	switch {
-	case live.InBoat() != other.InBoat():
+	case acrossBoatBoundary(live, other):
 		// One aboard a boat and the other not: nothing to do.
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case other.AttackableWithoutForceBy(live.Character) || (ctrl && other.AttackableBy(live.Character)):
@@ -35,19 +35,24 @@ func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctr
 	case other.Operating():
 		l.tryToInteract(live, other, shift)
 	default:
-		l.followLiveTarget(live, other, ctrl, shift)
+		l.followLiveTarget(live, other, shift)
 	}
 	return true
 }
 
+// acrossBoatBoundary reports whether target is a player on the other side
+// of the boat boundary from live: exactly one of the two is aboard a boat.
+func acrossBoatBoundary(live *livePlayer, target world.Tracked) bool {
+	other, ok := target.(*livePlayer)
+	return ok && live.InBoat() != other.InBoat()
+}
+
 // followLiveTarget makes following target live's intention. A player that
 // cannot take AI actions, or that clicked itself, is only answered
-// ActionFailed; so is a forced (ctrl) request from a player out of control,
-// the attack request that player may not send at all. One still swinging,
-// casting, sitting down or standing up queues the follow for that to end,
-// answered ActionFailed too.
-func (l *GameClientLink) followLiveTarget(live *livePlayer, target attackable.Combatant, ctrl, shift bool) {
-	if target.ObjectID() == live.ObjectID() || live.DenyAIAction() || (ctrl && liveOutOfControl(live)) {
+// ActionFailed. One still swinging, casting, sitting down or standing up
+// queues the follow for that to end, answered ActionFailed too.
+func (l *GameClientLink) followLiveTarget(live *livePlayer, target attackable.Combatant, shift bool) {
+	if target.ObjectID() == live.ObjectID() || live.DenyAIAction() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

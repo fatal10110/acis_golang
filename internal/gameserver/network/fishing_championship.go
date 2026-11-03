@@ -13,11 +13,11 @@ import (
 // championship and tells live its length, then whether it entered the
 // running ranking. A disabled championship measures nothing.
 func measureCatch(live *livePlayer, champ *fishchamp.Championship, lure int32) {
-	catch, ok := champ.NewFish(live.Name, lure)
+	catch, ok := champ.NewFish(live.CharacterName(), lure)
 	if !ok {
 		return
 	}
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCaughtFishS1Length, commons.JavaDouble(catch.Length)))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCaughtFishS1Length, commons.FormatDouble(catch.Length)))
 	if catch.Registered {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRegisteredInFishSizeRanking))
 	}
@@ -26,7 +26,7 @@ func measureCatch(live *livePlayer, champ *fishchamp.Championship, lure int32) {
 // requestFishRanking answers the fishing window's ranking button with the
 // running week's ranking, or, when it is due to be taken anew, with the
 // notice that it is being taken. A disabled championship answers nothing,
-// as the reference does: the fishing window then shows no ranking button,
+// on purpose: the fishing window then shows no ranking button,
 // so no client action waits on an answer.
 func (l *GameClientLink) requestFishRanking(live *livePlayer) {
 	champ := l.fishChamp
@@ -74,12 +74,12 @@ func (l *GameClientLink) fishermanReward(live *livePlayer, f *npc.Folk) {
 	case !champ.Enabled():
 		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageDisabled), 0)
 		return
-	case !champ.IsWinner(live.Name):
+	case !champ.IsWinner(live.CharacterName()):
 		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageNotWinner), 0)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), fishchamp.TaskTimeout)
-	paid, err := champ.Claim(ctx, live.Name)
+	paid, err := champ.Claim(ctx, live.CharacterName())
 	cancel()
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("fishing championship: store the claim")

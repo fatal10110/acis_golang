@@ -16,7 +16,7 @@ import (
 // follows the highest member level each time, as a class change's
 // recalculation sets it.
 func TestClassSwitchRecalculatesPartyLevel(t *testing.T) {
-	link := &GameClientLink{log: zerolog.Nop(), templates: testTemplates(t), parties: party.NewRegistry[*livePlayer](nil)}
+	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), Templates: testTemplates(t)})
 	switcher := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	other := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 	switcher.shortcuts = shortcut.NewList(nil)

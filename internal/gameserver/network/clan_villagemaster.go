@@ -77,8 +77,9 @@ func (l *GameClientLink) villageMasterClan(live *livePlayer, f *npc.Folk, comman
 	}
 }
 
-// createClan founds the clan name with live as its leader.
-func (l *GameClientLink) createClan(live *livePlayer, name string) {
+// createClan founds the clan name with live as its leader, telling live
+// the outcome, and reports whether it did.
+func (l *GameClientLink) createClan(live *livePlayer, name string) bool {
 	cl, result := l.clanService().Create(live.Character, name, time.Now())
 	switch result {
 	case clan.Created:
@@ -98,10 +99,11 @@ func (l *GameClientLink) createClan(live *livePlayer, name string) {
 	case clan.CreateNameTaken:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AlreadyExists, name))
 	}
+	return result == clan.Created
 }
 
 // clanLevelPayer pays a clan level's price out of live, reporting each
-// payment as the reference's own adena, item and SP removals do.
+// payment as plain adena, item and SP removals do.
 type clanLevelPayer struct {
 	l    *GameClientLink
 	live *livePlayer
@@ -141,8 +143,10 @@ func (l *GameClientLink) raiseClanLevel(live *livePlayer) {
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DeductedFromClanRep, int32(n.Points)))
 		case clan.LevelRaised:
 			l.ensureClanForums(cl.ID(), n.Level)
-			// The leader's siege skills follow the level here once sieges
-			// exist (#3150).
+			// The leader holds the siege skills from level 4 on.
+			if n.Level > 3 {
+				l.giveSiegeSkills(live)
+			}
 			if clan.TellsLeaderAboutReputation(n.Level) {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanCanAccumulateReputation))
 			}

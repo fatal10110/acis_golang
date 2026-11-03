@@ -2,7 +2,6 @@ package trade
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -36,8 +35,8 @@ func TestTradeSettleLeavesWeightToInventoryTick(t *testing.T) {
 			t.Fatalf("%s SendTradeDone success = %d, want 1", who.name, got)
 		}
 		assertStaticSystemMessage(t, who.client.Read(), serverpackets.SystemMessageTradeSuccessful)
-		if frame := who.client.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-			t.Fatalf("%s got %#x after the trade finished, before any inventory tick", who.name, frame[0])
+		if queued := who.client.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("%s got %#x after the trade finished, before any inventory tick", who.name, queued[0][0])
 		}
 	}
 

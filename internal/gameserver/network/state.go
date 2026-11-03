@@ -207,6 +207,8 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xc0: true, // clan rank privileges
 		0xc1: true, // create or edit a macro
 		0xc2: true, // delete a macro
+		0xc3: true, // procure window sale
+		0xc4: true, // buy seeds
 		0xc5: true, // dialog answer
 		0xc6: true, // try on merchant items
 		0xc7: true, // record of seven signs page

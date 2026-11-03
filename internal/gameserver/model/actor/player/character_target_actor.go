@@ -4,6 +4,9 @@ import (
 	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 var _ skilltarget.Actor = (*Character)(nil)
@@ -40,3 +43,15 @@ func (c *Character) CorpseDeadline() (time.Time, bool) { return time.Time{}, fal
 func (c *Character) CorpseTime() time.Duration         { return 0 }
 func (c *Character) Spoiled() bool                     { return false }
 func (c *Character) Seeded() bool                      { return false }
+
+// A player is no chest, beast or manor monster.
+func (c *Character) Chest() bool                              { return false }
+func (c *Character) Interacted() bool                         { return false }
+func (c *Character) FeedableBeast() bool                      { return false }
+func (c *Character) Seedable() bool                           { return false }
+func (c *Character) SpawnLocation() (location.Location, bool) { return location.Location{}, false }
+
+// A player lists no attackers and answers no skill aggro; its reaction to
+// an attack is NotifyAttacked.
+func (c *Character) RecordAttacker(attackable.Combatant)                       {}
+func (c *Character) SkillAttacked(attackable.Combatant, modelskill.Definition) {}

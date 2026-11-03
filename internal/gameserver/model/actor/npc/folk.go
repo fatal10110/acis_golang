@@ -11,17 +11,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // folkInstanceKinds are the civilian service NPC types: shopkeepers,
-// trainers, gatekeepers, warehouse keepers, village masters and the like.
-// Two civilian types are left out and skipped at spawn: HolyThing, as the
-// castle artifact belongs to the siege runtime, and ChristmasTree, whose
-// click only releases the client (no selection, no talk) and which spawns
-// only from event makers or as a summoned Decoration.
+// trainers, gatekeepers, warehouse keepers, village masters, the castle
+// holy artifacts and control towers, and the like. ChristmasTree is left
+// out and skipped at spawn: its click only releases the client (no
+// selection, no talk), and it spawns only from event makers or as a
+// summoned Decoration.
 var folkInstanceKinds = map[InstanceKind]struct{}{
 	"Adventurer":            {},
 	"Auctioneer":            {},
@@ -41,14 +40,18 @@ var folkInstanceKinds = map[InstanceKind]struct{}{
 	"DuskPriest":            {},
 	"FestivalGuide":         {},
 	"Fisherman":             {},
+	"FlameTower":            {},
 	"Folk":                  {},
 	"Gatekeeper":            {},
+	"HolyThing":             {},
+	"LifeTower":             {},
 	"ManorManagerNpc":       {},
 	"MercenaryManagerNpc":   {},
 	"Merchant":              {},
 	"MutedFolk":             {},
 	"OlympiadManagerNpc":    {},
 	"SchemeBuffer":          {},
+	"SiegeFlag":             {},
 	"SiegeNpc":              {},
 	"SignsPriest":           {},
 	"SymbolMaker":           {},
@@ -80,19 +83,23 @@ const socialInterval = 12 * time.Second
 
 // Folk is a live civilian NPC. It stands where it spawned, or walks its
 // route when it has one, is shown to nearby players, can be selected, and
-// answers a player's interact with its chat window. It never attacks, but
-// casts the skills a dialog command or script asks of it once given a cast
-// runtime (SetCaster), walking toward its target first when it can move
-// (EnableMovement). Any other creature may attack
+// answers a player's interact with its chat window. It attacks the
+// creatures and casts the skills a dialog command or script asks of it once
+// given an attack runtime (SetAttacker) and a cast runtime (SetCaster),
+// walking toward its target first when it can move (EnableMovement), and
+// flees and follows as a script asks. Any other creature may attack
 // it by force: it takes damage, regenerates, and holds the buffs and
 // debuffs cast on it (no other effect lands on it). An undying template
 // keeps at least 1 HP; any other dies, and its corpse decays.
 type Folk struct {
 	world.Presence
 	Instance *Instance
+	aiSleep  aiSleep
 	// spawnBinding is the spawn slot that placed the NPC: its AI parameters
 	// and script memory.
 	spawnBinding
+	// partyLinks is the NPC's master, privates and escort points.
+	partyLinks
 	// zones is the NPC's zone membership; Attach gives it the zone index.
 	zones *zoneMember
 
@@ -100,16 +107,35 @@ type Folk struct {
 	// cannot. EnableMovement sets it before the NPC is published.
 	motion *folkMotion
 
-	// lastSocial is the Unix millisecond time of the last talk animation.
+	// lastSocial is the social stamp, in Unix milliseconds on the NPC's
+	// queue clock: when the last talk animation played, or when the hold of
+	// the last social desire ends. Zero for never.
 	lastSocial atomic.Int64
 
 	folkCombat
 
-	cast folkCast
+	cast  folkCast
+	fight folkFight
+	shots folkShots
 
 	// observerGroups are the viewpoint groups a broadcasting tower offers;
 	// see folk_observer.go.
 	observerGroups atomic.Pointer[[]int]
+
+	// headquarters is a siege flag's clan and the end of its attack
+	// warning hold; see folk_siegeflag.go.
+	headquarters headquarters
+
+	// massTeleport is set while a mass gatekeeper's teleport of its
+	// defenders is armed; see folk_residence_commands.go.
+	massTeleport atomic.Bool
+
+	// towerState is a control tower's siege and form; see folk_tower.go.
+	towerState tower
+
+	// siegePreHour is a chamberlain's siege hour choice; see
+	// SiegePreHour.
+	siegePreHour atomic.Int32
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves
@@ -126,14 +152,21 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	if len(skills) > 0 {
 		lookup = skills[0]
 	}
-	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
+	passives, err := inst.Template.passiveMods(lookup)
 	if err != nil {
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
-	f := &Folk{Instance: inst, spawnBinding: newSpawnBinding(inst.Template)}
+	soul, spirit, err := shotCounts(inst.Template)
+	if err != nil {
+		return nil, err
+	}
+	f := &Folk{Instance: inst, spawnBinding: newSpawnBinding(inst)}
+	f.shots.soul, f.shots.spirit = soul, spirit
 	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()
-	f.initCombat(mods)
+	f.fight.aggro = attackable.NewThreatTable(f, f.now)
+	f.initCombat(passives)
+	f.siegePreHour.Store(DefaultSiegePreHour)
 	return f, nil
 }
 
@@ -158,23 +191,41 @@ func (f *Folk) CollisionHeight() float64 { return f.Instance.Template.CollisionH
 // weddingManager is the wedding manager's type.
 const weddingManager InstanceKind = "WeddingManagerNpc"
 
-// Muted reports a civilian NPC a player's interact does nothing on.
-func (f *Folk) Muted() bool { return hostileKind(f.Instance) == "MutedFolk" }
+// holyThing is the castle holy artifact's type: a civilian NPC no creature
+// may attack or damage and a player's interact does nothing on, shown with
+// ServerObjectInfo, and the only target a HOLY skill accepts.
+const holyThing InstanceKind = "HolyThing"
+
+// HolyThing reports a castle holy artifact.
+func (f *Folk) HolyThing() bool { return hostileKind(f.Instance) == holyThing }
+
+// Muted reports a civilian NPC a player's interact does nothing on: a muted
+// civilian, a holy artifact, a siege headquarters or a control tower.
+func (f *Folk) Muted() bool {
+	kind := hostileKind(f.Instance)
+	return kind == "MutedFolk" || kind == holyThing || kind == siegeFlag || f.Tower()
+}
+
+// ServerObjectView reports an NPC every player is shown with the stationary
+// ServerObjectInfo, whatever its speed: a holy artifact, or a control tower
+// standing dead.
+func (f *Folk) ServerObjectView() bool { return f.HolyThing() || (f.Tower() && !f.TowerWorking()) }
 
 // QuestTalker reports whether a player's interact goes through the quest
 // dialog first: every civilian NPC but the wedding manager, whose own
 // greeting answers every interact.
 func (f *Folk) QuestTalker() bool { return hostileKind(f.Instance) != weddingManager }
 
-// TalkAnimation claims the talk animation an interact at now plays: a
-// random social action id in [0, 8), at most one per socialInterval, the
-// first one always. ok is false when none plays. A wedding manager greets
-// with its own dialog and plays none.
-func (f *Folk) TalkAnimation(now time.Time) (id int32, ok bool) {
-	if f.Muted() || hostileKind(f.Instance) == weddingManager {
+// TalkAnimation claims the talk animation an interact plays: a random
+// social action id in [0, 8), only once socialInterval has passed since
+// the last one or since the hold of a social desire ended, the first one
+// always. ok is false when none plays, or when f cannot act. A wedding
+// manager greets with its own dialog and plays none.
+func (f *Folk) TalkAnimation() (id int32, ok bool) {
+	if f.Muted() || hostileKind(f.Instance) == weddingManager || f.denyAIAction() {
 		return 0, false
 	}
-	ms := now.UnixMilli()
+	ms := f.now().UnixMilli()
 	for {
 		last := f.lastSocial.Load()
 		if last != 0 && ms-last <= socialInterval.Milliseconds() {
@@ -198,16 +249,22 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 		title = f.Instance.Title()
 	}
 	pAtkSpd := f.AttackSpeed()
+	// A working control tower is shown as its working form: its template
+	// id, held items and body.
+	shown := t
+	if form := f.towerState.form.Load(); form != nil {
+		shown = form
+	}
 	return npcinfo.Snapshot{
-		ObjectID: f.ObjectID(), TemplateID: t.TemplateID,
+		ObjectID: f.ObjectID(), TemplateID: shown.TemplateID,
 		X: x, Y: y, Z: z, Heading: f.Heading(),
 		MAtkSpd: f.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
 		MoveMultiplier: float64(f.MovementSpeedMultiplier()), AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, t.AtkSpd),
 		MoveType:  f.zones.moveType(),
 		CurrentHP: f.CurrentHP(), MaxHP: f.MaxHP(),
-		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
-		RightHand: t.RightHand, LeftHand: t.LeftHand,
+		CollisionRadius: shown.CollisionRadius, CollisionHeight: shown.CollisionHeight,
+		RightHand: shown.RightHand, LeftHand: shown.LeftHand,
 		Running: f.Running(), InCombat: f.InCombat(), AlikeDead: f.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: f.AbnormalEffect(), Name: name, Title: title,
 	}

@@ -1,0 +1,22 @@
+# RaidBossType1 (25019, Pan Dryad), level 1 like the level 1 character, is hit for 22 from
+# 100 away. The character is not yet its top desire target and stands within 150, so on a
+# draw of 0 in 375 it wants its ranged physical special around itself, which it casts at
+# once, and on one of 0 in 750 its ranged cancel, each at 1000000; RaidBossStandard wants to
+# attack the character at 22 / (1 + 7) * 20000. 1 s after it appeared, its check wants its
+# self buff (SELF_BUFF_A) one time in five; it stands inside its territory, so it stays.
+# Its raid music, its curse and mute of an over-levelled character and its return home are
+# in tests/ai/raid_boss_test.go: the format compares no packet of an NPC's appearance and
+# no level of its own.
+character Hunter 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.RaidBoss.RaidBossStandard
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1
+npc boss 25019 RaidBoss 100 0 0 skill SELF_RANGE_PHYSICAL_SPECIAL_A 4172 2 skill SELF_RANGE_CANCEL_A 4177 2 skill PHYSICAL_SPECIAL_A 4732 2 skill SELF_BUFF_A 4175 2
+
+hit boss 22
+  S MagicSkillUse caster=boss target=boss skill=4172-2 hit=1096 reuse=0 success=0
+  desires boss attack(player)=55000 cast(boss,4172,move)=1000000 cast(boss,4177,move)=1000000
+advance 1s
+  desires boss attack(player)=55000 cast(boss,4172,move)=1000000 cast(boss,4177,move)=1000000 cast(boss,4175,move)=1000000

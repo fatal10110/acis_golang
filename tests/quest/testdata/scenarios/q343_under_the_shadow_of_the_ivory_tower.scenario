@@ -1,0 +1,323 @@
+# Under the Shadow of the Ivory Tower (Q343): a level 40 human mystic accepts at Cema; with no
+# orb she asks for them; twelve gargoyles give twelve orbs (every roll pinned to succeed);
+# Marsha's first talk opens her game; she takes 10 orbs, draws 10 and 1 (the second card, hint
+# 08b), and the third guess wins 20; two more gargoyles each give an orb, the first lowering
+# memoStateEx on a roll of 12 (at most 12), the second not on 13; Trumpin's game climbs four
+# wins (05 to 05c), pays 310 on the fifth, loses 10 on a roll of 1 for 05, then wins on 07 and
+# pays 10 at the first step; Icarus trades a liqueur for 401 C-grade spiritshots (rolls 200 and
+# 0), the second for a scroll of escape (roll 600), then has no liqueur; Cema pays 120 an orb and
+# the player gives up; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q343_under_the_shadow_of_the_ivory_tower.golden
+character Mystic 40
+class 10
+hold 4365 2
+random 0 0 0 0 0 0 0 0 0 0 0 0 10 1 0 12 0 13 0 0 0 0 0 1 1 200 0 600
+script quest.Q343_UnderTheShadowOfTheIvoryTower
+item 57 4364 4365 103 118 316 630 736 885 917 951 955 2510 2511
+page merchant/30834.htm
+page trainer/30835.htm
+page default/30934.htm
+page default/30935.htm
+page script/quest/Q343_UnderTheShadowOfTheIvoryTower/
+npc cema 30834 Merchant 10 0 0
+npc icarus 30835 Trainer -10 0 0
+npc marsha 30934 Folk 0 10 0
+npc trumpin 30935 Folk 0 -10 0
+npc gargoyle 20563 Monster 40 0 0
+
+# Cema: accept.
+action cema
+action cema
+  S ActionFailed
+  S NpcHtmlMessage obj=cema item=0 page=merchant/30834.htm
+  S ActionFailed
+bypass npc_{cema}_Quest
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30834-04.htm
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-04.htm
+  S ActionFailed
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30834-05.htm
+  S QuestList 343:0x80000001
+  S ExShowQuestMark quest=343
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-05.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | <state> | STARTED
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | <cond> | 1
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoStateEx | 0
+  state Q343_UnderTheShadowOfTheIvoryTower STARTED
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=0
+
+# No orb yet.
+action cema
+  S ActionFailed
+  S NpcHtmlMessage obj=cema item=0 page=merchant/30834.htm
+  S ActionFailed
+bypass npc_{cema}_Quest
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Twelve orbs.
+kill gargoyle x12
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4364=12
+
+# Marsha: her game opens, 10 orbs, the second card, the third guess pays 20.
+action marsha
+action marsha
+  S ActionFailed
+  S NpcHtmlMessage obj=marsha item=0 page=default/30934.htm
+  S ActionFailed
+bypass npc_{marsha}_Quest
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoStateEx | 1
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-05.htm
+  S SystemMessage id=301 3:4364 6:10
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-07.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 2
+  items 4364=2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-08a.htm
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-08b.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 1
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoStateEx | 5
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=2 memoStateEx=5 param1=1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30934-13a.htm
+  S SystemMessage id=53 3:4364 6:20
+  S NpcHtmlMessage obj=marsha item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30934-13b.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 4
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoState | 1
+  items 4364=22
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=5 param1=4
+
+# Two more orbs: the first gargoyle lowers memoStateEx, the second does not.
+kill gargoyle
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | memoStateEx | 4
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=4 param1=4
+kill gargoyle
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4364
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4364=24
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=4 param1=4
+
+# Trumpin: four wins.
+action trumpin
+action trumpin
+  S ActionFailed
+  S NpcHtmlMessage obj=trumpin item=0 page=default/30935.htm
+  S ActionFailed
+bypass npc_{trumpin}_Quest
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-05.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-05.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 1
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-05.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-05a.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 2
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-05.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-05b.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 3
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-05.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-05c.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 4
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=4 param1=4 param2=2
+
+# The fifth win pays 310.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-05.htm
+  S SystemMessage id=53 3:4364 6:310
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-05d.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+  items 4364=334
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-10.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-10.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+
+# A loss on 05 costs 10.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-05.htm
+  S SystemMessage id=301 3:4364 6:10
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-06.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+  items 4364=324
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-10.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-10.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+
+# A win on 07, taken at once: 10.
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-07.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-08.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 1
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-09.htm
+  S SystemMessage id=53 3:4364 6:10
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-09.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+  items 4364=334
+  rows Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=4 param1=0 param2=2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-10.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-10.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+
+# Icarus: two liqueurs, then none.
+action icarus
+action icarus
+  S ActionFailed
+  S NpcHtmlMessage obj=icarus item=0 page=trainer/30835.htm
+  S ActionFailed
+bypass npc_{icarus}_Quest
+  S NpcHtmlMessage obj=icarus item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30835-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30835-02.htm
+  S SystemMessage id=302 3:4365
+  S SystemMessage id=53 3:2511 6:401
+  S NpcHtmlMessage obj=icarus item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30835-03.htm
+  S ActionFailed
+  items 4365=1 2511=401
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30835-04.htm
+  S NpcHtmlMessage obj=icarus item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30835-04.htm
+  S ActionFailed
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30835-02.htm
+  S SystemMessage id=302 3:4365
+  S SystemMessage id=54 3:736
+  S NpcHtmlMessage obj=icarus item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30835-03.htm
+  S ActionFailed
+  items 4365=0 736=1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30835-04.htm
+  S NpcHtmlMessage obj=icarus item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30835-04.htm
+  S ActionFailed
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30835-02.htm
+  S NpcHtmlMessage obj=icarus item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30835-02.htm
+  S ActionFailed
+
+# Cema: 120 an orb, then the player gives up.
+action cema
+action cema
+  S ActionFailed
+  S NpcHtmlMessage obj=cema item=0 page=merchant/30834.htm
+  S ActionFailed
+bypass npc_{cema}_Quest
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30834-08.htm
+  S SystemMessage id=301 3:4364 6:334
+  S SystemMessage id=52 6:40080
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-08.htm
+  S ActionFailed
+  items 4364=0 57=40080
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30834-10.htm
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-10.htm
+  S ActionFailed
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30834-11.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=cema item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30834-11.htm
+  S ActionFailed
+  Q delete-quest Q343_UnderTheShadowOfTheIvoryTower
+  state Q343_UnderTheShadowOfTheIvoryTower -
+  rows Q343_UnderTheShadowOfTheIvoryTower -
+
+relog
+  state Q343_UnderTheShadowOfTheIvoryTower -
+  rows Q343_UnderTheShadowOfTheIvoryTower -
+  items 57=40080 2511=401 736=1

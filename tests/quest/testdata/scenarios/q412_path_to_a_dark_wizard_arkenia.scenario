@@ -1,0 +1,92 @@
+# Path to a Dark Wizard (Q412), level 19: Arkenia gives the scent, three hearts drop (the first draw misses) and she trades them for the seed of lunacy. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q412_path_to_a_dark_wizard_arkenia.golden
+character Fighter 19
+class 38
+quest Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+hold 1254 1
+random 999999 0 0 0
+script quest.Q412_PathToADarkWizard
+item 1253 1254 1255 1256 1257 1258 1259 1260 1261 1277 1278 1279
+page default/30421.htm
+page default/30415.htm
+page default/30418.htm
+page default/30419.htm
+page script/quest/Q412_PathToADarkWizard/
+npc varika 30421 Folk 10 0 0
+npc charkeren 30415 Folk -10 0 0
+npc annika 30418 Folk 20 0 0
+npc arkenia 30419 Folk -20 0 0
+npc remains 20015 Monster 40 0 0
+npc bone1 20022 Monster 45 0 0
+npc bone2 20517 Monster 50 0 0
+npc bone3 20518 Monster 55 0 0
+npc heart 20045 Monster 60 0 0
+
+kill heart
+  S SystemMessage id=95 1:0 1:0
+  items 1260=0
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action arkenia
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1279
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q412_PathToADarkWizard/30419-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1279=1
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q412_PathToADarkWizard/30419-02.htm
+  S ActionFailed
+  S ActionFailed
+kill heart
+  S SystemMessage id=95 1:0 1:0
+  items 1260=0
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+kill heart x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1260
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1260
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1260
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1260=3
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1260 6:3
+  S SystemMessage id=302 3:1279
+  S SystemMessage id=54 3:1256
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q412_PathToADarkWizard/30419-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 1260=0 1279=0 1256=1
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q412_PathToADarkWizard/30419-03.htm
+  S ActionFailed
+  S ActionFailed

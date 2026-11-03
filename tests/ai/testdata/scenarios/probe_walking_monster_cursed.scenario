@@ -1,0 +1,26 @@
+# A walking monster picks up a cursed weapon lying on the ground. The ground line's cursed
+# option starts the weapon's life from the shipped cursed weapon data before laying it, as a
+# monster kill's drop does. The monster's npc line says walks: it spawns moving, an npcmaker's
+# NPC still. Its look for Zariche and Akamanah tells the probe behavior about Zariche, which
+# asks its NPC to pick it up; the ticks see the character and take up the pick-up, walking
+# it there, past the 36 a parked monster reaches. Arrived, the next tick picks Zariche up: the
+# picked-item hook runs once, Zariche leaves the world and its life ends, so every player is
+# told it disappeared (S1_HAS_DISAPPEARED, 1818, with the item name). A later tick tells
+# nothing more.
+character Hunter 20
+script ai.Probe
+item 8689
+territory camp -100 -300 700 300 -100 100
+npc picker 20120 Monster 200 0 0 walks maker camp
+ground zariche 8190 1 500 0 0 cursed
+
+look picker 500 1 8190 8689
+  S NpcSay obj=picker type=0 npc=1020120 text="Probe.see_item q=1 8190"
+tick x2
+  S PlaySound type=0 file=Probe.see bind=0 obj=0 loc=0,0,0 delay=0
+walk picker
+tick
+  S NpcSay obj=picker type=0 npc=1020120 text="Probe.picked 8190"
+  S DeleteObject obj=zariche
+  S SystemMessage id=1818 3:8190
+tick

@@ -27,6 +27,9 @@ type Threat struct {
 //
 // mu guards entries. An attacker's hit adds threat from the attacker's queue
 // while the owner's AI reads it.
+//
+// A nil table is an empty one: it holds no threat and every method but
+// AddDamage reads nothing from it and changes nothing.
 type ThreatTable struct {
 	owner Combatant
 	// now stamps Threat.Timestamp.
@@ -73,6 +76,9 @@ func (t *ThreatTable) AddDamage(attacker Combatant, damage, hate float64) {
 // false if the table is empty, the owner is alike dead, or no attacker has
 // positive hate.
 func (t *ThreatTable) MostHated() (threat Threat, ok bool) {
+	if t == nil {
+		return Threat{}, false
+	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -105,6 +111,9 @@ func (t *ThreatTable) MostHated() (threat Threat, ok bool) {
 // owner is alike dead, no attacker currently holds positive hate, or no
 // candidate passes valid.
 func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int) int) bool {
+	if t == nil {
+		return false
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -172,6 +181,9 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 // Reports found false when the table has fewer than two entries or no
 // candidate passes both filters.
 func (t *ThreatTable) ReconsiderTarget(inRange func(Combatant) bool, valid func(Combatant) bool) (previousMostHated, chosen Combatant, found bool) {
+	if t == nil {
+		return nil, nil, false
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -226,6 +238,9 @@ func (t *ThreatTable) ReconsiderTarget(inRange func(Combatant) bool, valid func(
 // Hate returns the owner's hate against target, or 0 if target is not in
 // the table.
 func (t *ThreatTable) Hate(target Combatant) float64 {
+	if t == nil {
+		return 0
+	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -239,6 +254,9 @@ func (t *ThreatTable) Hate(target Combatant) float64 {
 // Get returns target's full entry, or ok false if target is not in the
 // table.
 func (t *ThreatTable) Get(target Combatant) (threat Threat, ok bool) {
+	if t == nil {
+		return Threat{}, false
+	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -253,6 +271,9 @@ func (t *ThreatTable) Get(target Combatant) (threat Threat, ok bool) {
 // and identity are preserved for reward calculation. It is a no-op if
 // target is not in the table.
 func (t *ThreatTable) StopHate(target Combatant) {
+	if t == nil {
+		return
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -265,6 +286,9 @@ func (t *ThreatTable) StopHate(target Combatant) {
 // this has no lower bound: hate can go negative, which simply keeps that
 // attacker out of MostHated until it accumulates positive hate again.
 func (t *ThreatTable) ReduceAllHate(amount float64) {
+	if t == nil {
+		return
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -277,6 +301,9 @@ func (t *ThreatTable) ReduceAllHate(amount float64) {
 // dead-equivalent attackers while preserving their damage. It returns the
 // attackers whose queued target desires should be removed.
 func (t *ThreatTable) Refresh(visible func(Combatant) bool) []Combatant {
+	if t == nil {
+		return nil
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -297,6 +324,9 @@ func (t *ThreatTable) Refresh(visible func(Combatant) bool) []Combatant {
 
 // ZeroHate zeroes every entry's hate without dropping any entries.
 func (t *ThreatTable) ZeroHate() {
+	if t == nil {
+		return
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -307,6 +337,9 @@ func (t *ThreatTable) ZeroHate() {
 
 // Remove drops target's entry entirely.
 func (t *ThreatTable) Remove(target Combatant) {
+	if t == nil {
+		return
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -315,6 +348,9 @@ func (t *ThreatTable) Remove(target Combatant) {
 
 // Clear drops every entry.
 func (t *ThreatTable) Clear() {
+	if t == nil {
+		return
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -323,6 +359,9 @@ func (t *ThreatTable) Clear() {
 
 // IsEmpty reports whether the table has no entries.
 func (t *ThreatTable) IsEmpty() bool {
+	if t == nil {
+		return true
+	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -331,6 +370,9 @@ func (t *ThreatTable) IsEmpty() bool {
 
 // Snapshot returns a copy of every entry, in no particular order.
 func (t *ThreatTable) Snapshot() []Threat {
+	if t == nil {
+		return nil
+	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 

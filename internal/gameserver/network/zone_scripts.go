@@ -7,12 +7,12 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 // revalidation holds the player's zone lock; the revalidation hands it to
 // the script once that lock is released. Only players are noted: the one
 // script that reacts to a zone entry reacts to players alone.
-func (l *GameClientLink) wireScriptZones() {
-	if l.scripts == nil || l.zones == nil {
+func (l *GameClientLink) wireScriptZones(ix *zone.Index) {
+	if l.scripts == nil {
 		return
 	}
 	for _, id := range l.scripts.ZoneEnterIDs() {
-		k, ok := l.zones.ByID(int(id))
+		k, ok := ix.ByID(int(id))
 		if !ok {
 			continue
 		}

@@ -262,12 +262,13 @@ func removeEffect(effects *[]*Effect, e *Effect) bool {
 	return true
 }
 
-// attachStatFuncs attaches e's stat funcs to the owner. The caller holds
-// l.mu, which keeps the attach and a concurrent removal of e in order; the
-// caller reports the change with statFuncsAttached after releasing it.
-func (l *List) attachStatFuncs(e *Effect) {
+// attachStatFuncs attaches an effect's stat funcs fns to the owner. The
+// caller holds l.mu, which keeps the attach and a concurrent removal of the
+// effect in order; the caller reports the change with StatFuncsAttached
+// after releasing it.
+func (l *List) attachStatFuncs(fns []Mod) {
 	if l.owner != nil {
-		l.owner.AttachStatFuncs(e.Funcs)
+		l.owner.AttachStatFuncs(fns)
 	}
 }
 

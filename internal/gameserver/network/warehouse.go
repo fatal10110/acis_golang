@@ -4,8 +4,8 @@ import (
 	"cmp"
 	"context"
 	"slices"
+	"strconv"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -90,6 +90,14 @@ func activatePrivateWarehouse(live *livePlayer) *itemcontainer.Container {
 	return wh
 }
 
+// openScriptWithdraw releases live's client, makes its private warehouse
+// the active store and opens its withdrawal window, as a script asks.
+func (l *GameClientLink) openScriptWithdraw(live *livePlayer) {
+	live.SendFrame(serverpackets.FrameActionFailed())
+	wh := activatePrivateWarehouse(live)
+	l.sendWithdrawList(live, serverpackets.WarehousePrivate, wh.Items())
+}
+
 // activateOwnFreight makes live's own freight the active store, limited to
 // live's freight size.
 func activateOwnFreight(live *livePlayer) *itemcontainer.Freight {
@@ -108,7 +116,7 @@ func (l *GameClientLink) activateDeposit(live *livePlayer, id int32) (*itemconta
 	if f == nil {
 		return nil, false
 	}
-	limit := l.playerConfig.StorageSlots.BaseFreight()
+	limit := l.playerConfig().StorageSlots.BaseFreight()
 	live.storage.active = activeStore{store: f, fits: func(slots int) bool {
 		return fitsLimit(f.VisibleSize(), slots, limit)
 	}}
@@ -123,7 +131,7 @@ func (l *GameClientLink) itemHolder(live *livePlayer) invops.Holder {
 			return objectID != mount && live.ControlItemInUse(objectID)
 		},
 		MountCollar:   mount,
-		EnchantScroll: l.enchantStateStore().Active(live.ObjectID()),
+		EnchantScroll: l.enchanting.scrolls.Active(live.ObjectID()),
 		Casting:       live.Character.CastingNow(),
 	}
 	if live.cast != nil {
@@ -138,7 +146,7 @@ func (l *GameClientLink) itemHolder(live *livePlayer) invops.Holder {
 // It reports false when the command aborted, so that nothing more is
 // sent.
 func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply npc.BypassReply) bool {
-	freight := l.playerConfig.freight()
+	freight := l.playerConfig().freight()
 	switch reply.Warehouse {
 	case npc.WithdrawPrivate:
 		wh := activatePrivateWarehouse(live)
@@ -186,7 +194,7 @@ func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply np
 		if !freight.Allow {
 			return true
 		}
-		id, err := commons.ParseInt(reply.FreightTarget, 32)
+		id, err := strconv.ParseInt(reply.FreightTarget, 10, 32)
 		if err != nil {
 			return false
 		}
@@ -294,7 +302,7 @@ func (l *GameClientLink) warehouseRequestGate(live *livePlayer) (activeStore, bo
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return activeStore{}, false
 	}
-	if !l.playerConfig.KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
+	if !l.playerConfig().KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
 		return activeStore{}, false
 	}
 	return active, true
@@ -312,7 +320,7 @@ func (l *GameClientLink) requestWarehouseDeposit(live *livePlayer, req clientpac
 	}
 	// A player with a trade open was refused above, so no open trade can
 	// stop the deposit between the fee and the moves.
-	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.Deposit(live.Inventory(), active.store, storeMoves(req.Items), l.itemHolder(live),
 		active.private, len(req.Items)*depositFeePerItem, active.fits)
@@ -334,7 +342,7 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 	if !ok || (active.clanID != 0 && !l.clanWithdrawGate(live, active)) {
 		return
 	}
-	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.Withdraw(active.store, live.Inventory(), storeMoves(req.Items))
 	if err != nil {
@@ -352,7 +360,7 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 // the fee is silent; the client closes its window when it sends the
 // request.
 func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.RequestPackageSend) {
-	freight := l.playerConfig.freight()
+	freight := l.playerConfig().freight()
 	if live == nil || len(req.Items) == 0 || !freight.Allow {
 		return
 	}
@@ -368,11 +376,11 @@ func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
+	if !l.playerConfig().KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
 		return
 	}
 	inv := live.Inventory()
-	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
+	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.SendPackage(inv, active.store, storeMoves(req.Items), l.itemHolder(live),
 		len(req.Items)*freight.Price, active.fits)
@@ -427,6 +435,7 @@ func (l *GameClientLink) restoreStorage(ctx context.Context, account string, c *
 	}
 	st.warehouse.Restore(rows)
 	st.freight.Restore(rows)
+	c.AttachWarehouse(st.warehouse)
 	if l.roster == nil || account == "" {
 		return st
 	}
@@ -439,7 +448,7 @@ func (l *GameClientLink) restoreStorage(ctx context.Context, account string, c *
 		if other.ID == c.ID {
 			continue
 		}
-		st.accountChars = append(st.accountChars, serverpackets.PackageRecipient{ObjectID: other.ID, Name: other.Name})
+		st.accountChars = append(st.accountChars, serverpackets.PackageRecipient{ObjectID: other.ID, Name: other.CharacterName()})
 		if f := l.restoreDepositedFreight(ctx, other.ID); f != nil {
 			st.deposits[other.ID] = f
 		}
@@ -463,7 +472,7 @@ func (l *GameClientLink) accountPlayerInWorld(chars []*player.Character) (*liveP
 // restoreDepositedFreight reads the freight of the offline character id,
 // once its last session's saves have landed, or returns nil.
 func (l *GameClientLink) restoreDepositedFreight(ctx context.Context, id int32) *itemcontainer.Freight {
-	if l.items == nil {
+	if l.belongings.items == nil {
 		return nil
 	}
 	// A character still in the world writes its own freight.
@@ -478,7 +487,7 @@ func (l *GameClientLink) restoreDepositedFreight(ctx context.Context, id int32) 
 		l.log.Error().Err(err).Int32("object_id", id).Msg("enter world: wait for account character saves")
 		return nil
 	}
-	rows, err := l.items.ListByOwner(ctx, id)
+	rows, err := l.belongings.items.ListByOwner(ctx, id)
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", id).Msg("enter world: read account character freight")
 		return nil

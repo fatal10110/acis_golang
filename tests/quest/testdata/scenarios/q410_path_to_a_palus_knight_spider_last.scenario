@@ -1,0 +1,70 @@
+# Path to a Palus Knight (Q410), level 19 hunting for Morte: the fifth silk without the carapace changes nothing, the spider that brings the carapace ends the hunt. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q410_path_to_a_palus_knight_spider_last.golden
+character Fighter 19
+class 31
+quest Q410_PathToAPalusKnight <cond>=4 <state>=STARTED
+hold 1240 1
+hold 1242 4
+script quest.Q410_PathToAPalusKnight
+item 1237 1238 1239 1240 1241 1242 1243 1244
+page trainer/30329.htm
+page default/30422.htm
+page script/quest/Q410_PathToAPalusKnight/
+npc virgil 30329 Trainer 10 0 0
+npc kalinta 30422 Folk -10 0 0
+npc spider 20038 Monster 40 0 0
+npc tracker 20043 Monster 50 0 0
+npc lycan 20049 Monster 60 0 0
+
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=trainer/30329.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-12.htm
+  S ActionFailed
+  S ActionFailed
+kill tracker
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1242=5
+  rows Q410_PathToAPalusKnight <cond>=4 <state>=STARTED
+  state Q410_PathToAPalusKnight STARTED
+action kalinta
+action kalinta
+  S ActionFailed
+  S NpcHtmlMessage obj=kalinta item=0 page=default/30422.htm
+  S ActionFailed
+bypass npc_{kalinta}_Quest
+  S NpcHtmlMessage obj=kalinta item=0 page=script/quest/Q410_PathToAPalusKnight/30422-03.htm
+  S ActionFailed
+  S ActionFailed
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 410:0x8000001f
+  S ExShowQuestMark quest=410
+  Q upsert Q410_PathToAPalusKnight | <cond> | 5
+  items 1241=1
+  rows Q410_PathToAPalusKnight <cond>=5 <state>=STARTED
+  state Q410_PathToAPalusKnight STARTED
+action kalinta
+  S ActionFailed
+  S NpcHtmlMessage obj=kalinta item=0 page=default/30422.htm
+  S ActionFailed
+bypass npc_{kalinta}_Quest
+  S NpcHtmlMessage obj=kalinta item=0 page=script/quest/Q410_PathToAPalusKnight/30422-05.htm
+  S ActionFailed
+  S ActionFailed
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=trainer/30329.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q410_PathToAPalusKnight/30329-12.htm
+  S ActionFailed
+  S ActionFailed

@@ -144,3 +144,69 @@ func (s *CastleStore) UnequipCirclets(ctx context.Context, circletID, ownerID in
 	return s.exec(ctx, "unequip castle circlets",
 		`UPDATE items SET loc='INVENTORY' WHERE item_id IN (?,6841) AND owner_id=? AND loc='PAPERDOLL'`, circletID, ownerID)
 }
+
+// LoadDoorUpgrades returns every castle_doorupgrade row, by castle and
+// door id.
+func (s *CastleStore) LoadDoorUpgrades(ctx context.Context) ([]castle.DoorUpgrade, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT castleId, doorId, hp FROM castle_doorupgrade ORDER BY castleId, doorId`)
+	if err != nil {
+		return nil, fmt.Errorf("load castle door upgrades: %w", err)
+	}
+	var out []castle.DoorUpgrade
+	for rows.Next() {
+		var u castle.DoorUpgrade
+		if err := rows.Scan(&u.CastleID, &u.DoorID, &u.Ratio); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("load castle door upgrades: %w", err)
+		}
+		out = append(out, u)
+	}
+	if err := closeRows(rows); err != nil {
+		return nil, fmt.Errorf("load castle door upgrades: %w", err)
+	}
+	return out, nil
+}
+
+// LoadTrapUpgrades returns every castle_trapupgrade row, by castle and
+// tower index.
+func (s *CastleStore) LoadTrapUpgrades(ctx context.Context) ([]castle.TrapUpgrade, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT castleId, towerIndex, level FROM castle_trapupgrade ORDER BY castleId, towerIndex`)
+	if err != nil {
+		return nil, fmt.Errorf("load castle trap upgrades: %w", err)
+	}
+	var out []castle.TrapUpgrade
+	for rows.Next() {
+		var u castle.TrapUpgrade
+		if err := rows.Scan(&u.CastleID, &u.TowerIndex, &u.Level); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("load castle trap upgrades: %w", err)
+		}
+		out = append(out, u)
+	}
+	if err := closeRows(rows); err != nil {
+		return nil, fmt.Errorf("load castle trap upgrades: %w", err)
+	}
+	return out, nil
+}
+
+// SaveDoorUpgrade replaces the stored HP upgrade of u's gate.
+func (s *CastleStore) SaveDoorUpgrade(ctx context.Context, u castle.DoorUpgrade) error {
+	return s.exec(ctx, "save castle door upgrade", `REPLACE INTO castle_doorupgrade (doorId, hp, castleId) VALUES (?, ?, ?)`,
+		u.DoorID, u.Ratio, u.CastleID)
+}
+
+// DeleteDoorUpgrades deletes every stored gate upgrade of castleID.
+func (s *CastleStore) DeleteDoorUpgrades(ctx context.Context, castleID int32) error {
+	return s.exec(ctx, "delete castle door upgrades", `DELETE FROM castle_doorupgrade WHERE castleId=?`, castleID)
+}
+
+// SaveTrapUpgrade replaces the stored level of u's tower trap.
+func (s *CastleStore) SaveTrapUpgrade(ctx context.Context, u castle.TrapUpgrade) error {
+	return s.exec(ctx, "save castle trap upgrade", `REPLACE INTO castle_trapupgrade (castleId, towerIndex, level) VALUES (?, ?, ?)`,
+		u.CastleID, u.TowerIndex, u.Level)
+}
+
+// DeleteTrapUpgrades deletes every stored trap upgrade of castleID.
+func (s *CastleStore) DeleteTrapUpgrades(ctx context.Context, castleID int32) error {
+	return s.exec(ctx, "delete castle trap upgrades", `DELETE FROM castle_trapupgrade WHERE castleId=?`, castleID)
+}

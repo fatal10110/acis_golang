@@ -1,0 +1,34 @@
+# Competition for the Bandit Stronghold (Q504), the start: the leader of a level 4 clan offered the quest takes it (cond 1) and is given the contest certificate.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q504_competition_start.golden
+character Leader 40
+clan 4
+hall 35 waiting date 4102444800000
+script quest.Q504_CompetitionForTheBanditStronghold
+script script.siegablehall.BanditStronghold
+item 4332 4333 5009
+page script/quest/Q504_CompetitionForTheBanditStronghold/
+page script/siegablehall/BanditStronghold/
+npc messenger 35437 Folk 10 0 0
+
+action messenger
+action messenger
+  S ActionFailed
+  S NpcHtmlMessage obj=messenger item=0 page=script/siegablehall/BanditStronghold/azit_messenger002.htm
+  S ActionFailed
+bypass npc_{messenger}_Quest
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q504_CompetitionForTheBanditStronghold/35437-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q504_CompetitionForTheBanditStronghold CREATED
+bypass Quest Q504_CompetitionForTheBanditStronghold 35437-02.htm
+  S QuestList 504:0x80000001
+  S ExShowQuestMark quest=504
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4333
+  S NpcHtmlMessage obj=messenger item=0 page=script/quest/Q504_CompetitionForTheBanditStronghold/35437-02.htm
+  S ActionFailed
+  Q upsert Q504_CompetitionForTheBanditStronghold | <state> | STARTED
+  Q upsert Q504_CompetitionForTheBanditStronghold | <cond> | 1
+  items 4333=1
+  state Q504_CompetitionForTheBanditStronghold STARTED

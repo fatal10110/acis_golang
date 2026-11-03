@@ -10,10 +10,12 @@ import (
 // hook reacts to. A skill, item or door the fact also involves is added, in
 // its script-facing form, by the change that raises the hook.
 
-// AbnormalStatusChanged: an effect is about to land on NPC.
+// AbnormalStatusChanged: an effect of Caster's Skill is about to land on
+// NPC. Caster is nil for an effect with no source.
 type AbnormalStatusChanged struct {
 	NPC    *NPC
 	Caster Creature
+	Skill  skill.Ref
 }
 
 // Attacked: Attacker attacked NPC for Damage, with Skill when a skill did
@@ -51,8 +53,18 @@ type ClanDied struct {
 // Created: NPC spawned or respawned.
 type Created struct{ NPC *NPC }
 
+// Death: Player died, or its summon did, killed by Killer. A death no
+// creature caused passes the one that died as Killer.
+type Death struct {
+	Killer Creature
+	Player *Player
+}
+
 // Decayed: NPC's corpse decayed.
 type Decayed struct{ NPC *NPC }
+
+// DoorChange: Door opened or closed.
+type DoorChange struct{ Door *Door }
 
 // Event: Player sent the script event Name, through NPC when NPC is set.
 type Event struct {
@@ -107,8 +119,11 @@ type PartyAttacked struct {
 // included.
 type PartyDied struct{ Caller, Called *NPC }
 
-// PickedItem: NPC picked up an item.
-type PickedItem struct{ NPC *NPC }
+// PickedItem: NPC picked up Item, which still lies on the ground.
+type PickedItem struct {
+	NPC  *NPC
+	Item GroundItem
+}
 
 // ScriptEvent: NPC received the script event EventID with two arguments,
 // sent to it or broadcast around another NPC.
@@ -124,29 +139,40 @@ type SeeCreature struct {
 	Creature Creature
 }
 
-// SeeItem: NPC noticed Quantity items.
+// SeeItem: NPC looked for Quantity items and noticed Items on the ground.
 type SeeItem struct {
 	NPC      *NPC
 	Quantity int32
+	Items    []GroundItem
 }
 
-// SeeSpell: NPC saw Caster cast a spell on Targets; IsPet when the caster's
+// SeeSpell: NPC saw Caster cast Skill on Targets; IsPet when the caster's
 // summon cast it.
 type SeeSpell struct {
 	NPC     *NPC
 	Caster  *Player
+	Skill   skill.Ref
 	Targets []Creature
 	IsPet   bool
 }
 
-// Spelled: Caster's spell landed on NPC.
+// Spelled: Caster's Skill, not offensive, landed on NPC.
 type Spelled struct {
 	NPC    *NPC
 	Caster *Player
+	Skill  skill.Ref
 }
 
 // Start: a scheduled task's start time came. Ctx ends when the schedule
-// runner stops; Server is what the task acts on.
+// runner stops; Server is what the task acts on, and the only way it acts.
+//
+// A start must never reach a player: a departure does not wait for a
+// running start hook. It is handed no world, so WorldPlayer, Object,
+// WorldNPC and TeleportPlayersInTerritory find nothing under it. An NPC
+// handle it gets another way (Spawner().AddSpawn) still reaches the players
+// around that NPC (NeighborHero, SendScriptEvent) and must not be used to
+// reach one. A timer a start hook starts fires its timer hook on that same
+// world-less script.
 type Start struct {
 	Ctx    context.Context
 	Server Server
@@ -173,10 +199,12 @@ type Timer struct {
 	Player *Player
 }
 
-// UseSkillFinished: NPC finished casting a skill on Creature.
+// UseSkillFinished: NPC's cast of Skill on Creature ended; Success is
+// false for a cast that was aborted.
 type UseSkillFinished struct {
 	NPC      *NPC
 	Creature Creature
+	Skill    skill.Ref
 	Success  bool
 }
 

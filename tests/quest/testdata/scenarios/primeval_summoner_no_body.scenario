@@ -1,0 +1,22 @@
+# Vervato (PrimevalSummoner): a character in no party asks him to summon a corpse. With no dead
+# party member on the isle there is no body: vervato002.htm, and no adena is taken. The paid
+# summon is primeval_summoner_summon.scenario, the fee missing primeval_summoner_short_of_fee.
+# Expectations are derived from the reference source (PrimevalSummoner.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/primeval_summoner_no_body.golden
+character Loner 20
+script script.teleport.PrimevalSummoner
+item 57
+page default/32104.htm
+page script/teleport/PrimevalSummoner/
+npc vervato 32104 Folk 10 0 0
+
+action vervato
+action vervato
+  S ActionFailed
+  S NpcHtmlMessage obj=vervato item=0 page=default/32104.htm
+  S ActionFailed
+bypass npc_{vervato}_Quest PrimevalSummoner
+  S NpcHtmlMessage obj=vervato item=0 page=script/teleport/PrimevalSummoner/vervato002.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=0

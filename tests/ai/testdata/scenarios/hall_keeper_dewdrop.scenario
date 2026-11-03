@@ -1,0 +1,29 @@
+# WarriorCast2SkillsApproachAggressive (18329, a hall keeper captain of the Frintezza raid): a dying
+# captain tells the NPCs within 5000 (script event 0, arg1 10037), and a captain that heard nine
+# captains die drops a Dewdrop of Destruction (8556) for its killer instead. Nine kills of the
+# fallen captain (each kill a fresh one at the same point) leave the survivor 40 away dropping the
+# dewdrop on its own kill; the fallen captain drops none.
+character Hunter 20
+random always 99
+item 8556
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive
+npc fallen 18329 Monster 40 0 0
+npc survivor 18329 Monster 80 0 0
+
+kill fallen x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+kill survivor
+  S SystemMessage id=95 1:0 1:0
+  S DropItem by=survivor item=8556 count=1 stackable=1 animate=1

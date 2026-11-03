@@ -1,0 +1,34 @@
+# Magical Power of Fire, Part 2 (Q616): a character on cond 2 kills the raid: cond 3 and the Fire Heart of Nastron.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q616_magical_power_of_fire_part2_hunt.golden
+character Hero 75
+quest Q616_MagicalPowerOfFire_Part2 <cond>=2 <state>=STARTED
+script quest.Q616_MagicalPowerOfFire_Part2
+item 7243 7244
+page npcdefault.htm
+page default/31558.htm
+page script/quest/Q616_MagicalPowerOfFire_Part2/
+npc udan 31379 Folk 10 0 0
+npc altar 31558 Folk 20 0 0
+npc raid 25306 RaidBoss 40 0 0
+
+kill raid
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 616:0x80000007
+  S ExShowQuestMark quest=616
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7244
+  Q upsert Q616_MagicalPowerOfFire_Part2 | <cond> | 3
+  items 7244=1
+  rows Q616_MagicalPowerOfFire_Part2 <cond>=3 <state>=STARTED
+action udan
+action udan
+  S ActionFailed
+  S NpcHtmlMessage obj=udan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{udan}_Quest
+  S NpcHtmlMessage obj=udan item=0 page=script/quest/Q616_MagicalPowerOfFire_Part2/31379-07.htm
+  S ActionFailed
+  S ActionFailed

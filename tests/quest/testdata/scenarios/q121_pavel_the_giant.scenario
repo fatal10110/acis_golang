@@ -1,0 +1,74 @@
+# Pavel the Giant (Q121): a level 46 character accepts at Newyear and reports to Yumi, who rewards
+# with experience; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q121_pavel_the_giant.golden
+character Giant 46
+script quest.Q121_PavelTheGiant
+item 57
+page villagemaster/31961.htm
+page default/32041.htm
+page script/quest/Q121_PavelTheGiant/
+npc newyear 31961 VillageMasterDwarf 10 0 0
+npc yumi 32041 Folk 20 0 0
+
+# Newyear: accept.
+action newyear
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q121_PavelTheGiant/31961-1.htm
+  S ActionFailed
+  S ActionFailed
+  state Q121_PavelTheGiant CREATED
+bypass Quest Q121_PavelTheGiant 31961-2.htm
+  S QuestList 121:0x80000001
+  S ExShowQuestMark quest=121
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q121_PavelTheGiant/31961-2.htm
+  S ActionFailed
+  Q upsert Q121_PavelTheGiant | <state> | STARTED
+  Q upsert Q121_PavelTheGiant | <cond> | 1
+  state Q121_PavelTheGiant STARTED
+  rows Q121_PavelTheGiant <cond>=1 <state>=STARTED
+action newyear
+  S ActionFailed
+  S NpcHtmlMessage obj=newyear item=0 page=villagemaster/31961.htm
+  S ActionFailed
+bypass npc_{newyear}_Quest
+  S NpcHtmlMessage obj=newyear item=0 page=script/quest/Q121_PavelTheGiant/31961-2a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Yumi rewards.
+action yumi
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q121_PavelTheGiant/32041-1.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q121_PavelTheGiant 32041-2.htm
+  S SystemMessage id=45 1:10000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 121:0x00000000
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q121_PavelTheGiant/32041-2.htm
+  S ActionFailed
+  Q upsert Q121_PavelTheGiant | <state> | COMPLETED
+  Q delete-except-state Q121_PavelTheGiant
+  state Q121_PavelTheGiant COMPLETED
+  rows Q121_PavelTheGiant <state>=COMPLETED
+action yumi
+  S ActionFailed
+  S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
+  S ActionFailed
+bypass npc_{yumi}_Quest
+  S NpcHtmlMessage obj=yumi item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  state Q121_PavelTheGiant COMPLETED
+  rows Q121_PavelTheGiant <state>=COMPLETED

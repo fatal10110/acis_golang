@@ -1,0 +1,79 @@
+# Status of the Beacon Tower (Q113): a level 40 character accepts at Moira, who gives the box, and
+# brings it to Torrant, who pays adena; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q113_status_of_the_beacon_tower.golden
+character Keeper 40
+script quest.Q113_StatusOfTheBeaconTower
+item 8086 57
+page trainer/31979.htm
+page default/32016.htm
+page script/quest/Q113_StatusOfTheBeaconTower/
+npc moira 31979 Trainer 10 0 0
+npc torrant 32016 Folk 20 0 0
+
+# Moira: accept.
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q113_StatusOfTheBeaconTower/31979-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q113_StatusOfTheBeaconTower CREATED
+bypass Quest Q113_StatusOfTheBeaconTower 31979-02.htm
+  S QuestList 113:0x80000001
+  S ExShowQuestMark quest=113
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8086
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q113_StatusOfTheBeaconTower/31979-02.htm
+  S ActionFailed
+  Q upsert Q113_StatusOfTheBeaconTower | <state> | STARTED
+  Q upsert Q113_StatusOfTheBeaconTower | <cond> | 1
+  state Q113_StatusOfTheBeaconTower STARTED
+  rows Q113_StatusOfTheBeaconTower <cond>=1 <state>=STARTED
+  items 8086=1
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q113_StatusOfTheBeaconTower/31979-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Torrant takes the box.
+action torrant
+action torrant
+  S ActionFailed
+  S NpcHtmlMessage obj=torrant item=0 page=default/32016.htm
+  S ActionFailed
+bypass npc_{torrant}_Quest
+  S NpcHtmlMessage obj=torrant item=0 page=script/quest/Q113_StatusOfTheBeaconTower/32016-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q113_StatusOfTheBeaconTower 32016-02.htm
+  S SystemMessage id=302 3:8086
+  S SystemMessage id=52 6:21578
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 113:0x00000000
+  S NpcHtmlMessage obj=torrant item=0 page=script/quest/Q113_StatusOfTheBeaconTower/32016-02.htm
+  S ActionFailed
+  Q upsert Q113_StatusOfTheBeaconTower | <state> | COMPLETED
+  Q delete-except-state Q113_StatusOfTheBeaconTower
+  state Q113_StatusOfTheBeaconTower COMPLETED
+  rows Q113_StatusOfTheBeaconTower <state>=COMPLETED
+  items 8086=0 57=21578
+action torrant
+  S ActionFailed
+  S NpcHtmlMessage obj=torrant item=0 page=default/32016.htm
+  S ActionFailed
+bypass npc_{torrant}_Quest
+  S NpcHtmlMessage obj=torrant item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 57=21578
+  state Q113_StatusOfTheBeaconTower COMPLETED
+  rows Q113_StatusOfTheBeaconTower <state>=COMPLETED

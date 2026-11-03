@@ -31,7 +31,7 @@ func TestClassSwitchRefreshesPartyIcons(t *testing.T) {
 		{name: "buffed", buffs: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			link := &GameClientLink{log: zerolog.Nop(), templates: testTemplates(t), parties: party.NewRegistry[*livePlayer](nil)}
+			link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), Templates: testTemplates(t)})
 			switcherOut, otherOut := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
 			switcher := newTestLivePlayer(t, 1, switcherOut)
 			other := newTestLivePlayer(t, 2, otherOut)

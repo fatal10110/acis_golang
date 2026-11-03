@@ -83,7 +83,7 @@ func refreshExit(e *Effect) {
 }
 
 func abortCastStart(e *Effect) bool {
-	if e.Effected == nil || e.Effected == e.Effector {
+	if e.Effected == nil || sameActor(e.Effected, e.Effector) {
 		return false
 	}
 	if e.Effected.RaidRelated() {

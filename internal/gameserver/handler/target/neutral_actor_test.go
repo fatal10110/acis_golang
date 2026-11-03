@@ -3,6 +3,8 @@ package target
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 )
@@ -73,3 +75,17 @@ func (neutralActor) DuelID() int32        { return 0 }
 func (neutralActor) DuelTeam() int        { return 0 }
 func (neutralActor) MageClass() bool      { return false }
 func (neutralActor) ClanGroups() []string { return nil }
+
+func (neutralActor) Chest() bool                              { return false }
+func (neutralActor) Interacted() bool                         { return false }
+func (neutralActor) FeedableBeast() bool                      { return false }
+func (neutralActor) Seedable() bool                           { return false }
+func (neutralActor) SpawnLocation() (location.Location, bool) { return location.Location{}, false }
+func (neutralActor) ReviveOffer() (pending, forPet bool)      { return false, false }
+func (neutralActor) InSiegeZone() bool                        { return false }
+func (neutralActor) SiegeState() int32                        { return 0 }
+func (neutralActor) FestivalParticipant() bool                { return false }
+
+func (neutralActor) RecordAttacker(attackable.Combatant)                       {}
+func (neutralActor) NotifyAttacked(attackable.Combatant)                       {}
+func (neutralActor) SkillAttacked(attackable.Combatant, modelskill.Definition) {}

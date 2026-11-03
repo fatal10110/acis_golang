@@ -25,15 +25,15 @@ func (a FolkActor) HP() int              { return int(a.Folk.HP()) }
 
 // MPInitialCost and MPCost apply the caster's magical or physical MP
 // consume rate to def's raw cost.
-func (a FolkActor) MPInitialCost(def modelskill.Definition) int {
+func (a FolkActor) MPInitialCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPInitialConsume)
 }
 
-func (a FolkActor) MPCost(def modelskill.Definition) int {
+func (a FolkActor) MPCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPConsume)
 }
 
-func (a FolkActor) scaleMP(def modelskill.Definition, mp int) int {
+func (a FolkActor) scaleMP(def *modelskill.Definition, mp int) int {
 	rate := stat.PhysicalMpConsumeRate
 	if def.Magic {
 		rate = stat.MagicalMpConsumeRate
@@ -61,19 +61,22 @@ func (a FolkActor) PhysicalMuted() bool {
 	return a.Folk.EffectList().IsAffected(effect.FlagPhysicalMuted)
 }
 
-// A civilian NPC charges no shots, has no skill mastery, carries no items,
-// cubics, ground signet, skill lock or charges.
-func (FolkActor) SpiritshotCharged() bool                 { return false }
-func (FolkActor) BlessedSpiritshotCharged() bool          { return false }
-func (FolkActor) SkillMastery(modelskill.Definition) bool { return false }
-func (FolkActor) ItemCount(int) int                       { return 0 }
-func (FolkActor) ConsumeItem(int, int) bool               { return false }
-func (FolkActor) ExitSignetGround()                       {}
-func (FolkActor) AllSkillsDisabled() bool                 { return false }
-func (FolkActor) EnableAllSkills()                        {}
-func (FolkActor) GroundTargetUnset() bool                 { return false }
-func (FolkActor) IncreaseCharges(int, int) bool           { return false }
-func (FolkActor) DecreaseCharges(int) bool                { return false }
+// SpiritshotCharged and BlessedSpiritshotCharged report the NPC's
+// spiritshot charges.
+func (a FolkActor) SpiritshotCharged() bool        { return a.Folk.SpiritshotCharged() }
+func (a FolkActor) BlessedSpiritshotCharged() bool { return a.Folk.BlessedSpiritshotCharged() }
+
+// A civilian NPC has no skill mastery, carries no items, cubics, ground
+// signet, skill lock or charges.
+func (FolkActor) SkillMastery(*modelskill.Definition) bool { return false }
+func (FolkActor) ItemCount(int) int                        { return 0 }
+func (FolkActor) ConsumeItem(int, int) bool                { return false }
+func (FolkActor) ExitSignetGround()                        {}
+func (FolkActor) AllSkillsDisabled() bool                  { return false }
+func (FolkActor) EnableAllSkills()                         {}
+func (FolkActor) GroundTargetUnset() bool                  { return false }
+func (FolkActor) IncreaseCharges(int, int) bool            { return false }
+func (FolkActor) DecreaseCharges(int) bool                 { return false }
 
 // HeldItemTypeMask is the NPC's weapon and shield item-type bits.
 func (a FolkActor) HeldItemTypeMask() int32 { return a.Folk.HeldItemTypeMask() }
@@ -84,3 +87,6 @@ var (
 	_ SkillCaster    = (*npc.Folk)(nil)
 	_ Actor          = FolkActor{}
 )
+
+// npcCaster gives a civilian NPC's casts the NPC finish timing.
+func (FolkActor) npcCaster() {}

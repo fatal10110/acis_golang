@@ -41,7 +41,7 @@ func bootFolkCaster(t *testing.T, defs []modelskill.Definition) (*gameservertest
 // script does, and waits for the NPC's queue to take it.
 func addCastDesire(t *testing.T, folk *npc.Folk, ref modelskill.Ref) {
 	t.Helper()
-	folk.AddCastDesire(folk, ref, 1_000_000)
+	folk.AddCastDesire(folk, ref, 1_000_000, true, true)
 	done := make(chan struct{})
 	if !folk.Queue().Post(func() { close(done) }) {
 		t.Fatal("post to folk queue: queue closed")
@@ -90,6 +90,8 @@ func TestFolkAuraCastLandsOnPlayersOnly(t *testing.T) {
 
 	addCastDesire(t, folk, modelskill.Ref{ID: folkAuraHealSkill, Level: 1})
 	frames := tickAI(t, srv)
+	srv.AdvanceUntil(t, "Folk cast end", func() bool { return !folk.CastingNow() })
+	frames = append(frames, readUntilQuiet(t, c)...)
 
 	if use := framesWith(frames, serverpackets.OpcodeMagicSkillUse, folk.ObjectID()); len(use) != 1 {
 		t.Fatalf("AI tick frames %x, want one MagicSkillUse", frameOpcodes(frames))

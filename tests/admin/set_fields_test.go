@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -115,6 +114,12 @@ func TestAdminSetClass(t *testing.T) {
 	}
 	if last := frames[len(frames)-1][0]; last != serverpackets.OpcodeActionFailed {
 		t.Fatalf("player frames after the delay = %x, want ActionFailed last", testsupport.FrameOpcodes(frames))
+	}
+	// The store reads the new class's maxima, which report the player's
+	// status ahead of HennaInfo.
+	if !hasOpcodes(frames, serverpackets.OpcodeCharInfo, serverpackets.OpcodeStatusUpdate, serverpackets.OpcodeHennaInfo) ||
+		hasOpcodes(frames, serverpackets.OpcodeHennaInfo, serverpackets.OpcodeStatusUpdate) {
+		t.Fatalf("player frames after the delay = %x, want the max-change StatusUpdates between the GM's CharInfo and HennaInfo", testsupport.FrameOpcodes(frames))
 	}
 	gmFrames = settle(t, gm)
 	charInfos, rest := split(gmFrames)
@@ -234,11 +239,11 @@ func npcNameTitle(t *testing.T, frame []byte) (int32, string, string) {
 // TestAdminSetNPCNameTitle pins //set name and //set title on an NPC
 // (AdminEditChar.java admin_set name|title, Npc case): the NPC takes the
 // word as given, every player around it is shown its NpcInfo again, and
-// the GM is told. Renaming a player is not ported yet (#3399) and releases
-// the client; a missing value answers the usage.
+// the GM is told; a missing value answers the usage. TestAdminSetPlayerName
+// covers a player.
 func TestAdminSetNPCNameTitle(t *testing.T) {
 	t.Parallel()
-	srv, gm, user, _, userID := bootSetAdmin(t)
+	srv, gm, user, _, _ := bootSetAdmin(t)
 	folk := srv.SpawnFolkNPCAt(t, &npc.Template{
 		ID: 31357, TemplateID: 31357, Type: "Folk", Name: "Leandro", Title: "Gatekeeper", Level: 1, HPMax: 100,
 		UsingServerSideName: true, UsingServerSideTitle: true,
@@ -276,15 +281,6 @@ func TestAdminSetNPCNameTitle(t *testing.T) {
 	if got := folk.CharacterName(); got != "Leandro_The_Very_Long_Name" {
 		t.Fatalf("NPC name = %q, want the new one", got)
 	}
-
-	// A player: not ported yet (#3399).
-	selectPlayer(t, gm, user, userID)
-	if got := testsupport.FrameOpcodes(exchange(t, gm, encodeBuildCmd("set name Renamed"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("//set name on a player frames = %x, want ActionFailed", got)
-	}
-	if strings.Contains(onlineCharacter(t, srv, userID).Name, "Renamed") {
-		t.Fatal("//set name renamed the player")
-	}
 }
 
 // TestAdminDeleteRenamedNPC pins //delete naming an NPC by the name //set
@@ -308,9 +304,8 @@ func TestAdminDeleteRenamedNPC(t *testing.T) {
 // TestAdminInvul pins //invul (AdminEffects.java admin_invul): the GM's
 // flag is turned to the opposite of what Invul reads, and the message says
 // what Invul reads after; a GM logged in invulnerable turns it off; a level
-// the table does not allow is refused. The spawn-protected read is not
-// reachable from a client packet until #3400: protection ends before the
-// handler runs.
+// the table does not allow is refused. TestAdminInvulWhileSpawnProtected
+// covers the spawn-protected read.
 func TestAdminInvul(t *testing.T) {
 	t.Parallel()
 	t.Run("toggle", func(t *testing.T) {

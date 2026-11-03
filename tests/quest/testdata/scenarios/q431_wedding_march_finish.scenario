@@ -1,0 +1,37 @@
+# Wedding March (Q431): a character with fifty silver crystals hands them in and gets 25 wedding
+# echo crystals; the quest ends. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q431_wedding_march_finish.golden
+character Hero 40
+quest Q431_WeddingMarch <cond>=2 <state>=STARTED
+hold 7540 50
+script quest.Q431_WeddingMarch
+item 7540 7062
+page default/31042.htm
+page script/quest/Q431_WeddingMarch/
+npc kanta 31042 Folk 10 0 0
+npc lien 20786 Monster 40 0 0
+
+action kanta
+action kanta
+  S ActionFailed
+  S NpcHtmlMessage obj=kanta item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kanta}_Quest
+  S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q431_WeddingMarch 31042-05.htm
+  S SystemMessage id=301 3:7540 6:50
+  S SystemMessage id=53 3:7062 6:25
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-05.htm
+  S ActionFailed
+  Q delete-quest Q431_WeddingMarch
+  items 7540=0 7062=25
+  state Q431_WeddingMarch -
+  rows Q431_WeddingMarch -
+relog
+  state Q431_WeddingMarch -
+  rows Q431_WeddingMarch -
+  items 7062=25

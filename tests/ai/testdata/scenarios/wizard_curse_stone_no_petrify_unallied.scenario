@@ -1,0 +1,19 @@
+# WizardCastClanBuffCurseStoneAggressive (21338, level 80, a Ketra clan), every draw 0, for a character with no alliance: it
+# sees the character cast Might (1068, a buff with aggro points) on a monster beside it, and wants nothing of the caster: no petrify.
+character Hunter 20
+skill 1068 1
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffCurseStoneAggressive
+npc stone 21338 Monster 150 0 0 level 80 clan ketra_orc_clan 500 skill BUFF1 4030 3 skill DEBUFF 4035 9 skill W_LONG_RANGE_DD_MAGIC 4158 9 skill W_SHORT_RANGE_DD_MAGIC 4561 9 skill BUFF2 4575 2 skill DEBUFF1 4578 1
+npc wolf 20120 Monster 60 100 0
+
+cast wolf 1068
+  S MagicSkillUse caster=player target=wolf skill=1068-1 hit=10015 reuse=15022 success=0
+  S SystemMessage id=46 4:1068,1
+  desires stone -
+  hate stone 0

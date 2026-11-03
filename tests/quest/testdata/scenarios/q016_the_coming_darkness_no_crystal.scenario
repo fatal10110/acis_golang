@@ -1,0 +1,45 @@
+# The Coming Darkness (Q016), given up: a level 62 character on the quest's first step holds no
+# crystal of seal; the first evil altar asks for one, and the hierarch ends the quest, which
+# leaves no row. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q016_the_coming_darkness_no_crystal.golden
+character Sealer 62
+quest Q016_TheComingDarkness <cond>=1 <state>=STARTED
+script quest.Q016_TheComingDarkness
+item 7167
+page default/31517.htm
+page default/31512.htm
+page script/quest/Q016_TheComingDarkness/
+npc hierarch 31517 Folk 10 0 0
+npc altar1 31512 Folk 20 0 0
+
+# The first altar wants a crystal.
+action altar1
+action altar1
+  S ActionFailed
+  S NpcHtmlMessage obj=altar1 item=0 page=default/31512.htm
+  S ActionFailed
+bypass npc_{altar1}_Quest
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q016_TheComingDarkness/altar_nocrystal.htm
+  S ActionFailed
+  S ActionFailed
+  state Q016_TheComingDarkness STARTED
+
+# The hierarch ends the quest.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S QuestList
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q016_TheComingDarkness/31517-3a.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q016_TheComingDarkness
+  state Q016_TheComingDarkness -
+  rows Q016_TheComingDarkness -
+
+# Relog: nothing is left of the quest.
+relog
+  state Q016_TheComingDarkness -
+  rows Q016_TheComingDarkness -

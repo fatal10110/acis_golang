@@ -1,0 +1,23 @@
+# Wrath of Ancestors (Q272), refused: a level 4 orc is too young for Livina, and the quest is not
+# started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q272_wrath_of_ancestors_low_level.golden
+character Ancestor 4
+class 44
+script quest.Q272_WrathOfAncestors
+item 1474
+page trainer/30572.htm
+page script/quest/Q272_WrathOfAncestors/
+npc livina 30572 Trainer 10 0 0
+
+# Livina: too young.
+action livina
+action livina
+  S ActionFailed
+  S NpcHtmlMessage obj=livina item=0 page=trainer/30572.htm
+  S ActionFailed
+bypass npc_{livina}_Quest
+  S NpcHtmlMessage obj=livina item=0 page=script/quest/Q272_WrathOfAncestors/30572-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q272_WrathOfAncestors CREATED
+  rows Q272_WrathOfAncestors -

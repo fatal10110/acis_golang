@@ -3,9 +3,9 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
@@ -104,13 +104,13 @@ func foldResidenceAttrs(own []xml.Attr, groups ...[]attrsElement) residenceAttrs
 	return out
 }
 
-// requiredInt reads a required int with the coord grammar (commons.Atoi).
+// requiredInt reads a required int with the coord grammar (strconv.Atoi).
 func (r residenceAttrs) requiredInt(key string) (int, error) {
 	raw, ok := r[key]
 	if !ok {
 		return 0, fmt.Errorf("%s is required", key)
 	}
-	n, err := commons.Atoi(raw)
+	n, err := strconv.Atoi(raw)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", key, err)
 	}
@@ -123,7 +123,7 @@ func (r residenceAttrs) optionalInt64(key string) (int64, bool, error) {
 	if !ok {
 		return 0, false, nil
 	}
-	n, err := commons.ParseInt(raw, 64)
+	n, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
 		return 0, true, fmt.Errorf("%s: %w", key, err)
 	}
@@ -334,9 +334,8 @@ func buildControlTower(t castleTowerElement) (castle.ControlTower, error) {
 	if len(t.Position) == 0 {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: position is required", t.Alias)
 	}
-	// Last element wins: the StatSet this replaced was built by merging every
-	// <position>/<stats> child in document order, so a later child's attrs
-	// overwrote an earlier one's.
+	// Last element wins: each <position>/<stats> child carries the full value,
+	// so a later child replaces an earlier one.
 	loc, err := t.Position[len(t.Position)-1].loc()
 	if err != nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: %w", t.Alias, err)
@@ -526,9 +525,8 @@ func joinVals(elems []valListElement) string {
 }
 
 // splitList splits raw on ";" without trimming or dropping empty elements,
-// or returns nil if raw is empty. It mirrors
-// commons.StatSet.GetStringArray/GetStringArrayDefault's raw split; callers
-// that need trimmed, non-empty elements apply cleanStrings.
+// or returns nil if raw is empty. Callers that need trimmed, non-empty
+// elements apply cleanStrings.
 func splitList(raw string) []string {
 	if raw == "" {
 		return nil
@@ -537,8 +535,8 @@ func splitList(raw string) []string {
 }
 
 // splitInts splits raw on ";" and parses each part as an int, or returns nil
-// if raw is empty. It mirrors commons.StatSet's coerceIntArray: no
-// trimming, and a malformed element is an error.
+// if raw is empty. Parts are not trimmed, and a malformed element is an
+// error.
 func splitInts(raw string) ([]int, error) {
 	if raw == "" {
 		return nil, nil
@@ -546,7 +544,7 @@ func splitInts(raw string) ([]int, error) {
 	parts := strings.Split(raw, ";")
 	out := make([]int, len(parts))
 	for i, p := range parts {
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return nil, err
 		}

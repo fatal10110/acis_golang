@@ -10,10 +10,8 @@ const baseWeightLimit = 69000
 
 // WeightLimit returns the current stat-modified carrying limit.
 func (c *Character) WeightLimit() int {
-	c.stateMu.RLock()
-	multiplier := c.weightLimitMultiplier
-	c.stateMu.RUnlock()
-	return int(c.CalcStat(stat.WeightLimit, baseWeightLimit*statbonus.CONBonus[c.CON()]*multiplier))
+	multiplier := c.rules().WeightLimitMultiplier
+	return int(c.calcFor(stat.WeightLimit, baseWeightLimit*statbonus.CONBonus[c.CON()]*multiplier, c.ConditionActor(), nil))
 }
 
 // CurrentWeight returns the attached inventory's current carried weight.
@@ -34,7 +32,7 @@ func (c *Character) RefreshWeightPenalty() {
 	if limit <= 0 {
 		return
 	}
-	weight := c.CurrentWeight() - int(c.CalcStat(stat.WeightPenalty, 0))
+	weight := c.CurrentWeight() - int(c.calcFor(stat.WeightPenalty, 0, c.ConditionActor(), nil))
 	penalty := 4
 	switch ratio := float64(weight) / float64(limit); {
 	case ratio < .5:

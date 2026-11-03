@@ -36,7 +36,7 @@ func (l *GameClientLink) clanFields(c *player.Character) serverpackets.ClanField
 // member-list update about a player is built.
 func liveMemberRow(c *player.Character, m clan.Member) serverpackets.PledgeMemberListMember {
 	return serverpackets.PledgeMemberListMember{
-		Name: c.Name, Level: int32(c.Level()), ClassID: int32(c.ClassID()),
+		Name: c.CharacterName(), Level: int32(c.Level()), ClassID: int32(c.ClassID()),
 		Sex: int32(c.Sex()), Race: int32(c.Race), OnlineObjectID: c.ObjectID(),
 		PledgeType: int32(m.PledgeType), HasSponsor: m.Sponsor != 0 || m.Apprentice != 0,
 	}
@@ -46,7 +46,7 @@ func liveMemberRow(c *player.Character, m clan.Member) serverpackets.PledgeMembe
 // live character, an offline member's are the stored ones. self, when not
 // nil, is a member still entering the world, not yet found there. A member
 // whose connection dropped while it lingers in the world is listed offline
-// with its live values (ClanMember.isOnline, ClanMember.java:174-177).
+// with its live values.
 func (l *GameClientLink) memberRow(m clan.Member, self ...*livePlayer) serverpackets.PledgeMemberListMember {
 	if m.Online {
 		for _, s := range self {
@@ -86,7 +86,8 @@ func (l *GameClientLink) framePledgeMemberList(cl *clan.Clan, self ...*livePlaye
 }
 
 // framePledgeUnitList builds the roster of cl's sub-unit pledgeType (the
-// main clan for 0) with the clan's header; see memberRow for self.
+// main clan for 0) with the clan's header, its members in roster table
+// order; see memberRow for self.
 func (l *GameClientLink) framePledgeUnitList(cl *clan.Clan, pledgeType int, self ...*livePlayer) wire.Frame {
 	info := cl.Info()
 	name := info.Name
@@ -94,7 +95,7 @@ func (l *GameClientLink) framePledgeUnitList(cl *clan.Clan, pledgeType int, self
 		unit, _ := cl.Subunit(pledgeType)
 		name = unit.Name
 	}
-	members := cl.Members()
+	members := cl.MembersInTableOrder()
 	rows := make([]serverpackets.PledgeMemberListMember, 0, len(members))
 	for _, m := range members {
 		if m.PledgeType == pledgeType {
@@ -142,8 +143,7 @@ func framePledgeShowInfoUpdate(cl *clan.Clan) wire.Frame {
 }
 
 // onlineClanMembers returns cl's members in the world, except exceptID,
-// leaving out a member whose connection dropped while it lingers there, as
-// Clan.getOnlineMembers does (Clan.java:842-851, ClanMember.isOnline).
+// leaving out a member whose connection dropped while it lingers there.
 func (l *GameClientLink) onlineClanMembers(cl *clan.Clan, exceptID int32) []*livePlayer {
 	var out []*livePlayer
 	for _, id := range cl.OnlineMemberIDs() {
@@ -159,7 +159,7 @@ func (l *GameClientLink) onlineClanMembers(cl *clan.Clan, exceptID int32) []*liv
 
 // clanMemberConnected reports whether the member objectID, listed online,
 // is in the world with its client: false once its connection dropped while
-// it lingers there (ClanMember.isOnline).
+// it lingers there.
 func (l *GameClientLink) clanMemberConnected(objectID int32) bool {
 	live, ok := l.livePlayerByID(objectID)
 	return ok && !live.clientDetached()

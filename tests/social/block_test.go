@@ -18,6 +18,7 @@ import (
 // unblock of a name not blocked answers nothing. The block is saved with
 // the relations, flagged by which side of the pair blocks.
 func TestBlockAndUnblock(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	carolID := p.srv.SeedCharacterFor(t, "player3", "Carol", 1, 0).ID
 	p.enterAll(t)
@@ -69,6 +70,7 @@ func TestBlockAndUnblock(t *testing.T) {
 // answers YOU_MAY_NOT_IMPOSE_A_BLOCK_ON_GM. A block type no command sends
 // answers nothing.
 func TestBlockRefusals(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	gmID := p.srv.SeedCharacterFor(t, "player3", "Gamemaster", 1, 0).ID
 	p.setAccessLevel(t, gmID, 1)
@@ -100,6 +102,7 @@ func TestBlockRefusals(t *testing.T) {
 // system message, then an EtcStatusUpdate whose third field carries the
 // mode. While it is on, friend invitations to the player are refused.
 func TestBlockEverything(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 
@@ -128,6 +131,7 @@ func TestBlockEverything(t *testing.T) {
 // answers TARGET_IS_NOT_FOUND_IN_THE_GAME. An empty message, or one past
 // 300 characters, answers nothing.
 func TestFriendMessage(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)
 	p.enterAll(t)

@@ -1,0 +1,74 @@
+# Path to a Cleric (Q405), level 19, quest started with no books: Praga and Vivyan have nothing for the character before Simplon, Lionel is not yet to be seen, and a ruin zombie gives nothing. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q405_path_to_a_cleric_wrong_order.golden
+character Cleric 19
+class 10
+quest Q405_PathToACleric <cond>=1 <state>=STARTED
+hold 1191 1
+script quest.Q405_PathToACleric
+item 1191 1192 1193 1194 1195 1196 1197 1198 1199 1200 1201
+page trainer/30022.htm
+page merchant/30253.htm
+page guard/30333.htm
+page trainer/30030.htm
+page default/30408.htm
+page default/30017.htm
+page script/quest/Q405_PathToACleric/
+npc zigaunt 30022 Trainer 10 0 0
+npc simplon 30253 Merchant -10 0 0
+npc praga 30333 Guard 20 0 0
+npc vivyan 30030 Trainer -20 0 0
+npc lionel 30408 Folk 30 0 0
+npc gallint 30017 Folk -30 0 0
+npc leader 20029 Monster 40 0 0
+npc zombie 20026 Monster 50 0 0
+
+action praga
+  items 1191=1
+  rows Q405_PathToACleric <cond>=1 <state>=STARTED
+  state Q405_PathToACleric STARTED
+action praga
+  S ActionFailed
+  S NpcHtmlMessage obj=praga item=0 page=guard/30333.htm
+  S ActionFailed
+bypass npc_{praga}_Quest
+  S NpcHtmlMessage obj=praga item=0 page=script/quest/Q405_PathToACleric/30333-02.htm
+  S ActionFailed
+  S ActionFailed
+action vivyan
+action vivyan
+  S ActionFailed
+  S NpcHtmlMessage obj=vivyan item=0 page=trainer/30030.htm
+  S ActionFailed
+bypass npc_{vivyan}_Quest
+  S NpcHtmlMessage obj=vivyan item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+action lionel
+action lionel
+  S ActionFailed
+  S NpcHtmlMessage obj=lionel item=0 page=default/30408.htm
+  S ActionFailed
+bypass npc_{lionel}_Quest
+  S NpcHtmlMessage obj=lionel item=0 page=script/quest/Q405_PathToACleric/30408-02.htm
+  S ActionFailed
+  S ActionFailed
+action gallint
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+bypass npc_{gallint}_Quest
+  S NpcHtmlMessage obj=gallint item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+kill leader
+  S SystemMessage id=95 1:0 1:0
+action zigaunt
+action zigaunt
+  S ActionFailed
+  S NpcHtmlMessage obj=zigaunt item=0 page=trainer/30022.htm
+  S ActionFailed
+bypass npc_{zigaunt}_Quest
+  S NpcHtmlMessage obj=zigaunt item=0 page=script/quest/Q405_PathToACleric/30022-06.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,267 @@
+# The Ocean of Distant Stars (Q117): a level 39 character accepts at Abey and goes between the
+# ancient ghost, Obi and Abey; the box gives the engraved hammer; a bandit warrior gives the grey
+# star (the roll pinned to succeed), which Obi takes, the ancient ghost takes the hammer, and the
+# railroad engineer's ghost rewards with experience; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q117_the_ocean_of_distant_stars.golden
+character Stargazer 39
+random always 0
+script quest.Q117_TheOceanOfDistantStars
+item 8495 8488
+page default/32053.htm
+page default/32055.htm
+page default/32052.htm
+page default/32076.htm
+page default/32054.htm
+page script/quest/Q117_TheOceanOfDistantStars/
+npc abey 32053 Folk 10 0 0
+npc ancient 32055 Folk 20 0 0
+npc obi 32052 Folk 30 0 0
+npc box 32076 Folk 0 10 0
+npc ghost 32054 Folk 0 20 0
+npc bandit 22023 Monster 40 0 0
+
+# Abey: accept.
+action abey
+action abey
+  S ActionFailed
+  S NpcHtmlMessage obj=abey item=0 page=default/32053.htm
+  S ActionFailed
+bypass npc_{abey}_Quest
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q117_TheOceanOfDistantStars CREATED
+bypass Quest Q117_TheOceanOfDistantStars 32053-02.htm
+  S QuestList 117:0x80000001
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-02.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <state> | STARTED
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 1
+  state Q117_TheOceanOfDistantStars STARTED
+  rows Q117_TheOceanOfDistantStars <cond>=1 <state>=STARTED
+action abey
+  S ActionFailed
+  S NpcHtmlMessage obj=abey item=0 page=default/32053.htm
+  S ActionFailed
+bypass npc_{abey}_Quest
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# The ancient ghost.
+action ancient
+action ancient
+  S ActionFailed
+  S NpcHtmlMessage obj=ancient item=0 page=default/32055.htm
+  S ActionFailed
+bypass npc_{ancient}_Quest
+  S NpcHtmlMessage obj=ancient item=0 page=script/quest/Q117_TheOceanOfDistantStars/32055-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32055-02.htm
+  S QuestList 117:0x80000003
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ancient item=0 page=script/quest/Q117_TheOceanOfDistantStars/32055-02.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 2
+  rows Q117_TheOceanOfDistantStars <cond>=2 <state>=STARTED
+
+# Obi.
+action obi
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q117_TheOceanOfDistantStars/32052-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32052-02.htm
+  S QuestList 117:0x80000007
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q117_TheOceanOfDistantStars/32052-02.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 3
+  rows Q117_TheOceanOfDistantStars <cond>=3 <state>=STARTED
+
+# Abey sends the character to the box.
+action abey
+action abey
+  S ActionFailed
+  S NpcHtmlMessage obj=abey item=0 page=default/32053.htm
+  S ActionFailed
+bypass npc_{abey}_Quest
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32053-04.htm
+  S QuestList 117:0x8000000f
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-04.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 4
+  rows Q117_TheOceanOfDistantStars <cond>=4 <state>=STARTED
+
+# The box: the engraved hammer.
+action box
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/32076.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q117_TheOceanOfDistantStars/32076-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32076-02.htm
+  S QuestList 117:0x8000001f
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8488
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q117_TheOceanOfDistantStars/32076-02.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 5
+  rows Q117_TheOceanOfDistantStars <cond>=5 <state>=STARTED
+  items 8488=1
+action box
+  S ActionFailed
+  S NpcHtmlMessage obj=box item=0 page=default/32076.htm
+  S ActionFailed
+bypass npc_{box}_Quest
+  S NpcHtmlMessage obj=box item=0 page=script/quest/Q117_TheOceanOfDistantStars/32076-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Abey.
+action abey
+action abey
+  S ActionFailed
+  S NpcHtmlMessage obj=abey item=0 page=default/32053.htm
+  S ActionFailed
+bypass npc_{abey}_Quest
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32053-06.htm
+  S QuestList 117:0x8000003f
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=abey item=0 page=script/quest/Q117_TheOceanOfDistantStars/32053-06.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 6
+  rows Q117_TheOceanOfDistantStars <cond>=6 <state>=STARTED
+
+# Obi asks for the grey star.
+action obi
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q117_TheOceanOfDistantStars/32052-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32052-04.htm
+  S QuestList 117:0x8000007f
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q117_TheOceanOfDistantStars/32052-04.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 7
+  rows Q117_TheOceanOfDistantStars <cond>=7 <state>=STARTED
+
+# A bandit warrior: the grey star.
+kill bandit
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8495
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 117:0x800000ff
+  S ExShowQuestMark quest=117
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 8
+  rows Q117_TheOceanOfDistantStars <cond>=8 <state>=STARTED
+  items 8495=1
+
+# Obi takes the star.
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q117_TheOceanOfDistantStars/32052-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32052-06.htm
+  S QuestList 117:0x800001ff
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8495
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q117_TheOceanOfDistantStars/32052-06.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 9
+  rows Q117_TheOceanOfDistantStars <cond>=9 <state>=STARTED
+  items 8495=0
+
+# The ancient ghost takes the hammer.
+action ancient
+action ancient
+  S ActionFailed
+  S NpcHtmlMessage obj=ancient item=0 page=default/32055.htm
+  S ActionFailed
+bypass npc_{ancient}_Quest
+  S NpcHtmlMessage obj=ancient item=0 page=script/quest/Q117_TheOceanOfDistantStars/32055-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32055-04.htm
+  S QuestList 117:0x800003ff
+  S ExShowQuestMark quest=117
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8488
+  S NpcHtmlMessage obj=ancient item=0 page=script/quest/Q117_TheOceanOfDistantStars/32055-04.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <cond> | 10
+  rows Q117_TheOceanOfDistantStars <cond>=10 <state>=STARTED
+  items 8488=0
+
+# The railroad engineer's ghost rewards.
+action ghost
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/32054.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q117_TheOceanOfDistantStars/32054-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32054-02.htm
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q117_TheOceanOfDistantStars/32054-02.htm
+  S ActionFailed
+bypass Quest Q117_TheOceanOfDistantStars 32054-03.htm
+  S SystemMessage id=45 1:63591
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 117:0x00000000
+  S NpcHtmlMessage obj=ghost item=0 page=script/quest/Q117_TheOceanOfDistantStars/32054-03.htm
+  S ActionFailed
+  Q upsert Q117_TheOceanOfDistantStars | <state> | COMPLETED
+  Q delete-except-state Q117_TheOceanOfDistantStars
+  state Q117_TheOceanOfDistantStars COMPLETED
+  rows Q117_TheOceanOfDistantStars <state>=COMPLETED
+action ghost
+  S ActionFailed
+  S NpcHtmlMessage obj=ghost item=0 page=default/32054.htm
+  S ActionFailed
+bypass npc_{ghost}_Quest
+  S NpcHtmlMessage obj=ghost item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  state Q117_TheOceanOfDistantStars COMPLETED
+  rows Q117_TheOceanOfDistantStars <state>=COMPLETED

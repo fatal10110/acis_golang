@@ -1,0 +1,21 @@
+# Shriek of Ghosts (Q371), level 58: Reva turns the character away. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q371_shriek_of_ghosts_low_level.golden
+character Ghosts 58
+script quest.Q371_ShriekOfGhosts
+item 57 5903 6002 6003 6004 6005 6006
+page trainer/30867.htm
+page default/30929.htm
+page script/quest/Q371_ShriekOfGhosts/
+npc reva 30867 Trainer 10 0 0
+
+action reva
+action reva
+  S ActionFailed
+  S NpcHtmlMessage obj=reva item=0 page=trainer/30867.htm
+  S ActionFailed
+bypass npc_{reva}_Quest
+  S NpcHtmlMessage obj=reva item=0 page=script/quest/Q371_ShriekOfGhosts/30867-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q371_ShriekOfGhosts -

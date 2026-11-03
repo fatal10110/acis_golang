@@ -315,9 +315,6 @@ func TestNoblesseTeleporterOpensHuntingGroundWindows(t *testing.T) {
 	adenaWindow := nobleWindow(nobleRow(gk, 2, "Giran Arena", "1000 &#57;"))
 
 	open(t)
-	wantPage(t, w.bypass(t, "Quest NoblesseTeleporter NOBLE_HUNTING_ZONE_PASS"), gk, passWindow, 0)
-
-	open(t)
 	w.openAnyNpcPage(t)
 	wantPage(t, w.bypass(t, "Quest NoblesseTeleporter noble_hunting_zone_pass"), gk, passWindow, 0)
 	w.c.Send(encodeBypass("Quest NoblesseTeleporter UNKNOWN_TYPE"))

@@ -2,7 +2,6 @@ package pets
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -239,7 +238,7 @@ func openTrade(t *testing.T, h *petWorld, buyer secondPlayer) {
 // requireNoFrame fails if c receives anything more after a refusal.
 func requireNoFrame(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("%s sent opcode %#x after its refusal, want nothing", what, frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s sent opcode %#x after its refusal, want nothing", what, queued[0][0])
 	}
 }

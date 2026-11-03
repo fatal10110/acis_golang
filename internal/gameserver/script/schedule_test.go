@@ -9,7 +9,9 @@ import (
 	"time"
 	_ "time/tzdata" // the calendar golden's zones, wherever the test runs
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 	"github.com/rs/zerolog"
 )
@@ -257,6 +259,64 @@ func TestScheduleStopCancelsStartContext(t *testing.T) {
 	in.Advance(time.Hour)
 	if ctxErr != context.Canceled {
 		t.Fatalf("start context after Stop: %v, want canceled", ctxErr)
+	}
+}
+
+// worldPlayerFake is a player the world tracks online.
+type worldPlayerFake struct{ combatant }
+
+func (*worldPlayerFake) Kind() actor.Kind    { return actor.KindPlayer }
+func (*worldPlayerFake) AccountName() string { return "" }
+
+// TestScheduleStartFindsNoWorld: a start hook is handed a script that finds
+// no world, so it never reaches a player, while a hook of another kind on
+// the same registered script finds the same player and NPC.
+func TestScheduleStartFindsNoWorld(t *testing.T) {
+	const playerID, npcObjectID, npcID = 7, 1_001, 30_001
+	w := world.New()
+	w.AddPlayer(&worldPlayerFake{combatant{objectID: playerID}})
+	w.AddObject(newNPCHandle(t, npcObjectID, npcID).combatant().(world.Tracked))
+
+	type found struct {
+		player *Player
+		object Creature
+		npc    *NPC
+	}
+	look := func(s *Script) found {
+		return found{s.WorldPlayer(playerID), s.Object(npcObjectID), s.WorldNPC(npcID)}
+	}
+	in := sim.NewInline(time.Date(2026, 10, 5, 23, 59, 0, 0, time.UTC))
+	var atStart *found
+	r := Build([]Listing{{Path: "task.Daily", Schedule: "DAILY", Start: "00:00:00"}},
+		Catalog{"task.Daily": func() Script {
+			return Script{Hooks: Hooks{OnStart: func(s *Script, _ Start) {
+				f := look(s)
+				atStart = &f
+			}}}
+		}},
+		Config{KindOf: allTemplates, Log: zerolog.Nop(), Env: &Env{World: w}})
+	sch := StartSchedule(r, in.NewQueue("schedule"), recordingServer{})
+	defer sch.Stop()
+
+	in.Advance(time.Hour)
+	if atStart == nil {
+		t.Fatal("the start hook did not run")
+	}
+	if atStart.player != nil || atStart.object != nil || atStart.npc != nil {
+		t.Fatalf("a start hook found player %v, object %v, NPC %v; want none", atStart.player, atStart.object, atStart.npc)
+	}
+
+	registered := r.byName["daily"]
+	if registered == nil {
+		t.Fatal("task.Daily is not registered")
+	}
+	var atEvent found
+	r.run(registered, hookEvent, func() { atEvent = look(registered) })
+	if atEvent.player == nil || atEvent.player.ObjectID() != playerID {
+		t.Fatalf("an event hook found player %v, want %d", atEvent.player, playerID)
+	}
+	if atEvent.object == nil || atEvent.npc == nil || atEvent.npc.NpcID() != npcID {
+		t.Fatalf("an event hook found object %v and NPC %v, want the NPC %d", atEvent.object, atEvent.npc, npcID)
 	}
 }
 

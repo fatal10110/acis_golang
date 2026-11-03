@@ -78,7 +78,7 @@ func TestMidSwingCastOnCooldownIsRejectedNotQueued(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	// A short cooldown: a queued replay at swing end would find it expired
 	// and start the cast.
-	pc.DisableSkill(cast.ReuseKey(midSwingSkill()), 50*time.Millisecond)
+	pc.DisableSkill(cast.ReuseKey(new(midSwingSkill())), 50*time.Millisecond)
 
 	c.Send(encodeRequestMagicSkillUse(midSwingSkillID, false, false))
 	assertSystemMessageSkillFrame(t, mustRead(t, c, "reuse rejection"), serverpackets.SystemMessageS1PreparedForReuse, midSwingSkillID, 1)
@@ -124,8 +124,8 @@ func TestThinkMidSwingLeavesQueuedCastWaiting(t *testing.T) {
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("THINK started the cast queued behind the swing")
 	}
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("frame %#x for the THINK mid-swing, want none", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("frame %#x for the THINK mid-swing, want none", queued[0][0])
 	}
 	srv.AdvanceUntil(t, "queued cast start", func() bool { return srv.PlayerCastingNow(t, objID) })
 }
@@ -159,7 +159,7 @@ func TestMidSwingToggleOnReuseIsRefusedNotQueued(t *testing.T) {
 	t.Parallel()
 	srv, pc := bootMidSwing(t)
 	c := srv.Client
-	pc.DisableSkill(cast.ReuseKey(midSwingToggle()), 50*time.Millisecond)
+	pc.DisableSkill(cast.ReuseKey(new(midSwingToggle())), 50*time.Millisecond)
 
 	c.Send(encodeRequestMagicSkillUse(midSwingToggleID, false, false))
 	assertSystemMessageSkillFrame(t, mustRead(t, c, "reuse rejection"), serverpackets.SystemMessageS1PreparedForReuse, midSwingToggleID, 1)

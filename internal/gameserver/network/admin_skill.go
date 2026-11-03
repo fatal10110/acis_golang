@@ -46,7 +46,7 @@ func (l *GameClientLink) adminSkill(gm *livePlayer, line string) {
 		if !ok || !isDigits(tok) {
 			return true
 		}
-		n, ok := parseJavaInt(tok)
+		n, ok := parseInt32(tok)
 		page = int(n)
 		return ok
 	}
@@ -68,7 +68,7 @@ func (l *GameClientLink) adminSkill(gm *livePlayer, line string) {
 			}
 		default:
 			if isDigits(param) {
-				n, ok := parseJavaInt(param)
+				n, ok := parseInt32(param)
 				if !ok {
 					return
 				}
@@ -95,13 +95,13 @@ func (l *GameClientLink) adminSkillSet(gm, target *livePlayer, next func() (stri
 	if param == "all" {
 		return onPlayer(gm, target, func() { l.rewardAdminSkills(gm, target) })
 	}
-	id, ok := parseJavaInt(param)
+	id, ok := parseInt32(param)
 	if !ok {
 		sendText(gm, usage)
 		return true
 	}
 	levelParam, _ := next()
-	level, ok := parseJavaInt(levelParam)
+	level, ok := parseInt32(levelParam)
 	if !ok {
 		sendText(gm, usage)
 		return true
@@ -127,14 +127,14 @@ func (l *GameClientLink) adminSkillRemove(gm, target *livePlayer, next func() (s
 	if param == "all" {
 		return onPlayer(gm, target, func() { l.removeAdminSkills(gm, target) })
 	}
-	id, ok := parseJavaInt(param)
+	id, ok := parseInt32(param)
 	if !ok {
 		sendText(gm, usage)
 		return true
 	}
 	return onPlayer(gm, target, func() {
 		l.removeLiveSkill(target, int(id), true)
-		sendText(gm, "You removed "+strconv.Itoa(int(id))+" skillId from "+target.Name+".")
+		sendText(gm, "You removed "+strconv.Itoa(int(id))+" skillId from "+target.CharacterName()+".")
 	})
 }
 
@@ -150,7 +150,7 @@ func (l *GameClientLink) rewardAdminSkills(gm, target *livePlayer) {
 		}
 		l.sendSkillChanges(target, before, raisedSkill)
 	}
-	sendText(gm, "You gave all available skills to "+target.Name+".")
+	sendText(gm, "You gave all available skills to "+target.CharacterName()+".")
 }
 
 // giveAdminSkill runs //skill set <id> <level> on target's queue: target
@@ -158,7 +158,7 @@ func (l *GameClientLink) rewardAdminSkills(gm, target *livePlayer) {
 // skill drops the skill its previous level brought along and re-points its
 // shortcuts at the new level; target gets its skill list either way, and
 // gm is told.
-func (l *GameClientLink) giveAdminSkill(gm, target *livePlayer, def modelskill.Definition) {
+func (l *GameClientLink) giveAdminSkill(gm, target *livePlayer, def *modelskill.Definition) {
 	before := target.SkillLevels()
 	id := int(def.ID)
 	if old := before[id]; old != def.Level {
@@ -170,7 +170,7 @@ func (l *GameClientLink) giveAdminSkill(gm, target *livePlayer, def modelskill.D
 		}
 	}
 	l.sendSkillChanges(target, before, changedSkill)
-	sendText(gm, "You gave "+def.Name+" skill to "+target.Name+".")
+	sendText(gm, "You gave "+def.Name+" skill to "+target.CharacterName()+".")
 }
 
 // removeAdminSkills runs //skill remove all on target's queue: every skill
@@ -186,7 +186,7 @@ func (l *GameClientLink) removeAdminSkills(gm, target *livePlayer) {
 	for _, id := range ids {
 		l.removeLiveSkill(target, id, true)
 	}
-	sendText(gm, "You removed all skills from "+target.Name+".")
+	sendText(gm, "You removed all skills from "+target.CharacterName()+".")
 	l.sendSkillChanges(target, nil, nil)
 }
 
@@ -200,9 +200,9 @@ func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bo
 	if level <= 0 {
 		return
 	}
-	def, _ := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
+	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
 	l.skills.ForgetSkill(live.Character, skillID, store)
-	if def.TriggeredID > 1 {
+	if known && def.TriggeredID > 1 {
 		l.removeLiveSkill(live, def.TriggeredID, false)
 	}
 	if live.cast != nil {
@@ -211,7 +211,7 @@ func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bo
 		}
 	}
 	live.StopSkillEffectsByID(modelskill.ID(skillID))
-	if store && def.Activation != modelskill.ActivationPassive {
+	if store && (!known || def.Activation != modelskill.ActivationPassive) {
 		l.deleteTargetShortcuts(live, shortcut.Skill, int32(skillID))
 	}
 }
@@ -243,7 +243,7 @@ func (l *GameClientLink) showAdminSkills(gm, target *livePlayer, page int) {
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_skill %page%")
-	l.sendAdminSkillPage(gm, "char_skills.htm", target.Name, b.String())
+	l.sendAdminSkillPage(gm, "char_skills.htm", target.CharacterName(), b.String())
 }
 
 // showAdminSkillTable opens page of the server's skill table on gm, every
@@ -262,7 +262,7 @@ func (l *GameClientLink) showAdminSkillTable(gm, target *livePlayer, page int) {
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_skill list %page%")
-	l.sendAdminSkillPage(gm, "char_skills_list.htm", target.Name, b.String())
+	l.sendAdminSkillPage(gm, "char_skills_list.htm", target.CharacterName(), b.String())
 }
 
 // adminSkillRow writes one row of a //skill page: id, label and level, on

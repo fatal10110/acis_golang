@@ -1,0 +1,40 @@
+# Little Wing (Q420): the dust is spent, a Shamhai egg and a roll of 69 give the wind flute, and a second roll of 1 adds the soft leather.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q420_little_wing_finish_dust_14_leather.golden
+character Wing 35
+quest Q420_LittleWing <cond>=7 <state>=STARTED
+hold 3499 1
+hold 3831 1
+random 69 1
+script quest.Q420_LittleWing
+item 1870 1871 1873 1875 2130 2131 3499 3500 3501 3502 3816 3817 3818 3819 3820 3821 3822 3823 3824 3825 3826 3827 3828 3829 3830 3831 3912 4038
+page default/30747.htm
+page script/quest/Q420_LittleWing/
+npc mimyu 30747 Folk 10 0 0
+
+action mimyu
+action mimyu
+  S ActionFailed
+  S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
+  S ActionFailed
+bypass npc_{mimyu}_Quest
+  S NpcHtmlMessage obj=mimyu item=0 page=script/quest/Q420_LittleWing/30747-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q420_LittleWing 30747-12.htm
+  S NpcHtmlMessage obj=mimyu item=0 page=script/quest/Q420_LittleWing/30747-12.htm
+  S ActionFailed
+bypass Quest Q420_LittleWing 30747-14.htm
+  S SystemMessage id=302 3:3499
+  S SystemMessage id=302 3:3831
+  S SystemMessage id=54 3:3500
+  S SystemMessage id=54 3:3912
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=mimyu item=0 page=script/quest/Q420_LittleWing/30747-14.htm
+  S ActionFailed
+  Q delete-quest Q420_LittleWing
+  items 3499=0 3831=0 3500=1 3912=1
+
+  state Q420_LittleWing -
+  rows Q420_LittleWing -

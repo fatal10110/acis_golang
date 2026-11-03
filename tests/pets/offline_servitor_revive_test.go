@@ -98,10 +98,8 @@ func (l *leftServitor) assertStandsUp(t *testing.T) {
 	if l.servitor.Dead() {
 		t.Fatal("resurrection left the departed owner's servitor dead")
 	}
-	// Kat the Cat's live max HP is 410 whole points, at the 0.7 respawn
-	// restore share.
-	if got := l.servitor.HP(); got != 287 {
-		t.Fatalf("revived servitor HP = %v, want 287", got)
+	if got, want := l.servitor.HP(), katRevivedHP(t); got != want {
+		t.Fatalf("revived servitor HP = %v, want %v", got, want)
 	}
 	if !l.servitor.OwnerLeft() {
 		t.Fatal("revive handed the servitor to an owner who is not in the world")

@@ -11,7 +11,7 @@ import (
 // carrying an AI cast.
 type ConsumeAICastItemRequest struct {
 	Caster     SkillCaster
-	Definition modelskill.Definition
+	Definition *modelskill.Definition
 	Inventory  *itemcontainer.Inventory
 	Item       *modelitem.Instance
 	Template   *modelitem.Template

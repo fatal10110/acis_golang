@@ -302,9 +302,9 @@ func (t *Template) Category() (Category, SubCategory) {
 	}
 }
 
-// Table is an in-memory lookup of item templates keyed by id, built once at
-// boot and read for the remainder of the process lifetime. The zero value
-// is not usable; construct with NewTable.
+// Table is an in-memory lookup of item templates keyed by id, built at boot
+// and replaced in place by //reload item. The zero value is not usable;
+// construct with NewTable.
 type Table struct {
 	*commons.Lookup[int32, *Template]
 }
@@ -313,4 +313,11 @@ type Table struct {
 // A later entry silently overwrites an earlier one with the same ID.
 func NewTable(templates []*Template) *Table {
 	return &Table{commons.NewLookup(templates, func(tpl *Template) int32 { return tpl.ID })}
+}
+
+// Replace swaps t's templates for from's, at once for every holder of t. A
+// template already resolved (a multisell entry, an item on the ground)
+// stays the one it was read as; every lookup afterwards reads the new ones.
+func (t *Table) Replace(from *Table) {
+	t.Swap(from.Lookup)
 }

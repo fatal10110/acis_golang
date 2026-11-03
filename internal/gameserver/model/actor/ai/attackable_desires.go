@@ -30,14 +30,14 @@ func (a *Attackable) AddCastDesire(target attackable.Combatant, ref skill.Ref, w
 	if checkConditions && !cast.CanDesire(target, ref) {
 		return
 	}
-	if !moveToTarget && !a.inCastReach(target, cast.Range(ref)) {
+	if !moveToTarget && !InCastReach(a.actor, target, cast.Range(ref)) {
 		return
 	}
 	final := cast.FinalTarget(target, ref)
 	if final == nil {
 		return
 	}
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:         IntentionCast,
 		FinalTarget:  final,
 		Skill:        ref,
@@ -47,12 +47,18 @@ func (a *Attackable) AddCastDesire(target attackable.Combatant, ref skill.Ref, w
 	})
 }
 
-// inCastReach reports whether target stands strictly within castRange plus
-// both collision radii of the actor, measured flat. The reach is truncated
-// to whole units before the comparison.
-func (a *Attackable) inCastReach(target attackable.Combatant, castRange int) bool {
-	reach := int(float64(castRange) + a.actor.CollisionRadius() + target.CollisionRadius())
-	ox, oy, oz := a.actor.Position()
+// body is a creature with a world position and a collision radius.
+type body interface {
+	Position() (x, y, z int)
+	CollisionRadius() float64
+}
+
+// InCastReach reports whether target stands strictly within castRange plus
+// both collision radii of self, measured flat. The reach is truncated to
+// whole units before the comparison.
+func InCastReach(self, target body, castRange int) bool {
+	reach := int(float64(castRange) + self.CollisionRadius() + target.CollisionRadius())
+	ox, oy, oz := self.Position()
 	tx, ty, tz := target.Position()
 	from := location.Location{X: ox, Y: oy, Z: oz}
 	return from.Distance2D(location.Location{X: tx, Y: ty, Z: tz}) < float64(reach)
@@ -62,7 +68,7 @@ func (a *Attackable) inCastReach(target attackable.Combatant, castRange int) boo
 // weight, its chain firing every timer seconds; an equal desire already
 // queued gains the weight instead.
 func (a *Attackable) AddWanderDesire(timer int, weight float64) {
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:     IntentionWander,
 		Timer:    timer,
 		Weight:   weight,
@@ -76,7 +82,7 @@ func (a *Attackable) AddWanderDesire(timer int, weight float64) {
 // keeps the idle follow and wander away. Its weight decays with the AI
 // clock. timer is carried with the desire but times nothing.
 func (a *Attackable) AddDoNothingDesire(timer int, weight float64) {
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:     IntentionNothing,
 		Timer:    timer,
 		Weight:   weight,
@@ -95,7 +101,7 @@ func (a *Attackable) AddFleeDesire(target attackable.Combatant, distance int, we
 		return
 	}
 	x, y, z := a.actor.Position()
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:        IntentionFlee,
 		FinalTarget: target,
 		Location:    location.Location{X: x, Y: y, Z: z},
@@ -133,7 +139,7 @@ func (a *Attackable) AddSocialDesire(id, timer int, weight float64) {
 	if a.actor.AISleeping() {
 		return
 	}
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:         IntentionSocial,
 		ItemObjectID: int32(id),
 		Timer:        timer,

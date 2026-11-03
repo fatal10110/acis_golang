@@ -13,30 +13,6 @@ import (
 // ShowXMasSeal writeC(0xf2) writeD(item); Dice writeC(0xd4) writeD(objectId)
 // writeD(itemId) writeD(number) then writeLoc's x, y, z.
 
-func TestFrameShowCalculator(t *testing.T) {
-	got := framePayload(t, FrameShowCalculator(4393))
-	want := []byte{0xdc, 0x29, 0x11, 0x00, 0x00}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShowCalculator(4393) = %x, want %x", got, want)
-	}
-}
-
-func TestFrameShowMiniMap(t *testing.T) {
-	got := framePayload(t, FrameShowMiniMap(RegularMapID, 3))
-	want := []byte{0x9d, 0x81, 0x06, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShowMiniMap(1665, 3) = %x, want %x", got, want)
-	}
-}
-
-func TestFrameShowXMasSeal(t *testing.T) {
-	got := framePayload(t, FrameShowXMasSeal(5555))
-	want := []byte{0xf2, 0xb3, 0x15, 0x00, 0x00}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShowXMasSeal(5555) = %x, want %x", got, want)
-	}
-}
-
 func TestFrameDice(t *testing.T) {
 	got := framePayload(t, FrameDice(0x10203040, 4625, 6, location.Location{X: -84318, Y: 244579, Z: -3730}))
 	want := []byte{

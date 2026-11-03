@@ -1,0 +1,23 @@
+# Totem of the Hestui (Q276), refused: Tanapi sends away an orc of level 14. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q276_totem_of_the_hestui_low_level.golden
+character Seer 14
+class 44
+script quest.Q276_TotemOfTheHestui
+item 1480
+page trainer/30571.htm
+page script/quest/Q276_TotemOfTheHestui/
+npc tanapi 30571 Trainer 10 0 0
+
+# Tanapi: the quest cannot start.
+action tanapi
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q276_TotemOfTheHestui/30571-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q276_TotemOfTheHestui CREATED
+  rows Q276_TotemOfTheHestui -

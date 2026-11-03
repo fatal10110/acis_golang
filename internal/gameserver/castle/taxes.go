@@ -26,9 +26,9 @@ func (m *Manager) ValidateTaxes(maxPercent int) {
 // ResetCertificates gives every castle its full count of certificates
 // back, storing each.
 //
-// The reference resets memory and stores every row with one table-wide
-// update; here each castle's row is written on its own lane, so the reset
-// lands after any certificate write that castle queued before it.
+// Each castle's row is written on its own lane rather than by one
+// table-wide update, so the reset lands after any certificate write that
+// castle queued before it.
 func (m *Manager) ResetCertificates() {
 	for _, c := range m.All() {
 		c.SetLeftCertificates(resetCertificates, true)

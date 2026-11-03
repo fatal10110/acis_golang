@@ -59,7 +59,12 @@ func TestPhysicalHitReadsTruncatedStats(t *testing.T) {
 	if in.AttackPower != 5 || in.Defence != 45 {
 		t.Fatalf("hit input attack %v / defence %v, want 5 / 45", in.AttackPower, in.Defence)
 	}
-	want := (5 * in.PosMul * in.RandomMul * in.RaceMul * in.PvPMul * in.ElementalMul * in.WeaponVulnMul) * 77. / 45
+	// skill/formulas/testdata/formulas.golden: physicalAttackDamage 45.0 5.0 false false 1.2 1.0 1.0 1.0
+	// 1.0 1.0 0.0 0.0 0.0 0.0.
+	if in.PosMul != 1.2 || in.RandomMul != 1 || in.RaceMul != 1 || in.PvPMul != 1 || in.ElementalMul != 1 || in.WeaponVulnMul != 1 {
+		t.Fatalf("hit input multipliers %+v, want position 1.2 and the rest 1", in)
+	}
+	want := 10.266666666666667
 	if got := formulas.PhysicalAttackDamage(in); !closeFloat(got, want) {
 		t.Fatalf("hit damage = %v, want %v", got, want)
 	}
@@ -80,7 +85,9 @@ func TestMagicDamageReadsTruncatedStats(t *testing.T) {
 	if in.MAtk != 13 || in.MDef != 46 {
 		t.Fatalf("MDAM input M.Atk %v / M.Def %v, want 13 / 46", in.MAtk, in.MDef)
 	}
-	want := 91 * math.Sqrt(13) / 46 * 40
+	// skill/formulas/testdata/formulas.golden: magicDamage true false 46.0 13.0 40.0 false false false 0
+	// 1.0 1.0.
+	want := 285.3088400584548
 	if got := formulas.MagicDamage(in); got != want {
 		t.Fatalf("MDAM damage = %v, want %v", got, want)
 	}

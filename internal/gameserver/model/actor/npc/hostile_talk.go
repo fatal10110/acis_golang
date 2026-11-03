@@ -25,15 +25,19 @@ func (h *Hostile) Talks() bool {
 	return false
 }
 
-// ChatPage returns the datapack page of this talking NPC's chat window: a
-// guard's own page, else the NPC's default page, which exists reports on,
-// or the generic one.
-func (h *Hostile) ChatPage(exists func(file string) bool) string {
-	id := strconv.Itoa(h.NpcID())
-	if hostileKind(h.Instance) == "Guard" {
-		return "data/html/guard/" + id + ".htm"
+// ChatPage returns the datapack page of chat page val of this NPC: a
+// guard's own page, <npcId>.htm for 0 and <npcId>-<val>.htm otherwise,
+// whether or not it exists; else that page of the NPC's default pages,
+// which exists reports on, or the generic one.
+func (h *Hostile) ChatPage(val int, exists func(file string) bool) string {
+	name := strconv.Itoa(h.NpcID())
+	if val != 0 {
+		name += "-" + strconv.Itoa(val)
 	}
-	if file := "data/html/default/" + id + ".htm"; exists(file) {
+	if hostileKind(h.Instance) == "Guard" {
+		return "data/html/guard/" + name + ".htm"
+	}
+	if file := "data/html/default/" + name + ".htm"; exists(file) {
 		return file
 	}
 	return "data/html/npcdefault.htm"

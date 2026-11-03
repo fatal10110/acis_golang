@@ -1,0 +1,10 @@
+# ImperialGravekeeper (27181): hits at full HP and at 75 % ask it to cast 4080 on itself and
+# call its Imperial Slaves, none of which the format renders (tests/ai/individual8_test.go
+# checks them): no line, no message, no page.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.ImperialGravekeeper
+npc keeper 27181 Monster 40 0 0
+
+hit keeper 10
+tick

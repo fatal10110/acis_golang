@@ -17,6 +17,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -47,8 +49,6 @@ type summonSink struct {
 	cleanupMu sync.Mutex
 	cleanup   []func()
 	despawned bool
-	// known is the scratch known-list snapshot the health-bar update reads.
-	known world.KnownBuffer
 }
 
 // onDespawn registers fn as runtime cleanup that runs exactly once when the
@@ -157,7 +157,7 @@ func (s *summonSink) Emit(ev event.Event) {
 		// the hit sends.
 		l.settleSummonOwnerPvPChanges(actor)
 	case event.HitLanded:
-		l.chance.AttackHit(actor, e)
+		l.combat.chance.AttackHit(actor, e)
 	case event.ShotsRechargeRequested:
 		// The summon's work runs on its owner's queue, which owns the
 		// owner's inventory and auto-use set.
@@ -198,6 +198,10 @@ func (s *summonSink) Emit(ev event.Event) {
 		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 		}
+	case event.AttackRefused:
+		if owner, ok := l.currentSummonOwner(actor); ok {
+			owner.SendFrame(serverpackets.FrameSystemMessage(attackRefusalMessage(e.Reason)))
+		}
 	case event.ExpGained:
 		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(e.Exp)))
@@ -226,6 +230,7 @@ func (s *summonSink) Emit(ev event.Event) {
 			source = skillhandler.DamageByPet
 		}
 		sendDamageMessage(owner, hitDamage(e, source))
+		l.notifyCompetitorDamage(owner, e.TargetID, e.Damage)
 	case event.Died:
 		// Observers see the summon fall, then its own combat stance end. The
 		// stance is its owner's: the owner stays in combat and keeps its own
@@ -234,17 +239,42 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
 	case event.DeathSettled:
 		l.notifyOwnerOfSummonDeath(actor)
-		if l.decay != nil {
-			actor.SetCorpseDeadline(l.decay.Add(actor, actor.DecayDelay()))
+		if l.summoning.decay != nil {
+			actor.SetCorpseDeadline(l.summoning.decay.Add(actor, actor.DecayDelay()))
 		}
 	case event.Revived:
 		l.broadcastSummon(actor, func() wire.Frame { return serverpackets.FrameRevive(actor.ObjectID()) })
 	case event.DecayCanceled:
-		if l.decay != nil {
-			l.decay.Cancel(actor)
+		if l.summoning.decay != nil {
+			l.summoning.decay.Cancel(actor)
 		}
-	case event.PetCorpseDecayed:
+	case event.PetCorpseDecayed, event.PetDeserted:
 		l.destroyDecayedPet(actor)
+	case event.LifetimeShown:
+		if owner, ok := l.currentSummonOwner(actor); ok {
+			owner.SendFrame(serverpackets.FrameSetSummonRemainTime(int32(e.Total), int32(e.Remaining)))
+		}
+	case event.UpkeepPaid:
+		if owner, ok := l.currentSummonOwner(actor); ok {
+			sendDestroyedMessage(owner, e.ItemID, e.Count)
+		}
+	case event.UpkeepShort:
+		l.sendSummonOwnerMessage(actor, serverpackets.SystemMessageNotEnoughItems)
+	case event.PetFoodDue:
+		l.autoFeedPet(actor, e.ObjectID)
+	case event.PetHungry:
+		message := serverpackets.SystemMessageYourPetIsVeryHungryBeCareful
+		if e.Starving {
+			message = serverpackets.SystemMessageYourPetIsVeryHungry
+		}
+		l.sendSummonOwnerMessage(actor, message)
+	case event.PetLeavingHungry:
+		l.sendSummonOwnerMessage(actor, serverpackets.SystemMessageStarvingPetHasLeft)
+	case event.MoveTypeChanged:
+		swimming := actor.InsideZone(zone.FlagWater)
+		l.broadcastSummon(actor, func() wire.Frame {
+			return serverpackets.FrameChangeMoveType(actor.ObjectID(), e.Running, swimming)
+		})
 	case event.CorpseLeftBehind:
 		s.leaveCorpseBehind()
 	case event.OwnerRelinked:
@@ -276,6 +306,20 @@ func (s *summonSink) Emit(ev event.Event) {
 		s.brain.Think()
 	case event.MoveBlocked:
 		s.move.BroadcastBlockedCorrection()
+	case event.InstantTeleportRequested:
+		// A script asks it from any queue: the jump runs on the summon's
+		// own queue, as a player's does.
+		j := e.Jump
+		if q := actor.Queue(); q != nil {
+			q.Post(func() { l.instantTeleportSummon(actor, j) })
+		}
+	case event.SummonTeleportRequested:
+		// A script asks it from any queue: the teleport runs on the
+		// summon's own queue.
+		j := e.Jump
+		if q := actor.Queue(); q != nil {
+			q.Post(func() { l.teleportSummon(actor, j) })
+		}
 	case event.Unsummoning:
 		if actor.OwnerLeft() {
 			// A corpse its owner left behind has not acted since its row was
@@ -284,16 +328,17 @@ func (s *summonSink) Emit(ev event.Event) {
 			// world (a signet's unsummon, a servitor's decay): it stops what
 			// it was doing, and a pet's row is saved again first, alive,
 			// with its owner's collar lifted to the level it regained.
-			if !actor.Dead() {
-				if s.brain != nil {
-					s.runCleanup(s.brain.AbortAll)
-				}
-				if actor.IsPet() {
-					s.runCleanup(func() {
-						l.savePet(actor, nil)
-						l.liftLeftPetCollar(actor)
-					})
-				}
+			// Either way its effects end, with no owner to show them to.
+			alive := !actor.Dead()
+			if alive && s.brain != nil {
+				s.runCleanup(s.brain.AbortAll)
+			}
+			s.runCleanup(actor.EffectList().StopAll)
+			if alive && actor.IsPet() {
+				s.runCleanup(func() {
+					l.savePet(actor, nil)
+					l.liftLeftPetCollar(actor)
+				})
 			}
 			s.runCleanup(func() { l.settleLeftCorpseItems(actor) })
 			return
@@ -302,16 +347,23 @@ func (s *summonSink) Emit(ev event.Event) {
 		// one-time despawn, so a panic escaping it would leave the summon in
 		// the world with no second despawn to take it out. The abort comes
 		// first, so a stop broadcast still reaches observers and a cast or
-		// attack in flight cannot land from a summon that is leaving.
+		// attack in flight cannot land from a summon that is leaving. A pet's
+		// items go back before its effects end, and its row is saved after
+		// they ended; the owner sees the icons cleared before PetDelete.
 		if s.brain != nil {
 			s.runCleanup(s.brain.AbortAll)
 		}
-		s.runCleanup(func() { l.releasePet(actor) })
+		s.runCleanup(func() { l.returnPetItems(actor) })
+		s.runCleanup(actor.StopAllEffects)
+		s.runCleanup(func() { l.storeDepartingPet(actor) })
 	case event.SummonRemoved:
 		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FramePetDelete(actor.SummonType(), actor.ObjectID()))
 		}
 	case event.Despawned:
+		// The owner's tail of the departure follows the summon's
+		// DeleteObject, ahead of the runtime cleanups.
+		s.runCleanup(func() { l.releaseSummonOwner(actor) })
 		s.runDespawn()
 	}
 }
@@ -322,9 +374,7 @@ func (s *summonSink) broadcastHP() {
 	if s.link.world == nil || s.actor == nil {
 		return
 	}
-	known := s.known.SnapshotCopy(s.link.world, s.actor)
-	defer known.Release()
-	sendHPToWatchers(known.Tracked(), s.actor.ObjectID(), s.actor.PublishHP)
+	sendHPToWatchers(s.link.world.KnownPlayers(s.actor), s.actor.ObjectID(), s.actor.PublishHP)
 }
 
 // leaveCorpseBehind settles a dead summon whose owner is leaving the world
@@ -351,11 +401,11 @@ func (s *summonSink) leaveCorpseBehind() {
 	actor.AdoptCorpseQueue(q)
 	s.moveWorkTo(q)
 	s.onDespawn(q.Close)
-	if l.attackStance != nil {
+	if l.combat.attackStance != nil {
 		// A corpse revived meanwhile is in a stance of its own
 		// (startSummonAttackStance), whose expiry the closed queue would
 		// never run.
-		s.onDespawn(func() { l.attackStance.Remove(actor) })
+		s.onDespawn(func() { l.combat.attackStance.Remove(actor) })
 	}
 }
 
@@ -427,7 +477,7 @@ func (l *GameClientLink) reclaimPetCorpse(live *livePlayer) {
 // settleLeftCorpseItems hands the items of a pet corpse its owner left
 // behind to that owner as the corpse decays. An owner back in the world
 // whose session has not taken the corpse over yet gets them in its
-// inventory, on its own queue, as for any other departure (releasePet).
+// inventory, on its own queue, as for any other departure (returnPetItems).
 // Otherwise the owner is offline: every item becomes a row of the owner's
 // carried inventory, without a capacity check or a stack merge, since the
 // inventory of a session that left holds nothing; the owner's next login
@@ -445,13 +495,19 @@ func (l *GameClientLink) settleLeftCorpseItems(actor *summon.Actor) {
 		l.flushItemPersistence(petInv)
 	}, func() {
 		// The pet's container stops persisting first, so the items leave
-		// it carrying no writer; the owner's rows are written below.
-		l.flushItemPersistence(petInv)
+		// it carrying no writer; the owner's rows are written below. The
+		// pet container's own last write is queued only after they left:
+		// one that read them would, on failure, abandon items the carried
+		// write still has to land.
+		petInv.ReleasePersistence()
 		carried := itemcontainer.NewPlayerInventory(ownerID, petInv.Templates())
 		for _, inst := range petInv.Items() {
 			st := inst.Snapshot()
-			petInv.TransferItem(st.ObjectID, st.Count, carried, 0)
+			if _, _, _, err := petInv.TransferItem(st.ObjectID, st.Count, carried, l.nextObjectID); err != nil {
+				l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("allocate left pet corpse item")
+			}
 		}
+		l.flushItemPersistence(petInv)
 		l.flushItemPersistence(carried)
 	})
 }
@@ -507,15 +563,35 @@ func (l *GameClientLink) notifyOwnerOfSummonDeath(actor *summon.Actor) {
 	owner.SendFrame(serverpackets.FrameSystemMessage(message))
 }
 
+// releaseSummonOwner ends what a departed summon's owner held for it: the
+// owner's Contract Payment effects stop, then each of the owner's summon
+// auto-shots still enabled is turned off. A corpse its owner left behind
+// answers to nobody here, and an owner leaving the world reads nothing.
+func (l *GameClientLink) releaseSummonOwner(actor *summon.Actor) {
+	if actor.OwnerLeft() {
+		return
+	}
+	owner, ok := liveSummonOwner(actor)
+	if !ok || owner.detached() {
+		return
+	}
+	owner.StopSkillEffectsByID(modelskill.ContractPaymentSkillID)
+	for _, itemID := range item.SummonShotIDs() {
+		if owner.AutoSoulShotEnabled(itemID) {
+			l.disableAutoShot(owner, itemID)
+		}
+	}
+}
+
 // petRowDeleter deletes a pet's saved row. The production pet store has it;
 // a store without it keeps the row.
 type petRowDeleter interface {
 	DeleteByItemObjectID(ctx context.Context, itemObjectID int32) error
 }
 
-// destroyDecayedPet ends a pet whose corpse decayed: its owner loses the
-// collar and the pets row is deleted. The pet has already left the world
-// through the same settle as any other departure (releasePet), so its items
+// destroyDecayedPet ends a pet whose corpse decayed, or that left its owner
+// from hunger: its owner loses the collar and the pets row is deleted. The pet has already left the world
+// through the same settle as any other departure (returnPetItems), so its items
 // are already back with its owner and its row was saved; the delete is queued
 // on the collar's persistence lane, behind that save.
 //
@@ -539,7 +615,7 @@ func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 			inv.DestroyByObjectID(itemObjectID, 1)
 		}
 	}
-	store, ok := l.petStore.(petRowDeleter)
+	store, ok := l.summoning.store.(petRowDeleter)
 	if !ok || l.persist == nil {
 		return
 	}
@@ -558,13 +634,13 @@ func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 // it. A row the owner no longer owns is left alone: the item has changed
 // hands since, and it is its new owner's now.
 func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
-	if l.items == nil || l.persist == nil {
+	if l.belongings.items == nil || l.persist == nil {
 		return
 	}
 	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) error {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if _, err := l.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
+		if _, err := l.belongings.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete offline item")
 			return err
 		}
@@ -576,13 +652,13 @@ func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 // offline player ownerID still owns it, on that owner's persistence lane,
 // where the rest of the owner's item writes run.
 func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant int) {
-	if l.items == nil || l.persist == nil {
+	if l.belongings.items == nil || l.persist == nil {
 		return
 	}
 	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) error {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if _, err := l.items.SetEnchantOwned(ctx, ownerID, objectID, enchant); err != nil {
+		if _, err := l.belongings.items.SetEnchantOwned(ctx, ownerID, objectID, enchant); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("set offline item enchant")
 			return err
 		}
@@ -590,11 +666,12 @@ func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant 
 	}, ownerID)
 }
 
-// releasePet settles a pet on its way out of the world, whatever took it out:
-// its items go back to its owner, its row and collar are saved, and its
-// container is then flushed and unregistered, since nothing else will ever
-// write it. It runs while the pet and its owner are both still in the world,
-// before PetDelete is sent.
+// returnPetItems and storeDepartingPet settle a pet on its way out of the
+// world, whatever took it out: its items go back to its owner, then its row
+// and collar are saved, and its container is flushed and unregistered, since
+// nothing else will ever write it. They run while the pet and its owner are
+// both still in the world, before PetDelete is sent; the pet's effects end
+// between the two.
 //
 // A dead pet is settled the same way. The routes that must leave a corpse
 // alone refuse before reaching here (Actor.Unsummon), so a dead pet only
@@ -602,19 +679,31 @@ func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant 
 // mid-despawn. Its items go to the owner now, since the collar goes with the
 // decay, and skipping the row would restore it alive from an older save. A
 // corpse its owner left behind is settled apart (settleLeftCorpseItems).
-func (l *GameClientLink) releasePet(actor *summon.Actor) {
+func (l *GameClientLink) returnPetItems(actor *summon.Actor) {
+	if actor.IsPet() {
+		l.transferPetInventory(actor, departingPetOwnerInventory(actor))
+	}
+}
+
+// storeDepartingPet saves a departing pet's row and collar, then flushes its
+// container (see returnPetItems).
+func (l *GameClientLink) storeDepartingPet(actor *summon.Actor) {
 	if !actor.IsPet() {
 		return
 	}
-	var ownerInv *itemcontainer.Inventory
-	if owner, ok := liveSummonOwner(actor); ok {
-		ownerInv = owner.Inventory()
-	}
-	l.transferPetInventory(actor, ownerInv)
-	l.savePet(actor, ownerInv)
+	l.savePet(actor, departingPetOwnerInventory(actor))
 	if inv := actor.PetInventory(); inv != nil {
 		l.flushItemPersistence(inv)
 	}
+}
+
+// departingPetOwnerInventory is the inventory of the live owner a departing
+// pet answers to, or nil.
+func departingPetOwnerInventory(actor *summon.Actor) *itemcontainer.Inventory {
+	if owner, ok := liveSummonOwner(actor); ok {
+		return owner.Inventory()
+	}
+	return nil
 }
 
 // broadcastSummon builds one frame lazily, only once a known observer capable

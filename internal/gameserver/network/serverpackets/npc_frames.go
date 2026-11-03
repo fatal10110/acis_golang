@@ -14,16 +14,6 @@ import (
 // NPC.
 type NpcFrameBuilder struct{}
 
-// Info builds the current NPCInfo frame from snapshot.
-func (NpcFrameBuilder) Info(snapshot npcinfo.Snapshot) wire.Frame {
-	return FrameNPCInfo(snapshot)
-}
-
-// ObjectInfo builds the stationary-NPC info frame from snapshot.
-func (NpcFrameBuilder) ObjectInfo(snapshot npcinfo.Snapshot) wire.Frame {
-	return FrameServerObjectInfo(snapshot)
-}
-
 // Attack builds the attack packet for snapshot.
 func (NpcFrameBuilder) Attack(snapshot event.Attack) wire.Frame {
 	return FrameAttack(snapshot)
@@ -44,13 +34,17 @@ func (NpcFrameBuilder) SocialAction(objectID int32, actionID int32) wire.Frame {
 	return FrameSocialAction(objectID, actionID)
 }
 
-// ChangeMoveType builds a walk/run stance broadcast packet.
-func (NpcFrameBuilder) ChangeMoveType(objectID int32, running bool) wire.Frame {
-	return FrameChangeMoveType(objectID, running, false)
+// ChangeMoveType builds a walk/run stance broadcast packet, flagged
+// swimming while the NPC is in water.
+func (NpcFrameBuilder) ChangeMoveType(objectID int32, running, swimming bool) wire.Frame {
+	return FrameChangeMoveType(objectID, running, swimming)
 }
 
-// NpcSay builds a chat-line broadcast packet.
-func (NpcFrameBuilder) NpcSay(objectID int32, npcID int, text string) wire.Frame {
+// NpcSay builds a chat-line broadcast packet, a shout when shout is set.
+func (NpcFrameBuilder) NpcSay(objectID int32, npcID int, text string, shout bool) wire.Frame {
+	if shout {
+		return FrameNpcSay(objectID, npcID, SayTypeShout, text)
+	}
 	return FrameNpcSay(objectID, npcID, SayTypeAll, text)
 }
 

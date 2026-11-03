@@ -1,0 +1,23 @@
+# Warehouse Keeper's Ambition (Q357), refused: a level 46 character is too young for Silva, and
+# the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q357_warehouse_keepers_ambition_low_level.golden
+character Silva 46
+script quest.Q357_WarehouseKeepersAmbition
+item 57 5867
+page warehouse/30686.htm
+page script/quest/Q357_WarehouseKeepersAmbition/
+npc silva 30686 WarehouseKeeper 10 0 0
+npc runner 20594 Monster 40 0 0
+
+# Silva: too young.
+action silva
+action silva
+  S ActionFailed
+  S NpcHtmlMessage obj=silva item=0 page=warehouse/30686.htm
+  S ActionFailed
+bypass npc_{silva}_Quest
+  S NpcHtmlMessage obj=silva item=0 page=script/quest/Q357_WarehouseKeepersAmbition/30686-0a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q357_WarehouseKeepersAmbition CREATED
+  rows Q357_WarehouseKeepersAmbition -

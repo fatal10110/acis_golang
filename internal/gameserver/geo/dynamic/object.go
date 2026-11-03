@@ -11,6 +11,22 @@ type Object interface {
 	GeoData() [][]block.NSWE
 }
 
+// StandIn is implemented by a value that wraps an Object the geodata
+// holds, such as a door seen as the target of a hit. Geodata matches
+// objects by identity, so a query told to ignore a stand-in ignores the
+// object it stands for.
+type StandIn interface {
+	StoredObject() Object
+}
+
+// Stored returns the object o stands for when o is a StandIn, else o.
+func Stored(o Object) Object {
+	if s, ok := o.(StandIn); ok {
+		return s.StoredObject()
+	}
+	return o
+}
+
 type object struct {
 	geoX   int
 	geoY   int
@@ -32,7 +48,8 @@ func (o *object) Height() int             { return o.height }
 func (o *object) GeoData() [][]block.NSWE { return o.data }
 
 // CalculateGeoObject converts an object's inside/outside cell mask into
-// geodata NSWE edits matching GeoEngine.calculateGeoObject.
+// geodata NSWE edits: an inside cell is fully blocked, and an outside cell
+// loses each direction that leads into an inside neighbour.
 func CalculateGeoObject(inside [][]bool) [][]block.NSWE {
 	width := len(inside)
 	if width == 0 {

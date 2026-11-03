@@ -1,0 +1,23 @@
+# Trial of the Seeker (Q213), refused: a level 35 Knight is turned away by Dufner, who
+# takes rogues only, and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q213_trial_of_the_seeker_wrong_class.golden
+character Knight 35
+class 4
+script quest.Q213_TrialOfTheSeeker
+item 2647
+page trainer/30106.htm
+page script/quest/Q213_TrialOfTheSeeker/
+npc dufner 30106 Trainer 10 0 0
+
+action dufner
+action dufner
+  S ActionFailed
+  S NpcHtmlMessage obj=dufner item=0 page=trainer/30106.htm
+  S ActionFailed
+bypass npc_{dufner}_Quest
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q213_TrialOfTheSeeker CREATED
+  rows Q213_TrialOfTheSeeker -

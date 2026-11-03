@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -44,6 +45,7 @@ func (a *randomDamageTestActor) PDef() float64                  { return 0 }
 func (a *randomDamageTestActor) MAtk() float64                  { return 0 }
 func (a *randomDamageTestActor) MDef() float64                  { return 0 }
 func (a *randomDamageTestActor) MagicCriticalRate() float64     { return 0 }
+func (a *randomDamageTestActor) CriticalRate() float64          { return 0 }
 func (a *randomDamageTestActor) AttackType() item.WeaponType    { return a.attackType }
 func (a *randomDamageTestActor) SoulshotCharged() bool          { return false }
 func (a *randomDamageTestActor) SpiritshotCharged() bool        { return false }
@@ -58,6 +60,8 @@ func (a *randomDamageTestActor) RandomDamageSpread() int { return a.spread }
 func (a *randomDamageTestActor) Roll(int) int            { return a.roll }
 
 var _ FormulaActor = (*randomDamageTestActor)(nil)
+
+func (a *randomDamageTestActor) Against(conditions.Actor, conditions.Skill) SkillStats { return a }
 
 func TestResolvePhysicalSkillInputSkipsEvasionForUnarmedAndBow(t *testing.T) {
 	target := &randomDamageTestActor{pSkillEvasion: 100}
@@ -487,6 +491,7 @@ func (a *physicalAttackActor) PDef() float64                  { return a.pDef }
 func (a *physicalAttackActor) MAtk() float64                  { return 0 }
 func (a *physicalAttackActor) MDef() float64                  { return 0 }
 func (a *physicalAttackActor) MagicCriticalRate() float64     { return 0 }
+func (a *physicalAttackActor) CriticalRate() float64          { return 0 }
 func (a *physicalAttackActor) AttackType() item.WeaponType    { return a.attackType }
 func (a *physicalAttackActor) SoulshotCharged() bool          { return a.soulshot }
 func (a *physicalAttackActor) SpiritshotCharged() bool        { return false }
@@ -510,6 +515,8 @@ func (a *physicalAttackActor) RaceMultiplier(FormulaActor) float64 {
 }
 
 var _ FormulaActor = (*physicalAttackActor)(nil)
+
+func (a *physicalAttackActor) Against(conditions.Actor, conditions.Skill) SkillStats { return a }
 
 type shieldedPhysicalAttackActor struct {
 	physicalAttackActor
@@ -638,10 +645,6 @@ func (a physicalAttackActor) Kind() actor.Kind {
 }
 
 func (physicalAttackActor) WeaponGradePenalty() bool { return false }
-
-func (randomDamageTestActor) LethalRate() float64 { return 0 }
-
-func (physicalAttackActor) LethalRate() float64 { return 0 }
 
 func (randomDamageTestActor) Evasion() int { return 0 }
 

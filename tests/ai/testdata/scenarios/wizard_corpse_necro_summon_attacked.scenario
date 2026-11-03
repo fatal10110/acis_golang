@@ -1,0 +1,15 @@
+# WizardCorpseNecroSummon (21563, level 67), every draw 0: a hit of 80 from the character adds 80 / (67 + 7) * 100 to the
+# attack desire its parent's hook leaves on the character.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroSummon
+npc necro 21563 Monster 300 0 0 level 67 skill DEBUFF 4047 6 skill W_SHORT_RANGE_DD_MAGIC 4561 6 skill W_LONG_RANGE_DD_MAGIC 4597 6 skill CANCEL 4650 1 skill DD_MAGIC 4654 6 skill CLEAR_CORPSE 4672 1 ai SummonPrivate=21549
+
+hit necro 80
+  desires necro attack(player)=108.10810810810811 cast(player,4597,move)=1000000

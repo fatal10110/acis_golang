@@ -1,0 +1,12 @@
+# No class, clan or quest line: a human fighter in no clan with no quest. Every script draw
+# is the random always one.
+character Talker 20
+random always 5
+script test.PreconditionProbe
+npc probe 30001 Folk 10 0 0
+
+action probe
+action probe
+  S ActionFailed
+  S NpcHtmlMessage obj=probe item=0 html="<html><body>class=0 race=Human leader=false q001=- draws=5,5,5</body></html>"
+  S ActionFailed

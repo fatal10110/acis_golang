@@ -1,0 +1,31 @@
+# 1000 Years, the End of Lamentation (Q344), refused: a level 47 character is too young for
+# Gilmore, and the quest is not started. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q344_1000_years_the_end_of_lamentation_low_level.golden
+character Watcher 47
+script quest.Q344_1000YearsTheEndOfLamentation
+item 57 4269 4270 4271 4272 4273 1875 952 2437 1882 1881 191 1874 1887 951 133 1879 885
+page default/30754.htm
+page default/30756.htm
+page villagemaster/30857.htm
+page default/30623.htm
+page villagemaster/30704.htm
+page script/quest/Q344_1000YearsTheEndOfLamentation/
+npc gilmore 30754 Folk 10 0 0
+npc rodemai 30756 Folk -10 0 0
+npc orven 30857 VillageMasterPriest 0 10 0
+npc kaien 30623 Folk 0 -10 0
+npc garvarentz 30704 VillageMasterOrc 10 10 0
+
+# Gilmore: too young.
+action gilmore
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q344_1000YearsTheEndOfLamentation/30754-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q344_1000YearsTheEndOfLamentation CREATED
+  rows Q344_1000YearsTheEndOfLamentation -

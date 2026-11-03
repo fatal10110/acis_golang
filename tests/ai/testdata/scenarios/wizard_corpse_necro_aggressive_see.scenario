@@ -1,0 +1,20 @@
+# WizardCorpseNecroAggressive (21560, level 66, its shipped skills), every draw 0: settled (8 AI ticks) in its
+# territory with an empty hate list, a character it sees 300 away is wanted under its long range DD magic
+# (4597-6, 1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecro
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCorpseNecro.WizardCorpseNecroAggressive
+npc wiz 21560 Monster 300 0 0 level 66 aggro 1000 skill DEBUFF 4098 6 skill W_SHORT_RANGE_DD_MAGIC 4561 6 skill W_LONG_RANGE_DD_MAGIC 4597 6 skill CANCEL 4652 1 skill DD_MAGIC 4654 6
+roll wiz 99
+
+tick x8
+away
+approach wiz 300
+  S MagicSkillUse caster=wiz target=player skill=4597-6 hit=10571 reuse=0 success=0
+  desires wiz cast(player,4597,move)=1000000 wander()=5

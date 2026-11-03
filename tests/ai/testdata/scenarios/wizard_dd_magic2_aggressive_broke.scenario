@@ -1,0 +1,16 @@
+# WizardDDMagic2Aggressive (21311, level 76) that cannot pay for its short range DD magic (0 MP), settled, every draw 0:
+# the character it sees makes it give up its spells (int slot 0) and want to attack, weight 1000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2Aggressive
+npc wiz 21311 Monster 1000 0 0 mp 0 level 76 skill W_LONG_RANGE_DD_MAGIC 4158 8 skill W_SHORT_RANGE_DD_MAGIC 4160 8
+
+tick x9
+approach wiz
+  mem wiz i_ai0=1
+  desires wiz attack(player)=1000 wander()=5

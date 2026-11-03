@@ -99,7 +99,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	if !ok {
 		return
 	}
-	summonItem, ok := link.summonItems.Item(tmpl.ID)
+	summonItem, ok := link.summoning.items.Item(tmpl.ID)
 	if !ok || summonItem.SummonType != summonItemTypePet {
 		return
 	}
@@ -114,7 +114,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// Such a write leaves no items behind under the collar: an unsummon and a
 	// decay hand every item to the owner, and a logout leaves a dead pet's
 	// items with its corpse, which keeps the owner's summon slot.
-	if state, hasSaved := link.queuedPets.latest(controlItem.ObjectID); hasSaved {
+	if state, hasSaved := link.summoning.queued.latest(controlItem.ObjectID); hasSaved {
 		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true, nil)
 		return
 	}
@@ -178,7 +178,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	if !link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
-		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
+		state, hasSaved, err := link.summoning.store.Get(restoreCtx, controlItem.ObjectID)
 		var items []*item.Instance
 		if err == nil {
 			items, err = link.petItemRows(restoreCtx, controlItem.ObjectID)
@@ -305,15 +305,6 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		name = state.Name
 	}
 
-	// food1/food2 restore different amounts: each maps to its own feed
-	// skill (the fixed item->skill map), and those skills'
-	// Feed values differ (e.g. Strider's food vs Clan Hall Strider's food).
-	foodRestore1, _ := petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food1))
-	var foodRestore2 int
-	if npcTmpl.Pet.Food2 != 0 {
-		foodRestore2, _ = petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food2))
-	}
-
 	pet, err := link.newPet(summon.PetConfig{
 		ObjectID:        objID,
 		Owner:           live,
@@ -322,16 +313,17 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		NPCID:           int(summonItem.NPCID),
 		CollisionRadius: npcTmpl.CollisionRadius,
 		CollisionHeight: npcTmpl.CollisionHeight,
+		RunSpeed:        npcTmpl.RunSpeed,
+		WalkSpeed:       npcTmpl.WalkSpeed,
 		Name:            name,
 		Named:           named,
 		BabyPet:         npcTmpl.Type == "BabyPet",
 		Level:           level,
-		MaxBuffsAmount:  link.playerConfig.MaxBuffsAmount,
 		Exp:             exp,
 		SP:              state.SP,
 		ExpType:         levelStats.ExpType,
 		Growth:          npcTmpl.Pet,
-		Config:          nil, // set by newPet from link.petConfig
+		Config:          nil, // set by newPet from link.summoning.config
 		Inventory:       link.newPetInventory(live, controlItem.ObjectID, items),
 		Fed:             fed,
 		MaxMeal:         levelStats.MaxMeal,
@@ -339,8 +331,6 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		MealInBattle:    levelStats.MealInBattle,
 		Food1:           int32(npcTmpl.Pet.Food1),
 		Food2:           int32(npcTmpl.Pet.Food2),
-		FoodRestore1:    foodRestore1,
-		FoodRestore2:    foodRestore2,
 		AutoFeedLimit:   npcTmpl.Pet.AutoFeedLimit,
 		HungryLimit:     npcTmpl.Pet.HungryLimit,
 		UnsummonLimit:   npcTmpl.Pet.UnsummonLimit,
@@ -398,13 +388,15 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
 	// Setting brain first means that edge also covers the brain field,
 	// instead of leaving it as an unsynchronized write racing that read.
-	link.wireSummonAI(pet, npcTmpl.RunSpeed)
+	link.wireSummonAI(pet)
 	pet.SyncControlItemEnchant()
 
 	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
 	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
+	// The NPCs around the pet see it arrive.
+	npc.ForceSeeCreature(link.world, pet)
 }
 
 // newPetInventory builds the live inventory of live's pet called out of the
@@ -415,11 +407,14 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 // across its owner's logout, and a server restart must not lose them.
 func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, items []*item.Instance) *itemcontainer.Inventory {
 	inv := itemcontainer.NewPetInventoryWithDelivery(controlItemID, live.Inventory().Templates(), &petInventoryDelivery{
-		updates: l.inventoryUpdates,
+		updates: l.belongings.inventoryUpdates,
 		ownerID: live.ObjectID(),
 		state:   l.world,
 		log:     l.log,
 	}, l.itemPersister(controlItemID))
+	// The pet built around inv does not exist yet, so its records name the
+	// player it is called out for.
+	inv.SetItemLog(l.itemLog, func() string { return live.CharacterName() })
 	inv.Restore(l.restoreRows(controlItemID, items, restoredPetItemLocation))
 	// Restored rows never queue an update, so the carried weight stays 0
 	// unless recomputed here; the pet built around inv takes its
@@ -431,10 +426,10 @@ func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, 
 
 // petItemRows reads the item rows saved under the collar controlItemID.
 func (l *GameClientLink) petItemRows(ctx context.Context, controlItemID int32) ([]*item.Instance, error) {
-	if l.items == nil {
+	if l.belongings.items == nil {
 		return nil, nil
 	}
-	return l.items.ListByOwner(ctx, controlItemID)
+	return l.belongings.items.ListByOwner(ctx, controlItemID)
 }
 
 // restoredPetItemLocation reports whether a row at loc is one a pet inventory
@@ -472,25 +467,32 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	}
 
 	servitor, err := summon.NewServitor(summon.ServitorConfig{
-		Effects:          link.effects,
-		ObjectID:         objID,
-		Owner:            live,
-		NPCID:            def.NpcID,
-		CollisionRadius:  npcTmpl.CollisionRadius,
-		CollisionHeight:  npcTmpl.CollisionHeight,
-		Name:             npcTmpl.Name,
-		Level:            npcTmpl.Level,
-		Undead:           npcTmpl.Race == npc.RaceUndead,
-		MaxBuffsAmount:   link.playerConfig.MaxBuffsAmount,
-		RespawnRestoreHP: link.playerConfig.RespawnRestoreHP,
-		OwnerInventory:   live.Inventory(),
-		ExpPenalty:       def.ExpPenalty,
-		CorpseTime:       time.Duration(npcTmpl.CorpseTime) * time.Second,
+		Effects:         link.effects,
+		ObjectID:        objID,
+		Owner:           live,
+		NPCID:           def.NpcID,
+		CollisionRadius: npcTmpl.CollisionRadius,
+		CollisionHeight: npcTmpl.CollisionHeight,
+		RunSpeed:        npcTmpl.RunSpeed,
+		WalkSpeed:       npcTmpl.WalkSpeed,
+		Name:            npcTmpl.Name,
+		Level:           npcTmpl.Level,
+		Undead:          npcTmpl.Race == npc.RaceUndead,
+		SiegeSummon:     npcTmpl.Type == "SiegeSummon",
+		Settings:        link.playerRules,
+		OwnerInventory:  live.Inventory(),
+		ExpPenalty:      def.ExpPenalty,
+		CorpseTime:      time.Duration(npcTmpl.CorpseTime) * time.Second,
 		Lifetime: summon.LifetimeState{
-			TimeRemaining:    def.SummonTotalLifeTime,
-			TotalLifeTime:    def.SummonTotalLifeTime,
-			ItemConsumeSteps: 0,
+			TimeRemaining:       def.SummonTotalLifeTime,
+			TotalLifeTime:       def.SummonTotalLifeTime,
+			NextItemConsumeTime: summon.InitialNextConsumeTime(def.SummonTotalLifeTime, def.ItemConsumeSteps, def.ItemConsumeIDOT),
+			ItemConsumeSteps:    def.ItemConsumeSteps,
 		},
+		TimeLostIdle:     def.SummonTimeLostIdle,
+		TimeLostActive:   def.SummonTimeLostActive,
+		ItemConsumeID:    int32(def.ItemConsumeIDOT),
+		ItemConsumeCount: def.ItemConsumeCountOT,
 		Stats: summon.CombatStats{
 			STR: npcTmpl.STR, CON: npcTmpl.CON, DEX: npcTmpl.DEX,
 			INT: npcTmpl.INT, WIT: npcTmpl.WIT, MEN: npcTmpl.MEN,
@@ -514,10 +516,20 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if err != nil {
 		return false
 	}
-	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
+	link.wireSummonAI(servitor)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
-	servitor.TryToFollow(live)
+	// A siege summon that lands off an active battlefield is shown, then
+	// vanishes at once; it never starts following.
+	offBattlefield := servitor.OffBattlefield()
+	if !offBattlefield {
+		servitor.TryToFollow(live)
+	}
 	link.broadcastSummonSpawnRelation(live, servitor)
+	// The NPCs around the servitor see it arrive.
+	npc.ForceSeeCreature(link.world, servitor)
+	if offBattlefield {
+		servitor.Vanish()
+	}
 	return true
 }
 
@@ -525,11 +537,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 // notifiers, and returns the installed cast controller so a caller (or a
 // test) can drive it directly rather than reaching into the brain's
 // unexported state.
-func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *actorcast.AIController {
-	runSpeed := 0.0
-	if len(speed) != 0 {
-		runSpeed = speed[0]
-	}
+func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIController {
 	sink := &summonSink{link: l, actor: actor}
 	// A summon's work runs on its owner's queue.
 	owner, _ := liveSummonOwner(actor)
@@ -538,7 +546,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
-		if err := actor.InitMovement(location.Location{X: x, Y: y, Z: z}, runSpeed, l.geo); err != nil {
+		if err := actor.InitMovement(location.Location{X: x, Y: y, Z: z}, l.geo); err != nil {
 			l.log.Warn().Err(err).Msg("summon: create movement controller")
 		} else {
 			setWaterSurface(actor.Move(), l.zones)
@@ -586,14 +594,14 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			}
 		},
 		// A failed target condition is reported to the owner the same way.
-		OnTargetRejection: func(rejection skilltarget.CastRejection, def modelskill.Definition) {
+		OnTargetRejection: func(rejection skilltarget.CastRejection, def *modelskill.Definition) {
 			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 				sendTargetCastRejection(owner, rejection, def)
 			}
 		},
 		// So is every other refused gate (reuse, costs, sight, skill
 		// conditions), with the reason message a player's own cast reads.
-		OnCastRefusal: func(err error, def modelskill.Definition) {
+		OnCastRefusal: func(err error, def *modelskill.Definition) {
 			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 				sendMagicCastFailureReason(owner, def, err)
 			}
@@ -646,10 +654,10 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// a summon that leaves the world inside this window cannot leave the AI
 	// task ticking a dead actor.
 	sink.onDespawn(brain.StartOffensiveFollowTicker(queue))
-	if l.ai != nil {
+	if l.combat.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
-		l.ai.Add(runner)
-		sink.onDespawn(func() { l.ai.Remove(runner) })
+		l.combat.ai.Add(runner)
+		sink.onDespawn(func() { l.combat.ai.Remove(runner) })
 	}
 	return aiController
 }
@@ -716,7 +724,7 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	if l.world == nil {
 		return
 	}
-	info, ok := summonInfoSnapshot(actor, nil, owner.npcs, l.summonInCombat(actor))
+	info, ok := l.summonInfoSnapshot(actor, nil, owner.npcs, l.summonInCombat(actor))
 	if !ok {
 		return
 	}

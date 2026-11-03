@@ -1,0 +1,19 @@
+# Magical Power of Water, part 1 (Q609) at cond 1: a Varka warrior that sees the thief calls no one, since the thief has not
+# been sent to the Udan Box yet. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q609_magical_power_of_water_part1_not_seen.golden
+character Ally 74
+standing 2
+quest Q609_MagicalPowerOfWater_Part1 <cond>=1 spawned=0 <state>=STARTED
+script quest.Q609_MagicalPowerOfWater_Part1
+item 1661 7237 7238 7081
+page npcdefault.htm
+page default/31561.htm
+page script/quest/Q609_MagicalPowerOfWater_Part1/
+npc wahkan 31371 Folk 10 0 0
+npc asefa 31372 Folk 20 0 0
+npc box 31561 Folk 30 0 0
+npc mob 21350 Monster 3000 0 0
+
+tick
+approach mob
+  rows Q609_MagicalPowerOfWater_Part1 <cond>=1 <state>=STARTED spawned=0

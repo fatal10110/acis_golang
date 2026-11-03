@@ -43,8 +43,7 @@ type SummonMoveController interface {
 	RecheckOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error)
 	// MaybeStartEntranceFollow arms a friendly follow of target that never
 	// walks after it, returning target's position and true when it is out
-	// of reach, for the summon to head for a boat entrance instead
-	// (SummonMove.friendlyFollowTask).
+	// of reach, for the summon to head for a boat entrance instead.
 	MaybeStartEntranceFollow(target attackable.Combatant, offset int) (location.Location, bool)
 }
 
@@ -561,7 +560,8 @@ func (s *Summon) thinkAttackLocked() (bool, error) {
 	}
 
 	s.move.Stop()
-	if !s.attack.CanAttack(target) {
+	// The owner is told a sight or peace-zone refusal, once per think.
+	if refusesAttack(s.attack, target) {
 		s.current = intention{kind: IntentionIdle}
 		return false, nil
 	}

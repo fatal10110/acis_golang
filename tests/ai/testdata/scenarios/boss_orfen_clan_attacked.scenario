@@ -1,0 +1,35 @@
+# Orfen (29014), two Riba Irens (29018) and a monster, all of Orfen's clan, beside the level 1
+# character; each of the three is a level 1 monster of 440 HP. A hit on the monster calls each:
+# Orfen wants to attack the character at damage / max MP (1000) / 0.05 * 3000, truncated (17999
+# for 300, 600 for 10). A Riba Iren, for a member other than Orfen standing under half its HP
+# (read before the hit's damage), wants Orfen Heal (4516) on it at 1000000 on a draw under 10 of
+# 100: the hit of 300 finds the monster whole, so neither draws; on the next hit the second, called
+# first, draws 9 and wants it, the first draws 10 and does not. Hits on the first Riba Iren make it heal itself once
+# it stands under half its HP; the other draws nothing for a Riba Iren's call, and Orfen wants
+# the character more each time.
+character Hunter 1
+random 9 10
+script script.ai.individual.DefaultNpc
+script script.ai.boss.orfen.Orfen
+script script.ai.boss.orfen.OrfenPrivateRibaIren
+npc orfen 29014 GrandBoss 300 0 0 clan orfen_clan 3000
+npc riba1 29018 Monster 100 100 0 clan orfen_clan 3000 skill HEAL 4516 1
+npc riba2 29018 Monster 100 -100 0 clan orfen_clan 3000 skill HEAL 4516 1
+npc guard 20120 Monster 100 0 0 clan orfen_clan 3000
+
+hit guard 300
+  desires orfen attack(player)=17999
+  desires riba1 -
+  desires riba2 -
+hit guard 10
+  desires orfen attack(player)=18599
+  desires riba1 -
+  desires riba2 cast(guard,4516,move)=1000000
+hit riba1 300
+  desires orfen attack(player)=36598
+  desires riba1 -
+  desires riba2 cast(guard,4516,move)=1000000
+hit riba1 10
+  desires orfen attack(player)=37198
+  desires riba1 cast(riba1,4516,move)=1000000
+  desires riba2 cast(guard,4516,move)=1000000

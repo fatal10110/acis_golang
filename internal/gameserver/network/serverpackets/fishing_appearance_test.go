@@ -12,7 +12,8 @@ import (
 // location both packets carry after the hero byte: the flag follows the
 // fishing state and the location the line, each on its own.
 func TestFishingStanceInUserInfoAndCharInfo(t *testing.T) {
-	c := &player.Character{Name: "Fisher"}
+	c := &player.Character{}
+	c.SetName("Fisher")
 	tails := func() (user, char []byte) {
 		u := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: &player.Template{}}))
 		ch := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))

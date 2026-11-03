@@ -75,6 +75,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		roster, skills, log := l.roster, l.skills, l.log
 		character := live.Character
 		charState := character.SaveState()
+		if at, ok := l.festivalDeparture(live); ok {
+			charState.Location = at
+		}
 		skillState := skills.SaveState(character)
 		l.persist.Enqueue(live.ObjectID(), func() {
 			// One budget for the whole character save, not one per store,
@@ -103,11 +106,11 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// A passenger leaves its boat silently once its save has taken the
 	// dock's shore as its position.
 	dropBoat(live)
-	if l.playerClock != nil {
-		l.playerClock.Remove(live.ObjectID())
+	if l.flow.playerClock != nil {
+		l.flow.playerClock.Remove(live.ObjectID())
 	}
-	if l.autosave != nil {
-		l.autosave.Remove(live.ObjectID())
+	if l.flow.autosave != nil {
+		l.flow.autosave.Remove(live.ObjectID())
 	}
 	if l.water != nil {
 		l.water.Remove(live)
@@ -115,7 +118,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.shadowItems != nil {
 		l.shadowItems.Remove(live.ObjectID())
 	}
-	if l.attackStance != nil {
+	if l.combat.attackStance != nil {
 		// Unconditional, alongside the other registry removals: the stance
 		// entry is dropped here, between the water and pvp-flag removals,
 		// whatever live.Stop left of the in-combat flag. Left behind, the
@@ -125,17 +128,16 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		// The removal is silent: observers of a player leaving the world
 		// get no AutoAttackStop, only its DeleteObject. A stance that
 		// expired while a dropped connection lingered sent its own.
-		l.attackStance.Remove(live)
+		l.combat.attackStance.Remove(live)
 	}
-	if l.pvpFlags != nil {
+	if l.combat.pvpFlags != nil {
 		// reset=false, as the disconnect cleanup requires: a
 		// disconnecting character's flag isn't persisted, so there's
 		// nothing to reset it to — just stop tracking it.
-		l.pvpFlags.Remove(live.Character, false)
+		l.combat.pvpFlags.Remove(live.Character, false)
 	}
 	if l.zones != nil && live.zoneActor != nil {
-		position := live.CurrentLocation()
-		live.zoneActor.removeFrom(l.zones, position.X, position.Y)
+		live.zoneActor.removeFrom(l.zones)
 	}
 	if l.world != nil {
 		// A living summon leaves with its owner; a corpse stays until it
@@ -205,11 +207,18 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 // those four jobs in front of this wait. The wait is a
 // bound, not a guarantee: awaitPersistence logs a wait it gave up on. The
 // restart and disconnect callers then continue, exactly as they do when the
-// saves themselves fail; character selection refuses instead of loading rows
-// the saves have not written. At shutdown every connection's exit waits in
-// parallel, so the game server's stop budget counts this once for the
-// listener's stop.
+// saves themselves fail; character selection refuses, answering with the
+// character list, instead of loading rows the saves have not written, and
+// warns once its wait passes half the budget. At shutdown every
+// connection's exit waits in parallel, so the game server's stop budget
+// counts this once for the listener's stop.
 const LivePlayerPersistWait = 3*livePlayerDetachSaveTimeout + task.ItemInstanceSaveTimeout
+
+// persistBudget is how long a connection waits for queued saves:
+// LivePlayerPersistWait unless the link was configured with another wait.
+func (l *GameClientLink) persistBudget() time.Duration {
+	return cmp.Or(l.persistWait, LivePlayerPersistWait)
+}
 
 // awaitPersistence waits until every save already enqueued for owners has
 // run, so a read that follows sees the rows those saves write. It reports,
@@ -219,7 +228,7 @@ func (l *GameClientLink) awaitPersistence(conn *Conn, owners ...int32) error {
 	if observe := conn.observePersistWait; observe != nil {
 		defer observe(owners)()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), cmp.Or(l.persistWait, LivePlayerPersistWait))
+	ctx, cancel := context.WithTimeout(context.Background(), l.persistBudget())
 	defer cancel()
 	err := l.persist.Flush(ctx, owners...)
 	if err != nil {
@@ -232,16 +241,16 @@ func (l *GameClientLink) awaitPersistence(conn *Conn, owners ...int32) error {
 // write of one pets row is keyed by that item, not by the player holding it,
 // so writes stay ordered when the collar changes hands.
 func (l *GameClientLink) savePet(actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
-	itemObjectID, state, write := savePet(l.petStore, actor, ownerInv, l.log)
+	itemObjectID, state, write := savePet(l.summoning.store, actor, ownerInv, l.log)
 	if write == nil {
 		return
 	}
-	seq := l.queuedPets.add(itemObjectID, state)
+	seq := l.summoning.queued.add(itemObjectID, state)
 	l.persist.Enqueue(itemObjectID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		write(ctx)
-		l.queuedPets.written(itemObjectID, seq)
+		l.summoning.queued.written(itemObjectID, seq)
 	})
 }
 
@@ -329,12 +338,14 @@ func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemco
 			l.dropPetItem(actor, petInventory, state.ObjectID, state.Count)
 			continue
 		}
-		petInventory.TransferItem(state.ObjectID, state.Count, owner, 0)
+		if _, _, _, err := petInventory.TransferItem(state.ObjectID, state.Count, owner, l.nextObjectID); err != nil {
+			l.log.Error().Err(err).Int32("object_id", state.ObjectID).Msg("allocate pet inventory return")
+		}
 	}
 }
 
 func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inventory, objectID int32, count int) {
-	if l.inventory == nil || l.groundItems == nil {
+	if l.inventory == nil || l.belongings.groundItems == nil {
 		return
 	}
 	res, ok, err := l.inventory.DropItem(inv, objectID, count)
@@ -351,7 +362,7 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 		return
 	}
 	x, y, z := actor.Position()
-	l.groundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z, DropperID: actor.ObjectID()})
+	l.belongings.groundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z, DropperID: actor.ObjectID()})
 }
 
 // flushItemPersistence releases inv's persistence dependency, so its items stop
@@ -366,7 +377,10 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 // succeeded. UpdateItems writes the whole container as one atomic flush, so
 // a deadline expiring partway through leaves none of it written; keeping
 // the container pending hands all of it to the next tick, or to the
-// shutdown flush, instead of dropping it on the floor.
+// shutdown flush, instead of dropping it on the floor. Nothing writes these
+// instances after this job, so a failure also abandons the bound rows they
+// hold (task.ItemInstances.FlushReleased): every item must already be in inv,
+// and stay there, when the job runs.
 //
 // So a pending entry here means "this item's write has not landed yet", not
 // "this item left its container" — the entry carries the container's final
@@ -378,10 +392,10 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 // changing it there turns a failed logout write into a missing inventory.
 func (l *GameClientLink) flushItemPersistence(inv persistedContainer) {
 	inv.ReleasePersistence()
-	if l.itemInstances == nil {
+	if l.belongings.itemInstances == nil {
 		return
 	}
-	itemInstances, log := l.itemInstances, l.log
+	itemInstances, log := l.belongings.itemInstances, l.log
 	l.persist.Enqueue(inv.OwnerID(), func() {
 		items := inv.Items()
 		if len(items) == 0 {
@@ -389,11 +403,9 @@ func (l *GameClientLink) flushItemPersistence(inv persistedContainer) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := itemInstances.UpdateItems(ctx, items); err != nil {
+		if err := itemInstances.FlushReleased(ctx, items); err != nil {
 			log.Error().Err(err).Int32("owner_id", inv.OwnerID()).Msg("save container items")
-			return
 		}
-		itemInstances.RemoveItems(items)
 	})
 }
 
@@ -420,12 +432,41 @@ func (l *GameClientLink) notifyPlayerLogout(account string) {
 // live leaves without entering the world, so nothing is shown of what the
 // replay changes. The ticks due on the loading screen run their actions
 // there (see effect.ApplyRestored), so a drop never saves an effect whose
-// ticks were spent without them.
+// ticks were spent without them. The restored HP's tutorial step runs in
+// the replay (see replaySavedEffects).
 func (l *GameClientLink) replayLoadingScreenEffects(live *livePlayer) {
 	if l.skills == nil || len(live.Character.ActiveSkillEffects()) == 0 {
+		live.noteRestoredHP()
 		return
 	}
+	l.replaySavedEffects(live, nil)
+	// No burst follows to show what a death there held back.
+	live.takeHeldForEnterWorld()
+}
+
+// replaySavedEffects replays the effects live's selection restored, then
+// runs settle, inside the silent replay window (see
+// livePlayer.replayingEffects). A player that enters the window alive may
+// die in it, to a damage-over-time tick due on the loading screen: that
+// death sends its client nothing (see livePlayer.deathOnLoadingScreen;
+// what it holds for the burst, livePlayer.holdForEnterWorld), and
+// replaySavedEffects reports it. The restored HP's tutorial step
+// (noteRestoredHP) runs once the replayed effects apply their stats and
+// before the ticks due on the loading screen run, as restoring the saved
+// HP follows the restored effects but precedes their first tick; with no
+// effect to replay it runs right after the replay.
+func (l *GameClientLink) replaySavedEffects(live *livePlayer, settle func()) (died bool) {
+	alive := !live.Dead()
 	live.replayingEffects.Store(true)
-	l.skills.ReplayEffects(live.Character)
+	live.replayMayDie.Store(alive)
+	if l.skills != nil {
+		l.skills.ReplayEffects(live.Character, live.noteRestoredHP)
+	}
+	live.noteRestoredHP()
+	if settle != nil {
+		settle()
+	}
+	live.replayMayDie.Store(false)
 	live.replayingEffects.Store(false)
+	return alive && live.Dead()
 }

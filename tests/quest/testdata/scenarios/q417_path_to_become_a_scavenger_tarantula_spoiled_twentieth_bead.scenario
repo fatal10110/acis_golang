@@ -1,0 +1,21 @@
+# Path To Become A Scavenger (Q417), the twentieth bead of a spoiled plunder tarantula moves the quest to cond 8. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q417_path_to_become_a_scavenger_tarantula_spoiled_twentieth_bead.golden
+character Scavenger 19
+class 53
+quest Q417_PathToBecomeAScavenger <cond>=7 <state>=STARTED
+hold 1656 19
+random 0
+script quest.Q417_PathToBecomeAScavenger
+item 1655 1656
+npc plunder 20508 Monster 40 0 0
+spoil plunder
+
+kill plunder
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1656
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 417:0x800000ff
+  S ExShowQuestMark quest=417
+  Q upsert Q417_PathToBecomeAScavenger | <cond> | 8
+  items 1656=20
+  rows Q417_PathToBecomeAScavenger <cond>=8 <state>=STARTED

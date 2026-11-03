@@ -1,9 +1,5 @@
 package zone
 
-import (
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
-
 // Arena is a combat zone: everyone inside fights freely (no flag, no
 // karma) and friend summoning is blocked.
 type Arena struct {
@@ -326,25 +322,11 @@ type MotherTree struct {
 	Notify func(a Actor, messageID int)
 }
 
-// NewMotherTree builds a regeneration zone from its data settings.
-func NewMotherTree(id int, form Form, set *commons.StatSet) (*MotherTree, error) {
-	f := commons.NewFields(set, "zone: mother tree")
-	enterMsg := f.IntDefault("enterMsgId", 0)
-	leaveMsg := f.IntDefault("leaveMsgId", 0)
-	mp := f.IntDefault("MpRegenBonus", 1)
-	hp := f.IntDefault("HpRegenBonus", 1)
-	race := f.IntDefault("affectedRace", -1)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return &MotherTree{
-		Zone:         newZone(id, form),
-		EnterMessage: enterMsg,
-		LeaveMessage: leaveMsg,
-		HPBonus:      hp,
-		MPBonus:      mp,
-		AffectedRace: race,
-	}, nil
+// NewMotherTree builds a silent regeneration zone affecting every race,
+// with a flat bonus of 1 HP and 1 MP; the loader overrides these from the
+// zone's data settings before publishing it.
+func NewMotherTree(id int, form Form) *MotherTree {
+	return &MotherTree{Zone: newZone(id, form), HPBonus: 1, MPBonus: 1, AffectedRace: -1}
 }
 
 // Core exposes the shared zone state.
@@ -389,24 +371,28 @@ type Town struct {
 	// default; special event towns may disable it).
 	Peaceful bool
 	// CombatRule adjusts town combat handling: 0 applies peace normally,
-	// 1 keeps siege participants flagged (needs InSiege), 2 disables the
-	// peace flag townwide.
+	// 1 raises neither flag for a player taking part in a siege (a
+	// Besieger with a siege state), 2 disables the peace flag townwide.
 	CombatRule int
-	// InSiege reports whether the player currently takes part in a siege;
-	// consulted only under CombatRule 1. Nil means no siege participation.
-	InSiege func(a Actor) bool
 }
 
-// NewTown builds a town zone from its data settings.
-func NewTown(id int, form Form, set *commons.StatSet) (*Town, error) {
-	f := commons.NewFields(set, "zone: town")
-	townID := f.IntDefault("townId", 0)
-	castleID := f.IntDefault("castleId", 0)
-	peaceful := f.BoolDefault("isPeaceZone", true)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return &Town{Zone: newZone(id, form), TownID: townID, CastleID: castleID, Peaceful: peaceful}, nil
+// Besieger is implemented by the player actors that may take part in a
+// siege.
+type Besieger interface {
+	// SiegeState is the player's siege state, 0 outside any siege.
+	SiegeState() int32
+}
+
+// inSiege reports whether a is a player taking part in a siege.
+func inSiege(a Actor) bool {
+	b, ok := a.(Besieger)
+	return ok && a.Class() == ClassPlayer && b.SiegeState() != 0
+}
+
+// NewTown builds a peaceful town zone with no town or castle link; the
+// loader overrides these from the zone's data settings before publishing it.
+func NewTown(id int, form Form) *Town {
+	return &Town{Zone: newZone(id, form), Peaceful: true}
 }
 
 // Core exposes the shared zone state.
@@ -415,7 +401,7 @@ func (z *Town) Core() *Zone { return &z.Zone }
 func (z *Town) affects(Actor) bool { return true }
 
 func (z *Town) enter(a Actor) {
-	if z.CombatRule == 1 && a.Class() == ClassPlayer && z.InSiege != nil && z.InSiege(a) {
+	if z.CombatRule == 1 && inSiege(a) {
 		return
 	}
 	if z.raisesPeace() {

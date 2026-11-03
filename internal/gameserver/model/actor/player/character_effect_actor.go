@@ -46,7 +46,7 @@ func (c *Character) aiDeniedBeforeEffect() bool {
 // on-start hook is running, if any: called from inside that hook, it
 // answers for the state c was in before the effect landed.
 func (c *Character) DenyAIActionBeforeEffect() bool {
-	return c.aiDeniedBeforeEffect() || c.ObserverMode() || c.InStoreMode()
+	return c.aiDeniedBeforeEffect() || c.InStoreMode()
 }
 
 // FearImmune reports false: only folk, siege flags and siege summons shrug

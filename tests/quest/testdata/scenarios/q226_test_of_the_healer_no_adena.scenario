@@ -1,0 +1,31 @@
+# Test of the Healer (Q226), without the price: a level 39 Cleric at cond 6, with no adena, asks
+# Gupu for Windy's picture and is told he cannot pay; nothing changes.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q226_test_of_the_healer_no_adena.golden
+character Healer 39
+class 15
+quest Q226_TestOfTheHealer <state>=STARTED <cond>=6
+script quest.Q226_TestOfTheHealer
+item 2810 2811 2812 2813 2814 2815 2816 2817 2818 2819 2820 57 7562
+page default/30658.htm
+page script/quest/Q226_TestOfTheHealer/
+npc gupu 30658 Folk 10 10 0
+
+action gupu
+action gupu
+  S ActionFailed
+  S NpcHtmlMessage obj=gupu item=0 page=default/30658.htm
+  S ActionFailed
+bypass npc_{gupu}_Quest
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=0
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=6
+bypass Quest Q226_TestOfTheHealer 30658-02.htm
+  S NpcHtmlMessage obj=gupu item=0 page=script/quest/Q226_TestOfTheHealer/30658-05.htm
+  S ActionFailed
+  items 57=0 2812=0
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=6

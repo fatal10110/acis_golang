@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -64,10 +65,11 @@ func (op Op) order() int {
 	}
 }
 
-// Condition gates whether a Mod's calculation applies against effector, the
-// only side of a stat calculation a Mod ever reads.
+// Condition gates whether a Mod's calculation applies: effector is the stat
+// owner, effected the calculation's target (nil when it runs against no
+// target) and skill the skill it runs for (nil when it runs for no skill).
 type Condition interface {
-	Test(effector stat.Actor) bool
+	Test(effector stat.Actor, effected conditions.Actor, skill conditions.Skill) bool
 }
 
 // ModOwner identifies whatever attached a Mod, so a Calculator can later
@@ -121,12 +123,18 @@ type Mod struct {
 	Value float64
 	Cond  Condition // nil always applies
 	Owner ModOwner
+
+	// attach is the <cond> attached to the func's enclosing <for>/<effect>
+	// group (nil when none), tested with attachSkill, the skill owning the
+	// func, once, when the func is attached (see Attachable).
+	attach      conditions.Condition
+	attachSkill conditions.Skill
 }
 
 // apply runs m against the calculation chain's running value, gated by its
 // Cond.
-func apply(m Mod, actor stat.Actor, base, value float64) float64 {
-	if m.Cond != nil && !m.Cond.Test(actor) {
+func apply(m Mod, actor stat.Actor, target conditions.Actor, skill conditions.Skill, base, value float64) float64 {
+	if m.Cond != nil && !m.Cond.Test(actor, target, skill) {
 		return value
 	}
 	switch m.Op {
@@ -277,9 +285,14 @@ func (c *Calculator) Size() int {
 func (c *Calculator) AddMod(m Mod) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.mods = insertMod(c.mods, m)
+}
 
+// insertMod returns a fresh slice of mods with m placed after every Mod
+// whose order is <= m's. mods itself is left untouched, so a chain shared
+// between Calculators (see StatMods) never sees another's insert.
+func insertMod(mods []Mod, m Mod) []Mod {
 	order := m.Op.order()
-	mods := c.mods
 	i := 0
 	for i < len(mods) && order >= mods[i].Op.order() {
 		i++
@@ -289,18 +302,27 @@ func (c *Calculator) AddMod(m Mod) {
 	copy(next, mods[:i])
 	next[i] = m
 	copy(next[i+1:], mods[i:])
-	c.mods = next
+	return next
 }
 
-// RemoveOwner removes every Mod whose Owner equals owner and returns how
-// many it removed.
+// is reports whether o is owner. An item owner is its instance alone (see
+// ItemOwner).
+func (o ModOwner) is(owner ModOwner) bool {
+	if o.item.Inst != nil || owner.item.Inst != nil {
+		return o.item.Inst == owner.item.Inst
+	}
+	return o == owner
+}
+
+// RemoveOwner removes every Mod whose Owner is owner and returns how many it
+// removed.
 func (c *Calculator) RemoveOwner(owner ModOwner) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	kept := make([]Mod, 0, len(c.mods))
 	for _, m := range c.mods {
-		if m.Owner != owner {
+		if !m.Owner.is(owner) {
 			kept = append(kept, m)
 		}
 	}
@@ -311,22 +333,29 @@ func (c *Calculator) RemoveOwner(owner ModOwner) int {
 	return removed
 }
 
-// Calc runs the chain for actor, starting the running value from base:
+// Calc runs the chain for actor, starting the running value from base, for
+// a calculation against target (nil for none) run for skill (nil when it
+// runs for no skill):
 // every Mod ordered below the builtin finalize step, then the builtin (if
 // any), then every Mod ordered above it. A Set overrides the base value
 // seen by everything that runs after it, including the builtin, mirroring
 // how a template override (e.g. a weapon's flat P.Atk) replaces rather
 // than augments the starting point for what follows.
-func (c *Calculator) Calc(actor stat.Actor, base float64) float64 {
+func (c *Calculator) Calc(actor stat.Actor, base float64, target conditions.Actor, skill conditions.Skill) float64 {
 	c.mu.RLock()
 	mods := c.mods
 	builtin := c.builtin
 	c.mu.RUnlock()
+	return calcChain(mods, builtin, actor, base, target, skill)
+}
 
+// calcChain runs mods, sorted by Op's order, around builtin as Calc
+// describes.
+func calcChain(mods []Mod, builtin funcs.Func, actor stat.Actor, base float64, target conditions.Actor, skill conditions.Skill) float64 {
 	value := base
 	i := 0
 	for ; i < len(mods) && mods[i].Op.order() < orderFinalize; i++ {
-		value = apply(mods[i], actor, base, value)
+		value = apply(mods[i], actor, target, skill, base, value)
 		if mods[i].Op == OpSet {
 			base = value
 		}
@@ -335,7 +364,7 @@ func (c *Calculator) Calc(actor stat.Actor, base float64) float64 {
 		value = builtin(actor, base, value)
 	}
 	for ; i < len(mods); i++ {
-		value = apply(mods[i], actor, base, value)
+		value = apply(mods[i], actor, target, skill, base, value)
 	}
 	return value
 }

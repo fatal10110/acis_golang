@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
@@ -56,6 +55,8 @@ type chapelOptions struct {
 	bobbyAdena   int32
 	friends      bool
 	formalOnBoth bool
+	// extra adds boot options.
+	extra []gameservertest.Option
 }
 
 // defaultChapel is a man and a woman, friends, each holding twice the
@@ -81,13 +82,13 @@ func bootChapel(t *testing.T, opts chapelOptions) *chapel {
 		}
 		pages["mods/wedding/"+name] = string(data)
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Alice", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithHTMLPages(pages),
 		gameservertest.WithWeddingConfig(opts.cfg),
 		gameservertest.WithReuseDelays(0, 0),
-	)
+	}, opts.extra...)...)
 	c := &chapel{srv: srv, alice: srv.Client, aliceID: srv.SoleObjectID(t)}
 	c.bobbyID = srv.SeedCharacterFor(t, "player2", "Bobby", 20, 0).ID
 	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET sex = ? WHERE obj_Id = ?", int(opts.bobbySex), c.bobbyID); err != nil {
@@ -227,20 +228,11 @@ func encodeUseItem(objectID int32) []byte {
 	return w.Bytes()
 }
 
-// drainFrames collects every frame c receives until the server goes
-// quiet, in arrival order.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	frames := make([][]byte, 0, 8)
-	for range 200 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 200 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 // only keeps the frames whose opcode is one of want, in order.

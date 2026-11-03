@@ -1,0 +1,29 @@
+# GludioHold's attacked and clan-attacked hooks on an attacker standing more than 100 above:
+# the knight (35235) hit from 150 above wants to run 150 from the character, weight 30, and
+# does not attack it; the clan calls reach it and its court guard clan mate (35238), also 150
+# below, for nothing. The bow guard (35241, GludioBowGuard) helps a clan mate hit from any
+# height (50), and hit from as high itself attacks as usual (100, its own attacked hook has no
+# height test, and 50 from its own clan call).
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioBowGuard
+script script.ai.siegeguards.GludioHold.GludioCourtGuard
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 100 0 -150 walks clan aden_siege_clan 300
+npc court 35238 SiegeGuard 0 100 -150 walks clan aden_siege_clan 300
+npc bow 35241 SiegeGuard 0 -100 -150 walks clan aden_siege_clan 300
+
+hit knight 22
+  at knight 100 0 -150
+  desires knight flee(player,150)=30
+  hate knight 0
+  desires court -
+  hate court 0
+  desires bow attack(player)=50
+  hate bow 50
+
+hit bow 22
+  desires bow attack(player)=200
+  hate bow 200
+  hate knight 0

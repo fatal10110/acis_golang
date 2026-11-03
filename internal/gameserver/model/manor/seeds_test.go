@@ -150,3 +150,23 @@ func TestHashOrderGrowsTheTable(t *testing.T) {
 		t.Fatalf("hashOrder of 13 keys = %v, want %v", got, want)
 	}
 }
+
+// TestCropIDsWhere pins the order of a crop subset: that of a hash table
+// holding the subset alone. Fourteen crops take 32 slots, where 16 and 17
+// follow 12; the subset {1, 16, 17} takes 16, where 16 is in slot 0 and 17
+// shares slot 1 with 1, after it.
+func TestCropIDsWhere(t *testing.T) {
+	t.Parallel()
+	var seeds []Seed
+	for _, crop := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17} {
+		seeds = append(seeds, Seed{SeedID: 100 + crop, CropID: crop, CastleID: 1})
+	}
+	table := NewTable([]Manor{{ID: 1, Seeds: seeds}})
+	if got, want := table.CropIDs(), []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17}; !slices.Equal(got, want) {
+		t.Fatalf("CropIDs = %v, want %v", got, want)
+	}
+	held := func(crop int) bool { return crop == 1 || crop == 16 || crop == 17 }
+	if got, want := table.CropIDsWhere(held), []int{16, 1, 17}; !slices.Equal(got, want) {
+		t.Fatalf("CropIDsWhere = %v, want %v", got, want)
+	}
+}

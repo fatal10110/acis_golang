@@ -2,7 +2,6 @@ package combat
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -36,12 +35,12 @@ func TestReturnHomeMovementDisabledSkipsWalkButKeepsRecoveryTeleport(t *testing.
 			if !hostile.MovementDisabled() || !hostile.ReturnHome() {
 				t.Fatal("movement-disabled ReturnHome should return true outside drift range")
 			}
-			assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+			assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 			if hostile.Move().Moving() {
 				t.Fatal("movement-disabled NPC started walking home")
 			}
-			if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-				t.Fatalf("unexpected packet after disabled ReturnHome: opcode %#x", frame[0])
+			if queued := c.ReadQueued(); len(queued) != 0 {
+				t.Fatalf("unexpected packet after disabled ReturnHome: opcode %#x", queued[0][0])
 			}
 
 			for range move.HomeGeoFailLimit {

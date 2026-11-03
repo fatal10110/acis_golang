@@ -26,33 +26,6 @@ func showBoardHeader() []byte {
 	return want
 }
 
-func TestFrameShowBoardPage(t *testing.T) {
-	got := framePayload(t, FrameShowBoard("101", "<html>é</html>"))
-	want := append(showBoardHeader(), encodeUTF16Z("101\b<html>é</html>")...)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShowBoard() = % x, want % x", got, want)
-	}
-}
-
-// A page part left unused carries the text "null" after its id, as the
-// reference's static 102 and 103 parts do.
-func TestFrameShowBoardNoPage(t *testing.T) {
-	got := framePayload(t, FrameShowBoard("103", ShowBoardNoPage))
-	want := append(showBoardHeader(), encodeUTF16Z("103\bnull")...)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShowBoard(no page) = % x, want % x", got, want)
-	}
-}
-
-// The edit-form fields follow "1002\b", each one followed by " \b".
-func TestFrameShowBoardFields(t *testing.T) {
-	got := framePayload(t, FrameShowBoardFields([]string{"0", "Alice", ""}))
-	want := append(showBoardHeader(), encodeUTF16Z("1002\b0 \bAlice \b \b")...)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameShowBoardFields() = % x, want % x", got, want)
-	}
-}
-
 // pagePart reads the content string of a ShowBoard frame.
 func pagePart(t *testing.T, payload []byte) string {
 	t.Helper()

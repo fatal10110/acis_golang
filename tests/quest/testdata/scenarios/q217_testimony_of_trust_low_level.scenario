@@ -1,0 +1,22 @@
+# Testimony of Trust (Q217), refused: a level 36 Knight is turned away by Hollint until level
+# 37, and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q217_testimony_of_trust_low_level.golden
+character Squire 36
+class 4
+script quest.Q217_TestimonyOfTrust
+item 2734 2735 2736 2737 2738 2739 2740 2741 2742 2743 2744 2745 2746 2747 2748 2749 2750 2751 2752 2753 2754 2755 2756 2757 2758 2759 2760 2761 7562
+page villagemaster/30191.htm
+page script/quest/Q217_TestimonyOfTrust/
+npc hollint 30191 VillageMasterPriest 10 0 0
+
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q217_TestimonyOfTrust CREATED
+  rows Q217_TestimonyOfTrust -

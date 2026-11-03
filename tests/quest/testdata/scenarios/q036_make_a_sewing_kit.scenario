@@ -1,0 +1,131 @@
+# Make a Sewing Kit (Q036): a level 60 character whose formal wear (Q037) is at its sixth step
+# accepts at Ferris, kills iron golems for five pieces of reinforced steel (every drop roll pinned
+# to land; the fifth moves the quest on), hands the steel to Ferris, then trades ten oriharukon and
+# ten artisan's frames for the sewing kit and the quest completes; then relog. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q036_make_a_sewing_kit.golden
+character Seamster 60
+quest Q037_MakeFormalWear <cond>=6 <state>=STARTED
+hold 1893 10
+hold 1891 10
+random always 0
+script quest.Q036_MakeASewingKit
+script quest.Q037_MakeFormalWear
+item 7163 1891 1893 7078
+page villagemaster/30847.htm
+page script/quest/Q036_MakeASewingKit/
+npc ferris 30847 VillageMasterDwarf 10 0 0
+npc golem 20566 Monster 0 40 0
+
+# Ferris: accept.
+action ferris
+action ferris
+  S ActionFailed
+  S NpcHtmlMessage obj=ferris item=0 page=villagemaster/30847.htm
+  S ActionFailed
+bypass npc_{ferris}_Quest
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q036_MakeASewingKit CREATED
+bypass Quest Q036_MakeASewingKit 30847-1.htm
+  S QuestList 37:0x8000003f 36:0x80000001
+  S ExShowQuestMark quest=36
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-1.htm
+  S ActionFailed
+  Q upsert Q036_MakeASewingKit | <state> | STARTED
+  Q upsert Q036_MakeASewingKit | <cond> | 1
+  state Q036_MakeASewingKit STARTED
+  rows Q036_MakeASewingKit <cond>=1 <state>=STARTED
+action ferris
+  S ActionFailed
+  S NpcHtmlMessage obj=ferris item=0 page=villagemaster/30847.htm
+  S ActionFailed
+bypass npc_{ferris}_Quest
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Iron golems: a piece of reinforced steel each; the fifth moves the quest on.
+kill golem x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7163=4
+kill golem
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7163
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x8000003f 36:0x80000003
+  S ExShowQuestMark quest=36
+  Q upsert Q036_MakeASewingKit | <cond> | 2
+  items 7163=5
+  rows Q036_MakeASewingKit <cond>=2 <state>=STARTED
+
+# Ferris takes the steel.
+action ferris
+  S ActionFailed
+  S NpcHtmlMessage obj=ferris item=0 page=villagemaster/30847.htm
+  S ActionFailed
+bypass npc_{ferris}_Quest
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q036_MakeASewingKit 30847-3.htm
+  S QuestList 37:0x8000003f 36:0x80000007
+  S ExShowQuestMark quest=36
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7163 6:5
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-3.htm
+  S ActionFailed
+  Q upsert Q036_MakeASewingKit | <cond> | 3
+  items 7163=0
+  rows Q036_MakeASewingKit <cond>=3 <state>=STARTED
+
+# Ferris trades the oriharukon and the frames for the sewing kit; the quest completes.
+action ferris
+  S ActionFailed
+  S NpcHtmlMessage obj=ferris item=0 page=villagemaster/30847.htm
+  S ActionFailed
+bypass npc_{ferris}_Quest
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q036_MakeASewingKit 30847-5.htm
+  S SystemMessage id=301 3:1891 6:10
+  S SystemMessage id=301 3:1893 6:10
+  S SystemMessage id=54 3:7078
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 37:0x8000003f 36:0x00000000
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q036_MakeASewingKit/30847-5.htm
+  S ActionFailed
+  Q upsert Q036_MakeASewingKit | <state> | COMPLETED
+  Q delete-except-state Q036_MakeASewingKit
+  state Q036_MakeASewingKit COMPLETED
+  rows Q036_MakeASewingKit <state>=COMPLETED
+  items 1891=0 1893=0 7078=1
+
+# Relog: the completed quest loads from its one row, and the kit stays.
+relog
+  state Q036_MakeASewingKit COMPLETED
+  rows Q036_MakeASewingKit <state>=COMPLETED
+  items 7078=1
+action ferris
+action ferris
+  S ActionFailed
+  S NpcHtmlMessage obj=ferris item=0 page=villagemaster/30847.htm
+  S ActionFailed
+bypass npc_{ferris}_Quest
+  S NpcHtmlMessage obj=ferris item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

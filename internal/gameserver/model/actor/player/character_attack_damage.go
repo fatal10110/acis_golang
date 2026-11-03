@@ -6,8 +6,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
+
+var _ attack.Target = (*Character)(nil)
 
 // SetRollSource overrides MakeAttackHit's random source for deterministic
 // tests.
@@ -17,7 +20,7 @@ func (c *Character) SetRollSource(f func(int) int) {
 
 // MakeAttackHit resolves one physical attack result.
 func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	hit := attack.Hit{TargetID: target.ObjectID()}
 	// Folding this needs the world known-list to hand out formula operands.
 	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
 	// yields attackable.Combatant, narrowed from world.Tracked, and world
@@ -38,7 +41,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 	}
 
 	accuracy := c.Accuracy()
-	evasion := other.Evasion()
+	evasion := other.Against(c.ConditionActor(), nil).Evasion()
 
 	_, _, sz := c.Position()
 	_, _, tz := other.Position()
@@ -49,7 +52,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 		return hit
 	}
 
-	crit := formulas.CritSucceeds(c.CriticalRate(), c.rollValue(1000))
+	crit := formulas.CritSucceeds(c.criticalRate(conditions.ActorOf(other)), c.rollValue(1000))
 	in, shield := creature.ResolvePhysicalAttackInput(c, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit

@@ -25,16 +25,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// defaultDriftRange is the shipped npcs.properties MaxDriftRange.
 const defaultDriftRange = 200
 
 // siegeGuardHomeMoveWeight is the MOVE_TO desire weight SiegeGuard return-home
 // queues so it outranks wander and ordinary combat desires.
 const siegeGuardHomeMoveWeight = 1_000_000
 
-// partyRangeDefault mirrors players.properties' PartyRange default (1500),
-// used by RandomizeHate's canAutoAttack gate. The Party subsystem isn't
-// ported yet, so this stays a local default instead of a wired Config
-// value; move it there once Party configuration exists.
+// partyRangeDefault is the shipped players.properties PartyRange, which a
+// hostile attached without party settings gates RandomizeHate by.
 const partyRangeDefault = 1500
 
 var hostileInstanceKinds = map[InstanceKind]struct{}{
@@ -61,18 +60,19 @@ type Hostile struct {
 	spawnBinding
 
 	brain *ai.Attackable
-	move  ai.MoveController
+	move  ai.AttackableMoveController
 	world *world.State
 	// sink receives this NPC's events. Attach installs it before the NPC is
 	// published into world.State; nil drops every event.
 	sink event.Sink
-	log  zerolog.Logger
+	// log is the logger shared by every NPC Attach wired; nil logs nothing.
+	log *zerolog.Logger
 
-	// rewards computes this NPC's drop/experience payout when TakeDamage
+	// rewards gives this NPC's drop/experience payout when TakeDamage
 	// kills it. It is nil until Attach installs one, in which case death
 	// still latches but grants nothing — matching Die's own "rewards may be
 	// nil" contract.
-	rewards creature.Rewarder
+	rewards RewardsSource
 	// remover takes this NPC out of the world for DeleteMe; nil despawns it
 	// with no respawn. Installed by Attach.
 	remover Remover
@@ -82,6 +82,17 @@ type Hostile struct {
 	// scripts raises this NPC's script hooks; nil raises none and leaves
 	// every built-in reaction on. Installed by Attach.
 	scripts ScriptHooks
+	// ground takes the items this NPC picks up out of the world; nil
+	// leaves them on the ground. Installed by Attach.
+	ground GroundTaker
+	// guarded is the siege a siege guard defends; nil for none. Installed
+	// by Attach.
+	guarded GuardedSiege
+	// regenSettings and party are Runtime.Regen and Runtime.Party.
+	regenSettings RegenSettings
+	party         PartySettings
+	// sight is what h's tick scan has told its see-creature scripts about.
+	sight sight
 	// interacted latches the first unlock attempt on a chest.
 	interacted atomic.Bool
 	// coreAIDisabled turns off this NPC's regular combat behavior; its only
@@ -100,24 +111,8 @@ type Hostile struct {
 	attackedByMu sync.Mutex
 	attackedBy   map[int32]attackable.Combatant
 
-	// minionsMu guards master, spawnMaster and the minion list. A minion
-	// claims its follow slot under its master's lock from the minion's own
-	// queue (claimFollowSlot).
-	minionsMu sync.RWMutex
-	master    *Hostile
-	// spawnMaster is the master this private was spawned for. It outlives
-	// the master link, which the master's death clears: a private stays one
-	// for its whole life.
-	spawnMaster *Hostile
-	minions     map[int32]*Hostile
-	// followSlots are the eight escort points around this NPC, occupied by
-	// minion object ids (0 is empty). Only a master uses them.
-	followSlots [escortSlotCount]int32
-	// lastFollowingLoc is the master position this minion's last escort step
-	// laid the slots out around, taken before the move; hasLastFollow reports
-	// whether it is set.
-	lastFollowingLoc location.Location
-	hasLastFollow    bool
+	// partyLinks is the NPC's master, privates and escort points.
+	partyLinks
 
 	// inWater reports whether a location lies in a water zone; nil means
 	// none does. Set before the NPC is published.
@@ -126,9 +121,12 @@ type Hostile struct {
 	// before the NPC is published.
 	zones *zoneMember
 
-	regionInactive atomic.Bool
+	aiSleep        aiSleep
 	abnormalEffect atomic.Int32
 	running        atomic.Bool
+	// offeringBonus is how many blood offerings a festival monster's kill
+	// is worth above one; see OfferingBonus.
+	offeringBonus atomic.Int32
 	// speedMu serializes refreshMoveSpeed's read of the stance and stats
 	// with its hand-off to the movement, so the last refresh to run always
 	// sets the speed that the latest stance and stat funcs give.
@@ -148,12 +146,10 @@ type Hostile struct {
 	// or one of its minions), set per-instance rather than derived from
 	// the template. See RaidRelated.
 	raidRelated atomic.Bool
-	// raidMultipliers scale the base defences and regeneration while
-	// raidRelated is set; nil leaves them unchanged. See SetRaidMultipliers.
-	raidMultipliers atomic.Pointer[RaidMultipliers]
-	// aiConfig holds the target-selection switches; nil means
-	// DefaultAIConfig. See SetAIConfig.
-	aiConfig atomic.Pointer[AIConfig]
+	// settings holds the target-selection switches and the raid
+	// multipliers that scale the base defences and regeneration while
+	// raidRelated is set; nil reads the defaults. See UseSettings.
+	settings atomic.Pointer[HostileSettings]
 
 	// cast is the live cast controller; see SetCastController.
 	cast atomic.Pointer[CastControl]
@@ -178,23 +174,26 @@ type Hostile struct {
 	mpMu sync.RWMutex
 	mp   float64
 
-	// weapon is this NPC's resolved right-hand weapon kind, recorded by
-	// Attach. Nil means unarmed — the common case, since the
-	// overwhelming majority of monster templates carry no weapon item id.
-	weapon *item.WeaponDetail
-
-	// weaponCrystal is the resolved right-hand weapon's crystal grade,
-	// resolved by Attach alongside weapon. CrystalNone when unarmed.
-	weaponCrystal item.CrystalType
-
-	// offHandMask is the armor-type bit of the shield the template holds
-	// in its left hand, resolved by Attach; zero when it holds none.
-	offHandMask int32
+	// held is what this NPC holds in its hands, nil while it holds its
+	// template's items. A script swaps it from whichever queue runs its
+	// hook, and a death puts the template's back.
+	held atomic.Pointer[heldItems]
+	// items resolves a held item id into its weapon or shield; nil leaves
+	// every hand empty of either. Set by Attach.
+	items *item.Table
+	// enchantEffect is the enchant glow observers see on its weapon.
+	enchantEffect atomic.Int32
+	// lastAttacker is the last creature that damaged this NPC in this life.
+	lastAttacker atomic.Pointer[attackerRef]
 
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
 	// damage-spread rolls. It defaults to math/rand's global source; tests
 	// substitute a fixed function for deterministic combat outcomes.
 	roll func(n int) int
+	// gaussian draws a standard normal for the formulas that use one (a
+	// magic skill's landing threshold). It defaults to the global source;
+	// tests substitute a fixed function.
+	gaussian func() float64
 
 	los LineOfSight
 
@@ -208,12 +207,15 @@ type Hostile struct {
 	currentSpiritshots int
 	shotsMask          int32
 
-	// statMu guards statCalcs slot creation; each slot's own Calculator
-	// then guards its own Mods independently, so a warm read only ever
-	// takes statMu's read lock. An attacker's formulas read these stats
-	// from the attacker's queue.
+	// statMu guards statCalcs, its slots and passives; each slot's own
+	// Calculator then guards its own Mods independently, so a read only
+	// ever takes statMu's read lock. A Stat without a slot computes from
+	// passives, the template's shared Mods; the slots are created on the
+	// first change to a Stat's chain. An attacker's formulas read these
+	// stats from the attacker's queue.
 	statMu    sync.RWMutex
-	statCalcs [stat.Count]*effect.Calculator
+	statCalcs *[stat.Count]*effect.Calculator
+	passives  *effect.StatMods
 
 	// collisionRadiusOverride is the runtime body-radius override a live
 	// effect (e.g. Grow) installs; nil means "use the template value".
@@ -225,7 +227,6 @@ type Hostile struct {
 	// controller.
 	skillMu        sync.Mutex
 	disabledSkills map[int32]time.Time
-	maxBuffsAmount atomic.Int32
 }
 
 // OffensiveFollowLead identifies hostile NPCs that lead moving offensive-follow targets.
@@ -245,7 +246,7 @@ func Attackable(inst *Instance) bool {
 
 // skillDefinitions resolves loaded skill definitions for template passives.
 type skillDefinitions interface {
-	Definition(skill.Ref) (skill.Definition, bool)
+	Definition(skill.Ref) (*skill.Definition, bool)
 }
 
 // NewHostile creates a live attackable NPC wrapper for inst. skills, when
@@ -253,7 +254,24 @@ type skillDefinitions interface {
 // current HP/MP are seeded from the calculated maxima. Folk and other
 // non-attackable instance types never reach this constructor, so they never
 // gain stats from template passives.
-func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
+func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
+	if attack == nil {
+		return nil, errors.New("npc: nil hostile attack")
+	}
+	return newHostile(inst, live, movement, attack, nil, skills...)
+}
+
+// NewHostileWithParts is NewHostile for an NPC whose attack and cast
+// controllers parts builds the first time the NPC needs each: an NPC nobody
+// fights never holds them.
+func NewHostileWithParts(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, parts ai.CombatParts, skills ...skillDefinitions) (*Hostile, error) {
+	if parts == nil {
+		return nil, errors.New("npc: nil hostile combat parts")
+	}
+	return newHostile(inst, live, movement, nil, parts, skills...)
+}
+
+func newHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, attack ai.AttackController, parts ai.CombatParts, skills ...skillDefinitions) (*Hostile, error) {
 	if inst == nil {
 		return nil, errors.New("npc: nil hostile instance")
 	}
@@ -270,9 +288,6 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	if movement == nil {
 		return nil, errors.New("npc: nil hostile movement")
 	}
-	if attack == nil {
-		return nil, errors.New("npc: nil hostile attack")
-	}
 	currentSoulshots, currentSpiritshots, err := shotCounts(inst.Template)
 	if err != nil {
 		return nil, err
@@ -280,7 +295,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 
 	h := &Hostile{
 		Instance:           inst,
-		spawnBinding:       newSpawnBinding(inst.Template),
+		spawnBinding:       newSpawnBinding(inst),
 		Live:               live,
 		move:               movement,
 		roll:               rand.Intn,
@@ -289,23 +304,26 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	}
 	h.zones = newZoneMember(h)
 	h.initSeedState()
-	h.maxBuffsAmount.Store(maxBuffCount)
 	// Raid and grand bosses are raid-related from construction; minions
 	// are marked at spawn (see SetRaidRelated).
 	h.raidRelated.Store(h.RaidBoss())
 	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
 	h.health = creature.NewHealth(&h.hp)
-	h.running.Store(!inst.WalkMode)
-	h.brain = ai.NewAttackable(h, movement, attack)
+	h.running.Store(true)
+	if parts != nil {
+		h.brain = ai.NewAttackableWithParts(h, movement, parts)
+	} else {
+		h.brain = ai.NewAttackable(h, movement, attack)
+	}
 	var lookup skillDefinitions
 	if len(skills) > 0 {
 		lookup = skills[0]
 	}
-	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
+	passives, err := inst.Template.passiveMods(lookup)
 	if err != nil {
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
-	h.AddStatFuncs(mods)
+	h.attachPassives(passives)
 	// The live movement starts at the template speed; move at the stat-
 	// finalized one from the first step.
 	h.refreshMoveSpeed()
@@ -344,26 +362,52 @@ func (h *Hostile) ForEachKnownCombatantInRadius(radius int, fn func(attackable.C
 	})
 }
 
+// ForEachKnownHitTargetInRadius is ForEachKnownCombatantInRadius: a
+// monster never hits a door.
+func (h *Hostile) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	h.ForEachKnownCombatantInRadius(radius, fn)
+}
+
 // Runtime is everything a Hostile needs to act in the live world beyond its
 // template and controllers. A nil dependency leaves the matching behavior
 // off: no world means no spatial queries, no LOS means CanSee is permissive,
 // no Items leaves the NPC unarmed, no Rewards makes a kill reward-free, and
 // no Sink drops every event.
 type Runtime struct {
-	World   *world.State
-	LOS     LineOfSight
-	Log     zerolog.Logger
-	Items   *item.Table
-	Rewards creature.Rewarder
-	Sink    event.Sink
-	Remover Remover
+	World *world.State
+	LOS   LineOfSight
+	// Log is the logger the NPC shares with others; nil logs nothing.
+	Log   *zerolog.Logger
+	Items *item.Table
+	// Rewards are the NPC's own death rewards; RewardsFor, when set, builds
+	// them instead each time the NPC needs them.
+	Rewards    Rewards
+	RewardsFor RewardsSource
+	Sink       event.Sink
+	Remover    Remover
 	// Hits watches every hit this NPC registers; nil watches none.
 	Hits HitObserver
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts ScriptHooks
-	// Slot is the spawn slot that placed the NPC; nil leaves it with no
-	// spawn parameters and a script memory of its own.
-	Slot SpawnSlot
+	// Ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	Ground GroundTaker
+	// Guarded is the siege of the castle a siege guard belongs to; nil
+	// leaves the guard unattackable.
+	Guarded GuardedSiege
+	// Regen answers the base regeneration multipliers the NPC takes while
+	// it is not raid related; nil takes the shipped ones.
+	Regen RegenSettings
+	// Party answers the party range RandomizeHate gates its candidates by;
+	// nil reads the shipped one.
+	Party PartySettings
+}
+
+// GuardedSiege is the siege of the castle a siege guard belongs to.
+type GuardedSiege interface {
+	// Attacking reports whether the siege is being fought and clanID
+	// attacks it.
+	Attacking(clanID int32) bool
 }
 
 // Attach installs rt. Call it once, before exposing this NPC to other
@@ -376,38 +420,44 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.world = rt.World
 	h.los = rt.LOS
 	h.log = rt.Log
-	h.rewards = rt.Rewards
+	switch {
+	case rt.RewardsFor != nil:
+		h.rewards = rt.RewardsFor
+	case rt.Rewards != nil:
+		h.rewards = fixedRewards{rt.Rewards}
+	}
 	h.sink = rt.Sink
 	h.remover = rt.Remover
 	h.hits = rt.Hits
 	h.scripts = rt.Scripts
-	h.bindSpawn(rt.Slot)
-	if rt.Items == nil {
-		return
+	h.ground = rt.Ground
+	h.guarded = rt.Guarded
+	h.regenSettings = rt.Regen
+	h.party = rt.Party
+	h.Scratch().setLife(h)
+	h.brain.KeepTerritory(h.Scratch().Territory())
+	h.items = rt.Items
+}
+
+// nopLog is the logger of an NPC wired with none.
+var nopLog = zerolog.Nop()
+
+// logger returns the logger h logs through.
+func (h *Hostile) logger() *zerolog.Logger {
+	if h.log == nil {
+		return &nopLog
 	}
-	if id := h.Instance.Template.LeftHand; id != 0 {
-		if tmpl, ok := rt.Items.Get(int32(id)); ok && tmpl.Kind == item.KindArmor && tmpl.Armor != nil {
-			h.offHandMask = tmpl.Armor.Type.Mask()
-		}
-	}
-	if h.Instance.Template.RightHand == 0 {
-		return
-	}
-	tmpl, ok := rt.Items.Get(int32(h.Instance.Template.RightHand))
-	if !ok || tmpl.Weapon == nil {
-		return
-	}
-	h.weapon = tmpl.Weapon
-	h.weaponCrystal = tmpl.Crystal
+	return h.log
 }
 
 // HeldItemTypeMask returns the item-type bits of this NPC's right-hand
 // weapon and of the armor, a shield, in its left hand. An unarmed NPC holds
 // no weapon bit at all, not a fist's.
 func (h *Hostile) HeldItemTypeMask() int32 {
-	mask := h.offHandMask
-	if h.weapon != nil {
-		mask |= h.weapon.Type.Mask()
+	held := h.hands()
+	mask := held.offHandMask
+	if held.weapon != nil {
+		mask |= held.weapon.Type.Mask()
 	}
 	return mask
 }
@@ -437,10 +487,13 @@ func (h *Hostile) StopAbnormalEffect(mask int) {
 // the stored visual bits plus the ones its live crowd-control state
 // implies.
 func (h *Hostile) AbnormalEffect() int {
-	return int(h.abnormalEffect.Load()) | h.EffectList().CrowdControlAbnormalEffect()
+	return int(h.abnormalEffect.Load()) | h.EffectListIfBuilt().CrowdControlAbnormalEffect()
 }
 
-// NPCInfoSnapshot captures this NPC's current client-visible state.
+// NPCInfoSnapshot captures this NPC's current client-visible state. Its
+// attackable flag is the one shown to no particular viewer: a living
+// Monster-family NPC; a per-viewer view sets it from
+// AttackableWithoutForceBy instead.
 func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	tmpl := h.Instance.Template
 	x, y, z := h.Position()
@@ -452,8 +505,9 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		title = h.Instance.Title()
 	}
 	pAtkSpd := h.AttackSpeed()
+	held := h.hands()
 	return npcinfo.Snapshot{
-		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: true,
+		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: h.MonsterKind() && !h.AlikeDead(),
 		X: x, Y: y, Z: z, Heading: h.Heading(),
 		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
@@ -461,7 +515,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		MoveType:  h.zones.moveType(),
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
-		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
+		RightHand: held.rightHand, LeftHand: held.leftHand, EnchantEffect: int(h.enchantEffect.Load()),
 		Running: h.Running(), InCombat: h.InCombat(), AlikeDead: h.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: h.AbnormalEffect(), Name: name, Title: title,
 	}
@@ -493,19 +547,24 @@ func (h *Hostile) relocate(position location.Location, placed bool) {
 	if h.world == nil {
 		return
 	}
-	previous := h.location()
 	_ = h.world.Move(h, position.X, position.Y, position.Z)
 	if placed {
-		h.zones.place(previous)
+		h.zones.place()
 		return
 	}
-	h.zones.step(previous)
+	h.zones.step()
 }
 
 // SetRollSource overrides the random source MakeAttackHit uses for its
 // hit/crit/damage-spread rolls, for deterministic tests.
 func (h *Hostile) SetRollSource(f func(n int) int) {
 	h.roll = f
+}
+
+// SetGaussianSource overrides the standard normal draw Gaussian returns, for
+// deterministic tests.
+func (h *Hostile) SetGaussianSource(f func() float64) {
+	h.gaussian = f
 }
 
 // ObjectID returns the world object id assigned to this NPC.
@@ -518,82 +577,6 @@ func (h *Hostile) Kind() actor.Kind { return actor.KindNPC }
 
 // Unlockable reports whether this hostile NPC is a chest.
 func (h *Hostile) Unlockable() bool { return hostileKind(h.Instance) == "Chest" }
-
-// Master returns the NPC that spawned this minion, if any.
-func (h *Hostile) Master() *Hostile {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	return h.master
-}
-
-// SetMaster links this NPC to its master, or unlinks it for nil. Linking
-// makes the NPC a private of master for the rest of its life.
-func (h *Hostile) SetMaster(master *Hostile) {
-	h.minionsMu.Lock()
-	h.master = master
-	if master != nil {
-		h.spawnMaster = master
-	}
-	h.minionsMu.Unlock()
-}
-
-// SpawnMaster returns the master this private was spawned for, nil for an
-// NPC that is not a private. Unlike Master it stays set once the master
-// died and let the private go.
-func (h *Hostile) SpawnMaster() *Hostile {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	return h.spawnMaster
-}
-
-// IsPrivate reports whether this NPC was spawned as a master's private.
-func (h *Hostile) IsPrivate() bool { return h.SpawnMaster() != nil }
-
-// AddMinion records a child spawned for this NPC.
-func (h *Hostile) AddMinion(minion *Hostile) {
-	if minion == nil {
-		return
-	}
-	h.minionsMu.Lock()
-	if h.minions == nil {
-		h.minions = make(map[int32]*Hostile)
-	}
-	h.minions[minion.ObjectID()] = minion
-	h.minionsMu.Unlock()
-}
-
-// RemoveMinion forgets a child that has decayed or been removed.
-func (h *Hostile) RemoveMinion(id int32) {
-	h.minionsMu.Lock()
-	delete(h.minions, id)
-	h.minionsMu.Unlock()
-}
-
-// ClearMinions forgets every child, leaving them in the world; the NPC
-// stays a master.
-func (h *Hostile) ClearMinions() {
-	h.minionsMu.Lock()
-	h.minions = make(map[int32]*Hostile)
-	h.minionsMu.Unlock()
-}
-
-// Minions returns a stable snapshot of this NPC's current children.
-func (h *Hostile) Minions() []*Hostile {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	minions := make([]*Hostile, 0, len(h.minions))
-	for _, minion := range h.minions {
-		minions = append(minions, minion)
-	}
-	return minions
-}
-
-// IsMaster reports whether this NPC has ever recorded a minion spawn.
-func (h *Hostile) IsMaster() bool {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	return h.minions != nil
-}
 
 // AI returns the hostile NPC brain.
 func (h *Hostile) AI() *ai.Attackable {
@@ -620,15 +603,6 @@ func (h *Hostile) AddAttackDesireHold(attacker attackable.Combatant, hate float6
 func (h *Hostile) RemoveAttackDesire(target attackable.Combatant) {
 	h.brain.StopAggroHate(target)
 	h.move.Stop()
-}
-
-// AddCombatDamageHate records attacker's combat damage against this NPC,
-// queuing its ATTACKED-event attack Desire at attackedHateWeight's
-// approximation of the per-script attacked-hate formula (see
-// ai.Attackable.AddCombatDamageHate). A hit adds it only for an NPC with no
-// bound behavior.
-func (h *Hostile) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
-	h.brain.AddCombatDamageHate(attacker, damage, h.attackedHateWeight(attacker, damage))
 }
 
 // AddHate records skill-cast hate against this NPC.
@@ -786,7 +760,7 @@ func RandomConfusionTarget(w *world.State, self world.Tracked, radius int, roll 
 // dropping that attacker's entry. A confusion effect uses this to drop
 // its forced redirect once the effect ends.
 func (h *Hostile) StopMostHatedTarget() {
-	if most, ok := h.brain.Threats().MostHated(); ok {
+	if most, ok := h.brain.ThreatsIfBuilt().MostHated(); ok {
 		h.brain.StopAggroHate(most.Attacker)
 	}
 }
@@ -809,7 +783,7 @@ func (h *Hostile) AggroHate(attacker attackable.Combatant) float64 {
 	if h == nil || h.brain == nil || attacker == nil {
 		return 0
 	}
-	return h.brain.Threats().Hate(attacker)
+	return h.brain.ThreatsIfBuilt().Hate(attacker)
 }
 
 // NpcID returns this NPC's template id.
@@ -824,25 +798,34 @@ var (
 
 // StopHateList drops target from the skill-cast hate table.
 func (h *Hostile) StopHateList(attacker attackable.Combatant) {
-	h.brain.Hates().StopHate(attacker)
+	h.brain.HatesIfBuilt().StopHate(attacker)
 }
 
 // ClearAggroTables drops every threat and skill-cast hate entry.
 func (h *Hostile) ClearAggroTables() {
-	h.brain.Threats().Clear()
-	h.brain.Hates().Clear()
+	h.brain.ThreatsIfBuilt().Clear()
+	h.brain.HatesIfBuilt().Clear()
 }
 
 // RandomizeHate is attack randomization, the behavior behind the
 // randomize-hate effect: swaps a random valid attacker into the most-hated
 // slot ahead of the current target, gated by the same AutoAttackTargetValid
-// rule ReconsiderTarget uses, here at party range with peaceful targets
-// allowed.
+// rule ReconsiderTarget uses, here at the party range in force with
+// peaceful targets allowed.
 // Reports whether a swap happened.
 func (h *Hostile) RandomizeHate() bool {
+	partyRange := h.partyRange()
 	return h.brain.RandomizeHate(func(target attackable.Combatant) bool {
-		return h.AutoAttackTargetValid(target, partyRangeDefault, true)
+		return h.AutoAttackTargetValid(target, partyRange, true)
 	}, h.roll)
+}
+
+// partyRange is the party range in force for h.
+func (h *Hostile) partyRange() int {
+	if h.party == nil {
+		return partyRangeDefault
+	}
+	return h.party.PartyRange()
 }
 
 // LifeTime returns the number of AI cycles h has completed since it
@@ -851,10 +834,17 @@ func (h *Hostile) LifeTime() int32 { return h.brain.LifeTime() }
 
 // Tick advances the hostile AI clock once.
 func (h *Hostile) Tick() {
-	if !h.canRunAI() {
+	if !h.tickable() {
 		return
 	}
 	h.brain.Tick()
+}
+
+// After runs fn on this NPC's queue once d has elapsed, for the AI's
+// wander chain and its out-of-territory stale-hate sweep. Closing the queue
+// at deletion cancels it.
+func (h *Hostile) After(d time.Duration, fn func()) ai.Timer {
+	return h.Queue().After(d, fn)
 }
 
 // Think continues the hostile AI's current intention after a bow's reuse
@@ -886,12 +876,13 @@ func (h *Hostile) AttackFinished() error {
 	return h.brain.AttackFinished()
 }
 
-// CastFinished ends the AI's hold on a cast that completed or was aborted:
-// the desire that drove it is dropped, and only a completed cast re-runs
-// desire selection.
-func (h *Hostile) CastFinished(interrupted bool) error {
+// CastFinished ends the AI's hold on the cast e reports, completed or
+// aborted: the desire that drove it is dropped, the skill-finished hooks
+// run, and only a completed cast re-runs desire selection.
+func (h *Hostile) CastFinished(e event.CastFinished) error {
 	h.brain.ClearCurrentDesire()
-	if interrupted {
+	raiseSkillFinished(h.scripts, h, e)
+	if e.Interrupted {
 		return nil
 	}
 	return h.RunAI()
@@ -900,77 +891,81 @@ func (h *Hostile) CastFinished(interrupted bool) error {
 // TickThink runs one periodic AI cycle, including empty-queue idle abort
 // after the first cycle.
 func (h *Hostile) TickThink() error {
-	if !h.canRunAI() {
+	if !h.tickable() {
 		return nil
 	}
 	return h.brain.TickThink()
 }
 
 // OnInactiveRegion applies the hostile-NPC reset when the owning world region
-// deactivates. The player whose departure deactivated the region calls it on
-// that player's queue, so the reset is posted to this NPC's queue and applies
-// only if the NPC is still placed in an inactive region when it runs.
+// deactivates, and puts the NPC's AI to sleep unless it is a noSleepMode NPC
+// or stands outside its territory. The player whose departure deactivated
+// the region calls it on that player's queue, so the reset is posted to this
+// NPC's queue and applies only if the NPC is still placed in an inactive
+// region when it runs.
 func (h *Hostile) OnInactiveRegion() {
-	reset := func() {
+	h.aiSleep.settle(h.world, h)
+	h.Queue().Post(func() {
 		if h.world != nil {
 			if placed, active := h.world.RegionActivity(h); !placed || active {
 				return
 			}
 		}
-		h.enterInactiveRegion()
+		h.clearAttackers()
+		h.EffectListIfBuilt().StopAll()
+		h.brain.SetBackToPeace()
+	})
+}
+
+// OnActiveRegion wakes the NPC's AI once players wake its region.
+func (h *Hostile) OnActiveRegion() { h.aiSleep.settle(h.world, h) }
+
+// OnRegionArrival decides the NPC's AI sleep when it comes onto the grid: it
+// sleeps in a quiet region it does not keep ticking in (see
+// OnInactiveRegion). Walking or teleporting into another region leaves the
+// AI sleep as it was.
+func (h *Hostile) OnRegionArrival(_, joined bool) {
+	if joined {
+		h.aiSleep.settle(h.world, h)
 	}
-	h.Queue().Post(reset)
 }
 
-// OnActiveRegion clears the deactivation latch once players wake the region.
-func (h *Hostile) OnActiveRegion() {
-	h.regionInactive.Store(false)
-}
-
-// SleepWhenRegionInactive reports whether the AI task should pause this NPC
-// while no player is near its region. noSleepMode NPCs and off-territory NPCs
-// keep ticking: they are exempt from deactivation.
+// SleepWhenRegionInactive reports whether this NPC sleeps in a region no
+// player keeps active: noSleepMode NPCs and off-territory NPCs do not.
 func (h *Hostile) SleepWhenRegionInactive() bool {
-	return !h.Instance.Template.NoSleepMode && h.InTerritory()
+	return !h.noSleepMode() && h.InTerritory()
 }
 
-// AISleeping reports whether the AI task leaves the NPC alone: it is dead,
-// out of the world, or in an inactive region it sleeps in.
+func (h *Hostile) noSleepMode() bool { return h.Instance.Template.NoSleepMode }
+
+// AISleeping reports whether the AI task leaves the NPC alone. Its region
+// going quiet, its death and its removal put it to sleep — not a
+// noSleepMode NPC's or one's outside its territory in the quiet region —
+// and coming onto the grid, its region waking or a teleport landing it
+// outside its territory wake it; it keeps that state wherever it walks in
+// between. An NPC with no world is awake.
 func (h *Hostile) AISleeping() bool {
-	if h.Dead() {
+	return h.world != nil && h.aiSleep.asleep()
+}
+
+// tickable reports whether the periodic AI cycle runs the NPC: it is on the
+// grid and awake.
+func (h *Hostile) tickable() bool {
+	if h.world == nil {
 		return true
 	}
-	if h.world == nil {
-		return false
-	}
-	placed, active := h.world.RegionActivity(h)
-	return !placed || (!active && h.SleepWhenRegionInactive())
+	placed, _ := h.world.RegionActivity(h)
+	return placed && !h.aiSleep.asleep()
 }
 
+// canRunAI reports whether an event may run the NPC's AI: it is on the grid,
+// in an active region or awake.
 func (h *Hostile) canRunAI() bool {
 	if h.world == nil {
-		h.regionInactive.Store(false)
 		return true
 	}
 	placed, active := h.world.RegionActivity(h)
-	if !placed {
-		h.regionInactive.Store(false)
-		return false
-	}
-	if !active {
-		h.enterInactiveRegion()
-		return !h.SleepWhenRegionInactive()
-	}
-	h.regionInactive.Store(false)
-	return true
-}
-
-func (h *Hostile) enterInactiveRegion() {
-	if h.regionInactive.CompareAndSwap(false, true) {
-		h.clearAttackers()
-		h.EffectList().StopAll()
-		h.brain.SetBackToPeace()
-	}
+	return placed && (active || !h.aiSleep.asleep())
 }
 
 // SiegeGuard reports whether this NPC is a defensive siege guard.
@@ -988,7 +983,7 @@ func (h *Hostile) RaidRelated() bool {
 
 // SetRaidRelated marks or clears this NPC's raid-encounter association.
 // Raid and grand bosses start marked; a Monster-family private spawned for a
-// raid boss master is marked by the spawner (MinionSpawn.doSpawn).
+// raid boss master is marked by the spawner.
 func (h *Hostile) SetRaidRelated(v bool) {
 	h.raidRelated.Store(v)
 }
@@ -1043,12 +1038,13 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if !h.MarkDead() {
 		return false
 	}
+	h.aiSleep.sleep()
 	h.BroadcastStatus()
 	h.AbortAll(true)
 	h.brain.ResetLifeTime()
 	// A death strip ends each effect's stat change silently; the status
 	// broadcast below is the only refresh observers get.
-	h.EffectList().StopAllExceptThoseThatLastThroughDeath()
+	h.EffectListIfBuilt().StopAllExceptThoseThatLastThroughDeath()
 	if rewards != nil {
 		rewards.CalculateRewards(killer)
 	}
@@ -1058,8 +1054,12 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if h.RaidBoss() && killedByPlayer(killer) {
 		h.emit(event.RaidBossKilled{})
 	}
+	// The corpse holds the template's items again and loses its glow; no
+	// observer is told until it next sees the NPC.
+	h.holdTemplateItems()
+	h.enchantEffect.Store(0)
 	h.raiseDying(killer)
-	h.partyDied()
+	partyDied(h.scripts, h)
 	raiseClanDied(h.scripts, h.world, h, killer)
 	return true
 }
@@ -1096,9 +1096,9 @@ func (h *Hostile) Decayed() bool {
 //
 // worldState may be nil in tests that do not track live world placement.
 // respawn is called after the world removal when non-nil; a live spawn
-// runtime is expected to close over its own spawn.State/spawn.Entry
-// linkage and call spawn.CalculateRespawnDelay plus spawn.State.SetRespawn
-// there, since Hostile itself carries no spawn linkage yet.
+// runtime is expected to close over its own spawn row/spawn.Entry
+// linkage and record the row's respawn time there (spawn.CalculateRespawnDelay),
+// since Hostile itself carries no spawn linkage yet.
 func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	return h.DecayWithRespawn(worldState, func(int32) func() { return respawn })
 }
@@ -1109,23 +1109,38 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 // winner claims the spawn's respawn, so it is armed exactly once.
 // respawnFor may be nil.
 func (h *Hostile) DecayWithRespawn(worldState *world.State, respawnFor func(id int32) func()) bool {
-	h.deathMu.Lock()
-	if h.decayed {
-		h.deathMu.Unlock()
+	if !h.markDecayed() {
 		return false
 	}
-	h.decayed = true
-	h.dead = true
-	h.corpseDeadline = time.Time{}
-	h.deathMu.Unlock()
 	var respawn func()
 	if respawnFor != nil {
 		respawn = respawnFor(h.ObjectID())
 	}
 	h.raiseDecayed()
+	h.leaveWorld(worldState, respawn)
+	return true
+}
 
+// markDecayed marks this NPC decayed, and dead, and reports whether this
+// call did: of several concurrent decays, only one wins.
+func (h *Hostile) markDecayed() bool {
+	h.deathMu.Lock()
+	defer h.deathMu.Unlock()
+	if h.decayed {
+		return false
+	}
+	h.decayed = true
+	h.dead = true
+	h.corpseDeadline = time.Time{}
+	return true
+}
+
+// leaveWorld takes this decayed NPC out of the world, then runs respawn
+// when it is not nil, and closes its queue.
+func (h *Hostile) leaveWorld(worldState *world.State, respawn func()) {
+	h.aiSleep.sleep()
 	// The NPC leaves its zones while its observers still know it.
-	h.zones.leave(h.location())
+	h.zones.leave()
 	if worldState != nil {
 		worldState.Despawn(h)
 	}
@@ -1134,14 +1149,13 @@ func (h *Hostile) DecayWithRespawn(worldState *world.State, respawnFor func(id i
 	// hooks, after the world removal so nobody sees them go. Untrack then
 	// keeps a straggler tick or skill task already on this queue from
 	// registering the list with task.Effects again.
-	h.EffectList().StopAll()
-	h.EffectList().Untrack()
+	h.EffectListIfBuilt().StopAll()
+	h.EffectListIfBuilt().Untrack()
 	if respawn != nil {
 		respawn()
 	}
 	// A respawn is a new Hostile on a new queue; this one takes no more work.
 	h.Queue().Close()
-	return true
 }
 
 // DenyAIAction reports whether this NPC is unable to act: dead, teleporting,
@@ -1154,7 +1168,7 @@ func (h *Hostile) DenyAIAction() bool {
 // DenyAIAction, or confused. Confusion counts once its start has run, so
 // the attack desire a confusion start queues is still selected at once.
 func (h *Hostile) OutOfControl() bool {
-	return h.DenyAIAction() || h.EffectList().StartedAffected(effect.FlagConfused)
+	return h.DenyAIAction() || h.EffectListIfBuilt().StartedAffected(effect.FlagConfused)
 }
 
 // Knows reports whether target is currently visible to this NPC.
@@ -1164,6 +1178,16 @@ func (h *Hostile) OutOfControl() bool {
 func (h *Hostile) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(h, tracked) && !attackable.HiddenActingPlayer(target)
+}
+
+// InWorld reports whether target is still registered in h's world. With no
+// world attached, nothing has left it.
+func (h *Hostile) InWorld(target attackable.Combatant) bool {
+	if h.world == nil {
+		return true
+	}
+	_, ok := h.world.Object(target.ObjectID())
+	return ok
 }
 
 // PhysicalAttackRange returns this NPC's melee attack range.
@@ -1178,7 +1202,7 @@ func (h *Hostile) PoleAttackAngle() int {
 
 // PoleAttackCountMax returns the primary-inclusive pole target cap.
 func (h *Hostile) PoleAttackCountMax() int {
-	for _, active := range h.EffectList().All() {
+	for _, active := range h.EffectListIfBuilt().All() {
 		if active.Type == effect.TypePolearmTargetSingle {
 			return 1
 		}
@@ -1194,7 +1218,7 @@ func (h *Hostile) ReturnHome() bool {
 	if h.SiegeGuard() {
 		return h.returnHomeOutsideDriftRange()
 	}
-	if h.InTerritory() || !h.brain.Hates().IsEmpty() {
+	if h.InTerritory() || !h.brain.HatesIfBuilt().IsEmpty() {
 		return false
 	}
 	return h.returnHomeOutsideDriftRange()
@@ -1206,28 +1230,12 @@ func (h *Hostile) ReturnHome() bool {
 // is always in its own territory.
 // Maker NPCs with a resolved territory use banned-then-allowed polygon
 // containment. A nil maker, or a maker with no territories, uses a strict
-// 200-unit 3D sphere around Home.
+// 3D sphere of the drift range around Home.
 func (h *Hostile) InTerritory() bool {
-	if master := h.Master(); master != nil {
-		if master.Dead() {
-			return true
-		}
-		return master.InTerritory()
+	if in, decided := h.privateInTerritory(); decided {
+		return in
 	}
-	if h.IsPrivate() {
-		return true
-	}
-	if maker := h.Instance.Maker; maker != nil && len(maker.Territories) > 0 {
-		loc := h.location()
-		if maker.ContainsBanned(loc) {
-			return false
-		}
-		return maker.Contains(loc)
-	}
-	if !h.Instance.HasHome {
-		return true
-	}
-	return h.location().In3DRadius(h.Instance.Home, defaultDriftRange)
+	return h.Instance.spawnTerritoryContains(h.location())
 }
 
 func hostileKind(inst *Instance) InstanceKind {
@@ -1263,17 +1271,14 @@ func (h *Hostile) driftRange() int {
 	if kind := hostileKind(h.Instance); kind == "Guard" || kind == "SiegeGuard" {
 		return 20
 	}
-	if h.Instance.DriftRange > 0 {
-		return h.Instance.DriftRange
-	}
-	return defaultDriftRange
+	return h.Instance.MaxDriftRange()
 }
 
 func (h *Hostile) returnHomeOutsideDriftRange() bool {
 	if !h.Instance.HasHome || h.location().In2DRadius(h.Instance.Home, h.driftRange()) {
 		return false
 	}
-	h.brain.Threats().ZeroHate()
+	h.brain.ThreatsIfBuilt().ZeroHate()
 	if h.SiegeGuard() {
 		h.ForceRunStance()
 	} else {
@@ -1288,7 +1293,7 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		// Count only a reachability miss as a path failure so the teleport
 		// recovery above still trips; a root expires on its own and must
 		// not burn fail count.
-		if !h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight) && !h.MovementDisabled() {
+		if !h.brain.AddMoveToPositionDesire(h.Instance.Home, h.Instance.SpawnHeading, siegeGuardHomeMoveWeight) && !h.MovementDisabled() {
 			h.AddGeoPathFailCount()
 		}
 		return true

@@ -15,6 +15,7 @@ import (
 // ahead of the bow's right hand, and the bow takes them into the left hand:
 // the login ItemList shows them worn.
 func TestRestoreWornBowPullsItsArrows(t *testing.T) {
+	t.Parallel()
 	const (
 		bowID       = 14
 		woodenArrow = 17

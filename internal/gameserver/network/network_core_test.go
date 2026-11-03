@@ -64,14 +64,11 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 		t.Fatalf("set read deadline: %v", err)
 	}
 
-	gameLink := &GameClientLink{
-		log:       zerolog.Nop(),
-		noCipher:  true,
-		loginLink: func() *LoginLink { return nil },
-		newCipherKey: func() ([]byte, error) {
-			return bytes.Repeat([]byte{0xcc}, gamecipher.KeySize), nil
-		},
-	}
+	gameLink := newBareGameClientLink(t, GameClientLinkConfig{
+		Flow:      CharacterFlowConfig{NoCipher: true},
+		LoginLink: func() *LoginLink { return nil },
+		Log:       zerolog.Nop(),
+	})
 	done := make(chan struct{})
 	go func() {
 		gameLink.Handle(context.Background(), conn)
@@ -230,6 +227,8 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestHennaUnequipList,
 		clientpackets.OpcodeRequestHennaUnequipInfo,
 		clientpackets.OpcodeRequestHennaUnequip,
+		clientpackets.OpcodeRequestBuyProcure,
+		clientpackets.OpcodeRequestBuySeed,
 		clientpackets.OpcodeDlgAnswer,
 		clientpackets.OpcodeGameGuardReply,
 		clientpackets.OpcodeRequestShowMiniMap,
@@ -743,10 +742,9 @@ func BenchmarkSessionSendAuthLoginFailFrame(b *testing.B) {
 }
 
 func benchmarkUserInfoSnapshot() serverpackets.UserInfoSnapshot {
-	return serverpackets.UserInfoSnapshot{
-		Character: &player.Character{Name: "Benchmark"},
-		Template:  &player.Template{},
-	}
+	c := &player.Character{}
+	c.SetName("Benchmark")
+	return serverpackets.UserInfoSnapshot{Character: c, Template: &player.Template{}}
 }
 
 func benchmarkUserInfoPayload(s serverpackets.UserInfoSnapshot) []byte {
@@ -814,7 +812,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	}
 
 	t.Run("short packet disconnects immediately pre-auth", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 
 		if _, err := decodeClientPacket(l, client, nil, shortPacket); !errors.Is(err, errMalformedPacketDisconnect) {
@@ -823,7 +821,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 
 	t.Run("validation error never disconnects pre-auth", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 
 		if _, err := decodeClientPacket(l, client, nil, validation); errors.Is(err, errMalformedPacketDisconnect) {
@@ -832,7 +830,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 
 	t.Run("short packet tolerates first, disconnects past threshold post-auth", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 		client.SetAuthenticated("acc", link.SessionKey{})
 
@@ -847,7 +845,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 
 	t.Run("validation error never disconnects post-auth even past threshold", func(t *testing.T) {
-		l := &GameClientLink{}
+		l := newBareGameClientLink(t, GameClientLinkConfig{})
 		client := discardClient(t)
 		client.SetAuthenticated("acc", link.SessionKey{})
 
@@ -859,8 +857,9 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 }
 
-// retainingReceiver is a world-visible observer that keeps every raw frame a
-// broadcast hands it, so a test can prove each recipient owns its copy.
+// retainingReceiver is a world-visible player observer that keeps every raw
+// frame a broadcast hands it, so a test can prove each recipient owns its
+// copy.
 type retainingReceiver struct {
 	world.Presence
 
@@ -870,7 +869,7 @@ type retainingReceiver struct {
 }
 
 func (r *retainingReceiver) ObjectID() int32 { return r.id }
-func (*retainingReceiver) Kind() actor.Kind  { return actor.KindNPC }
+func (*retainingReceiver) Kind() actor.Kind  { return actor.KindPlayer }
 
 func (r *retainingReceiver) BroadcastFrame(frame wire.Frame) bool {
 	r.mu.Lock()
@@ -893,33 +892,36 @@ func (sinkTestDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{0}} }
 func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		emit func(t *testing.T, state *world.State)
+		// emit triggers the broadcast under test; it calls drain to drop
+		// the frames its setup sent first.
+		emit func(t *testing.T, state *world.State, drain func())
 	}{
-		{"hostile", func(t *testing.T, state *world.State) {
+		{"hostile", func(t *testing.T, state *world.State, _ func()) {
 			h := newTestHostileNPC(t, 7)
 			h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state, nil)(h)})
 			state.Spawn(h, 0, 0, 0, 0)
 			h.BroadcastStop()
 		}},
-		{"summon", func(t *testing.T, state *world.State) {
+		{"summon", func(t *testing.T, state *world.State, _ func()) {
 			actor, err := summon.NewServitor(summon.ServitorConfig{ObjectID: 7})
 			if err != nil {
 				t.Fatal(err)
 			}
-			actor.Attach(summon.Runtime{Sink: &summonSink{link: &GameClientLink{world: state}, actor: actor}})
+			actor.Attach(summon.Runtime{Sink: &summonSink{link: newBareGameClientLink(t, GameClientLinkConfig{World: state}), actor: actor}})
 			state.Spawn(actor, 0, 0, 0, 0)
 			actor.BroadcastSelfSkillUse(1422, 1)
 		}},
-		{"effect point", func(t *testing.T, state *world.State) {
+		{"effect point", func(t *testing.T, state *world.State, drain func()) {
 			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1, sim.NewInline(time.Unix(0, 0)).NewQueue("effect-point"), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			ep.Attach(npc.Runtime{World: state, Sink: EffectPointSinks(state)(ep)})
 			ep.Spawn(0, 0, 0, 0)
+			drain() // the spawn sequence's NpcInfo frames
 			ep.BroadcastSkillLaunched(1, 1, []int32{1})
 		}},
-		{"door", func(t *testing.T, state *world.State) {
+		{"door", func(t *testing.T, state *world.State, _ func()) {
 			d, err := door.NewObject(7, &door.Template{ID: 1}, sinkTestDoorShape{})
 			if err != nil {
 				t.Fatal(err)
@@ -935,7 +937,13 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			state.Spawn(first, 10, 0, 0, 0)
 			state.Spawn(second, 20, 0, 0, 0)
 
-			tc.emit(t, state)
+			tc.emit(t, state, func() {
+				for _, r := range []*retainingReceiver{first, second} {
+					r.mu.Lock()
+					r.frames = nil
+					r.mu.Unlock()
+				}
+			})
 
 			if len(first.frames) != 1 || len(second.frames) != 1 {
 				t.Fatalf("frames = %d/%d, want 1/1", len(first.frames), len(second.frames))
@@ -1002,7 +1010,7 @@ func newDetachFilterFixture(t *testing.T) detachFilterFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gcl := &GameClientLink{world: state, pvpFlags: task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil), water: waterTask, log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{World: state, Combat: CombatConfig{PvPFlags: task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil)}, Water: waterTask, Log: zerolog.Nop()})
 	ownFrames, seenFrames := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, ownFrames)
 	observer := newTestLivePlayer(t, 2, seenFrames)
@@ -1013,7 +1021,7 @@ func newDetachFilterFixture(t *testing.T) detachFilterFixture {
 	waterTask.Add(live, time.Minute)
 	testsupport.ResetCapture(ownFrames, seenFrames)
 	water.gauges.Store(0)
-	return detachFilterFixture{live: live, observer: observer, ownFrames: ownFrames, seenFrames: seenFrames, pvpFlags: gcl.pvpFlags, water: water}
+	return detachFilterFixture{live: live, observer: observer, ownFrames: ownFrames, seenFrames: seenFrames, pvpFlags: gcl.combat.pvpFlags, water: water}
 }
 
 // effects reports the side effects ev had on this fixture: frames the player
@@ -1113,6 +1121,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.VitalsChanged{},
 		event.ItemsTaken{},
 		event.SoundPlayed{},
+		event.ScenePlayed{},
 		event.DialogPageShown{},
 		event.DialogReleased{},
 		event.ScriptMessage{},

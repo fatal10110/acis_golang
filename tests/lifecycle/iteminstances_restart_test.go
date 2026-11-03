@@ -39,6 +39,7 @@ func giveShadowSword(t *testing.T, srv *gameservertest.Server, ownerID int32) in
 // penalty, and the client sees the resulting remainder in the unequip
 // InventoryUpdate while the row keeps the exact seconds.
 func TestItemInstanceDecaySurvivesRestart(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)

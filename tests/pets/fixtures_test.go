@@ -472,28 +472,14 @@ func mustRead(t *testing.T, c *testsupport.ScriptedClient, what string) []byte {
 
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for i := 0; i < 100; i++ {
-		if c.ReadWithTimeout(300*time.Millisecond) == nil {
-			return
-		}
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
+	c.ReadQueued()
 }
 
-// drainFrames collects every frame the client receives until the server
-// goes quiet, returning them in arrival order.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	frames := make([][]byte, 0, 8)
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 func requireInventoryUpdateOrder(t *testing.T, frames [][]byte, what string, want ...byte) {

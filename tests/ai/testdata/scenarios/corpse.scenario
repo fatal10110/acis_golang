@@ -1,0 +1,8 @@
+# Corpse (18119): the corpse of a dead man dies, by its own hand, the moment it appears, before
+# the first step. Nothing more answers.
+character Hunter 20
+script script.ai.individual.Corpse
+script script.ai.individual.DefaultNpc
+npc corpse 18119 Monster 40 0 0
+
+advance 10s

@@ -157,6 +157,7 @@ func (s *petRevivalScene) resurrect(t *testing.T, objectID int32) {
 	s.healer.Send(encodeRequestMagicSkillUse(petResurrectSkillID))
 	s.h.srv.Settle(t)
 	s.h.srv.Advance(t, 600*time.Millisecond)
+	s.h.srv.AdvanceUntil(t, "resurrection cast end", func() bool { return !s.h.srv.PlayerCastingNow(t, s.healerID) })
 }
 
 // TestForeignPetResurrectionAsksItsOwner: another player's resurrection on

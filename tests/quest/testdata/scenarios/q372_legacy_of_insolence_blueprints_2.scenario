@@ -1,0 +1,66 @@
+# Legacy of Insolence (Q372): a character holding the 13 blueprints trades them at Walderal, option 2 (the draw 95 gives 5380, 5404 and 5430), and
+# asks again with none left. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q372_legacy_of_insolence_blueprints_2.golden
+character Insolence 59
+quest Q372_LegacyOfInsolence <cond>=2 <state>=STARTED
+hold 5989 1
+hold 5990 1
+hold 5991 1
+hold 5992 1
+hold 5993 1
+hold 5994 1
+hold 5995 1
+hold 5996 1
+hold 5997 1
+hold 5998 1
+hold 5999 1
+hold 6000 1
+hold 6001 1
+random 95
+script quest.Q372_LegacyOfInsolence
+item 57 5966 5967 5968 5969 5972 5973 5974 5975 5976 5977 5978 5979 5980 5981 5982 5983 5984 5985 5986 5987 5988 5989 5990 5991 5992 5993 5994 5995 5996 5997 5998 5999 6000 6001 5368 5370 5380 5382 5392 5394 5404 5406 5426 5428 5430 5432 5496 5497 5502 5503 5508 5509 5514 5515 5525 5526 5527 5528
+page warehouse/30844.htm
+page merchant/30839.htm
+page default/30929.htm
+page default/31001.htm
+page trainer/30855.htm
+page script/quest/Q372_LegacyOfInsolence/
+npc walderal 30844 WarehouseKeeper 10 0 0
+npc holly 30839 Merchant -10 0 0
+npc patrin 30929 Folk 20 0 0
+npc claudia 31001 Folk -20 0 0
+npc desmond 30855 Trainer 30 0 0
+npc beast 20817 Monster 40 0 0
+
+action walderal
+action walderal
+  S ActionFailed
+  S NpcHtmlMessage obj=walderal item=0 page=warehouse/30844.htm
+  S ActionFailed
+bypass npc_{walderal}_Quest
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q372_LegacyOfInsolence 30844-07.htm
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-07.htm
+  S ActionFailed
+bypass Quest Q372_LegacyOfInsolence 30844-07-2.htm
+  S SystemMessage id=302 3:5989
+  S SystemMessage id=302 3:5990
+  S SystemMessage id=302 3:5991
+  S SystemMessage id=302 3:5992
+  S SystemMessage id=302 3:5993
+  S SystemMessage id=302 3:5994
+  S SystemMessage id=302 3:5995
+  S SystemMessage id=302 3:5996
+  S SystemMessage id=302 3:5997
+  S SystemMessage id=302 3:5998
+  S SystemMessage id=302 3:5999
+  S SystemMessage id=302 3:6000
+  S SystemMessage id=302 3:6001
+  S SystemMessage id=54 3:5380
+  S SystemMessage id=54 3:5404
+  S SystemMessage id=54 3:5430
+  S NpcHtmlMessage obj=walderal item=0 page=script/quest/Q372_LegacyOfInsolence/30844-07-2.htm
+  S ActionFailed
+  items 5989=0 6001=0 5380=1 5404=1 5430=1

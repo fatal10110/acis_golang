@@ -1,0 +1,16 @@
+# WizardCastClanBuffRangeDDCurseStoneAggressive (21334, level 80, a Ketra clan), every draw 0: a hit by the character
+# while its top desire target is someone else wants its range DD magic (4571-9, a self-centered area skill, so cast on itself), weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffRangeDDCurseStoneAggressive
+npc stone 21334 Monster 300 0 0 level 80 clan ketra_orc_clan 500 skill DEBUFF 4035 9 skill W_LONG_RANGE_DD_MAGIC 4158 9 skill W_SHORT_RANGE_DD_MAGIC 4561 9 skill RANGE_DD 4571 9
+npc foe 20003 Monster 1500 0 0
+
+top stone foe
+hit stone 10
+  desires stone cast(stone,4571,move)=1000000 cast(player,4158,move)=1000000

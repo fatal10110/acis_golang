@@ -6,6 +6,10 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 // ServerObject selects the static-object view an immobile NPC uses.
 type NPCInfoChanged struct{ ServerObject bool }
 
+// NPCInfoShown asks for an NPC's NpcInfo to be shown again, as no
+// particular viewer sees it, to every player that knows the NPC.
+type NPCInfoShown struct{}
+
 // StatusKind names one value a status update carries.
 type StatusKind uint8
 
@@ -74,9 +78,12 @@ type OnScreenMessage struct {
 type NpcSay struct {
 	NpcID int
 	Text  string
+	// Shout sends the line as a shout.
+	Shout bool
 }
 
 func (NPCInfoChanged) event()    {}
+func (NPCInfoShown) event()      {}
 func (OnScreenMessage) event()   {}
 func (Status) event()            {}
 func (HPChanged) event()         {}
@@ -104,3 +111,34 @@ type HallSupportCast struct {
 
 func (HallManagerBuffCheck) event() {}
 func (HallSupportCast) event()      {}
+
+// HeadquartersAttacked reports a hit on a siege headquarters whose clan
+// was not warned of an attack in the last 30 seconds: the clan's members
+// are to be warned their base is under attack.
+type HeadquartersAttacked struct{}
+
+func (HeadquartersAttacked) event() {}
+
+// NpcShout reports the NPC's chat line Text shouted, named by its NpcID,
+// to the players within Radius of it.
+type NpcShout struct {
+	NpcID  int
+	Text   string
+	Radius int
+}
+
+func (NpcShout) event() {}
+
+// NpcSystemMessage is the system message ID an NPC sends to the players
+// within Radius of it: Text first when set, the castle or hall CastleID
+// names after it when set, and Number last when HasNumber.
+type NpcSystemMessage struct {
+	ID        int
+	Text      string
+	CastleID  int
+	Number    int32
+	HasNumber bool
+	Radius    int
+}
+
+func (NpcSystemMessage) event() {}

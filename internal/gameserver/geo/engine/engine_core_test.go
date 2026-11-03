@@ -503,9 +503,9 @@ func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 				// Last X block of the first region is loaded; the next
 				// region is never set.
 				e := New()
-				region := block.NewRegion()
+				region := block.NewRegionBuilder()
 				region.SetFlat((block.RegionBlocksX-1)*block.RegionBlocksY, height)
-				if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+				if err := e.SetRegion(TileXMin, TileYMin, region.Build()); err != nil {
 					t.Fatalf("SetRegion(): %v", err)
 				}
 				return e
@@ -555,10 +555,10 @@ func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 	// can block it. Blocks (0,0) and (2,0) are loaded, (1,0) is empty.
 	t.Run("null strip between loaded ground", func(t *testing.T) {
 		e := New()
-		region := block.NewRegion()
+		region := block.NewRegionBuilder()
 		region.SetFlat(0, ground)
 		region.SetFlat(2*block.RegionBlocksY, ground)
-		if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+		if err := e.SetRegion(TileXMin, TileYMin, region.Build()); err != nil {
 			t.Fatalf("SetRegion(): %v", err)
 		}
 		ox, oy := worldX(6), worldY(0)

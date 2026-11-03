@@ -1,0 +1,23 @@
+# Power of Darkness (Q353), refused: a level 54 character is too young for Galman, and the quest
+# is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q353_power_of_darkness_low_level.golden
+character Galman 54
+script quest.Q353_PowerOfDarkness
+item 57 5862
+page merchant/31044.htm
+page script/quest/Q353_PowerOfDarkness/
+npc galman 31044 Merchant 10 0 0
+npc succubus 20244 Monster 40 0 0
+
+# Galman: too young.
+action galman
+action galman
+  S ActionFailed
+  S NpcHtmlMessage obj=galman item=0 page=merchant/31044.htm
+  S ActionFailed
+bypass npc_{galman}_Quest
+  S NpcHtmlMessage obj=galman item=0 page=script/quest/Q353_PowerOfDarkness/31044-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q353_PowerOfDarkness CREATED
+  rows Q353_PowerOfDarkness -

@@ -1,0 +1,28 @@
+# An Elder Sows Seeds (Q370): a character short of one chapter gets the page it asked for and no pay.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q370_an_elder_sows_seeds_missing_chapter.golden
+character Seeds 28
+quest Q370_AnElderSowsSeeds <cond>=1 <state>=STARTED
+hold 5917 1
+hold 5918 1
+hold 5919 1
+script quest.Q370_AnElderSowsSeeds
+item 57 5916 5917 5918 5919 5920
+page default/30612.htm
+page script/quest/Q370_AnElderSowsSeeds/
+npc casian 30612 Folk 10 0 0
+
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q370_AnElderSowsSeeds 30612-6.htm
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q370_AnElderSowsSeeds/30612-6.htm
+  S ActionFailed
+  items 5917=1 5918=1 5919=1 5920=0 57=0
+  rows Q370_AnElderSowsSeeds <cond>=1 <state>=STARTED

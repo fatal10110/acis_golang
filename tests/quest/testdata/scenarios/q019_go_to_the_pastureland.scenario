@@ -1,0 +1,82 @@
+# Go to the Pastureland! (Q019): a level 63 character accepts at Vladimir and gets the young wild
+# beast meat; Tunatun takes it for adena and the quest completes; then relog. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q019_go_to_the_pastureland.golden
+character Herder 63
+script quest.Q019_GoToThePastureland
+item 7547 57
+page merchant/31302.htm
+page default/31537.htm
+page script/quest/Q019_GoToThePastureland/
+npc vladimir 31302 Merchant 10 0 0
+npc tunatun 31537 Folk 20 0 0
+
+# Vladimir: accept, with the meat.
+action vladimir
+action vladimir
+  S ActionFailed
+  S NpcHtmlMessage obj=vladimir item=0 page=merchant/31302.htm
+  S ActionFailed
+bypass npc_{vladimir}_Quest
+  S NpcHtmlMessage obj=vladimir item=0 page=script/quest/Q019_GoToThePastureland/31302-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q019_GoToThePastureland CREATED
+bypass Quest Q019_GoToThePastureland 31302-01.htm
+  S QuestList 19:0x80000001
+  S ExShowQuestMark quest=19
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7547
+  S NpcHtmlMessage obj=vladimir item=0 page=script/quest/Q019_GoToThePastureland/31302-01.htm
+  S ActionFailed
+  Q upsert Q019_GoToThePastureland | <state> | STARTED
+  Q upsert Q019_GoToThePastureland | <cond> | 1
+  state Q019_GoToThePastureland STARTED
+  rows Q019_GoToThePastureland <cond>=1 <state>=STARTED
+  items 7547=1
+action vladimir
+  S ActionFailed
+  S NpcHtmlMessage obj=vladimir item=0 page=merchant/31302.htm
+  S ActionFailed
+bypass npc_{vladimir}_Quest
+  S NpcHtmlMessage obj=vladimir item=0 page=script/quest/Q019_GoToThePastureland/31302-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Tunatun takes the meat; the quest completes.
+action tunatun
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q019_GoToThePastureland/31537-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q019_GoToThePastureland 019_finish
+  S SystemMessage id=302 3:7547
+  S SystemMessage id=52 6:30000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 19:0x00000000
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q019_GoToThePastureland/31537-01.htm
+  S ActionFailed
+  Q upsert Q019_GoToThePastureland | <state> | COMPLETED
+  Q delete-except-state Q019_GoToThePastureland
+  state Q019_GoToThePastureland COMPLETED
+  rows Q019_GoToThePastureland <state>=COMPLETED
+  items 7547=0 57=30000
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q019_GoToThePastureland COMPLETED
+  rows Q019_GoToThePastureland <state>=COMPLETED
+  items 57=30000
+action vladimir
+action vladimir
+  S ActionFailed
+  S NpcHtmlMessage obj=vladimir item=0 page=merchant/31302.htm
+  S ActionFailed
+bypass npc_{vladimir}_Quest
+  S NpcHtmlMessage obj=vladimir item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

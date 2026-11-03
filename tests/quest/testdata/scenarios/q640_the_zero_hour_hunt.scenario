@@ -1,0 +1,24 @@
+# The Zero Hour (Q640): every spiked stakato drops a fang.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q640_the_zero_hour_hunt.golden
+character Hero 66
+quest Q640_TheZeroHour <cond>=1 <state>=STARTED
+random 0 0 0 0
+script quest.Q640_TheZeroHour
+item 8085 4042 4043 4044 1887 1888 1889 5550 1890 1893
+page default/31554.htm
+page script/quest/Q640_TheZeroHour/
+npc kahman 31554 Folk 10 0 0
+npc m1 22105 Monster 40 0 0
+npc m2 22121 Monster 50 0 0
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8085
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8085=1
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8085
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8085=2

@@ -52,7 +52,7 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 	dir := moveDirectionFor(gtx-gox, gty-goy)
 	gridX := alignCell(ox)
 	gridY := alignCell(oy)
-	height := int32(commons.JavaInt(oheight))
+	height := int32(commons.TruncInt32Sat(oheight))
 	maxGeoX := GeoX(WorldXMax)
 	maxGeoY := GeoY(WorldYMax)
 
@@ -79,23 +79,23 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 		next := e.blockAtGeo(gox, goy)
 		stepDX := int32(checkX - ox)
 		stepDY := int32(checkY - oy)
-		bottomZ := int32(oz) + commons.JavaInt(mz*math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY)))
+		bottomZ := int32(oz) + commons.TruncInt32Sat(mz*math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY)))
 
 		// Some geodata always lies below a flier: the highest layer under
 		// the corridor top must stay at or under its bottom.
-		layer := next.Below(localCell(gox), localCell(goy), bottomZ+height)
+		layer, cell := next.belowCell(localCell(gox), localCell(goy), bottomZ+height, nil)
 		if layer < 0 {
 			return stopped, false
 		}
-		goz = int(next.Height(layer))
+		goz = int(cell.Height)
 		if int32(goz) > bottomZ {
 			return stopped, false
 		}
 
 		// The lowest layer over the corridor bottom must clear its top.
 		topZ := bottomZ + height
-		if layer = next.Above(localCell(gox), localCell(goy), bottomZ); layer >= 0 {
-			goz = int(next.Height(layer))
+		if layer, cell = next.aboveCell(localCell(gox), localCell(goy), bottomZ, nil); layer >= 0 {
+			goz = int(cell.Height)
 			if int32(goz) < topZ {
 				return stopped, false
 			}

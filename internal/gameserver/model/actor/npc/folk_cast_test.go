@@ -64,6 +64,8 @@ type scriptedFolkCastAI struct {
 	canCast   bool
 	castRange int
 	skillMP   int
+	// skillType is every skill's type; empty reads as HEAL.
+	skillType string
 	casts     []modelskill.Ref
 }
 
@@ -87,7 +89,12 @@ func (a *scriptedFolkCastAI) CanCast(attackable.Combatant, modelskill.Ref) bool 
 
 func (a *scriptedFolkCastAI) Range(modelskill.Ref) int          { return a.castRange }
 func (a *scriptedFolkCastAI) StopsMovement(modelskill.Ref) bool { return false }
-func (a *scriptedFolkCastAI) SkillType(modelskill.Ref) string   { return "HEAL" }
+func (a *scriptedFolkCastAI) SkillType(modelskill.Ref) string {
+	if a.skillType == "" {
+		return "HEAL"
+	}
+	return a.skillType
+}
 
 func (a *scriptedFolkCastAI) Cast(_ attackable.Combatant, ref modelskill.Ref) {
 	a.casts = append(a.casts, ref)
@@ -158,7 +165,7 @@ func newFolkCastRig(t *testing.T, dist int) *folkCastRig {
 
 // desire queues a cast of skill id at target and runs the NPC's queue.
 func (r *folkCastRig) desire(target attackable.Combatant, id modelskill.ID, weight float64) {
-	r.f.AddCastDesire(target, modelskill.Ref{ID: id, Level: 1}, weight)
+	r.f.AddCastDesire(target, modelskill.Ref{ID: id, Level: 1}, weight, true, true)
 	r.in.Run()
 }
 

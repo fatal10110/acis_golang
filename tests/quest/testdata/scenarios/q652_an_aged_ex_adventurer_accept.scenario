@@ -1,0 +1,32 @@
+# An Aged Ex-Adventurer (Q652): a level 46 character gives Tantan a hundred soulshots of grade C and takes the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q652_an_aged_ex_adventurer_accept.golden
+character Recruit 46
+hold 1464 100
+script quest.Q652_AnAgedExAdventurer
+item 1464 956 57
+page default/32012.htm
+page script/quest/Q652_AnAgedExAdventurer/
+npc tantan 32012 Folk 10 0 0
+
+action tantan
+action tantan
+  S ActionFailed
+  S NpcHtmlMessage obj=tantan item=0 page=default/32012.htm
+  S ActionFailed
+bypass npc_{tantan}_Quest
+  S NpcHtmlMessage obj=tantan item=0 page=script/quest/Q652_AnAgedExAdventurer/32012-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q652_AnAgedExAdventurer 32012-02.htm
+  S QuestList 652:0x80000001
+  S ExShowQuestMark quest=652
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1464 6:100
+  S NpcHtmlMessage obj=tantan item=0 page=script/quest/Q652_AnAgedExAdventurer/32012-04.htm
+  S ActionFailed
+  Q upsert Q652_AnAgedExAdventurer | <state> | STARTED
+  Q upsert Q652_AnAgedExAdventurer | <cond> | 1
+  rows Q652_AnAgedExAdventurer <cond>=1 <state>=STARTED
+  state Q652_AnAgedExAdventurer STARTED
+  items 1464=0

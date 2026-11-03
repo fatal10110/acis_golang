@@ -1,7 +1,7 @@
 package raidpoint
 
-// The client lists a player's bosses in the order the reference record
-// keeps them, which is its hash table's: bucket by bucket, and within a
+// The client lists a player's bosses in the order the record keeps them,
+// which is its hash table's: bucket by bucket, and within a
 // bucket in chain order. record replays that table. It starts at
 // initialBuckets buckets and doubles, keeping each chain's order, when it
 // holds more than three quarters of its bucket count: right after an
@@ -10,8 +10,8 @@ package raidpoint
 // While the table is under treeBuckets buckets, a chain reaching the tree
 // limit doubles the table instead of becoming a tree. A chain that reaches
 // it in a larger table, which takes eight bosses one bucket apart in a
-// record of at least 49, keeps its plain chain order here, where the
-// reference lists the tree differently.
+// record of at least 49, keeps its plain chain order here, where a tree
+// bucket would list them differently.
 const (
 	initialBuckets = 16
 	treeBuckets    = 64

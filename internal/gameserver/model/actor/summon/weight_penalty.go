@@ -34,7 +34,7 @@ func (a *Actor) WeightLimit() int {
 	if !a.isPet || a.petConfig == nil {
 		return 0
 	}
-	return int(a.calcStat(stat.WeightLimit, a.petConfig.BaseWeightLimit(a.CON())))
+	return int(a.calcFor(stat.WeightLimit, a.petConfig.BaseWeightLimit(a.CON()), a.ConditionActor(), nil))
 }
 
 // WeightPenalty returns this summon's current weight-penalty band, 0 when
@@ -74,7 +74,7 @@ func (a *Actor) storeWeightPenalty() bool {
 	if limit <= 0 {
 		return false
 	}
-	ratio := (float64(inv.TotalWeight()) - a.calcStat(stat.WeightPenalty, 0)) / float64(limit)
+	ratio := (float64(inv.TotalWeight()) - a.calcFor(stat.WeightPenalty, 0, a.ConditionActor(), nil)) / float64(limit)
 	band := int32(weightPenaltyLevel4)
 	switch {
 	case ratio < .5:

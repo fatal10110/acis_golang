@@ -39,6 +39,10 @@ type Actor interface {
 
 	HP() float64
 	ReduceHPByDOT(damage float64, effector Actor, isDOT bool)
+	// ReduceHPBySkillDOT applies a skill's damage-over-time tick. An NPC
+	// records the skill that dealt it; any other actor takes it as
+	// ReduceHPByDOT(damage, effector, true).
+	ReduceHPBySkillDOT(damage float64, effector Actor, sk modelskill.Ref)
 	MPValue() float64
 	// ReduceMP reports the amount actually removed.
 	ReduceMP(amount float64) float64
@@ -194,6 +198,13 @@ func asCaster(a Actor) (CasterActor, bool) {
 	return c, ok
 }
 
+// sameActor reports whether a and b are one creature. It compares object
+// ids, not values: a player reaches an effect both as its model and as the
+// object the world registers it under.
+func sameActor(a, b Actor) bool {
+	return a != nil && b != nil && a.ObjectID() == b.ObjectID()
+}
+
 func asPlayer(a Actor) (PlayerActor, bool) {
 	p, ok := a.(PlayerActor)
 	return p, ok
@@ -209,5 +220,5 @@ func asSummon(a Actor) (SummonActor, bool) {
 	return s, ok
 }
 
-// growRadiusScale is EffectGrow.onStart()'s collision-radius multiplier.
+// growRadiusScale is the Grow effect's collision-radius multiplier.
 const growRadiusScale = 1.19

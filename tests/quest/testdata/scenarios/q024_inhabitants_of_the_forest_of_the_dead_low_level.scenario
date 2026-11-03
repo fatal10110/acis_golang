@@ -1,0 +1,21 @@
+# Inhabitants of the Forest of the Dead (Q024) below level 65: Dorian turns the player away even
+# with Lidia's Heart done. Expectations come from the reference trace
+# (Q024_InhabitantsOfTheForestOfTheDead.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q024_inhabitants_of_the_forest_of_the_dead_low_level.golden
+character Young 64
+quest Q023_LidiasHeart <state>=COMPLETED
+script quest.Q023_LidiasHeart
+script quest.Q024_InhabitantsOfTheForestOfTheDead
+page default/31389.htm
+page script/quest/Q024_InhabitantsOfTheForestOfTheDead/
+npc dorian 31389 Folk 10 0 0
+
+action dorian
+action dorian
+  S ActionFailed
+  S NpcHtmlMessage obj=dorian item=0 page=default/31389.htm
+  S ActionFailed
+bypass npc_{dorian}_Quest
+  S NpcHtmlMessage obj=dorian item=0 page=script/quest/Q024_InhabitantsOfTheForestOfTheDead/31389-02.htm
+  S ActionFailed
+  S ActionFailed

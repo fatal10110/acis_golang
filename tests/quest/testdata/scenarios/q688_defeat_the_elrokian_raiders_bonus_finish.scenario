@@ -1,0 +1,39 @@
+# Defeat the Elrokian Raiders! (Q688): 107 necklaces: a hundred are paid 450000 adena, then the seven left are paid 3000 each and the quest ends.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q688_defeat_the_elrokian_raiders_bonus_finish.golden
+character Hero 75
+quest Q688_DefeatTheElrokianRaiders <cond>=1 <state>=STARTED
+hold 8785 107
+script quest.Q688_DefeatTheElrokianRaiders
+item 8785 57
+page merchant/32105.htm
+page script/quest/Q688_DefeatTheElrokianRaiders/
+npc dinn 32105 Merchant 10 0 0
+npc elroki 22214 Monster 40 0 0
+
+action dinn
+action dinn
+  S ActionFailed
+  S NpcHtmlMessage obj=dinn item=0 page=merchant/32105.htm
+  S ActionFailed
+bypass npc_{dinn}_Quest
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q688_DefeatTheElrokianRaiders 32105-07.htm
+  S SystemMessage id=301 3:8785 6:100
+  S SystemMessage id=52 6:450000
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-07.htm
+  S ActionFailed
+  items 8785=7 57=450000
+bypass Quest Q688_DefeatTheElrokianRaiders 32105-08.htm
+  S SystemMessage id=301 3:8785 6:7
+  S SystemMessage id=52 6:21000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=dinn item=0 page=script/quest/Q688_DefeatTheElrokianRaiders/32105-08.htm
+  S ActionFailed
+  Q delete-quest Q688_DefeatTheElrokianRaiders
+  rows Q688_DefeatTheElrokianRaiders -
+  state Q688_DefeatTheElrokianRaiders -
+  items 8785=0 57=471000

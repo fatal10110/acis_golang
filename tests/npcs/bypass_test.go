@@ -150,10 +150,10 @@ func TestBypassPlayerHelpKeepsTheDialogLinks(t *testing.T) {
 
 // TestBypassNpcRejections pins the dispatcher's gates on whitelisted npc_
 // commands: an object id that does not parse is dropped silently; an
-// unknown object, a non-civilian NPC, an NPC out of interaction distance,
-// a command naming no dialog command, an unported command and a Link
-// climbing out of the page tree are each answered ActionFailed alone; a
-// bare Link aborts with nothing sent.
+// unknown object, a hostile NPC's command it does not answer, an NPC out
+// of interaction distance, a command naming no dialog command, an unported
+// command and a Link climbing out of the page tree are each answered
+// ActionFailed alone; a bare Link aborts with nothing sent.
 func TestBypassNpcRejections(t *testing.T) {
 	t.Parallel()
 	w := bootFolkWorld(t, dialogPages(), noBypassReuse)
@@ -169,7 +169,7 @@ func TestBypassNpcRejections(t *testing.T) {
 	}{
 		{"npc_x1_Chat 1", nil},
 		{"npc_999999_Chat 1", releaseOnly},
-		{"npc_" + strconv.Itoa(int(hostile.ObjectID())) + "_Chat 1", releaseOnly},
+		{"npc_" + strconv.Itoa(int(hostile.ObjectID())) + "_Buy 1", releaseOnly},
 		{npcCommand(far, "Chat 1"), releaseOnly},
 		{"npc_" + strconv.Itoa(int(near.ObjectID())), releaseOnly},
 		{npcCommand(near, "Buy 1"), releaseOnly},
@@ -204,7 +204,9 @@ func TestBypassChatPagePaths(t *testing.T) {
 }
 
 // TestBypassDungeonGatekeeperReleasesFirst pins the dungeon gatekeeper,
-// which releases the client ahead of every command.
+// which releases the client ahead of every command, its own (see
+// dungeon_gatekeeper_test.go) and the generic ones alike, even one nothing
+// answers.
 func TestBypassDungeonGatekeeperReleasesFirst(t *testing.T) {
 	t.Parallel()
 	pages := dialogPages()
@@ -216,7 +218,7 @@ func TestBypassDungeonGatekeeperReleasesFirst(t *testing.T) {
 	want := append([]byte{serverpackets.OpcodeActionFailed}, chatWindowAnswer...)
 	assertAnswer(t, w.bypass(t, npcCommand(f, "Chat 1")), want, f, wantChatPage(pages["gatekeeper/31095-1.htm"], f))
 	w.openAnyNpcPage(t)
-	assertAnswer(t, w.bypass(t, npcCommand(f, "necro")), []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}, f, "")
+	assertAnswer(t, w.bypass(t, npcCommand(f, "unknown")), []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}, f, "")
 }
 
 // TestBypassKarmaGateCoversEveryCommand pins the shop karma gate on
@@ -308,8 +310,8 @@ func TestBypassRefusedWhileTradeRequestPending(t *testing.T) {
 	}
 }
 
-// TestBypassCommandFamilies pins the families whose systems are not in
-// place: each is answered ActionFailed. A Quest command must be on the
+// TestBypassCommandFamilies pins the answers of the command families to a
+// player at no particular NPC. A Quest command must be on the
 // last page, like an npc_ one, and is dropped silently when it is not, or
 // when the player talked to no NPC about quests (tests/quest pins the
 // rest of it). An
@@ -327,9 +329,13 @@ func TestBypassCommandFamilies(t *testing.T) {
 	for _, command := range []string{"bbs_default", "_bbshome", "_friendlist_0_", "_maillist_0_1_0_", "_block"} {
 		assertAnswer(t, w.bypass(t, command), []byte{serverpackets.OpcodeSystemMessage}, nil, "")
 	}
-	for _, command := range []string{"manor_menu_select?ask=1", "arenachange 1"} {
-		assertAnswer(t, w.bypass(t, command), releaseOnly, nil, "")
-	}
+	// A stadium is watched only from an Olympiad manager's list or while
+	// watching one (tests/olympiad); anyone else's arenachange answers
+	// nothing.
+	assertAnswer(t, w.bypass(t, "arenachange 1"), nil, nil, "")
+	// The manor windows answer only on a manor manager or a castle
+	// chamberlain targeted (tests/npcs/manor_setup_test.go).
+	assertAnswer(t, w.bypass(t, "manor_menu_select?ask=1"), nil, nil, "")
 	// The hero pages are ported: with no hero of the class the reference
 	// sends nothing (RequestBypassToServer's _match/_diary, heroid > 0).
 	for _, command := range []string{"_match?class=88&page=1", "_diary?class=88&page=1"} {

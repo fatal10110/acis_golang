@@ -1,0 +1,24 @@
+# TyrannoPrimeval (22215, its shipped buffs), every draw 0: a hit on it with its top desire target set drops its
+# attack desires, remembers that target (c_ai1) and wants its second self buff on itself; the buff finishing in a
+# fight sets its chance multiplier (i_ai3) to ProbMultiplier2 (5) and forgets the target, wanting to attack it again
+# (100) on top of the 125 the second hit added.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval
+npc rex 22215 Monster 300 0 0 skill SELF_BUFF1 5087 1 skill SELF_BUFF2 5087 2 skill LONG_RANGE_DD_MAGIC1 5120 1
+
+stance rex on
+hit rex 10
+  S MagicSkillUse caster=rex target=rex skill=5087-2 hit=5285 reuse=0 success=0
+top rex player
+  top rex player
+hit rex 10
+  mem rex c_ai1=player
+advance 6s
+  S MagicSkillUse caster=rex target=player skill=5120-1 hit=1321 reuse=7928 success=0
+  mem rex i_ai3=5 c_ai1=-
+  desires rex attack(player)=225 cast(player,5120,move)=2000000

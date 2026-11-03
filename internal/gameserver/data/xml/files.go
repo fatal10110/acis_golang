@@ -19,6 +19,16 @@ type xmlDocument[T any] struct {
 }
 
 func loadXMLDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
+	return loadDocuments[T](dir, kind, readXML)
+}
+
+// loadTemplateDocuments is loadXMLDocuments for skill and item files, whose
+// readers tell a CDATA section from the text around it (see readTemplateXML).
+func loadTemplateDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
+	return loadDocuments[T](dir, kind, readTemplateXML)
+}
+
+func loadDocuments[T any](dir, kind string, read func(string, any) error) ([]xmlDocument[T], error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*.xml"))
 	if err != nil {
 		return nil, fmt.Errorf("xml: list %s files in %s: %w", kind, dir, err)
@@ -31,7 +41,7 @@ func loadXMLDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
 	docs := make([]xmlDocument[T], 0, len(paths))
 	for _, path := range paths {
 		var doc T
-		if err := readXML(path, &doc); err != nil {
+		if err := read(path, &doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", kind, err)
 		}
 		docs = append(docs, xmlDocument[T]{Path: path, Data: doc})
@@ -55,14 +65,14 @@ func buildAll[T any](path string, els []attrsElement, build func(*attrValues) (T
 	return out, nil
 }
 
-// coord is a world-coordinate attribute. It parses itself with commons.Atoi
+// coord is a world-coordinate attribute. It parses itself with strconv.Atoi
 // so the accepted input set matches the attribute bag it replaces exactly:
 // the decoder's own int conversion accepts an empty value as 0 and trims
 // surrounding space, both of which the bag rejected.
 type coord int
 
 func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
-	n, err := commons.Atoi(attr.Value)
+	n, err := strconv.Atoi(attr.Value)
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
@@ -71,14 +81,14 @@ func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
 }
 
 // coord32 is like coord but for an attribute that must fit int32 (an id, a z
-// bound, a heading), rejecting the same malformed, empty, padded, and
-// out-of-range input commons.StatSet.GetInt32 did. Declare a required
-// attribute as *coord32 so absence stays distinguishable; a plain coord32 is
-// an optional attribute whose default is 0.
+// bound, a heading), rejecting malformed, empty, padded, and out-of-range
+// input. Declare a required attribute as *coord32 so absence stays
+// distinguishable; a plain coord32 is an optional attribute whose default
+// is 0.
 type coord32 int32
 
 func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
-	n, err := commons.ParseInt(attr.Value, 32)
+	n, err := strconv.ParseInt(attr.Value, 10, 32)
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
@@ -101,30 +111,28 @@ func (l *literal32) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
-// decodeLiteralAttrs replaces the raw value of each present key in set with
-// its integer-literal value (see literal32), for attributes a model
-// constructor reads from a StatSet. An absent key stays absent so the
-// constructor's own required/default handling still applies.
-func decodeLiteralAttrs(set *commons.StatSet, keys ...string) error {
+// canonicalizeLiteralAttrs replaces the raw value of each present key in
+// vals with the decimal form of its integer-literal value (see literal32),
+// so a later plain base-10 read sees the decoded number. It suits an
+// element whose values can still be overridden by later attributes (its
+// <set> children, a door's stats) after decoding. An absent key stays
+// absent.
+func canonicalizeLiteralAttrs(vals map[string]string, keys ...string) error {
 	for _, key := range keys {
-		if !set.Has(key) {
+		raw, ok := vals[key]
+		if !ok {
 			continue
-		}
-		raw, err := set.GetString(key)
-		if err != nil {
-			return err
 		}
 		n, err := commons.DecodeInt32(raw)
 		if err != nil {
 			return fmt.Errorf("%s: %w", key, err)
 		}
-		set.Set(key, int(n))
+		vals[key] = strconv.Itoa(int(n))
 	}
 	return nil
 }
 
-// floatAttr is a required float64 attribute, rejecting the same malformed
-// input commons.StatSet.GetFloat64 did.
+// floatAttr is a required float64 attribute, rejecting malformed input.
 type floatAttr float64
 
 func (f *floatAttr) UnmarshalXMLAttr(attr xml.Attr) error {
@@ -136,10 +144,9 @@ func (f *floatAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
-// boolAttr coerces an attribute value the same permissive way
-// commons.StatSet.GetBoolDefault did: case-insensitively "true" is true,
-// anything else present is false. It never fails to parse, matching that
-// laxness exactly rather than encoding/xml's stricter native bool decode.
+// boolAttr coerces an attribute value permissively: case-insensitively
+// "true" is true, anything else present is false. It never fails to parse,
+// unlike encoding/xml's stricter native bool decode.
 type boolAttr bool
 
 func (b *boolAttr) UnmarshalXMLAttr(attr xml.Attr) error {
@@ -159,11 +166,11 @@ func (d *dashPairAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 	if len(parts) != 2 {
 		return fmt.Errorf("%s: want \"left-right\"", attr.Name.Local)
 	}
-	id, err := commons.ParseInt(parts[0], 32)
+	id, err := strconv.ParseInt(parts[0], 10, 32)
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
-	count, err := commons.Atoi(parts[1])
+	count, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
@@ -172,7 +179,7 @@ func (d *dashPairAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 }
 
 // intListAttr is a ";"-separated list of ints (a soul crystal's level
-// list). It parses itself with commons.Atoi per element, rejecting the same
+// list). It parses itself with strconv.Atoi per element, rejecting the same
 // malformed and empty input the attribute bag's array accessor did.
 type intListAttr []int
 
@@ -180,7 +187,7 @@ func (l *intListAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 	parts := strings.Split(attr.Value, ";")
 	out := make(intListAttr, len(parts))
 	for i, p := range parts {
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return fmt.Errorf("%s: %w", attr.Name.Local, err)
 		}
@@ -250,6 +257,19 @@ func readXML(path string, dst any) error {
 		return fmt.Errorf("xml: read %s: %w", path, err)
 	}
 	if err := xml.Unmarshal(data, dst); err != nil {
+		return fmt.Errorf("xml: parse %s: %w", path, err)
+	}
+	return nil
+}
+
+// readTemplateXML is readXML for a skill or item file: the decoder it uses
+// brackets each CDATA section with cdataBound tokens (see cdataMarker).
+func readTemplateXML(path string, dst any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("xml: read %s: %w", path, err)
+	}
+	if err := newTemplateDecoder(data).Decode(dst); err != nil {
 		return fmt.Errorf("xml: parse %s: %w", path, err)
 	}
 	return nil

@@ -15,6 +15,7 @@ func TestAttackableAIPromotesQueuedCastDesireAndCasts(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -39,6 +40,7 @@ func TestAttackableAICastStopsMovementAndFacesTargetForLongCast(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, stopsMove: true}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -65,6 +67,7 @@ func TestAttackableAICastDoesNotFaceSelfTarget(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, stopsMove: true}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: owner, Skill: ref, Weight: 10})
@@ -86,6 +89,7 @@ func TestAttackableAICastStartsOffensiveFollowBeforeCasting(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -131,6 +135,7 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: false}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -156,6 +161,7 @@ func TestAttackableRunAICastStopsMovementAndStillFacesTarget(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: false, stopsMove: true}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -188,18 +194,33 @@ func TestAttackableAICastFinalGateRejectDoesNotBroadcastForSelfTarget(t *testing
 	}
 }
 
+// TestAttackableAICastSummonFriendBypassesTargetLostCheck: a current
+// SUMMON_FRIEND cast still casts on a target the actor no longer knows. Desire
+// selection drops the desire of a creature the actor does not know before it
+// is taken up, so the bypass shows on the continue pass of a cast taken up
+// while the target was known.
 func TestAttackableAICastSummonFriendBypassesTargetLostCheck(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
-	owner.known = map[int32]bool{target.ObjectID(): false}
 	move := &recordingMove{}
 	ref := skill.Ref{ID: 4, Level: 1}
-	cast := &recordingCast{canAttempt: true, canCast: true, skillType: "SUMMON_FRIEND"}
+	cast := &recordingCast{disabled: true, canAttempt: true, canCast: true, skillType: "SUMMON_FRIEND"}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.RunAI()
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionCast || cast.castCalled {
+		t.Fatalf("after RunAI with skills disabled: intention %v, cast called %v; want cast intention, no cast", got, cast.castCalled)
+	}
+	owner.known = map[int32]bool{target.ObjectID(): false}
+	cast.disabled = false
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 
 	if !cast.castCalled || cast.castedTarget != target {
 		t.Fatal("Cast() not called for a SUMMON_FRIEND cast against an unknown target")
@@ -231,6 +252,7 @@ func TestAttackableAICastNoOpsWithoutCastController(t *testing.T) {
 	move := &recordingMove{}
 	ref := skill.Ref{ID: 4, Level: 1}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
 

@@ -153,33 +153,18 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 }
 
 // GetFromPet transfers one item from a pet inventory to its owner's
-// inventory, unequipping it from the pet first if it was worn. Container.
-// Transfer only touches the container's item map — it never clears a
-// paperdoll slot pointing at the transferred instance — so an equipped item
-// must be unequipped explicitly here; the reported WasWorn drives the
-// PET_TOOK_OFF_S1 notification.
-//
-// wasWorn is only captured as a boolean before the transfer is attempted;
-// the actual paperdoll-clearing mutation runs only once s.transfer reports
-// GiveOK — the confirmed-success path, after the item is reconfirmed still
-// present. A failed transfer (e.g. the item was concurrently removed from
-// petInv between this lookup and transfer's own re-check) must leave the
-// pet's equip state untouched. The clear uses ClearWornSlot rather than UnequipSlot: by
-// this point the transfer has already moved inst into playerInv and set
-// its Location there, and UnequipSlot's own SetLocation(petInv.Location(),
-// 0) would incorrectly move it back.
+// inventory. A worn item is taken off as it leaves the pet's inventory, inside
+// the transfer, so a failed transfer leaves the pet's equip state untouched.
+// The reported WasWorn, read before the transfer, drives the PET_TOOK_OFF_S1
+// notification.
 func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
 	wasWorn := false
 	itemID := int32(0)
-	slot := 0
-	var inst *item.Instance
 	if petInv != nil {
-		if candidate := petInv.ItemByObjectID(objectID); candidate != nil {
-			if st := candidate.Snapshot(); st.Equipped() {
+		if inst := petInv.ItemByObjectID(objectID); inst != nil {
+			if st := inst.Snapshot(); st.Equipped() {
 				wasWorn = true
 				itemID = st.TemplateID
-				slot = st.LocationData
-				inst = candidate
 			}
 		}
 	}
@@ -187,10 +172,8 @@ func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectI
 	if failure != GiveOK {
 		return result, false, err
 	}
-	if wasWorn && petInv.ClearWornSlot(slot, inst) {
-		result.WasWorn = true
-		result.ItemID = itemID
-	}
+	result.WasWorn = wasWorn
+	result.ItemID = itemID
 	return result, true, err
 }
 
@@ -216,9 +199,17 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	// the item's use conditions, checked against the pet, for a
 	// not-yet-equipped item. A failed condition sends PET_CANNOT_USE_ITEM
 	// to the pet's owner rather than staying silent, so this reuses
-	// UsePetCannotUseItem rather than a bare no-op.
-	if !st.Equipped() && !checkUseConditions(pet, tmpl.UseConditions) {
-		return UseResult{ItemID: inst.TemplateID}, UsePetCannotUseItem
+	// UsePetCannotUseItem rather than a bare no-op. A test that aborts is
+	// the one silent refusal: the check fails hard before anything is
+	// sent, and a pet item use leaves the client waiting on nothing.
+	if !st.Equipped() {
+		held, aborted := checkUseConditions(pet, tmpl.UseConditions)
+		if aborted {
+			return UseResult{}, UseNoop
+		}
+		if !held {
+			return UseResult{ItemID: inst.TemplateID}, UsePetCannotUseItem
+		}
 	}
 
 	if !Equippable(tmpl) {

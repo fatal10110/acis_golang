@@ -3,9 +3,8 @@ package cast
 import (
 	"errors"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -26,6 +25,12 @@ var (
 	// ErrSiegeSummonUnavailable means a siege-summon skill was requested by a
 	// caster who is not an attacker of an active siege.
 	ErrSiegeSummonUnavailable = errors.New("cast: siege summon outside siege")
+	// ErrSiegeSummonInCastle means a siege attacker requested a siege-summon
+	// skill inside the castle's grounds.
+	ErrSiegeSummonInCastle = errors.New("cast: siege summon inside castle")
+	// ErrStrifeForbidsSummoning means the Seal of Strife forbids the caster a
+	// siege summon.
+	ErrStrifeForbidsSummoning = errors.New("cast: seal of strife forbids summoning")
 )
 
 // CanPlayerAttemptCast is a live player's pre-attempt gate: the checks that
@@ -37,7 +42,7 @@ var (
 // request that passes behind it. A caster still sitting down is not seated
 // yet: the request waits out the sit-down and is refused once it ends.
 // Every skill request path of a player shares it.
-func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Target, def modelskill.Definition) error {
+func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Target, def *modelskill.Definition) error {
 	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -56,7 +61,7 @@ func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Targe
 // CanPlayerAttemptItemCast is the pre-attempt gate of an item-carried
 // skill. It differs from CanPlayerAttemptCast only in that a toggle runs
 // the shared skill checks rather than CanCastToggle's.
-func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target Target, def modelskill.Definition) error {
+func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target Target, def *modelskill.Definition) error {
 	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -68,7 +73,7 @@ func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target T
 
 // playerAttemptRules is the player-only part of the pre-attempt gate;
 // sitting is whether the caster counts as seated.
-func (c *Controller) playerAttemptRules(caster *player.Character, target Target, def modelskill.Definition, sitting bool) error {
+func (c *Controller) playerAttemptRules(caster *player.Character, target Target, def *modelskill.Definition, sitting bool) error {
 	if err := playerStateBlocksCast(caster, def, sitting); err != nil {
 		return err
 	}
@@ -78,20 +83,30 @@ func (c *Controller) playerAttemptRules(caster *player.Character, target Target,
 	if outsideCasterDuel(caster, target) {
 		return ErrInvalidTarget
 	}
-	if def.SiegeSummonSkill && !caster.ActiveSiegeAttacker() {
-		return ErrSiegeSummonUnavailable
+	if def.SiegeSummonSkill {
+		return siegeSummonRefusal(caster)
 	}
-	// With siege summons (#235), a siege attacker's summon is next refused
-	// inside a castle zone (NOT_CALL_PET_FROM_THIS_LOCATION) and by a
-	// Dawn-held Seal of Strife for a Dusk member
-	// (SEAL_OF_STRIFE_FORBIDS_SUMMONING). Neither is reachable while
-	// ActiveSiegeAttacker is always false.
+	return nil
+}
+
+// siegeSummonRefusal is the siege-summon gate: the caster's clan must attack
+// the siege in progress where the caster stands, outside the castle's
+// grounds, and the Seal of Strife must not forbid the caster to summon.
+func siegeSummonRefusal(caster *player.Character) error {
+	switch {
+	case !caster.ActiveSiegeAttacker():
+		return ErrSiegeSummonUnavailable
+	case caster.InCastleZone():
+		return ErrSiegeSummonInCastle
+	case caster.StrifeForbidsSummoning():
+		return ErrStrifeForbidsSummoning
+	}
 	return nil
 }
 
 // playerStateBlocksCast rejects a cast the caster's own state forbids, in the
 // specified order.
-func playerStateBlocksCast(caster *player.Character, def modelskill.Definition, sitting bool) error {
+func playerStateBlocksCast(caster *player.Character, def *modelskill.Definition, sitting bool) error {
 	if caster.WearingFormalWear() {
 		return ErrFormalWear
 	}
@@ -111,7 +126,7 @@ func playerStateBlocksCast(caster *player.Character, def modelskill.Definition, 
 	return nil
 }
 
-func fishingSkill(def modelskill.Definition) bool {
+func fishingSkill(def *modelskill.Definition) bool {
 	switch def.SkillType {
 	case "FISHING", "PUMPING", "REELING":
 		return true
@@ -125,25 +140,19 @@ func outsideCasterDuel(caster *player.Character, target Target) bool {
 	if !caster.InDuel() {
 		return false
 	}
-	t, ok := target.(interface {
-		Kind() actor.Kind
-		Owner() (attackable.Combatant, bool)
-	})
+	t, ok := target.(skilltarget.Actor)
 	if !ok {
 		return false
 	}
-	var acting any = t
 	switch t.Kind() {
 	case actor.KindPlayer:
 	case actor.KindSummon:
-		owner, ok := t.Owner()
-		if !ok || owner == nil {
+		// A summon's duel is its owner's; an ownerless one is in none.
+		if owner, ok := t.Owner(); !ok || owner == nil {
 			return false
 		}
-		acting = owner
 	default:
 		return false
 	}
-	p, ok := acting.(interface{ DuelID() int32 })
-	return ok && p.DuelID() != caster.DuelID()
+	return t.DuelID() != caster.DuelID()
 }

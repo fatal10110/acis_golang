@@ -18,7 +18,7 @@ import (
 // cast), so a CC'd actor is rejected by the AI's deny-action check before
 // the toggle skill's own logic runs — toggles get no exemption from the
 // blanket lock.
-func (c *Controller) CanCastToggle(def modelskill.Definition) error {
+func (c *Controller) CanCastToggle(def *modelskill.Definition) error {
 	if c.actor == nil {
 		return ErrInvalidTarget
 	}
@@ -73,7 +73,7 @@ func (c *Controller) CanCastToggle(def modelskill.Definition) error {
 // activation then fails on the HP check. This mirrors the exact order the
 // two costs are validated in and is not a transactional all-or-nothing
 // charge.
-func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (activated bool, err error) {
+func (c *Controller) CastToggle(alreadyActive bool, def *modelskill.Definition) (activated bool, err error) {
 	if err := c.CanCastToggle(def); err != nil {
 		return false, err
 	}
@@ -125,7 +125,7 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 // reuse-delay gate. A rejected toggle — blanket lock, on cooldown, dead,
 // unknown skill — must never stop a walk that is specified to keep
 // running. It reports nothing: the stop cannot fail at all.
-func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest, stopMovement func(), ack func(modelskill.Definition)) (def modelskill.Definition, target Target, activated bool, err error) {
+func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest, stopMovement func(), ack func(*modelskill.Definition)) (def *modelskill.Definition, target Target, activated bool, err error) {
 	def, target, err = ResolvePlayerToggle(req)
 	if err != nil {
 		return def, target, false, err

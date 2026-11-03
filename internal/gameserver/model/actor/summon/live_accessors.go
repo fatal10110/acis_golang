@@ -28,16 +28,14 @@ func (a *Actor) ObjectID() int32 { return a.id }
 func (a *Actor) Move() *move.CreatureMove { return &a.movement }
 
 // InitMovement wires real geodata into this summon's movement state,
-// matching creature.NewLive's Init call, moving at baseRunSpeed (the
-// template run speed) through the RUN_SPEED stat. Call it once, before
-// building a move.Controller over Move() (see GameClientLink.wireSummonAI);
-// a summon left uninitialized (no geodata available) keeps a stationary,
-// never-moving zero-value CreatureMove.
-func (a *Actor) InitMovement(origin location.Location, baseRunSpeed float64, geo move.Geo) error {
-	if err := a.movement.Init(origin, a.MoveSpeed(baseRunSpeed), geo); err != nil {
+// matching creature.NewLive's Init call, moving at its MoveSpeed. Call it
+// once, before building a move.Controller over Move() (see
+// GameClientLink.wireSummonAI); a summon left uninitialized (no geodata
+// available) keeps a stationary, never-moving zero-value CreatureMove.
+func (a *Actor) InitMovement(origin location.Location, geo move.Geo) error {
+	if err := a.movement.Init(origin, a.MoveSpeed(), geo); err != nil {
 		return err
 	}
-	a.baseRunSpeed = baseRunSpeed
 	a.movementReady.Store(true)
 	return nil
 }
@@ -52,7 +50,7 @@ func (a *Actor) refreshMoveSpeed() {
 	}
 	a.speedMu.Lock()
 	defer a.speedMu.Unlock()
-	a.movement.SetSpeed(a.MoveSpeed(a.baseRunSpeed))
+	a.movement.SetSpeed(a.MoveSpeed())
 }
 
 // SetQueue makes q, the owner's queue, the queue this summon's work runs on,
@@ -88,10 +86,10 @@ func (a *Actor) OwnerID() int32 {
 }
 
 // OwnerStillLinked reports whether the owner still identifies this summon as
-// their active one. DecayTaskManager cancels a tracked summon corpse when this
-// returns false, before its deadline is checked. A servitor's corpse whose
-// owner left stays linked to the session that left it, which no longer
-// changes its summon.
+// their active one. The corpse-decay task cancels a tracked summon corpse when
+// this returns false, before its deadline is checked. A servitor's corpse whose
+// owner left stays linked to the session that left it, which no longer changes
+// its summon.
 func (a *Actor) OwnerStillLinked() bool {
 	if a == nil || a.world == nil {
 		return false
@@ -151,7 +149,7 @@ func (a *Actor) SyncControlItemEnchant() bool {
 }
 
 func (a *Actor) notifyDamage(attacker attackable.Combatant, amount float64) {
-	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: commons.JavaInt(amount)})
+	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: commons.TruncInt32Sat(amount)})
 }
 
 // IsPet reports whether this live summon is a pet rather than a servitor.
@@ -435,21 +433,10 @@ func (a *Actor) AlikeDead() bool { return a.Dead() }
 // siege guards.
 func (a *Actor) SiegeGuard() bool { return false }
 
-// siegeSummonNPCIDs are the Siege Golem, Hog Cannon, and Swoop Cannon
-// servitor templates (the siege summons), the summons the ERASE skill
-// exempts.
-var siegeSummonNPCIDs = map[int]struct{}{
-	14737: {},
-	14768: {},
-	14839: {},
-}
-
-// SiegeSummon reports whether this servitor is a siege-assault summon,
-// exempt from the ERASE skill.
-func (a *Actor) SiegeSummon() bool {
-	_, ok := siegeSummonNPCIDs[a.npcID]
-	return ok
-}
+// SiegeSummon reports whether this servitor is a siege summon (a template
+// of type SiegeSummon): it lives only on a siege battlefield, and fear,
+// bluff and the ERASE skill leave it alone.
+func (a *Actor) SiegeSummon() bool { return a.siegeSummon }
 
 // SummonOwner returns this summon's owning player.
 func (a *Actor) SummonOwner() Owner { return a.currentOwner() }
@@ -561,8 +548,8 @@ func (a *Actor) Knows(target attackable.Combatant) bool {
 // ownerSeesInvisible reports whether the summon's owner is a game master,
 // whose sight past invisibility the summon shares.
 func (a *Actor) ownerSeesInvisible() bool {
-	owner, ok := a.currentOwner().(interface{ SeesInvisible() bool })
-	return ok && owner.SeesInvisible()
+	owner := a.currentOwner()
+	return owner != nil && owner.SeesInvisible()
 }
 
 // OwnsOffensiveFollowTicker reports that summon AI already rechecks its
@@ -655,21 +642,33 @@ func (a *Actor) AttackTarget(target world.Tracked) { a.TryToAttack(target) }
 // TryToAttack forwards an attack request to the attached AI when target is
 // a live combatant.
 func (a *Actor) TryToAttack(target world.Tracked) {
-	combatant, ok := target.(attackable.Combatant)
-	if !ok || a.brain == nil {
+	combatant, _ := target.(attackable.Combatant)
+	a.tryToAttack(combatant)
+}
+
+// tryToAttack forwards an attack request on target, when there is one, to
+// the attached AI.
+func (a *Actor) tryToAttack(target attackable.Combatant) {
+	if target == nil || a.brain == nil {
 		return
 	}
-	a.brain.TryToAttack(combatant)
+	a.brain.TryToAttack(target)
 }
 
 // TryToFollow forwards a follow request to the attached AI when target is
 // a live combatant.
 func (a *Actor) TryToFollow(target world.Tracked) {
-	combatant, ok := target.(attackable.Combatant)
-	if !ok || a.brain == nil {
+	combatant, _ := target.(attackable.Combatant)
+	a.tryToFollow(combatant)
+}
+
+// tryToFollow forwards a follow request on target, when there is one, to
+// the attached AI.
+func (a *Actor) tryToFollow(target attackable.Combatant) {
+	if target == nil || a.brain == nil {
 		return
 	}
-	a.brain.TryToFollow(combatant)
+	a.brain.TryToFollow(target)
 }
 
 // TryToIdle sends the summon idle the way an effect, an interrupted action
@@ -842,15 +841,14 @@ func (a *Actor) Fed() int {
 }
 
 // CanEatFood reports whether itemID matches one of this pet's configured
-// food template ids, matching PetTemplate.canEatFood.
+// food template ids.
 func (a *Actor) CanEatFood(itemID int32) bool {
 	return itemID == a.food1 || itemID == a.food2
 }
 
 // AddFed increases a pet's meal gauge by amount, capped at maxMeal, and
 // reports the resulting fed value along with whether the pet is still below
-// the auto-feed threshold, matching Pet.checkAutoFeedState after
-// PetFoods.useFood's setCurrentFed update.
+// the auto-feed threshold after that update.
 func (a *Actor) AddFed(amount int) (fed int, stillHungry bool) {
 	a.statusMu.Lock()
 	a.fed += amount

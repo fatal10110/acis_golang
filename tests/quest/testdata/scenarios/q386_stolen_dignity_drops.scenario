@@ -1,0 +1,22 @@
+# Stolen Dignity (Q386), level 58, quest started: a soldier of ancient times drops an ore, the next one does not. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q386_stolen_dignity_drops.golden
+character Pastime 58
+quest Q386_StolenDignity <cond>=1 <state>=STARTED
+random 0 0 0 999999
+script quest.Q386_StolenDignity
+item 6363 5529 5534 5536 8346
+page warehouse/30843.htm
+page script/quest/Q386_StolenDignity/
+npc romp 30843 WarehouseKeeper 10 0 0
+npc soldier 20970 Monster 40 0 0
+npc warrior 20971 Monster 50 0 0
+
+kill soldier
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:6363
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 6363=1
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED
+  state Q386_StolenDignity STARTED
+kill soldier
+  S SystemMessage id=95 1:0 1:0

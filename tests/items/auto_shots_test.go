@@ -83,7 +83,7 @@ func TestAutoSpiritshotsRechargeAfterEachMagicCast(t *testing.T) {
 	}
 	for i, w := range want {
 		c.Send(encodeRequestMagicSkillUse(healSkillID))
-		if got := readCastShots(t, c, objID, healSkillID); got != w {
+		if got := readCastShots(t, srv, c, objID, healSkillID); got != w {
 			t.Fatalf("cast %d = %+v, want %+v", i+1, got, w)
 		}
 	}
@@ -107,17 +107,16 @@ func TestAutoSpiritshotsRechargeAfterEachMagicCast(t *testing.T) {
 	}
 }
 
-// readCastShots reads one cast of skillID by objID through its end, two
-// seconds of clock, and reports its spiritshot traffic. A spent stack drops
-// its auto use without an ExAutoSoulShot.
-func readCastShots(t *testing.T, c *testsupport.ScriptedClient, objID, skillID int32) castShots {
+// readCastShots lets one cast of skillID by objID run through its end, two
+// seconds of clock and until the cast is over, and reports the spiritshot
+// traffic queued meanwhile. A spent stack drops its auto use without an
+// ExAutoSoulShot.
+func readCastShots(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID, skillID int32) castShots {
 	t.Helper()
+	srv.Advance(t, 2*time.Second)
+	srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	var got castShots
-	for end := c.Now().Add(2 * time.Second); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			continue
-		}
+	for _, frame := range c.ReadQueued() {
 		r := wire.NewReader(frame[1:])
 		switch frame[0] {
 		case serverpackets.OpcodeMagicSkillLaunched:
@@ -183,7 +182,8 @@ func TestUseBeastSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
 	assertExAutoSoulShot(t, c.Read(), 6645, false)
 	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageAutoUseOfItemCancelled, 6645)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "failed consume")
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("unexpected extra reply %x, want none (not-enough suppressed while auto-enabled)", reply)
 	}
 	if inst := mustFindItem(t, srv, objID, shot); inst.Count != 4 {

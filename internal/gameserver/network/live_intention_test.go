@@ -34,7 +34,7 @@ func newIntentionFixture(t *testing.T) intentionFixture {
 	live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character, Attack: live.attack}, nil)
 	live.cast.SetQueue(live.Queue())
 	live.Character.SetCastController(live.cast)
-	f := intentionFixture{link: &GameClientLink{log: zerolog.Nop()}, live: live, world: world.New()}
+	f := intentionFixture{link: newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()}), live: live, world: world.New()}
 	f.spawn(t, live)
 	return f
 }
@@ -84,7 +84,7 @@ func TestIntentionFinalTargetIdle(t *testing.T) {
 	requireIntentionFinalTarget(t, live, 0, "idle")
 
 	target := f.player(t, 9)
-	if _, err := live.cast.Start(time.Unix(1000, 0), target.Character, intentionCastDef); err != nil {
+	if _, err := live.cast.Start(time.Unix(1000, 0), target.Character, &intentionCastDef); err != nil {
 		t.Fatalf("cast Start: %v", err)
 	}
 	live.cast.Stop()
@@ -100,7 +100,7 @@ func TestIntentionFinalTargetCastInFlightBeatsDeferredAttack(t *testing.T) {
 	target := f.player(t, 9)
 	npc := f.npc(t)
 
-	if _, err := live.cast.Start(time.Unix(1000, 0), target.Character, intentionCastDef); err != nil {
+	if _, err := live.cast.Start(time.Unix(1000, 0), target.Character, &intentionCastDef); err != nil {
 		t.Fatalf("cast Start: %v", err)
 	}
 	if live.combat.Start(npc, false) {
@@ -132,13 +132,13 @@ func TestIntentionFinalTargetCastApproach(t *testing.T) {
 			live.approachMagicSkill(req, live.Character, finalID)
 		}, func(int32) int32 { return finalID }},
 		{"item cast approach", func(live *livePlayer) {
-			live.approachItemAICast(nil, nil, itemSkill, live.Character, true, finalID)
+			live.approachItemAICast(nil, nil, &itemSkill, live.Character, true, finalID)
 		}, func(int32) int32 { return finalID }},
 		{"magic skill queued next", func(live *livePlayer) {
 			live.deferMagicSkill(req, live.Character)
 		}, func(npcID int32) int32 { return npcID }},
 		{"item cast queued next", func(live *livePlayer) {
-			live.deferItemAICast(nil, nil, itemSkill, live.Character, true)
+			live.deferItemAICast(nil, nil, &itemSkill, live.Character, true)
 		}, func(npcID int32) int32 { return npcID }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

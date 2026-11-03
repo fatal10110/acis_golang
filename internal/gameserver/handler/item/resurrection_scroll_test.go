@@ -5,16 +5,8 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
-)
-
-// The live player and summon types must satisfy the gate's optional
-// interfaces; otherwise a dead player or pet silently falls through to
-// ResurrectionScrollAllowed.
-var (
-	_ resurrectionPlayerTarget = (*player.Character)(nil)
-	_ petOwnerHolder           = (*summon.Actor)(nil)
 )
 
 // scrollTarget is a selected creature for ResurrectionScrollGate. The
@@ -35,9 +27,11 @@ func (t *scrollTarget) IsPet() bool      { return t.isPet }
 type scrollPlayer struct {
 	scrollTarget
 	inSiege, festival, offer, offerForPet bool
+	siegeState                            int32
 }
 
 func (p *scrollPlayer) InSiegeZone() bool         { return p.inSiege }
+func (p *scrollPlayer) SiegeState() int32         { return p.siegeState }
 func (p *scrollPlayer) FestivalParticipant() bool { return p.festival }
 func (p *scrollPlayer) ReviveOffer() (bool, bool) { return p.offer, p.offerForPet }
 func newScrollPlayer(dead bool) *scrollPlayer {
@@ -49,14 +43,16 @@ func (p *scrollPlayer) withOffer(forPet bool) *scrollPlayer {
 	return p
 }
 
-// ownerSurface names summon.Owner for embedding: the interface has its
-// own Owner method, so it cannot be embedded under its own name.
-type ownerSurface = summon.Owner
+// ownerActor is a pet's owner: a combatant that is also a skill target.
+type ownerActor interface {
+	attackable.Combatant
+	skilltarget.Actor
+}
 
-// scrollOwner is a pet owner; the embedded owner is nil and only
+// scrollOwner is a pet owner; the embedded actor is nil and only
 // ObjectID and ReviveOffer are called.
 type scrollOwner struct {
-	ownerSurface
+	ownerActor
 	id                 int32
 	offer, offerForPet bool
 }
@@ -67,12 +63,12 @@ func (o *scrollOwner) ReviveOffer() (bool, bool) { return o.offer, o.offerForPet
 // scrollSummon is a selected pet or servitor with its owner.
 type scrollSummon struct {
 	scrollTarget
-	owner summon.Owner
+	owner attackable.Combatant
 }
 
-func (s *scrollSummon) SummonOwner() summon.Owner { return s.owner }
+func (s *scrollSummon) Owner() (attackable.Combatant, bool) { return s.owner, s.owner != nil }
 
-func newScrollSummon(dead, isPet bool, owner summon.Owner) *scrollSummon {
+func newScrollSummon(dead, isPet bool, owner attackable.Combatant) *scrollSummon {
 	return &scrollSummon{scrollTarget: scrollTarget{kind: actor.KindSummon, dead: dead, isPet: isPet}, owner: owner}
 }
 
@@ -100,6 +96,15 @@ func TestResurrectionScrollGate(t *testing.T) {
 				return p
 			}(),
 			want: ResurrectionScrollSiege,
+		},
+		{
+			name: "dead siege fighter in a siege zone goes on to the festival check",
+			selected: func() *scrollPlayer {
+				p := newScrollPlayer(true)
+				p.inSiege, p.siegeState, p.festival = true, player.SiegeStateDefender, true
+				return p
+			}(),
+			want: ResurrectionScrollFestival,
 		},
 		{
 			name: "dead festival participant wins over an open offer",

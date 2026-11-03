@@ -57,7 +57,7 @@ func (s *Script) give(c *player.Character, itemID, count, enchant int32) {
 	if count <= 0 {
 		return
 	}
-	c.GiveScriptItems(itemID, int(count), int(enchant), s.env.MultipleItemDrop, s.env.NewItemID)
+	c.GiveScriptItems(itemID, int(count), int(enchant), s.env.multipleItemDrop(), s.env.NewItemID)
 }
 
 // TakeItems takes count units of itemID from p; a negative count takes
@@ -69,29 +69,40 @@ func (s *Script) TakeItems(p *Player, itemID, count int32) {
 // AddItems gives p count units of itemID as GiveItems does, with the chat
 // line of items picked up.
 func (s *Script) AddItems(p *Player, itemID, count int32) {
-	p.character().AddScriptItems(itemID, int(count), s.env.MultipleItemDrop, s.env.NewItemID)
+	p.character().AddScriptItems(itemID, int(count), s.env.multipleItemDrop(), s.env.NewItemID)
 }
 
-// DestroyItems destroys count units of itemID held by p, with no chat line,
-// and reports whether it did: p must hold that many in one instance.
-func (s *Script) DestroyItems(p *Player, itemID, count int32) bool {
+// DestroyItems destroys count units of itemID held by p and reports whether
+// it did: p must hold that many in one instance. With notify, p is told in
+// chat what disappeared, or that it holds too few; adena is then paid as
+// Player.ReduceAdena pays it.
+func (s *Script) DestroyItems(p *Player, itemID, count int32, notify bool) bool {
+	if notify {
+		return p.character().DestroyScriptItemsNotify(itemID, int(count))
+	}
 	return p.character().DestroyScriptItems(itemID, int(count))
 }
 
 // RewardItems gives p count units of itemID scaled by the reward rate, the
 // adena rate for adena.
 func (s *Script) RewardItems(p *Player, itemID, count int32) {
-	rate := s.env.Rates.Reward
+	rates := s.env.Rates.Rates()
+	rate := rates.Reward
 	if itemID == item.AdenaID {
-		rate = s.env.Rates.RewardAdena
+		rate = rates.RewardAdena
 	}
-	s.GiveItems(p, itemID, commons.JavaInt(float64(count)*rate))
+	s.GiveItems(p, itemID, commons.TruncInt32Sat(float64(count)*rate))
 }
 
 // RewardExpAndSp gives p exp experience and sp skill points, each scaled
-// by its reward rate.
+// by its reward rate. A player leaving the world gets nothing, as no script
+// gives it anything.
 func (s *Script) RewardExpAndSp(p *Player, exp int64, sp int32) {
-	p.character().AddExpAndSp(commons.JavaLong(float64(exp)*s.env.Rates.XP), int(commons.JavaInt(float64(sp)*s.env.Rates.SP)))
+	c := p.character()
+	rates := s.env.Rates.Rates()
+	c.WhileAttached(func() {
+		c.AddExpAndSp(commons.TruncInt64Sat(float64(exp)*rates.XP), int(commons.TruncInt32Sat(float64(sp)*rates.SP)))
+	})
 }
 
 // PlaySound plays sound for p alone.
@@ -122,7 +133,7 @@ func (s *Script) DropItemsAs(p *Player, itemID, count, needed, chance int32, typ
 	if needed > 0 && current >= needed {
 		return true
 	}
-	amount := s.dropAmount(count, chance, typ)
+	amount := dropAmount(s.env.Rates.Rates().Drop, s.env.Rand, count, chance, typ)
 	reached := false
 	if amount > 0 {
 		if needed > 0 {
@@ -158,13 +169,14 @@ type DropInfo struct {
 // needed units never does.
 func (s *Script) DropMultipleItems(p *Player, drops []DropInfo, typ DropType) bool {
 	c := p.character()
+	rate := s.env.Rates.Rates().Drop
 	given, reached := false, true
 	for _, d := range drops {
 		current := int32(c.ItemCount(int(d.ItemID)))
 		if d.Needed > 0 && current >= d.Needed {
 			continue
 		}
-		amount := s.dropAmount(d.Count, d.Chance, typ)
+		amount := dropAmount(rate, s.env.Rand, d.Count, d.Chance, typ)
 		if amount > 0 {
 			if d.Needed > 0 && current+amount >= d.Needed {
 				amount = d.Needed - current
@@ -189,29 +201,28 @@ func (s *Script) DropMultipleItems(p *Player, drops []DropInfo, typ DropType) bo
 	return reached
 }
 
-// dropAmount rolls one drop of count units at chance as typ scales it and
-// returns the units it gives. Every type draws once; an unknown type
-// draws nothing and gives nothing.
-func (s *Script) dropAmount(count, chance int32, typ DropType) int32 {
-	rate := s.env.Rates.Drop
+// dropAmount rolls one drop of count units at chance, through roll, as typ
+// and the quest drop rate scale it, and returns the units it gives. Every
+// type draws once; an unknown type draws nothing and gives nothing.
+func dropAmount(rate float64, roll func(int) int, count, chance int32, typ DropType) int32 {
 	switch typ {
 	case DropDivmod:
-		chance = commons.JavaInt(float64(chance) * rate)
+		chance = commons.TruncInt32Sat(float64(chance) * rate)
 		amount := count * (chance / MaxChance)
-		if int32(s.env.Rand(MaxChance)) < chance%MaxChance {
+		if int32(roll(MaxChance)) < chance%MaxChance {
 			amount += count
 		}
 		return amount
 	case DropFixedRate:
-		if int32(s.env.Rand(MaxChance)) < chance {
-			return commons.JavaInt(float64(count) * rate)
+		if int32(roll(MaxChance)) < chance {
+			return commons.TruncInt32Sat(float64(count) * rate)
 		}
 	case DropFixedCount:
-		if float64(s.env.Rand(MaxChance)) < float64(chance)*rate {
+		if float64(roll(MaxChance)) < float64(chance)*rate {
 			return count
 		}
 	case DropFixedBoth:
-		if int32(s.env.Rand(MaxChance)) < chance {
+		if int32(roll(MaxChance)) < chance {
 			return count
 		}
 	}

@@ -46,6 +46,11 @@ type scriptTimer struct {
 	due time.Time
 	// queue is the timer's home queue, where its hook runs.
 	queue *sim.Queue
+	// owner is the bound player when queue is that player's own queue, nil
+	// otherwise. Set before the timer registers, it never changes.
+	owner *player.Character
+	// armed is the timer of t's firings, made at the start and re-armed
+	// for each deadline of a fixed-rate timer.
 	armed *sim.Timer
 	// decays reports that the timer stops when its NPC decays: its script
 	// is a behavior bound to the NPC's template.
@@ -215,6 +220,9 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 		t.queue, onNPCQueue = live.Queue(), true
 	case pl != nil && !pl.Detaching():
 		t.queue = pl.Queue()
+		if h, ok := pl.(player.CharacterHolder); ok {
+			t.owner = h.PlayerCharacter()
+		}
 	}
 	if t.queue == nil {
 		t.queue = ts.engine
@@ -237,7 +245,7 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 	index(ts.byNPC, t.key.npc, t)
 	index(ts.byPlayer, t.key.player, t)
 	t.due = t.queue.Now().Add(max(d, 0))
-	ts.arm(t)
+	t.armed = t.queue.After(max(d, 0), func() { ts.fire(t) })
 	ts.mu.Unlock()
 
 	// A start that raced a removal it is subject to may have registered
@@ -276,9 +284,13 @@ func unindex(m map[any]map[*scriptTimer]struct{}, id any, t *scriptTimer) {
 	}
 }
 
-// arm schedules t's next firing at t.due. ts.mu is held.
-func (ts *timers) arm(t *scriptTimer) {
-	t.armed = t.queue.After(max(t.due.Sub(t.queue.Now()), 0), func() { ts.fire(t) })
+// rearm schedules the next firing of the fixed-rate timer t, one period
+// after the last deadline, or at once when that is already past. ts.mu is
+// held. On a closed home queue nothing is armed, as a start there arms
+// nothing.
+func (ts *timers) rearm(t *scriptTimer) {
+	t.due = t.due.Add(t.period)
+	t.armed.Rearm(max(t.due.Sub(t.queue.Now()), 0))
 }
 
 // remove takes t out of the registry and stops its armed firing. ts.mu is
@@ -300,7 +312,8 @@ func (ts *timers) remove(t *scriptTimer) {
 // registry before its hook runs, so the hook may start the same timer
 // again; a fixed-rate timer is armed for its next deadline after the hook,
 // unless the hook cancelled it. Neither the NPC nor the player is checked
-// for being alive.
+// for being alive. On the bound player's own queue the hook runs as a hook
+// on that queue (TeleportTo).
 func (ts *timers) fire(t *scriptTimer) {
 	ts.mu.Lock()
 	if ts.byScript[t.s][t.key] != t {
@@ -313,30 +326,33 @@ func (ts *timers) fire(t *scriptTimer) {
 	ts.mu.Unlock()
 
 	s := t.s
-	res := ts.r.answer(s, hookTimer, func() string { return s.Hooks.Timer(s, Timer{Name: t.key.name, NPC: t.npc, Player: t.pl}) })
-	ts.show(t, res)
+	hook := func() {
+		res := ts.r.answer(s, hookTimer, func() string { return s.Hooks.Timer(s, Timer{Name: t.key.name, NPC: t.npc, Player: t.pl}) })
+		ts.show(t, res)
+	}
+	if t.owner != nil {
+		t.owner.RunOnOwnQueue(hook)
+	} else {
+		hook()
+	}
 
 	if t.period == 0 {
 		return
 	}
 	ts.mu.Lock()
 	if ts.byScript[s][t.key] == t {
-		t.due = t.due.Add(t.period)
-		ts.arm(t)
+		ts.rearm(t)
 	}
 	ts.mu.Unlock()
 }
 
-// show answers the timer's player with res. Only a timer bound to a player
-// shows anything.
-//
-// Showing an answer is the dialog path's (#130); until it lands a
-// non-empty answer for a player is logged and dropped.
+// show sends the timer's player what its hook answered, through the
+// timer's NPC when it has one: a page then ActionFailed, or a chat line.
+// A timer bound to no player shows nothing.
 func (ts *timers) show(t *scriptTimer, res Result) {
-	if t.key.player == nil || res.Kind == ResultNone || res.Kind == ResultAborted {
-		return
+	if c, ok := t.key.player.(*player.Character); ok {
+		t.s.show(c, t.npc, res)
 	}
-	ts.r.log.Warn().Str("script", t.s.path).Str("timer", t.key.name).Msg("script: timer answer not shown")
 }
 
 // npcDecayed removes the timers bound to the NPC with identity id whose

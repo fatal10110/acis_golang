@@ -363,7 +363,7 @@ func (l *GameClientLink) spawnFishingMonster(live *livePlayer) bool {
 	if !ok {
 		return false
 	}
-	// ponytail: the monster's own AI (attack its fisher, leave when idle) waits for AI scripts, #3306.
+	// The monster's behavior turns it on live, its summoner.
 	if npcs := l.npcSpawns.Load(); npcs != nil {
 		x, y, z := live.Position()
 		if err := npcs.SpawnSummoned(tmpl, x, y, z, live.CurrentHeading(), live.Character); err != nil {

@@ -1,0 +1,23 @@
+# Test of Sagittarius (Q224), refused: a level 39 Warrior is turned away by Bernard (the test is for
+# rogues, elven scouts and assassins), and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q224_test_of_sagittarius_wrong_class.golden
+character Warrior 39
+class 1
+script quest.Q224_TestOfSagittarius
+item 17 3028 3293 3294 3295 3296 3297 3298 3299 3300 3301 3302 3303 3304 3305 3306 7562
+page default/30702.htm
+page script/quest/Q224_TestOfSagittarius/
+npc bernard 30702 Folk 10 0 0
+
+action bernard
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q224_TestOfSagittarius/30702-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q224_TestOfSagittarius CREATED
+  rows Q224_TestOfSagittarius -

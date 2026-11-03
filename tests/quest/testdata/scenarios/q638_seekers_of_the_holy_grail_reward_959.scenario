@@ -1,0 +1,26 @@
+# Seekers of the Holy Grail (Q638): two thousand totems pay the first prize of the draw.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q638_seekers_of_the_holy_grail_reward_959.golden
+character Hero 73
+quest Q638_SeekersOfTheHolyGrail <cond>=1 <state>=STARTED
+hold 8068 2000
+random 0
+script quest.Q638_SeekersOfTheHolyGrail
+item 8068 959 960 57
+page villagemaster/31328.htm
+page script/quest/Q638_SeekersOfTheHolyGrail/
+npc innocentin 31328 VillageMasterPriest 10 0 0
+
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:8068 6:2000
+  S SystemMessage id=54 3:959
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q638_SeekersOfTheHolyGrail/31328-03.htm
+  S ActionFailed
+  S ActionFailed
+  items 959=1 8068=0

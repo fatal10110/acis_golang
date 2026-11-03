@@ -92,6 +92,12 @@ func WithAdmission(admit func(*Effect) bool) Option {
 	return func(l *List) { l.admit = admit }
 }
 
+// Admits reports whether l holds effects like e at all (see
+// WithAdmission).
+func (l *List) Admits(e *Effect) bool {
+	return l != nil && e != nil && (l.admit == nil || l.admit(e))
+}
+
 // IsNight reports whether it is night on the server that owns l.
 func (l *List) IsNight() bool {
 	return l != nil && l.night != nil && l.night.IsNight()

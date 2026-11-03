@@ -1,0 +1,22 @@
+# Alliance with Ketra Orcs (Q605), stage 2 short of badges: 99 officer badges buy nothing, and Wahkan says so. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q605_alliance_with_ketra_orcs_short.golden
+character Ally 74
+quest Q605_AllianceWithKetraOrcs <cond>=2 <state>=STARTED
+hold 7216 200
+hold 7217 99
+script quest.Q605_AllianceWithKetraOrcs
+item 7211 7212 7213 7214 7215 7216 7217 7218 7219 7220 7233
+page npcdefault.htm
+page script/quest/Q605_AllianceWithKetraOrcs/
+npc wahkan 31371 Folk 10 0 0
+
+action wahkan
+action wahkan
+  S ActionFailed
+  S NpcHtmlMessage obj=wahkan item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{wahkan}_Quest
+  S NpcHtmlMessage obj=wahkan item=0 page=script/quest/Q605_AllianceWithKetraOrcs/31371-12.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q605_AllianceWithKetraOrcs <cond>=2 <state>=STARTED

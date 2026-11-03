@@ -1,0 +1,83 @@
+# Acts of Evil (Q171) from cond 10: with twenty-nine Ol Mahum heads, a captain drops the
+# thirtieth; Burai takes them for adena; Alvah pays the hunter and the quest completes; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q171_acts_of_evil_finish.golden
+character Hunter 30
+quest Q171_ActsOfEvil <state>=STARTED <cond>=10
+hold 4249 29
+random 0
+script quest.Q171_ActsOfEvil
+item 4239 4240 4241 4242 4243 4244 4245 4246 4247 4248 4249 57
+page guard/30381.htm
+page merchant/30207.htm
+page merchant/30420.htm
+page merchant/30437.htm
+page default/30425.htm
+page default/30617.htm
+page script/quest/Q171_ActsOfEvil/
+npc alvah 30381 Guard 10 0 0
+npc arodin 30207 Merchant 20 0 0
+npc tyra 30420 Merchant 30 0 0
+npc rolento 30437 Merchant -10 0 0
+npc neti 30425 Folk -20 0 0
+npc burai 30617 Folk -30 0 0
+npc captain 20066 Monster 40 0 0
+
+# An Ol Mahum captain: the thirtieth head.
+kill captain
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4249
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 4249=30
+
+# Burai pays for the heads.
+action burai
+action burai
+  S ActionFailed
+  S NpcHtmlMessage obj=burai item=0 page=default/30617.htm
+  S ActionFailed
+bypass npc_{burai}_Quest
+  S QuestList 171:0x800007ff
+  S ExShowQuestMark quest=171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:4249 6:30
+  S SystemMessage id=52 6:8000
+  Q upsert Q171_ActsOfEvil | <cond> | 11
+  S NpcHtmlMessage obj=burai item=0 page=script/quest/Q171_ActsOfEvil/30617-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 4249=0 57=8000
+
+# Alvah pays the hunter; the quest completes.
+action alvah
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S SystemMessage id=52 6:90000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 171:0x00000000
+  Q upsert Q171_ActsOfEvil | <state> | COMPLETED
+  Q delete-except-state Q171_ActsOfEvil
+  S NpcHtmlMessage obj=alvah item=0 page=script/quest/Q171_ActsOfEvil/30381-08.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=98000
+  state Q171_ActsOfEvil COMPLETED
+  rows Q171_ActsOfEvil <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q171_ActsOfEvil COMPLETED
+  rows Q171_ActsOfEvil <state>=COMPLETED
+  items 57=98000
+action alvah
+action alvah
+  S ActionFailed
+  S NpcHtmlMessage obj=alvah item=0 page=guard/30381.htm
+  S ActionFailed
+bypass npc_{alvah}_Quest
+  S NpcHtmlMessage obj=alvah item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

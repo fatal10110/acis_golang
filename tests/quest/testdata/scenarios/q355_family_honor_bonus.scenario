@@ -1,0 +1,32 @@
+# Family Honor (Q355), a hundred busts: at cond 1 holding a hundred busts, Galibredo pays the
+# bonus. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q355_family_honor_bonus.golden
+character Galibredo 36
+quest Q355_FamilyHonor <cond>=1 <state>=STARTED
+hold 4252 100
+script quest.Q355_FamilyHonor
+item 57 4252 4350 4351 4352 4353 4354
+page merchant/30181.htm
+page default/30929.htm
+page script/quest/Q355_FamilyHonor/
+npc galibredo 30181 Merchant 10 0 0
+npc patrin 30929 Folk -10 0 0
+npc orc 20767 Monster 40 0 0
+
+# Galibredo: a hundred busts.
+action galibredo
+action galibredo
+  S ActionFailed
+  S NpcHtmlMessage obj=galibredo item=0 page=merchant/30181.htm
+  S ActionFailed
+bypass npc_{galibredo}_Quest
+  S NpcHtmlMessage obj=galibredo item=0 page=script/quest/Q355_FamilyHonor/30181-3a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q355_FamilyHonor 30181-4b.htm
+  S SystemMessage id=301 3:4252 6:100
+  S SystemMessage id=52 6:19800
+  S NpcHtmlMessage obj=galibredo item=0 page=script/quest/Q355_FamilyHonor/30181-4a.htm
+  S ActionFailed
+  items 4252=0 57=19800
+  rows Q355_FamilyHonor <cond>=1 <state>=STARTED

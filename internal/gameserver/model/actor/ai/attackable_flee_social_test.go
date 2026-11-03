@@ -305,6 +305,7 @@ func TestFleeSocialDesiresQueueConcurrently(t *testing.T) {
 	target.x, target.y = 100, 50
 	move := &fleeMove{}
 	brain := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, brain)
 
 	var wg sync.WaitGroup
 	for range 16 {

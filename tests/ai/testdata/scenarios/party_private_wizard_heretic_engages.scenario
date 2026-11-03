@@ -1,0 +1,21 @@
+# PartyPrivateWizardHereticDD2Curse (22165, a private of a master), every draw 0: created, its engaged flag (int
+# slot 4) is clear; a hit on its master, or on itself while it neither attacks nor casts, sets it. A heretic with no
+# master engages on a hit on itself as well.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Curse
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2Curse
+npc master 20003 Monster 300 0 0
+npc priv 22165 Monster 200 0 0 master master
+npc alone 22165 Monster 0 300 0
+
+hit master 10
+  mem priv i_ai4=1
+  mem alone i_ai4=0
+hit alone 10
+  mem alone i_ai4=1

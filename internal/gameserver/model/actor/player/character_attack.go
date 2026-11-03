@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -95,9 +96,6 @@ func (w activeWeapon) grade() int {
 // AttachRuntime records the static template and restored inventory used by
 // live combat and visibility code. Call it before exposing c to the world.
 
-// AddRewardItem creates and adds one kill-reward item stack to this live
-// character's inventory. objectID must be allocated by the reward caller.
-
 // Inventory returns the carried item collection attached by AttachRuntime,
 // or nil if the character has none yet.
 
@@ -108,9 +106,8 @@ func (w activeWeapon) grade() int {
 // alongside the world-grid presence and CreatureMove position it must
 // stay consistent with.
 
-// UpdateUserInfo reports that this character's UserInfo must be resent,
-// mirroring PlayerStatus.addExp() pushing a fresh UserInfo on
-// every experience change — without it the client keeps displaying the
+// UpdateUserInfo reports that this character's UserInfo must be resent, as
+// every experience change does — without it the client keeps displaying the
 // experience, SP and level it was last told about.
 func (c *Character) UpdateUserInfo() {
 	c.emit(event.UserInfoChanged{})
@@ -126,13 +123,13 @@ func (c *Character) UpdateAbnormalEffect() {
 
 // StartAbnormalEffect adds mask to this character's client-visible
 // abnormal-effect bitmask (the cosmetic/visual state carried in CharInfo and
-// UserInfo, e.g. BigHead), mirroring Creature.startAbnormalEffect(int).
+// UserInfo, e.g. BigHead).
 func (c *Character) StartAbnormalEffect(mask int) {
 	c.abnormalEffectMask.Or(int32(mask))
 }
 
 // StopAbnormalEffect removes mask from this character's client-visible
-// abnormal-effect bitmask, mirroring Creature.stopAbnormalEffect(int).
+// abnormal-effect bitmask.
 func (c *Character) StopAbnormalEffect(mask int) {
 	for {
 		current := c.abnormalEffectMask.Load()
@@ -285,13 +282,14 @@ func (c *Character) AttackDisabled() bool {
 }
 
 // DenyAIAction reports whether this player cannot act on an intention now:
-// dead, teleporting, observing, running a store open for business (buy,
-// sell, package sell, manufacture; not the manage modes), or held by stun,
-// sleep, paralysis, fear, or an immobile-until-attacked effect. Unlike
-// AttackDisabled it ignores flying and fake death, which fail only the
-// attack itself, once in range.
+// dead, teleporting, running a store open for business (buy, sell, package
+// sell, manufacture; not the manage modes), or held by stun, sleep,
+// paralysis, fear, or an immobile-until-attacked effect. Observing is no
+// denial of its own: a viewpoint's observer is held by its paralysis, and a
+// stadium's spectator may walk. Unlike AttackDisabled it ignores flying and
+// fake death, which fail only the attack itself, once in range.
 func (c *Character) DenyAIAction() bool {
-	if c.Dead() || c.ObserverMode() || c.InStoreMode() {
+	if c.Dead() || c.InStoreMode() {
 		return true
 	}
 	live := c.liveLocked()
@@ -386,8 +384,11 @@ func (c *Character) Accuracy() int {
 
 // CriticalRate returns this player's physical critical rate, truncated to
 // an int and capped at 500: min(int(stat), 500).
-func (c *Character) CriticalRate() float64 {
-	return float64(min(int(c.calcStat(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4))), 500))
+func (c *Character) CriticalRate() float64 { return c.criticalRate(nil) }
+
+// criticalRate is CriticalRate for a calculation against target.
+func (c *Character) criticalRate(target conditions.Actor) float64 {
+	return float64(min(int(c.calcFor(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4), target, nil)), 500))
 }
 
 // MagicCriticalRate returns this player's magic critical rate.
@@ -787,40 +788,46 @@ func (c *Character) ClientActionFailed() {}
 // PAtk returns the physical attack value, truncated to a whole number
 // before any formula reads it. A rider attacks from its mount's P.Atk.
 // instead of its class and weapon.
-func (c *Character) PAtk() float64 {
+func (c *Character) PAtk() float64 { return c.pAtk(nil) }
+
+// pAtk is PAtk for a calculation against target. A rider's P.Atk. is
+// calculated against no target.
+func (c *Character) pAtk(target conditions.Actor) float64 {
 	if m, ok := c.ridden(); ok {
 		return math.Trunc(c.calcStat(stat.PowerAttack, m.pAtk))
 	}
-	return c.pAtk(c.activeWeapon())
-}
-
-func (c *Character) pAtk(weapon activeWeapon) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.PAtk > 0 {
 		base = tmpl.PAtk
 	}
-	return math.Trunc(c.calcStat(stat.PowerAttack, weapon.stat("pAtk", base)))
+	return math.Trunc(c.calcFor(stat.PowerAttack, c.activeWeapon().stat("pAtk", base), target, nil))
 }
 
 // PDef returns the current physical defence value, truncated to a whole
 // number.
-func (c *Character) PDef() float64 {
+func (c *Character) PDef() float64 { return c.pDef(nil) }
+
+// pDef is PDef for a calculation against target.
+func (c *Character) pDef(target conditions.Actor) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.PDef > 0 {
 		base = tmpl.PDef
 	}
-	return math.Trunc(c.calcStat(stat.PowerDefence, base))
+	return math.Trunc(c.calcFor(stat.PowerDefence, base, target, nil))
 }
 
 // Evasion returns this player's physical evasion rating.
-func (c *Character) Evasion() int {
+func (c *Character) Evasion() int { return c.evasion(nil) }
+
+// evasion is Evasion for a calculation against target.
+func (c *Character) evasion(target conditions.Actor) int {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.Level()
 	}
-	val := c.calcStat(stat.EvasionRate, 0)
+	val := c.calcFor(stat.EvasionRate, 0, target, nil)
 	if agp := c.ArmorGradePenalty(); agp > 0 {
 		val -= 2 * float64(agp)
 	}
@@ -889,13 +896,22 @@ func (c *Character) Playable() bool { return true }
 
 // AttackableBy reports whether attacker may attack this player: any living
 // one, fake death included, unless the playable attackability rules refuse
-// a playable attacker (attackable.PlayableRefuses).
+// a playable attacker (attackable.PlayableRefuses). A siege guard may
+// attack it unless its clan owns or defends the siege in progress where it
+// stands.
 func (c *Character) AttackableBy(attacker target.Actor) bool {
 	if c.Dead() {
 		return false
 	}
 	other, ok := attacker.(attackable.Combatant)
-	return !ok || !attackable.PlayableRefuses(c, other)
+	if !ok {
+		return true
+	}
+	if other.SiegeGuard() {
+		x, y, z := c.Position()
+		return !c.DefendsSiegeAt(x, y, z)
+	}
+	return !attackable.PlayableRefuses(c, other)
 }
 
 // AttackableWithoutForceBy reports whether caster may attack c without force:
@@ -903,8 +919,6 @@ func (c *Character) AttackableBy(attacker target.Actor) bool {
 // command channel, clan and alliance rules decide (SocialWithoutForce);
 // otherwise when c and caster both stand inside a PvP zone (each its own
 // membership), or while c has karma or a PvP flag.
-//
-// The Olympiad (#216) and siege-side (#3375) rules are not applied yet.
 func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	if caster == nil || actingPlayerID(caster) == c.ID {
 		return false

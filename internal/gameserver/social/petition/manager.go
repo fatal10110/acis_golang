@@ -6,8 +6,8 @@ import (
 	"slices"
 	"sync"
 	"time"
-	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 )
 
@@ -15,11 +15,10 @@ import (
 // player may send.
 const maxContentLength = 255
 
-// Churn bounds, a divergence from the reference, which keeps every
-// cancelled petition until a reset and tells the game masters of every
-// submit and cancel: a player looping submit and cancel would otherwise
-// grow the petition list, and the rows stored at shutdown, without end and
-// flood every game master with notices.
+// Churn bounds: keeping every cancelled petition until a reset and telling
+// the game masters of every submit and cancel would let a player looping
+// submit and cancel grow the petition list, and the rows stored at
+// shutdown, without end and flood every game master with notices.
 const (
 	// keptCancelled is how many of its cancelled petitions a player keeps
 	// listed; a cancel drops the oldest beyond it and frees their ids.
@@ -217,7 +216,7 @@ func (m *Manager) Submit(player Person, typ int32, content string) (Submission, 
 		s.Result = SubmitPlayerLimit
 		return s, nil
 	}
-	if len(utf16.Encode([]rune(content))) > maxContentLength {
+	if commons.UTF16Len(content) > maxContentLength {
 		s.Result = SubmitTooLong
 		return s, nil
 	}

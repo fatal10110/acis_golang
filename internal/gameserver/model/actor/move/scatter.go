@@ -17,14 +17,38 @@ func RandomNearbyLocation(geo Geo, target location.Location, offset int, keepHei
 	if geo == nil {
 		return target
 	}
+	j := location.Jump{To: target}
 	if offset > 0 {
 		nx := target.X + rand.IntN(2*offset+1) - offset
 		ny := target.Y + rand.IntN(2*offset+1) - offset
-		reached := geo.ValidLocation(target.X, target.Y, target.Z, nx, ny, target.Z)
-		target.X, target.Y = reached.X, reached.Y
+		j.Toward, j.Scattered = location.Location{X: nx, Y: ny, Z: target.Z}, true
 	}
-	if keepHeight == nil || !keepHeight(target) {
-		target.Z = int(geo.Height(target.X, target.Y, target.Z))
+	return Land(geo, j, keepHeight)
+}
+
+// LandingGeo is the geodata a jump lands through.
+type LandingGeo interface {
+	ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location
+	Height(x, y, z int) int16
+}
+
+// Land returns where j lands: a scattered jump stops at the last point geo
+// can reach on the straight line from j.To toward j.Toward, walked at
+// j.To's height; the result's Z then snaps to ground height unless
+// keepHeight (nil means never) reports that the point keeps its own
+// height, as a flying creature's or one inside water does. A nil geo lands
+// at j.To.
+func Land(geo LandingGeo, j location.Jump, keepHeight func(location.Location) bool) location.Location {
+	at := j.To
+	if geo == nil {
+		return at
 	}
-	return target
+	if j.Scattered {
+		reached := geo.ValidLocation(at.X, at.Y, at.Z, j.Toward.X, j.Toward.Y, at.Z)
+		at.X, at.Y = reached.X, reached.Y
+	}
+	if keepHeight == nil || !keepHeight(at) {
+		at.Z = int(geo.Height(at.X, at.Y, at.Z))
+	}
+	return at
 }

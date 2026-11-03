@@ -1,19 +1,18 @@
 // Package signspriest runs the "SevenSigns <n> ..." dialog commands of the
-// Seven Signs priests and the Mammon NPCs (SignsPriest.onBypassFeedback):
-// buying the Record of Seven Signs, signing up for a cabal, turning seal
-// stones in or exchanging them for ancient adena, the Black Marketeer's
-// ancient adena exchange, collecting the stones' reward and the seal status
-// page. It decides and mutates the talker's inventory and the Seven Signs
-// state; the caller turns the returned notices into client packets, opens
-// the page and moves the talker. Every call runs on the talker's own queue,
-// so a check and the change it allows see the same inventory.
+// Seven Signs priests and the Mammon NPCs: buying the Record of Seven Signs,
+// signing up for a cabal, turning seal stones in or exchanging them for ancient
+// adena, the Black Marketeer's ancient adena exchange, collecting the stones'
+// reward and the seal status page. It decides and mutates the talker's
+// inventory and the Seven Signs state; the caller turns the returned notices
+// into client packets, opens the page and moves the talker. Every call runs on
+// the talker's own queue, so a check and the change it allows see the same
+// inventory.
 package signspriest
 
 import (
 	"context"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -22,7 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
-// Items and prices of the dialog (SevenSignsManager).
+// Items and prices of the Seven Signs priest dialog.
 const (
 	RecordID                int32 = 5707
 	CertificateOfApprovalID int32 = 6388
@@ -34,7 +33,7 @@ const (
 	RedStoneID   int32 = 6362
 )
 
-// Points one stone of each color is worth (SevenSignsManager.SEAL_STONE_*_VALUE).
+// Contribution points one seal stone of each color is worth.
 const (
 	blueValue  = 3
 	greenValue = 5
@@ -155,7 +154,7 @@ func (s *Service) Command(ctx context.Context, t Talker, npcObjectID int32, dawn
 	if dawn {
 		h.side = "dawn"
 	}
-	h.tokens = strings.FieldsFunc(strings.TrimFunc(command, javaSpace), tokenSpace)
+	h.tokens = strings.FieldsFunc(strings.TrimFunc(command, isCtrlOrSpace), tokenSpace)
 	h.next = 1
 	value, ok := h.int()
 	if !ok {
@@ -230,7 +229,7 @@ func (h *handler) int() (int, bool) {
 	if h.next >= len(h.tokens) {
 		return 0, false
 	}
-	n, err := commons.ParseInt(h.tokens[h.next], 32)
+	n, err := strconv.ParseInt(h.tokens[h.next], 10, 32)
 	h.next++
 	return int(n), err == nil
 }
@@ -329,10 +328,9 @@ func (h *handler) signUp() Reply {
 		return Reply{Aborted: true}
 	}
 	seal, ok := h.seal()
-	// The reference counts the choice toward the seal's votes, which no
-	// seal of NoSeal has, and stops with an error once the sign-up is
-	// made; no page links it, and it is refused here before anything is
-	// taken.
+	// A NoSeal choice has no seal votes to count toward and would fail
+	// only after the sign-up is made; no page links it, and it is refused
+	// here before anything is taken.
 	if !ok || seal == sevensigns.NoSeal {
 		return Reply{Aborted: true}
 	}
@@ -346,8 +344,8 @@ func (h *handler) signUp() Reply {
 	}
 	h.reply.SignUpErr = h.s.state.SetPlayerInfo(h.ctx, h.t.ObjectID, cabal, seal)
 	// A new sign-up's row is inserted at once, but a changed one lives in
-	// memory until the next save, which the reference's periodic save
-	// (#172) would bring within minutes.
+	// memory until the next save, which a periodic save (#172) would bring
+	// within minutes.
 	h.reply.Save = true
 	h.notice(Joined{Cabal: cabal})
 	h.notice(SealChosen{Seal: seal})
@@ -384,9 +382,8 @@ func (h *handler) contributeStones() Reply {
 	case 3:
 		color, id, count = "Red", RedStoneID, red
 	case 4:
-		// The reference adds the stones to a sign-up it then fails to
-		// find, losing them; no page offers the command to a talker who
-		// never signed up.
+		// Without a sign-up the stones would be taken and lost; no page
+		// offers the command to a talker who never signed up.
 		if !signed {
 			return Reply{Aborted: true}
 		}
@@ -433,7 +430,7 @@ func (h *handler) contributeAmount(command string) Reply {
 	}
 	score, signed := h.s.state.PlayerContribScore(h.t.ObjectID)
 	if !signed && isStone(int32(itemID)) {
-		// As for contributeStones' 4: the reference loses the stones.
+		// As for contributeStones' 4: the stones would be lost.
 		return Reply{Aborted: true}
 	}
 	count := min(amount, inv.ItemCount(int32(itemID), -1, true))
@@ -467,7 +464,7 @@ func (h *handler) contributeAmount(command string) Reply {
 }
 
 // addContrib turns the stones in, returning the points they were worth, or
-// -1 when they would pass the cap, as the reference does.
+// -1 when they would pass the cap.
 func (h *handler) addContrib(blue, green, red int) int {
 	points, ok := h.s.state.AddPlayerStoneContrib(h.t.ObjectID, blue, green, red, h.s.cfg.MaxPlayerContrib)
 	if !ok {
@@ -505,8 +502,7 @@ func (h *handler) collectReward() Reply {
 		return Reply{}
 	}
 	if _, signed := st.PlayerContribScore(h.t.ObjectID); !signed {
-		// The reference fails on the missing sign-up of a talker of no
-		// cabal while no cabal won.
+		// A talker of no cabal has no sign-up to read while no cabal won.
 		return Reply{Aborted: true}
 	}
 	reward := st.TakeAncientAdenaReward(h.t.ObjectID)
@@ -520,7 +516,7 @@ func (h *handler) collectReward() Reply {
 
 // huntingGroundTeleport takes the talker to x, y, z for its price in
 // ancient adena ("SevenSigns 11 <x> <y> <z> <price>"). A malformed command
-// is only logged by the reference; here it does nothing.
+// does nothing.
 func (h *handler) huntingGroundTeleport() Reply {
 	x, okX := h.int()
 	y, okY := h.int()
@@ -543,7 +539,7 @@ func (h *handler) exchangeStonesPage(command string) Reply {
 	if !ok {
 		return Reply{Aborted: true}
 	}
-	stoneType, err := commons.Atoi(arg)
+	stoneType, err := strconv.Atoi(arg)
 	if err != nil {
 		return Reply{Aborted: true}
 	}
@@ -646,8 +642,7 @@ func (h *handler) sealStatus(npcObjectID int32) string {
 	return b.String()
 }
 
-// reduceAdena takes count adena, saying so when say is set
-// (Player.reduceAdena).
+// reduceAdena takes count adena, saying so when say is set.
 func (h *handler) reduceAdena(count int, say bool) bool {
 	inv := h.t.Inventory
 	if inv == nil || count > inv.Adena() {
@@ -670,8 +665,7 @@ func (h *handler) reduceAdena(count int, say bool) bool {
 	return true
 }
 
-// reduceAncientAdena takes count ancient adena, saying so
-// (Player.reduceAncientAdena).
+// reduceAncientAdena takes count ancient adena, saying so.
 func (h *handler) reduceAncientAdena(count int) bool {
 	inv := h.t.Inventory
 	if inv == nil || count > firstCount(inv, item.AncientAdenaID) {
@@ -688,11 +682,10 @@ func (h *handler) reduceAncientAdena(count int) bool {
 	return true
 }
 
-// destroyItems takes count of itemID, saying so when say is set
-// (Player.destroyItemByItemId): adena goes through reduceAdena, and holding
-// too few, or none, refuses. A count of 0 takes nothing from a held stack
-// and still names it. A negative count is refused like too few items: the
-// reference would add the units to the stack instead.
+// destroyItems takes count of itemID, saying so when say is set: adena goes
+// through reduceAdena, and holding too few, or none, refuses. A count of 0
+// takes nothing from a held stack and still names it. A negative count is
+// refused like too few items, rather than adding the units to the stack.
 func (h *handler) destroyItems(itemID int32, count int, say bool) bool {
 	if itemID == item.AdenaID {
 		return h.reduceAdena(count, say)
@@ -717,7 +710,7 @@ func (h *handler) destroyItems(itemID int32, count int, say bool) bool {
 	return true
 }
 
-// pickUp hands count of itemID over as picked up (Player.addItem).
+// pickUp hands count of itemID over as picked up.
 func (h *handler) pickUp(itemID int32, count int) {
 	if h.t.Inventory == nil {
 		return
@@ -730,7 +723,7 @@ func (h *handler) pickUp(itemID int32, count int) {
 }
 
 // addAncientAdena hands count ancient adena over, naming it even when there
-// is none to hand (Player.addAncientAdena).
+// is none to hand.
 func (h *handler) addAncientAdena(count int) {
 	h.notice(AncientAdenaEarned{Count: count})
 	h.add(item.AncientAdenaID, count)
@@ -743,11 +736,7 @@ func (h *handler) add(itemID int32, count int) {
 	if inv == nil || count < 1 || h.t.NextID == nil {
 		return
 	}
-	id, err := h.t.NextID()
-	if err != nil {
-		return
-	}
-	inv.AddNew(itemID, count, id)
+	_, _ = inv.AddCreated(itemID, count, h.t.NextID)
 }
 
 // isStone reports whether id is a seal stone.
@@ -774,16 +763,15 @@ func signs(value int, suffix string) string {
 	return name + ".htm"
 }
 
-// commandNumber reads the number from character begin of command on, as
-// the reference does for an edit box's value, which may be padded with
-// spaces. ok is false when command is too short or the text does not
-// parse.
+// commandNumber reads the number from character begin of command on: an edit
+// box's value, which may be padded with spaces. ok is false when command is too
+// short or the text does not parse.
 func commandNumber(command string, begin int) (int, bool) {
 	arg, ok := commandChars(command, begin)
 	if !ok {
 		return 0, false
 	}
-	n, err := commons.ParseInt(strings.TrimFunc(arg, javaSpace), 32)
+	n, err := strconv.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 10, 32)
 	return int(n), err == nil
 }
 
@@ -791,25 +779,26 @@ func commandNumber(command string, begin int) (int, bool) {
 // as the client encodes them: one per UTF-16 unit. ok is false when command
 // is shorter than begin.
 func commandChars(command string, begin int) (string, bool) {
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if begin > len(units) {
 		return "", false
 	}
-	return string(utf16.Decode(units[begin:])), true
+	return commons.UTF16String(units[begin:]), true
 }
 
-// javaSpace is what String.trim strips: every character up to and including
+// isCtrlOrSpace is what a trim strips: every character up to and including
 // the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }
 
-// tokenSpace is what StringTokenizer splits on by default.
+// tokenSpace is the whitespace a page argument splits on: space, tab, line
+// feed, carriage return and form feed.
 func tokenSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\f'
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
-// cabalShortName is the page suffix naming c (CabalType.getShortName).
+// cabalShortName is the page suffix naming c.
 func cabalShortName(c sevensigns.Cabal) string {
 	switch c {
 	case sevensigns.Dusk:
@@ -831,7 +820,7 @@ func cabalFullName(c sevensigns.Cabal) string {
 	return "No Cabal"
 }
 
-// sealShortName is the page part naming s (SealType.getShortName).
+// sealShortName is the page part naming s.
 func sealShortName(s sevensigns.Seal) string {
 	switch s {
 	case sevensigns.Avarice:

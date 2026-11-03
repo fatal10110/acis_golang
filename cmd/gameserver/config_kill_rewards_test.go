@@ -33,8 +33,8 @@ func TestKillRewardConfigReadsMultipleItemDrop(t *testing.T) {
 		if err != nil {
 			t.Fatalf("provideKillRewardConfig(%q) error = %v", tc.body, err)
 		}
-		if got.MultipleItemDrop != tc.want {
-			t.Fatalf("provideKillRewardConfig(%q).MultipleItemDrop = %v, want %v", tc.body, got.MultipleItemDrop, tc.want)
+		if got.Settings.MultipleItemDrop() != tc.want {
+			t.Fatalf("provideKillRewardConfig(%q).MultipleItemDrop = %v, want %v", tc.body, got.Settings.MultipleItemDrop(), tc.want)
 		}
 	}
 }
@@ -63,8 +63,8 @@ func TestKillRewardConfigReadsExpSpRates(t *testing.T) {
 		if err != nil {
 			t.Fatalf("provideKillRewardConfig(%q) error = %v", tc.body, err)
 		}
-		if got.RateXP != tc.xp || got.RateSP != tc.sp {
-			t.Fatalf("provideKillRewardConfig(%q) rates = %v/%v, want %v/%v", tc.body, got.RateXP, got.RateSP, tc.xp, tc.sp)
+		if got.Settings.Settings().RateXP != tc.xp || got.Settings.Settings().RateSP != tc.sp {
+			t.Fatalf("provideKillRewardConfig(%q) rates = %v/%v, want %v/%v", tc.body, got.Settings.Settings().RateXP, got.Settings.Settings().RateSP, tc.xp, tc.sp)
 		}
 	}
 }

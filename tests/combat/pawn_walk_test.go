@@ -2,6 +2,7 @@ package combat
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -135,6 +136,8 @@ func TestAttackClickMidApproachResendsMoveToPawn(t *testing.T) {
 	t.Parallel()
 	srv, c, objID, hostileID := rethinkApproach(t, nil)
 	before := srv.PlayerMove(t, objID).Position()
+	// Some of the walk passes after the last position update.
+	srv.Advance(t, 300*time.Millisecond)
 
 	c.Send(encodeAction(hostileID, int32(before.X), int32(before.Y), int32(before.Z), false))
 	srv.Settle(t)

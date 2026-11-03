@@ -1,0 +1,88 @@
+# Orc Subjugation (Q263): a dark elven fighter of level 8 accepts at Kayleen (a guard); two
+# Balor orc archers give two amulets and a Balor orc fighter a necklace (every roll pinned to
+# succeed); Kayleen pays 20 per amulet and 30 per necklace, then the player quits the repeatable
+# quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q263_orc_subjugation.golden
+character Subjugator 8
+class 31
+random always 0
+script quest.Q263_OrcSubjugation
+item 1116 1117
+page guard/30346.htm
+page script/quest/Q263_OrcSubjugation/
+npc kayleen 30346 Guard 10 0 0
+npc archer 20385 Monster 40 0 0
+npc fighter 20386 Monster 0 40 0
+
+# Kayleen: accept.
+action kayleen
+action kayleen
+  S ActionFailed
+  S NpcHtmlMessage obj=kayleen item=0 page=guard/30346.htm
+  S ActionFailed
+bypass npc_{kayleen}_Quest
+  S NpcHtmlMessage obj=kayleen item=0 page=script/quest/Q263_OrcSubjugation/30346-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q263_OrcSubjugation CREATED
+bypass Quest Q263_OrcSubjugation 30346-03.htm
+  S QuestList 263:0x80000001
+  S ExShowQuestMark quest=263
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kayleen item=0 page=script/quest/Q263_OrcSubjugation/30346-03.htm
+  S ActionFailed
+  Q upsert Q263_OrcSubjugation | <state> | STARTED
+  Q upsert Q263_OrcSubjugation | <cond> | 1
+  state Q263_OrcSubjugation STARTED
+  rows Q263_OrcSubjugation <cond>=1 <state>=STARTED
+action kayleen
+  S ActionFailed
+  S NpcHtmlMessage obj=kayleen item=0 page=guard/30346.htm
+  S ActionFailed
+bypass npc_{kayleen}_Quest
+  S NpcHtmlMessage obj=kayleen item=0 page=script/quest/Q263_OrcSubjugation/30346-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two amulets and a necklace.
+kill archer x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1116
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1116
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1116=2
+kill fighter
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1117
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1117=1
+
+# Kayleen: 2 x 20 + 30; then quit.
+action kayleen
+  S ActionFailed
+  S NpcHtmlMessage obj=kayleen item=0 page=guard/30346.htm
+  S ActionFailed
+bypass npc_{kayleen}_Quest
+  S SystemMessage id=301 3:1116 6:2
+  S SystemMessage id=302 3:1117
+  S SystemMessage id=52 6:70
+  S NpcHtmlMessage obj=kayleen item=0 page=script/quest/Q263_OrcSubjugation/30346-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1116=0 1117=0 57=70
+bypass Quest Q263_OrcSubjugation 30346-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kayleen item=0 page=script/quest/Q263_OrcSubjugation/30346-06.htm
+  S ActionFailed
+  Q delete-quest Q263_OrcSubjugation
+  state Q263_OrcSubjugation -
+  rows Q263_OrcSubjugation -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q263_OrcSubjugation -
+  rows Q263_OrcSubjugation -
+  items 57=70

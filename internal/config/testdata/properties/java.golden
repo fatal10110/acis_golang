@@ -1,0 +1,110 @@
+== 01-separators.properties
+[colon]=[v2]
+[eq]=[v1]
+[firsteq]=[a=b:c]
+[space]=[v3]
+[spaced]=[v4]
+[spaceeq]=[=v8]
+[spacesep]=[v7]
+[tab]=[v6]
+[wide]=[v5]
+== 02-whitespace.properties
+[blank]=[]
+[keyonly]=[]
+[keyonlyspaces]=[]
+[lead]=[v]
+[leadtab]=[v]
+[trail]=[v  \u0009]
+== 03-comments.properties
+[real]=[1#notcomment]
+== 04-comment-backslash.properties
+[after]=[1]
+[after2]=[2]
+== 05-cont-lf.properties
+[a]=[onetwothree]
+[b]=[x]
+== 06-cont-crlf.properties
+[a]=[onetwo]
+[b]=[x]
+[handlers]=[h1,h2,h3]
+== 07-cont-cr.properties
+[a]=[onetwo]
+[b]=[x]
+== 08-cont-key.properties
+[k2]=[v2]
+[key]=[v]
+== 09-empty-key.properties
+[]=[v3]
+== 10-key-escapes.properties
+[!x]=[g]
+[#notcomment]=[f]
+[a b]=[d]
+[a:b]=[e]
+[a=b]=[c]
+[t\u0009k]=[h]
+== 11-value-escapes.properties
+[bs]=[a\\b]
+[cr]=[a\u000Db]
+[ff]=[a\u000Cb]
+[lead]=[  lead]
+[nl]=[a\u000Ab]
+[tab]=[a\u0009b]
+[uni]=[A\u00E9\u4E2D]
+[unknown]=[xy=: z]
+== 12-double-backslash.properties
+[a]=[b\\]
+[c]=[d]
+== 13-trailing-backslash-eof.properties
+[a]=[b]
+== 14-duplicate.properties
+[k]=[2]
+== 15-surrogate.properties
+[pair]=[\uD83D\uDE00]
+== 16-cont-blank.properties
+[a]=[b]
+[c]=[d]
+== 17-cont-into-comment.properties
+[a]=[b#notcomment]
+== 18-no-trailing-newline.properties
+[a]=[b]
+== 19-crlf-mixed.properties
+[a]=[1]
+[b]=[2]
+[c]=[3]
+[d]=[4]
+== 20-cont-whitespace-only.properties
+[a]=[b]
+[c]=[d]
+== 21-latin1.properties
+[name]=[caf\u00E9]
+[utf8]=[caf\u00C3\u00A9]
+== 22-bom.properties
+[c]=[d]
+[\u00EF\u00BB\u00BFa]=[b]
+== 23-uppercase-u.properties
+[u]=[U0041]
+== 24-comment-only-cont.properties
+[a]=[1]
+== 25-cont-odd.properties
+[a]=[x\\b]
+== 26-key-tab-only.properties
+[k]=[]
+== 27-bad-unicode-short.properties
+ERROR
+== 28-bad-unicode-hex.properties
+ERROR
+== 29-bad-unicode-key.properties
+ERROR
+== 30-bad-unicode-plus.properties
+ERROR
+== 31-bad-unicode-minus.properties
+ERROR
+== 32-comment-crlf-backslash.properties
+[after]=[1]
+== 33-cont-then-hash.properties
+== 34-cont-empty-value.properties
+[a]=[b]
+== 35-escaped-latin1.properties
+[k\u00E9y]=[v\u00FF]
+== 36-surrogate-then-bad.properties
+ERROR

@@ -135,6 +135,7 @@ func TestHostileNPCWalkIntoWaterSwims(t *testing.T) {
 	if !monster.ReturnHome() {
 		t.Fatal("NPC did not start walking home")
 	}
+	drainFrames(t, w.c) // the walk stance, with its NpcInfo, and the move
 	for i := 0; monster.IsMoving(); i++ {
 		if i == 300 {
 			t.Fatal("walk home still under way after 30 s of position updates")

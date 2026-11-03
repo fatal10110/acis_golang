@@ -1,0 +1,139 @@
+# Invaders of the Holy Land (Q273): an orc fighter of level 6 accepts at Varkees; ten Rakeclaw imps
+# give ten black soulstones (each roll pinned under the imp's 90) and a Rakeclaw imp chieftain a red
+# one (its roll pinned at 99, over its 77); Varkees pays 3 per black stone, 10 per red one and 1800
+# more for ten black stones with a red one, and, the first time only, 6000 beginner soulshots with
+# the tutorial voice. One more imp's black stone is paid without shots and with the "black only"
+# page; then the player quits the repeatable quest; then relog. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q273_invaders_of_the_holy_land.golden
+character Invader 6
+class 44
+random 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 99 0 0 0
+script quest.Q273_InvadersOfTheHolyLand
+item 1475 1476 5789
+page default/30566.htm
+page script/quest/Q273_InvadersOfTheHolyLand/
+npc varkees 30566 Folk 10 0 0
+npc imp 20311 Monster 40 0 0
+npc chieftain 20313 Monster 0 40 0
+
+# Varkees: accept.
+action varkees
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q273_InvadersOfTheHolyLand/30566-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q273_InvadersOfTheHolyLand CREATED
+bypass Quest Q273_InvadersOfTheHolyLand 30566-03.htm
+  S QuestList 273:0x80000001
+  S ExShowQuestMark quest=273
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q273_InvadersOfTheHolyLand/30566-03.htm
+  S ActionFailed
+  Q upsert Q273_InvadersOfTheHolyLand | <state> | STARTED
+  Q upsert Q273_InvadersOfTheHolyLand | <cond> | 1
+  state Q273_InvadersOfTheHolyLand STARTED
+  rows Q273_InvadersOfTheHolyLand <cond>=1 <state>=STARTED
+
+# Varkees: no stone yet.
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q273_InvadersOfTheHolyLand/30566-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten imps: a black soulstone each; a chieftain: a red one.
+kill imp x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1475=10
+kill chieftain
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1476
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1476=1
+
+# First payment: 10 x 3 + 10 + 1800, then the beginner soulshots of a fighter.
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S SystemMessage id=301 3:1475 6:10
+  S SystemMessage id=302 3:1476
+  S SystemMessage id=52 6:1840
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5789 6:6000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q273_InvadersOfTheHolyLand/30566-06.htm
+  S ActionFailed
+  S ActionFailed
+  M set Q273_InvadersOfTheHolyLand_OneTimeQuestFlag | true
+  items 1475=0 1476=0 57=1840 5789=6000
+
+# Second payment: one black stone, and no shots this time; then quit.
+kill imp
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1475
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1475=1
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S SystemMessage id=302 3:1475
+  S SystemMessage id=52 6:3
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q273_InvadersOfTheHolyLand/30566-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1475=0 57=1843 5789=6000
+bypass Quest Q273_InvadersOfTheHolyLand 30566-07.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q273_InvadersOfTheHolyLand/30566-07.htm
+  S ActionFailed
+  Q delete-quest Q273_InvadersOfTheHolyLand
+  state Q273_InvadersOfTheHolyLand -
+  rows Q273_InvadersOfTheHolyLand -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q273_InvadersOfTheHolyLand -
+  rows Q273_InvadersOfTheHolyLand -
+  items 57=1843 5789=6000

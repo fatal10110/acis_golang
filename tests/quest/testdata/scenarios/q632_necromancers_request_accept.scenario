@@ -1,0 +1,40 @@
+# Necromancer's Request (Q632): a level 63 character accepts the quest.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q632_necromancers_request_accept.golden
+character Hero 63
+script quest.Q632_NecromancersRequest
+item 7542 7543 57
+page default/31522.htm
+page script/quest/Q632_NecromancersRequest/
+npc wizard 31522 Folk 10 0 0
+
+action wizard
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q632_NecromancersRequest/31522-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q632_NecromancersRequest 31522-03.htm
+  S QuestList 632:0x80000001
+  S ExShowQuestMark quest=632
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q632_NecromancersRequest/31522-03.htm
+  S ActionFailed
+  Q upsert Q632_NecromancersRequest | <state> | STARTED
+  Q upsert Q632_NecromancersRequest | <cond> | 1
+  rows Q632_NecromancersRequest <cond>=1 <state>=STARTED
+  state Q632_NecromancersRequest STARTED
+action wizard
+  S ActionFailed
+  S NpcHtmlMessage obj=wizard item=0 page=default/31522.htm
+  S ActionFailed
+bypass npc_{wizard}_Quest
+  S NpcHtmlMessage obj=wizard item=0 page=script/quest/Q632_NecromancersRequest/31522-04.htm
+  S ActionFailed
+  S ActionFailed
+relog
+  rows Q632_NecromancersRequest <cond>=1 <state>=STARTED
+  state Q632_NecromancersRequest STARTED

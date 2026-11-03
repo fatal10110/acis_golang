@@ -1,0 +1,25 @@
+# LV3Knight (27258, level 76), raised for the character (spawn parameters 0, character, owner), every draw 0: a plain hit
+# taking 60% of its hit points changes neither int slot (0 and 1); a hit by skill 28 under half its HP goes crazy at once
+# (slots 2 and 1); once its 5 s timers ran (slots 0 and 1), a hit by skill 18 only raises the defence again (slots 1 and 1),
+# which its 4000 timer lowers (slots 0 and 1).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3Knight
+npc owner 20003 Monster 600 0 0
+npc knight 27258 Monster 300 0 0 level 76 skill PHYSICAL_SPECIAL1 4032 8 skill PHYSICAL_SPECIAL2 4073 8 skill DEFENCE_MODE 4517 1 skill CRAZY_MODE 4518 1 skill PHYSICAL_SPECIAL3 4572 8 params 0 character owner master owner
+
+hit knight 264
+  S MagicSkillUse caster=knight target=knight skill=4517-1 hit=0 reuse=0 success=0
+  mem knight i_ai0=0 i_ai1=0
+hit knight 10 skill 28 1
+  mem knight i_ai0=2 i_ai1=1
+advance 5s
+  S MagicSkillUse caster=knight target=knight skill=4518-1 hit=0 reuse=0 success=0
+  mem knight i_ai0=0 i_ai1=1
+hit knight 10 skill 18 1
+  mem knight i_ai0=1 i_ai1=1
+advance 5s
+  mem knight i_ai0=0 i_ai1=1

@@ -1,11 +1,10 @@
 // Package zonepulse runs the periodic tasks of the effect and damage zones.
 //
-// The first occupant to enter such a zone starts its pulse: after the
-// zone's initial delay, then every reuse delay at a fixed rate, a damage
-// zone hurts each living occupant (DamageZone.onEnter's task) and an effect
-// zone lands its skills on each living occupant that wins the chance roll
-// (EffectZone.applyEffect). A pulse that finds its zone empty, or a damage
-// zone gone dormant, stops; the next entry starts a fresh one.
+// The first occupant to enter such a zone starts its pulse: after the zone's
+// initial delay, then every reuse delay at a fixed rate, a damage zone hurts
+// each living occupant and an effect zone lands its skills on each living
+// occupant that wins the chance roll. A pulse that finds its zone empty, or a
+// damage zone gone dormant, stops; the next entry starts a fresh one.
 //
 // Each pulse runs on the queue Wire is given. What it does to one occupant
 // runs on that occupant's own queue, when it has one.
@@ -31,7 +30,7 @@ type Objects interface {
 
 // Skills resolves a skill reference to its loaded definition.
 type Skills interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // Target is an occupant's world object as a pulse acts on it.
@@ -53,11 +52,9 @@ type Damageable interface {
 // occupant being both the skill's caster and its target.
 type Effects interface {
 	// Conditions reports whether def's conditions hold for target using it
-	// on itself, telling target why not when they do not
-	// (L2Skill.checkCondition).
+	// on itself, telling target why not when they do not.
 	Conditions(target Target, def modelskill.Definition) bool
-	// Land lands def's effects on target (L2Skill.getEffects(target,
-	// target)).
+	// Land lands def's effects on target, as both effector and effected.
 	Land(target Target, def modelskill.Definition)
 }
 
@@ -76,8 +73,8 @@ type Config struct {
 }
 
 // Wire gives every effect and damage zone of ix its pulse. A zone whose
-// reuse delay is not positive never pulses: the reference fails to
-// schedule such a task. Call it once at boot, before any actor enters a
+// reuse delay is not positive never pulses: it schedules no pulse task.
+// Call it once at boot, before any actor enters a
 // zone.
 func Wire(ix *zone.Index, cfg Config) {
 	if ix == nil || cfg.Queue == nil || cfg.Objects == nil {
@@ -231,16 +228,16 @@ func landSkills(cfg *Config, z *zone.Effect, t Target) {
 		if !ok {
 			continue
 		}
-		if !cfg.Effects.Conditions(t, def) || holds(t, ref.ID) {
+		if !cfg.Effects.Conditions(t, *def) || holds(t, ref.ID) {
 			continue
 		}
-		cfg.Effects.Land(t, def)
+		cfg.Effects.Land(t, *def)
 	}
 }
 
 // holds reports whether t holds an effect of skill id.
 func holds(t Target, id int) bool {
-	h, ok := t.(interface{ EffectList() *effect.List })
+	h, ok := t.(effectHolder)
 	if !ok {
 		return false
 	}
@@ -251,11 +248,21 @@ func holds(t Target, id int) bool {
 // onQueueOf runs fn on t's own queue, or at once when t has none. A closed
 // queue drops it: t has left the world.
 func onQueueOf(t Target, fn func()) {
-	if q, ok := t.(interface{ Queue() *sim.Queue }); ok {
+	if q, ok := t.(queueOwner); ok {
 		if queue := q.Queue(); queue != nil {
 			queue.Post(fn)
 			return
 		}
 	}
 	fn()
+}
+
+// effectHolder is a target that holds effects.
+type effectHolder interface {
+	EffectList() *effect.List
+}
+
+// queueOwner is a target that runs its own work on a queue.
+type queueOwner interface {
+	Queue() *sim.Queue
 }

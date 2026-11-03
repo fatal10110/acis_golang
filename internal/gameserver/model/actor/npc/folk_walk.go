@@ -44,8 +44,17 @@ type FolkMovement struct {
 	// Route is the route walk task the NPC's route desires walk it on; nil
 	// leaves those desires moving it nowhere.
 	Route FolkRoute
-	// Log reports a failed-pathfinding streak that overflows.
-	Log zerolog.Logger
+	// Log, shared with other NPCs, reports a failed-pathfinding streak that
+	// overflows; nil reports nothing.
+	Log *zerolog.Logger
+}
+
+// logger returns the logger c names.
+func (c *FolkMovement) logger() *zerolog.Logger {
+	if c.Log == nil {
+		return &nopLog
+	}
+	return c.Log
 }
 
 // FolkRoute is the route walk task a walking civilian NPC walks its route
@@ -124,22 +133,21 @@ func (f *Folk) MovingTo() (location.Location, bool) {
 }
 
 // Emit settles the NPC's controller events: an arrival syncs its world
-// position, faces its spawn heading when back on its spawn point, and is
-// passed on to Control; a blocked walk shows observers where it stopped.
+// position, runs the AI's arrival (Folk.arrived), and is passed on to
+// Control; a blocked walk ends the AI's walk and shows observers where it
+// stopped.
 func (m *folkMotion) Emit(ev event.Event) {
 	switch ev.(type) {
 	case event.Arrived:
-		at := m.ctl.Position()
-		m.SyncPosition(at)
+		m.SyncPosition(m.ctl.Position())
 		// A move's end revalidates the zones at once.
 		m.zones.settle()
-		if at == m.Instance.Home {
-			m.SetHeading(m.Instance.SpawnHeading)
-		}
+		m.arrived()
 		if m.cfg.Control != nil {
 			m.cfg.Control.Emit(ev)
 		}
 	case event.MoveBlocked:
+		m.arrivedBlocked()
 		m.ctl.BroadcastBlockedCorrection()
 	}
 }
@@ -153,9 +161,8 @@ func (m *folkMotion) emit(ev event.Event) {
 // SyncPosition moves the NPC's world presence to position, a movement step.
 func (m *folkMotion) SyncPosition(position location.Location) {
 	if m.cfg.World != nil {
-		x, y, z := m.Folk.Position()
 		_ = m.cfg.World.Move(m.Folk, position.X, position.Y, position.Z)
-		m.zones.step(location.Location{X: x, Y: y, Z: z})
+		m.zones.step()
 	}
 }
 
@@ -188,10 +195,11 @@ func (m *folkMotion) IntentionMovesToTarget() bool {
 // CanSee reports whether the NPC has line of sight to target.
 func (m *folkMotion) CanSee(target attackable.Combatant) bool { return m.canSee(target) }
 
-// MovementDisabled reports a template that cannot move, a dead NPC or a
-// teleport under way; nothing else immobilizes a civilian NPC.
+// MovementDisabled reports a template that cannot move, a paralyzed or
+// dead NPC, or a teleport under way; nothing else immobilizes a civilian
+// NPC's walk.
 func (m *folkMotion) MovementDisabled() bool {
-	return !m.Instance.Template.CanMove || m.Dead() || m.teleporting.Load()
+	return !m.Instance.Template.CanMove || m.Paralyzed() || m.Dead() || m.teleporting.Load()
 }
 
 // GeoPathFailCount reports the NPC's failed-pathfinding streak.
@@ -217,7 +225,7 @@ func (m *folkMotion) AddGeoPathFailCount() {
 		}
 		if m.geoPathFails.CompareAndSwap(cur, 0) {
 			x, y, z := m.Folk.Position()
-			m.cfg.Log.Warn().
+			m.cfg.logger().Warn().
 				Str("npc", m.Instance.Template.Name).
 				Int("x", x).
 				Int("y", y).
@@ -234,18 +242,20 @@ func (m *folkMotion) AddGeoPathFailCount() {
 // re-enters the world grid there, and its failed-pathfinding streak clears.
 // A teleport that starts while another is under way is dropped.
 func (m *folkMotion) TeleportTo(target location.Location) {
+	m.teleport(location.Jump{To: target})
+}
+
+// teleport is TeleportTo aimed where j lands (move.Land).
+func (m *folkMotion) teleport(j location.Jump) {
 	if !m.teleporting.CompareAndSwap(false, true) {
 		return
 	}
 	m.ctl.Stop()
-	if m.cfg.InWater == nil || !m.cfg.InWater(target) {
-		target.Z = int(m.move.Height(target.X, target.Y, target.Z))
-	}
+	target := move.Land(m.move, j, m.cfg.InWater)
 	m.emit(event.Teleported{To: target})
 	// The NPC leaves the zones around its old position while its observers
 	// there still know it, and enters those at target once it has landed.
-	x, y, z := m.Folk.Position()
-	m.zones.leave(location.Location{X: x, Y: y, Z: z})
+	m.zones.leave()
 	m.move.SetPosition(target)
 	if m.cfg.World != nil {
 		_ = m.cfg.World.Teleport(m.Folk, target.X, target.Y, target.Z)
@@ -253,6 +263,7 @@ func (m *folkMotion) TeleportTo(target location.Location) {
 	m.teleporting.Store(false)
 	m.zones.enter()
 	m.ResetGeoPathFailCount()
+	m.aiSleep.wakeOutOfTerritory(m.Folk)
 }
 
 // Queue returns the queue the NPC's movement runs on.
@@ -275,14 +286,15 @@ func (w *FolkWalker) MoveToLocation(target location.Location) (event.Move, error
 	return w.ctl.MoveToLocationEvent(target)
 }
 
-// SayNPCString shows observers a route node's chat line; an unmapped id
-// says nothing.
+// SayNPCString shows observers a route node's chat line, as Say does:
+// named by the npc id, not the client template id. An unmapped id says
+// nothing.
 func (w *FolkWalker) SayNPCString(id int) {
 	text, ok := npcstring.Text(int32(id))
 	if !ok {
 		return
 	}
-	w.emit(event.NpcSay{NpcID: w.Instance.Template.TemplateID, Text: text})
+	w.Folk.Say(text)
 }
 
 // SocialAction shows observers a route node's social animation.

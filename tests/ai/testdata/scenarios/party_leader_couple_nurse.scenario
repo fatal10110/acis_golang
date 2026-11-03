@@ -1,0 +1,20 @@
+# PartyLeaderCoupleCaptainNurseAggressive (22118, Spiked Stakato Nurse), every draw 0: hit by
+# the character it wants to attack, standing 150 away, it wants its self-centred DD magic
+# (4571-8) on itself and its DD magic (4078-8) on the character, each weight 1000000; its
+# attacked parents add the hit's hate. tests/ai/warrior_individual3e_test.go covers its sight,
+# range rows and clan calls.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptain
+script script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderCoupleCaptain.PartyLeaderCoupleCaptainNurseAggressive
+npc nurse 22118 Monster 150 0 0 skill SELF_RANGE_DD_MAGIC 4571 8 skill DD_MAGIC 4078 8
+
+hit nurse 10
+  desires nurse attack(player)=125
+hit nurse 10
+  desires nurse cast(nurse,4571,move)=1000000 cast(player,4078,move)=1000000 attack(player)=250

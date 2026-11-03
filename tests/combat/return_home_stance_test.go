@@ -2,7 +2,6 @@ package combat
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -12,7 +11,7 @@ import (
 
 // TestReturnHomeBroadcastsWalkThenMove pins Attackable.returnHome's
 // forceWalkStance before the home move: observers receive ChangeMoveType
-// (walk) immediately followed by MoveToLocation.
+// (walk) and the NPC's NpcInfo, immediately followed by MoveToLocation.
 func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -31,7 +30,7 @@ func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
 		t.Fatal("ReturnHome() = false, want true outside drift range")
 	}
 
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 }
 
@@ -62,7 +61,7 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 		t.Fatalf("CurrentIntention() after ReturnHome = %v, want idle until TickThink", got)
 	}
 
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), true)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), true)
 	if err := hostile.TickThink(); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
 	}
@@ -92,11 +91,11 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	}
 	// Periodic idle abort matches thinkIdle: leftover movement StopMove
 	// and walk stance. SiegeGuard return-home had switched to run, so
-	// observers then see ChangeMoveType(walk) and nothing else.
+	// observers then see ChangeMoveType(walk), NpcInfo and nothing else.
 	assertFrameOpcode(t, mustRead(t, c, "idle StopMove"), serverpackets.OpcodeStopMove, "StopMove")
-	assertChangeMoveType(t, mustRead(t, c, "idle walk stance"), hostile.ObjectID(), false)
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("unexpected frame after idle Think: opcode %#x", frame[0])
+	assertStanceShown(t, c, "idle walk stance", hostile.ObjectID(), false)
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unexpected frame after idle Think: opcode %#x", queued[0][0])
 	}
 }
 

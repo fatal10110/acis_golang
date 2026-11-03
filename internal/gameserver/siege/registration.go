@@ -124,7 +124,7 @@ func (s *Siege) canRegisterLocked(cl *clan.Clan, side Side) (Message, bool) {
 		}
 		return Message{ID: MsgOwnerCannotJoinOther}, false
 	case e.registeredLocked(cl.ID()):
-		// This also covers the reference's next check, a registration on
+		// This also covers the next check, a registration on
 		// another siege fought the same day of the week (639), which a clan
 		// registered on no siege cannot have.
 		return Message{ID: MsgAlreadyRequested}, false

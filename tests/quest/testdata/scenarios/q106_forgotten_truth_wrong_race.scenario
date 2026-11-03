@@ -1,0 +1,22 @@
+# Forgotten Truth (Q106), refused: an elven fighter of level 10 is turned away by Thifiell, who
+# takes dark elves only, and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q106_forgotten_truth_wrong_race.golden
+character Stranger 10
+class 18
+script quest.Q106_ForgottenTruth
+item 984
+page villagemaster/30358.htm
+page script/quest/Q106_ForgottenTruth/
+npc thifiell 30358 VillageMasterDElf 10 0 0
+
+action thifiell
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q106_ForgottenTruth/30358-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q106_ForgottenTruth CREATED
+  rows Q106_ForgottenTruth -

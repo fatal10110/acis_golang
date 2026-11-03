@@ -1,0 +1,26 @@
+# In Search of Fragments of Dimension (Q634): with the draw under the chance, a monster drops its level times 0.15, plus 1.6, truncated, fragments: 4 at level 20, 13 at level 77.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q634_in_search_of_fragments_of_dimension_levels.golden
+character Hero 20
+quest Q634_InSearchOfFragmentsOfDimension <cond>=1 <state>=STARTED
+random 0 0 0 0
+script quest.Q634_InSearchOfFragmentsOfDimension
+item 7079
+page default/31494.htm
+page default/31507.htm
+page script/quest/Q634_InSearchOfFragmentsOfDimension/
+npc gate1 31494 Folk 10 0 0
+npc gate14 31507 Folk 20 0 0
+npc m1 21208 Monster 40 0 0 level 20
+npc m2 21255 Monster 50 0 0 level 77
+
+kill m1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:7079 6:4
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7079=4
+kill m2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:7079 6:13
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7079=17

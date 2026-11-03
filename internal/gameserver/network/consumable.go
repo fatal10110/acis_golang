@@ -24,7 +24,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		return false
 	}
 	results := itemhandler.UseAll(itemhandler.UseRequest{
-		Caster:      live.Character,
+		Caster:      live,
 		Inventory:   inv,
 		Item:        inst,
 		Definitions: l.skills,

@@ -1,0 +1,17 @@
+# Elcroki (22214, level 80) that cannot pay for its magic (0 MP), every draw 0: the first hit from 150 away sets int slot 0
+# and wants to attack the character with weight 1000 instead of casting; with the slot set, the next hit adds the attack
+# formula, 10 / (80 + 7) * 100.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki
+npc elcroki 22214 Monster 150 0 0 mp 0 level 80 skill LONG_RANGE_DD_MAGIC1 4151 10 skill SELF_RANGE_DEBUFF1 4486 10 skill SELF_RANGE_BUFF1 5080 1 skill SELF_RANGE_DD_MAGIC1 5178 1
+
+hit elcroki 10
+  mem elcroki i_ai0=1
+  desires elcroki attack(player)=1000
+hit elcroki 10
+  desires elcroki attack(player)=1011.4942528735633

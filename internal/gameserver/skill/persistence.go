@@ -169,8 +169,7 @@ func (p *Persistence) Save(ctx context.Context, st SaveState) error {
 }
 
 // liveActiveEffects snapshots c's live effect list into the ActiveEffect view
-// BuildSaveRows needs, mirroring Player.storeEffect()'s use of
-// getAllEffects(): the effect list itself is the single source of truth for
+// BuildSaveRows needs: the effect list itself is the single source of truth for
 // what gets saved, not a separate write-only registry. A stacked-out effect
 // still held in the list is saved too, so it resumes behind the stronger one
 // after relog. An effect whose skill definition no longer resolves is
@@ -354,24 +353,30 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 // ReplayEffects reinstates every effect Restore recorded into c's restore
 // registry (via RestoreSkillEffect) onto c's live effect list, at the tick
 // count and elapsed time it had at logout, run on from its restore instant.
-// Call once c.EffectList() is attached, after Restore itself: Restore
-// records restored effects into the registry only, so a character not yet
-// in the world sends nothing for them — this replay is what actually fires
-// their OnStart, schedules their ticks, and surfaces their icons, mirroring
-// Player.restoreEffects()'s template.getEffect(this, this, skill) ->
-// setCount/setTime -> scheduleEffect() chain, with one icon refresh for
-// the whole replay, as EnterWorld sends one. An effect whose ticks run an
-// action runs those of the ticks due between the restore and the replay, in
-// time order across all the effects, on c; one that ran out in between is
-// not reinstated. A session
-// that ends before EnterWorld replays them too, ahead of its saves.
-func (p *Persistence) ReplayEffects(c *player.Character) {
+// Call once c.EffectList() is attached, after Restore itself: Restore records
+// restored effects into the registry only, so a character not yet in the world
+// sends nothing for them — this replay is what actually fires their OnStart,
+// schedules their ticks from the restored count and time, and surfaces their
+// icons, with one icon refresh for the whole replay, as EnterWorld sends one.
+// An effect whose ticks run an action runs those of the ticks due between the
+// restore and the replay, in time order across all the effects, on c; one that
+// ran out in between is not reinstated. A session that ends before EnterWorld
+// replays them too, ahead of its saves. applied, when set, runs once every
+// effect is back with its stats, before any tick due since the restore:
+// what the restore does with the full maxima, it does ahead of those ticks.
+func (p *Persistence) ReplayEffects(c *player.Character, applied func()) {
 	if p == nil || c == nil {
 		return
 	}
 	list := c.EffectList()
 	if list == nil {
 		return
+	}
+	// Each effect is c's own, named by the object the world registers c
+	// under, as every effect that player casts is.
+	self, ok := c.WorldHandle().(effect.Actor)
+	if !ok {
+		self = c
 	}
 	// One restore for all of them: the ticks due since the restore run in
 	// time order across the effects, and the icons refresh once.
@@ -381,7 +386,10 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 			if !ok {
 				continue
 			}
-			effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
+			effect.ApplyRestored(list, self, self, effect.SkillFromDefinition(*def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
+		}
+		if applied != nil {
+			applied()
 		}
 	})
 	// The registry's only purpose is staging Restore's effects until the live
@@ -418,7 +426,7 @@ func (p *Persistence) ApplyTransientPassiveSkill(c *player.Character, skillID, o
 	if !ok || def.Activation != modelskill.ActivationPassive {
 		return nil
 	}
-	fns, err := effect.PassiveFuncs(def)
+	fns, err := effect.PassiveFuncs(*def)
 	if err != nil {
 		return fmt.Errorf("apply transient passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
 	}
@@ -450,7 +458,7 @@ func (p *Persistence) setKnownSkill(c *player.Character, skillID, level int, per
 	if !ok || def.Activation != modelskill.ActivationPassive {
 		return nil
 	}
-	fns, err := effect.PassiveFuncs(def)
+	fns, err := effect.PassiveFuncs(*def)
 	if err != nil {
 		return fmt.Errorf("apply passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
 	}
@@ -552,6 +560,7 @@ func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.In
 	if p == nil || c == nil || inst == nil || tmpl == nil {
 		return false, false, nil
 	}
+	c.SetEquippedTemplate(inst, tmpl)
 	aug, augmentedWeapon := inst.AugmentationValue()
 	augmentedWeapon = augmentedWeapon && tmpl.Weapon != nil
 	var augMods []effect.Mod
@@ -642,7 +651,7 @@ func (p *Persistence) augmentationGrant(inst *item.Instance, aug item.Augmentati
 	}
 	g := itemSkillGrant{def: def, noEquipDelay: true}
 	if def.Activation == modelskill.ActivationPassive {
-		fns, err := effect.PassiveFuncs(def)
+		fns, err := effect.PassiveFuncs(*def)
 		if err != nil {
 			return nil, nil, fmt.Errorf("skill %d level %d: %w", aug.SkillID, aug.SkillLevel, err)
 		}
@@ -824,7 +833,7 @@ func (p *Persistence) listenerSkillGrant(ref modelskill.Ref) (g itemSkillGrant, 
 	}
 	g = itemSkillGrant{def: def, noEquipDelay: true}
 	if def.Activation == modelskill.ActivationPassive {
-		if g.fns, err = effect.PassiveFuncs(def); err != nil {
+		if g.fns, err = effect.PassiveFuncs(*def); err != nil {
 			return itemSkillGrant{}, false, err
 		}
 	}
@@ -918,7 +927,7 @@ func removeItemSkill(c *player.Character, skillID int) bool {
 // itemSkillGrant is one loaded tmpl.AttachedSkills entry and, for a passive
 // one, the stat functions it attaches, owned by the skill.
 type itemSkillGrant struct {
-	def modelskill.Definition
+	def *modelskill.Definition
 	fns []effect.Mod
 	// noEquipDelay skips the equip-delay reuse timer an ACTIVE item skill
 	// arms: the +4 enchant skill is added without one.
@@ -937,7 +946,7 @@ func (p *Persistence) itemSkillGrants(tmpl *item.Template) ([]itemSkillGrant, er
 		}
 		g := itemSkillGrant{def: def}
 		if def.Activation == modelskill.ActivationPassive {
-			fns, err := effect.PassiveFuncs(def)
+			fns, err := effect.PassiveFuncs(*def)
 			if err != nil {
 				return nil, fmt.Errorf("item %d passive skill %d level %d: %w", tmpl.ID, ref.ID, ref.Level, err)
 			}
@@ -954,8 +963,7 @@ func (p *Persistence) itemSkillGrants(tmpl *item.Template) ([]itemSkillGrant, er
 // attach its passive stat functions once); at another level the known
 // level's stat functions are dropped before the granted level's attach. An
 // ACTIVE entry with a positive equip delay and no already-armed reuse timer
-// for its reuse key gets one armed, matching
-// ItemPassiveSkillsListener.onEquip:58-72.
+// for its reuse key gets one armed.
 func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGrant) (skillsChanged, timersChanged bool) {
 	for _, g := range grants {
 		def := g.def
@@ -1026,9 +1034,19 @@ type WornStep struct {
 // stage, when not nil, is told what each of those changed at that moment; a
 // nil stage folds the armor set and augmentation into the result instead,
 // and leaves formal wear out.
+//
+// Everything detaches by the template inst's equip stats attached with,
+// when they did; tmpl is the fallback for an item that brought none. Once
+// inst is no longer equipped, that record goes.
 func (p *Persistence) UnequipItemStatsReporting(c *player.Character, worn WornStep, inst *item.Instance, tmpl *item.Template, stage func(SkillChange)) (skillsChanged bool) {
 	if c == nil || inst == nil {
 		return false
+	}
+	if attached, ok := c.EquippedTemplate(inst); ok {
+		tmpl = attached
+	}
+	if !inst.Equipped() {
+		c.ForgetEquippedTemplate(inst)
 	}
 	c.RemoveStatsByOwner(effect.ModOwnerItem(effect.ItemOwner{Inst: inst, Tmpl: tmpl}))
 	if tmpl == nil {
@@ -1088,14 +1106,15 @@ func (p *Persistence) RestoreEquippedItemStats(c *player.Character, inv *itemcon
 
 // RefreshEquippedItemStats reapplies equipped item modifiers and passives,
 // and item-granted skills, after a state gate changes which of them may be
-// active (e.g. an Expertise level change). skillsChanged and timersChanged
-// report whether the caller must resend SkillList and SkillCoolTime.
+// active (e.g. an Expertise level change), each against the template it is
+// worn with (WornTemplate). skillsChanged and timersChanged report whether
+// the caller must resend SkillList and SkillCoolTime.
 func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcontainer.Inventory) (skillsChanged, timersChanged bool, err error) {
 	if c == nil || inv == nil {
 		return false, false, nil
 	}
 	for _, inst := range inv.PaperdollItems() {
-		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		tmpl, ok := WornTemplate(c, inv, inst)
 		if !ok {
 			continue
 		}
@@ -1112,8 +1131,24 @@ func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcon
 	return skillsChanged, timersChanged, nil
 }
 
+// WornTemplate returns the template worn inst counts as on c: the one its
+// equip stats attached with, else inv's current template for its id. A
+// reload replacing or dropping the id leaves a worn item what it went on as
+// until it comes off.
+func WornTemplate(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance) (*item.Template, bool) {
+	if c != nil {
+		if tmpl, ok := c.EquippedTemplate(inst); ok {
+			return tmpl, true
+		}
+	}
+	if inv == nil {
+		return nil, false
+	}
+	return inv.Templates().Get(inst.TemplateID)
+}
+
 // Definition returns a loaded skill definition.
-func (p *Persistence) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (p *Persistence) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	return p.definition(ref)
 }
 
@@ -1159,7 +1194,7 @@ func (p *Persistence) applyKnownSkills(c *player.Character, levels player.SkillL
 		if !ok || def.Activation != modelskill.ActivationPassive {
 			continue
 		}
-		fns, err := effect.PassiveFuncs(def)
+		fns, err := effect.PassiveFuncs(*def)
 		if err != nil {
 			return fmt.Errorf("restore passive stats for character %d skill %d level %d: %w", c.ID, id, level, err)
 		}
@@ -1178,9 +1213,9 @@ func (p *Persistence) lookup(ref modelskill.Ref) (bool, bool) {
 	return true, len(def.Effects) > 0
 }
 
-func (p *Persistence) definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (p *Persistence) definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	if p == nil || p.skills == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return p.skills.Get(ref.ID, ref.Level)
 }
@@ -1228,7 +1263,7 @@ func (p *Persistence) RestoreDuelState(c *player.Character, st SaveState) {
 	// c is in the world: its effects run from the replay, which runs none
 	// of their ticks.
 	p.stageSkillState(c, st.rows, c.Now(), time.Time{})
-	p.ReplayEffects(c)
+	p.ReplayEffects(c, nil)
 }
 
 // ClearSaved deletes the rows st's character saved for st's class.

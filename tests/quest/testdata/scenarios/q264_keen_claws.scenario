@@ -1,0 +1,164 @@
+# Keen Claws (Q264): a level 3 character accepts at Payne (a merchant); goblins give two claws
+# each and ashen wolves one (every roll pinned to succeed), the fiftieth claw moving the quest on;
+# Payne takes them and rolls the reward, here pinned to the jackpot wooden helmet, and the
+# repeatable quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q264_keen_claws.golden
+character Clawer 3
+random always 0
+script quest.Q264_KeenClaws
+item 1367 36 43 462 1061 48 35
+page merchant/30136.htm
+page script/quest/Q264_KeenClaws/
+npc payne 30136 Merchant 10 0 0
+npc goblin 20003 Monster 40 0 0
+npc wolf 20456 Monster 0 40 0
+
+# Payne: accept.
+action payne
+action payne
+  S ActionFailed
+  S NpcHtmlMessage obj=payne item=0 page=merchant/30136.htm
+  S ActionFailed
+bypass npc_{payne}_Quest
+  S NpcHtmlMessage obj=payne item=0 page=script/quest/Q264_KeenClaws/30136-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q264_KeenClaws CREATED
+bypass Quest Q264_KeenClaws 30136-03.htm
+  S QuestList 264:0x80000001
+  S ExShowQuestMark quest=264
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=payne item=0 page=script/quest/Q264_KeenClaws/30136-03.htm
+  S ActionFailed
+  Q upsert Q264_KeenClaws | <state> | STARTED
+  Q upsert Q264_KeenClaws | <cond> | 1
+  state Q264_KeenClaws STARTED
+  rows Q264_KeenClaws <cond>=1 <state>=STARTED
+
+# A goblin (two claws) and an ashen wolf (one).
+kill goblin
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1367=2
+kill wolf
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1367
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1367=3
+action payne
+  S ActionFailed
+  S NpcHtmlMessage obj=payne item=0 page=merchant/30136.htm
+  S ActionFailed
+bypass npc_{payne}_Quest
+  S NpcHtmlMessage obj=payne item=0 page=script/quest/Q264_KeenClaws/30136-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Twenty-three goblins and a wolf: the fiftieth claw completes the set.
+kill goblin x23
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1367 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1367=49
+  rows Q264_KeenClaws <cond>=1 <state>=STARTED
+kill wolf
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1367
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 264:0x80000003
+  S ExShowQuestMark quest=264
+  Q upsert Q264_KeenClaws | <cond> | 2
+  items 1367=50
+  rows Q264_KeenClaws <cond>=2 <state>=STARTED
+
+# Payne: the claws for the wooden helmet (a roll of 0, the jackpot); the quest ends.
+action payne
+  S ActionFailed
+  S NpcHtmlMessage obj=payne item=0 page=merchant/30136.htm
+  S ActionFailed
+bypass npc_{payne}_Quest
+  S SystemMessage id=301 3:1367 6:50
+  S SystemMessage id=54 3:43
+  S PlaySound type=0 file=ItemSound.quest_jackpot bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=payne item=0 page=script/quest/Q264_KeenClaws/30136-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q264_KeenClaws
+  items 1367=0 43=1
+  state Q264_KeenClaws -
+  rows Q264_KeenClaws -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q264_KeenClaws -
+  rows Q264_KeenClaws -
+  items 43=1

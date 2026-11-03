@@ -80,7 +80,7 @@ var funcOpTags = [...]string{
 }
 
 // ParseFuncOp resolves a stat-template element name to its operation. The
-// name matches case-insensitively, as the reference matches it.
+// name matches case-insensitively.
 func ParseFuncOp(tag string) (FuncOp, error) {
 	for op, name := range funcOpTags {
 		if strings.EqualFold(tag, name) {

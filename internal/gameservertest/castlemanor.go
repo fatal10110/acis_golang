@@ -54,7 +54,7 @@ func startCastleManor(t *testing.T, m *castlemanor.Manager, o *options, gcl *net
 	}
 	clock := sim.NewInline(o.castleManor.start)
 	queue := clock.NewQueue("castle-manor")
-	t.Cleanup(queue.Close)
+	cleanup(t, queue.Close)
 	m.Start(queue, network.CastleManorEffects(gcl))
 	return clock
 }

@@ -253,11 +253,11 @@ func TestTutorialHearsEnterWorldLastInTheBurst(t *testing.T) {
 
 // TestTutorialHearsTheGameTriggers drives the game's tutorial triggers on
 // the player's queue. An HP write that leaves the player below 30% of its
-// maximum raises CE45 once, one that does not raises nothing; a death from
-// HP damage raises CE45 for the damage's write, CE45 for the death's own
-// HP clear, then CE30, but no CE30 in the Olympiad; a level gain raises
-// CE40 once, a loss nothing; sitting down raises CE8388608, on request and
-// through Sit.
+// maximum raises CE45 once its status is reported, one that does not
+// raises nothing; a death from HP damage raises CE45 for the damage's
+// write, CE45 for the death's own HP clear, then CE30, but only the first
+// CE45 in the Olympiad; a level gain raises CE40 once, a loss nothing;
+// sitting down raises CE8388608, on request and through Sit.
 func TestTutorialHearsTheGameTriggers(t *testing.T) {
 	t.Parallel()
 	levels := flatLevels(t)
@@ -277,8 +277,14 @@ func TestTutorialHearsTheGameTriggers(t *testing.T) {
 		}
 	}
 
-	expect("HP at 50%", onPlayer(func(c *player.Character) { c.SetHP(c.MaxHPValue() * 0.5) }))
-	expect("HP at 20%", onPlayer(func(c *player.Character) { c.SetHP(c.MaxHPValue() * 0.2) }), "CE45")
+	setHP := func(ratio float64) func(c *player.Character) {
+		return func(c *player.Character) {
+			c.SetHP(c.MaxHPValue() * ratio)
+			c.BroadcastStatus()
+		}
+	}
+	expect("HP at 50%", onPlayer(setHP(0.5)))
+	expect("HP at 20%", onPlayer(setHP(0.2)), "CE45")
 	expect("lethal hit", onPlayer(func(c *player.Character) { c.TakeDamage(1_000_000, c) }), "CE45", "CE45", "CE30")
 
 	onPlayer(func(c *player.Character) {
@@ -286,12 +292,9 @@ func TestTutorialHearsTheGameTriggers(t *testing.T) {
 		c.SetHP(c.MaxHPValue())
 		c.SetOlympiadMode(true)
 	})
-	// Only the missing CE30 is pinned here: in the Olympiad a lethal hit
-	// raises CE45 once for the damage's write and runs no death sequence,
-	// which this server does not have yet (#3540).
-	if got := onPlayer(func(c *player.Character) { c.TakeDamage(1_000_000, c) }); slices.Contains(got, "CE30") || !slices.Contains(got, "CE45") {
-		t.Fatalf("lethal hit in the Olympiad: heard %q, want CE45 and no CE30", got)
-	}
+	// In the Olympiad a lethal hit only marks the player dead: CE45 once
+	// for the damage's write, no death HP clear and no CE30.
+	expect("lethal hit in the Olympiad", onPlayer(func(c *player.Character) { c.TakeDamage(1_000_000, c) }), "CE45")
 	onPlayer(func(c *player.Character) {
 		c.SetOlympiadMode(false)
 		c.Revive()
@@ -419,12 +422,15 @@ func TestMemosSurviveRelog(t *testing.T) {
 }
 
 // TestMemoLoadFailureRefusesSelection: memos that cannot be read refuse the
-// selection silently, as a journal that cannot be read does, so a one-time
-// reward a memo records cannot be taken again.
+// selection, answered with the character list, as a journal that cannot be
+// read is, so a one-time reward a memo records cannot be taken again.
 func TestMemoLoadFailureRefusesSelection(t *testing.T) {
 	t.Parallel()
 	srv, objID, _ := bootTutorial(t, false, gameservertest.WithMemoLoadFault(errors.New("memos unreadable")))
 	srv.Client.Send(encodeRequestGameStart(0))
+	if frame := srv.Client.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("refused selection: opcode %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
+	}
 	srv.Client.ExpectNoFrame()
 	if _, ok := srv.State.Player(objID); ok {
 		t.Fatal("refused selection registered the player in the world")

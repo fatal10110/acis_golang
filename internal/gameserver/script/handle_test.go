@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -45,12 +46,30 @@ func (b *recordingBrain) AddDoNothingDesire(timer int, weight float64) {
 	b.record("nothing %d %v", timer, weight)
 }
 
+func (b *recordingBrain) AddMoveToDesire(loc location.Location, weight float64) bool {
+	b.record("move-to %d,%d,%d %v", loc.X, loc.Y, loc.Z, weight)
+	return true
+}
+
+func (b *recordingBrain) AddMoveToPositionDesire(loc location.Location, heading int, weight float64) bool {
+	b.record("move-to %d,%d,%d heading %d %v", loc.X, loc.Y, loc.Z, heading, weight)
+	return true
+}
+
 func (b *recordingBrain) AddFleeDesire(target attackable.Combatant, distance int, weight float64) {
 	b.record("flee %v %d %v", id(target), distance, weight)
 }
 
 func (b *recordingBrain) AddSocialDesire(socialID, timer int, weight float64) {
 	b.record("social %d %d %v", socialID, timer, weight)
+}
+
+func (b *recordingBrain) AddMoveRouteDesire(name string, weight float64) {
+	b.record("route %s %v", name, weight)
+}
+
+func (b *recordingBrain) AddPickUpDesire(itemObjectID int32, weight float64) {
+	b.record("pick-up %d %v", itemObjectID, weight)
 }
 
 // combatant is a creature the world tracks under objectID.
@@ -61,6 +80,13 @@ type combatant struct {
 }
 
 func (c *combatant) ObjectID() int32 { return c.objectID }
+
+// thinkingCombatant is a tracked creature that queues its own desires, as a
+// civilian NPC does.
+type thinkingCombatant struct {
+	*combatant
+	*recordingBrain
+}
 
 func id(c attackable.Combatant) any {
 	if c == nil {
@@ -74,7 +100,7 @@ func id(c attackable.Combatant) any {
 // and condition-check flags of each variant.
 func TestNPCDesireRequests(t *testing.T) {
 	b := &recordingBrain{}
-	n := &NPC{self: &combatant{objectID: 1}, brain: b}
+	n := &NPC{self: thinkingCombatant{&combatant{objectID: 1}, b}}
 	p := &Player{self: &combatant{objectID: 2}}
 	ref := skill.Ref{ID: 4107, Level: 1}
 
@@ -87,8 +113,11 @@ func TestNPCDesireRequests(t *testing.T) {
 	n.AddFollowDesire(n, 5)
 	n.AddWanderDesire(5, 5)
 	n.AddDoNothingDesire(40, 30)
+	n.AddMoveToDesire(Loc{X: 10, Y: -20, Z: 30, Heading: 400}, 30)
 	n.AddFleeDesire(p, 500, 10000)
 	n.AddSocialDesire(3, 7000, 1000)
+	n.AddMoveRouteDesire("walk", 1000000)
+	n.AddPickUpDesire(9001, 1000000)
 	n.AddAttackDesire(nil, 1)
 	n.AddFollowDesire((*Player)(nil), 1)
 	n.AddCastDesire(&Player{}, ref, 1)
@@ -103,8 +132,11 @@ func TestNPCDesireRequests(t *testing.T) {
 		"follow 1 5",
 		"wander 5 5",
 		"nothing 40 30",
+		"move-to 10,-20,30 30",
 		"flee 2 500 10000",
 		"social 3 7000 1000",
+		"route walk 1e+06",
+		"pick-up 9001 1e+06",
 		"attack nil 1",
 		"follow nil 1",
 		"cast nil {4107 1} 1 check=true move=true",

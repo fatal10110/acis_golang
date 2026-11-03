@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestClanSkillChangeSkipsMemberExpelledFirst holds the recruit's queue
@@ -43,14 +44,16 @@ func TestClanSkillChangeSkipsMemberExpelledFirst(t *testing.T) {
 			}
 			<-held
 
+			// The recruit's queue is held, so the reads wait for the
+			// leader's answers rather than for every queue to settle.
 			w.leader.Send(encodeRequestAcquireSkill(vitalityID, 1, acquireSkillReq))
-			if _, ok := firstOpcode(drainFrames(t, w.leader), serverpackets.OpcodeAcquireSkillList); !ok {
-				t.Fatal("the leader's learn was not answered")
-			}
+			readUntilFrame(t, w.leader, "the leader's learn answer", func(f []byte) bool {
+				return f[0] == serverpackets.OpcodeAcquireSkillList
+			})
 			w.leader.Send(encodeRequestOustPledgeMember("Recruit"))
-			if ids := messages(t, drainFrames(t, w.leader)); !slices.Contains(ids, serverpackets.SystemMessageSucceededInExpellingClanMember) {
-				t.Fatalf("leader's expulsion = %v, want SUCCEEDED_IN_EXPELLING_CLAN_MEMBER", ids)
-			}
+			readUntilFrame(t, w.leader, "the leader's SUCCEEDED_IN_EXPELLING_CLAN_MEMBER", func(f []byte) bool {
+				return slices.Equal(messages(t, [][]byte{f}), []int{serverpackets.SystemMessageSucceededInExpellingClanMember})
+			})
 
 			letGo()
 			frames := drainFrames(t, w.member)
@@ -77,4 +80,16 @@ func TestClanSkillChangeSkipsMemberExpelledFirst(t *testing.T) {
 			}
 		})
 	}
+}
+
+// readUntilFrame reads c's frames until one matches, failing the test if
+// none has within 100 frames.
+func readUntilFrame(t *testing.T, c *testsupport.ScriptedClient, what string, match func([]byte) bool) {
+	t.Helper()
+	for range 100 {
+		if match(c.Read()) {
+			return
+		}
+	}
+	t.Fatalf("%s not among 100 frames", what)
 }

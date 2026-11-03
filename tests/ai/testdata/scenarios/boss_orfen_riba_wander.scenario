@@ -1,0 +1,9 @@
+# Riba Iren (29018), standing out of the character's sight with nothing to do, wants to wander,
+# trying a walk every 5 s, with weight 5. An NPC first idles on its second AI cycle.
+character Hunter 1
+script script.ai.individual.DefaultNpc
+script script.ai.boss.orfen.OrfenPrivateRibaIren
+npc riba 29018 Monster 1000 0 0 walks
+
+tick x2
+  desires riba wander()=5

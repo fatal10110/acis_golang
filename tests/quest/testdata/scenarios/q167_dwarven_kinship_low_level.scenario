@@ -1,0 +1,21 @@
+# Dwarven Kinship (Q167), refused: a level 14 character is turned away by Carlon, and the quest
+# is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q167_dwarven_kinship_low_level.golden
+character Novice 14
+script quest.Q167_DwarvenKinship
+item 1076
+page warehouse/30350.htm
+page script/quest/Q167_DwarvenKinship/
+npc carlon 30350 WarehouseKeeper 10 0 0
+
+action carlon
+action carlon
+  S ActionFailed
+  S NpcHtmlMessage obj=carlon item=0 page=warehouse/30350.htm
+  S ActionFailed
+bypass npc_{carlon}_Quest
+  S NpcHtmlMessage obj=carlon item=0 page=script/quest/Q167_DwarvenKinship/30350-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q167_DwarvenKinship CREATED
+  rows Q167_DwarvenKinship -

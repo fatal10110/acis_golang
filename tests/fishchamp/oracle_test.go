@@ -132,7 +132,7 @@ func (r *run) step(f []string) {
 		if len(r.rolls) > 0 {
 			t.Fatalf("rolls left: %v", r.rolls)
 		}
-		r.add("MSG 1847 " + commons.JavaDouble(catch.Length))
+		r.add("MSG 1847 " + commons.FormatDouble(catch.Length))
 		if catch.Registered {
 			r.add("MSG 1848")
 		}
@@ -187,7 +187,7 @@ func (r *run) step(f []string) {
 			if err := rows.Scan(&e.Name, &e.Length, &e.Reward); err != nil {
 				t.Fatal(err)
 			}
-			r.add("ROW " + e.Name + " " + commons.JavaDouble(e.Length) + " " + strconv.Itoa(int(e.Reward)))
+			r.add("ROW " + e.Name + " " + commons.FormatDouble(e.Length) + " " + strconv.Itoa(int(e.Reward)))
 		}
 		if err := rows.Err(); err != nil {
 			t.Fatal(err)

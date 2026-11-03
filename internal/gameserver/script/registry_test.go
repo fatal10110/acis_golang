@@ -199,7 +199,7 @@ func TestAbnormalStatusReachesSeeSpellList(t *testing.T) {
 		},
 	}
 	r, _ := build(t, listOf("ai.Seer", "quest.Q", "script.Blind"), catalog)
-	r.AbnormalStatusChanged(1, AbnormalStatusChanged{})
+	r.abnormalStatusChanged(1, AbnormalStatusChanged{})
 	if want := []string{"ai.Seer", "quest.Q"}; !slices.Equal(got, want) {
 		t.Fatalf("abnormal status reached %v, want the see-spell list %v", got, want)
 	}
@@ -257,9 +257,9 @@ func TestSeamGateRefusesUnraisedHooks(t *testing.T) {
 		t.Fatalf("id without a template bound: %v", got)
 	}
 
-	// Production raises talk, first talk, attacked, clan attacked and clan
-	// died on both NPC kinds, and the party hooks on hostile NPCs only: a
-	// civilian NPC has no party.
+	// Production raises talk, first talk, attacked, clan attacked, clan
+	// died and party died on both NPC kinds, and party attacked on hostile
+	// NPCs only.
 	catalog["quest.FolkFirstTalk"] = quest(Bindings{EventFirstTalk: {1}})
 	catalog["quest.HostileFirstTalk"] = quest(Bindings{EventFirstTalk: {2}})
 	catalog["ai.FolkClan"] = func() Script {
@@ -268,16 +268,19 @@ func TestSeamGateRefusesUnraisedHooks(t *testing.T) {
 	catalog["ai.FolkParty"] = func() Script {
 		return Script{Behavior: true, NPCs: []int32{1}, Hooks: Hooks{OnPartyDied: func(*Script, PartyDied) {}}}
 	}
+	catalog["ai.FolkPartyAttacked"] = func() Script {
+		return Script{Behavior: true, NPCs: []int32{1}, Hooks: Hooks{OnPartyAttacked: func(*Script, PartyAttacked) {}}}
+	}
 	catalog["ai.HostileParty"] = func() Script {
 		return Script{Behavior: true, NPCs: []int32{2}, Hooks: Hooks{OnPartyAttacked: func(*Script, PartyAttacked) {}, OnPartyDied: func(*Script, PartyDied) {}}}
 	}
-	r = Build(listOf("quest.Talker", "ai.HostileOnly", "ai.FolkAttacked", "quest.FolkFirstTalk", "quest.HostileFirstTalk", "ai.FolkClan", "ai.FolkParty", "ai.HostileParty"), catalog, Config{KindOf: kindOf, Log: zerolog.Nop()})
+	r = Build(listOf("quest.Talker", "ai.HostileOnly", "ai.FolkAttacked", "quest.FolkFirstTalk", "quest.HostileFirstTalk", "ai.FolkClan", "ai.FolkParty", "ai.FolkPartyAttacked", "ai.HostileParty"), catalog, Config{KindOf: kindOf, Log: zerolog.Nop()})
 	var got []entryState
 	for _, e := range r.entries {
 		got = append(got, e.state)
 	}
-	if want := []entryState{entryRegistered, entryRegistered, entryRegistered, entryRegistered, entryRegistered, entryRegistered, entryRefused, entryRegistered}; !slices.Equal(got, want) {
-		t.Fatalf("production gate states = %v, want %v: only the civilian party hook refused", got, want)
+	if want := []entryState{entryRegistered, entryRegistered, entryRegistered, entryRegistered, entryRegistered, entryRegistered, entryRegistered, entryRefused, entryRegistered}; !slices.Equal(got, want) {
+		t.Fatalf("production gate states = %v, want %v: only the civilian party-attacked hook refused", got, want)
 	}
 }
 
@@ -305,16 +308,23 @@ func TestBehavesNamesTheIDsABehaviorIsBoundTo(t *testing.T) {
 }
 
 // TestRegistryHasNoWritePath pins the registry's exported surface to
-// reads and hook raises: nothing changes it after Build. HostileDecayed
-// and PlayerDetached change only the timers, a container of their own;
-// CharacterCreated only the new character's journal.
+// reads and hook raises: nothing changes it after Build. HostileDecayed,
+// HostileHidden and PlayerDetached change only the timers, a container of
+// their own;
+// CharacterCreated only the new character's journal. NPCScripts,
+// AIClasses and NPCTimers read for the //info NPC script pages. ScriptRuns
+// hands out the count of the invocations in flight, a container of its own.
+// WatchDoors registers the scripts on the doors, and the registry as
+// their clan call, which the doors keep. BindHallSieges runs the hall
+// scripts' siege bindings, which change the halls. DeliverScriptEvent
+// raises the script event hook without telling the heard observer.
 func TestRegistryHasNoWritePath(t *testing.T) {
 	var got []string
 	typ := reflect.TypeFor[*Registry]()
 	for i := range typ.NumMethod() {
 		got = append(got, typ.Method(i).Name)
 	}
-	if want := []string{"AbnormalStatusChanged", "Behaves", "CharacterCreated", "ClanAttacked", "ClanDied", "Dump", "FirstTalk", "FolkAttacked", "FolkCreated", "FolkDecayed", "FolkDying", "FolkNoDesire", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "HostilePartyDied", "Interact", "Invoke", "ItemUsed", "JournalQuest", "PlayerDetached", "QuestEvent", "QuestWindow", "ReactsToCreated", "TutorialEvent", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
+	if want := []string{"AIClasses", "AbnormalStatusChanged", "Behaves", "BindHallSieges", "CharacterCreated", "ClanAttacked", "ClanDied", "DeliverScriptEvent", "DoorAttacked", "Dump", "FirstTalk", "FolkAttacked", "FolkCreated", "FolkDecayed", "FolkDying", "FolkMoveToFinished", "FolkNoDesire", "FolkOutOfTerritory", "FolkSeeCreature", "HostileAttackFinished", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileHidden", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "HostileSeeCreature", "Interact", "Invoke", "ItemUsed", "JournalQuest", "NPCScripts", "NPCTimers", "PartyDied", "PickedItem", "PlayableDied", "PlayerDetached", "QuestEvent", "QuestWindow", "ScriptEvent", "ScriptRuns", "SeeItem", "SeeSpell", "SeesCreatures", "Spelled", "TutorialEvent", "UseSkillFinished", "WatchDoors", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
 		t.Fatalf("Registry methods = %v, want only the reads %v; a new method must not change the registry", got, want)
 	}
 	for i := range reflect.TypeFor[Registry]().NumField() {

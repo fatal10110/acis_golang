@@ -50,5 +50,5 @@ func (f *fishChampFixture) start(tb testing.TB, db *sql.DB, ids *sequentialIDs, 
 		tb.Fatalf("restore fishing championship: %v", err)
 	}
 	c.Start()
-	tb.Cleanup(func() { _ = c.Stop(context.Background()) })
+	cleanup(tb, func() { _ = c.Stop(context.Background()) })
 }

@@ -2,6 +2,7 @@ package gameservertest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -18,8 +19,10 @@ import (
 // Advance lets d pass for the actor queues. On the inline executor it first
 // lets the server catch up (see catchUp), then moves the Inline clock by d
 // and runs every timer and task that comes due, without waiting; on the
-// real pool it sleeps for d. Either way the
-// tasks posted by then have run when it returns.
+// real pool it sleeps for d, except that a suite's pool pass skips the rest
+// of the test when d is longer than maxWallAdvance (a test WithRealPool
+// pins has no inline pass, so it still sleeps). Either way the tasks posted
+// by then have run when it returns.
 func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	tb.Helper()
 	if s.queues.advance != nil {
@@ -28,10 +31,46 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 		}
 		s.queues.advance(d)
 	} else {
+		if d > maxWallAdvance && s.queues.passOfSuite {
+			tb.Skipf("waiting %v on the wall clock; the driven clock covers the rest", d)
+		}
 		time.Sleep(d)
 	}
 	s.Settle(tb)
 }
+
+// AdvanceWithEffects is Advance with the production one-second effect sweep
+// running as time passes: it lets d pass in pieces that end on every whole
+// second of the time passed through here and ticks every live effect list
+// (TickEffects) after each whole second, so a buff, stun or damage-over-time
+// effect lands, ticks and expires on the same clock the timers run on, once
+// per elapsed second however the span is cut (the part of a second left over
+// counts toward the next call). A span a suite's pool pass would skip (see
+// Advance) is handed to Advance whole, so it is skipped there too. The
+// server's effect ticker is not otherwise running (WithProductionTickers
+// starts it).
+func (s *Server) AdvanceWithEffects(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	if !s.DrivesClock() && d > maxWallAdvance && s.queues.passOfSuite {
+		s.Advance(tb, d)
+		return
+	}
+	for d > 0 {
+		step := min(d, time.Second-s.effectRest)
+		s.Advance(tb, step)
+		d -= step
+		s.effectRest += step
+		if s.effectRest == time.Second {
+			s.effectRest = 0
+			s.TickEffects()
+		}
+	}
+}
+
+// maxWallAdvance is the longest single Advance a real-pool run sleeps out.
+// The real pool is there for real interleavings; a long timer's exact timing
+// is pinned on the driven clock, where waiting it out costs nothing.
+const maxWallAdvance = 30 * time.Second
 
 // DrivesClock reports whether the test moves the actor queues' clock (the
 // inline executor) rather than the wall clock doing it (the real pool).
@@ -49,6 +88,15 @@ func (s *Server) SettlePosture(tb testing.TB, objID int32) {
 	s.Advance(tb, postureDelay)
 	c := s.onlineCharacter(tb, objID)
 	s.AdvanceUntil(tb, "posture transition end", func() bool { return !c.SittingNow() && !c.StandingNow() })
+}
+
+// SettlePickup lets the brief paralysis a pickup by the player objID started
+// run out, so the player can act again.
+func (s *Server) SettlePickup(tb testing.TB, objID int32) {
+	tb.Helper()
+	s.Settle(tb)
+	c := s.onlineCharacter(tb, objID)
+	s.AdvanceUntil(tb, "pickup paralysis end", func() bool { return !c.Paralyzed() })
 }
 
 // advanceStep is how far AdvanceUntil moves the clock between checks, and
@@ -121,6 +169,7 @@ func (s *Server) addClient(c *testsupport.ScriptedClient) {
 	s.traffic.mu.Lock()
 	s.traffic.clients = append(s.traffic.clients, c)
 	s.traffic.mu.Unlock()
+	c.SetQueued(func() (int64, error) { return s.queuedTo(c, true) })
 	if s.queues.advance != nil {
 		c.SetAwait(func(d time.Duration) bool { return s.awaitFrame(c, d) }, s.queues.inline.Now)
 		return
@@ -160,8 +209,12 @@ func (s *Server) awaitEnterWorld(c *testsupport.ScriptedClient) {
 }
 
 // catchUpTimeout bounds the wall time the server may take to handle frames
-// a client already wrote.
-const catchUpTimeout = 5 * time.Second
+// a client already wrote, and the persistence lanes to run their jobs. It
+// only stops a server that will never catch up from hanging the test: a
+// frame is handled in milliseconds, but a machine running every suite at
+// once can hold the process back for seconds, so, like enterWorldTimeout,
+// the bound is generous.
+const catchUpTimeout = 30 * time.Second
 
 // catchUp waits until the server has handled every frame a client wrote,
 // the actor queues have run everything posted and the persistence lanes the
@@ -289,17 +342,49 @@ func (s *Server) awaitFrame(c *testsupport.ScriptedClient, d time.Duration) bool
 // read yet, once the server has handled what c sent (see Settle). It lets no
 // time pass on a driven clock, so no timer comes due meanwhile, and on the
 // wall clock it does not stop at a quiet spell: a frame already queued is
-// read however long the machine takes to deliver it.
+// read however long the machine takes to deliver it. c.ReadQueued does the
+// same, failing c's test instead of tb.
 func (s *Server) ReadQueued(tb testing.TB, c *testsupport.ScriptedClient) [][]byte {
 	tb.Helper()
-	s.Settle(tb)
-	ct := s.traffic.conn(c.LocalAddr())
-	if ct == nil {
-		tb.Fatal("ReadQueued: client connection not tracked")
+	return s.readQueued(tb, c, true)
+}
+
+// ReadHandled is ReadQueued without the wait on the actor queues (see
+// AwaitHandled): a test holding an actor's queue uses it to read what the
+// requests it sent were answered.
+func (s *Server) ReadHandled(tb testing.TB, c *testsupport.ScriptedClient) [][]byte {
+	tb.Helper()
+	return s.readQueued(tb, c, false)
+}
+
+func (s *Server) readQueued(tb testing.TB, c *testsupport.ScriptedClient, settle bool) [][]byte {
+	tb.Helper()
+	queued, err := s.queuedTo(c, settle)
+	if err != nil {
+		tb.Fatalf("ReadQueued: %v", err)
 	}
 	var frames [][]byte
-	for c.Received() < ct.sent.Load() {
+	for c.Received() < queued {
 		frames = append(frames, c.Read())
 	}
 	return frames
+}
+
+// queuedTo waits until the server has handled every frame a client wrote
+// and, with settle, until the actor queues have run what was posted to them,
+// then returns how many frames the server has queued to c.
+func (s *Server) queuedTo(c *testsupport.ScriptedClient, settle bool) (int64, error) {
+	if err := s.awaitHandled(); err != nil {
+		return 0, err
+	}
+	if settle {
+		if err := s.queues.settle(); err != nil {
+			return 0, err
+		}
+	}
+	ct := s.traffic.conn(c.LocalAddr())
+	if ct == nil {
+		return 0, errors.New("client connection not tracked")
+	}
+	return ct.sent.Load(), nil
 }

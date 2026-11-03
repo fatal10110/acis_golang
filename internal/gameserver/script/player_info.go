@@ -2,8 +2,8 @@ package script
 
 import (
 	"fmt"
+	"strconv"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
@@ -23,6 +23,9 @@ func (p *Player) HasItem(itemID int32) bool {
 	inv := p.character().Inventory()
 	return inv != nil && inv.HasItem(itemID)
 }
+
+// Karma returns the player's karma, 0 for a player with none.
+func (p *Player) Karma() int32 { return int32(p.character().Karma()) }
 
 // Dead reports whether the player is dead.
 func (p *Player) Dead() bool { return p.character().Dead() }
@@ -60,7 +63,7 @@ func (qs *QuestState) GetInt(key string) int32 {
 	if !ok {
 		return 0
 	}
-	n, err := commons.ParseInt(v, 32)
+	n, err := strconv.ParseInt(v, 10, 32)
 	if err != nil {
 		panic(fmt.Sprintf("script: quest %s variable %s %q: %v", qs.state.Quest().Name, key, v, err))
 	}

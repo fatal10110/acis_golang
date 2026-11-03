@@ -32,9 +32,9 @@ const (
 )
 
 // walkerTestSpawnFixture writes a spawnlist with one fresh (non-db) entry
-// fixed at (100, 200, 0), heading 12345 — matching walkerTestRoutes' single
-// node, so the NPC's very first route move is a same-cell arrival back at
-// its own spawn point.
+// fixed at (100, 200, 0), heading 12345: walkerTestSpawnPoint, the first
+// node of the routes the walker tests give it, so the NPC's very first route
+// move is a same-cell arrival back at its own spawn point.
 func walkerTestSpawnFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -70,20 +70,20 @@ func walkerTestTemplate() *npc.Table {
 	}})
 }
 
-func walkerTestRoutes(spawnPoint location.Location) route.WalkerRoutes {
+// walkerTestRoutes is the walker alias's route over nodes.
+func walkerTestRoutes(nodes ...route.WalkerLocation) route.WalkerRoutes {
 	return route.WalkerRoutes{
-		walkerTestAlias: {walkerTestAlias: []route.WalkerLocation{{Location: spawnPoint}}},
+		walkerTestAlias: {walkerTestAlias: nodes},
 	}
 }
 
-// TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading pins issue #1940:
-// a spawned NPC whose template alias resolves in walkerRoutes.xml is
-// registered with task.Walker at spawn (previously PR #418's Walker task
-// had no production caller at all — StartRoute/Arrived/MoveToNextPoint were
-// unreachable outside tests), and an arrival that lands exactly back at the
-// spawn point restores the spawn heading (aCis NpcAI.onEvtArrived,
-// NpcAI.java:295-296), even after the NPC's heading changed in between.
-func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
+// walkerTestSpawnPoint is where walkerTestSpawnFixture places its NPC.
+var walkerTestSpawnPoint = location.Location{X: 100, Y: 200, Z: 0}
+
+// spawnWalkerTestNPC spawns walkerTestSpawnFixture's NPC walking routes and
+// returns it with the clock its queue runs on.
+func spawnWalkerTestNPC(t *testing.T, routes route.WalkerRoutes) (*npc.Hostile, *sim.Inline) {
+	t.Helper()
 	dir := walkerTestSpawnFixture(t)
 	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
@@ -92,7 +92,6 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	templates := walkerTestTemplate()
 	spawns := NewSpawns(table, nil)
 
-	spawnPoint := location.Location{X: 100, Y: 200, Z: 0}
 	state := world.New()
 	ids := &sequentialIDs{}
 	decay, err := task.NewDecay(nopDecayEffects{}, time.Now)
@@ -106,7 +105,7 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	ai := task.NewAI(state, zerolog.Nop())
 	positions := task.NewPositionUpdates(state)
 	items := item.NewTable(nil)
-	walker, err := task.NewWalker(walkerTestRoutes(spawnPoint), alwaysOpenPath{}, time.Now, state)
+	walker, err := task.NewWalker(routes, alwaysOpenPath{}, time.Now, state)
 	if err != nil {
 		t.Fatalf("NewWalker() error: %v", err)
 	}
@@ -129,6 +128,39 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	if !ok {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
+	walkAliasRoute(t, hostile)
+	return hostile, clock
+}
+
+// walkAliasRoute has hostile take up the route named after its alias, as
+// a behavior's route desire does: queued, then taken up by the AI.
+func walkAliasRoute(t *testing.T, hostile *npc.Hostile) {
+	t.Helper()
+	alias := hostile.Instance.Template.Alias
+	hostile.AI().AddMoveRouteDesire(alias, 1_000_000)
+	for range 3 {
+		if hostile.Move().Moving() {
+			return
+		}
+		if err := hostile.TickThink(); err != nil {
+			t.Fatalf("TickThink() error: %v", err)
+		}
+	}
+}
+
+// TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading pins issue #1940:
+// a spawned NPC that takes up the route its template alias names in
+// walkerRoutes.xml is registered with task.Walker, and an arrival that lands exactly
+// back at the spawn point restores the spawn heading (NpcAI.onEvtArrived),
+// even after the NPC's heading changed in between. The spawn point is the
+// route's only node, which holds a pause, so no further leg turns it. The
+// first leg heads for that node although the NPC stands on it: the route
+// step moves with a zero offset, and a zero radius holds no distance.
+func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
+	hostile, clock := spawnWalkerTestNPC(t, walkerTestRoutes(route.WalkerLocation{Location: walkerTestSpawnPoint, DelayMillis: 60_000}))
+	if !hostile.Move().Moving() {
+		t.Fatal("walker standing on its nearest node started no leg, want a leg to that node")
+	}
 
 	// Prove the eventual match to walkerTestSpawnHeading below comes from
 	// the arrival's own reset, not coincidence: knock the heading away from
@@ -140,6 +172,30 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	advanceUntil(clock, func() bool { return hostile.Heading() == walkerTestSpawnHeading })
 	if got := hostile.Heading(); got != walkerTestSpawnHeading {
 		t.Fatalf("Heading() after route arrival = %d, want spawn heading %d", got, walkerTestSpawnHeading)
+	}
+	if hostile.Move().Moving() {
+		t.Fatal("walker moving during its node pause")
+	}
+}
+
+// TestRouteArrivalOnSpawnPointTurnsTowardTheNextLeg pins the order of a
+// route arrival (NpcAI.onEvtArrived): the AI restores the spawn heading
+// first, then the route step starts the next leg, which turns the NPC
+// toward the next node. The spawn heading does not override the leg.
+func TestRouteArrivalOnSpawnPointTurnsTowardTheNextLeg(t *testing.T) {
+	next := location.Location{X: 100, Y: 500, Z: 0}
+	hostile, clock := spawnWalkerTestNPC(t, walkerTestRoutes(route.WalkerLocation{Location: walkerTestSpawnPoint}, route.WalkerLocation{Location: next}))
+
+	towardNext := func() bool {
+		to, moving := hostile.Move().MovingTo()
+		return moving && to == next
+	}
+	advanceUntil(clock, towardNext)
+	if !towardNext() {
+		t.Fatal("walker never started its leg to the next node")
+	}
+	if got, want := hostile.Heading(), walkerTestSpawnPoint.HeadingTo(next); got != want {
+		t.Fatalf("Heading() as the next leg starts = %d, want %d toward the next node (spawn heading %d)", got, want, walkerTestSpawnHeading)
 	}
 }
 
@@ -216,7 +272,7 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 	ai := task.NewAI(state, zerolog.Nop())
 	positions := task.NewPositionUpdates(state)
 	items := item.NewTable(nil)
-	walker, err := task.NewWalker(walkerTestRoutes(spawnPoint), alwaysOpenPath{}, time.Now, state)
+	walker, err := task.NewWalker(walkerTestRoutes(route.WalkerLocation{Location: spawnPoint}), alwaysOpenPath{}, time.Now, state)
 	if err != nil {
 		t.Fatalf("NewWalker() error: %v", err)
 	}
@@ -329,6 +385,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	if !ok {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
+	walkAliasRoute(t, hostile)
 
 	// Let the route's initial move settle the NPC at routeNode.
 	advanceUntil(clock, func() bool { return !hostile.Move().Moving() && hostile.Move().Position() == routeNode })
@@ -361,82 +418,6 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	}
 	if hostile.Move().Moving() {
 		t.Fatal("Move().Moving() = true after leash return settled, want false (walker route re-issued a move)")
-	}
-}
-
-// TestWalkerWalkModeNPCsMoveAtWalkSpeed pins issue #2028: aCis Walkers.java
-// onCreated forces a specific WALKING_NPCS id subset into walk stance
-// (setWalkOrRun(false)) instead of every other NPC's default run stance, so
-// those ids must move at their template's WalkSpeed, not RunSpeed, while on
-// their route (and at all times — the reference never toggles an NPC back).
-func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
-	dir := t.TempDir()
-	writeSpawnFixture(t, filepath.Join(dir, "walkmode.xml"), `
-<list>
-	<territory name="field" minZ="-10" maxZ="10">
-		<node x="0" y="0"/>
-		<node x="1000" y="0"/>
-		<node x="1000" y="1000"/>
-		<node x="0" y="1000"/>
-	</territory>
-	<npcmaker name="maker" territory="field" maximumNpcs="1">
-		<npc id="31357" total="1" pos="100;200;0;0"/>
-	</npcmaker>
-</list>`)
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
-	if err != nil {
-		t.Fatalf("LoadSpawnlist() error: %v", err)
-	}
-	templates := npc.NewTable([]*npc.Template{{
-		ID:         31357,
-		TemplateID: 31357,
-		Type:       "Monster",
-		HPMax:      100,
-		RunSpeed:   200,
-		WalkSpeed:  50,
-		DEX:        30,
-	}})
-	spawns := NewSpawns(table, nil)
-
-	state := world.New()
-	ids := &sequentialIDs{}
-	decay, err := task.NewDecay(nopDecayEffects{}, time.Now)
-	if err != nil {
-		t.Fatalf("NewDecay() error: %v", err)
-	}
-	respawnTask, err := task.NewRespawn(nopRespawnEffects{}, time.Now)
-	if err != nil {
-		t.Fatalf("NewRespawn() error: %v", err)
-	}
-	ai := task.NewAI(state, zerolog.Nop())
-	positions := task.NewPositionUpdates(state)
-	items := item.NewTable(nil)
-	walker, err := task.NewWalker(nil, alwaysOpenPath{}, time.Now, state)
-	if err != nil {
-		t.Fatalf("NewWalker() error: %v", err)
-	}
-
-	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers()); err != nil {
-		t.Fatalf("NewNpcs() error: %v", err)
-	}
-
-	obj, ok := state.Object(1)
-	if !ok {
-		t.Fatal("spawned npc object id 1 not found")
-	}
-	hostile, ok := obj.(*npc.Hostile)
-	if !ok {
-		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
-	}
-
-	ev, err := hostile.Move().MoveToLocation(location.Location{X: 900, Y: 200, Z: 0})
-	if err != nil {
-		t.Fatalf("MoveToLocation() error: %v", err)
-	}
-	// WalkSpeed 50 through the RUN_SPEED stat's DEX 30 bonus of 1.1.
-	if got, want := ev.Speed, 55.0; got != want {
-		t.Fatalf("MoveToLocation() Speed = %v, want finalized WalkSpeed %v (RunSpeed leaked through for a WALKING_NPCS id)", got, want)
 	}
 }
 

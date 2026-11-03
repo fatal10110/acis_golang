@@ -1,0 +1,19 @@
+# PartyLeaderWizardDD2CurseAggressive (21090, level 75; the npc line gives the debuff 4117, the long range
+# DD 4152 and the short range DD 4160 the template lists), every draw 0: seeing the character once
+# settled (8 ticks past its life time of 7) inside its spawn territory it casts the debuff at it
+# (draw under 33) and wants the short range DD (the character stands within 100) as well.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2CurseAggressive
+npc wiz 21090 Monster 600 0 0 level 75 skill DEBUFF 4117 8 skill W_LONG_RANGE_DD_MAGIC 4152 8 skill W_SHORT_RANGE_DD_MAGIC 4160 8
+
+tick x8
+approach wiz
+  S MagicSkillUse caster=wiz target=player skill=4117-8 hit=15857 reuse=21142 success=0
+  mem wiz i_ai0=0
+  desires wiz cast(player,4117,move)=934000 cast(player,4160,move)=934000

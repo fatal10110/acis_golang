@@ -90,7 +90,7 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 // founding, or being marked online or offline.
 func LiveMember(c *player.Character) Member {
 	return Member{
-		ObjectID: c.ID, Name: c.Name, Title: c.Title(),
+		ObjectID: c.ID, Name: c.CharacterName(), Title: c.Title(),
 		Level: c.Level(), ClassID: c.ClassID(), Sex: int(c.Sex()), Race: int(c.Race),
 	}
 }
@@ -257,11 +257,15 @@ const (
 )
 
 // Oust expels the member named targetName from c's clan. online resolves a
-// member's live character; nil when it is not in the world. The expelled
-// member may not join a clan, nor the clan recruit, for JoinDays. The
-// leader cannot be expelled: an expulsion naming it is refused as
-// unauthorized, as a clan without its leader would be left unusable.
-func (s *Service) Oust(c *player.Character, targetName string, online func(int32) *player.Character, now time.Time) (*Clan, Member, OustRefusal) {
+// member's live character; nil when it is not in the world. connected
+// reports whether a member in the world still has its client: the combat
+// of one lingering after its connection dropped refuses nothing, though it
+// leaves the clan as an online member does, so that the character it
+// stores on leaving the world is clanless. The expelled member may not join
+// a clan, nor the clan recruit, for JoinDays. The leader cannot be
+// expelled: an expulsion naming it is refused as unauthorized, as a clan
+// without its leader would be left unusable.
+func (s *Service) Oust(c *player.Character, targetName string, online func(int32) *player.Character, connected func(int32) bool, now time.Time) (*Clan, Member, OustRefusal) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
 		return nil, Member{}, OustNotMember
@@ -272,7 +276,7 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 		return nil, Member{}, OustUnknownTarget
 	case !cl.HasPrivilege(c.ID, PrivDismiss):
 		return nil, Member{}, OustNotAuthorized
-	case strings.EqualFold(c.Name, targetName):
+	case strings.EqualFold(c.CharacterName(), targetName):
 		return nil, Member{}, OustSelf
 	case cl.IsLeader(target.ObjectID):
 		return nil, Member{}, OustNotAuthorized
@@ -281,7 +285,7 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 	if target.Online {
 		live = online(target.ObjectID)
 	}
-	if live != nil && live.InCombat() {
+	if live != nil && live.InCombat() && connected(target.ObjectID) {
 		return nil, Member{}, OustInCombat
 	}
 	joinExpiry := s.joinExpiry(now)
@@ -312,6 +316,7 @@ func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live 
 		return Member{}, false
 	}
 	delete(cl.members, objectID)
+	delete(cl.loginGrades, objectID)
 	s.unlinkLeaverLocked(cl, m)
 	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil, KeepTitle: live != nil && live.IsNoble()}
 	switch {
@@ -328,9 +333,10 @@ func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live 
 }
 
 // ApplyLeft clears the clan state of m, removed at now, on its live
-// character; it runs on that character's queue. A noble keeps its title.
-// An academy member leaves without a join penalty. A personal surrender is
-// forgotten, so it does not follow the character into its next clan.
+// character; it runs on that character's queue. A noble keeps its title;
+// the siege state clears. An academy member leaves without a join penalty.
+// A personal surrender is forgotten, so it does not follow the character
+// into its next clan.
 func (s *Service) ApplyLeft(c *player.Character, m Member, now time.Time) {
 	s.applyLeft(c, m, s.joinExpiry(now))
 }
@@ -341,6 +347,7 @@ func (s *Service) applyLeft(c *player.Character, m Member, joinExpiry int64) {
 	clearLeaverTitle(c)
 	c.SetClanID(0)
 	c.SetWantsPeace(false)
+	c.SetSiegeState(player.SiegeStateNone)
 	if m.PledgeType != SubunitAcademy {
 		c.SetClanJoinExpiryTime(joinExpiry)
 	}

@@ -1,0 +1,13 @@
+# RoyalRushWizardShortSelfRange (18140, level 81) with int slot 0 set (it gave up its spells), every draw 0:
+# a hit by the character adds the attack desire of its attack formula (10 / 88 * 100) instead of a spell.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.RoyalRushWizardShortSelfRange
+npc wiz 18140 Monster 300 0 0 level 81 skill W_SELF_RANGE_DD_MAGIC 4033 9 skill W_SHORT_RANGE_DD_MAGIC 4160 9 mem i_ai0=1
+
+hit wiz 10
+  desires wiz attack(player)=11.363636363636363

@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -42,6 +43,14 @@ type MountBodies interface {
 // the zone lookup uses the caster's region only.
 type PeaceZoneQuery interface {
 	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
+}
+
+// ZoneQuery answers the zone questions a character asks of its position.
+type ZoneQuery interface {
+	PeaceZoneQuery
+	// MotherTreeBonus reports the flat HP and MP regeneration bonuses of
+	// the first Mother Tree zone whose volume contains (x, y, z).
+	MotherTreeBonus(x, y, z int) (hp, mp int, ok bool)
 }
 
 // SetInPvPZone records the live zone engine's current PvP membership.
@@ -207,6 +216,12 @@ type Rules struct {
 	RaidCursesDisabled     bool
 	AwardPKKillPVPPoint    bool
 	DeathDrop              DeathDropRules
+	// FakeDeathUpProtection is how long, after a Fake Death ends, hostile
+	// NPCs do not aggro the character; 0 or less gives no grace.
+	FakeDeathUpProtection time.Duration
+	// Regen scales the base HP, MP and CP regeneration of the characters,
+	// their summons, the NPCs that are not raid related and the doors.
+	Regen creature.RegenMultipliers
 }
 
 // Runtime is everything a persisted Character needs to act in the live
@@ -215,7 +230,7 @@ type Rules struct {
 type Runtime struct {
 	World *world.State
 	LOS   LineOfSight
-	Zones PeaceZoneQuery
+	Zones ZoneQuery
 	// Social answers the party and clan standing the social rules read;
 	// nil leaves the character in no party and its clan in no alliance,
 	// war or leadership.
@@ -223,20 +238,43 @@ type Runtime struct {
 	// HallFunctions answers the functions a clan hall rents; nil rents
 	// none, so no clan hall bonus applies.
 	HallFunctions HallFunctions
+	// Sieges answers the castle sieges under way; nil runs none.
+	Sieges SiegeGround
+	// Seals answers the Seven Signs seal rules; nil applies none.
+	Seals SealRules
 	// PartyLoot shares the items a partied character auto-loots or sweeps
 	// by its party's loot rule; nil keeps every item with the character.
 	PartyLoot PartyLoot
 	// Tutorial takes the tutorial events the character raises; nil drops
 	// them.
 	Tutorial TutorialEvents
-	Mounts   MountBodies
+	// Deaths takes the deaths of the character and of its summon; nil
+	// drops them.
+	Deaths DeathEvents
+	// ScriptRuns counts the script invocations in flight, for the
+	// character's departure to wait out the ones that changed it; nil
+	// counts only the script writes made to the character itself.
+	ScriptRuns *ScriptRuns
+	Mounts     MountBodies
 	// MountData resolves a mount's pet data; nil leaves every mount unfed
 	// and riding at its rider's own speeds.
 	MountData MountDataSource
 	Skills    skillDefinitions
 	Levels    *LevelTable
 	Log       zerolog.Logger
-	Rules     Rules
+	// Rules holds the server rules the character reads, each time it needs
+	// one; nil configures the zero Rules.
+	Rules *RuleBook
+	// ItemDrops answers, each time the character creates items, whether a
+	// non-stackable counted above one arrives as that many instances; nil
+	// always splits it.
+	ItemDrops ItemDropRule
+}
+
+// ItemDropRule answers the multiple item drop rule in force, which the
+// party loot, the kill rewards and the scripts read too.
+type ItemDropRule interface {
+	MultipleItemDrop() bool
 }
 
 // Configure installs rt. Call it before exposing c to the world.
@@ -248,25 +286,28 @@ func (c *Character) Configure(rt Runtime) {
 	c.zones = rt.Zones
 	c.social = rt.Social
 	c.hallFunctions = rt.HallFunctions
+	c.sieges = rt.Sieges
+	c.seals = rt.Seals
 	c.partyLoot = rt.PartyLoot
 	c.tutorial = rt.Tutorial
+	c.deaths = rt.Deaths
+	c.scriptRuns = rt.ScriptRuns
 	c.mounts = rt.Mounts
 	c.mountData = rt.MountData
 	c.skillDefs = rt.Skills
 	c.levelTable = rt.Levels
 	c.log = rt.Log
-	c.rateKarmaExpLost = rt.Rules.RateKarmaExpLost
-	c.respawnRestoreHP = rt.Rules.RespawnRestoreHP
-	c.weightLimitMultiplier = rt.Rules.WeightLimitMultiplier
-	c.inventorySlots = rt.Rules.InventorySlots
-	c.storageSlots = rt.Rules.StorageSlots
-	c.perfectShieldBlockRate = rt.Rules.PerfectShieldBlockRate
-	c.maxBuffsAmount = rt.Rules.MaxBuffsAmount
-	c.deathPenaltyChance = rt.Rules.DeathPenaltyChance
-	c.allowDelevel = rt.Rules.AllowDelevel
-	c.raidCursesDisabled = rt.Rules.RaidCursesDisabled
-	c.awardPKKillPVPPoint = rt.Rules.AwardPKKillPVPPoint
-	c.deathDrop = rt.Rules.DeathDrop
+	rules := rt.Rules
+	if rules == nil {
+		rules = NewRuleBook(Rules{})
+	}
+	c.ruleBook.Store(rules)
+	c.itemDrops = rt.ItemDrops
+}
+
+// multipleItemDrop reports whether the multiple item drop rule is in force.
+func (c *Character) multipleItemDrop() bool {
+	return c.itemDrops == nil || c.itemDrops.MultipleItemDrop()
 }
 
 // Attach installs live as this character's crowd-control/movement runtime
@@ -322,15 +363,20 @@ func (c *Character) RewardItemFits(itemID int32, count int) bool {
 	return c.inventory != nil && c.inventory.ValidateCapacityByItemID(itemID, count)
 }
 
-// AddRewardItem creates and adds one kill-reward item stack to this live
-// character's inventory, then runs ItemAdded's side effects: adena names
-// its amount, anything else its template and count. objectID must be
-// allocated by the reward caller.
-func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool {
-	if c.inventory == nil {
+// AddRewardItem creates count units of itemID in this live character's
+// inventory the way an auto-looted reward arrives, then runs ItemAdded's
+// side effects for the whole count: adena names its amount, anything else
+// its template and count. A stackable item joins the held stack or starts
+// one; a non-stackable one arrives as count single instances when multiple
+// (server.properties MultipleItemDrop), else as one. nextID allocates the
+// object id of each instance actually created, so units joining a held
+// stack take none. It reports whether anything was added.
+func (c *Character) AddRewardItem(itemID int32, count int, multiple bool, nextID func() (int32, error)) bool {
+	if c.inventory == nil || count < 1 || nextID == nil {
 		return false
 	}
-	if c.inventory.AddNew(itemID, count, objectID) == nil {
+	tmpl, ok := c.inventory.Templates().Get(itemID)
+	if !ok || c.addByTemplate(tmpl, count, multiple, nextID) == 0 {
 		return false
 	}
 	notice := event.ObtainCreated
@@ -359,25 +405,28 @@ func (c *Character) ItemSlotsFit(slots int) bool {
 
 // AddCreatedItem creates count units of itemID in this live character's
 // inventory, named in chat as picked up, the way an opened capsule hands
-// over its product. nextID allocates each new instance's object id. It
-// reports whether anything was added or, for a herb, applied.
+// over its product. A non-stackable arrives as count instances, or as one
+// when the multiple item drop rule is off. nextID allocates each new
+// instance's object id. It reports whether anything was added or, for a herb, applied.
 func (c *Character) AddCreatedItem(itemID int32, count int, nextID func() (int32, error)) bool {
 	return c.createItem(itemID, count, nextID, event.ObtainCreated)
 }
 
 // AddEarnedItem creates count units of itemID in this live character's
 // inventory, named in chat as earned, the way a sweep or a harvest pays
-// out. nextID allocates each new instance's object id. It reports whether
-// anything was added or, for a herb, applied.
+// out. A non-stackable arrives as count instances, or as one when the
+// multiple item drop rule is off. nextID allocates each new instance's object id. It
+// reports whether anything was added or, for a herb, applied.
 func (c *Character) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool {
 	return c.createItem(itemID, count, nextID, event.ObtainEarned)
 }
 
 // createItem creates count units of itemID by template id: a herb is
 // applied at once instead of carried, a stackable joins the held stack or
-// starts one, and a non-stackable arrives as one instance per unit. The
-// items are then named in chat as notice says. Slot and weight limits are
-// the caller's to check first.
+// starts one, and a non-stackable arrives as one instance per unit unless
+// the multiple item drop rule is off. The whole count is then named in
+// chat as notice says. Slot and weight limits are the caller's to check
+// first.
 func (c *Character) createItem(itemID int32, count int, nextID func() (int32, error), notice event.ObtainNotice) bool {
 	if c.inventory == nil || count < 1 || nextID == nil {
 		return false
@@ -389,8 +438,7 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 	if tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemHerb {
 		return c.ConsumeHerb(itemID)
 	}
-	count = c.addByTemplate(tmpl, count, nextID)
-	if count == 0 {
+	if c.addByTemplate(tmpl, count, c.multipleItemDrop(), nextID) == 0 {
 		return false
 	}
 	c.ItemAdded(event.ItemObtained{ItemID: itemID, Count: count, Notice: notice})
@@ -399,8 +447,10 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 
 // AddCraftedItem puts count units of itemID into this character's
 // inventory the way a finished craft hands over its product: straight into
-// the inventory, with no chat line and no arrow auto-equip. nextID allocates
-// each new instance's object id. It reports how many units were added.
+// the inventory, with no chat line and no arrow auto-equip. A non-stackable
+// arrives as count instances, or as one when the multiple item drop rule
+// is off. nextID allocates each new instance's object id. It reports how many units
+// were added.
 func (c *Character) AddCraftedItem(itemID int32, count int, nextID func() (int32, error)) int {
 	if c.inventory == nil || count < 1 || nextID == nil {
 		return 0
@@ -409,21 +459,25 @@ func (c *Character) AddCraftedItem(itemID int32, count int, nextID func() (int32
 	if !ok {
 		return 0
 	}
-	return c.addByTemplate(tmpl, count, nextID)
+	return c.addByTemplate(tmpl, count, c.multipleItemDrop(), nextID)
 }
 
 // addByTemplate adds count units of tmpl: a stackable joins the held stack
-// or starts one, and a non-stackable arrives as one instance per unit. It
-// returns how many units were added.
-func (c *Character) addByTemplate(tmpl *item.Template, count int, nextID func() (int32, error)) int {
+// or starts one, and a non-stackable arrives as one instance per unit when
+// multiple, else as one instance. nextID is asked for an id only for an
+// instance actually created. It returns how many units were added.
+func (c *Character) addByTemplate(tmpl *item.Template, count int, multiple bool, nextID func() (int32, error)) int {
 	instances := 1
-	if !tmpl.Stackable {
+	if !tmpl.Stackable && multiple {
 		instances = count
 	}
 	added := 0
 	for range instances {
-		id, err := nextID()
-		if err != nil || c.inventory.AddNew(tmpl.ID, count, id) == nil {
+		inst, err := c.inventory.AddCreated(tmpl.ID, count, nextID)
+		if err != nil {
+			c.log.Error().Err(err).Int32("item_id", tmpl.ID).Msg("allocate item id")
+		}
+		if inst == nil {
 			break
 		}
 		added++
@@ -474,6 +528,15 @@ func (c *Character) ForEachKnownCombatantInRadius(radius int, fn func(attackable
 	})
 }
 
+// ForEachKnownHitTargetInRadius calls fn for every creature this player
+// knows within radius, a door through its hit surface.
+func (c *Character) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	if c.world == nil {
+		return
+	}
+	doorhit.ForEachKnownInRadius(c.world, c, radius, fn)
+}
+
 // SyncPosition moves this player's live world-grid presence to position, a
 // movement step.
 func (c *Character) SyncPosition(position location.Location) {
@@ -483,7 +546,6 @@ func (c *Character) SyncPosition(position location.Location) {
 // relocate moves this player's live world-grid presence to position; placed
 // marks a position set outside movement.
 func (c *Character) relocate(position location.Location, placed bool) {
-	previous := c.CurrentLocation()
 	c.locMu.Lock()
 	c.Location = position
 	c.locMu.Unlock()
@@ -491,7 +553,7 @@ func (c *Character) relocate(position location.Location, placed bool) {
 		return
 	}
 	_ = c.world.Move(c.tracked(), position.X, position.Y, position.Z)
-	c.emit(event.Relocated{Previous: previous, Placed: placed})
+	c.emit(event.Relocated{Placed: placed})
 }
 
 // SetWorldHandle names t, the object that embeds c, as the one the world
@@ -534,9 +596,6 @@ func (c *Character) ObjectID() int32 {
 
 // Kind reports KindPlayer.
 func (c *Character) Kind() actor.Kind { return actor.KindPlayer }
-
-// CharacterName returns this player's display name for character-name packets.
-func (c *Character) CharacterName() string { return c.Name }
 
 // LevelValue returns the player's current level for live-owned actors.
 func (c *Character) LevelValue() int {

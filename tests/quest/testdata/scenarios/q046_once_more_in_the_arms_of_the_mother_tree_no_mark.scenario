@@ -1,0 +1,23 @@
+# Once More In the Arms of the Mother Tree (Q046), refused: a level 3 elven fighter without a mark of traveler gets Galladucci's
+# page with no offer, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q046_once_more_in_the_arms_of_the_mother_tree_no_mark.golden
+character Traveler 3
+class 18
+script quest.Q046_OnceMoreInTheArmsOfTheMotherTree
+item 7563 7564 7565 7566 7567 7568 7570 7555
+page merchant/30097.htm
+page script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/
+npc galladucci 30097 Merchant 10 0 0
+
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q046_OnceMoreInTheArmsOfTheMotherTree/30097-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q046_OnceMoreInTheArmsOfTheMotherTree CREATED
+  rows Q046_OnceMoreInTheArmsOfTheMotherTree -

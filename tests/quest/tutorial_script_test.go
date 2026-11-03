@@ -239,6 +239,7 @@ func TestTutorialLowHPThenSitting(t *testing.T) {
 	onCharacter(t, srv, objID, func(c *player.Character) {
 		at = c.CurrentLocation()
 		c.SetHP(c.MaxHPValue() * 0.2)
+		c.BroadcastStatus()
 	})
 	expectFrames(t, "low HP", tutorialFrames(srv.ReadQueued(t, srv.Client)),
 		serverpackets.FrameTutorialShowQuestionMark(10),

@@ -52,9 +52,13 @@ type ScriptMessage struct{ Text string }
 
 func (ScriptMessage) event() {}
 
-// SystemMessageShown reports the system message ID, which takes no
-// parameter, shown to the character.
-type SystemMessageShown struct{ ID int }
+// SystemMessageShown reports the system message ID shown to the
+// character, with its number parameters in order; none for a message that
+// takes no parameter.
+type SystemMessageShown struct {
+	ID      int
+	Numbers []int32
+}
 
 func (SystemMessageShown) event() {}
 
@@ -63,3 +67,10 @@ func (SystemMessageShown) event() {}
 type QuestOverweight struct{}
 
 func (QuestOverweight) event() {}
+
+// NPCChatShown reports a script opening, on the character, the NPC
+// ObjectID's own chat window, as the NPC opens it when talked to with no
+// script answering.
+type NPCChatShown struct{ ObjectID int32 }
+
+func (NPCChatShown) event() {}

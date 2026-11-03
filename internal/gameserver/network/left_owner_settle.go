@@ -8,9 +8,8 @@ import "sync"
 // the owner's rows, its collar row is deleted. A selection of that owner reads
 // those rows before it registers its player, so a settle landing in between
 // would change rows the selection has already loaded, leaving the session with
-// a collar whose row is gone and without the corpse's items. The reference
-// relinks the pet on the same restore that loads the inventory
-// (Player.restore, Player.java:4144-4150), so no decay settles in between.
+// a collar whose row is gone and without the corpse's items: no decay may
+// settle between the restore that loads the inventory and the pet's relink.
 //
 // A selection is under way from before it waits for the character's queued
 // saves until it has registered its player and taken its pet over, or given
@@ -134,13 +133,13 @@ func (l *GameClientLink) settleWithLeftOwner(ownerID int32, online func(*livePla
 // selection gate runs it again as a held settle.
 func (l *GameClientLink) settleLeftOwnerPart(ownerID int32, online func(*livePlayer), offline func(), draining bool) {
 	retry := func() { l.settleLeftOwnerPart(ownerID, online, offline, true) }
-	owner, ok := l.selections.settle(ownerID, l.livePlayerByID, offline, retry, draining)
+	owner, ok := l.flow.selections.settle(ownerID, l.livePlayerByID, offline, retry, draining)
 	if !ok {
 		return
 	}
 	// A session found leaving settles offline instead: on its queue, as a
 	// settle arriving now; on a refused post, still in this settle's place.
-	leaving := func(draining bool) { l.selections.settle(ownerID, nil, offline, retry, draining) }
+	leaving := func(draining bool) { l.flow.selections.settle(ownerID, nil, offline, retry, draining) }
 	posted := postLive(owner, func() {
 		if owner.detached() {
 			leaving(false)

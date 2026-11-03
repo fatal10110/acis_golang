@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -163,10 +162,7 @@ func TestCompassZonePvPAndSiegePriority(t *testing.T) {
 	zones := zone.NewIndex()
 	zones.Add(zone.NewPeace(1, form))
 	zones.Add(zone.NewArena(2, form))
-	siege, err := zone.NewSiege(3, form, commons.NewStatSet())
-	if err != nil {
-		t.Fatal(err)
-	}
+	siege := zone.NewSiege(3, form)
 	siege.SetActive(true)
 	zones.Add(siege)
 	srv := gameservertest.Boot(t,

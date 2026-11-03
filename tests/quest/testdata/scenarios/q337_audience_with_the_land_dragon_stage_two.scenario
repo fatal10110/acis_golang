@@ -1,0 +1,49 @@
+# Audience with the Land Dragon (Q337), four marks held: Gabrielle takes them for the second stage, and with none left sends the character off for more. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_stage_two.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=1 <state>=STARTED drop1=1 drop2=1 drop3=1 drop4=1
+hold 3864 4
+hold 3852 1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page default/30753.htm
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc gabrielle 30753 Folk 10 0 0
+
+action gabrielle
+action gabrielle
+  S ActionFailed
+  S NpcHtmlMessage obj=gabrielle item=0 page=default/30753.htm
+  S ActionFailed
+bypass npc_{gabrielle}_Quest
+  S NpcHtmlMessage obj=gabrielle item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30753-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q337_AudienceWithTheLandDragon 30753-09.htm
+  S QuestList 337:0x80000003
+  S ExShowQuestMark quest=337
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3864 6:4
+  S NpcHtmlMessage obj=gabrielle item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30753-09.htm
+  S ActionFailed
+  Q upsert Q337_AudienceWithTheLandDragon | <cond> | 2
+  Q upsert Q337_AudienceWithTheLandDragon | drop5 | 2
+  Q upsert Q337_AudienceWithTheLandDragon | drop6 | 2
+  items 3864=0 3852=1
+  rows Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED drop1=1 drop2=1 drop3=1 drop4=1 drop5=2 drop6=2
+  state Q337_AudienceWithTheLandDragon STARTED
+action gabrielle
+  S ActionFailed
+  S NpcHtmlMessage obj=gabrielle item=0 page=default/30753.htm
+  S ActionFailed
+action gabrielle
+  S ActionFailed
+  S NpcHtmlMessage obj=gabrielle item=0 page=default/30753.htm
+  S ActionFailed
+bypass npc_{gabrielle}_Quest
+  S NpcHtmlMessage obj=gabrielle item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30753-10.htm
+  S ActionFailed
+  S ActionFailed
+  items 3864=0 3852=1
+  rows Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED drop1=1 drop2=1 drop3=1 drop4=1 drop5=2 drop6=2
+  state Q337_AudienceWithTheLandDragon STARTED

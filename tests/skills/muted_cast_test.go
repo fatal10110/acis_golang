@@ -3,7 +3,6 @@ package skills
 import (
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -89,8 +88,8 @@ func TestMutedPlayerCastRefusedSilently(t *testing.T) {
 				}
 				return
 			}
-			if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-				t.Fatalf("muted cast answered opcode %#x, want silence", frame[0])
+			if queued := c.ReadQueued(); len(queued) != 0 {
+				t.Fatalf("muted cast answered opcode %#x, want silence", queued[0][0])
 			}
 			if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
 				t.Fatalf("MP after muted cast = %d, want unchanged %d", got, mpBefore)

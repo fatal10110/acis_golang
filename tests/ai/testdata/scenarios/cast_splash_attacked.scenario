@@ -1,0 +1,17 @@
+# WarriorCastSplash (20449, its shipped skills), every draw 0, 100 away from the character. Its
+# first hit finds it hating no one, so it only takes the Warrior's hate; the second, by the
+# character it now hates most from closer than 200, also wants its ranged DD magic (4033) on
+# itself, weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastSplash.WarriorCastSplash
+npc wisp 20449 Monster 100 0 0 skill SELF_RANGE_DD_MAGIC 4033 1
+
+hit wisp 22
+  desires wisp attack(player)=275
+hit wisp 22
+  desires wisp attack(player)=550 cast(wisp,4033,move)=1000000

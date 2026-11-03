@@ -1,0 +1,60 @@
+# Stolen Dignity (Q386), level 58, quest started with 100 ore: a pick of six cells that completes no line pays ten of a reward. Untraced: the reference scrambles the board with an unseeded shuffle, so the random line pins the eight scramble draws (all 0 give the board 234567891) and the expected pages are the datapack pages filled by the reference algorithm.
+character Pastime 58
+quest Q386_StolenDignity <cond>=1 <state>=STARTED
+hold 6363 100
+random 0 0 0 0 0 0 0 0 21
+script quest.Q386_StolenDignity
+item 6363 5529 5534 5536 8346
+page warehouse/30843.htm
+page script/quest/Q386_StolenDignity/
+npc romp 30843 WarehouseKeeper 10 0 0
+
+action romp
+  items 6363=100
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED
+  state Q386_StolenDignity STARTED
+action romp
+  S ActionFailed
+  S NpcHtmlMessage obj=romp item=0 page=warehouse/30843.htm
+  S ActionFailed
+bypass npc_{romp}_Quest
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q386_StolenDignity 30843-12.htm
+  S SystemMessage id=301 3:6363 6:100
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-12.htm
+  S ActionFailed
+  Q upsert Q386_StolenDignity | board | 234567891
+  items 6363=0
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED board=234567891
+bypass Quest Q386_StolenDignity select_1-3
+  S NpcHtmlMessage obj=romp item=0 html="<html><body>Warehouse Keeper Romp:<br>\nNow, pick your second number.<br>\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-9\">9</a><br>\nCurrent status<br>\n<table border=\"1\" border color=\"white\" width=100>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q386_StolenDignity | playerArray | 3
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED board=234567891 playerArray=3
+bypass Quest Q386_StolenDignity select_2-4
+  S NpcHtmlMessage obj=romp item=0 html="<html><body>Warehouse Keeper Romp:<br>\nReady to pick your third number?<br>\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-9\">9</a><br>\nCurrent status<br>\n<table border=\"1\" border color=\"white\" width=100>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">4</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q386_StolenDignity | playerArray | 34
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED board=234567891 playerArray=34
+bypass Quest Q386_StolenDignity select_2-5
+  S NpcHtmlMessage obj=romp item=0 html="<html><body>Warehouse Keeper Romp:<br>\nTime for the fourth number. Pick it well...<br>\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-9\">9</a><br>\nCurrent status<br>\n<table border=\"1\" border color=\"white\" width=100>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">4</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">5</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q386_StolenDignity | playerArray | 345
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED board=234567891 playerArray=345
+bypass Quest Q386_StolenDignity select_2-7
+  S NpcHtmlMessage obj=romp item=0 html="<html><body>Warehouse Keeper Romp:<br>\nYou're almost finished. Choose your fifth number carefully.<br>\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_2-9\">9</a><br>\nCurrent status<br>\n<table border=\"1\" border color=\"white\" width=100>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">4</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">5</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">7</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q386_StolenDignity | playerArray | 3457
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED board=234567891 playerArray=3457
+bypass Quest Q386_StolenDignity select_2-8
+  S NpcHtmlMessage obj=romp item=0 html="<html><body>Warehouse Keeper Romp:<br>\nGood! Now, it's time to pick your sixth and final number.<br>\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-1\">1</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-2\">2</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-3\">3</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-4\">4</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-5\">5</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-6\">6</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-7\">7</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-8\">8</a>&nbsp;&nbsp;&nbsp;&nbsp;\n<a action=\"bypass -h Quest Q386_StolenDignity select_3-9\">9</a><br>\nCurrent status<br>\n<table border=\"1\" border color=\"white\" width=100>\n\t<tr>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">3</td>\n\t\t<td align=\"center\">4</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">5</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">7</td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\">8</td>\n\t\t<td align=\"center\">?</td>\n\t\t<td align=\"center\">?</td>\n\t</tr>\n</table>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q386_StolenDignity | playerArray | 34578
+  rows Q386_StolenDignity <cond>=1 <state>=STARTED board=234567891 playerArray=34578
+bypass Quest Q386_StolenDignity select_3-9
+  S SystemMessage id=53 3:8346 6:10
+  S NpcHtmlMessage obj=romp item=0 html="<html><body>Warehouse Keeper Romp:<br>\nYou are a seriously unlucky person! Your choices are in red on the bingo pad below. As you can see, you didn't even make a single line! You know, that's actually harder to do than to complete all 3 lines.<br>\nUsually, we only reward winners, but I want to do something nice for you to keep your spirits up.<br>\nHere, take this. I hope it helps!<br>\n<table border=\"1\" border color=\"white\" width=100>\n\t<tr>\n\t\t<td align=\"center\"><font color=\"ffffff\">2</font></td>\n\t\t<td align=\"center\"><font color=\"ff0000\">3</font></td>\n\t\t<td align=\"center\"><font color=\"ff0000\">4</font></td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\"><font color=\"ff0000\">5</font></td>\n\t\t<td align=\"center\"><font color=\"ffffff\">6</font></td>\n\t\t<td align=\"center\"><font color=\"ff0000\">7</font></td>\n\t</tr>\n\t<tr>\n\t\t<td align=\"center\"><font color=\"ff0000\">8</font></td>\n\t\t<td align=\"center\"><font color=\"ff0000\">9</font></td>\n\t\t<td align=\"center\"><font color=\"ffffff\">1</font></td>\n\t</tr>\n</table>\n</body></html>\n"
+  S ActionFailed
+  items 8346=10

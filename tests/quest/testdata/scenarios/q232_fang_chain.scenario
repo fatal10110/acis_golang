@@ -1,0 +1,166 @@
+# Test of the Lord (Q232), Manakia's orders and the Breka orc fangs make his amulet, Varkees takes it for the huge orc fang and, with the other five proofs held, the quest moves on; Kakai takes the proofs for the bear fang necklace.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q232_fang_chain.golden
+character Shaman 39
+class 50
+quest Q232_TestOfTheLord <state>=STARTED <cond>=1
+random always 0
+hold 3398 19
+hold 3404 1
+hold 3406 1
+hold 3409 1
+hold 3411 1
+hold 3391 1
+script quest.Q232_TestOfTheLord
+item 1341 3390 3391 3392 3393 3394 3395 3396 3397 3398 3399 3400 3401 3402 3403 3404 3405 3406 3407 3408 3409 3410 3411 3412 3413 3414 3415 3416 7562
+page villagemaster/30565.htm
+page trainer/30515.htm
+page trainer/30515-noskills.htm
+page default/30566.htm
+page script/quest/Q232_TestOfTheLord/
+npc kakai 30565 VillageMasterOrc 10 0 0
+npc manakia 30515 Trainer 20 0 0
+npc varkees 30566 Folk 30 0 0
+npc m20269 20269 Monster 40 0 0
+
+action kakai
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-06.htm
+  S ActionFailed
+  S ActionFailed
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S SystemMessage id=54 3:3397
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q232_TestOfTheLord/30515-01.htm
+  S ActionFailed
+  S ActionFailed
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q232_TestOfTheLord/30515-02.htm
+  S ActionFailed
+  S ActionFailed
+kill m20269
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3398
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S SystemMessage id=302 3:3397
+  S SystemMessage id=301 3:3398 6:20
+  S SystemMessage id=54 3:3399
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q232_TestOfTheLord/30515-03.htm
+  S ActionFailed
+  S ActionFailed
+action varkees
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q232_TestOfTheLord/30566-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30566-02.htm
+  S SystemMessage id=54 3:3392
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q232_TestOfTheLord/30566-02.htm
+  S ActionFailed
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S SystemMessage id=302 3:3392
+  S SystemMessage id=302 3:3399
+  S SystemMessage id=54 3:3400
+  S QuestList 232:0x80000003
+  S ExShowQuestMark quest=232
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q232_TestOfTheLord/30566-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q232_TestOfTheLord | <cond> | 2
+action manakia
+action manakia
+  S ActionFailed
+  S NpcHtmlMessage obj=manakia item=0 page=trainer/30515.htm
+  S ActionFailed
+bypass npc_{manakia}_Quest
+  S NpcHtmlMessage obj=manakia item=0 page=script/quest/Q232_TestOfTheLord/30515-05.htm
+  S ActionFailed
+  S ActionFailed
+action varkees
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q232_TestOfTheLord/30566-05.htm
+  S ActionFailed
+  S ActionFailed
+action kakai
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30565-08.htm
+  S QuestList 232:0x80000007
+  S ExShowQuestMark quest=232
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3404
+  S SystemMessage id=302 3:3406
+  S SystemMessage id=302 3:3411
+  S SystemMessage id=302 3:3409
+  S SystemMessage id=302 3:3391
+  S SystemMessage id=302 3:3400
+  S SystemMessage id=54 3:3412
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-08.htm
+  S ActionFailed
+  Q upsert Q232_TestOfTheLord | <cond> | 3
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-09.htm
+  S ActionFailed
+  S ActionFailed
+  items 3412=1 3391=0 3400=0 3399=0 3392=0
+  state Q232_TestOfTheLord STARTED
+  rows Q232_TestOfTheLord <cond>=3 <state>=STARTED

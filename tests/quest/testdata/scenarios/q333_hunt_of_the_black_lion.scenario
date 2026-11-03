@@ -1,0 +1,246 @@
+# Hunt of the Black Lion (Q333), the statue run: a level 25 human mystic holding the Black Lion
+# mark accepts at Sophya and takes her first letter. An Ol Mahum guerilla of another ground drops
+# nothing; a Neer crawler drops the twentieth undead ash and a first cargo box (both rolls 0).
+# Redfoot refuses to open the box without 650 adena; Sophya pays 700 adena and a lion claw for the
+# ashes and trades ten claws for a lion eye and fifty spiritshots (roll 30). Redfoot opens the first
+# box (rolls 80 and 10, the even roll true) into the statue's head, which completes the statue
+# pieces; Rupio assembles it (even roll true) and Undrias buys it for 30000 adena. Redfoot's gossip
+# (roll 7) costs 200 adena and counts one, Morgan buys the second box for 100 adena and a guild
+# coin, and Sophya takes the letter back and ends the repeatable quest for 12400 adena; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q333_hunt_of_the_black_lion.golden
+character Mercenary 25
+class 10
+hold 1369 1
+hold 3848 19
+hold 3675 9
+hold 3458 1
+hold 3459 1
+hold 3460 1
+hold 3441 1
+random 0 0 30 80 10 0 0 7
+script quest.Q333_HuntOfTheBlackLion
+item 57 735 736 1061 1369 1463 2510 3440 3441 3442 3443 3444 3445 3446 3447 3448 3449 3450 3451 3452 3453 3454 3455 3456 3457 3458 3459 3460 3461 3462 3463 3464 3465 3466 3671 3672 3673 3674 3675 3676 3677 3848 3849 3850 3851
+page default/30735.htm
+page default/30736.htm
+page trainer/30471.htm
+page default/30130.htm
+page default/30531.htm
+page default/30737.htm
+page script/quest/Q333_HuntOfTheBlackLion/
+npc sophya 30735 Folk 10 0 0
+npc redfoot 30736 Folk 20 0 0
+npc rupio 30471 Trainer 30 0 0
+npc undrias 30130 Folk -10 0 0
+npc lockirin 30531 Folk -20 0 0
+npc morgan 30737 Folk -30 0 0
+npc guerilla 20207 Monster 0 -40 0
+npc crawler 20160 Monster 40 40 0
+
+# Sophya: accept, and the first letter.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q333_HuntOfTheBlackLion CREATED
+bypass Quest Q333_HuntOfTheBlackLion 30735-04.htm
+  S QuestList 333:0x80000001
+  S ExShowQuestMark quest=333
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-04.htm
+  S ActionFailed
+  Q upsert Q333_HuntOfTheBlackLion | <state> | STARTED
+  Q upsert Q333_HuntOfTheBlackLion | <cond> | 1
+  state Q333_HuntOfTheBlackLion STARTED
+  rows Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED
+bypass Quest Q333_HuntOfTheBlackLion 30735-05.htm
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-05.htm
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-06.htm
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-06.htm
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-10.htm
+  S SystemMessage id=54 3:3671
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-10.htm
+  S ActionFailed
+  items 3671=1
+
+# The hunt: only the letter's ground drops.
+kill guerilla
+  S SystemMessage id=95 1:0 1:0
+  items 3848=19 3440=0 3849=0
+kill crawler
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3848
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3440
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3848=20 3440=1
+
+# Redfoot: no box opens without 650 adena.
+action redfoot
+action redfoot
+  S ActionFailed
+  S NpcHtmlMessage obj=redfoot item=0 page=default/30736.htm
+  S ActionFailed
+bypass npc_{redfoot}_Quest
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30736-03.htm
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-05.htm
+  S ActionFailed
+  items 57=0 3440=1 3441=1
+
+# Sophya: twenty ashes pay a lion claw; ten claws make a lion eye.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S SystemMessage id=301 3:3848 6:20
+  S SystemMessage id=52 6:700
+  S SystemMessage id=54 3:3675
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-23.htm
+  S ActionFailed
+  S ActionFailed
+  items 3848=0 57=700 3675=10
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=54 3:3676
+  S SystemMessage id=53 3:2510 6:50
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-17a.htm
+  S ActionFailed
+  items 3675=0 3676=1 2510=50 1463=0
+
+# Redfoot: the first box holds the statue's head.
+action redfoot
+action redfoot
+  S ActionFailed
+  S NpcHtmlMessage obj=redfoot item=0 page=default/30736.htm
+  S ActionFailed
+bypass npc_{redfoot}_Quest
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30736-03.htm
+  S SystemMessage id=672 1:650
+  S SystemMessage id=302 3:3440
+  S SystemMessage id=54 3:3457
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-04n.htm
+  S ActionFailed
+  items 57=50 3440=0 3441=1 3457=1
+
+# Rupio assembles the statue, Undrias buys it.
+action rupio
+action rupio
+  S ActionFailed
+  S NpcHtmlMessage obj=rupio item=0 page=trainer/30471.htm
+  S ActionFailed
+bypass npc_{rupio}_Quest
+  S NpcHtmlMessage obj=rupio item=0 page=script/quest/Q333_HuntOfTheBlackLion/30471-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30471-03.htm
+  S SystemMessage id=302 3:3457
+  S SystemMessage id=302 3:3458
+  S SystemMessage id=302 3:3459
+  S SystemMessage id=302 3:3460
+  S SystemMessage id=54 3:3461
+  S NpcHtmlMessage obj=rupio item=0 page=script/quest/Q333_HuntOfTheBlackLion/30471-04.htm
+  S ActionFailed
+  items 3457=0 3458=0 3459=0 3460=0 3461=1
+action undrias
+action undrias
+  S ActionFailed
+  S NpcHtmlMessage obj=undrias item=0 page=default/30130.htm
+  S ActionFailed
+bypass npc_{undrias}_Quest
+  S NpcHtmlMessage obj=undrias item=0 page=script/quest/Q333_HuntOfTheBlackLion/30130-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30130-04.htm
+  S SystemMessage id=302 3:3461
+  S SystemMessage id=52 6:30000
+  S NpcHtmlMessage obj=undrias item=0 page=script/quest/Q333_HuntOfTheBlackLion/30130-04.htm
+  S ActionFailed
+  items 3461=0 57=30050
+
+# Redfoot's gossip.
+action redfoot
+action redfoot
+  S ActionFailed
+  S NpcHtmlMessage obj=redfoot item=0 page=default/30736.htm
+  S ActionFailed
+bypass npc_{redfoot}_Quest
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30736-07.htm
+  S SystemMessage id=672 1:200
+  S NpcHtmlMessage obj=redfoot item=0 page=script/quest/Q333_HuntOfTheBlackLion/30736-08b.htm
+  S ActionFailed
+  Q upsert Q333_HuntOfTheBlackLion | state | 1
+  items 57=29850
+  rows Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED state=1
+
+# Morgan buys the second box.
+action morgan
+action morgan
+  S ActionFailed
+  S NpcHtmlMessage obj=morgan item=0 page=default/30737.htm
+  S ActionFailed
+bypass npc_{morgan}_Quest
+  S NpcHtmlMessage obj=morgan item=0 page=script/quest/Q333_HuntOfTheBlackLion/30737-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30737-06.htm
+  S SystemMessage id=302 3:3441
+  S SystemMessage id=52 6:100
+  S SystemMessage id=54 3:3677
+  S NpcHtmlMessage obj=morgan item=0 page=script/quest/Q333_HuntOfTheBlackLion/30737-03.htm
+  S ActionFailed
+  items 3441=0 57=29950 3677=1
+
+# Sophya: the letter back, and the end of the hunt.
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-20.htm
+  S SystemMessage id=302 3:3671
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-20.htm
+  S ActionFailed
+  items 3671=0
+bypass Quest Q333_HuntOfTheBlackLion 30735-21.htm
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-21.htm
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-26.htm
+  S SystemMessage id=302 3:3676
+  S SystemMessage id=302 3:3677
+  S SystemMessage id=302 3:1369
+  S SystemMessage id=52 6:12400
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-26.htm
+  S ActionFailed
+  Q delete-quest Q333_HuntOfTheBlackLion
+  state Q333_HuntOfTheBlackLion -
+  rows Q333_HuntOfTheBlackLion -
+  items 3676=0 3677=0 1369=0 57=42350 2510=50 3457=0
+relog
+  state Q333_HuntOfTheBlackLion -
+  rows Q333_HuntOfTheBlackLion -
+  items 57=42350 2510=50 1369=0

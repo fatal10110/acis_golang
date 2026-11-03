@@ -1,0 +1,13 @@
+# PartyLeaderWizardSaintAggressive (21541, level 63), every draw 0: 5 s after it spawns, not attacking, it wants
+# its self range buff on itself (1000000).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardSaintAggressive
+npc saint 21541 Monster 300 0 0 level 63 aggro 1000 skill RANGE_DEBUFF 4036 6 skill W_LONG_RANGE_DD_MAGIC1 4158 6 skill W_LONG_RANGE_DD_MAGIC2 4566 6 skill SELF_RANGE_BUFF 4638 3
+
+advance 5s
+  desires saint cast(saint,4638,move)=1000000

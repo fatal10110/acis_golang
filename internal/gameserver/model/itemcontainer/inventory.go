@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/rs/zerolog"
 )
 
 // Paperdoll equip-array positions, matching the items table's loc_data
@@ -43,14 +44,58 @@ const (
 	UpdateRemoved
 )
 
+var updateStateNames = [...]string{
+	updateUnchanged: "UNCHANGED",
+	UpdateAdded:     "ADDED",
+	UpdateModified:  "MODIFIED",
+	UpdateRemoved:   "REMOVED",
+}
+
+// String returns the state's item log spelling.
+func (s UpdateState) String() string {
+	if int(s) >= len(updateStateNames) {
+		return "UNKNOWN"
+	}
+	return updateStateNames[s]
+}
+
 // Update is one pending inventory-change notification. Delivering it to
 // the client as an actual packet is the network layer's job; Inventory
-// only queues the fact that something changed.
+// only queues the fact that something changed, along with the instance
+// state the client is shown for it, copied when the change is queued: by the
+// time the update is sent the instance may have changed again or left the
+// inventory.
 type Update struct {
 	ObjectID   int32
 	TemplateID int32
 	Count      int
 	State      UpdateState
+
+	EnchantLevel             int
+	CustomType1, CustomType2 int
+	Equipped                 bool
+	// Augmentation is the augmentation id, 0 when the item has none.
+	Augmentation int32
+	ManaLeft     int
+}
+
+// NewUpdate returns the update reporting st as changed by state.
+func NewUpdate(st item.InstanceState, state UpdateState) Update {
+	u := Update{
+		ObjectID:     st.ObjectID,
+		TemplateID:   st.TemplateID,
+		Count:        st.Count,
+		State:        state,
+		EnchantLevel: st.EnchantLevel,
+		CustomType1:  st.CustomType1,
+		CustomType2:  st.CustomType2,
+		Equipped:     st.Equipped(),
+		ManaLeft:     st.ManaLeft,
+	}
+	if st.Augmentation != nil {
+		u.Augmentation = st.Augmentation.Attributes
+	}
+	return u
 }
 
 // Inventory is an equip-capable item container: a player or pet's own
@@ -73,7 +118,8 @@ type Update struct {
 // left. Every paperdoll mutation applies that rule, so each caller reports
 // the extra left-hand change among the instances it altered.
 //
-// mu guards paperdoll, wornMask, totalWeight, updates, removed and limiter.
+// mu guards paperdoll, wornTemplates, wornMask, totalWeight, updates, removed, limiter,
+// itemLog and itemOwner.
 // Mutable item fields are guarded by item.Instance.
 type Inventory struct {
 	*Container
@@ -85,16 +131,36 @@ type Inventory struct {
 
 	WeightLimit int
 
-	mu          sync.Mutex
-	paperdoll   [item.PaperdollSlots]*item.Instance
-	wornMask    int32
-	totalWeight int
-	updates     []Update
-	delivery    Delivery
-	limiter     Limiter
+	mu        sync.Mutex
+	paperdoll [item.PaperdollSlots]*item.Instance
+	// wornTemplates holds the template each paperdoll occupant went on
+	// with. It stays the occupant's template until it comes off, even when
+	// a reload replaces or drops that template id from the table.
+	wornTemplates [item.PaperdollSlots]*item.Template
+	wornMask      int32
+	totalWeight   int
+	updates       []Update
+	delivery      Delivery
+	limiter       Limiter
 	// removed holds the object ids of instances that left the inventory
 	// since the last fireDelivery, which hands them to a RemovalDelivery.
 	removed []int32
+	// itemLog records each change to a non-stackable item, naming the
+	// holder itemOwner returns; the zero logger records nothing.
+	itemLog   zerolog.Logger
+	itemOwner func() string
+}
+
+// SetItemLog makes inv record every add, change and removal of one of its
+// non-stackable items on log (server.properties LogItems), owner naming who
+// holds the inventory at that moment. owner runs with inv's lock held, so it
+// must not call back into inv. The zero logger records nothing. Set it
+// before Restore so the items a restore puts back on the paperdoll are
+// recorded too.
+func (inv *Inventory) SetItemLog(log zerolog.Logger, owner func() string) {
+	inv.mu.Lock()
+	inv.itemLog, inv.itemOwner = log, owner
+	inv.mu.Unlock()
 }
 
 // Limiter reports how many item slots and how much carried weight an
@@ -234,9 +300,8 @@ func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, it
 // of the pet's collar (not the pet's own world object id, nor its owner's).
 // The pet's world object id is transient, while its items must be found
 // again after an offline decay of its corpse and across a restart, both of
-// which leave only the collar and its pets row. The reference saves them
-// under the player instead (PetInventory.getOwnerId), which cannot tell two
-// collars' items apart, and never restores them; a character's purge finds
+// which leave only the collar and its pets row. Keying them by the player
+// instead could not tell two collars' items apart; a character's purge finds
 // them through its collars (sql.CharacterStore.Purge). A live pet must use
 // NewPetInventoryWithDelivery to send inventory updates.
 func NewPetInventory(ownerID int32, templates *item.Table) *Inventory {
@@ -274,6 +339,22 @@ func (inv *Inventory) AddNew(templateID int32, count int, objectID int32) *item.
 	return result
 }
 
+// AddCreated creates count units of templateID per Container.AddCreated,
+// taking an object id from nextID only for a new instance, and queues the
+// same notification Add does.
+func (inv *Inventory) AddCreated(templateID int32, count int, nextID func() (int32, error)) (*item.Instance, error) {
+	result, joined, err := inv.Container.addCreated(templateID, count, nextID)
+	if result == nil {
+		return nil, err
+	}
+	if joined {
+		inv.queueUpdate(result, UpdateModified)
+	} else {
+		inv.queueUpdate(result, UpdateAdded)
+	}
+	return result, nil
+}
+
 // Restore replaces inv's current contents with persisted item rows without
 // changing their locations and without queuing inventory updates. The only
 // writes it schedules are those of a stackable row merged into an earlier
@@ -284,7 +365,7 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
 
-	clear(inv.Container.items)
+	inv.Container.clearLocked()
 	clear(inv.paperdoll[:])
 	inv.wornMask = 0
 	inv.totalWeight = 0
@@ -312,30 +393,23 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		// fix-up nor an equip displacement schedules a redundant write of
 		// what was just read.
 		inst.EnterContainer(inv.OwnerID(), st.Location, st.LocationData, restoredAt)
-		merged := false
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if tmpl != nil && tmpl.Stackable {
-			for _, held := range inv.Container.items {
-				if held.TemplateID == inst.TemplateID {
-					// A stack merge is the exception: it changes two rows.
-					// Unwritten, the absorbed row survives to be merged in
-					// again on every later restore, so both the grown stack
-					// and the absorbed row's delete are scheduled here. The
-					// grown stack stays bound from here on, so a later row
-					// displacing it from its equip slot is written too.
-					held.BindPersister(inv.Container.persist)
-					inst.BindPersister(inv.Container.persist)
-					held.AddCount(st.Count)
-					inst.DestroyState()
-					merged = true
-					break
-				}
+			if held := inv.Container.itemByTemplateIDLocked(inst.TemplateID); held != nil {
+				// A stack merge is the exception: it changes two rows.
+				// Unwritten, the absorbed row survives to be merged in
+				// again on every later restore, so both the grown stack
+				// and the absorbed row's delete are scheduled here. The
+				// grown stack stays bound from here on, so a later row
+				// displacing it from its equip slot is written too.
+				held.BindPersister(inv.Container.persist)
+				inst.BindPersister(inv.Container.persist)
+				held.AddCount(st.Count)
+				inst.DestroyState()
+				continue
 			}
 		}
-		if merged {
-			continue
-		}
-		inv.Container.items[inst.ObjectID] = inst
+		inv.Container.putLocked(inst)
 
 		// totalWeight is deliberately left at 0 here: restoring only fills
 		// the item set, and carried weight is computed and reported solely by
@@ -384,7 +458,8 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 	inv.mu.Lock()
 	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
-	inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
+	inv.logItemLocked(st, UpdateRemoved)
+	inv.queueRemovedLocked(st)
 	return true
 }
 
@@ -442,10 +517,10 @@ func (inv *Inventory) DestroyAllItems() {
 	inv.Container.mu.Lock()
 	inv.mu.Lock()
 	instances := make([]*item.Instance, 0, len(inv.Container.items))
-	for objectID, inst := range inv.Container.items {
-		delete(inv.Container.items, objectID)
+	for _, inst := range inv.Container.items {
 		instances = append(instances, inst)
 	}
+	inv.Container.clearLocked()
 	clear(inv.paperdoll[:])
 	inv.wornMask = 0
 	inv.mu.Unlock()
@@ -455,7 +530,8 @@ func (inv *Inventory) DestroyAllItems() {
 		st := inst.Snapshot()
 		inst.DestroyState()
 		inv.mu.Lock()
-		inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
+		inv.logItemLocked(st, UpdateRemoved)
+		inv.queueRemovedLocked(st)
 		inv.mu.Unlock()
 	}
 	inv.fireDelivery()
@@ -471,6 +547,18 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 	if inv.ItemByObjectID(inst.ObjectID) != inst || !inst.SetEnchantLevel(level) {
 		return false
 	}
+	inv.queueUpdate(inst, UpdateModified)
+	return true
+}
+
+// SetCustomType2 sets inst's second custom type to value and queues a
+// modified inventory notification, even when the value was already set. It
+// returns false when inst is absent from this inventory.
+func (inv *Inventory) SetCustomType2(inst *item.Instance, value int) bool {
+	if inst == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
+		return false
+	}
+	inst.SetCustomType2(value)
 	inv.queueUpdate(inst, UpdateModified)
 	return true
 }
@@ -540,38 +628,66 @@ func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *it
 	return inst
 }
 
-// TransferItem moves count units from inv to target and queues inventory
-// updates on inv for the source-side change. A target inventory's Add path
+// TransferItem moves count units from inv to target per Container.Transfer
+// and queues inventory updates on inv for the source-side change, also when
+// the units left inv but nextID failed them. A target inventory's Add path
 // queues its own update.
-func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, nextID func() (int32, error)) (result *item.Instance, freedObjectID int32, freed bool, err error) {
 	if target == nil || count <= 0 {
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	source := inv.ItemByObjectID(objectID)
 	if source == nil {
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	st := source.Snapshot()
-	templateID := st.TemplateID
-	sourceCount := st.Count
-	movedCount := count
-	if movedCount > sourceCount {
-		movedCount = sourceCount
-	}
+	movedCount := min(count, st.Count)
 
-	result, freedObjectID, freed = inv.Container.Transfer(objectID, count, target, newObjectID)
-	if result == nil {
-		return nil, 0, false
+	moving := &removalFirst{Receiver: target, inv: inv, source: source}
+	result, freedObjectID, freed, err = inv.Container.Transfer(objectID, count, moving, nextID)
+	if result == nil && err == nil {
+		return nil, 0, false, nil
 	}
 	if remaining := inv.ItemByObjectID(objectID); remaining != nil {
 		inv.queueUpdate(remaining, UpdateModified)
 	} else {
 		inv.mu.Lock()
-		inv.queueRemovedLocked(objectID, templateID, movedCount)
+		st.Count = movedCount
+		if !moving.logged {
+			inv.logItemLocked(st, UpdateRemoved)
+		}
+		inv.queueRemovedLocked(st)
 		inv.mu.Unlock()
 		inv.fireDelivery()
 	}
-	return result, freedObjectID, freed
+	return result, freedObjectID, freed, err
+}
+
+// removalFirst is a transfer's target that settles the source inventory's
+// side of a whole moved instance just before target takes it in: a worn
+// instance is taken off first (its modified change queued at the source's
+// base location), then the removal is recorded, so the item log reads out of
+// one inventory, then into the other.
+type removalFirst struct {
+	Receiver
+	inv    *Inventory
+	source *item.Instance
+	logged bool
+}
+
+func (r *removalFirst) Add(inst *item.Instance) (*item.Instance, bool) {
+	if inst == r.source {
+		r.inv.mu.Lock()
+		for slot, occupant := range r.inv.paperdoll {
+			if occupant == inst {
+				r.inv.unequipSlotLocked(slot)
+			}
+		}
+		r.inv.logItemLocked(inst.Snapshot(), UpdateRemoved)
+		r.inv.mu.Unlock()
+		r.logged = true
+	}
+	return r.Receiver.Add(inst)
 }
 
 // ItemAt returns the instance equipped at paperdoll position slot, or nil.
@@ -625,31 +741,28 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 	}
 
 	if old != nil {
-		inv.paperdoll[slot] = nil
+		oldTmpl := inv.wornTemplates[slot]
+		inv.paperdoll[slot], inv.wornTemplates[slot] = nil, nil
 		old.SetLocation(inv.Location(), 0)
-		if oldTmpl, ok := inv.Templates().Get(old.TemplateID); ok {
+		if oldTmpl != nil {
 			inv.wornMask &^= oldTmpl.Mask()
 		}
 		inv.queueUpdateLocked(old, UpdateModified)
 	}
 
 	if inst != nil {
-		inv.paperdoll[slot] = inst
+		inv.paperdoll[slot], inv.wornTemplates[slot] = inst, tmpl
 		inst.SetLocation(inv.equipLocation, slot)
 		inv.queueUpdateLocked(inst, UpdateModified)
 
 		switch {
 		case tmpl != nil && tmpl.Slot == item.SlotChest:
-			if legs := inv.paperdoll[Legs]; legs != nil {
-				if legsTmpl, ok := inv.Templates().Get(legs.TemplateID); ok && legsTmpl.Mask() == tmpl.Mask() {
-					inv.wornMask |= tmpl.Mask()
-				}
+			if legsTmpl := inv.wornTemplates[Legs]; legsTmpl != nil && legsTmpl.Mask() == tmpl.Mask() {
+				inv.wornMask |= tmpl.Mask()
 			}
 		case tmpl != nil && tmpl.Slot == item.SlotLegs:
-			if chest := inv.paperdoll[Chest]; chest != nil {
-				if chestTmpl, ok := inv.Templates().Get(chest.TemplateID); ok && chestTmpl.Mask() == tmpl.Mask() {
-					inv.wornMask |= tmpl.Mask()
-				}
+			if chestTmpl := inv.wornTemplates[Chest]; chestTmpl != nil && chestTmpl.Mask() == tmpl.Mask() {
+				inv.wornMask |= tmpl.Mask()
 			}
 		case tmpl != nil:
 			inv.wornMask |= tmpl.Mask()
@@ -690,16 +803,14 @@ func (inv *Inventory) EquipPlayerItem(inst *item.Instance, tmpl *item.Template) 
 	defer inv.Container.mu.RUnlock()
 	defer inv.mu.Unlock()
 
-	if chest := inv.paperdoll[Chest]; chest != nil {
-		if chestTmpl, ok := inv.Templates().Get(chest.TemplateID); ok && chestTmpl.Slot == item.SlotAllDress {
-			switch tmpl.Slot {
-			case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
-				if old := inv.setPaperdollItemLocked(Chest, nil, nil); old != nil {
-					altered = append(altered, old)
-				}
-			case item.SlotLegs, item.SlotFeet, item.SlotGloves, item.SlotHead:
-				return nil, true
+	if chestTmpl := inv.wornTemplates[Chest]; chestTmpl != nil && chestTmpl.Slot == item.SlotAllDress {
+		switch tmpl.Slot {
+		case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
+			if old := inv.setPaperdollItemLocked(Chest, nil, nil); old != nil {
+				altered = append(altered, old)
 			}
+		case item.SlotLegs, item.SlotFeet, item.SlotGloves, item.SlotHead:
+			return nil, true
 		}
 	}
 	return append(altered, inv.equipItemLocked(inst, tmpl)...), false
@@ -720,26 +831,20 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		}
 	}
 	set := func(slot int) {
+		oldTmpl := inv.wornTemplates[slot]
 		if old := inv.setPaperdollItemLocked(slot, inst, tmpl); old != nil && old != inst {
-			record(inv.releaseOffHandLocked(slot, old)...)
+			record(inv.releaseOffHandLocked(slot, oldTmpl)...)
 			record(old)
 		}
 		record(inv.pullOffHandLocked(slot, inst, tmpl)...)
 		record(inst)
 	}
 	clearSlot := func(slot int) {
+		oldTmpl := inv.wornTemplates[slot]
 		if old := inv.setPaperdollItemLocked(slot, nil, nil); old != nil {
-			record(inv.releaseOffHandLocked(slot, old)...)
+			record(inv.releaseOffHandLocked(slot, oldTmpl)...)
 			record(old)
 		}
-	}
-	occupantTemplate := func(slot int) *item.Template {
-		occ := inv.paperdoll[slot]
-		if occ == nil {
-			return nil
-		}
-		t, _ := inv.Templates().Get(occ.TemplateID)
-		return t
 	}
 
 	switch tmpl.Slot {
@@ -748,7 +853,7 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		set(RHand)
 
 	case item.SlotLHand:
-		if rhTmpl := occupantTemplate(RHand); rhTmpl != nil && rhTmpl.Slot == item.SlotLRHand {
+		if rhTmpl := inv.wornTemplates[RHand]; rhTmpl != nil && rhTmpl.Slot == item.SlotLRHand {
 			pairedBowArrow := rhTmpl.Weapon != nil && rhTmpl.Weapon.Type == item.WeaponBow &&
 				tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemArrow
 			pairedRodLure := rhTmpl.Weapon != nil && rhTmpl.Weapon.Type == item.WeaponFishingRod &&
@@ -779,7 +884,7 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		set(Chest)
 
 	case item.SlotLegs:
-		if chestTmpl := occupantTemplate(Chest); chestTmpl != nil && chestTmpl.Slot == item.SlotFullArmor {
+		if chestTmpl := inv.wornTemplates[Chest]; chestTmpl != nil && chestTmpl.Slot == item.SlotFullArmor {
 			clearSlot(Chest)
 		}
 		set(Legs)
@@ -794,13 +899,13 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		set(Head)
 
 	case item.SlotFace:
-		if hairTmpl := occupantTemplate(Hair); hairTmpl != nil && hairTmpl.Slot == item.SlotHairAll {
+		if hairTmpl := inv.wornTemplates[Hair]; hairTmpl != nil && hairTmpl.Slot == item.SlotHairAll {
 			clearSlot(Hair)
 		}
 		set(Face)
 
 	case item.SlotHair:
-		if faceTmpl := occupantTemplate(Face); faceTmpl != nil && faceTmpl.Slot == item.SlotHairAll {
+		if faceTmpl := inv.wornTemplates[Face]; faceTmpl != nil && faceTmpl.Slot == item.SlotHairAll {
 			clearSlot(Face)
 		}
 		set(Hair)
@@ -894,23 +999,23 @@ func (inv *Inventory) unequipSlotLocked(slot int) []*item.Instance {
 	if slot < 0 || slot >= item.PaperdollSlots {
 		return nil
 	}
+	oldTmpl := inv.wornTemplates[slot]
 	old := inv.setPaperdollItemLocked(slot, nil, nil)
 	if old == nil {
 		return nil
 	}
-	return append(inv.releaseOffHandLocked(slot, old), old)
+	return append(inv.releaseOffHandLocked(slot, oldTmpl), old)
 }
 
 // releaseOffHandLocked applies the first half of the player's bow/rod rule
-// after old left paperdoll position slot: a bow or fishing rod leaving the
-// right hand clears the left hand. It returns the instance it took off, if
-// any. The caller holds mu.
-func (inv *Inventory) releaseOffHandLocked(slot int, old *item.Instance) []*item.Instance {
-	if !inv.pairsHands || slot != RHand || old == nil {
+// after an item that went on with template tmpl left paperdoll position
+// slot: a bow or fishing rod leaving the right hand clears the left hand. It
+// returns the instance it took off, if any. The caller holds mu.
+func (inv *Inventory) releaseOffHandLocked(slot int, tmpl *item.Template) []*item.Instance {
+	if !inv.pairsHands || slot != RHand || tmpl == nil {
 		return nil
 	}
-	tmpl, ok := inv.Templates().Get(old.TemplateID)
-	if !ok || tmpl.Weapon == nil || (tmpl.Weapon.Type != item.WeaponBow && tmpl.Weapon.Type != item.WeaponFishingRod) {
+	if tmpl.Weapon == nil || (tmpl.Weapon.Type != item.WeaponBow && tmpl.Weapon.Type != item.WeaponFishingRod) {
 		return nil
 	}
 	if off := inv.setPaperdollItemLocked(LHand, nil, nil); off != nil {
@@ -945,31 +1050,6 @@ func (inv *Inventory) pullOffHandLocked(slot int, inst *item.Instance, tmpl *ite
 		moved = append(moved, off)
 	}
 	return append(moved, arrows)
-}
-
-// ClearWornSlot drops paperdoll position slot's occupant and its wornMask
-// contribution when it still equals inst, without touching inst's own
-// Location/LocationData or queuing an inventory update for it. Use this
-// instead of UnequipSlot when inst has already been moved to a different
-// container (e.g. by a completed transfer) and only this inventory's own
-// equip bookkeeping needs to catch up — UnequipSlot's SetLocation(inv.
-// Location(), 0) would otherwise stomp the location the transfer already
-// assigned. Reports whether it actually cleared anything.
-func (inv *Inventory) ClearWornSlot(slot int, inst *item.Instance) bool {
-	if slot < 0 || slot >= item.PaperdollSlots || inst == nil {
-		return false
-	}
-	inv.mu.Lock()
-	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
-	defer inv.mu.Unlock()
-	if inv.paperdoll[slot] != inst {
-		return false
-	}
-	inv.paperdoll[slot] = nil
-	if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
-		inv.wornMask &^= tmpl.Mask()
-	}
-	return true
 }
 
 // UpdateWeight recomputes the inventory's total carried weight and reports
@@ -1122,7 +1202,7 @@ func (inv *Inventory) requeueUpdates(drained []Update) {
 	newer := inv.updates
 	inv.updates = drained
 	for _, u := range newer {
-		inv.queueUpdateRecordLocked(u.ObjectID, u.TemplateID, u.Count, u.State)
+		inv.queueUpdateRecordLocked(u)
 	}
 }
 
@@ -1145,31 +1225,63 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 		return
 	}
 	st := inst.Snapshot()
-	inv.queueUpdateRecordLocked(st.ObjectID, st.TemplateID, st.Count, state)
+	inv.logItemLocked(st, state)
+	inv.queueUpdateRecordLocked(NewUpdate(st, state))
 }
 
-func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count int, state UpdateState) {
+func (inv *Inventory) queueUpdateRecordLocked(update Update) {
 	// Coalesce a repeated update for the same stackable instance and state
 	// (e.g. several count changes in a row) into the latest count instead of
 	// letting the queue grow unbounded; any other update is appended as its
 	// own entry.
-	tmpl, _ := inv.Templates().Get(templateID)
+	tmpl, _ := inv.Templates().Get(update.TemplateID)
 	if tmpl != nil && tmpl.Stackable {
 		for i, u := range inv.updates {
-			if u.ObjectID == objectID && u.State == state {
-				inv.updates[i].Count = count
+			if u.ObjectID == update.ObjectID && u.State == update.State {
+				inv.updates[i].Count = update.Count
 				return
 			}
 		}
 	}
-	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
+	inv.updates = append(inv.updates, update)
 }
 
-// queueRemovedLocked queues the removed update of an instance that left the
-// inventory and records its object id for the next fireDelivery.
-func (inv *Inventory) queueRemovedLocked(objectID, templateID int32, count int) {
-	inv.queueUpdateRecordLocked(objectID, templateID, count, UpdateRemoved)
-	inv.removed = append(inv.removed, objectID)
+// queueRemovedLocked queues the removed update of st, an instance that left
+// the inventory with st.Count units, and records its object id for the next
+// fireDelivery. A removed item is never reported worn: it is taken off before
+// it leaves. Callers write the removal's item log record themselves.
+func (inv *Inventory) queueRemovedLocked(st item.InstanceState) {
+	update := NewUpdate(st, UpdateRemoved)
+	update.Equipped = false
+	inv.queueUpdateRecordLocked(update)
+	inv.removed = append(inv.removed, st.ObjectID)
+}
+
+// logItemLocked writes the item log record of st changing by state, when st
+// is a non-stackable item and the log is on.
+func (inv *Inventory) logItemLocked(st item.InstanceState, state UpdateState) {
+	e := inv.itemLog.Info()
+	if e == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(st.TemplateID)
+	if !ok || tmpl.Stackable {
+		e.Discard()
+		return
+	}
+	var owner string
+	if inv.itemOwner != nil {
+		owner = inv.itemOwner()
+	}
+	e.Str("owner", owner).
+		Int32("owner_id", inv.OwnerID()).
+		Str("item", tmpl.Name).
+		Int32("object_id", st.ObjectID).
+		Int32("item_id", st.TemplateID).
+		Str("location", st.Location.String()).
+		Int("count", st.Count).
+		Int("enchant", st.EnchantLevel).
+		Msg(state.String())
 }
 
 // fireDelivery reports a queued update after a mutation, then the instances

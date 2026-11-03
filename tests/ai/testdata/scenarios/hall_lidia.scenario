@@ -1,0 +1,17 @@
+# Agit03Lidia (35629), raised bare: she shouts her line as she appears (sent as the NPC lines'
+# NPCs spawn, before the first step), and her farewell three seconds after her death. A kill of
+# a dead Lidia kills a fresh one, which shouts as she appears. Her privates' templates are not
+# served, so she raises none; her self buff, attacked and clan-attacked hooks only queue
+# desires, which the format cannot render (tests/ai/hall_agit03_test.go covers them).
+character Hunter 20
+random always 1
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.Agit03Lidia
+npc lidia 35629 Monster 40 0 0
+
+kill lidia x2
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=lidia type=1 npc=1035629 text="I'll let you have the throne of the Lord of the Forest for now...!  Get drunk with your victory...!  And while you wait with fear and trembling under the pressure of your ill-gotten position, just you wait for the return of the true Lord...!  Bwa ha ha ha ha...!"
+  S NpcSay obj=lidia type=1 npc=1035629 text="Hmm, those who are not of the bloodline are coming this way to take over the castle?! Humph! The bitter grudges of the dead. You must not make light of their power!"
+  S SystemMessage id=95 1:0 1:0
+  S NpcSay obj=lidia type=1 npc=1035629 text="I'll let you have the throne of the Lord of the Forest for now...!  Get drunk with your victory...!  And while you wait with fear and trembling under the pressure of your ill-gotten position, just you wait for the return of the true Lord...!  Bwa ha ha ha ha...!"

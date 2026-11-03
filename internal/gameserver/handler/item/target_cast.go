@@ -56,22 +56,10 @@ type TargetCast struct {
 	// Skills are cast, in order, on the user's current target as ordinary
 	// skill requests when Refusal is TargetCastAllowed. The item itself is
 	// not consumed: a skill that costs it names it as its consume item.
-	Skills []modelskill.Definition
+	Skills []*modelskill.Definition
 	// CtrlForces reports that the UseItem Ctrl modifier is the casts'
 	// force-use flag. Otherwise they are cast with no modifiers.
 	CtrlForces bool
-}
-
-// chestTarget is a chest a key may be used on.
-type chestTarget interface {
-	Chest() bool
-	Dead() bool
-	Interacted() bool
-}
-
-// feedableTarget is an NPC that can be a beast spice's target.
-type feedableTarget interface {
-	FeedableBeast() bool
 }
 
 // ResolveTargetCast decides a key, soul crystal or beast spice use by user
@@ -102,14 +90,14 @@ func resolveKey(tmpl *modelitem.Template, user TargetCastUser, defs actorcast.De
 	if user.MovementDisabled() || user.MoveSpeed() == 0 {
 		return TargetCast{Handled: true, Refusal: TargetCastSilent}
 	}
-	chest, ok := user.Target().(chestTarget)
+	chest, ok := user.Target().(skilltarget.Actor)
 	if !ok || !chest.Chest() || chest.Dead() || chest.Interacted() {
 		return TargetCast{Handled: true, Refusal: TargetCastInvalidTarget}
 	}
 	if len(tmpl.AttachedSkills) == 0 {
 		return TargetCast{Handled: true, Refusal: TargetCastNoSkills}
 	}
-	skills := make([]modelskill.Definition, 0, len(tmpl.AttachedSkills))
+	skills := make([]*modelskill.Definition, 0, len(tmpl.AttachedSkills))
 	for _, ref := range tmpl.AttachedSkills {
 		if def, ok := resolveSkillRef(ref, defs); ok {
 			skills = append(skills, def)
@@ -131,13 +119,13 @@ func resolveSoulCrystal(tmpl *modelitem.Template, user TargetCastUser, defs acto
 	if _, ok := user.Target().(skilltarget.Actor); !ok {
 		return TargetCast{Handled: true, Refusal: TargetCastInvalidTarget}
 	}
-	return TargetCast{Handled: true, Skills: []modelskill.Definition{def}, CtrlForces: true}
+	return TargetCast{Handled: true, Skills: []*modelskill.Definition{def}, CtrlForces: true}
 }
 
 // resolveBeastSpice casts the spice's first skill on a FeedableBeast
 // target.
 func resolveBeastSpice(tmpl *modelitem.Template, user TargetCastUser, defs actorcast.Definitions) TargetCast {
-	beast, ok := user.Target().(feedableTarget)
+	beast, ok := user.Target().(skilltarget.Actor)
 	if !ok || !beast.FeedableBeast() {
 		return TargetCast{Handled: true, Refusal: TargetCastInvalidTarget}
 	}
@@ -148,12 +136,12 @@ func resolveBeastSpice(tmpl *modelitem.Template, user TargetCastUser, defs actor
 	if !ok {
 		return TargetCast{Handled: true, Refusal: TargetCastSilent}
 	}
-	return TargetCast{Handled: true, Skills: []modelskill.Definition{def}}
+	return TargetCast{Handled: true, Skills: []*modelskill.Definition{def}}
 }
 
-func resolveSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (modelskill.Definition, bool) {
+func resolveSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (*modelskill.Definition, bool) {
 	if defs == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
 }

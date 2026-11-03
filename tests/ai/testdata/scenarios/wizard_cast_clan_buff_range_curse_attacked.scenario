@@ -1,0 +1,18 @@
+# WizardCastClanBuffRangeCurse (21430, level 80, its shipped skills), every draw 0: the character's first hit,
+# the NPC over half its HP, wants its two buffs (4585-3, 4601-3) on itself (1000000 each), once; the character
+# is its top desire target, so no range debuff. The second hit adds only the long range DD magic its parents want.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.Wizard.Wizard
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardDDMagic2
+script script.ai.individual.Monster.WizardBase.Wizard.WizardDDMagic2.WizardCastClanBuffRangeCurse
+npc wiz 21430 Monster 300 0 0 level 80 aggro 1000 skill W_SHORT_RANGE_DD_MAGIC 4160 9 skill W_LONG_RANGE_DD_MAGIC 4257 9 skill RANGE_DEBUFF 4577 9 skill BUFF1 4585 3 skill BUFF2 4601 3
+
+hit wiz 10
+  mem wiz i_ai3=1
+  desires wiz cast(player,4257,move)=1000000 cast(wiz,4585,move)=1000000 cast(wiz,4601,move)=1000000
+hit wiz 10
+  desires wiz cast(player,4257,move)=2000000 cast(wiz,4585,move)=1000000 cast(wiz,4601,move)=1000000

@@ -1,0 +1,236 @@
+# Method to Raise the Dead (Q345): a level 35 character accepts at Dorothy; with no bone she
+# asks for them; five crokians give the five victim bones in turn (pinned rolls: the part roll
+# 0, then each part); a sixth rolls the arm bone again, already held, and gives useless bone
+# pieces; a seventh misses the part roll and gives pieces too; Dorothy sees the five bones (cond
+# 2) and asks again; Xenovia sells the powder for 1000 adena (cond 3), then sends him on;
+# Dorothy waits; Orpheus buys the 2 pieces for 208; the medium jar rolls the scared girl (cond
+# 7, every bone and the powder taken); Dorothy pays 3040 and, on a roll under 10, an imperial
+# diamond, and the quest ends; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q345_method_to_raise_the_dead.golden
+character Dorothy 35
+hold 57 1000
+random 0 0 0 1 0 2 0 3 0 4 0 0 0 1 0 2 0
+script quest.Q345_MethodToRaiseTheDead
+item 57 4274 4275 4276 4277 4278 4280 4281 4310 3456
+page default/30970.htm
+page trainer/30912.htm
+page default/30973.htm
+page default/30971.htm
+page script/quest/Q345_MethodToRaiseTheDead/
+npc dorothy 30970 Folk 10 0 0
+npc xenovia 30912 Trainer -10 0 0
+npc jar 30973 Folk 0 10 0
+npc orpheus 30971 Folk 0 -10 0
+npc crokian 20789 Monster 40 0 0
+
+# Dorothy: accept.
+action dorothy
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30970-02.htm
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-02.htm
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30970-03.htm
+  S QuestList 345:0x80000001
+  S ExShowQuestMark quest=345
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-03.htm
+  S ActionFailed
+  Q upsert Q345_MethodToRaiseTheDead | <state> | STARTED
+  Q upsert Q345_MethodToRaiseTheDead | <cond> | 1
+  state Q345_MethodToRaiseTheDead STARTED
+  rows Q345_MethodToRaiseTheDead <cond>=1 <state>=STARTED
+
+# No bone yet.
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# The five bones, one a kill.
+kill crokian x5
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4274
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4275
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4276
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4277
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4278
+  items 4274=1 4275=1 4276=1 4277=1 4278=1 4280=0
+
+# The arm bone again: pieces instead.
+kill crokian
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4280
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4274=1 4280=1
+
+# The part roll misses: pieces.
+kill crokian
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:4280
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 4280=2
+
+# Dorothy: the five bones, cond 2.
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30970-06.htm
+  S QuestList 345:0x80000003
+  S ExShowQuestMark quest=345
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-06.htm
+  S ActionFailed
+  Q upsert Q345_MethodToRaiseTheDead | <cond> | 2
+  rows Q345_MethodToRaiseTheDead <cond>=2 <state>=STARTED
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Xenovia: the powder for 1000 adena, cond 3.
+action xenovia
+action xenovia
+  S ActionFailed
+  S NpcHtmlMessage obj=xenovia item=0 page=trainer/30912.htm
+  S ActionFailed
+bypass npc_{xenovia}_Quest
+  S NpcHtmlMessage obj=xenovia item=0 page=script/quest/Q345_MethodToRaiseTheDead/30912-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30912-02.htm
+  S NpcHtmlMessage obj=xenovia item=0 page=script/quest/Q345_MethodToRaiseTheDead/30912-02.htm
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30912-04.htm
+  S QuestList 345:0x80000007
+  S ExShowQuestMark quest=345
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:1000
+  S SystemMessage id=54 3:4281
+  S NpcHtmlMessage obj=xenovia item=0 page=script/quest/Q345_MethodToRaiseTheDead/30912-03.htm
+  S ActionFailed
+  Q upsert Q345_MethodToRaiseTheDead | <cond> | 3
+  items 57=0 4281=1
+  rows Q345_MethodToRaiseTheDead <cond>=3 <state>=STARTED
+action xenovia
+  S ActionFailed
+  S NpcHtmlMessage obj=xenovia item=0 page=trainer/30912.htm
+  S ActionFailed
+bypass npc_{xenovia}_Quest
+  S NpcHtmlMessage obj=xenovia item=0 page=script/quest/Q345_MethodToRaiseTheDead/30912-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Dorothy waits.
+action dorothy
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Orpheus: 104 a piece.
+action orpheus
+action orpheus
+  S ActionFailed
+  S NpcHtmlMessage obj=orpheus item=0 page=default/30971.htm
+  S ActionFailed
+bypass npc_{orpheus}_Quest
+  S NpcHtmlMessage obj=orpheus item=0 page=script/quest/Q345_MethodToRaiseTheDead/30971-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30971-02a.htm
+  S NpcHtmlMessage obj=orpheus item=0 page=script/quest/Q345_MethodToRaiseTheDead/30971-02.htm
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30971-03.htm
+  S SystemMessage id=301 3:4280 6:2
+  S SystemMessage id=52 6:208
+  S NpcHtmlMessage obj=orpheus item=0 page=script/quest/Q345_MethodToRaiseTheDead/30971-03.htm
+  S ActionFailed
+  items 4280=0 57=208
+
+# The medium jar: the scared girl, cond 7.
+action jar
+action jar
+  S ActionFailed
+  S NpcHtmlMessage obj=jar item=0 page=default/30973.htm
+  S ActionFailed
+bypass npc_{jar}_Quest
+  S NpcHtmlMessage obj=jar item=0 page=script/quest/Q345_MethodToRaiseTheDead/30973-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q345_MethodToRaiseTheDead 30973-04.htm
+  S QuestList 345:0x80000047
+  S ExShowQuestMark quest=345
+  S SystemMessage id=302 3:4281
+  S SystemMessage id=302 3:4274
+  S SystemMessage id=302 3:4275
+  S SystemMessage id=302 3:4276
+  S SystemMessage id=302 3:4277
+  S SystemMessage id=302 3:4278
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jar item=0 page=script/quest/Q345_MethodToRaiseTheDead/30973-02c.htm
+  S ActionFailed
+  Q upsert Q345_MethodToRaiseTheDead | <flags> | -2147483577
+  Q upsert Q345_MethodToRaiseTheDead | <cond> | 7
+  items 4274=0 4275=0 4276=0 4277=0 4278=0 4281=0
+  rows Q345_MethodToRaiseTheDead <cond>=7 <flags>=-2147483577 <state>=STARTED
+bypass Quest Q345_MethodToRaiseTheDead 30973-03c.htm
+  S NpcHtmlMessage obj=jar item=0 page=script/quest/Q345_MethodToRaiseTheDead/30973-03c.htm
+  S ActionFailed
+
+# Dorothy: 3040 adena and the imperial diamond.
+action dorothy
+action dorothy
+  S ActionFailed
+  S NpcHtmlMessage obj=dorothy item=0 page=default/30970.htm
+  S ActionFailed
+bypass npc_{dorothy}_Quest
+  S SystemMessage id=52 6:3040
+  S SystemMessage id=54 3:3456
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=dorothy item=0 page=script/quest/Q345_MethodToRaiseTheDead/30970-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q345_MethodToRaiseTheDead
+  items 57=3248 3456=1 4310=0
+  state Q345_MethodToRaiseTheDead -
+  rows Q345_MethodToRaiseTheDead -
+
+relog
+  state Q345_MethodToRaiseTheDead -
+  rows Q345_MethodToRaiseTheDead -
+  items 57=3248 3456=1

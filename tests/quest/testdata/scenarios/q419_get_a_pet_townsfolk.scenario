@@ -1,0 +1,68 @@
+# Get a Pet (Q419), Bella, Metty and Ellie each teach the character about pets; Martin then gives the quiz. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q419_get_a_pet_townsfolk.golden
+character Fighter 15
+quest Q419_GetAPet <cond>=1 <state>=STARTED
+hold 3417 1
+script quest.Q419_GetAPet
+item 3417 3418 3419 3420 3421 3422 3423 3424 3425 3426 3427 2375
+page merchant/30731.htm
+page gatekeeper/30256.htm
+page guard/30072.htm
+page merchant/30091.htm
+page script/quest/Q419_GetAPet/
+npc martin 30731 Merchant 10 0 0
+npc bella 30256 Gatekeeper -20 0 0
+npc metty 30072 Guard 30 0 0
+npc ellie 30091 Merchant -40 0 0
+npc fang 20103 Monster 40 0 0
+npc kasha 20476 Monster 50 0 0
+
+action bella
+action bella
+  S ActionFailed
+  S NpcHtmlMessage obj=bella item=0 page=gatekeeper/30256.htm
+  S ActionFailed
+bypass npc_{bella}_Quest
+  S NpcHtmlMessage obj=bella item=0 page=script/quest/Q419_GetAPet/30256-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q419_GetAPet 30256-03.htm
+action metty
+action metty
+  S ActionFailed
+  S NpcHtmlMessage obj=metty item=0 page=guard/30072.htm
+  S ActionFailed
+bypass npc_{metty}_Quest
+  S NpcHtmlMessage obj=metty item=0 page=script/quest/Q419_GetAPet/30072-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q419_GetAPet 30072-02.htm
+  S NpcHtmlMessage obj=metty item=0 page=script/quest/Q419_GetAPet/30072-02.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | progress | 2
+  rows Q419_GetAPet <cond>=1 <state>=STARTED progress=2
+  state Q419_GetAPet STARTED
+action ellie
+action ellie
+  S ActionFailed
+  S NpcHtmlMessage obj=ellie item=0 page=merchant/30091.htm
+  S ActionFailed
+bypass npc_{ellie}_Quest
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q419_GetAPet/30091-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q419_GetAPet 30091-02.htm
+  S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q419_GetAPet/30091-02.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | progress | 6
+  rows Q419_GetAPet <cond>=1 <state>=STARTED progress=6
+  state Q419_GetAPet STARTED
+action martin
+action martin
+  S ActionFailed
+  S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
+  S ActionFailed
+bypass npc_{martin}_Quest
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-16.htm
+  S ActionFailed
+  S ActionFailed

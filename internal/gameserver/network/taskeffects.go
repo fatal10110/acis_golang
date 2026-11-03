@@ -41,9 +41,8 @@ const autosaveSaveTimeout = 5 * time.Second
 // Character's world.Position method signature.
 //
 // mu serializes zone revalidation for this player. Movement revalidates on
-// the player's own queue, but a summon-friend cast teleports the player from
-// the caster's queue (TeleportRequested → teleportLivePlayer), and logout
-// removes it from the zones on the detach path.
+// the player's own queue, but logout removes it from the zones on the
+// detach path.
 //
 // offGrid is set from a teleport's grid leave until the Appearing rejoin.
 // The player holds no zone in between, so position updates must not enter
@@ -55,6 +54,11 @@ const autosaveSaveTimeout = 5 * time.Second
 // revalidate them at once and restart the count. While the player is
 // teleporting the count still runs but no zone is revalidated, as a
 // teleport stops the player's move before it leaves the grid.
+//
+// held is a point of the region holding the player, whose zones a
+// revalidation checks: its position when it last entered the grid or moved
+// through the world. An instant teleport leaves it, so the player keeps the
+// zones of its old region until its next position update.
 type liveZoneActor struct {
 	// deliveryMu keeps compass sends in the same order as zone transitions.
 	// mu protects the zone state and is released before sending a frame.
@@ -64,6 +68,7 @@ type liveZoneActor struct {
 	flags       zone.Flags
 	offGrid     bool
 	steps       int
+	held        location.Location
 	lastCompass int32
 	// leftBattlefield is set, under mu, by the exit rule of a battlefield
 	// under siege. The revalidation that ran it applies the pvp flag once
@@ -76,6 +81,14 @@ type liveZoneActor struct {
 	scriptZones []int32
 	// scripts are the scripts zone entries reach; nil reaches none.
 	scripts zoneScripts
+	// spawnMu guards spawning and spawnRules. While spawning, the zone
+	// rules the spawn's revalidation runs (a move out, its notices) are
+	// held in spawnRules instead of posted, and that revalidation runs them
+	// inline once it has released its locks, so their frames land at the
+	// spawn's place in the enter-world burst.
+	spawnMu    sync.Mutex
+	spawning   bool
+	spawnRules []func()
 }
 
 // zoneScripts is what a player's zone entries ask of the script registry.
@@ -116,12 +129,16 @@ const (
 	// revalidateStep is a movement step: it revalidates on every
 	// zoneStepsPerRevalidation-th step.
 	revalidateStep zoneRevalidation = iota
-	// revalidateForce is a move's end: it revalidates at once.
+	// revalidateForce is a position update that revalidates at once.
 	revalidateForce
 	// revalidatePlaced is a position set outside movement (a forced
 	// flight's landing): it revalidates only when it changes region, and
 	// does not count as a step.
 	revalidatePlaced
+	// revalidateStop is a move's stop where the player stands: it
+	// revalidates at once against the zones of the region holding the
+	// player, without moving it to the region of its position.
+	revalidateStop
 )
 
 func (a *liveZoneActor) ObjectID() int32             { return a.live.ObjectID() }
@@ -132,6 +149,40 @@ func (a *liveZoneActor) GM() bool                    { return a.live.accessLevel
 func (a *liveZoneActor) Online() bool                { return !a.live.detached() }
 func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
 func (a *liveZoneActor) ClanID() int32               { return a.live.Character.ClanID() }
+func (a *liveZoneActor) SiegeState() int32           { return a.live.Character.SiegeState() }
+
+// revalidateSpawn enters the player into the zones it spawns in, on its
+// own queue, then runs the zone rules that entry asked of it (zoneRule)
+// with no zone lock held.
+func (a *liveZoneActor) revalidateSpawn(ix *zone.Index) {
+	a.spawnMu.Lock()
+	a.spawning = true
+	a.spawnMu.Unlock()
+	a.revalidate(ix)
+	a.spawnMu.Lock()
+	rules := a.spawnRules
+	a.spawning, a.spawnRules = false, nil
+	a.spawnMu.Unlock()
+	for _, fn := range rules {
+		fn()
+	}
+}
+
+// zoneRule runs fn, a zone rule's action on live, on live's queue with no
+// zone lock held: at the end of live's spawn revalidation while it runs,
+// else posted to the queue. It reports false when live's queue is closed.
+func zoneRule(live *livePlayer, fn func()) bool {
+	if a := live.zoneActor; a != nil {
+		a.spawnMu.Lock()
+		if a.spawning {
+			a.spawnRules = append(a.spawnRules, fn)
+			a.spawnMu.Unlock()
+			return true
+		}
+		a.spawnMu.Unlock()
+	}
+	return postLive(live, fn)
+}
 
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	defer a.fireScriptZones()
@@ -143,6 +194,7 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 		return
 	}
 	a.steps = 0
+	a.held = a.Position()
 	if ix != nil {
 		ix.Revalidate(a)
 	}
@@ -155,10 +207,10 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 }
 
 // revalidateMove revalidates the player's zones after its position changed
-// from previous for reason. A region change revalidates the zones of both
-// regions at once and restarts the step count; a step then counts toward
-// the next revalidation.
-func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location, reason zoneRevalidation) {
+// for reason. A position update that leaves the region holding the player
+// revalidates the zones of both regions at once and restarts the step
+// count; a step then counts toward the next revalidation.
+func (a *liveZoneActor) revalidateMove(ix *zone.Index, reason zoneRevalidation) {
 	defer a.fireScriptZones()
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
@@ -170,19 +222,30 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 	// A teleport in progress keeps the count but revalidates no zone: the
 	// move it stops must not enter the zones of a position it is leaving.
 	teleporting := a.live.Teleporting()
-	pos := a.Position()
-	if reason == revalidateForce || world.RegionKey(previous.X, previous.Y) != world.RegionKey(pos.X, pos.Y) {
-		a.steps = 0
-		if ix != nil && !teleporting {
-			ix.RevalidateMove(a, previous)
+	regionChanged := false
+	if reason != revalidateStop {
+		pos := a.Position()
+		if world.RegionKey(a.held.X, a.held.Y) != world.RegionKey(pos.X, pos.Y) {
+			regionChanged = true
+			a.steps = 0
+			if ix != nil && !teleporting {
+				ix.RevalidateMove(a, a.held)
+			}
 		}
+		a.held = pos
 	}
-	if reason == revalidateStep {
+	switch reason {
+	case revalidateForce, revalidateStop:
+		a.steps = 0
+		if !regionChanged && ix != nil && !teleporting {
+			ix.RevalidateIn(a, a.held)
+		}
+	case revalidateStep:
 		a.steps++
 		if a.steps >= zoneStepsPerRevalidation {
 			a.steps = 0
 			if ix != nil && !teleporting {
-				ix.Revalidate(a)
+				ix.RevalidateIn(a, a.held)
 			}
 		}
 	}
@@ -194,12 +257,12 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 	a.sendCompass(code, changed, flagPvP)
 }
 
-func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
+func (a *liveZoneActor) removeFrom(ix *zone.Index) {
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	ix.RemoveFrom(a, x, y)
+	ix.RemoveFrom(a, a.held.X, a.held.Y)
 	a.syncFlags()
 	// A player logging out is no longer tracked for the pvp flag, so
 	// leaving a battlefield on the way out does not flag it.
@@ -207,15 +270,14 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 }
 
 // leave takes the player off the grid for a teleport: it exits every zone
-// of the region containing (x, y), its position before the jump, and
-// enters none until rejoin.
-func (a *liveZoneActor) leave(ix *zone.Index, x, y int) {
+// of the region holding it, and enters none until rejoin.
+func (a *liveZoneActor) leave(ix *zone.Index) {
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	a.offGrid = true
 	if ix != nil {
-		ix.RemoveFrom(a, x, y)
+		ix.RemoveFrom(a, a.held.X, a.held.Y)
 	}
 	a.syncFlags()
 	leftBattlefield := a.takeLeftBattlefield()
@@ -232,6 +294,7 @@ func (a *liveZoneActor) rejoin(ix *zone.Index) {
 	a.mu.Lock()
 	a.offGrid = false
 	a.steps = 0
+	a.held = a.Position()
 	if ix != nil {
 		ix.Revalidate(a)
 	}
@@ -251,10 +314,9 @@ func (a *liveZoneActor) takeLeftBattlefield() bool {
 	return left
 }
 
-// flagLeftBattlefield puts a player that left a battlefield under siege on
-// the normal pvp flag timer, flagging it when it is not
-// (SiegeZone.onExit). It runs with deliveryMu held and mu released,
-// before the compass update of the same revalidation.
+// flagLeftBattlefield puts a player that left a battlefield under siege on the
+// normal pvp flag timer, flagging it when it is not. It runs with deliveryMu
+// held and mu released, before the compass update of the same revalidation.
 func (a *liveZoneActor) flagLeftBattlefield(left bool) {
 	if left {
 		a.live.Emit(event.PvPFlagged{})
@@ -268,6 +330,8 @@ func (a *liveZoneActor) syncFlags() {
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
 	a.live.SetInBossZone(a.flags.Has(zone.FlagBoss))
 	a.live.SetInClanHallZone(a.flags.Has(zone.FlagClanHall))
+	a.live.SetInMotherTreeZone(a.flags.Has(zone.FlagMotherTree))
+	a.live.SetInCastleZone(a.flags.Has(zone.FlagCastle))
 	a.live.SetInWater(a.flags.Has(zone.FlagWater))
 	a.live.SetInDangerArea(a.flags.Has(zone.FlagDanger))
 	if !a.flags.Has(zone.FlagSwamp) {
@@ -507,13 +571,13 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		return
 	}
 	l.broadcastCharacterInfo(live)
-	if l.water == nil || !l.playerConfig.AllowWater || live.Teleporting() {
+	if l.water == nil || !l.playerConfig().AllowWater || live.Teleporting() {
 		// A teleport stops the breath countdown itself, once the old
 		// neighborhood has been forgotten.
 		return
 	}
 	if swimming {
-		breath := time.Duration(live.CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
+		breath := time.Duration(live.Against(live.ConditionActor(), nil).CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
 		l.water.Add(live, breath)
 		return
 	}
@@ -566,29 +630,28 @@ func (l *GameClientLink) ejectBossPlayer(boss *zone.Boss, actor zone.Actor) {
 		}
 		radius = restartTeleportOffset
 	}
-	// Zone entry may hold both the zone and teleport locks. Post to the
-	// player's queue so the teleport starts after the callback returns.
-	postLive(live, func() {
+	// Zone entry may hold both the zone and teleport locks, so the
+	// teleport starts on the player's queue after the callback returns.
+	zoneRule(live, func() {
 		if !live.detached() {
-			live.Emit(event.TeleportRequested{X: dest.X, Y: dest.Y, Z: dest.Z, Radius: radius})
+			l.teleportLivePlayer(live, dest, radius)
 		}
 	})
 }
 
-func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location, reason zoneRevalidation) {
+func (l *GameClientLink) revalidateZones(live *livePlayer, reason zoneRevalidation) {
 	if live != nil && live.zoneActor != nil {
-		live.zoneActor.revalidateMove(l.zones, previous, reason)
+		live.zoneActor.revalidateMove(l.zones, reason)
 	}
 }
 
-// leaveZones exits live from every zone around its current position as a
+// leaveZones exits live from every zone of the region holding it as a
 // teleport takes it off the grid; until rejoinZones, movement enters none.
 func (l *GameClientLink) leaveZones(live *livePlayer) {
 	if live.zoneActor == nil {
 		return
 	}
-	position := live.CurrentLocation()
-	live.zoneActor.leave(l.zones, position.X, position.Y)
+	live.zoneActor.leave(l.zones)
 }
 
 // rejoinZones enters live into the zones at its teleport destination once

@@ -1,0 +1,191 @@
+# The Other Side of Truth (Q115), first part: a level 53 character takes the quest from Rafforty,
+# brings Misa's letter back (cond 1 to 3), hears Rafforty out (cond 4 and 5), carries his letter to
+# Misa (cond 6 and 7), then relogs. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q115_the_other_side_of_truth.golden
+character Seeker 53
+script quest.Q115_TheOtherSideOfTruth
+item 57 8079 8080 8081 8082
+page default/32018.htm
+page default/32020.htm
+page default/32021.htm
+page default/32022.htm
+page default/32077.htm
+page default/32078.htm
+page default/32079.htm
+page script/quest/Q115_TheOtherSideOfTruth/
+npc rafforty 32020 Folk 10 0 0
+npc misa 32018 Folk 0 10 0
+npc kierre 32022 Folk -10 0 0
+npc s1 32021 Folk 0 -10 0
+npc s2 32077 Folk 20 0 0
+npc s3 32078 Folk 0 20 0
+npc s4 32079 Folk -20 0 0
+
+# Rafforty gives the quest.
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-03.htm
+  S QuestList 115:0x80000001
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-03.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <state> | STARTED
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 1
+  rows Q115_TheOtherSideOfTruth <cond>=1 <state>=STARTED
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Misa gives her letter.
+action misa
+action misa
+  S ActionFailed
+  S NpcHtmlMessage obj=misa item=0 page=default/32018.htm
+  S ActionFailed
+bypass npc_{misa}_Quest
+  S QuestList 115:0x80000003
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8079
+  S NpcHtmlMessage obj=misa item=0 page=script/quest/Q115_TheOtherSideOfTruth/32018-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 2
+  rows Q115_TheOtherSideOfTruth <cond>=2 <state>=STARTED
+action misa
+  S ActionFailed
+  S NpcHtmlMessage obj=misa item=0 page=default/32018.htm
+  S ActionFailed
+bypass npc_{misa}_Quest
+  S NpcHtmlMessage obj=misa item=0 page=script/quest/Q115_TheOtherSideOfTruth/32018-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rafforty reads it and tells his story.
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-07.htm
+  S QuestList 115:0x80000007
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8079
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-07.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 3
+  items 8079=0
+  rows Q115_TheOtherSideOfTruth <cond>=3 <state>=STARTED
+bypass Quest Q115_TheOtherSideOfTruth 32020-10.htm
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-10.htm
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-12.htm
+  S QuestList 115:0x8000000f
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-12.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 4
+  rows Q115_TheOtherSideOfTruth <cond>=4 <state>=STARTED
+bypass Quest Q115_TheOtherSideOfTruth 32020-14.htm
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-14.htm
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-15.htm
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-15.htm
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32020-17.htm
+  S QuestList 115:0x8000001f
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-17.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 5
+  rows Q115_TheOtherSideOfTruth <cond>=5 <state>=STARTED
+
+# Misa has nothing for a character on cond 5.
+action misa
+action misa
+  S ActionFailed
+  S NpcHtmlMessage obj=misa item=0 page=default/32018.htm
+  S ActionFailed
+bypass npc_{misa}_Quest
+  S NpcHtmlMessage obj=misa item=0 page=script/quest/Q115_TheOtherSideOfTruth/32018-01.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rafforty gives his letter, and while it is held has nothing more.
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S QuestList 115:0x8000003f
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8080
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-18.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 6
+  rows Q115_TheOtherSideOfTruth <cond>=6 <state>=STARTED
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-19.htm
+  S ActionFailed
+  S ActionFailed
+
+# Misa takes it.
+action misa
+action misa
+  S ActionFailed
+  S NpcHtmlMessage obj=misa item=0 page=default/32018.htm
+  S ActionFailed
+bypass npc_{misa}_Quest
+  S NpcHtmlMessage obj=misa item=0 page=script/quest/Q115_TheOtherSideOfTruth/32018-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q115_TheOtherSideOfTruth 32018-05.htm
+  S QuestList 115:0x8000007f
+  S ExShowQuestMark quest=115
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8080
+  S NpcHtmlMessage obj=misa item=0 page=script/quest/Q115_TheOtherSideOfTruth/32018-05.htm
+  S ActionFailed
+  Q upsert Q115_TheOtherSideOfTruth | <cond> | 7
+  items 8080=0
+  rows Q115_TheOtherSideOfTruth <cond>=7 <state>=STARTED
+
+# Relog.
+relog
+  rows Q115_TheOtherSideOfTruth <cond>=7 <state>=STARTED
+action rafforty
+action rafforty
+  S ActionFailed
+  S NpcHtmlMessage obj=rafforty item=0 page=default/32020.htm
+  S ActionFailed
+bypass npc_{rafforty}_Quest
+  S NpcHtmlMessage obj=rafforty item=0 page=script/quest/Q115_TheOtherSideOfTruth/32020-19.htm
+  S ActionFailed
+  S ActionFailed

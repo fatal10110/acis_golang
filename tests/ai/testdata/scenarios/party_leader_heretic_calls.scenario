@@ -1,0 +1,21 @@
+# PartyLeaderWizardHereticAggressive (22163, level 78; its shipped skills), every draw 0: a hit by the character while it
+# neither attacks nor casts broadcasts the call for help (script event 10033, naming the character and the leader) to the
+# NPCs within its HelpCastRange (500), here a heretic private (22166) whose script hears it; the reference run records
+# what the NPCs hear.
+trace internal/gameserver/script/testdata/oracle/scenarios/party_leader_heretic_calls.golden
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WizardBase.WizardBase
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2CurseAggressive
+script script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardHereticAggressive
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2
+script script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2
+npc heretic 22163 Monster 1500 0 0 level 78 skill SELF_MAGIC_HEAL 4065 9 skill DEBUFF 4088 9 skill W_LONG_RANGE_DD_MAGIC 4158 9 skill W_SHORT_RANGE_DD_MAGIC 4622 9 skill SPECIAL_ATTACK 4641 10
+npc listener 22166 Monster 1500 100 0 skill W_SHORT_RANGE_DD_MAGIC 4622 9 skill W_LONG_RANGE_DD_MAGIC 4665 9
+
+hit heretic 10

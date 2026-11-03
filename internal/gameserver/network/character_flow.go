@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -40,11 +41,11 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 	// closed ahead of the new player-auth request to the login server.
 	if l.clients != nil {
 		if evicted, replaced := l.clients.Take(req.LoginName, client); replaced {
-			l.validator.Resolve(req.LoginName, false)
+			l.flow.validator.Resolve(req.LoginName, false)
 			evicted.Session.Close()
 		}
 	}
-	ok, err := l.validator.Validate(ctx, client, req, loginLink)
+	ok, err := l.flow.validator.Validate(ctx, client, req, loginLink)
 	if l.clients != nil && (!ok || err != nil) {
 		l.clients.Release(req.LoginName, client)
 	}
@@ -63,7 +64,7 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	slots := make([]serverpackets.CharacterSlot, len(chars))
 	now := time.Now() // character select runs on the connection goroutine, off any actor queue
 	for i, c := range chars {
-		items, err := l.items.ListByOwner(ctx, c.ID)
+		items, err := l.belongings.items.ListByOwner(ctx, c.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -120,14 +121,14 @@ func (l *GameClientLink) restoreItemRows(ownerID int32, items []*item.Instance) 
 // the rows at the locations restored reports.
 func (l *GameClientLink) restoreRows(ownerID int32, items []*item.Instance, restored func(item.Location) bool) []*item.Instance {
 	var claimed map[int32]*item.Instance
-	if l.itemInstances != nil {
+	if l.belongings.itemInstances != nil {
 		ids := make([]int32, 0, len(items))
 		for _, inst := range items {
 			if inst != nil && restored(inst.Location) {
 				ids = append(ids, inst.ObjectID)
 			}
 		}
-		claimed = l.itemInstances.ClaimRestoredItems(ownerID, ids)
+		claimed = l.belongings.itemInstances.ClaimRestoredItems(ownerID, ids)
 	}
 
 	kept := items[:0]
@@ -138,7 +139,7 @@ func (l *GameClientLink) restoreRows(ownerID int32, items []*item.Instance, rest
 		}
 		if restored, ok := claimed[inst.ObjectID]; ok {
 			inst = restored
-		} else if l.itemInstances != nil && l.itemInstances.ContainsID(inst.ObjectID) {
+		} else if l.belongings.itemInstances != nil && l.belongings.itemInstances.ContainsID(inst.ObjectID) {
 			stale++
 			continue
 		}
@@ -186,10 +187,10 @@ func restoredItemLocation(loc item.Location) bool {
 
 // findHenna resolves a saved henna row's symbol.
 func (l *GameClientLink) findHenna(symbolID int) (henna.Henna, bool) {
-	if l.hennaTable == nil {
+	if l.belongings.hennaTable == nil {
 		return henna.Henna{}, false
 	}
-	return l.hennaTable.Find(symbolID)
+	return l.belongings.hennaTable.Find(symbolID)
 }
 
 // restoreSelected restores the character c a selection picked: its items,
@@ -204,7 +205,7 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 		l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 		return nil, false
 	}
-	items, err := l.items.ListByOwner(ctx, c.ID)
+	items, err := l.belongings.items.ListByOwner(ctx, c.ID)
 	if err != nil {
 		l.log.Error().Err(err).Msg("select character: list items")
 		return nil, false
@@ -237,8 +238,8 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 		c.MarkDead()
 	}
 	shortcuts := shortcut.Starter()
-	if l.shortcuts != nil {
-		restored, listErr := l.shortcuts.ListByOwner(ctx, c.ID, c.ClassIndex())
+	if l.belongings.shortcuts != nil {
+		restored, listErr := l.belongings.shortcuts.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
 			l.log.Error().Err(listErr).Msg("select character: list shortcuts")
 			shortcuts = nil
@@ -246,8 +247,8 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 			shortcuts = restored
 		}
 	}
-	if l.hennas != nil {
-		rows, listErr := l.hennas.ListByOwner(ctx, c.ID, c.ClassIndex())
+	if l.belongings.hennas != nil {
+		rows, listErr := l.belongings.hennas.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
 			l.log.Error().Err(listErr).Msg("select character: list hennas")
 		} else {
@@ -315,26 +316,19 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		return false
 	}
 	l.activateSpawnProtection(live)
-	if l.skills != nil {
-		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
-			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore equipped item stats")
-			return false
-		}
-	}
-	// Computed after RestoreEquippedItemStats so an item's equip-delay reuse
-	// timer, armed by that restore, is included in the login SkillCoolTime
-	// snapshot rather than missed.
+	// An item's equip-delay reuse timer, armed when the selection restored
+	// the worn equipment, is included in the login SkillCoolTime snapshot.
 	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
-	if l.playerClock != nil {
-		l.playerClock.Add(live)
+	if l.flow.playerClock != nil {
+		l.flow.playerClock.Add(live)
 	}
-	// Reproduce GameClient's _autoSaveInDB: first full-stat save 5 minutes
-	// after entering the world, then every 15 minutes while still online.
-	if l.autosave != nil {
-		l.autosave.Add(live)
+	// Periodic autosave: first full-stat save 5 minutes after entering the
+	// world, then every 15 minutes while still online.
+	if l.flow.autosave != nil {
+		l.flow.autosave.Add(live)
 	}
 
 	l.applyGMLoginModes(live)
@@ -348,18 +342,17 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// icon refresh's place in the enter-world sequence: the replay's one
 	// icon refresh (List.Restore) fires the AbnormalStatusUpdate frame (if
 	// any effect was restored) right where it belongs, ahead of
-	// EtcStatusUpdate.
-	live.replayingEffects.Store(true)
-	if l.skills != nil {
-		l.skills.ReplayEffects(c)
+	// EtcStatusUpdate. Decide the restored load's penalty band only once
+	// the replayed effects and the equipped items have set the weight
+	// limit, and inside the silent replay window: the EtcStatusUpdate below
+	// and every later login frame carry the band, and sendLoginWeight
+	// reports the change between UserInfo and ItemList.
+	if l.replaySavedEffects(live, c.RefreshWeightPenalty) {
+		// A tick due on the loading screen killed the player, silently: its
+		// icon refresh went with the death's frames, and the burst shows
+		// what the death left. The Die frame follows ShortCutInit.
+		l.updateEffectIcons(live)
 	}
-	// Decide the restored load's penalty band only now that the replayed
-	// effects and the equipped items have set the weight limit, and inside
-	// the silent replay window: the EtcStatusUpdate below and every later
-	// login frame carry the band, and sendLoginWeight reports the change
-	// between UserInfo and ItemList.
-	c.RefreshWeightPenalty()
-	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	l.enterWorldClan(client, live)
 	// The Seal of Strife skill follows the clan block, ahead of the spawn.
@@ -373,8 +366,11 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		// Registered since its selection; from here on it is in the world
 		// for the view refreshes its burst carried until now.
 		live.entered.Store(true)
+		// Vitals restored short regenerate one period from the entry.
+		c.SettleEnteredRegen()
 		if live.zoneActor != nil {
-			live.zoneActor.revalidate(l.zones)
+			// A zone that refuses live moves it out here, mid-burst.
+			live.zoneActor.revalidateSpawn(l.zones)
 		}
 	}
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
@@ -382,18 +378,24 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(sevenSignsPeriodMessage(l.sevenSigns.CurrentPeriod())))
 	}
 	l.sendLoginAnnouncements(live)
-	if l.playerClock != nil && c.Race == player.RaceDarkElf {
-		l.playerClock.NotifyShadowSenseState(live)
+	if l.flow.playerClock != nil && c.Race == player.RaceDarkElf {
+		l.flow.playerClock.NotifyShadowSenseState(live)
 	}
 	client.Session.SendFrame(questListFrame(c))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(c.ID)))
+	// From the UserInfo on, the client knows the maxima, and a change
+	// to one is reported.
+	c.AdoptMaxima()
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	l.sendLoginWeight(live)
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.Inventory(), live.shortcuts.All())))
 	if c.Dead() {
-		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), dieOptions(live)))
+		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), l.dieOptions(live)))
+		// A death on the loading screen offered its resurrection and told the
+		// tutorial; the client hears both after the death they follow.
+		live.releaseHeldForEnterWorld()
 	}
 	l.sendLoginBoardPages(client, live)
 	// The chat of a petition still active is replayed after the login
@@ -417,13 +419,17 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if c.ClanJoinExpiryTime() > time.Now().UnixMilli() {
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanMembershipTerminated))
 	}
-	// ponytail: an attacker or spectator (siege state below 2) logging in
-	// on a battlefield under siege is sent to town here; it needs the login
-	// siege state, so both land together (#3150).
+	// An attacker or a spectator (siege state below the defender's) logging
+	// in on a battlefield under siege is sent to town.
+	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagSiege) && c.SiegeState() < player.SiegeStateDefender {
+		if dest, ok := l.restartDestination(live); ok {
+			l.teleportLivePlayer(live, dest, restartTeleportOffset)
+		}
+	}
 
 	// The tutorial quest hears of the entry last, ahead of the closing
-	// ActionFailed.
-	live.NotifyTutorial(player.TutorialEnterWorld)
+	// ActionFailed, as a hook on live's queue, which runs the entry.
+	live.NotifyTutorialOnQueue(player.TutorialEnterWorld)
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }
@@ -515,7 +521,7 @@ func sendKarmaChangeFrames(live *livePlayer, karma int) {
 // available skill automatically.
 func (l *GameClientLink) giveOrRewardSkills(c *player.Character, tmpl *player.Template) error {
 	refresh := l.skills.GiveSkills
-	if l.playerConfig.AutoLearnSkills {
+	if l.playerConfig().AutoLearnSkills {
 		refresh = l.skills.RewardSkills
 	}
 	return refresh(c, tmpl)
@@ -544,7 +550,7 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 	// an actual level increase refreshes shortcuts — ahead of the skill
 	// list, as the grant does — and a pull-back's level decrease must not.
 	var refresh func(old, level int) bool
-	if l.playerConfig.AutoLearnSkills {
+	if l.playerConfig().AutoLearnSkills {
 		refresh = raisedSkill
 	}
 	l.sendSkillChanges(live, before, refresh)
@@ -558,7 +564,7 @@ func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserIn
 		Template:           live.Template(),
 		Items:              live.inventoryItems(),
 		IsGM:               live.accessLevel().IsGM,
-		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
+		SpawnProtectedTeam: l.spawnProtectedTeam(live),
 		Clan:               l.clanFields(live.Character),
 		HeroAura:           l.heroAura(live),
 	}
@@ -618,9 +624,9 @@ func skillListEntriesGreyed(c *player.Character, skills *skillstate.Persistence,
 	}
 	sort.Ints(ids)
 
-	// Worn formal wear greys out every skill. The reference also greys a
-	// clan skill while the clan's reputation is negative, but no member
-	// holds its clan's skills at 0 reputation or below, so that never shows.
+	// Worn formal wear greys out every skill. A clan skill would also grey
+	// out while the clan's reputation is negative, but no member holds its
+	// clan's skills at 0 reputation or below, so that never shows.
 	disabled := formalWear
 	entries := make([]serverpackets.SkillListEntry, 0, len(ids))
 	for _, id := range ids {
@@ -660,8 +666,11 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 }
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
-	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
-	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery, l.itemPersister(c.ID)))
+	delivery := &playerInventoryDelivery{updates: l.belongings.inventoryUpdates, character: c}
+	inv := itemcontainer.NewPlayerInventoryWithDelivery(c.ID, l.itemTemplates, delivery, l.itemPersister(c.ID))
+	inv.SetItemLog(l.itemLog, func() string { return c.CharacterName() })
+	inv.Restore(items)
+	c.AttachRuntime(tmpl, inv)
 	// The body stays the base class's while a subclass is played.
 	if base, ok := l.templates.Get(c.BaseClassID()); ok {
 		c.SetBaseTemplate(base)
@@ -688,29 +697,33 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		// Tutorial hands the tutorial events to the player's tutorial
 		// quest.
 		Tutorial: l.scripts,
-		Skills:   l.skills,
-		Levels:   l.levels,
-		Log:      l.log,
-		Rules: player.Rules{
-			RateKarmaExpLost:       l.playerConfig.RateKarmaExpLost,
-			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,
-			WeightLimitMultiplier:  l.playerConfig.WeightLimitMultiplier,
-			InventorySlots:         l.playerConfig.InventorySlots,
-			StorageSlots:           l.playerConfig.StorageSlots,
-			PerfectShieldBlockRate: l.playerConfig.PerfectShieldBlockRate,
-			MaxBuffsAmount:         l.playerConfig.MaxBuffsAmount,
-			DeathPenaltyChance:     l.playerConfig.DeathPenaltyChance,
-			AllowDelevel:           l.playerConfig.AllowDelevel,
-			RaidCursesDisabled:     l.disableRaidCurse,
-			AwardPKKillPVPPoint:    l.playerConfig.AwardPKKillPVPPoint,
-			DeathDrop:              l.playerConfig.DeathDrop,
-		},
+		// Deaths hands the deaths of the player and its summon to the
+		// player's quests.
+		Deaths: l.scripts,
+		Skills: l.skills,
+		Levels: l.levels,
+		Log:    l.log,
+		Rules:  l.playerRules,
+		// ItemDrops answers the multiple item drop rule party loot, the
+		// kill rewards and the scripts read too.
+		ItemDrops: l.killRewards,
+	}
+	if l.scripts != nil {
+		// A script invocation that wrote the player holds its departure
+		// until it ends.
+		rt.ScriptRuns = l.scripts.ScriptRuns()
 	}
 	if los, ok := l.geo.(player.LineOfSight); ok {
 		rt.LOS = los
 	}
 	if l.zones != nil {
 		rt.Zones = l.zones
+	}
+	if l.sieges != nil {
+		rt.Sieges = l.sieges
+	}
+	if l.sevenSigns != nil {
+		rt.Seals = l.sevenSigns
 	}
 	if l.npcs != nil {
 		rt.Mounts = l.npcs
@@ -726,6 +739,14 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		inv.UpdateWeight()
 	}
 	c.RefreshExpertisePenalty()
+	// The worn equipment's stat functions, item skills and set bonuses apply
+	// with the restore, still silent before anything reports c, so the
+	// selection already carries the stats they move.
+	if l.skills != nil {
+		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
+			return nil, fmt.Errorf("attach live player: restore equipped item stats: %w", err)
+		}
+	}
 
 	x, y, z := c.Position()
 	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.MoveSpeed(), l.geo, c, effect.WithEnv(l.effects))
@@ -742,16 +763,23 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	live.access.Store(&access)
 	live.remoteIP = client.Session.remoteIP()
 	delivery.live = live
+	// The restored HP raises its low-HP tutorial event once the restored
+	// equipment and effects make its maximum (noteRestoredHP).
+	live.restoredHP.Store(math.Float64bits(c.ResourceValues().CurrentHP))
+	live.restoredHPPending.Store(true)
 	c.Attach(creatureLive, live)
 	c.SetWorldHandle(live)
-	moveCtl, err := move.NewController(c.Move(), c, live)
+	// The controllers act as live, the object the world registers: the
+	// creatures a swing or a follow reaches see the same player the world,
+	// the AI and every known list hold.
+	moveCtl, err := move.NewController(c.Move(), live, live)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	moveCtl.SetPositionUpdates(l.positions)
-	attackCtl := attack.NewPlayer(c, live)
+	attackCtl := attack.NewPlayer(live, live)
 	attackCtl.SetQueue(creatureLive.Queue())
-	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
+	combat := ai.NewPlayerAttack(live, moveCtl, attackCtl)
 
 	c.SetCanGiveDamage(access.GiveDamage)
 	c.SetSeesInvisible(access.IsGM)
@@ -767,6 +795,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	l.castController(live)
 	// The intention source reads cast, combat and move, all built above.
 	c.SetIntentionSource(live)
+	if l.festival != nil {
+		c.SetFestivalRoster(l.festival)
+	}
 	return live, nil
 }
 

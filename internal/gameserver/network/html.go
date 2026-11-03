@@ -2,9 +2,9 @@ package network
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -47,7 +47,7 @@ func (l *GameClientLink) sendPlayerHelp(live *livePlayer, requestedPath string) 
 	file := "data/html/help/" + parts[0]
 	itemID := int32(0)
 	if len(parts) > 1 {
-		id, err := commons.ParseInt(parts[1], 32)
+		id, err := strconv.ParseInt(parts[1], 10, 32)
 		if err != nil {
 			return
 		}

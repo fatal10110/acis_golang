@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
@@ -25,53 +23,62 @@ const (
 
 // FramePrivateStoreManageListSell builds the sell store's manage window:
 // the owner's adena, the items it may still list (each at its reference
-// price) and the rows already listed.
+// price) and the rows already listed. A row whose template templates no
+// longer holds (one a reload removed) is left out.
 func FramePrivateStoreManageListSell(ownerID int32, packaged bool, adena int, candidates []privatestore.SellCandidate, listed []privatestore.SellItem, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePrivateStoreManageListSell)
 	w.WriteInt32(ownerID)
 	w.WriteInt32(boolInt32(packaged))
 	w.WriteInt32(int32(adena))
-	w.WriteInt32(int32(len(candidates)))
-	for _, c := range candidates {
+	writeInt32Rows(w, candidates, func(c privatestore.SellCandidate) bool {
 		tmpl, ok := templates.Get(c.Item.TemplateID)
-		if !ok {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: PrivateStoreManageListSell: no template loaded for item template %d", c.Item.TemplateID)
+		if ok {
+			writeStoreSellRow(w, tmpl, c.Item.ObjectID, c.Count, c.Item.EnchantLevel, tmpl.ReferencePrice)
 		}
-		writeStoreSellRow(w, tmpl, c.Item.ObjectID, c.Count, c.Item.EnchantLevel, tmpl.ReferencePrice)
-	}
-	w.WriteInt32(int32(len(listed)))
-	for _, row := range listed {
-		tmpl, ok := templates.Get(row.TemplateID)
-		if !ok {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: PrivateStoreManageListSell: no template loaded for item template %d", row.TemplateID)
-		}
-		writeStoreSellRow(w, tmpl, row.ObjectID, row.Count, row.Enchant, int32(row.Price))
-		w.WriteInt32(tmpl.ReferencePrice)
-	}
+		return ok
+	})
+	writeListedSellRows(w, listed, templates)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
 // FramePrivateStoreListSell builds a sell store's window as buyer sees it:
 // the store's owner, whether it sells as one package, the buyer's adena and
-// every listed row with its price and reference price.
+// every listed row with its price and reference price. A row whose template
+// templates no longer holds (one a reload removed) is left out.
 func FramePrivateStoreListSell(ownerID int32, packaged bool, buyerAdena int, listed []privatestore.SellItem, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePrivateStoreListSell)
 	w.WriteInt32(ownerID)
 	w.WriteInt32(boolInt32(packaged))
 	w.WriteInt32(int32(buyerAdena))
-	w.WriteInt32(int32(len(listed)))
-	for _, row := range listed {
-		tmpl, ok := templates.Get(row.TemplateID)
-		if !ok {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: PrivateStoreListSell: no template loaded for item template %d", row.TemplateID)
-		}
-		writeStoreSellRow(w, tmpl, row.ObjectID, row.Count, row.Enchant, int32(row.Price))
-		w.WriteInt32(tmpl.ReferencePrice)
-	}
+	writeListedSellRows(w, listed, templates)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
+}
+
+// writeListedSellRows writes the count and rows of a sell store's listed
+// items, each with its price and reference price.
+func writeListedSellRows(w *wire.Writer, listed []privatestore.SellItem, templates *item.Table) {
+	writeInt32Rows(w, listed, func(row privatestore.SellItem) bool {
+		tmpl, ok := templates.Get(row.TemplateID)
+		if ok {
+			writeStoreSellRow(w, tmpl, row.ObjectID, row.Count, row.Enchant, int32(row.Price))
+			w.WriteInt32(tmpl.ReferencePrice)
+		}
+		return ok
+	})
+}
+
+// writeInt32Rows writes a 32-bit row count and then each row write accepts,
+// the count backfilled with the rows it reported written.
+func writeInt32Rows[T any](w *wire.Writer, rows []T, write func(T) bool) {
+	countOffset := w.Len()
+	w.WriteInt32(0)
+	var written int32
+	for _, row := range rows {
+		if write(row) {
+			written++
+		}
+	}
+	w.PatchInt32(countOffset, written)
 }
 
 // writeStoreSellRow writes the item fields every sell-store row shares:
@@ -91,54 +98,50 @@ func writeStoreSellRow(w *wire.Writer, tmpl *item.Template, objectID int32, coun
 
 // FramePrivateStoreManageListBuy builds the buy store's manage window: the
 // owner's adena, the items it may want (one per item that does not stack)
-// and the rows already wanted.
+// and the rows already wanted. A row whose template templates no longer
+// holds (one a reload removed) is left out.
 func FramePrivateStoreManageListBuy(ownerID int32, adena int, candidates []item.InstanceState, listed []privatestore.BuyItem, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePrivateStoreManageListBuy)
 	w.WriteInt32(ownerID)
 	w.WriteInt32(int32(adena))
-	w.WriteInt32(int32(len(candidates)))
-	for _, st := range candidates {
+	writeInt32Rows(w, candidates, func(st item.InstanceState) bool {
 		tmpl, ok := templates.Get(st.TemplateID)
-		if !ok {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: PrivateStoreManageListBuy: no template loaded for item template %d", st.TemplateID)
+		if ok {
+			writeStoreBuyRow(w, tmpl, st.EnchantLevel, st.Count)
 		}
-		writeStoreBuyRow(w, tmpl, st.EnchantLevel, st.Count)
-	}
-	w.WriteInt32(int32(len(listed)))
-	for _, row := range listed {
+		return ok
+	})
+	writeInt32Rows(w, listed, func(row privatestore.BuyItem) bool {
 		tmpl, ok := templates.Get(row.TemplateID)
-		if !ok {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: PrivateStoreManageListBuy: no template loaded for item template %d", row.TemplateID)
+		if ok {
+			writeStoreBuyRow(w, tmpl, row.Enchant, row.Quantity)
+			w.WriteInt32(int32(row.Price))
+			w.WriteInt32(tmpl.ReferencePrice)
 		}
-		writeStoreBuyRow(w, tmpl, row.Enchant, row.Quantity)
-		w.WriteInt32(int32(row.Price))
-		w.WriteInt32(tmpl.ReferencePrice)
-	}
+		return ok
+	})
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
 // FramePrivateStoreListBuy builds a buy store's window as seller sees it:
 // the store's owner, the seller's adena and every wanted row, showing the
 // seller's own instance that can fill it, how many units of it the row
-// takes, the price and the units still wanted.
+// takes, the price and the units still wanted. A row whose template
+// templates no longer holds (one a reload removed) is left out.
 func FramePrivateStoreListBuy(ownerID int32, sellerAdena int, offers []privatestore.BuyOffer, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePrivateStoreListBuy)
 	w.WriteInt32(ownerID)
 	w.WriteInt32(int32(sellerAdena))
-	w.WriteInt32(int32(len(offers)))
-	for _, offer := range offers {
+	writeInt32Rows(w, offers, func(offer privatestore.BuyOffer) bool {
 		tmpl, ok := templates.Get(offer.TemplateID)
-		if !ok {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: PrivateStoreListBuy: no template loaded for item template %d", offer.TemplateID)
+		if ok {
+			w.WriteInt32(offer.ObjectID)
+			writeStoreBuyRow(w, tmpl, offer.Enchant, offer.Count)
+			w.WriteInt32(int32(offer.Price))
+			w.WriteInt32(int32(offer.Quantity))
 		}
-		w.WriteInt32(offer.ObjectID)
-		writeStoreBuyRow(w, tmpl, offer.Enchant, offer.Count)
-		w.WriteInt32(int32(offer.Price))
-		w.WriteInt32(int32(offer.Quantity))
-	}
+		return ok
+	})
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 

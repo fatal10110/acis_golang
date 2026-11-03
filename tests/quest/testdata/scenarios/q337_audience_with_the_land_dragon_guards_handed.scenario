@@ -1,0 +1,106 @@
+# Audience with the Land Dragon (Q337), fragments and fangs held: Moke and Helton take them for a mark each and tell how many marks are held. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q337_audience_with_the_land_dragon_guards_handed.golden
+character Dragoon 50
+quest Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED drop5=2 drop6=2
+hold 3859 1
+hold 3860 1
+hold 3862 1
+hold 3863 1
+script quest.Q337_AudienceWithTheLandDragon
+item 3852 3864 3857 3858 3855 3856 3854 3853 3859 3862 3860 3863 3890 3861 3865
+page villagemaster/30498.htm
+page trainer/30678.htm
+page script/quest/Q337_AudienceWithTheLandDragon/
+npc moke 30498 VillageMasterDwarf 10 0 0
+npc helton 30678 Trainer 15 0 0
+
+action moke
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+bypass npc_{moke}_Quest
+  S NpcHtmlMessage obj=moke item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30498-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q337_AudienceWithTheLandDragon | drop5 | 1
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+bypass npc_{moke}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3859
+  S SystemMessage id=302 3:3862
+  S SystemMessage id=54 3:3864
+  S NpcHtmlMessage obj=moke item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30498-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q337_AudienceWithTheLandDragon | drop5
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+bypass npc_{moke}_Quest
+  S NpcHtmlMessage obj=moke item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30498-04.htm
+  S ActionFailed
+  S ActionFailed
+action helton
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+bypass npc_{helton}_Quest
+  S NpcHtmlMessage obj=helton item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30678-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q337_AudienceWithTheLandDragon | drop6 | 1
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+bypass npc_{helton}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3860
+  S SystemMessage id=302 3:3863
+  S SystemMessage id=54 3:3864
+  S NpcHtmlMessage obj=helton item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30678-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q337_AudienceWithTheLandDragon | drop6
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+action helton
+  S ActionFailed
+  S NpcHtmlMessage obj=helton item=0 page=trainer/30678.htm
+  S ActionFailed
+bypass npc_{helton}_Quest
+  S NpcHtmlMessage obj=helton item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30678-05.htm
+  S ActionFailed
+  S ActionFailed
+action moke
+action moke
+  S ActionFailed
+  S NpcHtmlMessage obj=moke item=0 page=villagemaster/30498.htm
+  S ActionFailed
+bypass npc_{moke}_Quest
+  S NpcHtmlMessage obj=moke item=0 page=script/quest/Q337_AudienceWithTheLandDragon/30498-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 3864=2 3859=0 3862=0 3860=0 3863=0
+  rows Q337_AudienceWithTheLandDragon <cond>=2 <state>=STARTED
+  state Q337_AudienceWithTheLandDragon STARTED

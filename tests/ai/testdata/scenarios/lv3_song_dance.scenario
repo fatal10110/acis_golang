@@ -1,0 +1,15 @@
+# LV3SongDance (27270, level 76), raised for the character (spawn parameters 0, character, owner),
+# every draw 0: the character's hit wants each of the three debuffs (4539 to 4541)
+# (1000000 each) while its IntAI0 to IntAI2 are clear.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.LV3Monster.LV3Monster
+script script.ai.individual.Monster.LV3Monster.LV3SongDance
+npc owner 20003 Monster 600 0 0
+npc song 27270 Monster 300 0 0 level 76 skill DEBUFF1 4539 1 skill DEBUFF2 4540 1 skill DEBUFF3 4541 1 params 0 character owner master owner
+
+hit song 10
+  desires song attack(player)=24.096385542168676 cast(player,4539,move)=1000000 cast(player,4540,move)=1000000 cast(player,4541,move)=1000000

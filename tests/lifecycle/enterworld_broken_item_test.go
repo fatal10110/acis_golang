@@ -27,6 +27,7 @@ const unloadedTemplateID = 65000
 // here is what pins that down: one penalty per login the player actually
 // completes, which is what the reference charges too.
 func TestBrokenItemTemplateCostsOneItemNotTheLogin(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),

@@ -21,17 +21,45 @@ jobs:
       matrix:
         # The slowest behavior suites get their own runners. In a single
         # `go test ./...` they queue behind compiling every other package.
-        # Keep the `rest` exclusion list in sync with these packages.
+        # `rest` runs cmd and internal, `suites` every other behavior suite;
+        # keep the `suites` exclusion list in sync with the suites named here.
+        #
+        # A shard runs either `pkgs` on the inline executor or `pool` on the
+        # real pool, so the two passes over a suite run side by side. Each
+        # shard saves its own cache, which also holds its test results; until
+        # it has one, it starts from its inline sibling's (`cache`). A restore
+        # key matches by prefix, so no shard name may begin with another's.
         shard:
           - name: skills-pets
+            cache: skills-pets
             pkgs: ./tests/skills ./tests/pets
+          - name: pool-skills-pets
+            cache: skills-pets
             pool: ./tests/skills ./tests/pets
           - name: combat-items
+            cache: combat-items
             pkgs: ./tests/combat ./tests/items
+          - name: pool-combat-items
+            cache: combat-items
             pool: ./tests/combat ./tests/items
+          - name: ai
+            cache: rest
+            pkgs: ./tests/ai
           - name: rest
-            pkgs: ""
+            cache: rest
+            pkgs: ./cmd/... ./internal/...
+          - name: suites
+            cache: rest
+            pkgs: suites
+          - name: pool-rest
+            cache: rest
             pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
+    env:
+      # Single-goroutine checks that spend minutes type-checking sources or
+      # replaying path searches. The race detector finds nothing in them and
+      # slows them several times over, so the short pool-rest job runs them
+      # in their own step without it.
+      STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:
         image: mariadb:11
@@ -63,7 +91,9 @@ jobs:
             ~/.cache/go-build
             ~/go/pkg/mod
           key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
-          restore-keys: go-${{ runner.os }}-${{ matrix.shard.name }}-
+          restore-keys: |
+            go-${{ runner.os }}-${{ matrix.shard.name }}-
+            go-${{ runner.os }}-${{ matrix.shard.cache }}-
 
       # main saves only the build cache entries its own run used, so the cache
       # does not carry every earlier build forward and grow without bound. Go
@@ -77,41 +107,44 @@ jobs:
           find ~/.cache/go-build -type f -name '*-[ad]' -exec touch -d '2 hours ago' {} +
           touch "$RUNNER_TEMP/go-cache-start"
 
-      - name: Build
-        if: matrix.shard.name == 'rest'
-        run: go build ./...
-
-      - name: Vet
-        if: matrix.shard.name == 'rest'
-        run: go vet ./...
-
+      # No separate build or vet step: lint type-checks every package and runs
+      # govet, and docker builds the binaries.
+      #
+      # gotest.sh keeps the log to package results and failing tests' output,
+      # and ends it with the slowest packages and tests.
       - name: Test
+        if: matrix.shard.pkgs
         env:
           PKGS: ${{ matrix.shard.pkgs }}
         run: |
-          if [ -z "$PKGS" ]; then
-            PKGS="$(go list ./... | grep -vE '/tests/(skills|pets|combat|items)$')"
+          if [ "$PKGS" = suites ]; then
+            PKGS="$(go list ./tests/... | grep -vE '/tests/(skills|pets|combat|items|ai)$')"
           fi
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          go test -race $PKGS
+          .github/scripts/gotest.sh -race -skip "$STATIC_TESTS" $PKGS
+
+      - name: Test (static, no race)
+        if: matrix.shard.name == 'pool-rest'
+        run: .github/scripts/gotest.sh -run "$STATIC_TESTS" ./cmd/gameserver ./internal/gameserver/geo/pathfind ./internal/provenance ./internal/config
 
       # Behavior suites run on sim.Inline with a test-driven clock by
       # default; this keeps their run on the real pool, with real
       # interleavings. On the wall clock most of a test is spent waiting out
       # cast, swing and stand-up times, so far more tests than GOMAXPROCS
-      # run at once.
+      # run at once. A single wait longer than 30 s skips the rest of its
+      # test (gameservertest's Server.Advance); the inline pass covers it.
       - name: Test (real pool)
-        if: matrix.shard.pool != ''
+        if: matrix.shard.pool
         env:
           ACIS_SIM_EXECUTOR: pool
           PKGS: ${{ matrix.shard.pool }}
         run: |
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          go test -race -parallel 16 $PKGS
+          .github/scripts/gotest.sh -race -parallel 16 $PKGS
 
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'
-        run: go test -race -tags simdebug ./internal/gameserver/sim/...
+        run: .github/scripts/gotest.sh -race -tags simdebug ./internal/gameserver/sim/...
 
       # Go skips writing an output it already holds byte for byte, so an
       # action entry written this run can name an output file left backdated;
@@ -146,16 +179,86 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          # As in test: setup-go's go.sum-keyed cache is never refreshed.
+          cache: false
+
+      # golangci-lint-action keeps one cache entry per week and never updates
+      # it, so most runs re-analyze nearly every package. Keep the analysis
+      # cache per commit instead, saved by main like the test caches.
+      - name: Restore lint cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/golangci-lint
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: lint-${{ runner.os }}-${{ github.sha }}
+          restore-keys: lint-${{ runner.os }}-
 
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
+          skip-cache: true
+
+      - name: Save lint cache
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/golangci-lint
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: lint-${{ runner.os }}-${{ github.sha }}
+
+  # Builds the Dockerfile, runs its binaries, and seeds the compose db from a
+  # stub datapack and from the real aCis_datapack schema
+  # (ops/docker/smoke-test.sh). Not path-filtered: a Go change (a cgo-only
+  # dependency, a package under an ignored directory) can break the static
+  # image build as surely as a Dockerfile change can.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Whether the read-only token for the private repository that holds
+      # aCis_datapack is set. Only the checkout step sees the token itself,
+      # not the steps that run this branch's code. Workflows triggered from
+      # forks get no secrets; those runs check only the stub datapack.
+      HAS_DATAPACK_TOKEN: ${{ secrets.ACIS_DATAPACK_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Only the schema: sql/ holds one file per table, tools/ the
+      # full_install.sql that drops them first.
+      - name: Check out the aCis_datapack schema
+        if: env.HAS_DATAPACK_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: fatal10110/acis_public
+          token: ${{ secrets.ACIS_DATAPACK_TOKEN }}
+          path: acis-datapack
+          persist-credentials: false
+          sparse-checkout: |
+            aCis_datapack/sql
+            aCis_datapack/tools
+
+      - name: Docker smoke test
+        run: |
+          if [ "$HAS_DATAPACK_TOKEN" = true ]; then
+            # Out of the image's build context.
+            mv acis-datapack "$RUNNER_TEMP/"
+            export ACIS_SMOKE_DATAPACK="$RUNNER_TEMP/acis-datapack/aCis_datapack"
+          else
+            echo "::warning::ACIS_DATAPACK_TOKEN is not set; the real aCis_datapack schema is not checked"
+          fi
+          ops/docker/smoke-test.sh
 
   # The ruleset requires a single check named "go"; it passes only when
-  # every shard and the lint job do.
+  # every shard, the lint job and the Docker smoke test do.
   go:
     if: always()
-    needs: [test, lint]
+    needs: [test, lint, docker]
     runs-on: ubuntu-latest
     steps:
-      - run: '[ "${{ needs.test.result }}" = success ] && [ "${{ needs.lint.result }}" = success ]'
+      - run: '[ "${{ needs.test.result }}" = success ] && [ "${{ needs.lint.result }}" = success ] && [ "${{ needs.docker.result }}" = success ]'

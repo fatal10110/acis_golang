@@ -52,11 +52,16 @@ func castTwiceFrames(t *testing.T, skillID int) (firstSelf, recastSelf, recastOb
 	drainUntilQuiet(t, observer)
 	drainUntilQuiet(t, caster)
 
+	castEnded := func() bool { return !srv.PlayerCastingNow(t, casterID) }
 	caster.Send(encodeRequestMagicSkillUse(int32(skillID), false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "first cast end", castEnded)
 	firstSelf = readQuiet(caster)
 	drainUntilQuiet(t, observer)
 
 	caster.Send(encodeRequestMagicSkillUse(int32(skillID), false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "recast end", castEnded)
 	return firstSelf, readQuiet(caster), readQuiet(observer), casterID
 }
 

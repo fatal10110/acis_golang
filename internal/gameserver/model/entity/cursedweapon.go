@@ -56,8 +56,8 @@ func NewCursedWeaponTable(weapons []CursedWeapon) (*CursedWeaponTable, error) {
 	return t, nil
 }
 
-// Replace swaps t's definitions for from's, at once for every holder of t:
-// CursedWeaponManager.reload.
+// Replace swaps t's definitions for from's, at once for every holder of t,
+// as a cursed weapon reload does.
 func (t *CursedWeaponTable) Replace(from *CursedWeaponTable) {
 	t.byItemID.Store(from.byItemID.Load())
 }

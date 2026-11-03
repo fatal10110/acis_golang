@@ -1,0 +1,48 @@
+# Alliance with Varka Silenos (Q611), stage 4: 300 soldier, 300 officer and 200 captain badges and the Feather of Valor buy the
+# fourth mark (cond 5). Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q611_alliance_with_varka_silenos_stage4.golden
+character Ally 74
+quest Q611_AllianceWithVarkaSilenos <cond>=4 <state>=STARTED
+hold 7226 300
+hold 7227 300
+hold 7228 200
+hold 7229 1
+hold 7223 1
+script quest.Q611_AllianceWithVarkaSilenos
+item 7221 7222 7223 7224 7225 7226 7227 7228 7229 7230 7234
+page npcdefault.htm
+page script/quest/Q611_AllianceWithVarkaSilenos/
+npc naran 31378 Folk 10 0 0
+
+action naran
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-22.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q611_AllianceWithVarkaSilenos 31378-10-4.htm
+  Q upsert Q611_AllianceWithVarkaSilenos | <cond> | 5
+  S QuestList 611:0x8000001f
+  S ExShowQuestMark quest=611
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7226 6:300
+  S SystemMessage id=301 3:7227 6:300
+  S SystemMessage id=301 3:7228 6:200
+  S SystemMessage id=302 3:7229
+  S SystemMessage id=302 3:7223
+  S SystemMessage id=54 3:7224
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-10-4.htm
+  S ActionFailed
+  items 7226=0 7227=0 7228=0 7229=0 7223=0 7224=1
+  rows Q611_AllianceWithVarkaSilenos <cond>=5 <state>=STARTED
+action naran
+  S ActionFailed
+  S NpcHtmlMessage obj=naran item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{naran}_Quest
+  S NpcHtmlMessage obj=naran item=0 page=script/quest/Q611_AllianceWithVarkaSilenos/31378-17.htm
+  S ActionFailed
+  S ActionFailed

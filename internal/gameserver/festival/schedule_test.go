@@ -15,8 +15,10 @@ type fakeCalendar struct {
 	nextChange time.Time
 }
 
-func (c *fakeCalendar) CurrentPeriod() sevensigns.Period { return c.period }
-func (c *fakeCalendar) NextChange() time.Time            { return c.nextChange }
+func (c *fakeCalendar) CurrentPeriod() sevensigns.Period       { return c.period }
+func (c *fakeCalendar) NextChange() time.Time                  { return c.nextChange }
+func (c *fakeCalendar) AddFestivalScore(sevensigns.Cabal, int) {}
+func (c *fakeCalendar) SaveStatus(context.Context) error       { return nil }
 
 // memStore keeps the festival rows in memory.
 type memStore struct {
@@ -95,7 +97,7 @@ func notice(minutes string) string {
 // The default schedule (first cycle 2 minutes after the start, 38-minute
 // cycles of which the festival takes 18 and the signup 19) counts a new
 // festival cycle on start, awaits the first festival 2 + 19 minutes later,
-// and, with nobody able to sign up, opens a new 19-minute signup period
+// and, with nobody signed up, opens a new 19-minute signup period
 // whenever one ends.
 func TestScheduleCountsDownWithoutParties(t *testing.T) {
 	h := newScheduleHarness(t)

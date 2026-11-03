@@ -1,0 +1,20 @@
+# RoyalRushRoomBoss5 (18122, a Four Sepulchers room boss, its shipped skills), every draw 0. Once its AI took up
+# the attack on the character, the character is its top desire target, and a hit by it wants its debuff (4618) and
+# its damage magic (4657) on the character, beside its parent's first physical special (4572), each weight
+# 1000000 and the Warrior's hate; the self range magic it keeps for a hit by someone else.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss5
+npc boss 18122 Monster 40 0 0 level 81 skill PHYSICAL_SPECIAL1 4572 9 skill SELF_RANGE_DD_MAGIC1 4589 9 skill DEBUFF 4618 1 skill DD_MAGIC 4657 9
+roll boss 99
+
+hit boss 22
+  desires boss attack(player)=25
+tick
+hit boss 22
+  desires boss attack(player)=50 cast(player,4572,move)=1000000 cast(player,4618,move)=1000000 cast(player,4657,move)=1000000

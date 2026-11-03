@@ -27,7 +27,7 @@ func (l *GameClientLink) adminEnchant(gm *livePlayer, line string) {
 		sendText(gm, "Unknown paperdoll slot.")
 		return
 	}
-	level, ok := parseJavaInt(args[1])
+	level, ok := parseInt32(args[1])
 	if !ok {
 		sendText(gm, "Please specify a new enchant value.")
 		return
@@ -46,12 +46,12 @@ func (l *GameClientLink) setEnchantLevel(gm, target *livePlayer, slot, level int
 	if inv == nil {
 		return
 	}
-	end := l.itemInstances.BeginOperation(inv.OwnerID())
-	result := l.enchantService().SetLevel(inv, slot, level)
+	end := l.belongings.itemInstances.BeginOperation(inv.OwnerID())
+	result := l.enchanting.items.SetLevel(inv, slot, level)
 	l.applyPersistActions(result.Persist)
 	end()
 	if result.Item == nil {
-		sendText(gm, fmt.Sprintf("%s doesn't wear any item in %s slot.", target.Name, handleradmin.PaperdollSlotName(slot)))
+		sendText(gm, fmt.Sprintf("%s doesn't wear any item in %s slot.", target.CharacterName(), handleradmin.PaperdollSlotName(slot)))
 		return
 	}
 	name := ""
@@ -59,9 +59,9 @@ func (l *GameClientLink) setEnchantLevel(gm, target *livePlayer, slot, level int
 		name = result.Template.Name
 	}
 	if result.Unchanged {
-		sendText(gm, target.Name+"'s "+name+" enchant is already set to "+strconv.Itoa(level)+".")
+		sendText(gm, target.CharacterName()+"'s "+name+" enchant is already set to "+strconv.Itoa(level)+".")
 		return
 	}
 	l.applyEnchantSteps(target, result.Steps)
-	sendText(gm, fmt.Sprintf("%s's %s enchant was modified from %d to %d.", target.Name, name, result.OldLevel, level))
+	sendText(gm, fmt.Sprintf("%s's %s enchant was modified from %d to %d.", target.CharacterName(), name, result.OldLevel, level))
 }

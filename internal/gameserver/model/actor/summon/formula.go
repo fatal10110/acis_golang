@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
@@ -67,7 +68,10 @@ func (a *Actor) initVitals() {
 // applied. Callers that need a batch to appear all-or-nothing to readers
 // must serialize at a higher level (see effect.List, which does this for
 // effect-driven adds through AttachStatFuncs).
+//
+// A func whose attached condition fails for a is left out.
 func (a *Actor) AddStatFuncs(fns []effect.Mod) {
+	fns = effect.Attachable(fns, a.ConditionActor())
 	a.AttachStatFuncs(fns)
 	a.StatFuncsAttached(fns)
 }
@@ -153,7 +157,13 @@ func (a *Actor) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 }
 
 func (a *Actor) calcStat(s stat.Stat, base float64) float64 {
-	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base)
+	return a.calcFor(s, base, nil, nil)
+}
+
+// calcFor is calcStat for a calculation against target run for skill (nil
+// for none).
+func (a *Actor) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base, target, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -261,7 +271,11 @@ func (a *Actor) MaxBuffCount() int {
 	if a == nil {
 		return baseBuffSlots
 	}
-	return a.maxBuffsAmount + a.skills[int(modelskill.DivineInspirationSkillID)]
+	base := baseBuffSlots
+	if a.settings != nil {
+		base = defaultPositive(a.settings.MaxBuffsAmount(), baseBuffSlots)
+	}
+	return base + a.skills[int(modelskill.DivineInspirationSkillID)]
 }
 
 // Playable reports whether a is player-controlled.
@@ -308,28 +322,60 @@ func (a *Actor) CanGiveDamage() bool {
 func (a *Actor) Invulnerable() bool { return a.Invul() }
 
 // PAtk returns this summon's physical attack stat, truncated to a whole number.
-func (a *Actor) PAtk() float64 {
-	return math.Trunc(a.calcStat(stat.PowerAttack, positiveBase(a.combatStats().PAtk)))
-}
+func (a *Actor) PAtk() float64 { return skillStats{a: a}.PAtk() }
 
 // PDef returns this summon's physical defence stat, truncated to a whole number.
-func (a *Actor) PDef() float64 {
-	return math.Trunc(a.calcStat(stat.PowerDefence, positiveBase(a.combatStats().PDef)))
-}
+func (a *Actor) PDef() float64 { return skillStats{a: a}.PDef() }
 
 // MAtk returns this summon's magic attack stat, truncated to a whole number.
-func (a *Actor) MAtk() float64 {
-	return math.Trunc(a.calcStat(stat.MagicAttack, positiveBase(a.combatStats().MAtk)))
-}
+func (a *Actor) MAtk() float64 { return skillStats{a: a}.MAtk() }
 
 // MDef returns this summon's magic defence stat, truncated to a whole number.
-func (a *Actor) MDef() float64 {
-	return math.Trunc(a.calcStat(stat.MagicDefence, positiveBase(a.combatStats().MDef)))
-}
+func (a *Actor) MDef() float64 { return skillStats{a: a}.MDef() }
 
 // MagicCriticalRate returns this summon's magic critical rate.
-func (a *Actor) MagicCriticalRate() float64 {
-	return a.calcStat(stat.MCriticalRate, 8)
+func (a *Actor) MagicCriticalRate() float64 { return skillStats{a: a}.MagicCriticalRate() }
+
+// Against is a's stats read for a calculation against target run for
+// skill (either nil for none).
+func (a *Actor) Against(target conditions.Actor, skill conditions.Skill) creature.SkillStats {
+	return skillStats{a: a, target: target, skill: skill}
+}
+
+type skillStats struct {
+	a      *Actor
+	target conditions.Actor
+	skill  conditions.Skill
+}
+
+func (s skillStats) CalcStat(st stat.Stat, base float64) float64 {
+	return s.a.calcFor(st, base, s.target, s.skill)
+}
+
+func (s skillStats) PAtk() float64 {
+	return math.Trunc(s.a.calcFor(stat.PowerAttack, positiveBase(s.a.combatStats().PAtk), s.target, nil))
+}
+
+func (s skillStats) PDef() float64 {
+	return math.Trunc(s.a.calcFor(stat.PowerDefence, positiveBase(s.a.combatStats().PDef), s.target, nil))
+}
+
+func (s skillStats) MAtk() float64 {
+	return math.Trunc(s.a.calcFor(stat.MagicAttack, positiveBase(s.a.combatStats().MAtk), s.target, s.skill))
+}
+
+func (s skillStats) MDef() float64 {
+	return math.Trunc(s.a.calcFor(stat.MagicDefence, positiveBase(s.a.combatStats().MDef), s.target, s.skill))
+}
+
+func (s skillStats) Evasion() int { return int(s.a.calcFor(stat.EvasionRate, 0, s.target, nil)) }
+
+func (s skillStats) CriticalRate() float64 {
+	return float64(min(int(s.a.calcFor(stat.CriticalRate, s.a.combatStats().CritRate, s.target, nil)), 500))
+}
+
+func (s skillStats) MagicCriticalRate() float64 {
+	return s.a.calcFor(stat.MCriticalRate, 8, s.target, s.skill)
 }
 
 // Accuracy returns this summon's physical accuracy stat.
@@ -350,11 +396,11 @@ func (a *Actor) CriticalRate(baseCritRate float64) float64 {
 }
 
 // MoveSpeed returns this summon's current move speed from its template
-// run speed: a summon stays in run stance, the swamp it stands in and then
-// a pet's weight-penalty band scale the base, and the RUN_SPEED stat
+// speed for its stance (baseMoveSpeed): the swamp it stands in and then a
+// pet's weight-penalty band scale the base, and the RUN_SPEED stat
 // finalizes the speed, narrowed to float32 like the client-facing speed.
-func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
-	base := float64(int(baseRunSpeed))
+func (a *Actor) MoveSpeed() float64 {
+	base := float64(a.baseMoveSpeed())
 	if bonus := a.swampMoveBonus.Load(); bonus != 0 {
 		base = float64(float32(base * (float64(100+bonus) / 100)))
 	}
@@ -364,20 +410,28 @@ func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
 	return float64(float32(a.calcStat(stat.RunSpeed, base)))
 }
 
-// MovementSpeedMultiplier is the current move speed over the template run
-// speed, or 0 when that base is 0. The client scales the base run and walk
-// speeds it is sent by this value.
-func (a *Actor) MovementSpeedMultiplier(baseRunSpeed float64) float32 {
-	base := int(baseRunSpeed)
+// MovementSpeedMultiplier is the current move speed over the template speed
+// of the summon's stance, or 0 when that base is 0. The client scales the
+// base run and walk speeds it is sent by this value.
+func (a *Actor) MovementSpeedMultiplier() float32 {
+	base := a.baseMoveSpeed()
 	if base == 0 {
 		return 0
 	}
-	return float32(a.MoveSpeed(baseRunSpeed)) / float32(base)
+	return float32(a.MoveSpeed()) / float32(base)
 }
 
-// hungryHalved reports whether a pet's attack speed should be halved for
-// being under-fed, matching Pet.checkHungryState. Servitors have no feeding
-// state and are never halved.
+// baseMoveSpeed is the template speed of the summon's stance, in whole
+// points: its run speed while it runs, its walk speed while it walks.
+func (a *Actor) baseMoveSpeed() int {
+	if a.Running() {
+		return int(a.runSpeed)
+	}
+	return int(a.walkSpeed)
+}
+
+// hungryHalved reports whether a pet's attack speed should be halved for being
+// under-fed. Servitors have no feeding state and are never halved.
 func (a *Actor) hungryHalved() bool {
 	a.statusMu.RLock()
 	fed, maxMeal := a.fed, a.maxMeal
@@ -389,8 +443,8 @@ func (a *Actor) hungryHalved() bool {
 }
 
 // PAtkSpd returns this summon's physical attack speed, given baseAtkSpd from
-// its npc template (Pet.getStatus().getPAtkSpd() / SummonStatus's shared
-// basis), halved while hungry.
+// its npc template (the basis pets and servitors share), halved while
+// hungry.
 func (a *Actor) PAtkSpd(baseAtkSpd float64) float64 {
 	if a.hungryHalved() {
 		baseAtkSpd /= 2
@@ -399,8 +453,7 @@ func (a *Actor) PAtkSpd(baseAtkSpd float64) float64 {
 }
 
 // magicAtkSpdBase is the fixed magic-attack-speed base every pet and
-// servitor uses (PetStatus.getMAtkSpd / base SummonStatus), independent of
-// npc template.
+// servitor uses, independent of npc template.
 const magicAtkSpdBase = 333
 
 // MAtkSpd returns this summon's magic attack speed, halved while hungry.
@@ -703,6 +756,12 @@ func (a *Actor) ConsumeHP(amount float64) {
 	a.notifyDamage(a, amount)
 }
 
+// ReduceHPBySkillDOT applies a skill's damage-over-time tick: a summon
+// records no skill for it.
+func (a *Actor) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, _ modelskill.Ref) {
+	a.ReduceHPByDOT(amount, attacker, true)
+}
+
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
 // A lethal tick kills a. Any tick, a zero one included, interrupts the duel
 // of an attacker from outside the owner's duel.
@@ -764,7 +823,7 @@ func (a *Actor) RechargeMP(amount float64) float64 {
 // HealInput resolves a's side of an outgoing HEAL. A summon's charged
 // spiritshot scales its M.Atk term the way a mage-class player's does.
 func (a *Actor) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
-	return creature.ResolveHealInput(def, a.HealProficiency(), a.MAtk(), formulas.HealShotScalingMage), true
+	return creature.ResolveHealInput(def, a.HealProficiency(), a.Against(a.ConditionActor(), nil).MAtk(), formulas.HealShotScalingMage), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
@@ -786,7 +845,7 @@ func (a *Actor) BlowInput(caster creature.FormulaActor, def modelskill.Definitio
 }
 
 func (a *Actor) CounterSkillPhysical() float64 {
-	return a.CalcStat(stat.CounterSkillPhysical, 0)
+	return a.calcFor(stat.CounterSkillPhysical, 0, a.ConditionActor(), nil)
 }
 
 // CancelVulnerability returns a's CANCEL_VULN multiplier for the cancel and
@@ -808,7 +867,7 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  a.CalcStat(reflectStat, 0),
+		ReflectChance:  a.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
 	}
 }
 
@@ -816,11 +875,6 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 // by caster against a.
 func (a *Actor) ManaDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, a, a.MaxMPValue(), def)
-}
-
-// LethalRate returns a's lethal-strike rate multiplier.
-func (a *Actor) LethalRate() float64 {
-	return a.calcStat(stat.LethalRate, 1)
 }
 
 // LethalInput resolves a lethal-strike roll against a.
@@ -838,7 +892,7 @@ func (a *Actor) LethalInput(caster creature.FormulaActor, def modelskill.Definit
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: attacker.Level(),
 		TargetLevel:   a.Level(),
-		LethalMul:     attacker.LethalRate(),
+		LethalMul:     attacker.Against(a.ConditionActor(), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 

@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -40,10 +39,7 @@ func TestWalkOffBattlefieldFlagsBeforeCompass(t *testing.T) {
 				t.Fatal(err)
 			}
 			zones := zone.NewIndex()
-			siege, err := zone.NewSiege(1, battlefield, commons.NewStatSet())
-			if err != nil {
-				t.Fatal(err)
-			}
+			siege := zone.NewSiege(1, battlefield)
 			siege.SetActive(true)
 			zones.Add(siege)
 			if tc.peace {

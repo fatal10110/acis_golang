@@ -1,0 +1,12 @@
+# AzitWateringTreasureBox (35595) hit by a character holding a weapon (a Short Sword): the box is
+# invulnerable and its script takes nothing for an armed blow, so a hit of all its 440 hit
+# points leaves it alive, and nothing drops.
+character Hunter 20
+item 1
+equip 1
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.AzitWateringTreasureBox
+npc box 35595 Monster 40 0 0
+
+hit box 440
+advance 3s

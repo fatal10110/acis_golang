@@ -4,57 +4,90 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// DataReloads re-read the data tables //reload names (AdminReload.java)
-// and the spawn list //respawnall reloads. A hook that returns only an error
-// reads its files and swaps the loaded table in place for every holder,
-// keeping the table as it was when the files cannot be read; a nil hook
-// leaves its table as booted, and //reload answers its type as not ported
-// yet.
+// DataReloads re-read the data tables //reload names and the spawn list
+// //respawnall reloads. A hook that returns only an error reads its files and
+// swaps the loaded table in place for every holder, keeping the table as it was
+// when the files cannot be read; a nil hook leaves its table as booted, and
+// //reload answers its type as not ported yet.
 type DataReloads struct {
-	// Admin reloads the access levels and admin commands
-	// (AdminData.reload).
+	// Admin reloads the access levels and admin commands.
 	Admin func() error
-	// Crests reloads the crest images (CrestCache.reload).
+	// BoatRoutes reads the boat itineraries anew, which then replace the
+	// fleet's.
+	BoatRoutes func() ([]route.BoatItinerary, error)
+	// Config reads the game server properties files anew into the player
+	// settings, which then replace the ones in force. Each read of a
+	// setting after the swap sees the reloaded value, the rules of the
+	// characters and summons already in the world, the regeneration
+	// multipliers every creature's base regeneration takes, the kill reward
+	// settings (party loot, the scripts and item creation share their
+	// party range and multiple item drop rule, NPC hate randomization
+	// their party range), the event settings and quest rates the scripts
+	// read, the PvP flag times, the base buff-slot count and drift range
+	// of every NPC (those already spawned included), ShowNpcLevel and the
+	// enchant, skill, craft and multisell switches included. Every setting
+	// outside PlayerConfig keeps its boot value (the calendar systems
+	// because they schedule their cycles at boot, the rest, the wyvern ride
+	// settings included, because each is read when its service or link is
+	// built); the composition root that builds this hook lists them.
+	Config func() (PlayerConfig, error)
+	// BuyLists reads the buylists anew, which the merchant then sells
+	// from, its limited stock rebuilt from the saved rows.
+	BuyLists func() (*buylist.Table, error)
+	// Crests reloads the crest images.
 	Crests func() error
-	// CursedWeapons reads the cursed weapons anew (CursedWeaponManager.load),
-	// which the link then takes in place of the ones it had.
+	// CursedWeapons reads the cursed weapons anew, which the link then takes in
+	// place of the ones it had.
 	CursedWeapons func() (*entity.CursedWeaponTable, error)
-	// HTML reloads the HTML pages (HtmCache.reload).
+	// Doors reads the doors anew, which then replace the doors in the
+	// world.
+	Doors func() (*door.Table, error)
+	// HTML reloads the HTML pages.
 	HTML func() error
-	// Multisells reloads the multisell lists (MultisellData.reload).
+	// Items reloads the item templates. Tables that resolved or checked
+	// item ids against the templates when they were read (multisells,
+	// buylists, NPC drops) are not read again; each has its own reload.
+	Items func() error
+	// Multisells reloads the multisell lists.
 	Multisells func() error
-	// NPCs reloads the NPC templates (NpcData.reload); NPCs already in the
+	// NPCs reloads the NPC templates; NPCs already in the
 	// world keep theirs, and so do the respawns of spawns already in place
-	// (ASpawn's template is fixed when the spawn is built).
+	// (a spawn's template is fixed when the spawn is built).
 	NPCs func() error
-	// WalkerRoutes reloads the walker routes (WalkerRouteData.reload).
+	// Skills reloads the skill definitions. Tables that resolved or
+	// checked skills against them when they were read (NPC templates,
+	// cursed weapons, the scheme buffer) are not read again; NPC templates
+	// and cursed weapons have their own reload.
+	Skills func() error
+	// WalkerRoutes reloads the walker routes.
 	WalkerRoutes func() error
 	// Teleports reads the gatekeeper destinations, which the link's
-	// gatekeeper then holds (TeleportData.reload and
-	// InstantTeleportData.reload).
+	// gatekeeper then holds.
 	Teleports func() (travel.TeleportTable, travel.InstantTable, error)
 	// SpawnList saves current's database-tracked spawn rows, then reads the
-	// spawn list and those rows anew, for //respawnall
-	// (SpawnManager.reload's save and load).
+	// spawn list and those rows anew, for //respawnall.
 	SpawnList func(ctx context.Context, current *manager.Spawns) (*manager.Spawns, error)
+	// Zones reads the zones anew, set up as at boot, which then replace the
+	// ones the server holds.
+	Zones func() (*zone.Index, error)
 }
 
 // errReloadNotPorted answers a //reload type whose table has no reload
 // hook yet.
 var errReloadNotPorted = errors.New("reload not ported yet")
-
-// reloadNotPorted answers a type no reload exists for yet, each tracked by
-// its issue: boat (#3404), buylist (#3405), config (#3406), door (#3407),
-// item (#3408), skill (#3409) and zone (#3410).
-func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
 
 // reloadHook runs hook, errReloadNotPorted without one.
 func reloadHook(hook func() error) error {
@@ -73,28 +106,32 @@ type reloadType struct {
 	// done is what the game master is told once the type has reloaded.
 	done string
 	run  func(l *GameClientLink) error
+	// runThen, when set, reloads in place of run for the game master gm,
+	// on whose queue the command runs. Unless it fails, it runs then on
+	// gm's queue once the reload is over, which may be after it returns.
+	runThen func(l *GameClientLink, gm *livePlayer, then func()) error
 }
 
-// reloadTypes are the types //reload takes, in the order AdminReload.java
+// reloadTypes are the types //reload takes, in the order //reload
 // tests a token against them: the first that matches reloads.
 var reloadTypes = []reloadType{
 	{word: "admin", done: "Admin data has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Admin) }},
 	{word: "announcement", done: "The content of announcements.xml has been reloaded.", run: func(l *GameClientLink) error { return l.announcements.Load() }},
-	{word: "boat", done: "Boat have been reloaded.", run: reloadNotPorted},
-	{word: "buylist", done: "Buylists have been reloaded.", run: reloadNotPorted},
-	{word: "config", done: "Configs files have been reloaded.", run: reloadNotPorted},
+	{word: "boat", done: "Boat have been reloaded.", runThen: (*GameClientLink).reloadBoats},
+	{word: "buylist", done: "Buylists have been reloaded.", run: (*GameClientLink).reloadBuyLists},
+	{word: "config", done: "Configs files have been reloaded.", run: (*GameClientLink).reloadConfig},
 	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Crests) }},
 	{word: "cw", done: "Cursed weapons have been reloaded.", run: (*GameClientLink).reloadCursedWeapons},
-	{word: "door", done: "Doors instance has been reloaded.", run: reloadNotPorted},
+	{word: "door", done: "Doors instance has been reloaded.", run: (*GameClientLink).reloadDoors},
 	{word: "htm", done: "The HTM cache has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.HTML) }},
-	{word: "item", done: "Items' templates have been reloaded.", run: reloadNotPorted},
+	{word: "item", done: "Items' templates have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Items) }},
 	{word: "multisell", exact: true, done: "The multisell instance has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Multisells) }},
 	{word: "npc", exact: true, done: "NPCs templates have been reloaded; scripts were not reloaded.", run: (*GameClientLink).reloadNPCs},
 	{word: "npcwalker", done: "Walking routes have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.WalkerRoutes) }},
 	{word: "script", exact: true, done: "Script reload is not supported; scripts load once, at server start.", run: reloadNothing},
-	{word: "skill", done: "Skills' XMLs have been reloaded.", run: reloadNotPorted},
+	{word: "skill", done: "Skills' XMLs have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Skills) }},
 	{word: "teleport", done: "Teleport locations have been reloaded.", run: (*GameClientLink).reloadTeleports},
-	{word: "zone", done: "Zones have been reloaded.", run: reloadNotPorted},
+	{word: "zone", done: "Zones have been reloaded.", run: (*GameClientLink).reloadZones},
 }
 
 // reloadUsage is what //reload answers a type it does not take.
@@ -115,13 +152,33 @@ func (l *GameClientLink) adminReload(gm *livePlayer, line string) {
 		sendReloadUsage(gm)
 		return
 	}
-	for _, token := range args {
+	l.reloadTokens(gm, args)
+}
+
+// reloadTokens reloads the types tokens name, in turn. A type that finishes
+// later tells gm it reloaded, and goes on with the tokens after it, only
+// once it is over, so gm sees what each reload sends before its text and
+// the next reload.
+func (l *GameClientLink) reloadTokens(gm *livePlayer, tokens []string) {
+	for i, token := range tokens {
 		typ, ok := reloadTypeOf(token)
 		if !ok {
 			sendReloadUsage(gm)
 			continue
 		}
-		err := typ.run(l)
+		var err error
+		if typ.runThen != nil {
+			rest := tokens[i+1:]
+			err = typ.runThen(l, gm, func() {
+				sendText(gm, typ.done)
+				l.reloadTokens(gm, rest)
+			})
+			if err == nil {
+				return
+			}
+		} else {
+			err = typ.run(l)
+		}
 		switch {
 		case errors.Is(err, errReloadNotPorted):
 			l.log.Warn().Str("type", typ.word).Msg("admin: //reload type not implemented yet")
@@ -157,11 +214,29 @@ func sendReloadUsage(live *livePlayer) {
 // once, at boot, and their registry never changes.
 func reloadNothing(*GameClientLink) error { return nil }
 
-// reloadNPCs reloads the NPC templates: NpcData.reload. Scripts are not
+// reloadNPCs reloads the NPC templates. Scripts are not
 // reloaded with them; their bindings are keyed by NPC id, so the new
 // templates keep them.
 func (l *GameClientLink) reloadNPCs() error {
 	return reloadHook(l.reloads.NPCs)
+}
+
+// reloadConfig reads the properties files anew and puts the player settings
+// read in force in place of the ones before (see applyPlayerConfig); a file
+// that cannot be read leaves them as they were. Two game masters reloading
+// at once put their settings in force one after the other, each whole.
+func (l *GameClientLink) reloadConfig() error {
+	if l.reloads.Config == nil {
+		return errReloadNotPorted
+	}
+	settings, err := l.reloads.Config()
+	if err != nil {
+		return err
+	}
+	l.playerConfigMu.Lock()
+	defer l.playerConfigMu.Unlock()
+	l.applyPlayerConfig(&settings)
+	return nil
 }
 
 // reloadTeleports reads the gatekeeper destinations anew and hands them to
@@ -176,4 +251,35 @@ func (l *GameClientLink) reloadTeleports() error {
 	}
 	l.gatekeeper.SetTables(teleports, instants)
 	return nil
+}
+
+// reloadBuyListsTimeout bounds the stock rows read of //reload buylist.
+const reloadBuyListsTimeout = 30 * time.Second
+
+// reloadBuyLists reads the buylists anew and hands them to the merchant,
+// which rebuilds their limited stock from the saved rows.
+func (l *GameClientLink) reloadBuyLists() error {
+	if l.reloads.BuyLists == nil || l.merchant == nil {
+		return errReloadNotPorted
+	}
+	lists, err := l.reloads.BuyLists()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), reloadBuyListsTimeout)
+	defer cancel()
+	return l.merchant.Reload(ctx, lists)
+}
+
+// reloadDoors reads the doors anew and puts them in the world in place of
+// the ones standing there.
+func (l *GameClientLink) reloadDoors() error {
+	if l.reloads.Doors == nil || l.doors == nil {
+		return errReloadNotPorted
+	}
+	doors, err := l.reloads.Doors()
+	if err != nil {
+		return err
+	}
+	return l.doors.ReloadDoors(doors)
 }

@@ -1,0 +1,77 @@
+# Path to a Dark Wizard (Q412), a level 19 dark mystic accepts at Varika and gets the seed of despair; Varika answers each seed question, then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q412_path_to_a_dark_wizard_accept.golden
+character Fighter 19
+class 38
+script quest.Q412_PathToADarkWizard
+item 1253 1254 1255 1256 1257 1258 1259 1260 1261 1277 1278 1279
+page default/30421.htm
+page default/30415.htm
+page default/30418.htm
+page default/30419.htm
+page script/quest/Q412_PathToADarkWizard/
+npc varika 30421 Folk 10 0 0
+npc charkeren 30415 Folk -10 0 0
+npc annika 30418 Folk 20 0 0
+npc arkenia 30419 Folk -20 0 0
+npc remains 20015 Monster 40 0 0
+npc bone1 20022 Monster 45 0 0
+npc bone2 20517 Monster 50 0 0
+npc bone3 20518 Monster 55 0 0
+npc heart 20045 Monster 60 0 0
+
+action varika
+action varika
+  S ActionFailed
+  S NpcHtmlMessage obj=varika item=0 page=default/30421.htm
+  S ActionFailed
+bypass npc_{varika}_Quest
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q412_PathToADarkWizard 30421-05.htm
+  S QuestList 412:0x80000001
+  S ExShowQuestMark quest=412
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1254
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-05.htm
+  S ActionFailed
+  Q upsert Q412_PathToADarkWizard | <state> | STARTED
+  Q upsert Q412_PathToADarkWizard | <cond> | 1
+  items 1254=1
+  rows Q412_PathToADarkWizard <cond>=1 <state>=STARTED
+  state Q412_PathToADarkWizard STARTED
+bypass Quest Q412_PathToADarkWizard 30421-07.htm
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-07.htm
+  S ActionFailed
+action varika
+  S ActionFailed
+  S NpcHtmlMessage obj=varika item=0 page=default/30421.htm
+  S ActionFailed
+bypass npc_{varika}_Quest
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-17.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q412_PathToADarkWizard 30421-10.htm
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-10.htm
+  S ActionFailed
+action varika
+  S ActionFailed
+  S NpcHtmlMessage obj=varika item=0 page=default/30421.htm
+  S ActionFailed
+bypass npc_{varika}_Quest
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-17.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q412_PathToADarkWizard 30421-13.htm
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-13.htm
+  S ActionFailed
+relog
+action varika
+action varika
+  S ActionFailed
+  S NpcHtmlMessage obj=varika item=0 page=default/30421.htm
+  S ActionFailed
+bypass npc_{varika}_Quest
+  S NpcHtmlMessage obj=varika item=0 page=script/quest/Q412_PathToADarkWizard/30421-17.htm
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,51 @@
+# Illegitimate Child of a Goddess (Q358), the reward: at cond 1 holding 107 scales, a Trives gives
+# the 108th (cond 2) and a second one nothing; Oltlin takes the scales for the eighth recipe and the
+# quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q358_illegitimate_child_of_a_goddess_reward.golden
+character Oltlin 63
+quest Q358_IllegitimateChildOfAGoddess <cond>=1 <state>=STARTED
+hold 5868 107
+random 0 7
+script quest.Q358_IllegitimateChildOfAGoddess
+item 57 5868 6329 6331 6333 6335 6337 6339 5364 5366
+page villagemaster/30862.htm
+page script/quest/Q358_IllegitimateChildOfAGoddess/
+npc oltlin 30862 VillageMasterDElf 10 0 0
+npc trives 20672 Monster 40 0 0
+
+# The 108th scale (cond 2), then nothing.
+kill trives
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5868
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 358:0x80000003
+  S ExShowQuestMark quest=358
+  Q upsert Q358_IllegitimateChildOfAGoddess | <cond> | 2
+  items 5868=108
+  rows Q358_IllegitimateChildOfAGoddess <cond>=2 <state>=STARTED
+kill trives
+  S SystemMessage id=95 1:0 1:0
+  items 5868=108
+  rows Q358_IllegitimateChildOfAGoddess <cond>=2 <state>=STARTED
+
+# Oltlin: the recipe, the quest ends.
+action oltlin
+action oltlin
+  S ActionFailed
+  S NpcHtmlMessage obj=oltlin item=0 page=villagemaster/30862.htm
+  S ActionFailed
+bypass npc_{oltlin}_Quest
+  S SystemMessage id=301 3:5868 6:108
+  S SystemMessage id=54 3:5366
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=oltlin item=0 page=script/quest/Q358_IllegitimateChildOfAGoddess/30862-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q358_IllegitimateChildOfAGoddess
+  items 5868=0 5366=1
+  state Q358_IllegitimateChildOfAGoddess -
+  rows Q358_IllegitimateChildOfAGoddess -
+relog
+  rows Q358_IllegitimateChildOfAGoddess -
+  items 5366=1

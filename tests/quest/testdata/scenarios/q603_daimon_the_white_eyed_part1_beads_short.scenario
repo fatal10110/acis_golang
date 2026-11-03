@@ -1,0 +1,30 @@
+# Daimon the White-Eyed, Part 1 (Q603): with 199 beads the character is sent back to the hunt, at the
+# beads stage. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q603_daimon_the_white_eyed_part1_beads_short.golden
+character Hero 75
+quest Q603_DaimonTheWhiteEyed_Part1 <cond>=8 <state>=STARTED
+hold 7190 199
+script quest.Q603_DaimonTheWhiteEyed_Part1
+item 7190 7191 7192
+page default/31683.htm
+page script/quest/Q603_DaimonTheWhiteEyed_Part1/
+npc eye 31683 Folk 10 0 0
+
+action eye
+action eye
+  S ActionFailed
+  S NpcHtmlMessage obj=eye item=0 page=default/31683.htm
+  S ActionFailed
+bypass npc_{eye}_Quest
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q603_DaimonTheWhiteEyed_Part1 31683-10.htm
+  S QuestList 603:0x8000007f
+  S ExShowQuestMark quest=603
+  S NpcHtmlMessage obj=eye item=0 page=script/quest/Q603_DaimonTheWhiteEyed_Part1/31683-11.htm
+  S ActionFailed
+  Q upsert Q603_DaimonTheWhiteEyed_Part1 | <cond> | 7
+  items 7190=199 7192=0
+  rows Q603_DaimonTheWhiteEyed_Part1 <cond>=7 <state>=STARTED
+  state Q603_DaimonTheWhiteEyed_Part1 STARTED

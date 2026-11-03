@@ -1,0 +1,25 @@
+# RoyalRushWarriorPhysicalSpecial2 (18168), every draw 0: script event 1234 naming the character
+# makes it want to attack the character at 300 (a draw under 80), or, on a draw of 99, forget what
+# it wanted and want to attack it at 1000. A clan member (tomb3_clan, range 600) hit by the character
+# more than 100 away wants its first physical special (4573) on the character.
+character Hunter 20
+item 5286
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2
+npc guard 18168 Monster 50 0 0 level 81 skill PHYSICAL_SPECIAL2 4572 9 skill PHYSICAL_SPECIAL1 4573 9 clan tomb3_clan 600
+npc mate 18168 Monster 300 0 0 level 81 skill PHYSICAL_SPECIAL2 4572 9 skill PHYSICAL_SPECIAL1 4573 9 clan tomb3_clan 600
+roll guard 99
+roll mate 99
+
+event guard 1234 character 0
+  desires guard attack(player)=300
+event guard 1234 character 0
+  random always 99
+  desires guard attack(player)=1000
+tick x8
+hit guard 1
+  S MagicSkillUse caster=mate target=player skill=4573-9 hit=2510 reuse=19821 success=0

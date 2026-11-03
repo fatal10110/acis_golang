@@ -21,7 +21,6 @@ func BoatSinks(state *world.State) func(*boat.Boat) event.Sink {
 type boatSink struct {
 	world *world.State
 	boat  *boat.Boat
-	known world.KnownBuffer
 }
 
 // Emit sends ev's packets.
@@ -29,18 +28,18 @@ func (s *boatSink) Emit(ev event.Event) {
 	id := s.boat.ObjectID()
 	switch e := ev.(type) {
 	case event.BoatDeparted:
-		broadcastKnown(&s.known, s.world, s.boat, func() wire.Frame {
+		broadcastKnown(s.world, s.boat, func() wire.Frame {
 			return serverpackets.FrameMoveToLocation(id, e.Destination, e.From)
 		})
-		broadcastKnown(&s.known, s.world, s.boat, func() wire.Frame {
+		broadcastKnown(s.world, s.boat, func() wire.Frame {
 			return serverpackets.FrameVehicleDeparture(id, e.Speed, e.Rotation, e.Destination)
 		})
 	case event.BoatStarted:
-		broadcastKnown(&s.known, s.world, s.boat, func() wire.Frame {
+		broadcastKnown(s.world, s.boat, func() wire.Frame {
 			return serverpackets.FrameVehicleStarted(id, e.Moving)
 		})
 	case event.BoatShown:
-		broadcastKnown(&s.known, s.world, s.boat, func() wire.Frame {
+		broadcastKnown(s.world, s.boat, func() wire.Frame {
 			return vehicleInfoFrame(s.boat)
 		})
 	case event.BoatAnnounced:

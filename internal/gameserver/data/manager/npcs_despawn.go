@@ -2,19 +2,18 @@ package manager
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // DespawnAll removes every NPC from the world for good, as //unspawnall
-// does with SpawnManager.despawn and then World.deleteVisibleNpcSpawns:
+// does:
 //
 //   - every spawn slot is dropped and its pending respawn cancelled, so no
 //     NPC comes back, not even one whose corpse decays meanwhile;
 //   - every database-tracked spawn row of the spawn list is reset to
-//     uninitialized (SpawnData.setStatus(-1)), so the next save drops it;
+//     uninitialized, so the next save drops it;
 //   - every NPC in the world is deleted: the ones the spawn list placed,
 //     the standalone ones, and the ones no spawn placed (item decorations,
 //     signet points, NPCs other systems placed). Each leaves on its own
@@ -34,15 +33,16 @@ func (n *Npcs) DespawnAll() int {
 			if entry.DBName == "" {
 				continue
 			}
-			if state, ok := n.spawns.State(entry.DBName); ok {
-				state.Status = spawn.StatusUninitialized
-			}
+			n.spawns.Uninitialize(entry.DBName)
 		}
 	}
 	clear(n.slot)
+	clear(n.privates)
 	for _, g := range n.groups {
 		clear(g.keys)
+		g.orphansAlive = 0
 	}
+	n.despawns++
 	clear(n.live)
 	n.liveCount = 0
 	n.mu.Unlock()
@@ -57,7 +57,7 @@ func (n *Npcs) DespawnAll() int {
 }
 
 // deleteNpc deletes obj from the world, with no corpse and no respawn, when
-// it is an NPC: Npc.deleteMe. It reports false for anything else.
+// it is an NPC. It reports false for anything else.
 func (n *Npcs) deleteNpc(obj world.Tracked) bool {
 	switch o := obj.(type) {
 	case *npc.Hostile:
@@ -102,14 +102,13 @@ func onQueue(q *sim.Queue, fn func()) {
 	q.Post(fn)
 }
 
-// RespawnAll puts spawns in place of the spawn list and starts every
-// on-start maker of it, the makers of the listed spawn events and the
-// Seven Signs groups, as SpawnManager.reload does after //respawnall's
-// despawn: the database-tracked spawns come back as spawns' rows say. The
-// slots of an earlier spawn list are not touched; //respawnall runs
-// DespawnAll first, which drops them all. Only the swap holds the gate:
-// each NPC then read-holds it while it is placed, and its created hooks
-// run with no lock held.
+// RespawnAll puts spawns in place of the spawn list and starts every on-start
+// maker of it, the makers of the listed spawn events and the Seven Signs
+// groups, as //respawnall does after its despawn: the database-tracked spawns
+// come back as spawns' rows say. The slots of an earlier spawn list are not
+// touched; //respawnall runs DespawnAll first, which drops them all. Only the
+// swap holds the gate: each NPC then read-holds it while it is placed, and its
+// created hooks run with no lock held.
 func (n *Npcs) RespawnAll(spawns *Spawns) {
 	n.gate.Lock()
 	n.mu.Lock()

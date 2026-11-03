@@ -4,15 +4,17 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // ItemOwner is the owner and item enchant-data source for the stat
-// functions one equipped item instance's Modifiers contribute. Equality
-// between two ItemOwner values compares Inst and Tmpl, so
-// RemoveStatsByOwner drops only the functions attached for that specific
-// instance even when another equipped item shares its template.
+// functions one equipped item instance's Modifiers contribute. As a
+// ModOwner it is Inst alone, so RemoveStatsByOwner drops only the functions
+// attached for that specific instance even when another equipped item
+// shares its template, and drops them whatever template it is given: Tmpl
+// is the template the functions were attached with, which an item template
+// reload may since have replaced or removed.
 // EnchantLevel reads Inst's live snapshot on every call rather than a value
 // captured at attach time, so a scroll of enchant used on an
 // already-equipped item needs no explicit re-attach.
@@ -53,7 +55,7 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 	}
 	mods := make([]Mod, 0, len(owner.Tmpl.Modifiers))
 	for _, mod := range owner.Tmpl.Modifiers {
-		gate, err := itemModifierCondition(mod)
+		gate, attach, err := itemModifierCondition(mod)
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
@@ -65,42 +67,33 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
+		m.attach = attach
 		mods = append(mods, m)
 	}
 	return mods, nil
 }
 
-// itemModifierCondition builds the same effector-side gate as
-// funcCondition, converting item.StatModifier's own Condition/
-// AttachCondition (an XML-shape twin of modelskill.Condition/
+// itemModifierCondition builds the same gate and attached condition as
+// funcCondition and attachCondition, converting item.StatModifier's own
+// Condition/AttachCondition (an XML-shape twin of modelskill.Condition/
 // ConditionClause, parsed independently for item templates) to the shared
-// tree first.
-func itemModifierCondition(mod item.StatModifier) (Condition, error) {
-	var direct *modelskill.Condition
+// tree first. An item's func has no owning skill: its attached <cond> is
+// tested with none.
+func itemModifierCondition(mod item.StatModifier) (Condition, conditions.Condition, error) {
+	var gate Condition
 	if mod.Condition != nil {
-		c := ItemCondition(*mod.Condition)
-		direct = &c
-	}
-	var attach *modelskill.ConditionClause
-	if mod.AttachCondition != nil {
-		attach = &modelskill.ConditionClause{
-			Root:      ItemCondition(mod.AttachCondition.Root),
-			Message:   mod.AttachCondition.Message,
-			MessageID: mod.AttachCondition.MessageID,
-			AddName:   mod.AttachCondition.AddName,
+		c := conditions.ItemCondition(*mod.Condition)
+		g, err := funcCondition(&c)
+		if err != nil {
+			return nil, nil, err
 		}
+		gate = g
 	}
-	return funcCondition(direct, attach)
-}
-
-// ItemCondition is c in the skill condition shape the condition compiler
-// reads.
-func ItemCondition(c item.Condition) modelskill.Condition {
-	out := modelskill.Condition{Kind: c.Kind, Attrs: c.Attrs}
-	for _, ch := range c.Children {
-		out.Children = append(out.Children, ItemCondition(ch))
+	if mod.AttachCondition == nil {
+		return gate, nil, nil
 	}
-	return out
+	attach, err := conditions.Compile(conditions.ItemCondition(mod.AttachCondition.Root))
+	return gate, attach, err
 }
 
 func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond Condition) (Mod, error) {

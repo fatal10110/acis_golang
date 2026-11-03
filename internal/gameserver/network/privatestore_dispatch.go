@@ -11,7 +11,7 @@ import (
 // runs it on live's queue. It reports false when a malformed packet ended
 // the connection. A request with no player in the world is dropped.
 func (l *GameClientLink) dispatchPrivateStore(client *Client, live *livePlayer, opcode byte, payload []byte) bool {
-	maxItems := l.playerConfig.InventorySlots.MaxItemInPacket()
+	maxItems := l.playerConfig().InventorySlots.MaxItemInPacket()
 	var run func()
 	var err error
 	switch opcode {
@@ -77,7 +77,7 @@ func (l *GameClientLink) dispatchPrivateStore(client *Client, live *livePlayer, 
 		req, err = decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRecipeShopMakeItem)
 		// An order inside the manufacture reuse window, which self crafts
 		// share, is dropped silently before anything else is looked at.
-		if err == nil && !client.performFloodProtected(floodProtectorManufacture, l.playerConfig.ManufactureDelay, time.Now()) {
+		if err == nil && !client.performFloodProtected(floodProtectorManufacture, l.playerConfig().ManufactureDelay, time.Now()) {
 			return true
 		}
 		run = func() { l.orderWorkshopCraft(live, req) }

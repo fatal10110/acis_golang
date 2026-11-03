@@ -18,7 +18,7 @@ func TestMoveLivePlayerRejectsBeyond9900Units(t *testing.T) {
 	live := newTestLivePlayer(t, 1, frames)
 	testsupport.ResetCapture(frames)
 
-	gcl := &GameClientLink{log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	origin := location.Location{X: 0, Y: 0, Z: 0}
 	target := location.Location{X: 10000, Y: 0, Z: 0} // 10000 > 9900 cap
 	gcl.moveLivePlayer(live, target, origin)
@@ -34,9 +34,9 @@ func TestMoveLivePlayerRejectsBeyond9900Units(t *testing.T) {
 func TestMoveLivePlayerCancelsEnchantBefore9900Reject(t *testing.T) {
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
-	gcl := &GameClientLink{log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	live.Character.Inventory().AddNew(955, 1, 600) // the selected scroll
-	if !gcl.enchantStateStore().Select(live.ObjectID(), 600) {
+	if !gcl.enchanting.scrolls.Select(live.ObjectID(), 600) {
 		t.Fatal("Select returned false")
 	}
 	testsupport.ResetCapture(frames)
@@ -54,7 +54,7 @@ func TestMoveLivePlayerCancelsEnchantBefore9900Reject(t *testing.T) {
 	}
 	assertEnchantResultFrame(t, got[0], serverpackets.EnchantResultCancelled)
 	assertSystemMessageIDFrame(t, got[1], serverpackets.SystemMessageEnchantScrollCancelled)
-	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+	if got := gcl.enchanting.scrolls.Active(live.ObjectID()); got != 0 {
 		t.Fatalf("active scroll after too-far cancel = %d, want 0", got)
 	}
 }
@@ -68,7 +68,7 @@ func TestMoveLivePlayerRejectsZeroMoveSpeed(t *testing.T) {
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 
-	live.Character.Configure(player.Runtime{Rules: player.Rules{WeightLimitMultiplier: 1}})
+	live.Character.Configure(player.Runtime{Rules: player.NewRuleBook(player.Rules{WeightLimitMultiplier: 1})})
 	live.Character.Inventory().AddNew(9500, 100000, 999) // Heavy Ingot, weight 10 each
 	live.Character.Inventory().UpdateWeight()
 	live.Character.RefreshWeightPenalty()
@@ -77,7 +77,7 @@ func TestMoveLivePlayerRejectsZeroMoveSpeed(t *testing.T) {
 	}
 	testsupport.ResetCapture(frames)
 
-	gcl := &GameClientLink{log: zerolog.Nop()}
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
 	target := location.Location{X: 100, Y: 0, Z: 0}
 	origin := location.Location{X: 0, Y: 0, Z: 0}
 	gcl.moveLivePlayer(live, target, origin)
@@ -95,7 +95,7 @@ func TestMoveLivePlayerZeroSpeedKeepsActiveEnchant(t *testing.T) {
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 
-	live.Character.Configure(player.Runtime{Rules: player.Rules{WeightLimitMultiplier: 1}})
+	live.Character.Configure(player.Runtime{Rules: player.NewRuleBook(player.Rules{WeightLimitMultiplier: 1})})
 	live.Character.Inventory().AddNew(9500, 100000, 999) // Heavy Ingot, weight 10 each
 	live.Character.Inventory().UpdateWeight()
 	live.Character.RefreshWeightPenalty()
@@ -103,8 +103,8 @@ func TestMoveLivePlayerZeroSpeedKeepsActiveEnchant(t *testing.T) {
 		t.Fatalf("WeightPenalty() = %d, want 4 (fully overloaded)", got)
 	}
 
-	gcl := &GameClientLink{log: zerolog.Nop()}
-	if !gcl.enchantStateStore().Select(live.ObjectID(), 600) {
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()})
+	if !gcl.enchanting.scrolls.Select(live.ObjectID(), 600) {
 		t.Fatal("Select returned false")
 	}
 	testsupport.ResetCapture(frames)
@@ -117,7 +117,7 @@ func TestMoveLivePlayerZeroSpeedKeepsActiveEnchant(t *testing.T) {
 		got[0] != serverpackets.OpcodeActionFailed || got[1] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcodes = %x, want [ActionFailed, SystemMessage]", got)
 	}
-	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 600 {
+	if got := gcl.enchanting.scrolls.Active(live.ObjectID()); got != 600 {
 		t.Fatalf("active scroll after zero-speed reject = %d, want 600", got)
 	}
 }

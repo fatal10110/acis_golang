@@ -88,10 +88,10 @@ func (w *Writer) WriteBytes(b []byte) {
 }
 
 // WriteString appends s as null-terminated UTF-16LE: each rune as one or two
-// 16-bit code units, followed by a trailing 0x0000 unit.
+// 16-bit code units, followed by a trailing 0x0000 unit. A byte that is not
+// valid UTF-8 is emitted as U+FFFD.
 func (w *Writer) WriteString(s string) {
 	for _, r := range s {
-		// Ranging over a string replaces invalid UTF-8, including encoded surrogates, with RuneError.
 		if r < 0x10000 {
 			w.WriteUint16(uint16(r))
 			continue
@@ -99,6 +99,15 @@ func (w *Writer) WriteString(s string) {
 		high, low := utf16.EncodeRune(r)
 		w.WriteUint16(uint16(high))
 		w.WriteUint16(uint16(low))
+	}
+	w.WriteUint16(0)
+}
+
+// WriteUTF16 appends units verbatim as null-terminated UTF-16LE, so a
+// surrogate pair cut in two still reaches the client as its two halves.
+func (w *Writer) WriteUTF16(units []uint16) {
+	for _, u := range units {
+		w.WriteUint16(u)
 	}
 	w.WriteUint16(0)
 }
@@ -131,6 +140,14 @@ func (w *Writer) Len() int {
 // before its element count was known.
 func (w *Writer) PatchUint16(offset int, v uint16) {
 	binary.LittleEndian.PutUint16(w.buf[offset:offset+2], v)
+}
+
+// PatchInt32 overwrites the little-endian 32-bit integer at offset (an index
+// previously obtained from Len, immediately before the field it now patches
+// was written) with v. Used to backfill a count field written before its
+// element count was known.
+func (w *Writer) PatchInt32(offset int, v int32) {
+	binary.LittleEndian.PutUint32(w.buf[offset:offset+4], uint32(v))
 }
 
 // Bytes returns the assembled payload.

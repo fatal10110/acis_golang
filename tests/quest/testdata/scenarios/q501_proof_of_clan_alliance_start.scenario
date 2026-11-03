@@ -1,0 +1,78 @@
+# Proof Of Clan Alliance (Q501): the leader of a level 3 clan takes the quest from Sir Kristof Rodemai, Kalis sets the
+# sacrifices, and the leader, who cannot sacrifice at the Statue of Offering, is turned away by Kalis for the want of three Symbols
+# of Loyalty. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q501_proof_of_clan_alliance_start.golden
+character Leader 40
+clan 3
+random always 0
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page default/30757.htm
+page default/30759.htm
+page default/30758.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+npc statue 30757 Folk 20 0 0
+npc kalis 30759 Folk 30 0 0
+npc athrea 30758 Folk 40 0 0
+
+action kristof
+action kristof
+  S ActionFailed
+  S NpcHtmlMessage obj=kristof item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{kristof}_Quest
+  S NpcHtmlMessage obj=kristof item=0 page=script/quest/Q501_ProofOfClanAlliance/30756-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q501_ProofOfClanAlliance 30756-06.htm
+  S NpcHtmlMessage obj=kristof item=0 page=script/quest/Q501_ProofOfClanAlliance/30756-06.htm
+  S ActionFailed
+bypass Quest Q501_ProofOfClanAlliance 30756-07.htm
+  S QuestList 501:0x80000001
+  S ExShowQuestMark quest=501
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kristof item=0 page=script/quest/Q501_ProofOfClanAlliance/30756-07.htm
+  S ActionFailed
+  Q upsert Q501_ProofOfClanAlliance | <state> | STARTED
+  Q upsert Q501_ProofOfClanAlliance | <cond> | 1
+  rows Q501_ProofOfClanAlliance <cond>=1 <state>=STARTED
+action kalis
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q501_ProofOfClanAlliance 30759-02.htm
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-02.htm
+  S ActionFailed
+bypass Quest Q501_ProofOfClanAlliance 30759-03.htm
+  S QuestList 501:0x80000003
+  S ExShowQuestMark quest=501
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-03.htm
+  S ActionFailed
+  Q upsert Q501_ProofOfClanAlliance | <cond> | 2
+  rows Q501_ProofOfClanAlliance <cond>=2 <state>=STARTED
+action statue
+action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/30757.htm
+  S ActionFailed
+bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q501_ProofOfClanAlliance/30757-01a.htm
+  S ActionFailed
+  S ActionFailed
+action kalis
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-05.htm
+  S ActionFailed
+  S ActionFailed

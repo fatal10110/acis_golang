@@ -1,0 +1,18 @@
+# An Arrogant Search (Q348), level 60: the ark guardians speak at the first hit only only once. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q348_an_arrogant_search_guardians.golden
+character Dragoon 60
+quest Q348_AnArrogantSearch <cond>=5 <state>=STARTED points=0
+script quest.Q348_AnArrogantSearch
+item 4287 4288 4289 4290 4291 4292 4293 4397 4398 4399 4294 4295 1831 1061
+page script/quest/Q348_AnArrogantSearch/
+npc elberoth 27182 Monster 40 0 0
+npc shadowfang 27183 Monster 45 0 0
+
+hit elberoth 5
+  S NpcSay obj=elberoth type=0 npc=1027182 text="Sorry about this, but I must kill you now."
+hit elberoth 5
+hit shadowfang 5
+  S NpcSay obj=shadowfang type=0 npc=1027183 text="I shall drench this mountain with your blood!"
+hit shadowfang 5
+  state Q348_AnArrogantSearch STARTED
+  rows Q348_AnArrogantSearch <cond>=5 <state>=STARTED points=0

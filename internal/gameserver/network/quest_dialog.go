@@ -48,7 +48,7 @@ func (l *GameClientLink) questWindow(live *livePlayer, n attackable.Combatant, c
 	if l.scripts == nil {
 		return
 	}
-	name := strings.TrimFunc(strings.TrimPrefix(command, "Quest"), javaSpace)
+	name := strings.TrimFunc(strings.TrimPrefix(command, "Quest"), isCtrlOrSpace)
 	l.scripts.QuestWindow(script.PlayerOf(live), script.NPCOf(n), name)
 }
 
@@ -71,7 +71,7 @@ func (l *GameClientLink) bypassQuest(live *livePlayer, command string) {
 	if l.scripts == nil {
 		return
 	}
-	name, event, _ := strings.Cut(strings.TrimFunc(command[len("Quest "):], javaSpace), " ")
+	name, event, _ := strings.Cut(strings.TrimFunc(command[len("Quest "):], isCtrlOrSpace), " ")
 	l.scripts.QuestEvent(script.PlayerOf(live), l.lastQuestNPC(live), name, event)
 }
 

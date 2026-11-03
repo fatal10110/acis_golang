@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // useItem handles UseItem. ctrl is the client's Ctrl modifier, carried into
@@ -63,7 +64,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if itemhandler.ItemBlockedByKarmaTeleport(tmpl, l.skills, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
+	if itemhandler.ItemBlockedByKarmaTeleport(tmpl, l.skills, live.Karma(), l.playerConfig().KarmaPlayerCanTeleport) {
 		return
 	}
 	if live.Fishing() && tmpl.DefaultAction != item.ActionFishingShot {
@@ -130,7 +131,8 @@ func (l *GameClientLink) useItemHandler(live *livePlayer, inv *itemcontainer.Inv
 		l.useWindowItem(live, tmpl, rollDice) ||
 		l.usePaganKey(live, inv, inst, tmpl) ||
 		l.useManorItem(live, inv, inst, tmpl) ||
-		l.useTargetCastItem(live, inv, inst, ctrl)
+		l.useTargetCastItem(live, inv, inst, ctrl) ||
+		l.useMercenaryTicket(live, inv, inst, tmpl)
 }
 
 // raiseItemUse hands live's use of inst, once the item's own use is done,
@@ -268,14 +270,19 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 // that changes several slots sends one per item that changed skills. A set
 // piece cleared ahead of the chest is still checked against the old chest,
 // and every SkillList greys out its entries only while formal wear is worn
-// at that step.
+// at that step. An item coming off, and every item worn at a step, counts as
+// the template it went on with (skillstate.WornTemplate), so one whose
+// template a reload replaced or removed takes off everything it brought.
 func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
 	if live == nil || inv == nil {
 		return
 	}
-	steps := equipSteps(inv, res.Changed)
+	steps := equipSteps(live.Character, inv, res.Changed)
 	for i, inst := range res.Changed {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		if !inst.Equipped() {
+			tmpl, ok = skillstate.WornTemplate(live.Character, inv, inst)
+		}
 		if !ok {
 			continue
 		}
@@ -283,14 +290,12 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 	}
 	if l.shadowItems != nil {
 		for _, inst := range res.Changed {
-			tmpl, ok := inv.Templates().Get(inst.TemplateID)
-			if !ok {
+			if !inst.Equipped() {
+				l.shadowItems.Untrack(inst)
 				continue
 			}
-			if inst.Equipped() {
+			if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
 				l.shadowItems.Track(live.ObjectID(), inst, tmpl)
-			} else {
-				l.shadowItems.Untrack(inst)
 			}
 		}
 	}
@@ -348,11 +353,14 @@ type equipStep struct {
 // backwards from the paperdoll inv wears now: an item worn now went on at
 // its step, so it was not worn before it; one not worn now came off at its
 // step, so it was worn before it.
-func equipSteps(inv *itemcontainer.Inventory, changed []*item.Instance) []equipStep {
+func equipSteps(c *player.Character, inv *itemcontainer.Inventory, changed []*item.Instance) []equipStep {
 	worn := inv.PaperdollItems()
 	steps := make([]equipStep, len(changed))
+	wornTemplate := func(inst *item.Instance) (*item.Template, bool) {
+		return skillstate.WornTemplate(c, inv, inst)
+	}
 	for i := len(changed) - 1; i >= 0; i-- {
-		steps[i] = paperdollStep(inv.Templates(), slices.Clone(worn))
+		steps[i] = paperdollStep(wornTemplate, slices.Clone(worn))
 		inst := changed[i]
 		if inst.Equipped() {
 			worn = slices.DeleteFunc(worn, func(w *item.Instance) bool { return w == inst })
@@ -363,11 +371,12 @@ func equipSteps(inv *itemcontainer.Inventory, changed []*item.Instance) []equipS
 	return steps
 }
 
-// paperdollStep resolves the chest among worn.
-func paperdollStep(templates *item.Table, worn []*item.Instance) equipStep {
+// paperdollStep resolves the chest among worn, each item counting as the
+// template wornTemplate gives it.
+func paperdollStep(wornTemplate func(*item.Instance) (*item.Template, bool), worn []*item.Instance) equipStep {
 	step := equipStep{worn: skillstate.WornStep{Items: worn}}
 	for _, inst := range worn {
-		tmpl, ok := templates.Get(inst.TemplateID)
+		tmpl, ok := wornTemplate(inst)
 		if !ok {
 			continue
 		}
@@ -594,7 +603,7 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 // neither gets this far, since an augmented item is not
 // droppable and a quest item is ignored above.
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
-	if !liveItemOpsAllowed(live) || l.groundItems == nil {
+	if !liveItemOpsAllowed(live) || l.belongings.groundItems == nil {
 		return
 	}
 	inv := live.Inventory()
@@ -602,7 +611,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 	count := int(req.Count)
-	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig.DiscardItemDisabled && !live.accessLevel().IsGM)
+	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig().DiscardItemDisabled && !live.accessLevel().IsGM)
 	switch l.inventory.DropItemFailure(inv, req.ObjectID, count, refused) {
 	case invops.DropOK:
 	case invops.DropCannotDiscard:
@@ -631,18 +640,24 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 
-	res, ok, err := l.inventory.DropItem(inv, req.ObjectID, count)
+	if _, ok := l.dropToGround(live, inv, req.ObjectID, count, int(req.X), int(req.Y), int(req.Z)); !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
+// dropToGround drops count of live's item objectID on the ground at
+// (x, y, z) and returns it there, reporting false when nothing was
+// dropped. A worn item leaves the paperdoll before it reaches the ground:
+// its stat functions, item skills and shot charges go with it.
+func (l *GameClientLink) dropToGround(live *livePlayer, inv *itemcontainer.Inventory, objectID int32, count, x, y, z int) (*grounditem.Item, bool) {
+	res, ok, err := l.inventory.DropItem(inv, objectID, count)
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate dropped item id")
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+		return nil, false
 	}
 	if !ok {
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+		return nil, false
 	}
-	// A worn item leaves the paperdoll before it reaches the ground: its
-	// stat functions, item skills and shot charges go with it.
 	for _, unequipped := range res.Changed {
 		unequipped.UnchargeAllShots()
 	}
@@ -654,18 +669,18 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 	ground, err := grounditem.New(*res.Dropped, res.Template)
 	if err != nil {
 		l.log.Error().Err(err).Msg("build dropped ground item")
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+		return nil, false
 	}
 
-	l.groundItems.Drop(ground, task.DropOptions{
-		X:             int(req.X),
-		Y:             int(req.Y),
-		Z:             int(req.Z),
+	l.belongings.groundItems.Drop(ground, task.DropOptions{
+		X:             x,
+		Y:             y,
+		Z:             z,
 		Heading:       live.CurrentHeading(),
 		PlayerDropped: true,
 		DropperID:     live.ObjectID(),
 	})
+	return ground, true
 }
 
 // destroyLiveItem answers RequestDestroyItem. A player running a private
@@ -750,6 +765,16 @@ func destroyHeldItems(live *livePlayer, templateID int32, count int) bool {
 	return true
 }
 
+// destroyItemByItemID destroys count units of templateID out of live's
+// inventory with its notices: adena reads as adena spent or lacking,
+// anything else as destroyHeldItems names it.
+func destroyItemByItemID(live *livePlayer, templateID int32, count int) bool {
+	if templateID == item.AdenaID {
+		return reduceAdena(live, count)
+	}
+	return destroyHeldItems(live, templateID, count)
+}
+
 // sendDestroyedMessage names count units of templateID the player just
 // destroyed: a shadow item reads as its mana running out, several units
 // carry their count.
@@ -803,6 +828,10 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate crystal item id")
 		live.SendFrame(serverpackets.FrameActionFailed())
+		if len(res.Changed) > 0 {
+			l.applyEquipStatChanges(live, inv, res.Result)
+			l.broadcastEquipmentChange(live)
+		}
 		return
 	}
 	switch failure {
@@ -862,11 +891,33 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 
 // broadcastCharacterInfo resends UserInfo to live (refreshing its own
 // visible state) and CharInfo to every client that already knows about it
-// (broadcastCharInfo).
+// (broadcastCharInfo). A polymorphed live is shown to them as its NPC form
+// instead, with no relation update.
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	l.broadcastCharInfo(live, items)
+	l.broadcastLooks(live, items)
+}
+
+// broadcastLooks shows live to every client that already knows about it:
+// its CharInfo (broadcastCharInfo), or its NPC form while it is
+// polymorphed, with no relation update.
+func (l *GameClientLink) broadcastLooks(live *livePlayer, items []*item.Instance) {
+	form := live.Polymorph()
+	if form == nil {
+		l.broadcastCharInfo(live, items)
+		return
+	}
+	if l.world == nil {
+		return
+	}
+	broadcastFrame(func() wire.Frame { return serverpackets.FramePcMorphInfo(live.Character, *form) }, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
+	})
 }
 
 // busyTrading reports whether live runs or is setting up a private store or
