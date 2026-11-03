@@ -227,7 +227,6 @@ type Hostile struct {
 	// controller.
 	skillMu        sync.Mutex
 	disabledSkills map[int32]time.Time
-	maxBuffsAmount atomic.Int32
 }
 
 // OffensiveFollowLead identifies hostile NPCs that lead moving offensive-follow targets.
@@ -291,7 +290,6 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	}
 	h.zones = newZoneMember(h)
 	h.initSeedState()
-	h.maxBuffsAmount.Store(maxBuffCount)
 	// Raid and grand bosses are raid-related from construction; minions
 	// are marked at spawn (see SetRaidRelated).
 	h.raidRelated.Store(h.RaidBoss())

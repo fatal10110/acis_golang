@@ -59,8 +59,7 @@ type folkCombat struct {
 	// roll overrides the combat random source; nil draws at random.
 	roll func(n int) int
 
-	effects  *effect.List
-	maxBuffs atomic.Int32
+	effects *effect.List
 
 	// statMu guards statCalcs, its slots and passives; each Calculator
 	// guards its own mods. A Stat without a slot computes from passives,
@@ -103,9 +102,6 @@ type FolkRuntime struct {
 	Sink  event.Sink
 	// Effects is the server's effect-list context.
 	Effects effect.Env
-	// MaxBuffsAmount is the configured base buff-slot count; zero keeps the
-	// shipped default.
-	MaxBuffsAmount int
 	// AI is the AI task the NPC's spawner put it on, which it leaves when
 	// it dies; nil for none.
 	AI FolkAI
@@ -159,7 +155,6 @@ func folkAdmits(e *effect.Effect) bool {
 // its HP and MP.
 func (f *Folk) initCombat(passives *compiledPassives) {
 	f.effects = effect.NewList(f, effect.WithAdmission(folkAdmits))
-	f.maxBuffs.Store(maxBuffCount)
 	f.running.Store(true)
 	_, byStat := passives.attached(f.ConditionActor())
 	f.statMu.Lock()
@@ -188,9 +183,6 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	f.Scratch().setLife(f)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	f.resolveWeapon(rt.Items)
-	if rt.MaxBuffsAmount > 0 {
-		f.maxBuffs.Store(int32(rt.MaxBuffsAmount))
-	}
 	f.effects = effect.NewList(f, effect.WithEnv(rt.Effects), effect.WithAdmission(folkAdmits))
 	f.effects.SetQueue(rt.Queue)
 	f.keepTerritory()

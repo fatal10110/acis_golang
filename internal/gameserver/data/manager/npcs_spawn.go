@@ -147,7 +147,7 @@ func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc
 	}
 	inst.Home = loc
 	inst.HasHome = true
-	inst.DriftRange = n.settings.AI().DriftRange
+	inst.Limits = n.limits
 	inst.SpawnHeading = heading
 	n.mu.Lock()
 	info := n.slot[key]
@@ -179,7 +179,7 @@ func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc
 
 	speed := tmpl.RunSpeed
 	queue := n.queues.NewQueue("npc").Serial(inst.ObjectID)
-	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, &n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
+	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, &n.log, n.castDefs, n.castEffects, n.walker, n.maxGeoPathFailCount, n.zones, n.effects, queue)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil

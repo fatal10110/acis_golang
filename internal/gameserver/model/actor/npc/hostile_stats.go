@@ -114,20 +114,14 @@ func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {
 	h.emit(event.Status{Attrs: attrs})
 }
 
-// SetMaxBuffsAmount records the players.properties base buff-slot count.
-func (h *Hostile) SetMaxBuffsAmount(amount int) {
-	if h != nil {
-		h.maxBuffsAmount.Store(int32(amount))
-	}
-}
-
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs h can
-// hold at once: the configured base plus its template's Divine Inspiration.
+// hold at once: the base in force (Limits) plus its template's Divine
+// Inspiration.
 func (h *Hostile) MaxBuffCount() int {
 	if h == nil {
 		return maxBuffCount
 	}
-	return int(h.maxBuffsAmount.Load()) + h.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
+	return h.Instance.maxBuffsBase() + h.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
 }
 
 // ownerCalcs returns h's stat slots, with one created for every Stat a

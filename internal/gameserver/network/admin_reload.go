@@ -35,10 +35,14 @@ type DataReloads struct {
 	// multipliers every creature's base regeneration takes, the kill reward
 	// settings (party loot, the scripts and item creation share their
 	// party range and multiple item drop rule, NPC hate randomization
-	// their party range) and the enchant, skill, craft and multisell
-	// switches included. Every setting outside PlayerConfig
-	// keeps its boot value; the composition root that builds this hook
-	// lists them.
+	// their party range), the event settings and quest rates the scripts
+	// read, the PvP flag times, the base buff-slot count and drift range
+	// of every NPC (those already spawned included), ShowNpcLevel and the
+	// enchant, skill, craft and multisell switches included. Every setting
+	// outside PlayerConfig keeps its boot value (the calendar systems
+	// because they schedule their cycles at boot, the rest because each is
+	// read when its service is built); the composition root that builds
+	// this hook lists them.
 	Config func() (PlayerConfig, error)
 	// BuyLists reads the buylists anew, which the merchant then sells
 	// from, its limited stock rebuilt from the saved rows.

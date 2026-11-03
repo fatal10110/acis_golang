@@ -141,34 +141,43 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 // events properties files anew, failing as boot would on a file or value it cannot
 // read, and returns the player settings read from them.
 //
-// Only the player settings take the reloaded values, the rules of the
-// characters and summons already in the world, the regeneration
-// multipliers the characters, summons, NPCs and doors read, and the kill
-// reward settings (drop and XP/SP rates, auto-loot, party XP, the party
+// Only the player settings take the reloaded values, each group put in force
+// whole: the rules of the characters and summons already in the world, the
+// regeneration multipliers the characters, summons, NPCs and doors read, the
+// kill reward settings (drop and XP/SP rates, auto-loot, party XP, the party
 // range and the multiple item drop rule, shared by the kill rewards, party
-// loot, NPC hate randomization, the scripts and item creation) and the
-// event settings the event quests read (the Four Sepulchers party size and
-// the Dimensional Rift settings) included.
+// loot, NPC hate randomization, the scripts and item creation), the event
+// settings the event quests read (the Four Sepulchers party size and the
+// Dimensional Rift settings), the quest drop and reward rates the scripts
+// read, the PvP flag times (a flag already running keeps its deadline), the
+// MaxBuffsAmount and MaxDriftRange every NPC reads, those already spawned
+// included, and ShowNpcLevel (an NpcInfo already sent keeps its title).
+//
 // These keep their boot value, read once into what the boot built from
 // them:
 //   - the listener and login server addresses, the login registration
-//     (server id, hexid, status flags), the database and the client cipher;
+//     (server id, hexid, status flags), the database and the client cipher:
+//     the connections and the registration are made with them at boot;
 //   - the geodata and the town combat rule the zones were set up with,
 //     which //reload zone reapplies as booted;
-//   - AllowCursedWeapons, AllowBoat, DeleteCharAfterDays and NoSpawns;
-//   - the quest drop and reward rates, the PvP flag times, the ground item
-//     settings, the pet settings, the spellbook needs, StoreSkillCooltime
-//     and CancelLesserEffect;
-//   - the clan, siege, manor, Olympiad, hero, Seven Signs, festival,
-//     lottery, wedding, fishing championship, derby, scheme buffer,
-//     community board, petition and class master settings;
-//   - the NPC settings: the NPCs' own MaxBuffsAmount, AI, random walk
-//     rate, path fail count, raid multipliers, boss wait times, spawn
-//     multiplier and spawn events (//respawnall reads the spawn list with
-//     the boot multiplier), raid curse (characters included), NPC and
-//     summon crests and free teleport;
-//   - the merchant and augmentation settings, the chat settings, and the GM
-//     audit and item logs.
+//   - the calendar systems: the siege, Olympiad, hero, Seven Signs,
+//     festival, manor (RateDropManor included), lottery, derby, wedding and
+//     fishing championship settings. Each schedules its cycle at boot, and a
+//     change in the middle of one could leave the schedule and the stored
+//     state disagreeing;
+//   - the rest of the long tail, each read when its service or system is
+//     built and rarely changed on a running server: AllowCursedWeapons,
+//     AllowBoat, DeleteCharAfterDays, NoSpawns (the spawn passes, //respawnall
+//     included, keep the boot value), the ground item settings, the pet
+//     settings, the spellbook needs, StoreSkillCooltime and
+//     CancelLesserEffect, the NPC AI switches, see range and timings, the
+//     random walk rate, the path fail count, the raid multipliers, the boss
+//     wait times, the raid curse (characters included), the NPC and summon
+//     crests (ShowNpcCrest, ShowSummonCrest), free teleport, the merchant
+//     and augmentation settings, the chat settings, the GM audit and item
+//     logs, the clan, scheme buffer, community board, petition and class
+//     master settings, and the spawn multiplier and spawn events
+//     (//respawnall reads the spawn list with the boot multiplier).
 func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logger) (network.PlayerConfig, error) {
 	serverProps, err := loadGameServerProperties(paths, log)
 	if err != nil {
@@ -198,8 +207,17 @@ func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logge
 	if err != nil {
 		return network.PlayerConfig{}, err
 	}
+	rates, err := loadQuestRates(serverProps)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
 	settings := newPlayerConfig(cfg, gameplay, pvpOptions)
 	settings.KillRewards = &rewards
 	settings.Events = &events
+	settings.QuestRates = &rates
+	pvpTimes := pvpOptions.Times()
+	settings.PvPFlagTimes = &pvpTimes
+	limits := npcLimits(gameplay)
+	settings.NPCLimits = &limits
 	return settings, nil
 }

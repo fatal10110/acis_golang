@@ -26,10 +26,10 @@ type Instance struct {
 	// SpawnHeading is the heading restored when a non-follow arrival lands
 	// exactly on Home.
 	SpawnHeading int
-	// DriftRange is how far around Home the NPC's territory reaches and how
-	// far it strays from Home before it heads back: the configured drift
-	// range the spawn sets, the shipped 200 when not positive.
-	DriftRange int
+	// Limits holds the base buff-slot count and the drift range the NPC
+	// reads at each use, shared with the other NPCs of its population; nil
+	// reads DefaultLimits. Set before the NPC is placed, read-only after.
+	Limits *LimitBook
 	// Maker is the spawning npc-maker group. InTerritory and idle wander
 	// use its polygon when this is set. A nil Maker keeps the home-offset
 	// walk unless the NPC is a private, which offsets from current position.
@@ -141,11 +141,11 @@ func NewInstance(objectID int32, template *Template) (*Instance, error) {
 	return &Instance{ObjectID: objectID, Template: template, Kind: kind}, nil
 }
 
-// MaxDriftRange is the NPC's drift range: DriftRange when positive, else the
-// shipped 200.
+// MaxDriftRange is the NPC's drift range in force: the Limits one when
+// positive, else the shipped 200.
 func (inst *Instance) MaxDriftRange() int {
-	if inst.DriftRange > 0 {
-		return inst.DriftRange
+	if r := inst.Limits.Limits().DriftRange; r > 0 {
+		return r
 	}
 	return defaultDriftRange
 }
