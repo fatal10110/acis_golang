@@ -270,20 +270,20 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 // that changes several slots sends one per item that changed skills. A set
 // piece cleared ahead of the chest is still checked against the old chest,
 // and every SkillList greys out its entries only while formal wear is worn
-// at that step.
+// at that step. An item coming off, and every item worn at a step, counts as
+// the template it went on with (skillstate.WornTemplate), so one whose
+// template a reload replaced or removed takes off everything it brought.
 func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
 	if live == nil || inv == nil {
 		return
 	}
-	steps := equipSteps(inv, res.Changed)
+	steps := equipSteps(live.Character, inv, res.Changed)
 	for i, inst := range res.Changed {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		if !inst.Equipped() {
+			tmpl, ok = skillstate.WornTemplate(live.Character, inv, inst)
+		}
 		if !ok {
-			// A worn item whose template a reload removed can still come
-			// off: the stat functions it was attached with go with it.
-			if l.skills != nil && !inst.Equipped() {
-				l.skills.UnequipItemStatsReporting(live.Character, steps[i].worn, inst, nil, nil)
-			}
 			continue
 		}
 		l.applyEquipStep(live, inst, tmpl, steps[i])
@@ -353,11 +353,14 @@ type equipStep struct {
 // backwards from the paperdoll inv wears now: an item worn now went on at
 // its step, so it was not worn before it; one not worn now came off at its
 // step, so it was worn before it.
-func equipSteps(inv *itemcontainer.Inventory, changed []*item.Instance) []equipStep {
+func equipSteps(c *player.Character, inv *itemcontainer.Inventory, changed []*item.Instance) []equipStep {
 	worn := inv.PaperdollItems()
 	steps := make([]equipStep, len(changed))
+	wornTemplate := func(inst *item.Instance) (*item.Template, bool) {
+		return skillstate.WornTemplate(c, inv, inst)
+	}
 	for i := len(changed) - 1; i >= 0; i-- {
-		steps[i] = paperdollStep(inv.Templates(), slices.Clone(worn))
+		steps[i] = paperdollStep(wornTemplate, slices.Clone(worn))
 		inst := changed[i]
 		if inst.Equipped() {
 			worn = slices.DeleteFunc(worn, func(w *item.Instance) bool { return w == inst })
@@ -368,11 +371,12 @@ func equipSteps(inv *itemcontainer.Inventory, changed []*item.Instance) []equipS
 	return steps
 }
 
-// paperdollStep resolves the chest among worn.
-func paperdollStep(templates *item.Table, worn []*item.Instance) equipStep {
+// paperdollStep resolves the chest among worn, each item counting as the
+// template wornTemplate gives it.
+func paperdollStep(wornTemplate func(*item.Instance) (*item.Template, bool), worn []*item.Instance) equipStep {
 	step := equipStep{worn: skillstate.WornStep{Items: worn}}
 	for _, inst := range worn {
-		tmpl, ok := templates.Get(inst.TemplateID)
+		tmpl, ok := wornTemplate(inst)
 		if !ok {
 			continue
 		}

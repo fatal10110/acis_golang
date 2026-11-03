@@ -118,7 +118,7 @@ func NewUpdate(st item.InstanceState, state UpdateState) Update {
 // left. Every paperdoll mutation applies that rule, so each caller reports
 // the extra left-hand change among the instances it altered.
 //
-// mu guards paperdoll, wornMask, totalWeight, updates, removed, limiter,
+// mu guards paperdoll, wornTemplates, wornMask, totalWeight, updates, removed, limiter,
 // itemLog and itemOwner.
 // Mutable item fields are guarded by item.Instance.
 type Inventory struct {
@@ -131,13 +131,17 @@ type Inventory struct {
 
 	WeightLimit int
 
-	mu          sync.Mutex
-	paperdoll   [item.PaperdollSlots]*item.Instance
-	wornMask    int32
-	totalWeight int
-	updates     []Update
-	delivery    Delivery
-	limiter     Limiter
+	mu        sync.Mutex
+	paperdoll [item.PaperdollSlots]*item.Instance
+	// wornTemplates holds the template each paperdoll occupant went on
+	// with. It stays the occupant's template until it comes off, even when
+	// a reload replaces or drops that template id from the table.
+	wornTemplates [item.PaperdollSlots]*item.Template
+	wornMask      int32
+	totalWeight   int
+	updates       []Update
+	delivery      Delivery
+	limiter       Limiter
 	// removed holds the object ids of instances that left the inventory
 	// since the last fireDelivery, which hands them to a RemovalDelivery.
 	removed []int32
@@ -737,31 +741,28 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 	}
 
 	if old != nil {
-		inv.paperdoll[slot] = nil
+		oldTmpl := inv.wornTemplates[slot]
+		inv.paperdoll[slot], inv.wornTemplates[slot] = nil, nil
 		old.SetLocation(inv.Location(), 0)
-		if oldTmpl, ok := inv.Templates().Get(old.TemplateID); ok {
+		if oldTmpl != nil {
 			inv.wornMask &^= oldTmpl.Mask()
 		}
 		inv.queueUpdateLocked(old, UpdateModified)
 	}
 
 	if inst != nil {
-		inv.paperdoll[slot] = inst
+		inv.paperdoll[slot], inv.wornTemplates[slot] = inst, tmpl
 		inst.SetLocation(inv.equipLocation, slot)
 		inv.queueUpdateLocked(inst, UpdateModified)
 
 		switch {
 		case tmpl != nil && tmpl.Slot == item.SlotChest:
-			if legs := inv.paperdoll[Legs]; legs != nil {
-				if legsTmpl, ok := inv.Templates().Get(legs.TemplateID); ok && legsTmpl.Mask() == tmpl.Mask() {
-					inv.wornMask |= tmpl.Mask()
-				}
+			if legsTmpl := inv.wornTemplates[Legs]; legsTmpl != nil && legsTmpl.Mask() == tmpl.Mask() {
+				inv.wornMask |= tmpl.Mask()
 			}
 		case tmpl != nil && tmpl.Slot == item.SlotLegs:
-			if chest := inv.paperdoll[Chest]; chest != nil {
-				if chestTmpl, ok := inv.Templates().Get(chest.TemplateID); ok && chestTmpl.Mask() == tmpl.Mask() {
-					inv.wornMask |= tmpl.Mask()
-				}
+			if chestTmpl := inv.wornTemplates[Chest]; chestTmpl != nil && chestTmpl.Mask() == tmpl.Mask() {
+				inv.wornMask |= tmpl.Mask()
 			}
 		case tmpl != nil:
 			inv.wornMask |= tmpl.Mask()
@@ -802,16 +803,14 @@ func (inv *Inventory) EquipPlayerItem(inst *item.Instance, tmpl *item.Template) 
 	defer inv.Container.mu.RUnlock()
 	defer inv.mu.Unlock()
 
-	if chest := inv.paperdoll[Chest]; chest != nil {
-		if chestTmpl, ok := inv.Templates().Get(chest.TemplateID); ok && chestTmpl.Slot == item.SlotAllDress {
-			switch tmpl.Slot {
-			case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
-				if old := inv.setPaperdollItemLocked(Chest, nil, nil); old != nil {
-					altered = append(altered, old)
-				}
-			case item.SlotLegs, item.SlotFeet, item.SlotGloves, item.SlotHead:
-				return nil, true
+	if chestTmpl := inv.wornTemplates[Chest]; chestTmpl != nil && chestTmpl.Slot == item.SlotAllDress {
+		switch tmpl.Slot {
+		case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
+			if old := inv.setPaperdollItemLocked(Chest, nil, nil); old != nil {
+				altered = append(altered, old)
 			}
+		case item.SlotLegs, item.SlotFeet, item.SlotGloves, item.SlotHead:
+			return nil, true
 		}
 	}
 	return append(altered, inv.equipItemLocked(inst, tmpl)...), false
@@ -832,26 +831,20 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		}
 	}
 	set := func(slot int) {
+		oldTmpl := inv.wornTemplates[slot]
 		if old := inv.setPaperdollItemLocked(slot, inst, tmpl); old != nil && old != inst {
-			record(inv.releaseOffHandLocked(slot, old)...)
+			record(inv.releaseOffHandLocked(slot, oldTmpl)...)
 			record(old)
 		}
 		record(inv.pullOffHandLocked(slot, inst, tmpl)...)
 		record(inst)
 	}
 	clearSlot := func(slot int) {
+		oldTmpl := inv.wornTemplates[slot]
 		if old := inv.setPaperdollItemLocked(slot, nil, nil); old != nil {
-			record(inv.releaseOffHandLocked(slot, old)...)
+			record(inv.releaseOffHandLocked(slot, oldTmpl)...)
 			record(old)
 		}
-	}
-	occupantTemplate := func(slot int) *item.Template {
-		occ := inv.paperdoll[slot]
-		if occ == nil {
-			return nil
-		}
-		t, _ := inv.Templates().Get(occ.TemplateID)
-		return t
 	}
 
 	switch tmpl.Slot {
@@ -860,7 +853,7 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		set(RHand)
 
 	case item.SlotLHand:
-		if rhTmpl := occupantTemplate(RHand); rhTmpl != nil && rhTmpl.Slot == item.SlotLRHand {
+		if rhTmpl := inv.wornTemplates[RHand]; rhTmpl != nil && rhTmpl.Slot == item.SlotLRHand {
 			pairedBowArrow := rhTmpl.Weapon != nil && rhTmpl.Weapon.Type == item.WeaponBow &&
 				tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemArrow
 			pairedRodLure := rhTmpl.Weapon != nil && rhTmpl.Weapon.Type == item.WeaponFishingRod &&
@@ -891,7 +884,7 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		set(Chest)
 
 	case item.SlotLegs:
-		if chestTmpl := occupantTemplate(Chest); chestTmpl != nil && chestTmpl.Slot == item.SlotFullArmor {
+		if chestTmpl := inv.wornTemplates[Chest]; chestTmpl != nil && chestTmpl.Slot == item.SlotFullArmor {
 			clearSlot(Chest)
 		}
 		set(Legs)
@@ -906,13 +899,13 @@ func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) 
 		set(Head)
 
 	case item.SlotFace:
-		if hairTmpl := occupantTemplate(Hair); hairTmpl != nil && hairTmpl.Slot == item.SlotHairAll {
+		if hairTmpl := inv.wornTemplates[Hair]; hairTmpl != nil && hairTmpl.Slot == item.SlotHairAll {
 			clearSlot(Hair)
 		}
 		set(Face)
 
 	case item.SlotHair:
-		if faceTmpl := occupantTemplate(Face); faceTmpl != nil && faceTmpl.Slot == item.SlotHairAll {
+		if faceTmpl := inv.wornTemplates[Face]; faceTmpl != nil && faceTmpl.Slot == item.SlotHairAll {
 			clearSlot(Face)
 		}
 		set(Hair)
@@ -1006,23 +999,23 @@ func (inv *Inventory) unequipSlotLocked(slot int) []*item.Instance {
 	if slot < 0 || slot >= item.PaperdollSlots {
 		return nil
 	}
+	oldTmpl := inv.wornTemplates[slot]
 	old := inv.setPaperdollItemLocked(slot, nil, nil)
 	if old == nil {
 		return nil
 	}
-	return append(inv.releaseOffHandLocked(slot, old), old)
+	return append(inv.releaseOffHandLocked(slot, oldTmpl), old)
 }
 
 // releaseOffHandLocked applies the first half of the player's bow/rod rule
-// after old left paperdoll position slot: a bow or fishing rod leaving the
-// right hand clears the left hand. It returns the instance it took off, if
-// any. The caller holds mu.
-func (inv *Inventory) releaseOffHandLocked(slot int, old *item.Instance) []*item.Instance {
-	if !inv.pairsHands || slot != RHand || old == nil {
+// after an item that went on with template tmpl left paperdoll position
+// slot: a bow or fishing rod leaving the right hand clears the left hand. It
+// returns the instance it took off, if any. The caller holds mu.
+func (inv *Inventory) releaseOffHandLocked(slot int, tmpl *item.Template) []*item.Instance {
+	if !inv.pairsHands || slot != RHand || tmpl == nil {
 		return nil
 	}
-	tmpl, ok := inv.Templates().Get(old.TemplateID)
-	if !ok || tmpl.Weapon == nil || (tmpl.Weapon.Type != item.WeaponBow && tmpl.Weapon.Type != item.WeaponFishingRod) {
+	if tmpl.Weapon == nil || (tmpl.Weapon.Type != item.WeaponBow && tmpl.Weapon.Type != item.WeaponFishingRod) {
 		return nil
 	}
 	if off := inv.setPaperdollItemLocked(LHand, nil, nil); off != nil {
