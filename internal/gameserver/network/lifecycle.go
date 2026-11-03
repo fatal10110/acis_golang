@@ -207,11 +207,18 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 // those four jobs in front of this wait. The wait is a
 // bound, not a guarantee: awaitPersistence logs a wait it gave up on. The
 // restart and disconnect callers then continue, exactly as they do when the
-// saves themselves fail; character selection refuses instead of loading rows
-// the saves have not written. At shutdown every connection's exit waits in
-// parallel, so the game server's stop budget counts this once for the
-// listener's stop.
+// saves themselves fail; character selection refuses, answering with the
+// character list, instead of loading rows the saves have not written, and
+// warns once its wait passes half the budget. At shutdown every
+// connection's exit waits in parallel, so the game server's stop budget
+// counts this once for the listener's stop.
 const LivePlayerPersistWait = 3*livePlayerDetachSaveTimeout + task.ItemInstanceSaveTimeout
+
+// persistBudget is how long a connection waits for queued saves:
+// LivePlayerPersistWait unless the link was configured with another wait.
+func (l *GameClientLink) persistBudget() time.Duration {
+	return cmp.Or(l.persistWait, LivePlayerPersistWait)
+}
 
 // awaitPersistence waits until every save already enqueued for owners has
 // run, so a read that follows sees the rows those saves write. It reports,
@@ -221,7 +228,7 @@ func (l *GameClientLink) awaitPersistence(conn *Conn, owners ...int32) error {
 	if observe := conn.observePersistWait; observe != nil {
 		defer observe(owners)()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), cmp.Or(l.persistWait, LivePlayerPersistWait))
+	ctx, cancel := context.WithTimeout(context.Background(), l.persistBudget())
 	defer cancel()
 	err := l.persist.Flush(ctx, owners...)
 	if err != nil {

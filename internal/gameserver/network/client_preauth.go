@@ -243,8 +243,22 @@ func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connSta
 	if selected != nil {
 		cs.entering = selected
 	}
-	if next == selectionStopped {
+	switch next {
+	case selectionStopped:
 		return errDisconnect
+	case selectionFailed:
+		// No packet of the protocol reports a failed selection, and a client
+		// left without an answer stays waiting on it. The character list is
+		// what returns a client to character select after a restart or a
+		// delete, so it answers here too: the player is back at the list and
+		// can retry. A list that cannot be read either ends the connection,
+		// as it does for those requests.
+		list, err := l.sendCharSelectInfo(ctx, client)
+		if err != nil {
+			l.log.Error().Err(err).Msg("list characters")
+			return errDisconnect
+		}
+		cs.chars = list
 	}
 	return nil
 }
