@@ -43,7 +43,7 @@ func TestSkillCondThatHoldsNoConditionReadsNoFeedback(t *testing.T) {
 			if c.MessageID != 0 || c.AddName || c.Message != "" || !conditions.IsNull(c.Root) {
 				t.Errorf("%s: level %d clause = %+v, want a null root with no feedback", name, level, c)
 			}
-			if failed, ok := conditions.EvaluateSkill(def, caster, nil); ok || failed.MessageID != 0 {
+			if failed, ok := conditions.EvaluateSkill(*def, caster, nil); ok || failed.MessageID != 0 {
 				t.Errorf("%s: level %d cast = (%+v, %v), want refused with no feedback", name, level, failed, ok)
 			}
 		}
@@ -59,7 +59,7 @@ func TestSkillCondThatHoldsNoConditionReadsNoFeedback(t *testing.T) {
 	if len(def.Conditions) != 1 || def.Conditions[0].MessageID != 113 {
 		t.Fatalf("<player bogus level=1>: conditions = %+v, want one clause with msgId 113", def.Conditions)
 	}
-	if _, ok := conditions.EvaluateSkill(def, caster, nil); !ok {
+	if _, ok := conditions.EvaluateSkill(*def, caster, nil); !ok {
 		t.Error("<player bogus level=1> at level 40: cast refused, want allowed")
 	}
 }

@@ -237,14 +237,14 @@ func (a *testActor) MP() int { return a.mp }
 
 func (a *testActor) HP() int { return a.hp }
 
-func (a *testActor) MPInitialCost(def modelskill.Definition) int {
+func (a *testActor) MPInitialCost(def *modelskill.Definition) int {
 	if a.initialCost != 0 {
 		return a.initialCost
 	}
 	return def.MPInitialConsume
 }
 
-func (a *testActor) MPCost(def modelskill.Definition) int {
+func (a *testActor) MPCost(def *modelskill.Definition) int {
 	if a.hitCost != 0 {
 		return a.hitCost
 	}
@@ -275,7 +275,7 @@ func (a *testActor) SpiritshotCharged() bool { return a.spiritshot }
 
 func (a *testActor) BlessedSpiritshotCharged() bool { return a.blessedSpiritshot }
 
-func (a *testActor) SkillMastery(modelskill.Definition) bool {
+func (a *testActor) SkillMastery(*modelskill.Definition) bool {
 	return a.mastery
 }
 

@@ -101,7 +101,7 @@ func TestMuteStopDropsQueuedItemCast(t *testing.T) {
 		t.Fatal("a cast is in flight after the stop")
 	}
 	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
-		if pc.SkillDisabled(actorcast.ReuseKey(modelskill.Definition{ID: 2031, Level: 1})) {
+		if pc.SkillDisabled(actorcast.ReuseKey(&modelskill.Definition{ID: 2031, Level: 1})) {
 			t.Error("potion skill on reuse after the stop dropped it")
 		}
 	})

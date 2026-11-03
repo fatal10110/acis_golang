@@ -308,7 +308,7 @@ type deferredMagicSkill struct {
 type itemAICastIntention struct {
 	inventory *itemcontainer.Inventory
 	item      *item.Instance
-	skill     modelskill.Definition
+	skill     *modelskill.Definition
 	selected  world.Tracked
 	// ctrl is the UseItem Ctrl modifier, the cast's force-use flag.
 	ctrl bool
@@ -694,19 +694,19 @@ func (p *livePlayer) dropDeferredCast() bool {
 	return queued
 }
 
-func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
+func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill *modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl})
 }
 
 // approachItemAICast is deferItemAICast for the current CAST intention,
 // walking to its final target finalID before it casts.
-func (p *livePlayer) approachItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool, finalID int32) {
+func (p *livePlayer) approachItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill *modelskill.Definition, selected world.Tracked, ctrl bool, finalID int32) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl, approach: finalID})
 }
 
 // deferSummonCreatureCast stores the SUMMON_CREATURE cast of the pet collar
 // collar as the next CAST intention, cast on the player itself.
-func (p *livePlayer) deferSummonCreatureCast(inventory *itemcontainer.Inventory, collar *item.Instance, skill modelskill.Definition) {
+func (p *livePlayer) deferSummonCreatureCast(inventory *itemcontainer.Inventory, collar *item.Instance, skill *modelskill.Definition) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: collar, skill: skill, selected: p.Character, summon: true})
 }
 

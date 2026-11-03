@@ -56,7 +56,7 @@ func TestRevalidateLaunchSelfTargetSkipsEveryGate(t *testing.T) {
 	caster := &launchActor{id: 1, knows: false, inPeaceZone: true, sees: false}
 	def := modelskill.Definition{Offensive: true, Radius: 900, EffectRange: 50}
 
-	if got := RevalidateLaunch(caster, caster, def); got != LaunchAbortNone {
+	if got := RevalidateLaunch(caster, caster, &def); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch(self) = %v, want LaunchAbortNone", got)
 	}
 }
@@ -83,7 +83,7 @@ func TestRevalidateLaunchTargetLost(t *testing.T) {
 	target := &launchActor{id: 2}
 	def := modelskill.Definition{SkillType: "PDAM"}
 
-	if got := RevalidateLaunch(caster, target, def); got != LaunchAbortTargetLost {
+	if got := RevalidateLaunch(caster, target, &def); got != LaunchAbortTargetLost {
 		t.Fatalf("RevalidateLaunch() = %v, want LaunchAbortTargetLost", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestRevalidateLaunchSummonFriendBypassesTargetLost(t *testing.T) {
 	target := &launchActor{id: 2}
 	def := modelskill.Definition{SkillType: "SUMMON_FRIEND"}
 
-	if got := RevalidateLaunch(caster, target, def); got != LaunchAbortNone {
+	if got := RevalidateLaunch(caster, target, &def); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch(SUMMON_FRIEND) = %v, want LaunchAbortNone", got)
 	}
 }
@@ -140,7 +140,7 @@ func TestRevalidateLaunchEscapeRange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			caster := &launchActor{id: 1, knows: true, sees: true}
 			target := &launchActor{id: 2, x: tt.dist, knows: true, sees: true}
-			if got := RevalidateLaunch(caster, target, tt.def); got != tt.want {
+			if got := RevalidateLaunch(caster, target, &tt.def); got != tt.want {
 				t.Fatalf("RevalidateLaunch() = %v, want %v", got, tt.want)
 			}
 		})
@@ -154,7 +154,7 @@ func TestRevalidateLaunchEscapeRangeIncludesCollisionRadii(t *testing.T) {
 
 	// Raw distance (115) exceeds the range (100), but the actors' combined
 	// collision radii (40) cover the gap, matching MathUtil.checkIfInRange.
-	if got := RevalidateLaunch(caster, target, def); got != LaunchAbortNone {
+	if got := RevalidateLaunch(caster, target, &def); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch() = %v, want LaunchAbortNone (collision radii close the gap)", got)
 	}
 }
@@ -164,12 +164,12 @@ func TestRevalidateLaunchLineOfSight(t *testing.T) {
 	target := &launchActor{id: 2}
 
 	blocked := modelskill.Definition{Radius: 100}
-	if got := RevalidateLaunch(caster, target, blocked); got != LaunchAbortNoLineOfSight {
+	if got := RevalidateLaunch(caster, target, &blocked); got != LaunchAbortNoLineOfSight {
 		t.Fatalf("RevalidateLaunch(radius>0, blocked) = %v, want LaunchAbortNoLineOfSight", got)
 	}
 
 	noRadius := modelskill.Definition{Radius: 0}
-	if got := RevalidateLaunch(caster, target, noRadius); got != LaunchAbortNone {
+	if got := RevalidateLaunch(caster, target, &noRadius); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch(radius=0, blocked LOS) = %v, want LaunchAbortNone (gate skipped)", got)
 	}
 }
@@ -179,13 +179,13 @@ func TestRevalidateLaunchPeaceZone(t *testing.T) {
 
 	casterInZone := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer, inPeaceZone: true}
 	target := &launchActor{id: 2, kind: modelactor.KindPlayer}
-	if got := RevalidateLaunch(casterInZone, target, def); got != LaunchAbortCasterPeaceZone {
+	if got := RevalidateLaunch(casterInZone, target, &def); got != LaunchAbortCasterPeaceZone {
 		t.Fatalf("RevalidateLaunch(caster in peace zone) = %v, want LaunchAbortCasterPeaceZone", got)
 	}
 
 	caster := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer}
 	targetInZone := &launchActor{id: 2, kind: modelactor.KindPlayer, inPeaceZone: true}
-	if got := RevalidateLaunch(caster, targetInZone, def); got != LaunchAbortTargetPeaceZone {
+	if got := RevalidateLaunch(caster, targetInZone, &def); got != LaunchAbortTargetPeaceZone {
 		t.Fatalf("RevalidateLaunch(target in peace zone) = %v, want LaunchAbortTargetPeaceZone", got)
 	}
 }
@@ -197,7 +197,7 @@ func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := RevalidateLaunch(caster, target, modelskill.Definition{Offensive: true}); got != LaunchAbortTargetPeaceZone {
+	if got := RevalidateLaunch(caster, target, &modelskill.Definition{Offensive: true}); got != LaunchAbortTargetPeaceZone {
 		t.Fatalf("RevalidateLaunch(summon target in peace zone) = %v, want LaunchAbortTargetPeaceZone", got)
 	}
 }
@@ -211,13 +211,13 @@ func TestRevalidateLaunchPeaceZoneOnlyGatesOffensivePlayableVsPlayable(t *testin
 	target := &launchActor{id: 2, kind: modelactor.KindPlayer}
 
 	nonOffensive := modelskill.Definition{Offensive: false}
-	if got := RevalidateLaunch(caster, target, nonOffensive); got != LaunchAbortNone {
+	if got := RevalidateLaunch(caster, target, &nonOffensive); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch(non-offensive) = %v, want LaunchAbortNone", got)
 	}
 
 	npcTarget := &launchActor{id: 3, kind: modelactor.KindNPC}
 	offensive := modelskill.Definition{Offensive: true}
-	if got := RevalidateLaunch(caster, npcTarget, offensive); got != LaunchAbortNone {
+	if got := RevalidateLaunch(caster, npcTarget, &offensive); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch(caster peace zone, non-playable target) = %v, want LaunchAbortNone", got)
 	}
 }
@@ -227,7 +227,7 @@ func TestRevalidateLaunchAllGatesPass(t *testing.T) {
 	target := &launchActor{id: 2, kind: modelactor.KindPlayer}
 	def := modelskill.Definition{Offensive: true, EffectRange: 100, Radius: 100}
 
-	if got := RevalidateLaunch(caster, target, def); got != LaunchAbortNone {
+	if got := RevalidateLaunch(caster, target, &def); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch() = %v, want LaunchAbortNone", got)
 	}
 }

@@ -118,7 +118,7 @@ func TestItemCastConsumesItemBeforeMasteryAndInitialMP(t *testing.T) {
 	}
 	assertMagicSkillUseSelf(t, c.Read(), objID, 2031, 1, 500, 3000)
 
-	if !player.SkillDisabled(actorcast.ReuseKey(modelskill.Definition{ID: 2031, Level: 1})) {
+	if !player.SkillDisabled(actorcast.ReuseKey(&modelskill.Definition{ID: 2031, Level: 1})) {
 		t.Fatal("skill 2031 not on reuse after a mastery proc, want the item's 10 s reuse")
 	}
 	srv.InventoryUpdates.Tick()
@@ -159,7 +159,7 @@ func TestItemCastWithItemGoneChargesNothing(t *testing.T) {
 	if got := srv.PlayerCurrentMP(t, objID); got != mp {
 		t.Fatalf("MP after the item-gone cast = %d, want %d unchanged", got, mp)
 	}
-	if player.SkillDisabled(actorcast.ReuseKey(modelskill.Definition{ID: 2015, Level: 1})) {
+	if player.SkillDisabled(actorcast.ReuseKey(&modelskill.Definition{ID: 2015, Level: 1})) {
 		t.Fatal("skill 2015 on reuse after its item was gone, want nothing charged")
 	}
 	if srv.PlayerCastingNow(t, objID) {

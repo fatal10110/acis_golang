@@ -55,7 +55,7 @@ const (
 // one.
 type UseResult struct {
 	Outcome Outcome
-	Skill   modelskill.Definition
+	Skill   *modelskill.Definition
 	// Condition is set only when Outcome is ConditionRejected.
 	Condition modelskill.ConditionClause
 
@@ -171,7 +171,7 @@ func UseAll(req UseRequest) []UseResult {
 		if !ok {
 			continue
 		}
-		if failed, ok := conditions.EvaluateSkill(def, req.Caster, req.Target); !ok {
+		if failed, ok := conditions.EvaluateSkill(*def, req.Caster, req.Target); !ok {
 			return append(results, UseResult{Outcome: ConditionRejected, Skill: def, Condition: failed})
 		}
 
@@ -189,9 +189,9 @@ func UseAll(req UseRequest) []UseResult {
 		reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
 		mirrorToSummon := tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil
 		apply := func() actorcast.EffectResult {
-			result := actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Caster, def)
+			result := actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Caster, *def)
 			if mirrorToSummon {
-				summonResult := actorcast.ApplyEffectsResult(req.Effects, req.Summon, req.Summon, def)
+				summonResult := actorcast.ApplyEffectsResult(req.Effects, req.Summon, req.Summon, *def)
 				result.Messages = append(result.Messages, summonResult.Messages...)
 				result.AttackFailed += summonResult.AttackFailed
 				result.Handled = result.Handled || summonResult.Handled
@@ -223,7 +223,7 @@ func UseAll(req UseRequest) []UseResult {
 // It only reads caster's current HUD state; actually updating that state
 // (and sending the packet) is the caller's job once its own cast packets
 // are already on the wire.
-func shortBuffDecision(caster SkillCaster, def modelskill.Definition) (ok bool, skillID, level, durationSeconds int32) {
+func shortBuffDecision(caster SkillCaster, def *modelskill.Definition) (ok bool, skillID, level, durationSeconds int32) {
 	if !hpPotionSkillIDs[int32(def.ID)] || int32(def.ID) < caster.ShortBuffTaskSkillID() {
 		return false, 0, 0, 0
 	}
@@ -237,13 +237,13 @@ func shortBuffDecision(caster SkillCaster, def modelskill.Definition) (ok bool, 
 // resolveInstantItemSkillRef resolves ref to a potion or simultaneous-cast
 // definition. Anything else (unknown ref, or a non-instant skill) reports
 // not-ok so the caller can skip it.
-func resolveInstantItemSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (modelskill.Definition, bool) {
+func resolveInstantItemSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (*modelskill.Definition, bool) {
 	if defs == nil {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	def, ok := defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
 	if !ok || (!def.Potion && !def.SimultaneousCast) {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return def, true
 }
@@ -254,7 +254,7 @@ func resolveInstantItemSkillRef(ref modelitem.SkillRef, defs actorcast.Definitio
 // ordinary skill-cast pipeline (the item providing the skill, consumed on
 // each successful start). Empty when tmpl isn't an ItemSkills-handled etc
 // item, carries no such skill, or none of the skills resolve.
-func ResolveAICastSkills(tmpl *modelitem.Template, defs actorcast.Definitions) []modelskill.Definition {
+func ResolveAICastSkills(tmpl *modelitem.Template, defs actorcast.Definitions) []*modelskill.Definition {
 	if tmpl == nil || tmpl.Kind != modelitem.KindEtcItem || tmpl.EtcItem == nil {
 		return nil
 	}
@@ -264,7 +264,7 @@ func ResolveAICastSkills(tmpl *modelitem.Template, defs actorcast.Definitions) [
 	if defs == nil {
 		return nil
 	}
-	out := make([]modelskill.Definition, 0, len(tmpl.AttachedSkills))
+	out := make([]*modelskill.Definition, 0, len(tmpl.AttachedSkills))
 	for _, ref := range tmpl.AttachedSkills {
 		def, ok := defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
 		if !ok || def.Potion || def.SimultaneousCast {
@@ -281,7 +281,7 @@ func ResolveAICastSkills(tmpl *modelitem.Template, defs actorcast.Definitions) [
 // reports that reuse delay in milliseconds regardless of whether it
 // installed a cooldown: the shared-reuse-group packet carries the same reuse
 // value even when the delay is too short to disable the skill.
-func installItemReuse(caster SkillCaster, def modelskill.Definition, reuseKey int32, itemReuseDelay int32) int {
+func installItemReuse(caster SkillCaster, def *modelskill.Definition, reuseKey int32, itemReuseDelay int32) int {
 	reuse := time.Duration(def.ReuseDelay) * time.Millisecond
 	if item := time.Duration(itemReuseDelay) * time.Millisecond; item > reuse {
 		reuse = item

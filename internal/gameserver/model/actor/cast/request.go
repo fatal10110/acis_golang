@@ -12,14 +12,14 @@ import (
 
 // Definitions resolves loaded skill definitions.
 type Definitions interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 // StartHooks are the phase callbacks StartPlayerSkill / StartItemSkill
 // invoke while accepting a cast. Schedule uses Hooks for Launch / Hit /
 // Finish after the cast has already started.
 type StartHooks struct {
-	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)
+	ResolveTarget func(Target, world.Tracked, *modelskill.Definition, bool) (Target, skilltarget.CastRejection)
 	// StopMovement cancels an in-flight walk before final cast validation
 	// when the skill's template hit time is long enough to freeze the caster.
 	StopMovement func()
@@ -59,7 +59,7 @@ const fakeDeathSkillID = 60
 
 // StartedSkill is a player skill request accepted by the cast controller.
 type StartedSkill struct {
-	Definition     modelskill.Definition
+	Definition     *modelskill.Definition
 	Target         Target
 	Rejection      skilltarget.CastRejection
 	CanCastFailure bool
@@ -125,7 +125,7 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
 // sequence once a caller has already resolved def, regardless of whether
 // def came from the caster's own skill list or an item's attached skill.
-func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, hooks StartHooks) (StartedSkill, error) {
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def *modelskill.Definition, ctrl bool, hooks StartHooks) (StartedSkill, error) {
 	var target Target
 	var rejection skilltarget.CastRejection
 	var ok bool
@@ -186,7 +186,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 // stopForCast cancels an in-flight walk when the skill's template hit time
 // is long enough that the caster must stand still. Callers must already
 // have passed the pre-movement reuse and disable gates.
-func stopForCast(def modelskill.Definition, stopMovement func()) {
+func stopForCast(def *modelskill.Definition, stopMovement func()) {
 	if def.HitTime <= 50 || stopMovement == nil {
 		return
 	}
@@ -195,7 +195,7 @@ func stopForCast(def modelskill.Definition, stopMovement func()) {
 
 // faceCastTarget orients the caster toward a non-self target after the
 // cast has been accepted.
-func faceCastTarget(caster *player.Character, target Target, def modelskill.Definition) {
+func faceCastTarget(caster *player.Character, target Target, def *modelskill.Definition) {
 	if caster == nil || target == nil || def.HitTime <= 50 || target.ObjectID() == caster.ObjectID() {
 		return
 	}
@@ -217,19 +217,19 @@ type PlayerToggleRequest struct {
 // resource or touching effect state. ApplyToggle is the typical caller — it
 // looks up the caster's live effect list to decide the on/off branch and
 // drives Controller.CastToggle with the result.
-func ResolvePlayerToggle(req PlayerToggleRequest) (modelskill.Definition, Target, error) {
+func ResolvePlayerToggle(req PlayerToggleRequest) (*modelskill.Definition, Target, error) {
 	if req.Caster == nil || req.Caster.Dead() || (req.Caster.FakeDead() && req.SkillID != fakeDeathSkillID) || req.SkillID <= 0 || req.Definitions == nil {
-		return modelskill.Definition{}, nil, ErrSkillUnavailable
+		return nil, nil, ErrSkillUnavailable
 	}
 
 	level := req.Caster.SkillLevel(req.SkillID)
 	if level <= 0 {
-		return modelskill.Definition{}, nil, ErrSkillUnavailable
+		return nil, nil, ErrSkillUnavailable
 	}
 
 	def, ok := req.Definitions.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: level})
 	if !ok || def.Activation != modelskill.ActivationToggle {
-		return modelskill.Definition{}, nil, ErrSkillUnavailable
+		return nil, nil, ErrSkillUnavailable
 	}
 
 	target, ok := SelectTarget(req.Caster, req.Selected, def)

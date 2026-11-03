@@ -594,14 +594,14 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIControll
 			}
 		},
 		// A failed target condition is reported to the owner the same way.
-		OnTargetRejection: func(rejection skilltarget.CastRejection, def modelskill.Definition) {
+		OnTargetRejection: func(rejection skilltarget.CastRejection, def *modelskill.Definition) {
 			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 				sendTargetCastRejection(owner, rejection, def)
 			}
 		},
 		// So is every other refused gate (reuse, costs, sight, skill
 		// conditions), with the reason message a player's own cast reads.
-		OnCastRefusal: func(err error, def modelskill.Definition) {
+		OnCastRefusal: func(err error, def *modelskill.Definition) {
 			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 				sendMagicCastFailureReason(owner, def, err)
 			}

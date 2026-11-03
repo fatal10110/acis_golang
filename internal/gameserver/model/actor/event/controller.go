@@ -20,7 +20,7 @@ type CastAborted struct{}
 type CastFinished struct {
 	Interrupted  bool
 	Broken       bool
-	Skill        modelskill.Definition
+	Skill        *modelskill.Definition
 	Target       attackable.Combatant
 	LaunchTarget attackable.Combatant
 }

@@ -58,7 +58,7 @@ func TestBehindGatedCritFuncTestsAttackTarget(t *testing.T) {
 			onQueue(t, srv.PlayerQueue(t, objID), func() {
 				unbuffed = pc.CriticalRate()
 				if tc.buffed {
-					effect.Apply(pc, pc, effect.SkillFromDefinition(def), def.Effects)
+					effect.Apply(pc, pc, effect.SkillFromDefinition(*def), def.Effects)
 				}
 				shown = pc.CriticalRate()
 				// The hit roll lands, the critical roll sits at the unbuffed rate.

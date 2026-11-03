@@ -158,7 +158,7 @@ func (l *GameClientLink) rewardAdminSkills(gm, target *livePlayer) {
 // skill drops the skill its previous level brought along and re-points its
 // shortcuts at the new level; target gets its skill list either way, and
 // gm is told.
-func (l *GameClientLink) giveAdminSkill(gm, target *livePlayer, def modelskill.Definition) {
+func (l *GameClientLink) giveAdminSkill(gm, target *livePlayer, def *modelskill.Definition) {
 	before := target.SkillLevels()
 	id := int(def.ID)
 	if old := before[id]; old != def.Level {
@@ -200,9 +200,9 @@ func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bo
 	if level <= 0 {
 		return
 	}
-	def, _ := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
+	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
 	l.skills.ForgetSkill(live.Character, skillID, store)
-	if def.TriggeredID > 1 {
+	if known && def.TriggeredID > 1 {
 		l.removeLiveSkill(live, def.TriggeredID, false)
 	}
 	if live.cast != nil {
@@ -211,7 +211,7 @@ func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bo
 		}
 	}
 	live.StopSkillEffectsByID(modelskill.ID(skillID))
-	if store && def.Activation != modelskill.ActivationPassive {
+	if store && (!known || def.Activation != modelskill.ActivationPassive) {
 		l.deleteTargetShortcuts(live, shortcut.Skill, int32(skillID))
 	}
 }

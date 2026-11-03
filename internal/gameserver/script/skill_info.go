@@ -12,7 +12,7 @@ import (
 
 // SkillInfo is what a behavior reads of one skill level.
 type SkillInfo struct {
-	def skill.Definition
+	def *skill.Definition
 }
 
 // Skill returns the definition of ref. A skill the table does not hold
@@ -25,9 +25,9 @@ func (s *Script) Skill(ref skill.Ref) SkillInfo {
 	return SkillInfo{def: def}
 }
 
-func (s *Script) skillDef(ref skill.Ref) (skill.Definition, bool) {
+func (s *Script) skillDef(ref skill.Ref) (*skill.Definition, bool) {
 	if s.env == nil || s.env.Skills == nil {
-		return skill.Definition{}, false
+		return nil, false
 	}
 	return s.env.Skills.Definition(ref)
 }
@@ -123,7 +123,7 @@ func effectActor(c Creature) effectParticipant {
 func (s *Script) ApplyEffects(ref skill.Ref, effector, effected Creature) {
 	def := s.Skill(ref).def
 	from, to := effectActor(effector), effectActor(effected)
-	resisted := skillhandler.LandEffects(from, to, def)
+	resisted := skillhandler.LandEffects(from, to, *def)
 	if resisted == 0 {
 		return
 	}

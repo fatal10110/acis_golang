@@ -31,7 +31,7 @@ func TestConsumeAICastItemInstallsItemReuse(t *testing.T) {
 	inv := caster.Inventory()
 
 	consumed := ConsumeAICastItem(ConsumeAICastItemRequest{
-		Caster: caster, Definition: def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
+		Caster: caster, Definition: &def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
 	})
 	if consumed.Err != nil {
 		t.Fatalf("ConsumeAICastItem() error: %v", consumed.Err)
@@ -39,7 +39,7 @@ func TestConsumeAICastItemInstallsItemReuse(t *testing.T) {
 	if got := stackCount(inv, 20); got != 0 {
 		t.Fatalf("item stack after consume = %d, want 0 (the one carried unit destroyed)", got)
 	}
-	if !caster.SkillDisabled(actorcast.ReuseKey(def)) {
+	if !caster.SkillDisabled(actorcast.ReuseKey(&def)) {
 		t.Fatal("skill not disabled after the item was consumed, want the item reuse installed")
 	}
 }
@@ -52,12 +52,12 @@ func TestConsumeAICastItemMissingItemChangesNothing(t *testing.T) {
 
 	// Object 20 is not carried, so there is nothing to destroy.
 	consumed := ConsumeAICastItem(ConsumeAICastItemRequest{
-		Caster: caster, Definition: def, Inventory: inv, Item: carried(20, tmpl.ID, 1), Destroyer: destroyer(),
+		Caster: caster, Definition: &def, Inventory: inv, Item: carried(20, tmpl.ID, 1), Destroyer: destroyer(),
 	})
 	if !errors.Is(consumed.Err, actorcast.ErrNotEnoughItems) {
 		t.Fatalf("ConsumeAICastItem() error = %v, want ErrNotEnoughItems", consumed.Err)
 	}
-	if caster.SkillDisabled(actorcast.ReuseKey(def)) {
+	if caster.SkillDisabled(actorcast.ReuseKey(&def)) {
 		t.Fatal("skill disabled after a failed consume, want no reuse")
 	}
 	if got := stackCount(inv, 21); got != 1 {
@@ -74,7 +74,7 @@ func TestConsumeAICastItemReportsSharedReuseGroup(t *testing.T) {
 		inv := caster.Inventory()
 		tmpl := &modelitem.Template{ID: 1, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: -1}}
 		res := ConsumeAICastItem(ConsumeAICastItemRequest{
-			Caster: caster, Definition: def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
+			Caster: caster, Definition: &def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
 		})
 		if res.Err != nil {
 			t.Fatalf("ConsumeAICastItem() error: %v", res.Err)
@@ -89,7 +89,7 @@ func TestConsumeAICastItemReportsSharedReuseGroup(t *testing.T) {
 		inv := caster.Inventory()
 		tmpl := &modelitem.Template{ID: 1, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: 3, ReuseDelay: 8000}}
 		res := ConsumeAICastItem(ConsumeAICastItemRequest{
-			Caster: caster, Definition: def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
+			Caster: caster, Definition: &def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
 		})
 		if res.Err != nil {
 			t.Fatalf("ConsumeAICastItem() error: %v", res.Err)
@@ -1001,7 +1001,7 @@ func TestUse(t *testing.T) {
 
 	t.Run("reuse rejected before consume", func(t *testing.T) {
 		caster := newUseCaster(t)
-		caster.DisableSkill(actorcast.ReuseKey(potion), time.Hour)
+		caster.DisableSkill(actorcast.ReuseKey(&potion), time.Hour)
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, false)
 
 		res := Use(req)
@@ -1045,7 +1045,7 @@ func TestUse(t *testing.T) {
 		if res.ReuseMillis != 3000 {
 			t.Fatalf("ReuseMillis = %d, want 3000 (item's 3000 > skill's 1000)", res.ReuseMillis)
 		}
-		key := actorcast.ReuseKey(def)
+		key := actorcast.ReuseKey(&def)
 		if !caster.SkillDisabled(key) || !caster.HasSkillReuse(key) {
 			t.Fatalf("SkillDisabled/HasSkillReuse = %v/%v, want the item reuse installed", caster.SkillDisabled(key), caster.HasSkillReuse(key))
 		}
@@ -1098,7 +1098,7 @@ func TestUseAll(t *testing.T) {
 			t.Fatalf("results = %#v, want both skills in attached order", results)
 		}
 		for _, def := range []modelskill.Definition{first, second} {
-			if !caster.HasSkillReuse(actorcast.ReuseKey(def)) {
+			if !caster.HasSkillReuse(actorcast.ReuseKey(&def)) {
 				t.Fatalf("skill %d has no reuse recorded, want each applied skill's reuse installed", def.ID)
 			}
 		}
@@ -1106,7 +1106,7 @@ func TestUseAll(t *testing.T) {
 
 	t.Run("stops at the first reuse-disabled skill", func(t *testing.T) {
 		caster := newUseCaster(t)
-		caster.DisableSkill(actorcast.ReuseKey(first), time.Hour)
+		caster.DisableSkill(actorcast.ReuseKey(&first), time.Hour)
 
 		results := UseAll(newHerbPairRequest(t, first, second, caster, false))
 
@@ -1114,7 +1114,7 @@ func TestUseAll(t *testing.T) {
 			t.Fatalf("results = %#v, want first skill reuse rejection only", results)
 		}
 		for _, def := range []modelskill.Definition{first, second} {
-			if caster.HasSkillReuse(actorcast.ReuseKey(def)) {
+			if caster.HasSkillReuse(actorcast.ReuseKey(&def)) {
 				t.Fatalf("skill %d has a reuse recorded, want none installed", def.ID)
 			}
 		}
@@ -1146,7 +1146,7 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 			if got := stackCount(req.Inventory, useStackID); got != 5 {
 				t.Fatalf("stack left = %d, want untouched 5", got)
 			}
-			if caster.HasSkillReuse(actorcast.ReuseKey(first)) {
+			if caster.HasSkillReuse(actorcast.ReuseKey(&first)) {
 				t.Fatal("reuse recorded after a condition failure, want none")
 			}
 		})

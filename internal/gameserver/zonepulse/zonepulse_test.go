@@ -79,9 +79,12 @@ func (o objects) Object(id int32) (world.Tracked, bool) {
 
 type skills map[modelskill.Ref]modelskill.Definition
 
-func (s skills) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (s skills) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	d, ok := s[ref]
-	return d, ok
+	if !ok {
+		return nil, false
+	}
+	return &d, true
 }
 
 // effects lands skills by recording them on the creature; refuse fails the

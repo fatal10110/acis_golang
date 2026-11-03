@@ -317,7 +317,7 @@ func (c Cast) reportResisted(target Actor, def modelskill.Definition, count int)
 
 // Definitions resolves loaded skill definitions.
 type Definitions interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 	MaxLevel(modelskill.ID) int
 }
 

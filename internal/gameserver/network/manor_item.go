@@ -42,7 +42,7 @@ func (l *GameClientLink) useManorItem(live *livePlayer, inv *itemcontainer.Inven
 		if decision.Carrier {
 			carrier = inst
 		}
-		l.castItemSkills(live, inv, carrier, []modelskill.Definition{decision.Skill}, false, false)
+		l.castItemSkills(live, inv, carrier, []*modelskill.Definition{decision.Skill}, false, false)
 	case itemhandler.ManorUnavailableForSeeding:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetUnavailableForSeeding))
 	case itemhandler.ManorSeedNotHere:

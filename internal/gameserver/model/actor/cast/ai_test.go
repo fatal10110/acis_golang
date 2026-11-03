@@ -26,7 +26,7 @@ func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 	}
 
 	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true}
-	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); err != nil {
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &def); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	if !ai.Disabled() {
@@ -89,7 +89,7 @@ func TestAIControllerCanAttemptReflectsCooldown(t *testing.T) {
 		t.Fatal("CanAttempt() = false with no cooldown installed")
 	}
 
-	actor.disabledKeys = map[int32]bool{ReuseKey(def): true}
+	actor.disabledKeys = map[int32]bool{ReuseKey(&def): true}
 	if ai.CanAttempt(target, ref) {
 		t.Fatal("CanAttempt() = true while the reuse key is disabled")
 	}
@@ -116,7 +116,7 @@ func TestAIControllerCanCastReflectsControllerGates(t *testing.T) {
 func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
-	actor := &testActor{mp: 10, hp: 100, disabledKeys: map[int32]bool{ReuseKey(def): true}}
+	actor := &testActor{mp: 10, hp: 100, disabledKeys: map[int32]bool{ReuseKey(&def): true}}
 	ctrl := NewController(actor, nil)
 	ai := &AIController{Controller: ctrl, Definitions: definitions(def)}
 	target := &fakeCastCreature{id: 2}

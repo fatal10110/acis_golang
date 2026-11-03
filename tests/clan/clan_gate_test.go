@@ -29,10 +29,12 @@ const clanGateID = 3632
 func clanGateSkill(t *testing.T) gameservertest.Option {
 	t.Helper()
 	defs, _ := shippedSkillData(t)
-	def, ok := defs.Get(clanGateID, 1)
+	shipped, ok := defs.Get(clanGateID, 1)
 	if !ok {
 		t.Fatal("no shipped Clan Gate")
 	}
+	// The shipped table is shared: change a copy.
+	def := *shipped
 	def.HitTime, def.ReuseDelay = 0, 0
 	db := sqltest.SharedDB(t)
 	return gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{def}), gamesql.NewCharacterSkillStore(db)))

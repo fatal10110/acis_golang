@@ -59,7 +59,7 @@ func TestPlayerPreAttemptGateOrderAndExemptions(t *testing.T) {
 			name: "reuse answers before sitting", def: active,
 			setup: func(_ *testing.T, ch *player.Character) {
 				ch.SetStanding(false)
-				ch.DisableSkill(ReuseKey(active), time.Minute)
+				ch.DisableSkill(ReuseKey(&active), time.Minute)
 			},
 			want: ErrSkillDisabled,
 		},
@@ -82,7 +82,7 @@ func TestPlayerPreAttemptGateOrderAndExemptions(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(t, ch)
 			}
-			err := ctrl.CanPlayerAttemptCast(ch, ch, tt.def)
+			err := ctrl.CanPlayerAttemptCast(ch, ch, &tt.def)
 			if tt.want == nil && err != nil {
 				t.Fatalf("CanPlayerAttemptCast = %v, want nil", err)
 			}
@@ -103,7 +103,7 @@ type olympiadActor struct {
 
 func (a *olympiadActor) ActingPlayerInOlympiad() bool { return a.olympiad }
 
-func (a *olympiadActor) SkillConditions(Target, modelskill.Definition) (modelskill.ConditionClause, bool) {
+func (a *olympiadActor) SkillConditions(Target, *modelskill.Definition) (modelskill.ConditionClause, bool) {
 	return modelskill.ConditionClause{MessageID: 113}, !a.condFail
 }
 
@@ -143,7 +143,7 @@ func TestCanCastRefusesOlympiadSkills(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			actor := &olympiadActor{testActor: testActor{mp: 100, hp: 100}, olympiad: tt.olympiad, condFail: tt.condFail}
-			err := NewController(actor, nil).CanCast(testTarget{}, tt.def)
+			err := NewController(actor, nil).CanCast(testTarget{}, &tt.def)
 			switch want := tt.want.(type) {
 			case nil:
 				if err != nil {
@@ -221,7 +221,7 @@ func TestServitorSummonMidSwingAnswersCannotSummonInCombat(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := NewController(PlayerActor{Character: ch, Attack: tt.swinging}, nil)
-			if err := ctrl.CanCast(ch, tt.def); !errors.Is(err, tt.want) {
+			if err := ctrl.CanCast(ch, &tt.def); !errors.Is(err, tt.want) {
 				t.Fatalf("CanCast = %v, want %v", err, tt.want)
 			}
 		})

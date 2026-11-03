@@ -778,7 +778,7 @@ func (l *GameClientLink) hallManagerSelfBuff(f *npc.Folk) {
 	if !ok {
 		return
 	}
-	skillhandler.LandEffects(f, f, def)
+	skillhandler.LandEffects(f, f, *def)
 }
 
 // hallSupportAnswer tells the player a clan hall manager cast support magic

@@ -115,7 +115,7 @@ func TestSkillConditionTableRefsResolveWithSkillTemplate(t *testing.T) {
 				t.Errorf("%s: level %d not loaded", tc.name, level)
 				continue
 			}
-			if got := tc.attr(def)[tc.key]; got != tc.want[i] {
+			if got := tc.attr(*def)[tc.key]; got != tc.want[i] {
 				t.Errorf("%s: level %d %s = %q, want %q", tc.name, level, tc.key, got, tc.want[i])
 			}
 		}

@@ -169,9 +169,12 @@ func buffEffect() []modelskill.EffectTemplate {
 
 type continuousDefinitions map[modelskill.Ref]modelskill.Definition
 
-func (d continuousDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (d continuousDefinitions) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 	def, ok := d[ref]
-	return def, ok
+	if !ok {
+		return nil, false
+	}
+	return &def, true
 }
 
 func (d continuousDefinitions) MaxLevel(id modelskill.ID) int {

@@ -616,7 +616,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 }
 
 type skillLookup interface {
-	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	Definition(modelskill.Ref) (*modelskill.Definition, bool)
 }
 
 func (a *Actor) attachTemplatePassives(lookup skillLookup, passives []modelskill.Ref) error {

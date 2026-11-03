@@ -111,7 +111,7 @@ func TestPlayerRangedCastNeedsLineOfSight(t *testing.T) {
 				t.Fatalf("%s: MP = %d after the refusal, want untouched %d", tc.name, got, mp)
 			}
 			var disabled bool
-			onPlayerQueue(t, srv, objID, func(pc *player.Character) { disabled = pc.SkillDisabled(cast.ReuseKey(def)) })
+			onPlayerQueue(t, srv, objID, func(pc *player.Character) { disabled = pc.SkillDisabled(cast.ReuseKey(&def)) })
 			if disabled {
 				t.Fatalf("%s charged the skill's reuse", tc.name)
 			}

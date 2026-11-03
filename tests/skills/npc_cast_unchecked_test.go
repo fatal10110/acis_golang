@@ -44,7 +44,7 @@ func TestScriptCastUncheckedSkipsTheStartGates(t *testing.T) {
 		}
 	})
 	drainUntilQuiet(t, w.c)
-	w.caster.DisableSkill(actorcast.ReuseKey(def), time.Minute)
+	w.caster.DisableSkill(actorcast.ReuseKey(&def), time.Minute)
 	ref := modelskill.Ref{ID: corpseClear, Level: 1}
 
 	w.cast(corpseClear)

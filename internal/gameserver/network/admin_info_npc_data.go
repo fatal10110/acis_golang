@@ -92,10 +92,12 @@ func (l *GameClientLink) npcSkillContent(t *npc.Template) string {
 	var b strings.Builder
 	for _, typ := range slices.Sorted(maps.Keys(t.SkillsByType)) {
 		ref := t.SkillsByType[typ]
-		def, _ := l.skills.Definition(ref)
-		name := def.Name
-		if def.SkillType == "NOTDONE" {
-			name = `<font color="777777">` + name + "</font>"
+		var name string
+		if def, ok := l.skills.Definition(ref); ok {
+			name = def.Name
+			if def.SkillType == "NOTDONE" {
+				name = `<font color="777777">` + name + "</font>"
+			}
 		}
 		b.WriteString(`<br><font color="LEVEL">` + typ.String() + "</font><br1>")
 		b.WriteString(name + " [" + strconv.Itoa(int(ref.ID)) + "-" + strconv.Itoa(ref.Level) + "]<br1>")

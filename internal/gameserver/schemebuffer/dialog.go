@@ -184,7 +184,7 @@ func (d dialog) give(args []string) Reply {
 				continue
 			}
 			if def, ok := d.m.skills.Definition(buff.Skill); ok {
-				reply.Buffs = append(reply.Buffs, def)
+				reply.Buffs = append(reply.Buffs, *def)
 			}
 		}
 	}
@@ -443,7 +443,10 @@ func (m *Manager) skillName(id int32) (string, bool) {
 		return "", false
 	}
 	def, ok := m.skills.Get(skill.ID(id), 1)
-	return def.Name, ok
+	if !ok {
+		return "", false
+	}
+	return def.Name, true
 }
 
 // fee is what giving ids costs: the static cost per buff when one is set,

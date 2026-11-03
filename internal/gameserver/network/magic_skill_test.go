@@ -211,7 +211,7 @@ func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			testsupport.ResetCapture(frames)
-			sendTargetCastRejection(live, tt.rejection, tt.def)
+			sendTargetCastRejection(live, tt.rejection, &tt.def)
 			sendMagicActionFailed(live)
 
 			got := frames.Frames()
@@ -243,7 +243,7 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 		t.Fatal(err)
 	}
 	l := newBareGameClientLink(t, GameClientLinkConfig{})
-	target, rejection := l.resolveMagicSkillTarget(live.Character, locked, modelskill.Definition{Target: modelskill.TargetUnlockable}, false)
+	target, rejection := l.resolveMagicSkillTarget(live.Character, locked, &modelskill.Definition{Target: modelskill.TargetUnlockable}, false)
 	if target != locked {
 		t.Fatalf("target = %T, want locked door", target)
 	}
@@ -251,7 +251,7 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 		t.Fatalf("rejection = %v, want silent", rejection)
 	}
 	testsupport.ResetCapture(frames)
-	sendTargetCastRejection(live, rejection, modelskill.Definition{})
+	sendTargetCastRejection(live, rejection, &(modelskill.Definition{}))
 	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 0 {
 		t.Fatalf("silent rejection opcodes = %x, want none", got)
 	}

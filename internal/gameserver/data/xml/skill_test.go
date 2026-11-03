@@ -64,8 +64,13 @@ func (fakeWearingActor) InventorySize() int                { return 0 }
 func (fakeWearingActor) InventoryLimit() int               { return 0 }
 func (fakeWearingActor) Charges() int                      { return 0 }
 func (a fakeWearingActor) IsWearingType(mask int) bool     { return a.mask&mask != 0 }
+func (fakeWearingActor) TargetID() (int, bool)             { return 0, false }
+func (fakeWearingActor) RaceOrdinal() (int, bool)          { return 0, false }
 
-var _ stat.Actor = fakeWearingActor{}
+var (
+	_ stat.Actor       = fakeWearingActor{}
+	_ conditions.Actor = fakeWearingActor{}
+)
 
 // TestConditionalStatFuncsBuildForEveryShippedSkill covers issue #1499's
 // acceptance criteria directly against the real datapack: every shipped
@@ -131,7 +136,7 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 142 level 5 not loaded")
 		}
-		funcs, err := effect.PassiveFuncs(def)
+		funcs, err := effect.PassiveFuncs(*def)
 		if err != nil {
 			t.Fatalf("PassiveFuncs(skill 142 level 5): %v", err)
 		}
@@ -217,7 +222,7 @@ func TestSkillStackTypeComesFromFirstShippedTemplate(t *testing.T) {
 		if len(def.Effects) != 2 || def.Effects[1].StackType != tc.second {
 			t.Fatalf("skill %d effects = %+v, want two templates, second %q", tc.id, def.Effects, tc.second)
 		}
-		if got := effect.SkillFromDefinition(def).StackType; got != tc.first {
+		if got := effect.SkillFromDefinition(*def).StackType; got != tc.first {
 			t.Fatalf("SkillFromDefinition(skill %d).StackType = %q, want first template's %q", tc.id, got, tc.first)
 		}
 	}
@@ -338,7 +343,7 @@ func TestLoadSkillDefinitions(t *testing.T) {
 			if def.Activation != skill.ActivationPassive {
 				t.Fatalf("skill 5076 level %d activation = %v, want passive", level, def.Activation)
 			}
-			funcs, err := effect.PassiveFuncs(def)
+			funcs, err := effect.PassiveFuncs(*def)
 			if err != nil {
 				t.Fatalf("PassiveFuncs(skill 5076 level %d) error: %v", level, err)
 			}

@@ -7,8 +7,8 @@ import "testing"
 func TestZeroTableReadsEmpty(t *testing.T) {
 	var table Table
 
-	if d, ok := table.Get(1, 1); ok || d.ID != 0 {
-		t.Fatalf("Get on zero Table = %+v, %v; want zero, false", d, ok)
+	if d, ok := table.Get(1, 1); ok || d != nil {
+		t.Fatalf("Get on zero Table = %+v, %v; want nil, false", d, ok)
 	}
 	if got := table.MaxLevel(1); got != 0 {
 		t.Fatalf("MaxLevel on zero Table = %d; want 0", got)

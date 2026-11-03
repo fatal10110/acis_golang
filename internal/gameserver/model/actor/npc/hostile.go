@@ -245,7 +245,7 @@ func Attackable(inst *Instance) bool {
 
 // skillDefinitions resolves loaded skill definitions for template passives.
 type skillDefinitions interface {
-	Definition(skill.Ref) (skill.Definition, bool)
+	Definition(skill.Ref) (*skill.Definition, bool)
 }
 
 // NewHostile creates a live attackable NPC wrapper for inst. skills, when

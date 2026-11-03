@@ -22,10 +22,10 @@ func (p *Persistence) TopLevelDefinitions() []modelskill.Definition {
 // key does: the two fold into one id*256+level key (32-bit, wrapping), so a
 // level outside 0-255 lands on another id's level, and the definition at
 // that key is returned.
-func (p *Persistence) KeyedDefinition(id, level int32) (modelskill.Definition, bool) {
+func (p *Persistence) KeyedDefinition(id, level int32) (*modelskill.Definition, bool) {
 	key := id*skillKeyLevels + level
 	if key < 0 {
-		return modelskill.Definition{}, false
+		return nil, false
 	}
 	return p.definition(modelskill.Ref{ID: modelskill.ID(key / skillKeyLevels), Level: int(key % skillKeyLevels)})
 }

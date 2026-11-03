@@ -57,7 +57,7 @@ type ManorUse struct {
 	Refusal ManorRefusal
 	// Skill is cast on the user's current target, with no modifiers, when
 	// Refusal is ManorAllowed.
-	Skill modelskill.Definition
+	Skill *modelskill.Definition
 	// Carrier reports that the item itself carries the cast: it is spent as
 	// the cast starts and is the seed the sow reads. A harvester's cast is
 	// an ordinary skill cast.

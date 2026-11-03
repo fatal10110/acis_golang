@@ -23,7 +23,10 @@ func (l *GameClientLink) clanSkillMinClass(sk clan.Skill) (int, bool) {
 		return 0, false
 	}
 	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(sk.ID), Level: sk.Level})
-	return def.MinPledgeClass, ok
+	if !ok {
+		return 0, false
+	}
+	return def.MinPledgeClass, true
 }
 
 // clanSkillRefs is skills as skill references.

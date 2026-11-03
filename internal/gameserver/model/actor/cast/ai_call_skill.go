@@ -37,7 +37,7 @@ func (a *AIController) CallSkill(target attackable.Combatant, ref modelskill.Ref
 			a.OnHitResult(EffectResult{Messages: []any{message}})
 		}
 	}
-	result := CallSkill(handlers, caster, actor, def)
+	result := CallSkill(handlers, caster, actor, *def)
 	if a.OnHitResult != nil {
 		a.OnHitResult(result)
 	}
