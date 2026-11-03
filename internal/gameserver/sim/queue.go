@@ -45,8 +45,10 @@ type Queue struct {
 	scheduled bool     // Pool only: q is in the run queue or being drained
 	backlog   bool     // Pool only: pending tasks crossed highWater and have not dropped back below it
 	closed    bool
-	accepted  uint64              // tasks and timer expiries the executor took from q, ever
-	timers    map[*Timer]struct{} // armed timers and tickers, cancelled by Close
+	accepted  uint64 // tasks and timer expiries the executor took from q, ever
+	// timers heads the list of armed timers and tickers, linked through
+	// Timer.prev and Timer.succ; Close walks it to cancel them.
+	timers *Timer
 }
 
 // Post appends fn to the queue. It never runs fn inline and never waits for
@@ -88,14 +90,41 @@ func (q *Queue) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closed = true
-	for t := range q.timers {
-		if t.pastClose {
-			continue
+	for t := q.timers; t != nil; {
+		succ := t.succ
+		if !t.pastClose {
+			t.done = true
+			t.ct.Stop()
+			q.unlink(t)
 		}
-		t.done = true
-		t.ct.Stop()
-		delete(q.timers, t)
+		t = succ
 	}
+}
+
+// link adds the armed t to q's timer list. Callers hold q.mu.
+func (q *Queue) link(t *Timer) {
+	t.prev, t.succ = nil, q.timers
+	if q.timers != nil {
+		q.timers.prev = t
+	}
+	q.timers = t
+}
+
+// unlink removes t from q's timer list; a t not on it is left alone.
+// Callers hold q.mu.
+func (q *Queue) unlink(t *Timer) {
+	if t.prev == nil && q.timers != t {
+		return
+	}
+	if t.prev != nil {
+		t.prev.succ = t.succ
+	} else {
+		q.timers = t.succ
+	}
+	if t.succ != nil {
+		t.succ.prev = t.prev
+	}
+	t.prev, t.succ = nil, nil
 }
 
 // After posts fn to q once d has elapsed, unless the timer is stopped or q
@@ -135,10 +164,7 @@ func (q *Queue) arm(d, period time.Duration, fn func(), pastClose bool) *Timer {
 	// Arming under q.mu orders the ct write before fire, which takes q.mu.
 	t.next = q.exec.Now().Add(d)
 	t.ct = q.exec.afterFunc(d, t.fire)
-	if q.timers == nil {
-		q.timers = make(map[*Timer]struct{})
-	}
-	q.timers[t] = struct{}{}
+	q.link(t)
 	return t
 }
 
@@ -157,6 +183,8 @@ type Timer struct {
 	pastClose bool
 	queued    bool   // an expiry is posted and has not run yet
 	post      func() // run as a func value, made at the first expiry
+	// prev and succ link t into q's timer list while it is armed.
+	prev, succ *Timer
 }
 
 // Stop cancels the timer and reports whether this call kept fn from running.
@@ -171,7 +199,7 @@ func (t *Timer) Stop() bool {
 		return false
 	}
 	t.done = true
-	delete(q.timers, t)
+	q.unlink(t)
 	t.ct.Stop()
 	return true
 }
@@ -200,7 +228,7 @@ func (t *Timer) fire() {
 	}
 	if !q.enqueue(t.post) {
 		t.done = true
-		delete(q.timers, t)
+		q.unlink(t)
 		t.ct.Stop()
 		return
 	}
@@ -218,7 +246,7 @@ func (t *Timer) run() {
 	t.queued = false
 	if t.period == 0 {
 		t.done, t.ran = true, true
-		delete(q.timers, t)
+		q.unlink(t)
 	}
 	q.mu.Unlock()
 	t.fn()
@@ -239,7 +267,7 @@ func (t *Timer) Rearm(d time.Duration) bool {
 	t.ran, t.done = false, false
 	t.next = q.exec.Now().Add(d)
 	t.ct.Reset(d)
-	q.timers[t] = struct{}{}
+	q.link(t)
 	return true
 }
 
