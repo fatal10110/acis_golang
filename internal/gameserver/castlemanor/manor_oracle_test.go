@@ -89,9 +89,10 @@ func TestNextChangeMatchesReferenceProbe(t *testing.T) {
 	}
 }
 
-// TestManorCostMatchesReferenceProbe replays "cost <seeds>|<crops> => <cost>":
-// seeds as reference price x start amount ("none" for a seed the table does
-// not hold), crops as price x start amount.
+// TestManorCostMatchesReferenceProbe replays "cost <seeds>|<crops> => <cost>
+// running <cost>": the next period holds seeds as reference price x start
+// amount ("none" for a seed the table does not hold) and crops as price x
+// start amount; the running period holds nothing.
 func TestManorCostMatchesReferenceProbe(t *testing.T) {
 	t.Parallel()
 	for _, l := range manorGolden(t, "cost") {
@@ -126,8 +127,8 @@ func TestManorCostMatchesReferenceProbe(t *testing.T) {
 		h := startOver(t, cfg, table, at(12, 0), 0, &memStore{}, 0)
 		h.m.SetNextSeedProduction(gludio, production)
 		h.m.SetNextCropProcure(gludio, procure)
-		if got, want := h.m.ManorCost(gludio, true), must(strconv.ParseInt(l[1], 10, 64)); got != want {
-			t.Errorf("ManorCost of %q = %d, want %d", l[0], got, want)
+		if got := fmt.Sprintf("%d running %d", h.m.ManorCost(gludio, true), h.m.ManorCost(gludio, false)); got != l[1] {
+			t.Errorf("ManorCost of %q = %s, want %s", l[0], got, l[1])
 		}
 	}
 }
