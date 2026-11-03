@@ -63,11 +63,12 @@ func TestBootCatchesUpOverduePeriodAndReportsItOnEntry(t *testing.T) {
 	now := time.Date(2026, 1, 7, 12, 0, 0, 0, time.UTC)
 	staleSave := now.Add(-time.Hour)
 	var change func()
+	var delay time.Duration
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSevenSignsClock(func() time.Time { return now }),
-		gameservertest.WithSevenSignsTimer(func(_ time.Duration, fn func()) *time.Timer { change = fn; return nil }),
+		gameservertest.WithSevenSignsTimer(func(d time.Duration, fn func()) *time.Timer { delay, change = d, fn; return nil }),
 		gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) {
 			ctx := context.Background()
 			row, found, err := store.LoadStatus(ctx)
@@ -84,6 +85,9 @@ func TestBootCatchesUpOverduePeriodAndReportsItOnEntry(t *testing.T) {
 	)
 	if change == nil {
 		t.Fatal("boot armed no period change")
+	}
+	if delay != 0 {
+		t.Fatalf("period change armed with delay %v, want 0 (the overdue change is due now)", delay)
 	}
 	change()
 
