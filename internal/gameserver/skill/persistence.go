@@ -560,6 +560,7 @@ func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.In
 	if p == nil || c == nil || inst == nil || tmpl == nil {
 		return false, false, nil
 	}
+	c.SetEquippedTemplate(inst, tmpl)
 	aug, augmentedWeapon := inst.AugmentationValue()
 	augmentedWeapon = augmentedWeapon && tmpl.Weapon != nil
 	var augMods []effect.Mod
@@ -1033,9 +1034,19 @@ type WornStep struct {
 // stage, when not nil, is told what each of those changed at that moment; a
 // nil stage folds the armor set and augmentation into the result instead,
 // and leaves formal wear out.
+//
+// Everything detaches by the template inst's equip stats attached with,
+// when they did; tmpl is the fallback for an item that brought none. Once
+// inst is no longer equipped, that record goes.
 func (p *Persistence) UnequipItemStatsReporting(c *player.Character, worn WornStep, inst *item.Instance, tmpl *item.Template, stage func(SkillChange)) (skillsChanged bool) {
 	if c == nil || inst == nil {
 		return false
+	}
+	if attached, ok := c.EquippedTemplate(inst); ok {
+		tmpl = attached
+	}
+	if !inst.Equipped() {
+		c.ForgetEquippedTemplate(inst)
 	}
 	c.RemoveStatsByOwner(effect.ModOwnerItem(effect.ItemOwner{Inst: inst, Tmpl: tmpl}))
 	if tmpl == nil {
@@ -1095,14 +1106,15 @@ func (p *Persistence) RestoreEquippedItemStats(c *player.Character, inv *itemcon
 
 // RefreshEquippedItemStats reapplies equipped item modifiers and passives,
 // and item-granted skills, after a state gate changes which of them may be
-// active (e.g. an Expertise level change). skillsChanged and timersChanged
-// report whether the caller must resend SkillList and SkillCoolTime.
+// active (e.g. an Expertise level change), each against the template it is
+// worn with (WornTemplate). skillsChanged and timersChanged report whether
+// the caller must resend SkillList and SkillCoolTime.
 func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcontainer.Inventory) (skillsChanged, timersChanged bool, err error) {
 	if c == nil || inv == nil {
 		return false, false, nil
 	}
 	for _, inst := range inv.PaperdollItems() {
-		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		tmpl, ok := WornTemplate(c, inv, inst)
 		if !ok {
 			continue
 		}
@@ -1117,6 +1129,22 @@ func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcon
 		timersChanged = timersChanged || equipTimers
 	}
 	return skillsChanged, timersChanged, nil
+}
+
+// WornTemplate returns the template worn inst counts as on c: the one its
+// equip stats attached with, else inv's current template for its id. A
+// reload replacing or dropping the id leaves a worn item what it went on as
+// until it comes off.
+func WornTemplate(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance) (*item.Template, bool) {
+	if c != nil {
+		if tmpl, ok := c.EquippedTemplate(inst); ok {
+			return tmpl, true
+		}
+	}
+	if inv == nil {
+		return nil, false
+	}
+	return inv.Templates().Get(inst.TemplateID)
 }
 
 // Definition returns a loaded skill definition.

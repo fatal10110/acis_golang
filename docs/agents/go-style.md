@@ -99,7 +99,7 @@ it:
 | 2 | `charmMu` | outer, only around one effect-list read | It serializes the Charm of Courage mirror refresh. Taken before, never under, the effect list's lock; the charm's hooks run after the list unlocks. |
 | 3 | `effect.List.mu` (`EffectList()`) | only into the owner's `AttachStatFuncs` and `MaxBuffCount`, and the effect-tick registry (`task.Effects.SetActive`) | Start/exit hooks, `StatFuncsAttached`, icon refreshes and messages are queued and run after it is released. |
 | 4 | `stateMu`, `skills.mu`, `statMu`, each `effect.Calculator.mu` | leaf | These four are reachable under the effect list's lock: `MaxBuffCount` reads `stateMu` and the Divine Inspiration level (`skills.mu`), and `AttachStatFuncs` takes `statMu` and the calculators. Calling into the effect list while holding one of them (`IsAffected`, `Flags`, `AllSkillsDisabled`, `Stunned`, `Add`) deadlocks against a buff landing from another queue. |
-| 5 | `progressionMu`, `vitalsMu`, `locMu`, `summonFriendMu`, `saved.mu`, `boat.mu`, `recommendations.mu`, `mountFeed.mu` | leaf | Never held across a call; follow-ups go through hooks or run after unlock. |
+| 5 | `progressionMu`, `vitalsMu`, `locMu`, `summonFriendMu`, `saved.mu`, `boat.mu`, `recommendations.mu`, `mountFeed.mu`, `equipped.mu` | leaf | Never held across a call; follow-ups go through hooks or run after unlock. |
 
 Leaves never nest in one another, so the order within a row does not matter. `stateMu` and
 `mountFeed.mu` may arm or stop a task on the character's queue (`afterLocked`, `stopLocked`); the
