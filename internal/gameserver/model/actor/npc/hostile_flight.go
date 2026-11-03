@@ -47,7 +47,7 @@ func (h *Hostile) TeleportJump(j location.Jump) {
 	// its threat entry (damage and hate) goes with it even when the
 	// destination still sees it. Queued attack desires stay; the next
 	// combat-memory refresh handles those.
-	threats := h.brain.Threats()
+	threats := h.brain.ThreatsIfBuilt()
 	for _, threat := range threats.Snapshot() {
 		if h.Knows(threat.Attacker) {
 			threats.Remove(threat.Attacker)
@@ -82,7 +82,7 @@ func DropThreatAround(w *world.State, subject interface {
 	}
 	w.ForEachKnown(subject, func(o world.Tracked) {
 		if h, ok := o.(*Hostile); ok {
-			h.brain.Threats().Remove(subject)
+			h.brain.ThreatsIfBuilt().Remove(subject)
 		}
 	})
 }

@@ -160,7 +160,7 @@ func (n *NPC) MostHated() Creature {
 	switch o := n.combatant().(type) {
 	case *npc.Hostile:
 		var t attackable.Threat
-		t, ok = o.AI().Threats().MostHated()
+		t, ok = o.AI().ThreatsIfBuilt().MostHated()
 		c = t.Attacker
 	case *npc.Folk:
 		c, ok = o.MostHated()
@@ -195,7 +195,7 @@ func (n *NPC) StopHate(c Creature) {
 func (n *NPC) ClearDesires() {
 	switch o := n.combatant().(type) {
 	case *npc.Hostile:
-		o.AI().Desires().Clear()
+		o.AI().DesiresIfBuilt().Clear()
 	case *npc.Folk:
 		o.ClearDesires()
 	}

@@ -37,7 +37,7 @@ func (a *Attackable) AddCastDesire(target attackable.Combatant, ref skill.Ref, w
 	if final == nil {
 		return
 	}
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:         IntentionCast,
 		FinalTarget:  final,
 		Skill:        ref,
@@ -68,7 +68,7 @@ func InCastReach(self, target body, castRange int) bool {
 // weight, its chain firing every timer seconds; an equal desire already
 // queued gains the weight instead.
 func (a *Attackable) AddWanderDesire(timer int, weight float64) {
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:     IntentionWander,
 		Timer:    timer,
 		Weight:   weight,
@@ -82,7 +82,7 @@ func (a *Attackable) AddWanderDesire(timer int, weight float64) {
 // keeps the idle follow and wander away. Its weight decays with the AI
 // clock. timer is carried with the desire but times nothing.
 func (a *Attackable) AddDoNothingDesire(timer int, weight float64) {
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:     IntentionNothing,
 		Timer:    timer,
 		Weight:   weight,
@@ -101,7 +101,7 @@ func (a *Attackable) AddFleeDesire(target attackable.Combatant, distance int, we
 		return
 	}
 	x, y, z := a.actor.Position()
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:        IntentionFlee,
 		FinalTarget: target,
 		Location:    location.Location{X: x, Y: y, Z: z},
@@ -139,7 +139,7 @@ func (a *Attackable) AddSocialDesire(id, timer int, weight float64) {
 	if a.actor.AISleeping() {
 		return
 	}
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:         IntentionSocial,
 		ItemObjectID: int32(id),
 		Timer:        timer,

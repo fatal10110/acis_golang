@@ -23,15 +23,15 @@ func (l HateList) Add(c Creature, amount float64) {
 }
 
 // Clear empties the list. It touches no desire.
-func (l HateList) Clear() { l.h.AI().Hates().Clear() }
+func (l HateList) Clear() { l.h.AI().HatesIfBuilt().Clear() }
 
 // Empty reports whether the list holds no creature.
-func (l HateList) Empty() bool { return l.h.AI().Hates().IsEmpty() }
+func (l HateList) Empty() bool { return l.h.AI().HatesIfBuilt().IsEmpty() }
 
 // MostHated returns the listed creature with the most hate, nil when the
 // list is empty or the NPC is dead.
 func (l HateList) MostHated() Creature {
-	e, ok := l.h.AI().Hates().MostHated()
+	e, ok := l.h.AI().HatesIfBuilt().MostHated()
 	if !ok {
 		return nil
 	}
@@ -40,7 +40,7 @@ func (l HateList) MostHated() Creature {
 
 // Refresh drops the creatures that are dead or play dead, and the ones the
 // NPC no longer knows or sees. It touches no desire.
-func (l HateList) Refresh() { l.h.AI().Hates().Refresh(l.h.Knows) }
+func (l HateList) Refresh() { l.h.AI().HatesIfBuilt().Refresh(l.h.Knows) }
 
 // RemoveIfOutOfRange drops the creatures standing distance or farther from
 // the NPC, in 3D, and the cast desires aimed at them.

@@ -179,7 +179,7 @@ func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc
 
 	speed := tmpl.RunSpeed
 	queue := n.queues.NewQueue("npc").Serial(inst.ObjectID)
-	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, &n.log, n.castDefs, n.castEffects, n.walker, n.maxGeoPathFailCount, n.zones, n.effects, queue)
+	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, &n.log, n.castDefs, &n.castEffects, n.walker, n.maxGeoPathFailCount, n.zones, n.effectOpts, queue)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil
@@ -197,13 +197,20 @@ func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc
 		hp = hostile.MaxHP()
 	}
 	hostile.SetCurrentHP(hp)
-	rewards := n.rewarderFor(hostile, tmpl)
-	rt := npc.Runtime{World: n.state, Log: &n.log, Items: n.items, Rewards: rewards, Remover: n, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
+	rt := npc.Runtime{World: n.state, Log: &n.log, Items: n.items, Remover: n, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
 	if n.rewards.Settings != nil {
 		rt.Party = n.rewards.Settings
 	}
-	if rewards.rights != nil {
-		rt.Hits = rewards.rights
+	if hostile.RaidBoss() {
+		// A raid or grand boss's rewards hold its command channel loot
+		// rights, which watch its hits from the first one.
+		rewards := n.rewarderFor(hostile, tmpl)
+		rt.Rewards = rewards
+		if rewards.rights != nil {
+			rt.Hits = rewards.rights
+		}
+	} else {
+		rt.RewardsFor = spawnRewards{n}
 	}
 	if los, ok := n.geo.(npc.LineOfSight); ok {
 		rt.LOS = los
@@ -318,6 +325,15 @@ func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewar
 		geo:        n.geo,
 		rights:     raidLootRights(hostile, tmpl, n.rewards.Channels),
 	}
+}
+
+// spawnRewards builds the death rewards of a hostile spawned by n other
+// than a raid or grand boss each time it needs them: they hold nothing but
+// what n and the NPC's template give them.
+type spawnRewards struct{ n *Npcs }
+
+func (s spawnRewards) RewardsFor(h *npc.Hostile) npc.Rewards {
+	return s.n.rewarderFor(h, h.Instance.Template)
 }
 
 // raidLootRights returns the command channel loot rights of a raid or

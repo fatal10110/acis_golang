@@ -64,7 +64,7 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 		return false
 	}
 
-	if _, ok := h.brain.Desires().NonMovingAttack(target); ok {
+	if _, ok := h.brain.DesiresIfBuilt().NonMovingAttack(target); ok {
 		following, err := h.brain.MaybeStartOffensiveFollow(target)
 		if err != nil {
 			h.logger().Debug().Err(err).Int32("object_id", h.ObjectID()).Msg("npc: offensive follow broadcast")

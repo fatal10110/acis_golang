@@ -19,7 +19,7 @@ func (d *dropRecorder) DropItem(_ attackable.Combatant, itemID int32, count int)
 // none rather than dropping nothing.
 func TestHostileDropItemGoesToItsRewards(t *testing.T) {
 	rec := &dropRecorder{}
-	h := &Hostile{rewards: rec}
+	h := &Hostile{rewards: fixedRewards{rec}}
 	h.DropItem(nil, 6353, 1)
 	if len(rec.drops) != 1 || rec.drops[0] != [2]int32{6353, 1} {
 		t.Fatalf("drops = %v, want [[6353 1]]", rec.drops)

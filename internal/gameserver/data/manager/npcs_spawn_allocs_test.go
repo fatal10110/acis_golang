@@ -20,8 +20,10 @@ import (
 var testLog = zerolog.Nop()
 
 // spawnAllocCeiling bounds the heap allocations one standalone hostile spawn
-// makes, its live wiring, settings and slot included.
-const spawnAllocCeiling = 26
+// makes, its live wiring, settings and slot included. Its combat-only parts
+// (attack and cast controllers, effect list, threat, hate and desire
+// tables, death rewards) are built on first use, so a spawn makes none.
+const spawnAllocCeiling = 16
 
 // TestSpawnAllocations bounds the allocations of one hostile's spawn: its
 // shared settings, logger and wiring add no allocation of their own.
@@ -54,7 +56,7 @@ func TestSpawnAllocations(t *testing.T) {
 	inst := &npc.Instance{ObjectID: 1, Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100}, HasHome: true, Home: location.Location{}}
 	positions := task.NewPositionUpdates(state)
 	wiring := testing.AllocsPerRun(200, func() {
-		if _, _, err := newLiveHostile(inst, 100, fakeGeo{}, positions, &testLog, nil, actorcast.EffectHandlers{}, walker, 0, nil, effect.Env{}, queues.NewQueue("npc")); err != nil {
+		if _, _, err := newLiveHostile(inst, 100, fakeGeo{}, positions, &testLog, nil, &actorcast.EffectHandlers{}, walker, 0, nil, nil, queues.NewQueue("npc")); err != nil {
 			t.Fatalf("newLiveHostile() error: %v", err)
 		}
 	})

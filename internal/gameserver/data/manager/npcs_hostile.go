@@ -162,28 +162,78 @@ func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
 
 // hostileWiring is every adapter newLiveHostile wires one live Hostile
 // with, in a single allocation: each controller holds a pointer into it.
+// It is also the NPC's ai.CombatParts: castDefs and castEffects, shared by
+// every NPC, build its cast controller.
 type hostileWiring struct {
-	control   hostileControl
-	stat      statOwnerRef
-	located   locatedRef
-	actor     creatureActorRef
-	walker    walkerActorRef
-	moveCtl   routeAwareMoveController
-	route     hostileRoute
-	routeMove atomic.Bool
+	control     hostileControl
+	stat        statOwnerRef
+	located     locatedRef
+	actor       creatureActorRef
+	walker      walkerActorRef
+	moveCtl     routeAwareMoveController
+	route       hostileRoute
+	routeMove   atomic.Bool
+	castDefs    actorcast.Definitions
+	castEffects *actorcast.EffectHandlers
 }
 
+// NewAttack builds the NPC's attack controller on its own queue.
+func (w *hostileWiring) NewAttack() ai.AttackController {
+	ctl := attack.NewAttackable(&w.actor, &w.control)
+	ctl.SetQueue(w.control.hostile.Queue())
+	return ctl
+}
+
+// NewCast builds the NPC's AI cast controller on its own queue, nil when
+// no skill data is loaded (a harness that loads none): the AI loop then
+// casts nothing, as for an actor with no skills.
+func (w *hostileWiring) NewCast() ai.CastController {
+	if w.castDefs == nil {
+		return nil
+	}
+	hostile := w.control.hostile
+	castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, &w.control)
+	castController.SetQueue(hostile.Queue())
+	// A delete closes the NPC's queue without stopping its cast.
+	castController.OutliveQueueClose()
+	return &hostileCast{AIController: actorcast.AIController{
+		Controller:  castController,
+		Definitions: w.castDefs,
+		Effects:     *w.castEffects,
+		Caster:      hostile,
+		// A packet sent to a non-Player, non-Summon-owner caster goes
+		// nowhere, so caster-addressed messages (ATTACK_FAILED,
+		// MISSED_TARGET, ...) still have no forward target here. But
+		// target-addressed messages (MagicResist, ManaDrain) are delivered
+		// by ID lookup against the real target independent of caster type,
+		// so OnHitResult is wired to the boot-provided delivery hook (issue
+		// #2350) rather than left unset.
+		OnHitResult: w.castEffects.OnHitResult,
+	}}
+}
+
+// hostileCast is a hostile NPC's AI cast controller, holding the live cast
+// controller its damage and crowd control stop or break.
+type hostileCast struct {
+	actorcast.AIController
+}
+
+// CastControl returns the live cast controller.
+func (c *hostileCast) CastControl() npc.CastControl { return c.Controller }
+
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
-// controller (over the Hostile's lifetime movement state) and a real attack
-// controller, resolving their mutual construction-order dependency on the
-// finished Hostile via locatedRef/creatureActorRef/statOwnerRef. log is the
-// logger shared by every NPC.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log *zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
-	w := &hostileWiring{}
+// controller (over the Hostile's lifetime movement state), resolving their
+// mutual construction-order dependency on the finished Hostile via
+// locatedRef/creatureActorRef/statOwnerRef. Its attack and cast
+// controllers and its effect list (built with effectOpts) are built the
+// first time it needs each. log, castDefs, castEffects and effectOpts are
+// shared by every NPC.
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log *zerolog.Logger, castDefs actorcast.Definitions, castEffects *actorcast.EffectHandlers, walker *task.Walker, maxGeoPathFailCount int, zones *zone.Index, effectOpts []effect.Option, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
+	w := &hostileWiring{castDefs: castDefs, castEffects: castEffects}
 	control := &w.control
 	control.walker, control.log, control.chance = walker, log, castEffects.Chance
 	statRef := &w.stat
-	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithEnv(effects))
+	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effectOpts...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -203,12 +253,9 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	moveCtl.SetPositionUpdates(positions)
 
 	actorRef := &w.actor
-	attackCtl := attack.NewAttackable(actorRef, control)
-	attackCtl.SetQueue(queue)
-
 	routeMove := &w.routeMove
 	w.moveCtl = routeAwareMoveController{AttackableMoveController: moveCtl, routeMove: routeMove}
-	hostile, err := npc.NewHostile(inst, live, &w.moveCtl, attackCtl, castDefs)
+	hostile, err := npc.NewHostileWithParts(inst, live, &w.moveCtl, w, castDefs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -224,35 +271,6 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
-
-	// Wire the AI-cast seam (issue #1612): a nil castDefs (an existing
-	// harness that hasn't loaded skill data) leaves the AI loop with no
-	// CastController, matching ai.Attackable's existing "no skills to
-	// cast" no-op contract for IntentionCast — the same nil-safe pattern
-	// SummonActor's caller relies on before l.skills is ready.
-	if castDefs != nil {
-		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, control)
-		castController.SetQueue(queue)
-		// A delete closes the NPC's queue without stopping its cast.
-		castController.OutliveQueueClose()
-		aiController := &actorcast.AIController{
-			Controller:  castController,
-			Definitions: castDefs,
-			Effects:     castEffects,
-			Caster:      hostile,
-			// A packet sent to a non-Player, non-Summon-owner caster goes
-			// nowhere, so caster-addressed messages (ATTACK_FAILED,
-			// MISSED_TARGET, ...) still have no forward target here. But
-			// target-addressed messages (MagicResist, ManaDrain) are
-			// delivered by ID lookup against the real target independent of
-			// caster type,
-			// so OnHitResult is wired to the boot-provided delivery hook
-			// (issue #2350) rather than left unset.
-			OnHitResult: castEffects.OnHitResult,
-		}
-		hostile.AI().SetCastController(aiController)
-		hostile.SetCastController(castController)
-	}
 
 	walkerRef := &w.walker
 	walkerRef.Hostile, walkerRef.moveCtl, walkerRef.routeMove = hostile, moveCtl, routeMove
