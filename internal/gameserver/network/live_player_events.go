@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 )
 
 // SendFrame sends frame to this player's client. Once the session has
@@ -608,21 +609,28 @@ func sendRestoredFrame(live *livePlayer, e event.Restored) {
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(self, int32(e.Amount)))
 }
 
+// refreshLiveItemStats answers a grade penalty change for the worn weapon:
+// its augmentation's skill change, then its other skills' change, each with
+// its own SkillList and, when a returning skill's reuse must reach the
+// client, SkillCoolTime.
 func (l *GameClientLink) refreshLiveItemStats(live *livePlayer) {
 	if l.skills == nil {
 		return
 	}
-	skillsChanged, timersChanged, err := l.skills.RefreshEquippedItemStats(live.Character, live.Inventory())
+	stage := func(change skillstate.SkillChange) {
+		if change.SkillsChanged {
+			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+		}
+		if change.TimersChanged {
+			now := live.Now()
+			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
+		}
+	}
+	skillsChanged, timersChanged, err := l.skills.RefreshEquippedItemStatsReporting(live.Character, live.Inventory(), stage)
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("refresh grade-penalty item stats")
 	}
-	if skillsChanged {
-		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	}
-	if timersChanged {
-		now := live.Now()
-		live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
-	}
+	stage(skillstate.SkillChange{SkillsChanged: skillsChanged, TimersChanged: timersChanged})
 }
 
 func (l *GameClientLink) sendLiveWeightPenalty(live *livePlayer) {

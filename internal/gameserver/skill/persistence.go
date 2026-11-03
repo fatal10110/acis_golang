@@ -576,26 +576,9 @@ func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.In
 	if err != nil {
 		return false, false, fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
-	// A weapon whose crystal grade the character's Expertise doesn't yet
-	// allow skips its whole item-skill grant (the grade penalty check
-	// returns before the +4 skill and the item_skill loop
-	// run), so none of its granted skills apply until Expertise catches up.
-	var grants []itemSkillGrant
-	if tmpl.Weapon == nil || c.WeaponSkillsAllowed(tmpl.Crystal) {
-		if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel {
-			g, ok, err := p.enchant4SkillGrant(tmpl)
-			if err != nil {
-				return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
-			}
-			if ok {
-				grants = append(grants, g)
-			}
-		}
-		attached, err := p.itemSkillGrants(tmpl)
-		if err != nil {
-			return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
-		}
-		grants = append(grants, attached...)
+	grants, err := p.gatedItemSkillGrants(c, inst, tmpl)
+	if err != nil {
+		return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
 	setStages, err := p.armorSetGrants(c, inst, tmpl)
 	if err != nil {
@@ -622,10 +605,37 @@ func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.In
 		report(SkillChange{SkillsChanged: true})
 	}
 	if augmentedWeapon {
-		report(p.applyAugmentation(c, augMods, augGrant))
+		report(p.applyAugmentation(c, inst, augMods, augGrant))
 	}
 	itemSkills, itemTimers := p.grantItemSkills(c, grants)
 	return skillsChanged || itemSkills, timersChanged || itemTimers, nil
+}
+
+// gatedItemSkillGrants resolves the skills worn inst grants: a weapon's +4
+// enchant skill while it is at +4 or higher, then every
+// item.Template.AttachedSkills entry. A weapon whose crystal grade the
+// character's Expertise doesn't yet allow grants none of them (the grade
+// penalty check returns before the +4 skill and the item_skill loop run),
+// so none apply until Expertise catches up.
+func (p *Persistence) gatedItemSkillGrants(c *player.Character, inst *item.Instance, tmpl *item.Template) ([]itemSkillGrant, error) {
+	if tmpl.Weapon != nil && !c.WeaponSkillsAllowed(tmpl.Crystal) {
+		return nil, nil
+	}
+	var grants []itemSkillGrant
+	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel {
+		g, ok, err := p.enchant4SkillGrant(tmpl)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			grants = append(grants, g)
+		}
+	}
+	attached, err := p.itemSkillGrants(tmpl)
+	if err != nil {
+		return nil, err
+	}
+	return append(grants, attached...), nil
 }
 
 // augmentationGrant resolves what aug, carried by inst, applies: its stat
@@ -660,11 +670,14 @@ func (p *Persistence) augmentationGrant(inst *item.Instance, aug item.Augmentati
 	return mods, &g, nil
 }
 
-// applyAugmentation attaches an augmentation's stat bonuses, which report
-// no stat change of their own, then grants its skill. An active skill whose
-// reuse is still running when it comes back is disabled until it ends.
-func (p *Persistence) applyAugmentation(c *player.Character, mods []effect.Mod, grant *itemSkillGrant) SkillChange {
-	c.AttachStatFuncs(mods)
+// applyAugmentation attaches the stat bonuses of the augmentation inst
+// carries, which report no stat change of their own, unless they are
+// attached already, then grants its skill. An active skill whose reuse is
+// still running when it comes back is disabled until it ends.
+func (p *Persistence) applyAugmentation(c *player.Character, inst *item.Instance, mods []effect.Mod, grant *itemSkillGrant) SkillChange {
+	if !c.HasStatsByOwner(effect.ModOwnerAugmentation(inst)) {
+		c.AttachStatFuncs(mods)
+	}
 	if grant == nil {
 		return SkillChange{}
 	}
@@ -1068,10 +1081,19 @@ func (p *Persistence) UnequipItemStatsReporting(c *player.Character, worn WornSt
 	if tmpl.Weapon != nil && inst.Augmented() {
 		report(p.removeAugmentation(c, inst))
 	}
+	return p.withdrawItemSkills(c, worn.Items, inst, tmpl) || skillsChanged
+}
+
+// withdrawItemSkills takes away the skills inst granted while worn: a
+// weapon's +4 enchant skill at +4 or higher, then — unless another item in
+// worn shares tmpl's id — every tmpl.AttachedSkills entry. It reports
+// whether the caller must resend SkillList: a loaded +4 skill asks for it at
+// +4 or higher even when the Expertise gate kept it from being granted.
+func (p *Persistence) withdrawItemSkills(c *player.Character, worn []*item.Instance, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
 	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
 		skillsChanged = true
 	}
-	for _, other := range worn.Items {
+	for _, other := range worn {
 		if other != inst && other.TemplateID == tmpl.ID {
 			return skillsChanged
 		}
@@ -1104,31 +1126,67 @@ func (p *Persistence) RestoreEquippedItemStats(c *player.Character, inv *itemcon
 	return nil
 }
 
-// RefreshEquippedItemStats reapplies equipped item modifiers and passives,
-// and item-granted skills, after a state gate changes which of them may be
-// active (e.g. an Expertise level change), each against the template it is
-// worn with (WornTemplate). skillsChanged and timersChanged report whether
-// the caller must resend SkillList and SkillCoolTime.
+// RefreshEquippedItemStats is RefreshEquippedItemStatsReporting with every
+// stage folded into its result.
 func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcontainer.Inventory) (skillsChanged, timersChanged bool, err error) {
-	if c == nil || inv == nil {
+	return p.RefreshEquippedItemStatsReporting(c, inv, nil)
+}
+
+// RefreshEquippedItemStatsReporting answers a grade penalty change: the
+// item in the right hand, counted as the template it is worn with
+// (WornTemplate), keeps or loses what the Expertise gate decides, and no
+// other worn item is touched. Its own stat functions stay either way. A
+// weapon whose crystal grade Expertise doesn't allow loses its augmentation
+// — the stat bonuses with their own stat report, then its skill, if any —
+// then its +4 skill and its item skills (see withdrawItemSkills). Any other
+// item gets them back: its augmentation, the stat bonuses unless they are
+// attached already, then its +4 skill and item skills (see
+// gatedItemSkillGrants). stage, when not nil, is told what the augmentation
+// changed at that moment; a nil stage folds it into the result. skillsChanged
+// and timersChanged report whether the caller must resend SkillList and
+// SkillCoolTime for the rest.
+func (p *Persistence) RefreshEquippedItemStatsReporting(c *player.Character, inv *itemcontainer.Inventory, stage func(SkillChange)) (skillsChanged, timersChanged bool, err error) {
+	if p == nil || c == nil || inv == nil {
 		return false, false, nil
 	}
-	for _, inst := range inv.PaperdollItems() {
-		tmpl, ok := WornTemplate(c, inv, inst)
-		if !ok {
-			continue
-		}
-		if p.UnequipItemStats(c, inv, inst, tmpl) {
-			skillsChanged = true
-		}
-		equipSkills, equipTimers, err := p.EquipItemStats(c, inst, tmpl)
-		if err != nil {
-			return false, false, err
-		}
-		skillsChanged = skillsChanged || equipSkills
-		timersChanged = timersChanged || equipTimers
+	inst := inv.ItemAt(itemcontainer.RHand)
+	if inst == nil {
+		return false, false, nil
 	}
-	return skillsChanged, timersChanged, nil
+	tmpl, ok := WornTemplate(c, inv, inst)
+	if !ok {
+		return false, false, nil
+	}
+	report := func(change SkillChange) {
+		if stage != nil {
+			stage(change)
+			return
+		}
+		skillsChanged = skillsChanged || change.SkillsChanged
+		timersChanged = timersChanged || change.TimersChanged
+	}
+	aug, augmentedWeapon := inst.AugmentationValue()
+	augmentedWeapon = augmentedWeapon && tmpl.Weapon != nil
+	if tmpl.Weapon != nil && !c.WeaponSkillsAllowed(tmpl.Crystal) {
+		if augmentedWeapon {
+			report(p.removeAugmentation(c, inst))
+		}
+		withdrawn := p.withdrawItemSkills(c, inv.PaperdollItems(), inst, tmpl)
+		return skillsChanged || withdrawn, timersChanged, nil
+	}
+	grants, err := p.gatedItemSkillGrants(c, inst, tmpl)
+	if err != nil {
+		return false, false, fmt.Errorf("refresh item skills for character %d item %d: %w", c.ID, inst.ObjectID, err)
+	}
+	if augmentedWeapon {
+		mods, grant, err := p.augmentationGrant(inst, aug)
+		if err != nil {
+			return false, false, fmt.Errorf("refresh augmentation for character %d item %d: %w", c.ID, inst.ObjectID, err)
+		}
+		report(p.applyAugmentation(c, inst, mods, grant))
+	}
+	itemSkills, itemTimers := p.grantItemSkills(c, grants)
+	return skillsChanged || itemSkills, timersChanged || itemTimers, nil
 }
 
 // WornTemplate returns the template worn inst counts as on c: the one its
