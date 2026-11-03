@@ -127,6 +127,7 @@ func runInitConfig(t *testing.T, server, login string) (dst, datapack, out strin
 		"ACIS_CONFIG_DIR="+dst,
 		"ACIS_DATAPACK_DIR="+datapack,
 		"ACIS_LOG_DIR="+filepath.Join(root, "log"),
+		"ACIS_CACHE_DIR="+filepath.Join(root, "cache"),
 		"ACIS_DB_ROOT_PASSWORD=s3cret",
 		"ACIS_PUBLIC_HOST=203.0.113.7",
 	)
@@ -143,6 +144,9 @@ func TestInitConfigPointsServersAtComposeServices(t *testing.T) {
 	dst, datapack, out, err := runInitConfig(t, initConfigServerFixture, initConfigLoginFixture)
 	if err != nil {
 		t.Fatalf("init-config.sh: %v\n%s", err, out)
+	}
+	if info, err := os.Stat(filepath.Join(filepath.Dir(dst), "cache")); err != nil || !info.IsDir() {
+		t.Errorf("init-config.sh did not create the game server cache directory: %v", err)
 	}
 
 	serverProps, err := config.LoadFile(filepath.Join(dst, "server.properties"))
@@ -235,6 +239,7 @@ func TestInitConfigRefusesExistingConfig(t *testing.T) {
 		"ACIS_CONFIG_DIR="+dst,
 		"ACIS_DATAPACK_DIR="+filepath.Join(filepath.Dir(dst), "aCis_datapack"),
 		"ACIS_LOG_DIR="+filepath.Join(filepath.Dir(dst), "log"),
+		"ACIS_CACHE_DIR="+filepath.Join(filepath.Dir(dst), "cache"),
 	)
 	if output, err := cmd.CombinedOutput(); err == nil {
 		t.Fatalf("second init-config.sh run succeeded, want refusal\n%s", output)
@@ -256,4 +261,55 @@ func TestInitConfigFailsOnMissingKey(t *testing.T) {
 	if !strings.Contains(out, "no LoginHost key") {
 		t.Errorf("output = %q, want it to name the missing LoginHost key", out)
 	}
+}
+
+// TestComposeGeodataCacheIsOnAMountedDirectory checks that the gameserver
+// service points -geodata-cache into one of its bind mounts: the image's
+// /opt/acis belongs to root, so a cache path anywhere else cannot be written
+// and every boot falls back to loading the regions onto the heap.
+func TestComposeGeodataCacheIsOnAMountedDirectory(t *testing.T) {
+	const compose = "../../docker-compose.yml"
+	data, err := os.ReadFile(compose)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var service, cache string
+	var mounts []string
+	for line := range strings.Lines(string(data)) {
+		line = strings.TrimRight(line, "\n")
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		switch {
+		case indent == 0:
+			service = ""
+		case indent == 2 && strings.HasSuffix(trimmed, ":"):
+			service = strings.TrimSuffix(trimmed, ":")
+		case service != "gameserver":
+		case indent == 4 && strings.HasPrefix(trimmed, "command:"):
+			args := strings.Split(strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "command:")), "[]"), ",")
+			for i, arg := range args {
+				if strings.Trim(strings.TrimSpace(arg), `"`) == "-geodata-cache" && i+1 < len(args) {
+					cache = strings.Trim(strings.TrimSpace(args[i+1]), `"`)
+				}
+			}
+		case indent == 6 && strings.HasPrefix(trimmed, "- "):
+			if _, target, ok := strings.Cut(strings.TrimPrefix(trimmed, "- "), ":/"); ok {
+				mounts = append(mounts, "/"+target)
+			}
+		}
+	}
+	if cache == "" {
+		t.Fatalf("%s: gameserver command sets no -geodata-cache, so the default lands in the root-owned /opt/acis", compose)
+	}
+	dir := filepath.Dir(filepath.Join("/opt/acis", cache))
+	for _, m := range mounts {
+		if m == dir {
+			return
+		}
+	}
+	t.Fatalf("%s: gameserver -geodata-cache %q is in %s, which is not one of its mounts %v", compose, cache, dir, mounts)
 }

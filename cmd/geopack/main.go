@@ -23,7 +23,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("geopack", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	configPath := fs.String("config", "config/geoengine.properties", "geoengine.properties listing the regions to pack")
-	geodataDir := fs.String("geodata", "", "directory of geodata region files; defaults to -config's GeoDataPath")
+	dataRoot := fs.String("data-root", ".", "datapack root, as the game server's -data-root; resolves -config's GeoDataPath")
+	geodataDir := fs.String("geodata", "", "directory of geodata region files; defaults to -config's GeoDataPath, resolved as the game server does")
 	out := fs.String("out", "geodata.cache", "cache file to write; the game server's -geodata-cache")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -36,7 +37,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	dir := *geodataDir
 	if dir == "" {
-		dir = props.String("GeoDataPath", "")
+		dir = probe.ResolveDir(*dataRoot, props.String("GeoDataPath", ""))
 	}
 	geoType := probe.GeoType(props.String("GeoDataType", string(probe.L2OFF)))
 	regions := probe.ListedRegions(props)

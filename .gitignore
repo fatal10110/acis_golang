@@ -1,6 +1,7 @@
 .worktrees/
 log
 /config/
+/cache/
 .DS_Store
 .vscode
 ops/admin-panel/admin-panel

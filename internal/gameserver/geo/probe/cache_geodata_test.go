@@ -119,6 +119,7 @@ func compareQueries(t *testing.T, want *legacyRegion, got *block.Region, bx, by,
 			zs = append(zs, (h+int32(cells[i-1].Height))/2)
 		}
 	}
+	cellQueries := [2]func(bx, by, cx, cy int, z int32) (int, block.Cell){got.AboveCell, got.BelowCell}
 	for _, z := range zs {
 		g := [3]int{got.Nearest(bx, by, cx, cy, z), got.Above(bx, by, cx, cy, z), got.Below(bx, by, cx, cy, z)}
 		w := [3]int{want.Nearest(bx, by, cx, cy, z), want.Above(bx, by, cx, cy, z), want.Below(bx, by, cx, cy, z)}
@@ -128,6 +129,15 @@ func compareQueries(t *testing.T, want *legacyRegion, got *block.Region, bx, by,
 		for _, h := range g {
 			if h >= 0 && (got.Height(bx, by, h) != want.Height(bx, by, h) || got.NSWE(bx, by, h) != want.NSWE(bx, by, h)) {
 				t.Fatalf("block %d_%d handle %d resolves differently", bx, by, h)
+			}
+		}
+		for i, query := range cellQueries {
+			h, cell := query(bx, by, cx, cy, z)
+			if h != w[i+1] {
+				t.Fatalf("block %d_%d cell %d,%d z %d: %s handle = %d, want %d", bx, by, cx, cy, z, [2]string{"AboveCell", "BelowCell"}[i], h, w[i+1])
+			}
+			if h >= 0 && cell != (block.Cell{Height: want.Height(bx, by, h), NSWE: want.NSWE(bx, by, h)}) {
+				t.Fatalf("block %d_%d cell %d,%d z %d: %s cell = %+v, want height %d NSWE %v", bx, by, cx, cy, z, [2]string{"AboveCell", "BelowCell"}[i], cell, want.Height(bx, by, h), want.NSWE(bx, by, h))
 			}
 		}
 		if got.HeightNearest(bx, by, cx, cy, z) != want.HeightNearest(bx, by, cx, cy, z) || got.NSWENearest(bx, by, cx, cy, z) != want.NSWENearest(bx, by, cx, cy, z) {

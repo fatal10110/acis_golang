@@ -368,7 +368,7 @@ func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	}
 
 	geo := &geodata{
-		Dir:           resolveGeodataDir(paths.DataRoot, props.String("GeoDataPath", "")),
+		Dir:           probe.ResolveDir(paths.DataRoot, props.String("GeoDataPath", "")),
 		Type:          probe.GeoType(props.String("GeoDataType", string(probe.L2OFF))),
 		EngineOptions: engineOptions,
 		Pathfind:      pathOptions,
@@ -383,20 +383,4 @@ func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	}
 	geo.Finder = pathfind.New(geo.Engine, geo.Pathfind)
 	return geo, nil
-}
-
-func resolveGeodataDir(dataRoot, configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured == "" {
-		return filepath.Join(dataRoot, "data", "geodata")
-	}
-	if filepath.IsAbs(configured) {
-		return configured
-	}
-
-	clean := filepath.Clean(configured)
-	if clean == "data" || strings.HasPrefix(clean, "data"+string(os.PathSeparator)) {
-		return filepath.Join(dataRoot, clean)
-	}
-	return clean
 }

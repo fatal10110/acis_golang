@@ -9,8 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 )
 
-// legacyRegion is the previous packed region decoder, kept verbatim as the
-// equivalence oracle for the compact layout: a u32 index entry per block
+// legacyRegion re-implements the previous packed region decoder with the
+// same answers, as the equivalence oracle for the compact layout: a u32 index entry per block
 // (kind<<30 | flat height or data offset) over raw 16-bit cell codes, a
 // multilayer block storing 64 layer counts and 64 u16 cell offsets.
 type legacyRegion struct {
