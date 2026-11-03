@@ -123,10 +123,16 @@ what the reference does in the scenario's own world:
   Go runner's world. The scenario's `npcmaker <name> <ai type>` lines put their own in its place: an
   `NpcMaker` of that name running the script of that AI type, with no spawn entry and no territory
   (`start` is never called on it, so its script starts no timer), which a script finds by
-  `getNpcMaker(name)`. The probe has no spawn_data and starts no maker, so the Go runner's
-  `npcmaker ... spawn`, `spawnrow` and `started` lines (a maker started over a saved row, as
-  SailrenMaker reads it) are for untraced scenarios alone, and a traced scenario using one is
-  rejected at parse time (tracked on #4333);
+  `getNpcMaker(name)`. A line with a `spawn` entry builds the maker's `MultiSpawn` (one NPC at the
+  line's position, the template made the fixture NPC of the line's type, `max` its maximum NPC
+  count), and a `spawnrow <name> alive|dead` line is the `SpawnData` of its `db` name: alive at the
+  line's position with 1000 HP and MP, or dead with its respawn that many seconds ahead on the
+  virtual wall clock. The probe then starts every maker (`spawnAll`) in the lines' order, as the
+  Go runner does as it boots; the script events they send each other meanwhile are `# started`
+  lines, not the first step's `# maker` lines. The `started` lines are the Go run's expectation of
+  those sends: the probe reads and ignores them, and the scenario's trace comparison checks them
+  against the trace's. A maker-spawned NPC counts in the `live` and `spawned` lines, and the
+  makers delete their NPCs when the scenario is over;
 - a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes
@@ -396,6 +402,8 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
                                 (the arguments as the scenario writes them)
 # heard <npc id> (object <id>) <id> <arg1> <arg2>   a scenario trace: the NPC hears a script event a script
                                 sent or broadcast (the arguments as numbers; an object id is a role to the Go run)
+# started <name> <event> <int1> <int2>   a scenario trace: the script event sent to the NPC maker of that name
+                                while the makers start, before the first step (the scenario's started lines)
 # maker <name> <event> <int1> <int2>   a scenario trace: the script event sent to the NPC maker of that name
                                 (the maker as its npcmaker line writes it), in the order they were sent
 # live <npc id> <count>         a scenario trace: how many living NPCs of that template the world

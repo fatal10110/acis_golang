@@ -54,7 +54,6 @@ func TestParseRejectsBadMakerSeeds(t *testing.T) {
 		{"row kept twice", spawn + "npcmaker n default_maker spawn 2 Monster 0 0 0 db row\n", "keep the row"},
 		{"started with no spawn", "npcmaker m default_maker\nstarted m 1 0 0\n", "no maker is started"},
 		{"started of no maker", spawn + "started nobody 1 0 0\n", "no npcmaker line names it"},
-		{"traced spawn", "trace some.golden\n" + spawn, "traced scenario takes no npcmaker spawn"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,6 +1,6 @@
 # SailrenMaker started with Sailren's row saved dead, its respawn an hour ahead: the start runs no 11047 and
-# Sailren, dead until then, is not in the world. Untraced: the reference probe starts no maker and keeps no
-# spawn_data.
+# Sailren, dead until then, is not in the world.
+trace internal/gameserver/script/testdata/oracle/scenarios/sailren_maker_row_dead.golden
 character Hunter 20
 npcmaker rune20_mb2017_04m1 sailren_maker max 2 spawn 29065 GrandBoss -113091 -243942 -15536 respawn 129600 db sailren
 npcmaker rune16_npc2017_01m1 default_maker
