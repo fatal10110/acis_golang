@@ -100,7 +100,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	controller := l.castController(live)
 	// The pre-attempt gate above ran before this GROUND approach walk, so a
 	// recast still on cooldown never starts walking toward the signet.
-	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, selected, def.CastRange) {
+	if known && def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, selected, def.CastRange) {
 		return
 	}
 
