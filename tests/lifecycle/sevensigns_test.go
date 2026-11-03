@@ -58,10 +58,16 @@ func TestEnterWorldBurstCarriesCurrentPeriodMessage(t *testing.T) {
 // hears the new period's announcement.
 func TestBootCatchesUpOverduePeriodAndReportsItOnEntry(t *testing.T) {
 	t.Parallel()
-	staleSave := time.Now().Add(-time.Hour)
+	// The calendar and its period-change timer are pinned: the overdue change
+	// runs when the test fires it, not on a real timer racing the entry burst.
+	now := time.Date(2026, 1, 7, 12, 0, 0, 0, time.UTC)
+	staleSave := now.Add(-time.Hour)
+	var change func()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithSevenSignsClock(func() time.Time { return now }),
+		gameservertest.WithSevenSignsTimer(func(_ time.Duration, fn func()) *time.Timer { change = fn; return nil }),
 		gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) {
 			ctx := context.Background()
 			row, found, err := store.LoadStatus(ctx)
@@ -76,15 +82,14 @@ func TestBootCatchesUpOverduePeriodAndReportsItOnEntry(t *testing.T) {
 			}
 		}),
 	)
+	if change == nil {
+		t.Fatal("boot armed no period change")
+	}
+	change()
 
 	cycle, period, date := statusRow(t, srv.DB)
-	deadline := time.Now().Add(2 * time.Second)
-	for (period != "SEAL_VALIDATION" || cycle != 7 || date <= staleSave.UnixMilli()) && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-		cycle, period, date = statusRow(t, srv.DB)
-	}
-	if period != "SEAL_VALIDATION" || cycle != 7 || date <= staleSave.UnixMilli() {
-		t.Fatalf("status row after boot catch-up = (%d, %s, %d), want (7, SEAL_VALIDATION, fresh date)", cycle, period, date)
+	if period != "SEAL_VALIDATION" || cycle != 7 || date != now.UnixMilli() {
+		t.Fatalf("status row after the catch-up = (%d, %s, %d), want (7, SEAL_VALIDATION, %d)", cycle, period, date, now.UnixMilli())
 	}
 
 	frames := startInWorld(t, srv.Client)

@@ -50,9 +50,15 @@ func TestNewbieTokenTeleportList(t *testing.T) {
 		t.Fatalf("newbie token list = %q, want the guide's newbie token teleports", tokenList)
 	}
 	w.srv.Client.Send(encodeBypass(fmt.Sprintf("npc_%d_teleport 0", guide.ObjectID())))
-	w.srv.AdvanceUntil(t, "token spent", func() bool { return w.srv.PlayerItemCount(t, w.player, travelToken) == 11 })
-	if x, y, _ := w.srv.PlayerPosition(t, w.player); abs(x-9716) > 100 || abs(y-15502) > 100 {
-		t.Fatalf("player at %d,%d after the token teleport, want near 9716,15502", x, y)
+	// The fee is taken first and the move follows as a separate step (posted
+	// to the player's queue when the guide's hook runs on another), so the
+	// spent token does not say the player has landed: wait on the position.
+	w.srv.AdvanceUntil(t, "the token teleport lands", func() bool {
+		x, y, _ := w.srv.PlayerPosition(t, w.player)
+		return abs(x-9716) <= 100 && abs(y-15502) <= 100
+	})
+	if n := w.srv.PlayerItemCount(t, w.player, travelToken); n != 11 {
+		t.Fatalf("travel tokens after the teleport = %d, want 11", n)
 	}
 }
 
