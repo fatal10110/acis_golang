@@ -1,10 +1,12 @@
 package gameservertest
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
 
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 )
 
@@ -66,16 +68,17 @@ func WithOlympiadCompetition(remaining time.Duration) Option {
 	return func(o *options) { o.olympiadWindow = &olympiadWindow{competition: true, remaining: remaining} }
 }
 
-// WithOlympiadValidation starts the Olympiad calendar at boot in a
-// validation period, the next competition window two hours away.
+// WithOlympiadValidation starts the Olympiad calendar at boot in the
+// validation period after an Olympiad's end, as if the Olympiad of the
+// seeded cycle had just ended: the period closes a day later.
 func WithOlympiadValidation() Option {
 	return func(o *options) { o.olympiadWindow = &olympiadWindow{} }
 }
 
-// config is the Olympiad configuration putting now in w: the default one,
-// its daily window moved to open two hours after now, for an hour, for a
-// validation period, or to have opened earlier today and to close
-// w.remaining after now, for a competition. A nil w keeps the default.
+// config is the Olympiad configuration putting now in w: the default one
+// for a validation period, which opens no window, or one whose daily
+// window opened earlier today and closes w.remaining after now, for a
+// competition. A nil w keeps the default.
 //
 // The calendar rebuilds the day's window from its start hour and minute on
 // now's date, and yesterday's as that minus a fixed day, so a competition
@@ -90,9 +93,6 @@ func (w *olympiadWindow) config(now time.Time) olympiad.Config {
 		return cfg
 	}
 	if !w.competition {
-		start := now.Add(2 * time.Hour)
-		cfg.StartHour, cfg.StartMinute = start.Hour(), start.Minute()
-		cfg.CompetitionMillis = time.Hour.Milliseconds()
 		return cfg
 	}
 	y, m, d := now.Date()
@@ -106,4 +106,27 @@ func (w *olympiadWindow) config(now time.Time) olympiad.Config {
 	cfg.StartHour, cfg.StartMinute = start.Hour(), start.Minute()
 	cfg.CompetitionMillis = now.Add(w.remaining).Sub(rebuilt(start)).Milliseconds()
 	return cfg
+}
+
+// seed stores, for a validation period, the close of one a day after now,
+// keeping the stored cycle or storing the first; a nil w or a competition
+// stores nothing.
+func (w *olympiadWindow) seed(tb testing.TB, db *sql.DB, now time.Time) {
+	tb.Helper()
+	if w == nil || w.competition {
+		return
+	}
+	ctx := context.Background()
+	store := gamesql.NewOlympiadStore(db)
+	st, found, err := store.LoadStatus(ctx)
+	if err != nil {
+		tb.Fatalf("gameservertest: load olympiad status: %v", err)
+	}
+	if !found {
+		st.Cycle = 1
+	}
+	st.ValidationEnd = now.Add(24 * time.Hour).UnixMilli()
+	if err := store.SaveStatus(ctx, st); err != nil {
+		tb.Fatalf("gameservertest: seed olympiad validation period: %v", err)
+	}
 }

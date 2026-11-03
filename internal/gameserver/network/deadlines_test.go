@@ -112,6 +112,23 @@ func TestSessionKeepsHandshakeDeadlineUntilExplicitlyCompleted(t *testing.T) {
 	}
 }
 
+func TestSessionReadTimeoutOverride(t *testing.T) {
+	override := time.Duration(0)
+	session := &Session{handshaking: true, idleTimeout: func() time.Duration { return override }}
+	override = time.Second
+	if got := session.readTimeout(); got != clientReadHandshakeTimeout {
+		t.Fatalf("handshake read timeout = %s, want %s: the override is for established sessions only", got, clientReadHandshakeTimeout)
+	}
+	session.CompleteHandshake()
+	if got := session.readTimeout(); got != time.Second {
+		t.Fatalf("established read timeout = %s, want the 1s override", got)
+	}
+	override = 0
+	if got := session.readTimeout(); got != clientReadIdleTimeout {
+		t.Fatalf("established read timeout with a zero override = %s, want %s", got, clientReadIdleTimeout)
+	}
+}
+
 func TestSessionSendFrameSetsWriteDeadline(t *testing.T) {
 	server, client := net.Pipe()
 	tracked := &deadlineConn{Conn: server, writeDeadline: make(chan time.Time, 1)}

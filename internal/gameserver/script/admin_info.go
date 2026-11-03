@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 )
 
 // This file is what the //info NPC script pages read of the registry and
@@ -92,12 +93,30 @@ func (r *Registry) NPCTimers(n attackable.Combatant) []ScriptTimers {
 		pl   *Player
 	}
 	var found []pending
-	ts := r.timers
-	ts.mu.Lock()
-	for t := range ts.byNPC[id] {
-		found = append(found, pending{t.s, t.key.name, t.pl})
+	if sc, ok := id.(*npc.Scratch); ok {
+		if h := keptTimers(sc); h != nil {
+			h.mu.Lock()
+			for _, t := range h.list {
+				found = append(found, pending{t.s, t.key.name, t.pl})
+			}
+			h.mu.Unlock()
+		}
+	} else {
+		// An NPC with no spawn slot has its timers in its scripts' tables.
+		for _, e := range r.entries {
+			if e.script == nil || e.script.ownTimers == nil {
+				continue
+			}
+			own := e.script.ownTimers
+			own.mu.Lock()
+			for key, t := range own.loose {
+				if key.npc == id {
+					found = append(found, pending{t.s, key.name, t.pl})
+				}
+			}
+			own.mu.Unlock()
+		}
 	}
-	ts.mu.Unlock()
 
 	// The player names are read with the timers unlocked.
 	byScript := map[*Script][]NPCTimer{}

@@ -410,6 +410,10 @@ type GameClientLink struct {
 	// flood windows.
 	now func() time.Time
 
+	// readIdleTimeout overrides the established-session read deadline of
+	// every session it opens; nil keeps the default (Session.readTimeout).
+	readIdleTimeout func() time.Duration
+
 	// olympiadDraw is the random source of the Olympiad's draws and of the
 	// spot its competitors return to; nil uses the random source.
 	olympiadDraw func(n int) int
@@ -653,6 +657,11 @@ type GameClientLinkConfig struct {
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
 	Now func() time.Time
+	// ReadIdleTimeout, when set, supplies how long an authenticated client
+	// may stay silent before the server closes its connection with
+	// ServerClose. It is read before every wait for the next frame; nil, or
+	// a value not above zero, means 15 minutes.
+	ReadIdleTimeout func() time.Duration
 	// TradeClock times every pending request out (direct trade, party,
 	// command channel, party room and friend invitations); nil means
 	// time.Now.
@@ -882,6 +891,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		combat:           newCombat(cfg),
 		log:              cfg.Log,
 		now:              cfg.Now,
+		readIdleTimeout:  cfg.ReadIdleTimeout,
 	}
 	playerConfig := cfg.PlayerConfig
 	link.playerSettings.Store(&playerConfig)

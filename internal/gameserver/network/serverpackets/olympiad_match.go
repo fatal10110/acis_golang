@@ -54,14 +54,15 @@ func FrameExOlympiadMatchEnd() wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// OlympiadUserInfo is a competitor as an Olympiad match window shows it.
+// OlympiadUserInfo is a competitor as an Olympiad match window shows it. The
+// gauges are the live values; the packet narrows each to its wire int.
 type OlympiadUserInfo struct {
 	Side      int
 	ObjectID  int32
 	Name      string
 	ClassID   int32
-	HP, MaxHP int32
-	CP, MaxCP int32
+	HP, MaxHP float64
+	CP, MaxCP float64
 }
 
 // FrameExOlympiadUserInfo shows one competitor's gauges in the receiver's
@@ -73,10 +74,10 @@ func FrameExOlympiadUserInfo(u OlympiadUserInfo) wire.Frame {
 	w.WriteInt32(u.ObjectID)
 	w.WriteString(u.Name)
 	w.WriteInt32(u.ClassID)
-	w.WriteInt32(u.HP)
-	w.WriteInt32(u.MaxHP)
-	w.WriteInt32(u.CP)
-	w.WriteInt32(u.MaxCP)
+	w.WriteInt32(statInt32(u.HP))
+	w.WriteInt32(statInt32(u.MaxHP))
+	w.WriteInt32(statInt32(u.CP))
+	w.WriteInt32(statInt32(u.MaxCP))
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 

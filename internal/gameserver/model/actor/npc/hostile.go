@@ -958,14 +958,15 @@ func (h *Hostile) tickable() bool {
 	return placed && !h.aiSleep.asleep()
 }
 
-// canRunAI reports whether an event may run the NPC's AI: it is on the grid,
-// in an active region or awake.
+// canRunAI reports whether an event may run the NPC's AI: it is on the grid.
+// AI sleep gates only the periodic cycle (see tickable); an event wakes a
+// sleeping NPC's AI for that step without waking the AI task.
 func (h *Hostile) canRunAI() bool {
 	if h.world == nil {
 		return true
 	}
-	placed, active := h.world.RegionActivity(h)
-	return placed && (active || !h.aiSleep.asleep())
+	placed, _ := h.world.RegionActivity(h)
+	return placed
 }
 
 // SiegeGuard reports whether this NPC is a defensive siege guard.

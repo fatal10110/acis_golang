@@ -75,16 +75,28 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// the other direction.
 		if cs.live != nil && cs.live.handlerPanicked {
 			l.log.Warn().Str("account", client.AccountName()).Msg("game client disconnected: panic in queued packet handler")
+			endSession(ctx, client)
 			return
 		}
 		payload, err := session.ReadFrame()
 		if err != nil {
+			// A read the client did not end by hanging up (the idle
+			// deadline) leaves it connected: it reads ServerClose before the close, so it shows
+			// the disconnect instead of waiting on a dead connection. The
+			// player lingers as on a dropped connection.
 			cs.lost = true
 			l.logReadFrameError(client, err)
+			if !hangUp(err) && !errors.Is(err, net.ErrClosed) && endSession(ctx, client) {
+				_ = conn.Close()
+			}
 			return
 		}
-		if len(payload) == 0 {
-			return
+		if len(payload) == 0 && client.State() != StateConnected {
+			// A frame with no body is skipped unread, and the client waits
+			// on no answer to it. Before authentication gateFrame still
+			// counts it toward the pre-auth packet cap, so empty frames
+			// cannot hold an unauthenticated connection open.
+			continue
 		}
 		serve, open := l.gateFrame(client, payload)
 		if !open {
@@ -100,9 +112,24 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// protection gates stay on this goroutine.
 		cs.acted = clearsSpawnProtection(payload[0])
 		if !l.dispatch(ctx, cs, payload) {
+			endSession(ctx, client)
 			return
 		}
 	}
+}
+
+// endSession makes ServerClose the last frame of an authenticated session
+// the server ends, so its client shows the disconnect instead of hanging. It
+// reports whether it did. A session that already sent its last frame (a
+// rejection's ServerClose, a logout's LeaveWorld) keeps it. An
+// unauthenticated connection just closes, as does every connection of a
+// stopping server, whose own close decides what each client reads.
+func endSession(ctx context.Context, client *Client) bool {
+	if ctx.Err() != nil || client.State() == StateConnected {
+		return false
+	}
+	client.closeNow()
+	return true
 }
 
 // openSession builds the connection's cipher and session, logging and
@@ -118,7 +145,9 @@ func (l *GameClientLink) openSession(conn *Conn) (key []byte, session *Session, 
 		l.log.Error().Err(err).Msg("build game cipher")
 		return nil, nil, false
 	}
-	return key, NewSession(conn, gameCipher), true
+	session = NewSession(conn, gameCipher)
+	session.idleTimeout = l.readIdleTimeout
+	return key, session, true
 }
 
 // closeOnShutdown ends the connection when ctx (the server) stops. A client
@@ -206,6 +235,9 @@ func (l *GameClientLink) gateFrame(client *Client, payload []byte) (serve, open 
 		l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packets in non-authed state")
 		client.closeNow()
 		return false, false
+	}
+	if len(payload) == 0 {
+		return false, true
 	}
 	if !client.Accept(payload[0]) {
 		l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")

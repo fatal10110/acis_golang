@@ -10,6 +10,13 @@ public final class Castle
 		_id = id;
 	}
 
+	public final Siege siege = new Siege();
+
+	public Siege getSiege()
+	{
+		return siege;
+	}
+
 	public int getId()
 	{
 		return _id;

@@ -38,6 +38,12 @@ wrote into a byte buffer.
   `PledgeStatusChanged`, `PledgeShowInfoUpdate`, `ManagePledgePower`, `PledgeReceiveMemberInfo`, `PowerInfo`,
   `WarList` and `SubPledgeCreated`, `PledgeSkillList` and `ListAdd`, `PledgeCrest`, `AllianceInfo`,
   `GMViewPledgeInfo`, `ExHeroList` and `ShowMiniMap`
+- the skill, effect, attack, door and gauge packets (`ProbeSkills.java`): `AbnormalStatusUpdate`,
+  `ExOlympiadSpelledInfo`, `SkillList`, `SkillCoolTime`, `MagicSkillLaunched`, `ExEnchantSkillList`,
+  `AcquireSkillList` (usual, fishing and clan), `AcquireSkillDone`, `ShortCutInit` and `ShortCutRegister`,
+  `Attack`, `DoorInfo`, `DoorStatusUpdate`, `StaticObjectInfo`, `QuestList`, `ExOlympiadUserInfo` and
+  `ExDuelUpdateUserInfo`; and the `vitals` rows (the current gauges as NaN, infinities and values outside
+  the int range) of those two, `UserInfo`, `CharInfo` and the recipe windows
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
 - the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
   `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,
@@ -55,7 +61,10 @@ and `EffectHolder` (never written). The engine graphs behind the last family are
 `SystemMessageId` (id and parameter count; the shared no-parameter message is never cached),
 `ItemInstance`/`Item`/`PcInventory`/`ItemData`, `Playable`, `Augmentation`, `Product`, `Ingredient`, `MultisellData`,
 `TradeList`, `RecipeBook`, `Recipe`, `RecipeData`, `Henna`, `HennaList`, `HennaData`, `L2Skill`/`AbstractEffect` (never written), `Clan`,
-`Siege`/`ClanHallSiege`/`Castle`, `CastleManager`/`ClanHallManager`/`ClanTable`, `Monster` with its
+`Siege`/`ClanHallSiege`/`Castle`, `Door`/`StaticObject`, `CreatureAttack` (only its hit record), `QuestList`/`Quest`/`QuestState`,
+`ShortcutList`, `EtcItem`, `Timestamp` (the same record read against a fixed clock, so the time left is a
+function of the stamp), the player's skill map (kept in the order the probe adds them), shortcut bar,
+quest log and reuse timers, `CastleManager`/`ClanHallManager`/`ClanTable`, `Monster` with its
 spoil state, the player's access level, appearance and status, `GameTimeTaskManager`,
 `CastleManorManager` (the reference's own lookups over tables the probe fills), and for the character
 list a `ConnectionPool` over `FakeDb`: in-memory tables answering the reference JDBC queries, so the

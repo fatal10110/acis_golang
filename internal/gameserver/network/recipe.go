@@ -69,8 +69,7 @@ func sendRecipeBook(live *livePlayer, dwarven bool) {
 
 // recipeBookFrame builds the dwarven or common page of live's recipe book.
 func recipeBookFrame(live *livePlayer, dwarven bool) wire.Frame {
-	maxMP := int32(live.ResourceValues().MaxMP)
-	return serverpackets.FrameRecipeBookItemList(dwarven, maxMP, live.RecipeBook().Recipes(dwarven))
+	return serverpackets.FrameRecipeBookItemList(dwarven, live.ResourceValues().MaxMP, live.RecipeBook().Recipes(dwarven))
 }
 
 // destroyRecipe answers RequestRecipeBookDestroy: the recipe leaves the
@@ -116,7 +115,7 @@ func (l *GameClientLink) sendRecipeItemMakeInfo(live *livePlayer, req clientpack
 
 func sendRecipeMakeInfo(live *livePlayer, r recipe.Recipe, status int32) {
 	res := live.ResourceValues()
-	live.SendFrame(serverpackets.FrameRecipeItemMakeInfo(r, int32(res.CurrentMP), int32(res.MaxMP), status))
+	live.SendFrame(serverpackets.FrameRecipeItemMakeInfo(r, res.CurrentMP, res.MaxMP, status))
 }
 
 // makeRecipeSelf answers RequestRecipeItemMakeSelf. A request specified to
