@@ -128,7 +128,7 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) (clamped []int3
 	}
 	for _, sk := range s.Skills {
 		if cl, ok := t.clans[sk.ClanID]; ok {
-			cl.skills[sk.ID] = sk.Level
+			cl.putSkillLocked(sk.ID, sk.Level)
 		}
 	}
 	t.restoreSubunits(s.Subunits)

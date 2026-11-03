@@ -279,13 +279,17 @@ func TestElectionAndClaimReloadRecords(t *testing.T) {
 }
 
 // TestHeroByClass pins the hero a page names: the running era's hero of
-// the class, the lowest object id among several.
+// the class, the first in hero list order among several (17 in bucket 1
+// before 2 in bucket 2).
 func TestHeroByClass(t *testing.T) {
 	t.Parallel()
 	m := New(&recordStore{}, nil, nil, nil, 5, time.Now, zerolog.Nop())
-	m.heroes = map[int32]Hero{9: {ClassID: 93}, 4: {ClassID: 93}, 5: {ClassID: 88}}
-	if id, ok := m.HeroByClass(93); !ok || id != 4 {
-		t.Fatalf("HeroByClass(93) = %d, %v; want 4", id, ok)
+	m.heroes = map[int32]Hero{17: {ClassID: 93}, 2: {ClassID: 93}, 5: {ClassID: 88}}
+	for _, id := range []int32{5, 2, 17} {
+		m.table.put(id)
+	}
+	if id, ok := m.HeroByClass(93); !ok || id != 17 {
+		t.Fatalf("HeroByClass(93) = %d, %v; want 17", id, ok)
 	}
 	if _, ok := m.HeroByClass(90); ok {
 		t.Fatal("HeroByClass(90) found a hero")

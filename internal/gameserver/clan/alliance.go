@@ -29,19 +29,18 @@ const (
 // minAllyLevel is the clan level an alliance founder needs.
 const minAllyLevel = 5
 
-// Allies returns the clans of the alliance allyID, in ascending clan id
-// order; none for 0.
+// Allies returns the clans of the alliance allyID, in registry order (see
+// Clans); none for 0.
 func (t *Table) Allies(allyID int32) []*Clan {
 	if t == nil || allyID == 0 {
 		return nil
 	}
 	var out []*Clan
-	for _, cl := range t.allClans() {
+	for _, cl := range t.Clans() {
 		if cl.AllyID() == allyID {
 			out = append(out, cl)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].id < out[j].id })
 	return out
 }
 

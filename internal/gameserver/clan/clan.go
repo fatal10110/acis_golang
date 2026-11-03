@@ -87,8 +87,10 @@ type Clan struct {
 	// member logs in.
 	loginGrades map[int32]int
 	privileges  map[int]int32
-	// skills maps each skill the clan learnt to its level.
-	skills map[int]int
+	// skills maps each skill the clan learnt to its level; skillOrder
+	// holds their ids in the order the clan skill list shows them.
+	skills     map[int]int
+	skillOrder warSet
 	// subunits are the academy, royal guards and knight orders the clan
 	// founded, by pledge type.
 	subunits map[int]*SubPledge

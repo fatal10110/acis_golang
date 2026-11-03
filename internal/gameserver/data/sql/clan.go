@@ -82,7 +82,7 @@ func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 		return snap, fmt.Errorf("load clan privileges: %w", err)
 	}
 
-	rows, err = s.db.QueryContext(ctx, `SELECT clan_id, skill_id, skill_level FROM clan_skills`)
+	rows, err = s.db.QueryContext(ctx, `SELECT clan_id, skill_id, skill_level FROM clan_skills ORDER BY clan_id, skill_id`)
 	if err != nil {
 		return snap, fmt.Errorf("load clan skills: %w", err)
 	}
