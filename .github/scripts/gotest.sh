@@ -37,6 +37,11 @@ jq -nrj --raw-input '
 jq -rj 'select(.Action == "output" and (.Output | contains("the driven clock covers the rest")))
   | "cut on the wall clock: \(.Package) \(.Test)\(.Output | sub("^\\s+"; " "))"' "$events"
 
+# The count of skipped tests, so a run where the datapack-backed tests
+# stopped running shows up as a jump.
+echo
+echo "Skipped tests: $(jq -s '[.[] | select(.Action == "skip" and .Test != null)] | length' "$events")"
+
 echo
 echo "Slowest packages and tests:"
 go run ./cmd/testtiming -n 15 <"$events" || true

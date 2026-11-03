@@ -127,15 +127,15 @@
 //	                                          instance type) at that world position, back after that many seconds, kept in the
 //	                                          spawn_data row of that name when db says so; max is its maximum NPC count
 //	                                          (default 1). A scenario with a spawn starts all its makers as the server boots,
-//	                                          as the server starts its own; not for a traced scenario (the reference probe
-//	                                          starts no maker)
+//	                                          as the server starts its own, in the lines' order; the reference probe does the same
 //	spawnrow <name> <alive|dead> <x> <y> <z> [respawn <seconds>]
 //	                                          optional, one per db name of a spawn: the spawn_data row the server saved last,
 //	                                          restored as it boots: alive at that position, or dead with its respawn that many
 //	                                          seconds after the server boots (the spawns read the wall clock; a dead row needs it); no row is a spawn
 //	                                          never saved
 //	started <maker> <event> <int1> <int2>     optional, repeatable, with a spawn: a script event the makers sent each other as
-//	                                          the server started them, in order; none listed means none was sent
+//	                                          the server started them, in order; none listed means none was sent; a traced
+//	                                          scenario's started lines are the trace's started lines
 //	member <name> <level> [dead] [standing <n>] [hold <item id> <count>]... [<dx> <dy> <dz>]
 //	                                          optional: a second character, of its own account, that enters the world where the
 //	                                          character first does, right after it, joins its party, then stands at that

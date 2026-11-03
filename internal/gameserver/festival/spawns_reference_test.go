@@ -11,16 +11,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
-// referenceManager reads the reference festival manager's source, found
-// beside the datapack checkout.
+// referenceManager reads the reference festival manager's source.
 func referenceManager(t *testing.T) string {
 	t.Helper()
-	dir, err := filepath.EvalSymlinks(datapack.Require(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(filepath.Dir(dir), "aCis_gameserver", "java", "net", "sf", "l2j", "gameserver", "data", "manager", "FestivalOfDarknessManager.java")
-	raw, err := os.ReadFile(path)
+	const manager = "java/net/sf/l2j/gameserver/data/manager/FestivalOfDarknessManager.java"
+	raw, err := os.ReadFile(filepath.Join(datapack.Reference(t, manager), manager))
 	if err != nil {
 		t.Fatalf("read the reference festival manager: %v", err)
 	}

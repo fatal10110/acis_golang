@@ -11,3 +11,7 @@ backups/
 # Packed geodata cache the game server and cmd/geopack write.
 geodata.cache
 geodata.cache.tmp*
+
+# Geodata is too large for the repository; a local copy under the datapack
+# copy stays out of it.
+/aCis_datapack/data/geodata/
