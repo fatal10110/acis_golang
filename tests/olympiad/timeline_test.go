@@ -51,9 +51,18 @@ type traceStore struct {
 	tr *trace
 }
 
-func (s traceStore) SaveCycle(ctx context.Context, cycle int32) error {
-	s.tr.add("DB save_cycle %d", cycle)
-	return s.OlympiadStore.SaveCycle(ctx, cycle)
+func (s traceStore) SaveStatus(ctx context.Context, st olympiad.Status) error {
+	s.tr.add("DB save_status %d %s", st.Cycle, validationEnd(st.ValidationEnd))
+	return s.OlympiadStore.SaveStatus(ctx, st)
+}
+
+// validationEnd formats a stored validation end as the probe prints it,
+// "-" for none.
+func validationEnd(ms int64) string {
+	if ms == 0 {
+		return "-"
+	}
+	return instant(time.UnixMilli(ms))
 }
 
 func (s traceStore) SaveNobles(ctx context.Context, nobles map[int32]olympiad.Noble) error {
@@ -90,22 +99,27 @@ func instant(t time.Time) string {
 }
 
 // timelineScenario is one probe run: the clock's start, how many distinct
-// instants to step through, and the stored cycle and noble points.
+// instants to step through, the stored cycle and noble points, and the
+// stored close of a validation period, empty for none.
 type timelineScenario struct {
-	name     string
-	start    string
-	instants int
-	cycle    int
-	nobles   map[int32]int
+	name          string
+	start         string
+	instants      int
+	cycle         int
+	nobles        map[int32]int
+	validationEnd string
 }
 
 // timelineScenarios are the probe's runs, in its order.
 var timelineScenarios = []timelineScenario{
-	{"validation start, nobles, crosses month end", "2026-10-02T12:00:00Z", 30, 4, map[int32]int{1001: 10, 1002: 0}},
-	{"inside competition", "2026-10-31T20:00:00Z", 12, 1, map[int32]int{1001: 5}},
-	{"yesterday's window past midnight", "2026-11-30T23:59:59.500Z", 10, 7, nil},
-	{"competition hour, minute passed, not grant day", "2026-11-03T18:30:00Z", 10, 2, map[int32]int{1001: 1}},
-	{"first of month in competition", "2026-12-01T19:00:00Z", 10, 2, map[int32]int{1001: 1}},
+	{"between windows, nobles, weekly grant", "2026-10-02T12:00:00Z", 30, 4, map[int32]int{1001: 10, 1002: 0}, ""},
+	{"inside competition, through the Olympiad end", "2026-10-31T20:00:00Z", 12, 1, map[int32]int{1001: 5}, ""},
+	{"yesterday's window past midnight", "2026-11-30T23:59:59.500Z", 10, 7, nil, ""},
+	{"competition hour, minute passed, not grant day", "2026-11-03T18:30:00Z", 10, 2, map[int32]int{1001: 1}, ""},
+	{"first of month in competition", "2026-12-01T19:00:00Z", 10, 2, map[int32]int{1001: 1}, ""},
+	{"restart in the validation period", "2026-11-01T15:00:00Z", 6, 3, map[int32]int{1001: 40}, "2026-11-02T12:00:00Z"},
+	{"restart after the validation period", "2026-11-02T13:00:00Z", 4, 3, map[int32]int{1001: 40}, "2026-11-02T12:00:00Z"},
+	{"grant due in the validation period", "2027-02-28T12:00:00Z", 8, 9, map[int32]int{1001: 20}, ""},
 }
 
 // TestOlympiadCalendarTimeline runs the calendar on a virtual clock against
@@ -113,24 +127,25 @@ var timelineScenarios = []timelineScenario{
 // announcement, database write and the state after each instant with
 // testdata/timeline.golden.
 //
-// The golden file is the output of a probe of the reference calendar
-// (aCis 409, model/olympiad/Olympiad.java: reschedule, getDelay,
-// executeTask, endOlympiad, checkPendingGames, schedulePeriodEnd,
-// revalidatePeriod, init, startCompetition, setNextNoblePointsUpdate,
-// setNewOlympiadEnd, startNewCycle, deleteNobles, copied with
-// System.currentTimeMillis and Calendar.getInstance read from a virtual
-// clock, ThreadPool.schedule replaced by stepping that clock to the soonest
-// delay, the database, broadcast and game manager calls replaced by trace
-// lines, and no match ever running). Its one deviation: init renews the
-// Olympiad end once reached rather than once passed, as the Go calendar
-// does; on a clock that never moves the reference's comparison repeats the
-// steps due at the end forever (#3280). The probe and how to regenerate the
-// golden file are in testdata/oracle (OlyProbe.java, README.md).
+// The golden file is the output of a probe of the calendar the owner chose
+// in #3280: the daily windows and weekly grant of aCis 409
+// (model/olympiad/Olympiad.java: reschedule, getDelay, executeTask,
+// endOlympiad, checkPendingGames, schedulePeriodEnd, revalidatePeriod,
+// init, startCompetition, setNextNoblePointsUpdate, setNewOlympiadEnd,
+// deleteNobles) on the monthly cycle of aCis 401 (olympiadEnd,
+// validationEnd, load), copied with System.currentTimeMillis and
+// Calendar.getInstance read from a virtual clock, ThreadPool.schedule
+// replaced by stepping that clock to the soonest delay, the database,
+// broadcast and game manager calls replaced by trace lines, and no match
+// ever running. Its deviations are listed in testdata/oracle/README.md,
+// with the probe (OlyProbe.java) and how to regenerate the golden file.
 //
-// The runs cover a start in the validation period, inside the window,
-// inside the previous day's window just before midnight, during the start
-// hour once its minute has passed, and on the first of a month; each
-// crosses at least one month end.
+// The runs cover a start between two windows across a weekly grant, inside
+// the window through an Olympiad's end and its validation period, inside
+// the previous day's window just before midnight, during the start hour
+// once its minute has passed, on the first of a month after the end time,
+// restarts inside and after a stored validation period, and a weekly grant
+// falling in a validation period.
 func TestOlympiadCalendarTimeline(t *testing.T) {
 	want, err := os.ReadFile("testdata/timeline.golden")
 	if err != nil {
@@ -158,6 +173,15 @@ func runTimeline(t *testing.T, sc timelineScenario) []string {
 	ctx := context.Background()
 	db := sqltest.SharedDB(t)
 	seedNobles(t, db, sc.cycle, sc.nobles)
+	if sc.validationEnd != "" {
+		end, err := time.Parse(time.RFC3339Nano, sc.validationEnd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, "INSERT INTO server_memo (var, value) VALUES ('olympiad_valid_end', ?)", fmt.Sprint(end.UnixMilli())); err != nil {
+			t.Fatalf("seed validation end: %v", err)
+		}
+	}
 
 	start, err := time.Parse(time.RFC3339Nano, sc.start)
 	if err != nil {
@@ -172,10 +196,7 @@ func runTimeline(t *testing.T, sc timelineScenario) []string {
 	o.Start()
 	loop.Run()
 	state := func() {
-		period := "COMPETITION"
-		if o.Period() == olympiad.Validation {
-			period = "VALIDATION"
-		}
+		period := map[olympiad.Period]string{olympiad.Competition: "COMPETITION", olympiad.Interval: "INTERVAL", olympiad.Validation: "VALIDATION"}[o.Period()]
 		held := map[int32]olympiad.Noble{}
 		for id := range sc.nobles {
 			if n, ok := o.Noble(id); ok {

@@ -125,7 +125,7 @@ func TestOlympiadStopCancelsPendingStep(t *testing.T) {
 	loop.Run()
 	o.Stop(ctx)
 	loop.Advance(48 * time.Hour)
-	want := []string{"ANN game_started", "DB save_cycle 2", "DB save_nobles 1001:5"}
+	want := []string{"ANN game_started", "DB save_status 2 -", "DB save_nobles 1001:5"}
 	if !slices.Equal(tr.lines, want) {
 		t.Fatalf("trace = %q, want %q", tr.lines, want)
 	}

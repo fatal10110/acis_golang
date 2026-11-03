@@ -13,6 +13,9 @@ const (
 	// olympiadEndHour is the hour of the first day of the month an Olympiad
 	// ends at.
 	olympiadEndHour = 12
+	// validationMillis is how long the validation period after an
+	// Olympiad's end lasts.
+	validationMillis = dayMillis
 )
 
 // nextOlympiadEnd returns when an Olympiad started at now ends: the first
@@ -45,14 +48,17 @@ func nextNoblePointsUpdate(now time.Time, cfg Config) int64 {
 	return time.Date(y, m, d+days, cfg.StartHour, cfg.StartMinute, 0, 0, now.Location()).UnixMilli()
 }
 
-// periodAt reports the period running at now and when it ends. The
-// competition runs daily from the start time for the configured length
-// (capped just short of a day), and the validation period fills the rest of
-// the day up to the next competition start. A competition that began the
-// day before and runs past midnight is still the running one. Neither
-// period ends after olympiadEnd.
+// periodAt reports the part of an Olympiad's day running at now and when
+// it ends. The competition runs daily from the start time for the
+// configured length (capped just short of a day), and the interval fills
+// the rest of the day up to the next competition start. A competition that
+// began the day before and runs past midnight is still the running one.
+// Neither ends after olympiadEnd, and from olympiadEnd on no window opens.
 func periodAt(now time.Time, cfg Config, olympiadEnd int64) (period Period, end int64) {
 	nowMs := now.UnixMilli()
+	if nowMs >= olympiadEnd {
+		return Interval, olympiadEnd
+	}
 	y, m, d := now.Date()
 	startToday := time.Date(y, m, d, cfg.StartHour, cfg.StartMinute, 0, 0, now.Location())
 	length := min(cfg.CompetitionMillis, maxCompetitionMillis)
@@ -65,9 +71,9 @@ func periodAt(now time.Time, cfg Config, olympiadEnd int64) (period Period, end 
 	case nowMs >= startYesterdayMs && nowMs < startYesterdayMs+length:
 		period, end = Competition, startYesterdayMs+length
 	case startTodayMs > nowMs:
-		period, end = Validation, startTodayMs
+		period, end = Interval, startTodayMs
 	default:
-		period, end = Validation, startToday.AddDate(0, 0, 1).UnixMilli()
+		period, end = Interval, startToday.AddDate(0, 0, 1).UnixMilli()
 	}
 	return period, min(end, olympiadEnd)
 }

@@ -38,9 +38,9 @@ func (s *gatedStore) written() []string {
 	return slices.Clone(s.writes)
 }
 
-func (s *gatedStore) SaveCycle(ctx context.Context, cycle int32) error {
-	s.wait("save_cycle %d", cycle)
-	return s.OlympiadStore.SaveCycle(ctx, cycle)
+func (s *gatedStore) SaveStatus(ctx context.Context, st olympiad.Status) error {
+	s.wait("save_status %d %s", st.Cycle, validationEnd(st.ValidationEnd))
+	return s.OlympiadStore.SaveStatus(ctx, st)
 }
 
 func (s *gatedStore) SaveNobles(ctx context.Context, nobles map[int32]olympiad.Noble) error {
@@ -60,10 +60,11 @@ func (s *gatedStore) SnapshotMonth(ctx context.Context) error {
 
 // TestOlympiadStepsDoNotWaitOnTheDatabase pins that the calendar's
 // database writes run on the persistence lane, not on its queue: with
-// every write stalled, the competition end and the next day's new cycle
-// still run and change the held state at once; the writes land later in
-// the order the steps made them, the truncate before the save that
-// follows it; and Stop waits for all of them and its own save.
+// every write stalled, the competition end, the Olympiad's end and the new
+// cycle after its validation period still run and change the held state
+// at once; the writes land later in the order the steps made them, the
+// truncate before the save that follows it; and Stop waits for all of them
+// and its own save.
 func TestOlympiadStepsDoNotWaitOnTheDatabase(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -72,7 +73,7 @@ func TestOlympiadStepsDoNotWaitOnTheDatabase(t *testing.T) {
 	worker := persist.New(zerolog.Nop())
 	t.Cleanup(func() { _ = worker.Close(context.Background()) })
 	store := &gatedStore{OlympiadStore: gamesql.NewOlympiadStore(db), release: make(chan struct{})}
-	loop := sim.NewInline(time.Date(2026, 10, 7, 20, 0, 0, 0, time.UTC))
+	loop := sim.NewInline(time.Date(2026, 10, 31, 20, 0, 0, 0, time.UTC))
 	o := olympiad.New(olympiad.DefaultConfig(), store, worker, discard{}, nil, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(ctx); err != nil {
 		t.Fatal(err)
@@ -80,11 +81,13 @@ func TestOlympiadStepsDoNotWaitOnTheDatabase(t *testing.T) {
 	o.Start()
 	loop.Run()
 
-	// The competition end at midnight queues the cycle and records save;
-	// the validation end at 18:00 opens cycle 3 and queues the truncate.
+	// The competition end at midnight queues the status and records save;
+	// the Olympiad's end at noon saves them and keeps the month's
+	// standings; the validation end a day later opens cycle 3 and queues
+	// the truncate.
 	stepped := make(chan struct{})
 	go func() {
-		loop.Advance(22 * time.Hour)
+		loop.Advance(41 * time.Hour)
 		close(stepped)
 	}()
 	select {
@@ -120,7 +123,12 @@ func TestOlympiadStepsDoNotWaitOnTheDatabase(t *testing.T) {
 		t.Fatal("Stop did not return once the writes landed")
 	}
 
-	want := []string{"save_cycle 2", "save_nobles 1001:5", "delete_nobles", "save_cycle 3"}
+	want := []string{
+		"save_status 2 -", "save_nobles 1001:5",
+		"save_nobles 1001:5", "save_status 2 2026-11-02T12:00:00Z", "save_nobles 1001:5", "snapshot_month",
+		"delete_nobles", "save_status 3 -",
+		"save_status 3 -",
+	}
 	if got := store.written(); !slices.Equal(got, want) {
 		t.Fatalf("writes = %q, want %q", got, want)
 	}

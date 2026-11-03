@@ -1,15 +1,14 @@
 // Package olympiad owns the Olympiad calendar and the nobles' records.
 //
-// An Olympiad runs until noon on the first day of the next month. Inside it
-// each day has a competition window, from the configured start time for the
-// configured length, and a validation period filling the rest of the day.
-// Every competition start opens a new cycle and clears the nobles'
-// records; a weekly grant adds points to every record; and the end of the
-// Olympiad keeps a copy of the records as the month's standings, though a
-// period change due at the same moment always runs first and moves the end
-// a month on. The cycle number and the records persist across restarts.
-// Whether the daily new cycle and the unreachable end should stay is open
-// (#3280).
+// An Olympiad is one cycle: it runs until noon on the first day of the next
+// month. Inside it each day has a competition window, from the configured
+// start time for the configured length, and a weekly grant adds points to
+// every noble's record. Its end elects the heroes and keeps a copy of the
+// records as the month's standings; a validation period of a day follows,
+// with no competition window, in which nobles trade their points for
+// Noblesse Gate Passes. Only once the validation period is over does the
+// next cycle open, with the records cleared. The cycle number, the
+// records and a running validation period persist across restarts.
 //
 // The waiting lists nobles register on during a competition window, and
 // the trade of a cycle's points for Noblesse Gate Passes, are in
@@ -40,14 +39,18 @@ const TaskTimeout = 10 * time.Second
 // item or clan has object id 0.
 const writeLane int32 = 0
 
-// Period is the part of the day the Olympiad is in.
+// Period is the part of the calendar the Olympiad is in.
 type Period int
 
 const (
-	// Competition is the daily match window.
+	// Competition is a daily match window of a running Olympiad.
 	Competition Period = iota
-	// Validation is the rest of the day, between two competition windows.
+	// Validation follows the end of an Olympiad until the next cycle opens:
+	// no window opens, and nobles trade their points for passes.
 	Validation
+	// Interval is the time between two competition windows of a running
+	// Olympiad.
+	Interval
 )
 
 // Config is the Olympiad's configuration.
@@ -147,12 +150,20 @@ type Writer interface {
 	Flush(ctx context.Context, ownerIDs ...int32) error
 }
 
-// Store persists the cycle number and the nobles' records.
+// Status is the calendar state kept across restarts.
+type Status struct {
+	Cycle int32
+	// ValidationEnd is when the validation period running after an
+	// Olympiad's end closes, in Unix milliseconds; zero outside one.
+	ValidationEnd int64
+}
+
+// Store persists the calendar's status and the nobles' records.
 type Store interface {
-	// LoadCycle returns the stored cycle number, found=false when none was
+	// LoadStatus returns the stored status, found=false when no cycle was
 	// stored yet.
-	LoadCycle(ctx context.Context) (cycle int32, found bool, err error)
-	SaveCycle(ctx context.Context, cycle int32) error
+	LoadStatus(ctx context.Context) (st Status, found bool, err error)
+	SaveStatus(ctx context.Context, st Status) error
 	// LoadNobles returns the record of every noble whose character still
 	// exists, keyed by character object id.
 	LoadNobles(ctx context.Context) (map[int32]Noble, error)
@@ -179,17 +190,23 @@ type Heroes interface {
 }
 
 // step is one scheduled calendar change. The order breaks ties between
-// steps due at the same moment: the earlier one runs first.
+// steps due at the same moment: the earlier one runs first, so a window
+// cut short by the Olympiad's end closes before the end runs, and the end
+// runs before a window due to open at that moment.
 type step int
 
 const (
 	stepNoblePoints step = iota
-	stepValidationEnd
 	stepCompetitionEnd
 	stepOlympiadEnd
+	stepCompetitionStart
+	stepValidationEnd
 	stepRegistrationEnd
 	stepCount
 )
+
+// periodEnding is the period each of the steps ending one closes.
+var periodEnding = [stepCount]Period{stepCompetitionEnd: Competition, stepCompetitionStart: Interval, stepValidationEnd: Validation}
 
 // Olympiad is the calendar and the nobles' records. Its calendar steps run
 // on its queue and hand their database writes to its writer; the reads are
@@ -230,7 +247,8 @@ type Olympiad struct {
 	mu     sync.Mutex
 	cycle  int32
 	period Period
-	// periodEnd is in Unix milliseconds.
+	// periodEnd is when period ends, in Unix milliseconds: the window's
+	// close, the next window's opening, or the validation period's close.
 	periodEnd int64
 	nobles    map[int32]Noble
 	// classed holds the waiting list of each base class anyone registered
@@ -249,30 +267,35 @@ func New(cfg Config, store Store, writes Writer, out Announcer, heroes Heroes, q
 	return &Olympiad{cfg: cfg, store: store, writes: writes, out: out, heroes: heroes, queue: queue, log: log, registrationEnd: -1, nobles: map[int32]Noble{}, classed: map[int][]int32{}}
 }
 
-// Restore loads the cycle number, the first when none is stored, and the
-// nobles' records.
+// Restore loads the cycle number, the first when none is stored, a running
+// validation period and the nobles' records.
 func (o *Olympiad) Restore(ctx context.Context) error {
-	cycle, found, err := o.store.LoadCycle(ctx)
+	st, found, err := o.store.LoadStatus(ctx)
 	if err != nil {
 		return err
 	}
 	if !found {
-		cycle = 1
+		st.Cycle = 1
 	}
 	nobles, err := o.store.LoadNobles(ctx)
 	if err != nil {
 		return err
 	}
 	o.mu.Lock()
-	o.cycle = cycle
+	o.cycle = st.Cycle
+	if st.ValidationEnd != 0 {
+		o.period, o.periodEnd = Validation, st.ValidationEnd
+	}
 	o.nobles = nobles
 	o.mu.Unlock()
-	o.log.Info().Int("nobles", len(nobles)).Int32("cycle", cycle).Msg("olympiad: restored")
+	o.log.Info().Int("nobles", len(nobles)).Int32("cycle", st.Cycle).Msg("olympiad: restored")
 	return nil
 }
 
-// Start sets the Olympiad's end a month ahead, enters the period the clock
-// is in and schedules the next calendar step.
+// Start schedules the next calendar step. A restored validation period
+// runs to its end, or opens the next cycle at once when already over;
+// otherwise the Olympiad ends at noon on the first of the next month, and
+// the period the clock is in is entered.
 func (o *Olympiad) Start() {
 	o.queue.Post(func() {
 		o.run.Lock()
@@ -280,8 +303,17 @@ func (o *Olympiad) Start() {
 		if o.stopped {
 			return
 		}
-		o.olympiadEnd = nextOlympiadEnd(o.queue.Now())
-		o.enterPeriod()
+		now := o.queue.Now()
+		o.mu.Lock()
+		validation, validationEnd := o.period == Validation, o.periodEnd
+		o.mu.Unlock()
+		switch {
+		case !validation:
+			o.olympiadEnd = nextOlympiadEnd(now)
+			o.enterPeriod()
+		case validationEnd <= now.UnixMilli():
+			o.startCycle()
+		}
 		o.schedule()
 	})
 }
@@ -357,16 +389,19 @@ func (o *Olympiad) fire() {
 	case stepCompetitionEnd:
 		o.out.Announce(NoticeCompetitionEnded, 0)
 		o.closeCompetition()
+	case stepCompetitionStart:
+		o.enterPeriod()
 	case stepValidationEnd:
 		o.startCycle()
-		o.deleteNobles()
-		o.enterPeriod()
 	case stepNoblePoints:
+		// A grant due in the validation period adds nothing.
 		o.nextPoints = nextNoblePointsUpdate(o.queue.Now(), o.cfg)
 		o.mu.Lock()
-		for id, n := range o.nobles {
-			n.addPoints(o.cfg.WeeklyPoints)
-			o.nobles[id] = n
+		if o.period != Validation {
+			for id, n := range o.nobles {
+				n.addPoints(o.cfg.WeeklyPoints)
+				o.nobles[id] = n
+			}
 		}
 		o.mu.Unlock()
 	case stepRegistrationEnd:
@@ -379,8 +414,9 @@ func (o *Olympiad) fire() {
 }
 
 // schedule arms the timer for the step due soonest; ties go to the step
-// listed first. The competition window's end is a candidate only during the
-// competition, the validation period's only outside it.
+// listed first. Each period's own end is a candidate only during it, the
+// Olympiad's end only outside the validation period, and the weekly grant
+// once it is set. A step the clock has passed is due at once.
 func (o *Olympiad) schedule() {
 	now := o.queue.Now().UnixMilli()
 	o.mu.Lock()
@@ -391,15 +427,21 @@ func (o *Olympiad) schedule() {
 	for s := range stepCount {
 		var delay int64
 		switch s {
-		case stepCompetitionEnd, stepValidationEnd:
-			if (s == stepCompetitionEnd) != (period == Competition) {
+		case stepCompetitionEnd, stepCompetitionStart, stepValidationEnd:
+			if period != periodEnding[s] {
 				continue
 			}
-			delay = periodEnd - now
+			delay = max(periodEnd-now, 0)
 		case stepOlympiadEnd:
-			delay = o.olympiadEnd - now
+			if period == Validation {
+				continue
+			}
+			delay = max(o.olympiadEnd-now, 0)
 		case stepNoblePoints:
-			delay = o.nextPoints - now
+			if o.nextPoints == 0 {
+				continue
+			}
+			delay = max(o.nextPoints-now, 0)
 		case stepRegistrationEnd:
 			delay = o.registrationEnd
 		}
@@ -415,22 +457,12 @@ func (o *Olympiad) schedule() {
 	o.timer = o.queue.After(time.Duration(bestDelay)*time.Millisecond, o.fire)
 }
 
-// enterPeriod renews a reached Olympiad end and a passed weekly grant, then
-// enters the period the clock is in. Entering a competition window opens
-// it; a validation period found already over opens a new cycle and the
-// window.
-//
-// The end is renewed once reached, not only once passed: a step due at the
-// end itself would otherwise find it still ahead, enter a period clamped to
-// end now, and fire again at once, for as long as the clock reads the same
-// millisecond.
+// enterPeriod sets a weekly grant not set or passed, then enters the part
+// of the running Olympiad's day the clock is in, opening the competition
+// window when inside it.
 func (o *Olympiad) enterPeriod() {
 	now := o.queue.Now()
-	nowMs := now.UnixMilli()
-	if o.olympiadEnd == 0 || o.olympiadEnd <= nowMs {
-		o.olympiadEnd = nextOlympiadEnd(now)
-	}
-	if o.nextPoints == 0 || o.nextPoints < nowMs {
+	if o.nextPoints == 0 || o.nextPoints < now.UnixMilli() {
 		o.nextPoints = nextNoblePointsUpdate(now, o.cfg)
 	}
 	period, end := periodAt(now, o.cfg, o.olympiadEnd)
@@ -444,10 +476,6 @@ func (o *Olympiad) enterPeriod() {
 	}
 	o.registrationEnd = -1
 	o.stopGames()
-	if end <= o.queue.Now().UnixMilli() {
-		o.startCycle()
-		o.openCompetition()
-	}
 }
 
 // openCompetition announces the competition window, starts its draws and
@@ -463,28 +491,36 @@ func (o *Olympiad) openCompetition() {
 
 // closeCompetition stops the window's draws, saves the status and enters
 // the next period. A match still running goes on to its end in its stadium
-// (#3280 owns whether the window should wait for it).
+// and is saved with the next status save.
 func (o *Olympiad) closeCompetition() {
 	o.stopGames()
 	o.saveStatus()
 	o.enterPeriod()
 }
 
-// startCycle opens the next cycle in the competition period.
+// startCycle closes the validation period: the next cycle opens with no
+// records, its Olympiad ending at noon on the first of the next month; the
+// status is saved, so a restart opens no second cycle, and the period the
+// clock is in is entered.
 func (o *Olympiad) startCycle() {
 	o.mu.Lock()
-	o.period = Competition
+	o.period = Interval
 	o.cycle++
 	cycle := o.cycle
 	o.mu.Unlock()
+	o.deleteNobles()
 	o.out.Announce(NoticeCycleStarted, cycle)
+	o.olympiadEnd = nextOlympiadEnd(o.queue.Now())
+	o.saveStatus()
+	o.enterPeriod()
 }
 
 // SelectHeroes ends the running Olympiad at once, as its end would: the
-// heroes are elected from the records as they stand. The pending calendar
-// step is cancelled and none is scheduled after the end, so the calendar
-// stands still until the next restart; the end itself still enters the
-// period the clock is in, opening a competition window when inside one.
+// pending calendar step is cancelled, an open competition window closes
+// with no announcement, the heroes are elected from the records as they
+// stand and the validation period starts, the next cycle opening once it
+// is over. Run during a validation period it ends the Olympiad again, the
+// validation period starting over.
 func (o *Olympiad) SelectHeroes() {
 	o.queue.Post(func() {
 		o.run.Lock()
@@ -496,24 +532,21 @@ func (o *Olympiad) SelectHeroes() {
 			o.timer.Stop()
 			o.timer = nil
 		}
-		o.stopGames()
-		o.olympiadEnd, o.nextPoints, o.registrationEnd = 0, 0, -1
-		o.mu.Lock()
-		o.periodEnd = 0
-		o.mu.Unlock()
 		o.endOlympiad()
+		o.schedule()
 	})
 }
 
-// endOlympiad closes the running Olympiad: it saves the records, enters the
-// validation period, elects the heroes from the saved records, saves the
-// status, keeps the month's standings and enters the period the clock is
-// in.
+// endOlympiad closes the running Olympiad: it stops the draws, saves the
+// records, enters the validation period, elects the heroes from the saved
+// records, saves the status and keeps the month's standings.
 func (o *Olympiad) endOlympiad() {
+	o.stopGames()
+	o.registrationEnd = -1
 	o.out.Announce(NoticeCycleEnded, o.Cycle())
 	o.saveNobles()
 	o.mu.Lock()
-	o.period = Validation
+	o.period, o.periodEnd = Validation, o.queue.Now().UnixMilli()+validationMillis
 	o.mu.Unlock()
 	if o.heroes != nil {
 		heroes := o.heroes
@@ -524,13 +557,17 @@ func (o *Olympiad) endOlympiad() {
 	}
 	o.saveStatus()
 	o.write("keep the month's standings", func(ctx context.Context, st Store) error { return st.SnapshotMonth(ctx) })
-	o.enterPeriod()
 }
 
-// saveStatus queues the save of the cycle number and the nobles' records.
+// saveStatus queues the save of the status and the nobles' records.
 func (o *Olympiad) saveStatus() {
-	cycle := o.Cycle()
-	o.write("save cycle", func(ctx context.Context, st Store) error { return st.SaveCycle(ctx, cycle) })
+	o.mu.Lock()
+	st := Status{Cycle: o.cycle}
+	if o.period == Validation {
+		st.ValidationEnd = o.periodEnd
+	}
+	o.mu.Unlock()
+	o.write("save status", func(ctx context.Context, s Store) error { return s.SaveStatus(ctx, st) })
 	o.saveNobles()
 }
 

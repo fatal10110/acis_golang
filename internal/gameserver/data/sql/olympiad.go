@@ -9,10 +9,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 )
 
-// olympiadCycleMemo is the server_memo variable holding the Olympiad cycle.
-const olympiadCycleMemo = "olympiad_cycle"
+// olympiadCycleMemo and olympiadValidationEndMemo are the server_memo
+// variables holding the Olympiad cycle and the close of a running
+// validation period; server_memo names hold at most 20 characters.
+const (
+	olympiadCycleMemo         = "olympiad_cycle"
+	olympiadValidationEndMemo = "olympiad_valid_end"
+)
 
-// OlympiadStore reads and writes the Olympiad's cycle number, kept in
+// OlympiadStore reads and writes the Olympiad's status, kept in
 // server_memo, and the nobles' records in olympiad_nobles, whose month's
 // standings are copied to olympiad_nobles_eom.
 type OlympiadStore struct {
@@ -24,31 +29,52 @@ func NewOlympiadStore(db *sql.DB) *OlympiadStore {
 	return &OlympiadStore{db: db}
 }
 
-// LoadCycle returns the stored cycle number, found=false when none is
-// stored. A value that is not a 32-bit decimal integer is an error.
-func (s *OlympiadStore) LoadCycle(ctx context.Context) (int32, bool, error) {
-	var value string
-	err := s.db.QueryRowContext(ctx, "SELECT value FROM server_memo WHERE var = ?", olympiadCycleMemo).Scan(&value)
-	if err == sql.ErrNoRows {
-		return 0, false, nil
-	}
+// LoadStatus returns the stored status, found=false when no cycle is
+// stored; a validation end not stored reads as none running. A cycle that
+// is not a 32-bit decimal integer, or a validation end not a 64-bit one,
+// is an error.
+func (s *OlympiadStore) LoadStatus(ctx context.Context) (olympiad.Status, bool, error) {
+	var st olympiad.Status
+	rows, err := s.db.QueryContext(ctx, "SELECT var, value FROM server_memo WHERE var IN (?, ?)", olympiadCycleMemo, olympiadValidationEndMemo)
 	if err != nil {
-		return 0, false, fmt.Errorf("load olympiad cycle: %w", err)
+		return st, false, fmt.Errorf("load olympiad status: %w", err)
 	}
-	cycle, err := strconv.ParseInt(value, 10, 32)
-	if err != nil {
-		return 0, false, fmt.Errorf("load olympiad cycle %q: %w", value, err)
+	defer rows.Close()
+	found := false
+	for rows.Next() {
+		var name, value string
+		if err := rows.Scan(&name, &value); err != nil {
+			return st, false, fmt.Errorf("load olympiad status: %w", err)
+		}
+		switch name {
+		case olympiadCycleMemo:
+			cycle, err := strconv.ParseInt(value, 10, 32)
+			if err != nil {
+				return st, false, fmt.Errorf("load olympiad cycle %q: %w", value, err)
+			}
+			st.Cycle, found = int32(cycle), true
+		case olympiadValidationEndMemo:
+			end, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return st, false, fmt.Errorf("load olympiad validation end %q: %w", value, err)
+			}
+			st.ValidationEnd = end
+		}
 	}
-	return int32(cycle), true, nil
+	if err := rows.Err(); err != nil {
+		return st, false, fmt.Errorf("load olympiad status: %w", err)
+	}
+	return st, found, nil
 }
 
-// SaveCycle stores the cycle number.
-func (s *OlympiadStore) SaveCycle(ctx context.Context, cycle int32) error {
+// SaveStatus stores the status, both variables in one statement.
+func (s *OlympiadStore) SaveStatus(ctx context.Context, st olympiad.Status) error {
 	if _, err := s.db.ExecContext(ctx,
-		"INSERT INTO server_memo (var, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)",
-		olympiadCycleMemo, strconv.FormatInt(int64(cycle), 10),
+		"INSERT INTO server_memo (var, value) VALUES (?, ?), (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)",
+		olympiadCycleMemo, strconv.FormatInt(int64(st.Cycle), 10),
+		olympiadValidationEndMemo, strconv.FormatInt(st.ValidationEnd, 10),
 	); err != nil {
-		return fmt.Errorf("save olympiad cycle: %w", err)
+		return fmt.Errorf("save olympiad status: %w", err)
 	}
 	return nil
 }

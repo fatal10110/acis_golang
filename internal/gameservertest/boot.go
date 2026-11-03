@@ -2633,6 +2633,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedOlympiad != nil {
 		ids.seed(t, db, func() { o.seedOlympiad(db) })
 	}
+	o.olympiadWindow.seed(t, db, olympiadQueue.Now())
 	if err := olympiadState.Restore(context.Background()); err != nil {
 		t.Fatalf("restore olympiad: %v", err)
 	}
