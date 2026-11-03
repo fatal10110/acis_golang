@@ -57,12 +57,12 @@ func (a *Actor) Regen() *creature.Regen { return &a.regen }
 // short of HP or MP, its first tick one period from now, and disarms
 // it otherwise; every HP or MP change settles it so.
 func (a *Actor) SettleRegen() {
-	a.regen.Settle(a.Queue(), a.regenShort)
+	a.regen.Settle(a.Queue(), a.RegenShort)
 }
 
-// regenShort reports whether a regenerates: spawned (on the grid or off it
+// RegenShort reports whether a regenerates: spawned (on the grid or off it
 // mid-relocation, as a hidden owner's summon is), not dead, and below its
 // maximum HP or MP.
-func (a *Actor) regenShort() bool {
+func (a *Actor) RegenShort() bool {
 	return a.Spawned() && !a.Dead() && (a.HP() < a.MaxHPValue() || a.MPValue() < a.MaxMPValue())
 }

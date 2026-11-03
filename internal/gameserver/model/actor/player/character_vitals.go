@@ -76,7 +76,7 @@ func (c *Character) boundedLocked(cur, maxValue float64) float64 {
 
 // noteMaxima settles c's maxima (SettleMaxima) when a read finds one
 // changed since the last read. A read runs under the regeneration task's
-// own lock (regenShort) and under other actors' locks, so the settle is
+// own lock (RegenShort) and under other actors' locks, so the settle is
 // posted to c's queue. A character not in the world has no queue; it
 // settles as it enters (AdoptMaxima, SettleEnteredRegen).
 func (c *Character) noteMaxima(res Resources) {

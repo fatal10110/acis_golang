@@ -69,11 +69,11 @@ func (h *Hostile) Regen() *creature.Regen { return &h.regen }
 // and short of HP or MP, its first tick one period from now, and disarms
 // it otherwise; every HP or MP change settles it so.
 func (h *Hostile) SettleRegen() {
-	h.regen.Settle(h.Queue(), h.regenShort)
+	h.regen.Settle(h.Queue(), h.RegenShort)
 }
 
-// regenShort reports whether this NPC regenerates: spawned (on the grid or
+// RegenShort reports whether this NPC regenerates: spawned (on the grid or
 // off it mid-relocation), not dead, and below its maximum HP or MP.
-func (h *Hostile) regenShort() bool {
+func (h *Hostile) RegenShort() bool {
 	return h.Spawned() && !h.Dead() && (h.HP() < h.MaxHPValue() || h.MPValue() < h.MaxMPValue())
 }

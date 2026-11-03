@@ -24,7 +24,8 @@ func (*phasedRegenActor) ObjectID() int32          { return 1 }
 func (*phasedRegenActor) Kind() actor.Kind         { return actor.KindNPC }
 func (a *phasedRegenActor) Queue() *sim.Queue      { return a.q }
 func (a *phasedRegenActor) Regen() *creature.Regen { return &a.regen }
-func (a *phasedRegenActor) SettleRegen()           { a.regen.Settle(a.q, func() bool { return a.short }) }
+func (a *phasedRegenActor) SettleRegen()           { a.regen.Settle(a.q, a.RegenShort) }
+func (a *phasedRegenActor) RegenShort() bool       { return a.short }
 
 func (a *phasedRegenActor) TickRegen() { a.ticks = append(a.ticks, a.q.Now()); a.SettleRegen() }
 
