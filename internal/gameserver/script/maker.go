@@ -20,6 +20,18 @@ type Maker struct {
 	run *makerRun
 }
 
+// SendSelf sends the maker's own npcmaker the script event e, as a maker
+// does through its npcmaker: World.Heard is told of it, then the maker's
+// ScriptEvent hook runs. A maker running its own hook directly through
+// ScriptEvent (a device resolving its own state) is not a send and is not
+// told to Heard.
+func (m *Maker) SendSelf(e MakerEvent) {
+	if heard := m.world.Heard; heard != nil {
+		heard(e.Group.Maker().Name, e.Name, e.Int1, e.Int2)
+	}
+	m.ScriptEvent(m, e)
+}
+
 // IsNight reports whether it is night in the game world (00:00 to 05:59
 // game time).
 func (m *Maker) IsNight() bool { return m.world.Night() }
@@ -207,6 +219,12 @@ type MakerWorld struct {
 	// Now returns the local wall-clock time, from the clock the maker
 	// timers run on.
 	Now func() time.Time
+	// Heard, when set, is told of each script event sent to an npcmaker by
+	// its name (a script's or another maker's), before the maker's script
+	// runs: the maker's name, the event and its two arguments. A test
+	// suite uses it to see which makers a send reached; it may be called
+	// from any goroutine a script runs on.
+	Heard func(maker, event string, int1, int2 int)
 }
 
 // CastlesByID finds a castle by its id.
@@ -265,6 +283,9 @@ func (r *makerRun) NPCDBInfo(g spawn.Group, s spawn.GroupSpawn) {
 }
 
 func (r *makerRun) ScriptEvent(g spawn.Group, name string, int1, int2 int) {
+	if heard := r.m.world.Heard; heard != nil {
+		heard(g.Maker().Name, name, int1, int2)
+	}
 	r.run(g, "onMakerScriptEvent", func() {
 		r.m.MakerHooks.ScriptEvent(r.m, MakerEvent{Group: g, Name: name, Int1: int1, Int2: int2})
 	})

@@ -25,9 +25,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import net.sf.l2j.commons.data.StatSet;
 import net.sf.l2j.commons.mmocore.ProbeWire;
 import net.sf.l2j.commons.probe.ProbeClock;
 import net.sf.l2j.commons.probe.ProbeHeard;
+import net.sf.l2j.commons.probe.ProbeMaker;
 import net.sf.l2j.commons.pool.ConnectionPool;
 import net.sf.l2j.commons.pool.ThreadPool;
 import net.sf.l2j.commons.random.Rnd;
@@ -84,6 +86,7 @@ import net.sf.l2j.gameserver.model.residence.clanhall.ClanHall;
 import net.sf.l2j.gameserver.model.residence.clanhall.SiegableHall;
 import net.sf.l2j.gameserver.model.residence.castle.Castle;
 import net.sf.l2j.gameserver.model.spawn.ASpawn;
+import net.sf.l2j.gameserver.model.spawn.NpcMaker;
 import net.sf.l2j.gameserver.model.spawn.Spawn;
 import net.sf.l2j.gameserver.network.GameClient;
 import net.sf.l2j.gameserver.network.GameClient.GameClientState;
@@ -191,6 +194,12 @@ final class ScenarioTrace
 	private final Set<String> _scripts = new HashSet<>();
 	/** Header lines the probe does not read: a traced scenario must have none. */
 	private final List<String> _unread = new ArrayList<>();
+
+	/** Whether an npc line names a corpse time: the corpses then decay as the ticks pass. */
+	private boolean _decays;
+
+	/** The npcmaker lines: {name, AI type}. */
+	private final List<String[]> _npcMakers = new ArrayList<>();
 	/** The NPC templates' own script bindings, kept while the scenario's replace them. */
 	private final Map<NpcTemplate, Map<EventHandler, List<Quest>>> _bindings = new HashMap<>();
 	/** The template fields the scenario changed, each with the value it had, in the order they changed. */
@@ -276,7 +285,7 @@ final class ScenarioTrace
 	private boolean _muted;
 
 	/** An npc line: params holds the three spawn parameters the line gives (a number, an NPC role or character), null for none; ai the AI parameters of its ai option, which replace the template's as the Go runner's fixture template has only them, null for none. */
-	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level, String[][] skills)
+	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level, int corpse, String[][] skills)
 	{
 	}
 
@@ -397,6 +406,12 @@ final class ScenarioTrace
 				if (!t._muted)
 					t._lines.add("# heard " + npc.getNpcId() + " (object " + npc.getObjectId() + ") " + id + " " + a1 + " " + a2);
 			});
+			// The script events sent to an NPC maker are the step's lines, in the order they were sent.
+			ProbeMaker.listen((maker, name, i1, i2) ->
+			{
+				if (!t._muted)
+					t._lines.add("# maker " + maker.getName() + " " + name + " " + i1 + " " + i2);
+			});
 			t.restrict(loaded);
 			ConnectionPool.keep(KEPT);
 			ProbeClock.virtual(WALL + t._clock);
@@ -414,6 +429,7 @@ final class ScenarioTrace
 			{
 				Rnd.endScriptCallers();
 				ProbeHeard.listen(null);
+				ProbeMaker.listen(null);
 				stop();
 				t.restore();
 				failures = ConnectionPool.forget();
@@ -633,7 +649,13 @@ final class ScenarioTrace
 					_draws = Arrays.stream(f, _always ? 2 : 1, f.length).mapToInt(Integer::parseInt).toArray();
 				}
 				case "clock" -> _clock = clock(f[1]);
-				case "npc" -> _npcs.put(f[1], new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f), npcLevel(f), npcSkills(f)));
+				case "npc" ->
+				{
+					final NpcLine n = new NpcLine(f[1], Integer.parseInt(f[2]), f[3], Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]), npcParams(f), npcAi(f), npcLevel(f), npcCorpse(f), npcSkills(f));
+					_npcs.put(f[1], n);
+					_decays |= n.corpse() > 0;
+				}
+				case "npcmaker" -> _npcMakers.add(new String[] { f[1], f[2] });
 				case "script", "stub" -> _scripts.add(ScriptProbe.PKG + f[1]);
 				case "hold" -> _holds.add(new int[]
 				{
@@ -757,6 +779,15 @@ final class ScenarioTrace
 			if (f[i].equals("skill"))
 				skills.add(new String[] { f[i + 1], f[i + 2], f[i + 3] });
 		return skills.toArray(new String[0][]);
+	}
+
+	/** The corpse time, in seconds, of an npc line's corpse option, 0 without one. */
+	private static int npcCorpse(String[] f)
+	{
+		for (int i = 7; i + 1 < f.length; i++)
+			if (f[i].equals("corpse"))
+				return Integer.parseInt(f[i + 1]);
+		return 0;
 	}
 
 	/** The template level of an npc line's level option, 0 without one. */
@@ -1356,11 +1387,25 @@ final class ScenarioTrace
 					fought.add(s[1]);
 			// The Go runner's world holds the scenario's spawns alone: the datapack's makers (loaded, never
 			// spawned here) are not what a script's spawn lookup finds.
-			alter(SpawnManager.class, SpawnManager.getInstance(), "_makers", ConcurrentHashMap.newKeySet());
+			// The npcmaker lines' makers, which spawn nothing, are the scenario's: a script's lookup by name finds them.
+			final Set<NpcMaker> makers = ConcurrentHashMap.newKeySet();
+			for (String[] m : _npcMakers)
+			{
+				final StatSet set = new StatSet();
+				set.set("name", m[0]);
+				set.set("maximumNpcs", 1);
+				set.set("maker", m[1]);
+				final NpcMaker maker = new NpcMaker(set);
+				maker.setSpawns(new ArrayList<>());
+				makers.add(maker);
+			}
+			alter(SpawnManager.class, SpawnManager.getInstance(), "_makers", makers);
 			for (NpcLine n : _npcs.values())
 			{
 				final NpcTemplate template = NpcData.getInstance().getTemplate(n.id());
 				casting(template, n.type());
+				if (n.corpse() > 0)
+					alter(NpcTemplate.class, template, "_corpseTime", n.corpse());
 				if (n.ai() != null)
 					alter(NpcTemplate.class, template, "_aiParams", new NpcMemo(n.ai()));
 				if (fought.contains(n.role()))
@@ -1778,6 +1823,10 @@ final class ScenarioTrace
 	{
 		_lines.add("T " + STEP);
 		ThreadPool.advance(STEP);
+		// The decay task runs each second in the server; the probe cancels the periodic tasks between scenarios,
+		// so a scenario whose NPC lines name a corpse time runs it after every tick.
+		if (_decays)
+			DecayTaskManager.getInstance().run();
 	}
 
 	private void record()

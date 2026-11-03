@@ -147,7 +147,7 @@ func dropReceiver(killer attackable.Combatant, maxDealer *player.Character) atta
 }
 
 func (d *deathRewards) scheduleDecay() {
-	if d.tmpl.CorpseTime <= 0 {
+	if d.tmpl.CorpseTime <= 0 || d.decay == nil {
 		return
 	}
 	interval := time.Duration(d.tmpl.CorpseTime) * time.Second

@@ -118,6 +118,10 @@
 //	territory <name> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>
 //	                                          optional: an npcmaker territory, the box between those offsets from where the
 //	                                          character first enters the world
+//	npcmaker <name> <ai type>                 optional, one per name: a named npcmaker running the maker script of that AI type,
+//	                                          with no NPC to spawn: a script finds it by name (its lookup of a maker) and
+//	                                          sends it script events, which run its script, and which a traced scenario
+//	                                          compares (the trace's maker lines)
 //	member <name> <level> [dead] [standing <n>] [hold <item id> <count>]... [<dx> <dy> <dz>]
 //	                                          optional: a second character, of its own account, that enters the world where the
 //	                                          character first does, right after it, joins its party, then stands at that
@@ -146,7 +150,10 @@
 //	                                          scenario with a summon line takes no relog or restart
 //
 // An npc line takes more options, in any order after the offsets: level <n>, the template's level (default 1);
-// aggro <range>, its aggro range (default none: a raid boss sees only as far as that); mp <n>, the current MP
+// aggro <range>, its aggro range (default none: a raid boss sees only as far as that); corpse <seconds>, its
+// corpse time, how long a killed monster's corpse stays before it decays (default the fixture's, which is not the
+// shipped one: the decay is then not compared; with it, the decay task runs as time passes in a kill or an advance
+// step, and the corpse's DeleteObject is a step's line); mp <n>, the current MP
 // each of its lives starts with once its created hook ran (default its maximum, 1000); a civilian's maximum
 // is that many instead (default none), so it casts the shipped skills it can pay for; mem <slot>=<value>[,...],
 // the script memory slots its life starts with once its created hook ran (i_ai0 to i_ai4, i_quest0 to i_quest4,
@@ -375,7 +382,9 @@
 // run's same steps draw: the same bounds, in order. So must the script
 // events its NPCs hear from a script's send or broadcast (not the event
 // step's own): the same set in each step, the receiver and an argument that
-// is an object id named by role. A trace under the
+// is an object id named by role. So must the script events its npcmakers
+// are sent (the npcmaker lines'), in order: the maker, the event and its two
+// integers. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
 // scenario itself (the oracle README). The trace format has no member,
 // ground or look, so a traced scenario takes no member or ground line, and
@@ -402,7 +411,8 @@
 // the one before it is compared once (the reference sends a spawned NPC's
 // twice), a run of DeleteObject lines in sorted order (the order a teleport
 // empties the character's view in is not a script's), and the DeleteObject
-// of an NPC a Die packet showed dead (its corpse's decay) not at all. The
+// of an NPC a Die packet showed dead (its corpse's decay) not at all, unless
+// its npc line names a corpse time. The
 // character's teleports also delete the NPCs it leaves behind. A trace that
 // lists no npc line's object (the hand-made trace_*.golden files) shows no
 // NpcInfo or DeleteObject.
@@ -505,9 +515,11 @@ type Scenario struct {
 	Rolls map[string]int
 	// Gauss are the gauss lines' values by role.
 	Gauss map[string]float64
-	// Territories are the territory lines, Zones the zone lines, Members the
-	// member lines and Grounds the ground lines.
+	// Territories are the territory lines, NpcMakers the npcmaker lines,
+	// Zones the zone lines, Members the member lines and Grounds the ground
+	// lines.
 	Territories []Territory
+	NpcMakers   []NpcMaker
 	Zones       []ZoneLine
 	Members     []Member
 	Grounds     []Ground
@@ -611,6 +623,10 @@ type NPC struct {
 	// Params are the three spawn parameters, each "" (0), a number, a role
 	// or character.
 	Params [3]string
+	// Corpse is the template's corpse time in seconds, how long a dead NPC's
+	// corpse stays before it decays; 0 for the fixture's, which is not the
+	// shipped one.
+	Corpse int
 	// Level is the template's level, 0 for the fixture's 1; Aggro its aggro
 	// range, 0 for none.
 	Level, Aggro int
@@ -1075,7 +1091,7 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		opts.Role, opts.ID, opts.Type = role, int32(id), args[2]
 		opts.DX, opts.DY, opts.DZ = offsets[0], offsets[1], offsets[2]
 		sc.NPCs = append(sc.NPCs, opts)
-	case "territory", "zone", "member", "ground", "roll", "gauss":
+	case "territory", "npcmaker", "zone", "member", "ground", "roll", "gauss":
 		return sc.world(key, args, roles)
 	case "skill", "door", "summon":
 		return sc.fight(key, args, roles)

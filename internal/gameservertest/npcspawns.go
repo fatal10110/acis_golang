@@ -76,6 +76,14 @@ func WithSpawnData() Option {
 	return func(o *options) { o.spawnData = true }
 }
 
+// WithMakerEventsHeard makes heard told of each script event sent to an
+// npcmaker of the WithNpcSpawns population by its name, before the maker's
+// script runs, from any goroutine: the maker's name, the event and its two
+// arguments.
+func WithMakerEventsHeard(heard func(maker, event string, int1, int2 int)) Option {
+	return func(o *options) { o.makerHeard = heard }
+}
+
 // WithMakers gives the WithNpcSpawns population catalog's makers beside
 // the server's own; a type in both runs catalog's.
 func WithMakers(catalog script.MakerCatalog) Option {
@@ -127,6 +135,9 @@ type npcSpawnDeps struct {
 	rand func(n int) int
 	// makerCatalog are makers added to the server's own.
 	makerCatalog script.MakerCatalog
+	// makerHeard is told of the script events sent to the makers by name;
+	// nil for none.
+	makerHeard func(maker, event string, int1, int2 int)
 	// driftRange is the WithMaxDriftRange drift range; 0 keeps the shipped
 	// one.
 	driftRange int
@@ -200,7 +211,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if rand == nil {
 		rand = rnd.Get
 	}
-	makerWorld := script.MakerWorld{Night: night, Castles: deps.castles, Sieges: deps.sieges, Rand: rand, Now: now}
+	makerWorld := script.MakerWorld{Night: night, Castles: deps.castles, Sieges: deps.sieges, Rand: rand, Now: now, Heard: deps.makerHeard}
 	if deps.doors != nil {
 		makerWorld.Doors = deps.doors
 	}

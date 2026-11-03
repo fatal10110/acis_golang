@@ -115,6 +115,16 @@ func npcFightOption(n *NPC, args []string) (rest []string, ok bool, err error) {
 		}
 		n.Clans, n.ClanRange = names, r
 		return args[3:], true, nil
+	case "corpse":
+		if n.Corpse != 0 || len(args) < 2 {
+			return nil, true, fmt.Errorf("npc option corpse <seconds>, once")
+		}
+		secs, err := strconv.Atoi(args[1])
+		if err != nil || secs < 1 {
+			return nil, true, fmt.Errorf("corpse time %q is not a number of seconds of 1 or more", args[1])
+		}
+		n.Corpse = secs
+		return args[2:], true, nil
 	case "skill":
 		if len(args) < 4 {
 			return nil, true, fmt.Errorf("npc option skill <type> <skill id> <level>")

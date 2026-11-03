@@ -74,11 +74,11 @@ func OnDayNightSpawn() script.Maker {
 			in := spawned.get()
 			isNight := memoInt(e.Group, "IsNight")
 			bringIn := func() {
-				m.ScriptEvent(m, script.MakerEvent{Group: e.Group, Name: "1001"})
+				m.SendSelf(script.MakerEvent{Group: e.Group, Name: "1001"})
 				spawned.set(1)
 			}
 			takeOut := func() {
-				m.ScriptEvent(m, script.MakerEvent{Group: e.Group, Name: "1000"})
+				m.SendSelf(script.MakerEvent{Group: e.Group, Name: "1000"})
 				spawned.set(0)
 			}
 			if m.IsNight() {
