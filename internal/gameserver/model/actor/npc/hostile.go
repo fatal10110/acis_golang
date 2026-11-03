@@ -355,8 +355,8 @@ func (h *Hostile) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.C
 // no Items leaves the NPC unarmed, no Rewards makes a kill reward-free, and
 // no Sink drops every event.
 type Runtime struct {
-	World   *world.State
-	LOS     LineOfSight
+	World *world.State
+	LOS   LineOfSight
 	// Log is the logger the NPC shares with others; nil logs nothing.
 	Log     *zerolog.Logger
 	Items   *item.Table

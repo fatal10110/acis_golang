@@ -21,7 +21,7 @@ var testLog = zerolog.Nop()
 
 // spawnAllocCeiling bounds the heap allocations one standalone hostile spawn
 // makes, its live wiring, settings and slot included.
-const spawnAllocCeiling = 245
+const spawnAllocCeiling = 26
 
 // TestSpawnAllocations bounds the allocations of one hostile's spawn: its
 // shared settings, logger and wiring add no allocation of their own.

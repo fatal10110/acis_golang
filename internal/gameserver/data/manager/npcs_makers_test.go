@@ -1,12 +1,13 @@
 package manager
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
