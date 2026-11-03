@@ -306,6 +306,10 @@ type Character struct {
 	statMu    sync.RWMutex
 	statCalcs [stat.Count]*effect.Calculator
 
+	// equipped records the template each worn item's equip stats attached
+	// with (see EquippedTemplate).
+	equipped equippedTemplates
+
 	// stateMu guards transient live flags and item-use disabled timestamps.
 	// A killer's queue raises the death penalty (RaiseDeathPenaltyLevel).
 	// The effect list reads it under its own lock (MaxBuffCount), so it is

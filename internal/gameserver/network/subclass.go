@@ -585,7 +585,7 @@ func (l *GameClientLink) unequipItemStats(live *livePlayer) {
 		return
 	}
 	for _, inst := range inv.PaperdollItems() {
-		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
+		if tmpl, ok := skillstate.WornTemplate(live.Character, inv, inst); ok {
 			l.skills.UnequipItemStats(live.Character, inv, inst, tmpl)
 		}
 	}
@@ -600,7 +600,7 @@ func (l *GameClientLink) equipItemStats(live *livePlayer, inv *itemcontainer.Inv
 	}
 	changed := false
 	for _, inst := range inv.PaperdollItems() {
-		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		tmpl, ok := skillstate.WornTemplate(live.Character, inv, inst)
 		if !ok {
 			continue
 		}

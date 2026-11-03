@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -51,6 +53,13 @@ var shippedItemTemplates = sync.OnceValues(func() (*item.Table, error) {
 // levels, and enters the world. It returns the server and the GM's id.
 func bootArmorSetAdmin(t *testing.T, enchant map[int32]int) (*gameservertest.Server, int32) {
 	t.Helper()
+	return bootArmorSetAdminReloading(t, enchant, 0)
+}
+
+// bootArmorSetAdminReloading is bootArmorSetAdmin whose //reload item, when
+// dropped is not 0, reloads the item table without the template dropped.
+func bootArmorSetAdminReloading(t *testing.T, enchant map[int32]int, dropped int32) (*gameservertest.Server, int32) {
+	t.Helper()
 	dir := datapack.Require(t)
 	shipped, err := shippedItemTemplates()
 	if err != nil {
@@ -80,10 +89,19 @@ func bootArmorSetAdmin(t *testing.T, enchant map[int32]int) (*gameservertest.Ser
 		passive(mithrilSetSkillID, 10),
 		passive(mithrilEnchant6ID, mithrilEnchant6HP),
 	}), gamesql.NewCharacterSkillStore(db))
-	srv, gmID := bootAdmin(t, adminLevel,
-		gameservertest.WithItemTemplates(item.NewTable(templates)),
+	items := item.NewTable(templates)
+	opts := []gameservertest.Option{
+		gameservertest.WithItemTemplates(items),
 		gameservertest.WithSkills(skills),
-		gameservertest.WithArmorSets(sets))
+		gameservertest.WithArmorSets(sets),
+	}
+	if dropped != 0 {
+		opts = append(opts, gameservertest.WithDataReloads(network.DataReloads{Items: func() error {
+			items.Replace(item.NewTable(slices.DeleteFunc(slices.Clone(templates), func(tmpl *item.Template) bool { return tmpl.ID == dropped })))
+			return nil
+		}}))
+	}
+	srv, gmID := bootAdmin(t, adminLevel, opts...)
 	if err := srv.KnownSkills.SetKnownSkill(context.Background(), gmID, 0, expertiseSkillID, 1); err != nil {
 		t.Fatalf("grant Expertise: %v", err)
 	}
