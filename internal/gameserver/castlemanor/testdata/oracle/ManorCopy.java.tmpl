@@ -70,13 +70,25 @@ public final class ManorCopy
 		}
 	}
 
+	// The scheduler: it keeps the last task given and its delay, and the
+	// periodic task's delay and period, for the probe to run.
 	static final class ThreadPool
 	{
+		static Runnable task;
 		static long delay;
+		static long fixedDelay;
+		static long fixedPeriod;
 
-		static void schedule(Runnable task, long ms)
+		static void schedule(Runnable r, long ms)
 		{
+			task = r;
 			delay = ms;
+		}
+
+		static void scheduleAtFixedRate(Runnable r, long initial, long period)
+		{
+			fixedDelay = initial;
+			fixedPeriod = period;
 		}
 	}
 
@@ -113,12 +125,15 @@ public final class ManorCopy
 	{
 		static final Props clans = new Props();
 		static final Props players = new Props();
+		static final Props server = new Props();
 		static int MANOR_REFRESH_TIME;
 		static int MANOR_REFRESH_MIN;
 		static int MANOR_APPROVE_TIME;
 		static int MANOR_APPROVE_MIN;
 		static int MANOR_MAINTENANCE_MIN;
 		static int WAREHOUSE_SLOTS_CLAN;
+		static int MANOR_SAVE_PERIOD_RATE;
+		static int RATE_DROP_MANOR;
 
 		static
 		{
@@ -146,6 +161,8 @@ public final class ManorCopy
 		final int cropId;
 		final int matureId;
 		final int referencePrice;
+		int _seedsLimit;
+		int _cropsLimit;
 
 		Seed(int seedId, int cropId, int matureId, int referencePrice)
 		{
@@ -154,6 +171,8 @@ public final class ManorCopy
 			this.matureId = matureId;
 			this.referencePrice = referencePrice;
 		}
+
+@@LIMITS@@
 
 		int getCropId()
 		{
@@ -349,8 +368,18 @@ public final class ManorCopy
 		scheduleModeChange();
 	}
 
+	// The constructor's autosave.
+	void autosave()
+	{
+@@AUTOSAVE@@
+	}
+
+	// storeMe writes the lists to the database: here it counts the writes.
+	int stores;
+
 	boolean storeMe()
 	{
+		stores++;
 		return true;
 	}
 
@@ -367,4 +396,6 @@ public final class ManorCopy
 @@PRODUCTION@@
 
 @@PROCURE@@
+
+@@RESET@@
 }
