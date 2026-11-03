@@ -37,7 +37,7 @@ func decodeL2OFF(data []byte) (*block.Region, int, error) {
 		return nil, 0, shortL2OFF(-1, "header", r.pos)
 	}
 
-	region := block.NewRegion()
+	region := block.NewRegionBuilder()
 	for i := 0; i < block.RegionBlockCount; i++ {
 		typ, ok := r.u16()
 		if !ok {
@@ -57,7 +57,7 @@ func decodeL2OFF(data []byte) (*block.Region, int, error) {
 			return nil, 0, err
 		}
 	}
-	return region, len(data) - r.pos, nil
+	return region.Build(), len(data) - r.pos, nil
 }
 
 type l2offReader struct {
@@ -82,7 +82,7 @@ func (r *l2offReader) u16() (uint16, bool) {
 	return v, true
 }
 
-func (r *l2offReader) flat(region *block.Region, blockIndex int) error {
+func (r *l2offReader) flat(region *block.RegionBuilder, blockIndex int) error {
 	height, ok := r.u16()
 	if !ok {
 		return shortL2OFF(blockIndex, "flat height", r.pos)
@@ -94,7 +94,7 @@ func (r *l2offReader) flat(region *block.Region, blockIndex int) error {
 	return nil
 }
 
-func (r *l2offReader) complex(region *block.Region, blockIndex int) error {
+func (r *l2offReader) complex(region *block.RegionBuilder, blockIndex int) error {
 	var cells [block.CellCount]uint16
 	for i := range cells {
 		code, ok := r.u16()
@@ -103,13 +103,11 @@ func (r *l2offReader) complex(region *block.Region, blockIndex int) error {
 		}
 		cells[i] = code
 	}
-	if err := region.SetComplexEncoded(blockIndex, cells); err != nil {
-		return fmt.Errorf("geo/reader: block %d complex: %w", blockIndex, err)
-	}
+	region.SetComplexEncoded(blockIndex, cells)
 	return nil
 }
 
-func (r *l2offReader) multilayer(region *block.Region, blockIndex int) error {
+func (r *l2offReader) multilayer(region *block.RegionBuilder, blockIndex int) error {
 	var counts [block.CellCount]uint8
 	cells := make([]uint16, 0, block.CellCount)
 	for cell := range counts {

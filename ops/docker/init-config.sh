@@ -16,7 +16,8 @@
 #     LoginHost -> loginserver                  (the loginserver service)
 #     Hostname  -> $ACIS_PUBLIC_HOST            (default 127.0.0.1)
 # Every other key keeps the reference value. It also creates the log
-# directories (under ACIS_LOG_DIR, default ./log) and the datapack's
+# directories (under ACIS_LOG_DIR, default ./log), the game server's cache
+# directory (ACIS_CACHE_DIR, default ./cache) and the datapack's
 # data/crests directory, which the servers write to: a directory Docker
 # creates for a missing bind mount belongs to root, not to ACIS_UID.
 #
@@ -31,6 +32,7 @@ src=${1:-../aCis_gameserver/config}
 dst=${ACIS_CONFIG_DIR:-./config}
 datapack=${ACIS_DATAPACK_DIR:-../aCis_datapack}
 logdir=${ACIS_LOG_DIR:-./log}
+cachedir=${ACIS_CACHE_DIR:-./cache}
 password=${ACIS_DB_ROOT_PASSWORD:-123321}
 public_host=${ACIS_PUBLIC_HOST:-127.0.0.1}
 
@@ -69,7 +71,7 @@ done
 set_key "$dst/server.properties" LoginHost loginserver
 set_key "$dst/server.properties" Hostname "$public_host"
 
-mkdir -p "$logdir/loginserver" "$logdir/gameserver" "$datapack/data/crests"
+mkdir -p "$logdir/loginserver" "$logdir/gameserver" "$cachedir" "$datapack/data/crests"
 
 echo "init-config: wrote $dst (database db, login link loginserver, advertised host $public_host)"
 if [ ! -f "$dst/hexid.txt" ]; then

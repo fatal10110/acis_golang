@@ -351,6 +351,7 @@ func loadCrestCache(paths gameServerPaths, log zerolog.Logger) (*datacache.Crest
 // loadGeodata loads exactly the region files geoengine.properties lists by
 // their "X_Y" keys; unlisted tiles stay null-block. A listed region that
 // fails to load fails boot: the server does not run on partial geodata.
+// With a cache path the regions are served from that packed cache file.
 func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	props, err := config.LoadFile(paths.GeoConfigPath)
 	if err != nil {
@@ -367,31 +368,19 @@ func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	}
 
 	geo := &geodata{
-		Dir:           resolveGeodataDir(paths.DataRoot, props.String("GeoDataPath", "")),
+		Dir:           probe.ResolveDir(paths.DataRoot, props.String("GeoDataPath", "")),
 		Type:          probe.GeoType(props.String("GeoDataType", string(probe.L2OFF))),
 		EngineOptions: engineOptions,
 		Pathfind:      pathOptions,
 	}
-	geo.Engine, err = probe.LoadRegions(geo.Dir, geo.Type, probe.ListedRegions(props), log, geo.EngineOptions)
+	if paths.GeoCachePath != "" {
+		geo.Engine, err = probe.LoadRegionsCached(geo.Dir, geo.Type, probe.ListedRegions(props), paths.GeoCachePath, log, geo.EngineOptions)
+	} else {
+		geo.Engine, err = probe.LoadRegions(geo.Dir, geo.Type, probe.ListedRegions(props), log, geo.EngineOptions)
+	}
 	if err != nil {
 		return nil, err
 	}
 	geo.Finder = pathfind.New(geo.Engine, geo.Pathfind)
 	return geo, nil
-}
-
-func resolveGeodataDir(dataRoot, configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured == "" {
-		return filepath.Join(dataRoot, "data", "geodata")
-	}
-	if filepath.IsAbs(configured) {
-		return configured
-	}
-
-	clean := filepath.Clean(configured)
-	if clean == "data" || strings.HasPrefix(clean, "data"+string(os.PathSeparator)) {
-		return filepath.Join(dataRoot, clean)
-	}
-	return clean
 }
