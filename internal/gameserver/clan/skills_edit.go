@@ -11,10 +11,7 @@ func (s *Service) SetSkill(cl *Clan, sk Skill) bool {
 	if level, ok := cl.skills[sk.ID]; ok && level == sk.Level {
 		return false
 	}
-	if cl.skills == nil {
-		cl.skills = map[int]int{}
-	}
-	cl.skills[sk.ID] = sk.Level
+	cl.putSkillLocked(sk.ID, sk.Level)
 	clanID := cl.id
 	s.write(clanID, "store clan skill", func(ctx context.Context, st Store) error { return st.SaveSkill(ctx, clanID, sk) })
 	return true
@@ -36,11 +33,8 @@ func (s *Service) RaiseSkills(cl *Clan, skills []Skill) bool {
 	if len(raised) == 0 {
 		return false
 	}
-	if cl.skills == nil {
-		cl.skills = map[int]int{}
-	}
 	for _, sk := range raised {
-		cl.skills[sk.ID] = sk.Level
+		cl.putSkillLocked(sk.ID, sk.Level)
 	}
 	clanID := cl.id
 	s.write(clanID, "store clan skills", func(ctx context.Context, st Store) error {
@@ -63,6 +57,7 @@ func (s *Service) RemoveSkill(cl *Clan, id int) bool {
 		return false
 	}
 	delete(cl.skills, id)
+	cl.skillOrder.remove(int32(id))
 	clanID := cl.id
 	s.write(clanID, "remove clan skill", func(ctx context.Context, st Store) error { return st.RemoveSkill(ctx, clanID, id) })
 	return true
@@ -78,6 +73,9 @@ func (s *Service) RemoveAllSkills(cl *Clan) ([]Skill, bool) {
 		return nil, false
 	}
 	removed := cl.skillsLocked()
+	for _, sk := range removed {
+		cl.skillOrder.remove(int32(sk.ID))
+	}
 	clear(cl.skills)
 	clanID := cl.id
 	s.write(clanID, "remove clan skills", func(ctx context.Context, st Store) error { return st.RemoveAllSkills(ctx, clanID) })

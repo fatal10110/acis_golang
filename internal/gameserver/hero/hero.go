@@ -10,7 +10,6 @@
 package hero
 
 import (
-	"cmp"
 	"context"
 	"maps"
 	"slices"
@@ -134,6 +133,8 @@ type Manager struct {
 	// elected, both by character object id.
 	heroes  map[int32]Hero
 	allTime map[int32]Hero
+	// table holds the running era's heroes in the order they are listed.
+	table   heroTable
 	records records
 }
 
@@ -157,16 +158,18 @@ func (m *Manager) Restore(ctx context.Context) error {
 		return err
 	}
 	heroes, allTime := map[int32]Hero{}, map[int32]Hero{}
+	var table heroTable
 	for _, r := range rows {
 		h := Hero{Name: r.Name, ClassID: r.ClassID, Count: r.Count, Played: r.Played, Active: r.Active}
 		m.setClan(&h, r.ClanID)
 		allTime[r.ObjectID] = h
 		if r.Played {
 			heroes[r.ObjectID] = h
+			table.put(r.ObjectID)
 		}
 	}
 	m.mu.Lock()
-	m.heroes, m.allTime = heroes, allTime
+	m.heroes, m.allTime, m.table = heroes, allTime, table
 	m.mu.Unlock()
 	for _, r := range rows {
 		if r.Played {
@@ -220,19 +223,15 @@ func (m *Manager) IsInactive(objectID int32) bool {
 	return ok && !h.Active
 }
 
-// Heroes returns the running era's heroes ordered by class, then object
-// id.
+// Heroes returns the running era's heroes in the order the hero list
+// shows them (see heroTable).
 func (m *Manager) Heroes() []Hero {
 	m.mu.Lock()
-	ids := slices.Collect(maps.Keys(m.heroes))
-	heroes := maps.Clone(m.heroes)
-	m.mu.Unlock()
-	slices.SortFunc(ids, func(a, b int32) int {
-		return cmp.Or(cmp.Compare(heroes[a].ClassID, heroes[b].ClassID), cmp.Compare(a, b))
-	})
+	defer m.mu.Unlock()
+	ids := m.table.order()
 	out := make([]Hero, len(ids))
 	for i, id := range ids {
-		out[i] = heroes[id]
+		out[i] = m.heroes[id]
 	}
 	return out
 }
@@ -306,6 +305,7 @@ func (m *Manager) Elect(ctx context.Context) {
 	m.mu.Lock()
 	outgoing := slices.Sorted(maps.Keys(m.heroes))
 	clear(m.heroes)
+	m.table.replace(nil)
 	online := m.online
 	m.mu.Unlock()
 	if online != nil {
@@ -341,7 +341,11 @@ func (m *Manager) Elect(ctx context.Context) {
 
 	m.mu.Lock()
 	elected := make(map[int32]Hero, len(picks))
+	// The new heroes are gathered in a table of their own, in class
+	// order, and copied over in that table's order.
+	var gathered heroTable
 	for _, p := range picks {
+		gathered.put(p.objectID)
 		h, ok := m.allTime[p.objectID]
 		if ok {
 			h.Count++
@@ -378,6 +382,7 @@ func (m *Manager) Elect(ctx context.Context) {
 	}
 	m.mu.Lock()
 	m.heroes = elected
+	m.table.replace(gathered.order())
 	heroes := maps.Clone(elected)
 	m.mu.Unlock()
 	if err := m.store.SaveHeroes(ctx, heroes); err != nil {

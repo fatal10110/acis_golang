@@ -249,15 +249,15 @@ func (m *Manager) Shutdown() {
 	})
 }
 
-// HeroByClass returns the hero of the running era of classID, the lowest
-// object id among several; found is false when there is none.
+// HeroByClass returns the hero of the running era of classID, the first
+// in hero list order among several; found is false when there is none.
 func (m *Manager) HeroByClass(classID int) (objectID int32, found bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for id, h := range m.heroes {
-		if h.ClassID == classID && (!found || id < objectID) {
-			objectID, found = id, true
+	for _, id := range m.table.order() {
+		if m.heroes[id].ClassID == classID {
+			return id, true
 		}
 	}
-	return objectID, found
+	return 0, false
 }

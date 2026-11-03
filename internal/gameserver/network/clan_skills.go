@@ -71,7 +71,7 @@ func (l *GameClientLink) takeClanSkills(live *livePlayer, cl *clan.Clan) {
 
 // framePledgeSkillList builds cl's clan skill list.
 func framePledgeSkillList(cl *clan.Clan) wire.Frame {
-	skills := cl.Skills()
+	skills := cl.SkillsInTableOrder()
 	entries := make([]serverpackets.SkillListEntry, len(skills))
 	for i, sk := range skills {
 		entries[i] = serverpackets.SkillListEntry{ID: int32(sk.ID), Level: int32(sk.Level)}

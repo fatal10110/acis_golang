@@ -39,6 +39,32 @@ func (cl *Clan) Skills() []Skill {
 	return cl.skillsLocked()
 }
 
+// SkillsInTableOrder returns the clan's skills in the order of the hash
+// table they are kept in, the order the clan skill list shows them in: by
+// bucket of the skill id, and within a bucket in the order the clan
+// learnt them, the table keeping the size it grew to after skills are
+// removed.
+func (cl *Clan) SkillsInTableOrder() []Skill {
+	cl.mu.RLock()
+	defer cl.mu.RUnlock()
+	ids := cl.skillOrder.order()
+	out := make([]Skill, len(ids))
+	for i, id := range ids {
+		out[i] = Skill{ID: int(id), Level: cl.skills[int(id)]}
+	}
+	return out
+}
+
+// putSkillLocked has cl know skill id at level; a skill it already knows
+// keeps its place in the table order.
+func (cl *Clan) putSkillLocked(id, level int) {
+	if cl.skills == nil {
+		cl.skills = map[int]int{}
+	}
+	cl.skills[id] = level
+	cl.skillOrder.add(int32(id))
+}
+
 func (cl *Clan) skillsLocked() []Skill {
 	out := make([]Skill, 0, len(cl.skills))
 	for id, level := range cl.skills {
@@ -203,10 +229,7 @@ func (s *Service) LearnSkill(c *player.Character, trees *modelskill.Trees, id, l
 	}
 	notices = append(notices, ReputationDeducted{Points: node.Cost})
 	sk := Skill{ID: id, Level: level}
-	if cl.skills == nil {
-		cl.skills = map[int]int{}
-	}
-	cl.skills[id] = level
+	cl.putSkillLocked(id, level)
 	clanID := cl.id
 	s.write(clanID, "store clan skill", func(ctx context.Context, st Store) error { return st.SaveSkill(ctx, clanID, sk) })
 	return append(notices, SkillLearned{Skill: sk, Refresh: changed && change.Crossed != 0})
