@@ -97,6 +97,9 @@ var adminCommands = map[string]adminCommand{
 	"admin_item": (*GameClientLink).adminItem,
 	"admin_give": (*GameClientLink).adminGive,
 
+	// Zone panel and drawings; see admin_zone.go.
+	"admin_zone": (*GameClientLink).adminZone,
+
 	// Olympiad and heroes; see admin_olympiad.go.
 	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
 	"admin_sethero": (*GameClientLink).adminSetHero,

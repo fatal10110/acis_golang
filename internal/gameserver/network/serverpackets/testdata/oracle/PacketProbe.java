@@ -127,5 +127,6 @@ public final class PacketProbe
 		ProbePledge.run();
 		ProbeSkills.run();
 		ProbePolymorph.run();
+		ProbePrimitive.run();
 	}
 }

@@ -44,6 +44,11 @@ wrote into a byte buffer.
   `Attack`, `DoorInfo`, `DoorStatusUpdate`, `StaticObjectInfo`, `QuestList`, `ExOlympiadUserInfo` and
   `ExDuelUpdateUserInfo`; and the `vitals` rows (the current gauges as NaN, infinities and values outside
   the int range) of those two, `UserInfo`, `CharInfo` and the recipe windows
+- the debug drawing `ExServerPrimitive` and the zone outlines `model/zone/form/{ZoneCuboid,ZoneCylinder,ZoneNPoly}`
+  draw into it (`ProbePrimitive.java`), sent through `sendTo` to a stub `Player` that records what it is
+  sent. The packet keeps its strokes in identity-hashed sets; the probe swaps the sets of every packet it
+  fills with more than one point or line for insertion-ordered ones (reflection), so the bytes follow the
+  order the strokes were added in, the order the Go drawing writes.
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
 - the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
   `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,

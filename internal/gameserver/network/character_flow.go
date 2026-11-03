@@ -372,6 +372,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 			// A zone that refuses live moves it out here, mid-burst.
 			live.zoneActor.revalidateSpawn(l.zones)
 		}
+		x, y, _ = c.Position()
+		live.drawingAnchor = location.Location{X: x, Y: y, Z: drawingAnchorZ}
 	}
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
 	if l.sevenSigns != nil {
