@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // engineOwner names the catalogs of the scripts and makers ported with the
@@ -159,27 +160,12 @@ func readMakerTypes(t *testing.T) []string {
 
 // TestMakerTypesMatchReference rebuilds the maker types golden from the
 // reference's maker switch. It needs the reference source beside the
-// module and skips without it, or fails when ACIS_REQUIRE_DATAPACK is set.
+// module and skips without it, or fails as datapack.Reference decides.
 func TestMakerTypesMatchReference(t *testing.T) {
-	const npcMaker = "aCis_gameserver/java/net/sf/l2j/gameserver/model/spawn/NpcMaker.java"
-	var src []byte
-	dir, err := filepath.Abs(".")
+	const npcMaker = "java/net/sf/l2j/gameserver/model/spawn/NpcMaker.java"
+	src, err := os.ReadFile(filepath.Join(datapack.Reference(t, npcMaker), npcMaker))
 	if err != nil {
 		t.Fatal(err)
-	}
-	for ; src == nil; dir = filepath.Dir(dir) {
-		for _, candidate := range []string{filepath.Join(dir, npcMaker), filepath.Join(dir, "acis_public", npcMaker)} {
-			if b, err := os.ReadFile(candidate); err == nil {
-				src = b
-				break
-			}
-		}
-		if src == nil && filepath.Dir(dir) == dir {
-			if os.Getenv("ACIS_REQUIRE_DATAPACK") != "" {
-				t.Fatal("reference source not found above the module root and ACIS_REQUIRE_DATAPACK is set")
-			}
-			t.Skip("reference source not checked out near the module root (set ACIS_REQUIRE_DATAPACK=1 to fail instead)")
-		}
 	}
 	var want []string
 	for _, m := range regexp.MustCompile(`case "([^"]+)":`).FindAllSubmatch(src, -1) {

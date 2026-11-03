@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -15,32 +14,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
-// requireReference returns the reference server's java directory, found
-// above this module as datapack.Find finds the datapack. A missing checkout
-// skips the test, or fails it when ACIS_REQUIRE_DATAPACK is set.
+// requireReference returns the reference server's java directory. A missing
+// checkout skips the test, or fails it as datapack.Reference decides.
 func requireReference(t *testing.T) string {
 	t.Helper()
-	_, thisFile, _, _ := runtime.Caller(0)
-	for dir := filepath.Dir(thisFile); ; {
-		for _, candidate := range []string{
-			filepath.Join(dir, "aCis_gameserver", "java"),
-			filepath.Join(dir, "acis_public", "aCis_gameserver", "java"),
-		} {
-			if info, err := os.Stat(filepath.Join(candidate, ScriptingDir)); err == nil && info.IsDir() {
-				return candidate
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	if os.Getenv("ACIS_REQUIRE_DATAPACK") != "" {
-		t.Fatal("aCis_gameserver not found above the module root and ACIS_REQUIRE_DATAPACK is set")
-	}
-	t.Skip("aCis_gameserver not checked out near the module root, skipping reference comparison (set ACIS_REQUIRE_DATAPACK=1 to fail instead)")
-	return ""
+	return filepath.Join(datapack.Reference(t, filepath.Join("java", ScriptingDir)), "java")
 }
 
 // TestCommittedGoldensMatchReference rebuilds both goldens from the

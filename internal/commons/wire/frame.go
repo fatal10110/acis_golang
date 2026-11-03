@@ -3,6 +3,7 @@ package wire
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -17,6 +18,11 @@ const FrameHeaderSize = 2
 // encode. A frame beyond it would write a truncated header and desynchronize
 // every later frame on that connection, so it must be rejected instead.
 const MaxFrameLength = math.MaxUint16
+
+// ErrFrameTooShort reports a frame header whose length is smaller than the
+// header itself. FrameReader has consumed the header when it returns it, so
+// a reader that skips such frames can read on.
+var ErrFrameTooShort = errors.New("wire: frame length is smaller than its header")
 
 func frameLengthError(length int) error {
 	return fmt.Errorf("wire: frame length %d exceeds the %d-byte maximum", length, MaxFrameLength)
@@ -136,7 +142,7 @@ func (fr *FrameReader) ReadFrame() ([]byte, error) {
 
 	length := binary.LittleEndian.Uint16(fr.header[:])
 	if length < FrameHeaderSize {
-		return nil, fmt.Errorf("wire: frame length %d is smaller than the %d-byte header", length, FrameHeaderSize)
+		return nil, fmt.Errorf("%w: %d < %d", ErrFrameTooShort, length, FrameHeaderSize)
 	}
 
 	n := int(length) - FrameHeaderSize

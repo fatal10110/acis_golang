@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -41,6 +42,9 @@ type Session struct {
 	// the single goroutine calling ReadFrame.
 	frames      *wire.FrameReader
 	handshaking bool
+	// idleTimeout, when set, supplies the established-session read
+	// deadline in place of clientReadIdleTimeout (see readTimeout).
+	idleTimeout func() time.Duration
 
 	// evicted is closed, once, when Close evicts the session: a kick, an
 	// account takeover or a duplicate selection. A player still lingering
@@ -108,14 +112,15 @@ func (s *Session) ReadFrame() ([]byte, error) {
 	if observe := s.conn.observeRead; observe != nil {
 		observe()
 	}
-	timeout := clientReadIdleTimeout
-	if s.handshaking {
-		timeout = clientReadHandshakeTimeout
-	}
-	if err := s.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+	if err := s.conn.SetReadDeadline(time.Now().Add(s.readTimeout())); err != nil {
 		return nil, err
 	}
 	payload, err := s.frames.ReadFrame()
+	if errors.Is(err, wire.ErrFrameTooShort) {
+		// A length below the header's own size is a frame with no body:
+		// its header is consumed and the next frame starts right after it.
+		return payload[:0], nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +128,21 @@ func (s *Session) ReadFrame() ([]byte, error) {
 		s.cipher.Decrypt(payload)
 	}
 	return payload, nil
+}
+
+// readTimeout is how long the next read may wait: the handshake deadline
+// until CompleteHandshake, then the idle deadline, which idleTimeout
+// overrides with any value above zero.
+func (s *Session) readTimeout() time.Duration {
+	if s.handshaking {
+		return clientReadHandshakeTimeout
+	}
+	if s.idleTimeout != nil {
+		if d := s.idleTimeout(); d > 0 {
+			return d
+		}
+	}
+	return clientReadIdleTimeout
 }
 
 // CompleteHandshake switches later reads to the established-session idle

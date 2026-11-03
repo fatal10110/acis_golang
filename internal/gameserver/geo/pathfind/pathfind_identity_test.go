@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/reader"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // The fingerprints below were captured from the search before its open/closed
@@ -199,27 +200,7 @@ var geodataRegions = [][2]int{{19, 21}, {19, 22}, {20, 21}, {20, 22}}
 func loadGeodataSample(t testing.TB) *engine.Engine {
 	t.Helper()
 
-	dir := os.Getenv("ACIS_GEODATA_DIR")
-	if dir == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			t.Fatalf("Getwd(): %v", err)
-		}
-		for d := wd; ; d = filepath.Dir(d) {
-			candidate := filepath.Join(d, "aCis_datapack", "data", "geodata")
-			if _, err := os.Stat(candidate); err == nil {
-				dir = candidate
-				break
-			}
-			if filepath.Dir(d) == d {
-				break
-			}
-		}
-	}
-	if dir == "" {
-		t.Skip("no aCis_datapack/data/geodata above the package and ACIS_GEODATA_DIR unset")
-	}
-
+	dir := datapack.Geodata(t)
 	e := engine.New()
 	for _, tile := range geodataRegions {
 		path := filepath.Join(dir, filepathRegion(tile))

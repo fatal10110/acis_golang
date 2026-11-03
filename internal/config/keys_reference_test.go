@@ -1,18 +1,19 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // configSource is the reference configuration loader, relative to the
-// workspace that holds the reference checkout.
-const configSource = "aCis_gameserver/java/net/sf/l2j/Config.java"
+// reference checkout.
+const configSource = "java/net/sf/l2j/Config.java"
 
 var (
 	// referenceFileConst matches a properties file constant:
@@ -26,7 +27,7 @@ var (
 // TestReferenceKeysGolden rebuilds testdata/reference_keys.golden from the
 // reference loader: every key each file's properties are read by, up to
 // the next file's. It needs the reference source beside the module and
-// skips without it, or fails when ACIS_REQUIRE_DATAPACK is set.
+// skips without it, or fails as datapack.Reference decides.
 func TestReferenceKeysGolden(t *testing.T) {
 	t.Parallel()
 	src := readConfigSource(t)
@@ -71,30 +72,12 @@ func TestReferenceKeysGolden(t *testing.T) {
 	}
 }
 
-// readConfigSource returns the reference loader's source, found above the
-// module root directly or under an acis_public directory.
+// readConfigSource returns the reference loader's source.
 func readConfigSource(t *testing.T) string {
 	t.Helper()
-	dir, err := filepath.Abs(".")
+	b, err := os.ReadFile(filepath.Join(datapack.Reference(t, configSource), configSource))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for {
-		for _, candidate := range []string{filepath.Join(dir, configSource), filepath.Join(dir, "acis_public", configSource)} {
-			if b, err := os.ReadFile(candidate); err == nil {
-				return string(b)
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	msg := fmt.Sprintf("%s not found above the module root", configSource)
-	if os.Getenv("ACIS_REQUIRE_DATAPACK") != "" {
-		t.Fatal(msg + " and ACIS_REQUIRE_DATAPACK is set")
-	}
-	t.Skip(msg + " (set ACIS_REQUIRE_DATAPACK=1 to fail instead)")
-	return ""
+	return string(b)
 }
