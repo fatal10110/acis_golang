@@ -142,20 +142,32 @@ Every test that reads it resolves the path through `internal/testsupport/datapac
 the module root and every ancestor, so the in-repo copy wins. CI sets `ACIS_REQUIRE_DATAPACK=1`:
 a datapack test that cannot find its data fails there instead of skipping, so CI is their gate.
 
-Two kinds of test still cannot run in CI, and the local run is their only gate:
+Two groups of test cannot run in CI. The owner accepts both as **local-only** (decision on #4426):
+CI does not run them, no CI geodata store exists (a private release asset with `actions/cache` can be
+revisited later), and `ACIS_REQUIRE_REFERENCE=0` stays in CI. The local run is their only gate.
 
 - **geodata** (`datapack.Geodata`): the region files are too large for the repository. They are
   found in a full datapack checkout above the module (the outer `acis_public/aCis_datapack/`) or
-  `ACIS_GEODATA_DIR`, and always skip without one, even under `ACIS_REQUIRE_DATAPACK`;
-- **reference** (`datapack.Reference`: `scriptfp`, `scriptcontract`, the config key, maker type and
-  festival spawn reference tests): they read `aCis_gameserver/`, which is not in the repository.
+  `ACIS_GEODATA_DIR`, and always skip without one, even under `ACIS_REQUIRE_DATAPACK`. The tests:
+  - `internal/gameserver/geo/probe`: `TestCacheMatchesLegacyDecoderOnRealGeodata`;
+  - `internal/gameserver/geo/pathfind`: `TestFindGeodataResultsMatchCapturedFingerprint` and the
+    benchmarks `BenchmarkGeodataQueries` and `BenchmarkFinderSearch` (both load `loadGeodataSample`).
+- **reference** (`datapack.Reference`): they read `aCis_gameserver/`, which is not in the repository.
   A missing checkout skips, or fails when `ACIS_REQUIRE_REFERENCE` is set to anything but `0`;
-  unset, it follows `ACIS_REQUIRE_DATAPACK`. CI sets `ACIS_REQUIRE_REFERENCE=0`.
+  unset, it follows `ACIS_REQUIRE_DATAPACK`. CI sets `ACIS_REQUIRE_REFERENCE=0`. The tests:
+  - `internal/testsupport/scriptfp`: `TestCommittedGoldensMatchReference`,
+    `TestEveryListedScriptHasAFingerprint`, `TestHooksMatchProbeManifest`;
+  - `internal/testsupport/scriptcontract`: `TestSourcesMatchReference`;
+  - `internal/config`: `TestReferenceKeysGolden`;
+  - `cmd/gameserver`: `TestMakerTypesMatchReference`;
+  - `internal/gameserver/festival`: `TestSpawnTablesMatchTheReference`.
 
-When a change touches what they cover (geodata readers and pathfinding; `census.golden`,
-`apimap.txt`, the script-facing API or script content), run them locally with
-`ACIS_REQUIRE_DATAPACK=1`, scoped with `-run`, confirm in `-v` output that they ran (a SKIP verifies
-nothing), and report them in the PR body with each result, or "none related".
+A change to geo code (readers, cache, pathfinding), or to what the reference tests cover
+(`census.golden`, `apimap.txt`, the script-facing API or script content, config keys, maker types,
+festival spawns), must run the related tests locally with `ACIS_REQUIRE_DATAPACK=1` and the
+reference checkout present. Scope them with `-run`, confirm in `-v` output that they ran (a SKIP
+verifies nothing), and report them in the PR body with each result, or "none related".
+Re-find the full set with `rg -l 'datapack\.(Geodata|Reference)\(' --glob '*_test.go'`.
 
 ```bash
 ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race -count=1 -v <packages> -run '<tests>'
