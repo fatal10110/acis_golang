@@ -501,7 +501,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		Effects:             effects,
 		MaxBuffsAmount:      maxBuffsAmount,
 		MaxGeoPathFailCount: maxGeoPathFailCount,
-		Log:                 log,
+		Log:                 &n.log,
 		Scripts:             scripts,
 		Remover:             n,
 		SeeRange:            aiConfig.SeeRange,

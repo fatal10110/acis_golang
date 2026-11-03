@@ -22,7 +22,8 @@ func TestFolkGeoPathFailCountWrapsPastMaximum(t *testing.T) {
 		t.Fatalf("new folk: %v", err)
 	}
 	var logs bytes.Buffer
-	w, err := f.EnableMovement(FolkMovement{Geo: hostileGeo{}, Queue: idleQueue(), MaxGeoPathFailCount: 2, Log: zerolog.New(&logs)})
+	logger := zerolog.New(&logs)
+	w, err := f.EnableMovement(FolkMovement{Geo: hostileGeo{}, Queue: idleQueue(), MaxGeoPathFailCount: 2, Log: &logger})
 	if err != nil {
 		t.Fatalf("enable movement: %v", err)
 	}

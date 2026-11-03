@@ -53,7 +53,8 @@ type FolkSpawner struct {
 	// MaxBuffsAmount is the configured base buff-slot count.
 	MaxBuffsAmount      int
 	MaxGeoPathFailCount int
-	Log                 zerolog.Logger
+	// Log is the logger every civilian NPC shares.
+	Log *zerolog.Logger
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts npc.ScriptHooks
 	// Remover takes the NPC out of the world for a script delete; nil
@@ -213,7 +214,7 @@ func (s FolkSpawner) movement(rt npc.FolkRuntime) npc.FolkMovement {
 type folkControl struct {
 	walker *task.Walker
 	ref    *npc.FolkWalker
-	log    zerolog.Logger
+	log    *zerolog.Logger
 }
 
 // Emit advances the NPC's route on each arrival, and ends it when the NPC
