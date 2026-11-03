@@ -422,12 +422,15 @@ func TestMemosSurviveRelog(t *testing.T) {
 }
 
 // TestMemoLoadFailureRefusesSelection: memos that cannot be read refuse the
-// selection silently, as a journal that cannot be read does, so a one-time
-// reward a memo records cannot be taken again.
+// selection, answered with the character list, as a journal that cannot be
+// read is, so a one-time reward a memo records cannot be taken again.
 func TestMemoLoadFailureRefusesSelection(t *testing.T) {
 	t.Parallel()
 	srv, objID, _ := bootTutorial(t, false, gameservertest.WithMemoLoadFault(errors.New("memos unreadable")))
 	srv.Client.Send(encodeRequestGameStart(0))
+	if frame := srv.Client.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("refused selection: opcode %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
+	}
 	srv.Client.ExpectNoFrame()
 	if _, ok := srv.State.Player(objID); ok {
 		t.Fatal("refused selection registered the player in the world")
