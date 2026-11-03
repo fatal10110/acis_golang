@@ -209,9 +209,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 // restart and disconnect callers then continue, exactly as they do when the
 // saves themselves fail; character selection refuses, answering with the
 // character list, instead of loading rows the saves have not written, and
-// warns once its wait passes half the budget. At shutdown every connection's exit waits in
-// parallel, so the game server's stop budget counts this once for the
-// listener's stop.
+// warns once its wait passes half the budget. At shutdown every
+// connection's exit waits in parallel, so the game server's stop budget
+// counts this once for the listener's stop.
 const LivePlayerPersistWait = 3*livePlayerDetachSaveTimeout + task.ItemInstanceSaveTimeout
 
 // persistBudget is how long a connection waits for queued saves:

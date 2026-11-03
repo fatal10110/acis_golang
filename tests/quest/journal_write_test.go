@@ -458,8 +458,9 @@ func TestDetachingPlayerGetsNoJournalWrite(t *testing.T) {
 
 // TestFailedSealedDrainRefusesSelection makes journal writes fail while a
 // character sets a condition and leaves: its next selection is refused and
-// answered with the character list, since loading would lose the writes. Once writes succeed again
-// the next selection applies them first and loads them.
+// answered with the character list, since loading would lose the writes.
+// Once writes succeed again the next selection applies them first and loads
+// them.
 func TestFailedSealedDrainRefusesSelection(t *testing.T) {
 	t.Parallel()
 	srv, objID := bootJournal(t, gameservertest.WithCapturedLog())

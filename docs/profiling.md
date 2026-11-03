@@ -81,8 +81,10 @@ budget`), so a lane that couples selections on a live server shows up in the log
 `ACIS_PERF_CLIENTS=200 ACIS_PERF_DURATION=30s` on `origin/main` at `0696a8cd` plus the selection
 measurement, same host class (4 vCPU, `GOMAXPROCS=3`, Go 1.27.1): selection p50 / p99 / max =
 4.8 / 5.6 / 5.8 ms; step p50 / p99 / max = 3.6 / 59 / 139 ms. At 50 clients for 10 s: selection
-4.7 / 5.2 / 5.4 ms. The wait is far below its 16 s budget, so publishing the saved state in memory
-to skip it is not needed on these numbers.
+4.7 / 5.2 / 5.4 ms. The wait is far below its 16 s budget. These numbers were measured with idle
+lanes: no logout backlog sits ahead of a selection, so the shared-lane coupling under a write
+backlog is not exercised. The half-budget warn is what surfaces that coupling on a live server, and
+is the evidence to collect before publishing the saved state in memory to skip the wait.
 
 ## Measured Run (2026-10-05)
 
