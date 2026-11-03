@@ -98,6 +98,7 @@ type gameplayConfig struct {
 	Wyvern                   npc.WyvernRules
 	RaidMultipliers          npc.RaidMultipliers
 	NpcAI                    npc.AIConfig
+	MaxDriftRange            int
 	BossWaits                script.BossWaitTimes
 	Enchant                  enchant.Config
 	Merchant                 merchant.Config
@@ -267,6 +268,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.NpcAI, err = loadNpcAIConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.MaxDriftRange, err = loadMaxDriftRange(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.BossWaits, err = loadBossWaitTimes(paths); err != nil {
@@ -1039,9 +1043,8 @@ func loadRaidMultipliers(paths gameServerPaths) (npc.RaidMultipliers, error) {
 }
 
 // loadNpcAIConfig reads the npcs.properties MobAggroInPeaceZone (default
-// true) and GuardAttackAggroMob (default false) target-selection switches,
-// the DefaultSeeRange (default 450) NPC see range and the MaxDriftRange
-// (default 200) drift range.
+// true) and GuardAttackAggroMob (default false) target-selection switches
+// and the DefaultSeeRange (default 450) NPC see range.
 func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 	props, err := config.LoadFile(paths.NpcsConfigPath)
 	if err != nil {
@@ -1053,12 +1056,29 @@ func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 		MobAggroInPeaceZone: f.Bool("MobAggroInPeaceZone", def.MobAggroInPeaceZone),
 		GuardAttackAggroMob: f.Bool("GuardAttackAggroMob", def.GuardAttackAggroMob),
 		SeeRange:            f.Int("DefaultSeeRange", def.SeeRange),
-		DriftRange:          f.Int("MaxDriftRange", def.DriftRange),
 	}
 	if err := f.Err(); err != nil {
 		return npc.AIConfig{}, err
 	}
 	return c, nil
+}
+
+// loadMaxDriftRange reads the npcs.properties MaxDriftRange (default 200)
+// drift range every NPC reads at each use.
+func loadMaxDriftRange(paths gameServerPaths) (int, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	f := config.NewFields(props, "max drift range")
+	v := f.Int("MaxDriftRange", npc.DefaultLimits().DriftRange)
+	return v, f.Err()
+}
+
+// npcLimits are the NPC limits gameplay gives: the players.properties
+// MaxBuffsAmount base buff-slot count and the npcs.properties MaxDriftRange.
+func npcLimits(gameplay gameplayConfig) npc.Limits {
+	return npc.Limits{MaxBuffs: int(gameplay.MaxBuffsAmount), DriftRange: gameplay.MaxDriftRange}
 }
 
 // loadBossWaitTimes reads the npcs.properties AntharasWaitTime (default

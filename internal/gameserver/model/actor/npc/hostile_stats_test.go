@@ -25,12 +25,19 @@ func TestHostileMaxBuffCountIncludesTemplateDivineInspiration(t *testing.T) {
 	}
 }
 
-func TestHostileMaxBuffCountUsesConfiguredBase(t *testing.T) {
+// TestHostileMaxBuffCountReadsTheLimitsInForce: the base comes from the
+// shared limits at each call, so setting new ones reaches the hostile.
+func TestHostileMaxBuffCountReadsTheLimitsInForce(t *testing.T) {
 	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
-	hostile.SetMaxBuffsAmount(2)
+	limits := NewLimitBook(Limits{MaxBuffs: 2})
+	hostile.Instance.Limits = limits
 
 	if got := hostile.MaxBuffCount(); got != 2 {
 		t.Fatalf("MaxBuffCount() = %d, want 2", got)
+	}
+	limits.Set(Limits{MaxBuffs: 7, DriftRange: 300})
+	if got, drift := hostile.MaxBuffCount(), hostile.Instance.MaxDriftRange(); got != 7 || drift != 300 {
+		t.Fatalf("after Set: MaxBuffCount() = %d, MaxDriftRange() = %d, want 7 and 300", got, drift)
 	}
 }
 

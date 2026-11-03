@@ -253,15 +253,10 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 	return script.NewSpawner(nil, log)
 }
 
-// provideScriptEnv returns what the script helpers act through: the quest
-// rates of server.properties, the party range and multiple item drop the
-// kill rewards read, the item id allocator, the NPC spawner, the shared
-// random source, the world the scripts look NPCs up in, the skill and item
-// definitions, the in-game clock and the wall clock, the datapack pages a
-// script reads, the Seven Signs state, the grand boss wait times, the doors
-// scripts open and close, the castles NPCs belong to with their sieges, and
-// the clan halls with the siegable halls' sieges, and the clans.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine, halls *clanhall.Halls, clans *clan.Service, events *script.EventBook) (*script.Env, error) {
+// loadQuestRates reads the server.properties RateQuestDrop, RateQuestReward,
+// RateQuestRewardXP, RateQuestRewardSP and RateQuestRewardAdena rates, each
+// defaulting to 1. A malformed value fails.
+func loadQuestRates(serverProps *config.Properties) (script.Rates, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -275,10 +270,32 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 	} {
 		v, err := serverProps.Float64(r.key, 1)
 		if err != nil {
-			return nil, err
+			return script.Rates{}, err
 		}
 		*r.dst = v
 	}
+	return rates, nil
+}
+
+// provideQuestRates returns the quest rates read from server.properties,
+// in a book //reload config sets whole.
+func provideQuestRates(serverProps *config.Properties) (*script.RateBook, error) {
+	r, err := loadQuestRates(serverProps)
+	if err != nil {
+		return nil, err
+	}
+	return script.NewRateBook(r), nil
+}
+
+// provideScriptEnv returns what the script helpers act through: the quest
+// rates of server.properties, the party range and multiple item drop the
+// kill rewards read, the item id allocator, the NPC spawner, the shared
+// random source, the world the scripts look NPCs up in, the skill and item
+// definitions, the in-game clock and the wall clock, the datapack pages a
+// script reads, the Seven Signs state, the grand boss wait times, the doors
+// scripts open and close, the castles NPCs belong to with their sieges, and
+// the clan halls with the siegable halls' sieges, and the clans.
+func provideScriptEnv(rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine, halls *clanhall.Halls, clans *clan.Service, events *script.EventBook, rates *script.RateBook) *script.Env {
 	return &script.Env{
 		Quests:       journals,
 		Rates:        rates,
@@ -303,7 +320,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Halls:        halls,
 		Clans:        clanTable(clans),
 		Zones:        data.Zones,
-	}, nil
+	}
 }
 
 // provideQuestJournals returns the quest journal writer, draining each

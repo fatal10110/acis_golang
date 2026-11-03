@@ -205,15 +205,15 @@ type questBoot struct {
 // item templates items and the link's page cache html, and the script
 // registry, whose own work (the dying hooks, and the timers bound to no NPC
 // or player queue) runs on engine. The scripts read the Seven Signs from
-// sevenSigns, the party range and multiple item drop rule from drops and
-// the event settings from events.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, events *script.EventBook, o *options) *questBoot {
+// sevenSigns, the party range and multiple item drop rule from drops, the
+// event settings from events and the quest rates from rates.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, events *script.EventBook, rates *script.RateBook, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
 	env := &script.Env{
 		Quests:     journals,
-		Rates:      script.Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1},
+		Rates:      rates,
 		Drops:      drops,
 		Events:     events,
 		NewItemID:  ids.NextID,
@@ -229,9 +229,6 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		SevenSigns: sevenSigns,
 		BossWaits:  script.DefaultBossWaitTimes(),
 		Zones:      o.zones,
-	}
-	if so.rates != nil {
-		env.Rates = *so.rates
 	}
 	if so.rand != nil {
 		env.Rand = so.rand

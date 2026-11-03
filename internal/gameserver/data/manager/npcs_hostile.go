@@ -178,7 +178,7 @@ type hostileWiring struct {
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef. log is the
 // logger shared by every NPC.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log *zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log *zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
 	w := &hostileWiring{}
 	control := &w.control
 	control.walker, control.log, control.chance = walker, log, castEffects.Chance
@@ -212,7 +212,6 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	if err != nil {
 		return nil, nil, err
 	}
-	hostile.SetMaxBuffsAmount(maxBuffsAmount)
 	hostile.SetMaxGeoPathFailCount(maxGeoPathFailCount)
 	if zones != nil {
 		hostile.SetWaterZone(func(at location.Location) bool {

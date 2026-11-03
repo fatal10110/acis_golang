@@ -13,7 +13,10 @@ import (
 // then "* " for a monster with an aggro range or " " for one without, then
 // the title s carries. Any other NPC keeps its title.
 func (l *GameClientLink) addNPCLevel(v world.Tracked, s *npcinfo.Snapshot) {
-	if l == nil || !l.showNPCLevel {
+	if l == nil {
+		return
+	}
+	if settings := l.playerSettings.Load(); settings == nil || !settings.ShowNPCLevel {
 		return
 	}
 	h, ok := v.(*npc.Hostile)

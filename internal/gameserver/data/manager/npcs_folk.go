@@ -49,9 +49,7 @@ type FolkSpawner struct {
 	// Decay removes a dead NPC's corpse; nil leaves corpses in place.
 	Decay *task.Decay
 	// Effects is the server's effect-list context.
-	Effects effect.Env
-	// MaxBuffsAmount is the configured base buff-slot count.
-	MaxBuffsAmount      int
+	Effects             effect.Env
 	MaxGeoPathFailCount int
 	// Log is the logger every civilian NPC shares.
 	Log *zerolog.Logger
@@ -88,20 +86,19 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 		return nil, err
 	}
 	rt := npc.FolkRuntime{
-		World:          s.State,
-		Queue:          s.Queues.NewQueue("npc").Serial(inst.ObjectID),
-		Effects:        s.Effects,
-		MaxBuffsAmount: s.MaxBuffsAmount,
-		Items:          s.Items,
-		Decay:          s.Decay,
-		Zones:          s.Zones,
-		Scripts:        s.Scripts,
-		Remover:        s.Remover,
-		Ground:         s.Ground,
-		Landing:        s.Geo,
-		SeeRange:       s.SeeRange,
-		Tower:          tower,
-		Regen:          s.Regen,
+		World:    s.State,
+		Queue:    s.Queues.NewQueue("npc").Serial(inst.ObjectID),
+		Effects:  s.Effects,
+		Items:    s.Items,
+		Decay:    s.Decay,
+		Zones:    s.Zones,
+		Scripts:  s.Scripts,
+		Remover:  s.Remover,
+		Ground:   s.Ground,
+		Landing:  s.Geo,
+		SeeRange: s.SeeRange,
+		Tower:    tower,
+		Regen:    s.Regen,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)

@@ -54,7 +54,7 @@ func TestSpawnAllocations(t *testing.T) {
 	inst := &npc.Instance{ObjectID: 1, Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100}, HasHome: true, Home: location.Location{}}
 	positions := task.NewPositionUpdates(state)
 	wiring := testing.AllocsPerRun(200, func() {
-		if _, _, err := newLiveHostile(inst, 100, fakeGeo{}, positions, &testLog, nil, actorcast.EffectHandlers{}, walker, 20, 0, nil, effect.Env{}, queues.NewQueue("npc")); err != nil {
+		if _, _, err := newLiveHostile(inst, 100, fakeGeo{}, positions, &testLog, nil, actorcast.EffectHandlers{}, walker, 0, nil, effect.Env{}, queues.NewQueue("npc")); err != nil {
 			t.Fatalf("newLiveHostile() error: %v", err)
 		}
 	})

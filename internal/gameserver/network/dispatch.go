@@ -286,6 +286,23 @@ type PlayerConfig struct {
 	// in force whole with the rest. Nil leaves the ones in force as they
 	// are.
 	Events *script.EventRules
+	// QuestRates, when set, are the quest drop and reward rates the
+	// scripts read, put in force whole with the rest. Nil leaves the ones
+	// in force as they are.
+	QuestRates *script.Rates
+	// PvPFlagTimes, when set, are the PvP flag durations //reload config
+	// puts in force whole: a flag started afterwards lasts the new
+	// duration, one already running keeps its deadline. Nil leaves the ones
+	// in force as they are.
+	PvPFlagTimes *task.PvPFlagTimes
+	// NPCLimits, when set, are the NPC base buff-slot count and drift range
+	// //reload config puts in force whole for every NPC, those already in
+	// the world included. Nil leaves the ones in force as they are.
+	NPCLimits *npc.Limits
+	// ShowNPCLevel is npcs.properties ShowNpcLevel: when true, a monster's
+	// NpcInfo title starts with its level and, when it is aggressive, a
+	// star. An NpcInfo already sent keeps the title it had.
+	ShowNPCLevel bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -360,13 +377,15 @@ type GameClientLink struct {
 	// events holds the event settings in force, shared with the scripts;
 	// //reload config sets them whole.
 	events *script.EventBook
+	// questRates holds the quest rates in force, shared with the scripts;
+	// //reload config sets them whole.
+	questRates *script.RateBook
 	// playerConfigMu serializes the //reload config puts, so the settings
 	// and the rules and switches built from them come from one reload.
 	playerConfigMu   sync.Mutex
 	disableRaidCurse bool
 	showNPCCrest     bool
 	showSummonCrest  bool
-	showNPCLevel     bool
 	wyvern           npc.WyvernRules
 	inventory        *invops.Service
 	trades           *tradebook.Book
@@ -618,10 +637,6 @@ type GameClientLinkConfig struct {
 	// owner is sent that NpcInfo too when the summon spawns or lands from a
 	// teleport.
 	ShowSummonCrest bool
-	// ShowNPCLevel is npcs.properties ShowNpcLevel: when true, a monster's
-	// NpcInfo title starts with its level and, when it is aggressive, a
-	// star.
-	ShowNPCLevel bool
 	// Wyvern is the npcs.properties wyvern ride settings; nil reads their
 	// defaults.
 	Wyvern *npc.WyvernRules
@@ -771,6 +786,10 @@ type GameClientLinkConfig struct {
 	// read; nil gives the link its own, holding PlayerConfig.Events or
 	// else the shipped settings.
 	Events *script.EventBook
+	// QuestRates holds the quest rates in force, the same book the scripts
+	// read; nil gives the link its own, holding PlayerConfig.QuestRates or
+	// else the shipped rates.
+	QuestRates *script.RateBook
 	// BossZones saves and restores who may enter the boss zones around a
 	// zone reload; nil keeps nobody's permission across one.
 	BossZones BossZoneStore
@@ -843,7 +862,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		disableRaidCurse: cfg.DisableRaidCurse,
 		showNPCCrest:     cfg.ShowNPCCrest,
 		showSummonCrest:  cfg.ShowSummonCrest,
-		showNPCLevel:     cfg.ShowNPCLevel,
 		wyvern:           wyvernRules(cfg.Wyvern),
 		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},
 		inventory:        invops.NewService(cfg.IDs),
@@ -881,6 +899,13 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	if playerConfig.Events != nil {
 		link.events.Set(*playerConfig.Events)
+	}
+	link.questRates = cfg.QuestRates
+	if link.questRates == nil {
+		link.questRates = script.NewRateBook(script.DefaultRates())
+	}
+	if playerConfig.QuestRates != nil {
+		link.questRates.Set(*playerConfig.QuestRates)
 	}
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor

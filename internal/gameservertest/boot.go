@@ -2223,6 +2223,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	shops, stock := bootMerchant(t, o.merchant, buyListStore, persistWorker, ids, o.log)
 	killRewards := gamemanager.NewKillRewardBook(fixtureKillRewards(o))
 	events := script.NewEventBook(fixtureEventRules(o))
+	questRates := script.NewRateBook(script.DefaultRates())
+	if r := o.scriptHelpers().rates; r != nil {
+		questRates.Set(*r)
+	}
 	gclConfig := network.GameClientLinkConfig{
 		Flow: network.CharacterFlowConfig{Validator: validator, PlayerClock: playerClock, Autosave: autosave},
 		Belongings: network.BelongingsConfig{
@@ -2254,6 +2258,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		},
 		KillRewards:      killRewards,
 		Events:           events,
+		QuestRates:       questRates,
 		Merchant:         shops,
 		Effects:          effectEnv,
 		LoginLink:        func() *network.LoginLink { return loginLink },
@@ -2289,7 +2294,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		PersistWait:      o.persistWait,
 		Queues:           queues,
 		ShadowItems:      shadowItems,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, Regen: o.regenMultipliers, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, Regen: o.regenMultipliers, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, ShowNPCLevel: o.showNPCLevel},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
@@ -2298,7 +2303,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,
 		ShowNPCCrest:     o.showNPCCrest,
-		ShowNPCLevel:     o.showNPCLevel,
 		TeleportClock:    o.teleportClock,
 		TradeClock:       o.tradeClock,
 		Zones:            o.zones,
@@ -2354,7 +2358,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, o)
+	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, questRates, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
 	quests.memos = &memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
 	gclConfig.Memos = quests.memos

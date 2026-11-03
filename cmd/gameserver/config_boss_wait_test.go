@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -63,15 +62,8 @@ func TestLoadBossWaitTimesUsesNpcsProperties(t *testing.T) {
 // TestScriptEnvCarriesBossWaitTimes: the script helpers read the wait
 // times the gameplay config loaded.
 func TestScriptEnvCarriesBossWaitTimes(t *testing.T) {
-	props, err := config.Parse(strings.NewReader(""))
-	if err != nil {
-		t.Fatal(err)
-	}
 	waits := script.BossWaitTimes{Antharas: time.Minute, Valakas: 2 * time.Minute, Frintezza: 3 * time.Minute}
-	env, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{BossWaits: waits}, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("provideScriptEnv() error = %v", err)
-	}
+	env := provideScriptEnv(manager.KillRewardConfig{}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{BossWaits: waits}, nil, nil, nil, nil, nil, nil, nil)
 	if env.BossWaits != waits {
 		t.Fatalf("env.BossWaits = %+v, want %+v", env.BossWaits, waits)
 	}

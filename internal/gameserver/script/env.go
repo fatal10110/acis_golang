@@ -1,6 +1,7 @@
 package script
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
@@ -47,8 +48,9 @@ func (e *Env) multipleItemDrop() bool {
 type Env struct {
 	// Quests writes the quest journals whose states the checks return.
 	Quests *Quests
-	// Rates scale quest drops and rewards.
-	Rates Rates
+	// Rates holds the quest drop and reward rates in force, read at each
+	// use; nil reads the shipped ones.
+	Rates *RateBook
 	// Drops answers the party range and the multiple item drop rule in
 	// force, read at each use; nil reads a zero range and gives a
 	// non-stackable counted above one as one instance.
@@ -169,6 +171,36 @@ type Rates struct {
 	Reward, RewardAdena float64
 	// XP and SP scale rewarded experience and skill points.
 	XP, SP float64
+}
+
+// DefaultRates are the shipped server.properties quest rates: every one 1.
+func DefaultRates() Rates {
+	return Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1}
+}
+
+// RateBook holds the quest Rates in force. //reload config puts new ones in
+// force whole, so a reader that takes them once per action sees one set
+// from before or after, never a mix.
+type RateBook struct {
+	rates atomic.Pointer[Rates]
+}
+
+// NewRateBook returns a RateBook holding r.
+func NewRateBook(r Rates) *RateBook {
+	b := &RateBook{}
+	b.Set(r)
+	return b
+}
+
+// Set puts r in force in place of the rates before.
+func (b *RateBook) Set(r Rates) { b.rates.Store(&r) }
+
+// Rates returns the rates in force; a nil book reads the shipped ones.
+func (b *RateBook) Rates() Rates {
+	if b == nil {
+		return DefaultRates()
+	}
+	return *b.rates.Load()
 }
 
 // character resolves p to the character the world tracks. A handle on

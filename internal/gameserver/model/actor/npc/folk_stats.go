@@ -151,10 +151,10 @@ func (f *Folk) broadcastModifiedStats(stats []stat.Stat) {
 	}
 }
 
-// MaxBuffCount is the configured buff-slot count plus the template's
-// Divine Inspiration.
+// MaxBuffCount is the base buff-slot count in force (Limits) plus the
+// template's Divine Inspiration.
 func (f *Folk) MaxBuffCount() int {
-	return int(f.maxBuffs.Load()) + f.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
+	return f.Instance.maxBuffsBase() + f.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
 }
 
 // UpdateEffectIcons does nothing: NPCs show no effect icons.

@@ -3,7 +3,7 @@ package npc
 import "sync/atomic"
 
 // AIConfig holds the npcs.properties switches that shape which targets an
-// NPC picks on its own, and how far it strays from where it spawned.
+// NPC picks on its own.
 type AIConfig struct {
 	// MobAggroInPeaceZone (MobAggroInPeaceZone) lets an NPC other than a
 	// Guard or FriendlyMonster pick a target standing in a peace zone.
@@ -14,18 +14,12 @@ type AIConfig struct {
 	// SeeRange (DefaultSeeRange) is how far an NPC other than a raid or
 	// grand boss sees around itself; zero keeps the shipped 450.
 	SeeRange int
-	// DriftRange (MaxDriftRange) is how far around its spawn point an NPC
-	// spawned at a point keeps its territory, how far it strays before it
-	// heads back, and how far a script makes it flee; the spawn hands it to
-	// the NPC's Instance. Not positive keeps the shipped 200.
-	DriftRange int
 }
 
 // DefaultAIConfig is the shipped npcs.properties setting: peace-zone aggro
-// allowed, guards ignore aggressive monsters, a see range of 450, a drift
-// range of 200.
+// allowed, guards ignore aggressive monsters, a see range of 450.
 func DefaultAIConfig() AIConfig {
-	return AIConfig{MobAggroInPeaceZone: true, SeeRange: DefaultSeeRange, DriftRange: defaultDriftRange}
+	return AIConfig{MobAggroInPeaceZone: true, SeeRange: DefaultSeeRange}
 }
 
 // HostileSettings holds the AI switches and raid multipliers in force for
