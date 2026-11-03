@@ -130,9 +130,7 @@ func (l *GameClientLink) broadcastLiveFrameAfterClanQueued(live *livePlayer, cl 
 		if l.world == nil {
 			return
 		}
-		known := live.known.SnapshotCopy(l.world, live)
-		defer known.Release()
-		for _, o := range known.Tracked() {
+		for o := range l.world.KnownPlayers(live) {
 			if viewer, ok := o.(*livePlayer); ok && cl.IsMember(viewer.ObjectID()) {
 				send(queuedMember{actor: live, member: viewer})
 			} else if receiver, ok := o.(frameReceiver); ok {

@@ -1,6 +1,8 @@
 package network
 
 import (
+	"iter"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -34,7 +36,6 @@ type hostileSink struct {
 	world  *world.State
 	stance AttackStanceTracker
 	h      *npc.Hostile
-	known  world.KnownBuffer
 	// link adds the crest to the NPC's view; nil adds none.
 	link *GameClientLink
 }
@@ -85,9 +86,9 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.HPChanged:
 		s.broadcastHP()
 	case event.AbnormalEffectChanged:
-		broadcastNPCView(s.link, &s.known, s.world, h, false)
+		broadcastNPCView(s.link, s.world, h, false)
 	case event.NPCInfoChanged:
-		broadcastNPCView(s.link, &s.known, s.world, h, e.ServerObject)
+		broadcastNPCView(s.link, s.world, h, e.ServerObject)
 	case event.NPCInfoShown:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameNPCInfo(npcSnapshot(s.link, h, false)) })
 	case event.MoveTypeChanged:
@@ -163,17 +164,13 @@ func (s *hostileSink) stopAttackStance() {
 
 // broadcast fans one lazily built frame out to the NPC's observers.
 func (s *hostileSink) broadcast(build func() wire.Frame) {
-	broadcastKnown(&s.known, s.world, s.h, build)
+	broadcastKnown(s.world, s.h, build)
 }
 
-// broadcastKnown fans one lazily built frame out over a detached snapshot of
-// t's known list, taken through buf, so no region lock is held while frames
-// are sent.
-func broadcastKnown(buf *world.KnownBuffer, state *world.State, t world.Tracked, build func() wire.Frame) {
-	known := buf.SnapshotCopy(state, t)
-	defer known.Release()
+// broadcastKnown fans one lazily built frame out to the players that know t.
+func broadcastKnown(state *world.State, t world.Tracked, build func() wire.Frame) {
 	broadcastFrame(build, func(send func(frameReceiver)) {
-		for _, o := range known.Tracked() {
+		for o := range state.KnownPlayers(t) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
@@ -183,9 +180,7 @@ func broadcastKnown(buf *world.KnownBuffer, state *world.State, t world.Tracked,
 
 // broadcastHP sends the NPC's current HP to the known players targeting it.
 func (s *hostileSink) broadcastHP() {
-	known := s.known.SnapshotCopy(s.world, s.h)
-	defer known.Release()
-	sendHPToWatchers(known.Tracked(), s.h.ObjectID(), s.h.PublishHP)
+	sendHPToWatchers(s.world.KnownPlayers(s.h), s.h.ObjectID(), s.h.PublishHP)
 }
 
 // sendHPToWatchers sends the current HP of creature id to the players in
@@ -196,9 +191,9 @@ func (s *hostileSink) broadcastHP() {
 // the HP under the creature's bar lock, and the frame is queued to every
 // watcher inside that hand-over, so two concurrent HP changes cannot reach
 // a watcher in the reverse order of their reads.
-func sendHPToWatchers(known []world.Tracked, id int32, publish func(send func(hp int))) {
+func sendHPToWatchers(known iter.Seq[world.Tracked], id int32, publish func(send func(hp int))) {
 	var watchers []frameReceiver
-	for _, o := range known {
+	for o := range known {
 		p, ok := o.(*livePlayer)
 		if !ok {
 			continue
@@ -248,7 +243,6 @@ func EffectPointSinks(state *world.State) func(*npc.EffectPoint) event.Sink {
 type effectPointSink struct {
 	world *world.State
 	ep    *npc.EffectPoint
-	known world.KnownBuffer
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -265,7 +259,7 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	case event.NPCInfoChanged:
 		// A signet point's template serves no residence: its view carries
 		// no crest.
-		broadcastNPCView(nil, &s.known, s.world, s.ep, e.ServerObject)
+		broadcastNPCView(nil, s.world, s.ep, e.ServerObject)
 		return
 	default:
 		return
@@ -284,7 +278,6 @@ func (s *effectPointSink) Emit(ev event.Event) {
 type decorationSink struct {
 	world *world.State
 	d     *npc.Decoration
-	known world.KnownBuffer
 	link  *GameClientLink
 }
 
@@ -293,9 +286,9 @@ type decorationSink struct {
 func (s *decorationSink) Emit(ev event.Event) {
 	switch e := ev.(type) {
 	case event.NPCInfoChanged:
-		broadcastNPCView(s.link, &s.known, s.world, s.d, e.ServerObject)
+		broadcastNPCView(s.link, s.world, s.d, e.ServerObject)
 	case event.MoveTypeChanged:
-		broadcastKnown(&s.known, s.world, s.d, func() wire.Frame {
+		broadcastKnown(s.world, s.d, func() wire.Frame {
 			return serverpackets.NpcFrameBuilder{}.ChangeMoveType(s.d.ObjectID(), e.Running, s.d.InsideZone(zone.FlagWater))
 		})
 	}
@@ -310,7 +303,6 @@ func DoorSinks(state *world.State) func(*door.Object) event.Sink {
 type doorSink struct {
 	world *world.State
 	door  *door.Object
-	known world.KnownBuffer
 }
 
 // Emit sends the door's status (open/close state, HP and damage stage) or
@@ -325,13 +317,5 @@ func (s *doorSink) Emit(ev event.Event) {
 	default:
 		return
 	}
-	known := s.known.SnapshotCopy(s.world, s.door)
-	defer known.Release()
-	broadcastFrame(build, func(send func(frameReceiver)) {
-		for _, o := range known.Tracked() {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		}
-	})
+	broadcastKnown(s.world, s.door, build)
 }

@@ -143,7 +143,6 @@ type livePlayer struct {
 	handlerPanicked bool
 	log             zerolog.Logger
 
-	known          world.KnownBuffer
 	zoneActor      *liveZoneActor
 	visibilitySend func(wire.Frame) bool
 	// kick closes this player's client connection (ServerClose then close),

@@ -418,7 +418,7 @@ func (l *GameClientLink) broadcastLiveRevive(live *livePlayer) {
 }
 
 // broadcastLiveFrame sends one serialized frame to live's own session and to
-// every object it currently knows. Each recipient gets an independent pooled
+// every player that currently knows it. Each recipient gets an independent pooled
 // copy because its session encrypts outgoing bytes in place.
 func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
 	broadcastFrame(frame, func(send func(frameReceiver)) {
@@ -426,9 +426,7 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		if l.world == nil {
 			return
 		}
-		known := live.known.SnapshotCopy(l.world, live)
-		defer known.Release()
-		for _, o := range known.Tracked() {
+		for o := range l.world.KnownPlayers(live) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}

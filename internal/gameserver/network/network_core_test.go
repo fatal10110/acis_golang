@@ -857,8 +857,9 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	})
 }
 
-// retainingReceiver is a world-visible observer that keeps every raw frame a
-// broadcast hands it, so a test can prove each recipient owns its copy.
+// retainingReceiver is a world-visible player observer that keeps every raw
+// frame a broadcast hands it, so a test can prove each recipient owns its
+// copy.
 type retainingReceiver struct {
 	world.Presence
 
@@ -868,7 +869,7 @@ type retainingReceiver struct {
 }
 
 func (r *retainingReceiver) ObjectID() int32 { return r.id }
-func (*retainingReceiver) Kind() actor.Kind  { return actor.KindNPC }
+func (*retainingReceiver) Kind() actor.Kind  { return actor.KindPlayer }
 
 func (r *retainingReceiver) BroadcastFrame(frame wire.Frame) bool {
 	r.mu.Lock()

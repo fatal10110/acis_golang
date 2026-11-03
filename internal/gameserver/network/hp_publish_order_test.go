@@ -1,6 +1,7 @@
 package network
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -63,7 +64,7 @@ func TestSendHPToWatchersQueuesInReadOrder(t *testing.T) {
 		return capture.Send(f)
 	}}
 	watcher.StoreTarget(&hpWatchTarget{id: id})
-	known := []world.Tracked{watcher}
+	known := slices.Values([]world.Tracked{watcher})
 
 	var (
 		bar   creature.HPBar // uncalibrated: every change is sent
