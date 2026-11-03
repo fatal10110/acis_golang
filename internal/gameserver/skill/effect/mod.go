@@ -285,9 +285,14 @@ func (c *Calculator) Size() int {
 func (c *Calculator) AddMod(m Mod) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.mods = insertMod(c.mods, m)
+}
 
+// insertMod returns a fresh slice of mods with m placed after every Mod
+// whose order is <= m's. mods itself is left untouched, so a chain shared
+// between Calculators (see StatMods) never sees another's insert.
+func insertMod(mods []Mod, m Mod) []Mod {
 	order := m.Op.order()
-	mods := c.mods
 	i := 0
 	for i < len(mods) && order >= mods[i].Op.order() {
 		i++
@@ -297,7 +302,7 @@ func (c *Calculator) AddMod(m Mod) {
 	copy(next, mods[:i])
 	next[i] = m
 	copy(next[i+1:], mods[i:])
-	c.mods = next
+	return next
 }
 
 // is reports whether o is owner. An item owner is its instance alone (see
@@ -341,7 +346,12 @@ func (c *Calculator) Calc(actor stat.Actor, base float64, target conditions.Acto
 	mods := c.mods
 	builtin := c.builtin
 	c.mu.RUnlock()
+	return calcChain(mods, builtin, actor, base, target, skill)
+}
 
+// calcChain runs mods, sorted by Op's order, around builtin as Calc
+// describes.
+func calcChain(mods []Mod, builtin funcs.Func, actor stat.Actor, base float64, target conditions.Actor, skill conditions.Skill) float64 {
 	value := base
 	i := 0
 	for ; i < len(mods) && mods[i].Op.order() < orderFinalize; i++ {

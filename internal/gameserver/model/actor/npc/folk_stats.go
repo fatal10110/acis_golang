@@ -9,32 +9,52 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 var _ effect.StatOwner = (*Folk)(nil)
 
-// statCalc returns s's live Calculator, creating it on first touch.
+// statCalc returns s's Calculator, creating it from s's template passives
+// and builtin finalize step on first use.
 func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
-	f.statMu.RLock()
-	if calc := f.statCalcs[s]; calc != nil {
-		f.statMu.RUnlock()
-		return calc
-	}
-	f.statMu.RUnlock()
 	f.statMu.Lock()
 	defer f.statMu.Unlock()
+	if f.statCalcs == nil {
+		f.statCalcs = new([stat.Count]*effect.Calculator)
+	}
 	if calc := f.statCalcs[s]; calc != nil {
 		return calc
 	}
-	builtin := defaultBuiltin(s)
-	if f.SiegeFlag() {
-		// A siege headquarters has none of a creature's built-in bonuses.
-		builtin = nil
-	}
-	calc := effect.NewCalculator(builtin)
+	calc := f.passives.NewCalculator(s, f.builtin(s))
 	f.statCalcs[s] = &calc
 	return &calc
+}
+
+// builtin returns s's builtin finalize step for the NPC, nil for none.
+func (f *Folk) builtin(s stat.Stat) funcs.Func {
+	if f.SiegeFlag() {
+		// A siege headquarters has none of a creature's built-in bonuses.
+		return nil
+	}
+	return defaultBuiltin(s)
+}
+
+// ownerCalcs returns the NPC's stat slots, with one created for every Stat
+// a template passive of owner modifies so that its Mods can be dropped.
+func (f *Folk) ownerCalcs(owner effect.ModOwner) [stat.Count]*effect.Calculator {
+	f.statMu.RLock()
+	passives := f.passives
+	f.statMu.RUnlock()
+	for s := range passives.StatsOwnedBy(owner) {
+		f.statCalc(s)
+	}
+	f.statMu.RLock()
+	defer f.statMu.RUnlock()
+	if f.statCalcs == nil {
+		return [stat.Count]*effect.Calculator{}
+	}
+	return *f.statCalcs
 }
 
 // CalcStat finalizes base for s through the NPC's builtin funcs, template
@@ -48,7 +68,19 @@ func (f *Folk) CalcStat(s stat.Stat, base float64) float64 {
 // conditional func tests f against them. A non-positive stat that can't go
 // negative is floored at one.
 func (f *Folk) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
-	value := f.statCalc(s).Calc(f.statActor(), base, target, skill)
+	f.statMu.RLock()
+	var calc *effect.Calculator
+	if f.statCalcs != nil {
+		calc = f.statCalcs[s]
+	}
+	passives := f.passives
+	f.statMu.RUnlock()
+	var value float64
+	if calc != nil {
+		value = calc.Calc(f.statActor(), base, target, skill)
+	} else {
+		value = passives.Calc(s, f.builtin(s), f.statActor(), base, target, skill)
+	}
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -79,11 +111,8 @@ func (f *Folk) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
 	}
-	f.statMu.RLock()
-	calcs := f.statCalcs
-	f.statMu.RUnlock()
 	var modified []stat.Stat
-	for s, calc := range calcs {
+	for s, calc := range f.ownerCalcs(owner) {
 		if calc != nil && calc.RemoveOwner(owner) > 0 {
 			modified = append(modified, stat.Stat(s))
 		}
