@@ -11,7 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -153,7 +152,7 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	if len(skills) > 0 {
 		lookup = skills[0]
 	}
-	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
+	passives, err := inst.Template.passiveMods(lookup)
 	if err != nil {
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
@@ -166,7 +165,7 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()
 	f.fight.aggro = attackable.NewThreatTable(f, f.now)
-	f.initCombat(mods)
+	f.initCombat(passives)
 	f.siegePreHour.Store(DefaultSiegePreHour)
 	return f, nil
 }

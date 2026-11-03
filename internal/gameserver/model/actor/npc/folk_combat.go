@@ -62,10 +62,12 @@ type folkCombat struct {
 	effects  *effect.List
 	maxBuffs atomic.Int32
 
-	// statMu guards statCalcs slot creation; each Calculator guards its own
-	// mods.
+	// statMu guards statCalcs, its slots and passives; each Calculator
+	// guards its own mods. A Stat without a slot computes from passives,
+	// the template's shared Mods.
 	statMu    sync.RWMutex
-	statCalcs [stat.Count]*effect.Calculator
+	statCalcs *[stat.Count]*effect.Calculator
+	passives  *effect.StatMods
 	// speedMu orders move-speed hand-offs to a walking NPC's movement.
 	speedMu sync.Mutex
 
@@ -156,13 +158,16 @@ func folkAdmits(e *effect.Effect) bool {
 	return e.Type == effect.TypeBuff || e.Type == effect.TypeDebuff
 }
 
-// initCombat settles the NPC's stats from its template passives mods and
-// fills its HP and MP.
-func (f *Folk) initCombat(mods []effect.Mod) {
+// initCombat settles the NPC's stats from its template passives and fills
+// its HP and MP.
+func (f *Folk) initCombat(passives *compiledPassives) {
 	f.effects = effect.NewList(f, effect.WithAdmission(folkAdmits))
 	f.maxBuffs.Store(maxBuffCount)
 	f.running.Store(true)
-	f.AttachStatFuncs(effect.Attachable(mods, f.ConditionActor()))
+	_, byStat := passives.attached(f.ConditionActor())
+	f.statMu.Lock()
+	f.passives = byStat
+	f.statMu.Unlock()
 	f.hp = float64(f.MaxHP())
 	f.mp = math.Trunc(f.MaxMPValue())
 	f.hpBar.Calibrate(float64(f.MaxHP()))
