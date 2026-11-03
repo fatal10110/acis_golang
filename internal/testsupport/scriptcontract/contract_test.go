@@ -5,13 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 func mustTables(t *testing.T) []Table {
@@ -101,16 +101,10 @@ func TestGoldensNameSourceAndProvenance(t *testing.T) {
 }
 
 // Every cited range exists in the reference checkout and holds the symbol it
-// names. The reference tree is not in CI; ACIS_REQUIRE_DATAPACK turns its
-// absence into a failure, as for the datapack oracle tests.
+// names. The reference tree is not in CI; datapack.Reference decides
+// whether its absence skips or fails.
 func TestSourcesMatchReference(t *testing.T) {
-	root, ok := referenceRoot()
-	if !ok {
-		if os.Getenv("ACIS_REQUIRE_DATAPACK") != "" {
-			t.Fatal("aCis_gameserver not found above the module root and ACIS_REQUIRE_DATAPACK is set")
-		}
-		t.Skip("aCis_gameserver not checked out near the module root")
-	}
+	root := datapack.Reference(t, filepath.Join("java", "net", "sf", "l2j", "gameserver"))
 	lines := map[string][]string{}
 	for _, tb := range mustTables(t) {
 		for _, s := range tb.Sources {
@@ -128,25 +122,6 @@ func TestSourcesMatchReference(t *testing.T) {
 				t.Errorf("%s: %s %d-%d does not mention %s", tb.Name, s.File, s.From, s.To, word)
 			}
 		}
-	}
-}
-
-func referenceRoot() (string, bool) {
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", false
-	}
-	for dir := filepath.Dir(here); ; {
-		for _, c := range []string{filepath.Join(dir, "aCis_gameserver"), filepath.Join(dir, "acis_public", "aCis_gameserver")} {
-			if info, err := os.Stat(filepath.Join(c, "java")); err == nil && info.IsDir() {
-				return c, true
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", false
-		}
-		dir = parent
 	}
 }
 

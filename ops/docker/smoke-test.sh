@@ -13,13 +13,12 @@
 #      healthy: the init script's marker fails the healthcheck;
 #   5. a data directory left by a first start killed before the init script
 #      ran (no marker, no tables) never reports healthy either;
-#   6. with ACIS_SMOKE_DATAPACK set to an aCis_datapack checkout, the first
-#      start loads its real schema: acis then holds one table per sql/*.sql
-#      file.
+#   6. the first start over the real datapack loads its schema: acis then
+#      holds one table per sql/*.sql file. The datapack is the repository's
+#      aCis_datapack/ copy, or ACIS_SMOKE_DATAPACK when set.
 #
 # Steps 1-5 use a generated stub datapack, so they check the compose mounts,
-# the init script and the healthcheck without an aCis_datapack checkout.
-# Step 6 is skipped when ACIS_SMOKE_DATAPACK is unset.
+# the init script and the healthcheck apart from the shipped schema.
 #
 # Run from anywhere: ops/docker/smoke-test.sh. It tags the image
 # acis-golang:smoke, uses the compose project acis-smoke (its own volume,
@@ -69,11 +68,10 @@ fail() {
 	exit 1
 }
 
-if [ -n "${ACIS_SMOKE_DATAPACK:-}" ]; then
-	[ -f "$ACIS_SMOKE_DATAPACK/tools/full_install.sql" ] ||
-		fail "ACIS_SMOKE_DATAPACK=$ACIS_SMOKE_DATAPACK has no tools/full_install.sql"
-	ACIS_SMOKE_DATAPACK=$(cd "$ACIS_SMOKE_DATAPACK" && pwd)
-fi
+datapack=${ACIS_SMOKE_DATAPACK:-$root/aCis_datapack}
+[ -f "$datapack/tools/full_install.sql" ] ||
+	fail "datapack $datapack has no tools/full_install.sql"
+datapack=$(cd "$datapack" && pwd)
 
 # acis_tables prints the number of tables in acis.
 acis_tables() {
@@ -224,17 +222,13 @@ clean_project
 
 # 6. The real datapack schema. Every table file must load under this
 # MariaDB image, and acis must then hold one table per sql/*.sql file.
-if [ -n "${ACIS_SMOKE_DATAPACK:-}" ]; then
-	want=$(find "$ACIS_SMOKE_DATAPACK/sql" -maxdepth 1 -type f -name '*.sql' | wc -l)
-	[ "$want" -gt 0 ] || fail "$ACIS_SMOKE_DATAPACK/sql has no .sql files"
-	ACIS_DATAPACK_DIR="$ACIS_SMOKE_DATAPACK" compose up -d --wait --wait-timeout 300 db ||
-		{ compose logs db >&2; fail "db did not become healthy with $ACIS_SMOKE_DATAPACK"; }
-	got=$(acis_tables) || { compose logs db >&2; fail "cannot count acis tables"; }
-	[ "$got" = "$want" ] || { compose logs db >&2; fail "acis has $got tables, want $want (one per sql/*.sql)"; }
-	echo "smoke: real datapack schema loaded $got tables"
-	clean_project
-else
-	echo "smoke: ACIS_SMOKE_DATAPACK unset; real datapack schema not checked"
-fi
+want=$(find "$datapack/sql" -maxdepth 1 -type f -name '*.sql' | wc -l)
+[ "$want" -gt 0 ] || fail "$datapack/sql has no .sql files"
+ACIS_DATAPACK_DIR="$datapack" compose up -d --wait --wait-timeout 300 db ||
+	{ compose logs db >&2; fail "db did not become healthy with $datapack"; }
+got=$(acis_tables) || { compose logs db >&2; fail "cannot count acis tables"; }
+[ "$got" = "$want" ] || { compose logs db >&2; fail "acis has $got tables, want $want (one per sql/*.sql)"; }
+echo "smoke: real datapack schema loaded $got tables"
+clean_project
 
 echo "smoke: ok"

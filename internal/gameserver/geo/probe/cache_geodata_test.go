@@ -17,11 +17,11 @@ import (
 // the compact layout over the real geodata: every region file is packed
 // into a cache, mapped, and compared byte for byte with the heap loader,
 // then every cell and layer of every block is compared with the previous
-// decoder, layer handles included. It needs the datapack geodata, which CI
-// does not have, so it runs locally or on the server; a -race build checks
-// a sample of regions.
+// decoder, layer handles included. It needs the datapack geodata, which the
+// repository and CI do not have, so it runs locally or on the server (it
+// skips otherwise); a -race build checks a sample of regions.
 func TestCacheMatchesLegacyDecoderOnRealGeodata(t *testing.T) {
-	dir := datapack.Path(t, "data", "geodata")
+	dir := datapack.Geodata(t)
 	files, err := filepath.Glob(filepath.Join(dir, "*_conv.dat"))
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no L2OFF region files in %s (%v)", dir, err)

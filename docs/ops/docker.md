@@ -19,7 +19,8 @@ the binaries directly instead, see [run-servers.md](../run-servers.md).
   mounts its `data/` (`xml/`, `html/`, `geodata/`, `serverNames.xml`) into both servers.
 - The reference server's `config/` directory (`aCis_gameserver/config` in the aCis sources).
 - By default both paths are `../aCis_datapack` and `../aCis_gameserver/config`, next to this
-  checkout. Point compose and the init script elsewhere with `ACIS_DATAPACK_DIR` and the
+  checkout. The repository's own `aCis_datapack/` is a test copy without geodata; do not point
+  servers at it. Point compose and the init script elsewhere with `ACIS_DATAPACK_DIR` and the
   script's first argument.
 
 ## First start

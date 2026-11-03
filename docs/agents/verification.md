@@ -77,7 +77,7 @@ ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race -count=1 <changed package
 Run only the tests the change can affect: the unit tests of the changed packages and the behavior
 suites in `tests/<domain>/` that exercise the change, selected with `-run`. Do not run the full suite
 (`go test ./...`, `./tests/...`, `./internal/...`, `make test`) locally: PR CI runs it on every push
-and is the gate for everything except the datapack suites (next section). The PR body lists the scoped
+and is the gate for everything except the geodata and reference suites (next section). The PR body lists the scoped
 tests run and says "full suite: CI".
 
 There is no separate integration tier: `go test ./...` is CI's only run and needs Docker (the
@@ -134,45 +134,39 @@ adopts `SharedDB`. Another schema gets its own pool the same way `sqltest` does:
 Use `NewDB` instead of `SharedDB` for a test that mutates the schema itself (e.g. dropping a table to
 force a downstream failure), because the database goes back to the pool for the package's next test.
 
-### Datapack oracle tests are local-only — CI cannot run them
+### Datapack, geodata and reference tests
 
-`aCis_datapack` is a separate checkout that is never pushed, and `.github/workflows/go.yml` checks
-out only `acis_golang`. Every test that reads the shared datapack resolves its path through
-`internal/testsupport/datapack`, which searches every ancestor of the Go checkout (so the primary
-checkout and any `acis_golang-worktrees/<task>/` resolve the same `aCis_datapack/`) and calls
-`t.Skip` when none is found. **All datapack oracle tests therefore skip in CI, and a green CI run
-proves nothing about them.** Setting `ACIS_REQUIRE_DATAPACK=1` turns that skip into a failure.
+The repository carries a copy of the datapack in `aCis_datapack/` (`data/xml`, `data/html`,
+`data/serverNames.xml`, `sql`, `tools`, `build.xml`), byte for byte as the full checkout ships it.
+Every test that reads it resolves the path through `internal/testsupport/datapack`, which searches
+the module root and every ancestor, so the in-repo copy wins. CI sets `ACIS_REQUIRE_DATAPACK=1`:
+a datapack test that cannot find its data fails there instead of skipping, so CI is their gate.
 
-This makes the local run the only gate for them. CI runs everything else, so locally you run only
-the datapack suites related to the change, before every push:
+Two kinds of test still cannot run in CI, and the local run is their only gate:
 
-- find the candidates:
+- **geodata** (`datapack.Geodata`): the region files are too large for the repository. They are
+  found in a full datapack checkout above the module (the outer `acis_public/aCis_datapack/`) or
+  `ACIS_GEODATA_DIR`, and always skip without one, even under `ACIS_REQUIRE_DATAPACK`;
+- **reference** (`datapack.Reference`: `scriptfp`, `scriptcontract`, the config key, maker type and
+  festival spawn reference tests): they read `aCis_gameserver/`, which is not in the repository.
+  A missing checkout skips, or fails when `ACIS_REQUIRE_REFERENCE` is set to anything but `0`;
+  unset, it follows `ACIS_REQUIRE_DATAPACK`. CI sets `ACIS_REQUIRE_REFERENCE=0`.
 
-  ```bash
-  rg -l 'datapack\.(Require|Path|Find)\(|scriptfp\.|scriptcontract\.|scriptpages\.' \
-    <go-root>/tests <go-root>/internal <go-root>/cmd --glob '*_test.go'
-  ```
-
-- run the ones that cover the change:
-  - datapack tests in the changed packages;
-  - datapack tests that exercise the changed code path or the content the issue names (data
-    readers, templates, skill/item/NPC/zone/door data, geodata, HTML pages, multisells, spawns);
-  - the `scriptfp`, `scriptcontract` and `scriptpages` tests whenever `census.golden`,
-    `apimap.txt`, the script-facing API or script content changes;
-- run them from the outer `acis_public/` root, with `aCis_datapack/` present and
-  `ACIS_REQUIRE_DATAPACK=1` set, scoped with `-run`, and confirm in `-v` output that they ran (a SKIP
-  verifies nothing);
-- report them in the PR body as "Datapack suites (local only; CI skips them)" with each result,
-  or "none related";
-- never treat a green CI check as covering a datapack-backed acceptance criterion.
+When a change touches what they cover (geodata readers and pathfinding; `census.golden`,
+`apimap.txt`, the script-facing API or script content), run them locally with
+`ACIS_REQUIRE_DATAPACK=1`, scoped with `-run`, confirm in `-v` output that they ran (a SKIP verifies
+nothing), and report them in the PR body with each result, or "none related".
 
 ```bash
-# from acis_public/, with aCis_datapack/ checked out; <go-root> may be a linked worktree
-ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race -count=1 -v <packages> -run '<datapack tests>'
+ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race -count=1 -v <packages> -run '<tests>'
 ```
 
-An issue whose acceptance criteria name real datapack content is not verified until its oracle test
-is observed passing locally.
+The in-repo copy mirrors the full datapack and is not edited on its own: change the full checkout
+first (an owner decision), then resync the copy (`rsync -a --delete` of the listed paths), run
+`ops/datapack-manifest.sh write`, and commit the copy and `ops/datapack.sha256` together. CI's
+docker job runs `ops/datapack-manifest.sh check`, so an edit without a manifest refresh, or a
+checkout that converted line endings, fails. A server run from the in-repo copy writes into
+`data/` (crests, announcements); run servers from the full checkout instead.
 
 The installed `rtk` version exposes compact `go test`, `go build`, and `go vet` wrappers.
 Formatting is gofumpt, configured in `.golangci.yml`; `golangci-lint fmt` applies it. CI runs

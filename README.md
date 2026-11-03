@@ -47,7 +47,7 @@ go run ./cmd/datadiff -category=skill > skill.dump
 go run ./cmd/datadiff -category=skill -expected-dump=skill.dump
 ```
 
-`-datapack` is optional when `aCis_datapack/` sits next to the checkout or `ACIS_DATAPACK` is set. Current category coverage is the output of `-list`.
+`-datapack` is optional when `aCis_datapack/` sits next to the checkout or `ACIS_DATAPACK` is set; inside the repository it finds the in-repo copy (`aCis_datapack/`, without geodata) first. Current category coverage is the output of `-list`.
 
 ## Testing
 
