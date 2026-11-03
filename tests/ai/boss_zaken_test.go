@@ -573,16 +573,11 @@ func TestZakenBringsBackADeadPrivate(t *testing.T) {
 		t.Fatalf("live pirate captains after the death = %d, want 35", got)
 	}
 	w.onQueue(t, victim, func() { victim.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(victim.ObjectID())) })
-	var armed []string
-	for i := 1; i <= 256; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.RespawnArmed(key) {
-			armed = append(armed, key)
-		}
-	}
+	armed := w.srv.ArmedPrivates()
 	if len(armed) != 1 {
 		t.Fatalf("privates with a respawn pending = %q, want one", armed)
 	}
-	deadline, ok := w.srv.RespawnDeadline(armed[0])
+	deadline, ok := w.srv.RespawnDeadline(t, armed[0])
 	if !ok {
 		t.Fatalf("no deadline for the armed respawn %s", armed[0])
 	}
@@ -591,7 +586,7 @@ func TestZakenBringsBackADeadPrivate(t *testing.T) {
 		t.Fatalf("respawn due %s after the death, want %s", deadline.Sub(before), delay)
 	}
 
-	w.srv.RespawnSlot(armed[0])
+	w.srv.RespawnSlot(t, armed[0])
 	w.srv.Settle(t)
 	if got := alive(); got != 36 {
 		t.Fatalf("live pirate captains after the respawn = %d, want 36", got)

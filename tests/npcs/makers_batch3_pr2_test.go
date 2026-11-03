@@ -79,8 +79,8 @@ func TestRhamphorhynchusMakerWakesTheTyrannosaurus(t *testing.T) {
 	mw.inWorld(rhamphorhynchusID)[0].DeleteMe()
 	w.srv.Settle(t)
 	makers.expect(t, "the NPC left with the flag down", "rune20_mb2017_03m1:1001(0,0)")
-	if w.srv.RespawnArmed("rune20_mb2017_02m1#0#0") {
-		t.Fatal("the NPC armed a respawn of its own")
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("the NPC left: respawns armed = %d, want none", n)
 	}
 
 	send("11052", 0)
@@ -166,8 +166,8 @@ func TestTyrannosaurusMakerCallsSailren(t *testing.T) {
 		t.Helper()
 		mw.inWorld(tyrannosaurusID)[0].DeleteMe()
 		w.srv.Settle(t)
-		if w.srv.RespawnArmed("rune20_mb2017_03m1#0#0") {
-			t.Fatalf("%s: the NPC armed a respawn of its own", step)
+		if n := w.srv.RespawnsArmed(); n != 0 {
+			t.Fatalf("%s: respawns armed = %d, want none", step, n)
 		}
 		w.srv.Advance(t, 180*time.Second-time.Millisecond)
 		makers.expect(t, step+", before timer 1002")
@@ -270,10 +270,8 @@ func TestDefaultUseDBMakerForFrintezzaPlacesItsRows(t *testing.T) {
 	if got := deleted(frames); !slices.Equal(got, []int32{frintezza.ObjectID(), follower.ObjectID()}) {
 		t.Fatalf("deleted objects = %v, want [%d %d]", got, frintezza.ObjectID(), follower.ObjectID())
 	}
-	for _, slot := range []string{"frintessa_maker#0#0", "frintessa_maker#1#0"} {
-		if w.srv.RespawnArmed(slot) {
-			t.Fatalf("slot %s armed a respawn of its own", slot)
-		}
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("the last left: respawns armed = %d, want none", n)
 	}
 
 	w.srv.Advance(t, 60*time.Second-3*time.Millisecond)
@@ -380,8 +378,8 @@ func TestIceFairySirrMakerFollowsItsDoor(t *testing.T) {
 	sirra := mw.inWorld(iceFairySirrID)[0]
 	sirra.DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.RespawnArmed("schuttgart13_mb2314_05m1#0#0") {
-		t.Fatal("Sirra armed a respawn of her own")
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("Sirra left: respawns armed = %d, want none", n)
 	}
 	if got := deleted(drainFrames(t, w.c)); !slices.Equal(got, []int32{sirra.ObjectID()}) {
 		t.Fatalf("Sirra left: deleted objects = %v, want [%d]", got, sirra.ObjectID())

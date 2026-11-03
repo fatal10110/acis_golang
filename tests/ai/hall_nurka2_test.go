@@ -157,7 +157,7 @@ func TestNurka2BringsBackAFallenPrivate(t *testing.T) {
 	w.kill(t, fallen)
 	after := time.Now()
 	key := w.armedPrivateRespawn(t)
-	deadline, ok := w.srv.RespawnDeadline(key)
+	deadline, ok := w.srv.RespawnDeadline(t, key)
 	if !ok {
 		t.Fatalf("no deadline for the armed respawn %s", key)
 	}
@@ -166,7 +166,7 @@ func TestNurka2BringsBackAFallenPrivate(t *testing.T) {
 	}
 
 	w.onQueue(t, fallen, func() { fallen.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(fallen.ObjectID())) })
-	w.srv.RespawnSlot(key)
+	w.srv.RespawnSlot(t, key)
 	w.srv.Settle(t)
 	w.srv.ReadQueued(t, w.srv.Client)
 	var back *npc.Hostile

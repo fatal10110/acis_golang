@@ -316,7 +316,7 @@ func TestScriptCreatedHooksRunAtBootBeforeTheMakerHook(t *testing.T) {
 				t.Errorf("npc %d still in the world", id)
 			}
 		}
-		if w.srv.RespawnArmed(lifeSelfDelKey) {
+		if w.srv.RespawnArmed(t, lifeSelfDelKey) {
 			t.Fatal("an NPC deleted in its first placement armed its maker's respawn")
 		}
 	})
@@ -336,7 +336,7 @@ func TestScriptCreatedHooksRunOnRespawn(t *testing.T) {
 	if got, want := w.log.take(), []string{"recorder decayed 21201 decayed=true inWorld=true"}; !slices.Equal(got, want) {
 		t.Fatalf("delete hooks = %q, want %q", got, want)
 	}
-	w.srv.RespawnSlot(lifeWolfKey)
+	w.srv.RespawnSlot(t, lifeWolfKey)
 	w.srv.Settle(t)
 	if got, want := w.log.take(), []string{
 		"recorder created 21201 decayed=false inWorld=true",
@@ -348,7 +348,7 @@ func TestScriptCreatedHooksRunOnRespawn(t *testing.T) {
 		t.Fatal("the respawn reused the deleted NPC's object id")
 	}
 
-	w.srv.RespawnSlot(lifeSelfDelKey)
+	w.srv.RespawnSlot(t, lifeSelfDelKey)
 	w.srv.Settle(t)
 	if got, want := w.log.take(), []string{
 		"selfdel created 21204 decayed=false inWorld=true",
@@ -356,7 +356,7 @@ func TestScriptCreatedHooksRunOnRespawn(t *testing.T) {
 	}; !slices.Equal(got, want) {
 		t.Fatalf("self-deleting respawn hooks = %q, want %q", got, want)
 	}
-	if !w.srv.RespawnArmed(lifeSelfDelKey) {
+	if !w.srv.RespawnArmed(t, lifeSelfDelKey) {
 		t.Fatal("an NPC deleted on its respawn armed no respawn")
 	}
 }
@@ -446,7 +446,7 @@ func TestScriptDeleteIsSynchronous(t *testing.T) {
 			if got, want := w.log.take(), []string{fmt.Sprintf("recorder decayed %d decayed=true inWorld=true", tc.id)}; !slices.Equal(got, want) {
 				t.Fatalf("delete hooks = %q, want %q", got, want)
 			}
-			if !w.srv.RespawnArmed(tc.key) {
+			if !w.srv.RespawnArmed(t, tc.key) {
 				t.Fatal("the deleted NPC's spawn armed no respawn")
 			}
 			if !deletedIn(drainFrames(t, w.srv.Client), target.ObjectID()) {

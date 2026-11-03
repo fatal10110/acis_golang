@@ -177,8 +177,8 @@ func TestMortalFolkDecaysAndRespawnsThroughItsSlot(t *testing.T) {
 	}
 	setNow(start.Add(7*time.Second + time.Minute - time.Second))
 	respawn.Tick()
-	if keys := due.take(); len(keys) != 0 || !respawnArmed(npcs, respawn, key) {
-		t.Fatalf("pig slot respawned at %v before its 60s delay: %v", keys, respawnArmed(npcs, respawn, key))
+	if keys := due.take(); len(keys) != 0 || !respawnArmed(t, npcs, respawn, key) {
+		t.Fatalf("pig slot respawned at %v before its 60s delay: %v", keys, respawnArmed(t, npcs, respawn, key))
 	}
 	setNow(start.Add(7*time.Second + time.Minute))
 	respawn.Tick()

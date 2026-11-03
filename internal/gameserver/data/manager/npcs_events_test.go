@@ -193,7 +193,7 @@ func TestSpawnEventsGateRespawn(t *testing.T) {
 	} {
 		f.hostile(t, tc.npcID).DeleteMe()
 		f.queues.Run()
-		if got := respawnArmed(f.npcs, f.respawn, tc.key); got != tc.armed {
+		if got := respawnArmed(t, f.npcs, f.respawn, tc.key); got != tc.armed {
 			t.Fatalf("npc %d respawn armed = %v, want %v", tc.npcID, got, tc.armed)
 		}
 	}

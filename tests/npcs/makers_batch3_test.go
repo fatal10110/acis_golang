@@ -214,7 +214,7 @@ func TestFreyaGardenMakersPassEventsOn(t *testing.T) {
 
 	mw.inWorld(fairySculptureID)[0].DeleteMe()
 	w.srv.Settle(t)
-	if !fireRespawn(w.srv, "garden_fairy#0#0") {
+	if !fireRespawn(t, w.srv, "garden_fairy#0#0") {
 		t.Fatal("the ice fairy sculpture leaving armed no respawn")
 	}
 	w.srv.Settle(t)
@@ -347,14 +347,15 @@ func TestFrintezzaEvilateMakerFillsPastItsMaximum(t *testing.T) {
 		t.Fatalf("1001: NPCs shown = %v", got)
 	}
 
+	slotA := w.srv.Slot(t, evilateSpiritSlotA)
 	mw.inWorld(evilSpiritAID)[0].DeleteMe()
 	mw.inWorld(evilSpiritBID)[0].DeleteMe()
 	w.srv.Settle(t)
 	count("both spirits left", 0, 0)
-	if w.srv.RespawnArmed(evilateSpiritSlotA) {
+	if w.srv.NpcRespawns.Tracked(slotA) {
 		t.Fatal("the spirit with no respawn delay armed a respawn")
 	}
-	if !w.srv.RespawnArmed(evilateSpiritSlotB) {
+	if !w.srv.RespawnArmed(t, evilateSpiritSlotB) {
 		t.Fatal("the spirit with a respawn delay armed no respawn")
 	}
 	drainFrames(t, w.c)
@@ -366,7 +367,7 @@ func TestFrintezzaEvilateMakerFillsPastItsMaximum(t *testing.T) {
 	count("1001 again, before int1 seconds", 0, 0)
 	w.srv.Advance(t, time.Millisecond)
 	count("1001 again", 1, 0)
-	if !fireRespawn(w.srv, evilateSpiritSlotB) {
+	if !fireRespawn(t, w.srv, evilateSpiritSlotB) {
 		t.Fatal("1001 again left the second spirit no respawn")
 	}
 	w.srv.Settle(t)
@@ -493,9 +494,7 @@ func TestVelociraptorMakerWakesTheLair(t *testing.T) {
 	raptors[1].DeleteMe()
 	w.srv.Settle(t)
 	makers.expect(t, "the group left with the flag down", "rune20_mb2017_02m1:1001(0,0)")
-	for _, slot := range []string{"rune20_mb2017_01m1#0#0", "rune20_mb2017_01m1#1#0", "rune20_mb2017_01m1#1#1"} {
-		if w.srv.RespawnArmed(slot) {
-			t.Fatalf("slot %s armed a respawn", slot)
-		}
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("the group left with the flag down: respawns armed = %d, want none", n)
 	}
 }

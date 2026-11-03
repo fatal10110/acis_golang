@@ -93,7 +93,7 @@ func TestHeldNPCHandleFollowsItsSlotAcrossARespawn(t *testing.T) {
 	if !held.Decayed() || held.ObjectID() != first.ObjectID() {
 		t.Fatalf("held handle before the respawn: decayed %v, id %d; want the decayed wolf %d", held.Decayed(), held.ObjectID(), first.ObjectID())
 	}
-	srv.RespawnSlot(lifeWolfKey)
+	srv.RespawnSlot(t, lifeWolfKey)
 	srv.Settle(t)
 	drainFrames(t, c)
 

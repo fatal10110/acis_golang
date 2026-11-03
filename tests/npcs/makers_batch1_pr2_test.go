@@ -1,7 +1,6 @@
 package npcs
 
 import (
-	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -79,10 +78,8 @@ func TestOpenDoorMakerFollowsItsDoor(t *testing.T) {
 	leaders := mw.inWorld(openDoorLeaderID)
 	leaders[0].DeleteMe()
 	w.srv.Settle(t)
-	for i := range 3 {
-		if key := fmt.Sprintf("band_leader#0#%d", i); w.srv.RespawnArmed(key) {
-			t.Fatalf("slot %s armed a respawn", key)
-		}
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("a leader left: respawns armed = %d, want none", n)
 	}
 	w.srv.Advance(t, time.Minute)
 	world("a leader left", 1, 1)
@@ -179,7 +176,7 @@ func TestInstantSpawnSerialMakersChainTheirWaves(t *testing.T) {
 		if got := deleted(drainFrames(t, w.c)); !slices.Equal(got, []int32{first.ObjectID()}) {
 			t.Fatalf("%s: deleted objects = %v, want [%d]", step, got, first.ObjectID())
 		}
-		if !fireRespawn(w.srv, waveFirstSlot) {
+		if !fireRespawn(t, w.srv, waveFirstSlot) {
 			t.Fatalf("%s: the series armed no respawn of its NPC", step)
 		}
 		w.srv.Settle(t)
@@ -201,7 +198,7 @@ func TestInstantSpawnSerialMakersChainTheirWaves(t *testing.T) {
 	final := mw.inWorld(waveFirstID)[0]
 	final.DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.RespawnArmed(waveFirstSlot) {
+	if w.srv.RespawnArmed(t, waveFirstSlot) {
 		t.Fatal("the final wave armed a respawn of the series NPC")
 	}
 	w.srv.Advance(t, 29*time.Second)
@@ -216,7 +213,7 @@ func TestInstantSpawnSerialMakersChainTheirWaves(t *testing.T) {
 	last := mw.inWorld(waveLastID)[0]
 	last.DeleteMe()
 	w.srv.Settle(t)
-	if !fireRespawn(w.srv, waveFirstSlot) {
+	if !fireRespawn(t, w.srv, waveFirstSlot) {
 		t.Fatal("the last maker's group leaving did not bring the series back")
 	}
 	w.srv.Settle(t)
@@ -229,7 +226,7 @@ func TestInstantSpawnSerialMakersChainTheirWaves(t *testing.T) {
 	// that NPC's respawn instead of placing a new one.
 	mw.inWorld(waveFirstID)[0].DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.RespawnArmed(waveFirstSlot) || !fireRespawn(w.srv, "wave_last#0#0") {
+	if w.srv.RespawnArmed(t, waveFirstSlot) || !fireRespawn(t, w.srv, "wave_last#0#0") {
 		t.Fatal("the restarted series' final wave did not wake the last maker")
 	}
 	w.srv.Settle(t)
@@ -308,7 +305,7 @@ func TestOnDayNightSpawnMakerFollowsTheTimeOfDay(t *testing.T) {
 	in.DeleteMe()
 	w.srv.Settle(t)
 	slot := inMaker + "#0#0"
-	if !fireRespawn(w.srv, slot) {
+	if !fireRespawn(t, w.srv, slot) {
 		t.Fatalf("%s's NPC left in its time and armed no respawn", inMaker)
 	}
 	w.srv.Settle(t)
@@ -330,18 +327,19 @@ func TestOnDayNightSpawnMakerFollowsTheTimeOfDay(t *testing.T) {
 	if got, gone := shown(frames), deleted(frames); !slices.Equal(got, []int{outID}) || len(gone) != 1 {
 		t.Fatalf("outside 1001 out of its time: shown %v and deleted %v, want one NPC of %d shown and deleted", got, gone, outID)
 	}
-	if w.srv.RespawnArmed(outMaker + "#0#0") {
-		t.Fatalf("%s's NPC deleted out of its time armed a respawn", outMaker)
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("%s's NPC deleted out of its time: respawns armed = %d, want none", outMaker, n)
 	}
 }
 
 // fireRespawn fires the respawn armed for slot, as the respawn ticker
 // would once it came due, and reports whether one was armed. The fixture's
 // respawn timers never fire on their own.
-func fireRespawn(srv *gameservertest.Server, slot string) bool {
-	if !srv.CancelRespawn(slot) {
+func fireRespawn(t *testing.T, srv *gameservertest.Server, slot string) bool {
+	t.Helper()
+	if !srv.CancelRespawn(t, slot) {
 		return false
 	}
-	srv.RespawnSlot(slot)
+	srv.RespawnSlot(t, slot)
 	return true
 }

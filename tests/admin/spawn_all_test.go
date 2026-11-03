@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,18 +28,6 @@ const npcServerNotOperating = 1278
 
 // denKey is the slot key of wolfDen's wolf.
 const denKey = "wolf_den#0#0"
-
-// armedPrivates returns the slot keys of the script-created privates with a
-// respawn pending.
-func armedPrivates(srv *gameservertest.Server) []string {
-	var armed []string
-	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); srv.RespawnArmed(key) {
-			armed = append(armed, key)
-		}
-	}
-	return armed
-}
 
 // staticsIn returns the ids of the parameterless system messages among
 // frames.
@@ -125,7 +112,7 @@ func TestAdminUnspawnAll(t *testing.T) {
 	script.NewSpawner(srv.NpcSpawns, zerolog.Nop()).ScheduleRespawn(script.NPCOf(private), time.Minute)
 	onNPCQueue(t, private, func() { private.Decay(srv.State, srv.NpcSpawns.RespawnHook(private.ObjectID())) })
 	srv.Settle(t)
-	if got := armedPrivates(srv); len(got) != 1 {
+	if got := srv.ArmedPrivates(); len(got) != 1 {
 		t.Fatalf("armed private respawns = %v, want the den private's", got)
 	}
 	if got := len(allNpcs(srv)); got != 4 {
@@ -159,11 +146,8 @@ func TestAdminUnspawnAll(t *testing.T) {
 	if got := srv.NpcSpawns.LiveCount(); got != 0 {
 		t.Fatalf("live spawned npcs = %d, want 0", got)
 	}
-	if srv.RespawnArmed(denKey) {
-		t.Fatalf("respawn of %s still armed", denKey)
-	}
-	if got := armedPrivates(srv); len(got) != 0 {
-		t.Fatalf("private respawns still armed: %v", got)
+	if n := srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("respawns still armed = %d, want none", n)
 	}
 }
 
@@ -177,7 +161,8 @@ func TestAdminUnspawnAllRacingRespawn(t *testing.T) {
 	den := npcsOf(srv, wolfID)[0].(*npc.Hostile)
 	den.DeleteMe()
 	srv.Settle(t)
-	if !srv.RespawnArmed(denKey) {
+	denSlot := srv.Slot(t, denKey)
+	if !srv.NpcRespawns.Tracked(denSlot) {
 		t.Fatal("removed den wolf armed no respawn")
 	}
 
@@ -191,7 +176,7 @@ func TestAdminUnspawnAllRacingRespawn(t *testing.T) {
 			if stop.Load() {
 				return
 			}
-			srv.RespawnSlot(denKey)
+			srv.NpcSpawns.Respawn(denSlot)
 		}
 	}()
 	frames := exchange(t, gm, encodeBuildCmd("unspawnall"))
@@ -205,8 +190,8 @@ func TestAdminUnspawnAllRacingRespawn(t *testing.T) {
 	if got := allNpcs(srv); len(got) != 0 {
 		t.Fatalf("npcs left in the world: %v", got)
 	}
-	if srv.RespawnArmed(denKey) || srv.NpcSpawns.LiveCount() != 0 {
-		t.Fatalf("respawn armed %v, live %d; want neither", srv.RespawnArmed(denKey), srv.NpcSpawns.LiveCount())
+	if n := srv.RespawnsArmed(); n != 0 || srv.NpcSpawns.LiveCount() != 0 {
+		t.Fatalf("respawns armed %d, live %d; want neither", n, srv.NpcSpawns.LiveCount())
 	}
 }
 

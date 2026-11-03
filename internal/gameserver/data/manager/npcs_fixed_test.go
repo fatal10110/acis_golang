@@ -142,6 +142,7 @@ func TestDeleteFixedRemovesWithoutRespawn(t *testing.T) {
 		}
 	}
 
+	fixed := []task.SlotID{mustSlot(t, npcs, "fixed#1"), mustSlot(t, npcs, "fixed#2"), mustSlot(t, npcs, "fixed#3")}
 	if npcs.DeleteFixed(1) {
 		t.Fatal("DeleteFixed(maker spawn) = true, want refused")
 	}
@@ -181,9 +182,9 @@ func TestDeleteFixedRemovesWithoutRespawn(t *testing.T) {
 	if slots != 1 {
 		t.Fatalf("spawn slots = %d, want only the maker's left", slots)
 	}
-	for _, key := range []string{"fixed#1", "fixed#2", "fixed#3"} {
-		if respawnArmed(npcs, npcs.respawn, key) {
-			t.Fatalf("respawn armed for %s, want none", key)
+	for i, slot := range fixed {
+		if npcs.respawn.Tracked(slot) {
+			t.Fatalf("respawn armed for fixed#%d, want none", i+1)
 		}
 	}
 }

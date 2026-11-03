@@ -311,10 +311,10 @@ func TestAntharasSleepsDiesAndComesBack(t *testing.T) {
 	// dbName, which the test then fires.
 	w.onQueue(t, boss, func() { boss.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(boss.ObjectID())) })
 	w.srv.ReadQueued(t, w.srv.Client)
-	if !w.srv.RespawnArmed(antharasRow) {
+	if !w.srv.RespawnArmed(t, antharasRow) {
 		t.Fatal("Antharas's maker armed no respawn")
 	}
-	w.srv.RespawnSlot(antharasRow)
+	w.srv.RespawnSlot(t, antharasRow)
 	w.srv.Settle(t)
 	frames := w.srv.ReadQueued(t, w.srv.Client)
 	again := soleBaiumNPC(t, w, antharasID)

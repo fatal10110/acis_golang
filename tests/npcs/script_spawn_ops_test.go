@@ -132,13 +132,13 @@ func TestScriptDoRespawnBringsAMakerNPCBackAtOnce(t *testing.T) {
 	if frames := drainFrames(t, w.c); !deletedIn(frames, first) {
 		t.Fatalf("deleting the altar sent %x, want its DeleteObject", opcodes(frames))
 	}
-	if !w.srv.RespawnArmed(opsAltarKey) {
+	if !w.srv.RespawnArmed(t, opsAltarKey) {
 		t.Fatal("the maker armed no respawn for the deleted altar")
 	}
 
 	w.spawner.DoRespawn(altar)
 	w.srv.Settle(t)
-	if w.srv.RespawnArmed(opsAltarKey) {
+	if w.srv.RespawnArmed(t, opsAltarKey) {
 		t.Fatal("the altar's pending respawn is still armed after DoRespawn")
 	}
 	back := liveOf(t, w.srv, opsAltarID).(*npc.Folk)

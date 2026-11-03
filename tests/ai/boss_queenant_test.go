@@ -244,8 +244,8 @@ func TestQueenAntBringsHerPrivatesBack(t *testing.T) {
 		w.kill(t, c.npc)
 		after := time.Now()
 		var fresh []string
-		for i := 1; i <= 64; i++ {
-			if key := fmt.Sprintf("private#%d", i); w.srv.RespawnArmed(key) && !armed[key] {
+		for _, key := range w.srv.ArmedPrivates() {
+			if !armed[key] {
 				fresh = append(fresh, key)
 			}
 		}
@@ -253,7 +253,7 @@ func TestQueenAntBringsHerPrivatesBack(t *testing.T) {
 			t.Fatalf("%s: respawns newly armed = %q, want one", c.name, fresh)
 		}
 		armed[fresh[0]] = true
-		deadline, ok := w.srv.RespawnDeadline(fresh[0])
+		deadline, ok := w.srv.RespawnDeadline(t, fresh[0])
 		if !ok {
 			t.Fatalf("%s: no deadline for the armed respawn %s", c.name, fresh[0])
 		}

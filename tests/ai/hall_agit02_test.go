@@ -280,12 +280,7 @@ func TestGustavBringsBackAFallenPrivate(t *testing.T) {
 				}
 			}
 			w.kill(t, knight)
-			var armed []string
-			for i := 1; i <= 64; i++ {
-				if key := fmt.Sprintf("private#%d", i); w.srv.RespawnArmed(key) {
-					armed = append(armed, key)
-				}
-			}
+			armed := w.srv.ArmedPrivates()
 			if (len(armed) == 1) != c.armed || len(armed) > 1 {
 				t.Fatalf("private respawns pending = %q, want armed %v", armed, c.armed)
 			}

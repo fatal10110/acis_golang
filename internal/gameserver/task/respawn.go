@@ -12,12 +12,12 @@ import (
 // RespawnTick is the fixed spawn-slot respawn sweep interval.
 const RespawnTick = time.Second
 
-// RespawnEffects re-instantiates one spawn slot once its respawn deadline
-// elapses. Slots are identified by a caller-owned string key rather than an
-// object id, since a slot waiting to respawn has no live world object yet.
 // SlotID identifies one spawn slot: the slot a respawn brings back.
 type SlotID uint32
 
+// RespawnEffects re-instantiates one spawn slot once its respawn deadline
+// elapses. Slots are identified by a SlotID rather than an object id, since
+// a slot waiting to respawn has no live world object yet.
 type RespawnEffects interface {
 	Respawn(slot SlotID)
 }
@@ -70,6 +70,11 @@ func (r *Respawn) Cancel(key SlotID) bool {
 // Tracked reports whether key currently has a pending respawn deadline.
 func (r *Respawn) Tracked(key SlotID) bool {
 	return r.tracked(key)
+}
+
+// Len returns the number of slots with a respawn armed.
+func (r *Respawn) Len() int {
+	return r.len()
 }
 
 // Deadline returns the respawn deadline tracked for key, if any.

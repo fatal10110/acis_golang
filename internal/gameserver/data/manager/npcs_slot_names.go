@@ -25,6 +25,17 @@ func (n *Npcs) SlotID(name string) (id task.SlotID, ok bool) {
 	return 0, false
 }
 
+// Slots returns the names of the live spawn slots (see SlotID) by slot id.
+func (n *Npcs) Slots() map[task.SlotID]string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	names := make(map[task.SlotID]string, len(n.slot))
+	for id, slot := range n.slot {
+		names[id] = slotName(slot)
+	}
+	return names
+}
+
 // slotName is the name of slot (see SlotID).
 func slotName(slot slotInfo) string {
 	seq := strconv.Itoa(int(slot.seq))

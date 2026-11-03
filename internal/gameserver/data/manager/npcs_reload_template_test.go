@@ -32,14 +32,14 @@ func TestRespawnKeepsTheSpawnTemplateAcrossReload(t *testing.T) {
 	f.hostile(t, 2).DeleteMe()
 	f.queues.Run()
 	wolfKey := "wolves#0#0"
-	if !respawnArmed(f.npcs, f.respawn, wolfKey) {
+	if !respawnArmed(t, f.npcs, f.respawn, wolfKey) {
 		wolfKey = "wolves#0#1"
 	}
-	if !respawnArmed(f.npcs, f.respawn, wolfKey) || !respawnArmed(f.npcs, f.respawn, "boss_db") {
+	if !respawnArmed(t, f.npcs, f.respawn, wolfKey) || !respawnArmed(t, f.npcs, f.respawn, "boss_db") {
 		t.Fatal("removed wolf and boss armed no respawn")
 	}
-	respawnNamed(f.npcs, wolfKey)
-	respawnNamed(f.npcs, "boss_db")
+	respawnNamed(t, f.npcs, wolfKey)
+	respawnNamed(t, f.npcs, "boss_db")
 	f.queues.Run()
 
 	if got := f.names(1); len(got) != 2 || got[0] != "Wolf" || got[1] != "Wolf" {

@@ -27,18 +27,18 @@ func TestMakerCreatedHookDeletesWhileHeld(t *testing.T) {
 	const ssqID, key = 6, "ssq#0#0"
 	f.hostile(t, ssqID).DeleteMe()
 	f.queues.Run()
-	if !respawnArmed(f.npcs, f.respawn, key) {
+	if !respawnArmed(t, f.npcs, f.respawn, key) {
 		t.Fatal("Seven Signs event NPC armed no respawn in the competition")
 	}
 
 	ss.period = sevensigns.SealValidation
-	cancelRespawn(f.npcs, f.respawn, key)
-	respawnNamed(f.npcs, key)
+	cancelRespawn(t, f.npcs, f.respawn, key)
+	respawnNamed(t, f.npcs, key)
 	f.queues.Run()
 	if slices.Contains(f.spawnedIDs(), ssqID) {
 		t.Fatal("Seven Signs event NPC stays in the world at seal validation")
 	}
-	if respawnArmed(f.npcs, f.respawn, key) {
+	if respawnArmed(t, f.npcs, f.respawn, key) {
 		t.Fatal("Seven Signs event NPC deleted by its created hook armed a respawn")
 	}
 }
@@ -52,7 +52,7 @@ func TestEventMakerCreatedHookDeletesWhileUnlisted(t *testing.T) {
 	listed := newEventsFixture(t, eventsTable(t), eventsTemplates(), []string{"18age"})
 	listed.hostile(t, orcID).DeleteMe()
 	listed.queues.Run()
-	if !respawnArmed(listed.npcs, listed.respawn, key) {
+	if !respawnArmed(t, listed.npcs, listed.respawn, key) {
 		t.Fatal("listed event maker NPC armed no respawn")
 	}
 
@@ -65,8 +65,8 @@ func TestEventMakerCreatedHookDeletesWhileUnlisted(t *testing.T) {
 	if slices.Contains(unlisted.spawnedIDs(), orcID) {
 		t.Fatal("unlisted event maker NPC stays in the world after 1001")
 	}
-	if respawnArmed(unlisted.npcs, unlisted.respawn, key) {
-		t.Fatal("unlisted event maker NPC deleted by its created hook armed a respawn")
+	if n := unlisted.respawn.Len(); n != 0 {
+		t.Fatalf("unlisted event maker NPC deleted by its created hook: respawns armed = %d, want none", n)
 	}
 }
 
