@@ -23,8 +23,10 @@ for f in ../aCis_datapack/sql/*.sql; do mysql -uroot acis < "$f"; done
 ## Build
 
 ```bash
-go build ./cmd/loginserver ./cmd/gameserver ./cmd/gsregister
+go build ./cmd/loginserver ./cmd/gameserver ./cmd/gsregister ./cmd/botswarm
 ```
+
+`botswarm` is the load-test client described in [Bot Swarm](#bot-swarm); the servers do not need it.
 
 ## Register A Gameserver ID
 
@@ -104,6 +106,56 @@ curl -s 'http://127.0.0.1:6060/debug/pprof/goroutine?debug=1'
 - Gameserver should link to the loginserver and then log its game-client listener from `GameserverHostname/GameserverPort`.
 - With `AutoCreateAccounts = True` or the key omitted, a fresh client login creates the account and reaches the server list.
 - After selecting the linked gameserver, the client can create/select a character and enter the empty world.
+- `./botswarm -bots 1 -actions 10 -duration 0` runs the same path without a client (see [Bot Swarm](#bot-swarm)) and exits 0 when the bot entered the world and logged out.
+
+## Bot Swarm
+
+`cmd/botswarm` runs simulated players against a running loginserver and gameserver over the real
+client protocol: the login handshake (RSA credentials, Blowfish), the server list, the game-server
+cipher, character creation or selection, `EnterWorld`, then a behavior cycle per bot. It is a
+separate process, so it measures the servers the way real clients load them. The in-process
+counterpart is the `tests/perf` harness in [Profiling And GC Tuning](profiling.md#profiling-under-load).
+
+```bash
+go build ./cmd/botswarm
+# 50 bots, 5 new bots per second, 2 minutes, report also written as JSON
+./botswarm -login 127.0.0.1:2106 -bots 50 -rate 5 -duration 2m -json swarm.json
+```
+
+Requirements and limits:
+
+- One account per bot: bot `i` logs in as `<prefix><i>` (default prefix `bot`) with `-password`. A
+  second login on an account already in play kicks the first, so two swarms need different prefixes.
+- The loginserver must run with `AutoCreateAccounts = True` (the default), or the accounts must exist
+  already (`cmd/accountmgr`). New accounts are hashed with bcrypt on the loginserver, so a high
+  `-rate` on fresh accounts measures bcrypt as much as the server; rerun on the same prefix for
+  login-path numbers without it. Failed logins count toward `LoginTryBeforeBan` for `127.0.0.1`.
+- Account names hold at most 14 characters, so the prefix plus the last bot index must fit, using
+  lowercase ASCII letters and digits. Each bot names its character after its account.
+- A bot whose account has no character creates a human fighter and selects it; an account that
+  already has a character selects its first slot.
+- `-game-addr` replaces the game address the ServerList advertises, for a gameserver whose
+  `GameserverHostname` is not reachable from the bot host.
+
+Behaviors (`-behaviors`, default `move,validate,chat,attack,idle`) run one per `-interval` tick, each
+bot starting at its own offset into the cycle: `move` clicks a point within `-move-radius` of the
+bot, `validate` sends `ValidatePosition`, `chat` says a line on all-chat, `attack` targets and
+attacks the nearest attackable NPC the bot has seen (counted as `attack_no_target` when none is in
+sight), `idle` sends nothing. A dead bot asks to restart in town instead. A bot stops after
+`-actions` ticks or at `-duration`, whichever comes first, then sends `Logout`; a refused logout (in
+combat) or no answer within `-timeout` closes the connection.
+
+The report lists the bot, started and entered-world counts (a `-duration` that ends during the
+`-rate` ramp leaves the remaining bots unstarted; they are counted in neither errors nor `aborted`), connect (TCP plus Init), login (Init to `PlayOk`)
+and enter-world (game connect to `UserInfo`, character creation included) latency as p50, p99
+and max, packets sent and received in total and per second, action counts, disconnects (the server
+closed an in-world bot), errors by phase (`login`, `game`) with up to ten distinct samples, and bots
+the run's end interrupted before entering (`aborted`). `-json <file>` (or `-json -` for stdout)
+writes the same fields as JSON. The exit code is 0 when every bot entered the world with no error
+or disconnect, 1 otherwise, 2 on a usage error.
+
+`tests/botswarm` runs a few bots end to end against an in-process server through this tool's code
+(`make test-one PKG=tests/botswarm` with the test database up).
 
 ## Game Master Access And Audit Log
 

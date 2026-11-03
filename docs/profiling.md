@@ -44,6 +44,10 @@ growing.
 
 ## Profiling Under Load
 
+To load a deployed or locally started server from outside its process, use the `botswarm` client
+([Running Loginserver And Gameserver](run-servers.md#bot-swarm)) and profile the server through its
+debug endpoint as above.
+
 `tests/perf` drives many scripted clients against one in-process server: the production boot path,
 the production tickers, the real executor pool, and the shared test MariaDB. It is skipped unless
 `ACIS_PERF_CLIENTS` is set:

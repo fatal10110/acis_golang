@@ -79,3 +79,27 @@ func scrambleModulus(modulus *big.Int) ([]byte, error) {
 	}
 	return scrambled, nil
 }
+
+// UnscrambleModulus reverses the client-bound modulus scrambling and returns
+// the login server's RSA public key (exponent 65537), as a client recovers it
+// from Init. Returns an error if scrambled is not 128 bytes.
+func UnscrambleModulus(scrambled []byte) (*rsa.PublicKey, error) {
+	if len(scrambled) != modulusSize {
+		return nil, fmt.Errorf("scrambled modulus is %d bytes, want %d", len(scrambled), modulusSize)
+	}
+	b := make([]byte, modulusSize)
+	copy(b, scrambled)
+	for i := 0; i < 0x40; i++ {
+		b[0x40+i] ^= b[i]
+	}
+	for i := 0; i < 4; i++ {
+		b[0x0d+i] ^= b[0x34+i]
+	}
+	for i := 0; i < 0x40; i++ {
+		b[i] ^= b[0x40+i]
+	}
+	for i := 0; i < 4; i++ {
+		b[i], b[0x4d+i] = b[0x4d+i], b[i]
+	}
+	return &rsa.PublicKey{N: new(big.Int).SetBytes(b), E: 65537}, nil
+}
