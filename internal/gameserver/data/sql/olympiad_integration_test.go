@@ -9,44 +9,63 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 )
 
-// TestOlympiadStoreCycle pins the cycle's server_memo row: none stored
-// reads as not found, a save inserts it, a later save replaces it.
-func TestOlympiadStoreCycle(t *testing.T) {
+// TestOlympiadStoreStatus pins the status's server_memo rows: none stored
+// reads as not found, a save inserts both, a later save replaces them, and
+// a cycle stored alone reads with no validation period running.
+func TestOlympiadStoreStatus(t *testing.T) {
 	ctx := context.Background()
 	db := sqltest.SharedDB(t)
 	store := NewOlympiadStore(db)
 
-	if _, found, err := store.LoadCycle(ctx); err != nil || found {
-		t.Fatalf("LoadCycle() on an empty table = found %v, err %v; want not found", found, err)
+	if _, found, err := store.LoadStatus(ctx); err != nil || found {
+		t.Fatalf("LoadStatus() on an empty table = found %v, err %v; want not found", found, err)
 	}
-	for _, cycle := range []int32{3, 4} {
-		if err := store.SaveCycle(ctx, cycle); err != nil {
-			t.Fatalf("SaveCycle(%d): %v", cycle, err)
+	for _, st := range []olympiad.Status{{Cycle: 3, ValidationEnd: 1793534400000}, {Cycle: 4}} {
+		if err := store.SaveStatus(ctx, st); err != nil {
+			t.Fatalf("SaveStatus(%+v): %v", st, err)
 		}
-		got, found, err := store.LoadCycle(ctx)
-		if err != nil || !found || got != cycle {
-			t.Fatalf("LoadCycle() after SaveCycle(%d) = %d, %v, %v", cycle, got, found, err)
+		got, found, err := store.LoadStatus(ctx)
+		if err != nil || !found || got != st {
+			t.Fatalf("LoadStatus() after SaveStatus(%+v) = %+v, %v, %v", st, got, found, err)
 		}
 	}
-	var value string
-	if err := db.QueryRowContext(ctx, "SELECT value FROM server_memo WHERE var = 'olympiad_cycle'").Scan(&value); err != nil || value != "4" {
-		t.Fatalf("server_memo olympiad_cycle = %q, %v; want \"4\"", value, err)
+	for name, want := range map[string]string{"olympiad_cycle": "4", "olympiad_valid_end": "0"} {
+		var value string
+		if err := db.QueryRowContext(ctx, "SELECT value FROM server_memo WHERE var = ?", name).Scan(&value); err != nil || value != want {
+			t.Fatalf("server_memo %s = %q, %v; want %q", name, value, err, want)
+		}
+	}
+	if _, err := db.ExecContext(ctx, "DELETE FROM server_memo WHERE var = 'olympiad_valid_end'"); err != nil {
+		t.Fatal(err)
+	}
+	if got, found, err := store.LoadStatus(ctx); err != nil || !found || got != (olympiad.Status{Cycle: 4}) {
+		t.Fatalf("LoadStatus() with the cycle alone = %+v, %v, %v", got, found, err)
 	}
 }
 
-// TestOlympiadStoreCycleOutOfRange pins that a stored cycle beyond 32 bits
-// fails the load rather than wrapping, as the reference's integer parse
-// rejects it.
-func TestOlympiadStoreCycleOutOfRange(t *testing.T) {
+// TestOlympiadStoreStatusOutOfRange pins that a stored cycle beyond 32
+// bits, or a validation end beyond 64, fails the load rather than
+// wrapping, as the reference's integer parse rejects it.
+func TestOlympiadStoreStatusOutOfRange(t *testing.T) {
 	ctx := context.Background()
 	db := sqltest.SharedDB(t)
 	store := NewOlympiadStore(db)
-	for _, value := range []string{"4294967297", "2147483648", "-2147483649", "abc"} {
-		if _, err := db.ExecContext(ctx, "REPLACE INTO server_memo (var, value) VALUES ('olympiad_cycle', ?)", value); err != nil {
+	for _, tc := range []struct{ name, value string }{
+		{"olympiad_cycle", "4294967297"},
+		{"olympiad_cycle", "2147483648"},
+		{"olympiad_cycle", "-2147483649"},
+		{"olympiad_cycle", "abc"},
+		{"olympiad_valid_end", "9223372036854775808"},
+		{"olympiad_valid_end", "abc"},
+	} {
+		if _, err := db.ExecContext(ctx, "DELETE FROM server_memo WHERE var LIKE 'olympiad_%'"); err != nil {
 			t.Fatal(err)
 		}
-		if got, found, err := store.LoadCycle(ctx); err == nil {
-			t.Fatalf("LoadCycle() with %q stored = %d, %v, nil; want an error", value, got, found)
+		if _, err := db.ExecContext(ctx, "INSERT INTO server_memo (var, value) VALUES (?, ?)", tc.name, tc.value); err != nil {
+			t.Fatal(err)
+		}
+		if got, found, err := store.LoadStatus(ctx); err == nil {
+			t.Fatalf("LoadStatus() with %s %q stored = %+v, %v, nil; want an error", tc.name, tc.value, got, found)
 		}
 	}
 }

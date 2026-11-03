@@ -229,13 +229,13 @@ func (o *Olympiad) Points(objectID int32) int {
 	return n.Points
 }
 
-// Passes trades objectID's points for Noblesse Gate Passes outside the
-// competition window, once a cycle: its points, at most 1000 and none
+// Passes trades objectID's points for Noblesse Gate Passes during the
+// validation period after an Olympiad's end, once a cycle: its points, at most 1000 and none
 // below 50, plus HeroPoints for a hero (hero set), times GPPerPoint. The
 // record is then marked rewarded with no points, whatever it paid, and
 // stored before Passes returns, so a second claim pays nothing even across
-// a restart. Without a record, inside the window or once rewarded it pays
-// 0 and changes nothing.
+// a restart. Without a record, outside the validation period or once
+// rewarded it pays 0 and changes nothing.
 //
 // The claim's row lands before Passes returns what to pay, so the passes a
 // caller creates on it, written later by the item persistence, can never
@@ -247,7 +247,7 @@ func (o *Olympiad) Passes(ctx context.Context, objectID int32, hero bool) (int, 
 	o.order.Lock()
 	o.mu.Lock()
 	n, ok := o.nobles[objectID]
-	if o.period == Competition || !ok || n.Rewarded {
+	if o.period != Validation || !ok || n.Rewarded {
 		o.mu.Unlock()
 		o.order.Unlock()
 		return 0, nil
