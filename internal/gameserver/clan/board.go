@@ -1,9 +1,7 @@
 package clan
 
 import (
-	"cmp"
 	"context"
-	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -80,48 +78,31 @@ func (s *Service) SetIntroduction(cl *Clan, introduction string) {
 }
 
 // MembersInTableOrder returns the roster in the order of the hash table it
-// is kept in, as Clans orders the registry: the order a clan mail
-// addresses the members in and a roster packet lists them in. Like Clans,
-// it approximates that order.
+// is kept in: the order a clan mail addresses the members in and a roster
+// packet lists them in.
 func (cl *Clan) MembersInTableOrder() []Member {
-	members := cl.Members()
-	buckets := registryBuckets(len(members))
-	slices.SortStableFunc(members, func(a, b Member) int {
-		return registryBucket(a.ObjectID, buckets) - registryBucket(b.ObjectID, buckets)
-	})
-	return members
+	cl.mu.RLock()
+	defer cl.mu.RUnlock()
+	ids := cl.memberOrder.order()
+	out := make([]Member, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, *cl.members[id])
+	}
+	return out
 }
 
 // Clans returns every clan in registry order: by bucket of the hash table
 // the registry is kept in (an id folded onto its own high half, masked to
-// the table size), lowest bucket first, and by ascending id within a
-// bucket. The order is approximate: the table size is recomputed from the
-// current count, where the client-facing order comes from a table that
-// never shrinks after a clan leaves it, and whose resize can reverse the
-// order within a bucket.
+// the table size), lowest bucket first, and within a bucket in the order
+// the clans came in, as reordered by the table's doublings. The table
+// never shrinks after a clan leaves it.
 func (t *Table) Clans() []*Clan {
-	clans := t.allClans()
-	buckets := registryBuckets(len(clans))
-	slices.SortFunc(clans, func(a, b *Clan) int {
-		if ba, bb := registryBucket(a.id, buckets), registryBucket(b.id, buckets); ba != bb {
-			return ba - bb
-		}
-		return cmp.Compare(a.id, b.id)
-	})
-	return clans
-}
-
-// registryBuckets is the size of the registry's hash table holding n
-// clans: 16 to start, doubled while n reaches three quarters of it.
-func registryBuckets(n int) int {
-	buckets := 16
-	for n >= buckets-buckets/4 {
-		buckets *= 2
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	ids := t.order.order()
+	out := make([]*Clan, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, t.clans[id])
 	}
-	return buckets
-}
-
-func registryBucket(id int32, buckets int) int {
-	h := uint32(id)
-	return int((h ^ h>>16) & uint32(buckets-1))
+	return out
 }
