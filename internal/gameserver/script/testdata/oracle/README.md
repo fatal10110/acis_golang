@@ -123,7 +123,10 @@ what the reference does in the scenario's own world:
   Go runner's world. The scenario's `npcmaker <name> <ai type>` lines put their own in its place: an
   `NpcMaker` of that name running the script of that AI type, with no spawn entry and no territory
   (`start` is never called on it, so its script starts no timer), which a script finds by
-  `getNpcMaker(name)`;
+  `getNpcMaker(name)`. The probe has no spawn_data and starts no maker, so the Go runner's
+  `npcmaker ... spawn`, `spawnrow` and `started` lines (a maker started over a saved row, as
+  SailrenMaker reads it) are for untraced scenarios alone, and a traced scenario using one is
+  rejected at parse time (tracked on #4333);
 - a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes

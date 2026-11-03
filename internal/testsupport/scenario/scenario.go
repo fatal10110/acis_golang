@@ -122,6 +122,20 @@
 //	                                          with no NPC to spawn: a script finds it by name (its lookup of a maker) and
 //	                                          sends it script events, which run its script, and which a traced scenario
 //	                                          compares (the trace's maker lines)
+//	npcmaker <name> <ai type> [max <n>] [spawn <npc id> <type> <x> <y> <z> [respawn <seconds>] [db <name>]]
+//	                                          with a spawn, the maker has that one NPC to place (a fixture template of that
+//	                                          instance type) at that world position, back after that many seconds, kept in the
+//	                                          spawn_data row of that name when db says so; max is its maximum NPC count
+//	                                          (default 1). A scenario with a spawn starts all its makers as the server boots,
+//	                                          as the server starts its own; not for a traced scenario (the reference probe
+//	                                          starts no maker)
+//	spawnrow <name> <alive|dead> <x> <y> <z> [respawn <seconds>]
+//	                                          optional, one per db name of a spawn: the spawn_data row the server saved last,
+//	                                          restored as it boots: alive at that position, or dead with its respawn that many
+//	                                          seconds after the server boots (the spawns read the wall clock; a dead row needs it); no row is a spawn
+//	                                          never saved
+//	started <maker> <event> <int1> <int2>     optional, repeatable, with a spawn: a script event the makers sent each other as
+//	                                          the server started them, in order; none listed means none was sent
 //	member <name> <level> [dead] [standing <n>] [hold <item id> <count>]... [<dx> <dy> <dz>]
 //	                                          optional: a second character, of its own account, that enters the world where the
 //	                                          character first does, right after it, joins its party, then stands at that
@@ -520,9 +534,12 @@ type Scenario struct {
 	// lines.
 	Territories []Territory
 	NpcMakers   []NpcMaker
-	Zones       []ZoneLine
-	Members     []Member
-	Grounds     []Ground
+	// SpawnRows are the spawnrow lines, Started the started lines.
+	SpawnRows []SpawnRow
+	Started   []MakerEvent
+	Zones     []ZoneLine
+	Members   []Member
+	Grounds   []Ground
 	// Skills are the skill lines: the shipped skills the character knows.
 	// Doors are the door lines, Summon the summon line (nil for none).
 	Skills []modelskill.Ref
@@ -836,6 +853,9 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if what := sc.tracedSeeds(); sc.Trace != "" && what != "" {
 		return nil, fmt.Errorf("%s: a traced scenario takes no %s", name, what)
 	}
+	if err := sc.checkMakerSeeds(); err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
 	if err := sc.checkFlow(); err != nil {
 		return nil, fmt.Errorf("%s:%w", name, err)
 	}
@@ -1091,7 +1111,7 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		opts.Role, opts.ID, opts.Type = role, int32(id), args[2]
 		opts.DX, opts.DY, opts.DZ = offsets[0], offsets[1], offsets[2]
 		sc.NPCs = append(sc.NPCs, opts)
-	case "territory", "npcmaker", "zone", "member", "ground", "roll", "gauss":
+	case "territory", "npcmaker", "spawnrow", "started", "zone", "member", "ground", "roll", "gauss":
 		return sc.world(key, args, roles)
 	case "skill", "door", "summon":
 		return sc.fight(key, args, roles)
