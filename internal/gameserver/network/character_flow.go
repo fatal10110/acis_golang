@@ -390,7 +390,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	l.sendLoginWeight(live)
 	client.Session.SendFrame(itemListFrame)
-	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.Inventory(), live.shortcuts.All())))
+	client.Session.SendFrame(serverpackets.FrameShortCutInit(l.serverShortcutList(live, live.shortcuts.All())))
 	if c.Dead() {
 		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), l.dieOptions(live)))
 		// A death on the loading screen offered its resurrection and told the

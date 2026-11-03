@@ -242,7 +242,7 @@ func (l *GameClientLink) refreshItemShortcuts(live *livePlayer, objectID int32) 
 	}
 	for _, sc := range live.shortcuts.All() {
 		if sc.Type == shortcut.Item && sc.ID == objectID {
-			live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
+			live.SendFrame(serverpackets.FrameShortCutRegister(l.serverShortcut(live, sc)))
 		}
 	}
 }
