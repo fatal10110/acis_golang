@@ -1,6 +1,7 @@
 package script
 
 import (
+	"slices"
 	"sync"
 	"time"
 
@@ -13,17 +14,75 @@ import (
 // script, its name and the NPC and player it is bound to, by identity: a
 // nil NPC or player is bound to none and matches only timers bound to
 // none. An NPC is identified by its spawn slot, so a timer bound to an NPC
-// keeps its key across the slot's respawns. Every field is guarded by mu,
-// which is never held while a hook runs.
+// keeps its key across the slot's respawns.
+//
+// A timer has one home, whose lock guards it: the list kept on its NPC's
+// spawn slot (npcTimers) when it is bound to one, else its script's table
+// (scriptTimers). No registry-wide lock is held to start, fire or remove a
+// timer bound to an NPC. Locks nest in this order, and none is held while a
+// hook runs: an NPC's list, a script's table, the player index (mu), then
+// the timer's sim queue.
 type timers struct {
 	r *Registry
 	// engine is the queue a timer bound to no NPC or player queue runs on.
 	engine *sim.Queue
 
+	// mu guards byPlayer, the timers bound to each player, by its identity.
 	mu       sync.Mutex
-	byScript map[*Script]map[timerKey]*scriptTimer
-	byNPC    map[any]map[*scriptTimer]struct{}
-	byPlayer map[any]map[*scriptTimer]struct{}
+	byPlayer map[any][]*scriptTimer
+}
+
+// scriptTimers is one script's table: its timers bound to no spawn slot,
+// and the NPC lists that hold its other timers. Its fields are guarded by
+// mu.
+type scriptTimers struct {
+	mu    sync.Mutex
+	loose map[timerKey]*scriptTimer
+	homes map[*npcTimers]struct{}
+}
+
+// npcTimers are the timers bound to one spawn slot's NPC, whatever their
+// script, kept on the slot's Scratch for as long as the slot lives. Its
+// fields are guarded by mu.
+type npcTimers struct {
+	mu   sync.Mutex
+	list []*scriptTimer
+}
+
+// npcTimersOf returns the timer list kept on sc, made at its first timer.
+func npcTimersOf(sc *npc.Scratch) *npcTimers {
+	if h, _ := sc.ScriptTimers().(*npcTimers); h != nil {
+		return h
+	}
+	h, _ := sc.KeepScriptTimers(&npcTimers{}).(*npcTimers)
+	return h
+}
+
+// keptTimers returns the timer list kept on sc, nil before its first
+// timer.
+func keptTimers(sc *npc.Scratch) *npcTimers {
+	h, _ := sc.ScriptTimers().(*npcTimers)
+	return h
+}
+
+// find returns the timer of s with key in h. h.mu is held.
+func (h *npcTimers) find(s *Script, key timerKey) *scriptTimer {
+	for _, t := range h.list {
+		if t.s == s && t.key == key {
+			return t
+		}
+	}
+	return nil
+}
+
+// holds reports whether h has a timer of s. h.mu is held.
+func (h *npcTimers) holds(s *Script) bool {
+	for _, t := range h.list {
+		if t.s == s {
+			return true
+		}
+	}
+	return false
 }
 
 type timerKey struct {
@@ -33,13 +92,18 @@ type timerKey struct {
 	npc, player any
 }
 
-// scriptTimer is one registered timer. Its fields are guarded by
-// timers.mu.
+// scriptTimer is one registered timer. Its fields are guarded by the lock
+// of its home (scriptTimer.lock).
 type scriptTimer struct {
 	s   *Script
 	key timerKey
 	npc *NPC
 	pl  *Player
+	// home is the list of the spawn slot t is bound to, nil when t is in
+	// its script's table. Set before the timer registers, it never changes.
+	home *npcTimers
+	// live reports that t is registered.
+	live bool
 	// period is the fixed rate; 0 for a one-shot.
 	period time.Duration
 	// due is the deadline of the armed firing.
@@ -57,13 +121,16 @@ type scriptTimer struct {
 	decays bool
 }
 
-func newTimers(r *Registry, engine *sim.Queue) *timers {
-	return &timers{
-		r: r, engine: engine,
-		byScript: map[*Script]map[timerKey]*scriptTimer{},
-		byNPC:    map[any]map[*scriptTimer]struct{}{},
-		byPlayer: map[any]map[*scriptTimer]struct{}{},
+// lock is the lock of t's home.
+func (t *scriptTimer) lock() *sync.Mutex {
+	if t.home != nil {
+		return &t.home.mu
 	}
+	return &t.s.ownTimers.mu
+}
+
+func newTimers(r *Registry, engine *sim.Queue) *timers {
+	return &timers{r: r, engine: engine, byPlayer: map[any][]*scriptTimer{}}
 }
 
 // timerNPC is a live NPC as the timers see it.
@@ -125,10 +192,20 @@ func (s *Script) StartTimerAtFixedRate(name string, n *NPC, p *Player, initial, 
 // HasTimer reports whether the script has a timer name bound to n and p
 // pending. A one-shot timer is no longer pending once its hook runs.
 func (s *Script) HasTimer(name string, n *NPC, p *Player) bool {
-	ts := s.timers
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	_, ok := ts.byScript[s][timerKey{name, npcIdentity(n), playerIdentity(p)}]
+	key := timerKey{name, npcIdentity(n), playerIdentity(p)}
+	if sc, ok := key.npc.(*npc.Scratch); ok {
+		h := keptTimers(sc)
+		if h == nil {
+			return false
+		}
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return h.find(s, key) != nil
+	}
+	own := s.ownTimers
+	own.mu.Lock()
+	defer own.mu.Unlock()
+	_, ok := own.loose[key]
 	return ok
 }
 
@@ -140,11 +217,55 @@ func (s *Script) CancelTimer(name string, n *NPC, p *Player) {
 // CancelTimers cancels every timer of the script that matches all of
 // filters; with no filter, every timer of the script.
 func (s *Script) CancelTimers(filters ...TimerFilter) {
-	ts := s.timers
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	for key, t := range ts.byScript[s] {
+	ts, own := s.timers, s.ownTimers
+	for _, f := range filters {
+		if f.field != byNPC {
+			continue
+		}
+		// Only the timers bound to that NPC can match.
+		if sc, ok := f.id.(*npc.Scratch); ok {
+			if h := keptTimers(sc); h != nil {
+				h.mu.Lock()
+				ts.cancelIn(h, s, filters)
+				h.mu.Unlock()
+			}
+			return
+		}
+		own.mu.Lock()
+		ts.cancelLoose(s, filters)
+		own.mu.Unlock()
+		return
+	}
+	own.mu.Lock()
+	ts.cancelLoose(s, filters)
+	homes := make([]*npcTimers, 0, len(own.homes))
+	for h := range own.homes {
+		homes = append(homes, h)
+	}
+	own.mu.Unlock()
+	// A timer an NPC gains meanwhile started after the cancel.
+	for _, h := range homes {
+		h.mu.Lock()
+		ts.cancelIn(h, s, filters)
+		h.mu.Unlock()
+	}
+}
+
+// cancelLoose removes the timers of s's table that match all of filters.
+// s.ownTimers.mu is held.
+func (ts *timers) cancelLoose(s *Script, filters []TimerFilter) {
+	for key, t := range s.ownTimers.loose {
 		if matchAll(key, filters) {
+			ts.remove(t)
+		}
+	}
+}
+
+// cancelIn removes the timers of s in h that match all of filters. h.mu is
+// held.
+func (ts *timers) cancelIn(h *npcTimers, s *Script, filters []TimerFilter) {
+	for i := len(h.list) - 1; i >= 0; i-- {
+		if t := h.list[i]; t.s == s && matchAll(t.key, filters) {
 			ts.remove(t)
 		}
 	}
@@ -230,23 +351,20 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 	if t.queue == nil {
 		panic("script: a timer bound to no live NPC or player needs the engine queue")
 	}
+	if sc, ok := t.key.npc.(*npc.Scratch); ok {
+		t.home = npcTimersOf(sc)
+	}
 
-	ts.mu.Lock()
-	set := ts.byScript[s]
-	if _, dup := set[t.key]; dup {
-		ts.mu.Unlock()
+	mu := t.lock()
+	mu.Lock()
+	if ts.registered(t) {
+		mu.Unlock()
 		return false
 	}
-	if set == nil {
-		set = map[timerKey]*scriptTimer{}
-		ts.byScript[s] = set
-	}
-	set[t.key] = t
-	index(ts.byNPC, t.key.npc, t)
-	index(ts.byPlayer, t.key.player, t)
 	t.due = t.queue.Now().Add(max(d, 0))
 	t.armed = t.queue.After(max(d, 0), func() { ts.fire(t) })
-	ts.mu.Unlock()
+	ts.add(t)
+	mu.Unlock()
 
 	// A start that raced a removal it is subject to may have registered
 	// after that removal ran: it is taken as started just before it, and
@@ -254,58 +372,98 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 	// to a departed player. A timer on the NPC's queue never outlives its
 	// decay.
 	if ((watchDecay || onNPCQueue) && live.Decayed()) || (watchDetach && pl.Detaching()) {
-		ts.mu.Lock()
-		if ts.byScript[s][t.key] == t {
+		mu.Lock()
+		if t.live {
 			ts.remove(t)
 		}
-		ts.mu.Unlock()
+		mu.Unlock()
 	}
 	return true
 }
 
-func index(m map[any]map[*scriptTimer]struct{}, id any, t *scriptTimer) {
-	if id == nil {
-		return
+// registered reports whether t's home has a timer of t's script and key.
+// The lock of that home is held.
+func (ts *timers) registered(t *scriptTimer) bool {
+	if t.home != nil {
+		return t.home.find(t.s, t.key) != nil
 	}
-	set := m[id]
-	if set == nil {
-		set = map[*scriptTimer]struct{}{}
-		m[id] = set
-	}
-	set[t] = struct{}{}
+	_, ok := t.s.ownTimers.loose[t.key]
+	return ok
 }
 
-func unindex(m map[any]map[*scriptTimer]struct{}, id any, t *scriptTimer) {
-	if set := m[id]; set != nil {
-		delete(set, t)
-		if len(set) == 0 {
-			delete(m, id)
+// add registers t in its home and in the player index. The lock of t's
+// home is held.
+func (ts *timers) add(t *scriptTimer) {
+	t.live = true
+	own := t.s.ownTimers
+	if h := t.home; h != nil {
+		first := !h.holds(t.s)
+		h.list = append(h.list, t)
+		if first {
+			own.mu.Lock()
+			if own.homes == nil {
+				own.homes = map[*npcTimers]struct{}{}
+			}
+			own.homes[h] = struct{}{}
+			own.mu.Unlock()
 		}
+	} else {
+		if own.loose == nil {
+			own.loose = map[timerKey]*scriptTimer{}
+		}
+		own.loose[t.key] = t
+	}
+	if id := t.key.player; id != nil {
+		ts.mu.Lock()
+		ts.byPlayer[id] = append(ts.byPlayer[id], t)
+		ts.mu.Unlock()
 	}
 }
 
-// rearm schedules the next firing of the fixed-rate timer t, one period
-// after the last deadline, or at once when that is already past. ts.mu is
-// held. On a closed home queue nothing is armed, as a start there arms
-// nothing.
-func (ts *timers) rearm(t *scriptTimer) {
-	t.due = t.due.Add(t.period)
-	t.armed.Rearm(max(t.due.Sub(t.queue.Now()), 0))
-}
-
-// remove takes t out of the registry and stops its armed firing. ts.mu is
-// held.
+// remove takes t out of the registry and stops its armed firing. The lock
+// of t's home is held.
 func (ts *timers) remove(t *scriptTimer) {
-	set := ts.byScript[t.s]
-	delete(set, t.key)
-	if len(set) == 0 {
-		delete(ts.byScript, t.s)
+	t.live = false
+	own := t.s.ownTimers
+	if h := t.home; h != nil {
+		h.list = without(h.list, t)
+		if !h.holds(t.s) {
+			own.mu.Lock()
+			delete(own.homes, h)
+			own.mu.Unlock()
+		}
+	} else {
+		delete(own.loose, t.key)
 	}
-	unindex(ts.byNPC, t.key.npc, t)
-	unindex(ts.byPlayer, t.key.player, t)
+	if id := t.key.player; id != nil {
+		ts.mu.Lock()
+		if list := without(ts.byPlayer[id], t); len(list) > 0 {
+			ts.byPlayer[id] = list
+		} else {
+			delete(ts.byPlayer, id)
+		}
+		ts.mu.Unlock()
+	}
 	if t.armed != nil {
 		t.armed.Stop()
 	}
+}
+
+// without returns list less t, keeping the order of the others.
+func without(list []*scriptTimer, t *scriptTimer) []*scriptTimer {
+	if i := slices.Index(list, t); i >= 0 {
+		return slices.Delete(list, i, i+1)
+	}
+	return list
+}
+
+// rearm schedules the next firing of the fixed-rate timer t, one period
+// after the last deadline, or at once when that is already past. The lock
+// of t's home is held. On a closed home queue nothing is armed, as a start
+// there arms nothing.
+func (ts *timers) rearm(t *scriptTimer) {
+	t.due = t.due.Add(t.period)
+	t.armed.Rearm(max(t.due.Sub(t.queue.Now()), 0))
 }
 
 // fire runs one firing of t on its home queue. A one-shot leaves the
@@ -315,15 +473,16 @@ func (ts *timers) remove(t *scriptTimer) {
 // for being alive. On the bound player's own queue the hook runs as a hook
 // on that queue (TeleportTo).
 func (ts *timers) fire(t *scriptTimer) {
-	ts.mu.Lock()
-	if ts.byScript[t.s][t.key] != t {
-		ts.mu.Unlock()
+	mu := t.lock()
+	mu.Lock()
+	if !t.live {
+		mu.Unlock()
 		return
 	}
 	if t.period == 0 {
 		ts.remove(t)
 	}
-	ts.mu.Unlock()
+	mu.Unlock()
 
 	s := t.s
 	hook := func() {
@@ -339,11 +498,11 @@ func (ts *timers) fire(t *scriptTimer) {
 	if t.period == 0 {
 		return
 	}
-	ts.mu.Lock()
-	if ts.byScript[s][t.key] == t {
+	mu.Lock()
+	if t.live {
 		ts.rearm(t)
 	}
-	ts.mu.Unlock()
+	mu.Unlock()
 }
 
 // show sends the timer's player what its hook answered, through the
@@ -355,25 +514,36 @@ func (ts *timers) show(t *scriptTimer, res Result) {
 	}
 }
 
-// npcDecayed removes the timers bound to the NPC with identity id whose
+// npcDecayed removes the timers bound to the NPC of spawn slot sc whose
 // script is a behavior bound to its template.
-func (ts *timers) npcDecayed(id any) {
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	for t := range ts.byNPC[id] {
-		if t.decays {
+func (ts *timers) npcDecayed(sc *npc.Scratch) {
+	h := keptTimers(sc)
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for i := len(h.list) - 1; i >= 0; i-- {
+		if t := h.list[i]; t.decays {
 			ts.remove(t)
 		}
 	}
 }
 
 // playerDetached removes every timer bound to the player with identity id,
-// whatever its script.
+// whatever its script. A timer that starts meanwhile sees the player
+// detaching and removes itself (start).
 func (ts *timers) playerDetached(id any) {
 	ts.mu.Lock()
-	defer ts.mu.Unlock()
-	for t := range ts.byPlayer[id] {
-		ts.remove(t)
+	list := slices.Clone(ts.byPlayer[id])
+	ts.mu.Unlock()
+	for _, t := range list {
+		mu := t.lock()
+		mu.Lock()
+		if t.live {
+			ts.remove(t)
+		}
+		mu.Unlock()
 	}
 }
 

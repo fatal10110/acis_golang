@@ -274,8 +274,11 @@ func TestConcurrentStartsOfOneKey(t *testing.T) {
 	barrier := make(chan struct{})
 	p.self.(*timerPlayerFake).queue.Post(func() { close(barrier) })
 	<-barrier
+	s.ownTimers.mu.Lock()
+	left := len(s.ownTimers.loose) + len(s.ownTimers.homes)
+	s.ownTimers.mu.Unlock()
 	r.timers.mu.Lock()
-	left := len(r.timers.byScript) + len(r.timers.byPlayer)
+	left += len(r.timers.byPlayer)
 	r.timers.mu.Unlock()
 	if left != 0 {
 		t.Fatalf("%d timer index entries left after the cancel", left)
