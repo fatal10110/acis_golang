@@ -84,7 +84,7 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 		// Some geodata always lies below a flier: the highest layer under
 		// the corridor top must stay at or under its bottom.
 		layer, cell := next.belowCell(localCell(gox), localCell(goy), bottomZ+height, nil)
-		if layer < 0 {
+		if layer == -1 {
 			return stopped, false
 		}
 		goz = int(cell.Height)
@@ -94,7 +94,7 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 
 		// The lowest layer over the corridor bottom must clear its top.
 		topZ := bottomZ + height
-		if layer, cell = next.aboveCell(localCell(gox), localCell(goy), bottomZ, nil); layer >= 0 {
+		if layer, cell = next.aboveCell(localCell(gox), localCell(goy), bottomZ, nil); layer != -1 {
 			goz = int(cell.Height)
 			if int32(goz) < topZ {
 				return stopped, false

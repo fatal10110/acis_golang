@@ -113,8 +113,11 @@ func (b engineBlock) belowCell(cellX, cellY int, worldZ int32, ignore dynamic.Ob
 	return b.resolve(b.dyn.BelowIgnoring(cellX, cellY, worldZ, ignore))
 }
 
+// resolve decodes a dynamic block's layer handle. Only -1 means no layer: a
+// cell no object covers answers with a negative handle into the static
+// block underneath, and that layer is as real as any other.
 func (b engineBlock) resolve(layer int) (int, block.Cell) {
-	if layer < 0 {
+	if layer == -1 {
 		return layer, block.Cell{}
 	}
 	return layer, block.Cell{Height: b.dyn.Height(layer), NSWE: b.dyn.NSWE(layer)}
