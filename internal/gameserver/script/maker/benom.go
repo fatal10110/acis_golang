@@ -13,10 +13,12 @@ import (
 // (8 when the memo declares none), places the gatekeeper and, unless the
 // siege takes registrations, brings Benom back when his row is saved
 // alive. The siege's registrations closing bring Benom in, their opening
-// deletes him, and while the siege is fought a tower check runs every 30
-// seconds: once fewer than two life control towers
+// deletes him, and while the siege is fought a tower check runs at its
+// start and then every 30 seconds: once fewer than two life control towers
 // stand, Benom hears script event 10100 and the gatekeeper 10101, and the
-// check stops. Its NPCs never respawn on their own.
+// check stops. The check at the start runs before the start makes the
+// castle's control towers work, so it finds none standing. Its NPCs never
+// respawn on their own.
 func Benom() script.Maker {
 	// towerCheck holds the running tower check's ticker, none when no
 	// check runs: the siege event hook and the check itself share it.
@@ -44,11 +46,12 @@ func Benom() script.Maker {
 			switch e.Status {
 			case script.SiegeInProgress:
 				stopTowerCheck(towerCheck)
-				// The first check is due 30 seconds in: one at the start's
-				// own instant would run before the start makes the castle's
-				// control towers work, so it would find none standing.
-				// Once they work, every placed life control tower stands.
+				// The ticker is armed first so a first check that stops
+				// itself stops it too. That first check runs here, before
+				// the start makes the castle's control towers work: it
+				// finds no life control tower standing.
 				towerCheck.Set(struct{}{}, e.Group.Every(30000*time.Millisecond, func() { benomTowerCheck(e, towerCheck) }))
+				benomTowerCheck(e, towerCheck)
 			case script.SiegeRegistrationOpened:
 				if len(spawns) > 1 {
 					spawns[1].DeleteNPCs()

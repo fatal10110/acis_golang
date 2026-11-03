@@ -115,12 +115,13 @@ func (w *folkWorld) benomCount(step string, t *testing.T, gatekeepers, benoms in
 }
 
 // At start, with the siege taking registrations, only the gatekeeper
-// spawns. The registrations closing bring Benom in. Once the siege runs,
-// the tower check runs every 30 seconds: with both life
-// control towers standing nothing happens; the first check after one falls
-// sends Benom 10100 and the gatekeeper 10101, each with 1, and the check
-// stops. The siege's end opens the registrations, which deletes Benom; the
-// gatekeeper stays. An NPC leaving arms no respawn.
+// spawns. The registrations closing bring Benom in. The siege's start runs
+// the first tower check before it makes the castle's control towers work:
+// with both life control towers placed it finds none standing, so Benom
+// hears 10100 and the gatekeeper 10101, each with 1, and the check stops;
+// a tower falling later sends nothing. The siege's end opens the
+// registrations, which deletes Benom; the gatekeeper stays. An NPC leaving
+// arms no respawn.
 func TestBenomMakerFollowsTheSiege(t *testing.T) {
 	t.Parallel()
 	w, log, gludio := bootBenom(t, 2)
@@ -134,15 +135,11 @@ func TestBenomMakerFollowsTheSiege(t *testing.T) {
 	}
 
 	gludio.Start()
-	drainUntilQuiet(t, w.c)
-	w.srv.Advance(t, 30*time.Second)
-	log.expect(t, "two towers standing")
-
-	w.destroyLifeTower(t, gludio, 0)
-	w.srv.Advance(t, 30*time.Second)
-	log.expect(t, "a tower fell",
+	log.expect(t, "siege started",
 		heardEvent{npcID: benomID, event: 10100, arg1: 1},
 		heardEvent{npcID: benomGatekeeperID, event: 10101, arg1: 1})
+	drainUntilQuiet(t, w.c)
+	w.destroyLifeTower(t, gludio, 0)
 	w.srv.Advance(t, 90*time.Second)
 	log.expect(t, "the check stopped")
 
@@ -163,11 +160,12 @@ func TestBenomMakerFollowsTheSiege(t *testing.T) {
 }
 
 // A tower check that finds the Benom spawn keeping no NPC brings Benom
-// back from his row instead and runs on: a row the delete reset to
-// uninitialized first comes alive without an NPC, the next check places
-// Benom, and the check after that, with the castle's one life control
-// tower under two, sends Benom 10100 and stops; the gatekeeper's spawn,
-// keeping no NPC either, hears nothing.
+// back from his row instead and runs on: at the siege's start the check
+// finds the row the delete reset to uninitialized, which comes alive
+// without an NPC; the check 30 seconds in places Benom, and the one after
+// that, with the castle's one life control tower under two, sends Benom
+// 10100 and stops; the gatekeeper's spawn, keeping no NPC either, hears
+// nothing.
 func TestBenomMakerTowerCheckLoadsBenom(t *testing.T) {
 	t.Parallel()
 	w, log, gludio := bootBenom(t, 1)
@@ -179,10 +177,12 @@ func TestBenomMakerTowerCheckLoadsBenom(t *testing.T) {
 	drainUntilQuiet(t, w.c)
 
 	gludio.Start()
+	w.srv.Settle(t)
 	drainUntilQuiet(t, w.c)
-	w.srv.Advance(t, 60*time.Second-time.Millisecond)
 	w.benomCount("first check", t, 0, 0)
 	log.expect(t, "first check")
+	w.srv.Advance(t, 30*time.Second-time.Millisecond)
+	w.benomCount("before the second check", t, 0, 0)
 	w.srv.Advance(t, time.Millisecond)
 	w.benomCount("second check", t, 0, 1)
 	log.expect(t, "second check")
