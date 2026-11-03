@@ -1119,6 +1119,7 @@ type Server struct {
 	positions     *task.PositionUpdates
 	addr          net.Addr
 	sessions      *manager.SessionStore
+	login         *loginSide
 	groundStore   *gamesql.GroundItemStore
 	spawnStore    *gamesql.SpawnStore
 	cursedWeapons *entity.CursedWeaponTable
@@ -2024,7 +2025,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		cursed = o.cursedWeapons[0]
 	}
 
-	loginAddr, servers, sessions := startLoginServerAcceptor(t, loginsql.NewAccountStore(db))
+	loginAddr, login := startLoginServerAcceptor(t, loginsql.NewAccountStore(db))
+	servers, sessions := login.servers, login.sessions
 	servers.Register(1, HexID)
 	shutdownState := newShutdownHarness(servers)
 
@@ -2767,6 +2769,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		positions:           positions,
 		addr:                ln.Addr(),
 		sessions:            sessions,
+		login:               login,
 		groundStore:         gamesql.NewGroundItemStore(db),
 		cursedWeapons:       cursed,
 		autosave:            autosave,
@@ -2807,7 +2810,7 @@ var sharedRSAKeys = sync.OnceValues(manager.NewRSAKeyPool)
 // package's own tests use, so Boot completes a real login handshake.
 //
 // accounts takes the account access levels the game server sends.
-func startLoginServerAcceptor(t *testing.T, accounts *loginsql.AccountStore) (addr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
+func startLoginServerAcceptor(t *testing.T, accounts *loginsql.AccountStore) (addr string, login *loginSide) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -2827,11 +2830,15 @@ func startLoginServerAcceptor(t *testing.T, accounts *loginsql.AccountStore) (ad
 		t.Fatalf("NewRSAKeyPool: %v", err)
 	}
 
-	servers = manager.NewServerRegistry()
-	sessions = manager.NewSessionStore()
-	bans := manager.NewIPBanList(zerolog.Nop())
+	login = &loginSide{
+		accounts: accounts,
+		servers:  manager.NewServerRegistry(),
+		sessions: manager.NewSessionStore(),
+		bans:     manager.NewIPBanList(zerolog.Nop()),
+		roster:   loginserver.NewLinkRoster(),
+	}
 
-	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, accounts, nil, false, nil, loginserver.NewLinkRoster(), zerolog.Nop())
+	gsLink := loginserver.NewGameServerLink(login.servers, names, keys, login.sessions, login.bans, accounts, nil, false, nil, login.roster, zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -2842,7 +2849,7 @@ func startLoginServerAcceptor(t *testing.T, accounts *loginsql.AccountStore) (ad
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
 	go func() { _ = gsLink.Serve(ctx, ln) }()
 
-	return ln.Addr().String(), servers, sessions
+	return ln.Addr().String(), login
 }
 
 // SaveRelations writes the friend and block lists to character_relations,

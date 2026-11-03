@@ -63,6 +63,35 @@ func NewLoginCrypt(dynamicKey []byte) (*LoginCrypt, error) {
 	return &LoginCrypt{static: static, dynamic: dynamic, first: true}, nil
 }
 
+// NewClientLoginCrypt builds the client side of a session's crypt from the
+// dynamic key Init delivered: Encrypt always pads, checksums and encrypts with
+// that key, as the server's Decrypt expects, and Decrypt reads the server's
+// post-Init packets.
+func NewClientLoginCrypt(dynamicKey []byte) (*LoginCrypt, error) {
+	c, err := NewLoginCrypt(dynamicKey)
+	if err != nil {
+		return nil, err
+	}
+	c.first = false
+	return c, nil
+}
+
+// DecryptFirst reverses the first-packet encryption in place on the client
+// side: it decrypts buf with the static bootstrap key and undoes the rolling
+// XOR pass, leaving the padded Init payload.
+func DecryptFirst(buf []byte) error {
+	if len(buf) < 2*crypt.BlockSize || len(buf)%crypt.BlockSize != 0 {
+		return fmt.Errorf("first login packet length %d is not a multiple of %d of at least %d", len(buf), crypt.BlockSize, 2*crypt.BlockSize)
+	}
+	static, err := staticBootstrapCipher()
+	if err != nil {
+		return fmt.Errorf("static bootstrap cipher: %w", err)
+	}
+	crypt.DecryptBlocks(static, buf)
+	unxorPass(buf)
+	return nil
+}
+
 // Encrypt pads payload to a Blowfish block boundary and encrypts it,
 // returning the (longer) encrypted packet body. The first call uses the
 // static bootstrap key and a rolling XOR pass; every call after that uses
@@ -122,4 +151,17 @@ func xorPass(buf []byte, key uint32) {
 		pos += 4
 	}
 	binary.LittleEndian.PutUint32(buf[pos:pos+4], ecx)
+}
+
+// unxorPass reverses xorPass: starting from the rolled key stored before
+// buf's final word, it walks the words back to offset 4, recovering each
+// original word and unrolling the key by it.
+func unxorPass(buf []byte) {
+	pos := len(buf) - 8
+	ecx := binary.LittleEndian.Uint32(buf[pos : pos+4])
+	for pos -= 4; pos >= 4; pos -= 4 {
+		orig := binary.LittleEndian.Uint32(buf[pos:pos+4]) ^ ecx
+		ecx -= orig
+		binary.LittleEndian.PutUint32(buf[pos:pos+4], orig)
+	}
 }
