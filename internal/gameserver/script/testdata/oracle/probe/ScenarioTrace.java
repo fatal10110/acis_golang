@@ -86,8 +86,13 @@ import net.sf.l2j.gameserver.model.residence.clanhall.ClanHall;
 import net.sf.l2j.gameserver.model.residence.clanhall.SiegableHall;
 import net.sf.l2j.gameserver.model.residence.castle.Castle;
 import net.sf.l2j.gameserver.model.spawn.ASpawn;
+import net.sf.l2j.gameserver.model.spawn.MultiSpawn;
 import net.sf.l2j.gameserver.model.spawn.NpcMaker;
 import net.sf.l2j.gameserver.model.spawn.Spawn;
+import net.sf.l2j.gameserver.model.spawn.Territory;
+import net.sf.l2j.gameserver.model.spawn.SpawnData;
+import net.sf.l2j.gameserver.model.location.Point2D;
+import net.sf.l2j.commons.geometry.Triangle;
 import net.sf.l2j.gameserver.network.GameClient;
 import net.sf.l2j.gameserver.network.GameClient.GameClientState;
 import net.sf.l2j.gameserver.network.SessionKey;
@@ -198,8 +203,12 @@ final class ScenarioTrace
 	/** Whether an npc line names a corpse time: the corpses then decay as the ticks pass. */
 	private boolean _decays;
 
-	/** The npcmaker lines: {name, AI type}. */
-	private final List<String[]> _npcMakers = new ArrayList<>();
+	/** The npcmaker lines. */
+	private final List<MakerLine> _npcMakers = new ArrayList<>();
+	/** The spawnrow lines: {name, alive or dead, x, y, z, respawn seconds}. */
+	private final List<String[]> _spawnRows = new ArrayList<>();
+	/** The makers a scenario with a spawn entry started, in the lines' order. */
+	private final List<NpcMaker> _startedMakers = new ArrayList<>();
 	/** The NPC templates' own script bindings, kept while the scenario's replace them. */
 	private final Map<NpcTemplate, Map<EventHandler, List<Quest>>> _bindings = new HashMap<>();
 	/** The template fields the scenario changed, each with the value it had, in the order they changed. */
@@ -283,6 +292,13 @@ final class ScenarioTrace
 	private boolean _spawned;
 	/** While true, packets and statements are not recorded: the probe's own setup. */
 	private boolean _muted;
+	/** While true, the script events the makers send each other are the boot's, not a step's. */
+	private boolean _starting;
+
+	/** An npcmaker line: type is null for a maker with no spawn entry; db is null for an entry kept in no row. */
+	private record MakerLine(String name, String ai, int max, int npc, String type, int[] pos, int respawn, String db)
+	{
+	}
 
 	/** An npc line: params holds the three spawn parameters the line gives (a number, an NPC role or character), null for none; ai the AI parameters of its ai option, which replace the template's as the Go runner's fixture template has only them, null for none. */
 	private record NpcLine(String role, int id, String type, int dx, int dy, int dz, String[] params, Map<String, String> ai, int level, int corpse, String[][] skills)
@@ -409,7 +425,9 @@ final class ScenarioTrace
 			// The script events sent to an NPC maker are the step's lines, in the order they were sent.
 			ProbeMaker.listen((maker, name, i1, i2) ->
 			{
-				if (!t._muted)
+				if (t._starting)
+					t._lines.add("# started " + maker.getName() + " " + name + " " + i1 + " " + i2);
+				else if (!t._muted)
 					t._lines.add("# maker " + maker.getName() + " " + name + " " + i1 + " " + i2);
 			});
 			t.restrict(loaded);
@@ -655,7 +673,12 @@ final class ScenarioTrace
 					_npcs.put(f[1], n);
 					_decays |= n.corpse() > 0;
 				}
-				case "npcmaker" -> _npcMakers.add(new String[] { f[1], f[2] });
+				case "npcmaker" -> _npcMakers.add(makerLine(f));
+				case "spawnrow" -> _spawnRows.add(Arrays.copyOfRange(f, 1, f.length));
+				case "started" ->
+				{
+					// The Go run's expectation of what the boot's makers sent: the trace shows what the probe's sent.
+				}
 				case "script", "stub" -> _scripts.add(ScriptProbe.PKG + f[1]);
 				case "hold" -> _holds.add(new int[]
 				{
@@ -759,6 +782,63 @@ final class ScenarioTrace
 	 * The three spawn parameters of an npc line's params option, null without one. The other options
 	 * (walks, maker, ...) are not read: the probe plays the shipped template.
 	 */
+	/** Reads an npcmaker line: npcmaker name ai [max n] [spawn npc type x y z [respawn seconds] [db name]]. */
+	private static MakerLine makerLine(String[] f)
+	{
+		int i = 3;
+		int max = 1;
+		if (f.length > i + 1 && f[i].equals("max"))
+		{
+			max = Integer.parseInt(f[i + 1]);
+			i += 2;
+		}
+		if (f.length <= i)
+			return new MakerLine(f[1], f[2], max, 0, null, null, 0, null);
+		if (!f[i].equals("spawn"))
+			throw new IllegalStateException("npcmaker " + f[1] + ": " + f[i] + " is not max or spawn");
+		final int[] pos =
+		{
+			Integer.parseInt(f[i + 3]),
+			Integer.parseInt(f[i + 4]),
+			Integer.parseInt(f[i + 5])
+		};
+		int respawn = 0;
+		String db = null;
+		for (int j = i + 6; j + 1 < f.length; j += 2)
+		{
+			switch (f[j])
+			{
+				case "respawn" -> respawn = Integer.parseInt(f[j + 1]);
+				case "db" -> db = f[j + 1];
+				default -> throw new IllegalStateException("npcmaker " + f[1] + ": " + f[j] + " is not respawn or db");
+			}
+		}
+		return new MakerLine(f[1], f[2], max, Integer.parseInt(f[i + 1]), f[i + 2], pos, respawn, db);
+	}
+
+	/**
+	 * A spawn_data row as the spawnrow line left it, as the server read it back: alive at the line's
+	 * place with its HP and MP full (the fixture's 1000), or dead with its respawn the line's seconds
+	 * on the wall clock.
+	 */
+	private static SpawnData row(String name, String[] r) throws Exception
+	{
+		final SpawnData data = new SpawnData(name);
+		if (r[1].equals("dead"))
+		{
+			set(SpawnData.class, data, "_status", (byte) 0);
+			set(SpawnData.class, data, "_respawnTime", ProbeClock.wall() + Long.parseLong(r[6]) * 1000);
+		}
+		else
+		{
+			set(SpawnData.class, data, "_status", (byte) 1);
+			set(SpawnData.class, data, "_currentHp", 1000);
+			set(SpawnData.class, data, "_currentMp", 1000);
+			data.set(Integer.parseInt(r[2]), Integer.parseInt(r[3]), Integer.parseInt(r[4]), 0);
+		}
+		return data;
+	}
+
 	private static String[] npcParams(String[] f)
 	{
 		for (int i = 7; i + 3 < f.length; i++)
@@ -1389,17 +1469,52 @@ final class ScenarioTrace
 			// spawned here) are not what a script's spawn lookup finds.
 			// The npcmaker lines' makers, which spawn nothing, are the scenario's: a script's lookup by name finds them.
 			final Set<NpcMaker> makers = ConcurrentHashMap.newKeySet();
-			for (String[] m : _npcMakers)
+			// The rows a spawnrow line saved are what the makers with a spawn entry read as they start.
+			final Map<String, SpawnData> rows = new ConcurrentHashMap<>();
+			final List<NpcMaker> order = new ArrayList<>();
+			for (String[] r : _spawnRows)
+				rows.put(r[0], row(r[0], r));
+			for (MakerLine m : _npcMakers)
 			{
 				final StatSet set = new StatSet();
-				set.set("name", m[0]);
-				set.set("maximumNpcs", 1);
-				set.set("maker", m[1]);
+				set.set("name", m.name());
+				set.set("maximumNpcs", m.max());
+				set.set("maker", m.ai());
+				// A maker with a spawn entry has the Go runner's territory: the unit square at the origin, which no spawn stands in.
+				if (m.type() != null)
+					set.set("t", new Territory("scenario_npcmakers", List.of(new Triangle(new Point2D(0, 0), new Point2D(1, 0), new Point2D(1, 1)), new Triangle(new Point2D(0, 0), new Point2D(1, 1), new Point2D(0, 1))), 0, 0));
 				final NpcMaker maker = new NpcMaker(set);
-				maker.setSpawns(new ArrayList<>());
+				final List<MultiSpawn> spawns = new ArrayList<>();
+				if (m.type() != null)
+				{
+					// The spawn caches the instance class of the template's type, so the fixture comes first.
+					final NpcTemplate template = NpcData.getInstance().getTemplate(m.npc());
+					casting(template, m.type());
+					fixture(template, m.type());
+					final SpawnData data = m.db() == null ? null : rows.computeIfAbsent(m.db(), SpawnData::new);
+					spawns.add(new MultiSpawn(maker, template, 1, m.respawn(), 0, Collections.emptyList(), null, new int[][] { { m.pos()[0], m.pos()[1], m.pos()[2], 0 } }, data));
+				}
+				maker.setSpawns(spawns);
 				makers.add(maker);
+				order.add(maker);
 			}
 			alter(SpawnManager.class, SpawnManager.getInstance(), "_makers", makers);
+			if (_npcMakers.stream().anyMatch(m -> m.type() != null))
+			{
+				_startedMakers.addAll(order);
+				alter(SpawnManager.class, SpawnManager.getInstance(), "_spawnData", rows);
+				// The Go run starts every maker as it boots, in the lines' order; their sends are the boot's.
+				_starting = true;
+				try
+				{
+					for (NpcMaker maker : order)
+						maker.spawnAll();
+				}
+				finally
+				{
+					_starting = false;
+				}
+			}
 			for (NpcLine n : _npcs.values())
 			{
 				final NpcTemplate template = NpcData.getInstance().getTemplate(n.id());
@@ -1859,6 +1974,9 @@ final class ScenarioTrace
 	 */
 	private void clear() throws Exception
 	{
+		// The started makers delete their NPCs without telling their scripts, far from the player as they stand.
+		for (NpcMaker maker : _startedMakers)
+			maker.deleteAll();
 		final List<Npc> near = new ArrayList<>(_spawnedNpcs);
 		final List<ItemInstance> ground = new ArrayList<>();
 		for (WorldObject o : World.getInstance().getObjects())

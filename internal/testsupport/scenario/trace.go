@@ -266,6 +266,7 @@ var (
 	traceDraw     = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
 	traceHeard    = regexp.MustCompile(`^# heard (\d+) \(object (\d+)\) (-?\d+) (-?\d+) (-?\d+)$`)
 	traceMaker    = regexp.MustCompile(`^# maker (\S+) (\S+) (-?\d+) (-?\d+)$`)
+	traceStarted  = regexp.MustCompile(`^# started (\S+) (\S+) (-?\d+) (-?\d+)$`)
 	traceStance   = regexp.MustCompile(`^# stance (on|off)$`)
 	traceCheck    = regexp.MustCompile(`^# check (open|dungeon|standing|stance) (\S+( \S+)*)$`)
 	traceLive     = regexp.MustCompile(`^# live (\d+) (\d+)$`)
@@ -341,6 +342,9 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 		raw       []rawStep
 		playerObj int32
 		mateObjs  = map[string]int32{}
+		// started are the script events the makers sent each other as the
+		// reference booted them, before the first client packet.
+		started []string
 	)
 	// seen pairs each NPC object of the trace with its NPC id; actioned
 	// holds those the client acted on, which a bypass can name; spawned
@@ -434,6 +438,15 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
 			}
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
+		case strings.HasPrefix(line, "# started "):
+			m := traceStarted.FindStringSubmatch(line)
+			if m == nil {
+				return nil, nil, fmt.Errorf("trace line %q is not a started <name> <event> <int1> <int2>", line)
+			}
+			if len(raw) > 0 {
+				return nil, nil, fmt.Errorf("trace line %q comes after the first client packet", line)
+			}
+			started = append(started, makerLine(m[1], m[2], atoi32(m[3]), atoi32(m[4])))
 		case strings.HasPrefix(line, "# maker "):
 			if !traceMaker.MatchString(line) {
 				return nil, nil, fmt.Errorf("trace line %q is not a maker <name> <event> <int1> <int2>", line)
@@ -462,6 +475,14 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	}
 	if err := sb.Err(); err != nil {
 		return nil, nil, err
+	}
+	// The boot's sends are the scenario's started lines: the run compares its own with them.
+	wantStarted := make([]string, len(sc.Started))
+	for i, e := range sc.Started {
+		wantStarted[i] = makerLine(e.Maker, e.Event, e.Int1, e.Int2)
+	}
+	if d := FirstDiff("started", wantStarted, started); d != "" {
+		return nil, nil, fmt.Errorf("scenario %s (got: the started lines, want: the trace)", d)
 	}
 	roles := map[int32]string{playerObj: "player"}
 	for name, obj := range mateObjs {

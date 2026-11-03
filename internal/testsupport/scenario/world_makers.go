@@ -154,8 +154,7 @@ func (sc *Scenario) StartsMakers() bool {
 }
 
 // checkMakerSeeds requires the spawnrow lines to name a spawn entry's row,
-// the started lines a maker line and a started maker, and a traced scenario
-// none of them: the reference probe starts no maker and keeps no spawn_data.
+// the started lines a maker line and a started maker.
 func (sc *Scenario) checkMakerSeeds() error {
 	byDB := map[string]string{}
 	for _, m := range sc.NpcMakers {
@@ -179,9 +178,6 @@ func (sc *Scenario) checkMakerSeeds() error {
 		if !slices.ContainsFunc(sc.NpcMakers, func(m NpcMaker) bool { return strings.EqualFold(m.Name, e.Maker) }) {
 			return fmt.Errorf("started %s: no npcmaker line names it", e.Maker)
 		}
-	}
-	if sc.Trace != "" && (sc.StartsMakers() || len(sc.SpawnRows) > 0) {
-		return fmt.Errorf("a traced scenario takes no npcmaker spawn or spawnrow line: the reference probe starts no maker")
 	}
 	for _, m := range sc.NpcMakers {
 		if m.Max != 0 && m.Spawn == nil {
