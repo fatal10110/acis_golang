@@ -214,7 +214,10 @@ type RaidKillRecorder interface {
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
 type Npcs struct {
-	effects        effect.Env
+	effects effect.Env
+	// effectOpts build every hostile's effect list over effects; one
+	// slice all of them share.
+	effectOpts     []effect.Option
 	templates      *npc.Table
 	randomWalkRate int
 	// maxGeoPathFailCount is each hostile's pathfinding-fail overflow
@@ -462,6 +465,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	n := &Npcs{
 		templates:           templates,
 		effects:             effects,
+		effectOpts:          []effect.Option{effect.WithEnv(effects)},
 		randomWalkRate:      randomWalkRate,
 		maxGeoPathFailCount: maxGeoPathFailCount,
 		settings:            npc.NewHostileSettings(aiConfig, raidMultipliers),

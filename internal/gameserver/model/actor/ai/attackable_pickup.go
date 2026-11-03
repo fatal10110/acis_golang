@@ -15,7 +15,7 @@ func (a *Attackable) AddPickUpDesire(itemObjectID int32, weight float64) {
 	if itemObjectID == 0 {
 		return
 	}
-	a.desires.AddOrUpdate(&Desire{
+	a.Desires().AddOrUpdate(&Desire{
 		Kind:         IntentionPickUp,
 		ItemObjectID: itemObjectID,
 		Weight:       weight,

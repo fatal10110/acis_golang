@@ -255,7 +255,7 @@ func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant, sk mod
 	if !newlyDead {
 		return
 	}
-	h.Die(attacker, h.rewards)
+	h.Die(attacker, h.deathRewards())
 }
 
 // ConsumeHP pays one of h's own skill HP costs. The NPC is its own attacker
@@ -277,7 +277,7 @@ func (h *Hostile) ConsumeHP(amount float64) {
 	if !newlyDead {
 		return
 	}
-	h.Die(h, h.rewards)
+	h.Die(h, h.deathRewards())
 }
 
 // ReduceHPByDOT applies periodic damage and records it in the threat table
@@ -315,7 +315,7 @@ func (h *Hostile) reduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 	if !newlyDead {
 		return
 	}
-	h.Die(killer, h.rewards)
+	h.Die(killer, h.deathRewards())
 }
 
 // applyNonConsumptionDamageEffects applies the creature-wide HP-reduction
@@ -335,7 +335,7 @@ func (h *Hostile) applyNonConsumptionDamageEffects(isDOT bool) {
 	if isDOT {
 		return
 	}
-	list := h.EffectList()
+	list := h.EffectListIfBuilt()
 	list.StopByType(effect.TypeSleep)
 	list.StopByType(effect.TypeImmobileUntilAttacked)
 

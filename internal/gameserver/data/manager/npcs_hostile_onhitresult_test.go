@@ -6,7 +6,6 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -49,16 +48,17 @@ func TestNewLiveHostileWiresOnHitResultFromEffects(t *testing.T) {
 		},
 	}
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, &testLog, fakeHostileCastDefs{}, effects, nil, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, &testLog, fakeHostileCastDefs{}, &effects, nil, 0, nil, nil, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
 
 	controller := hostile.AI().CastController()
-	aiController, ok := controller.(*actorcast.AIController)
-	if !ok || aiController == nil {
-		t.Fatalf("CastController() = %T, want non-nil *actorcast.AIController", controller)
+	cast, ok := controller.(*hostileCast)
+	if !ok || cast == nil {
+		t.Fatalf("CastController() = %T, want non-nil *hostileCast", controller)
 	}
+	aiController := &cast.AIController
 	if aiController.OnHitResult == nil {
 		t.Fatal("AIController.OnHitResult is nil, want it wired from EffectHandlers.OnHitResult")
 	}
@@ -89,7 +89,7 @@ func TestNewLiveHostileLeavesOnHitResultUnsetWithoutCastDefs(t *testing.T) {
 	state := world.New()
 	positions := task.NewPositionUpdates(state)
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, &testLog, nil, actorcast.EffectHandlers{}, nil, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, &testLog, nil, &actorcast.EffectHandlers{}, nil, 0, nil, nil, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}

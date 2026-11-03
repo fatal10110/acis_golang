@@ -25,8 +25,8 @@ type attackerRef struct{ c attackable.Combatant }
 
 // resolveHeld resolves rightHand and leftHand through items, nil resolving
 // neither.
-func resolveHeld(items *item.Table, rightHand, leftHand int) *heldItems {
-	held := &heldItems{rightHand: rightHand, leftHand: leftHand}
+func resolveHeld(items *item.Table, rightHand, leftHand int) heldItems {
+	held := heldItems{rightHand: rightHand, leftHand: leftHand}
 	if items == nil {
 		return held
 	}
@@ -43,25 +43,26 @@ func resolveHeld(items *item.Table, rightHand, leftHand int) *heldItems {
 	return held
 }
 
-// hands returns what h holds now: its template's items until Attach.
-func (h *Hostile) hands() *heldItems {
+// hands returns what h holds now. Its template's items are resolved on each
+// read, so an NPC holding them keeps no copy: until Attach installs the
+// item table they resolve to no weapon and no shield.
+func (h *Hostile) hands() heldItems {
 	if held := h.held.Load(); held != nil {
-		return held
+		return *held
 	}
-	return &heldItems{rightHand: h.Instance.Template.RightHand, leftHand: h.Instance.Template.LeftHand}
+	return resolveHeld(h.items, h.Instance.Template.RightHand, h.Instance.Template.LeftHand)
 }
 
 // holdTemplateItems puts the template's items back in h's hands.
-func (h *Hostile) holdTemplateItems() {
-	h.held.Store(resolveHeld(h.items, h.Instance.Template.RightHand, h.Instance.Template.LeftHand))
-}
+func (h *Hostile) holdTemplateItems() { h.held.Store(nil) }
 
 // EquipItem puts the item rightHand in h's right hand and leftHand in its
 // left, 0 for an empty hand, and shows every player around it h's new
 // look. The right-hand item decides h's attack style and reuse from then
 // on. Its death puts the template's items back.
 func (h *Hostile) EquipItem(rightHand, leftHand int32) {
-	h.held.Store(resolveHeld(h.items, int(rightHand), int(leftHand)))
+	held := resolveHeld(h.items, int(rightHand), int(leftHand))
+	h.held.Store(&held)
 	h.emit(event.NPCInfoShown{})
 }
 

@@ -15,7 +15,13 @@ import (
 // status flags both the effect list and transient action locks feed into.
 type Live struct {
 	movement move.CreatureMove
-	effects  *effect.List
+	// effects is built on its first use and published once by
+	// compare-and-swap, whichever goroutine needs it first (a buff lands
+	// from the caster's queue); nil until then, as a creature no effect
+	// ever reached holds none. effectOwner and effectOpts build it.
+	effects     atomic.Pointer[effect.List]
+	effectOwner effect.StatOwner
+	effectOpts  []effect.Option
 	// queue runs this creature's work; set once before the creature is
 	// published into the world.
 	queue *sim.Queue
@@ -31,9 +37,11 @@ type Live struct {
 // NewLive creates runtime state at origin with speed and geodata-bound
 // movement validation. owner receives stat-function callbacks from this
 // creature's active effects; a nil owner (e.g. an actor whose stats aren't
-// driven by a calculator yet) leaves those callbacks unapplied.
+// driven by a calculator yet) leaves those callbacks unapplied. The live
+// state keeps opts to build its effect list with on first use, so callers
+// spawning many creatures pass one shared slice.
 func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect.StatOwner, opts ...effect.Option) (*Live, error) {
-	live := &Live{effects: effect.NewList(owner, opts...)}
+	live := &Live{effectOwner: owner, effectOpts: opts}
 	if err := live.movement.Init(origin, speed, geo); err != nil {
 		return nil, err
 	}
@@ -46,7 +54,9 @@ func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect
 func (l *Live) SetQueue(q *sim.Queue) {
 	l.queue = q
 	l.movement.SetQueue(q)
-	l.effects.SetQueue(q)
+	if e := l.effects.Load(); e != nil {
+		e.SetQueue(q)
+	}
 }
 
 // Queue returns the queue this creature's work runs on.
@@ -93,12 +103,29 @@ func (l *Live) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return l.movement.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 
-// EffectList returns this creature's active buffs and debuffs.
+// EffectList returns this creature's active buffs and debuffs, building
+// the list first when none exists yet.
 func (l *Live) EffectList() *effect.List {
 	if l == nil {
 		return nil
 	}
-	return l.effects
+	if e := l.effects.Load(); e != nil {
+		return e
+	}
+	e := effect.NewList(l.effectOwner, l.effectOpts...)
+	e.SetQueue(l.queue)
+	l.effects.CompareAndSwap(nil, e)
+	return l.effects.Load()
+}
+
+// EffectListIfBuilt is EffectList without building one: nil, a list that
+// holds nothing, until the first use. Every effect.List read and stop
+// takes a nil list.
+func (l *Live) EffectListIfBuilt() *effect.List {
+	if l == nil {
+		return nil
+	}
+	return l.effects.Load()
 }
 
 // Stunned reports whether an active effect currently stuns this creature.
@@ -106,7 +133,7 @@ func (l *Live) Stunned() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagStunned)
+	return l.effects.Load().IsAffected(effect.FlagStunned)
 }
 
 // Rooted reports whether an active effect currently roots this creature in
@@ -115,7 +142,7 @@ func (l *Live) Rooted() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagRooted)
+	return l.effects.Load().IsAffected(effect.FlagRooted)
 }
 
 // Sleeping reports whether an active effect currently puts this creature to
@@ -124,7 +151,7 @@ func (l *Live) Sleeping() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagSleep)
+	return l.effects.Load().IsAffected(effect.FlagSleep)
 }
 
 // FakeDead reports whether an active effect currently makes this creature
@@ -133,7 +160,7 @@ func (l *Live) FakeDead() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagFakeDeath)
+	return l.effects.Load().IsAffected(effect.FlagFakeDeath)
 }
 
 // SilentMoving reports whether an active effect currently lets this
@@ -142,7 +169,7 @@ func (l *Live) SilentMoving() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagSilentMove)
+	return l.effects.Load().IsAffected(effect.FlagSilentMove)
 }
 
 // Confused reports whether an active effect currently confuses this
@@ -151,7 +178,7 @@ func (l *Live) Confused() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagConfused)
+	return l.effects.Load().IsAffected(effect.FlagConfused)
 }
 
 // Afraid reports whether an active effect currently fears this creature.
@@ -159,7 +186,7 @@ func (l *Live) Afraid() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagFear)
+	return l.effects.Load().IsAffected(effect.FlagFear)
 }
 
 // ImmobileUntilAttacked reports whether an active effect currently holds
@@ -168,7 +195,7 @@ func (l *Live) ImmobileUntilAttacked() bool {
 	if l == nil {
 		return false
 	}
-	return l.effects.IsAffected(effect.FlagMeditating)
+	return l.effects.Load().IsAffected(effect.FlagMeditating)
 }
 
 // Paralyzed reports whether this creature is paralyzed, either by a
@@ -178,7 +205,7 @@ func (l *Live) Paralyzed() bool {
 	if l == nil {
 		return false
 	}
-	return l.paralyzed.Load() || l.effects.IsAffected(effect.FlagParalyzed)
+	return l.paralyzed.Load() || l.effects.Load().IsAffected(effect.FlagParalyzed)
 }
 
 // SetParalyzed sets or clears this creature's transient paralysis lock and
@@ -241,7 +268,7 @@ func (l *Live) AIDeniedBeforeEffect() bool {
 	if l == nil {
 		return false
 	}
-	return l.paralyzed.Load() || l.teleporting.Load() || l.effects.StartedAffected(effect.AIDenyFlags)
+	return l.paralyzed.Load() || l.teleporting.Load() || l.effects.Load().StartedAffected(effect.AIDenyFlags)
 }
 
 // SetTeleporting sets or clears this creature's teleport transition flag

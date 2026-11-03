@@ -8,16 +8,17 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack
 func (a *Attackable) CleanAllHate() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for _, t := range a.threats.Snapshot() {
-		a.threats.StopHate(t.Attacker)
+	for _, t := range a.threats.Load().Snapshot() {
+		a.threats.Load().StopHate(t.Attacker)
 	}
-	a.desires.RemoveIf(func(d *Desire) bool { return d.Kind == IntentionAttack })
+	a.desires.Load().RemoveIf(func(d *Desire) bool { return d.Kind == IntentionAttack })
 }
 
 // CanAttack reports whether the actor may physically attack target now, as
 // its attack controller's gate decides.
 func (a *Attackable) CanAttack(target attackable.Combatant) bool {
-	return a.attack.CanAttack(target)
+	c := a.attackController()
+	return c != nil && c.CanAttack(target)
 }
 
 // RemoveAllDesire drops every queued desire and zeroes the hate of every
@@ -26,9 +27,9 @@ func (a *Attackable) CanAttack(target attackable.Combatant) bool {
 func (a *Attackable) RemoveAllDesire() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.desires.Clear()
-	a.threats.ZeroHate()
-	a.hates.ZeroHate()
+	a.desires.Load().Clear()
+	a.threats.Load().ZeroHate()
+	a.hates.Load().ZeroHate()
 }
 
 // CleanAllHates zeroes the hate of every hate-list entry, keeping the
@@ -36,10 +37,10 @@ func (a *Attackable) RemoveAllDesire() {
 func (a *Attackable) CleanAllHates() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for _, e := range a.hates.Snapshot() {
-		a.desires.Remove(IntentionCast, e.Attacker)
+	for _, e := range a.hates.Load().Snapshot() {
+		a.desires.Load().Remove(IntentionCast, e.Attacker)
 	}
-	a.hates.ZeroHate()
+	a.hates.Load().ZeroHate()
 }
 
 // RemoveThreat drops target's threat entry, its damage and its hate. No
@@ -47,5 +48,5 @@ func (a *Attackable) CleanAllHates() {
 func (a *Attackable) RemoveThreat(target attackable.Combatant) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.threats.Remove(target)
+	a.threats.Load().Remove(target)
 }

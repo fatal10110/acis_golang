@@ -113,6 +113,9 @@ type npcSpawnDeps struct {
 	stance    network.AttackStanceTracker
 	makers    *spawn.Table
 	dropRates item.Rates
+	// channels resolves the command channel that wins a raid boss's loot
+	// rights, as the link's does.
+	channels gamemanager.LootChannels
 	// partyRange is the WithPartyRange party range; 0 keeps the shipped
 	// one.
 	partyRange int
@@ -227,7 +230,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		limits.DriftRange = deps.driftRange
 	}
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
-		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1})}, time.Now, deps.log,
+		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1}), Channels: deps.channels}, time.Now, deps.log,
 		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		limits, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
 		script.NewMakers(makers, maker.Default, makerWorld, deps.log), deps.scripts, deps.zones)

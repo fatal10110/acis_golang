@@ -11,7 +11,7 @@ import (
 // attack desires, the current intention and the threat table stay as they
 // are.
 func (a *Attackable) RemoveHatesOutOfRange(distance int) {
-	if a.hates.IsEmpty() {
+	if a.hates.Load().IsEmpty() {
 		return
 	}
 	ox, oy, oz := a.actor.Position()
@@ -20,10 +20,10 @@ func (a *Attackable) RemoveHatesOutOfRange(distance int) {
 		x, y, z := c.Position()
 		return origin.Distance3D(location.Location{X: x, Y: y, Z: z}) >= float64(distance)
 	}
-	for _, e := range a.hates.Snapshot() {
+	for _, e := range a.hates.Load().Snapshot() {
 		if far(e.Attacker) {
-			a.desires.Remove(IntentionCast, e.Attacker)
+			a.desires.Load().Remove(IntentionCast, e.Attacker)
 		}
 	}
-	a.hates.RemoveIf(far)
+	a.hates.Load().RemoveIf(far)
 }

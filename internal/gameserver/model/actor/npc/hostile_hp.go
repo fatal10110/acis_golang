@@ -93,5 +93,5 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if !newlyDead {
 		return false
 	}
-	return h.Die(attacker, h.rewards)
+	return h.Die(attacker, h.deathRewards())
 }

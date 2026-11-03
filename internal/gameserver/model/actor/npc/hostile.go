@@ -68,11 +68,11 @@ type Hostile struct {
 	// log is the logger shared by every NPC Attach wired; nil logs nothing.
 	log *zerolog.Logger
 
-	// rewards computes this NPC's drop/experience payout when TakeDamage
+	// rewards gives this NPC's drop/experience payout when TakeDamage
 	// kills it. It is nil until Attach installs one, in which case death
 	// still latches but grants nothing — matching Die's own "rewards may be
 	// nil" contract.
-	rewards Rewards
+	rewards RewardsSource
 	// remover takes this NPC out of the world for DeleteMe; nil despawns it
 	// with no respawn. Installed by Attach.
 	remover Remover
@@ -174,9 +174,9 @@ type Hostile struct {
 	mpMu sync.RWMutex
 	mp   float64
 
-	// held is what this NPC holds in its hands, nil until Attach. A script
-	// swaps it from whichever queue runs its hook, and a death puts the
-	// template's back.
+	// held is what this NPC holds in its hands, nil while it holds its
+	// template's items. A script swaps it from whichever queue runs its
+	// hook, and a death puts the template's back.
 	held atomic.Pointer[heldItems]
 	// items resolves a held item id into its weapon or shield; nil leaves
 	// every hand empty of either. Set by Attach.
@@ -255,6 +255,23 @@ type skillDefinitions interface {
 // non-attackable instance types never reach this constructor, so they never
 // gain stats from template passives.
 func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
+	if attack == nil {
+		return nil, errors.New("npc: nil hostile attack")
+	}
+	return newHostile(inst, live, movement, attack, nil, skills...)
+}
+
+// NewHostileWithParts is NewHostile for an NPC whose attack and cast
+// controllers parts builds the first time the NPC needs each: an NPC nobody
+// fights never holds them.
+func NewHostileWithParts(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, parts ai.CombatParts, skills ...skillDefinitions) (*Hostile, error) {
+	if parts == nil {
+		return nil, errors.New("npc: nil hostile combat parts")
+	}
+	return newHostile(inst, live, movement, nil, parts, skills...)
+}
+
+func newHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, attack ai.AttackController, parts ai.CombatParts, skills ...skillDefinitions) (*Hostile, error) {
 	if inst == nil {
 		return nil, errors.New("npc: nil hostile instance")
 	}
@@ -270,9 +287,6 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	}
 	if movement == nil {
 		return nil, errors.New("npc: nil hostile movement")
-	}
-	if attack == nil {
-		return nil, errors.New("npc: nil hostile attack")
 	}
 	currentSoulshots, currentSpiritshots, err := shotCounts(inst.Template)
 	if err != nil {
@@ -296,7 +310,11 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
 	h.health = creature.NewHealth(&h.hp)
 	h.running.Store(true)
-	h.brain = ai.NewAttackable(h, movement, attack)
+	if parts != nil {
+		h.brain = ai.NewAttackableWithParts(h, movement, parts)
+	} else {
+		h.brain = ai.NewAttackable(h, movement, attack)
+	}
 	var lookup skillDefinitions
 	if len(skills) > 0 {
 		lookup = skills[0]
@@ -359,11 +377,14 @@ type Runtime struct {
 	World *world.State
 	LOS   LineOfSight
 	// Log is the logger the NPC shares with others; nil logs nothing.
-	Log     *zerolog.Logger
-	Items   *item.Table
-	Rewards Rewards
-	Sink    event.Sink
-	Remover Remover
+	Log   *zerolog.Logger
+	Items *item.Table
+	// Rewards are the NPC's own death rewards; RewardsFor, when set, builds
+	// them instead each time the NPC needs them.
+	Rewards    Rewards
+	RewardsFor RewardsSource
+	Sink       event.Sink
+	Remover    Remover
 	// Hits watches every hit this NPC registers; nil watches none.
 	Hits HitObserver
 	// Scripts raises the NPC's script hooks; nil raises none.
@@ -399,7 +420,12 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.world = rt.World
 	h.los = rt.LOS
 	h.log = rt.Log
-	h.rewards = rt.Rewards
+	switch {
+	case rt.RewardsFor != nil:
+		h.rewards = rt.RewardsFor
+	case rt.Rewards != nil:
+		h.rewards = fixedRewards{rt.Rewards}
+	}
 	h.sink = rt.Sink
 	h.remover = rt.Remover
 	h.hits = rt.Hits
@@ -411,7 +437,6 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.Scratch().setLife(h)
 	h.brain.KeepTerritory(h.Scratch().Territory())
 	h.items = rt.Items
-	h.holdTemplateItems()
 }
 
 // nopLog is the logger of an NPC wired with none.
@@ -462,7 +487,7 @@ func (h *Hostile) StopAbnormalEffect(mask int) {
 // the stored visual bits plus the ones its live crowd-control state
 // implies.
 func (h *Hostile) AbnormalEffect() int {
-	return int(h.abnormalEffect.Load()) | h.EffectList().CrowdControlAbnormalEffect()
+	return int(h.abnormalEffect.Load()) | h.EffectListIfBuilt().CrowdControlAbnormalEffect()
 }
 
 // NPCInfoSnapshot captures this NPC's current client-visible state. Its
@@ -735,7 +760,7 @@ func RandomConfusionTarget(w *world.State, self world.Tracked, radius int, roll 
 // dropping that attacker's entry. A confusion effect uses this to drop
 // its forced redirect once the effect ends.
 func (h *Hostile) StopMostHatedTarget() {
-	if most, ok := h.brain.Threats().MostHated(); ok {
+	if most, ok := h.brain.ThreatsIfBuilt().MostHated(); ok {
 		h.brain.StopAggroHate(most.Attacker)
 	}
 }
@@ -758,7 +783,7 @@ func (h *Hostile) AggroHate(attacker attackable.Combatant) float64 {
 	if h == nil || h.brain == nil || attacker == nil {
 		return 0
 	}
-	return h.brain.Threats().Hate(attacker)
+	return h.brain.ThreatsIfBuilt().Hate(attacker)
 }
 
 // NpcID returns this NPC's template id.
@@ -773,13 +798,13 @@ var (
 
 // StopHateList drops target from the skill-cast hate table.
 func (h *Hostile) StopHateList(attacker attackable.Combatant) {
-	h.brain.Hates().StopHate(attacker)
+	h.brain.HatesIfBuilt().StopHate(attacker)
 }
 
 // ClearAggroTables drops every threat and skill-cast hate entry.
 func (h *Hostile) ClearAggroTables() {
-	h.brain.Threats().Clear()
-	h.brain.Hates().Clear()
+	h.brain.ThreatsIfBuilt().Clear()
+	h.brain.HatesIfBuilt().Clear()
 }
 
 // RandomizeHate is attack randomization, the behavior behind the
@@ -887,7 +912,7 @@ func (h *Hostile) OnInactiveRegion() {
 			}
 		}
 		h.clearAttackers()
-		h.EffectList().StopAll()
+		h.EffectListIfBuilt().StopAll()
 		h.brain.SetBackToPeace()
 	})
 }
@@ -1019,7 +1044,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	h.brain.ResetLifeTime()
 	// A death strip ends each effect's stat change silently; the status
 	// broadcast below is the only refresh observers get.
-	h.EffectList().StopAllExceptThoseThatLastThroughDeath()
+	h.EffectListIfBuilt().StopAllExceptThoseThatLastThroughDeath()
 	if rewards != nil {
 		rewards.CalculateRewards(killer)
 	}
@@ -1124,8 +1149,8 @@ func (h *Hostile) leaveWorld(worldState *world.State, respawn func()) {
 	// hooks, after the world removal so nobody sees them go. Untrack then
 	// keeps a straggler tick or skill task already on this queue from
 	// registering the list with task.Effects again.
-	h.EffectList().StopAll()
-	h.EffectList().Untrack()
+	h.EffectListIfBuilt().StopAll()
+	h.EffectListIfBuilt().Untrack()
 	if respawn != nil {
 		respawn()
 	}
@@ -1143,7 +1168,7 @@ func (h *Hostile) DenyAIAction() bool {
 // DenyAIAction, or confused. Confusion counts once its start has run, so
 // the attack desire a confusion start queues is still selected at once.
 func (h *Hostile) OutOfControl() bool {
-	return h.DenyAIAction() || h.EffectList().StartedAffected(effect.FlagConfused)
+	return h.DenyAIAction() || h.EffectListIfBuilt().StartedAffected(effect.FlagConfused)
 }
 
 // Knows reports whether target is currently visible to this NPC.
@@ -1177,7 +1202,7 @@ func (h *Hostile) PoleAttackAngle() int {
 
 // PoleAttackCountMax returns the primary-inclusive pole target cap.
 func (h *Hostile) PoleAttackCountMax() int {
-	for _, active := range h.EffectList().All() {
+	for _, active := range h.EffectListIfBuilt().All() {
 		if active.Type == effect.TypePolearmTargetSingle {
 			return 1
 		}
@@ -1193,7 +1218,7 @@ func (h *Hostile) ReturnHome() bool {
 	if h.SiegeGuard() {
 		return h.returnHomeOutsideDriftRange()
 	}
-	if h.InTerritory() || !h.brain.Hates().IsEmpty() {
+	if h.InTerritory() || !h.brain.HatesIfBuilt().IsEmpty() {
 		return false
 	}
 	return h.returnHomeOutsideDriftRange()
@@ -1253,7 +1278,7 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 	if !h.Instance.HasHome || h.location().In2DRadius(h.Instance.Home, h.driftRange()) {
 		return false
 	}
-	h.brain.Threats().ZeroHate()
+	h.brain.ThreatsIfBuilt().ZeroHate()
 	if h.SiegeGuard() {
 		h.ForceRunStance()
 	} else {
