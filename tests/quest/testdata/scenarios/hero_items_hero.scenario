@@ -1,6 +1,7 @@
 # The hero's weapon and circlet (HeroWeapon, HeroCirclet) at a Monument of Heroes, asked by a hero. The weapon
-# list opens and a pick is given with no page, a second pick too (the list's other links stay open); the
-# monument then says the hero has one (each answer follows the monument's own page, which the bypass needs). An event naming no hero's weapon, or not a number, answers nothing.
+# list opens; an event naming no hero's weapon, or not a number, answers nothing; a pick is given with no page;
+# the monument then says the hero has one (each answer follows the monument's own page, which the bypass needs).
+# A second pick from the open list is refused only here, not by the reference: tests/npcs TestHeroWeaponForAHero.
 # The circlet is given with a message, then refused as already held.
 # Expectations are derived from the reference source (HeroWeapon.onTalk, onAdvEvent, HeroCirclet.onTalk) and
 # replay the reference trace.
@@ -24,16 +25,15 @@ bypass npc_{monument}_Quest HeroWeapon
   S NpcHtmlMessage obj=monument item=0 page=script/feature/HeroWeapon/weapon_list.htm
   S ActionFailed
   S ActionFailed
-bypass Quest HeroWeapon 6611
-  S SystemMessage id=54 3:6611
-bypass Quest HeroWeapon 6612
-  S SystemMessage id=54 3:6612
 bypass Quest HeroWeapon 6610
 bypass Quest HeroWeapon 6622
 bypass Quest HeroWeapon abc
 bypass Quest HeroWeapon 57
 bypass Quest HeroWeapon 4294973907
-  items 6611=1 6612=1
+  items 6611=0
+bypass Quest HeroWeapon 6611
+  S SystemMessage id=54 3:6611
+  items 6611=1
 action monument
   S ActionFailed
   S NpcHtmlMessage obj=monument item=0 html="<html><body>Monument of Heroes:<br>\nYou are a Noblesse. Welcome. I offer many things - but only for Heroes.<br>\n\n<a action=\"bypass -h npc_{monument}_Quest HeroWeapon\">\"I want to receive weapons for a Hero.\"</a><br>\n<a action=\"bypass -h npc_{monument}_Quest HeroCirclet\">\"I want to receive the Wings of Destiny Circlet for Heroes Only.\"</a><br>\n<a action=\"bypass npc_{monument}_Olympiad 4\">\"I want to verify who is the Hero of this era.\"</a>\n</body></html>\n"

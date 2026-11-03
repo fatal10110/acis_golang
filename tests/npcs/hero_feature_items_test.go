@@ -2,6 +2,7 @@ package npcs
 
 import (
 	"os"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -89,4 +90,31 @@ func TestHeroItemsRefusedToANonHero(t *testing.T) {
 	if n := w.srv.PlayerItemCount(t, w.player, heroCirclet); n != 0 {
 		t.Fatalf("circlets held = %d, want 0", n)
 	}
+}
+
+// TestHeroWeaponForAHero: a hero opens the weapon list and picks a weapon.
+// The list stays open, but its other links give a hero holding a weapon
+// nothing; the monument then says one is held.
+func TestHeroWeaponForAHero(t *testing.T) {
+	t.Parallel()
+	w, monument := bootMonument(t, 76, append(heroFeatureOptions(t), heroSeed(t, true))...)
+
+	w.openAnyNpcPage(t)
+	wantPage(t, w.bypass(t, npcCommand(monument, "Quest HeroWeapon")), monument, scriptPage(t, heroWeaponDir+"weapon_list.htm", monument), 2)
+	got := dialogFrames(w.bypass(t, "Quest HeroWeapon "+strconv.Itoa(infinityBlade)))
+	if want := sysMsg(54, itemNameParam(infinityBlade)); len(got) != 1 || !slices.Equal(got[0], want) {
+		t.Fatalf("first pick answered %x, want one %x", got, want)
+	}
+	if frames := w.bypass(t, "Quest HeroWeapon "+strconv.Itoa(infinityCleaver)); len(frames) != 0 {
+		t.Fatalf("second pick answered %x, want nothing", opcodes(frames))
+	}
+	if n := w.srv.PlayerItemCount(t, w.player, infinityBlade); n != 1 {
+		t.Fatalf("first weapon held = %d, want 1", n)
+	}
+	if n := w.srv.PlayerItemCount(t, w.player, infinityCleaver); n != 0 {
+		t.Fatalf("second weapon held = %d, want 0", n)
+	}
+
+	w.openAnyNpcPage(t)
+	wantPage(t, w.bypass(t, npcCommand(monument, "Quest HeroWeapon")), monument, scriptPage(t, heroWeaponDir+"already_have_weapon.htm", monument), 2)
 }
