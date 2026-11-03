@@ -151,7 +151,7 @@ func (r *run) passRespawns(t *testing.T, d time.Duration) {
 		if !seen {
 			// The armed delay is whole seconds from the wall clock, a few
 			// milliseconds ago.
-			r.respawnLeft[id] = time.Until(deadline).Round(time.Second)
+			r.respawnLeft[id] = (time.Until(deadline) + time.Second - 1).Truncate(time.Second)
 			continue
 		}
 		if left -= d; left > 0 {

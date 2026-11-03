@@ -47,14 +47,20 @@ func (c *corpses) Decay(actor task.DecayActor) {
 		return
 	}
 	if obj, ok := state.Object(actor.ObjectID()); ok {
+		if f := c.respawnHook.Load(); f != nil {
+			// The hook is resolved only once the decay has won, as the
+			// server's decay does.
+			if corpse, ok := obj.(interface {
+				DecayWithRespawn(*world.State, func(int32) func()) bool
+			}); ok {
+				corpse.DecayWithRespawn(state, *f)
+				return
+			}
+		}
 		if corpse, ok := obj.(interface {
 			Decay(*world.State, func()) bool
 		}); ok {
-			var hook func()
-			if f := c.respawnHook.Load(); f != nil {
-				hook = (*f)(actor.ObjectID())
-			}
-			corpse.Decay(state, hook)
+			corpse.Decay(state, nil)
 		}
 	}
 }
