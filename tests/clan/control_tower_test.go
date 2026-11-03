@@ -80,14 +80,14 @@ func workingTowerTemplates() *npc.Table {
 }
 
 // towerWorld boots the test castle owned by Rivals, Knights registered to
-// attack its siege, with the NPC spawns placing its towers. The founder
-// (Knights) and the rival (Rivals) stand at towerBase, in the world.
-func towerWorld(t *testing.T) *clanWorld {
+// attack its siege, with the NPC spawns placing its towers, and opts. The
+// founder (Knights) and the rival (Rivals) stand at towerBase, in the world.
+func towerWorld(t *testing.T, opts ...gameservertest.Option) *clanWorld {
 	t.Helper()
 	at := func(who string) string {
 		return `UPDATE characters SET x = ` + itoa(int32(towerBase.X)) + `, y = ` + itoa(int32(towerBase.Y)) + `, z = ` + itoa(int32(towerBase.Z)) + ` WHERE ` + who
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Founder", 40, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCastles(towerCastle(t)),
@@ -101,7 +101,7 @@ func towerWorld(t *testing.T) *clanWorld {
 			at(`char_name = 'Founder'`),
 			at(`obj_Id = `+itoa(rivalLeaderID)),
 		),
-	)
+	}, opts...)...)
 	w := &clanWorld{srv: srv, leader: srv.Client, leaderID: srv.SoleObjectID(t), memberID: rivalLeaderID, at: towerBase}
 	w.member = srv.DialClient(t, "player2", 1)
 	return w

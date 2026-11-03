@@ -157,6 +157,7 @@ func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc
 	inst.CastleID = info.castleID
 	inst.ClanID = info.clanID
 	inst.ResidenceOwner = n.owners
+	inst.SetPolymorph(info.form)
 	// Each life of the slot starts with the script value cleared; its
 	// other script memory carries over.
 	var slot npc.SpawnSlot

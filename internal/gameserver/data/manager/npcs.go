@@ -77,6 +77,10 @@ type slotInfo struct {
 	// declared afterwards (//respawnall, a new //spawn) use the reloaded
 	// templates.
 	tmpl *npc.Template
+	// form is the look the slot's NPC last left the world in, nil for its
+	// own: the NPC the slot brings back next is shown so from its first
+	// sight.
+	form *npc.Template
 	// fixed marks a standalone spawn placed at a point of its own, not
 	// declared under a maker: at and heading are that point. It never
 	// respawns. placed marks a script private created at a point of its

@@ -237,8 +237,17 @@ func (f *Folk) TalkAnimation() (id int32, ok bool) {
 	}
 }
 
-// NPCInfoSnapshot captures this NPC's client-visible state.
+// NPCInfoSnapshot captures this NPC's client-visible state, in its form
+// when it has one.
 func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
+	s := f.infoSnapshot()
+	f.Instance.showForm(&s)
+	return s
+}
+
+// infoSnapshot is NPCInfoSnapshot shown as the NPC itself, whatever its
+// form.
+func (f *Folk) infoSnapshot() npcinfo.Snapshot {
 	t := f.Instance.Template
 	x, y, z := f.Position()
 	name, title := "", ""
@@ -249,22 +258,16 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 		title = f.Instance.Title()
 	}
 	pAtkSpd := f.AttackSpeed()
-	// A working control tower is shown as its working form: its template
-	// id, held items and body.
-	shown := t
-	if form := f.towerState.form.Load(); form != nil {
-		shown = form
-	}
 	return npcinfo.Snapshot{
-		ObjectID: f.ObjectID(), TemplateID: shown.TemplateID,
+		ObjectID: f.ObjectID(), TemplateID: t.TemplateID,
 		X: x, Y: y, Z: z, Heading: f.Heading(),
 		MAtkSpd: f.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
 		MoveMultiplier: float64(f.MovementSpeedMultiplier()), AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, t.AtkSpd),
 		MoveType:  f.zones.moveType(),
 		CurrentHP: f.CurrentHP(), MaxHP: f.MaxHP(),
-		CollisionRadius: shown.CollisionRadius, CollisionHeight: shown.CollisionHeight,
-		RightHand: shown.RightHand, LeftHand: shown.LeftHand,
+		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
+		RightHand: t.RightHand, LeftHand: t.LeftHand,
 		Running: f.Running(), InCombat: f.InCombat(), AlikeDead: f.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: f.AbnormalEffect(), Name: name, Title: title,
 	}
