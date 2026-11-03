@@ -7,12 +7,17 @@ import (
 
 // A Region stores its blocks in four read-only sections, all little-endian:
 //
-//   - kinds: a 2-bit block kind per block, four blocks per byte.
-//   - values: a u16 per block: a flat block's exact height, or a complex or
-//     multilayer block's byte offset inside its superblock's data.
 //   - bases: a u32 per superblock of 16x16 blocks: the data offset its
 //     blocks are stored from, or wideSuperblock|n when its data outgrows u16
 //     offsets and row n of wide holds its blocks' absolute data offsets.
+//   - index: a group per 16 blocks in block index order, so each group
+//     covers one block X and 16 consecutive block Ys. A group is a u32 of
+//     2-bit block kinds, then a u16 value per block: a flat block's exact
+//     height, or a complex or multilayer block's byte offset inside its
+//     superblock's data. A block's kind and value thus share one small
+//     record.
+//   - wide: per wide superblock, a row of u32 absolute data offsets, one
+//     per block in superblock storage order.
 //   - data: every complex and multilayer block, superblock by superblock,
 //     followed by dataPad bytes so any field is read with one 8-byte load.
 //
@@ -40,9 +45,11 @@ const (
 	superblockBlocks = superblockSide * superblockSide
 
 	regionHeaderSize = 8
-	kindsSize        = RegionBlockCount / 4
-	valuesSize       = RegionBlockCount * 2
 	basesSize        = superblockCount * 4
+	groupBlocks      = 16
+	groupValues      = 4
+	groupSize        = groupValues + groupBlocks*2
+	indexSize        = RegionBlockCount / groupBlocks * groupSize
 	wideRowSize      = superblockBlocks * 4
 	dataPad          = 8
 
@@ -72,9 +79,8 @@ const (
 // never modified afterwards, so its storage may be a read-only mapping.
 type Region struct {
 	stored []byte // the whole stored form WriteTo emits
-	kinds  []byte
-	values []byte
-	bases  []byte
+	bases  *[basesSize]byte
+	index  *[indexSize]byte
 	wide   []byte
 	data   []byte
 }
@@ -95,18 +101,20 @@ func NewRegionFromBlocks(blocks []Block) (*Region, error) {
 
 // KindAt identifies the block layout at block coordinates.
 func (r *Region) KindAt(blockX, blockY int) Kind {
-	return Kind(r.kind(blockIndex(blockX, blockY)))
+	kind, _ := r.entry(blockX, blockY)
+	return Kind(kind)
 }
 
 // HasGeodata reports whether a block carries real geodata.
 func (r *Region) HasGeodata(blockX, blockY int) bool {
-	return r.kind(blockIndex(blockX, blockY)) != regionNull
+	kind, _ := r.entry(blockX, blockY)
+	return kind != regionNull
 }
 
 // Layers returns the cell's layer count.
 func (r *Region) Layers(blockX, blockY, cellX, cellY int) int {
-	if r.kind(blockIndex(blockX, blockY)) == regionMultilayer {
-		b := r.multilayer(blockX, blockY)
+	if kind, v := r.entry(blockX, blockY); kind == regionMultilayer {
+		b := r.multilayer(blockX, blockY, v)
 		_, count := b.span(r.data, cellIndex(cellX, cellY))
 		return count
 	}
@@ -115,16 +123,17 @@ func (r *Region) Layers(blockX, blockY, cellX, cellY int) int {
 
 // HeightNearest returns the closest layer height at the cell.
 func (r *Region) HeightNearest(blockX, blockY, cellX, cellY int, worldZ int32) int16 {
-	i := blockIndex(blockX, blockY)
-	switch r.kind(i) {
+	kind, v := r.entry(blockX, blockY)
+	switch kind {
 	case regionFlat:
-		return r.flatHeight(i)
+		return int16(v)
 	case regionComplex:
-		return r.complexCell(blockX, blockY, cellIndex(cellX, cellY)).Height
+		return r.complexHeight(blockX, blockY, v, cellIndex(cellX, cellY))
 	case regionMultilayer:
-		b := r.multilayer(blockX, blockY)
+		b := r.multilayer(blockX, blockY, v)
 		start, count := b.span(r.data, cellIndex(cellX, cellY))
-		return b.layer(r.data, start+b.nearest(r.data, start, count, worldZ)).Height
+		_, c := b.nearest(r.data, start, count, worldZ)
+		return c.Height
 	default:
 		return NullHeight(worldZ)
 	}
@@ -132,13 +141,15 @@ func (r *Region) HeightNearest(blockX, blockY, cellX, cellY int, worldZ int32) i
 
 // NSWENearest returns the closest layer passability mask at the cell.
 func (r *Region) NSWENearest(blockX, blockY, cellX, cellY int, worldZ int32) NSWE {
-	switch r.kind(blockIndex(blockX, blockY)) {
+	kind, v := r.entry(blockX, blockY)
+	switch kind {
 	case regionComplex:
-		return r.complexCell(blockX, blockY, cellIndex(cellX, cellY)).NSWE
+		return r.complexCell(blockX, blockY, v, cellIndex(cellX, cellY)).NSWE
 	case regionMultilayer:
-		b := r.multilayer(blockX, blockY)
+		b := r.multilayer(blockX, blockY, v)
 		start, count := b.span(r.data, cellIndex(cellX, cellY))
-		return b.layer(r.data, start+b.nearest(r.data, start, count, worldZ)).NSWE
+		_, c := b.nearest(r.data, start, count, worldZ)
+		return c.NSWE
 	default:
 		return AllDirections
 	}
@@ -146,14 +157,16 @@ func (r *Region) NSWENearest(blockX, blockY, cellX, cellY int, worldZ int32) NSW
 
 // Nearest returns a handle to the closest layer at the cell.
 func (r *Region) Nearest(blockX, blockY, cellX, cellY int, worldZ int32) int {
-	switch r.kind(blockIndex(blockX, blockY)) {
+	kind, v := r.entry(blockX, blockY)
+	switch kind {
 	case regionComplex:
 		return cellIndex(cellX, cellY)
 	case regionMultilayer:
 		ci := cellIndex(cellX, cellY)
-		b := r.multilayer(blockX, blockY)
+		b := r.multilayer(blockX, blockY, v)
 		start, count := b.span(r.data, ci)
-		return ci*layerSlot + b.nearest(r.data, start, count, worldZ)
+		l, _ := b.nearest(r.data, start, count, worldZ)
+		return ci*layerSlot + l
 	default:
 		return 0
 	}
@@ -168,20 +181,20 @@ func (r *Region) Above(blockX, blockY, cellX, cellY int, worldZ int32) int {
 // AboveCell is Above that also returns the found layer's cell, so a caller
 // resolving the handle at once decodes the cell a single time.
 func (r *Region) AboveCell(blockX, blockY, cellX, cellY int, worldZ int32) (int, Cell) {
-	i := blockIndex(blockX, blockY)
-	switch r.kind(i) {
+	kind, v := r.entry(blockX, blockY)
+	switch kind {
 	case regionFlat:
-		if h := r.flatHeight(i); int32(h) > worldZ {
+		if h := int16(v); int32(h) > worldZ {
 			return 0, Cell{Height: h, NSWE: AllDirections}
 		}
 	case regionComplex:
 		ci := cellIndex(cellX, cellY)
-		if c := r.complexCell(blockX, blockY, ci); int32(c.Height) > worldZ {
+		if c := r.complexCell(blockX, blockY, v, ci); int32(c.Height) > worldZ {
 			return ci, c
 		}
 	case regionMultilayer:
 		ci := cellIndex(cellX, cellY)
-		b := r.multilayer(blockX, blockY)
+		b := r.multilayer(blockX, blockY, v)
 		start, count := b.span(r.data, ci)
 		for l := 0; l < count; l++ {
 			if c := b.layer(r.data, start+l); int32(c.Height) > worldZ {
@@ -203,20 +216,20 @@ func (r *Region) Below(blockX, blockY, cellX, cellY int, worldZ int32) int {
 // BelowCell is Below that also returns the found layer's cell, so a caller
 // resolving the handle at once decodes the cell a single time.
 func (r *Region) BelowCell(blockX, blockY, cellX, cellY int, worldZ int32) (int, Cell) {
-	i := blockIndex(blockX, blockY)
-	switch r.kind(i) {
+	kind, v := r.entry(blockX, blockY)
+	switch kind {
 	case regionFlat:
-		if h := r.flatHeight(i); int32(h) < worldZ {
+		if h := int16(v); int32(h) < worldZ {
 			return 0, Cell{Height: h, NSWE: AllDirections}
 		}
 	case regionComplex:
 		ci := cellIndex(cellX, cellY)
-		if c := r.complexCell(blockX, blockY, ci); int32(c.Height) < worldZ {
+		if c := r.complexCell(blockX, blockY, v, ci); int32(c.Height) < worldZ {
 			return ci, c
 		}
 	case regionMultilayer:
 		ci := cellIndex(cellX, cellY)
-		b := r.multilayer(blockX, blockY)
+		b := r.multilayer(blockX, blockY, v)
 		start, count := b.span(r.data, ci)
 		for l := count - 1; l >= 0; l-- {
 			if c := b.layer(r.data, start+l); int32(c.Height) < worldZ {
@@ -249,14 +262,14 @@ func (r *Region) Cells(blockX, blockY, cellX, cellY int) []Cell {
 // never allocates, so hot paths can walk a cell's layers through a
 // caller-owned buffer instead of Cells' fresh slice.
 func (r *Region) AppendCells(dst []Cell, blockX, blockY, cellX, cellY int) []Cell {
-	i := blockIndex(blockX, blockY)
-	switch r.kind(i) {
+	kind, v := r.entry(blockX, blockY)
+	switch kind {
 	case regionFlat:
-		return append(dst, Cell{Height: r.flatHeight(i), NSWE: AllDirections})
+		return append(dst, Cell{Height: int16(v), NSWE: AllDirections})
 	case regionComplex:
-		return append(dst, r.complexCell(blockX, blockY, cellIndex(cellX, cellY)))
+		return append(dst, r.complexCell(blockX, blockY, v, cellIndex(cellX, cellY)))
 	case regionMultilayer:
-		b := r.multilayer(blockX, blockY)
+		b := r.multilayer(blockX, blockY, v)
 		start, count := b.span(r.data, cellIndex(cellX, cellY))
 		for l := 0; l < count; l++ {
 			dst = append(dst, b.layer(r.data, start+l))
@@ -270,14 +283,14 @@ func (r *Region) AppendCells(dst []Cell, blockX, blockY, cellX, cellY int) []Cel
 // layerCell resolves a layer handle to its cell layer. A null block is a
 // constant ground height 0, the same contract as Null.Height.
 func (r *Region) layerCell(blockX, blockY, layer int) Cell {
-	i := blockIndex(blockX, blockY)
-	switch r.kind(i) {
+	kind, v := r.entry(blockX, blockY)
+	switch kind {
 	case regionFlat:
-		return Cell{Height: r.flatHeight(i), NSWE: AllDirections}
+		return Cell{Height: int16(v), NSWE: AllDirections}
 	case regionComplex:
-		return r.complexCell(blockX, blockY, layer)
+		return r.complexCell(blockX, blockY, v, layer)
 	case regionMultilayer:
-		b := r.multilayer(blockX, blockY)
+		b := r.multilayer(blockX, blockY, v)
 		start, _ := b.span(r.data, layer/layerSlot)
 		return b.layer(r.data, start+layer%layerSlot)
 	default:
@@ -289,39 +302,34 @@ func blockIndex(blockX, blockY int) int {
 	return blockX*RegionBlocksY + blockY
 }
 
-func (r *Region) kind(i int) uint8 {
-	return r.kinds[i>>2] >> (uint(i&3) * 2) & 3
+// entry returns the kind and value of the block at blockX, blockY. Block
+// coordinates are always in range; reducing the index modulo the block count
+// only lets the compiler drop the bounds checks.
+func (r *Region) entry(blockX, blockY int) (uint8, uint16) {
+	i := uint(blockIndex(blockX, blockY)) % RegionBlockCount
+	g, j := i/groupBlocks*groupSize, i%groupBlocks
+	return uint8(binary.LittleEndian.Uint32(r.index[g:]) >> (j * 2) & 3), binary.LittleEndian.Uint16(r.index[g+groupValues+j*2:])
 }
 
-func (r *Region) flatHeight(i int) int16 {
-	return int16(binary.LittleEndian.Uint16(r.values[i*2:]))
-}
-
-// offset returns the data offset of a complex or multilayer block.
-func (r *Region) offset(blockX, blockY int) int {
-	base := binary.LittleEndian.Uint32(r.bases[(blockX>>superblockShift*superblocksY+blockY>>superblockShift)*4:])
+// offset returns the data offset of the complex or multilayer block at
+// blockX, blockY whose index value is value.
+func (r *Region) offset(blockX, blockY int, value uint16) uint {
+	sb := uint(blockX>>superblockShift*superblocksY+blockY>>superblockShift) % superblockCount
+	base := binary.LittleEndian.Uint32(r.bases[sb*4:])
 	if base&wideSuperblock != 0 {
-		return r.wideOffset(base, blockX, blockY)
+		local := blockX&(superblockSide-1)*superblockSide + blockY&(superblockSide-1)
+		return uint(binary.LittleEndian.Uint32(r.wide[(int(base&^wideSuperblock)*superblockBlocks+local)*4:]))
 	}
-	return int(base) + int(binary.LittleEndian.Uint16(r.values[blockIndex(blockX, blockY)*2:]))
+	return uint(base) + uint(value)
 }
 
-func (r *Region) wideOffset(base uint32, blockX, blockY int) int {
-	local := blockX&(superblockSide-1)*superblockSide + blockY&(superblockSide-1)
-	return int(binary.LittleEndian.Uint32(r.wide[(int(base&^wideSuperblock)*superblockBlocks+local)*4:]))
-}
-
-// complexCell decodes cell ci of the complex block at blockX, blockY. It is
-// the hottest geodata read, so it keeps the load chain short: the header
-// (mode, base, slopes and usually the whole palette) is one 8-byte load,
-// then the cell field is a second.
-func (r *Region) complexCell(blockX, blockY, ci int) Cell {
-	base := binary.LittleEndian.Uint32(r.bases[(blockX>>superblockShift*superblocksY+blockY>>superblockShift)*4:])
-	off := uint(base) + uint(binary.LittleEndian.Uint16(r.values[blockIndex(blockX, blockY)*2:]))
-	if base&wideSuperblock != 0 {
-		off = uint(r.wideOffset(base, blockX, blockY))
-	}
-	head := binary.LittleEndian.Uint64(r.data[off:])
+// complexCell decodes cell ci of the complex block at blockX, blockY whose
+// index value is value. It is the hottest geodata read, so it keeps the
+// load chain short: the header (mode, base, slopes and usually the whole
+// palette) is one 8-byte load, then the cell field is a second.
+func (r *Region) complexCell(blockX, blockY int, value uint16, ci int) Cell {
+	off := r.offset(blockX, blockY, value)
+	head := load64(r.data, off)
 	mode := uint(head)
 	k := mode & modeResidualMask
 	w := k + mode>>modePaletteShift&modePaletteMask
@@ -339,45 +347,57 @@ func (r *Region) complexCell(blockX, blockY, ci int) Cell {
 	}
 	size := (uint(1)<<(w-k) + 1) >> 1
 	if palette+size > 8 {
-		nibbles = binary.LittleEndian.Uint64(r.data[off+palette:])
+		nibbles = load64(r.data, off+palette)
 	}
 	bit := (off+palette+size)*8 + uint(ci)*w
-	v := uint(binary.LittleEndian.Uint64(r.data[bit>>3:])>>(bit&7)) & (1<<w - 1)
+	v := uint(load64(r.data, bit>>3)>>(bit&7)) & (1<<w - 1)
 	q += int32(v & (1<<k - 1))
 	return Cell{Height: int16(q * CellHeight), NSWE: NSWE(nibbles >> (v >> k * 4) & 0xf)}
 }
 
-// multilayerBlock is a multilayer block's decoded header. It holds no data
-// slice so it stays small enough to pass in registers.
-type multilayerBlock struct {
-	nibbles    uint64 // the NSWE palette, at most 16 nibbles
-	base       int32
-	k, w       uint
-	starts     int // data offset of the layer starts
-	wideStarts bool
-	layers     uint // bit offset of layer 0
-}
-
-func (r *Region) multilayer(blockX, blockY int) multilayerBlock {
-	off := r.offset(blockX, blockY)
-	head := binary.LittleEndian.Uint64(r.data[off:])
+// complexHeight is complexCell's height alone. It skips the palette, and a
+// block whose heights lie exactly on its plane (k == 0) needs no field read.
+func (r *Region) complexHeight(blockX, blockY int, value uint16, ci int) int16 {
+	off := r.offset(blockX, blockY, value)
+	head := load64(r.data, off)
 	mode := uint(head)
 	k := mode & modeResidualMask
-	w := k + mode>>modePaletteShift&modePaletteMask
-	size := paletteBytes(w - k)
-	b := multilayerBlock{
-		nibbles:    head >> 24,
-		base:       int32(int16(head >> 8)),
-		k:          k,
-		w:          w,
-		starts:     off + 3 + size,
-		wideStarts: mode&modeFlag != 0,
+	q := int32(int16(head >> 8))
+	fields := off + 3
+	if mode&modeFlag != 0 {
+		c := uint(ci)
+		q += int32(int8(head>>24))*int32(c/CellsY) + int32(int8(head>>32))*int32(c%CellsY)
+		fields += 2
 	}
+	if k != 0 {
+		p := mode >> modePaletteShift & modePaletteMask
+		bit := (fields+(uint(1)<<p+1)>>1)*8 + uint(ci)*(k+p)
+		q += int32(uint(load64(r.data, bit>>3)>>(bit&7)) & (1<<k - 1))
+	}
+	return int16(q * CellHeight)
+}
+
+// multilayerBlock is a multilayer block's decoded header. It holds no data
+// slice and at most four fields, so it stays in registers.
+type multilayerBlock struct {
+	head    uint64 // the mode byte, then the base height
+	nibbles uint64 // the NSWE palette, at most 16 nibbles
+	starts  int    // data offset of the layer starts
+	layers  uint   // bit offset of layer 0
+}
+
+func (r *Region) multilayer(blockX, blockY int, value uint16) multilayerBlock {
+	off := r.offset(blockX, blockY, value)
+	head := load64(r.data, off)
+	b := multilayerBlock{head: head, nibbles: head >> 24}
+	mode := uint(head)
+	size := uint(paletteBytes(mode >> modePaletteShift & modePaletteMask))
 	if 3+size > 8 {
-		b.nibbles = binary.LittleEndian.Uint64(r.data[off+3:])
+		b.nibbles = load64(r.data, off+3)
 	}
-	b.layers = uint(b.starts + layerStarts)
-	if b.wideStarts {
+	b.starts = int(off + 3 + size)
+	b.layers = off + 3 + size + layerStarts
+	if mode&modeFlag != 0 {
 		b.layers += layerStarts
 	}
 	b.layers *= 8
@@ -385,8 +405,8 @@ func (r *Region) multilayer(blockX, blockY int) multilayerBlock {
 }
 
 // span returns the index of the cell's lowest layer and its layer count.
-func (b *multilayerBlock) span(data []byte, ci int) (start, count int) {
-	if b.wideStarts {
+func (b multilayerBlock) span(data []byte, ci int) (start, count int) {
+	if b.head&modeFlag != 0 {
 		start = int(binary.LittleEndian.Uint16(data[b.starts+ci*2:]))
 		return start, int(binary.LittleEndian.Uint16(data[b.starts+ci*2+2:])) - start
 	}
@@ -394,27 +414,37 @@ func (b *multilayerBlock) span(data []byte, ci int) (start, count int) {
 	return start, int(data[b.starts+ci+1]) - start
 }
 
-func (b *multilayerBlock) layer(data []byte, l int) Cell {
-	bit := b.layers + uint(l)*b.w
-	v := uint(binary.LittleEndian.Uint64(data[bit>>3:])>>(bit&7)) & (1<<b.w - 1)
-	q := b.base + int32(v&(1<<b.k-1))
-	return Cell{Height: int16(q * CellHeight), NSWE: NSWE(b.nibbles >> (v >> b.k * 4) & 0xf)}
+func (b multilayerBlock) layer(data []byte, l int) Cell {
+	mode := uint(b.head)
+	k := mode & modeResidualMask
+	w := k + mode>>modePaletteShift&modePaletteMask
+	bit := b.layers + uint(l)*w
+	v := uint(load64(data, bit>>3)>>(bit&7)) & (1<<w - 1)
+	q := int32(int16(b.head>>8)) + int32(v&(1<<k-1))
+	return Cell{Height: int16(q * CellHeight), NSWE: NSWE(b.nibbles >> (v >> k * 4) & 0xf)}
 }
 
-// nearest returns the cell's layer closest to worldZ; of two equally close
-// layers the higher wins.
-func (b *multilayerBlock) nearest(data []byte, start, count int, worldZ int32) int {
-	best := 0
+// nearest returns the cell's layer closest to worldZ and that layer; of two
+// equally close layers the higher wins.
+func (b multilayerBlock) nearest(data []byte, start, count int, worldZ int32) (int, Cell) {
+	best, cell := 0, Cell{}
 	limit := int32(math.MaxInt32)
 	for l := 0; l < count; l++ {
-		d := abs32(int32(b.layer(data, start+l).Height) - worldZ)
+		c := b.layer(data, start+l)
+		d := abs32(int32(c.Height) - worldZ)
 		if d > limit {
 			break
 		}
 		limit = d
-		best = l
+		best, cell = l, c
 	}
-	return best
+	return best, cell
+}
+
+// load64 reads the 8 bytes at data[off:]. Its three-index slice keeps the
+// read to one bounds check.
+func load64(data []byte, off uint) uint64 {
+	return binary.LittleEndian.Uint64(data[off : off+8 : off+8])
 }
 
 // paletteBytes is the size of a palette of 2^p nibbles.

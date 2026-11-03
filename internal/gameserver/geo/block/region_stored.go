@@ -8,7 +8,7 @@ import (
 )
 
 // A stored region is a u32 wide-row count and a u32 data length (dataPad
-// included), then the kinds, values, bases, wide and data sections.
+// included), then the bases, index, wide and data sections.
 
 // WriteTo writes the region's stored form, which ParseRegion reads back.
 func (r *Region) WriteTo(w io.Writer) (int64, error) {
@@ -55,11 +55,11 @@ func (r *Region) validate() error {
 	}
 	for bx := range RegionBlocksX {
 		for by := range RegionBlocksY {
-			kind := r.kind(blockIndex(bx, by))
+			kind, v := r.entry(bx, by)
 			if kind != regionComplex && kind != regionMultilayer {
 				continue
 			}
-			off := r.offset(bx, by)
+			off := int(r.offset(bx, by, v))
 			n, err := packedSize(r.data[:limit], off, kind)
 			if err == nil && off+n > limit {
 				err = errors.New("block overruns region data")
@@ -118,8 +118,8 @@ func packedSize(data []byte, off int, kind uint8) (int, error) {
 // RegionStats summarizes a region's blocks and stored bytes by kind.
 type RegionStats struct {
 	FlatBlocks, ComplexBlocks, MultilayerBlocks int
-	// IndexBytes covers the stored-region header and the kinds, values,
-	// bases and wide sections; data padding counts as complex bytes.
+	// IndexBytes covers the stored-region header and the bases, index and
+	// wide sections; data padding counts as complex bytes.
 	IndexBytes, ComplexBytes, MultilayerBytes int
 }
 
@@ -138,16 +138,16 @@ func (r *Region) Stats() RegionStats {
 	s := RegionStats{IndexBytes: len(r.stored) - len(r.data), ComplexBytes: dataPad}
 	for bx := range RegionBlocksX {
 		for by := range RegionBlocksY {
-			kind := r.kind(blockIndex(bx, by))
+			kind, v := r.entry(bx, by)
 			switch kind {
 			case regionFlat:
 				s.FlatBlocks++
 			case regionComplex:
-				n, _ := packedSize(r.data, r.offset(bx, by), kind)
+				n, _ := packedSize(r.data, int(r.offset(bx, by, v)), kind)
 				s.ComplexBlocks++
 				s.ComplexBytes += n
 			case regionMultilayer:
-				n, _ := packedSize(r.data, r.offset(bx, by), kind)
+				n, _ := packedSize(r.data, int(r.offset(bx, by, v)), kind)
 				s.MultilayerBlocks++
 				s.MultilayerBytes += n
 			}
