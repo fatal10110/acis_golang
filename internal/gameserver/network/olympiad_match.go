@@ -205,7 +205,7 @@ func olympiadUserInfo(live *livePlayer) serverpackets.OlympiadUserInfo {
 	res := live.ResourceValues()
 	return serverpackets.OlympiadUserInfo{
 		Side: live.OlympiadSide(), ObjectID: live.ObjectID(), Name: live.CharacterName(), ClassID: int32(live.ClassID()),
-		HP: int32(res.CurrentHP), MaxHP: int32(res.MaxHP), CP: int32(res.CurrentCP), MaxCP: int32(res.MaxCP),
+		HP: res.CurrentHP, MaxHP: res.MaxHP, CP: res.CurrentCP, MaxCP: res.MaxCP,
 	}
 }
 

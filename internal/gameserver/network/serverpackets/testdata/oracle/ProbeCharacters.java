@@ -61,7 +61,7 @@ final class ProbeCharacters
 		variants();
 	}
 
-	private static final int[] CLASS_INDEX =
+	static final int[] CLASS_INDEX =
 	{
 		0,
 		18,

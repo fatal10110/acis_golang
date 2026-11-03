@@ -3,7 +3,7 @@ package net.sf.l2j.commons.data;
 import java.util.HashMap;
 import java.util.Map;
 
-// Stand-in: a map-backed set with the two readers the value types use (the
+// Stand-in: a map-backed set with the readers the value types use (the
 // location type and the manor seed build themselves from one).
 public final class StatSet
 {
@@ -35,6 +35,23 @@ public final class StatSet
 	{
 		final Object val = _map.get(key);
 		return (val == null) ? defaultValue : ((Number) val).intValue();
+	}
+
+	// The pair a node names under key (an item the node needs); unread unless containsKey.
+	public net.sf.l2j.gameserver.model.holder.IntIntHolder getIntIntHolder(String key)
+	{
+		return (net.sf.l2j.gameserver.model.holder.IntIntHolder) _map.get(key);
+	}
+
+	public boolean containsKey(String key)
+	{
+		return _map.containsKey(key);
+	}
+
+	public boolean getBool(String key, boolean defaultValue)
+	{
+		final Object val = _map.get(key);
+		return (val == null) ? defaultValue : (Boolean) val;
 	}
 
 	public boolean getBool(String key)

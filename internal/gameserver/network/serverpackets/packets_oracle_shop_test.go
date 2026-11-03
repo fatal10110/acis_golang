@@ -209,7 +209,7 @@ func addPrivateStoreCases(m map[string]func() wire.Frame, r int, v [10]int32, n 
 }
 
 func addRecipeCases(m map[string]func() wire.Frame, r int, v [10]int32, n string) {
-	crafter, adena, mp, maxMP := rowField(v, 0), int(rowField(v, 1)), rowField(v, 2), rowField(v, 3)
+	crafter, adena, mp, maxMP := rowField(v, 0), int(rowField(v, 1)), float64(rowField(v, 2)), float64(rowField(v, 3))
 	dwarvenBook := []recipe.Recipe{{ID: int(rowField(v, 4)), Dwarven: true}, {ID: int(rowField(v, 5)), Dwarven: true}}
 	commonBook := []recipe.Recipe{{ID: int(rowField(v, 6))}}
 	all := []privatestore.ManufactureItem{

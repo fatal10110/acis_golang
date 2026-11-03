@@ -7,6 +7,12 @@ import net.sf.l2j.gameserver.model.pledge.Clan;
 public final class Siege
 {
 	public SiegeSide side = SiegeSide.PENDING;
+	public boolean inProgress;
+
+	public boolean isInProgress()
+	{
+		return inProgress;
+	}
 
 	public SiegeSide getSide(Clan clan)
 	{
