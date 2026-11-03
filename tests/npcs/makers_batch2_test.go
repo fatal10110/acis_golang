@@ -183,7 +183,7 @@ func TestAlarmDeviceMakersRaiseEachOther(t *testing.T) {
 		if got := deleted(drainFrames(t, w.c)); !slices.Equal(got, []int32{gone.ObjectID()}) {
 			t.Fatalf("%s: deleted objects = %v, want [%d]", step, got, gone.ObjectID())
 		}
-		if slot := devices[d].maker + "#0#0"; w.srv.NpcRespawns.Tracked(slot) {
+		if slot := devices[d].maker + "#0#0"; w.srv.RespawnArmed(slot) {
 			t.Fatalf("%s: slot %s armed a respawn", step, slot)
 		}
 	}
@@ -351,7 +351,7 @@ func TestRainbowMakerSpawnsTheRestOnSiegeEnd(t *testing.T) {
 	messenger.DeleteMe()
 	w.srv.Settle(t)
 	count("the messenger left", 0, 1, 1)
-	if w.srv.NpcRespawns.Tracked("rainbow_hall#0#0") {
+	if w.srv.RespawnArmed("rainbow_hall#0#0") {
 		t.Fatal("the messenger leaving armed a respawn")
 	}
 }

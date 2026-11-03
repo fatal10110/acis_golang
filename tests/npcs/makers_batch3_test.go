@@ -351,10 +351,10 @@ func TestFrintezzaEvilateMakerFillsPastItsMaximum(t *testing.T) {
 	mw.inWorld(evilSpiritBID)[0].DeleteMe()
 	w.srv.Settle(t)
 	count("both spirits left", 0, 0)
-	if w.srv.NpcRespawns.Tracked(evilateSpiritSlotA) {
+	if w.srv.RespawnArmed(evilateSpiritSlotA) {
 		t.Fatal("the spirit with no respawn delay armed a respawn")
 	}
-	if !w.srv.NpcRespawns.Tracked(evilateSpiritSlotB) {
+	if !w.srv.RespawnArmed(evilateSpiritSlotB) {
 		t.Fatal("the spirit with a respawn delay armed no respawn")
 	}
 	drainFrames(t, w.c)
@@ -494,7 +494,7 @@ func TestVelociraptorMakerWakesTheLair(t *testing.T) {
 	w.srv.Settle(t)
 	makers.expect(t, "the group left with the flag down", "rune20_mb2017_02m1:1001(0,0)")
 	for _, slot := range []string{"rune20_mb2017_01m1#0#0", "rune20_mb2017_01m1#1#0", "rune20_mb2017_01m1#1#1"} {
-		if w.srv.NpcRespawns.Tracked(slot) {
+		if w.srv.RespawnArmed(slot) {
 			t.Fatalf("slot %s armed a respawn", slot)
 		}
 	}

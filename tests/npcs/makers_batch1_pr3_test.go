@@ -121,7 +121,7 @@ func TestExclusiveSpawnNormalMakerKeepsItsGroupOut(t *testing.T) {
 	}
 	count("boot", 1, 0, 0)
 	for _, slot := range []string{"excl_m#1#0", "excl_m#1#1", "excl_a_other#0#0"} {
-		if w.srv.NpcRespawns.Tracked(slot) {
+		if w.srv.RespawnArmed(slot) {
 			t.Fatalf("boot: slot %s armed a respawn", slot)
 		}
 	}
@@ -138,17 +138,17 @@ func TestExclusiveSpawnNormalMakerKeepsItsGroupOut(t *testing.T) {
 	if got := shown(frames); !slices.Equal(got, []int{exclOtherID}) {
 		t.Fatalf("the leader left: NPCs shown = %v, want [%d]", got, exclOtherID)
 	}
-	if !w.srv.NpcRespawns.Tracked("excl_m#0#0") {
+	if !w.srv.RespawnArmed("excl_m#0#0") {
 		t.Fatal("the leader left and armed no respawn of its own")
 	}
 
-	w.srv.NpcSpawns.Respawn("excl_m#1#0")
+	w.srv.RespawnSlot("excl_m#1#0")
 	w.srv.Settle(t)
 	count("a minion while the leader is out", 0, 1, 1)
 	drainFrames(t, w.c)
 	mw.inWorld(exclMinionID)[0].DeleteMe()
 	w.srv.Settle(t)
-	if !w.srv.NpcRespawns.Tracked("excl_m#1#0") {
+	if !w.srv.RespawnArmed("excl_m#1#0") {
 		t.Fatal("a minion left while the leader is out and armed no respawn")
 	}
 	drainFrames(t, w.c)
@@ -171,7 +171,7 @@ func TestExclusiveSpawnNormalMakerKeepsItsGroupOut(t *testing.T) {
 	if got, gone := shown(frames), deleted(frames); !slices.Equal(got, []int{exclMinionID}) || len(gone) != 1 {
 		t.Fatalf("a minion while the leader is in: shown %v and deleted %v, want the minion shown and deleted", got, gone)
 	}
-	if w.srv.NpcRespawns.Tracked("excl_m#1#0") {
+	if w.srv.RespawnArmed("excl_m#1#0") {
 		t.Fatal("a minion deleted while the leader is in armed a respawn")
 	}
 
@@ -182,7 +182,7 @@ func TestExclusiveSpawnNormalMakerKeepsItsGroupOut(t *testing.T) {
 	}
 	w.srv.Advance(t, time.Millisecond)
 	count("1001 with int1 0", 1, 0, 0)
-	w.srv.NpcSpawns.Respawn("excl_m#1#1")
+	w.srv.RespawnSlot("excl_m#1#1")
 	w.srv.Settle(t)
 	count("a minion after 1001 with int1 0", 1, 1, 0)
 	drainFrames(t, w.c)
@@ -201,7 +201,7 @@ func TestExclusiveSpawnNormalMakerKeepsItsGroupOut(t *testing.T) {
 		t.Fatalf("1000 with int1 0: NPCs shown = %v, want none", got)
 	}
 	for _, slot := range []string{"excl_m#0#0", "excl_m#1#0", "excl_m#1#1"} {
-		if w.srv.NpcRespawns.Tracked(slot) {
+		if w.srv.RespawnArmed(slot) {
 			t.Fatalf("1000 with int1 0: slot %s armed a respawn", slot)
 		}
 	}
@@ -267,7 +267,7 @@ func TestExclusiveDespawnNormalMakerFollowsItsBrazier(t *testing.T) {
 	}
 	count("boot", 1, 0, 0)
 	for _, slot := range []string{"desp1_mob#0#0", "desp1_mob#0#1"} {
-		if w.srv.NpcRespawns.Tracked(slot) {
+		if w.srv.RespawnArmed(slot) {
 			t.Fatalf("boot: slot %s armed a respawn", slot)
 		}
 	}
@@ -286,13 +286,13 @@ func TestExclusiveDespawnNormalMakerFollowsItsBrazier(t *testing.T) {
 		if got := deleted(drainFrames(t, w.c)); !slices.Equal(got, want) {
 			t.Fatalf("%s: deleted objects = %v, want %v", step, got, want)
 		}
-		if !w.srv.NpcRespawns.Tracked("desp3_brazier#0#0") {
+		if !w.srv.RespawnArmed("desp3_brazier#0#0") {
 			t.Fatalf("%s: the brazier armed no respawn", step)
 		}
 	}
 	killBrazier("the brazier left", 0)
 
-	w.srv.NpcSpawns.Respawn("desp1_mob#0#0")
+	w.srv.RespawnSlot("desp1_mob#0#0")
 	w.srv.Settle(t)
 	count("a mob after the brazier came in", 0, 1, 0)
 	mw.inWorld(despMobID)[0].DeleteMe()
@@ -315,7 +315,7 @@ func TestExclusiveDespawnNormalMakerFollowsItsBrazier(t *testing.T) {
 	mw.inWorld(despMobID)[0].DeleteMe()
 	w.srv.Settle(t)
 	count("a mob left with the flag down", 0, 0, 0)
-	if w.srv.NpcRespawns.Tracked("desp1_mob#0#0") {
+	if w.srv.RespawnArmed("desp1_mob#0#0") {
 		t.Fatal("a mob left with the flag down and armed a respawn")
 	}
 	drainFrames(t, w.c)
@@ -328,7 +328,7 @@ func TestExclusiveDespawnNormalMakerFollowsItsBrazier(t *testing.T) {
 	if got := shown(drainFrames(t, w.c)); len(got) != 0 {
 		t.Fatalf("1001 to the mob maker: NPCs shown = %v, want none", got)
 	}
-	w.srv.NpcSpawns.Respawn("desp1_mob#0#1")
+	w.srv.RespawnSlot("desp1_mob#0#1")
 	w.srv.Settle(t)
 	count("a mob after 1001 with int1 1", 0, 1, 0)
 }
@@ -401,7 +401,7 @@ func TestInstantSpawnRandomMakerWakesADrawnMaker(t *testing.T) {
 		if got := draws.takeAsked(); !slices.Equal(got, []int{3}) {
 			t.Fatalf("%s: draws = %v, want one Rnd(3)", step, got)
 		}
-		if w.srv.NpcRespawns.Tracked("isr_src#0#0") {
+		if w.srv.RespawnArmed("isr_src#0#0") {
 			t.Fatalf("%s: the source NPC armed a respawn", step)
 		}
 		w.srv.Advance(t, 19*time.Second)
@@ -504,7 +504,7 @@ func TestRandomSpawnMakersDrawTheirSpawn(t *testing.T) {
 			t.Fatalf("%s: draws = %v, want one Rnd(2)", step, got)
 		}
 		for _, slot := range []string{"rs_m#0#0", "rs_m#0#1", "rs_m#1#0", "rsp_m#0#0", "rsp_m#0#1", "rsp_m#1#0"} {
-			if w.srv.NpcRespawns.Tracked(slot) {
+			if w.srv.RespawnArmed(slot) {
 				t.Fatalf("%s: slot %s armed a respawn", step, slot)
 			}
 		}
@@ -609,7 +609,7 @@ func TestUniqueNpcKillEventMakerActsOnItsUniqueNPC(t *testing.T) {
 	armed := func() []string {
 		var out []string
 		for _, slot := range []string{"uk_delete#1#0", "uk_delete#1#1"} {
-			if w.srv.NpcRespawns.Tracked(slot) {
+			if w.srv.RespawnArmed(slot) {
 				out = append(out, slot)
 			}
 		}
@@ -630,7 +630,7 @@ func TestUniqueNpcKillEventMakerActsOnItsUniqueNPC(t *testing.T) {
 	if got := armed(); len(got) != 0 {
 		t.Fatalf("event 0: mob respawns still armed = %v", got)
 	}
-	if !w.srv.NpcRespawns.Tracked("uk_delete#0#0") {
+	if !w.srv.RespawnArmed("uk_delete#0#0") {
 		t.Fatal("event 0: the unique NPC armed no respawn after the 1000")
 	}
 
@@ -645,7 +645,7 @@ func TestUniqueNpcKillEventMakerActsOnItsUniqueNPC(t *testing.T) {
 	if got := deleted(frames); !slices.Equal(got, []int32{wakeBoss.ObjectID()}) {
 		t.Fatalf("event 1: deleted objects = %v, want [%d]", got, wakeBoss.ObjectID())
 	}
-	if !w.srv.NpcRespawns.Tracked("uk_wake#0#0") {
+	if !w.srv.RespawnArmed("uk_wake#0#0") {
 		t.Fatal("event 1: the unique NPC armed no respawn")
 	}
 
@@ -653,8 +653,8 @@ func TestUniqueNpcKillEventMakerActsOnItsUniqueNPC(t *testing.T) {
 	// 0 one too, though the 1000 had deleted its group; the mobs it
 	// deleted stay gone. The harness never fires a respawn timer.
 	for _, slot := range []string{"uk_delete#0#0", "uk_wake#0#0"} {
-		w.srv.NpcRespawns.Cancel(slot)
-		w.srv.NpcSpawns.Respawn(slot)
+		w.srv.CancelRespawn(slot)
+		w.srv.RespawnSlot(slot)
 	}
 	w.srv.Settle(t)
 	count("the unique NPCs respawned", 1, 0, 1, 1, 1)

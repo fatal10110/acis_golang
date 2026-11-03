@@ -86,11 +86,11 @@ func TestSailrenMakerReadsItsRow(t *testing.T) {
 	makers.expect(t, "Sailren died", "rune16_npc2017_01m1:11045(0,0)")
 	// The slot key of a database-tracked spawn is its database name; the
 	// harness never fires a respawn timer, so it is brought due by hand.
-	if !srv.NpcRespawns.Tracked(sailrenRow) {
+	if !srv.RespawnArmed(sailrenRow) {
 		t.Fatal("Sailren's death armed no respawn")
 	}
-	srv.NpcRespawns.Cancel(sailrenRow)
-	srv.NpcSpawns.Respawn(sailrenRow)
+	srv.CancelRespawn(sailrenRow)
+	srv.RespawnSlot(sailrenRow)
 	srv.Settle(t)
 	if got := len(mw.inWorld(sailrenID)); got != 1 {
 		t.Fatalf("after the respawn: Sailren in the world = %d, want 1", got)

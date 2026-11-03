@@ -43,16 +43,16 @@ func (d *spawnDecay) Decay(actor task.DecayActor) {
 // dueSlots records the spawn slots whose respawn deadline passed.
 type dueSlots struct {
 	mu   sync.Mutex
-	keys []string
+	keys []task.SlotID
 }
 
-func (d *dueSlots) Respawn(key string) {
+func (d *dueSlots) Respawn(key task.SlotID) {
 	d.mu.Lock()
 	d.keys = append(d.keys, key)
 	d.mu.Unlock()
 }
 
-func (d *dueSlots) take() []string {
+func (d *dueSlots) take() []task.SlotID {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	keys := d.keys
@@ -169,6 +169,7 @@ func TestMortalFolkDecaysAndRespawnsThroughItsSlot(t *testing.T) {
 		t.Fatalf("LiveCount() after the decay = %d, want 1", got)
 	}
 	const key = "maker#0#0"
+	id := mustSlot(t, npcs, key)
 	setNow := func(at time.Time) {
 		clockMu.Lock()
 		now = at
@@ -176,16 +177,16 @@ func TestMortalFolkDecaysAndRespawnsThroughItsSlot(t *testing.T) {
 	}
 	setNow(start.Add(7*time.Second + time.Minute - time.Second))
 	respawn.Tick()
-	if keys := due.take(); len(keys) != 0 || !respawn.Tracked(key) {
-		t.Fatalf("pig slot respawned at %v before its 60s delay: %v", keys, respawn.Tracked(key))
+	if keys := due.take(); len(keys) != 0 || !respawnArmed(npcs, respawn, key) {
+		t.Fatalf("pig slot respawned at %v before its 60s delay: %v", keys, respawnArmed(npcs, respawn, key))
 	}
 	setNow(start.Add(7*time.Second + time.Minute))
 	respawn.Tick()
-	if keys := due.take(); len(keys) != 1 || keys[0] != key {
+	if keys := due.take(); len(keys) != 1 || keys[0] != id {
 		t.Fatalf("respawned slots after the delay = %v, want [%s]", keys, key)
 	}
 
-	npcs.Respawn(key)
+	npcs.Respawn(id)
 	queues.Run()
 	if got := npcs.LiveCount(); got != 2 {
 		t.Fatalf("LiveCount() after the respawn = %d, want 2", got)

@@ -282,7 +282,7 @@ func TestGustavBringsBackAFallenPrivate(t *testing.T) {
 			w.kill(t, knight)
 			var armed []string
 			for i := 1; i <= 64; i++ {
-				if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
+				if key := fmt.Sprintf("private#%d", i); w.srv.RespawnArmed(key) {
 					armed = append(armed, key)
 				}
 			}

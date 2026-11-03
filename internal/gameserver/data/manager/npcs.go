@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,7 +29,9 @@ import (
 // and forced to a single live instance: a database-tracked spawn ignores
 // its declared total and only ever has one instance.
 type slotInfo struct {
-	key   string
+	// key is the id the slot lives under: its own (serial), or the one
+	// a database-tracked entry declares every slot under.
+	key   task.SlotID
 	maker *spawn.Maker
 	// group is the run-time npcmaker the slot belongs to and spawnIdx its
 	// entry there; nil for a private's or a standalone spawn's slot.
@@ -51,11 +52,19 @@ type slotInfo struct {
 	orphan bool
 	// epoch is the DespawnAll run the slot was declared in.
 	epoch int
-	// serial tells an npcmaker's slot apart from any other declared under
-	// the same key: a database-tracked entry declares each of its slots
-	// under its one key.
-	serial int
-	entry  spawn.Entry
+	// serial is the slot's own id. It tells an npcmaker's slot apart from
+	// any other declared under the same key: a database-tracked entry
+	// declares each of its slots under its one key. It is the key the slot
+	// lives under once its spawn lets it go (see orphanKey).
+	serial task.SlotID
+	// seq numbers the slot among its entry's for an npcmaker's slot, among
+	// the standalone spawns and privates for any other: with the maker, the
+	// entry and the RespawnAll run it makes the slot's name (slotName).
+	seq int32
+	// entry is the entry the slot was declared under: its maker's own, or
+	// one of the slot's for a standalone spawn or a private. It is never
+	// written through: a change replaces it.
+	entry  *spawn.Entry
 	dbName string
 	// master is the master a private's slot spawns its NPC for, as the
 	// life it had when the slot was declared (npc.Current reads it now);
@@ -103,7 +112,7 @@ type slotMemory struct {
 	row *dbRow
 }
 
-func newSlotMemory(entry spawn.Entry, row *dbRow) *slotMemory {
+func newSlotMemory(entry *spawn.Entry, row *dbRow) *slotMemory {
 	return &slotMemory{params: npc.AIParams(entry.AIParams), scratch: npc.NewScratch(), row: row}
 }
 
@@ -123,6 +132,8 @@ func (m *slotMemory) Row() npc.SpawnRow {
 type dbRow struct {
 	rows *Spawns
 	name string
+	// slot is the key every slot of the row's entry is declared under.
+	slot task.SlotID
 	// loaded is set when a placement restores a live row, cleared when a
 	// boot finds the row dead or the entry's maker clears it; a placement
 	// from a fresh or expired row leaves it as it was.
@@ -261,23 +272,24 @@ type Npcs struct {
 	gate sync.RWMutex
 
 	mu   sync.Mutex
-	slot map[string]slotInfo
+	slot map[task.SlotID]slotInfo
 	// privates indexes the keys of the private slots in slot by their
 	// master's script memory, which every life of the master shares, so a
 	// master's decay visits only its own privates' slots. Every slot
 	// change goes through addSlotLocked and dropSlotLocked to keep it in
 	// step.
-	privates map[*npc.Scratch]map[string]struct{}
-	live     map[int32]string
-	// gen counts the RespawnAll runs; it suffixes the slot keys after the
-	// first, so a respawn armed for a slot of an earlier run never fires
-	// on the slot of the same maker entry spawned anew.
+	privates map[*npc.Scratch]map[task.SlotID]struct{}
+	live     map[int32]task.SlotID
+	// gen counts the RespawnAll runs; it suffixes the slot names after the
+	// first. Every slot declared has an id of its own, so a respawn armed
+	// for a slot of an earlier run never fires on the slot of the same
+	// maker entry spawned anew.
 	gen int
 	// despawns counts the DespawnAll runs: a slot declared before the
 	// last one is gone for good.
 	despawns int
-	// serials counts the npcmaker slots declared, numbering each.
-	serials int
+	// slotIDs counts the slot ids handed out (newSlotID).
+	slotIDs atomic.Uint32
 	// groups are the run-time npcmakers of the spawn list in use, in list
 	// order.
 	groups []*makerGroup
@@ -299,8 +311,9 @@ type Npcs struct {
 	restoredDeadCount     atomic.Int64
 	skippedNonCombatCount atomic.Int64
 	folkCount             atomic.Int64
-	// fixedSeq numbers the standalone spawns SpawnFixed places.
-	fixedSeq atomic.Int64
+	// fixedSeq numbers the standalone spawns SpawnFixed places and the
+	// privates scripts create.
+	fixedSeq atomic.Int32
 	// noSpawns is SetNoSpawns' switch.
 	noSpawns atomic.Bool
 
@@ -468,9 +481,9 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		makerQueue:          queues.NewQueue("makers"),
 		castDefs:            castDefs,
 		castEffects:         castEffects,
-		slot:                make(map[string]slotInfo),
-		privates:            make(map[*npc.Scratch]map[string]struct{}),
-		live:                make(map[int32]string),
+		slot:                make(map[task.SlotID]slotInfo),
+		privates:            make(map[*npc.Scratch]map[task.SlotID]struct{}),
+		live:                make(map[int32]task.SlotID),
 	}
 	n.folk = FolkSpawner{
 		State:               state,
@@ -523,13 +536,9 @@ func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	n.sevenSignsPass()
 }
 
-// slotKey is the key of the slot base names in RespawnAll run gen: base
-// itself at boot.
-func slotKey(base string, gen int) string {
-	if gen == 0 {
-		return base
-	}
-	return base + "@" + strconv.Itoa(gen)
+// newSlotID returns a slot id no slot had before.
+func (n *Npcs) newSlotID() task.SlotID {
+	return task.SlotID(n.slotIDs.Add(1))
 }
 
 // currentSpawns returns the spawn list in use.

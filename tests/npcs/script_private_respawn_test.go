@@ -31,7 +31,7 @@ func (w *scriptSpawnWorld) diePrivate(t *testing.T, h *npc.Hostile, request time
 func (w *scriptSpawnWorld) armedPrivates() []string {
 	var armed []string
 	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
+		if key := fmt.Sprintf("private#%d", i); w.srv.RespawnArmed(key) {
 			armed = append(armed, key)
 		}
 	}
@@ -45,8 +45,8 @@ func (w *scriptSpawnWorld) respawnArmed(t *testing.T) {
 	if len(armed) != 1 {
 		t.Fatalf("script privates with a respawn pending = %q, want one", armed)
 	}
-	w.srv.NpcRespawns.Cancel(armed[0])
-	w.srv.NpcSpawns.Respawn(armed[0])
+	w.srv.CancelRespawn(armed[0])
+	w.srv.RespawnSlot(armed[0])
 	w.srv.Settle(t)
 }
 

@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"errors"
 	"time"
 
@@ -27,7 +28,7 @@ func (n *Npcs) slotOf(id int32) (slotInfo, bool) {
 
 // slotKeyLocked returns the key of the spawn slot of the live or decayed
 // NPC with object id, as slotOf finds it. The caller holds n.mu.
-func (n *Npcs) slotKeyLocked(id int32) (string, bool) {
+func (n *Npcs) slotKeyLocked(id int32) (task.SlotID, bool) {
 	if key, ok := n.live[id]; ok {
 		return key, true
 	}
@@ -36,7 +37,7 @@ func (n *Npcs) slotKeyLocked(id int32) (string, bool) {
 			return key, true
 		}
 	}
-	return "", false
+	return 0, false
 }
 
 // RespawnDelay returns the respawn delay the spawn that placed h declares,
@@ -84,7 +85,7 @@ func (n *Npcs) ScheduleRespawn(h *npc.Hostile, d time.Duration) error {
 // its master lives, for the master's script to ask it back. A dead
 // master's private has nobody left to ask, and a request already pending
 // would find that master dead anyway, so a kept slot would stay for good.
-func (n *Npcs) dropOrphanScriptSlot(key string, slot slotInfo) {
+func (n *Npcs) dropOrphanScriptSlot(key task.SlotID, slot slotInfo) {
 	master := npc.Current(slot.master)
 	alive := master != nil && !master.Dead()
 	n.mu.Lock()

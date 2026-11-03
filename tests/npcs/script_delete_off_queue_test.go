@@ -232,10 +232,10 @@ func TestScriptDeleteOffQueueEndsTheFightInFlight(t *testing.T) {
 			if n != 1 {
 				t.Fatalf("round %d: decayed hooks ran %d times, want 1", round, n)
 			}
-			if !w.srv.NpcRespawns.Cancel(lifeWolfKey) {
+			if !w.srv.CancelRespawn(lifeWolfKey) {
 				t.Fatalf("round %d: the delete armed no respawn", round)
 			}
-			w.srv.NpcSpawns.Respawn(lifeWolfKey)
+			w.srv.RespawnSlot(lifeWolfKey)
 		}
 	})
 }

@@ -48,7 +48,7 @@ func TestSpawnRowSaveRacesDecayAndRespawn(t *testing.T) {
 		})
 		onQueueOf(t, boss, func() { boss.Decay(srv.State, srv.NpcSpawns.RespawnHook(boss.ObjectID())) })
 		srv.Settle(t)
-		srv.NpcSpawns.Respawn(rowDBKey)
+		srv.RespawnSlot(rowDBKey)
 		srv.Settle(t)
 	}
 	close(stop)

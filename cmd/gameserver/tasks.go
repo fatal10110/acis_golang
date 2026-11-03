@@ -322,21 +322,21 @@ func startDecay(lc fx.Lifecycle, d *task.Decay, log zerolog.Logger) {
 // needs *task.Respawn to schedule respawns in the first place.
 type npcRespawnEffects struct {
 	mu   sync.RWMutex
-	hook func(key string)
+	hook func(slot task.SlotID)
 }
 
-func (e *npcRespawnEffects) Respawn(key string) {
+func (e *npcRespawnEffects) Respawn(slot task.SlotID) {
 	e.mu.RLock()
 	hook := e.hook
 	e.mu.RUnlock()
 	if hook != nil {
-		hook(key)
+		hook(slot)
 	}
 }
 
 // SetHook records the callback that re-instantiates a due spawn slot. Call
 // it once, before fx starts the respawn ticker.
-func (e *npcRespawnEffects) SetHook(f func(key string)) {
+func (e *npcRespawnEffects) SetHook(f func(slot task.SlotID)) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.hook = f

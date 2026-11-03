@@ -19,7 +19,7 @@ import (
 // respawnInto respawns the slots of the population it is pointed at.
 type respawnInto struct{ npcs *Npcs }
 
-func (r *respawnInto) Respawn(key string) { r.npcs.Respawn(key) }
+func (r *respawnInto) Respawn(key task.SlotID) { r.npcs.Respawn(key) }
 
 // scriptRespawnWorld is a population on a clock the test moves, whose
 // respawn task respawns into it, with a standalone master of template 1

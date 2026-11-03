@@ -137,7 +137,7 @@ func (w *warriorWorld) armedPrivateRespawn(t *testing.T) string {
 	t.Helper()
 	var armed []string
 	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
+		if key := fmt.Sprintf("private#%d", i); w.srv.RespawnArmed(key) {
 			armed = append(armed, key)
 		}
 	}
@@ -208,7 +208,7 @@ func TestPartyLeaderLeadsPrivatesUntilItDies(t *testing.T) {
 		}
 	}
 	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
+		if key := fmt.Sprintf("private#%d", i); w.srv.RespawnArmed(key) {
 			t.Fatalf("hidden private slot %s armed a respawn", key)
 		}
 	}
@@ -360,7 +360,7 @@ func TestPartyLeaderRespawnsADeadPrivate(t *testing.T) {
 	w.kill(t, private)
 	key := w.armedPrivateRespawn(t)
 	w.onQueue(t, private, func() { private.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(private.ObjectID())) })
-	w.srv.NpcSpawns.Respawn(key)
+	w.srv.RespawnSlot(key)
 	w.srv.Settle(t)
 	w.srv.ReadQueued(t, w.srv.Client)
 

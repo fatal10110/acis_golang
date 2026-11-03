@@ -194,13 +194,13 @@ func TestSpawnRowDeadRowIsNotLoaded(t *testing.T) {
 
 	srv = bootRow(t, log)
 	expectLines(t, "restart", log.take(), []string{fmt.Sprintf("%d loaded=true value=3 memo=unset", rowBossID)})
-	srv.NpcSpawns.Respawn(rowDBKey)
+	srv.RespawnSlot(rowDBKey)
 	srv.Settle(t)
 	expectLines(t, "respawn", log.take(), []string{fmt.Sprintf("%d loaded=false value=3 memo=npc %d", rowDBBossID, rowBossID)})
 	other := liveOf(t, srv, rowBossID).(*npc.Hostile)
 	other.DeleteMe()
 	srv.Settle(t)
-	srv.NpcSpawns.Respawn(rowBossKey)
+	srv.RespawnSlot(rowBossKey)
 	srv.Settle(t)
 	expectLines(t, "respawn after the memo's NPC left", log.take(), []string{fmt.Sprintf("%d loaded=true value=6 memo=npc %d", rowBossID, rowDBBossID)})
 }
@@ -231,7 +231,7 @@ func TestSpawnRowDBMakerClearsLoaded(t *testing.T) {
 	}
 	srv.Settle(t)
 	for _, key := range []string{rowBossKey, rowDBKey} {
-		srv.NpcSpawns.Respawn(key)
+		srv.RespawnSlot(key)
 	}
 	srv.Settle(t)
 	expectLines(t, "respawn", log.take(), []string{

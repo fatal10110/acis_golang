@@ -160,10 +160,10 @@ func TestSpawnSlotScratchSurvivesRespawn(t *testing.T) {
 	grocer.Queue().Post(func() { grocer.Decay(srv.State, srv.NpcSpawns.RespawnHook(grocerID)) })
 	srv.Settle(t)
 	for _, key := range []string{memoWolfKey, memoGrocerKey} {
-		if !srv.NpcRespawns.Tracked(key) {
+		if !srv.RespawnArmed(key) {
 			t.Fatalf("slot %s armed no respawn", key)
 		}
-		srv.NpcSpawns.Respawn(key)
+		srv.RespawnSlot(key)
 	}
 	srv.Settle(t)
 

@@ -79,7 +79,7 @@ func TestRhamphorhynchusMakerWakesTheTyrannosaurus(t *testing.T) {
 	mw.inWorld(rhamphorhynchusID)[0].DeleteMe()
 	w.srv.Settle(t)
 	makers.expect(t, "the NPC left with the flag down", "rune20_mb2017_03m1:1001(0,0)")
-	if w.srv.NpcRespawns.Tracked("rune20_mb2017_02m1#0#0") {
+	if w.srv.RespawnArmed("rune20_mb2017_02m1#0#0") {
 		t.Fatal("the NPC armed a respawn of its own")
 	}
 
@@ -166,7 +166,7 @@ func TestTyrannosaurusMakerCallsSailren(t *testing.T) {
 		t.Helper()
 		mw.inWorld(tyrannosaurusID)[0].DeleteMe()
 		w.srv.Settle(t)
-		if w.srv.NpcRespawns.Tracked("rune20_mb2017_03m1#0#0") {
+		if w.srv.RespawnArmed("rune20_mb2017_03m1#0#0") {
 			t.Fatalf("%s: the NPC armed a respawn of its own", step)
 		}
 		w.srv.Advance(t, 180*time.Second-time.Millisecond)
@@ -271,7 +271,7 @@ func TestDefaultUseDBMakerForFrintezzaPlacesItsRows(t *testing.T) {
 		t.Fatalf("deleted objects = %v, want [%d %d]", got, frintezza.ObjectID(), follower.ObjectID())
 	}
 	for _, slot := range []string{"frintessa_maker#0#0", "frintessa_maker#1#0"} {
-		if w.srv.NpcRespawns.Tracked(slot) {
+		if w.srv.RespawnArmed(slot) {
 			t.Fatalf("slot %s armed a respawn of its own", slot)
 		}
 	}
@@ -380,7 +380,7 @@ func TestIceFairySirrMakerFollowsItsDoor(t *testing.T) {
 	sirra := mw.inWorld(iceFairySirrID)[0]
 	sirra.DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.NpcRespawns.Tracked("schuttgart13_mb2314_05m1#0#0") {
+	if w.srv.RespawnArmed("schuttgart13_mb2314_05m1#0#0") {
 		t.Fatal("Sirra armed a respawn of her own")
 	}
 	if got := deleted(drainFrames(t, w.c)); !slices.Equal(got, []int32{sirra.ObjectID()}) {

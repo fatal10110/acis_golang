@@ -214,7 +214,7 @@ func respawnKeepsOutOfTerritoryState(t *testing.T, typ string) {
 	}
 	<-done
 	w.srv.Settle(t)
-	w.srv.NpcSpawns.Respawn(ootDenKey)
+	w.srv.RespawnSlot(ootDenKey)
 	w.srv.Settle(t)
 	w.srv.ReadQueued(t, w.srv.Client)
 	second := w.roamer(t)

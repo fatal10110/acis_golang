@@ -182,7 +182,7 @@ func TestDeleteFixedRemovesWithoutRespawn(t *testing.T) {
 		t.Fatalf("spawn slots = %d, want only the maker's left", slots)
 	}
 	for _, key := range []string{"fixed#1", "fixed#2", "fixed#3"} {
-		if npcs.respawn.Tracked(key) {
+		if respawnArmed(npcs, npcs.respawn, key) {
 			t.Fatalf("respawn armed for %s, want none", key)
 		}
 	}

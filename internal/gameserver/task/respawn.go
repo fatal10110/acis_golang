@@ -15,8 +15,11 @@ const RespawnTick = time.Second
 // RespawnEffects re-instantiates one spawn slot once its respawn deadline
 // elapses. Slots are identified by a caller-owned string key rather than an
 // object id, since a slot waiting to respawn has no live world object yet.
+// SlotID identifies one spawn slot: the slot a respawn brings back.
+type SlotID uint32
+
 type RespawnEffects interface {
-	Respawn(key string)
+	Respawn(slot SlotID)
 }
 
 // Respawn tracks spawn slots awaiting their next respawn deadline and fires
@@ -27,7 +30,7 @@ type Respawn struct {
 	effects RespawnEffects
 	now     func() time.Time
 
-	*deadlineRegistry[string, string]
+	*deadlineRegistry[SlotID, SlotID]
 }
 
 // NewRespawn returns an empty spawn-slot respawn tracker.
@@ -38,7 +41,7 @@ func NewRespawn(effects RespawnEffects, now func() time.Time) (*Respawn, error) 
 	if now == nil {
 		now = time.Now
 	}
-	return &Respawn{effects: effects, now: now, deadlineRegistry: newDeadlineRegistry[string, string]()}, nil
+	return &Respawn{effects: effects, now: now, deadlineRegistry: newDeadlineRegistry[SlotID, SlotID]()}, nil
 }
 
 // Start launches the fixed one-second respawn task.
@@ -48,29 +51,29 @@ func (r *Respawn) Start(log zerolog.Logger) *scheduler.Ticker {
 
 // Add schedules key to respawn at deadline, replacing any deadline already
 // tracked for it. A deadline at or before now fires on the next Tick.
-func (r *Respawn) Add(key string, deadline time.Time) {
+func (r *Respawn) Add(key SlotID, deadline time.Time) {
 	r.add(key, key, deadline)
 }
 
 // AddEarliest schedules key to respawn at deadline unless it already has an
 // earlier respawn pending: of two respawns armed for one slot, the first to
 // come due brings the NPC back.
-func (r *Respawn) AddEarliest(key string, deadline time.Time) {
+func (r *Respawn) AddEarliest(key SlotID, deadline time.Time) {
 	r.addEarliest(key, key, deadline)
 }
 
 // Cancel stops tracking key and reports whether it had been tracked.
-func (r *Respawn) Cancel(key string) bool {
+func (r *Respawn) Cancel(key SlotID) bool {
 	return r.remove(key)
 }
 
 // Tracked reports whether key currently has a pending respawn deadline.
-func (r *Respawn) Tracked(key string) bool {
+func (r *Respawn) Tracked(key SlotID) bool {
 	return r.tracked(key)
 }
 
 // Deadline returns the respawn deadline tracked for key, if any.
-func (r *Respawn) Deadline(key string) (time.Time, bool) {
+func (r *Respawn) Deadline(key SlotID) (time.Time, bool) {
 	return r.deadlineOf(key)
 }
 

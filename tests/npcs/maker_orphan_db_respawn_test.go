@@ -125,15 +125,15 @@ func TestMakerRespawnOfADatabaseTrackedNPCLeavesItsSpawnFree(t *testing.T) {
 	}
 	// The spawn's slot key is its database name; the respawn the old
 	// boss armed sits on a key of its own.
-	if w.srv.NpcRespawns.Tracked("orphan_db_boss") {
+	if w.srv.RespawnArmed("orphan_db_boss") {
 		t.Fatal("the boss left: the old boss's respawn was armed on the new boss's slot")
 	}
-	const orphan = "orphan_db_boss~1"
-	if !w.srv.NpcRespawns.Cancel(orphan) {
+	const orphan = "orphan_db_boss~0"
+	if !w.srv.CancelRespawn(orphan) {
 		t.Fatalf("the boss left: no respawn armed for %s", orphan)
 	}
 	// The harness never fires a respawn timer: bring it due by hand.
-	w.srv.NpcSpawns.Respawn(orphan)
+	w.srv.RespawnSlot(orphan)
 	w.srv.Settle(t)
 	bosses("the old boss respawned", 2)
 	probe.expect(t, "the old boss respawned", "created alive=2 spawned=1")

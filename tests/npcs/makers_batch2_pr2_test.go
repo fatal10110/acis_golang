@@ -139,7 +139,7 @@ func TestWarriorPassiveWeaknessMakerOpensTheWallDoors(t *testing.T) {
 	w.srv.Advance(t, weaknessTimerDelay)
 	doorsAre("three warriors left", true, true, true, true, false, false, false)
 	for i := range 4 {
-		if slot := fmt.Sprintf("godard32_2515_16m1#0#%d", i); w.srv.NpcRespawns.Tracked(slot) {
+		if slot := fmt.Sprintf("godard32_2515_16m1#0#%d", i); w.srv.RespawnArmed(slot) {
 			t.Fatalf("three warriors left: slot %s armed a respawn", slot)
 		}
 	}
@@ -367,7 +367,7 @@ func TestUndeadBandmasterMakerOpensTheNextPathways(t *testing.T) {
 		}
 	}
 	for i := range 8 {
-		if slot := fmt.Sprintf("godard32_2515_17m1#%d#0", i); w.srv.NpcRespawns.Tracked(slot) {
+		if slot := fmt.Sprintf("godard32_2515_17m1#%d#0", i); w.srv.RespawnArmed(slot) {
 			t.Fatalf("slot %s armed a respawn", slot)
 		}
 	}

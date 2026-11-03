@@ -1,9 +1,8 @@
 package manager
 
 import (
-	"fmt"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -43,7 +42,7 @@ type makerGroup struct {
 	// keys are, per entry, the slot keys the entry keeps, in creation
 	// order; seq numbers, per entry, the slots it has created. Both are
 	// guarded by n.mu.
-	keys [][]string
+	keys [][]task.SlotID
 	seq  []int
 	// rows are, per entry, its persisted row; nil for an entry that is
 	// not database-tracked.
@@ -61,16 +60,24 @@ type makerGroup struct {
 func (n *Npcs) newGroups(spawns *Spawns, gen int) []*makerGroup {
 	makers := spawns.Table().Makers()
 	groups := make([]*makerGroup, 0, len(makers))
+	dbKeys := make(map[string]task.SlotID)
 	for _, def := range makers {
 		rows := make([]*dbRow, len(def.Entries))
 		for i, entry := range def.Entries {
 			if entry.DBName != "" {
-				rows[i] = &dbRow{rows: spawns, name: entry.DBName}
+				// Every entry of one database name declares its slots
+				// under one key.
+				key, ok := dbKeys[entry.DBName]
+				if !ok {
+					key = n.newSlotID()
+					dbKeys[entry.DBName] = key
+				}
+				rows[i] = &dbRow{rows: spawns, name: entry.DBName, slot: key}
 			}
 		}
 		groups = append(groups, &makerGroup{
 			n: n, def: def, gen: gen, behavior: n.makers.New(def.AIType),
-			keys: make([][]string, len(def.Entries)), seq: make([]int, len(def.Entries)), rows: rows,
+			keys: make([][]task.SlotID, len(def.Entries)), seq: make([]int, len(def.Entries)), rows: rows,
 		})
 	}
 	n.mu.Lock()
@@ -263,7 +270,7 @@ func (s groupSpawn) Spawn() { s.g.n.spawnGroupEntry(s.g, s.i) }
 func (s groupSpawn) Respawn() {
 	n := s.g.n
 	n.mu.Lock()
-	var first string
+	var first task.SlotID
 	for _, key := range s.g.keys[s.i] {
 		if !n.liveLocked(key) && !n.slot[key].spawning {
 			first = key
@@ -271,7 +278,7 @@ func (s groupSpawn) Respawn() {
 		}
 	}
 	n.mu.Unlock()
-	if first != "" {
+	if first != 0 {
 		n.respawn.Cancel(first)
 		n.respawnSlot(first)
 	}
@@ -298,13 +305,13 @@ type groupNPC struct {
 // keyLocked returns the key c's slot lives under now, listed or orphan,
 // and whether it lives at all: a slot declared anew under the same key is
 // another NPC's. The caller holds n.mu.
-func (c groupNPC) keyLocked() (string, bool) {
-	for _, key := range [2]string{c.slot.key, orphanKey(c.slot)} {
+func (c groupNPC) keyLocked() (task.SlotID, bool) {
+	for _, key := range [2]task.SlotID{c.slot.key, orphanKey(c.slot)} {
 		if slot, ok := c.n.slot[key]; ok && slot.serial == c.slot.serial {
 			return key, true
 		}
 	}
-	return "", false
+	return 0, false
 }
 
 func (c groupNPC) Decayed() bool {
@@ -350,22 +357,23 @@ func (c groupNPC) ScheduleRespawn(d time.Duration) {
 }
 
 // orphanKey is the key slot lives under once its spawn lets it go. Only
-// a database-tracked slot needs a new one: its spawn declares every slot
-// under its one key, where any other slot key is declared once.
-func orphanKey(slot slotInfo) string {
+// a database-tracked slot needs a new one, its own serial: its spawn
+// declares every slot under its one key, where any other slot key is
+// declared once.
+func orphanKey(slot slotInfo) task.SlotID {
 	if slot.orphan || slot.dbName == "" {
 		return slot.key
 	}
-	return slot.key + "~" + strconv.Itoa(slot.serial)
+	return slot.serial
 }
 
 // adoptOrphanLocked declares slot again as an orphan slot of its group,
 // its NPC out of the world, and returns its key: none for a slot of no
 // npcmaker, nor one DespawnAll or RespawnAll dropped. The caller holds
 // n.mu.
-func (n *Npcs) adoptOrphanLocked(slot slotInfo) (string, bool) {
-	if slot.group == nil || slot.key == "" || slot.epoch != n.despawns || !slices.Contains(n.groups, slot.group) {
-		return "", false
+func (n *Npcs) adoptOrphanLocked(slot slotInfo) (task.SlotID, bool) {
+	if slot.group == nil || slot.key == 0 || slot.epoch != n.despawns || !slices.Contains(n.groups, slot.group) {
+		return 0, false
 	}
 	slot.key = orphanKey(slot)
 	slot.orphan, slot.liveID, slot.spawning, slot.first = true, 0, false, false
@@ -375,7 +383,7 @@ func (n *Npcs) adoptOrphanLocked(slot slotInfo) (string, bool) {
 
 // liveLocked reports whether the slot key has its NPC in the world. The
 // caller holds n.mu.
-func (n *Npcs) liveLocked(key string) bool {
+func (n *Npcs) liveLocked(key task.SlotID) bool {
 	slot, ok := n.slot[key]
 	return ok && slot.liveID != 0 && n.live[slot.liveID] == key
 }
@@ -391,7 +399,7 @@ func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
 	}
 
 	if entry.DBName != "" {
-		key := slotKey(entry.DBName, g.gen)
+		key := g.rows[i].slot
 		n.mu.Lock()
 		_, exists := n.slot[key]
 		n.mu.Unlock()
@@ -407,11 +415,7 @@ func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
 		n.deferredCount.Add(1)
 		return
 	}
-	n.mu.Lock()
-	seq := g.seq[i]
-	g.seq[i]++
-	n.mu.Unlock()
-	key := slotKey(fmt.Sprintf("%s#%d#%d", g.def.Name, i, seq), g.gen)
+	key := n.newSlotID()
 	n.registerSlot(key, g, i, "", tmpl)
 	n.spawnFresh(key, entry, tmpl, pos)
 	n.endSpawn(key)

@@ -130,10 +130,13 @@ func (n *Npcs) CreatePrivates(master npc.PartyMember) error {
 func (n *Npcs) privatesOf(master npc.PartyMember) []spawn.Private {
 	n.mu.Lock()
 	key := n.live[master.ObjectID()]
-	entry := n.slot[key].entry
+	var privates []spawn.Private
+	if entry := n.slot[key].entry; entry != nil {
+		privates = entry.Privates
+	}
 	n.mu.Unlock()
-	if len(entry.Privates) > 0 {
-		return entry.Privates
+	if len(privates) > 0 {
+		return privates
 	}
 	declared := master.Template().Privates
 	out := make([]spawn.Private, 0, len(declared))
@@ -150,7 +153,7 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 		return nil, fmt.Errorf("%w: npc %d has no master", ErrNotPlaceable, tmpl.ID)
 	}
 
-	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
+	entry := &spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
 	slot := slotInfo{entry: entry, master: master, tmpl: tmpl, scripted: true, memory: newSlotMemory(entry, nil)}
 	for i, p := range params {
 		slot.memory.scratch.SetInt(npc.IntParam1+npc.IntSlot(i), p)
@@ -161,12 +164,12 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 		loc, face = location.Location{X: at.X, Y: at.Y, Z: int(n.geo.Height(at.X, at.Y, at.Z))}, heading
 		slot.placed, slot.at, slot.heading = true, loc, face
 	}
-	slot.key = fmt.Sprintf("private#%d", n.fixedSeq.Add(1))
+	slot.key, slot.seq = n.newSlotID(), n.fixedSeq.Add(1)
 	n.mu.Lock()
 	n.addSlotLocked(slot)
 	n.mu.Unlock()
 
-	private, _ := n.instantiate(slot.key, entry, tmpl, loc, face, fullHP, fullMP, master).(npc.PartyMember)
+	private, _ := n.instantiate(slot.key, *entry, tmpl, loc, face, fullHP, fullMP, master).(npc.PartyMember)
 	if private == nil {
 		n.mu.Lock()
 		n.dropSlotLocked(slot.key)

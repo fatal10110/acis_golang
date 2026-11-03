@@ -124,7 +124,7 @@ func TestCloseDoorMakerFollowsItsDoor(t *testing.T) {
 	guards[0].DeleteMe()
 	w.srv.Settle(t)
 	for i := range 3 {
-		if key := fmt.Sprintf("ice_guard#0#%d", i); w.srv.NpcRespawns.Tracked(key) {
+		if key := fmt.Sprintf("ice_guard#0#%d", i); w.srv.RespawnArmed(key) {
 			t.Fatalf("slot %s armed a respawn", key)
 		}
 	}
@@ -208,7 +208,7 @@ func TestInstantSpawnMakerRefillsOnTheLastNPC(t *testing.T) {
 	if got := shown(frames); !slices.Equal(got, []int{instantOnceID}) {
 		t.Fatalf("NPCs shown after the last NPC left = %v, want [%d]", got, instantOnceID)
 	}
-	if w.srv.NpcRespawns.Tracked("instant_m#1#0") {
+	if w.srv.RespawnArmed("instant_m#1#0") {
 		t.Fatal("the kept NPC armed a respawn of its own")
 	}
 	w.srv.Advance(t, 61*time.Second)
@@ -218,10 +218,10 @@ func TestInstantSpawnMakerRefillsOnTheLastNPC(t *testing.T) {
 	// timers never fire on their own, so the test fires it.
 	w.srv.NpcSpawns.MakerEvent("instant_m", "1001", 3, 0)
 	w.srv.Settle(t)
-	if !w.srv.NpcRespawns.Tracked("instant_m#1#0") {
+	if !w.srv.RespawnArmed("instant_m#1#0") {
 		t.Fatal("the outside 1001 armed no respawn of the kept NPC")
 	}
-	w.srv.NpcSpawns.Respawn("instant_m#1#0")
+	w.srv.RespawnSlot("instant_m#1#0")
 	w.srv.Settle(t)
 	count("outside 1001", 1, 1)
 	if got := shown(drainFrames(t, w.c)); !slices.Equal(got, []int{instantKeptID}) {
@@ -313,7 +313,7 @@ func TestDefaultUseDBMakerRestoresAndWakesItsMaker(t *testing.T) {
 	if got := deleted(frames); !slices.Equal(got, []int32{boss.ObjectID()}) {
 		t.Fatalf("deleted objects = %v, want [%d]", got, boss.ObjectID())
 	}
-	if w.srv.NpcRespawns.Tracked("usedb_m#0#0") {
+	if w.srv.RespawnArmed("usedb_m#0#0") {
 		t.Fatal("the boss armed a respawn of its own")
 	}
 
@@ -406,7 +406,7 @@ func TestFarmMakerFollowsTheHallEvents(t *testing.T) {
 	keeper := mw.inWorld(farmKeeperID)[0]
 	keeper.DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.NpcRespawns.Tracked("farm_rows#0#0") {
+	if w.srv.RespawnArmed("farm_rows#0#0") {
 		t.Fatal("the farm keeper armed a respawn")
 	}
 	w.srv.Advance(t, 61*time.Second)

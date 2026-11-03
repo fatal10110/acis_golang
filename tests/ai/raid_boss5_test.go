@@ -722,7 +722,7 @@ func (w *rb5World) bringBack(t *testing.T, private *npc.Hostile) {
 	t.Helper()
 	key := w.armedPrivateRespawn(t)
 	w.onQueue(t, private, func() { private.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(private.ObjectID())) })
-	w.srv.NpcSpawns.Respawn(key)
+	w.srv.RespawnSlot(key)
 	w.srv.Settle(t)
 	w.srv.ReadQueued(t, w.srv.Client)
 }

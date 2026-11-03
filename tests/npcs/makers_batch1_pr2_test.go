@@ -80,7 +80,7 @@ func TestOpenDoorMakerFollowsItsDoor(t *testing.T) {
 	leaders[0].DeleteMe()
 	w.srv.Settle(t)
 	for i := range 3 {
-		if key := fmt.Sprintf("band_leader#0#%d", i); w.srv.NpcRespawns.Tracked(key) {
+		if key := fmt.Sprintf("band_leader#0#%d", i); w.srv.RespawnArmed(key) {
 			t.Fatalf("slot %s armed a respawn", key)
 		}
 	}
@@ -201,7 +201,7 @@ func TestInstantSpawnSerialMakersChainTheirWaves(t *testing.T) {
 	final := mw.inWorld(waveFirstID)[0]
 	final.DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.NpcRespawns.Tracked(waveFirstSlot) {
+	if w.srv.RespawnArmed(waveFirstSlot) {
 		t.Fatal("the final wave armed a respawn of the series NPC")
 	}
 	w.srv.Advance(t, 29*time.Second)
@@ -229,7 +229,7 @@ func TestInstantSpawnSerialMakersChainTheirWaves(t *testing.T) {
 	// that NPC's respawn instead of placing a new one.
 	mw.inWorld(waveFirstID)[0].DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.NpcRespawns.Tracked(waveFirstSlot) || !fireRespawn(w.srv, "wave_last#0#0") {
+	if w.srv.RespawnArmed(waveFirstSlot) || !fireRespawn(w.srv, "wave_last#0#0") {
 		t.Fatal("the restarted series' final wave did not wake the last maker")
 	}
 	w.srv.Settle(t)
@@ -330,7 +330,7 @@ func TestOnDayNightSpawnMakerFollowsTheTimeOfDay(t *testing.T) {
 	if got, gone := shown(frames), deleted(frames); !slices.Equal(got, []int{outID}) || len(gone) != 1 {
 		t.Fatalf("outside 1001 out of its time: shown %v and deleted %v, want one NPC of %d shown and deleted", got, gone, outID)
 	}
-	if w.srv.NpcRespawns.Tracked(outMaker + "#0#0") {
+	if w.srv.RespawnArmed(outMaker + "#0#0") {
 		t.Fatalf("%s's NPC deleted out of its time armed a respawn", outMaker)
 	}
 }
@@ -339,9 +339,9 @@ func TestOnDayNightSpawnMakerFollowsTheTimeOfDay(t *testing.T) {
 // would once it came due, and reports whether one was armed. The fixture's
 // respawn timers never fire on their own.
 func fireRespawn(srv *gameservertest.Server, slot string) bool {
-	if !srv.NpcRespawns.Cancel(slot) {
+	if !srv.CancelRespawn(slot) {
 		return false
 	}
-	srv.NpcSpawns.Respawn(slot)
+	srv.RespawnSlot(slot)
 	return true
 }

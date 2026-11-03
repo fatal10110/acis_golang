@@ -39,7 +39,7 @@ func TestScriptDecayMeHidesWithoutDecay(t *testing.T) {
 	if s.HasTimer(decayTimerName, handle, nil) {
 		t.Fatal("the hidden wolf's behavior timer is still pending")
 	}
-	if srv.NpcRespawns.Tracked(lifeWolfKey) {
+	if srv.RespawnArmed(lifeWolfKey) {
 		t.Fatal("the hide armed the wolf's respawn")
 	}
 	s.Spawner().DecayMe(handle)

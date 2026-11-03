@@ -143,7 +143,7 @@ func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 	first := makerWolves[0]
 	first.DeleteMe()
 	f.queues.Run()
-	if !f.respawn.Tracked("wolves#0#0") && !f.respawn.Tracked("wolves#0#1") {
+	if !respawnArmed(f.npcs, f.respawn, "wolves#0#0") && !respawnArmed(f.npcs, f.respawn, "wolves#0#1") {
 		t.Fatal("removed wolf armed no respawn")
 	}
 	// The other wolf's corpse decays while the despawn runs: its respawn
@@ -166,7 +166,7 @@ func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 		t.Fatalf("npcs left in the world: %d", len(got))
 	}
 	for _, key := range []string{"wolves#0#0", "wolves#0#1", "boss_db"} {
-		if f.respawn.Tracked(key) {
+		if respawnArmed(f.npcs, f.respawn, key) {
 			t.Fatalf("respawn of %s still armed", key)
 		}
 	}
@@ -180,8 +180,8 @@ func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 		t.Fatalf("boss row status = %d, want uninitialized", state.Status)
 	}
 	// A respawn firing late finds no spawn left.
-	f.npcs.Respawn("wolves#0#0")
-	f.npcs.Respawn("boss_db")
+	respawnNamed(f.npcs, "wolves#0#0")
+	respawnNamed(f.npcs, "boss_db")
 	f.queues.Run()
 	if got := f.npcObjects(); len(got) != 0 {
 		t.Fatalf("a late respawn placed %d npcs", len(got))
@@ -197,7 +197,7 @@ func TestDespawnAllRacingRespawn(t *testing.T) {
 		f.hostile(t, 1).DeleteMe()
 		f.queues.Run()
 		key := "wolves#0#0"
-		if !f.respawn.Tracked(key) {
+		if !respawnArmed(f.npcs, f.respawn, key) {
 			key = "wolves#0#1"
 		}
 
@@ -205,7 +205,7 @@ func TestDespawnAllRacingRespawn(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			f.npcs.Respawn(key)
+			respawnNamed(f.npcs, key)
 		}()
 		go func() {
 			defer wg.Done()
@@ -217,8 +217,8 @@ func TestDespawnAllRacingRespawn(t *testing.T) {
 		if got := f.npcObjects(); len(got) != 0 {
 			t.Fatalf("npcs left in the world: %d", len(got))
 		}
-		if f.respawn.Tracked(key) || f.npcs.LiveCount() != 0 {
-			t.Fatalf("respawn armed %v, live %d; want neither", f.respawn.Tracked(key), f.npcs.LiveCount())
+		if respawnArmed(f.npcs, f.respawn, key) || f.npcs.LiveCount() != 0 {
+			t.Fatalf("respawn armed %v, live %d; want neither", respawnArmed(f.npcs, f.respawn, key), f.npcs.LiveCount())
 		}
 	}
 }
@@ -255,12 +255,12 @@ func TestRespawnAllSpawnsTheNewListAnew(t *testing.T) {
 	if wolves != 2 || bosses != 0 {
 		t.Fatalf("wolves %d, bosses %d; want 2 wolves and the dead boss waiting", wolves, bosses)
 	}
-	if !f.respawn.Tracked("boss_db@1") {
+	if !respawnArmed(f.npcs, f.respawn, "boss_db@1") {
 		t.Fatal("dead boss's respawn not armed on the new slot")
 	}
 	// The old list's slot keys name no spawn of the new one.
-	f.npcs.Respawn("wolves#0#0")
-	f.npcs.Respawn("boss_db")
+	respawnNamed(f.npcs, "wolves#0#0")
+	respawnNamed(f.npcs, "boss_db")
 	f.queues.Run()
 	if got := len(f.npcObjects()); got != 2 {
 		t.Fatalf("npcs = %d after stale respawns, want the 2 wolves", got)

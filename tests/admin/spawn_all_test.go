@@ -35,7 +35,7 @@ const denKey = "wolf_den#0#0"
 func armedPrivates(srv *gameservertest.Server) []string {
 	var armed []string
 	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); srv.NpcRespawns.Tracked(key) {
+		if key := fmt.Sprintf("private#%d", i); srv.RespawnArmed(key) {
 			armed = append(armed, key)
 		}
 	}
@@ -159,7 +159,7 @@ func TestAdminUnspawnAll(t *testing.T) {
 	if got := srv.NpcSpawns.LiveCount(); got != 0 {
 		t.Fatalf("live spawned npcs = %d, want 0", got)
 	}
-	if srv.NpcRespawns.Tracked(denKey) {
+	if srv.RespawnArmed(denKey) {
 		t.Fatalf("respawn of %s still armed", denKey)
 	}
 	if got := armedPrivates(srv); len(got) != 0 {
@@ -177,7 +177,7 @@ func TestAdminUnspawnAllRacingRespawn(t *testing.T) {
 	den := npcsOf(srv, wolfID)[0].(*npc.Hostile)
 	den.DeleteMe()
 	srv.Settle(t)
-	if !srv.NpcRespawns.Tracked(denKey) {
+	if !srv.RespawnArmed(denKey) {
 		t.Fatal("removed den wolf armed no respawn")
 	}
 
@@ -191,7 +191,7 @@ func TestAdminUnspawnAllRacingRespawn(t *testing.T) {
 			if stop.Load() {
 				return
 			}
-			srv.NpcSpawns.Respawn(denKey)
+			srv.RespawnSlot(denKey)
 		}
 	}()
 	frames := exchange(t, gm, encodeBuildCmd("unspawnall"))
@@ -205,8 +205,8 @@ func TestAdminUnspawnAllRacingRespawn(t *testing.T) {
 	if got := allNpcs(srv); len(got) != 0 {
 		t.Fatalf("npcs left in the world: %v", got)
 	}
-	if srv.NpcRespawns.Tracked(denKey) || srv.NpcSpawns.LiveCount() != 0 {
-		t.Fatalf("respawn armed %v, live %d; want neither", srv.NpcRespawns.Tracked(denKey), srv.NpcSpawns.LiveCount())
+	if srv.RespawnArmed(denKey) || srv.NpcSpawns.LiveCount() != 0 {
+		t.Fatalf("respawn armed %v, live %d; want neither", srv.RespawnArmed(denKey), srv.NpcSpawns.LiveCount())
 	}
 }
 
