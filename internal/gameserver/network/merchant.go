@@ -73,12 +73,14 @@ func (l *GameClientLink) showWearWindow(live *livePlayer, f *npc.Folk, listID in
 // requestBuyItem buys the rows of req from its buylist. A list sold by an
 // NPC needs that NPC, a merchant or mercenary manager, targeted and within
 // interaction reach; each unit price is then taxed at the rate of that
-// NPC's castle, whose tax revenue takes the tax on the purchase. A
+// NPC's castle, whose tax revenue takes the tax on the purchase. A list no
+// NPC sells is a game master's, untaxed and bought without a merchant. A
 // completed purchase shows the merchant's -bought page when it has one,
 // then the full item list.
 //
 // Every refusal specified with a system message answers so here; the
-// others (an unknown list, an untargeted or unreachable seller, an item off
+// others (an unknown list, a game master's list sent by anyone else, an
+// untargeted or unreachable seller, an item off
 // the list, an unpriced item, a count over the stock, a price overflowing
 // the adena range) answer nothing, as specified. The
 // buy window's submit leaves no client action pending, so that silence
@@ -94,7 +96,12 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 		taxRate float64
 		taxedBy *castle.Castle
 	)
-	if list.NPCID > 0 {
+	switch {
+	case list.NPCID <= 0 && !live.accessLevel().IsGM:
+		// A list no NPC sells opens only through //buy; anyone else
+		// sending it is refused, unanswered like the other refusals.
+		return
+	case list.NPCID > 0:
 		f, _ := live.Target().(*npc.Folk)
 		if f == nil || !(f.Merchant() || f.MercenaryManager()) || !list.AllowsNPC(f.NpcID()) || !l.playerCanDoInteract(live, f) {
 			return
