@@ -27,7 +27,7 @@ import (
 // other list or file contents is stale and is rebuilt, never used.
 const (
 	cacheMagic      = "ACISGEO\x00"
-	cacheVersion    = 1
+	cacheVersion    = 2
 	cacheHeaderSize = 24
 	cacheEntrySize  = 40
 )

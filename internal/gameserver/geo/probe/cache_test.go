@@ -119,6 +119,10 @@ func TestLoadRegionsCached(t *testing.T) {
 		"rebuilds a corrupt cache":   func(b []byte) []byte { b[len(b)-100] ^= 0x40; return b },
 		"rebuilds a truncated cache": func(b []byte) []byte { return b[:len(b)/2] },
 		"rebuilds a foreign file":    func(b []byte) []byte { b[0] = 'X'; return b },
+		"rebuilds an older format": func(b []byte) []byte {
+			binary.LittleEndian.PutUint32(b[8:], cacheVersion-1)
+			return b
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir, cachePath := setup(t)

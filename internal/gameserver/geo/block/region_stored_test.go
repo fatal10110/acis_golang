@@ -230,22 +230,24 @@ func TestParseRegionRejectsMalformed(t *testing.T) {
 	}
 
 	dataStart := len(good) - int(binary.LittleEndian.Uint32(good[4:]))
+	// Block 1 is the second block of the first index group.
+	block1Value := regionHeaderSize + basesSize + groupValues + 2
 	mutate := func(f func(b []byte) []byte) []byte { return f(bytes.Clone(good)) }
 	cases := map[string][]byte{
 		"truncated":     good[:len(good)-1],
 		"short header":  good[:4],
 		"too many wide": mutate(func(b []byte) []byte { binary.LittleEndian.PutUint32(b, superblockCount+1); return b }),
 		"bad wide index": mutate(func(b []byte) []byte {
-			binary.LittleEndian.PutUint32(b[regionHeaderSize+kindsSize+valuesSize:], wideSuperblock)
+			binary.LittleEndian.PutUint32(b[regionHeaderSize:], wideSuperblock)
 			return b
 		}),
 		"offset past end": mutate(func(b []byte) []byte {
-			binary.LittleEndian.PutUint16(b[regionHeaderSize+kindsSize+2:], 0xffff)
+			binary.LittleEndian.PutUint16(b[block1Value:], 0xffff)
 			return b
 		}),
 		"bad mode": mutate(func(b []byte) []byte { b[dataStart] = 0x0f; return b }),
 		"bad layer start": mutate(func(b []byte) []byte {
-			off := dataStart + int(binary.LittleEndian.Uint16(b[regionHeaderSize+kindsSize+2:]))
+			off := dataStart + int(binary.LittleEndian.Uint16(b[block1Value:]))
 			b[off+3+1+5]++
 			return b
 		}),

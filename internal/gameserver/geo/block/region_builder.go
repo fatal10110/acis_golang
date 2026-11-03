@@ -160,9 +160,8 @@ func (b *RegionBuilder) Build() *Region {
 	r := viewRegion(stored, wideRows)
 
 	for i, kind := range b.kinds {
-		r.kinds[i>>2] |= kind << (uint(i&3) * 2)
 		if kind == regionFlat {
-			binary.LittleEndian.PutUint16(r.values[i*2:], uint16(b.heights[i]))
+			r.setEntry(i, kind, uint16(b.heights[i]))
 		}
 	}
 	off, row := 0, 0
@@ -177,11 +176,13 @@ func (b *RegionBuilder) Build() *Region {
 			if !b.packed(i) {
 				continue
 			}
+			value := 0
 			if wide[sb] {
 				binary.LittleEndian.PutUint32(r.wide[(row*superblockBlocks+local)*4:], uint32(off))
 			} else {
-				binary.LittleEndian.PutUint16(r.values[i*2:], uint16(off-base))
+				value = off - base
 			}
+			r.setEntry(i, b.kinds[i], uint16(value))
 			s := b.spans[i]
 			off += copy(r.data[off:], b.scratch[s.off:s.off+s.n])
 		}
@@ -190,6 +191,13 @@ func (b *RegionBuilder) Build() *Region {
 		}
 	}
 	return r
+}
+
+// setEntry stores block i's kind and value into a fresh region's index.
+func (r *Region) setEntry(i int, kind uint8, value uint16) {
+	g, j := i/groupBlocks*groupSize, i%groupBlocks
+	binary.LittleEndian.PutUint32(r.index[g:], binary.LittleEndian.Uint32(r.index[g:])|uint32(kind)<<(j*2))
+	binary.LittleEndian.PutUint16(r.index[g+groupValues+j*2:], value)
 }
 
 func (b *RegionBuilder) packed(i int) bool {
@@ -210,16 +218,15 @@ func superblockOrder(sb int) [superblockBlocks]int {
 // storedSize is the size of a stored region with the given wide rows and
 // data length.
 func storedSize(wideRows, dataLen int) int {
-	return regionHeaderSize + kindsSize + valuesSize + basesSize + wideRows*wideRowSize + dataLen
+	return regionHeaderSize + basesSize + indexSize + wideRows*wideRowSize + dataLen
 }
 
 // viewRegion slices a stored region's sections out of stored.
 func viewRegion(stored []byte, wideRows int) *Region {
 	r := &Region{stored: stored}
 	s := stored[regionHeaderSize:]
-	r.kinds, s = s[:kindsSize:kindsSize], s[kindsSize:]
-	r.values, s = s[:valuesSize:valuesSize], s[valuesSize:]
-	r.bases, s = s[:basesSize:basesSize], s[basesSize:]
+	r.bases, s = (*[basesSize]byte)(s), s[basesSize:]
+	r.index, s = (*[indexSize]byte)(s), s[indexSize:]
 	n := wideRows * wideRowSize
 	r.wide, r.data = s[:n:n], s[n:]
 	return r
