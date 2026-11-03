@@ -116,7 +116,7 @@ public class FlyProbe
 	
 	private static void cases()
 	{
-		// the hand-traced cases of fly_test.go, on block (0,0) and null geodata
+		// level and descending lines on block (0,0) and null geodata
 		fly("level line over the low floor", X0 + 8, Y0 + 8, 100, 32, X0 + 56, Y0 + 8, 100);
 		fly("level line into the high floor", X0 + 8, Y0 + 8, 100, 32, X0 + 104, Y0 + 8, 100);
 		fly("level line over the high floor", X0 + 8, Y0 + 8, 250, 32, X0 + 120, Y0 + 8, 250);
