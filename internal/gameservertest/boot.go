@@ -1054,6 +1054,7 @@ type Server struct {
 	effectRest time.Duration
 	Client     *testsupport.ScriptedClient
 	State      *world.State
+	idleReads  *idleReads
 	DB         *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
 	RaidPoints *raidpoint.Points
@@ -2227,8 +2228,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if r := o.scriptHelpers().rates; r != nil {
 		questRates.Set(*r)
 	}
+	idle := &idleReads{}
 	gclConfig := network.GameClientLinkConfig{
-		Flow: network.CharacterFlowConfig{Validator: validator, PlayerClock: playerClock, Autosave: autosave},
+		ReadIdleTimeout: idle.timeout,
+		Flow:            network.CharacterFlowConfig{Validator: validator, PlayerClock: playerClock, Autosave: autosave},
 		Belongings: network.BelongingsConfig{
 			Items:            items,
 			Shortcuts:        shortcuts,
@@ -2689,6 +2692,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	readCharSelectInfo(t, c, o.account, o.wantChars)
 
 	srv := &Server{
+		idleReads:           idle,
 		shutdown:            shutdownState,
 		Client:              c,
 		State:               state,
