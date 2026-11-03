@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,6 +21,9 @@ type corpses struct {
 	ns    atomic.Int64
 	task  *task.Decay
 	state atomic.Pointer[world.State]
+	// respawnHook is the server's hook of a decaying NPC its spawn
+	// replaces (nil for none), set once it booted.
+	respawnHook atomic.Pointer[func(int32) func()]
 }
 
 func newCorpses(t *testing.T, start time.Time) *corpses {
@@ -43,6 +47,16 @@ func (c *corpses) Decay(actor task.DecayActor) {
 		return
 	}
 	if obj, ok := state.Object(actor.ObjectID()); ok {
+		if f := c.respawnHook.Load(); f != nil {
+			// The hook is resolved only once the decay has won, as the
+			// server's decay does.
+			if corpse, ok := obj.(interface {
+				DecayWithRespawn(*world.State, func(int32) func()) bool
+			}); ok {
+				corpse.DecayWithRespawn(state, *f)
+				return
+			}
+		}
 		if corpse, ok := obj.(interface {
 			Decay(*world.State, func()) bool
 		}); ok {
@@ -51,14 +65,15 @@ func (c *corpses) Decay(actor task.DecayActor) {
 	}
 }
 
-// hasCorpses reports whether an npc line names a corpse time.
+// hasCorpses reports whether an npc line or an npcmaker line's spawn names
+// a corpse time.
 func (sc *Scenario) hasCorpses() bool {
 	for _, n := range sc.NPCs {
 		if n.Corpse != 0 {
 			return true
 		}
 	}
-	return false
+	return slices.ContainsFunc(sc.NpcMakers, func(m NpcMaker) bool { return m.Spawn != nil && m.Spawn.Corpse != 0 })
 }
 
 // passCorpseTime moves the corpses' clock by d and sweeps the decay task
@@ -87,5 +102,6 @@ func (r *run) passKillTime(t *testing.T) {
 	for range killWait / corpseStep {
 		r.srv.Advance(t, corpseStep)
 		r.passCorpseTime(t, corpseStep)
+		r.passRespawns(t, corpseStep)
 	}
 }

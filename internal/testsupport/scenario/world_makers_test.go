@@ -45,7 +45,8 @@ func TestParseRejectsBadMakerSeeds(t *testing.T) {
 	tests := []struct{ name, lines, want string }{
 		{"max without a spawn", "npcmaker m default_maker max 2\n", "max needs a spawn"},
 		{"zero max", "npcmaker m default_maker max 0 spawn 1 Monster 0 0 0\n", "max"},
-		{"unknown spawn option", "npcmaker m default_maker spawn 1 Monster 0 0 0 weight 3\n", "not respawn or db"},
+		{"unknown spawn option", "npcmaker m default_maker spawn 1 Monster 0 0 0 weight 3\n", "not respawn, db or corpse"},
+		{"bad corpse", "npcmaker m default_maker spawn 1 Monster 0 0 0 corpse 0\n", "corpse \"0\" is not a number of seconds of 1 or more"},
 		{"short spawn", "npcmaker m default_maker spawn 1 Monster 0 0\n", "npcmaker <name>"},
 		{"row of no spawn", spawn + "spawnrow other alive 0 0 0\n", "no npcmaker line's spawn keeps that row"},
 		{"dead without respawn", spawn + "spawnrow row dead 0 0 0\n", "no respawn ahead"},

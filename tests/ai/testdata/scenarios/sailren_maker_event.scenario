@@ -1,0 +1,17 @@
+# SailrenMaker sent the script event 11042 by a script outside it (the makerevent step, as Sailren's lair device
+# sends it): the maker sends Sailren 11042 with 1 and 0, which jumps him to his lair's gate at 27549,-6638, and
+# sends no maker event. Sailren's own script told rune16_npc2017_01m1 11041 as he appeared. The NPC the maker placed has no role, so the heard event names its receiver by template id.
+trace internal/gameserver/script/testdata/oracle/scenarios/sailren_maker_event.golden
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.Sailren
+npcmaker rune20_mb2017_04m1 sailren_maker max 2 spawn 29065 GrandBoss -113091 -243942 -15536 respawn 129600 db sailren
+npcmaker rune16_npc2017_01m1 default_maker
+npcmaker rune16_npc2017_13m1 default_maker
+started rune16_npc2017_01m1 11047 0 0
+started rune16_npc2017_13m1 11047 0 0
+started rune16_npc2017_01m1 11041 0 0
+
+makerevent rune20_mb2017_04m1 11042 0 0
+  live 29065 1
+  spawned 29065 27549,-6638

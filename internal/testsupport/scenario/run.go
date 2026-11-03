@@ -33,6 +33,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
@@ -134,6 +135,9 @@ type run struct {
 	// makerSent records the script events the npcmakers are sent, for the
 	// step that caused them to take.
 	makerSent makerEvents
+	// respawnLeft is how much of the scenario's time each armed respawn of a
+	// maker's spawn has left.
+	respawnLeft map[task.SlotID]time.Duration
 }
 
 // heardEvents records the script events the NPCs' scripts receive, for the
@@ -171,12 +175,27 @@ func (h *heardEvents) take(roles map[int32]string) []string {
 type makerEvents struct {
 	mu    sync.Mutex
 	lines []string
+	// own is the send a makerevent step makes itself, which is the step's
+	// line and not one its maker's script sent; "" for none.
+	own string
+}
+
+// setOwn sets the send the step makes itself (see own), "" to end it.
+func (m *makerEvents) setOwn(line string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.own = line
 }
 
 func (m *makerEvents) add(maker, event string, int1, int2 int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.lines = append(m.lines, makerLine(maker, event, int32(int1), int32(int2)))
+	line := makerLine(maker, event, int32(int1), int32(int2))
+	if m.own != "" && line == m.own {
+		m.own = ""
+		return
+	}
+	m.lines = append(m.lines, line)
 }
 
 // take returns the events recorded since the last take.
@@ -335,7 +354,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		}
 		r.npcs[n.Role] = n
 	}
-	templates = append(templates, r.makerTemplates(t, templates)...)
+	templates = append(templates, r.makerTemplates(t, templates, kinds)...)
 	if s := r.sc.Summon; s != nil {
 		templates = append(templates, summonTemplate(s))
 	}
@@ -421,6 +440,10 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	r.checkStarted(t)
 	if r.corpses != nil {
 		r.corpses.state.Store(r.srv.State)
+		if r.sc.StartsMakers() {
+			hook := r.srv.NpcSpawns.RespawnHook
+			r.corpses.respawnHook.Store(&hook)
+		}
 	}
 	if r.sc.HasClock && !r.srv.DrivesClock() {
 		t.Skipf("%s: the clock line needs the driven clock; the real pool runs on the wall clock", r.sc.Name)
@@ -920,6 +943,10 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.hit(t, st.Args)
 	case "event":
 		r.event(t, st.Args)
+	case "makerevent":
+		r.makerEvent(t, st.Args)
+	case "killspawn":
+		r.killSpawn(t, st.Args[0])
 	case "hp", "mp", "want", "die", "top", "land", "stance", "swing":
 		r.state(t, st.Verb, st.Args)
 	case "cast":
@@ -950,6 +977,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.srv.AdvanceWithEffects(t, d)
 		r.passStanceTime(t, d)
 		r.passCorpseTime(t, d)
+		r.passRespawns(t, d)
 	case "approach":
 		distance := 100
 		if len(st.Args) == 2 {

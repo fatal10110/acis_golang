@@ -295,8 +295,8 @@ final class ScenarioTrace
 	/** While true, the script events the makers send each other are the boot's, not a step's. */
 	private boolean _starting;
 
-	/** An npcmaker line: type is null for a maker with no spawn entry; db is null for an entry kept in no row. */
-	private record MakerLine(String name, String ai, int max, int npc, String type, int[] pos, int respawn, String db)
+	/** An npcmaker line: type is null for a maker with no spawn entry; db is null for an entry kept in no row; corpse is 0 for the template's own corpse time. */
+	private record MakerLine(String name, String ai, int max, int npc, String type, int[] pos, int respawn, String db, int corpse)
 	{
 	}
 
@@ -673,7 +673,12 @@ final class ScenarioTrace
 					_npcs.put(f[1], n);
 					_decays |= n.corpse() > 0;
 				}
-				case "npcmaker" -> _npcMakers.add(makerLine(f));
+				case "npcmaker" ->
+				{
+					final MakerLine m = makerLine(f);
+					_npcMakers.add(m);
+					_decays |= m.corpse() > 0;
+				}
 				case "spawnrow" -> _spawnRows.add(Arrays.copyOfRange(f, 1, f.length));
 				case "started" ->
 				{
@@ -778,7 +783,7 @@ final class ScenarioTrace
 		return null;
 	}
 
-	/** Reads an npcmaker line: npcmaker name ai [max n] [spawn npc type x y z [respawn seconds] [db name]]. */
+	/** Reads an npcmaker line: npcmaker name ai [max n] [spawn npc type x y z [respawn seconds] [db name] [corpse seconds]]. */
 	private static MakerLine makerLine(String[] f)
 	{
 		int i = 3;
@@ -789,7 +794,7 @@ final class ScenarioTrace
 			i += 2;
 		}
 		if (f.length <= i)
-			return new MakerLine(f[1], f[2], max, 0, null, null, 0, null);
+			return new MakerLine(f[1], f[2], max, 0, null, null, 0, null, 0);
 		if (!f[i].equals("spawn"))
 			throw new IllegalStateException("npcmaker " + f[1] + ": " + f[i] + " is not max or spawn");
 		final int[] pos =
@@ -800,16 +805,18 @@ final class ScenarioTrace
 		};
 		int respawn = 0;
 		String db = null;
+		int corpse = 0;
 		for (int j = i + 6; j + 1 < f.length; j += 2)
 		{
 			switch (f[j])
 			{
 				case "respawn" -> respawn = Integer.parseInt(f[j + 1]);
 				case "db" -> db = f[j + 1];
-				default -> throw new IllegalStateException("npcmaker " + f[1] + ": " + f[j] + " is not respawn or db");
+				case "corpse" -> corpse = Integer.parseInt(f[j + 1]);
+				default -> throw new IllegalStateException("npcmaker " + f[1] + ": " + f[j] + " is not respawn, db or corpse");
 			}
 		}
-		return new MakerLine(f[1], f[2], max, Integer.parseInt(f[i + 1]), f[i + 2], pos, respawn, db);
+		return new MakerLine(f[1], f[2], max, Integer.parseInt(f[i + 1]), f[i + 2], pos, respawn, db, corpse);
 	}
 
 	/**
@@ -927,7 +934,7 @@ final class ScenarioTrace
 	{
 		return switch (verb)
 		{
-			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event", "as", "away", "stance" -> true;
+			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event", "killspawn", "makerevent", "as", "away", "stance" -> true;
 			default -> false;
 		};
 	}
@@ -977,6 +984,8 @@ final class ScenarioTrace
 				case "advance" -> advance(s[1]);
 				case "approach" -> approach(s[1]);
 				case "event" -> event(s[1], s[2], s[3], s[4]);
+				case "killspawn" -> killSpawn(s[1]);
+				case "makerevent" -> makerEvent(s[1], s[2], Integer.parseInt(s[3]), Integer.parseInt(s[4]));
 				case "tick" ->
 				{
 					final int n = s.length > 1 ? Integer.parseInt(s[1].substring(1)) : 1;
@@ -1491,6 +1500,8 @@ final class ScenarioTrace
 					final NpcTemplate template = NpcData.getInstance().getTemplate(m.npc());
 					casting(template, m.type());
 					fixture(template, m.type());
+					if (m.corpse() > 0)
+						alter(NpcTemplate.class, template, "_corpseTime", m.corpse());
 					final SpawnData data = m.db() == null ? null : rows.computeIfAbsent(m.db(), SpawnData::new);
 					spawns.add(new MultiSpawn(maker, template, 1, m.respawn(), 0, Collections.emptyList(), null, new int[][] { { m.pos()[0], m.pos()[1], m.pos()[2], 0 } }, data));
 				}
@@ -1723,6 +1734,37 @@ final class ScenarioTrace
 		// The dying hook runs 3 s after the death.
 		for (int i = 0; i < KILL_TICKS; i++)
 			tick();
+	}
+
+	/**
+	 * Kills the NPC the named npcmaker's spawn placed, as kill does an NPC line's, and lets the kill's ticks run; its
+	 * corpse decays through the maker.
+	 */
+	private void killSpawn(String maker) throws Exception
+	{
+		Npc monster = null;
+		for (Npc n : SpawnManager.getInstance().getNpcMaker(maker).getSpawns().get(0).getNpcs())
+			if (!n.isDead())
+				monster = n;
+		if (monster == null)
+			throw new IllegalStateException(_name + ": no live NPC of the npcmaker " + maker);
+		_lines.add("# kill " + monster.getNpcId() + " (object " + monster.getObjectId() + ")");
+		monster.reduceCurrentHp(monster.getStatus().getMaxHp() + 1, _player, null);
+
+		for (int i = 0; i < KILL_TICKS; i++)
+			tick();
+	}
+
+	/**
+	 * Sends the named npcmaker a script event as a script outside it would, then runs what it queued now. The
+	 * send is the step's line; a script's own sends are the maker lines.
+	 */
+	private void makerEvent(String name, String event, int i1, int i2)
+	{
+		final NpcMaker maker = SpawnManager.getInstance().getNpcMaker(name);
+		_lines.add("# makerevent " + maker.getName() + " " + event + " " + i1 + " " + i2);
+		maker.getMaker().onMakerScriptEvent(event, maker, i1, i2);
+		ThreadPool.advance(0);
 	}
 
 	/** Sends the NPC of role a script event, then runs what it queued now. */

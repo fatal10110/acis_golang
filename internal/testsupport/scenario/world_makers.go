@@ -11,13 +11,15 @@ import (
 // MakerSpawn is the spawn entry of an npcmaker line: one NPC of template NPC
 // (a fixture template of that instance Type) placed at the world position X,
 // Y, Z, back Respawn after it leaves, kept in the spawn_data row DB when that
-// is set.
+// is set. Corpse is the template's corpse time in seconds, 0 for the
+// fixture's.
 type MakerSpawn struct {
 	NPC     int32
 	Type    string
 	X, Y, Z int
 	Respawn time.Duration
 	DB      string
+	Corpse  int
 }
 
 // SpawnRow is one spawnrow line: the spawn_data row Name as the server
@@ -40,9 +42,9 @@ type MakerEvent struct {
 
 // parseNpcMaker reads an npcmaker line:
 //
-//	npcmaker <name> <ai type> [max <n>] [spawn <npc id> <type> <x> <y> <z> [respawn <seconds>] [db <name>]]
+//	npcmaker <name> <ai type> [max <n>] [spawn <npc id> <type> <x> <y> <z> [respawn <seconds>] [db <name>] [corpse <seconds>]]
 func parseNpcMaker(args []string) (NpcMaker, error) {
-	usage := fmt.Errorf("npcmaker <name> <ai type> [max <n>] [spawn <npc id> <type> <x> <y> <z> [respawn <seconds>] [db <name>]]")
+	usage := fmt.Errorf("npcmaker <name> <ai type> [max <n>] [spawn <npc id> <type> <x> <y> <z> [respawn <seconds>] [db <name>] [corpse <seconds>]]")
 	if len(args) < 2 {
 		return NpcMaker{}, usage
 	}
@@ -83,8 +85,14 @@ func parseNpcMaker(args []string) (NpcMaker, error) {
 			sp.Respawn = d
 		case "db":
 			sp.DB = opts[1]
+		case "corpse":
+			n, err := strconv.Atoi(opts[1])
+			if err != nil || n < 1 {
+				return NpcMaker{}, fmt.Errorf("npcmaker spawn corpse %q is not a number of seconds of 1 or more", opts[1])
+			}
+			sp.Corpse = n
 		default:
-			return NpcMaker{}, fmt.Errorf("npcmaker spawn option %q is not respawn or db", opts[0])
+			return NpcMaker{}, fmt.Errorf("npcmaker spawn option %q is not respawn, db or corpse", opts[0])
 		}
 	}
 	m.Spawn = sp
@@ -143,6 +151,16 @@ func (sc *Scenario) worldMakers(key string, args []string) error {
 			return fmt.Errorf("started: %w", err)
 		}
 		sc.Started = append(sc.Started, MakerEvent{Maker: args[0], Event: args[1], Int1: int32(n[0]), Int2: int32(n[1])})
+	}
+	return nil
+}
+
+// maker returns the npcmaker line of that name, nil for none.
+func (sc *Scenario) maker(name string) *NpcMaker {
+	for i := range sc.NpcMakers {
+		if strings.EqualFold(sc.NpcMakers[i].Name, name) {
+			return &sc.NpcMakers[i]
+		}
 	}
 	return nil
 }

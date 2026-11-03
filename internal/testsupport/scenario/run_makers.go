@@ -8,16 +8,19 @@ import (
 	"time"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // makerTemplates are the fixture templates of the npcmaker lines' spawn
-// entries that no npc line (known) already builds, one per id.
-func (r *run) makerTemplates(t *testing.T, known []*npc.Template) []*npc.Template {
+// entries that no npc line (known) already builds, one per id; each is an
+// attackable, which kinds records for the scripts bound to it.
+func (r *run) makerTemplates(t *testing.T, known []*npc.Template, kinds map[int32]script.NPCKind) []*npc.Template {
 	t.Helper()
 	var out []*npc.Template
 	for _, m := range r.sc.NpcMakers {
@@ -29,10 +32,11 @@ func (r *run) makerTemplates(t *testing.T, known []*npc.Template) []*npc.Templat
 		if slices.ContainsFunc(known, have) || slices.ContainsFunc(out, have) {
 			continue
 		}
-		tmpl := template(NPC{ID: sp.NPC, Type: sp.Type})
+		tmpl := template(NPC{ID: sp.NPC, Type: sp.Type, Corpse: sp.Corpse})
 		if !npc.Attackable(&npc.Instance{Template: tmpl}) {
 			t.Fatalf("%s: npcmaker %s spawn: type %s is not an attackable", r.sc.Name, m.Name, sp.Type)
 		}
+		kinds[sp.NPC] = script.KindHostile
 		out = append(out, tmpl)
 	}
 	return out
@@ -83,5 +87,83 @@ func (r *run) checkStarted(t *testing.T) {
 	}
 	if got := r.makerSent.take(); !slices.Equal(got, want) {
 		t.Fatalf("%s: the makers started sent %q, want %q (the started lines)", r.sc.Name, strings.Join(got, "; "), strings.Join(want, "; "))
+	}
+}
+
+// makerEvent sends the npcmaker args[0] the script event args[1] with the
+// integers args[2] and args[3], as a script outside the maker sends it. The
+// send itself is the step's line; what the maker's script sends or says on
+// is the step's.
+func (r *run) makerEvent(t *testing.T, args []string) {
+	t.Helper()
+	n, _ := ints(args[2:])
+	maker := r.sc.maker(args[0]).Name
+	r.makerSent.setOwn(makerLine(maker, args[1], int32(n[0]), int32(n[1])))
+	found := r.srv.NpcSpawns.MakerEvent(maker, args[1], n[0], n[1])
+	r.makerSent.setOwn("")
+	if !found {
+		t.Fatalf("%s: npcmaker %s is not in the server", r.sc.Name, maker)
+	}
+	r.srv.Settle(t)
+}
+
+// killSpawn lands a lethal hit from the character on the NPC the npcmaker
+// name's spawn placed, and lets the kill's time pass.
+func (r *run) killSpawn(t *testing.T, name string) {
+	t.Helper()
+	sp := r.sc.maker(name).Spawn
+	var target *npc.Hostile
+	for _, obj := range r.srv.State.Objects() {
+		h, ok := obj.(*npc.Hostile)
+		if !ok || h.Template().ID != int(sp.NPC) || r.rd.placed[h.ObjectID()] || h.AlikeDead() {
+			continue
+		}
+		target = h
+	}
+	if target == nil {
+		t.Fatalf("%s: killspawn %s: no live NPC %d is in the world", r.sc.Name, name, sp.NPC)
+	}
+	r.onPlayer(t, func(p attackable.Combatant) { target.TakeDamage(target.MaxHP()+1, p) })
+	r.passKillTime(t)
+}
+
+// passRespawns lets d pass for the respawns the makers' spawns armed on the
+// scenario's clock: a respawn that comes due brings its NPC back, as the
+// server's respawn task would (the harness never fires one). A respawn is
+// seen the first time this runs after it was armed, which is at the end of
+// the tick that armed it.
+func (r *run) passRespawns(t *testing.T, d time.Duration) {
+	t.Helper()
+	if !r.sc.StartsMakers() {
+		return
+	}
+	if r.respawnLeft == nil {
+		r.respawnLeft = map[task.SlotID]time.Duration{}
+	}
+	fired := false
+	for id := range r.srv.NpcSpawns.Slots() {
+		deadline, armed := r.srv.NpcRespawns.Deadline(id)
+		if !armed {
+			delete(r.respawnLeft, id)
+			continue
+		}
+		left, seen := r.respawnLeft[id]
+		if !seen {
+			// The armed delay is whole seconds from the wall clock, a few
+			// milliseconds ago.
+			r.respawnLeft[id] = (time.Until(deadline) + time.Second - 1).Truncate(time.Second)
+			continue
+		}
+		if left -= d; left > 0 {
+			r.respawnLeft[id] = left
+			continue
+		}
+		delete(r.respawnLeft, id)
+		r.srv.NpcRespawns.Cancel(id)
+		r.srv.NpcSpawns.Respawn(id)
+		fired = true
+	}
+	if fired {
+		r.srv.Settle(t)
 	}
 }
