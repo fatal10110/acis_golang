@@ -13,8 +13,10 @@ const (
 	connectionWriteTimeout = time.Minute
 )
 
-func setLoginClientReadDeadline(conn net.Conn, authed bool) error {
-	timeout := connectionHandshakeTimeout
+// setClientReadDeadline arms the login client's read deadline: the handshake
+// timeout until the client authenticates, the idle timeout after.
+func (l *ClientLink) setClientReadDeadline(conn net.Conn, authed bool) error {
+	timeout := l.handshakeTimeout
 	if authed {
 		timeout = loginClientIdleTimeout
 	}
