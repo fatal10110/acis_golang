@@ -22,7 +22,7 @@ type SpawnHook interface {
 // the zones at its position again. It reports whether t stands on the grid
 // again; a t off the grid or despawned stays out of the world and its
 // zones.
-func reshowInPlace(w *world.State, t world.Tracked, zones *zoneMember) bool {
+func reshowInPlace(w *world.State, t reshowable, zones *zoneMember) bool {
 	if w == nil {
 		return false
 	}
@@ -36,7 +36,20 @@ func reshowInPlace(w *world.State, t world.Tracked, zones *zoneMember) bool {
 		return false
 	}
 	zones.enter()
+	// A decay marks t decayed before it takes t out of its zones, so one
+	// that ran its zone exit before this entry is seen here.
+	if t.Decayed() {
+		zones.leave()
+		return false
+	}
 	return true
+}
+
+// reshowable is an NPC reshowInPlace shows again.
+type reshowable interface {
+	world.Tracked
+	// Decayed reports whether the NPC has left the world for good.
+	Decayed() bool
 }
 
 // onQueue runs fn on q, at once when there is no queue.
