@@ -43,6 +43,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
@@ -325,6 +326,8 @@ type GameClientLink struct {
 	augment       *augment.Service
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
+	// armorSets is the loaded armor set data //item set lists and grants.
+	armorSets     *armorset.Table
 	html          *datacache.HTML
 	crests        *datacache.Crests
 	skills        *skillstate.Persistence
@@ -829,6 +832,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		merchant:      cfg.Merchant,
 		templates:     cfg.Templates,
 		itemTemplates: cfg.ItemTemplates,
+		armorSets:     cfg.Enchanting.ArmorSets,
 		html:          cfg.HTML,
 		crests:        cfg.Crests,
 		skills:        cfg.Skills,

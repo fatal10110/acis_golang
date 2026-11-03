@@ -26,8 +26,9 @@ type EnchantingConfig struct {
 	// to the random source. Behavior harnesses inject a deterministic roll.
 	SkillRoll func() int
 	// ArmorSets is the loaded armor set data whose +6 skill an armor
-	// enchant grants and revokes; nil grants none. The equip-time set
-	// skills come from the skill persistence's own table.
+	// enchant grants and revokes, and the sets //item set lists and
+	// grants; nil holds none. The equip-time set skills come from the skill
+	// persistence's own table.
 	ArmorSets *armorset.Table
 }
 

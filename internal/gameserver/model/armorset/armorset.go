@@ -1,7 +1,11 @@
 // Package armorset models static armor set data loaded at boot.
 package armorset
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+import (
+	"slices"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+)
 
 // Set is one armor set template.
 type Set struct {
@@ -25,15 +29,54 @@ func (s Set) PieceIDs() [5]int32 {
 // Table stores armor sets keyed by chest item id.
 type Table struct {
 	byChest map[int32]Set
+	// order holds the chest ids in hash table order.
+	order []int32
 }
 
-// NewTable builds an armor set lookup table.
+// NewTable builds an armor set lookup table. A later set with the chest of
+// an earlier one replaces it in the earlier one's place.
 func NewTable(sets []Set) *Table {
 	t := &Table{byChest: make(map[int32]Set, len(sets))}
+	var chests []int32
 	for _, s := range sets {
+		if _, ok := t.byChest[s.Chest]; !ok {
+			chests = append(chests, s.Chest)
+		}
 		t.byChest[s.Chest] = s
 	}
+	t.order = hashOrder(chests)
 	return t
+}
+
+// InTableOrder returns the sets in the order a hash table keyed by chest id
+// and filled in load order lists them.
+func (t *Table) InTableOrder() []Set {
+	if t == nil {
+		return nil
+	}
+	out := make([]Set, len(t.order))
+	for i, chest := range t.order {
+		out[i] = t.byChest[chest]
+	}
+	return out
+}
+
+// hashOrder orders distinct keys, given in insertion order, as a hash table
+// of power-of-two size iterates them: by slot, the key's hash spread over
+// the table size, then by insertion within a slot. The table starts at 16
+// slots and doubles whenever it is more than three quarters full.
+func hashOrder(keys []int32) []int32 {
+	size := 16
+	for len(keys) > size*3/4 {
+		size *= 2
+	}
+	slot := func(k int32) int {
+		h := uint32(k)
+		return int((h ^ h>>16) & uint32(size-1))
+	}
+	out := slices.Clone(keys)
+	slices.SortStableFunc(out, func(a, b int32) int { return slot(a) - slot(b) })
+	return out
 }
 
 // Len returns the number of armor sets keyed by chest item id.
