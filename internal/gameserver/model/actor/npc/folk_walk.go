@@ -254,6 +254,7 @@ func (m *folkMotion) teleport(j location.Jump) {
 	m.teleporting.Store(false)
 	m.zones.enter()
 	m.ResetGeoPathFailCount()
+	m.aiSleep.wakeOutOfTerritory(m.Folk)
 }
 
 // Queue returns the queue the NPC's movement runs on.

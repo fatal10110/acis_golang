@@ -120,7 +120,7 @@ type Hostile struct {
 	// before the NPC is published.
 	zones *zoneMember
 
-	regionInactive atomic.Bool
+	aiSleep        aiSleep
 	abnormalEffect atomic.Int32
 	running        atomic.Bool
 	// offeringBonus is how many blood offerings a festival monster's kill
@@ -801,7 +801,7 @@ func (h *Hostile) LifeTime() int32 { return h.brain.LifeTime() }
 
 // Tick advances the hostile AI clock once.
 func (h *Hostile) Tick() {
-	if !h.canRunAI() {
+	if !h.tickable() {
 		return
 	}
 	h.brain.Tick()
@@ -858,77 +858,81 @@ func (h *Hostile) CastFinished(e event.CastFinished) error {
 // TickThink runs one periodic AI cycle, including empty-queue idle abort
 // after the first cycle.
 func (h *Hostile) TickThink() error {
-	if !h.canRunAI() {
+	if !h.tickable() {
 		return nil
 	}
 	return h.brain.TickThink()
 }
 
 // OnInactiveRegion applies the hostile-NPC reset when the owning world region
-// deactivates. The player whose departure deactivated the region calls it on
-// that player's queue, so the reset is posted to this NPC's queue and applies
-// only if the NPC is still placed in an inactive region when it runs.
+// deactivates, and puts the NPC's AI to sleep unless it is a noSleepMode NPC
+// or stands outside its territory. The player whose departure deactivated
+// the region calls it on that player's queue, so the reset is posted to this
+// NPC's queue and applies only if the NPC is still placed in an inactive
+// region when it runs.
 func (h *Hostile) OnInactiveRegion() {
-	reset := func() {
+	h.aiSleep.settle(h.world, h)
+	h.Queue().Post(func() {
 		if h.world != nil {
 			if placed, active := h.world.RegionActivity(h); !placed || active {
 				return
 			}
 		}
-		h.enterInactiveRegion()
-	}
-	h.Queue().Post(reset)
-}
-
-// OnActiveRegion clears the deactivation latch once players wake the region.
-func (h *Hostile) OnActiveRegion() {
-	h.regionInactive.Store(false)
-}
-
-// SleepWhenRegionInactive reports whether the AI task should pause this NPC
-// while no player is near its region. noSleepMode NPCs and off-territory NPCs
-// keep ticking: they are exempt from deactivation.
-func (h *Hostile) SleepWhenRegionInactive() bool {
-	return !h.Instance.Template.NoSleepMode && h.InTerritory()
-}
-
-// AISleeping reports whether the AI task leaves the NPC alone: it is dead,
-// out of the world, or in an inactive region it sleeps in.
-func (h *Hostile) AISleeping() bool {
-	if h.Dead() {
-		return true
-	}
-	if h.world == nil {
-		return false
-	}
-	placed, active := h.world.RegionActivity(h)
-	return !placed || (!active && h.SleepWhenRegionInactive())
-}
-
-func (h *Hostile) canRunAI() bool {
-	if h.world == nil {
-		h.regionInactive.Store(false)
-		return true
-	}
-	placed, active := h.world.RegionActivity(h)
-	if !placed {
-		h.regionInactive.Store(false)
-		return false
-	}
-	if !active {
-		h.enterInactiveRegion()
-		return !h.SleepWhenRegionInactive()
-	}
-	h.regionInactive.Store(false)
-	return true
-}
-
-func (h *Hostile) enterInactiveRegion() {
-	if h.regionInactive.CompareAndSwap(false, true) {
 		h.clearAttackers()
 		h.EffectList().StopAll()
 		h.brain.SetBackToPeace()
+	})
+}
+
+// OnActiveRegion wakes the NPC's AI once players wake its region.
+func (h *Hostile) OnActiveRegion() { h.aiSleep.settle(h.world, h) }
+
+// OnRegionArrival decides the NPC's AI sleep when it comes onto the grid: it
+// sleeps in a quiet region it does not keep ticking in (see
+// OnInactiveRegion). Walking or teleporting into another region leaves the
+// AI sleep as it was.
+func (h *Hostile) OnRegionArrival(_, joined bool) {
+	if joined {
+		h.aiSleep.settle(h.world, h)
 	}
+}
+
+// SleepWhenRegionInactive reports whether this NPC sleeps in a region no
+// player keeps active: noSleepMode NPCs and off-territory NPCs do not.
+func (h *Hostile) SleepWhenRegionInactive() bool {
+	return !h.noSleepMode() && h.InTerritory()
+}
+
+func (h *Hostile) noSleepMode() bool { return h.Instance.Template.NoSleepMode }
+
+// AISleeping reports whether the AI task leaves the NPC alone. Its region
+// going quiet, its death and its removal put it to sleep — not a
+// noSleepMode NPC's or one's outside its territory in the quiet region —
+// and coming onto the grid, its region waking or a teleport landing it
+// outside its territory wake it; it keeps that state wherever it walks in
+// between. An NPC with no world is awake.
+func (h *Hostile) AISleeping() bool {
+	return h.world != nil && h.aiSleep.asleep()
+}
+
+// tickable reports whether the periodic AI cycle runs the NPC: it is on the
+// grid and awake.
+func (h *Hostile) tickable() bool {
+	if h.world == nil {
+		return true
+	}
+	placed, _ := h.world.RegionActivity(h)
+	return placed && !h.aiSleep.asleep()
+}
+
+// canRunAI reports whether an event may run the NPC's AI: it is on the grid,
+// in an active region or awake.
+func (h *Hostile) canRunAI() bool {
+	if h.world == nil {
+		return true
+	}
+	placed, active := h.world.RegionActivity(h)
+	return placed && (active || !h.aiSleep.asleep())
 }
 
 // SiegeGuard reports whether this NPC is a defensive siege guard.
@@ -1001,6 +1005,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if !h.MarkDead() {
 		return false
 	}
+	h.aiSleep.sleep()
 	h.BroadcastStatus()
 	h.AbortAll(true)
 	h.brain.ResetLifeTime()
@@ -1100,6 +1105,7 @@ func (h *Hostile) markDecayed() bool {
 // leaveWorld takes this decayed NPC out of the world, then runs respawn
 // when it is not nil, and closes its queue.
 func (h *Hostile) leaveWorld(worldState *world.State, respawn func()) {
+	h.aiSleep.sleep()
 	// The NPC leaves its zones while its observers still know it.
 	h.zones.leave()
 	if worldState != nil {

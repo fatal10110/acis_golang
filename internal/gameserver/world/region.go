@@ -48,6 +48,16 @@ type inactiveRegionActor interface {
 	OnInactiveRegion()
 }
 
+// regionArrivalActor is told, in place of OnActiveRegion or
+// OnInactiveRegion, the activity of the region an arrival placed it in;
+// joined reports that the arrival brought it onto the grid (a spawn or a
+// rejoin) rather than across from another region. Region toggles still
+// reach it through OnActiveRegion and OnInactiveRegion. The call runs on
+// the goroutine that placed it.
+type regionArrivalActor interface {
+	OnRegionArrival(active, joined bool)
+}
+
 func newRegion(tileX, tileY int) *Region {
 	return &Region{tileX: tileX, tileY: tileY}
 }

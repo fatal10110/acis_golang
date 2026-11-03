@@ -81,6 +81,7 @@ func (h *Hostile) InstantTeleportTo(j location.Jump) {
 		h.world.SetPosition(h, target.X, target.Y, target.Z)
 	}
 	h.ResetGeoPathFailCount()
+	h.aiSleep.wakeOutOfTerritory(h)
 }
 
 // RemoveAllDesire drops every desire the NPC holds, zeroes its hate of every

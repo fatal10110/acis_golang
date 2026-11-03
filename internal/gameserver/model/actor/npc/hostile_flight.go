@@ -63,6 +63,7 @@ func (h *Hostile) TeleportJump(j location.Jump) {
 	h.SetTeleporting(false)
 	h.zones.enter()
 	h.ResetGeoPathFailCount()
+	h.aiSleep.wakeOutOfTerritory(h)
 }
 
 // DropThreatAround removes subject's threat entry (damage and hate) from

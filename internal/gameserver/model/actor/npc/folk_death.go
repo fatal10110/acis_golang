@@ -41,6 +41,7 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 	f.hp = 0
 	f.dead = true
 	f.vitalsMu.Unlock()
+	f.aiSleep.sleep()
 
 	f.BroadcastStatus()
 	f.stopMoving()
@@ -120,6 +121,7 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 	f.decayed, f.dead = true, true
 	f.corpseDeadline = time.Time{}
 	f.vitalsMu.Unlock()
+	f.aiSleep.sleep()
 	var respawn func()
 	if respawnFor != nil {
 		respawn = respawnFor(f.ObjectID())

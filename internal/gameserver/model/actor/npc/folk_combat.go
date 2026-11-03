@@ -206,9 +206,12 @@ func (f *Folk) emit(ev event.Event) {
 }
 
 // OnInactiveRegion stops every effect the NPC holds once no player is near
-// its region. The departing player's goroutine calls it, so the stop runs
-// on the NPC's own queue, and only if the region is still inactive then.
+// its region, and puts its AI to sleep unless it is a noSleepMode NPC or
+// stands outside its territory. The departing player's goroutine calls it,
+// so the stop runs on the NPC's own queue, and only if the region is still
+// inactive then.
 func (f *Folk) OnInactiveRegion() {
+	f.aiSleep.settle(f.world, f)
 	if f.queue == nil {
 		return
 	}
@@ -220,6 +223,18 @@ func (f *Folk) OnInactiveRegion() {
 		}
 		f.effects.StopAll()
 	})
+}
+
+// OnActiveRegion wakes the NPC's AI once players wake its region.
+func (f *Folk) OnActiveRegion() { f.aiSleep.settle(f.world, f) }
+
+// OnRegionArrival decides the NPC's AI sleep when it comes onto the grid, as
+// OnInactiveRegion and OnActiveRegion do. Walking or teleporting into
+// another region leaves it as it was.
+func (f *Folk) OnRegionArrival(_, joined bool) {
+	if joined {
+		f.aiSleep.settle(f.world, f)
+	}
 }
 
 // CharacterName returns the template name.
