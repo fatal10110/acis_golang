@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"cmp"
 	"encoding/binary"
 	"slices"
 	"strings"
@@ -106,7 +107,8 @@ func (r *run) maker(t *testing.T, tr Territory) *spawn.Maker {
 }
 
 // npcMakerTable is the spawn list of the npcmaker lines: each maker runs
-// the script of its AI type and spawns nothing. The table needs a territory,
+// the script of its AI type and spawns nothing, but for the one NPC of its
+// spawn entry. The table needs a territory,
 // which no maker spawns in.
 func npcMakerTable(t *testing.T, lines []NpcMaker) *spawn.Table {
 	t.Helper()
@@ -116,7 +118,14 @@ func npcMakerTable(t *testing.T, lines []NpcMaker) *spawn.Table {
 	}
 	makers := make([]*spawn.Maker, len(lines))
 	for i, m := range lines {
-		makers[i] = spawn.NewMaker(spawn.Maker{Name: m.Name, Territories: []*spawn.Territory{territory}, AIType: m.AIType, MaximumNPCs: 1}, 1)
+		maker := spawn.Maker{Name: m.Name, Territories: []*spawn.Territory{territory}, AIType: m.AIType, MaximumNPCs: cmp.Or(m.Max, 1)}
+		if sp := m.Spawn; sp != nil {
+			maker.Entries = []spawn.Entry{spawn.NewEntry(spawn.Entry{
+				NPCID: sp.NPC, Total: 1, RespawnDelay: sp.Respawn, DBName: sp.DB,
+				Positions: []spawn.Position{{Location: location.Location{X: sp.X, Y: sp.Y, Z: sp.Z}}},
+			}, 1)}
+		}
+		makers[i] = spawn.NewMaker(maker, 1)
 	}
 	table, err := spawn.NewTable([]*spawn.Territory{territory}, makers)
 	if err != nil {

@@ -389,5 +389,5 @@ var scenarioScripts = script.Catalog{
 // through the booted server and MariaDB (format: package scenario).
 func TestScenarios(t *testing.T) {
 	t.Parallel()
-	scenario.RunDir(t, "testdata/scenarios", scenario.Config{Catalog: scenarioScripts})
+	scenario.RunDir(t, "testdata/scenarios", scenario.Config{Catalog: scenarioScripts, Makers: scenarioMakers()})
 }

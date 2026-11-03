@@ -1,0 +1,14 @@
+# SailrenMaker started with Sailren's row saved alive away from the lair's X: the start runs 11047 on
+# rune16_npc2017_01m1 and rune16_npc2017_13m1, and Sailren appears where the row says, not at his spawn point.
+# Untraced: the reference probe starts no maker and keeps no spawn_data.
+character Hunter 20
+npcmaker rune20_mb2017_04m1 sailren_maker max 2 spawn 29065 GrandBoss -113091 -243942 -15536 respawn 129600 db sailren
+npcmaker rune16_npc2017_01m1 default_maker
+npcmaker rune16_npc2017_13m1 default_maker
+spawnrow sailren alive -112000 -243000 -15536
+started rune16_npc2017_01m1 11047 0 0
+started rune16_npc2017_13m1 11047 0 0
+
+advance 1s
+  live 29065 1
+  spawned 29065 -112000,-243000

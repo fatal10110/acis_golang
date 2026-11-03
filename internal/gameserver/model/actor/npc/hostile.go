@@ -207,12 +207,15 @@ type Hostile struct {
 	currentSpiritshots int
 	shotsMask          int32
 
-	// statMu guards statCalcs slot creation; each slot's own Calculator
-	// then guards its own Mods independently, so a warm read only ever
-	// takes statMu's read lock. An attacker's formulas read these stats
-	// from the attacker's queue.
+	// statMu guards statCalcs, its slots and passives; each slot's own
+	// Calculator then guards its own Mods independently, so a read only
+	// ever takes statMu's read lock. A Stat without a slot computes from
+	// passives, the template's shared Mods; the slots are created on the
+	// first change to a Stat's chain. An attacker's formulas read these
+	// stats from the attacker's queue.
 	statMu    sync.RWMutex
-	statCalcs [stat.Count]*effect.Calculator
+	statCalcs *[stat.Count]*effect.Calculator
+	passives  *effect.StatMods
 
 	// collisionRadiusOverride is the runtime body-radius override a live
 	// effect (e.g. Grow) installs; nil means "use the template value".
@@ -300,11 +303,11 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	if len(skills) > 0 {
 		lookup = skills[0]
 	}
-	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
+	passives, err := inst.Template.passiveMods(lookup)
 	if err != nil {
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
-	h.AddStatFuncs(mods)
+	h.attachPassives(passives)
 	// The live movement starts at the template speed; move at the stat-
 	// finalized one from the first step.
 	h.refreshMoveSpeed()

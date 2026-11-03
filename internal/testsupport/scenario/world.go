@@ -18,10 +18,15 @@ type Territory struct {
 	DZ1, DZ2           int
 }
 
-// NpcMaker is one npcmaker line: a named npcmaker of an AI type, with no
-// NPC to spawn, which a script finds by name and sends script events.
+// NpcMaker is one npcmaker line: a named npcmaker of an AI type, which a
+// script finds by name and sends script events. It spawns nothing and is
+// never started, unless it has a Spawn entry: then every npcmaker is started
+// as the server boots. Max is its maximum NPC count (0: the default, 1; only
+// with a Spawn).
 type NpcMaker struct {
 	Name, AIType string
+	Max          int
+	Spawn        *MakerSpawn
 }
 
 // Member is one member line: a second character in the character's party.
@@ -91,13 +96,16 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 		}
 		sc.Territories = append(sc.Territories, Territory{Name: args[0], DX1: n[0], DY1: n[1], DX2: n[2], DY2: n[3], DZ1: n[4], DZ2: n[5]})
 	case "npcmaker":
-		if len(args) != 2 {
-			return fmt.Errorf("npcmaker <name> <ai type>")
+		m, err := parseNpcMaker(args)
+		if err != nil {
+			return err
 		}
-		if slices.ContainsFunc(sc.NpcMakers, func(m NpcMaker) bool { return strings.EqualFold(m.Name, args[0]) }) {
-			return fmt.Errorf("npcmaker %s listed twice", args[0])
+		if slices.ContainsFunc(sc.NpcMakers, func(o NpcMaker) bool { return strings.EqualFold(o.Name, m.Name) }) {
+			return fmt.Errorf("npcmaker %s listed twice", m.Name)
 		}
-		sc.NpcMakers = append(sc.NpcMakers, NpcMaker{Name: args[0], AIType: args[1]})
+		sc.NpcMakers = append(sc.NpcMakers, m)
+	case "spawnrow", "started":
+		return sc.worldMakers(key, args)
 	case "zone":
 		usage := fmt.Errorf("zone <boss|peace> <id> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>")
 		if len(args) != 8 {

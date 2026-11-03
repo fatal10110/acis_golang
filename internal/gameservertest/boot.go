@@ -214,6 +214,7 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
+	seedSpawnData          func(*gamesql.SpawnStore)
 	sevenSignsTimer        func(time.Duration, func()) *time.Timer
 	sevenSignsClock        func() time.Time
 	seedFestival           func(*gamesql.FestivalStore)
@@ -2462,6 +2463,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	var spawnStore *gamesql.SpawnStore
 	if o.npcSpawns != nil && o.spawnData {
 		spawnStore = gamesql.NewSpawnStore(db)
+		if o.seedSpawnData != nil {
+			o.seedSpawnData(spawnStore)
+		}
 	}
 	if o.npcSpawns != nil {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{

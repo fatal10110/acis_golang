@@ -109,6 +109,10 @@ type Template struct {
 	// skill table. Race-marker ids never enter this list, and commanded-skill
 	// lookups do not search it.
 	Passives []skill.Ref
+
+	// passives keeps Passives compiled for the NPCs of the template; nil
+	// (a template not built by NewTemplate) compiles them per NPC.
+	passives *passiveCache
 }
 
 // PrivateEntry describes one escort minion a template spawns alongside its
@@ -162,6 +166,7 @@ type TemplateSkills struct {
 func NewTemplate(t Template, skills TemplateSkills) *Template {
 	t.SkillsByType = skills.ByType
 	t.Passives = skills.Passives
+	t.passives = &passiveCache{}
 	t.Skills = nil
 	if skills.ByType != nil {
 		t.Skills = make(map[int]int, len(skills.ByType))
