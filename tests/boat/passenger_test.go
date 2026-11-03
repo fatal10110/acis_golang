@@ -1,11 +1,14 @@
 package boat
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -16,7 +19,7 @@ import (
 // the player onto the deck; boarding sets the player at the boat, at peace,
 // and shows it aboard; once the boat sails each of its position updates
 // carries the passenger along and tells it where the boat is; five seconds
-// after the departure one ticket is taken.
+// after the departure one ticket is taken, shown taken and stored taken.
 func TestPassengerBoardsSailsAndPays(t *testing.T) {
 	t.Parallel()
 	srv, c, me, b := bootPassenger(t, runeBoarding, 2)
@@ -58,6 +61,42 @@ func TestPassengerBoardsSailsAndPays(t *testing.T) {
 	assertLog(t, "second 308", rest, sm(serverpackets.SystemMessageS1Disappeared))
 	if got := srv.PlayerInventory(t, me).ItemCount(ticketID, -1, false); got != 1 {
 		t.Fatalf("tickets left %d, want 1", got)
+	}
+	srv.InventoryUpdates.Tick()
+	var updates [][]byte
+	for _, f := range srv.ReadQueued(t, c) {
+		if f[0] == serverpackets.OpcodeInventoryUpdate {
+			updates = append(updates, f)
+		}
+	}
+	if len(updates) != 1 {
+		t.Fatalf("InventoryUpdate frames after the fare %d, want 1", len(updates))
+	}
+	// One row, kept (modified, not removed) and about the ticket: the
+	// category and object id are skipped, the count is the one ticket left.
+	r := wire.NewReader(updates[0][1:])
+	if n := r.ReadUint16(); n != 1 {
+		t.Fatalf("InventoryUpdate rows %d, want 1", n)
+	}
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateModified) {
+		t.Fatalf("InventoryUpdate state %d, want %d (modified)", state, itemcontainer.UpdateModified)
+	}
+	r.ReadUint16() // category
+	r.ReadInt32()  // object id
+	if item := r.ReadInt32(); item != ticketID {
+		t.Fatalf("InventoryUpdate item %d, want ticket %d", item, ticketID)
+	}
+	if count := r.ReadInt32(); count != 1 {
+		t.Fatalf("InventoryUpdate ticket count %d, want 1", count)
+	}
+	srv.FlushItems(t)
+	var stored int
+	if err := srv.DB.QueryRowContext(context.Background(),
+		"SELECT COALESCE(SUM(count), 0) FROM items WHERE owner_id = ? AND item_id = ?", me, ticketID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != 1 {
+		t.Fatalf("stored tickets %d, want 1", stored)
 	}
 }
 
