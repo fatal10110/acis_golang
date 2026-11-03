@@ -223,9 +223,18 @@ func TestAdminClanSkillSetAllAndRemoveAll(t *testing.T) {
 		if level := skillListLevel(t, frameOf(t, frames, isSkillList), vitalityID); level != 3 {
 			t.Fatalf("%s's SkillList has Clan Vitality at %d, want 3", who, level)
 		}
+		// 22 skills fill a table of 32 buckets: 384 to 391 in buckets 0
+		// to 7 list before 370 to 383 in buckets 18 to 31.
 		listed := pledgeSkills(t, frameOf(t, frames, isPledgeSkillList))
-		if len(listed) != clanSkillCount || listed[0] != [2]int32{vitalityID, 3} {
-			t.Fatalf("%s's PledgeSkillList = %v, want the %d clan skills from Clan Vitality 3", who, listed, clanSkillCount)
+		var ids, want []int32
+		for _, sk := range listed {
+			ids = append(ids, sk[0])
+		}
+		for id := range int32(clanSkillCount) {
+			want = append(want, 370+(id+14)%clanSkillCount)
+		}
+		if !slices.Equal(ids, want) || listed[8] != [2]int32{vitalityID, 3} {
+			t.Fatalf("%s's PledgeSkillList = %v, want the %d clan skills in table order, Clan Vitality 3 ninth", who, listed, clanSkillCount)
 		}
 	}
 	stored := storedClanSkills(t, w.clanWorld)

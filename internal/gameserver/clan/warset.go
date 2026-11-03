@@ -11,8 +11,8 @@ const (
 	setUntreeifyAt = 6  // a tree bucket this small or smaller turns back into a chain
 )
 
-// warSet is a set of clan ids that remembers the order a concurrent hash
-// set lists them in: the table starts at 16 buckets and doubles whenever it
+// warSet is a set of ids (clan ids, skill ids) that remembers the order a
+// concurrent hash table lists them in: the table starts at 16 buckets and doubles whenever it
 // holds three quarters of its size, a bucket chains its ids in insertion
 // order, and a doubling reorders a chain (see grow). Removing an id only
 // unlinks it, so the table never shrinks and a clan that once held twelve

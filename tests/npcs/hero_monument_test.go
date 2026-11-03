@@ -209,8 +209,9 @@ func TestHeroClaimBelowLevel76(t *testing.T) {
 }
 
 // TestHeroList pins "Olympiad 4": ExHeroList with every hero of the running
-// era, by class: name, class, clan name and crest, alliance name and
-// crest, and how many times it was elected.
+// era, in hero table order (Talker's id in a lower bucket than 9100's):
+// name, class, clan name and crest, alliance name and crest, and how many
+// times it was elected.
 func TestHeroList(t *testing.T) {
 	t.Parallel()
 	w, monument := bootMonument(t, 76,
@@ -241,7 +242,7 @@ func TestHeroList(t *testing.T) {
 	for range int(r.ReadInt32()) {
 		got = append(got, entry{r.ReadString(), r.ReadInt32(), r.ReadString(), r.ReadInt32(), r.ReadString(), r.ReadInt32(), r.ReadInt32()})
 	}
-	want := []entry{{"Other", 88, "Valor", 0, "", 0, 1}, {"Talker", 90, "", 0, "", 0, 2}}
+	want := []entry{{"Talker", 90, "", 0, "", 0, 2}, {"Other", 88, "Valor", 0, "", 0, 1}}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("ExHeroList = %+v, want %+v", got, want)
 	}
