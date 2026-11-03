@@ -13,18 +13,19 @@ func DefaultRaidMultipliers() RaidMultipliers {
 	return RaidMultipliers{Defence: 1, HPRegen: 1, MPRegen: 1}
 }
 
-// SetRaidMultipliers installs the raid base multipliers h applies while it
-// is raid related. Until set, h uses DefaultRaidMultipliers.
+// SetRaidMultipliers gives h a holder of its own, with the raid base
+// multipliers m it applies while it is raid related and the AI switches h
+// has now.
 func (h *Hostile) SetRaidMultipliers(m RaidMultipliers) {
-	h.raidMultipliers.Store(&m)
+	h.settings.Store(NewHostileSettings(h.aiSettings(), m))
 }
 
 // raidBaseMultipliers returns the multipliers h's base defences and
 // regeneration take: the installed ones while h is raid related, otherwise
 // DefaultRaidMultipliers.
 func (h *Hostile) raidBaseMultipliers() RaidMultipliers {
-	if m := h.raidMultipliers.Load(); m != nil && h.RaidRelated() {
-		return *m
+	if h.RaidRelated() {
+		return h.hostileSettings().Raid()
 	}
 	return DefaultRaidMultipliers()
 }

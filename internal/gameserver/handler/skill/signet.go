@@ -188,7 +188,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 		queue.Close()
 		return nil, false
 	}
-	point.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(point)})
+	point.Attach(npc.Runtime{World: h.world, Sink: h.newSink(point)})
 	point.SetZones(h.zones)
 
 	pos, ok := caster.(signetPositioned)

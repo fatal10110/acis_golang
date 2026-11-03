@@ -1,8 +1,6 @@
 package manager
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -55,7 +53,8 @@ type FolkSpawner struct {
 	// MaxBuffsAmount is the configured base buff-slot count.
 	MaxBuffsAmount      int
 	MaxGeoPathFailCount int
-	Log                 zerolog.Logger
+	// Log is the logger every civilian NPC shares.
+	Log *zerolog.Logger
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts npc.ScriptHooks
 	// Remover takes the NPC out of the world for a script delete; nil
@@ -83,19 +82,19 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 // for: the NPC is linked to master before it enters the world. tower is
 // what a control tower works with.
 func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember, tower npc.TowerRuntime) (*npc.Folk, error) {
+	inst.Slot = slot
 	f, err := npc.NewFolk(inst, s.Skills)
 	if err != nil {
 		return nil, err
 	}
 	rt := npc.FolkRuntime{
 		World:          s.State,
-		Queue:          s.Queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)),
+		Queue:          s.Queues.NewQueue("npc").Serial(inst.ObjectID),
 		Effects:        s.Effects,
 		MaxBuffsAmount: s.MaxBuffsAmount,
 		Items:          s.Items,
 		Decay:          s.Decay,
 		Zones:          s.Zones,
-		Slot:           slot,
 		Scripts:        s.Scripts,
 		Remover:        s.Remover,
 		Ground:         s.Ground,
@@ -215,7 +214,7 @@ func (s FolkSpawner) movement(rt npc.FolkRuntime) npc.FolkMovement {
 type folkControl struct {
 	walker *task.Walker
 	ref    *npc.FolkWalker
-	log    zerolog.Logger
+	log    *zerolog.Logger
 }
 
 // Emit advances the NPC's route on each arrival, and ends it when the NPC

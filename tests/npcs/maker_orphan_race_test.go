@@ -98,16 +98,19 @@ func TestMakerRespawnArmedAfterAnotherCallersDeleteAllBringsNothingBack(t *testi
 		t.Fatalf("boot: maker hooks = %q, want %q", got, want)
 	}
 
+	bossSlot := w.srv.Slot(t, "orphan_race#0#0")
 	mw.inWorld(orphanRaceBossID)[0].DeleteMe()
 	w.srv.Settle(t)
 	if got, want := probe.take(), []string{"delete alive=0", "deleted alive=0"}; !slices.Equal(got, want) {
 		t.Fatalf("the boss left: maker hooks = %q, want %q", got, want)
 	}
-	const slot = "orphan_race#0#0"
-	if w.srv.NpcRespawns.Tracked(slot) {
+	if _, ok := w.srv.NpcSpawns.SlotID("orphan_race#0#0"); ok {
+		t.Fatal("the boss left: its slot outlived another caller's DeleteAll")
+	}
+	if w.srv.NpcRespawns.Tracked(bossSlot) {
 		t.Fatal("the boss left: its respawn is armed though another caller's DeleteAll let it go")
 	}
-	w.srv.NpcSpawns.Respawn(slot)
+	w.srv.NpcSpawns.Respawn(bossSlot)
 	w.srv.Settle(t)
 	if got := len(mw.inWorld(orphanRaceBossID)); got != 0 {
 		t.Fatalf("its slot gone: bosses in the world = %d, want 0", got)

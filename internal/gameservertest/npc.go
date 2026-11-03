@@ -745,7 +745,7 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		Decay:               s.decay,
 		Effects:             s.effectEnv,
 		MaxGeoPathFailCount: s.maxGeoPathFail,
-		Log:                 s.log,
+		Log:                 &s.log,
 		Scripts:             s.quests.registry,
 		Ground:              s.groundTaker,
 		Regen:               s.playerRules,

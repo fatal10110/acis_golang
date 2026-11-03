@@ -137,10 +137,10 @@ func TestMakerRespawnBringsBackTheNPCItsSpawnLetGo(t *testing.T) {
 	// due.
 	respawn := func(step, key string) {
 		t.Helper()
-		if !w.srv.NpcRespawns.Cancel(key) {
+		if !w.srv.CancelRespawn(t, key) {
 			t.Fatalf("%s: no respawn armed for %s", step, key)
 		}
-		w.srv.NpcSpawns.Respawn(key)
+		w.srv.RespawnSlot(t, key)
 		w.srv.Settle(t)
 	}
 	count("boot", 1, 1, 1)
@@ -152,6 +152,7 @@ func TestMakerRespawnBringsBackTheNPCItsSpawnLetGo(t *testing.T) {
 
 	boss := mw.inWorld(orphanBossID)[0]
 	mob := mw.inWorld(orphanMobID)[0]
+	mobSlot := w.srv.Slot(t, "orphan_m#1#0")
 	boss.DeleteMe()
 	w.srv.Settle(t)
 	count("the boss left", 0, 0, 1)
@@ -159,7 +160,7 @@ func TestMakerRespawnBringsBackTheNPCItsSpawnLetGo(t *testing.T) {
 	if got := deleted(drainFrames(t, w.c)); !slices.Equal(got, objectIDs([]*npc.Hostile{boss, mob})) {
 		t.Fatalf("the boss left: deleted objects = %v, want the boss and the mob", got)
 	}
-	if w.srv.NpcRespawns.Tracked("orphan_m#1#0") {
+	if w.srv.NpcRespawns.Tracked(mobSlot) {
 		t.Fatal("the boss left: the deleted mob's respawn is still armed")
 	}
 
@@ -179,14 +180,18 @@ func TestMakerRespawnBringsBackTheNPCItsSpawnLetGo(t *testing.T) {
 		t.Fatalf("a second DeleteAll: deleted objects = %v, want none", got)
 	}
 
+	bossSlot := w.srv.Slot(t, "orphan_m#0#0")
 	mw.inWorld(orphanBossID)[0].DeleteMe()
 	w.srv.Settle(t)
 	event("orphan_m", "counts")
 	probe.expect(t, "the respawned boss left", "counts orphan_m alive=-1 21993:0/0/0 21994:0/0/0")
-	if w.srv.NpcRespawns.Tracked("orphan_m#0#0") {
+	if _, ok := w.srv.NpcSpawns.SlotID("orphan_m#0#0"); ok {
+		t.Fatal("the respawned boss left: its slot outlived the DeleteAll")
+	}
+	if w.srv.NpcRespawns.Tracked(bossSlot) {
 		t.Fatal("the respawned boss left: a respawn is armed for it")
 	}
-	w.srv.NpcSpawns.Respawn("orphan_m#0#0")
+	w.srv.NpcSpawns.Respawn(bossSlot)
 	w.srv.Settle(t)
 	count("its slot gone", 0, 0, 1)
 	probe.expect(t, "its slot gone")

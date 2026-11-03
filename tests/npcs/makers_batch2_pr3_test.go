@@ -110,7 +110,7 @@ func TestManageTeleportDungeonMakerOpensAndClosesTheRoom(t *testing.T) {
 		t.Helper()
 		out := 0
 		for i := range n {
-			if w.srv.NpcRespawns.Tracked(fmt.Sprintf("dimension_gap_00#%d#%d", entry, i)) {
+			if w.srv.RespawnArmed(t, fmt.Sprintf("dimension_gap_00#%d#%d", entry, i)) {
 				out++
 			}
 		}
@@ -142,7 +142,7 @@ func TestManageTeleportDungeonMakerOpensAndClosesTheRoom(t *testing.T) {
 		t.Fatalf("an invader left: respawns armed = %d, want 1", n)
 	}
 	for i := range 2 {
-		fireRespawn(w.srv, fmt.Sprintf("dimension_gap_00#1#%d", i))
+		fireRespawn(t, w.srv, fmt.Sprintf("dimension_gap_00#1#%d", i))
 	}
 	w.srv.Settle(t)
 	count("invader respawn", 2, 0, 3)
@@ -193,8 +193,8 @@ func TestManageTeleportDungeonMakerOpensAndClosesTheRoom(t *testing.T) {
 	if got := deleted(drainFrames(t, w.c)); len(got) != 4 {
 		t.Fatalf("3: deleted objects = %v, want the four invaders", got)
 	}
-	if n := armed(1, 2) + armed(2, 2); n != 0 {
-		t.Fatalf("3: invader respawns armed = %d, want 0", n)
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("3: respawns armed = %d, want 0", n)
 	}
 }
 
@@ -296,7 +296,7 @@ func TestRoyalRushMakerKeepsTheHallOnTheClock(t *testing.T) {
 	guardsArmed := func() int {
 		n := 0
 		for i := range 2 {
-			if w.srv.NpcRespawns.Tracked(fmt.Sprintf("royal_room#0#%d", i)) {
+			if w.srv.RespawnArmed(t, fmt.Sprintf("royal_room#0#%d", i)) {
 				n++
 			}
 		}
@@ -312,17 +312,18 @@ func TestRoyalRushMakerKeepsTheHallOnTheClock(t *testing.T) {
 		t.Fatalf("1001 at minute 5: NPCs shown = %v", got)
 	}
 
+	onceSlot := w.srv.Slot(t, "royal_room#1#0")
 	mw.inWorld(royalGuardID)[0].DeleteMe()
 	mw.inWorld(royalOnceID)[0].DeleteMe()
 	w.srv.Settle(t)
 	if n := guardsArmed(); n != 1 {
 		t.Fatalf("a guard left at minute 5: respawns armed = %d, want 1", n)
 	}
-	if w.srv.NpcRespawns.Tracked("royal_room#1#0") {
+	if w.srv.NpcRespawns.Tracked(onceSlot) {
 		t.Fatal("an NPC of a spawn with no respawn delay armed a respawn")
 	}
 	for i := range 2 {
-		fireRespawn(w.srv, fmt.Sprintf("royal_room#0#%d", i))
+		fireRespawn(t, w.srv, fmt.Sprintf("royal_room#0#%d", i))
 	}
 	w.srv.Settle(t)
 	count("guard respawn", 2, 0)
@@ -447,7 +448,7 @@ func TestRoyalReqNextMakersChainToTheTreasure(t *testing.T) {
 
 	leave(royalEscortID)
 	count("the escort left", 0, 1, 0, 0)
-	if w.srv.NpcRespawns.Tracked("1st_boss_type1#1#0") {
+	if w.srv.RespawnArmed(t, "1st_boss_type1#1#0") {
 		t.Fatal("the escort leaving armed a respawn")
 	}
 	leave(royalBossID)

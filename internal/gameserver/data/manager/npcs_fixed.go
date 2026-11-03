@@ -81,13 +81,13 @@ func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn
 		return nil, fmt.Errorf("%w: npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
 	}
 	at := location.Location{X: x, Y: y, Z: int(n.geo.Height(x, y, z))}
-	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
-	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: max(respawn, 0)}
+	key, seq := n.newSlotID(), n.fixedSeq.Add(1)
+	entry := &spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: max(respawn, 0)}
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, castleID: castleID, clanID: clanID, memory: newSlotMemory(entry, nil)}
+	n.slot[key] = slotInfo{key: key, seq: seq, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, castleID: castleID, clanID: clanID, memory: newSlotMemory(entry, nil)}
 	n.mu.Unlock()
 
-	live := n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)
+	live := n.instantiate(key, *entry, tmpl, at, heading, fullHP, fullMP, nil)
 	if live == nil {
 		n.mu.Lock()
 		n.dropSlotLocked(key)
@@ -175,7 +175,7 @@ func (n *Npcs) SpawnOf(id int32) (SpawnRecord, bool) {
 	if !live || !ok {
 		return SpawnRecord{}, false
 	}
-	rec := SpawnRecord{Fixed: slot.fixed, Entry: slot.entry}
+	rec := SpawnRecord{Fixed: slot.fixed, Entry: *slot.entry}
 	if slot.fixed || slot.placed {
 		rec.At, rec.Heading = slot.at, slot.heading
 	}

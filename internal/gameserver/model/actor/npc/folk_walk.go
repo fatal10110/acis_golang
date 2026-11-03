@@ -44,8 +44,17 @@ type FolkMovement struct {
 	// Route is the route walk task the NPC's route desires walk it on; nil
 	// leaves those desires moving it nowhere.
 	Route FolkRoute
-	// Log reports a failed-pathfinding streak that overflows.
-	Log zerolog.Logger
+	// Log, shared with other NPCs, reports a failed-pathfinding streak that
+	// overflows; nil reports nothing.
+	Log *zerolog.Logger
+}
+
+// logger returns the logger c names.
+func (c *FolkMovement) logger() *zerolog.Logger {
+	if c.Log == nil {
+		return &nopLog
+	}
+	return c.Log
 }
 
 // FolkRoute is the route walk task a walking civilian NPC walks its route
@@ -216,7 +225,7 @@ func (m *folkMotion) AddGeoPathFailCount() {
 		}
 		if m.geoPathFails.CompareAndSwap(cur, 0) {
 			x, y, z := m.Folk.Position()
-			m.cfg.Log.Warn().
+			m.cfg.logger().Warn().
 				Str("npc", m.Instance.Template.Name).
 				Int("x", x).
 				Int("y", y).

@@ -65,7 +65,7 @@ func TestRespawnedSummonerLeaderStaysAMaster(t *testing.T) {
 		t.Fatal("the dead leader kept its private's master link")
 	}
 	w.onQueue(t, first, func() { first.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(first.ObjectID())) })
-	w.srv.NpcSpawns.Respawn(summonDenKey)
+	w.srv.RespawnSlot(t, summonDenKey)
 	w.srv.Settle(t)
 	w.srv.ReadQueued(t, w.srv.Client)
 

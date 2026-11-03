@@ -266,10 +266,10 @@ func TestDefaultMakerRespawnsADeletedNPC(t *testing.T) {
 		t.Fatalf("deleted objects = %v, want [%d]", got, old.ObjectID())
 	}
 	const key = "default_m#0#0"
-	if !w.srv.NpcRespawns.Tracked(key) {
+	if !w.srv.RespawnArmed(t, key) {
 		t.Fatal("deleted default maker NPC armed no respawn")
 	}
-	w.srv.NpcSpawns.Respawn(key)
+	w.srv.RespawnSlot(t, key)
 	w.srv.Settle(t)
 	if got := shown(drainFrames(t, c)); !slices.Equal(got, []int{makerDefaultID}) {
 		t.Fatalf("NPCs shown after the respawn = %v, want [%d]", got, makerDefaultID)
@@ -299,10 +299,8 @@ func TestDefaultMakerScriptEvents(t *testing.T) {
 	if got := deleted(drainFrames(t, c)); !slices.Equal(got, objectIDs(group)) {
 		t.Fatalf("deleted objects after 1000 = %v, want %v", got, objectIDs(group))
 	}
-	for i := range 3 {
-		if key := fmt.Sprintf("group_m#0#%d", i); w.srv.NpcRespawns.Tracked(key) {
-			t.Fatalf("slot %s armed a respawn after 1000", key)
-		}
+	if n := w.srv.RespawnsArmed(); n != 0 {
+		t.Fatalf("after 1000: respawns armed = %d, want none", n)
 	}
 
 	npcs.MakerEvent("group_m", "1001", 2, 0)
@@ -411,7 +409,11 @@ func TestMakerHooksRaceRespawnAndPeriodChange(t *testing.T) {
 					h.DeleteMe()
 				}
 				for i := range 64 {
-					npcs.Respawn(fmt.Sprintf("ssq_ev#0#%d", i))
+					// Whichever slots are live this round: the race
+					// drops and remakes them.
+					if id, ok := npcs.SlotID(fmt.Sprintf("ssq_ev#0#%d", i)); ok {
+						npcs.Respawn(id)
+					}
 				}
 			}
 			<-done

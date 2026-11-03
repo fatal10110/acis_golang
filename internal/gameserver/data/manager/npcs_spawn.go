@@ -1,8 +1,6 @@
 package manager
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -19,11 +17,18 @@ const fullMP = -1
 // registerSlot declares the spawn slot key of entry i of g, backed by the
 // persisted row dbName when non-empty, with its first spawn under way: the
 // caller ends it with endSpawn.
-func (n *Npcs) registerSlot(key string, g *makerGroup, i int, dbName string, tmpl *npc.Template) {
-	entry := g.def.Entries[i]
+func (n *Npcs) registerSlot(key task.SlotID, g *makerGroup, i int, dbName string, tmpl *npc.Template) {
+	entry := &g.def.Entries[i]
+	// A database-tracked slot has a serial of its own; any other is its
+	// key.
+	serial := key
+	if dbName != "" {
+		serial = n.newSlotID()
+	}
 	n.mu.Lock()
-	n.serials++
-	n.slot[key] = slotInfo{key: key, maker: g.def, group: g, spawnIdx: i, entry: entry, dbName: dbName, tmpl: tmpl, memory: newSlotMemory(entry, g.rows[i]), spawning: true, first: true, epoch: n.despawns, serial: n.serials}
+	seq := int32(g.seq[i])
+	g.seq[i]++
+	n.slot[key] = slotInfo{key: key, maker: g.def, group: g, spawnIdx: i, seq: seq, entry: entry, dbName: dbName, tmpl: tmpl, memory: newSlotMemory(entry, g.rows[i]), spawning: true, first: true, epoch: n.despawns, serial: serial}
 	g.keys[i] = append(g.keys[i], key)
 	n.mu.Unlock()
 }
@@ -32,7 +37,7 @@ func (n *Npcs) registerSlot(key string, g *makerGroup, i int, dbName string, tmp
 // g and restores or freshly spawns its NPC. A spawn still dead with a
 // pending respawn deadline is not instantiated: only its respawn timer is
 // armed, matching the persisted-state restore rule.
-func (n *Npcs) spawnPersistedSlot(g *makerGroup, i int, key string, tmpl *npc.Template) {
+func (n *Npcs) spawnPersistedSlot(g *makerGroup, i int, key task.SlotID, tmpl *npc.Template) {
 	entry := g.def.Entries[i]
 	dbName := entry.DBName
 	n.registerSlot(key, g, i, dbName, tmpl)
@@ -54,7 +59,7 @@ func (n *Npcs) spawnPersistedSlot(g *makerGroup, i int, key string, tmpl *npc.Te
 // rolled position at full HP otherwise (CheckAlive's own restore rule). A
 // live row restored marks row loaded before the NPC's created hooks run;
 // a fresh or expired one leaves the mark as it was.
-func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry, tmpl *npc.Template, rows *Spawns, dbName string, row *dbRow) {
+func (n *Npcs) spawnPersisted(key task.SlotID, maker *spawn.Maker, entry spawn.Entry, tmpl *npc.Template, rows *Spawns, dbName string, row *dbRow) {
 	now := n.now()
 	pos, ok := n.pickSpawnPosition(maker, entry)
 	if !ok {
@@ -79,14 +84,14 @@ const fullHP = -1
 // spawnFresh places one non-persisted instance of entry at a freshly rolled
 // position, always alive at full HP/MP — HP/MP/position are never restored
 // across restarts for a spawn without a database name.
-func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
+func (n *Npcs) spawnFresh(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
 	n.spawnMaster(key, entry, tmpl, pos.Location, pos.Heading, fullHP, fullMP)
 }
 
 // spawnMaster places the NPC of the maker slot key and its spawn-list
 // privates, then runs its npcmaker's hook: after the NPC's own created
 // hooks, which instantiate runs.
-func (n *Npcs) spawnMaster(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int) {
+func (n *Npcs) spawnMaster(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int) {
 	n.mu.Lock()
 	slot := n.slot[key]
 	n.mu.Unlock()
@@ -107,7 +112,7 @@ func (n *Npcs) spawnMaster(key string, entry spawn.Entry, tmpl *npc.Template, lo
 // instantiate places one NPC, as place does, then runs its created hooks
 // with no lock held. It returns the NPC placed, nil when none was; a
 // created hook may have deleted it again.
-func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) attackable.Combatant {
+func (n *Npcs) instantiate(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) attackable.Combatant {
 	live := n.place(key, entry, tmpl, loc, heading, hp, mp, master)
 	if n.scripts != nil {
 		switch o := live.(type) {
@@ -126,7 +131,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 // for AI ticks and corpse decay/respawn. A non-nil master makes it one of
 // master's privates before it enters the world. It read-holds the gate: a
 // placement never lands halfway through DespawnAll.
-func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) attackable.Combatant {
+func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) attackable.Combatant {
 	n.gate.RLock()
 	defer n.gate.RUnlock()
 	id, err := n.ids.NextID()
@@ -142,7 +147,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	inst.Home = loc
 	inst.HasHome = true
-	inst.DriftRange = n.aiConfig.DriftRange
+	inst.DriftRange = n.settings.AI().DriftRange
 	inst.SpawnHeading = heading
 	n.mu.Lock()
 	info := n.slot[key]
@@ -159,6 +164,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 		info.memory.scratch.Respawned()
 		slot = info.memory
 	}
+	inst.Slot = slot
 
 	if npc.FolkKind(inst) {
 		if f := n.spawnFolk(key, inst, loc, heading, slot, master); f != nil {
@@ -172,15 +178,14 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 
 	speed := tmpl.RunSpeed
-	queue := n.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID))
-	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
+	queue := n.queues.NewQueue("npc").Serial(inst.ObjectID)
+	hostile, _, err := newLiveHostile(inst, speed, n.geo, n.positions, &n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.maxGeoPathFailCount, n.zones, n.effects, queue)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil
 	}
 	hostile.AI().SetRandomWalkRate(n.randomWalkRate)
-	hostile.SetRaidMultipliers(n.raidMultipliers)
-	hostile.SetAIConfig(n.aiConfig)
+	hostile.UseSettings(n.settings)
 
 	// MP goes first: a saved HP of zero leaves the NPC dead, and a dead
 	// NPC's MP no longer changes.
@@ -193,7 +198,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	hostile.SetCurrentHP(hp)
 	rewards := n.rewarderFor(hostile, tmpl)
-	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n, Slot: slot, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
+	rt := npc.Runtime{World: n.state, Log: &n.log, Items: n.items, Rewards: rewards, Remover: n, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
 	if n.rewards.Settings != nil {
 		rt.Party = n.rewards.Settings
 	}
@@ -248,7 +253,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 // one that dies decays and respawns through the slot. A route walker walks
 // its route while it lives. A non-nil master makes it one of master's
 // privates. It returns the NPC, nil when none stays placed.
-func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember) *npc.Folk {
+func (n *Npcs) spawnFolk(key task.SlotID, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember) *npc.Folk {
 	f, err := n.folk.spawn(inst, loc, heading, slot, master, n.towerRuntime(inst))
 	if err != nil {
 		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
@@ -263,7 +268,7 @@ func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, 
 }
 
 // endSpawn marks the spawn of the slot key done.
-func (n *Npcs) endSpawn(key string) {
+func (n *Npcs) endSpawn(key task.SlotID) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if slot, ok := n.slot[key]; ok {
@@ -275,7 +280,7 @@ func (n *Npcs) endSpawn(key string) {
 // trackLive records id as the live NPC of the slot key. It reports false,
 // recording nothing, when the slot was dropped while the NPC was being
 // placed (its group deleted meanwhile); the caller then deletes the NPC.
-func (n *Npcs) trackLive(key string, id int32) bool {
+func (n *Npcs) trackLive(key task.SlotID, id int32) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	slot, ok := n.slot[key]

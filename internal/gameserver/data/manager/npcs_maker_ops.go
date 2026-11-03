@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -51,18 +50,14 @@ func (n *Npcs) FindSpawn(npcID int32) spawn.Locator {
 	defer n.mu.Unlock()
 	var (
 		first standaloneSpawn
-		seq   int64
+		seq   int32
 	)
-	for key, slot := range n.slot {
+	for _, slot := range n.slot {
 		if !slot.fixed || slot.entry.NPCID != npcID {
 			continue
 		}
-		k, err := strconv.ParseInt(strings.TrimPrefix(key, "fixed#"), 10, 64)
-		if err != nil {
-			continue
-		}
-		if seq == 0 || k < seq {
-			first, seq = standaloneSpawn{at: spawn.Position{Location: slot.at, Heading: slot.heading}}, k
+		if seq == 0 || slot.seq < seq {
+			first, seq = standaloneSpawn{at: spawn.Position{Location: slot.at, Heading: slot.heading}}, slot.seq
 		}
 	}
 	if seq == 0 {

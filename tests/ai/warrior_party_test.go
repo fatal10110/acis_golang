@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -135,12 +134,7 @@ func (w *warriorWorld) kill(t *testing.T, h *npc.Hostile) {
 // with a respawn pending.
 func (w *warriorWorld) armedPrivateRespawn(t *testing.T) string {
 	t.Helper()
-	var armed []string
-	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
-			armed = append(armed, key)
-		}
-	}
+	armed := w.srv.ArmedPrivates()
 	if len(armed) != 1 {
 		t.Fatalf("script privates with a respawn pending = %q, want one", armed)
 	}
@@ -207,10 +201,11 @@ func TestPartyLeaderLeadsPrivatesUntilItDies(t *testing.T) {
 			t.Fatalf("DeleteObject frames for hidden private %d = %d, want 1", p.ObjectID(), len(got))
 		}
 	}
-	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
-			t.Fatalf("hidden private slot %s armed a respawn", key)
-		}
+	if armed := w.srv.ArmedPrivates(); len(armed) != 0 {
+		t.Fatalf("hidden private slots %q armed a respawn", armed)
+	}
+	if n := w.srv.StrayRespawns(); n != 0 {
+		t.Fatalf("respawns armed for gone slots = %d, want none", n)
 	}
 }
 
@@ -360,7 +355,7 @@ func TestPartyLeaderRespawnsADeadPrivate(t *testing.T) {
 	w.kill(t, private)
 	key := w.armedPrivateRespawn(t)
 	w.onQueue(t, private, func() { private.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(private.ObjectID())) })
-	w.srv.NpcSpawns.Respawn(key)
+	w.srv.RespawnSlot(t, key)
 	w.srv.Settle(t)
 	w.srv.ReadQueued(t, w.srv.Client)
 

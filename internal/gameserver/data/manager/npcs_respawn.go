@@ -4,6 +4,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -54,7 +56,7 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		n.dropOrphanScriptSlot(key, slot)
 		return nil
 	}
-	delay := spawn.CalculateRespawnDelay(slot.entry)
+	delay := spawn.CalculateRespawnDelay(*slot.entry)
 	if delay <= 0 || slot.fixed {
 		n.mu.Lock()
 		n.dropSlotLocked(key)
@@ -100,7 +102,7 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 	if _, ok := n.slot[slot.key]; !ok {
 		return
 	}
-	n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(slot.entry), now)
+	n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(*slot.entry), now)
 }
 
 // orphanNPCDeleted answers the NPC of an orphan slot of g leaving the
@@ -116,7 +118,7 @@ func (n *Npcs) orphanNPCDeleted(g *makerGroup, slot slotInfo) {
 	}
 	g.orphansAlive--
 	if slot.dbName != "" && slot.entry.RespawnDelay > 0 {
-		n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(slot.entry), now)
+		n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(*slot.entry), now)
 	}
 	if !n.respawn.Tracked(slot.key) {
 		n.dropSlotLocked(slot.key)
@@ -178,14 +180,14 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 // template the slot was declared with, not the one the table holds now:
 // A spawn keeps its template for life, so //reload npc does not reach the
 // respawns of spawns already in place.
-func (n *Npcs) Respawn(key string) {
+func (n *Npcs) Respawn(key task.SlotID) {
 	n.respawnSlot(key)
 }
 
 // respawnSlot brings back the NPC of the slot key, a database-tracked one
 // with its saved respawn time cleared first. A slot whose NPC is in the
 // world, or is being placed, is left alone.
-func (n *Npcs) respawnSlot(key string) {
+func (n *Npcs) respawnSlot(key task.SlotID) {
 	n.mu.Lock()
 	slot, ok := n.slot[key]
 	if !ok || slot.spawning || n.liveLocked(key) {
@@ -215,22 +217,22 @@ func (n *Npcs) respawnSlot(key string) {
 		if slot.placed {
 			at, heading = slot.at, slot.heading
 		}
-		n.instantiate(key, slot.entry, tmpl, at, heading, fullHP, fullMP, master)
+		n.instantiate(key, *slot.entry, tmpl, at, heading, fullHP, fullMP, master)
 		return
 	}
 
 	if slot.dbName != "" {
 		rows := n.currentSpawns()
 		rows.CancelRespawn(slot.dbName)
-		n.spawnPersisted(key, slot.maker, slot.entry, tmpl, rows, slot.dbName, slot.memory.row)
+		n.spawnPersisted(key, slot.maker, *slot.entry, tmpl, rows, slot.dbName, slot.memory.row)
 		return
 	}
-	pos, ok := n.pickSpawnPosition(slot.maker, slot.entry)
+	pos, ok := n.pickSpawnPosition(slot.maker, *slot.entry)
 	if !ok {
 		n.deferredCount.Add(1)
 		return
 	}
-	n.spawnFresh(key, slot.entry, tmpl, pos)
+	n.spawnFresh(key, *slot.entry, tmpl, pos)
 }
 
 // despawnMinions takes master's minions out of the world as its spawn is
@@ -247,7 +249,7 @@ func (n *Npcs) despawnMinions(master npc.PartyMember) {
 		return
 	}
 	minions := master.Minions()
-	keys := make(map[string]bool, len(minions))
+	keys := make(map[task.SlotID]bool, len(minions))
 	for _, minion := range minions {
 		id := minion.ObjectID()
 		n.walker.StopRouteByID(id)
@@ -280,7 +282,7 @@ func (n *Npcs) despawnMinions(master npc.PartyMember) {
 // in keys (the taken minions' own), those of the privates spawned for master
 // that are not in the world, and those of the gone privates spawned for one
 // of minions.
-func (n *Npcs) dropPrivateSlots(master npc.PartyMember, minions []npc.PartyMember, keys map[string]bool) {
+func (n *Npcs) dropPrivateSlots(master npc.PartyMember, minions []npc.PartyMember, keys map[task.SlotID]bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	for key := range keys {
@@ -316,7 +318,7 @@ func (n *Npcs) addSlotLocked(slot slotInfo) {
 	scratch := slot.master.Scratch()
 	keys := n.privates[scratch]
 	if keys == nil {
-		keys = make(map[string]struct{})
+		keys = make(map[task.SlotID]struct{})
 		n.privates[scratch] = keys
 	}
 	keys[slot.key] = struct{}{}
@@ -324,7 +326,7 @@ func (n *Npcs) addSlotLocked(slot slotInfo) {
 
 // dropSlotLocked drops the slot key, and a private's from its master's
 // index. The caller holds n.mu.
-func (n *Npcs) dropSlotLocked(key string) {
+func (n *Npcs) dropSlotLocked(key task.SlotID) {
 	slot, ok := n.slot[key]
 	if !ok {
 		return
@@ -346,7 +348,7 @@ func (n *Npcs) dropSlotLocked(key string) {
 // (mid respawn countdown) are left untouched (Spawns.SetStats).
 func (n *Npcs) SyncPersistedState() {
 	n.mu.Lock()
-	live := make(map[int32]string, len(n.live))
+	live := make(map[int32]task.SlotID, len(n.live))
 	for id, key := range n.live {
 		live[id] = key
 	}

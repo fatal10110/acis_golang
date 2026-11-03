@@ -60,7 +60,7 @@ func (n *Npcs) DrawSpawnPoint(m npc.PartyMember) (at location.Location, heading 
 		}
 		return n.privateSpawnLocation(master, slot.tmpl), master.Heading(), true
 	}
-	pos, ok := n.pickSpawnPosition(slot.maker, slot.entry)
+	pos, ok := n.pickSpawnPosition(slot.maker, *slot.entry)
 	return pos.Location, pos.Heading, ok
 }
 
@@ -84,7 +84,9 @@ func (n *Npcs) SetRespawnDelay(m npc.PartyMember, d time.Duration) error {
 	if slot.master == nil {
 		return ErrNotPrivate
 	}
-	slot.entry.RespawnDelay = max(d, 0)
+	entry := *slot.entry
+	entry.RespawnDelay = max(d, 0)
+	slot.entry = &entry
 	n.slot[key] = slot
 	return nil
 }

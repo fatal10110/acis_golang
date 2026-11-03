@@ -183,7 +183,7 @@ func TestAlarmDeviceMakersRaiseEachOther(t *testing.T) {
 		if got := deleted(drainFrames(t, w.c)); !slices.Equal(got, []int32{gone.ObjectID()}) {
 			t.Fatalf("%s: deleted objects = %v, want [%d]", step, got, gone.ObjectID())
 		}
-		if slot := devices[d].maker + "#0#0"; w.srv.NpcRespawns.Tracked(slot) {
+		if slot := devices[d].maker + "#0#0"; w.srv.RespawnArmed(t, slot) {
 			t.Fatalf("%s: slot %s armed a respawn", step, slot)
 		}
 	}
@@ -214,7 +214,7 @@ func TestAlarmDeviceMakersRaiseEachOther(t *testing.T) {
 
 	w.srv.NpcSpawns.MakerEvent("godard32_2515_22m1", "1001", 5, 0)
 	w.srv.Settle(t)
-	if !fireRespawn(w.srv, "godard32_2515_22m1#0#0") {
+	if !fireRespawn(t, w.srv, "godard32_2515_22m1#0#0") {
 		t.Fatal("1001 to the lost device 1 armed no respawn of its NPC")
 	}
 	w.srv.Settle(t)
@@ -274,7 +274,7 @@ func TestHallKeeperMakerSpawnsOnlyOnEvent(t *testing.T) {
 	count("a keeper left", 1)
 	armed := 0
 	for i := range 2 {
-		if fireRespawn(w.srv, fmt.Sprintf("hall_wizards#0#%d", i)) {
+		if fireRespawn(t, w.srv, fmt.Sprintf("hall_wizards#0#%d", i)) {
 			armed++
 		}
 	}
@@ -351,7 +351,7 @@ func TestRainbowMakerSpawnsTheRestOnSiegeEnd(t *testing.T) {
 	messenger.DeleteMe()
 	w.srv.Settle(t)
 	count("the messenger left", 0, 1, 1)
-	if w.srv.NpcRespawns.Tracked("rainbow_hall#0#0") {
+	if w.srv.RespawnArmed(t, "rainbow_hall#0#0") {
 		t.Fatal("the messenger leaving armed a respawn")
 	}
 }

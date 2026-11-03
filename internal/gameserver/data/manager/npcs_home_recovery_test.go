@@ -13,7 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
-	"github.com/rs/zerolog"
 )
 
 // blockedHomeGeo blocks every route so return-home attempts accumulate
@@ -74,7 +73,7 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 
 	state := world.New()
 	positions := task.NewPositionUpdates(state)
-	hostile, walkerRef, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
+	hostile, walkerRef, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, &testLog, nil, actorcast.EffectHandlers{}, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
@@ -131,7 +130,7 @@ func TestHostileControlClosesAbortedCastWithCancelAnimation(t *testing.T) {
 		Kind:     "Monster",
 	}
 	state := world.New()
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, task.NewPositionUpdates(state), zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, task.NewPositionUpdates(state), &testLog, nil, actorcast.EffectHandlers{}, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
@@ -174,7 +173,7 @@ func newTeleportTestHostile(t *testing.T, id int32, geo move.Geo, zones *zone.In
 		Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100, CanMove: true},
 		Kind:     "Monster",
 	}
-	hostile, _, err := newLiveHostile(inst, 100, geo, task.NewPositionUpdates(state), zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, 0, zones, effect.Env{}, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, geo, task.NewPositionUpdates(state), &testLog, nil, actorcast.EffectHandlers{}, nil, 20, 0, zones, effect.Env{}, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}

@@ -99,7 +99,7 @@ func TestCoreBringsItsPrivatesBack(t *testing.T) {
 	w.kill(t, privates[0])
 	after := time.Now()
 	key := w.armedPrivateRespawn(t)
-	deadline, ok := w.srv.NpcRespawns.Deadline(key)
+	deadline, ok := w.srv.RespawnDeadline(t, key)
 	if !ok {
 		t.Fatalf("no deadline for the armed respawn %s", key)
 	}

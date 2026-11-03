@@ -50,6 +50,10 @@ type Instance struct {
 	// read at each use, 0 for none; nil serves none. Set before the NPC is
 	// placed, read-only after.
 	ResidenceOwner func(*Instance) int32
+	// Slot is the spawn slot placing the NPC; nil leaves it with no spawn
+	// parameters and a script memory of its own. Set before the NPC is
+	// built, read-only after.
+	Slot SpawnSlot
 
 	// name and title, once set, replace the template's; see Name and Title.
 	name, title atomic.Pointer[string]

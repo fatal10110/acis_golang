@@ -160,7 +160,7 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	if err != nil {
 		return nil, err
 	}
-	f := &Folk{Instance: inst, spawnBinding: newSpawnBinding(inst.Template)}
+	f := &Folk{Instance: inst, spawnBinding: newSpawnBinding(inst)}
 	f.shots.soul, f.shots.spirit = soul, spirit
 	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()

@@ -24,8 +24,8 @@ func TestRespawnAddEarliestKeepsTheEarlierDeadline(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewRespawn() error = %v", err)
 			}
-			r.AddEarliest("slot", start.Add(tc.first))
-			r.AddEarliest("slot", start.Add(tc.second))
+			r.AddEarliest(SlotID(1), start.Add(tc.first))
+			r.AddEarliest(SlotID(1), start.Add(tc.second))
 
 			now = start.Add(59 * time.Second)
 			r.Tick()
@@ -34,7 +34,7 @@ func TestRespawnAddEarliestKeepsTheEarlierDeadline(t *testing.T) {
 			}
 			now = start.Add(60 * time.Second)
 			r.Tick()
-			if got, want := effects.take(), []string{"slot"}; !slices.Equal(got, want) {
+			if got, want := effects.take(), []SlotID{1}; !slices.Equal(got, want) {
 				t.Fatalf("Tick at 60s = %v, want %v", got, want)
 			}
 			now = start.Add(600 * time.Second)

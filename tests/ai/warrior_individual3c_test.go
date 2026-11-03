@@ -134,10 +134,11 @@ func slotID(h *npc.Hostile, slot script.CreatureSlot) int32 {
 // pending.
 func (w *ind1World) noPrivateRespawn(t *testing.T, when string) {
 	t.Helper()
-	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
-			t.Fatalf("%s: private slot %s armed a respawn, want none", when, key)
-		}
+	if armed := w.srv.ArmedPrivates(); len(armed) != 0 {
+		t.Fatalf("%s: private slots %q armed a respawn, want none", when, armed)
+	}
+	if n := w.srv.StrayRespawns(); n != 0 {
+		t.Fatalf("%s: respawns armed for gone slots = %d, want none", when, n)
 	}
 }
 

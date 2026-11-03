@@ -370,7 +370,7 @@ func (f *Folk) thinkMoveRoute(name string) {
 	}
 	f.cast.onRoute = true
 	if err := f.motion.cfg.Route.Walk(f.motion.walker, name, f.Instance.Template.Alias); err != nil {
-		f.motion.cfg.Log.Debug().Err(err).Str("route", name).Msg("npc: folk route walk")
+		f.motion.cfg.logger().Debug().Err(err).Str("route", name).Msg("npc: folk route walk")
 	}
 }
 

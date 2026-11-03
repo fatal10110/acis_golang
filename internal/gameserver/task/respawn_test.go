@@ -10,16 +10,16 @@ import (
 // ---- from respawn_test.go ----
 type respawnFakeEffects struct {
 	mu     sync.Mutex
-	events []string
+	events []SlotID
 }
 
-func (e *respawnFakeEffects) Respawn(key string) {
+func (e *respawnFakeEffects) Respawn(key SlotID) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.events = append(e.events, key)
 }
 
-func (e *respawnFakeEffects) take() []string {
+func (e *respawnFakeEffects) take() []SlotID {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	out := e.events
@@ -41,8 +41,8 @@ func TestRespawnAddThenTickFiresAfterDeadline(t *testing.T) {
 		t.Fatalf("NewRespawn() error = %v", err)
 	}
 
-	r.Add("slot-1", now.Add(7*time.Second))
-	if !r.Tracked("slot-1") {
+	r.Add(SlotID(1), now.Add(7*time.Second))
+	if !r.Tracked(SlotID(1)) {
 		t.Fatal("slot should be tracked after Add")
 	}
 
@@ -54,10 +54,10 @@ func TestRespawnAddThenTickFiresAfterDeadline(t *testing.T) {
 
 	now = now.Add(time.Second)
 	r.Tick()
-	if got, want := effects.take(), []string{"slot-1"}; !slices.Equal(got, want) {
+	if got, want := effects.take(), []SlotID{1}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at deadline = %v, want %v", got, want)
 	}
-	if r.Tracked("slot-1") {
+	if r.Tracked(SlotID(1)) {
 		t.Fatal("slot should be removed after respawn fires")
 	}
 }
@@ -67,9 +67,9 @@ func TestRespawnAddWithPastDeadlineFiresOnNextTick(t *testing.T) {
 	effects := &respawnFakeEffects{}
 	r, _ := NewRespawn(effects, func() time.Time { return now })
 
-	r.Add("slot-1", now.Add(-time.Minute))
+	r.Add(SlotID(1), now.Add(-time.Minute))
 	r.Tick()
-	if got, want := effects.take(), []string{"slot-1"}; !slices.Equal(got, want) {
+	if got, want := effects.take(), []SlotID{1}; !slices.Equal(got, want) {
 		t.Fatalf("Tick with past deadline = %v, want %v", got, want)
 	}
 }
@@ -79,12 +79,12 @@ func TestRespawnCancelStopsPendingRespawn(t *testing.T) {
 	effects := &respawnFakeEffects{}
 	r, _ := NewRespawn(effects, func() time.Time { return now })
 
-	r.Add("slot-1", now.Add(time.Second))
+	r.Add(SlotID(1), now.Add(time.Second))
 
-	if !r.Cancel("slot-1") {
+	if !r.Cancel(SlotID(1)) {
 		t.Fatal("Cancel() = false, want true for tracked slot")
 	}
-	if r.Cancel("slot-1") {
+	if r.Cancel(SlotID(1)) {
 		t.Fatal("Cancel() = true, want false for already-removed slot")
 	}
 
@@ -100,8 +100,8 @@ func TestRespawnAddReplacesExistingDeadline(t *testing.T) {
 	effects := &respawnFakeEffects{}
 	r, _ := NewRespawn(effects, func() time.Time { return now })
 
-	r.Add("slot-1", now.Add(time.Second))
-	r.Add("slot-1", now.Add(10*time.Second))
+	r.Add(SlotID(1), now.Add(time.Second))
+	r.Add(SlotID(1), now.Add(10*time.Second))
 
 	now = now.Add(time.Second)
 	r.Tick()
@@ -111,7 +111,7 @@ func TestRespawnAddReplacesExistingDeadline(t *testing.T) {
 
 	now = now.Add(9 * time.Second)
 	r.Tick()
-	if got, want := effects.take(), []string{"slot-1"}; !slices.Equal(got, want) {
+	if got, want := effects.take(), []SlotID{1}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at replaced deadline = %v, want %v", got, want)
 	}
 }
@@ -125,7 +125,7 @@ func TestRespawnConcurrentAddAndTick(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			key := "slot"
+			key := SlotID(1)
 			r.Add(key, time.Now())
 			r.Tick()
 			r.Cancel(key)

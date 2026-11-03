@@ -258,4 +258,4 @@ func (noDecay) Decay(task.DecayActor) {}
 
 type noRespawn struct{}
 
-func (noRespawn) Respawn(string) {}
+func (noRespawn) Respawn(task.SlotID) {}

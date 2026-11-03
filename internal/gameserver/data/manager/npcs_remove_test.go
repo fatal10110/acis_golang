@@ -53,7 +53,7 @@ func TestNpcDeleteMeRemovesThroughRespawnHook(t *testing.T) {
 	}
 	chest := obj.(*npc.Hostile)
 	decay.Add(chest, time.Minute)
-	if respawn.Tracked(key) {
+	if respawnArmed(t, npcs, respawn, key) {
 		t.Fatal("slot respawn armed before removal")
 	}
 
@@ -72,7 +72,7 @@ func TestNpcDeleteMeRemovesThroughRespawnHook(t *testing.T) {
 	if got := npcs.LiveCount(); got != 0 {
 		t.Fatalf("LiveCount() after removal = %d, want 0", got)
 	}
-	if !respawn.Tracked(key) {
+	if !respawnArmed(t, npcs, respawn, key) {
 		t.Fatal("slot respawn not armed by the removal")
 	}
 }

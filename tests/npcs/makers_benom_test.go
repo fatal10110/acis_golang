@@ -157,7 +157,7 @@ func TestBenomMakerFollowsTheSiege(t *testing.T) {
 	gatekeeper := (&makerWorld{srv: w.srv}).inWorld(benomGatekeeperID)[0]
 	gatekeeper.DeleteMe()
 	w.srv.Settle(t)
-	if w.srv.NpcRespawns.Tracked(benomMaker + "#0#0") {
+	if w.srv.RespawnArmed(t, benomMaker+"#0#0") {
 		t.Fatal("the gatekeeper leaving armed a respawn")
 	}
 }

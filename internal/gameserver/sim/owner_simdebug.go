@@ -25,6 +25,6 @@ func exitDrain(outer *Queue) {
 
 func assertDrainer(q *Queue) {
 	if owner, _ := drainers.Load(goid()); owner != q {
-		panic("sim: state of queue " + q.id + " touched while another goroutine drains it")
+		panic("sim: state of queue " + q.name() + " touched while another goroutine drains it")
 	}
 }

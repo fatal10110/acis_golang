@@ -25,7 +25,7 @@ func TestScriptCreatedHooksRunOnFolkRespawn(t *testing.T) {
 	if got, want := w.log.take(), []string{"recorder decayed 21203 decayed=true inWorld=true"}; !slices.Equal(got, want) {
 		t.Fatalf("delete hooks = %q, want %q", got, want)
 	}
-	w.srv.NpcSpawns.Respawn(lifeGrocerKey)
+	w.srv.RespawnSlot(t, lifeGrocerKey)
 	w.srv.Settle(t)
 	if got, want := w.log.take(), []string{"recorder created 21203 decayed=false inWorld=true"}; !slices.Equal(got, want) {
 		t.Fatalf("respawn hooks = %q, want %q", got, want)
@@ -106,10 +106,10 @@ func TestScriptDeleteRacingCorpseDecayArmsTheRespawnOnce(t *testing.T) {
 				if n != 1 {
 					t.Fatalf("round %d: decayed hooks ran %d times, want 1", round, n)
 				}
-				if !w.srv.NpcRespawns.Cancel(tc.key) {
+				if !w.srv.CancelRespawn(t, tc.key) {
 					t.Fatalf("round %d: the racing delete and decay armed no respawn", round)
 				}
-				w.srv.NpcSpawns.Respawn(tc.key)
+				w.srv.RespawnSlot(t, tc.key)
 			}
 		})
 	}

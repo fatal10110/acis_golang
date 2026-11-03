@@ -358,10 +358,11 @@ func TestEvilateSpiritsStayDead(t *testing.T) {
 	}
 	armed := func(when string) {
 		t.Helper()
-		for i := 1; i <= 64; i++ {
-			if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
-				t.Fatalf("%s: private respawn %s pending, want none", when, key)
-			}
+		if armed := w.srv.ArmedPrivates(); len(armed) != 0 {
+			t.Fatalf("%s: private respawns %q pending, want none", when, armed)
+		}
+		if n := w.srv.StrayRespawns(); n != 0 {
+			t.Fatalf("%s: respawns armed for gone slots = %d, want none", when, n)
 		}
 	}
 	w.kill(t, spirits[0])

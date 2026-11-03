@@ -1,7 +1,6 @@
 package npcs
 
 import (
-	"fmt"
 	"math"
 	"slices"
 	"testing"
@@ -29,13 +28,7 @@ func (w *scriptSpawnWorld) diePrivate(t *testing.T, h *npc.Hostile, request time
 // runs on the wall clock: the delay itself is pinned by the population's
 // own test.
 func (w *scriptSpawnWorld) armedPrivates() []string {
-	var armed []string
-	for i := 1; i <= 64; i++ {
-		if key := fmt.Sprintf("private#%d", i); w.srv.NpcRespawns.Tracked(key) {
-			armed = append(armed, key)
-		}
-	}
-	return armed
+	return w.srv.ArmedPrivates()
 }
 
 // respawnArmed brings the one armed script private's respawn due.
@@ -45,8 +38,8 @@ func (w *scriptSpawnWorld) respawnArmed(t *testing.T) {
 	if len(armed) != 1 {
 		t.Fatalf("script privates with a respawn pending = %q, want one", armed)
 	}
-	w.srv.NpcRespawns.Cancel(armed[0])
-	w.srv.NpcSpawns.Respawn(armed[0])
+	w.srv.CancelRespawn(t, armed[0])
+	w.srv.RespawnSlot(t, armed[0])
 	w.srv.Settle(t)
 }
 
