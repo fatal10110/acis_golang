@@ -84,15 +84,25 @@ func (ep *EffectPoint) swimStateChanged(bool) {
 	}
 }
 
-// NPCInfoSnapshot captures the point's client view.
+// NPCInfoSnapshot captures the point's client view, in its form when it has
+// one.
 func (ep *EffectPoint) NPCInfoSnapshot() npcinfo.Snapshot {
+	s := ep.infoSnapshot()
+	ep.Instance.showForm(&s)
+	return s
+}
+
+// infoSnapshot is NPCInfoSnapshot shown as the point itself, whatever its
+// form.
+func (ep *EffectPoint) infoSnapshot() npcinfo.Snapshot {
 	return fixedNPCInfoSnapshot(ep.Instance, ep.stats, &ep.Presence, ep.zones.moveType(), ep.running.Load())
 }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
-// always shown, the view an NPC that cannot move is announced with.
+// always shown, the view an NPC that cannot move is announced with. It never
+// shows a form.
 func (ep *EffectPoint) ServerObjectInfoSnapshot() npcinfo.Snapshot {
-	s := ep.NPCInfoSnapshot()
+	s := ep.infoSnapshot()
 	s.Name = ep.Instance.Name()
 	return s
 }

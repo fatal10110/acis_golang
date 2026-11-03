@@ -490,11 +490,19 @@ func (h *Hostile) AbnormalEffect() int {
 	return int(h.abnormalEffect.Load()) | h.EffectListIfBuilt().CrowdControlAbnormalEffect()
 }
 
-// NPCInfoSnapshot captures this NPC's current client-visible state. Its
-// attackable flag is the one shown to no particular viewer: a living
-// Monster-family NPC; a per-viewer view sets it from
-// AttackableWithoutForceBy instead.
+// NPCInfoSnapshot captures this NPC's current client-visible state, in its
+// form when it has one. Its attackable flag is the one shown to no
+// particular viewer: a living Monster-family NPC; a per-viewer view sets it
+// from AttackableWithoutForceBy instead.
 func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
+	s := h.infoSnapshot()
+	h.Instance.showForm(&s)
+	return s
+}
+
+// infoSnapshot is NPCInfoSnapshot shown as the NPC itself, whatever its
+// form.
+func (h *Hostile) infoSnapshot() npcinfo.Snapshot {
 	tmpl := h.Instance.Template
 	x, y, z := h.Position()
 	name, title := "", ""
@@ -522,9 +530,10 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the template's server-side
-// name always shown, the view an immobile NPC is announced with.
+// name always shown, the view an immobile NPC is announced with. It never
+// shows a form.
 func (h *Hostile) ServerObjectInfoSnapshot() npcinfo.Snapshot {
-	snapshot := h.NPCInfoSnapshot()
+	snapshot := h.infoSnapshot()
 	snapshot.Name = h.Instance.Name()
 	return snapshot
 }

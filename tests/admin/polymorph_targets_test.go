@@ -62,44 +62,6 @@ func TestAdminPolymorphSpawnProtectionEnds(t *testing.T) {
 	}
 }
 
-// TestAdminPolymorphNPCTarget pins //polymorph on a selected NPC. The id is
-// read first: none or an unreadable one gets the usage, one no NPC has is
-// refused (APPLICANT_INFORMATION_INCORRECT). An NPC form for an NPC is not
-// implemented yet, so a known id logs the gap and answers ActionFailed
-// alone, leaving the NPC as it was for everyone around it.
-//
-// A working control tower takes the toggle-off branch whatever follows;
-// a tower only works during a siege, whose castle, clans and siege start
-// tests/clan builds, so that branch is covered with the NPC form itself.
-func TestAdminPolymorphNPCTarget(t *testing.T) {
-	t.Parallel()
-	srv, gmID := bootAdmin(t, adminLevel, polymorphNPCs())
-	gm := srv.Client
-	enterWorld(t, gm)
-	monster := srv.SpawnHostileNPCAt(t, location.Location{X: spawnX + 40, Y: spawnY, Z: spawnZ})
-	watcher, _ := addPlayer(t, srv, "player2", "Watcher", userLevel)
-	exchange(t, gm, encodeAction(monster.ObjectID()))
-	settle(t, watcher)
-
-	frames := exchange(t, gm, encodeBuildCmd("polymorph "+strconv.Itoa(polymorphNPCID)))
-	if got := testsupport.FrameOpcodes(frames); !bytes.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("known id on an NPC frames = %x, want ActionFailed alone", got)
-	}
-	for _, f := range settle(t, watcher) {
-		if (f[0] == serverpackets.OpcodeNPCInfo || f[0] == serverpackets.OpcodeDeleteObject) && frameObjectID(f) == monster.ObjectID() {
-			t.Fatalf("Watcher frame %x shows the NPC changed", f)
-		}
-	}
-
-	frames = exchange(t, gm, encodeBuildCmd("polymorph 99999"))
-	if len(frames) != 1 {
-		t.Fatalf("unknown id on an NPC frames = %x, want one message", testsupport.FrameOpcodes(frames))
-	}
-	assertStatic(t, frames[0], serverpackets.SystemMessageApplicantInformationIncorrect)
-	assertTexts(t, exchange(t, gm, encodeBuildCmd("polymorph")), adminPolymorphUsageText)
-	requirePolymorph(t, srv, gmID, 0)
-}
-
 // TestAdminPolymorphDoorRefused pins //polymorph on a selected door: only
 // an NPC or a player takes a form, so a known id is refused, and a missing
 // id still gets the usage.

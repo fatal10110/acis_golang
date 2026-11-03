@@ -143,16 +143,27 @@ func (d *Decoration) ObjectID() int32 { return d.Instance.ObjectID }
 
 func (d *Decoration) CollisionRadius() float64 { return d.Instance.Template.CollisionRadius }
 
+// NPCInfoSnapshot captures the decoration's client view, in its form when it
+// has one.
 func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
+	s := d.infoSnapshot()
+	d.Instance.showForm(&s)
+	return s
+}
+
+// infoSnapshot is NPCInfoSnapshot shown as the decoration itself, whatever
+// its form.
+func (d *Decoration) infoSnapshot() npcinfo.Snapshot {
 	return fixedNPCInfoSnapshot(d.Instance, d.stats, &d.Presence, d.zones.moveType(), d.running.Load())
 }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
 // always shown, the view an NPC that cannot move is announced with. It
 // shows the decoration attackable, with its full HP: like any civilian NPC
-// it may be attacked by force, though it can never be targeted.
+// it may be attacked by force, though it can never be targeted. It never
+// shows a form.
 func (d *Decoration) ServerObjectInfoSnapshot() npcinfo.Snapshot {
-	s := d.NPCInfoSnapshot()
+	s := d.infoSnapshot()
 	s.Name = d.Instance.Name()
 	s.Attackable = true
 	s.CurrentHP, s.MaxHP = d.stats.maxHP, d.stats.maxHP
