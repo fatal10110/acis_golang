@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"strconv"
 	"sync/atomic"
 	"testing"
 
@@ -39,6 +40,63 @@ func rewardGains(t *testing.T, srv *gameservertest.Server, objID int32) (adena i
 	after := progression()
 	drain(t, srv.Client)
 	return srv.PlayerItemCount(t, objID, item.AdenaID) - held, after.Exp - before.Exp, int(after.SP - before.SP)
+}
+
+// Items the item rate test rewards and drops: two stackable materials.
+const (
+	rateRewardItem = 1864
+	rateDropItem   = 1878
+)
+
+// rateItemTemplates is the shared item catalog plus rateRewardItem and
+// rateDropItem as stackable materials.
+func rateItemTemplates() gameservertest.Option {
+	templates := gameservertest.ItemTemplates().All()
+	for _, id := range []int32{rateRewardItem, rateDropItem} {
+		templates = append(templates, &item.Template{
+			ID: id, Name: "Rate Item " + strconv.Itoa(int(id)), Kind: item.KindEtcItem, Duration: -1,
+			Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{},
+		})
+	}
+	return gameservertest.WithItemTemplates(item.NewTable(templates))
+}
+
+// itemGains rewards objID, srv.Client's character, through rateQuest with
+// 10 units of rateRewardItem and a sure drop of 5 units of rateDropItem,
+// and returns the units of each it gained.
+func itemGains(t *testing.T, srv *gameservertest.Server, objID int32) (reward, drop int) {
+	t.Helper()
+	heldReward, heldDrop := srv.PlayerItemCount(t, objID, rateRewardItem), srv.PlayerItemCount(t, objID, rateDropItem)
+	if !srv.RunScript(t, objID, rateQuest, func(sc *script.Script, p *script.Player) {
+		sc.RewardItems(p, rateRewardItem, 10)
+		sc.DropItemsAlways(p, rateDropItem, 5, 0)
+	}) {
+		t.Fatal("item reward invocation panicked")
+	}
+	drain(t, srv.Client)
+	return srv.PlayerItemCount(t, objID, rateRewardItem) - heldReward, srv.PlayerItemCount(t, objID, rateDropItem) - heldDrop
+}
+
+// TestAdminReloadConfigQuestItemRatesTakeReloadedValues: an item reward and
+// a quest drop after //reload config scale by the reloaded RateQuestReward
+// and RateQuestDrop. At the boot rates of 1 they give 10 and 5 units; at 5
+// and 2 they give 50 and 10.
+func TestAdminReloadConfigQuestItemRatesTakeReloadedValues(t *testing.T) {
+	t.Parallel()
+	reloaded := liveSettings()
+	reloaded.QuestRates = &script.Rates{Drop: 2, Reward: 5, RewardAdena: 1, XP: 1, SP: 1}
+	srv, gmID := bootAdmin(t, adminLevel, rateScripts(), rateItemTemplates(), gameservertest.WithDataReloads(fixedConfig(reloaded)))
+	gm := srv.Client
+	enterWorld(t, gm)
+	drain(t, gm)
+
+	if reward, drop := itemGains(t, srv, gmID); reward != 10 || drop != 5 {
+		t.Fatalf("boot rates gave %d reward and %d drop units; want 10, 5", reward, drop)
+	}
+	assertTexts(t, exchange(t, gm, encodeBuildCmd("reload config")), configReloaded)
+	if reward, drop := itemGains(t, srv, gmID); reward != 50 || drop != 10 {
+		t.Fatalf("reloaded rates gave %d reward and %d drop units; want 50, 10", reward, drop)
+	}
 }
 
 // TestAdminReloadConfigQuestRatesTakeReloadedValues: a quest reward after

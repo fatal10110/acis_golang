@@ -170,7 +170,9 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 //     AllowBoat, DeleteCharAfterDays, NoSpawns (the spawn passes, //respawnall
 //     included, keep the boot value), the ground item settings, the pet
 //     settings, the spellbook needs, StoreSkillCooltime and
-//     CancelLesserEffect, the NPC AI switches, see range and timings, the
+//     CancelLesserEffect, the wyvern ride settings (copied into each game
+//     client link when it is built), the NPC AI switches, see range and
+//     timings, the
 //     random walk rate, the path fail count, the raid multipliers, the boss
 //     wait times, the raid curse (characters included), the NPC and summon
 //     crests (ShowNpcCrest, ShowSummonCrest), free teleport, the merchant

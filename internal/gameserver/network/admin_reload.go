@@ -40,9 +40,9 @@ type DataReloads struct {
 	// of every NPC (those already spawned included), ShowNpcLevel and the
 	// enchant, skill, craft and multisell switches included. Every setting
 	// outside PlayerConfig keeps its boot value (the calendar systems
-	// because they schedule their cycles at boot, the rest because each is
-	// read when its service is built); the composition root that builds
-	// this hook lists them.
+	// because they schedule their cycles at boot, the rest, the wyvern ride
+	// settings included, because each is read when its service or link is
+	// built); the composition root that builds this hook lists them.
 	Config func() (PlayerConfig, error)
 	// BuyLists reads the buylists anew, which the merchant then sells
 	// from, its limited stock rebuilt from the saved rows.
