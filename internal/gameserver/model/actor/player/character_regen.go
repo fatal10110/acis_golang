@@ -61,12 +61,12 @@ func (c *Character) SettleEnteredRegen() {
 // HP writers whose caller reports the status run it, so the event follows
 // that report (writeHPLocked).
 func (c *Character) settleRegenTask() {
-	c.regen.Settle(c.liveLocked().Queue(), c.regenShort)
+	c.regen.Settle(c.liveLocked().Queue(), c.RegenShort)
 }
 
-// regenShort reports whether c regenerates: in the world (on the grid or
+// RegenShort reports whether c regenerates: in the world (on the grid or
 // off it mid-teleport), not dead, and below its maximum HP, MP or CP.
-func (c *Character) regenShort() bool {
+func (c *Character) RegenShort() bool {
 	if !c.Spawned() || c.Dead() {
 		return false
 	}

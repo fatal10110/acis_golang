@@ -29,6 +29,10 @@ func (a *countingRegenActor) SettleRegen() {
 func (a *countingRegenActor) Regen() *creature.Regen { return &a.regen }
 func (*countingRegenActor) TickRegen()               {}
 
+// RegenShort reports a shortfall, so every backstop visit settles the
+// actor.
+func (*countingRegenActor) RegenShort() bool { return true }
+
 // TestNPCRegenTickReusesScratchAcrossShrinkingPopulation is the regression
 // case for reusing NPCRegen's scratch buffer (AppendObjects) across ticks:
 // every remaining actor must still regenerate once the population shrinks,

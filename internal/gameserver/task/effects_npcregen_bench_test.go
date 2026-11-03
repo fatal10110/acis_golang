@@ -69,13 +69,14 @@ func (*benchRegenActor) Kind() actor.Kind         { return actor.KindNPC }
 func (a *benchRegenActor) Regen() *creature.Regen { return &a.regen }
 func (*benchRegenActor) TickRegen()               {}
 func (*benchRegenActor) SettleRegen()             {}
+func (*benchRegenActor) RegenShort() bool         { return false }
 
 // BenchmarkNPCRegenTickManyIdleActors reproduces the review's 30k tracked
 // population for NPCRegen.Tick, 1% of it short with its phase armed (never
 // due on the stopped clock): a sweep walks only the armed phases, and the
 // backstop pass every regenBackstopEvery sweeps visits every tracked object
-// through a reused scratch buffer, costing one allocation per NPC: the
-// SettleRegen task posted to its queue, which production pays too.
+// through a reused scratch buffer, posting nothing to an actor that is full
+// or already armed.
 func BenchmarkNPCRegenTickManyIdleActors(b *testing.B) {
 	regen := benchRegenPopulation()
 

@@ -41,8 +41,9 @@ func (a *sweptRegenActor) Regen() *creature.Regen {
 	a.looks.Add(1)
 	return &a.regen
 }
-func (a *sweptRegenActor) SettleRegen() { a.regen.Settle(a.q, a.shortF) }
-func (a *sweptRegenActor) TickRegen()   { a.ticks.Add(1); a.SettleRegen() }
+func (a *sweptRegenActor) SettleRegen()     { a.regen.Settle(a.q, a.shortF) }
+func (a *sweptRegenActor) RegenShort() bool { return a.shortF() }
+func (a *sweptRegenActor) TickRegen()       { a.ticks.Add(1); a.SettleRegen() }
 
 // TestNPCRegenSweepWalksOnlyArmedPhases pins the sweep's cost to the armed
 // phases: once a backstop pass has bound every actor, the sweeps between

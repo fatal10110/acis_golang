@@ -31,6 +31,10 @@ type npcRegenActor interface {
 	TickRegen()
 	// SettleRegen arms or disarms the phase to match the actor's vitals.
 	SettleRegen()
+	// RegenShort reports whether the actor has something to regenerate: in
+	// the world, alive and below a maximum. It is safe from any goroutine
+	// holding none of the actor's locks.
+	RegenShort() bool
 }
 
 // NPCRegen runs the regeneration ticks of every spawned actor that
@@ -44,9 +48,12 @@ type npcRegenActor interface {
 // Once per period a backstop pass visits every tracked object. It binds each
 // actor's phase to the armed set, so an actor joins the sweep within one
 // period of entering the world, never later than its first tick can come
-// due. It also settles each actor, which arms the phase of any actor left
-// short by a change that settled nothing, such as an NPC's maximum raised
-// under a full resource.
+// due, and a phase that dropped out of the set is back in it by the next
+// pass. It also settles each idle actor left short by a change that settled
+// nothing, such as an NPC's maximum raised under a full resource, which arms
+// its phase. An armed phase needs no settle (its next tick settles it), and
+// neither does an idle actor with nothing to regenerate, so a pass posts
+// nothing to either.
 //
 // scratch and due are per-tick scan buffers reused across calls instead of
 // reallocated. tickGuard enforces the single-goroutine, one-call-at-a-time
@@ -122,8 +129,8 @@ func (r *NPCRegen) Tick() {
 	clear(r.due)
 }
 
-// backstop binds every tracked actor's phase to the armed set and posts its
-// settle.
+// backstop binds every tracked actor's phase to the armed set and posts a
+// settle to each idle actor left short.
 func (r *NPCRegen) backstop() {
 	r.scratch = r.state.AppendObjects(r.scratch[:0])
 	for _, obj := range r.scratch {
@@ -131,8 +138,13 @@ func (r *NPCRegen) backstop() {
 		if !ok {
 			continue
 		}
-		actor.Regen().Bind(&r.armed, actor)
-		actor.Queue().Post(actor.SettleRegen)
+		regen := actor.Regen()
+		regen.Bind(&r.armed, actor)
+		// The settle runs on the actor's queue and decides from the vitals
+		// there; a change racing this read settles on its own.
+		if !regen.Active() && actor.RegenShort() {
+			actor.Queue().Post(actor.SettleRegen)
+		}
 	}
 	// Drop references past this pass's length so a shrinking population
 	// doesn't keep despawned objects reachable through unused capacity.
