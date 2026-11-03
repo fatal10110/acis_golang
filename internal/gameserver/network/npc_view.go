@@ -70,15 +70,12 @@ func npcSnapshotFrame(s npcinfo.Snapshot, serverObject bool) wire.Frame {
 	return serverpackets.FrameNPCInfo(s)
 }
 
-// broadcastNPCView shows every player that knows v, from a detached
-// snapshot of its known list taken through buf, v's view again: the
+// broadcastNPCView shows every player that knows v its view again: the
 // stationary one when serverObject is set, the full one otherwise. The view
 // tells each viewer whether it may attack v, so a viewer gets one of two
 // frames, each built once on first use from one snapshot of v, which
 // carries the crest l adds; a nil l adds none.
-func broadcastNPCView(l *GameClientLink, buf *world.KnownBuffer, state *world.State, v npcView, serverObject bool) {
-	known := buf.SnapshotCopy(state, v)
-	defer known.Release()
+func broadcastNPCView(l *GameClientLink, state *world.State, v npcView, serverObject bool) {
 	var snapshot npcinfo.Snapshot
 	taken := false
 	view := func() npcinfo.Snapshot {
@@ -97,7 +94,7 @@ func broadcastNPCView(l *GameClientLink, buf *world.KnownBuffer, state *world.St
 	frames := [2]fanout{newFanout(variant(false)), newFanout(variant(true))}
 	defer frames[0].release()
 	defer frames[1].release()
-	for _, o := range known.Tracked() {
+	for o := range state.KnownPlayers(v) {
 		receiver, ok := o.(frameReceiver)
 		if !ok {
 			continue

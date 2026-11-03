@@ -136,7 +136,6 @@ type folkSink struct {
 	world  *world.State
 	stance AttackStanceTracker
 	f      *npc.Folk
-	known  world.KnownBuffer
 	link   *GameClientLink
 }
 
@@ -168,9 +167,7 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.MusicPlayed:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameMusicAt(f.ObjectID(), e.File, e.At) })
 	case event.HPChanged:
-		known := s.known.SnapshotCopy(s.world, f)
-		defer known.Release()
-		sendHPToWatchers(known.Tracked(), f.ObjectID(), f.PublishHP)
+		sendHPToWatchers(s.world.KnownPlayers(f), f.ObjectID(), f.PublishHP)
 	case event.Status:
 		attrs := npcStatusAttributes(e.Attrs)
 		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })
@@ -200,7 +197,7 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.MoveTypeChanged:
 		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running, f.InsideZone(zone.FlagWater)) })
 	case event.AbnormalEffectChanged:
-		broadcastNPCView(s.link, &s.known, s.world, f, f.ServerObjectView())
+		broadcastNPCView(s.link, s.world, f, f.ServerObjectView())
 	case event.HallManagerBuffCheck:
 		if s.link != nil {
 			s.link.hallManagerSelfBuff(f)
@@ -214,7 +211,7 @@ func (s *folkSink) Emit(ev event.Event) {
 			s.link.warnHeadquartersAttacked(f)
 		}
 	case event.NPCInfoChanged:
-		broadcastNPCView(s.link, &s.known, s.world, f, e.ServerObject || f.ServerObjectView())
+		broadcastNPCView(s.link, s.world, f, e.ServerObject || f.ServerObjectView())
 	}
 }
 
@@ -246,7 +243,7 @@ func (s *folkSink) stopAttackStance() {
 
 // broadcast fans one lazily built frame out to the NPC's observers.
 func (s *folkSink) broadcast(build func() wire.Frame) {
-	broadcastKnown(&s.known, s.world, s.f, build)
+	broadcastKnown(s.world, s.f, build)
 }
 
 // chatRules are the karma gates on service NPC dialogs.
