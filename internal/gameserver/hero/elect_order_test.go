@@ -62,9 +62,10 @@ func TestElectionListsHeroesInTableOrder(t *testing.T) {
 		t.Parallel()
 		store := &electionStore{}
 		m := newElectionManager(store)
-		// Gathered in 16 buckets as [1 2 5]; the 4-bucket copy lists 5 in
-		// 1's bucket.
-		if got, want := electedOrder(t, m, store, 1, 5, 2), []int32{1, 5, 2}; !slices.Equal(got, want) {
+		// Picked as [5 1 2] and gathered in 16 buckets as [1 2 5]; the
+		// 4-bucket copy lists 5 in 1's bucket. A copy in pick order would
+		// list [5 1 2].
+		if got, want := electedOrder(t, m, store, 5, 1, 2), []int32{1, 5, 2}; !slices.Equal(got, want) {
 			t.Fatalf("heroes = %v, want %v", got, want)
 		}
 	})
