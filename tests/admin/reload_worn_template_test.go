@@ -110,8 +110,16 @@ func TestReloadedAwayWornWeaponUnequipTakesOffWhatItBrought(t *testing.T) {
 	}
 	gm := srv.Client
 	bare := lastMaxHP(t, enterWorldBurst(t, gm))
+	rigged, ok := riggedWeaponTable(true).Get(riggedWeaponID)
+	if !ok {
+		t.Fatalf("rigged weapon %d missing from its table", riggedWeaponID)
+	}
+	mask := rigged.Mask()
 
 	on := exchange(t, gm, encodeUseItem(weapon))
+	if !srv.PlayerInventory(t, gmID).IsWearingType(mask) {
+		t.Fatalf("worn mask wearing the weapon lacks its type %#x", mask)
+	}
 	brought := int32(riggedWeaponHP + riggedItemSkillHP + riggedEnchantSkillHP + riggedAugmentStatHP + riggedAugmentSkillHP)
 	if got := lastMaxHP(t, on); got != bare+brought {
 		t.Fatalf("max HP wearing the weapon = %d, want %d", got, bare+brought)
@@ -136,6 +144,9 @@ func TestReloadedAwayWornWeaponUnequipTakesOffWhatItBrought(t *testing.T) {
 	}
 	if got := srv.PlayerMaxHP(t, gmID); got != int(bare) {
 		t.Fatalf("live max HP after taking the reloaded-away weapon off = %d, want %d", got, bare)
+	}
+	if srv.PlayerInventory(t, gmID).IsWearingType(mask) {
+		t.Fatalf("worn mask after taking the reloaded-away weapon off still counts its type %#x", mask)
 	}
 }
 
