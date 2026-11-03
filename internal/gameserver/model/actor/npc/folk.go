@@ -95,6 +95,7 @@ const socialInterval = 12 * time.Second
 type Folk struct {
 	world.Presence
 	Instance *Instance
+	aiSleep  aiSleep
 	// spawnBinding is the spawn slot that placed the NPC: its AI parameters
 	// and script memory.
 	spawnBinding

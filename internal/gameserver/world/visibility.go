@@ -372,8 +372,11 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	p.knownFrom.Store(prev)
 	p.region.Store(next)
 	// A non-player entering a region that was already active or inactive
-	// sees no setActive transition, so it is notified directly.
-	notifyArrival := next != nil && !tIsPlayer && prev != nil
+	// sees no setActive transition, so it is notified directly. One that
+	// takes arrivals on their own is told of joining the grid too.
+	_, arrivalActor := t.(regionArrivalActor)
+	joined := prev == nil
+	notifyArrival := next != nil && !tIsPlayer && (!joined || arrivalActor)
 
 	var notificationBuf [16]visibilityNotification
 	var notifications []visibilityNotification
@@ -456,7 +459,7 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 		s.mu.Unlock()
 	}()
 	if notifyArrival {
-		s.notifyArrivalActivity(next, t, arrival)
+		s.notifyArrivalActivity(next, t, arrival, joined)
 	}
 	for _, tg := range toggles {
 		s.notifyActivity(tg.region, tg.active)
@@ -551,16 +554,22 @@ func (s *State) notifyActivity(r *Region, active bool) {
 
 // notifyArrivalActivity tells obj, which arrival placed in r, the activity r
 // had then — unless a toggle landed or is still pending since, in which case
-// that toggle's notifyActivity reaches obj instead.
-func (s *State) notifyArrivalActivity(r *Region, obj Tracked, arrival regionActivityArrival) {
+// that toggle's notifyActivity reaches obj instead. joined reports that the
+// arrival brought obj onto the grid.
+func (s *State) notifyArrivalActivity(r *Region, obj Tracked, arrival regionActivityArrival, joined bool) {
 	s.mu.RLock()
 	changed := r.activityVersion != arrival.version
 	pending := r.activityPending != 0
 	active := r.Active()
 	s.mu.RUnlock()
-	if !arrival.pending && !changed && !pending {
-		notifyObjectActivity(obj, active)
+	if arrival.pending || changed || pending {
+		return
 	}
+	if actor, ok := obj.(regionArrivalActor); ok {
+		actor.OnRegionArrival(active, joined)
+		return
+	}
+	notifyObjectActivity(obj, active)
 }
 
 // regionNeighborhoodEmpty reports whether r and its 3x3 neighborhood

@@ -107,9 +107,7 @@ func TestInactiveRegionLeavesTheWalkAlone(t *testing.T) {
 		_, active := srv.State.RegionActivity(hostile)
 		return !active
 	})
-	// The AI tick finds the region asleep and applies its reset, if the
-	// player's departure has not already.
-	hostile.Tick()
+	// The player's departure posts the reset to the monster's queue.
 	srv.Settle(t)
 
 	if dest, moving := hostile.MovingTo(); !moving || dest != far {

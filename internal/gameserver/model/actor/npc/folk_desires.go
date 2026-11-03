@@ -66,18 +66,16 @@ func (f *Folk) AddSocialDesire(id, timer int, weight float64) {
 	f.cast.desires.AddOrUpdate(&ai.Desire{Kind: ai.IntentionSocial, ItemObjectID: int32(id), Timer: timer, Weight: weight, QueuedAt: f.now()})
 }
 
-// AISleeping reports whether the AI task leaves f alone: it is dead, out
-// of the world, or in a region no player keeps active.
+// AISleeping reports whether the AI task leaves f alone, as a hostile
+// NPC's AISleeping does: its region going quiet, its death and its removal
+// put it to sleep, and coming onto the grid, its region waking or a
+// teleport landing it outside its territory wake it. An f with no world is
+// awake.
 func (f *Folk) AISleeping() bool {
-	if f.Dead() {
-		return true
-	}
-	if f.world == nil {
-		return false
-	}
-	placed, active := f.world.RegionActivity(f)
-	return !placed || !active
+	return f.world != nil && f.aiSleep.asleep()
 }
+
+func (f *Folk) noSleepMode() bool { return f.Instance.Template.NoSleepMode }
 
 // CurrentIntention returns the kind of the desire f's AI last took up, and
 // IntentionIdle once it idles or a cast it took up ends. Safe from any
