@@ -186,6 +186,37 @@ func TestSpawnInQuietRegionDecidesSleep(t *testing.T) {
 	}
 }
 
+// latchRegionEdge is the edge length of one world grid region.
+const latchRegionEdge = 2048
+
+// TestCrossingIntoQuietRegionKeepsTheLatch pins an awake monster crossing
+// into another quiet region, back inside its territory: the crossing is no
+// activity change, so the monster stays awake and keeps ticking.
+func TestCrossingIntoQuietRegionKeepsTheLatch(t *testing.T) {
+	t.Parallel()
+	srv, at := bootSleepLatch(t)
+	far := offset(at, 40000)
+	// home sits 100 short of a region edge; its out-of-territory stand lies
+	// across it, in the next region.
+	edge := world.MinX + ((far.X-world.MinX)/latchRegionEdge+1)*latchRegionEdge
+	home := location.Location{X: edge - 100, Y: far.Y, Z: far.Z}
+	out := offset(home, latchOff)
+	h := spawnLatched(t, srv, gameservertest.MovingHostileTemplate("Monster"), home, home)
+	assertLatch(t, srv, h, true, "spawned in territory in a quiet region")
+
+	onNPCQueue(t, srv, h, func() { h.TeleportTo(out) })
+	assertLatch(t, srv, h, false, "teleported outside its territory, into the next region")
+	if _, active := srv.State.RegionActivity(h); active {
+		t.Fatal("test setup: the next region is active")
+	}
+
+	onNPCQueue(t, srv, h, func() { h.TeleportTo(home) })
+	if !h.InTerritory() {
+		t.Fatal("test setup: the monster is not back in its territory")
+	}
+	assertLatch(t, srv, h, false, "crossed back into its quiet home region")
+}
+
 // TestRegionWakeAndTeleportsWakeTheAI pins the wake points of a sleeping
 // monster: its region waking, and a teleport landing it outside its
 // territory; one landing inside keeps it asleep. Its region going quiet
