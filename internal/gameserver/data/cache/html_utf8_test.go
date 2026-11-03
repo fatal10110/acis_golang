@@ -41,7 +41,7 @@ func TestLoadHTMLLeavesOutUndecodablePages(t *testing.T) {
 
 // TestLoadHTMLDatapackUndecodablePages: the datapack's page files a strict
 // UTF-8 line reader rejects with MalformedInputException, found by reading
-// every .htm/.html file under data/html that way (15320 files, 15308
+// every .htm/.html file under data/html that way (15297 files, 15285
 // read). Each is missing from the cache.
 func TestLoadHTMLDatapackUndecodablePages(t *testing.T) {
 	dir := datapack.Path(t, "data", "html")

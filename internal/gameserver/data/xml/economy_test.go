@@ -48,12 +48,13 @@ func TestLoadEconomyData(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadBuyLists error: %v", err)
 		}
-		if got, want := table.Len(), 687; got != want {
+		if got, want := table.Len(), 663; got != want {
 			t.Fatalf("Len() = %d, want %d", got, want)
 		}
-		// 18812 <product> elements, 9 of them repeating an item id already
-		// in their list: a repeat replaces the earlier product in place.
-		if got, want := table.ProductCount(), 18803; got != want {
+		// 17925 <product> elements, one of them (in list 335421) repeating an
+		// item id already in its list: a repeat replaces the earlier product
+		// in place.
+		if got, want := table.ProductCount(), 17924; got != want {
 			t.Fatalf("ProductCount() = %d, want %d", got, want)
 		}
 		if gm, ok := table.Find(300531); !ok || len(gm.Products) != 42 || gm.Products[34].ItemID != 7684 || gm.Products[41].ItemID != 7725 {
