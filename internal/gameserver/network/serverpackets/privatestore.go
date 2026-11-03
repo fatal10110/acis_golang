@@ -206,11 +206,11 @@ func FrameRecipeShopManageList(ownerID int32, adena int, dwarven bool, book []re
 // FrameRecipeShopSellList builds a workshop's window as a customer sees it:
 // the crafter, its current and max MP, the customer's adena and every
 // recipe the workshop offers with its cost.
-func FrameRecipeShopSellList(crafterID, mp, maxMP int32, customerAdena int, offered []privatestore.ManufactureItem) wire.Frame {
+func FrameRecipeShopSellList(crafterID int32, mp, maxMP float64, customerAdena int, offered []privatestore.ManufactureItem) wire.Frame {
 	w := newFrameWriter(OpcodeRecipeShopSellList)
 	w.WriteInt32(crafterID)
-	w.WriteInt32(mp)
-	w.WriteInt32(maxMP)
+	w.WriteInt32(statInt32(mp))
+	w.WriteInt32(statInt32(maxMP))
 	w.WriteInt32(int32(customerAdena))
 	writeManufactureItems(w, offered)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
@@ -227,12 +227,12 @@ func writeManufactureItems(w *wire.Writer, offered []privatestore.ManufactureIte
 
 // FrameRecipeShopItemInfo builds a workshop's craft window for recipeID:
 // the crafter and its current and max MP.
-func FrameRecipeShopItemInfo(crafterID, recipeID, mp, maxMP int32) wire.Frame {
+func FrameRecipeShopItemInfo(crafterID, recipeID int32, mp, maxMP float64) wire.Frame {
 	w := newFrameWriter(OpcodeRecipeShopItemInfo)
 	w.WriteInt32(crafterID)
 	w.WriteInt32(recipeID)
-	w.WriteInt32(mp)
-	w.WriteInt32(maxMP)
+	w.WriteInt32(statInt32(mp))
+	w.WriteInt32(statInt32(maxMP))
 	w.WriteInt32(-1)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

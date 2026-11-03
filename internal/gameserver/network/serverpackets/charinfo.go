@@ -147,8 +147,8 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteUint8(uint8(c.RecommendationsLeft()))
 	w.WriteUint16(uint16(c.RecommendationsHave()))
 	w.WriteInt32(int32(c.ClassID()))
-	w.WriteInt32(int32(resources.MaxCP))
-	w.WriteInt32(int32(resources.CurrentCP))
+	w.WriteInt32(statInt32(resources.MaxCP))
+	w.WriteInt32(statInt32(resources.CurrentCP))
 	w.WriteUint8(uint8(enchantEffect(c, paperdoll)))
 	if s.SpawnProtectedTeam {
 		w.WriteUint8(teamBlue)

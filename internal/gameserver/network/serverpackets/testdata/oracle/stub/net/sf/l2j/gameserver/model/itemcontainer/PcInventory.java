@@ -29,6 +29,13 @@ public final class PcInventory
 		return totalWeight;
 	}
 
+	public final Map<Integer, ItemInstance> byObjectId = new HashMap<>();
+
+	public ItemInstance getItemByObjectId(int objectId)
+	{
+		return byObjectId.get(objectId);
+	}
+
 	public ItemInstance getItemByItemId(int itemId)
 	{
 		return byItemId.get(itemId);
