@@ -122,12 +122,17 @@
 //	                                          with no NPC to spawn: a script finds it by name (its lookup of a maker) and
 //	                                          sends it script events, which run its script, and which a traced scenario
 //	                                          compares (the trace's maker lines)
-//	npcmaker <name> <ai type> [max <n>] [spawn <npc id> <type> <x> <y> <z> [respawn <seconds>] [db <name>]]
+//	npcmaker <name> <ai type> [max <n>] [spawn <npc id> <type> <x> <y> <z> [respawn <seconds>] [db <name>] [corpse <seconds>]]
 //	                                          with a spawn, the maker has that one NPC to place (a fixture template of that
 //	                                          instance type) at that world position, back after that many seconds, kept in the
 //	                                          spawn_data row of that name when db says so; max is its maximum NPC count
-//	                                          (default 1). A scenario with a spawn starts all its makers as the server boots,
-//	                                          as the server starts its own, in the lines' order; the reference probe does the same
+//	                                          (default 1); corpse is its template's corpse time, how long its killed NPC's
+//	                                          corpse stays before it decays (default the fixture's; the killspawn step needs
+//	                                          it). A scenario with a spawn starts all its makers as the server boots,
+//	                                          as the server starts its own, in the lines' order; the reference probe does the same.
+//	                                          The NPC a maker places has no role (it is no npc line's): a step reaches it through
+//	                                          its maker (killspawn), and a script event it hears from a script is written, in a
+//	                                          traced scenario, with its template id in the role's place
 //	spawnrow <name> <alive|dead> <x> <y> <z> [respawn <seconds>]
 //	                                          optional, one per db name of a spawn: the spawn_data row the server saved last,
 //	                                          restored as it boots: alive at that position, or dead with its respawn that many
@@ -236,6 +241,14 @@
 //	swing <role>           the AI ticks and the position ticks run, time passing, until the hostile NPC's swing
 //	                       is in flight (it attacks now), as a script's AttackingNow reads it
 //	kill <role> [xN]       the character lands a lethal hit on the NPC, N times; a dead NPC is replaced by a fresh one first
+//	killspawn <maker>      the character lands a lethal hit on the NPC the npcmaker line's spawn placed, and the kill waits as
+//	                       a kill step does; the NPC's corpse decays through its maker (the maker's script hears its NPC
+//	                       deleted and its respawn is armed; an advance step past the respawn seconds brings it back). The
+//	                       maker's spawn names a corpse time
+//	makerevent <maker> <event> <int1> <int2>
+//	                       the named npcmaker is sent that script event, as a script outside the maker sends it (its own
+//	                       script runs; what it sends on is a maker line of the step, and what it makes an NPC hear is a
+//	                       heard line)
 //	advance <duration>     time passes, as time.ParseDuration reads it
 //	                       the effect lists tick after each whole second of it, so a landed effect runs out (a rest
 //	                       under a second does not tick)
@@ -736,6 +749,8 @@ var argCount = map[string][2]int{
 	"enter":      {0, 1},
 	"hallstatus": {2, 2},
 	"event":      {4, 4},
+	"killspawn":  {1, 1},
+	"makerevent": {4, 4},
 	"create":     {0, 0},
 	"hp":         {2, 2},
 	"mp":         {2, 2},
@@ -1308,6 +1323,18 @@ func (sc *Scenario) checkStep(verb string, args []string, roles map[string]bool)
 			if err := sc.checkObjectRef(a); err != nil {
 				return fmt.Errorf("event argument: %w", err)
 			}
+		}
+	case "makerevent":
+		if _, err := ints(args[2:]); err != nil {
+			return fmt.Errorf("makerevent: %w", err)
+		}
+		if sc.maker(args[0]) == nil {
+			return fmt.Errorf("makerevent %s: no npcmaker line names it", args[0])
+		}
+	case "killspawn":
+		m := sc.maker(args[0])
+		if m == nil || m.Spawn == nil || m.Spawn.Corpse == 0 {
+			return fmt.Errorf("killspawn %s: no npcmaker line with that name has a spawn with a corpse time", args[0])
 		}
 	case "hit":
 		if _, err := strconv.ParseInt(args[1], 10, 32); err != nil {

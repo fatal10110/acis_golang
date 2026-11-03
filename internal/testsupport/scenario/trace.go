@@ -259,6 +259,7 @@ var (
 	traceKill     = regexp.MustCompile(`^# kill (\d+) \(object (\d+)\)$`)
 	traceHit      = regexp.MustCompile(`^# hit (\d+) \(object (\d+)\) (\d+)$`)
 	traceEvent    = regexp.MustCompile(`^# event (\d+) \(object (\d+)\) (\d+) (\S+) (\S+)$`)
+	traceMakerEv  = regexp.MustCompile(`^# makerevent (\S+) (\S+) (-?\d+) (-?\d+)$`)
 	traceAdvance  = regexp.MustCompile(`^# advance (\d+)$`)
 	traceHall     = regexp.MustCompile(`^# hallstatus (\d+) (registering|waiting|siege)$`)
 	traceApproach = regexp.MustCompile(`^# approach (\d+) \(object (\d+)\)$`)
@@ -409,6 +410,9 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			m := traceEvent.FindStringSubmatch(line)
 			seen[atoi32(m[2])] = atoi32(m[1])
 			raw = append(raw, rawStep{client: "event " + strings.Join([]string{m[1], m[3], m[4], m[5]}, " ")})
+		case traceMakerEv.MatchString(line):
+			m := traceMakerEv.FindStringSubmatch(line)
+			raw = append(raw, rawStep{client: "makerevent " + strings.Join(m[1:], " ")})
 		case traceHit.MatchString(line):
 			m := traceHit.FindStringSubmatch(line)
 			seen[atoi32(m[2])] = atoi32(m[1])
@@ -955,6 +959,13 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 		if id, ok := npcID(st.Args[0]); ok {
 			return []string{fmt.Sprintf("event %d %s %s %s", id, st.Args[1], st.Args[2], st.Args[3])}, nil
 		}
+	case "killspawn":
+		// The maker's NPC has no role: the trace's kill names its template.
+		if m := sc.maker(st.Args[0]); m != nil && m.Spawn != nil {
+			return []string{fmt.Sprintf("kill %d", m.Spawn.NPC)}, nil
+		}
+	case "makerevent":
+		return []string{"makerevent " + strings.Join(st.Args, " ")}, nil
 	case "tick":
 		return slices.Repeat([]string{"tick"}, times(st.Args)), nil
 	case "away":

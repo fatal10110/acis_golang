@@ -132,7 +132,17 @@ what the reference does in the scenario's own world:
   lines, not the first step's `# maker` lines. The `started` lines are the Go run's expectation of
   those sends: the probe reads and ignores them, and the scenario's trace comparison checks them
   against the trace's. A maker-spawned NPC counts in the `live` and `spawned` lines, and the
-  makers delete their NPCs when the scenario is over;
+  makers delete their NPCs when the scenario is over. The spawn entry's `corpse <seconds>` option
+  sets the template's corpse time on both sides, as an NPC line's does. A maker-spawned NPC has no
+  role (no NPC line placed it): a script event it hears is a `# heard` line naming its template id,
+  which the Go run writes in the role's place, and a `killspawn <maker>` step kills it through its
+  maker's spawn (the probe's `# kill` line, then the 7 ticks of a kill step), its corpse decaying
+  through the maker (the maker's `onNpcDeleted` runs, and a respawn it arms runs on the virtual
+  clock, so an `advance` past the respawn brings the NPC back). A `makerevent <maker> <event>
+  <int1> <int2>` step calls `<maker>.getMaker().onMakerScriptEvent(...)` itself, as a script
+  outside the maker would: the call is not a `ProbeMaker.send`, so the step's own send is its
+  `# makerevent` line and not a `# maker` one, while what the maker's script sends on is the
+  step's `# maker` and `# heard` lines;
 - a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes
@@ -402,6 +412,8 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
                                 (the arguments as the scenario writes them)
 # heard <npc id> (object <id>) <id> <arg1> <arg2>   a scenario trace: the NPC hears a script event a script
                                 sent or broadcast (the arguments as numbers; an object id is a role to the Go run)
+# makerevent <name> <event> <int1> <int2>   a scenario trace: the NPC maker of that name is sent the script
+                                event by the step itself (its own send; a killspawn step's `# kill` is the maker's NPC)
 # started <name> <event> <int1> <int2>   a scenario trace: the script event sent to the NPC maker of that name
                                 while the makers start, before the first step (the scenario's started lines)
 # maker <name> <event> <int1> <int2>   a scenario trace: the script event sent to the NPC maker of that name

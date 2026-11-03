@@ -1,0 +1,20 @@
+# Sailren killed (the killspawn step: his maker placed him, so he has no role): his corpse decays 2 seconds later, which
+# makes SailrenMaker send rune16_npc2017_01m1 the event 11045 and arm his respawn, 30 seconds after the decay. He is
+# gone until then and back at his spawn point once it passes.
+trace internal/gameserver/script/testdata/oracle/scenarios/sailren_maker_kill_respawn.golden
+character Hunter 20
+npcmaker rune20_mb2017_04m1 sailren_maker max 2 spawn 29065 GrandBoss -113091 -243942 -15536 respawn 30 db sailren corpse 2
+npcmaker rune16_npc2017_01m1 default_maker
+npcmaker rune16_npc2017_13m1 default_maker
+started rune16_npc2017_01m1 11047 0 0
+started rune16_npc2017_13m1 11047 0 0
+
+killspawn rune20_mb2017_04m1
+  live 29065 0
+
+advance 28s
+  live 29065 0
+
+advance 1s
+  live 29065 1
+  spawned 29065 -113091,-243942
