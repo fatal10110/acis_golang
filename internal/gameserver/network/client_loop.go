@@ -81,8 +81,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		payload, err := session.ReadFrame()
 		if err != nil {
 			// A read the client did not end by hanging up (the idle
-			// deadline, a frame header too short to be one) leaves it
-			// connected: it reads ServerClose before the close, so it shows
+			// deadline) leaves it connected: it reads ServerClose before the close, so it shows
 			// the disconnect instead of waiting on a dead connection. The
 			// player lingers as on a dropped connection.
 			cs.lost = true
@@ -92,9 +91,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			return
 		}
-		if len(payload) == 0 {
+		if len(payload) == 0 && client.State() != StateConnected {
 			// A frame with no body is skipped unread, and the client waits
-			// on no answer to it.
+			// on no answer to it. Before authentication gateFrame still
+			// counts it toward the pre-auth packet cap, so empty frames
+			// cannot hold an unauthenticated connection open.
 			continue
 		}
 		serve, open := l.gateFrame(client, payload)
@@ -234,6 +235,9 @@ func (l *GameClientLink) gateFrame(client *Client, payload []byte) (serve, open 
 		l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packets in non-authed state")
 		client.closeNow()
 		return false, false
+	}
+	if len(payload) == 0 {
+		return false, true
 	}
 	if !client.Accept(payload[0]) {
 		l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")

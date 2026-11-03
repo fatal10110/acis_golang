@@ -96,18 +96,19 @@ func encodeRequestPledgeCrest() []byte {
 	return w.Bytes()
 }
 
-// TestShortFrameHeaderClosesWithServerClose sends an authenticated session a
-// frame header shorter than the header itself: the server cannot read on,
-// and the client reads ServerClose before the close. It runs on the wall
-// clock, whose reads wait for frames the harness does not count.
-func TestShortFrameHeaderClosesWithServerClose(t *testing.T) {
+// TestShortFrameHeaderIsSkipped sends an authenticated session frame
+// headers whose length is smaller than the header itself: each is read as a
+// frame with no body and skipped, and the connection keeps serving the frame
+// after them. It runs on the wall clock, whose reads wait for frames the
+// harness does not count.
+func TestShortFrameHeaderIsSkipped(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1),
 		gameservertest.WithRealPool())
 
-	if _, err := srv.Client.Conn().Write([]byte{0x01, 0x00}); err != nil {
-		t.Fatalf("write short header: %v", err)
+	if _, err := srv.Client.Conn().Write([]byte{0x00, 0x00, 0x01, 0x00}); err != nil {
+		t.Fatalf("write short headers: %v", err)
 	}
-	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeServerClose, "short header ServerClose")
-	srv.Client.ExpectClosed()
+	srv.Client.Send(encodeRequestPledgeCrest())
+	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodePledgeCrest, "pledge crest after short headers")
 }

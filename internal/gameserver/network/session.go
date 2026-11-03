@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -115,6 +116,11 @@ func (s *Session) ReadFrame() ([]byte, error) {
 		return nil, err
 	}
 	payload, err := s.frames.ReadFrame()
+	if errors.Is(err, wire.ErrFrameTooShort) {
+		// A length below the header's own size is a frame with no body:
+		// its header is consumed and the next frame starts right after it.
+		return payload[:0], nil
+	}
 	if err != nil {
 		return nil, err
 	}
