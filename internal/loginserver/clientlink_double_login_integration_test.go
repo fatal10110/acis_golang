@@ -66,6 +66,7 @@ func newTestLinkPair(t *testing.T, accounts *fakeAccountStore) (clientAddr strin
 		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
 		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
 		newSessionID:       func() int32 { return testInitSessionID },
+		handshakeTimeout:   connectionHandshakeTimeout,
 	}
 
 	gsLn, err := net.Listen("tcp", "127.0.0.1:0")

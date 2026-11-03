@@ -310,6 +310,7 @@ func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool
 		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
 		newSessionID:       func() int32 { return testInitSessionID },
 		hashPassword:       minCostHashPassword,
+		handshakeTimeout:   connectionHandshakeTimeout,
 	}
 	for _, opt := range opts {
 		opt(l)

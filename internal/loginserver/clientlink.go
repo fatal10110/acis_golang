@@ -73,6 +73,10 @@ type ClientLink struct {
 	// welcome before the purge loop closes it; zero disables purging.
 	loginTimeout time.Duration
 
+	// handshakeTimeout bounds how long a connection may stay
+	// unauthenticated between frames that carry a body.
+	handshakeTimeout time.Duration
+
 	// purgeMu guards purgeable, the set of authenticated connections the
 	// purge loop walks. Connections join on successful authentication and
 	// leave when their handler finishes.
@@ -138,6 +142,7 @@ func NewClientLink(
 		log:                log,
 		failedAttempts:     make(map[string]failedAttempt),
 		loginTimeout:       LoginTimeout,
+		handshakeTimeout:   connectionHandshakeTimeout,
 		purgeable:          make(map[*clientConn]struct{}),
 		live:               make(map[string]int),
 		holders:            make(map[string]*clientConn),
@@ -450,22 +455,35 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 
 	frames := wire.NewFrameReader(conn)
+	rearm := true
 	for {
-		if err := setLoginClientReadDeadline(conn, c.authed); err != nil {
-			return
+		if rearm {
+			if err := l.setClientReadDeadline(conn, c.authed); err != nil {
+				return
+			}
 		}
 		if c.closeRequest.Load() != nil {
 			return // the deferred close writes the requested packet
 		}
 		payload, err := frames.ReadFrame()
+		if errors.Is(err, wire.ErrFrameTooShort) {
+			// A length below the header's own size is a frame with no
+			// body: its header is consumed and the next frame starts
+			// right after it.
+			payload, err = nil, nil
+		}
 		if err != nil {
 			return
 		}
+		// A frame with no body is skipped undecrypted and unanswered. It
+		// keeps the current read deadline, so a client sending only empty
+		// frames still runs into it.
+		rearm = len(payload) > 0
+		if !rearm {
+			continue
+		}
 		if err := c.crypt.Decrypt(payload); err != nil {
 			l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
-			return
-		}
-		if len(payload) == 0 {
 			return
 		}
 
