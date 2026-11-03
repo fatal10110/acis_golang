@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -429,6 +430,22 @@ func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
 func (n *Npcs) created(slot slotInfo) {
 	g, scope := slot.group, &hookScope{}
 	g.behavior.NPCCreated(g.in(scope), groupSpawn{g: g, i: slot.spawnIdx, scope: scope}, groupNPC{n: n, slot: slot, scope: scope})
+}
+
+// SpawnedInPlace runs the maker hook of the npcmaker that placed c for c
+// shown again where it stands as if newly spawned (a polymorph). c never
+// left, so its group's alive count stays as it is. An NPC no npcmaker
+// placed (a private, a standalone spawn's) runs none.
+func (n *Npcs) SpawnedInPlace(c attackable.Combatant) {
+	id := c.ObjectID()
+	n.mu.Lock()
+	key, ok := n.live[id]
+	slot := n.slot[key]
+	n.mu.Unlock()
+	if !ok || slot.group == nil || slot.liveID != id {
+		return
+	}
+	n.created(slot)
 }
 
 // held reports whether the spawn condition of m holds, keeping its NPCs out

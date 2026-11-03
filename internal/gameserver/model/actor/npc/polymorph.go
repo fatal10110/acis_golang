@@ -40,11 +40,17 @@ func reshow(w *world.State, t world.Tracked) {
 // is shown as itself.
 func (h *Hostile) Polymorph() *Template { return h.Instance.Polymorph() }
 
-// Morph shows the NPC as form, or as itself again for nil: the players
-// around it forget it, then see it again so.
+// Morph shows the NPC as form, or as itself again for nil, as taking it
+// out of the world and spawning it again where it stands would: it exits
+// its zones, the players around it forget it, then see it again so, and it
+// enters its zones again. Then, on its queue, it is reset as a new spawn
+// (resetForSpawn), its created hooks run again included. A despawned NPC
+// only takes the form.
 func (h *Hostile) Morph(form *Template) {
 	h.Instance.form.Store(form)
-	reshow(h.world, h)
+	if reshowInPlace(h.world, h, h.zones) {
+		onQueue(h.Queue(), h.resetForSpawn)
+	}
 }
 
 // Polymorph returns the NPC whose look the NPC is shown with, nil while it
@@ -56,7 +62,9 @@ func (f *Folk) Polymorph() *Template { return f.Instance.Polymorph() }
 // stands dead.
 func (f *Folk) Morph(form *Template) {
 	f.Instance.form.Store(form)
-	reshow(f.world, f)
+	if reshowInPlace(f.world, f, f.zones) {
+		onQueue(f.queue, f.resetForSpawn)
+	}
 }
 
 // Morph shows the decoration as form, or as itself again for nil, as

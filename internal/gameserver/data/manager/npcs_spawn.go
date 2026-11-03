@@ -198,7 +198,7 @@ func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc
 		hp = hostile.MaxHP()
 	}
 	hostile.SetCurrentHP(hp)
-	rt := npc.Runtime{World: n.state, Log: &n.log, Items: n.items, Remover: n, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
+	rt := npc.Runtime{World: n.state, Log: &n.log, Items: n.items, Remover: n, Spawns: n, Scripts: n.scripts, Ground: n.pickUps, Regen: n.regen}
 	if n.rewards.Settings != nil {
 		rt.Party = n.rewards.Settings
 	}
