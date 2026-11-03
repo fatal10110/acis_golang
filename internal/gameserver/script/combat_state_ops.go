@@ -40,4 +40,4 @@ func (n *NPC) RemoveAttackDesire(c Creature) {
 }
 
 // Size returns the number of creatures the hate list holds.
-func (l HateList) Size() int { return l.h.AI().Hates().Len() }
+func (l HateList) Size() int { return l.h.AI().HatesIfBuilt().Len() }

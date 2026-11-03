@@ -48,13 +48,13 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	d.creditRaidKill(killer)
 
 	// A corpse nobody fought pays nothing: no loot, no spoil, no exp.
-	if d.hostile.AI().Threats().IsEmpty() {
+	if d.hostile.AI().ThreatsIfBuilt().IsEmpty() {
 		return
 	}
 	// The death reads the settings in force once, so a reload under way
 	// never splits one kill between two of them.
 	s := d.config.Settings.Settings()
-	threats := d.hostile.AI().Threats().Snapshot()
+	threats := d.hostile.AI().ThreatsIfBuilt().Snapshot()
 	entries, summonDamage, totalDamage, maxDealer := d.rewardEntries(s, threats)
 	// A command channel holding the loot rights takes the drops through its
 	// leader, whatever damage anyone dealt.

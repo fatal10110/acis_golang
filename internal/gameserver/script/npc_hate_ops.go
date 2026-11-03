@@ -27,7 +27,7 @@ func (n *NPC) RemoveAllDesire() {
 // RemoveDesires drops every desire of kind the NPC holds. Only a hostile
 // NPC does it; any other NPC panics.
 func (n *NPC) RemoveDesires(kind Intention) {
-	n.hostile("remove desires").AI().Desires().RemoveKind(kind)
+	n.hostile("remove desires").AI().DesiresIfBuilt().RemoveKind(kind)
 }
 
 // CleanAllHate zeroes the NPC's attack hate of every creature, keeping them
@@ -51,7 +51,7 @@ func (l HateList) CleanAll() { l.h.AI().CleanAllHates() }
 
 // StopHate drops c from the list. Its desires stay. A nil c panics.
 func (l HateList) StopHate(c Creature) {
-	l.h.AI().Hates().StopHate(mustCombatant(c, "stop the hate of a missing creature"))
+	l.h.AI().HatesIfBuilt().StopHate(mustCombatant(c, "stop the hate of a missing creature"))
 }
 
 // AddDefault adds the hate an NPC gives a creature it notices: 300 when the

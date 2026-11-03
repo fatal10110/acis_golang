@@ -24,8 +24,8 @@ const (
 
 // lazyCombatWorld boots the plain fixture character in the world beside
 // an NPC population that spawns lazyCombatMonster, casting its skill, with
-// the AI task driven by hand.
-func lazyCombatWorld(t *testing.T) (*folkWorld, *npc.Template) {
+// the AI task driven by hand, and extra on top.
+func lazyCombatWorld(t *testing.T, extra ...gameservertest.Option) (*folkWorld, *npc.Template) {
 	t.Helper()
 	monster := &npc.Template{
 		ID: lazyCombatMonsterID, TemplateID: lazyCombatMonsterID, Name: "Lazy Dummy", Type: "Monster", Level: 1, HPMax: 1000, MPMax: 100,
@@ -37,11 +37,13 @@ func lazyCombatWorld(t *testing.T) (*folkWorld, *npc.Template) {
 		ID: lazyCombatSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		SkillType: "BUFF", CastRange: 600, HitTime: 500, StaticHitTime: true, StaticReuse: true,
 	}
-	w := bootFolkWorld(t, nil,
+	opts := append([]gameservertest.Option{
 		gameservertest.WithAITask(),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{monster})),
 		gameservertest.WithNpcDropRates(item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}),
-		gameservertest.WithNpcSpawnSkills(modelskill.NewTable([]modelskill.Definition{buff})))
+		gameservertest.WithNpcSpawnSkills(modelskill.NewTable([]modelskill.Definition{buff})),
+	}, extra...)
+	w := bootFolkWorld(t, nil, opts...)
 	return w, monster
 }
 
