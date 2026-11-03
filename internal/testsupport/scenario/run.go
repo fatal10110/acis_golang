@@ -52,6 +52,10 @@ type Config struct {
 	// Catalog maps the scripts.xml paths the scenarios list to their
 	// constructors.
 	Catalog script.Catalog
+	// Makers maps the npcmaker AI types to the maker scripts a scenario that
+	// starts its makers (an npcmaker line with a spawn) runs; another
+	// scenario's makers run the default maker's, whatever their type.
+	Makers script.MakerCatalog
 }
 
 // RunDir runs every scenario file of dir as a parallel subtest named after
@@ -331,6 +335,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		}
 		r.npcs[n.Role] = n
 	}
+	templates = append(templates, r.makerTemplates(t, templates)...)
 	if s := r.sc.Summon; s != nil {
 		templates = append(templates, summonTemplate(s))
 	}
@@ -392,8 +397,13 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		opts = append(opts, gameservertest.WithDecay(r.corpses.task))
 	}
 	if len(r.sc.NpcMakers) > 0 {
-		// The makers are built and never started, as the reference probe leaves its own.
-		opts = append(opts, gameservertest.WithNpcSpawns(npcMakerTable(t, r.sc.NpcMakers)), gameservertest.WithNoSpawns())
+		opts = append(opts, gameservertest.WithNpcSpawns(npcMakerTable(t, r.sc.NpcMakers)))
+		if r.sc.StartsMakers() {
+			opts = append(opts, r.makerSpawnOptions(t, cfg.Makers)...)
+		} else {
+			// The makers are built and never started, as the reference probe leaves its own.
+			opts = append(opts, gameservertest.WithNoSpawns())
+		}
 	}
 	if r.sc.Teleports {
 		opts = append(opts, r.teleportOptions(t)...)
@@ -408,6 +418,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedSevenSigns(t, store, r.sc) }))
 	}
 	r.srv = gameservertest.Boot(t, opts...)
+	r.checkStarted(t)
 	if r.corpses != nil {
 		r.corpses.state.Store(r.srv.State)
 	}

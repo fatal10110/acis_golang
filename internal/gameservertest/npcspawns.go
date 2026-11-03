@@ -76,6 +76,13 @@ func WithSpawnData() Option {
 	return func(o *options) { o.spawnData = true }
 }
 
+// WithSpawnDataSeed hands seed the spawn_data store of WithSpawnData before
+// the population restores its rows, so a boot can find rows a previous run
+// left: a row saved alive, or dead with its respawn ahead.
+func WithSpawnDataSeed(seed func(*gamesql.SpawnStore)) Option {
+	return func(o *options) { o.seedSpawnData = seed }
+}
+
 // WithMakerEventsHeard makes heard told of each script event sent to an
 // npcmaker of the WithNpcSpawns population by its name, before the maker's
 // script runs, from any goroutine: the maker's name, the event and its two
