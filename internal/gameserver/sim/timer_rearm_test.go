@@ -103,6 +103,9 @@ func TestTimerRearmStopAndClose(t *testing.T) {
 // TestTimerRearmAllocatesNothing: once warm, an expiry that re-arms its
 // timer allocates nothing, the clock's own firing included.
 func TestTimerRearmAllocatesNothing(t *testing.T) {
+	if simdebugBuild {
+		t.Skip("simdebug owner bookkeeping allocates per drain; the budget describes the production build")
+	}
 	in := NewInline(epoch)
 	q := in.NewQueue("q")
 	var tm *Timer
