@@ -176,11 +176,11 @@ func (l *GameClientLink) sendLoginBoardPages(client *Client, live *livePlayer) {
 // sendLoginPage opens page, set by setPage from file and its placeholders
 // filled, in an HTML window during the login burst as is, and makes its
 // links the ones live may send back. While //show html is on, a game
-// master is first told the file's name, as sendFilePage tells it.
+// master is then told the file's name, as sendFilePage tells it.
 func (l *GameClientLink) sendLoginPage(client *Client, live *livePlayer, file, page string) {
+	live.bypasses.record(page)
+	client.Session.SendFrame(serverpackets.FrameNpcHtmlMessage(0, page, 0))
 	if l.showPageFiles.Load() && live.IsGM() {
 		client.Session.SendFrame(serverpackets.FrameCreatureSay(0, serverpackets.SayTypeAll, "HTML", pageFileName(file)))
 	}
-	live.bypasses.record(page)
-	client.Session.SendFrame(serverpackets.FrameNpcHtmlMessage(0, page, 0))
 }

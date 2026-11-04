@@ -18,14 +18,14 @@ func sendFilledHTML(live *livePlayer, objectID int32, page string, itemID int32)
 }
 
 // sendFilePage is sendFilledHTML for page, set from the datapack page
-// file: while //show html is on, a game master is first told the file's
-// name in the general chat, under the name HTML. A page built rather than
-// set from a file has no file and is never named.
+// file: while //show html is on, a game master is then told the file's
+// name in the general chat, under the name HTML, right after the window. A
+// page built rather than set from a file has no file and is never named.
 func (l *GameClientLink) sendFilePage(live *livePlayer, objectID int32, file, page string, itemID int32) {
+	sendFilledHTML(live, objectID, page, itemID)
 	if file != "" && l.showPageFiles.Load() && live.IsGM() {
 		live.SendFrame(serverpackets.FrameCreatureSay(0, serverpackets.SayTypeAll, "HTML", pageFileName(file)))
 	}
-	sendFilledHTML(live, objectID, page, itemID)
 }
 
 // sendValidatedFile is sendValidatedHTML for html, set from the datapack

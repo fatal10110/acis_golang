@@ -14,7 +14,7 @@ import (
 )
 
 // pageNotice is the general-chat line, from no object and under the name
-// HTML, that names the page file text ahead of its window.
+// HTML, that names the page file text right after its window.
 func pageNotice(text string) []byte {
 	w := wire.NewPacketWriter(serverpackets.OpcodeCreatureSay)
 	w.WriteInt32(0)
@@ -38,18 +38,18 @@ func requirePage(t *testing.T, what string, frames [][]byte) {
 	}
 }
 
-// requireNamedPage fails unless frames are the notice naming file, then
-// the HTML window.
+// requireNamedPage fails unless frames are the HTML window, then the notice
+// naming file.
 func requireNamedPage(t *testing.T, what, file string, frames [][]byte) {
 	t.Helper()
-	if len(frames) != 2 || !bytes.Equal(frames[0], pageNotice(file)) || frames[1][0] != serverpackets.OpcodeNpcHtmlMessage {
-		t.Fatalf("%s = %x, want the notice naming %q, then the page", what, opcodes(frames), file)
+	if len(frames) != 2 || frames[0][0] != serverpackets.OpcodeNpcHtmlMessage || !bytes.Equal(frames[1], pageNotice(file)) {
+		t.Fatalf("%s = %x, want the page, then the notice naming %q", what, opcodes(frames), file)
 	}
 }
 
 // TestAdminShowHTMLNamesPageFiles pins //show html: it answers nothing and
 // flips one switch for every game master. While it is on, a game master
-// shown a page set from a datapack file is first told the file's name,
+// shown a page set from a datapack file is then told the file's name,
 // what follows its first "html/"; a page built in code, and every page a
 // player below game master is shown, comes alone.
 func TestAdminShowHTMLNamesPageFiles(t *testing.T) {
@@ -86,6 +86,35 @@ func TestAdminShowHTMLNamesPageFiles(t *testing.T) {
 	}
 	requirePage(t, "//admin with the switch back off", exchangeZones(t, gm, encodeBuildCmd("admin")))
 	requirePage(t, "a linked page with the switch back off", exchangeZones(t, second, link))
+}
+
+// TestAdminShowHTMLNamesLoginPage pins the login board page under //show
+// html: a game master entering the world while it is on is told the page
+// file's name right after the page, in the entry burst.
+func TestAdminShowHTMLNamesLoginPage(t *testing.T) {
+	t.Parallel()
+	srv, gm := bootShowAdmin(t,
+		gameservertest.WithServerNews(true),
+		gameservertest.WithHTMLPages(map[string]string{"servnews.htm": "<html><body>news</body></html>"}),
+	)
+	secondID := srv.SeedCharacterFor(t, "player2", "Second", 1, 0).ID
+	setAccessLevel(t, srv, secondID, adminLevel)
+	drain(t, gm)
+	if frames := exchangeZones(t, gm, encodeBuildCmd("show html")); len(frames) != 0 {
+		t.Fatalf("//show html = %x, want nothing", opcodes(frames))
+	}
+
+	burst := enterWorldFrames(t, srv.DialClient(t, "player2", 1))
+	for i, frame := range burst {
+		if frame[0] != serverpackets.OpcodeNpcHtmlMessage {
+			continue
+		}
+		if i+1 >= len(burst) || !bytes.Equal(burst[i+1], pageNotice("servnews.htm")) {
+			t.Fatalf("burst = %x, want the server news, then the notice naming servnews.htm", opcodes(burst))
+		}
+		return
+	}
+	t.Fatalf("burst = %x, want the server news", opcodes(burst))
 }
 
 // TestAdminShowWalkerShowsFirstSpawn pins the walker panel row of a route
