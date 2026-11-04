@@ -29,7 +29,7 @@ wrote into a byte buffer.
   `WarehouseDepositList`, `WarehouseWithdrawList`, `BuyList`, `SellList`, `MultiSellList`,
   `ShopPreviewList`, `ShopPreviewInfo`, `TradeStart`, `TradeOwnAdd`, `TradeOtherAdd`, `TradeUpdate`,
   `TradeItemUpdate`, the `PrivateStore*` lists and messages, the `RecipeShop*`, `RecipeBookItemList`
-  and `RecipeItemMakeInfo` packets, `SendMacroList` and the `Henna*` windows
+  and `RecipeItemMakeInfo` packets, `SendMacroList` and the `Henna*` windows (`GMHennaInfo` included)
 - the party, command channel and party-matching windows (`ProbeParty.java`): `PartySmallWindowAll`, `Add`,
   `Update` and `Delete`, `PartySpelled`, `PartyMemberPosition`, `PartyMatchList`, `PartyMatchDetail`,
   `ExPartyRoomMember`, `ExManagePartyRoomMember`, `ExListPartyMatchingWaitingRoom`, `ExMPCCShowPartyMemberInfo`,
