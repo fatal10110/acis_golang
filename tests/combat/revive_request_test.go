@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/vitals"
 )
 
 // Reference: Player.reviveRequest / reviveAnswer (Player.java:6015-6084),
@@ -214,7 +215,7 @@ func TestPhoenixBlessedDeathOffersFullRevive(t *testing.T) {
 				c.Send(encodeRequestRestartPoint(0))
 				assertRestartTeleport(t, c, id, chaosRestartPoint)
 				res := victim.ResourceValues()
-				if want := res.MaxHP * 0.7; res.CurrentHP != want {
+				if want := vitals.RevivedHP(t, wholeMax(t, res.MaxHP)); res.CurrentHP != want {
 					t.Fatalf("HP after restart = %v, want the respawn share %v of %v", res.CurrentHP, want, res.MaxHP)
 				}
 				if exp, before := persistedExp(t, srv, c, id); exp != 1300 || before != 1500 {
@@ -233,14 +234,25 @@ func TestPhoenixBlessedDeathOffersFullRevive(t *testing.T) {
 				t.Fatalf("revive frames: StatusUpdate %d, Revive %d, EtcStatusUpdate %d; want them in that order", status, revive, etc)
 			}
 			res := victim.ResourceValues()
-			if res.CurrentHP != res.MaxHP || res.CurrentMP != res.MaxMP {
-				t.Fatalf("HP/MP after blessed revive = %v/%v, want full %v/%v", res.CurrentHP, res.CurrentMP, res.MaxHP, res.MaxMP)
+			wantHP, wantMP := vitals.PhoenixRevivedVitals(t, wholeMax(t, res.MaxHP), wholeMax(t, res.MaxMP))
+			if res.CurrentHP != wantHP || res.CurrentMP != wantMP {
+				t.Fatalf("HP/MP after blessed revive = %v/%v, want %v/%v of max %v/%v", res.CurrentHP, res.CurrentMP, wantHP, wantMP, res.MaxHP, res.MaxMP)
 			}
 			if exp, before := persistedExp(t, srv, c, id); exp != 1500 || before != 0 {
 				t.Fatalf("persisted exp/before-death = %d/%d, want 1500/0 (all restored)", exp, before)
 			}
 		})
 	}
+}
+
+// wholeMax is a player's maximum as the whole number the revive formulas
+// measure against; a fractional maximum fails the test.
+func wholeMax(t *testing.T, maxValue float64) int {
+	t.Helper()
+	if maxValue != float64(int(maxValue)) {
+		t.Fatalf("maximum %v is not a whole number", maxValue)
+	}
+	return int(maxValue)
 }
 
 // resurrectionScene boots a victim with lost exp and a healer who knows the
@@ -328,7 +340,7 @@ func TestResurrectionAsksTheCorpse(t *testing.T) {
 		t.Fatal("accepted offer left the victim dead")
 	}
 	res := s.v.ResourceValues()
-	if want := res.MaxHP * 0.7; res.CurrentHP != want {
+	if want := vitals.RevivedHP(t, wholeMax(t, res.MaxHP)); res.CurrentHP != want {
 		t.Fatalf("HP after resurrection = %v, want the respawn share %v of %v", res.CurrentHP, want, res.MaxHP)
 	}
 	if i := indexOf(readQuiet(s.healer), 0, serverpackets.OpcodeRevive, s.victimID); i < 0 {

@@ -72,6 +72,7 @@ public final class VitalsProbe
 		// HP of a revived creature of that maximum.
 		for (int max : new int[]
 		{
+			36,
 			410,
 			600,
 			632,
@@ -126,6 +127,18 @@ public final class VitalsProbe
 			{
 				0,
 				0
+			},
+			{
+				100000,
+				93160
+			},
+			{
+				50000,
+				40000
+			},
+			{
+				100000,
+				100000
 			}
 		};
 		for (int[] c : cases)
@@ -134,6 +147,7 @@ public final class VitalsProbe
 			{
 				0,
 				10,
+				33,
 				50,
 				89,
 				90,
@@ -158,6 +172,10 @@ public final class VitalsProbe
 		{
 			for (int[] max : new int[][]
 			{
+				{
+					36,
+					30
+				},
 				{
 					410,
 					200
