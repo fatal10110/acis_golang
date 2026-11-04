@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver"
@@ -29,6 +30,14 @@ import (
 // server to complete the full handshake against, not just hand-rolled wire
 // bytes.
 func newTestLoginServer(t *testing.T, allowNewServers bool) (addr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
+	t.Helper()
+	return newTestLoginServerWith(t, allowNewServers, nil, nil)
+}
+
+// newTestLoginServerWith is newTestLoginServer behind flood (none when nil),
+// serving on the listener wrap returns for the bound one (the bound one
+// itself when wrap is nil).
+func newTestLoginServerWith(t *testing.T, allowNewServers bool, flood *netutil.FloodGuard, wrap func(net.Listener) net.Listener) (addr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -53,7 +62,7 @@ func newTestLoginServer(t *testing.T, allowNewServers bool) (addr string, server
 	sessions = manager.NewSessionStore()
 	bans := manager.NewIPBanList(zerolog.Nop())
 
-	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, allowNewServers, nil, loginserver.NewLinkRoster(), zerolog.Nop())
+	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, allowNewServers, flood, loginserver.NewLinkRoster(), zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -61,7 +70,11 @@ func newTestLoginServer(t *testing.T, allowNewServers bool) (addr string, server
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	go gsLink.Serve(ctx, ln)
+	served := ln
+	if wrap != nil {
+		served = wrap(ln)
+	}
+	go gsLink.Serve(ctx, served)
 
 	return ln.Addr().String(), servers, sessions
 }

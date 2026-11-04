@@ -353,6 +353,11 @@ func (l *LoginLink) Close() error {
 // after retryDelay. A failed dial or handshake is
 // logged and retried the same way. onLink may be nil.
 func Maintain(ctx context.Context, address string, auth func() LoginServerAuth, handlers LoginLinkHandlers, retryDelay time.Duration, onLink func(*LoginLink), log zerolog.Logger) {
+	maintain(ctx, address, auth, handlers, retryDelay, time.After, onLink, log)
+}
+
+// maintain is Maintain waiting out retryDelay on the channel after returns.
+func maintain(ctx context.Context, address string, auth func() LoginServerAuth, handlers LoginLinkHandlers, retryDelay time.Duration, after func(time.Duration) <-chan time.Time, onLink func(*LoginLink), log zerolog.Logger) {
 	for ctx.Err() == nil {
 		l, err := DialLoginLink(ctx, address, auth(), handlers, log)
 		if err != nil {
@@ -371,7 +376,7 @@ func Maintain(ctx context.Context, address string, auth func() LoginServerAuth, 
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(retryDelay):
+		case <-after(retryDelay):
 		}
 	}
 }

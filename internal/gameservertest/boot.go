@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
@@ -197,6 +198,8 @@ type options struct {
 	persistWait            time.Duration
 	characterDeleteAfter   time.Duration
 	serverBypassDelay      time.Duration
+	acceptFilter           *netutil.AcceptFilter
+	acceptFilterNow        func() time.Time
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
 	regenMultipliers       creature.RegenMultipliers
@@ -553,6 +556,15 @@ func WithPersistWait(d time.Duration) Option {
 // gated action within the shipped window can boot with zero delays.
 func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
 	return func(o *options) { o.characterSelectDelay, o.serverBypassDelay = characterSelect, serverBypass }
+}
+
+// WithAcceptFilter installs f on the game-client listener, timed by now, as
+// the game server installs its accept filter (default: none, so suites may
+// open many connections from one address at once). The listener also sweeps
+// f at now() on its 5 s wall ticker; a suite that needs a sweep at a known
+// point calls f.Sweep itself.
+func WithAcceptFilter(f *netutil.AcceptFilter, now func() time.Time) Option {
+	return func(o *options) { o.acceptFilter, o.acceptFilterNow = f, now }
 }
 
 // WithAutoLearnSkills sets the players.properties AutoLearnSkills gate: a
@@ -2556,8 +2568,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		})
 		gcl.Handle(ctx, conn)
 	}
+	gameLn := ln
+	if o.acceptFilter != nil {
+		gameLn = netutil.FilterAccepts(ln, o.acceptFilter, o.acceptFilterNow)
+	}
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
-	go func() { _ = network.Serve(ctx, ln, serve, zerolog.Nop()) }()
+	go func() { _ = network.Serve(ctx, gameLn, serve, zerolog.Nop()) }()
 
 	for _, spec := range o.characters {
 		tmpl, ok := templates.Get(spec.class)
