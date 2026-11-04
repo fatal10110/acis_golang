@@ -95,6 +95,7 @@ var gameDecoders = []gameDecoder{
 	{"RequestBuyItem", decodesList(DecodeRequestBuyItem), seedPacket(OpcodeRequestBuyItem, int32(1), int32(2), int32(1060), int32(5), int32(1835), int32(100))},
 	{"RequestLinkHtml", decodes(DecodeRequestLinkHTML), seedPacket(OpcodeRequestLinkHtml, "default/30001-1.htm")},
 	{"RequestBypassToServer", decodes(DecodeRequestBypassToServer), seedPacket(OpcodeRequestBypassToServer, "npc_268435457_Shop 1")},
+	{"RequestGMCommand", decodes(DecodeRequestGMCommand), seedPacket(OpcodeRequestGMCommand, "Player", int32(6))},
 	{"RequestMagicSkillUse", decodes(DecodeRequestMagicSkillUse), seedPacket(OpcodeRequestMagicSkillUse, int32(1177), int32(0), byte(0))},
 	{"SendWarehouseDepositList", decodesList(DecodeSendWarehouseDepositList), seedPacket(OpcodeSendWarehouseDeposit, int32(1), seedObjectID, int32(100))},
 	{"SendWarehouseWithdrawList", decodesList(DecodeSendWarehouseWithdrawList), seedPacket(OpcodeSendWarehouseWithdraw, int32(2), seedObjectID, int32(1), seedObjectID+1, int32(3))},
