@@ -2,11 +2,16 @@
 # 31540-01.htm below 50 entries and 31540-02.htm from 50 on (onTalk); a character without a floating
 # stone is refused with 31540-06.htm (onAdvEvent); the count starts over when Valakas dies
 # (onMyDying). The character holds 50 stones, sends itself in 50 times and talks to a Klein
-# standing in the lair, as the first Klein is out of its reach. Expectations are derived from the
-# reference source; the reference probe replays one trip (grand_boss_teleporter_klein).
+# standing in the lair, as the first Klein is out of its reach. The reference probe plays the 50 trips
+# and records the last of each count of sends, as the run compares it. The reference sends a character that
+# has not been admitted to the lair's outer boss zone (110004) back to its town as it arrives (BossZone
+# onEnter, a zone with an invade time), so the scenario stands that zone away from the landing. The reference
+# keeps the count in a static, which the probe sets to 0 before each scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_klein_counts.golden
 character Pilgrim 60
 hold 7267 50
 item 7267
+zone boss 110004 5000 5000 5100 5100 -100 100
 script script.teleport.GrandBossTeleporter
 page default/31540.htm
 page script/teleport/GrandBossTeleporter/

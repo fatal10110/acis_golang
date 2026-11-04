@@ -1,0 +1,22 @@
+# The cube inside Valakas's nest (GrandBossTeleporter): its page link (a talk with the cube, onTalk) sends the
+# character to the point outside the nest, up to 250 away from it on each axis. The reference probe replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_valakas_exit.golden
+character Pilgrim 60
+script script.teleport.GrandBossTeleporter
+page default/31759.htm
+npc cube 31759 Folk 10 0 0
+
+action cube
+action cube
+  S ActionFailed
+  S NpcHtmlMessage obj=cube item=0 page=default/31759.htm
+  S ActionFailed
+bypass npc_{cube}_Quest GrandBossTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=150037,-57720,-2976+-250 fast=0
+  S DeleteObject obj=cube
+  S ActionFailed

@@ -1,0 +1,23 @@
+# Benom's cube (GrandBossTeleporter): the above ground link of its page (onFirstTalk) sends the character to one
+# of the two points above Benom's lair, up to 100 away from it on each axis (onAdvEvent benom_exit; every draw 1: the
+# second point). The reference probe replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_benom_exit.golden
+character Pilgrim 60
+random always 1
+script script.teleport.GrandBossTeleporter
+page script/teleport/GrandBossTeleporter/
+npc benom 29055 Folk 10 0 0
+
+action benom
+action benom
+  S ActionFailed
+  S NpcHtmlMessage obj=benom item=0 page=script/teleport/GrandBossTeleporter/29055-01.htm
+  S ActionFailed
+bypass Quest GrandBossTeleporter benom_exit
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=11918,-49447,-1088+-100 fast=0
+  S DeleteObject obj=benom

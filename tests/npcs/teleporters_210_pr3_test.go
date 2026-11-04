@@ -26,16 +26,20 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
-// The scripted teleporters of #210's third and fourth batches, driven
-// through real Action and bypass packets against MariaDB: where each link
-// or talk lands the player, what it takes from the inventory as it is
-// saved, the player memo the oracles keep, the Seven Signs dungeon flag,
-// the doors the gatekeepers open, the attack stance Orahochin refuses, the
-// boss cubes' despawns and Klein's count of the players he sent to
-// Valakas. The V4 scenarios (tests/quest/testdata/scenarios) replay the
-// reference traces of the pages; a scenario seeds no player memo, door,
-// zone, attack stance or quest list, and asserts no dungeon flag or
-// despawn (#4048), so those are here.
+// The scripted teleporters of #210's third and fourth batches that no scenario
+// plays, driven through real Action and bypass packets against MariaDB: what
+// the gatekeepers take from the inventory as it is saved, the player memo the
+// oracles keep, the Seven Signs dungeon flag, the rift links, the doors the
+// gatekeepers open, the attack stance Orahochin refuses and the boss cubes'
+// despawns. The V4 scenarios (tests/quest/testdata/scenarios) replay the
+// reference traces of the pages and trips: the cubes' exits
+// (grand_boss_teleporter_*_exit), Klein's count of the players he sent to
+// Valakas (grand_boss_teleporter_klein_counts) and Triol's mirrors
+// (pagan_teleporter, pagan_teleporter_mirror_town). What stays here is a link
+// no shipped page offers (the oracle's festival link, a gatekeeper's Return;
+// the reference drops a bypass its last page did not offer), or one only the
+// festival guide's page offers, whose text counts the minutes to the next
+// festival and so cannot be compared with a trace.
 
 // The teleporters' NPCs and items, as the reference scripts have them.
 const (
@@ -242,23 +246,6 @@ func (w *folkWorld) requireNoTrip(t *testing.T, frames [][]byte) {
 			t.Fatalf("the player jumped: %x", opcodes(frames))
 		}
 	}
-}
-
-// requireTripNear requires frames to move the player to within offset of
-// one of spots on each axis, at its Z, and returns where it landed.
-func (w *folkWorld) requireTripNear(t *testing.T, frames [][]byte, offset int, spots ...location.Location) location.Location {
-	t.Helper()
-	got := w.landedAt(t, frames)
-	ok := slices.ContainsFunc(spots, func(s location.Location) bool {
-		return got.X >= s.X-offset && got.X <= s.X+offset && got.Y >= s.Y-offset && got.Y <= s.Y+offset && got.Z == s.Z
-	})
-	if !ok {
-		t.Fatalf("landed at %+v, want within %d of one of %+v", got, offset, spots)
-	}
-	w.at = got
-	w.c.Send(encodeAppearing())
-	drainFrames(t, w.c)
-	return got
 }
 
 // TestOracleTeleporterReturn: a temple priest's return sends the player
@@ -501,31 +488,6 @@ func TestOracleTeleporterZigguratGatekeeperPages(t *testing.T) {
 				want[tpFragment] = 1
 			}
 			w.requireSaved(t, want)
-		})
-	}
-}
-
-// TestPaganTeleporterMirrors: Triol's mirrors send the player between the
-// temple and the town, answering no page.
-func TestPaganTeleporterMirrors(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		npcID int
-		want  location.Location
-	}{
-		{npcID: tpMirror, want: location.Location{X: 34962, Y: -49758, Z: -763}},
-		{npcID: tpMirrorTown, want: location.Location{X: -12766, Y: -35840, Z: -10856}},
-	} {
-		t.Run(strconv.Itoa(tt.npcID), func(t *testing.T) {
-			t.Parallel()
-			w := bootOracles(t, oracleSetup{})
-			mirror := w.spawnFolk(t, folkTemplate("Folk", tt.npcID), 50)
-			w.openThrough(t, mirror)
-			frames := w.tripFrames(t, npcCommand(mirror, "Quest PaganTeleporter"))
-			if _, ok := firstOpcode(frames, serverpackets.OpcodeNpcHtmlMessage); ok {
-				t.Fatalf("the trip answered a page: %x", opcodes(frames))
-			}
-			w.requireTrip(t, frames, tt.want)
 		})
 	}
 }

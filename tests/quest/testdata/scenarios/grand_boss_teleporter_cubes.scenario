@@ -3,7 +3,7 @@
 # lair, answering no page (onTalk). The despawns of the cubes (onCreated) are in
 # grand_boss_teleporter_cube_despawns; the Baium and Core cube is in grand_boss_teleporter_baium_cube and
 # _core_cube, the fire dragon gatekeepers' doors in grand_boss_teleporter_fire_gatekeeper_*, the other
-# exits in tests/npcs/teleporters_210_pr4_test.go.
+# exits in grand_boss_teleporter_{benom,frintezza,valakas,sailren}_exit.
 trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_cubes.golden
 character Pilgrim 60
 random 100 200

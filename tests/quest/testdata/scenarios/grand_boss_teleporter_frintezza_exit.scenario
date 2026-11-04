@@ -1,0 +1,22 @@
+# Frintezza's cube (GrandBossTeleporter): the exit link of its page (onFirstTalk) sends the character to the
+# point outside the Last Imperial Tomb, up to 500 away from it on each axis (onAdvEvent frintezza_exit).
+# The reference probe replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_frintezza_exit.golden
+character Pilgrim 60
+script script.teleport.GrandBossTeleporter
+page script/teleport/GrandBossTeleporter/
+npc frintezza 29061 Folk 10 0 0
+
+action frintezza
+action frintezza
+  S ActionFailed
+  S NpcHtmlMessage obj=frintezza item=0 page=script/teleport/GrandBossTeleporter/29061-01.htm
+  S ActionFailed
+bypass Quest GrandBossTeleporter frintezza_exit
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=150037,-57720,-2976+-500 fast=0
+  S DeleteObject obj=frintezza

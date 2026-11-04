@@ -61,6 +61,7 @@ import net.sf.l2j.gameserver.data.xml.PlayerLevelData;
 import net.sf.l2j.gameserver.data.xml.ScriptData;
 import net.sf.l2j.gameserver.enums.CabalType;
 import net.sf.l2j.gameserver.enums.EventHandler;
+import net.sf.l2j.gameserver.enums.LootRule;
 import net.sf.l2j.gameserver.enums.SealType;
 import net.sf.l2j.gameserver.enums.SiegeSide;
 import net.sf.l2j.gameserver.enums.actors.ClassId;
@@ -91,12 +92,14 @@ import net.sf.l2j.gameserver.model.spawn.NpcMaker;
 import net.sf.l2j.gameserver.model.spawn.Spawn;
 import net.sf.l2j.gameserver.model.spawn.Territory;
 import net.sf.l2j.gameserver.model.spawn.SpawnData;
+import net.sf.l2j.gameserver.model.group.Party;
 import net.sf.l2j.gameserver.model.location.Point2D;
 import net.sf.l2j.commons.geometry.Triangle;
 import net.sf.l2j.gameserver.network.GameClient;
 import net.sf.l2j.gameserver.network.GameClient.GameClientState;
 import net.sf.l2j.gameserver.network.SessionKey;
 import net.sf.l2j.gameserver.network.clientpackets.Action;
+import net.sf.l2j.gameserver.network.clientpackets.Appearing;
 import net.sf.l2j.gameserver.network.clientpackets.EnterWorld;
 import net.sf.l2j.gameserver.network.clientpackets.L2GameClientPacket;
 import net.sf.l2j.gameserver.network.clientpackets.RequestBypassToServer;
@@ -109,6 +112,7 @@ import net.sf.l2j.gameserver.network.serverpackets.CharSelectInfo;
 import net.sf.l2j.gameserver.network.serverpackets.MonRaceInfo;
 import net.sf.l2j.gameserver.scripting.Quest;
 import net.sf.l2j.gameserver.scripting.QuestState;
+import net.sf.l2j.gameserver.scripting.script.teleport.GrandBossTeleporter;
 import net.sf.l2j.gameserver.taskmanager.AiTaskManager;
 import net.sf.l2j.gameserver.taskmanager.AttackStanceTaskManager;
 import net.sf.l2j.gameserver.taskmanager.DecayTaskManager;
@@ -238,6 +242,10 @@ final class ScenarioTrace
 	private final int[] _mateAt = new int[3];
 	/** The mate line's hold lines: item id, count. */
 	private final List<int[]> _mateHolds = new ArrayList<>();
+	/** The member lines: a second character each, of an account of its own, in the character's party. */
+	private final List<MemberLine> _memberLines = new ArrayList<>();
+	/** The members in the world, by name. */
+	private final Map<String, Player> _members = new LinkedHashMap<>();
 	private int[] _draws;
 	/** The time of day the clock line starts the scenario at, in milliseconds since midnight. */
 	private long _clock;
@@ -439,6 +447,8 @@ final class ScenarioTrace
 			final int[] festival = festival();
 			final Map<SealType, CabalType> sealOwners = new EnumMap<>(SevenSignsManager.getInstance().getSealOwners());
 			final List<String> failures;
+			// The count of the players sent to Valakas is a static of the script: each scenario starts it over.
+			set(GrandBossTeleporter.class, null, "_valakasPlayersCount", 0);
 			try
 			{
 				t.play();
@@ -701,6 +711,7 @@ final class ScenarioTrace
 					Integer.parseInt(f[8])
 				});
 				case "door" -> _doors.put(f[1], Integer.parseInt(f[2]));
+				case "member" -> _memberLines.add(memberLine(f));
 				case "equip" -> _equips.add(Integer.parseInt(f[1]));
 				case "standing" -> _standing = Integer.parseInt(f[1]);
 				case "pk" -> _pk = Integer.parseInt(f[1]);
@@ -748,13 +759,14 @@ final class ScenarioTrace
 	}
 
 	/** Whether an indented line is an expectation the probe reads: open, dungeon, or the character's standing or stance. */
-	private static boolean seedCheck(String line)
+	private boolean seedCheck(String line)
 	{
 		final String[] f = line.split("\\s+");
 		return switch (f[0])
 		{
 			case "open", "dungeon" -> true;
-			case "standing", "stance" -> f.length > 1 && f[1].equals("player");
+			case "standing" -> f.length > 1 && (f[1].equals("player") || _memberLines.stream().anyMatch(m -> m.name().equals(f[1])));
+			case "stance" -> f.length > 1 && f[1].equals("player");
 			default -> false;
 		};
 	}
@@ -934,7 +946,7 @@ final class ScenarioTrace
 	{
 		return switch (verb)
 		{
-			case "action", "bypass", "link", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event", "killspawn", "makerevent", "as", "away", "stance" -> true;
+			case "action", "bypass", "link", "appear", "hit", "kill", "advance", "approach", "tick", "relog", "pickup", "mark", "restart", "enter", "create", "hallstatus", "event", "killspawn", "makerevent", "as", "away", "stance" -> true;
 			default -> false;
 		};
 	}
@@ -972,6 +984,7 @@ final class ScenarioTrace
 			{
 				case "action", "bypass", "link" -> client(s);
 				case "as" -> as(s);
+				case "appear" -> receive("Appearing", new Appearing(), body(0));
 				case "away" -> away();
 				case "stance" -> stance(s[2]);
 				case "kill" ->
@@ -1031,7 +1044,7 @@ final class ScenarioTrace
 		switch (s[0])
 		{
 			case "action" -> action(npc(s[1]));
-			case "bypass" -> bypass(roles(s[1]));
+			case "bypass" -> repeatedBypass(s[1]);
 			default -> link(s[1]);
 		}
 	}
@@ -1129,7 +1142,74 @@ final class ScenarioTrace
 		holdings(player);
 		if (_mate != null && _mateOnline)
 			mateOnline();
+		members(player);
 		spawnNpcs();
+	}
+
+	/** Reads a member line as the Go runner does: name, level, then dead, standing and hold options, then an optional offset. */
+	private MemberLine memberLine(String[] f)
+	{
+		int standing = 0;
+		final List<int[]> holds = new ArrayList<>();
+		int i = 3;
+		while (i < f.length)
+		{
+			if (f[i].equals("dead"))
+				throw new IllegalStateException(_name + ": the probe plays no dead member");
+			else if (f[i].equals("standing"))
+			{
+				standing = Integer.parseInt(f[i + 1]);
+				i += 2;
+			}
+			else if (f[i].equals("hold"))
+			{
+				holds.add(new int[] { Integer.parseInt(f[i + 1]), Integer.parseInt(f[i + 2]) });
+				i += 3;
+			}
+			else
+				break;
+		}
+		final int[] at = new int[3];
+		if (i + 3 == f.length)
+			for (int k = 0; k < 3; k++)
+				at[k] = Integer.parseInt(f[i + k]);
+		else if (i != f.length)
+			throw new IllegalStateException(_name + ": member " + f[1] + ": " + String.join(" ", f));
+		return new MemberLine(f[1], Integer.parseInt(f[2]), standing, holds, at[0], at[1], at[2]);
+	}
+
+	/**
+	 * The member lines' characters: each of an account of its own, in the world where the character first
+	 * enters it, in its party, holding its items and standing as its line says.
+	 */
+	private void members(Player leader) throws Exception
+	{
+		Party party = null;
+		for (MemberLine m : _memberLines)
+		{
+			final Player member = Player.create(IdFactory.getInstance().getNextId(), PlayerData.getInstance().getTemplate(ClassId.VALUES[_class]), "member_" + m.name(), m.name(), (byte) 0, (byte) 0, (byte) 0, Sex.MALE);
+			member.getStatus().setLevel(m.level());
+			member.getStatus().setExp(PlayerLevelData.getInstance().getPlayerLevel(m.level()).requiredExpToLevelUp());
+			member.getStatus().setMaxHpMp();
+			World.getInstance().addObject(member);
+			final GameClient client = new GameClient(null);
+			client.setAccountName("member_" + m.name());
+			client.setSessionId(new SessionKey(1, 2, 3, 4));
+			client.setState(GameClientState.IN_GAME);
+			client.setPlayer(member);
+			member.setClient(client);
+			member.spawnMe(X + m.dx(), Y + m.dy(), Z + m.dz());
+			World.getInstance().addPlayer(member);
+			for (int[] h : m.holds())
+				hold(member, h);
+			if (m.standing() != 0)
+				member.setAllianceWithVarkaKetra(m.standing());
+			if (party == null)
+				party = new Party(leader, member, LootRule.ITEM_LOOTER);
+			else
+				party.addPartyMember(member);
+			_members.put(m.name(), member);
+		}
 	}
 
 	/**
@@ -1275,9 +1355,18 @@ final class ScenarioTrace
 		{
 			case "open" -> yesNo(door(c[1]).isOpened());
 			case "dungeon" -> yesNo(_player.isIn7sDungeon());
-			case "standing" -> String.valueOf(_player.getAllianceWithVarkaKetra());
+			case "standing" -> String.valueOf((c[1].equals("player") ? _player : member(c[1])).getAllianceWithVarkaKetra());
 			default -> AttackStanceTaskManager.getInstance().isInAttackStance(_player) ? "on" : "off";
 		};
+	}
+
+	/** The member a member line names. */
+	private Player member(String name)
+	{
+		final Player member = _members.get(name);
+		if (member == null)
+			throw new IllegalStateException(_name + ": no member line names " + name);
+		return member;
 	}
 
 	private static String yesNo(boolean b)
@@ -1840,6 +1929,30 @@ final class ScenarioTrace
 		receive("Action " + npc.getNpcId() + " (object " + npc.getObjectId() + ")", new Action(), b);
 	}
 
+	/**
+	 * A bypass step with an xN count: the command is sent N times and only the last send is recorded, as
+	 * the Go run compares only the last. After each earlier send that started a trip, the client has arrived
+	 * (Appearing) before the next send, as the Go run's does: the reference ignores a bypass while the
+	 * character is teleporting.
+	 */
+	private void repeatedBypass(String text) throws Exception
+	{
+		final java.util.regex.Matcher m = java.util.regex.Pattern.compile("(.*\\S)\\s+x(\\d+)").matcher(text);
+		final boolean counted = m.matches();
+		final String command = counted ? m.group(1) : text;
+		final int n = counted ? Integer.parseInt(m.group(2)) : 1;
+		for (int i = 1; i < n; i++)
+		{
+			final int mark = _lines.size();
+			bypass(roles(command));
+			if (_player.isTeleporting())
+				receive("Appearing", new Appearing(), body(0));
+			while (_lines.size() > mark)
+				_lines.remove(_lines.size() - 1);
+		}
+		bypass(roles(command));
+	}
+
 	private void bypass(String command) throws Exception
 	{
 		// The reference throttles bypasses to one per 100 ms.
@@ -2010,6 +2123,11 @@ final class ScenarioTrace
 		ConnectionPool.setSink(null);
 	}
 
+	/** A member line: name, level, standing (0 for none), holds (item id, count) and the offset it stands at. */
+	private record MemberLine(String name, int level, int standing, List<int[]> holds, int dx, int dy, int dz)
+	{
+	}
+
 	/**
 	 * Removes the scenario's player, the NPCs spawned for its NPC lines and every NPC and ground item
 	 * near it, so the next scenario starts alone.
@@ -2038,12 +2156,16 @@ final class ScenarioTrace
 			door(role).closeMe();
 		for (Map.Entry<Integer, ZoneForm> e : _shapes.entrySet())
 			set(ZoneType.class, ZoneManager.getInstance().getZoneById(e.getKey()), "_zone", e.getValue());
+		for (Player member : _members.values())
+			member.deleteMe();
 		if (_player != null)
 			_player.deleteMe();
 		if (_mateClient != null && _mateClient.getPlayer() != null)
 			_mateClient.getPlayer().deleteMe();
 		if (_mate != null)
 			PlayerInfoTable.getInstance().removePlayer(_mateObjectId);
+		for (Player member : _members.values())
+			PlayerInfoTable.getInstance().removePlayer(member.getObjectId());
 		PlayerInfoTable.getInstance().removePlayer(_objectId);
 		ThreadPool.cancelAll();
 	}
