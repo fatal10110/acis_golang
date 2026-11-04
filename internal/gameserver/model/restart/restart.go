@@ -32,6 +32,9 @@ func (a Area) Contains(loc location.Location) bool {
 	return a.shape.Contains(loc.X, loc.Y, loc.Z)
 }
 
+// Form is the area's boundary.
+func (a Area) Form() zone.Form { return a.shape }
+
 // ClassRestriction returns the restart point name overridden for race within
 // this area, if any.
 func (a Area) ClassRestriction(race player.Race) (string, bool) {

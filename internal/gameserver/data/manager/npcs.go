@@ -569,3 +569,7 @@ func (n *Npcs) currentSpawns() *Spawns {
 func (n *Npcs) Spawns() *Spawns {
 	return n.currentSpawns()
 }
+
+// Walker is the route walker the population's NPCs walk their routes on,
+// nil for none.
+func (n *Npcs) Walker() *task.Walker { return n.walker }

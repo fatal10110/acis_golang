@@ -37,8 +37,11 @@ type Fleet struct {
 
 	mu      sync.Mutex
 	engines []*engine
-	docks   *docks
-	updates int
+	// itineraries are the routes the boats of the last launch sail, until
+	// the next Retire.
+	itineraries []route.BoatItinerary
+	docks       *docks
+	updates     int
 	// launches numbers the launch the last Retire handed out; using it or
 	// retiring again moves it on.
 	launches uint64
@@ -93,6 +96,7 @@ func (f *Fleet) launch(itineraries []route.BoatItinerary) error {
 		f.engines = append(f.engines, newEngine(b, legs[i], f.docks, at))
 		f.state.Spawn(b, at.X, at.Y, at.Z, it.Heading)
 	}
+	f.itineraries = itineraries
 	return nil
 }
 
@@ -116,6 +120,7 @@ func (f *Fleet) Retire() (retired []*Boat, launch uint64) {
 		retired = append(retired, b)
 	}
 	f.engines = nil
+	f.itineraries = nil
 	f.launches++
 	return retired, f.launches
 }
@@ -142,6 +147,14 @@ func (f *Fleet) Boats() []*Boat {
 		out[i] = e.boat
 	}
 	return out
+}
+
+// Itineraries returns the itineraries the fleet's boats sail, in order;
+// none once retired until the next launch. The caller must not modify them.
+func (f *Fleet) Itineraries() []route.BoatItinerary {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.itineraries
 }
 
 // Tick collects the fares that fall due, advances every sailing boat by one

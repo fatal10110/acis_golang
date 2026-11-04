@@ -502,6 +502,9 @@ type GameClientLink struct {
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
+	// debugMoves holds the creatures //show move and //show path toggled
+	// on.
+	debugMoves debugMoves
 	// spawnAll runs one //unspawnall or //respawnall at a time, so two
 	// game masters respawning at once cannot leave both new populations
 	// in the world.
