@@ -18,7 +18,8 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 		Creature:$gs/model/actor/Creature.java Door:$gs/model/actor/instance/Door.java \
 		Func:$gs/skills/funcs/FuncMaxHpMul.java PetStatus:$gs/model/actor/status/PetStatus.java \
 		Pet:$gs/model/actor/instance/Pet.java Playable:$gs/model/actor/Playable.java \
-		Castle:$gs/model/residence/castle/Castle.java PlayableStatus:$gs/model/actor/status/PlayableStatus.java Template:$gs/model/actor/template/CreatureTemplate.java; do
+		Castle:$gs/model/residence/castle/Castle.java PlayableStatus:$gs/model/actor/status/PlayableStatus.java Template:$gs/model/actor/template/CreatureTemplate.java \
+		Player:$gs/model/actor/Player.java; do
 		tr -d "\r" < ${f#*:} > $out/src_${f%%:*}
 	done
 	method() { sed -n "/$2/,/^${tab}}\$/p" $out/src_$1; }
@@ -40,9 +41,14 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 	method PlayableStatus "public boolean addExp(long value)" > $out/addexp
 	method Playable "public void doRevive()" > $out/playablerevive
 	method Castle "public void spawnDoors(boolean isDoorWeak)" > $out/spawndoors
+	method Formulas "public static int calculateKarmaLost(int level, long exp)" > $out/karmalost
+	method Player "public void updateKarmaLoss(long exp)" > $out/updatekarmaloss
+	method Player "public void restoreExp(double restorePercent)" > $out/playerrestore
+	method Player "public void applyDeathPenalty(boolean atWar, boolean killedByPlayable)" > $out/applydeathpenalty
+	grep -F "_karma = Math.max(0, karma);" $out/src_Player > $out/karmaset
 	method Status "public final void setMaxHp()" > $out/setmaxhp
 	method Status "public final void setMaxHpMp()" > $out/setmaxhpmp
-	for k in config consts period baseregen revive damage maxhpmul hpratio sethp1 sethp getregen regen petmaxhp restore deathpenalty addexp playablerevive spawndoors setmaxhp setmaxhpmp; do
+	for k in config consts period baseregen revive damage maxhpmul hpratio sethp1 sethp getregen regen petmaxhp restore deathpenalty addexp playablerevive spawndoors setmaxhp setmaxhpmp karmalost updatekarmaloss playerrestore applydeathpenalty karmaset; do
 		[ "$(wc -l < $out/$k)" -ge 1 ] || { echo "block $k not found in the reference" >&2; exit 1; }
 	done
 	[ "$(wc -l < $out/config)" -eq 3 ] || { echo "config lines changed in the reference" >&2; exit 1; }
@@ -63,6 +69,11 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 	    -e "/@@SPAWNDOORS@@/{r $out/spawndoors" -e "d}" \
 	    -e "/@@SETMAXHPMP@@/{r $out/setmaxhpmp" -e "d}" \
 	    -e "/@@SETMAXHP@@/{r $out/setmaxhp" -e "d}" \
+	    -e "/@@KARMALOST@@/{r $out/karmalost" -e "d}" \
+	    -e "/@@KARMASET@@/{r $out/karmaset" -e "d}" \
+	    -e "/@@UPDATEKARMALOSS@@/{r $out/updatekarmaloss" -e "d}" \
+	    -e "/@@PLAYERRESTORE@@/{r $out/playerrestore" -e "d}" \
+	    -e "/@@APPLYDEATHPENALTY@@/{r $out/applydeathpenalty" -e "d}" \
 	    -e "/@@ADDEXP@@/{r $out/addexp" -e "d}" \
 	    -e "/@@DEATHPENALTY@@/{r $out/deathpenalty" -e "d}" \
 	    -e "/@@RESTORE@@/{r $out/restore" -e "d}" VitalsCopy.java.tmpl > $out/VitalsCopy.java

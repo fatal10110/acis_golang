@@ -39,4 +39,11 @@ func TestGoldenAnswers(t *testing.T) {
 	if got := PetDeath(t, 10, 200, 500, 1000, 510); got != (PetDeathResult{Lost: 29, Before: 510, After: 481, Level: 9}) {
 		t.Errorf("PetDeath(10, exp 510) = %+v", got)
 	}
+	band := PlayerDeathCase{Level: 5, LossPercent: 10, KarmaModifier: 2, KarmaRate: 1, Karma: 240, Prev: 3, Cur: 1000, Next: 3000, Exp: 1500}
+	if got := PlayerDeath(t, band); got != (PlayerDeathResult{Lost: 200, Before: 1500, After: 1300, Level: 5, Karma: 234}) {
+		t.Errorf("PlayerDeath(level 5, exp 1500) = %+v", got)
+	}
+	if got := PlayerExpRestored(t, 1500, 1300, 100); got != 200 {
+		t.Errorf("PlayerExpRestored(1500, 1300, 100) = %d, want 200", got)
+	}
 }

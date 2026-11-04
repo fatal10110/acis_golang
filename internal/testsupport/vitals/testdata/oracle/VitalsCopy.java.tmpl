@@ -27,6 +27,8 @@ public final class VitalsCopy
 		static double RESPAWN_RESTORE_HP;
 		static double HP_REGEN_MULTIPLIER;
 		static double RAID_HP_REGEN_MULTIPLIER;
+		// players' death-penalty karma rate: the probe sets it per row
+		static double RATE_KARMA_EXP_LOST;
 
 		static
 		{
@@ -39,6 +41,8 @@ public final class VitalsCopy
 @@CONSTS@@
 
 @@PERIOD@@
+
+@@KARMALOST@@
 	}
 
 	static final class Stats
@@ -311,6 +315,153 @@ public final class VitalsCopy
 		{
 			return 81;
 		}
+
+		// The probe gives every level the row of the player it runs.
+		PlayerLevel current;
+
+		PlayerLevel getPlayerLevel(int level)
+		{
+			return current;
+		}
+	}
+
+	static final class PlayerLevel
+	{
+		final double karmaModifier;
+		final double expLossAtDeath;
+
+		PlayerLevel(double karmaModifier, double expLossAtDeath)
+		{
+			this.karmaModifier = karmaModifier;
+			this.expLossAtDeath = expLossAtDeath;
+		}
+
+		double karmaModifier()
+		{
+			return karmaModifier;
+		}
+
+		double expLossAtDeath()
+		{
+			return expLossAtDeath;
+		}
+	}
+
+	enum ZoneId
+	{
+		PVP,
+		SIEGE
+	}
+
+	enum EffectFlag
+	{
+		CHARM_OF_COURAGE
+	}
+
+	enum EffectType
+	{
+		CHARM_OF_COURAGE
+	}
+
+	// A player's experience, karma and the zone state its death penalty reads.
+	// Its growth table holds the rows the probe sets.
+	static final class PlayerExp
+	{
+		long _expBeforeDeath;
+		long exp;
+		int level;
+		int _karma;
+		boolean festival;
+		boolean pvpZone;
+		boolean siegeZone;
+		boolean charm;
+		final long[] expForLevel = new long[200];
+
+		PlayerExp getStatus()
+		{
+			return this;
+		}
+
+		long getExp()
+		{
+			return exp;
+		}
+
+		void setExp(long value)
+		{
+			exp = value;
+		}
+
+		int getLevel()
+		{
+			return level;
+		}
+
+		void addLevel(byte value)
+		{
+			level += value;
+		}
+
+		long getExpForLevel(int lvl)
+		{
+			return expForLevel[lvl];
+		}
+
+		long getExpBeforeDeath()
+		{
+			return _expBeforeDeath;
+		}
+
+		void setExpBeforeDeath(long value)
+		{
+			_expBeforeDeath = value;
+		}
+
+		int getKarma()
+		{
+			return _karma;
+		}
+
+		// The reference also announces the new karma; only its value is read.
+		void setKarma(int karma)
+		{
+			if (_karma == karma)
+				return;
+@@KARMASET@@
+		}
+
+		boolean isCursedWeaponEquipped()
+		{
+			return false;
+		}
+
+		boolean isFestivalParticipant()
+		{
+			return festival;
+		}
+
+		boolean isInsideZone(ZoneId zone)
+		{
+			return zone == ZoneId.PVP ? pvpZone : siegeZone;
+		}
+
+		boolean isAffected(EffectFlag flag)
+		{
+			return charm;
+		}
+
+		void stopEffects(EffectType type)
+		{
+			charm = false;
+		}
+
+@@ADDEXP@@
+
+@@UPDATEKARMALOSS@@
+
+@@PLAYERRESTORE@@
+
+@@APPLYDEATHPENALTY@@
 	}
 
 	// A pet's experience: what it lost on death and the restore of it. Its
