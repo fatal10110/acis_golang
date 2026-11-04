@@ -3,6 +3,7 @@ package net.sf.l2j.gameserver.model.item.instance;
 import net.sf.l2j.gameserver.model.Augmentation;
 import net.sf.l2j.gameserver.model.item.kind.EtcItem;
 import net.sf.l2j.gameserver.model.item.kind.Item;
+import net.sf.l2j.gameserver.model.item.kind.Weapon;
 
 // Stand-in for an item stack: the identity, the template and the owner-specific
 // state the item packets read.
@@ -29,6 +30,11 @@ public final class ItemInstance
 	}
 
 	public EtcItem etc;
+
+	public boolean isWeapon()
+	{
+		return item instanceof Weapon;
+	}
 
 	public boolean isEtcItem()
 	{

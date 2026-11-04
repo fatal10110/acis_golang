@@ -49,6 +49,12 @@ wrote into a byte buffer.
   sent. The packet keeps its strokes in identity-hashed sets; the probe swaps the sets of every packet it
   fills with more than one point or line for insertion-ordered ones (reflection), so the bytes follow the
   order the strokes were added in, the order the Go drawing writes.
+- the siege windows (`ProbeSiege.java`): `SiegeInfo` of a castle and of a siegable hall, `SiegeAttackerList` and
+  `SiegeDefenderList`
+- the Seven Signs sky and record (`ProbeSevenSigns.java`): `SSQInfo` (its four sky packets and the sky it picks
+  for a state) and every page of `SSQStatus`
+- the game master's views and the raid point record (`ProbeGMView.java`): `GMViewCharacterInfo`, `GMViewSkillInfo`,
+  `GMViewQuestList`, `GMViewWarehouseWithdrawList` and `ExGetBossRecord`
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
 - the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
   `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,
@@ -157,6 +163,29 @@ The skill list probe uses ids that one table run lists in ascending order (the G
 
 `StartPledgeWar`, `StopPledgeWar` and `SurrenderPledgeWar` are not probed: nothing in the reference ever builds
 them, and the Go side has no encoder for them.
+`Snoop` is not probed for the same reason.
+
+The siege windows (`ProbeSiege.java`, `../../packets_oracle_siege_test.go`) run over stand-ins for the castle (its
+owner), the siege (its attacker, defender and pending lists, the side of each clan and the date), the siegable hall
+(`SiegableHall`: owner, attackers, next siege time) and the clan table. Whether the owner is a known clan is decided
+before the encoder on the Go side, so the Go cases hand it the view the server builds. `SiegeInfo` writes the current
+time: the probe checks the field holds the second the packet was written in and prints it as 0, the value the Go
+cases pass; the siege dates include one past the int range in seconds and a negative one.
+
+The Seven Signs record (`ProbeSevenSigns.java`, `../../packets_oracle_sevensigns_test.go`) runs `SSQStatus` over a
+`SevenSignsManager` stand-in holding the calendar, the stone and festival scores, the seal owners and votes and the
+sign-ups; its total score, winning cabal and member count are the reference's own arithmetic, copied unchanged. The
+states reach every branch of the seal prediction, every period and a cabal with no member (votes over no member
+count against one). The Go cases restore the same state into `sevensigns.State` and encode its `Record`, so the
+shares, the winner and the prediction come from the Go rules. The festival page runs over a
+`FestivalOfDarknessManager` stand-in holding each cabal's best score and comma-joined party; the Go cases split the
+party the way the server does (`festival.Score.MemberNames`), so the reference's split rules (a blank party names one
+empty member, trailing empty names are dropped) are pinned.
+
+The game master's views (`ProbeGMView.java`, `../../packets_oracle_gmview_test.go`) reuse the character, skill,
+quest and item stand-ins of the families above; the weapon template is a `Weapon` stand-in carrying its shot counts.
+The raid point record lists its bosses from an insertion-ordered map (the server orders them; the reference's own
+hash order is pinned by `tests/party/testdata/raid_points.golden`).
 
 The manor set windows hold their seeds in a hash set and `SellListProcure` its rows in an
 identity-hash map, so their probes use one seed per castle and one row; the other manor windows
