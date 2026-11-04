@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
@@ -412,7 +413,9 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := network.Serve(runCtx, ln, clients.Handle, log); err != nil {
+				// Connection bursts from one address are refused at accept.
+				filtered := netutil.FilterAccepts(ln, netutil.NewAcceptFilter(), time.Now)
+				if err := network.Serve(runCtx, filtered, clients.Handle, log); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ListenAddr).Msg("game client listener stopped")
 				}
 			}()

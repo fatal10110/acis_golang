@@ -323,7 +323,10 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := clients.Serve(runCtx, clientLn); err != nil {
+				// Connection bursts from one address are refused at
+				// accept, before the IP ban list is consulted.
+				filtered := netutil.FilterAccepts(clientLn, netutil.NewAcceptFilter(), time.Now)
+				if err := clients.Serve(runCtx, filtered); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ClientAddr).Msg("login client listener stopped")
 				}
 			}()
