@@ -78,13 +78,13 @@ func TestAdminShowMoveDebugsNPCChase(t *testing.T) {
 		t.Fatal("monster did not start chasing the player")
 	}
 	click := headedText(spawnX, spawnY, geoZ, preyHeading)
-	_, texts := debugFrames(t, exchangeZones(t, gm, nil))
+	_, texts := debugFrames(t, exchangeSettled(t, gm, nil))
 	if want := "Moving from " + headedText(at.X, at.Y, at.Z, turnedFrom) + " to " + click; len(texts) != 1 || texts[0] != want {
 		t.Fatalf("texts on the chase = %q, want %q", texts, want)
 	}
 
 	srv.TickPositions()
-	drawings, _ := debugFrames(t, exchangeZones(t, gm, nil))
+	drawings, _ := debugFrames(t, exchangeSettled(t, gm, nil))
 	moveName := "MOVE" + strconv.Itoa(int(monsterID))
 	if len(drawings) == 0 || drawings[0].name != moveName {
 		t.Fatalf("drawings on the first step = %+v, want %s", drawings, moveName)
@@ -108,7 +108,7 @@ func TestAdminShowMoveDebugsNPCChase(t *testing.T) {
 	}
 
 	srv.TickPositions()
-	if drawings, texts := debugFrames(t, exchangeZones(t, prey, nil)); len(drawings) != 0 || len(texts) != 0 {
+	if drawings, texts := debugFrames(t, exchangeSettled(t, prey, nil)); len(drawings) != 0 || len(texts) != 0 {
 		t.Fatalf("chased player got %+v %q, want no debug", drawings, texts)
 	}
 }
@@ -131,13 +131,13 @@ func TestAdminShowMoveDebugsPawnWalk(t *testing.T) {
 	gm.Send(encodeAction(monster.ObjectID()))
 	drain(t, gm)
 	target := itoa(at.X) + " " + itoa(at.Y) + " " + itoa(at.Z)
-	_, texts := debugFrames(t, exchangeZones(t, gm, encodeAction(monster.ObjectID())))
+	_, texts := debugFrames(t, exchangeSettled(t, gm, encodeAction(monster.ObjectID())))
 	if want := "Moving from " + itoa(spawnX) + " " + itoa(spawnY) + " " + itoa(geoZ) + " to " + target; len(texts) != 1 || texts[0] != want {
 		t.Fatalf("texts on the attack walk = %q, want %q", texts, want)
 	}
 
 	srv.TickPositions()
-	drawings, _ := debugFrames(t, exchangeZones(t, gm, nil))
+	drawings, _ := debugFrames(t, exchangeSettled(t, gm, nil))
 	moveName := "MOVE" + strconv.Itoa(int(gmID))
 	if len(drawings) == 0 || drawings[0].name != moveName || len(drawings[0].strokes) < 3 {
 		t.Fatalf("drawings on the first step = %+v, want %s", drawings, moveName)
@@ -184,7 +184,7 @@ func TestAdminShowMoveDebugsFolkWalk(t *testing.T) {
 	moveName := "MOVE" + strconv.Itoa(int(folk.ObjectID()))
 	for range 20 {
 		srv.TickPositions()
-		drawings, texts := debugFrames(t, exchangeZones(t, gm, nil))
+		drawings, texts := debugFrames(t, exchangeSettled(t, gm, nil))
 		for _, d := range drawings {
 			if d.name != moveName {
 				t.Fatalf("drawing %s on the walk, want %s", d.name, moveName)
