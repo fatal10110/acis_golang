@@ -159,22 +159,28 @@ func (l *GameClientLink) sendLoginBoardPages(client *Client, live *livePlayer) {
 	}
 	if cl, ok := l.clanService().ClanOf(live.Character); l.board.cfg.Enabled && ok {
 		if notice, shown := cl.Notice(); shown {
-			page := l.setPage("data/html/clan_notice.htm")
+			const file = "data/html/clan_notice.htm"
+			page := l.setPage(file)
 			page = strings.ReplaceAll(page, "%clan_name%", cl.Name())
 			page = strings.ReplaceAll(page, "%notice_text%", bbs.NoticeText(notice))
-			l.sendLoginPage(client, live, page)
+			l.sendLoginPage(client, live, file, page)
 			return
 		}
 	}
 	if l.board.serverNews {
-		l.sendLoginPage(client, live, l.setPage("data/html/servnews.htm"))
+		const file = "data/html/servnews.htm"
+		l.sendLoginPage(client, live, file, l.setPage(file))
 	}
 }
 
-// sendLoginPage opens page, set by setPage and its placeholders filled, in
-// an HTML window during the login burst as is, and makes its links the
-// ones live may send back.
-func (l *GameClientLink) sendLoginPage(client *Client, live *livePlayer, page string) {
+// sendLoginPage opens page, set by setPage from file and its placeholders
+// filled, in an HTML window during the login burst as is, and makes its
+// links the ones live may send back. While //show html is on, a game
+// master is then told the file's name, as sendFilePage tells it.
+func (l *GameClientLink) sendLoginPage(client *Client, live *livePlayer, file, page string) {
 	live.bypasses.record(page)
 	client.Session.SendFrame(serverpackets.FrameNpcHtmlMessage(0, page, 0))
+	if l.showPageFiles.Load() && live.IsGM() {
+		client.Session.SendFrame(serverpackets.FrameCreatureSay(0, serverpackets.SayTypeAll, "HTML", pageFileName(file)))
+	}
 }

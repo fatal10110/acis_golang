@@ -49,7 +49,7 @@ func (l *GameClientLink) adminNpcDrops(gm *livePlayer, inst *npc.Instance, isDro
 			return
 		}
 	}
-	sendFilledHTML(gm, 0, l.npcDefaultPage(content), 0)
+	l.sendFilePage(gm, 0, adminFile(npcDefaultFile), l.npcDefaultPage(content), 0)
 }
 
 // npcDropContent lists page of inst's drop categories (its spoil ones when

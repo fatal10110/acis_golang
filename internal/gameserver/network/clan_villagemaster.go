@@ -207,5 +207,5 @@ func (l *GameClientLink) sendClanPage(live *livePlayer, f *npc.Folk, path string
 		l.log.Warn().Str("path", path).Msg("clan: dialog page missing")
 		return
 	}
-	sendValidatedHTML(live, f.ObjectID(), page, 0)
+	l.sendValidatedFile(live, f.ObjectID(), path, page, 0)
 }

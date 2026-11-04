@@ -20,7 +20,7 @@ func (l *GameClientLink) requestLinkHTML(live *livePlayer, req clientpackets.Req
 	if !ok {
 		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", req.Link)
 	}
-	sendValidatedHTML(live, 0, html, 0)
+	l.sendValidatedFile(live, 0, req.Link, html, 0)
 }
 
 // sendPlayerHelp opens a help page. Its links are not validated, so the

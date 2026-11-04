@@ -175,11 +175,13 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 // folkBypass runs command on f for live. It reports false when the command
 // aborted, so that nothing more is sent.
 func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command string) bool {
-	return l.runFolkReply(live, f, command, l.folkReply(live, f, command))
+	reply, file := l.folkReply(live, f, command)
+	return l.runFolkReply(live, f, command, reply, file)
 }
 
-// folkReply is f's answer to command, sent by live.
-func (l *GameClientLink) folkReply(live *livePlayer, f *npc.Folk, command string) npc.BypassReply {
+// folkReply is f's answer to command, sent by live, and the datapack file
+// its page is set from, empty for a page built.
+func (l *GameClientLink) folkReply(live *livePlayer, f *npc.Folk, command string) (npc.BypassReply, string) {
 	rules := l.chatRules()
 	rules.AllowWear = l.merchant.Config().AllowWear
 	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
@@ -194,12 +196,15 @@ func (l *GameClientLink) folkReply(live *livePlayer, f *npc.Folk, command string
 	talker.SevenSigns = folkChatState{l: l, live: live, f: f}.SevenSigns
 	talker.Residence = folkChatState{l: l, live: live, f: f}.Residence
 	talker.FestivalNotice = folkChatState{l: l, live: live, f: f}.FestivalNotice
-	return f.Bypass(setPages{l.html}, rules, talker, command)
+	pages := l.pages()
+	reply := f.Bypass(pages, rules, talker, command)
+	return reply, pages.file
 }
 
-// runFolkReply carries out reply, f's answer to command, for live. It
-// reports false when the command aborted, so that nothing more is sent.
-func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command string, reply npc.BypassReply) bool {
+// runFolkReply carries out reply, f's answer to command, for live, its page
+// set from the datapack file file. It reports false when the command
+// aborted, so that nothing more is sent.
+func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command string, reply npc.BypassReply, file string) bool {
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
@@ -208,10 +213,14 @@ func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command str
 	}
 	switch reply.Outcome {
 	case npc.BypassChatWindow:
+		l.sendFilePage(live, f.ObjectID(), file, reply.HTML, 0)
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case npc.BypassKarmaRefused:
+		// The refusal page is shown as read, never named as a set file.
 		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.BypassPage:
-		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+		l.sendFilePage(live, f.ObjectID(), file, reply.HTML, 0)
 	case npc.BypassSellList:
 		l.sendSellList(live, f, reply.HTML)
 	case npc.BypassBuyList:
@@ -291,7 +300,7 @@ func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command str
 	case npc.BypassSevenSigns:
 		return l.sevenSignsBypass(live, f, command, reply.DawnPriest)
 	case npc.BypassSignsChat:
-		sendFolkChat(live, f, reply.HTML, reply.Chat)
+		l.sendFolkChat(live, f, file, reply.HTML, reply.Chat)
 	case npc.BypassTerritoryStatus:
 		l.showTerritoryStatus(live, f.ObjectID(), f.Instance)
 	case npc.BypassQuest:
@@ -301,25 +310,25 @@ func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command str
 	case npc.BypassDungeonExit:
 		l.dungeonGate(live, f, false)
 	case npc.BypassDungeonRefused:
-		dungeonRefusal(live, f, reply)
+		l.dungeonRefusal(live, f, reply, file)
 	case npc.BypassChatAs:
-		sendFolkChat(live, f, reply.HTML, reply.Chat)
+		l.sendFolkChat(live, f, file, reply.HTML, reply.Chat)
 	case npc.BypassDoors:
-		return l.doormanDoors(live, f, reply)
+		return l.doormanDoors(live, f, reply, file)
 	case npc.BypassDoorsBusy:
-		doormanBusy(live, f, reply.HTML)
+		l.doormanBusy(live, f, file, reply.HTML)
 	case npc.BypassClanGate:
-		l.clanGate(live, f, reply.HTML)
+		l.clanGate(live, f, file, reply.HTML)
 	case npc.BypassMassTeleport:
-		l.massTeleport(live, f, reply)
+		l.massTeleport(live, f, reply, file)
 	case npc.BypassMercenaryHire:
-		l.mercenaryHire(live, f, reply)
+		l.mercenaryHire(live, f, reply, file)
 	case npc.BypassWyvernNoStrider:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyRideWyvernFromStrider))
-		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+		l.sendFilePage(live, f.ObjectID(), file, reply.HTML, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.BypassWyvernRide:
-		l.rideWyvernAtNpc(live, f, reply)
+		l.rideWyvernAtNpc(live, f, reply, file)
 	case npc.BypassAlreadyTrading:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 	case npc.BypassChamberlain:

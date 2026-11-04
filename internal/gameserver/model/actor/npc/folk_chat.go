@@ -50,6 +50,10 @@ const (
 	ChatUnported
 	// ChatWedding is a wedding manager: its own dialog greets the talker.
 	ChatWedding
+	// ChatKarmaRefused opens the returned page as ChatShown does: the
+	// karma gate's refusal page, shown as read rather than set as the
+	// window's file.
+	ChatKarmaRefused
 	// ChatShownReleased releases the client with ActionFailed first, then
 	// opens the returned page.
 	ChatShownReleased
@@ -148,7 +152,7 @@ func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatSta
 	}
 	chat := folkChats[kind]
 	if page, refused := f.pkRefusal(pages, chat, rules, karma); refused {
-		return page, ChatShown
+		return page, ChatKarmaRefused
 	}
 	return f.chatPage(pages, chat, 0), ChatShown
 }

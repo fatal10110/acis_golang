@@ -25,8 +25,9 @@ func npcInfoRefresh(sub string) string {
 // instance inst: no argument or a page number opens a general page, and
 // each sub-command its own page.
 func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *npc.Instance, args []string) {
+	send := func(file, page string) { l.sendFilePage(gm, 0, adminFile(file), page, 0) }
 	if len(args) == 0 {
-		sendFilledHTML(gm, 0, l.npcGeneralPage(obj, inst, 0), 0)
+		send(npcGeneralFile(0), l.npcGeneralPage(obj, inst, 0))
 		return
 	}
 	switch sub := args[0]; sub {
@@ -39,32 +40,32 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 		}
 		switch page {
 		case 1:
-			sendFilledHTML(gm, 0, l.npcDefaultPage(npcTemplateParamsContent(inst.Template)), 0)
+			send(npcDefaultFile, l.npcDefaultPage(npcTemplateParamsContent(inst.Template)))
 		case 2:
-			sendFilledHTML(gm, 0, l.npcDefaultPage(l.npcSpawnParamsContent(obj)), 0)
+			send(npcDefaultFile, l.npcDefaultPage(l.npcSpawnParamsContent(obj)))
 		case 3:
-			sendFilledHTML(gm, 0, l.npcDefaultPage(npcScratchContent(obj)), 0)
+			send(npcDefaultFile, l.npcDefaultPage(npcScratchContent(obj)))
 		default:
 			// Any other page, and one that does not read as an int, is the
 			// AI path.
-			sendFilledHTML(gm, 0, l.npcDefaultPage(l.npcAIPathContent(inst.Template)), 0)
+			send(npcDefaultFile, l.npcDefaultPage(l.npcAIPathContent(inst.Template)))
 		}
 	case "aggro":
-		sendFilledHTML(gm, 0, l.npcDefaultPage(npcAggroContent(obj)), 0)
+		send(npcDefaultFile, l.npcDefaultPage(npcAggroContent(obj)))
 	case "desire":
-		sendFilledHTML(gm, 0, l.npcDefaultPage(npcDesireContent(obj)), 0)
+		send(npcDefaultFile, l.npcDefaultPage(npcDesireContent(obj)))
 	case "drop", "spoil":
 		l.adminNpcDrops(gm, inst, sub == "drop", args[1:])
 	case "script":
-		sendFilledHTML(gm, 0, l.npcScriptPage(obj, inst.Template), 0)
+		send("npcinfo/script.htm", l.npcScriptPage(obj, inst.Template))
 	case "shop":
-		sendFilledHTML(gm, 0, l.npcDefaultPage(l.npcShopContent(inst)), 0)
+		send(npcDefaultFile, l.npcDefaultPage(l.npcShopContent(inst)))
 	case "skill":
-		sendFilledHTML(gm, 0, l.npcDefaultPage(l.npcSkillContent(inst.Template)), 0)
+		send(npcDefaultFile, l.npcDefaultPage(l.npcSkillContent(inst.Template)))
 	case "spawn":
-		sendFilledHTML(gm, 0, l.npcSpawnPage(gm, obj, inst), 0)
+		send("npcinfo/spawn.htm", l.npcSpawnPage(gm, obj, inst))
 	case "stat":
-		sendFilledHTML(gm, 0, l.npcStatPage(npcStatusOf(obj), inst.Template), 0)
+		send("npcinfo/stat.htm", l.npcStatPage(npcStatusOf(obj), inst.Template))
 	default:
 		page := 0
 		if isDigits(sub) {
@@ -77,18 +78,30 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 			}
 			page = int(n)
 		}
-		sendFilledHTML(gm, 0, l.npcGeneralPage(obj, inst, page), 0)
+		send(npcGeneralFile(page), l.npcGeneralPage(obj, inst, page))
 	}
 }
 
 // npcDefaultPage is npcinfo/default.htm showing content.
 func (l *GameClientLink) npcDefaultPage(content string) string {
-	return strings.ReplaceAll(l.adminHTML("npcinfo/default.htm"), "%content%", content)
+	return strings.ReplaceAll(l.adminHTML(npcDefaultFile), "%content%", content)
 }
 
 // npcGeneralPage is general page index of NPC obj: page 1 its rewards,
 // attack range, race and aggro clans, page 2 its behavior flags and
 // residence, and any other index page 0, who it is and how it looks.
+// npcDefaultFile is the admin page every //info list fills in.
+const npcDefaultFile = "npcinfo/default.htm"
+
+// npcGeneralFile is the admin page file of //info general page index.
+func npcGeneralFile(index int) string {
+	switch index {
+	case 1, 2:
+		return "npcinfo/general-" + strconv.Itoa(index) + ".htm"
+	}
+	return "npcinfo/general-0.htm"
+}
+
 func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, index int) string {
 	t := inst.Template
 	switch index {
@@ -100,7 +113,7 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 		if t.IgnoredIDs != nil {
 			ignored = formatIntArray(t.IgnoredIDs)
 		}
-		return fillPage(l.adminHTML("npcinfo/general-1.htm"),
+		return fillPage(l.adminHTML(npcGeneralFile(1)),
 			"%exp%", commons.FormatDouble(t.RewardExp),
 			"%sp%", commons.FormatDouble(t.RewardSp),
 			"%baseAttackRange%", strconv.Itoa(t.BaseAttackRange),
@@ -112,7 +125,7 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 			"%ignoredIds%", ignored,
 		)
 	case 2:
-		return fillPage(l.adminHTML("npcinfo/general-2.htm"),
+		return fillPage(l.adminHTML(npcGeneralFile(2)),
 			"%isUndying%", strconv.FormatBool(t.Undying),
 			"%canBeAttacked%", strconv.FormatBool(t.CanBeAttacked),
 			"%isNoSleepMode%", strconv.FormatBool(t.NoSleepMode),
@@ -122,7 +135,7 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 			"%residence%", l.npcResidenceName(inst),
 		)
 	default:
-		return fillPage(l.adminHTML("npcinfo/general-0.htm"),
+		return fillPage(l.adminHTML(npcGeneralFile(0)),
 			"%objectId%", strconv.Itoa(int(obj.ObjectID())),
 			"%npcId%", strconv.Itoa(t.ID),
 			"%idTemplate%", strconv.Itoa(t.TemplateID),

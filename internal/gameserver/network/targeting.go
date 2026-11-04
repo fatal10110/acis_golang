@@ -632,11 +632,12 @@ func (l *GameClientLink) showStaticObject(live *livePlayer, obj *staticobject.Ob
 	case staticobject.MapType:
 		live.SendFrame(serverpackets.FrameShowTownMap("town_map."+obj.Template.Texture, obj.Template.MapX, obj.Template.MapY))
 	case staticobject.ArenaSignType:
-		html, ok := l.html.Get("signboard.htm")
+		const file = "data/html/signboard.htm"
+		html, ok := l.html.Get(file)
 		if !ok {
-			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
+			html = "<html><body>My html is missing:<br>" + file + "</body></html>"
 		}
-		sendValidatedHTML(live, obj.ObjectID(), html, 0)
+		l.sendValidatedFile(live, obj.ObjectID(), file, html, 0)
 	}
 }
 

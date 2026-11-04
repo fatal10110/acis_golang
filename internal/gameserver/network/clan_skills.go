@@ -170,7 +170,7 @@ func (l *GameClientLink) sendClanSkillsPage(live *livePlayer) {
 		l.log.Warn().Str("path", clanSkillsPage).Msg("clan: skills page missing")
 		return
 	}
-	sendValidatedHTML(live, 0, page, 0)
+	l.sendValidatedFile(live, 0, clanSkillsPage, page, 0)
 }
 
 // sendClanAcquireSkillInfo answers a clan leader's question about a clan

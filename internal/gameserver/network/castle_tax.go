@@ -66,18 +66,17 @@ func (l *GameClientLink) showTerritoryStatus(live *livePlayer, objectID int32, i
 	if id := c.OwnerID(); id != 0 && l.clans != nil {
 		owner, _ = l.clans.Table().Get(id)
 	}
-	var page string
+	file := "data/html/territorynoclan.htm"
 	var pairs []string
 	if owner != nil {
-		page = l.setPage("data/html/territorystatus.htm")
+		file = "data/html/territorystatus.htm"
 		pairs = append(pairs,
 			"%clanName%", owner.Name(),
 			"%clanLeaderName%", owner.SubunitLeaderName(clan.SubunitMain),
 			"%taxPercent%", strconv.Itoa(c.CurrentTaxPercent()),
 		)
-	} else {
-		page = l.setPage("data/html/territorynoclan.htm")
 	}
+	page := l.setPage(file)
 	kingdom := kingdomOfAdenNpcString
 	if c.ID >= elmoreFirstCastleID {
 		kingdom = kingdomOfElmoreNpcString
@@ -92,5 +91,5 @@ func (l *GameClientLink) showTerritoryStatus(live *livePlayer, objectID int32, i
 	for i := 0; i < len(pairs); i += 2 {
 		page = strings.ReplaceAll(page, pairs[i], pairs[i+1])
 	}
-	sendFilledHTML(live, objectID, page, 0)
+	l.sendFilePage(live, objectID, file, page, 0)
 }

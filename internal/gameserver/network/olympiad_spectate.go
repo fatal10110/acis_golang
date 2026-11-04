@@ -153,7 +153,7 @@ func (l *GameClientLink) requestOlympiadMatchList(live *livePlayer) {
 		sb.WriteString(`</td><td><font color="aaccff"></font></td></tr>`)
 	}
 	page := strings.ReplaceAll(l.setPage(arenaObserveListFile), "%list%", sb.String())
-	sendFilledHTML(live, 0, page, 0)
+	l.sendFilePage(live, 0, arenaObserveListFile, page, 0)
 }
 
 // showOlympiadStadiums opens Olympiad manager f's list of the stadiums for
@@ -181,7 +181,7 @@ func (l *GameClientLink) showOlympiadStadiums(live *livePlayer, f *npc.Folk) {
 	}
 	page := strings.ReplaceAll(l.setPage(stadiumListFile), "%list%", sb.String())
 	page = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID())))
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), stadiumListFile, page, 0)
 }
 
 // olympiadStadiums are the Olympiad's stadiums, none without an Olympiad.

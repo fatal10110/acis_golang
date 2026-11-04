@@ -219,7 +219,8 @@ func (l *GameClientLink) sendMakersPage(gm *livePlayer, npcs *manager.Npcs, numb
 		}
 	}
 	pg.Links(&b, "bypass admin_maker %page%")
-	sendFilledHTML(gm, 0, fillPage(l.adminHTML("spawnlist/maker_check.htm"), "%TERRITORIESLIST%", b.String()), 0)
+	const file = "spawnlist/maker_check.htm"
+	l.sendFilePage(gm, 0, adminFile(file), fillPage(l.adminHTML(file), "%TERRITORIESLIST%", b.String()), 0)
 }
 
 func containsTerritory(list []*spawn.Territory, t *spawn.Territory) bool {
@@ -262,7 +263,7 @@ func (l *GameClientLink) sendMakerPage(gm *livePlayer, m manager.MakerState) {
 		"%MAKERCNTT%", strconv.Itoa(m.Maker.MaximumNPCs),
 		"%NPCSLIST%", list,
 	)
-	sendFilledHTML(gm, 0, page, 0)
+	l.sendFilePage(gm, 0, adminFile("spawnlist/maker_info.htm"), page, 0)
 }
 
 // sendMakerScriptsPage sends gm the scripts npcmaker m tells when its last
@@ -275,7 +276,7 @@ func (l *GameClientLink) sendMakerScriptsPage(gm *livePlayer, m manager.MakerSta
 		"%MAKERSTART%", strconv.FormatBool(m.Maker.OnStart()),
 		"%SCRIPTS%", "<br><br><center>This NPC maker isn't affected by scripts.</center>",
 	)
-	sendFilledHTML(gm, 0, page, 0)
+	l.sendFilePage(gm, 0, adminFile("spawnlist/maker_scripts.htm"), page, 0)
 }
 
 func territoryName(t *spawn.Territory) string {

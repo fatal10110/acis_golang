@@ -221,7 +221,7 @@ func (l *GameClientLink) sendAdminFile(live *livePlayer, name string) {
 	if !ok {
 		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
 	}
-	sendValidatedHTML(live, 0, html, 0)
+	l.sendValidatedFile(live, 0, file, html, 0)
 }
 
 // adminTargetPlayer resolves the player a command acts on: gm's selected

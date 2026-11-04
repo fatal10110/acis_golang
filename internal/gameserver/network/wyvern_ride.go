@@ -14,15 +14,15 @@ import (
 // the shortage page and keeps its strider; a mount refused once the
 // crystals are gone, by a weapon that cannot be taken off, opens no page.
 // Each page releases the client.
-func (l *GameClientLink) rideWyvernAtNpc(live *livePlayer, f *npc.Folk, reply npc.BypassReply) {
-	page := reply.ShortHTML
+func (l *GameClientLink) rideWyvernAtNpc(live *livePlayer, f *npc.Folk, reply npc.BypassReply, file string) {
+	page, pageFile := reply.ShortHTML, reply.ShortFile
 	if destroyItemByItemID(live, item.CrystalB.ItemID(), reply.Count) {
 		live.Character.Dismount()
 		if !l.mountWyvern(live, player.WyvernNPCID, 0) {
 			return
 		}
-		page = reply.HTML
+		page, pageFile = reply.HTML, file
 	}
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), pageFile, page, 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 }

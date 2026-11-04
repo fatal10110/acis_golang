@@ -22,13 +22,20 @@ func (l *GameClientLink) currentTrainer(live *livePlayer) (*npc.Folk, bool) {
 	return f, true
 }
 
+// sendNoSkillsPage opens trainer f's page saying it teaches live nothing.
+func (l *GameClientLink) sendNoSkillsPage(live *livePlayer, f *npc.Folk) {
+	pages := l.pages()
+	page := f.NoSkillsPage(pages)
+	l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
+}
+
 // showSkillList opens f's list of skills live can learn now. An NPC that
 // does not train live's profession opens its no-skills page instead. An
 // empty list names the level of the next skill, or that none is left, and
 // closes the learn window. Every list ends with ActionFailed.
 func (l *GameClientLink) showSkillList(live *livePlayer, f *npc.Folk) {
 	if !f.CanTeach(live.ClassID()) {
-		sendValidatedHTML(live, f.ObjectID(), f.NoSkillsPage(l.html), 0)
+		l.sendNoSkillsPage(live, f)
 		return
 	}
 	if list, ok := l.acquireSkillList(live); ok {
@@ -51,7 +58,7 @@ func (l *GameClientLink) showSkillList(live *livePlayer, f *npc.Folk) {
 // closes the learn window. Every list ends with ActionFailed.
 func (l *GameClientLink) showEnchantSkillList(live *livePlayer, f *npc.Folk) {
 	if !f.CanTeach(live.ClassID()) {
-		sendValidatedHTML(live, f.ObjectID(), f.NoSkillsPage(l.html), 0)
+		l.sendNoSkillsPage(live, f)
 		return
 	}
 	if tier, _ := player.ClassLevel(live.ClassID()); tier < skillstate.EnchantMinClassLevel {

@@ -91,7 +91,7 @@ func (l *GameClientLink) showAdminCastles(gm *livePlayer) {
 		rows.WriteString(`</td><td width=40 align=right><a action="bypass admin_siege list ` + c.Alias + `">View</a></td>`)
 		rows.WriteString(`</tr></table><img src="L2UI.SquareGray" width=270 height=1>`)
 	}
-	sendValidatedHTML(gm, 0, strings.ReplaceAll(page, "%castles%", rows.String()), 0)
+	l.sendValidatedFile(gm, 0, file, strings.ReplaceAll(page, "%castles%", rows.String()), 0)
 }
 
 // siegeStatus names where c's siege stands, "" for a castle without one.

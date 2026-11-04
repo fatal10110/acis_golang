@@ -122,5 +122,5 @@ func (l *GameClientLink) sendMaintenancePage(gm *livePlayer) {
 	} {
 		page = strings.ReplaceAll(page, r[0], r[1])
 	}
-	sendValidatedHTML(gm, 0, page, 0)
+	l.sendValidatedFile(gm, 0, adminFile("maintenance.htm"), page, 0)
 }

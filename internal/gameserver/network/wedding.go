@@ -58,7 +58,7 @@ func (s weddingSpouse) Adena() int {
 // sendWeddingPage opens wedding page path of manager f on live, filled in.
 // No ActionFailed follows it.
 func (l *GameClientLink) sendWeddingPage(live *livePlayer, f *npc.Folk, path string) {
-	sendFilledHTML(live, f.ObjectID(), l.wedding.Page(l.setPage(path), f.ObjectID()), 0)
+	l.sendFilePage(live, f.ObjectID(), path, l.wedding.Page(l.setPage(path), f.ObjectID()), 0)
 }
 
 // weddingGreeting is wedding manager f's answer to live's interact: the
