@@ -1,0 +1,22 @@
+# Triol's mirror in the Pagan Temple's town side (PaganTeleporter, 32040): asked for a way out, it sends the
+# character to the point outside the temple, answering no page (onTalk). The reference probe replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/pagan_teleporter_mirror_town.golden
+character Pilgrim 40
+script script.teleport.PaganTeleporter
+page default/32040.htm
+npc mirror 32040 Folk 0 10 0
+
+action mirror
+action mirror
+  S ActionFailed
+  S NpcHtmlMessage obj=mirror item=0 page=default/32040.htm
+  S ActionFailed
+bypass npc_{mirror}_Quest PaganTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=-12766,-35840,-10856 fast=0
+  S DeleteObject obj=mirror
+  S ActionFailed

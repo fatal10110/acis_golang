@@ -1,0 +1,24 @@
+# The cube inside Sailren's nest (GrandBossTeleporter): its page link (a talk with the cube, onTalk) sends the
+# character to one of the three points outside the nest, up to 100 away from it on each axis (every draw 1: the
+# second point). The reference probe replays the trip.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_sailren_exit.golden
+character Pilgrim 60
+random always 1
+script script.teleport.GrandBossTeleporter
+page default/32107.htm
+npc cube 32107 Folk 10 0 0
+
+action cube
+action cube
+  S ActionFailed
+  S NpcHtmlMessage obj=cube item=0 page=default/32107.htm
+  S ActionFailed
+bypass npc_{cube}_Quest GrandBossTeleporter
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=10703,-24041,-3673+-100 fast=0
+  S DeleteObject obj=cube
+  S ActionFailed

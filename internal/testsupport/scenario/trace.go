@@ -771,7 +771,7 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]s
 		if d := FirstDiff("spawned", st.Spawns, ts.spawns); d != "" {
 			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
-		if d := FirstDiff("check", seedChecks(st), ts.checks); d != "" {
+		if d := FirstDiff("check", sc.seedChecks(st), ts.checks); d != "" {
 			return nil, nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		draws = append(draws, ts.draws)
@@ -941,6 +941,8 @@ func traceClients(st Step, objs map[string]int32, sc *Scenario) ([]string, error
 		return []string{"C RequestBypassToServer " + expandRoles(st.Args[0], objs)}, nil
 	case "link":
 		return []string{"C RequestLinkHtml " + st.Args[0]}, nil
+	case "appear":
+		return []string{"C Appearing"}, nil
 	case "hit":
 		if id, ok := npcID(st.Args[0]); ok {
 			return []string{fmt.Sprintf("hit %d %s", id, st.Args[1])}, nil

@@ -88,9 +88,7 @@ func TestParseRejectsMalformedWorldSeeds(t *testing.T) {
 		{"standing unknown", "advance 1s\n  standing Nobody 0", "is not player or a member line"},
 		{"standing range", "member M 5\nadvance 1s\n  standing M 7", "is not -5 to 5"},
 		{"stance unknown", "stance nobody on", "stance <role|player> <on|off>"},
-		{"traced repeat", "trace x.golden\nbypass Quest X x2", "a traced scenario takes no appear step, bypass count"},
-		{"traced appear", "trace x.golden\nadvance 1s\nappear", "a traced scenario takes no appear step"},
-		{"traced member standing", "trace x.golden\nmember M 5\nadvance 1s\n  standing M 0", "a traced scenario takes no member"},
+		{"traced dead member", "trace x.golden\nmember M 5 dead\nadvance 1s", "a traced scenario takes no dead member"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Parse("bad.scenario", []byte("character A 40\n"+tc.text+"\n"))

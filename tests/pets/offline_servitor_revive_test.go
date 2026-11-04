@@ -205,7 +205,7 @@ func TestNonPlayerResurrectionRevivesServitorLeftBehind(t *testing.T) {
 	monster := l.srv.SpawnAttackingHostileNPCAt(t, location.Location{X: x + 20, Y: y, Z: z})
 	drainUntilQuiet(t, l.client)
 	monster.DoAttack(t, servitor)
-	if servitor.HP() >= 287 {
+	if servitor.HP() >= katRevivedHP(t) {
 		t.Fatal("monster's hit did not land on the revived servitor")
 	}
 	frames := drainFrames(t, l.client)

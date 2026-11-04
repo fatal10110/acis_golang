@@ -413,9 +413,9 @@
 // are sent (the npcmaker lines'), in order: the maker, the event and its two
 // integers. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
-// scenario itself (the oracle README). The trace format has no member,
-// ground or look, so a traced scenario takes no member or ground line, and
-// the reference probe plays only the mate that leads the clan (online, or
+// scenario itself (the oracle README). The trace format has no ground
+// or look, so a traced scenario takes no ground line (a member line it takes,
+// but a dead member), and the reference probe plays only the mate that leads the clan (online, or
 // offline until an enter step; a hold line only with online), with its
 // as and enter steps and the away step, each client's packets compared by
 // its tag in the trace (S@<mate>, C@<mate>; an untagged line is the
@@ -847,8 +847,8 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if sc.Trace != "" && len(sc.Gauss) > 0 {
 		return nil, fmt.Errorf("%s: a traced scenario takes no gauss line", name)
 	}
-	if sc.Trace != "" && (len(sc.Members) > 0 || len(sc.Grounds) > 0) {
-		return nil, fmt.Errorf("%s: a traced scenario takes no member or ground line", name)
+	if sc.Trace != "" && len(sc.Grounds) > 0 {
+		return nil, fmt.Errorf("%s: a traced scenario takes no ground line", name)
 	}
 	if what := sc.tracedFight(); sc.Trace != "" && what != "" {
 		return nil, fmt.Errorf("%s: a traced scenario takes no %s", name, what)
