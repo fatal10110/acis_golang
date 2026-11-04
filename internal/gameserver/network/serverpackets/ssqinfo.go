@@ -1,6 +1,9 @@
 package serverpackets
 
-import "github.com/fatal10110/acis_golang/internal/commons/wire"
+import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+)
 
 // OpcodeSSQInfo is the wire opcode for SSQInfo, the seven-signs sky state
 // sent right after a character slot is chosen and on every period change.
@@ -30,4 +33,17 @@ func FrameSSQInfoSky(state uint16) wire.Frame {
 	w := newFrameWriter(OpcodeSSQInfo)
 	w.WriteUint16(state)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// SSQSky is the sky state showing cabal's sky: the regular one for no
+// cabal.
+func SSQSky(c sevensigns.Cabal) uint16 {
+	switch c {
+	case sevensigns.Dawn:
+		return SSQSkyDawn
+	case sevensigns.Dusk:
+		return SSQSkyDusk
+	default:
+		return SSQSkyRegular
+	}
 }

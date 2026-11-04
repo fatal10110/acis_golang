@@ -128,5 +128,8 @@ public final class PacketProbe
 		ProbeSkills.run();
 		ProbePolymorph.run();
 		ProbePrimitive.run();
+		ProbeSiege.run();
+		ProbeSevenSigns.run();
+		ProbeGMView.run();
 	}
 }

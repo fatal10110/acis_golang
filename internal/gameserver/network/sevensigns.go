@@ -13,14 +13,6 @@ import (
 // Signs, whose use opens the record's first page. The item is not consumed.
 const sevenSignsRecordsHandler = "SevenSignsRecords"
 
-// Record of Seven Signs pages.
-const (
-	ssqPageRecord     = 1
-	ssqPageFestival   = 2
-	ssqPageSeals      = 3
-	ssqPagePrediction = 4
-)
-
 // requestSSQStatus answers RequestSSQStatus with the asked page of live's
 // Record of Seven Signs. The prediction page is refused silently once the
 // competition is over (results and seal validation): the client shows the
@@ -31,10 +23,10 @@ func (l *GameClientLink) requestSSQStatus(live *livePlayer, req clientpackets.Re
 		return
 	}
 	period := l.sevenSigns.CurrentPeriod()
-	if req.Page == ssqPagePrediction && (period == sevensigns.SealValidation || period == sevensigns.Results) {
+	if req.Page == serverpackets.SSQPagePrediction && (period == sevensigns.SealValidation || period == sevensigns.Results) {
 		return
 	}
-	if req.Page == ssqPageFestival {
+	if req.Page == serverpackets.SSQPageFestival {
 		frame, ok := l.ssqFestivalFrame(period)
 		if !ok {
 			// The festival keeps no score for this cycle: its data is
@@ -72,84 +64,9 @@ func (l *GameClientLink) ssqFestivalFrame(period sevensigns.Period) (wire.Frame,
 	return serverpackets.FrameSSQStatusFestival(byte(period), festivals), true
 }
 
-// ssqStatusFrame builds page of objectID's Record of Seven Signs. A page
-// with no content carries only the page number and the active period.
+// ssqStatusFrame builds page of objectID's Record of Seven Signs.
 func (l *GameClientLink) ssqStatusFrame(objectID int32, page byte) wire.Frame {
-	r := l.sevenSigns.Record(objectID)
-	period := byte(r.Period)
-	switch page {
-	case ssqPageRecord:
-		periodMsg, untilMsg := ssqPeriodMessages(r.Period)
-		return serverpackets.FrameSSQStatusRecord(period, serverpackets.SSQRecord{
-			Cycle:         int32(r.Cycle),
-			PeriodMessage: periodMsg,
-			UntilMessage:  untilMsg,
-			PlayerCabal:   byte(r.PlayerCabal),
-			PlayerSeal:    byte(r.PlayerSeal),
-			PlayerStones:  int32(r.PlayerStones),
-			PlayerAdena:   int32(r.PlayerAncientAdena),
-			Dusk:          ssqCabalStanding(r.Dusk),
-			Dawn:          ssqCabalStanding(r.Dawn),
-		})
-	case ssqPageSeals:
-		seals := make([]serverpackets.SSQSealVotes, len(r.Seals))
-		for i, s := range r.Seals {
-			seals[i] = serverpackets.SSQSealVotes{
-				Seal: byte(s.Seal), Owner: byte(s.Owner),
-				DuskPercent: byte(s.DuskPercent), DawnPercent: byte(s.DawnPercent),
-			}
-		}
-		return serverpackets.FrameSSQStatusSeals(period, seals)
-	case ssqPagePrediction:
-		seals := make([]serverpackets.SSQSealPrediction, len(r.Seals))
-		for i, s := range r.Seals {
-			seals[i] = serverpackets.SSQSealPrediction{
-				Owner: byte(s.Owner), Predicted: byte(s.Predicted), Message: ssqPredictionMessage(s.Prediction),
-			}
-		}
-		return serverpackets.FrameSSQStatusPrediction(period, byte(r.Winner), seals)
-	default:
-		return serverpackets.FrameSSQStatusHeader(page, period)
-	}
-}
-
-func ssqCabalStanding(c sevensigns.CabalStanding) serverpackets.SSQCabalStanding {
-	return serverpackets.SSQCabalStanding{
-		StoneScore:    int32(c.StoneProportion),
-		FestivalScore: int32(c.FestivalScore),
-		TotalScore:    int32(c.TotalScore),
-		Percent:       byte(c.Percent),
-	}
-}
-
-// ssqPeriodMessages names the active period and when it ends on the
-// record's first page.
-func ssqPeriodMessages(p sevensigns.Period) (period, until int32) {
-	switch p {
-	case sevensigns.Recruiting:
-		return serverpackets.SystemMessageInitialPeriod, serverpackets.SystemMessageUntilToday6PM
-	case sevensigns.Competition:
-		return serverpackets.SystemMessageQuestEventPeriod, serverpackets.SystemMessageUntilMonday6PM
-	case sevensigns.Results:
-		return serverpackets.SystemMessageResultsPeriod, serverpackets.SystemMessageUntilToday6PM
-	default:
-		return serverpackets.SystemMessageValidationPeriod, serverpackets.SystemMessageUntilMonday6PM
-	}
-}
-
-func ssqPredictionMessage(p sevensigns.Prediction) uint16 {
-	switch p {
-	case sevensigns.PredictionOwnedRetained:
-		return serverpackets.SystemMessageSealOwned10MoreVoted
-	case sevensigns.PredictionOwnedLost:
-		return serverpackets.SystemMessageSealOwned10LessVoted
-	case sevensigns.PredictionClaimed:
-		return serverpackets.SystemMessageSealNotOwned35MoreVoted
-	case sevensigns.PredictionNotClaimed:
-		return serverpackets.SystemMessageSealNotOwned35LessVoted
-	default:
-		return serverpackets.SystemMessageCompetitionTieSealNotAwarded
-	}
+	return serverpackets.FrameSSQStatus(page, l.sevenSigns.Record(objectID))
 }
 
 // useSevenSignsRecords opens the first page of live's Record of Seven Signs.
@@ -158,7 +75,7 @@ func (l *GameClientLink) useSevenSignsRecords(live *livePlayer) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	live.SendFrame(l.ssqStatusFrame(live.ObjectID(), ssqPageRecord))
+	live.SendFrame(l.ssqStatusFrame(live.ObjectID(), serverpackets.SSQPageRecord))
 }
 
 // ssqSkyFrame builds the SSQInfo packet showing the sky the Seven Signs
@@ -167,18 +84,7 @@ func ssqSkyFrame(state *sevensigns.State) wire.Frame {
 	if state == nil {
 		return serverpackets.FrameSSQInfo()
 	}
-	return serverpackets.FrameSSQInfoSky(ssqSky(state.Sky()))
-}
-
-func ssqSky(c sevensigns.Cabal) uint16 {
-	switch c {
-	case sevensigns.Dawn:
-		return serverpackets.SSQSkyDawn
-	case sevensigns.Dusk:
-		return serverpackets.SSQSkyDusk
-	default:
-		return serverpackets.SSQSkyRegular
-	}
+	return serverpackets.FrameSSQInfoSky(serverpackets.SSQSky(state.Sky()))
 }
 
 // sevenSignsBroadcaster delivers Seven Signs period-change notices to every
@@ -239,7 +145,7 @@ func sevenSignsNoticeFrame(n sevensigns.Notice) (func() wire.Frame, bool) {
 			return message(id)
 		}
 	case sevensigns.NoticeSky:
-		sky := ssqSky(n.Cabal)
+		sky := serverpackets.SSQSky(n.Cabal)
 		return func() wire.Frame { return serverpackets.FrameSSQInfoSky(sky) }, true
 	}
 	return nil, false

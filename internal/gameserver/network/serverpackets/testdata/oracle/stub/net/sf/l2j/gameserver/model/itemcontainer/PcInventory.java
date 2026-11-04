@@ -24,6 +24,14 @@ public final class PcInventory
 	public final List<ItemInfo> updateList = new ArrayList<>();
 	public int totalWeight;
 
+	// The adena a warehouse holds.
+	public int adena;
+
+	public int getAdena()
+	{
+		return adena;
+	}
+
 	public int getTotalWeight()
 	{
 		return totalWeight;

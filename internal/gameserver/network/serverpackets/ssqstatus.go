@@ -1,6 +1,9 @@
 package serverpackets
 
-import "github.com/fatal10110/acis_golang/internal/commons/wire"
+import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+)
 
 // OpcodeSSQStatus is the wire opcode for SSQStatus, one page of the Record
 // of Seven Signs.
@@ -34,44 +37,13 @@ const (
 	SystemMessageCompetitionTieSealNotAwarded = 1294
 )
 
-// SSQCabalStanding is one cabal's scores on the record's first page.
-type SSQCabalStanding struct {
-	StoneScore    int32
-	FestivalScore int32
-	TotalScore    int32
-	Percent       byte
-}
-
-// SSQRecord is the record's first page: the calendar, the player's own
-// sign-up, and both cabals' scores.
-type SSQRecord struct {
-	Cycle         int32
-	PeriodMessage int32
-	UntilMessage  int32
-	PlayerCabal   byte
-	PlayerSeal    byte
-	PlayerStones  int32
-	PlayerAdena   int32
-	Dusk          SSQCabalStanding
-	Dawn          SSQCabalStanding
-}
-
-// SSQSealVotes is one seal's owner and the percent of each cabal's members
-// who chose it, on the record's third page.
-type SSQSealVotes struct {
-	Seal        byte
-	Owner       byte
-	DuskPercent byte
-	DawnPercent byte
-}
-
-// SSQSealPrediction is one seal's owner, predicted owner, and the message
-// explaining it, on the record's fourth page.
-type SSQSealPrediction struct {
-	Owner     byte
-	Predicted byte
-	Message   uint16
-}
+// Record of Seven Signs pages.
+const (
+	SSQPageRecord     = 1
+	SSQPageFestival   = 2
+	SSQPageSeals      = 3
+	SSQPagePrediction = 4
+)
 
 // Seal-ownership thresholds the record's third page states, in percent.
 const (
@@ -86,57 +58,78 @@ func newSSQStatusWriter(page, period byte) *wire.Writer {
 	return w
 }
 
-// FrameSSQStatusHeader builds an SSQStatus page with no content: the page
-// number and the active period only.
-func FrameSSQStatusHeader(page, period byte) wire.Frame {
-	w := newSSQStatusWriter(page, period)
-	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
-}
-
-// FrameSSQStatusRecord builds SSQStatus page 1.
-func FrameSSQStatusRecord(period byte, r SSQRecord) wire.Frame {
-	w := newSSQStatusWriter(1, period)
-	w.WriteInt32(r.Cycle)
-	w.WriteInt32(r.PeriodMessage)
-	w.WriteInt32(r.UntilMessage)
-	w.WriteUint8(r.PlayerCabal)
-	w.WriteUint8(r.PlayerSeal)
-	w.WriteInt32(r.PlayerStones)
-	w.WriteInt32(r.PlayerAdena)
-	for _, c := range [...]SSQCabalStanding{r.Dusk, r.Dawn} {
-		w.WriteInt32(c.StoneScore)
-		w.WriteInt32(c.FestivalScore)
-		w.WriteInt32(c.TotalScore)
-		w.WriteUint8(c.Percent)
+// FrameSSQStatus builds page of the Record of Seven Signs r: the calendar,
+// the player's sign-up and both cabals' scores (SSQPageRecord), the seals'
+// owners and votes (SSQPageSeals) or their predicted owners
+// (SSQPagePrediction). Any other page carries only the page number and the
+// active period; the festival page is FrameSSQStatusFestival.
+func FrameSSQStatus(page byte, r sevensigns.Record) wire.Frame {
+	w := newSSQStatusWriter(page, byte(r.Period))
+	switch page {
+	case SSQPageRecord:
+		periodMsg, untilMsg := ssqPeriodMessages(r.Period)
+		w.WriteInt32(int32(r.Cycle))
+		w.WriteInt32(periodMsg)
+		w.WriteInt32(untilMsg)
+		w.WriteUint8(byte(r.PlayerCabal))
+		w.WriteUint8(byte(r.PlayerSeal))
+		w.WriteInt32(int32(r.PlayerStones))
+		w.WriteInt32(int32(r.PlayerAncientAdena))
+		for _, c := range [...]sevensigns.CabalStanding{r.Dusk, r.Dawn} {
+			w.WriteInt32(int32(c.StoneProportion))
+			w.WriteInt32(int32(c.FestivalScore))
+			w.WriteInt32(int32(c.TotalScore))
+			w.WriteUint8(byte(c.Percent))
+		}
+	case SSQPageSeals:
+		w.WriteUint8(ssqRetainPercent)
+		w.WriteUint8(ssqClaimPercent)
+		w.WriteUint8(byte(len(r.Seals)))
+		for _, s := range r.Seals {
+			w.WriteUint8(byte(s.Seal))
+			w.WriteUint8(byte(s.Owner))
+			w.WriteUint8(byte(s.DuskPercent))
+			w.WriteUint8(byte(s.DawnPercent))
+		}
+	case SSQPagePrediction:
+		w.WriteUint8(byte(r.Winner))
+		w.WriteUint8(byte(len(r.Seals)))
+		for _, s := range r.Seals {
+			w.WriteUint8(byte(s.Owner))
+			w.WriteUint8(byte(s.Predicted))
+			w.WriteUint16(ssqPredictionMessage(s.Prediction))
+			w.WriteUint16(0)
+		}
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// FrameSSQStatusSeals builds SSQStatus page 3.
-func FrameSSQStatusSeals(period byte, seals []SSQSealVotes) wire.Frame {
-	w := newSSQStatusWriter(3, period)
-	w.WriteUint8(ssqRetainPercent)
-	w.WriteUint8(ssqClaimPercent)
-	w.WriteUint8(byte(len(seals)))
-	for _, s := range seals {
-		w.WriteUint8(s.Seal)
-		w.WriteUint8(s.Owner)
-		w.WriteUint8(s.DuskPercent)
-		w.WriteUint8(s.DawnPercent)
+// ssqPeriodMessages names the active period and when it ends on the
+// record's first page.
+func ssqPeriodMessages(p sevensigns.Period) (period, until int32) {
+	switch p {
+	case sevensigns.Recruiting:
+		return SystemMessageInitialPeriod, SystemMessageUntilToday6PM
+	case sevensigns.Competition:
+		return SystemMessageQuestEventPeriod, SystemMessageUntilMonday6PM
+	case sevensigns.Results:
+		return SystemMessageResultsPeriod, SystemMessageUntilToday6PM
+	default:
+		return SystemMessageValidationPeriod, SystemMessageUntilMonday6PM
 	}
-	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// FrameSSQStatusPrediction builds SSQStatus page 4.
-func FrameSSQStatusPrediction(period, winner byte, seals []SSQSealPrediction) wire.Frame {
-	w := newSSQStatusWriter(4, period)
-	w.WriteUint8(winner)
-	w.WriteUint8(byte(len(seals)))
-	for _, s := range seals {
-		w.WriteUint8(s.Owner)
-		w.WriteUint8(s.Predicted)
-		w.WriteUint16(s.Message)
-		w.WriteUint16(0)
+func ssqPredictionMessage(p sevensigns.Prediction) uint16 {
+	switch p {
+	case sevensigns.PredictionOwnedRetained:
+		return SystemMessageSealOwned10MoreVoted
+	case sevensigns.PredictionOwnedLost:
+		return SystemMessageSealOwned10LessVoted
+	case sevensigns.PredictionClaimed:
+		return SystemMessageSealNotOwned35MoreVoted
+	case sevensigns.PredictionNotClaimed:
+		return SystemMessageSealNotOwned35LessVoted
+	default:
+		return SystemMessageCompetitionTieSealNotAwarded
 	}
-	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

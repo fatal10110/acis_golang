@@ -19,6 +19,19 @@ public final class SystemMessageId
 	public static final SystemMessageId RESULTS_PERIOD_BEGUN = new SystemMessageId(3);
 	public static final SystemMessageId VALIDATION_PERIOD_BEGUN = new SystemMessageId(4);
 
+	// The Record of Seven Signs' period and seal prediction messages.
+	public static final SystemMessageId QUEST_EVENT_PERIOD = new SystemMessageId(1176);
+	public static final SystemMessageId VALIDATION_PERIOD = new SystemMessageId(1177);
+	public static final SystemMessageId INITIAL_PERIOD = new SystemMessageId(1183);
+	public static final SystemMessageId RESULTS_PERIOD = new SystemMessageId(1184);
+	public static final SystemMessageId UNTIL_MONDAY_6PM = new SystemMessageId(1286);
+	public static final SystemMessageId UNTIL_TODAY_6PM = new SystemMessageId(1287);
+	public static final SystemMessageId SEAL_OWNED_10_MORE_VOTED = new SystemMessageId(1289);
+	public static final SystemMessageId SEAL_NOT_OWNED_35_MORE_VOTED = new SystemMessageId(1290);
+	public static final SystemMessageId SEAL_OWNED_10_LESS_VOTED = new SystemMessageId(1291);
+	public static final SystemMessageId SEAL_NOT_OWNED_35_LESS_VOTED = new SystemMessageId(1292);
+	public static final SystemMessageId COMPETITION_TIE_SEAL_NOT_AWARDED = new SystemMessageId(1294);
+
 	private final int _id;
 	private int _paramCount;
 
