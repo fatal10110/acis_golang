@@ -88,7 +88,7 @@ func encodeGMCommand(name string, command int32) []byte {
 // altG sends the character window request from c and returns its answer.
 func altG(t *testing.T, c *testsupport.ScriptedClient, name string, command int32) [][]byte {
 	t.Helper()
-	return exchange(t, c, encodeGMCommand(name, command))
+	return exchangeSettled(t, c, encodeGMCommand(name, command))
 }
 
 func requireOpcodes(t *testing.T, label string, frames [][]byte, want ...byte) {
@@ -141,7 +141,7 @@ func TestGMCommandShowsEachView(t *testing.T) {
 	if own := lastFrame(t, w.entry, serverpackets.OpcodeHennaInfo); !bytes.Equal(frames[1][1:], own[1:]) {
 		t.Fatalf("GMHennaInfo % x, want the player's HennaInfo % x", frames[1][1:], own[1:])
 	}
-	requireOpcodes(t, "viewed player", exchange(t, w.player, encodeManorBarrier()))
+	requireOpcodes(t, "viewed player", exchangeSettled(t, w.player, nil))
 
 	// 2: the clan view of a clan member; a clanless player shows nothing.
 	frames = altG(t, w.gm, "Admin", 2)
@@ -202,7 +202,7 @@ func TestGMCommandShowsEachView(t *testing.T) {
 	if owner, adena, count := warehouseView(frames[0]); owner != "Boss" || adena != altGClanAdena || count != 2 {
 		t.Fatalf("clan warehouse view = %q %d adena %d items, want Boss %d adena 2 items", owner, adena, count, altGClanAdena)
 	}
-	requireOpcodes(t, "viewed player", exchange(t, w.player, encodeManorBarrier()))
+	requireOpcodes(t, "viewed player", exchangeSettled(t, w.player, nil))
 }
 
 // TestGMCommandSilences sends the requests the character window answers
@@ -225,7 +225,7 @@ func TestGMCommandSilences(t *testing.T) {
 	} {
 		requireOpcodes(t, tc.label, altG(t, w.gm, tc.name, tc.command))
 	}
-	requireOpcodes(t, "viewed player", exchange(t, w.player, encodeManorBarrier()))
+	requireOpcodes(t, "viewed player", exchangeSettled(t, w.player, nil))
 }
 
 // TestGMCommandRefusesWithoutAltG answers nothing to a player who is not a
@@ -241,7 +241,7 @@ func TestGMCommandRefusesWithoutAltG(t *testing.T) {
 		requireOpcodes(t, "test GM", altG(t, helper, "Player", command))
 	}
 	requireOpcodes(t, "test GM clan warehouse", altG(t, helper, "Wardens", 6))
-	requireOpcodes(t, "viewed player", exchange(t, w.player, encodeManorBarrier()))
+	requireOpcodes(t, "viewed player", exchangeSettled(t, w.player, nil))
 }
 
 // TestGMCommandRefusesGMWithoutAltG answers nothing to a game master whose
