@@ -15,8 +15,11 @@ import (
 // The game-client port refuses connection bursts from one address at
 // accept: within a second of the previous connection each one counts a
 // try, the fourth try bans the address, and only a sweep after 300 s of
-// silence lifts the ban. The filter reads a fake clock the suite sets, and
-// the suite runs its sweeps, so no wall-clock time passes.
+// silence lifts the ban. The filter reads a fake clock the suite sets, so
+// no wall-clock time passes. The listener's own 5 s ticker also sweeps at
+// that fake time; the suite calls f.Sweep where it needs a sweep at a known
+// point, and a ticker sweep in between sees the same clock, so it cannot
+// change the outcome.
 
 const protocolRevision = 746
 

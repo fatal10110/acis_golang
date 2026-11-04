@@ -560,8 +560,9 @@ func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
 
 // WithAcceptFilter installs f on the game-client listener, timed by now, as
 // the game server installs its accept filter (default: none, so suites may
-// open many connections from one address at once). The suite drives f's
-// sweeps itself with f.Sweep.
+// open many connections from one address at once). The listener also sweeps
+// f at now() on its 5 s wall ticker; a suite that needs a sweep at a known
+// point calls f.Sweep itself.
 func WithAcceptFilter(f *netutil.AcceptFilter, now func() time.Time) Option {
 	return func(o *options) { o.acceptFilter, o.acceptFilterNow = f, now }
 }
