@@ -109,11 +109,13 @@ func (s *Session) send(frame wire.Frame, last bool) bool {
 // ReadFrame call: decode it before reading again, or copy it. Only one
 // goroutine may call ReadFrame.
 func (s *Session) ReadFrame() ([]byte, error) {
-	if observe := s.conn.observeRead; observe != nil {
-		observe()
-	}
 	if err := s.conn.SetReadDeadline(time.Now().Add(s.readTimeout())); err != nil {
 		return nil, err
+	}
+	// The read observer runs once the deadline is fixed, so a watcher that
+	// sees the wait begin knows which deadline it runs under.
+	if observe := s.conn.observeRead; observe != nil {
+		observe()
 	}
 	payload, err := s.frames.ReadFrame()
 	if errors.Is(err, wire.ErrFrameTooShort) {

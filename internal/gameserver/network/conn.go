@@ -61,8 +61,8 @@ type Conn struct {
 	// observeSend, when set, sees each outbound payload on the goroutine
 	// that queues it; see ObserveSends.
 	observeSend func(payload []byte)
-	// observeRead, when set, runs before each wait for an inbound frame;
-	// see ObserveReads.
+	// observeRead, when set, runs as each wait for an inbound frame begins,
+	// after its read deadline is set; see ObserveReads.
 	observeRead func()
 	// observePersistWait, when set, brackets each wait for queued saves;
 	// see ObservePersistWaits.
@@ -243,7 +243,8 @@ func (c *Conn) ObserveSends(fn func(payload []byte)) {
 
 // ObserveReads installs fn to run on the reading goroutine each time a
 // Session on c starts waiting for the next inbound frame, which is when
-// every earlier frame has been fully handled. It is a test seam for knowing
+// every earlier frame has been fully handled and the wait's read deadline is
+// set. It is a test seam for knowing
 // the server has caught up with a client. Call it before c reaches its
 // handler; unset, a read pays only a nil check.
 func (c *Conn) ObserveReads(fn func()) {

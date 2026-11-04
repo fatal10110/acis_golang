@@ -10,8 +10,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-// The idle deadline is not waited out: ExpireIdleReads makes the next wait
-// for a frame time out at once, so each test sends one frame, reads its
+// The idle deadline is not waited out: ExpireIdleReads makes the wait after
+// the next frame time out at once, so each test sends one frame, reads its
 // answer, and then the ServerClose the deadline makes. The driven clock
 // counts a read loop as caught up once it waits for a frame, which the
 // expired wait does before it ends the connection, so each test stops the
@@ -23,7 +23,7 @@ import (
 func TestIdleCharacterListClosesWithServerClose(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
-	srv.ExpireIdleReads()
+	srv.ExpireIdleReads(t)
 
 	srv.Client.Send(encodeRequestPledgeCrest())
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodePledgeCrest, "pledge crest")
@@ -39,7 +39,7 @@ func TestIdlePlayerInWorldClosesWithServerClose(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	startInWorld(t, srv.Client)
-	srv.ExpireIdleReads()
+	srv.ExpireIdleReads(t)
 
 	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeSkillList, "skill list")

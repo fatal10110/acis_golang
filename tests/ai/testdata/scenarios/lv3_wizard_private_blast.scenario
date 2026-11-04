@@ -2,6 +2,7 @@
 # every draw 0: as it appears, lifetime 3 or under, it attacks the character (300). Its 1 s timer, the character inside 100,
 # wants its self range blast (4529-1) on itself (1000000) and adds 50 to the attack. When the blast ends it drops its attack desires and,
 # on a draw under 50 with the character inside 200, wants its second blast (4530-1) on the character; when that cast ends it dies.
+# Every combat draw of the wizard is 5000 (the blast lands: a landing draw of 100 or less would resist it and tell the character, one in a hundred runs unpinned).
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc
@@ -11,6 +12,7 @@ script script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster
 script script.ai.individual.Monster.LV3Monster.LV3WizardPrivate
 npc owner 20003 Monster 600 0 0
 npc wiz 27253 Monster 50 0 0 level 76 skill SELF_RANGE_DD_MAGIC1 4529 1 skill SELF_RANGE_DD_MAGIC2 4530 1 skill SELF_RANGE_DD_MAGIC3 4531 1 params character character owner master owner
+roll wiz 5000
 
 tick
   desires wiz attack(player)=300
