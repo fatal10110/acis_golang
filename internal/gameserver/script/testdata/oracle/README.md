@@ -175,7 +175,7 @@ what the reference does in the scenario's own world:
   also runs the stance task after each slice of an `advance`, so the stance ends 15 seconds after it was set. The zone line,
   a `zone <boss|peace> <zone id> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>` line stands the shipped zone of that id (the datapack must have it)
   in that box around where the character enters the world, for the scenario only (a peace zone of an id the datapack
-  has no zone of is not played: no scenario the probe plays reads one) (a wanted `loc=x,y,z+-n` teleport line takes the trace's landing inside its box);
+  has no zone of is not played: no scenario the probe plays reads one); a wanted `loc=x,y,z+-n` teleport line takes the trace's landing inside its box;
 - a `member <name> <level> [standing <n>] [hold <item> <count>]... [<dx> <dy> <dz>]` line makes a second character of an
   account of its own (a dead member is not played): it enters the world where the character does, joins the character's
   party (the first member forms it, the character leading) and stands at that offset, holding its items and standing

@@ -112,6 +112,7 @@ import net.sf.l2j.gameserver.network.serverpackets.CharSelectInfo;
 import net.sf.l2j.gameserver.network.serverpackets.MonRaceInfo;
 import net.sf.l2j.gameserver.scripting.Quest;
 import net.sf.l2j.gameserver.scripting.QuestState;
+import net.sf.l2j.gameserver.scripting.script.teleport.GrandBossTeleporter;
 import net.sf.l2j.gameserver.taskmanager.AiTaskManager;
 import net.sf.l2j.gameserver.taskmanager.AttackStanceTaskManager;
 import net.sf.l2j.gameserver.taskmanager.DecayTaskManager;
@@ -446,6 +447,8 @@ final class ScenarioTrace
 			final int[] festival = festival();
 			final Map<SealType, CabalType> sealOwners = new EnumMap<>(SevenSignsManager.getInstance().getSealOwners());
 			final List<String> failures;
+			// The count of the players sent to Valakas is a static of the script: each scenario starts it over.
+			set(GrandBossTeleporter.class, null, "_valakasPlayersCount", 0);
 			try
 			{
 				t.play();
@@ -2120,15 +2123,15 @@ final class ScenarioTrace
 		ConnectionPool.setSink(null);
 	}
 
-	/**
-	 * Removes the scenario's player, the NPCs spawned for its NPC lines and every NPC and ground item
-	 * near it, so the next scenario starts alone.
-	 */
 	/** A member line: name, level, standing (0 for none), holds (item id, count) and the offset it stands at. */
 	private record MemberLine(String name, int level, int standing, List<int[]> holds, int dx, int dy, int dz)
 	{
 	}
 
+	/**
+	 * Removes the scenario's player, the NPCs spawned for its NPC lines and every NPC and ground item
+	 * near it, so the next scenario starts alone.
+	 */
 	private void clear() throws Exception
 	{
 		// The started makers delete their NPCs without telling their scripts, far from the player as they stand.
