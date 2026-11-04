@@ -13,12 +13,22 @@ import (
 
 func (n *Npcs) RespawnHook(actorID int32) func() {
 	// The look the NPC leaves in is the one it comes back in.
-	var form *npc.Template
+	var (
+		form *npc.Template
+		left leftNPC
+	)
 	if obj, ok := n.state.Object(actorID); ok {
 		if m, ok := obj.(interface{ Polymorph() *npc.Template }); ok {
 			form = m.Polymorph()
 		}
+		switch a := obj.(type) {
+		case *npc.Hostile:
+			left.name = a.Instance.Name()
+		case *npc.Folk:
+			left.name = a.Instance.Name()
+		}
 	}
+	left.index, left.reverse, _ = n.walker.Walking(actorID)
 	n.mu.Lock()
 	key, tracked := n.live[actorID]
 	if tracked {
@@ -27,11 +37,12 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 	slot, ok := n.slot[key]
 	if tracked && ok {
-		slot.form = form
+		slot.form, slot.left = form, left
 		n.slot[key] = slot
 	}
 	n.mu.Unlock()
 	if !tracked || !ok {
+		n.walker.StopRouteByID(actorID)
 		return nil
 	}
 

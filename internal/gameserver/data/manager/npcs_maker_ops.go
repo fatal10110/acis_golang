@@ -67,12 +67,26 @@ func (n *Npcs) FindSpawn(npcID int32) spawn.Locator {
 	return first
 }
 
-// FirstNPCOfAlias returns the object id of the NPC of the first spawn whose
-// NPC template has alias, ignoring case: the first npcmaker spawn in list
-// order, else the standalone spawn placed first of those still kept. Of a
-// spawn keeping several NPCs it is the one of lowest object id. ok is false
-// when no spawn has the alias or the first one keeps no NPC.
-func (n *Npcs) FirstNPCOfAlias(alias string) (id int32, ok bool) {
+// SpawnNPC is the NPC a spawn keeps: in the world under ID, or, when
+// Decayed, an npcmaker's NPC that decayed and waits for its spawn to
+// respawn it, with Name, Index and Reverse what it decayed with: the walker
+// route node it headed for and its direction.
+type SpawnNPC struct {
+	ID      int32
+	Decayed bool
+	Name    string
+	Index   int
+	Reverse bool
+}
+
+// FirstNPCOfAlias returns the NPC of the first spawn whose NPC template has
+// alias, ignoring case: the first npcmaker spawn in list order, else the
+// standalone spawn placed first of those still kept. An npcmaker spawn
+// keeps an NPC that decayed while it waits to respawn it; a spawn that
+// never respawns lets it go. Of a spawn keeping several NPCs it is the one
+// of lowest object id. ok is false when no spawn has the alias or the
+// first one keeps no NPC.
+func (n *Npcs) FirstNPCOfAlias(alias string) (kept SpawnNPC, ok bool) {
 	match := func(t *npc.Template) bool { return strings.EqualFold(t.Alias, alias) }
 	first, inMaker := n.findGroupSpawn(match)
 	n.mu.Lock()
@@ -91,7 +105,7 @@ func (n *Npcs) FirstNPCOfAlias(alias string) (id int32, ok bool) {
 			}
 		}
 		if seq == 0 {
-			return 0, false
+			return SpawnNPC{}, false
 		}
 	}
 	for oid, key := range n.live {
@@ -102,11 +116,21 @@ func (n *Npcs) FirstNPCOfAlias(alias string) (id int32, ok bool) {
 		} else if key != standalone {
 			continue
 		}
-		if !ok || oid < id {
-			id, ok = oid, true
+		if !ok || oid < kept.ID {
+			kept, ok = SpawnNPC{ID: oid}, true
 		}
 	}
-	return id, ok
+	if !inMaker {
+		return kept, ok
+	}
+	for key, slot := range n.slot {
+		if slot.group != first.g || slot.spawnIdx != first.i || slot.orphan || slot.liveID == 0 ||
+			slot.entry.RespawnDelay <= 0 || n.liveLocked(key) || (ok && slot.liveID >= kept.ID) {
+			continue
+		}
+		kept, ok = SpawnNPC{ID: slot.liveID, Decayed: true, Name: slot.left.name, Index: slot.left.index, Reverse: slot.left.reverse}, true
+	}
+	return kept, ok
 }
 
 // standaloneSpawn is a standalone spawn as the point it places its NPC at.
