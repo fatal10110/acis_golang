@@ -131,7 +131,7 @@ func (n *Npcs) instantiate(key task.SlotID, entry spawn.Entry, tmpl *npc.Templat
 // for AI ticks and corpse decay/respawn. A non-nil master makes it one of
 // master's privates before it enters the world. It read-holds the gate: a
 // placement never lands halfway through DespawnAll.
-func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) attackable.Combatant {
+func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) (live attackable.Combatant) {
 	n.gate.RLock()
 	defer n.gate.RUnlock()
 	id, err := n.ids.NextID()
@@ -158,6 +158,17 @@ func (n *Npcs) place(key task.SlotID, entry spawn.Entry, tmpl *npc.Template, loc
 	inst.ClanID = info.clanID
 	inst.ResidenceOwner = n.owners
 	inst.SetPolymorph(info.form)
+	// The NPC comes back heading for the route node its last life headed
+	// for, the same way, until its route takes it on from the node nearest
+	// to it.
+	if info.left.index != 0 || info.left.reverse {
+		n.walker.Carry(id, info.left.index, info.left.reverse)
+		defer func() {
+			if live == nil {
+				n.walker.StopRouteByID(id)
+			}
+		}()
+	}
 	// Each life of the slot starts with the script value cleared; its
 	// other script memory carries over.
 	var slot npc.SpawnSlot
@@ -297,7 +308,7 @@ func (n *Npcs) trackLive(key task.SlotID, id int32) bool {
 	}
 	n.live[id] = key
 	n.liveCount++
-	slot.liveID = id
+	slot.liveID, slot.hidden, slot.left = id, false, leftNPC{}
 	n.slot[key] = slot
 	return true
 }

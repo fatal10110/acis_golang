@@ -61,6 +61,12 @@ func WithWalkerRoutes(routes route.WalkerRoutes) Option {
 	return func(o *options) { o.walkerRoutes = routes }
 }
 
+// WithWalkerPath gives the WithNpcSpawns population's route walker path as
+// its reachability checks; by default every route node is reachable.
+func WithWalkerPath(path task.WalkerPath) Option {
+	return func(o *options) { o.walkerPath = path }
+}
+
 // WithNpcSpawnSkills gives the WithNpcSpawns population defs as the skills
 // its NPCs cast, their effects dispatched through the link's NPC cast seam,
 // as the game server gives it the skill data; by default its NPCs cast
@@ -130,6 +136,9 @@ type npcSpawnDeps struct {
 	spawner *script.Spawner
 	// routes is the walker route data.
 	routes route.WalkerRoutes
+	// walkerPath answers the route walker's reachability checks; nil for
+	// every node reachable.
+	walkerPath task.WalkerPath
 	// skills are the skills the NPCs cast, nil for none.
 	skills actorcast.Definitions
 
@@ -193,7 +202,11 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if deps.queues != nil && deps.queues.inline != nil {
 		now = deps.queues.inline.Now
 	}
-	walker, err := task.NewWalker(deps.routes, task.GeoPath{Geo: Geo{}}, now, deps.state)
+	walkerPath := deps.walkerPath
+	if walkerPath == nil {
+		walkerPath = task.GeoPath{Geo: Geo{}}
+	}
+	walker, err := task.NewWalker(deps.routes, walkerPath, now, deps.state)
 	if err != nil {
 		t.Fatalf("new walker: %v", err)
 	}

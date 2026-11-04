@@ -365,7 +365,7 @@ func (l *GameClientLink) walkerRowNPC(alias string, walker *task.Walker) (name s
 	if !ok {
 		return "", 0, false, false
 	}
-	if kept.Decayed {
+	if kept.Away {
 		return kept.Name, kept.Index, kept.Reverse, true
 	}
 	obj, ok := l.world.Object(kept.ID)
