@@ -3,7 +3,9 @@ package pathfind
 import (
 	"container/heap"
 	"math"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
@@ -37,12 +39,21 @@ func (f *Finder) Find(origin, target location.Location) ([]location.Location, in
 
 // FindInto is Find with caller-owned result storage. dst is reset before use.
 func (f *Finder) FindInto(dst []location.Location, origin, target location.Location) ([]location.Location, int, bool) {
-	return f.find(dst, origin, target, true)
+	return f.find(dst, origin, target, true, nil)
+}
+
+// FindTraced is Find recording into tr how long the search took, as a red
+// point over the origin cell, then, for a route of three points or more,
+// each corner the smoothing dropped in red and kept in green, and the
+// smoothed route's segments in green from origin.
+func (f *Finder) FindTraced(origin, target location.Location, tr *engine.Trace) ([]location.Location, bool) {
+	path, _, ok := f.find(nil, origin, target, true, tr)
+	return path, ok
 }
 
 // HasPath reports whether origin can reach target without building a result path.
 func (f *Finder) HasPath(origin, target location.Location) bool {
-	_, _, ok := f.find(nil, origin, target, false)
+	_, _, ok := f.find(nil, origin, target, false, nil)
 	return ok
 }
 
@@ -51,7 +62,7 @@ func (f *Finder) HasPath(origin, target location.Location) bool {
 // requested target Z.
 const maxTargetHeightGap = 500
 
-func (f *Finder) find(dst []location.Location, origin, target location.Location, buildResult bool) ([]location.Location, int, bool) {
+func (f *Finder) find(dst []location.Location, origin, target location.Location, buildResult bool, tr *engine.Trace) ([]location.Location, int, bool) {
 	dst = dst[:0]
 	if f == nil || f.engine == nil || engine.OutOfWorld(origin.X, origin.Y) || engine.OutOfWorld(target.X, target.Y) {
 		return dst, 0, false
@@ -82,6 +93,10 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 		return dst, 0, true
 	}
 
+	var began time.Time
+	if tr != nil {
+		began = time.Now()
+	}
 	var path []location.Location
 	var cost int
 	var ok bool
@@ -91,8 +106,18 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 		path, cost, ok = f.findForward(dst, start, goal, buildResult, scratch)
 	}
 
+	if ok && tr != nil {
+		tr.Point(strconv.FormatInt(time.Since(began).Milliseconds(), 10)+"ms", engine.TraceRed, true, engine.WorldX(start.gx), engine.WorldY(start.gy), start.z+16)
+	}
 	if ok && buildResult && len(path) >= 3 {
-		path = f.collapseWaypoints(origin.X, origin.Y, start.z, path)
+		path = f.collapseWaypoints(origin.X, origin.Y, start.z, path, tr)
+		if tr != nil {
+			prev := origin
+			for i, next := range path {
+				tr.Line("Segment #"+strconv.Itoa(i+1), engine.TraceGreen, true, prev.X, prev.Y, prev.Z, next.X, next.Y, next.Z)
+				prev = next
+			}
+		}
 	}
 	return path, cost, ok
 }
@@ -104,15 +129,17 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 // anchor only advances to B when B is kept; on a successful skip it stays
 // put so a chain of mutually visible points can collapse across more than
 // one removal. The final waypoint (the target) is never subject to removal.
-func (f *Finder) collapseWaypoints(originX, originY, originZ int, path []location.Location) []location.Location {
+func (f *Finder) collapseWaypoints(originX, originY, originZ int, path []location.Location, tr *engine.Trace) []location.Location {
 	ax, ay, az := originX, originY, originZ
 	j := 0
 	for i := 0; i < len(path)-1; i++ {
 		next := path[i+1]
+		b := path[i]
 		if f.engine.CanMove(ax, ay, az, next.X, next.Y, next.Z) {
+			tr.Point("", engine.TraceRed, false, b.X, b.Y, b.Z)
 			continue
 		}
-		b := path[i]
+		tr.Point("", engine.TraceGreen, false, b.X, b.Y, b.Z)
 		path[j] = b
 		j++
 		ax, ay, az = b.X, b.Y, b.Z

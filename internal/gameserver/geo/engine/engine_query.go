@@ -7,7 +7,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 )
 
+// CanMove reports whether a walker standing at (ox,oy,oz) reaches
+// (tx,ty,tz) on a straight line over the ground.
 func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
+	return e.CanMoveTraced(ox, oy, oz, tx, ty, tz, nil)
+}
+
+// CanMoveTraced is CanMove recording into tr both endpoint cells in blue,
+// each border crossed with the cell left in green, and the cell the walk
+// stops on in red.
+func (e *Engine) CanMoveTraced(ox, oy, oz, tx, ty, tz int, tr *Trace) bool {
 	if OutOfWorld(tx, ty) {
 		return false
 	}
@@ -27,6 +36,8 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 	dir := moveDirectionFor(gtx-gox, gty-goy)
 	gridX := alignCell(ox)
 	gridY := alignCell(oy)
+	tr.cellSquare(TraceBlue, gridX, gridY, goz+1)
+	tr.cellSquare(TraceBlue, alignCell(tx), alignCell(ty), tz)
 
 	nx := gox
 	ny := goy
@@ -36,21 +47,31 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 
 		step := dir.dirY
 		if dir.stepX != 0 && GeoY(checkY) == goy {
+			tr.border(dir, true, checkX, checkY, goz)
+			tr.cellSquare(TraceGreen, gridX, gridY, goz)
 			gridX += dir.stepX
 			nx += dir.signumX
 			step = dir.dirX
 		} else {
+			if tr != nil {
+				checkY = gridY + dir.offsetY
+				checkX = min(max(int(float64(ox)+float64(checkY-oy)/m), gridX), gridX+block.CellSize-1)
+				tr.border(dir, false, checkX, checkY, goz)
+				tr.cellSquare(TraceGreen, gridX, gridY, goz)
+			}
 			gridY += dir.stepY
 			ny += dir.signumY
 		}
 
 		if !nswe.Allows(step) {
+			tr.cellSquare(TraceRed, gridX, gridY, goz)
 			return false
 		}
 
 		next := e.blockAtGeo(nx, ny)
 		layer, cell := next.belowCell(localCell(nx), localCell(ny), int32(goz+block.CellIgnoreHeight), nil)
 		if layer == -1 {
+			tr.cellSquare(TraceRed, gridX, gridY, goz)
 			return false
 		}
 
@@ -99,8 +120,16 @@ func (e *Engine) CanSeeWithHeights(ox, oy, oz int, oheight float64, tx, ty, tz i
 // a stored object ignores the object it stands for.
 func (e *Engine) CanSeeWithHeightsIgnoring(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object) bool {
 	ignore = dynamic.Stored(ignore)
-	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight, ignore) &&
-		e.canSee(tx, ty, tz, theight, ox, oy, oz, oheight, ignore)
+	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight, ignore, nil) &&
+		e.canSee(tx, ty, tz, theight, ox, oy, oz, oheight, ignore, nil)
+}
+
+// CanSeeOneWayTraced reports line of sight from (ox,oy,oz), oheight above
+// it, to (tx,ty,tz), theight above it, one way only, ignoring ignore. It
+// records into tr both endpoint cells in blue, each border crossed with the
+// cell left in green, and where sight is lost in red.
+func (e *Engine) CanSeeOneWayTraced(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object, tr *Trace) bool {
+	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight, dynamic.Stored(ignore), tr)
 }
 
 // CanSeeActor reports whether two actors, each supplying its own collision
@@ -142,7 +171,7 @@ func OutOfWorld(worldX, worldY int) bool {
 	return worldX < WorldXMin || worldX > WorldXMax || worldY < WorldYMin || worldY > WorldYMax
 }
 
-func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object) bool {
+func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object, tr *Trace) bool {
 	if OutOfWorld(ox, oy) || OutOfWorld(tx, ty) {
 		return false
 	}
@@ -177,6 +206,8 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 	dir := moveDirectionFor(gtx-gox, gty-goy)
 	gridX := alignCell(ox)
 	gridY := alignCell(oy)
+	tr.cellSquare(TraceBlue, gridX, gridY, groundZ+1)
+	tr.cellSquare(TraceBlue, alignCell(tx), alignCell(ty), tz)
 
 	for gox != gtx || goy != gty {
 		checkX := gridX + dir.offsetX
@@ -184,12 +215,16 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 
 		step := dir.dirY
 		if dir.stepX != 0 && GeoY(checkY) == goy {
+			tr.border(dir, true, checkX, checkY, groundZ)
+			tr.cellSquare(TraceGreen, gridX, gridY, groundZ)
 			gridX += dir.stepX
 			gox += dir.signumX
 			step = dir.dirX
 		} else {
 			checkY = gridY + dir.offsetY
 			checkX = min(max(int(float64(ox)+float64(checkY-oy)/m), gridX), gridX+block.CellSize-1)
+			tr.border(dir, false, checkX, checkY, groundZ)
+			tr.cellSquare(TraceGreen, gridX, gridY, groundZ)
 			gridY += dir.stepY
 			goy += dir.signumY
 		}
@@ -208,11 +243,14 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 			layer, cell = current.aboveCell(localCell(gox), localCell(goy), int32(groundZ-2*block.CellHeight), ignore)
 		}
 		if layer == -1 {
+			tr.cellSquare(TraceRed, gridX, gridY, groundZ)
 			return false
 		}
 
 		nextZ := int(cell.Height)
 		if float64(nextZ) > losZ {
+			tr.Point("", TraceRed, false, checkX, checkY, int(losZ))
+			tr.cellSquare(TraceRed, gridX, gridY, nextZ)
 			return false
 		}
 
