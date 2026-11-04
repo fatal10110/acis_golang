@@ -22,7 +22,7 @@ const (
 // when no such player plays. Only a game master whose access level opens
 // the character window is answered.
 //
-// Every refusal is silent, as in the reference: a player who is not such a
+// Every refusal is silent: a player who is not such a
 // game master, a name no online player (nor, for the warehouse, clan)
 // carries, the clan view of a clanless player and a view number outside
 // 1-6. The character window holds no pending client action to release.
