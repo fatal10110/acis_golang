@@ -19,6 +19,13 @@ import (
 // move at all when no pathfinder route exists, the actor advances as far as
 // the terrain allows in the requested direction.
 func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	return e.ValidLocationTraced(ox, oy, oz, tx, ty, tz, nil)
+}
+
+// ValidLocationTraced is ValidLocation recording into tr both endpoint
+// cells in blue, each border crossed with the cell left in green, and the
+// cell the walk stops on in red.
+func (e *Engine) ValidLocationTraced(ox, oy, oz, tx, ty, tz int, tr *Trace) location.Location {
 	gox := GeoX(ox)
 	goy := GeoY(oy)
 	goz := int(e.heightNearest(gox, goy, oz))
@@ -26,6 +33,10 @@ func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	gty := GeoY(ty)
 	gtz := int(e.heightNearest(gtx, gty, tz))
 
+	if tr != nil {
+		tr.cellSquare(TraceBlue, alignCell(ox), alignCell(oy), goz+1)
+		tr.cellSquare(TraceBlue, alignCell(tx), alignCell(ty), gtz+1)
+	}
 	if gox == gtx && goy == gty {
 		if goz == int(e.Height(tx, ty, tz)) {
 			return location.Location{X: tx, Y: ty, Z: gtz}
@@ -51,12 +62,16 @@ func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 
 		step := dir.dirY
 		if dir.stepX != 0 && GeoY(checkY) == goy {
+			tr.border(dir, true, checkX, checkY, goz)
+			tr.cellSquare(TraceGreen, gridX, gridY, goz)
 			gridX += dir.stepX
 			nx += dir.signumX
 			step = dir.dirX
 		} else {
 			checkY = gridY + dir.offsetY
 			checkX = min(max(int(float64(ox)+float64(checkY-oy)/m), gridX), gridX+block.CellSize-1)
+			tr.border(dir, false, checkX, checkY, goz)
+			tr.cellSquare(TraceGreen, gridX, gridY, goz)
 			gridY += dir.stepY
 			ny += dir.signumY
 		}
@@ -65,17 +80,20 @@ func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 		// this border, same as a blocked edge (the grid bounds are checked
 		// before the NSWE obstacle test).
 		if nx < 0 || nx > maxGeoX || ny < 0 || ny > maxGeoY {
+			tr.cellSquare(TraceRed, gridX, gridY, goz)
 			return location.Location{X: checkX, Y: checkY, Z: goz}
 		}
 
 		// A blocked edge or an unservable next cell ends the walk at this
 		// border: the actor stops at the last grid boundary it reached.
 		if !nswe.Allows(step) {
+			tr.cellSquare(TraceRed, gridX, gridY, goz)
 			return location.Location{X: checkX, Y: checkY, Z: goz}
 		}
 		next := e.blockAtGeo(nx, ny)
 		layer, cell := next.belowCell(localCell(nx), localCell(ny), int32(goz+block.CellIgnoreHeight), nil)
 		if layer == -1 {
+			tr.cellSquare(TraceRed, gridX, gridY, goz)
 			return location.Location{X: checkX, Y: checkY, Z: goz}
 		}
 

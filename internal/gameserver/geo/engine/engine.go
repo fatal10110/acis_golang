@@ -60,6 +60,10 @@ type Engine struct {
 	dynamicBlocksMu sync.Mutex
 	dynamicBlocks   atomic.Pointer[map[blockKey]*dynamic.Block]
 	dynamicMask     [regionTilesX][regionTilesY]atomic.Pointer[regionMask]
+	// overlaid records, per block key, whether a block that ever carried
+	// an overlay was multilayer: game masters keep seeing such a block named
+	// dynamic after its last object leaves. Written under dynamicBlocksMu.
+	overlaid sync.Map
 
 	maxObstacleHeight     int
 	partOfCharacterHeight int
@@ -77,6 +81,12 @@ func New(options ...Options) *Engine {
 // MaxObstacleHeight returns the line-of-sight obstacle allowance.
 func (e *Engine) MaxObstacleHeight() int {
 	return e.maxObstacleHeight
+}
+
+// PartOfCharacterHeight returns the percentage of an actor's full body
+// height that counts for line of sight.
+func (e *Engine) PartOfCharacterHeight() int {
+	return e.partOfCharacterHeight
 }
 
 // SightHeight converts an actor's collision height into its line-of-sight

@@ -337,11 +337,13 @@ func (l *GameClientLink) broadcastLiveWalk(live *livePlayer, dest location.Locat
 // validatePassengerPosition answers a passenger's ValidatePosition: a deck
 // position drifted more than passengerDriftLimit from the server's is put
 // back with GetOnVehicle, naming the boat the report names.
-func (l *GameClientLink) validatePassengerPosition(live *livePlayer, boatID int32, reported location.Location) {
+func (l *GameClientLink) validatePassengerPosition(live *livePlayer, boatID int32, reported location.Location) float64 {
 	deck, _ := live.BoatPosition()
-	if deck.Distance2D(reported) > passengerDriftLimit {
+	drift := deck.Distance2D(reported)
+	if drift > passengerDriftLimit {
 		live.SendFrame(serverpackets.FrameGetOnVehicle(live.ObjectID(), boatID, deck))
 	}
+	return drift
 }
 
 // leaveBoat takes live off the boat it rides, if any: it leaves the boat's

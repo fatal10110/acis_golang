@@ -5,9 +5,11 @@ import (
 	"errors"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -192,7 +194,20 @@ type CreatureMove struct {
 	// still being walked.
 	routeBufs [2][]location.Location
 	routeBuf  int
+	// debug holds the debugMove and debugPath bits a game master toggles;
+	// debugOut queues, under mu, the debug events a request produced for
+	// the owner, reported once mu is released.
+	debug    atomic.Uint32
+	debugOut []event.Event
+	// debugFollowed is, under mu during a follow request, the creature
+	// whose position the request heads for.
+	debugFollowed headed
 }
+
+const (
+	debugMove uint32 = 1 << iota
+	debugPath
+)
 
 // moveOwner is the controller a CreatureMove reports its movement milestones
 // to, each after the move's lock is released.
@@ -217,6 +232,79 @@ type moveOwner interface {
 	// fixed point) may run the retarget catch-up of a walk in flight: the
 	// actor is visible and knows pawn.
 	mayCatchUp(Pawn) bool
+	// debugged reports a debug event of a mover whose moves or paths are
+	// debugged.
+	debugged(event.Event)
+}
+
+// ToggleDebug flips the debugging of this mover's moves (or, with path,
+// of its routed searches) and reports whether it is now on.
+func (m *CreatureMove) ToggleDebug(path bool) bool {
+	bit := debugMove
+	if path {
+		bit = debugPath
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.debug.Load() ^ bit
+	m.debug.Store(now)
+	if now == 0 {
+		m.debugOut = nil
+	}
+	return now&bit != 0
+}
+
+// DebugMove reports whether this mover's moves are debugged.
+func (m *CreatureMove) DebugMove() bool {
+	return m.debug.Load()&debugMove != 0
+}
+
+// flushDebug reports the debug events the last request queued to the
+// owner. Callers do not hold mu.
+func (m *CreatureMove) flushDebug() {
+	if m.debug.Load() == 0 {
+		return
+	}
+	m.mu.Lock()
+	out, owner := m.debugOut, m.owner
+	m.debugOut = nil
+	m.mu.Unlock()
+	if owner == nil {
+		return
+	}
+	for _, ev := range out {
+		owner.debugged(ev)
+	}
+}
+
+// debugStartLocked queues the debug report of a request accepted from
+// origin, whose first leg ends at destination: a walk tracking pawn when
+// tracks is set, else one heading for the position of pawn or of the
+// creature a follow request follows. Callers hold mu.
+func (m *CreatureMove) debugStartLocked(origin, destination location.Location, pawn Pawn, tracks bool, offset int) {
+	if m.debug.Load()&debugMove == 0 {
+		return
+	}
+	ev := event.MoveDebugStart{
+		Origin:      origin,
+		Destination: destination,
+		Route:       append([]location.Location(nil), m.waypoints...),
+		Pawn:        pawn != nil && tracks,
+		Offset:      offset,
+	}
+	followed := m.debugFollowed
+	if h, ok := pawn.(headed); ok && !tracks {
+		followed = h
+	}
+	if followed != nil {
+		ev.Followed, ev.DestinationHeading = true, followed.Heading()
+	}
+	m.debugOut = append(m.debugOut, ev)
+}
+
+// headed is a creature that faces a heading.
+type headed interface {
+	Heading() int
 }
 
 // NewCreatureMove builds movement state at origin with a non-negative ground
@@ -632,6 +720,7 @@ func (m *CreatureMove) Walkable(x, y, z int) bool {
 // state. Production chase/wander/walker accounting goes through Controller.
 func (m *CreatureMove) MoveToLocation(target location.Location) (event.Move, error) {
 	catchUp := m.mayCatchUp(nil)
+	defer m.flushDebug()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ev, _, err := m.moveToLocationLocked(target, nil, 0, false, catchUp, false)
@@ -643,8 +732,22 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (event.Move, err
 // attempts the same way a successful routed search clears that streak.
 func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (event.Move, pathFindResult, error) {
 	catchUp := m.mayCatchUp(nil)
+	defer m.flushDebug()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.moveToLocationLocked(target, nil, 0, false, catchUp, false)
+}
+
+// followToLocationWithPathOutcome is MoveToLocationWithPathOutcome toward
+// target, the position of followed: a debugged walk reports the heading
+// followed faces with it.
+func (m *CreatureMove) followToLocationWithPathOutcome(target location.Location, followed any) (event.Move, pathFindResult, error) {
+	catchUp := m.mayCatchUp(nil)
+	defer m.flushDebug()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.debugFollowed, _ = followed.(headed)
+	defer func() { m.debugFollowed = nil }()
 	return m.moveToLocationLocked(target, nil, 0, false, catchUp, false)
 }
 
@@ -653,6 +756,7 @@ func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (
 // blocked on the position update that meets it, its arrival timer included.
 func (m *CreatureMove) MoveStraightToLocation(target location.Location) (event.Move, error) {
 	catchUp := m.mayCatchUp(nil)
+	defer m.flushDebug()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ev, _, err := m.moveToLocationLocked(target, nil, 0, false, catchUp, true)
@@ -667,6 +771,7 @@ func (m *CreatureMove) MoveStraightToLocation(target location.Location) (event.M
 func (m *CreatureMove) MoveToPawnWithPathOutcome(pawn Pawn, offset int) (event.Move, pathFindResult, error) {
 	x, y, z := pawn.Position()
 	catchUp := m.mayCatchUp(pawn)
+	defer m.flushDebug()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.moveToLocationLocked(location.Location{X: x, Y: y, Z: z}, pawn, offset, true, catchUp, false)
@@ -680,6 +785,7 @@ func (m *CreatureMove) MoveToPawnWithPathOutcome(pawn Pawn, offset int) (event.M
 func (m *CreatureMove) ChasePawnWithPathOutcome(pawn Pawn, offset int) (event.Move, pathFindResult, error) {
 	x, y, z := pawn.Position()
 	catchUp := m.mayCatchUp(pawn)
+	defer m.flushDebug()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.moveToLocationLocked(location.Location{X: x, Y: y, Z: z}, pawn, offset, false, catchUp, false)
@@ -737,6 +843,7 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 		m.straight = straight
 		m.moving = true
 		m.rescheduleLocked(PositionUpdateInterval)
+		m.debugStartLocked(m.origin, target, pawn, tracks, offset)
 		return event.Move{Origin: m.origin, Destination: target, Speed: m.speed}, pathDirect, nil
 	}
 
@@ -770,6 +877,7 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	m.straight = straight
 	m.moving = true
 	m.rescheduleLocked(m.arrivalDelayLocked())
+	m.debugStartLocked(origin, destination, pawn, tracks, offset)
 
 	return event.Move{
 		Origin:      origin,
@@ -823,7 +931,10 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 		return fallback, nil, pathFailed
 	}
 
-	if path, ok := m.findPathLocked(target); ok && len(path) >= 2 {
+	if path, ok, tr := m.findPathLocked(target); ok && len(path) >= 2 {
+		if tr != nil {
+			m.debugOut = append(m.debugOut, event.PathDebug{Strokes: debugStrokes(tr)})
+		}
 		// The pathfinder returns every corner plus the final target cell,
 		// omitting the origin. Treat the first entry as the active segment
 		// and queue the rest for per-segment advancement.
@@ -837,12 +948,19 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 // findPathLocked runs the routed search from origin to target into the
 // route buffer the current waypoints do not use, keeping its grown storage
 // for the next search. The caller makes that buffer current (routeBuf) only
-// when it commits the route. Callers hold mu.
-func (m *CreatureMove) findPathLocked(target location.Location) ([]location.Location, bool) {
+// when it commits the route. A mover whose paths are debugged searches
+// traced, and gets the trace back. Callers hold mu.
+func (m *CreatureMove) findPathLocked(target location.Location) ([]location.Location, bool, *engine.Trace) {
 	next := m.routeBuf ^ 1
 	var path []location.Location
 	var ok bool
-	if g, into := m.geo.(pathIntoFinder); into {
+	var tr *engine.Trace
+	if g, traced := m.geo.(tracedPathFinder); traced && m.debug.Load()&debugPath != 0 {
+		tr = &engine.Trace{}
+		var found []location.Location
+		found, ok = g.FindPathTraced(m.origin, target, tr)
+		path = append(m.routeBufs[next][:0], found...)
+	} else if g, into := m.geo.(pathIntoFinder); into {
 		path, ok = g.FindPathInto(m.routeBufs[next][:0], m.origin, target)
 	} else {
 		var found []location.Location
@@ -850,7 +968,19 @@ func (m *CreatureMove) findPathLocked(target location.Location) ([]location.Loca
 		path = append(m.routeBufs[next][:0], found...)
 	}
 	m.routeBufs[next] = path[:0]
-	return path, ok
+	return path, ok, tr
+}
+
+// debugStrokes copies the shapes tr drew into debug strokes.
+func debugStrokes(tr *engine.Trace) []event.DebugStroke {
+	out := make([]event.DebugStroke, len(tr.Strokes))
+	for i, s := range tr.Strokes {
+		out[i] = event.DebugStroke{
+			Label: s.Label, Color: s.Color, LabelColored: s.LabelColored, Line: s.Line,
+			X: s.X, Y: s.Y, Z: s.Z, X2: s.X2, Y2: s.Y2, Z2: s.Z2,
+		}
+	}
+	return out
 }
 
 // rescheduleLocked cancels any pending arrival timer and, for a positive
@@ -900,6 +1030,7 @@ func (m *CreatureMove) onArrive(seq uint64) {
 		m.mu.Unlock()
 		return
 	}
+	from, ground := m.origin, m.moveTypeLocked() == MoveGround
 	var action func()
 	switch {
 	case pawn != nil && !known:
@@ -915,8 +1046,14 @@ func (m *CreatureMove) onArrive(seq uint64) {
 	default:
 		action = m.finishLocked()
 	}
+	to := m.origin
 	m.mu.Unlock()
 
+	// The timer stands for the position updates it ran: a debugged mover
+	// reports where they took it.
+	if owner != nil && to != from && m.DebugMove() {
+		owner.debugged(event.MoveDebugStep{From: from, To: to, Ground: ground})
+	}
 	if action != nil {
 		action()
 	}
@@ -1103,6 +1240,9 @@ type positionUpdate struct {
 	hook     func()
 	pawnStep bool
 	from, to location.Location
+	// debugStep marks a step of a mover whose moves are debugged, ground
+	// one on the ground.
+	debugStep, ground bool
 }
 
 // updatePosition runs one position update standing for step. With measured,
@@ -1161,7 +1301,7 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 		}
 		return positionUpdate{ev: m.currentEventLocked(), moving: true, hook: hook}
 	}
-	u := positionUpdate{pawnStep: tracking, from: m.origin, to: next}
+	u := positionUpdate{pawnStep: tracking, from: m.origin, to: next, debugStep: m.debug.Load()&debugMove != 0, ground: moveType == MoveGround}
 	if reached {
 		u.hook = m.finishLocked()
 		if !m.moving {

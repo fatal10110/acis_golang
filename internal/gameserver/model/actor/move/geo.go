@@ -39,6 +39,14 @@ type pathIntoFinder interface {
 
 var _ pathIntoFinder = EngineGeo{}
 
+// tracedPathFinder is a Geo whose routed search can record the shapes it
+// draws, the search a mover whose paths are debugged runs.
+type tracedPathFinder interface {
+	FindPathTraced(origin, target location.Location, tr *engine.Trace) ([]location.Location, bool)
+}
+
+var _ tracedPathFinder = EngineGeo{}
+
 // EngineGeo wires a geodata engine and a pathfinder to the Geo interface used
 // by CreatureMove. The pathfinder may be nil, in which case FindPath always
 // reports no route, leaving the engine's straight-line CanMove and the
@@ -73,6 +81,14 @@ func (g EngineGeo) FindPathInto(dst []location.Location, origin, target location
 	}
 	path, _, ok := g.Finder.FindInto(dst, origin, target)
 	return path, ok
+}
+
+// FindPathTraced is FindPath recording the shapes the search draws into tr.
+func (g EngineGeo) FindPathTraced(origin, target location.Location, tr *engine.Trace) ([]location.Location, bool) {
+	if g.Finder == nil {
+		return nil, false
+	}
+	return g.Finder.FindTraced(origin, target, tr)
 }
 
 func (g EngineGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {

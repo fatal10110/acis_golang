@@ -536,7 +536,7 @@ func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 			if e.CanSee(ox, oy, ground, tx, ty, ground) {
 				t.Error("CanSee(loaded -3000 -> null at -3000) = true, want false: null ground reads as 0, above the sight line")
 			}
-			if e.canSee(ox, oy, ground, 0, tx, ty, ground, 0, nil) {
+			if e.canSee(ox, oy, ground, 0, tx, ty, ground, 0, nil, nil) {
 				t.Error("forward canSee(loaded -3000 -> null at -3000) = true, want false: the step into null must read ground at 0")
 			}
 
@@ -564,7 +564,7 @@ func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 		ox, oy := worldX(6), worldY(0)
 		tx, ty := worldX(17), worldY(0)
 
-		if e.canSee(ox, oy, ground, 0, tx, ty, ground, 0, nil) {
+		if e.canSee(ox, oy, ground, 0, tx, ty, ground, 0, nil, nil) {
 			t.Error("forward canSee(-3000 across null strip -> -3000) = true, want false: null ground reads as 0")
 		}
 		if e.CanSee(ox, oy, ground, tx, ty, ground) {

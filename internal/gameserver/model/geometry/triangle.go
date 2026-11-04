@@ -85,6 +85,16 @@ func (t Triangle) PointAt(ba, ca float64) Point {
 	return Point{X: int(t.ax) + int(dx), Y: int(t.ay) + int(dy)}
 }
 
+// Corners returns the vertices A, B and C, B and C as A plus their edge
+// vectors.
+func (t Triangle) Corners() [3]Point {
+	return [3]Point{
+		{X: int(t.ax), Y: int(t.ay)},
+		{X: int(t.ax + t.bax), Y: int(t.ay + t.bay)},
+		{X: int(t.ax + t.cax), Y: int(t.ay + t.cay)},
+	}
+}
+
 // Center is the integer centroid of the three vertices: (Ax+Bx+Cx)/3,
 // (Ay+By+Cy)/3, truncating toward zero.
 func (t Triangle) Center() Point {

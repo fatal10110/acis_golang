@@ -190,6 +190,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.rechargeShots(live, live.Inventory(), e.Physical, e.Magic)
 	case event.Move:
 		l.broadcastLiveMoveEvent(live, e)
+	case event.MoveDebugStart, event.MoveDebugStep, event.PathDebug:
+		drawMoveDebug(l.world, live, ev)
 	case event.Flight:
 		at := live.CurrentLocation()
 		l.broadcastLiveFrame(live, func() wire.Frame {

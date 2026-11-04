@@ -104,7 +104,7 @@ func TestCollapseWaypointsHasNoDistanceCap(t *testing.T) {
 		t.Fatalf("test hop %d cells, want more than maxSmoothCells %d", hopCells, maxSmoothCells)
 	}
 
-	got := finder.collapseWaypoints(origin.X, origin.Y, origin.Z, append([]location.Location{}, path...))
+	got := finder.collapseWaypoints(origin.X, origin.Y, origin.Z, append([]location.Location{}, path...), nil)
 	want := []location.Location{path[len(path)-1]}
 	if len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("collapseWaypoints() = %#v, want %#v (fully collapsed to the target)", got, want)
@@ -163,7 +163,7 @@ func TestCollapseWaypointsKeepsWaypointBehindObstacle(t *testing.T) {
 	gap := at(wallX, 3, 0)
 	path := []location.Location{gap, at(210, 3, 0)}
 
-	got := finder.collapseWaypoints(origin.X, origin.Y, origin.Z, append([]location.Location{}, path...))
+	got := finder.collapseWaypoints(origin.X, origin.Y, origin.Z, append([]location.Location{}, path...), nil)
 	if len(got) != 2 || got[0] != gap || got[1] != path[1] {
 		t.Fatalf("collapseWaypoints() = %#v, want the gap waypoint kept: %#v", got, path)
 	}

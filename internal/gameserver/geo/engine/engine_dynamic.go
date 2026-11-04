@@ -70,6 +70,7 @@ func (e *Engine) toggleObject(obj dynamic.Object, add bool) {
 				}
 				b = dynamic.NewBlock(bx, by, base)
 				next[key] = b
+				e.overlaid.LoadOrStore(key, b.Kind() == block.KindMultilayer)
 			}
 			if add {
 				b.Add(obj)

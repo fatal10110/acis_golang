@@ -347,6 +347,12 @@ func (h *Hostile) BroadcastMove(ev event.Move) {
 	h.emit(ev)
 }
 
+// BroadcastMoveDebug shows observers ev, a debug event of this NPC's
+// debugged moves or routed searches.
+func (h *Hostile) BroadcastMoveDebug(ev event.Event) {
+	h.emit(ev)
+}
+
 // BroadcastMoveToPawn reports a rotation-only MoveToPawn notice toward
 // target, the fallback when an AI-initiated cast is rejected after
 // movement has already turned the actor toward target.

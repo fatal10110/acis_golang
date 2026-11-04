@@ -332,6 +332,8 @@ func (c *hostileControl) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()
+	case event.MoveDebugStart, event.MoveDebugStep, event.PathDebug:
+		c.hostile.BroadcastMoveDebug(ev)
 	case event.AttackEnded:
 		c.hostile.AttackEnded(e.Target)
 	case event.AttackFinished:

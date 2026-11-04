@@ -26,6 +26,7 @@ type Actor interface {
 	Located
 	ObjectID() int32
 	SyncPosition(location.Location)
+	Heading() int
 	SetHeading(int)
 	BroadcastMove(event.Move)
 	BroadcastStop()
@@ -200,6 +201,25 @@ func (c *Controller) arrived() {
 	if c.sink != nil {
 		c.sink.Emit(event.Arrived{})
 	}
+}
+
+// debugged reports a debug event of a mover whose moves or paths are
+// debugged to the sink; with no sink it is dropped.
+// A start carries the heading the actor faced before the request turned
+// it, a step the heading it faces after the step.
+func (c *Controller) debugged(ev event.Event) {
+	if c.sink == nil {
+		return
+	}
+	switch e := ev.(type) {
+	case event.MoveDebugStart:
+		e.OriginHeading = c.self.Heading()
+		ev = e
+	case event.MoveDebugStep:
+		e.Heading = c.self.Heading()
+		ev = e
+	}
+	c.sink.Emit(ev)
 }
 
 // ObjectID returns the actor id this controller moves.
@@ -531,7 +551,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		case mode == FollowOffensive:
 			ev, outcome, err = c.move.ChasePawnWithPathOutcome(target, offset)
 		default:
-			ev, outcome, err = c.move.MoveToLocationWithPathOutcome(dest)
+			ev, outcome, err = c.move.followToLocationWithPathOutcome(dest, target)
 		}
 		c.syncRetarget(before)
 		if err != nil {
@@ -773,6 +793,9 @@ func (c *Controller) PositionUpdate() bool {
 	}
 	if u.pawnStep {
 		c.self.SetHeading(u.from.HeadingTo(u.to))
+	}
+	if u.debugStep {
+		c.debugged(event.MoveDebugStep{From: u.from, To: u.to, Ground: u.ground})
 	}
 	if u.hook != nil {
 		u.hook()

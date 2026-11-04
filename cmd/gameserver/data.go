@@ -90,6 +90,7 @@ type gameData struct {
 	Admin            *admin.Data
 	Geo              *engine.Engine
 	Finder           *pathfind.Finder
+	GeoBugs          *engine.BugLog
 	Hennas           *henna.Table
 	HealSps          *skill.HealSpsTable
 	Recipes          *recipe.Table
@@ -122,6 +123,7 @@ type gameData struct {
 type geodata struct {
 	Engine        *engine.Engine
 	Finder        *pathfind.Finder
+	Bugs          *engine.BugLog
 	Dir           string
 	Type          probe.GeoType
 	EngineOptions engine.Options
@@ -290,6 +292,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Admin:            adminData,
 		Geo:              geo.Engine,
 		Finder:           geo.Finder,
+		GeoBugs:          geo.Bugs,
 		Hennas:           hennas,
 		HealSps:          healSps,
 		Recipes:          recipes,
@@ -382,5 +385,7 @@ func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 		return nil, err
 	}
 	geo.Finder = pathfind.New(geo.Engine, geo.Pathfind)
+	// Game masters' bug reports go next to the geodata.
+	geo.Bugs = engine.NewBugLog(geo.Dir)
 	return geo, nil
 }

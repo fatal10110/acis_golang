@@ -74,6 +74,8 @@ func (s *hostileSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(h.ObjectID()) })
 	case event.Move:
 		s.broadcast(func() wire.Frame { return frames.Move(h.ObjectID(), e) })
+	case event.MoveDebugStart, event.MoveDebugStep, event.PathDebug:
+		drawMoveDebug(s.world, h, ev)
 	case event.MoveToPawn:
 		s.broadcast(func() wire.Frame { return frames.MoveToPawn(h.ObjectID(), e.TargetID, e.Distance, e.Origin) })
 	case event.Stopped:
