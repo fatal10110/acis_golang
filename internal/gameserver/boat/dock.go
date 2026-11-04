@@ -64,6 +64,12 @@ var dockSites = map[route.Dock]*Dock{
 // back on.
 func (d *Dock) OustLocation() location.Location { return d.oust }
 
+// Entrance returns the ends of the dock's entrance line.
+func (d *Dock) Entrance() (Point, Point) { return d.entrance.ends() }
+
+// Exit returns the ends of the dock's exit line.
+func (d *Dock) Exit() (Point, Point) { return d.exit.ends() }
+
 // BoardingPoint is where a walk from origin toward dest crosses the dock's
 // entrance, moved along that walk by the boarding ratio of a passenger
 // (inBoat) or of someone ashore; ok is false when the walk does not cross
@@ -167,6 +173,9 @@ func roundHalfUp(v float64) int { return int(math.Floor(v + 0.5)) }
 type line struct{ x1, y1, x2, y2 int }
 
 // vector is the segment's run from its first point to its second.
+// ends returns the line's two ends.
+func (l line) ends() (Point, Point) { return Point{X: l.x1, Y: l.y1}, Point{X: l.x2, Y: l.y2} }
+
 func (l line) vector() Point { return Point{X: l.x2 - l.x1, Y: l.y2 - l.y1} }
 
 // intersection is where l and the segment from start to end cross; ok is

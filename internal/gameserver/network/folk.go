@@ -146,6 +146,8 @@ func (s *folkSink) Emit(ev event.Event) {
 	switch e := ev.(type) {
 	case event.Move:
 		s.broadcast(func() wire.Frame { return frames.Move(f.ObjectID(), e) })
+	case event.MoveDebugStart, event.MoveDebugStep, event.PathDebug:
+		drawMoveDebug(s.world, f, ev)
 	case event.Stopped:
 		x, y, z := f.Position()
 		at := location.Location{X: x, Y: y, Z: z}

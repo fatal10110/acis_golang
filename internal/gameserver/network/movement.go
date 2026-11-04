@@ -175,7 +175,8 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	}
 	// A passenger reports its deck position.
 	if live.InBoat() {
-		l.validatePassengerPosition(live, boatID, reported)
+		drift := l.validatePassengerPosition(live, boatID, reported)
+		l.drawValidatedPosition(live, reported, passengerDriftLimit, drift)
 		return
 	}
 	// ValidatePosition only corrects excessive divergence: a client that
@@ -192,6 +193,7 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	if drift > liveMoveSpeed(live) && !live.BoatMovement() {
 		live.SendFrame(serverpackets.FrameValidateLocation(live.ObjectID(), current, live.CurrentHeading()))
 	}
+	l.drawValidatedPosition(live, reported, float32(liveMoveSpeed(live)), drift)
 }
 
 func liveMoveSpeed(live *livePlayer) float64 {

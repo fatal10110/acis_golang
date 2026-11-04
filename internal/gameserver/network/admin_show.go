@@ -218,8 +218,9 @@ func (l *GameClientLink) showRestartPoints(gm *livePlayer) {
 	sendDrawing(gm, d)
 }
 
-// debugMoves holds the creatures whose moves or paths are debugged. A
-// creature that leaves the world stays held until toggled off.
+// debugMoves holds the creatures that cannot move (doors) whose moves or
+// paths are debugged; a creature that moves holds its own toggles, which
+// leave the world with it.
 type debugMoves struct {
 	mu   sync.Mutex
 	move map[world.Tracked]bool
@@ -256,7 +257,12 @@ func (l *GameClientLink) toggleDebugMove(gm *livePlayer, path bool) {
 		word, drawing = "path", "PATH"
 	}
 	state := "disabled"
-	on := l.debugMoves.toggle(target, path)
+	var on bool
+	if m, ok := target.(debugMover); ok && m.Move() != nil {
+		on = m.Move().ToggleDebug(path)
+	} else {
+		on = l.debugMoves.toggle(target, path)
+	}
 	if on {
 		state = "enabled"
 	}

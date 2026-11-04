@@ -207,6 +207,8 @@ func (o *hookOwner) blocked() {
 
 func (*hookOwner) pawnStepped(location.Location, location.Location) {}
 
+func (*hookOwner) debugged(event.Event) {}
+
 func (*hookOwner) knowsPawn(Pawn) bool  { return true }
 func (*hookOwner) mayCatchUp(Pawn) bool { return true }
 

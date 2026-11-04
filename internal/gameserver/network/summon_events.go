@@ -126,6 +126,8 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummon(actor, func() wire.Frame { return frames.Attack(e) })
 	case event.Move:
 		l.broadcastSummon(actor, func() wire.Frame { return frames.Move(actor.ObjectID(), e) })
+	case event.MoveDebugStart, event.MoveDebugStep, event.PathDebug:
+		drawMoveDebug(l.world, actor, ev)
 	case event.MoveToPawn:
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.MoveToPawn(actor.ObjectID(), e.TargetID, e.Distance, e.Origin)

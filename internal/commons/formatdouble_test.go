@@ -34,3 +34,21 @@ func TestFormatDouble(t *testing.T) {
 		}
 	}
 }
+
+// The expected strings are what the reference's String.valueOf(float)
+// prints for each value.
+func TestFormatFloat(t *testing.T) {
+	for _, tc := range []struct {
+		v    float32
+		want string
+	}{
+		{500, "500.0"},
+		{126.3, "126.3"},
+		{0.1, "0.1"},
+		{1e7, "1.0E7"},
+	} {
+		if got := FormatFloat(tc.v); got != tc.want {
+			t.Errorf("FormatFloat(%v) = %q, want %q", tc.v, got, tc.want)
+		}
+	}
+}

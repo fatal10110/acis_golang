@@ -202,6 +202,14 @@ func (c *Controller) arrived() {
 	}
 }
 
+// debugged reports a debug event of a mover whose moves or paths are
+// debugged to the sink; with no sink it is dropped.
+func (c *Controller) debugged(ev event.Event) {
+	if c.sink != nil {
+		c.sink.Emit(ev)
+	}
+}
+
 // ObjectID returns the actor id this controller moves.
 func (c *Controller) ObjectID() int32 {
 	return c.self.ObjectID()
@@ -773,6 +781,9 @@ func (c *Controller) PositionUpdate() bool {
 	}
 	if u.pawnStep {
 		c.self.SetHeading(u.from.HeadingTo(u.to))
+	}
+	if u.debugStep {
+		c.debugged(event.MoveDebugStep{From: u.from, To: u.to, Ground: u.ground})
 	}
 	if u.hook != nil {
 		u.hook()
