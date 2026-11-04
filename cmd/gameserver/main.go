@@ -246,6 +246,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideDataReloads,
 			provideGameClientLink,
 		),
+		fx.Invoke(requireDatabase),
 		fx.Invoke(reportConfigKeys),
 		fx.Invoke(buildScripts),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),

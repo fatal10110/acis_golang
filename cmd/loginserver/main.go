@@ -203,8 +203,13 @@ func provideLoginServerDatabase(lc fx.Lifecycle, cfg loginServerConfig) (*sql.DB
 		return nil, err
 	}
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error { return pool.PingContext(ctx) },
-		OnStop:  func(context.Context) error { return pool.Close() },
+		OnStart: func(ctx context.Context) error {
+			if err := pool.PingContext(ctx); err != nil {
+				return fmt.Errorf("reach database: %w", err)
+			}
+			return nil
+		},
+		OnStop: func(context.Context) error { return pool.Close() },
 	})
 	return pool, nil
 }
