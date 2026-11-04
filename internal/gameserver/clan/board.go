@@ -83,7 +83,7 @@ func (s *Service) SetIntroduction(cl *Clan, introduction string) {
 func (cl *Clan) MembersInTableOrder() []Member {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	ids := cl.memberOrder.order()
+	ids := cl.memberOrder.Order()
 	out := make([]Member, 0, len(ids))
 	for _, id := range ids {
 		out = append(out, *cl.members[id])
@@ -99,7 +99,7 @@ func (cl *Clan) MembersInTableOrder() []Member {
 func (t *Table) Clans() []*Clan {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	ids := t.order.order()
+	ids := t.order.Order()
 	out := make([]*Clan, 0, len(ids))
 	for _, id := range ids {
 		out = append(out, t.clans[id])

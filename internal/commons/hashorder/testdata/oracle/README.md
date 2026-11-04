@@ -1,7 +1,10 @@
-# Clan registry order oracle
+# Hash order oracle
 
-`../order.golden` is the expected output of `TestRegistryOrderMatchesReferenceProbe`
-(`../../order_oracle_test.go`).
+`../order.golden` (the `war` and `ops` lines) is the expected output of
+`TestOrderMatchesReferenceProbe` (`../../oracle_test.go`), the `hashorder.Set` model.
+`internal/gameserver/clan/testdata/subunit_order.golden` (the `sub` lines) is the expected output
+of `TestSubunitOrderMatchesReferenceProbe` in `internal/gameserver/clan`. `run.sh` writes both
+from one probe run.
 
 `run.sh` cuts two field declarations **verbatim** out of
 `aCis_gameserver/java/net/sf/l2j/gameserver/model/pledge/Clan.java` (only CRLF line ends are
@@ -41,7 +44,7 @@ Line formats:
 ## Regenerating
 
 ```sh
-ACIS_JAVA=/path/to/aCis_gameserver/java internal/gameserver/clan/testdata/oracle/run.sh
+ACIS_JAVA=/path/to/aCis_gameserver/java internal/commons/hashorder/testdata/oracle/run.sh
 ```
 
 Needs docker with `eclipse-temurin:21-jdk-alpine`.

@@ -42,8 +42,8 @@ func (t *Table) restoreWars(rows []WarRow, nowMs int64) {
 		if !ok {
 			continue
 		}
-		cl.wars.add(r.TargetID)
-		target.attackers.add(r.ClanID)
+		cl.wars.Add(r.TargetID)
+		target.attackers.Add(r.ClanID)
 	}
 }
 
@@ -51,7 +51,7 @@ func (t *Table) restoreWars(rows []WarRow, nowMs int64) {
 func (cl *Clan) AtWarWith(clanID int32) bool {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	return cl.wars.has(clanID)
+	return cl.wars.Has(clanID)
 }
 
 // WarList returns the clans this clan declared war on, in the order the
@@ -59,7 +59,7 @@ func (cl *Clan) AtWarWith(clanID int32) bool {
 func (cl *Clan) WarList() []int32 {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	return cl.wars.order()
+	return cl.wars.Order()
 }
 
 // AttackerList returns the clans that declared war on this clan, in the
@@ -67,7 +67,7 @@ func (cl *Clan) WarList() []int32 {
 func (cl *Clan) AttackerList() []int32 {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	return cl.attackers.order()
+	return cl.attackers.Order()
 }
 
 // lockPair write-locks a and b, in id order so two clans acting on each
@@ -156,9 +156,9 @@ func (s *Service) DeclareWar(c *player.Character, targetName string, now time.Ti
 		// Dissolved since it was looked up.
 		return War{}, WarNoSuchClan
 	}
-	attacked, atWar := cl.attackers.has(target.id), cl.wars.has(target.id)
+	attacked, atWar := cl.attackers.Has(target.id), cl.wars.Has(target.id)
 	switch {
-	case cl.wars.len() >= maxWars:
+	case cl.wars.Len() >= maxWars:
 		return War{}, WarTooMany
 	case cl.level < minWarLevel || len(cl.members) < s.cfg.MembersForWar:
 		return War{}, WarTooWeak
@@ -173,8 +173,8 @@ func (s *Service) DeclareWar(c *player.Character, targetName string, now time.Ti
 	case cl.warPenalties[target.id] > now.UnixMilli():
 		return War{Clan: cl, Target: target}, WarPenalty
 	}
-	cl.wars.add(target.id)
-	target.attackers.add(cl.id)
+	cl.wars.Add(target.id)
+	target.attackers.Add(cl.id)
 	clanID, targetID := cl.id, target.id
 	s.write(clanID, "store clan war", func(ctx context.Context, st Store) error { return st.InsertWar(ctx, clanID, targetID) })
 	return War{Clan: cl, Target: target}, WarDone
@@ -240,11 +240,11 @@ func (s *Service) EndWar(cl, target *Clan, now time.Time) bool {
 
 // endWarLocked is EndWar with both clans' mu held.
 func (s *Service) endWarLocked(cl, target *Clan, now time.Time) bool {
-	if !cl.wars.has(target.id) {
+	if !cl.wars.Has(target.id) {
 		return false
 	}
-	cl.wars.remove(target.id)
-	target.attackers.remove(cl.id)
+	cl.wars.Remove(target.id)
+	target.attackers.Remove(cl.id)
 	var expiry int64
 	if s.cfg.WarPenaltyDays > 0 {
 		expiry = now.UnixMilli() + int64(s.cfg.WarPenaltyDays)*dayMillis
