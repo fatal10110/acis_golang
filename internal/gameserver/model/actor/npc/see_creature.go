@@ -189,16 +189,16 @@ func seesCreatures(n seer) bool {
 	return hooks != nil && n.worldState() != nil && hooks.SeesCreatures(n.npcID())
 }
 
-// knownCombatants is every creature in n's surrounding regions, n
-// excluded, taken before any hook runs.
-func knownCombatants(n seer) []attackable.Combatant {
-	var out []attackable.Combatant
-	n.worldState().ForEachKnown(n, func(o world.Tracked) {
-		if c, ok := o.(attackable.Combatant); ok {
-			out = append(out, c)
-		}
-	})
-	return out
+// sightCandidate reports whether o is a creature the tick scan looks at:
+// a player or a summon. It runs under a region lock, so it only reads
+// o's kind and type.
+func sightCandidate(o world.Tracked) bool {
+	k := o.Kind()
+	if k != actor.KindPlayer && k != actor.KindSummon {
+		return false
+	}
+	_, ok := o.(attackable.Combatant)
+	return ok
 }
 
 // scanSight is the see-creature scan that opens n's periodic AI tick. It
@@ -216,8 +216,12 @@ func scanSight(n seer) {
 	raid := n.raidBoss()
 	rng := n.seeRange()
 	st := n.sightState()
-	for _, c := range knownCombatants(n) {
-		if !playable(c) || hiddenFromSight(c) {
+	// The playables around n are taken before any hook runs; a few fit the
+	// stack array, so a scan among NPCs alone allocates nothing.
+	var buf [8]world.Tracked
+	for _, o := range n.worldState().AppendKnownMatching(buf[:0], n, sightCandidate) {
+		c := o.(attackable.Combatant)
+		if hiddenFromSight(c) {
 			continue
 		}
 		inRange := inSight(n, c, rng)

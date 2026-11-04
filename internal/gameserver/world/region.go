@@ -185,6 +185,20 @@ func (r *Region) appendObjectsExcept(out []Tracked, except int32) []Tracked {
 	return append(append(out, r.objects[:i]...), r.objects[i+1:]...)
 }
 
+// appendMatchingExcept appends every object currently visible within r,
+// but the one registered under except, for which keep reports true. keep
+// runs under r's read lock.
+func (r *Region) appendMatchingExcept(out []Tracked, except int32, keep func(Tracked) bool) []Tracked {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, o := range r.objects {
+		if o.ObjectID() != except && keep(o) {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
 // dropPlayer swap-removes obj from players if it is there. The caller holds
 // mu for writing.
 func (r *Region) dropPlayer(obj Tracked) {
