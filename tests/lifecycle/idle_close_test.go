@@ -12,9 +12,9 @@ import (
 
 // The idle deadline is not waited out: ExpireIdleReads makes the wait after
 // the next frame time out at once, so each test sends one frame, reads its
-// answer, and then the ServerClose the deadline makes. The driven clock
-// counts a read loop as caught up once it waits for a frame, which the
-// expired wait does before it ends the connection, so each test stops the
+// answer, and then the ServerClose the deadline makes. The driven clock does
+// not count the expired wait as caught up, so the ServerClose read waits for
+// the frame however the goroutines are scheduled; each test then stops the
 // server, which waits for the handler, before it checks the close.
 
 // TestIdleCharacterListClosesWithServerClose leaves a client idle on the

@@ -133,6 +133,9 @@ type connTraffic struct {
 	waits atomic.Int64 // reads started: frames fully handled + 1
 	sent  atomic.Int64 // frames queued to the client
 	done  atomic.Bool  // the connection's handler returned
+	// expiresAt is the sent count that ends the wait of a read loop whose
+	// deadline had already run out when it began waiting; zero while none did.
+	expiresAt atomic.Int64
 	// parked holds the owners whose saves the handler is waiting for (empty:
 	// every owner), nil while it is not waiting.
 	parked atomic.Pointer[[]int32]
@@ -147,13 +150,32 @@ func (t *traffic) track(conn *network.Conn) (sent func(), done func()) {
 	}
 	t.conns[conn.RemoteAddr().String()] = ct
 	t.mu.Unlock()
-	conn.ObserveReads(func() { ct.waits.Add(1) })
+	conn.ObserveReads(func(timeout time.Duration) {
+		// A wait that expires at once is not a read loop idling for a frame:
+		// it ends its connection next, so it counts as caught up only once
+		// the frame it queues on the way out (ServerClose) is queued.
+		if timeout == expiredReadTimeout {
+			ct.expiresAt.Store(ct.sent.Load() + 1)
+			return
+		}
+		ct.waits.Add(1)
+	})
 	conn.ObservePersistWaits(func(owners []int32) func() {
 		owners = append([]int32{}, owners...)
 		ct.parked.Store(&owners)
 		return func() { ct.parked.Store(nil) }
 	})
 	return func() { ct.sent.Add(1) }, func() { ct.done.Store(true) }
+}
+
+// caughtUp reports whether ct's read loop has handled every frame c wrote and
+// waits for the next, or, when that wait expires at once, has queued the frame
+// it ends the connection with.
+func (ct *connTraffic) caughtUp(c *testsupport.ScriptedClient) bool {
+	if n := ct.expiresAt.Load(); n != 0 {
+		return ct.sent.Load() >= n
+	}
+	return ct.waits.Load()-1 == c.Sent()
 }
 
 func (t *traffic) conn(addr net.Addr) *connTraffic {
@@ -307,7 +329,7 @@ func (s *Server) handledAll() bool {
 		if ct == nil {
 			return false // accepted but not yet tracked
 		}
-		if !ct.done.Load() && ct.waits.Load()-1 != c.Sent() && !s.parkedOnHeldLane(ct) {
+		if !ct.done.Load() && !ct.caughtUp(c) && !s.parkedOnHeldLane(ct) {
 			return false
 		}
 	}

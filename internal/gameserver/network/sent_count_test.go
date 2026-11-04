@@ -56,7 +56,7 @@ func (f *frameCounts) track(conn *Conn) (done func()) {
 	f.mu.Lock()
 	f.conns[conn.RemoteAddr().String()] = cf
 	f.mu.Unlock()
-	conn.ObserveReads(func() { cf.reads.Add(1) })
+	conn.ObserveReads(func(time.Duration) { cf.reads.Add(1) })
 	conn.ObserveSends(func([]byte) { cf.sent.Add(1) })
 	return func() { cf.done.Store(true) }
 }
