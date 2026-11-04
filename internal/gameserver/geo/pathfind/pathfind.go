@@ -303,6 +303,7 @@ type searchScratch struct {
 	opened     nodeHeap
 	backOpened nodeHeap
 	set        nodeSet
+	cells      cellCache
 	nodes      nodeArena
 	pathNodes  []*node
 }
@@ -314,6 +315,7 @@ func (s *searchScratch) reset() {
 	s.opened = s.opened[:0]
 	s.backOpened = s.backOpened[:0]
 	s.set.reset()
+	s.cells.reset()
 	s.nodes.reset()
 	s.pathNodes = s.pathNodes[:0]
 }
@@ -383,12 +385,12 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 			continue
 		}
 		gx, gy := current.gx+step.dx, current.gy+step.dy
-		height, nswe, ok := f.candidateNSWE(gx, gy, z)
-		if !ok {
+		cell := f.readCell(&scratch.cells, gx, gy, z)
+		if !cell.ok {
 			continue
 		}
-		cardinalNSWE[i] = nswe
-		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, false)
+		cardinalNSWE[i] = cell.nswe
+		f.addCandidate(current, goal, seq, scratch, gx, gy, cell.height, cell.nswe, false)
 	}
 
 	for _, corner := range cornerSteps {
@@ -403,11 +405,11 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 		// A flank only allows the turn once its cardinal read above
 		// succeeded at this z, so that read is the flank's answer.
 		gx, gy := current.gx+corner.dx, current.gy+corner.dy
-		height, nswe, ok := f.candidateNSWE(gx, gy, z)
-		if !ok {
+		cell := f.readCell(&scratch.cells, gx, gy, z)
+		if !cell.ok {
 			continue
 		}
-		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, true)
+		f.addCandidate(current, goal, seq, scratch, gx, gy, cell.height, cell.nswe, true)
 	}
 }
 
@@ -416,11 +418,11 @@ func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *search
 	// checked against current's own cell. Both answers depend only on the
 	// cell and z, so each is resolved once per expansion.
 	z := current.z + block.CellIgnoreHeight
-	match := currentMatch{finder: f, current: current}
+	match := currentMatch{finder: f, cells: &scratch.cells, current: current}
 	var cardinal [4]cellRead
 	for i, step := range cardinalSteps {
 		gx, gy := current.gx-step.dx, current.gy-step.dy
-		cardinal[i] = f.readCell(gx, gy, z)
+		cardinal[i] = f.readCell(&scratch.cells, gx, gy, z)
 		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, cardinal[i], &match)
 		if !ok || !nswe.Allows(step.flag) {
 			continue
@@ -432,7 +434,7 @@ func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *search
 		flagX := cardinalSteps[corner.xDir].flag
 		flagY := cardinalSteps[corner.yDir].flag
 		gx, gy := current.gx-corner.dx, current.gy-corner.dy
-		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, f.readCell(gx, gy, z), &match)
+		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, f.readCell(&scratch.cells, gx, gy, z), &match)
 		if !ok || !nswe.Allows(flagX|flagY) {
 			continue
 		}
@@ -443,8 +445,8 @@ func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *search
 		candidateZ := height + block.CellIgnoreHeight
 		cellX, cellY := cardinal[corner.yDir], cardinal[corner.xDir]
 		if candidateZ != z {
-			cellX = f.readCell(gx+corner.dx, gy, candidateZ)
-			cellY = f.readCell(gx, gy+corner.dy, candidateZ)
+			cellX = f.readCell(&scratch.cells, gx+corner.dx, gy, candidateZ)
+			cellY = f.readCell(&scratch.cells, gx, gy+corner.dy, candidateZ)
 		}
 		if !cellX.ok || !cellX.nswe.Allows(flagY) {
 			continue
@@ -461,11 +463,6 @@ type cellRead struct {
 	height int
 	nswe   block.NSWE
 	ok     bool
-}
-
-func (f *Finder) readCell(gx, gy, z int) cellRead {
-	height, nswe, ok := f.candidateNSWE(gx, gy, z)
-	return cellRead{height: height, nswe: nswe, ok: ok}
 }
 
 // candidateNSWE resolves a candidate cell's own decoded height and NSWE
@@ -488,6 +485,7 @@ func (f *Finder) candidateNSWE(gx, gy, z int) (height int, nswe block.NSWE, ok b
 // alone, so each z is resolved once.
 type currentMatch struct {
 	finder  *Finder
+	cells   *cellCache
 	current *node
 	n       int
 	z       [8]int
@@ -500,8 +498,8 @@ func (m *currentMatch) at(z int) bool {
 			return m.ok[i]
 		}
 	}
-	height, _, ok := m.finder.candidateNSWE(m.current.gx, m.current.gy, z)
-	ok = ok && height == m.current.z
+	cell := m.finder.readCell(m.cells, m.current.gx, m.current.gy, z)
+	ok := cell.ok && cell.height == m.current.z
 	if m.n < len(m.z) {
 		m.z[m.n], m.ok[m.n] = z, ok
 		m.n++
