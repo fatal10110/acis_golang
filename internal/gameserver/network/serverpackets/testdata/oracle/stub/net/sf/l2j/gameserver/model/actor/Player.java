@@ -552,4 +552,23 @@ public final class Player extends Playable
 	{
 		sent.add(packet);
 	}
+
+	// The account name and bypass registry the community board and html
+	// dialog classes reference; the probe never reaches them.
+	public String getAccountName()
+	{
+		return "";
+	}
+
+	public void clearBypass()
+	{
+	}
+
+	public void addBypass(String bypass)
+	{
+	}
+
+	public void addBypass2(String bypass)
+	{
+	}
 }

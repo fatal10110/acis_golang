@@ -2,154 +2,27 @@ package serverpackets
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 )
 
-// ---- from attack_test.go ----
-// ---- from autoattack_test.go ----
-// ---- from deleteobject_test.go ----
-// ---- from flytolocation_test.go ----
-// ---- from move_test.go ----
+// FrameMove picks the packet a move event goes out as; the packets' bytes
+// are pinned by the MoveToLocation and MoveToPawn rows of
+// testdata/packets.golden.
 func TestFrameMoveLocationEvent(t *testing.T) {
-	ev := event.Move{
-		Origin:      location.Location{X: 10, Y: 20, Z: 30},
-		Destination: location.Location{X: 100, Y: 200, Z: 300},
-	}
-	got := framePayload(t, FrameMove(101, ev))
-	want := []byte{
-		0x01,
-		0x65, 0x00, 0x00, 0x00,
-		0x64, 0x00, 0x00, 0x00,
-		0xc8, 0x00, 0x00, 0x00,
-		0x2c, 0x01, 0x00, 0x00,
-		0x0a, 0x00, 0x00, 0x00,
-		0x14, 0x00, 0x00, 0x00,
-		0x1e, 0x00, 0x00, 0x00,
-	}
-	if !bytes.Equal(got, want) {
+	origin, dest := location.Location{X: 10, Y: 20, Z: 30}, location.Location{X: 100, Y: 200, Z: 300}
+	got := framePayload(t, FrameMove(101, event.Move{Origin: origin, Destination: dest}))
+	if want := framePayload(t, FrameMoveToLocation(101, dest, origin)); !bytes.Equal(got, want) {
 		t.Fatalf("FrameMove() = %x, want MoveToLocation %x", got, want)
 	}
 }
 
 func TestFrameMoveFollowEvent(t *testing.T) {
-	ev := event.Move{
-		Origin:       location.Location{X: 10, Y: 20, Z: 30},
-		FollowTarget: 202,
-		FollowOffset: 40,
-	}
-	got := framePayload(t, FrameMove(101, ev))
-	want := []byte{
-		0x60,
-		0x65, 0x00, 0x00, 0x00,
-		0xca, 0x00, 0x00, 0x00,
-		0x28, 0x00, 0x00, 0x00,
-		0x0a, 0x00, 0x00, 0x00,
-		0x14, 0x00, 0x00, 0x00,
-		0x1e, 0x00, 0x00, 0x00,
-	}
-	if !bytes.Equal(got, want) {
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	got := framePayload(t, FrameMove(101, event.Move{Origin: origin, FollowTarget: 202, FollowOffset: 40}))
+	if want := framePayload(t, FrameMoveToPawn(101, 202, 40, origin)); !bytes.Equal(got, want) {
 		t.Fatalf("FrameMove() = %x, want MoveToPawn %x", got, want)
 	}
-}
-
-// ---- from movement_control_test.go ----
-// ---- from movetolocation_test.go ----
-// ---- from movetopawn_test.go ----
-// ---- from stance_social_test.go ----
-// ---- from targeting_test.go ----
-// ---- from teleporttolocation_test.go ----
-// ---- from worldobjects_test.go ----
-type doorShape struct{}
-
-func (doorShape) GeoX() int { return 0 }
-
-func (doorShape) GeoY() int { return 0 }
-
-func (doorShape) GeoZ() int { return 0 }
-
-func (doorShape) Height() int { return 32 }
-
-func (doorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{block.NoDirections}} }
-
-func TestFrameDoorInfo(t *testing.T) {
-	gate := testDoor(t)
-
-	got := framePayload(t, FrameDoorInfo(gate, true))
-
-	want := []byte{OpcodeDoorInfo}
-	want = binary.LittleEndian.AppendUint32(want, uint32(1000))
-	want = binary.LittleEndian.AppendUint32(want, uint32(19210001))
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 253200)
-	want = binary.LittleEndian.AppendUint32(want, 253200)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	if string(got) != string(want) {
-		t.Fatalf("FrameDoorInfo() = % x, want % x", got, want)
-	}
-}
-
-func TestFrameDoorStatusUpdate(t *testing.T) {
-	gate := testDoor(t)
-
-	got := framePayload(t, FrameDoorStatusUpdate(gate, false))
-
-	want := []byte{OpcodeDoorStatusUpdate}
-	want = binary.LittleEndian.AppendUint32(want, uint32(1000))
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, uint32(19210001))
-	want = binary.LittleEndian.AppendUint32(want, 253200)
-	want = binary.LittleEndian.AppendUint32(want, 253200)
-	if string(got) != string(want) {
-		t.Fatalf("FrameDoorStatusUpdate() = % x, want % x", got, want)
-	}
-}
-
-func TestFrameStaticObjectInfo(t *testing.T) {
-	sign, err := staticobject.NewObject(1001, &staticobject.Template{ID: 41001})
-	if err != nil {
-		t.Fatalf("NewObject: %v", err)
-	}
-
-	got := framePayload(t, FrameStaticObjectInfo(sign))
-
-	want := []byte{OpcodeStaticObjectInfo}
-	want = binary.LittleEndian.AppendUint32(want, 41001)
-	want = binary.LittleEndian.AppendUint32(want, 1001)
-	if string(got) != string(want) {
-		t.Fatalf("FrameStaticObjectInfo() = % x, want % x", got, want)
-	}
-}
-
-func testDoor(t *testing.T) *door.Object {
-	t.Helper()
-	gate, err := door.NewObject(1000, &door.Template{
-		ID:       19210001,
-		Name:     "gludio_castle_outter_001",
-		Kind:     door.KindDoor,
-		Level:    1,
-		Position: location.Location{X: -18408, Y: 113064, Z: -2768},
-		Coordinates: []location.Point{
-			{X: -18481, Y: 113059},
-			{X: -18351, Y: 113059},
-			{X: -18351, Y: 113071},
-			{X: -18481, Y: 113071},
-		},
-		HP: 253200, PDef: 644, MDef: 518, Height: 320,
-	}, doorShape{})
-	if err != nil {
-		t.Fatalf("NewObject: %v", err)
-	}
-	return gate
 }

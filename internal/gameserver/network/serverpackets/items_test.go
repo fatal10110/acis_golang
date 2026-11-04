@@ -8,15 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
-// ---- from enchant_test.go ----
-func TestFrameEnchantResult(t *testing.T) {
-	got := framePayload(t, FrameEnchantResult(EnchantResultCancelled))
-	want := []byte{OpcodeEnchantResult, 0x02, 0x00, 0x00, 0x00}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameEnchantResult() = %x, want %x", got, want)
-	}
-}
-
 // TestWriteItemListNoAuxiliaryAllocation guards against writeItemList
 // reintroducing a filtered snapshot slice: with a pre-sized Writer and
 // already-locked item.Instances, encoding must not allocate.
@@ -56,56 +47,5 @@ func TestWriteItemListNoAuxiliaryAllocation(t *testing.T) {
 	}
 	if !bytes.Equal(w.Bytes(), warm) {
 		t.Errorf("writeItemList output changed across repeated runs:\n got  %x\n want %x", w.Bytes(), warm)
-	}
-}
-
-func TestFrameExShowVariationWindows(t *testing.T) {
-	got := framePayload(t, FrameExShowVariationMakeWindow())
-	want := []byte{OpcodeExtended}
-	want = appendH(want, OpcodeExShowVariationMakeWindow)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExShowVariationMakeWindow() = %x, want %x", got, want)
-	}
-
-	got = framePayload(t, FrameExShowVariationCancelWindow())
-	want = []byte{OpcodeExtended}
-	want = appendH(want, OpcodeExShowVariationCancelWindow)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExShowVariationCancelWindow() = %x, want %x", got, want)
-	}
-}
-
-// TestFrameExShowQuestInfo pins the quest information window: writeC(0xfe)
-// then writeH(0x19), nothing more (ExShowQuestInfo.java).
-func TestFrameExShowQuestInfo(t *testing.T) {
-	if got, want := framePayload(t, FrameExShowQuestInfo()), []byte{0xfe, 0x19, 0x00}; !bytes.Equal(got, want) {
-		t.Fatalf("FrameExShowQuestInfo() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameExConfirmCancelItem(t *testing.T) {
-	got := framePayload(t, FrameExConfirmCancelItem(1000, 7575, 0x12345678, 390000))
-	want := []byte{OpcodeExtended}
-	want = appendH(want, OpcodeExConfirmCancelItem)
-	want = appendD(want, 1000)
-	want = appendD(want, 7575)
-	want = appendD(want, 0x5678)
-	want = appendD(want, 0x1234)
-	want = appendQ(want, 390000)
-	want = appendD(want, 1)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExConfirmCancelItem() = %x, want %x", got, want)
-	}
-}
-
-func TestFrameExVariationResultFailed(t *testing.T) {
-	got := framePayload(t, FrameExVariationResultFailed())
-	want := []byte{OpcodeExtended}
-	want = appendH(want, OpcodeExVariationResult)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	want = appendD(want, 0)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameExVariationResultFailed() = %x, want %x", got, want)
 	}
 }

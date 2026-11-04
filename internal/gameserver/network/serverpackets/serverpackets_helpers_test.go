@@ -46,8 +46,3 @@ func framePayload(t *testing.T, frame wire.Frame) []byte {
 	}
 	return bytes[2:]
 }
-
-// ---- from variation_test.go ----
-func appendQ(b []byte, v int64) []byte {
-	return binary.LittleEndian.AppendUint64(b, uint64(v))
-}

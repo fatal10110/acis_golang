@@ -3,7 +3,8 @@ package net.sf.l2j;
 // Stand-in for the reference configuration class: the packet base class reads
 // the debug flag, the manor seed limits the drop rate, and the player and
 // creature info packets read the display switches (all off, as the shipped
-// defaults).
+// defaults); the fishing and version packets read their switches, which the
+// probe flips.
 public final class Config
 {
 	public static boolean PACKET_HANDLER_DEBUG = false;
@@ -16,4 +17,6 @@ public final class Config
 	public static int MINIMUM_CLAN_LEVEL = 5;
 	public static int WEAR_PRICE = 10;
 	public static double RATE_SIEGE_GUARDS_PRICE = 1.0;
+	public static boolean ALLOW_FISH_CHAMPIONSHIP = false;
+	public static boolean USE_BLOWFISH_CIPHER = true;
 }
