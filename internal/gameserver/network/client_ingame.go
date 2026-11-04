@@ -493,12 +493,7 @@ func (l *GameClientLink) handleRequestRestart(ctx context.Context, cs *connState
 	cs.entering = nil
 	client.SetState(StateAuthed)
 	session.SendFrame(serverpackets.FrameRestartResponse(true))
-	list, err := l.sendCharSelectInfo(ctx, client)
-	if err != nil {
-		l.log.Error().Err(err).Msg("list characters")
-		return errDisconnect
-	}
-	cs.chars = list
+	cs.chars = l.sendCharSelectInfo(ctx, client)
 	return nil
 }
 

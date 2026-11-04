@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
@@ -120,6 +121,7 @@ type options struct {
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
+	dbFault                *dbtest.Fault
 	selectionHold          func(objectID int32)
 	scripts                *scriptOptions
 	memoLoadErr            error
@@ -1994,7 +1996,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		o.log = zerolog.New(logs)
 	}
 
-	db := sqltest.SharedDB(t)
+	// The server's stores use db; seeds, Server.DB and the login acceptor,
+	// which stands for a server with its own database, use rowsDB, which a
+	// WithDBFault fault never takes away.
+	rowsDB := sqltest.SharedDB(t)
+	db := rowsDB
+	if o.dbFault != nil {
+		db = o.dbFault.Wrap(t, rowsDB)
+	}
 	chars := gamesql.NewCharacterStore(db)
 	items := gamesql.NewItemStore(db)
 	shortcuts := gamesql.NewShortcutStore(db)
@@ -2037,7 +2046,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		cursed = o.cursedWeapons[0]
 	}
 
-	loginAddr, login := startLoginServerAcceptor(t, loginsql.NewAccountStore(db))
+	loginAddr, login := startLoginServerAcceptor(t, loginsql.NewAccountStore(rowsDB))
 	servers, sessions := login.servers, login.sessions
 	servers.Register(1, HexID)
 	shutdownState := newShutdownHarness(servers)
@@ -2731,7 +2740,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		itemTable:           itemTemplates,
 		levelTable:          levels,
 		rewardBook:          killRewards,
-		DB:                  db,
+		DB:                  rowsDB,
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,
 		cursedLink:          gcl,

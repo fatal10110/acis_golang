@@ -48,12 +48,7 @@ func (l *GameClientLink) handleAuthLogin(ctx context.Context, cs *connState, req
 		return errDisconnect
 	}
 	session.CompleteHandshake()
-	list, err := l.sendCharSelectInfo(ctx, client)
-	if err != nil {
-		l.log.Error().Err(err).Str("account", client.AccountName()).Msg("list characters")
-		return errDisconnect
-	}
-	cs.chars = list
+	cs.chars = l.sendCharSelectInfo(ctx, client)
 	return nil
 }
 
@@ -72,8 +67,11 @@ func (l *GameClientLink) handleRequestCharacterCreate(ctx context.Context, cs *c
 		AccessLevel: l.playerConfig().DefaultAccessLevel,
 	})
 	if err != nil {
+		// A character the database could not store fails like any other
+		// refused creation; the client stays at character creation.
 		l.log.Error().Err(err).Str("account", client.AccountName()).Msg("create character")
-		return errDisconnect
+		session.SendFrame(serverpackets.FrameCharCreateFail(serverpackets.CharCreateFailReasonCreationFailed))
+		return nil
 	}
 	if outcome != manager.CreateOK {
 		session.SendFrame(serverpackets.FrameCharCreateFail(createFailReason(outcome)))
@@ -83,12 +81,7 @@ func (l *GameClientLink) handleRequestCharacterCreate(ctx context.Context, cs *c
 	if l.scripts != nil {
 		l.scripts.CharacterCreated(created)
 	}
-	list, err := l.sendCharSelectInfo(ctx, client)
-	if err != nil {
-		l.log.Error().Err(err).Msg("list characters")
-		return errDisconnect
-	}
-	cs.chars = list
+	cs.chars = l.sendCharSelectInfo(ctx, client)
 	return nil
 }
 
@@ -107,12 +100,7 @@ func (l *GameClientLink) handleRequestCharacterDelete(ctx context.Context, cs *c
 	if !ok {
 		// An unknown slot sends no failure reply — only the
 		// refreshed character list every delete attempt ends with.
-		list, err := l.sendCharSelectInfo(ctx, client)
-		if err != nil {
-			l.log.Error().Err(err).Msg("list characters")
-			return errDisconnect
-		}
-		cs.chars = list
+		cs.chars = l.sendCharSelectInfo(ctx, client)
 		return nil
 	}
 	// A clan's members and leader may not be deleted. The roster
@@ -139,12 +127,7 @@ func (l *GameClientLink) handleRequestCharacterDelete(ctx context.Context, cs *c
 	} else {
 		session.SendFrame(serverpackets.FrameCharDeleteOk())
 	}
-	list, err := l.sendCharSelectInfo(ctx, client)
-	if err != nil {
-		l.log.Error().Err(err).Msg("list characters")
-		return errDisconnect
-	}
-	cs.chars = list
+	cs.chars = l.sendCharSelectInfo(ctx, client)
 	return nil
 }
 
@@ -162,12 +145,7 @@ func (l *GameClientLink) handleCharacterRestore(ctx context.Context, cs *connSta
 			l.log.Error().Err(err).Msg("restore character")
 		}
 	}
-	list, err := l.sendCharSelectInfo(ctx, client)
-	if err != nil {
-		l.log.Error().Err(err).Msg("list characters")
-		return errDisconnect
-	}
-	cs.chars = list
+	cs.chars = l.sendCharSelectInfo(ctx, client)
 	return nil
 }
 
@@ -251,14 +229,8 @@ func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connSta
 		// left without an answer stays waiting on it. The character list is
 		// what returns a client to character select after a restart or a
 		// delete, so it answers here too: the player is back at the list and
-		// can retry. A list that cannot be read either ends the connection,
-		// as it does for those requests.
-		list, err := l.sendCharSelectInfo(ctx, client)
-		if err != nil {
-			l.log.Error().Err(err).Msg("list characters")
-			return errDisconnect
-		}
-		cs.chars = list
+		// can retry. With the database down the list goes out empty.
+		cs.chars = l.sendCharSelectInfo(ctx, client)
 	}
 	return nil
 }

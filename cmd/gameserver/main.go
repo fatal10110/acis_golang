@@ -65,8 +65,8 @@ const (
 		fishchamp.TaskTimeout + shutdownSaveTimeout + // fishing_championship and its server_memo end, behind a save already running
 		castlemanor.TaskTimeout + shutdownSaveTimeout + // castle_manor_production and castle_manor_procure, behind a save already running
 		gameServerStopSlack
-	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
-	// restore, spawn-state load). These run inside fx.New's constructor graph,
+	// gameServerBootTimeout bounds constructor-time DB I/O (the reachability
+	// ping, id scan, ground-item restore, spawn-state load). These run inside fx.New's constructor graph,
 	// before fx.StartTimeout applies and before Run installs signal handling,
 	// so with context.Background() a stuck database hung the process with no
 	// way to interrupt it. idfactory.New alone runs six full-table scans plus
@@ -75,8 +75,7 @@ const (
 	// genuinely hung database ever trips it, not a large but healthy one.
 	gameServerBootTimeout = 5 * time.Minute
 	// gameServerStartTimeout bounds the OnStart phase, which fx runs with one
-	// shared context across every hook: pool.PingContext, sevensigns.State's
-	// Restore, clearing the previous shutdown's items_on_ground snapshot
+	// shared context across every hook: sevensigns.State's Restore, clearing the previous shutdown's items_on_ground snapshot
 	// (startGroundItems), and the game listener bind. fx's 15s default was
 	// sized before any of these touched the database; explicit and separate
 	// from gameServerBootTimeout so this budget can be tuned on its own.
@@ -246,6 +245,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideDataReloads,
 			provideGameClientLink,
 		),
+		fx.Invoke(requireDatabase),
 		fx.Invoke(reportConfigKeys),
 		fx.Invoke(buildScripts),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),

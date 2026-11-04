@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"time"
 
@@ -71,17 +72,27 @@ func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Lo
 	return rt.Logger, gmAuditLogger(rt.GMAudit), chatLogger(rt.Chat), itemLogger(rt.Item), nil
 }
 
-func provideGameServerDatabase(lc fx.Lifecycle, cfg gameServerConfig) (*sql.DB, error) {
+// provideGameServerDatabase opens the pool and reaches the database once,
+// within the boot deadline. A server that cannot reach it refuses to boot:
+// its object ids would be handed out from an empty used set, and its empty
+// clan, castle and hero tables would later be written over the stored ones.
+func provideGameServerDatabase(lc fx.Lifecycle, ctx bootContext, cfg gameServerConfig) (*sql.DB, error) {
 	pool, err := db.Open(cfg.Database)
 	if err != nil {
 		return nil, err
 	}
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error { return pool.PingContext(ctx) },
-		OnStop:  func(context.Context) error { return pool.Close() },
-	})
+	if err := pool.PingContext(ctx); err != nil {
+		_ = pool.Close()
+		return nil, fmt.Errorf("reach database: %w", err)
+	}
+	lc.Append(fx.Hook{OnStop: func(context.Context) error { return pool.Close() }})
 	return pool, nil
 }
+
+// requireDatabase builds the database pool before anything else, so an
+// unreachable database refuses the boot at once rather than after the
+// datapack has loaded.
+func requireDatabase(*sql.DB) {}
 
 // providePersist starts the persistence worker that runs player, pet and item
 // writes. It takes the pool so fx builds the database first and therefore
