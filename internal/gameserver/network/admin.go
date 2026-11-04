@@ -101,6 +101,10 @@ var adminCommands = map[string]adminCommand{
 	"admin_show": (*GameClientLink).adminShow,
 	"admin_zone": (*GameClientLink).adminZone,
 
+	// Geodata and path finding probes; see admin_geo.go.
+	"admin_geo":  (*GameClientLink).adminGeo,
+	"admin_path": (*GameClientLink).adminPath,
+
 	// Olympiad and heroes; see admin_olympiad.go.
 	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
 	"admin_sethero": (*GameClientLink).adminSetHero,

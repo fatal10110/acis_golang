@@ -339,20 +339,23 @@ type GameClientLink struct {
 	npcs          *npc.Table
 	doors         WorldDoors
 	geo           move.Geo
-	zones         *zone.Index
-	ids           idAllocator
-	effects       effect.Env
-	positions     *task.PositionUpdates
-	gameClock     *task.GameClock
-	shutdown      *shutdown.Countdown
-	loginStatus   *LoginStatus
-	sevenSigns    *sevensigns.State
-	festival      *festival.Manager
-	olympiad      *olympiad.Olympiad
-	heroes        *hero.Manager
-	raidPoints    *raidpoint.Points
-	water         *task.Water
-	shadowItems   *task.ShadowItems
+	// geoBugs saves //geo bug reports; nil when the report file did not
+	// open.
+	geoBugs     *engine.BugLog
+	zones       *zone.Index
+	ids         idAllocator
+	effects     effect.Env
+	positions   *task.PositionUpdates
+	gameClock   *task.GameClock
+	shutdown    *shutdown.Countdown
+	loginStatus *LoginStatus
+	sevenSigns  *sevensigns.State
+	festival    *festival.Manager
+	olympiad    *olympiad.Olympiad
+	heroes      *hero.Manager
+	raidPoints  *raidpoint.Points
+	water       *task.Water
+	shadowItems *task.ShadowItems
 	// persist runs this link's database writes for detached players, pets
 	// and containers on per-owner lanes.
 	persist *persist.Worker
@@ -583,8 +586,10 @@ type GameClientLinkConfig struct {
 	NPCs          *npc.Table
 	Doors         WorldDoors
 	Geo           move.Geo
-	Zones         *zone.Index
-	IDs           idAllocator
+	// GeoBugs saves game masters' geodata bug reports; nil saves none.
+	GeoBugs *engine.BugLog
+	Zones   *zone.Index
+	IDs     idAllocator
 	// Fences are the fences //spawnfence places; without them the link
 	// places fences on no geodata.
 	Fences    *fence.Manager
@@ -847,6 +852,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		npcs:          cfg.NPCs,
 		doors:         cfg.Doors,
 		geo:           cfg.Geo,
+		geoBugs:       cfg.GeoBugs,
 		zones:         cfg.Zones,
 		ids:           cfg.IDs,
 		effects:       cfg.Effects,

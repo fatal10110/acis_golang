@@ -13,9 +13,9 @@ const OpcodeExServerPrimitive uint16 = 0x0024
 
 // Primitive colors, 0xRRGGBB.
 const (
-	PrimitiveWhite  uint32 = 0xffffff
-	PrimitiveRed    uint32 = 0xff0000
-	PrimitiveGreen  uint32 = 0x00ff00
+	PrimitiveWhite   uint32 = 0xffffff
+	PrimitiveRed     uint32 = 0xff0000
+	PrimitiveGreen   uint32 = 0x00ff00
 	PrimitiveYellow  uint32 = 0xffff00
 	PrimitiveBlue    uint32 = 0x0000ff
 	PrimitiveCyan    uint32 = 0x00ffff

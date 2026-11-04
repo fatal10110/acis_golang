@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"math"
 	"net"
 	"os"
@@ -277,6 +278,7 @@ type options struct {
 	classMaster            classmaster.Config
 	log                    zerolog.Logger
 	geo                    move.Geo
+	geoBugs                *engine.BugLog
 	itemTemplates          *item.Table
 	productionTickers      bool
 	handAI                 bool
@@ -1032,6 +1034,10 @@ func WithRealPool() Option { return func(o *options) { o.realPool = true } }
 // WithGeo supplies the movement geodata collaborator wired into live
 // players. The default is the always-passable Geo double.
 func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
+
+// WithGeoBugLog saves game masters' geodata bug reports to log; without it
+// the server saves none.
+func WithGeoBugLog(log *engine.BugLog) Option { return func(o *options) { o.geoBugs = log } }
 
 // WithProductionTickers starts the recurring tasks the production boot runs
 // on the move/attack path — position updates, effects, attack stance,
@@ -2310,6 +2316,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		World:            state,
 		NPCs:             o.npcs,
 		Geo:              bootGeo(o.geo),
+		GeoBugs:          o.geoBugs,
 		IDs:              ids,
 		Positions:        positions,
 		GameClock:        task.NewGameClock(time.Now),

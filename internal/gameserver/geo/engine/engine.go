@@ -79,6 +79,12 @@ func (e *Engine) MaxObstacleHeight() int {
 	return e.maxObstacleHeight
 }
 
+// PartOfCharacterHeight returns the percentage of an actor's full body
+// height that counts for line of sight.
+func (e *Engine) PartOfCharacterHeight() int {
+	return e.partOfCharacterHeight
+}
+
 // SightHeight converts an actor's collision height into its line-of-sight
 // eye height: real creature height is collision height * 2, of which the
 // configured PartOfCharacterHeight percentage counts for visibility.

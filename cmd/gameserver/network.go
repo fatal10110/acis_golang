@@ -210,6 +210,7 @@ func provideGameClientLink(
 		NPCs:          data.NPCs,
 		Doors:         worldObjects,
 		Geo:           move.NewGeo(data.Geo, data.Finder),
+		GeoBugs:       data.GeoBugs,
 		Zones:         data.Zones,
 		IDs:           ids,
 		Fences:        fence.NewManager(data.Geo, state, ids),
