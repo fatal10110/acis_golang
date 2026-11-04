@@ -297,7 +297,7 @@ func addHennaCases(m map[string]func() wire.Frame, v [10]int32, n string) {
 	m["HennaUnequipList"+n] = func() wire.Frame { return FrameHennaUnequipList(adena, int(rowField(v, 4)), hennas) }
 	m["HennaItemInfo"+n] = func() wire.Frame { return FrameHennaItemInfo(hennas[0], adena, now) }
 	m["HennaItemUnequipInfo"+n] = func() wire.Frame { return FrameHennaItemUnequipInfo(hennas[1], adena, now) }
-	m["HennaInfo"+n] = func() wire.Frame {
+	equipped := func() henna.Snapshot {
 		snap := henna.Snapshot{
 			INT: now.INT, STR: now.STR, CON: now.CON, MEN: now.MEN, DEX: now.DEX, WIT: now.WIT,
 			MaxSlots: int(rowField(v, 3)),
@@ -309,6 +309,8 @@ func addHennaCases(m map[string]func() wire.Frame, v [10]int32, n string) {
 			}
 			snap.Equipped = append(snap.Equipped, e)
 		}
-		return FrameHennaInfo(snap)
+		return snap
 	}
+	m["HennaInfo"+n] = func() wire.Frame { return FrameHennaInfo(equipped()) }
+	m["GMHennaInfo"+n] = func() wire.Frame { return FrameGMHennaInfo(equipped()) }
 }

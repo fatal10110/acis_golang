@@ -84,6 +84,7 @@ func TestGameInboundServesInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestBBSWrite,
 		clientpackets.OpcodeSendBypassBuildCmd,
 		clientpackets.OpcodeRequestGmList,
+		clientpackets.OpcodeRequestGMCommand,
 		clientpackets.OpcodeRequestPetition,
 		clientpackets.OpcodeRequestPetitionCancel,
 		clientpackets.OpcodePetitionVote,

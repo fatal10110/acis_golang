@@ -183,6 +183,13 @@ import (
 // competition is over (results, seal validation) the reference sends
 // nothing, and the record window holds no pending action. tests/lifecycle
 // asserts that silence.
+//
+// RequestGMCommand is absent where the reference is silent: a player who is
+// not a game master or whose access level does not open the character
+// window, a name no online player carries (nor, for the warehouse view, a
+// clan), the clan view of a clanless player and a view number outside 1-6.
+// The character window (Alt+G) holds no pending client action; tests/admin
+// asserts those silences.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 

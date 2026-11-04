@@ -303,6 +303,7 @@ final class ProbeShops
 			p.hennaList.stats[i] = f(v, i);
 		p.hennaList.unusable.add(p.hennaList.hennas.get(1).symbolId());
 		PacketProbe.emit("HennaInfo" + n, new HennaInfo(p));
+		PacketProbe.emit("GMHennaInfo" + n, new GMHennaInfo(p));
 		HennaData.getInstance().hennas.clear();
 	}
 }
