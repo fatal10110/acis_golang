@@ -1,5 +1,6 @@
 package net.sf.l2j.gameserver.model.pledge;
 
+import net.sf.l2j.gameserver.model.itemcontainer.PcInventory;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,6 +40,13 @@ public final class Clan
 	public final Map<Integer, SubPledge> subPledges = new ConcurrentHashMap<>();
 	public final Map<Integer, Integer> privileges = new ConcurrentHashMap<>();
 	public final Map<Integer, L2Skill> skills = new ConcurrentHashMap<>();
+
+	public final PcInventory warehouse = new PcInventory();
+
+	public PcInventory getWarehouse()
+	{
+		return warehouse;
+	}
 
 	public boolean hasClanHall()
 	{

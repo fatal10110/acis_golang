@@ -490,6 +490,11 @@ public final class Player extends Playable
 		return warehouse;
 	}
 
+	public PcInventory getWarehouse()
+	{
+		return warehouse;
+	}
+
 	public TradeList getActiveTradeList()
 	{
 		return activeTradeList;

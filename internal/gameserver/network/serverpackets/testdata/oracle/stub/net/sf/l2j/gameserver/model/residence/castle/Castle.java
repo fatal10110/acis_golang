@@ -22,9 +22,11 @@ public final class Castle
 		return _id;
 	}
 
-	// The clan holding the castle; read by the creature info packets.
+	// The clan holding the castle; read by the creature info and siege packets.
+	public int ownerId;
+
 	public int getOwnerId()
 	{
-		return 0;
+		return ownerId;
 	}
 }

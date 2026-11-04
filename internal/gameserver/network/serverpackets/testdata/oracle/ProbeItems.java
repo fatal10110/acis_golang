@@ -12,6 +12,7 @@ import net.sf.l2j.gameserver.model.actor.instance.Pet;
 import net.sf.l2j.gameserver.model.item.instance.ItemInfo;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
 import net.sf.l2j.gameserver.model.item.kind.Item;
+import net.sf.l2j.gameserver.model.item.kind.Weapon;
 import net.sf.l2j.gameserver.network.GameClient;
 import net.sf.l2j.gameserver.network.serverpackets.*;
 
@@ -38,11 +39,13 @@ final class ProbeItems
 
 	static Item template(int kind, int[] v)
 	{
-		final Item i = new Item();
+		final Item i = kind == WEAPON ? new Weapon() : new Item();
 		i.referencePrice = f(v, kind + 9);
 		switch (kind)
 		{
 			case WEAPON:
+				((Weapon) i).soulShotCount = f(v, 7);
+				((Weapon) i).spiritShotCount = f(v, 8);
 				i.itemId = 2368;
 				i.type1 = 0;
 				i.type2 = 0;

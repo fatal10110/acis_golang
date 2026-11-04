@@ -30,7 +30,7 @@ func oracleItemTable(v [10]int32) *item.Table {
 	templates := []*item.Template{
 		{
 			ID: 2368, Kind: item.KindWeapon, Slot: item.SlotLRHand, Duration: -1, Crystal: item.CrystalC, ReferencePrice: price(oracleWeapon),
-			Weapon: &item.WeaponDetail{},
+			Weapon: &item.WeaponDetail{SoulshotCount: rowField(v, 7), SpiritshotCount: rowField(v, 8)},
 		},
 		{
 			ID: 1146, Kind: item.KindArmor, Slot: item.SlotChest, Duration: 60, Crystal: item.CrystalB, ReferencePrice: price(oracleArmor),

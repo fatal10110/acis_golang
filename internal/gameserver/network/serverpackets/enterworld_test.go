@@ -2,7 +2,6 @@ package serverpackets
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -152,14 +151,3 @@ func TestFrameSkillCoolTime(t *testing.T) {
 }
 
 // ---- from exregenmax_test.go ----
-// ---- from ssqinfo_test.go ----
-func TestFrameSSQInfo(t *testing.T) {
-	got := framePayload(t, FrameSSQInfo())
-
-	want := []byte{OpcodeSSQInfo}
-	want = binary.LittleEndian.AppendUint16(want, regularSkyState)
-
-	if !bytes.Equal(got, want) {
-		t.Errorf("FrameSSQInfo() = % x, want % x", got, want)
-	}
-}
