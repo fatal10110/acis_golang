@@ -105,6 +105,12 @@ var adminCommands = map[string]adminCommand{
 	"admin_geo":  (*GameClientLink).adminGeo,
 	"admin_path": (*GameClientLink).adminPath,
 
+	// Npcmakers and their territories; see admin_maker.go.
+	"admin_maker":         (*GameClientLink).adminMaker,
+	"admin_terr":          (*GameClientLink).adminTerritory,
+	"admin_spawn_event":   (*GameClientLink).adminSpawnEvent,
+	"admin_despawn_event": (*GameClientLink).adminDespawnEvent,
+
 	// Olympiad and heroes; see admin_olympiad.go.
 	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
 	"admin_sethero": (*GameClientLink).adminSetHero,

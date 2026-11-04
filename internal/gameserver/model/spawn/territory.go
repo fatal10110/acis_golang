@@ -77,6 +77,16 @@ func (t *Territory) Area() float64 {
 	return shape.Area()
 }
 
+// Triangles returns the triangles of the territory footprint, in shape
+// order.
+func (t *Territory) Triangles() []geometry.Triangle {
+	shape := t.geometryTerritory()
+	if shape == nil {
+		return nil
+	}
+	return shape.AppendTriangles(nil)
+}
+
 // Intersects reports whether this territory overlaps other.
 func (t *Territory) Intersects(other *geometry.Territory) bool {
 	shape := t.geometryTerritory()

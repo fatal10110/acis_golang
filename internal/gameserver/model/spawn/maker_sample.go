@@ -40,12 +40,34 @@ func (m *Maker) RandomLocation(geo Terrain, excludeBanned bool) (loc location.Lo
 		return location.Location{}, false
 	}
 	minZ, maxZ, hasZ := m.MergedZRange()
-	triangles := m.Triangles()
+	if !hasZ {
+		return location.Location{}, false
+	}
+	var banned func(location.Location) bool
+	if excludeBanned {
+		banned = m.ContainsBanned
+	}
+	return randomLocation(m.Triangles(), minZ, maxZ, banned, geo)
+}
+
+// RandomLocation draws a point in t as Maker.RandomLocation does for a
+// maker with t as its only territory and no banned territory.
+func (t *Territory) RandomLocation(geo Terrain) (loc location.Location, ok bool) {
+	if t == nil {
+		return location.Location{}, false
+	}
+	return randomLocation(t.Triangles(), t.MinZ, t.MaxZ, nil, geo)
+}
+
+// randomLocation draws a point in triangles, Z within minZ..maxZ, redrawing
+// without counting a draw banned reports (nil for none); see
+// Maker.RandomLocation.
+func randomLocation(triangles []geometry.Triangle, minZ, maxZ int, banned func(location.Location) bool, geo Terrain) (loc location.Location, ok bool) {
 	var total int64
 	for _, tri := range triangles {
 		total += tri.Size()
 	}
-	if !hasZ || total <= 0 {
+	if total <= 0 {
 		return location.Location{}, false
 	}
 	avgZ := (minZ + maxZ) / 2
@@ -55,7 +77,7 @@ func (m *Maker) RandomLocation(geo Terrain, excludeBanned bool) (loc location.Lo
 		tri := pickTriangle(triangles, int64(rnd.Get(int(total))))
 		pt := tri.PointAt(rnd.GetFloat(1), rnd.GetFloat(1))
 		candidate := location.Location{X: pt.X, Y: pt.Y, Z: int(geo.Height(pt.X, pt.Y, avgZ))}
-		if excludeBanned && m.ContainsBanned(candidate) {
+		if banned != nil && banned(candidate) {
 			continue
 		}
 		loc, ok = candidate, true

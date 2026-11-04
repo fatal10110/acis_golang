@@ -2,7 +2,10 @@ package spawn
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
 )
 
 // Table is the full in-memory result of loading spawnlist XML files.
@@ -13,6 +16,10 @@ type Table struct {
 	// order is makers in list order: the order they were handed in,
 	// which is the spawnlist's file and declaration order.
 	order []*Maker
+	// grouped are the merged territories of the makers naming several, by
+	// maker: its territory and its banned territory, nil where it names
+	// fewer than two.
+	grouped map[*Maker][2]*Territory
 }
 
 // NewTable builds a Table from already-validated territories and makers,
@@ -47,13 +54,77 @@ func NewTable(territories []*Territory, makers []*Maker) (*Table, error) {
 	}
 
 	order := append([]*Maker(nil), makers...)
+	grouped := groupTerritories(order, territoryMap)
 
 	return &Table{
 		territories:    territoryMap,
 		territoryCount: len(territories),
 		makers:         makerMap,
 		order:          order,
+		grouped:        grouped,
 	}, nil
+}
+
+// groupTerritories merges the territories of every maker naming several
+// into one, named grouped_NNN by a counter that runs over the makers in
+// list order, each maker's territory before its banned territory. Each
+// merged territory spans the members' lowest to highest Z over all their
+// triangles, and resolves by name in byName too.
+func groupTerritories(makers []*Maker, byName map[string]*Territory) map[*Maker][2]*Territory {
+	grouped := map[*Maker][2]*Territory{}
+	next := 0
+	merge := func(members []*Territory) *Territory {
+		if len(members) < 2 {
+			return nil
+		}
+		name := fmt.Sprintf("grouped_%03d", next)
+		next++
+		minZ, maxZ, ok := mergedZRange(members)
+		var shapes []geometry.Shape
+		for _, t := range members {
+			if shape := t.geometryTerritory(); shape != nil {
+				shapes = append(shapes, shape.Shapes...)
+			}
+		}
+		shape, err := geometry.NewTerritory(minZ, maxZ, shapes...)
+		if !ok || err != nil {
+			return nil
+		}
+		t := &Territory{Name: name, MinZ: minZ, MaxZ: maxZ, Territory: shape}
+		if _, taken := byName[name]; !taken {
+			byName[name] = t
+		}
+		return t
+	}
+	for _, m := range makers {
+		pair := [2]*Territory{merge(m.Territories), merge(m.BannedTerritories)}
+		if pair[0] != nil || pair[1] != nil {
+			grouped[m] = pair
+		}
+	}
+	return grouped
+}
+
+// MakerTerritory returns the territory m spawns in as one: the only one it
+// names, or the merged territory of the several it names. It is nil when m
+// names none.
+func (t *Table) MakerTerritory(m *Maker) *Territory {
+	return t.territoryOf(m, m.Territories, 0)
+}
+
+// MakerBannedTerritory is MakerTerritory for m's banned territories.
+func (t *Table) MakerBannedTerritory(m *Maker) *Territory {
+	return t.territoryOf(m, m.BannedTerritories, 1)
+}
+
+func (t *Table) territoryOf(m *Maker, members []*Territory, i int) *Territory {
+	switch len(members) {
+	case 0:
+		return nil
+	case 1:
+		return members[0]
+	}
+	return t.grouped[m][i]
 }
 
 // Territory returns one territory by name, matched case-insensitively.
