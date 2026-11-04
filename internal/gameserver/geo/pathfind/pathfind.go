@@ -1,7 +1,6 @@
 package pathfind
 
 import (
-	"container/heap"
 	"math"
 	"strconv"
 	"sync"
@@ -154,15 +153,14 @@ func (f *Finder) findForward(dst []location.Location, start, goal *node, buildRe
 	start.f = start.h
 
 	opened := &scratch.opened
-	heap.Init(opened)
-	heap.Push(opened, start)
+	opened.push(start)
 
 	scratch.set.slot(start.key()).fwd = start.id
 	seq := int64(1)
 	iterations := 0
 
 	for opened.Len() > 0 && iterations < f.options.MaxIterations {
-		current := heap.Pop(opened).(*node)
+		current := opened.pop()
 
 		if current.gx == goal.gx && current.gy == goal.gy && current.z == goal.z {
 			if !buildResult {
@@ -187,11 +185,9 @@ func (f *Finder) findBidirectional(dst []location.Location, start, goal *node, b
 	goal.f = goal.h
 	goal.seq = 2
 
-	heap.Init(&scratch.opened)
-	heap.Push(&scratch.opened, start)
+	scratch.opened.push(start)
 	scratch.set.slot(start.key()).fwd = start.id
-	heap.Init(&scratch.backOpened)
-	heap.Push(&scratch.backOpened, goal)
+	scratch.backOpened.push(goal)
 	scratch.set.slot(goal.key()).back = goal.id
 
 	// A popped node meets the other frontier wherever that frontier holds
@@ -200,7 +196,7 @@ func (f *Finder) findBidirectional(dst []location.Location, start, goal *node, b
 	iterations := 0
 	for scratch.opened.Len() > 0 && scratch.backOpened.Len() > 0 && iterations < f.options.MaxIterations {
 		if scratch.opened[0].f <= scratch.backOpened[0].f {
-			current := heap.Pop(&scratch.opened).(*node)
+			current := scratch.opened.pop()
 			if id := scratch.set.lookup(current.key()).back; id != 0 {
 				meet := scratch.nodes.at(id)
 				if !buildResult {
@@ -210,7 +206,7 @@ func (f *Finder) findBidirectional(dst []location.Location, start, goal *node, b
 			}
 			f.expandForward(current, goal, &seq, scratch)
 		} else {
-			current := heap.Pop(&scratch.backOpened).(*node)
+			current := scratch.backOpened.pop()
 			if id := scratch.set.lookup(current.key()).fwd; id != 0 {
 				meet := scratch.nodes.at(id)
 				if !buildResult {
@@ -236,7 +232,6 @@ type node struct {
 	f      int
 	seq    int64
 	parent *node
-	index  int
 	// id is the node's nodeArena id.
 	id int32
 }
@@ -245,36 +240,63 @@ func (n *node) key() uint64 {
 	return cellKey(n.gx, n.gy, n.z)
 }
 
+// nodeHeap is a binary min-heap ordered by f, then by seq. Every node
+// carries a distinct seq, so the order is total and the pop sequence depends
+// only on what was pushed, not on the heap's internal layout.
 type nodeHeap []*node
 
 func (h nodeHeap) Len() int { return len(h) }
 
-func (h nodeHeap) Less(i, j int) bool {
-	if h[i].f != h[j].f {
-		return h[i].f < h[j].f
+func (a *node) before(b *node) bool {
+	if a.f != b.f {
+		return a.f < b.f
 	}
-	return h[i].seq < h[j].seq
+	return a.seq < b.seq
 }
 
-func (h nodeHeap) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-	h[i].index = i
-	h[j].index = j
-}
-
-func (h *nodeHeap) Push(x any) {
-	n := x.(*node)
-	n.index = len(*h)
+func (h *nodeHeap) push(n *node) {
 	*h = append(*h, n)
+	q := *h
+	i := len(q) - 1
+	for i > 0 {
+		parent := (i - 1) / 2
+		if !n.before(q[parent]) {
+			break
+		}
+		q[i] = q[parent]
+		i = parent
+	}
+	q[i] = n
 }
 
-func (h *nodeHeap) Pop() any {
-	old := *h
-	n := old[len(old)-1]
-	n.index = -1
-	old[len(old)-1] = nil
-	*h = old[:len(old)-1]
-	return n
+func (h *nodeHeap) pop() *node {
+	q := *h
+	top := q[0]
+	last := len(q) - 1
+	n := q[last]
+	q[last] = nil
+	q = q[:last]
+	*h = q
+	if last == 0 {
+		return top
+	}
+	i := 0
+	for {
+		child := 2*i + 1
+		if child >= last {
+			break
+		}
+		if right := child + 1; right < last && q[right].before(q[child]) {
+			child = right
+		}
+		if !q[child].before(n) {
+			break
+		}
+		q[i] = q[child]
+		i = child
+	}
+	q[i] = n
+	return top
 }
 
 type searchScratch struct {
@@ -378,21 +400,8 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 			continue
 		}
 
-		// Extra corner check: a fresh resolve of the X-direction neighbor
-		// (same cell and z as nsweX above, kept as its own call rather than
-		// reusing nsweX's value). Provably value-identical to nsweX given
-		// static geodata — this line is only reachable once nsweX itself
-		// came from a successful candidateNSWE call at this exact cell/z —
-		// so it's a candidate for collapsing to nsweX if profiling ever calls
-		// for it; the only behavioral difference would surface under a door
-		// toggling this block mid-search, which the search does not account
-		// for.
-		xGX, xGY := current.gx+corner.dx, current.gy
-		_, recheckNSWE, ok := f.candidateNSWE(xGX, xGY, z)
-		if !ok || !recheckNSWE.Allows(flagY) {
-			continue
-		}
-
+		// A flank only allows the turn once its cardinal read above
+		// succeeded at this z, so that read is the flank's answer.
 		gx, gy := current.gx+corner.dx, current.gy+corner.dy
 		height, nswe, ok := f.candidateNSWE(gx, gy, z)
 		if !ok {
@@ -403,9 +412,16 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 }
 
 func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *searchScratch) {
-	for _, step := range cardinalSteps {
+	// The corner gates re-read the cardinal neighbors and every candidate is
+	// checked against current's own cell. Both answers depend only on the
+	// cell and z, so each is resolved once per expansion.
+	z := current.z + block.CellIgnoreHeight
+	match := currentMatch{finder: f, current: current}
+	var cardinal [4]cellRead
+	for i, step := range cardinalSteps {
 		gx, gy := current.gx-step.dx, current.gy-step.dy
-		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, current)
+		cardinal[i] = f.readCell(gx, gy, z)
+		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, cardinal[i], &match)
 		if !ok || !nswe.Allows(step.flag) {
 			continue
 		}
@@ -416,22 +432,40 @@ func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *search
 		flagX := cardinalSteps[corner.xDir].flag
 		flagY := cardinalSteps[corner.yDir].flag
 		gx, gy := current.gx-corner.dx, current.gy-corner.dy
-		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, current)
+		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, f.readCell(gx, gy, z), &match)
 		if !ok || !nswe.Allows(flagX|flagY) {
 			continue
 		}
 
+		// The flanking cells are current's yDir and xDir cardinal
+		// neighbors, already read at z when the corner sits on current's
+		// level.
 		candidateZ := height + block.CellIgnoreHeight
-		_, nsweX, ok := f.candidateNSWE(gx+corner.dx, gy, candidateZ)
-		if !ok || !nsweX.Allows(flagY) {
+		cellX, cellY := cardinal[corner.yDir], cardinal[corner.xDir]
+		if candidateZ != z {
+			cellX = f.readCell(gx+corner.dx, gy, candidateZ)
+			cellY = f.readCell(gx, gy+corner.dy, candidateZ)
+		}
+		if !cellX.ok || !cellX.nswe.Allows(flagY) {
 			continue
 		}
-		_, nsweY, ok := f.candidateNSWE(gx, gy+corner.dy, candidateZ)
-		if !ok || !nsweY.Allows(flagX) {
+		if !cellY.ok || !cellY.nswe.Allows(flagX) {
 			continue
 		}
 		f.addBackwardCandidate(current, goal, seq, scratch, gx, gy, height, nswe, true)
 	}
+}
+
+// cellRead is one candidateNSWE answer.
+type cellRead struct {
+	height int
+	nswe   block.NSWE
+	ok     bool
+}
+
+func (f *Finder) readCell(gx, gy, z int) cellRead {
+	height, nswe, ok := f.candidateNSWE(gx, gy, z)
+	return cellRead{height: height, nswe: nswe, ok: ok}
 }
 
 // candidateNSWE resolves a candidate cell's own decoded height and NSWE
@@ -448,25 +482,46 @@ func (f *Finder) candidateNSWE(gx, gy, z int) (height int, nswe block.NSWE, ok b
 	return int(h), m, true
 }
 
-func (f *Finder) candidateHeightMatches(gx, gy, z, wantHeight int) bool {
-	height, _, ok := f.candidateNSWE(gx, gy, z)
-	return ok && height == wantHeight
+// currentMatch reports, for one backward expansion, whether a step from a
+// candidate's layer lands back on current's: the at-or-below resolve of
+// current's cell at z must answer current's height. That depends on z
+// alone, so each z is resolved once.
+type currentMatch struct {
+	finder  *Finder
+	current *node
+	n       int
+	z       [8]int
+	ok      [8]bool
 }
 
-func (f *Finder) backwardCandidateNSWE(gx, gy int, current *node) (height int, nswe block.NSWE, ok bool) {
-	worldX, worldY := engine.WorldX(gx), engine.WorldY(gy)
-	if engine.OutOfWorld(worldX, worldY) {
+func (m *currentMatch) at(z int) bool {
+	for i := range m.n {
+		if m.z[i] == z {
+			return m.ok[i]
+		}
+	}
+	height, _, ok := m.finder.candidateNSWE(m.current.gx, m.current.gy, z)
+	ok = ok && height == m.current.z
+	if m.n < len(m.z) {
+		m.z[m.n], m.ok[m.n] = z, ok
+		m.n++
+	}
+	return ok
+}
+
+// backwardCandidateNSWE picks the candidate cell's layer a backward step
+// reaches: below, the cell's own at-or-below read at current's z, when it
+// leads back to current; otherwise the highest layer at or above that z
+// which does.
+func (f *Finder) backwardCandidateNSWE(gx, gy int, below cellRead, match *currentMatch) (height int, nswe block.NSWE, ok bool) {
+	if below.ok && match.at(below.height+block.CellIgnoreHeight) {
+		return below.height, below.nswe, true
+	}
+	if engine.OutOfWorld(engine.WorldX(gx), engine.WorldY(gy)) {
 		return 0, 0, false
 	}
-
-	z := current.z + block.CellIgnoreHeight
-	height, nswe, ok = f.candidateNSWE(gx, gy, z)
-	if ok && f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
-		return height, nswe, true
-	}
-
-	h, n, found := f.engine.NodeAtOrAbove(gx, gy, z, func(candidateHeight int16) bool {
-		return f.candidateHeightMatches(current.gx, current.gy, int(candidateHeight)+block.CellIgnoreHeight, current.z)
+	h, n, found := f.engine.NodeAtOrAbove(gx, gy, match.current.z+block.CellIgnoreHeight, func(candidateHeight int16) bool {
+		return match.at(int(candidateHeight) + block.CellIgnoreHeight)
 	})
 	if !found {
 		return 0, 0, false
@@ -507,22 +562,25 @@ func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchSc
 	// Cardinal steps need no such check: CanMove's single-iteration walk
 	// for an axis-aligned 1-cell step resolves the same NodeBelow call
 	// candidate generation already used, so it can never disagree.
-	direct := !diagonal || f.canMoveDirect(current, gx, gy, height)
-
+	//
+	// Both connectivity checks are CanMove line-walks, so each runs only
+	// once its answer can change the outcome: a cheaper parent-skip that
+	// holds makes the corner's own check moot, and a costlier one is worth
+	// trying only when the corner is not reachable from current.
 	parent := current
 	cost := current.g + weight
-	// canMoveDirect is a line-walk; only pay for it once the cheap cost/range
-	// comparison shows this parent-skip could actually change the outcome
-	// (either it's the only way direct connectivity holds, or it's cheaper).
-	if current.parent != nil && withinSmoothRange(current.parent, gx, gy, height) {
-		smoothed := current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
-		if (!direct || smoothed < cost) && f.canMoveDirect(current.parent, gx, gy, height) {
-			parent = current.parent
-			cost = smoothed
-			direct = true
-		}
+	smoothable := current.parent != nil && withinSmoothRange(current.parent, gx, gy, height)
+	smoothed := 0
+	if smoothable {
+		smoothed = current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
 	}
-	if !direct {
+	switch {
+	case smoothable && smoothed < cost && f.canMoveDirect(current.parent, gx, gy, height):
+		parent, cost = current.parent, smoothed
+	case !diagonal || f.canMoveDirect(current, gx, gy, height):
+	case smoothable && smoothed >= cost && f.canMoveDirect(current.parent, gx, gy, height):
+		parent, cost = current.parent, smoothed
+	default:
 		return
 	}
 
@@ -534,7 +592,7 @@ func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchSc
 	*seq = *seq + 1
 	n.h = f.heuristic(n, goal)
 	n.f = n.g + n.h
-	heap.Push(&scratch.opened, n)
+	scratch.opened.push(n)
 	slot.fwd = n.id
 }
 
@@ -559,28 +617,21 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 
 	// See the matching comment in addCandidate: corner-cut candidates need
 	// their own direct-connectivity check on multilayer terrain, cardinal
-	// steps don't.
-	direct := !diagonal || f.engine.CanMove(
-		engine.WorldX(gx), engine.WorldY(gy), height,
-		engine.WorldX(current.gx), engine.WorldY(current.gy), current.z,
-	)
-
+	// steps don't. The checks run in the same order as there.
 	parent := current
 	cost := current.g + weight
-	// See the matching comment in addCandidate: defer the CanMove line-walk
-	// behind the cheap cost/range comparison.
-	if current.parent != nil && withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) {
-		smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
-		if (!direct || smoothed < cost) && f.engine.CanMove(
-			engine.WorldX(gx), engine.WorldY(gy), height,
-			engine.WorldX(current.parent.gx), engine.WorldY(current.parent.gy), current.parent.z,
-		) {
-			parent = current.parent
-			cost = smoothed
-			direct = true
-		}
+	smoothable := current.parent != nil && withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z)
+	smoothed := 0
+	if smoothable {
+		smoothed = current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
 	}
-	if !direct {
+	switch {
+	case smoothable && smoothed < cost && f.canMoveTo(gx, gy, height, current.parent):
+		parent, cost = current.parent, smoothed
+	case !diagonal || f.canMoveTo(gx, gy, height, current):
+	case smoothable && smoothed >= cost && f.canMoveTo(gx, gy, height, current.parent):
+		parent, cost = current.parent, smoothed
+	default:
 		return
 	}
 
@@ -592,7 +643,7 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 	*seq = *seq + 1
 	n.h = f.heuristic(n, goal)
 	n.f = n.g + n.h
-	heap.Push(&scratch.backOpened, n)
+	scratch.backOpened.push(n)
 	slot.back = n.id
 }
 
@@ -600,6 +651,15 @@ func (f *Finder) canMoveDirect(from *node, gx, gy, height int) bool {
 	return f.engine.CanMove(
 		engine.WorldX(from.gx), engine.WorldY(from.gy), from.z,
 		engine.WorldX(gx), engine.WorldY(gy), height,
+	)
+}
+
+// canMoveTo is canMoveDirect in the backward direction: from the cell to
+// node.
+func (f *Finder) canMoveTo(gx, gy, height int, to *node) bool {
+	return f.engine.CanMove(
+		engine.WorldX(gx), engine.WorldY(gy), height,
+		engine.WorldX(to.gx), engine.WorldY(to.gy), to.z,
 	)
 }
 

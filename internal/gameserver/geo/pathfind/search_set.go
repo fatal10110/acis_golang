@@ -127,7 +127,7 @@ func (a *nodeArena) alloc() *node {
 	}
 	a.n++
 	n := &a.chunks[i/nodeChunkSize][i%nodeChunkSize]
-	*n = node{id: a.n, index: -1}
+	*n = node{id: a.n}
 	return n
 }
 
