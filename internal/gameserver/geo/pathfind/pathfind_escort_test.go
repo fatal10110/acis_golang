@@ -1,6 +1,8 @@
 package pathfind
 
 import (
+	"encoding/binary"
+	"hash"
 	"hash/fnv"
 	"slices"
 	"testing"
@@ -9,9 +11,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-// escortPathFingerprint pins every Find/FindInto/HasPath answer over
+// escortPathFingerprint pins each escort search's trajectory (every node it
+// allocated, in allocation order, with its cell, NSWE, cost and parent, and
+// both frontiers' final sizes) and every Find/FindInto/HasPath answer over
 // escortCases, captured before the search's cell reads were cached.
-const escortPathFingerprint = 0xec32669a74fcae65
+const escortPathFingerprint = 0x17fa06b365b465b9
 
 // escortCase is one raid-boss private's escort search as a fresh server
 // boot runs it: origin is the private's position, target the escort slot
@@ -87,6 +91,33 @@ func searchNodes(f *Finder, c pathCase) *searchScratch {
 	return scratch
 }
 
+// searchFingerprint folds a finished search's trajectory into h: the node
+// count, both frontiers' sizes, then each node in allocation order with its
+// cell, NSWE, path cost and parent id.
+func searchFingerprint(h hash.Hash64, scratch *searchScratch) {
+	var word [8]byte
+	put := func(v int64) {
+		binary.LittleEndian.PutUint64(word[:], uint64(v))
+		h.Write(word[:])
+	}
+	put(int64(scratch.nodes.n))
+	put(int64(scratch.opened.Len()))
+	put(int64(scratch.backOpened.Len()))
+	for id := int32(1); id <= scratch.nodes.n; id++ {
+		n := scratch.nodes.at(id)
+		parent := int32(0)
+		if n.parent != nil {
+			parent = n.parent.id
+		}
+		put(int64(n.gx))
+		put(int64(n.gy))
+		put(int64(n.z))
+		put(int64(n.nswe))
+		put(int64(n.g))
+		put(int64(parent))
+	}
+}
+
 // TestFindEscortResultsMatchCapturedFingerprint pins the escort searches'
 // answers, and checks the sample still exercises what it was logged for:
 // each search stays inside the loaded regions, and the exhausting ones
@@ -97,6 +128,7 @@ func TestFindEscortResultsMatchCapturedFingerprint(t *testing.T) {
 	}
 	e, tiles := loadEscortSample(t)
 	f := New(e, DefaultOptions())
+	h := fnv.New64a()
 	cases := make([]pathCase, len(escortCases))
 	for i, c := range escortCases {
 		cases[i] = c.pathCase
@@ -113,9 +145,9 @@ func TestFindEscortResultsMatchCapturedFingerprint(t *testing.T) {
 				t.Fatalf("%s: search reached region %v, outside the loaded %v", c.name, tile, tiles)
 			}
 		}
+		searchFingerprint(h, scratch)
 	}
 
-	h := fnv.New64a()
 	found := pathFingerprint(t, h, f, cases)
 	t.Logf("escort sample: %d cases over regions %v, %d found, fingerprint %#x", len(cases), tiles, found, h.Sum64())
 	if got := h.Sum64(); got != escortPathFingerprint {
