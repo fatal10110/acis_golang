@@ -41,6 +41,7 @@ func DefaultOptions() Options {
 }
 
 // OptionsFromProperties reads pathfinding options from geoengine.properties semantics.
+// Bidirectional is not a file key and keeps its DefaultOptions value.
 func OptionsFromProperties(props *config.Properties) (Options, error) {
 	if props == nil {
 		return DefaultOptions(), nil
@@ -53,7 +54,6 @@ func OptionsFromProperties(props *config.Properties) (Options, error) {
 	options.ObstacleWeight = f.Int("ObstacleWeight", options.ObstacleWeight)
 	options.HeuristicWeight = f.Int("HeuristicWeight", options.HeuristicWeight)
 	options.MaxIterations = f.Int("MaxIterations", options.MaxIterations)
-	options.Bidirectional = f.Bool("Bidirectional", options.Bidirectional)
 	if err := f.Err(); err != nil {
 		return Options{}, err
 	}

@@ -203,7 +203,12 @@ func ConfigFromProperties(p *config.Properties) (Config, error) {
 		}
 		cfg.Counts[sink] = count
 
-		cfg.Append[sink] = p.Bool(prefix+".append", cfg.Append[sink])
+		// .append is optional: the shipped file sets it only for the handlers
+		// that append, and the others keep the file-handler default without a
+		// missing-property warning.
+		if value, ok := p.Lookup(prefix + ".append"); ok {
+			cfg.Append[sink] = strings.EqualFold(value, "true")
+		}
 	}
 
 	for _, key := range p.Keys() {
