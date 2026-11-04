@@ -22,6 +22,22 @@ import (
 // (Playable.java:189-207), Player.doRevive (Player.java:5993-6013) and the
 // Resurrect handler (Resurrect.java:24-52), aCis revision in the outer repo.
 
+// diedWithExp is the experience the victims of this file's scenes die with,
+// inside the one band of deathLossTable that has a death penalty.
+const diedWithExp = 1500
+
+// deathAndRestore is what the reference leaves of a level 5 player that dies
+// carrying karma with diedWithExp experience (loss and snapshot) and what a
+// resurrection of power percent then gives back.
+func deathAndRestore(t *testing.T, karma int, power float64) (death vitals.PlayerDeathResult, restored int64) {
+	t.Helper()
+	death = vitals.PlayerDeath(t, vitals.PlayerDeathCase{
+		Level: 5, LossPercent: 10, KarmaModifier: 2, KarmaRate: 1, Karma: karma,
+		Prev: 3, Cur: 1000, Next: 3000, Exp: diedWithExp,
+	})
+	return death, vitals.PlayerExpRestored(t, death.Before, death.After, power)
+}
+
 const (
 	resurrectSkillID  = 1016
 	phoenixSkillID    = 1002
@@ -155,7 +171,7 @@ func TestPhoenixBlessedDeathOffersFullRevive(t *testing.T) {
 			t.Parallel()
 			srv := gameservertest.Boot(t,
 				gameservertest.WithWantChars(1),
-				gameservertest.WithSeed(seedExperiencedCharacter(1500, 240)),
+				gameservertest.WithSeed(seedExperiencedCharacter(diedWithExp, 240)),
 				gameservertest.WithLevels(deathLossTable(t)),
 				gameservertest.WithAllowDelevel(true),
 				gameservertest.WithRateKarmaExpLost(1.0),
@@ -218,8 +234,9 @@ func TestPhoenixBlessedDeathOffersFullRevive(t *testing.T) {
 				if want := vitals.RevivedHP(t, wholeMax(t, res.MaxHP)); res.CurrentHP != want {
 					t.Fatalf("HP after restart = %v, want the respawn share %v of %v", res.CurrentHP, want, res.MaxHP)
 				}
-				if exp, before := persistedExp(t, srv, c, id); exp != 1300 || before != 1500 {
-					t.Fatalf("persisted exp/before-death = %d/%d, want 1300/1500 (loss kept)", exp, before)
+				death, _ := deathAndRestore(t, 240, 100)
+				if exp, before := persistedExp(t, srv, c, id); exp != death.After || before != death.Before {
+					t.Fatalf("persisted exp/before-death = %d/%d, want %d/%d (loss kept)", exp, before, death.After, death.Before)
 				}
 				return
 			}
@@ -238,8 +255,9 @@ func TestPhoenixBlessedDeathOffersFullRevive(t *testing.T) {
 			if res.CurrentHP != wantHP || res.CurrentMP != wantMP {
 				t.Fatalf("HP/MP after blessed revive = %v/%v, want %v/%v of max %v/%v", res.CurrentHP, res.CurrentMP, wantHP, wantMP, res.MaxHP, res.MaxMP)
 			}
-			if exp, before := persistedExp(t, srv, c, id); exp != 1500 || before != 0 {
-				t.Fatalf("persisted exp/before-death = %d/%d, want 1500/0 (all restored)", exp, before)
+			death, restored := deathAndRestore(t, 240, 100)
+			if exp, before := persistedExp(t, srv, c, id); exp != death.After+restored || before != 0 {
+				t.Fatalf("persisted exp/before-death = %d/%d, want %d/0 (all restored)", exp, before, death.After+restored)
 			}
 		})
 	}
@@ -271,7 +289,7 @@ func newResurrectionScene(t *testing.T) *resurrectionScene {
 	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSeed(seedExperiencedCharacter(1500, 0)),
+		gameservertest.WithSeed(seedExperiencedCharacter(diedWithExp, 0)),
 		gameservertest.WithLevels(deathLossTable(t)),
 		gameservertest.WithAllowDelevel(true),
 		gameservertest.WithRestartPoints(restartTable()),
@@ -353,8 +371,9 @@ func TestResurrectionAsksTheCorpse(t *testing.T) {
 	if queued := s.victim.ReadQueued(); len(queued) != 0 {
 		t.Fatalf("repeated answer sent opcode %#x, want nothing", queued[0][0])
 	}
-	if exp, before := persistedExp(t, s.srv, s.victim, s.victimID); exp != 1500 || before != 0 {
-		t.Fatalf("persisted exp/before-death = %d/%d, want 1500/0", exp, before)
+	death, restored := deathAndRestore(t, 0, 100)
+	if exp, before := persistedExp(t, s.srv, s.victim, s.victimID); exp != death.After+restored || before != 0 {
+		t.Fatalf("persisted exp/before-death = %d/%d, want %d/0", exp, before, death.After+restored)
 	}
 }
 
@@ -378,7 +397,8 @@ func TestResurrectionAcceptedAfterRestartGivesNothing(t *testing.T) {
 	if queued := s.victim.ReadQueued(); len(queued) != 0 {
 		t.Fatalf("answer after restart sent opcode %#x, want nothing", queued[0][0])
 	}
-	if exp, before := persistedExp(t, s.srv, s.victim, s.victimID); exp != 1300 || before != 1500 {
-		t.Fatalf("persisted exp/before-death = %d/%d, want 1300/1500 (loss kept)", exp, before)
+	death, _ := deathAndRestore(t, 0, 100)
+	if exp, before := persistedExp(t, s.srv, s.victim, s.victimID); exp != death.After || before != death.Before {
+		t.Fatalf("persisted exp/before-death = %d/%d, want %d/%d (loss kept)", exp, before, death.After, death.Before)
 	}
 }
