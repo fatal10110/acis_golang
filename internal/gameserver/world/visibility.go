@@ -656,6 +656,23 @@ func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
 	return out
 }
 
+// AppendKnownMatching is AppendKnown keeping only the objects for which
+// keep reports true. keep runs under a region's read lock, so it must be
+// cheap and must not call back into the world. A scan that expects few
+// matches among many objects can collect them into a small stack array
+// without allocating.
+func (s *State) AppendKnownMatching(out []Tracked, t Tracked, keep func(Tracked) bool) []Tracked {
+	r := t.presence().knownRegion()
+	if r == nil {
+		return out
+	}
+	var regionBuf [9]*Region
+	for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
+		out = region.appendMatchingExcept(out, t.ObjectID(), keep)
+	}
+	return out
+}
+
 // KnownPlayers yields every player in t's surrounding regions, excluding t
 // itself: the recipients of a broadcast about t. It yields nothing when t is
 // off the grid, and follows the same surroundings as AppendKnown. The
