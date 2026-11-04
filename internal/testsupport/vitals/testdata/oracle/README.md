@@ -16,7 +16,10 @@ and compiles them unchanged inside the harness `VitalsCopy.java.tmpl`:
 - `skills/funcs/FuncMaxHpMul.java`: the maximum HP function (the constitution bonus),
 - `model/actor/status/PetStatus.java`: `getMaxHp`,
 - `model/actor/instance/Pet.java`: `restoreExp` and `deathPenalty`,
-- `model/actor/status/PlayableStatus.java`: `addExp` (the pet's loss is applied through it),
+- `model/actor/status/PlayableStatus.java`: `addExp` (the pet's and the player's loss and restore
+  are applied through it),
+- `model/actor/Player.java`: `applyDeathPenalty`, `restoreExp`, `updateKarmaLoss`, and the
+  `setKarma` assignment line; `Formulas.java` also `calculateKarmaLost`,
 - `model/actor/Playable.java`: `doRevive` (the phoenix blessing restores the maximum HP and MP),
 - `model/residence/castle/Castle.java`: `spawnDoors` (a door respawns at its maximum HP, or
   half of it at mid-victory),
@@ -47,7 +50,14 @@ Line formats (`VitalsProbe.java`):
   <exp after> <level after>`: a pet dying (the growth table has only those three rows; a loss
   that would take the experience below zero is skipped, and the level after is only meaningful
   below level 81),
-- `petexp <before death> <exp now> <power> <exp added>`.
+- `petexp <before death> <exp now> <power> <exp added>`,
+- `playerdeath <level> <loss share %> <karma modifier> <karma rate> <karma> <at war 0|1> <exp of
+  level-1> <exp of level> <exp of level+1> <exp> <exp lost> <exp kept> <exp after> <level after>
+  <karma after>`: a player dying (only those three growth rows exist; a loss that would take the
+  experience below zero is dropped, and the level after is only meaningful away from level 81),
+- `playerexp <before death> <exp now> <power> <exp added>`: a resurrection of a player, whose
+  share narrows to an int and rounds half up (so a negative share, from experience gained since
+  the death, rounds up).
 
 ## Regenerating
 

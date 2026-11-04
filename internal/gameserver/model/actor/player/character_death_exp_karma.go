@@ -1,8 +1,7 @@
 package player
 
 import (
-	"math"
-
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -131,7 +130,7 @@ func (c *Character) applyDeathPenaltyLocked(loss deathLoss, hooks *progressionHo
 	}
 
 	span := table.ExpSpanAtLevel(c.CharLevel)
-	lostExp := int64(math.Round(float64(span) * percentLost / 100))
+	lostExp := commons.RoundHalfUp(float64(span) * percentLost / 100)
 
 	// Snapshot the pre-loss exp for a later resurrection to restore from.
 	c.ExpBeforeDeath = c.Exp
@@ -158,7 +157,10 @@ func (c *Character) RestoreExp(restorePercent float64) {
 		c.progressionMu.Unlock()
 		return
 	}
-	restored := int64(math.Round(float64(c.ExpBeforeDeath-c.Exp) * restorePercent / 100))
+	// The share is rounded half up (toward positive infinity, so a negative one
+	// when experience was gained since the death rounds up too) and kept to
+	// 32 bits, as the client-visible experience arithmetic is.
+	restored := int64(int32(commons.RoundHalfUp(float64(c.ExpBeforeDeath-c.Exp) * restorePercent / 100)))
 	c.ExpBeforeDeath = 0
 	// A bare experience add: UserInfo, but no reward message.
 	var hooks progressionHooks

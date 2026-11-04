@@ -349,5 +349,119 @@ public final class VitalsProbe
 			pet.die();
 			System.out.println("petdeath " + level + " " + d[1] + " " + d[2] + " " + d[3] + " " + d[4] + " " + (d[4] - pet.exp) + " " + pet._expBeforeDeath + " " + pet.exp + " " + pet.level);
 		}
+
+		// A player's death: the loss table has only the rows of level-1, level
+		// and level+1; a level above them is out of reach. The first band is the
+		// combat tests' (10% lost, karma modifier 2); the others cover the
+		// halved loss at war, a karma rate above 1, a loss that would take the
+		// experience below zero (dropped) and the highest level, which takes its
+		// loss from the span below it.
+		for (int karma : new int[]
+		{
+			0,
+			240
+		})
+		{
+			for (boolean war : new boolean[]
+			{
+				false,
+				true
+			})
+			{
+				for (long exp : new long[]
+				{
+					1000,
+					1100,
+					1450,
+					1500,
+					2999
+				})
+				{
+					playerDeath(5, 10, 2, 1, karma, war, 3, 1000, 3000, exp);
+				}
+			}
+		}
+		playerDeath(5, 10, 2, 2, 240, false, 3, 1000, 3000, 1500);
+		playerDeath(5, 10, 2, 0.5, 240, false, 3, 1000, 3000, 1500);
+		playerDeath(5, 100, 2, 1, 240, false, 3, 1000, 3000, 1500);
+		playerDeath(5, 100, 2, 1, 240, false, 3, 1000, 3000, 2500);
+		playerDeath(40, 4, 11.5, 1, 1000, false, 4800000, 5000000, 5400000, 5100000);
+		playerDeath(81, 1.5, 11.5, 1, 1000, false, 2000000000, 2100000000, 2147483647, 2100000000);
+		playerDeath(81, 1.5, 11.5, 1, 1000, false, 2000000000, 2100000000, 2147483647, 2123456789);
+
+		// A resurrection's share of the lost experience, restored on a player at
+		// exp now: it narrows to an int, so a share of 2^31 or more wraps.
+		for (long[] c : new long[][]
+		{
+			{
+				1500,
+				1300
+			},
+			{
+				1500,
+				1500
+			},
+			{
+				1500,
+				1505
+			},
+			{
+				1500,
+				1503
+			},
+			{
+				100000,
+				93160
+			},
+			{
+				5000000000L,
+				1000000000L
+			},
+			{
+				4000000000L,
+				1000000
+			},
+			{
+				3000000000L,
+				1000000000L
+			}
+		})
+		{
+			for (double power : new double[]
+			{
+				0,
+				50,
+				100
+			})
+			{
+				final VitalsCopy.PlayerExp player = new VitalsCopy.PlayerExp();
+				player._expBeforeDeath = c[0];
+				player.exp = c[1];
+				for (int k = 0; k < 200; k++)
+					player.expForLevel[k] = Long.MAX_VALUE / 4;
+				player.level = 1;
+				player.expForLevel[0] = 0;
+				player.expForLevel[1] = 0;
+				player.restoreExp(power);
+				System.out.println("playerexp " + c[0] + " " + c[1] + " " + power + " " + (player.exp - c[1]));
+			}
+		}
+	}
+
+	private static void playerDeath(int level, double lossPercent, double karmaModifier, double rate, int karma, boolean war, long prev, long cur, long next, long exp)
+	{
+		VitalsCopy.Config.RATE_KARMA_EXP_LOST = rate;
+		VitalsCopy.PlayerLevelData.INSTANCE.current = new VitalsCopy.PlayerLevel(karmaModifier, lossPercent);
+		final VitalsCopy.PlayerExp player = new VitalsCopy.PlayerExp();
+		player.level = level;
+		player._karma = karma;
+		for (int k = 0; k < 200; k++)
+			player.expForLevel[k] = k < level - 1 ? 0 : Long.MAX_VALUE / 4;
+		player.expForLevel[level - 1] = prev;
+		player.expForLevel[level] = cur;
+		player.expForLevel[level + 1] = next;
+		player.exp = exp;
+		player.applyDeathPenalty(war, false);
+		System.out.println("playerdeath " + level + " " + lossPercent + " " + karmaModifier + " " + rate + " " + karma + " " + (war ? 1 : 0) + " " + prev + " " + cur + " " + next + " " + exp + " " + (exp - player.exp) + " " + player._expBeforeDeath + " " + player.exp + " " + player.level + " " + player._karma);
 	}
 }

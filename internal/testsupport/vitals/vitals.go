@@ -1,10 +1,11 @@
 // Package vitals answers the exact door and pet vital-sign values behavior
 // tests assert: door damage stages, door regeneration ticks, revive HP, the
 // HP of respawned castle doors, a pet's maximum HP, the experience a pet
-// loses on death and the experience a resurrection gives back. The answers
-// are not worked by hand: they come from testdata/vitals.golden, the output of
-// testdata/oracle/run.sh, which runs the reference code itself (formats in the
-// README there). A question the golden does not list fails the test.
+// loses on death, a player's death penalty and the experience a resurrection
+// gives back. The answers are not worked by hand: they come from
+// testdata/vitals.golden, the output of testdata/oracle/run.sh, which runs the
+// reference code itself (formats in the README there). A question the golden
+// does not list fails the test.
 package vitals
 
 import (
@@ -62,6 +63,34 @@ type PetDeathResult struct {
 	Level  int   // level after the death (meaningful below level 81)
 }
 
+// PlayerDeathCase is a player dying: its level, the level row's loss share
+// (percent of the level's experience span) and karma modifier, the
+// karma-loss rate, the karma it carries, whether the death is at war (a
+// quarter of the loss), the experience the levels below, at and above it
+// start at (the level above is not read at the highest level), and the
+// experience it dies with.
+type PlayerDeathCase struct {
+	Level         int
+	LossPercent   float64
+	KarmaModifier float64
+	KarmaRate     float64
+	Karma         int
+	AtWar         bool
+	Prev          int64
+	Cur           int64
+	Next          int64
+	Exp           int64
+}
+
+// PlayerDeathResult is what a player's death penalty leaves.
+type PlayerDeathResult struct {
+	Lost   int64 // experience taken off; 0 when the loss was dropped for going below zero
+	Before int64 // experience kept for a resurrection to give back
+	After  int64 // experience after the death
+	Level  int   // level after the death (only meaningful away from the highest level)
+	Karma  int   // karma after the death
+}
+
 type table struct {
 	damage map[int][]run
 	period map[string]time.Duration
@@ -73,6 +102,8 @@ type table struct {
 	playableRevive map[reviveKey][2]float64
 	doors          map[doorsKey]float64
 	petDeath       map[petDeathKey]PetDeathResult
+	playerDeath    map[PlayerDeathCase]PlayerDeathResult
+	playerExp      map[petExpKey]int64
 }
 
 var (
@@ -86,6 +117,7 @@ func load() *table {
 			damage: map[int][]run{}, period: map[string]time.Duration{}, regen: map[regenKey][]Tick{},
 			revive: map[int]float64{}, petHP: map[[2]int]int{}, petExp: map[petExpKey]int64{},
 			playableRevive: map[reviveKey][2]float64{}, doors: map[doorsKey]float64{}, petDeath: map[petDeathKey]PetDeathResult{},
+			playerDeath: map[PlayerDeathCase]PlayerDeathResult{}, playerExp: map[petExpKey]int64{},
 		}
 		for _, line := range strings.Split(golden, "\n") {
 			f := strings.Fields(line)
@@ -138,6 +170,13 @@ func (t *table) add(f []string) (err error) {
 		t.petDeath[petDeathKey{atoi(f[1]), whole(f[2]), whole(f[3]), whole(f[4]), whole(f[5])}] = PetDeathResult{
 			Lost: whole(f[6]), Before: whole(f[7]), After: whole(f[8]), Level: atoi(f[9]),
 		}
+	case "playerdeath":
+		t.playerDeath[PlayerDeathCase{
+			Level: atoi(f[1]), LossPercent: num(f[2]), KarmaModifier: num(f[3]), KarmaRate: num(f[4]), Karma: atoi(f[5]),
+			AtWar: f[6] == "1", Prev: whole(f[7]), Cur: whole(f[8]), Next: whole(f[9]), Exp: whole(f[10]),
+		}] = PlayerDeathResult{Lost: whole(f[11]), Before: whole(f[12]), After: whole(f[13]), Level: atoi(f[14]), Karma: atoi(f[15])}
+	case "playerexp":
+		t.playerExp[petExpKey{whole(f[1]), whole(f[2]), num(f[3])}] = whole(f[4])
 	default:
 		return fmt.Errorf("unknown line kind %q", f[0])
 	}
@@ -259,4 +298,26 @@ func PetDeath(tb testing.TB, level int, prev, cur, next, exp int64) PetDeathResu
 		tb.Fatalf("vitals.golden has no pet death line for level %d (%d, %d, %d) at exp %d", level, prev, cur, next, exp)
 	}
 	return r
+}
+
+// PlayerDeath is what a player dying as c leaves.
+func PlayerDeath(tb testing.TB, c PlayerDeathCase) PlayerDeathResult {
+	tb.Helper()
+	r, ok := load().playerDeath[c]
+	if !ok {
+		tb.Fatalf("vitals.golden has no player death line for %+v", c)
+	}
+	return r
+}
+
+// PlayerExpRestored is the experience a resurrection of power percent gives a
+// player that had before experience before dying and has exp now (negative
+// when it has gained since).
+func PlayerExpRestored(tb testing.TB, before, exp int64, power float64) int64 {
+	tb.Helper()
+	n, ok := load().playerExp[petExpKey{before, exp, power}]
+	if !ok {
+		tb.Fatalf("vitals.golden has no player exp line for %d -> %d at power %v", before, exp, power)
+	}
+	return n
 }
