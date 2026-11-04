@@ -224,7 +224,7 @@ action yumi
   S NpcHtmlMessage obj=yumi item=0 page=default/32041.htm
   S ActionFailed
 bypass npc_{yumi}_Quest
-  S NpcHtmlMessage obj=yumi item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q114_ResurrectionOfAnOldManager/32041-26.htm</body></html>"
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-26.htm
   S ActionFailed
   S ActionFailed
 

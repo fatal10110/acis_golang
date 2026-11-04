@@ -5085,7 +5085,7 @@
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-01.htm","hash":"ff368a4a65b17e2b","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-02.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-02.htm","hash":"1b24a4c5076fbc54","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-03.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-03.htm","hash":"8dbe331c5861d23d","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-04.htm"]}
-{"page":"quest/Q114_ResurrectionOfAnOldManager/32041-04.htm","hash":"2cd721697bbf6702","invalidUTF8":true}
+{"page":"quest/Q114_ResurrectionOfAnOldManager/32041-04.htm","hash":"8de977b42ff036fb","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-05.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-05.htm","hash":"237081dd75b4bf00","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-06.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-06.htm","hash":"6dc3b3c99cda06e3","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-07.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-07.htm","hash":"d216ae2e6335a9c5"}
@@ -5109,7 +5109,7 @@
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-23.htm","hash":"2702fd0b6640f343","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-24.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-24.htm","hash":"4daa3150612d35a1","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-25.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-25.htm","hash":"1280ee96c23e2372"}
-{"page":"quest/Q114_ResurrectionOfAnOldManager/32041-26.htm","hash":"5abfe989faf7ad21","invalidUTF8":true}
+{"page":"quest/Q114_ResurrectionOfAnOldManager/32041-26.htm","hash":"7616949fcf465cfc"}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-27.htm","hash":"b23e569acb9a6482","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-28.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-28.htm","hash":"26304bdd38af2675","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-29.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32041-29.htm","hash":"9069f42bd8f6bc42","bypass":["Quest Q114_ResurrectionOfAnOldManager 32041-30.htm"]}
@@ -5171,11 +5171,11 @@
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-30.htm","hash":"4d19644d43509011","bypass":["Quest Q114_ResurrectionOfAnOldManager 32047-31.htm","Quest Q114_ResurrectionOfAnOldManager 32047-33.htm","Quest Q114_ResurrectionOfAnOldManager 32047-32.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-31.htm","hash":"162ea3fef438cfb4","bypass":["Quest Q114_ResurrectionOfAnOldManager 32047-30.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-32.htm","hash":"605783651262e944","bypass":["Quest Q114_ResurrectionOfAnOldManager 32047-30.htm"]}
-{"page":"quest/Q114_ResurrectionOfAnOldManager/32047-33.htm","hash":"60f808cb172b584b","invalidUTF8":true}
+{"page":"quest/Q114_ResurrectionOfAnOldManager/32047-33.htm","hash":"b0e1664fd0e6795a","bypass":["Quest Q114_ResurrectionOfAnOldManager 32047-34.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-34.htm","hash":"58ae4da11d0cd313"}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-35.htm","hash":"d8af47026bbc8a88","bypass":["Quest Q114_ResurrectionOfAnOldManager 32047-36.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-36.htm","hash":"96ce7694b78ef782","bypass":["Quest Q114_ResurrectionOfAnOldManager 32047-37.htm"]}
-{"page":"quest/Q114_ResurrectionOfAnOldManager/32047-37.htm","hash":"ce6ca5ff3bc2185b","invalidUTF8":true}
+{"page":"quest/Q114_ResurrectionOfAnOldManager/32047-37.htm","hash":"0379d4c4aaad6673","bypass":["Quest Q114_ResurrectionOfAnOldManager 32047-38.htm","Quest Q114_ResurrectionOfAnOldManager 32047-39.htm"]}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-38.htm","hash":"5aed3f8ddb3afaf8"}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-39.htm","hash":"6c29b8eb3fc09a62"}
 {"page":"quest/Q114_ResurrectionOfAnOldManager/32047-40.htm","hash":"0e611e4a3737259d"}
@@ -5505,7 +5505,7 @@
 {"page":"quest/Q122_OminousNews/32017-02.htm","hash":"6073e2407d3ec9f4"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-00.htm","hash":"8237af9068675284"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-01.htm","hash":"af83c4eecfe8a968","bypass":["Quest Q123_TheLeaderAndTheFollower 31961-03.htm"]}
-{"page":"quest/Q123_TheLeaderAndTheFollower/31961-02.htm","hash":"58db51df5d20c265","invalidUTF8":true}
+{"page":"quest/Q123_TheLeaderAndTheFollower/31961-02.htm","hash":"9dbb837c3770b98b"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-02a.htm","hash":"de124795114d758e"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-02b.htm","hash":"981d3a39bb8a8b32"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-03.htm","hash":"ecd4c18bb7bd5b3b"}
@@ -5538,7 +5538,7 @@
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-11.htm","hash":"8b096a96293c86ae"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-11a.htm","hash":"11f28762ddf38761"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-12.htm","hash":"38f212e07bacd256"}
-{"page":"quest/Q123_TheLeaderAndTheFollower/31961-14.htm","hash":"d65c7e1ca0f9f6eb","invalidUTF8":true}
+{"page":"quest/Q123_TheLeaderAndTheFollower/31961-14.htm","hash":"ac7c228ca13cb1fb"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-15.htm","hash":"a6cc06287c149c06"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-16.htm","hash":"8c6532c8b53ddd7d"}
 {"page":"quest/Q123_TheLeaderAndTheFollower/31961-17.htm","hash":"fc5fa9ecf238aef7"}
@@ -6346,7 +6346,7 @@
 {"page":"quest/Q215_TrialOfThePilgrim/30649-01.htm","hash":"bc30f2f19c38c818"}
 {"page":"quest/Q215_TrialOfThePilgrim/30649-02.htm","hash":"8bb3f5c4828ae48f"}
 {"page":"quest/Q215_TrialOfThePilgrim/30649-03.htm","hash":"46f867d2abd00944","bypass":["Quest Q215_TrialOfThePilgrim 30649-04.htm"]}
-{"page":"quest/Q215_TrialOfThePilgrim/30649-04.htm","hash":"5ca16def232834e8","invalidUTF8":true}
+{"page":"quest/Q215_TrialOfThePilgrim/30649-04.htm","hash":"e549f3a3f3fd8410"}
 {"page":"quest/Q215_TrialOfThePilgrim/30650-01.htm","hash":"a7f2629a47d7e301","bypass":["Quest Q215_TrialOfThePilgrim 30650-02.htm","Quest Q215_TrialOfThePilgrim 30650-03.htm"]}
 {"page":"quest/Q215_TrialOfThePilgrim/30650-02.htm","hash":"be803b15abc46058"}
 {"page":"quest/Q215_TrialOfThePilgrim/30650-03.htm","hash":"15703f0ed4c47579"}
@@ -8529,8 +8529,8 @@
 {"page":"quest/Q336_CoinsOfMagic/30232-10.htm","hash":"cd1a8b60fcfd0528","bypass":["Quest Q336_CoinsOfMagic upgrade","npc_%objectId%_multisell 507","npc_%objectId%_multisell 508","npc_%objectId%_multisell 509","Quest Q336_CoinsOfMagic 30232-22.htm","Quest Q336_CoinsOfMagic 30232-23.htm","Quest Q336_CoinsOfMagic 30232-18.htm"],"placeholders":["%objectId%"]}
 {"page":"quest/Q336_CoinsOfMagic/30232-11.htm","hash":"edbad9419db5b241","bypass":["Quest Q336_CoinsOfMagic upgrade","npc_%objectId%_multisell 507","npc_%objectId%_multisell 508","npc_%objectId%_multisell 509","Quest Q336_CoinsOfMagic 30232-22.htm","Quest Q336_CoinsOfMagic 30232-23.htm","Quest Q336_CoinsOfMagic 30232-18.htm"],"placeholders":["%objectId%"]}
 {"page":"quest/Q336_CoinsOfMagic/30232-12.htm","hash":"e1f50f18ccaca584","bypass":["npc_%objectId%_multisell 507","npc_%objectId%_multisell 508","npc_%objectId%_multisell 509","Quest Q336_CoinsOfMagic 30232-22.htm","Quest Q336_CoinsOfMagic 30232-23.htm","Quest Q336_CoinsOfMagic 30232-18.htm"],"placeholders":["%objectId%"]}
-{"page":"quest/Q336_CoinsOfMagic/30232-13.htm","hash":"5c1e18ce43eb9879","invalidUTF8":true}
-{"page":"quest/Q336_CoinsOfMagic/30232-14.htm","hash":"edd6fc8a6386cc9e","invalidUTF8":true}
+{"page":"quest/Q336_CoinsOfMagic/30232-13.htm","hash":"0479bbf63c263aeb"}
+{"page":"quest/Q336_CoinsOfMagic/30232-14.htm","hash":"d59fd453ae43b790"}
 {"page":"quest/Q336_CoinsOfMagic/30232-15.htm","hash":"0a9c4776e478247b"}
 {"page":"quest/Q336_CoinsOfMagic/30232-16.htm","hash":"1adab7ea48483517"}
 {"page":"quest/Q336_CoinsOfMagic/30232-17.htm","hash":"961eb956f1be24bf"}
@@ -10965,8 +10965,8 @@
 {"page":"quest/Q616_MagicalPowerOfFire_Part2/31558-03.htm","hash":"1d232aeddbd32bfb"}
 {"page":"quest/Q616_MagicalPowerOfFire_Part2/31558-04.htm","hash":"b0e141027acfd34d"}
 {"page":"quest/Q616_MagicalPowerOfFire_Part2/31558-05.htm","hash":"9c9248103d2a8473"}
-{"page":"quest/Q617_GatherTheFlames/31271-01.htm","hash":"8103d05a9f7829f6","invalidUTF8":true}
-{"page":"quest/Q617_GatherTheFlames/31271-02.htm","hash":"76a03418101f229e","invalidUTF8":true}
+{"page":"quest/Q617_GatherTheFlames/31271-01.htm","hash":"2b4bcb53e1bc5c8a","bypass":["Quest Q617_GatherTheFlames 31271-03.htm"]}
+{"page":"quest/Q617_GatherTheFlames/31271-02.htm","hash":"fd95d7ab2c1c8057"}
 {"page":"quest/Q617_GatherTheFlames/31271-03.htm","hash":"29428ad632d1a5eb"}
 {"page":"quest/Q617_GatherTheFlames/31271-04.htm","hash":"a156a2bcddfa837e"}
 {"page":"quest/Q617_GatherTheFlames/31539-01.htm","hash":"377993dc9dda10a8","bypass":["Quest Q617_GatherTheFlames 31539-03.htm"]}
@@ -11651,7 +11651,7 @@
 {"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_17.htm","hash":"035a41883493e17f"}
 {"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_18.htm","hash":"fd3ac82fdcf0aa50"}
 {"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_19.htm","hash":"0a62cdd4c7a05dac"}
-{"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_20.htm","hash":"f58081bc26c82bf5","invalidUTF8":true}
+{"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_20.htm","hash":"ba080dfe39596d15"}
 {"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_21.htm","hash":"7a4900842c9c6727"}
 {"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_22.htm","hash":"6a2c9a811107e010"}
 {"page":"siegablehall/BanditStronghold/agit_oel_mahum_messeger_23.htm","hash":"83f73a003d0c79dc"}

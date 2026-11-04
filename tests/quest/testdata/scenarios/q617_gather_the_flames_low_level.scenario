@@ -27,6 +27,6 @@ action hilda
   S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
   S ActionFailed
 bypass npc_{hilda}_Quest
-  S NpcHtmlMessage obj=hilda item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q617_GatherTheFlames/31271-02.htm</body></html>"
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q617_GatherTheFlames/31271-02.htm
   S ActionFailed
   S ActionFailed

@@ -1,6 +1,6 @@
 # Resurrection of an Old Manager (Q114): a level 49 character who completed Pavel the Giant
-# (Q121, its journal seeded) accepts at Yumi (cond 1) and hears her out to the page that does
-# not decode; the story starts over on the next talk. Then relog. Expectations replay the
+# (Q121, its journal seeded) accepts at Yumi (cond 1) and hears her out to 32041-05, then
+# walks away; the story starts over on the next talk. Then relog. Expectations replay the
 # reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q114_resurrection_of_an_old_manager.golden
 character Manager 49
@@ -44,13 +44,14 @@ bypass Quest Q114_ResurrectionOfAnOldManager 32041-03.htm
   S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-03.htm
   S ActionFailed
 
-# The next page does not decode (a stray Latin-1 byte): the server reads it as missing
-# and shows its notice, which leads nowhere, so the story cannot go on; the next talk
-# starts it over.
+# The character walks away from 32041-05 without answering; the next talk starts the story
+# over.
 bypass Quest Q114_ResurrectionOfAnOldManager 32041-04.htm
-  S NpcHtmlMessage obj=yumi item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q114_ResurrectionOfAnOldManager/32041-04.htm</body></html>"
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-04.htm
   S ActionFailed
 bypass Quest Q114_ResurrectionOfAnOldManager 32041-05.htm
+  S NpcHtmlMessage obj=yumi item=0 page=script/quest/Q114_ResurrectionOfAnOldManager/32041-05.htm
+  S ActionFailed
 action yumi
   S ActionFailed
   S NpcHtmlMessage obj=yumi item=0 html="<html><body>Collector Yumi:<br>\nThis area is know as the Ruins of Pavel. It is one of the research labs the Giants established in the distant past. I've come here to research the Starstones that are being produced in this area.<br>\nThe roaming golems make it very risky to go outside of the barracks, however. In addition, the remnants of ancient old experiments, vile and disgusting, add to the danger.<br>\n<a action=\"bypass -h npc_{yumi}_Quest\">Quest</a>\n</body></html>\n"

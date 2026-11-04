@@ -1,4 +1,4 @@
-# Gather the Flames (Q617): the first two pages of Hilda are not valid UTF-8 and so are not served; the notice has no accept link and the accept event is refused.
+# Gather the Flames (Q617): a level 74 character opens Hilda's quest window, gets her offer page and accepts from its link.
 # Expectations replay the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q617_gather_the_flames_hilda_created.golden
 character Hero 74
@@ -14,9 +14,16 @@ action hilda
   S NpcHtmlMessage obj=hilda item=0 page=trainer/31271.htm
   S ActionFailed
 bypass npc_{hilda}_Quest
-  S NpcHtmlMessage obj=hilda item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q617_GatherTheFlames/31271-01.htm</body></html>"
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q617_GatherTheFlames/31271-01.htm
   S ActionFailed
   S ActionFailed
 bypass Quest Q617_GatherTheFlames 31271-03.htm
-  state Q617_GatherTheFlames CREATED
-  rows Q617_GatherTheFlames -
+  S QuestList 617:0x80000001
+  S ExShowQuestMark quest=617
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hilda item=0 page=script/quest/Q617_GatherTheFlames/31271-03.htm
+  S ActionFailed
+  Q upsert Q617_GatherTheFlames | <state> | STARTED
+  Q upsert Q617_GatherTheFlames | <cond> | 1
+  state Q617_GatherTheFlames STARTED
+  rows Q617_GatherTheFlames <cond>=1 <state>=STARTED

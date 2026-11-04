@@ -155,7 +155,7 @@ bypass Quest Q215_TrialOfThePilgrim 30649-04.htm
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=302 3:2725
   S SystemMessage id=54 3:2724
-  S NpcHtmlMessage obj=martankus item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q215_TrialOfThePilgrim/30649-04.htm</body></html>"
+  S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q215_TrialOfThePilgrim/30649-04.htm
   S ActionFailed
   Q upsert Q215_TrialOfThePilgrim | <cond> | 5
   items 2725=0 2724=1

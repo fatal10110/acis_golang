@@ -328,7 +328,7 @@ bypass npc_{sorint}_Quest
 bypass Quest Q336_CoinsOfMagic upgrade
   S QuestList 336:0x8000030f
   S ExShowQuestMark quest=336
-  S NpcHtmlMessage obj=sorint item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q336_CoinsOfMagic/30232-14.htm</body></html>"
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-14.htm
   S ActionFailed
   Q upsert Q336_CoinsOfMagic | <flags> | -2147482865
   Q upsert Q336_CoinsOfMagic | <cond> | 10

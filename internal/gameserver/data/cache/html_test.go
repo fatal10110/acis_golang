@@ -84,8 +84,8 @@ func TestLoadHTMLAgainstDatapack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadHTML(%q): %v", dir, err)
 	}
-	// 15297 page files, less the 12 that are not valid UTF-8.
-	if got, want := cache.Len(), 15285; got != want {
+	// Every one of the 15297 page files is valid UTF-8.
+	if got, want := cache.Len(), 15297; got != want {
 		t.Fatalf("Len() = %d, want %d", got, want)
 	}
 
