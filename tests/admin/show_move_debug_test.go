@@ -90,9 +90,9 @@ func TestAdminShowMoveAndPathDebugDrawWalk(t *testing.T) {
 	for _, c := range []*testsupport.ScriptedClient{gm, watcher} {
 		var frames [][]byte
 		if c == gm {
-			frames = exchangeZones(t, gm, encodeMove(geoBeyondWallX, spawnY, geoZ))
+			frames = exchangeSettled(t, gm, encodeMove(geoBeyondWallX, spawnY, geoZ))
 		} else {
-			frames = exchangeZones(t, c, nil)
+			frames = exchangeSettled(t, c, nil)
 		}
 		drawings, texts := debugFrames(t, frames)
 		if len(drawings) != 1 || drawings[0].name != pathName {
@@ -109,13 +109,13 @@ func TestAdminShowMoveAndPathDebugDrawWalk(t *testing.T) {
 			t.Fatalf("texts on the walk = %q, want %q", texts, moving)
 		}
 	}
-	if drawings, texts := debugFrames(t, exchangeZones(t, bystander, nil)); len(drawings) != 0 || len(texts) != 0 {
+	if drawings, texts := debugFrames(t, exchangeSettled(t, bystander, nil)); len(drawings) != 0 || len(texts) != 0 {
 		t.Fatalf("bystander got %+v %q, want no debug", drawings, texts)
 	}
 
 	srv.TickPositions()
 	for _, c := range []*testsupport.ScriptedClient{gm, watcher} {
-		drawings, _ := debugFrames(t, exchangeZones(t, c, nil))
+		drawings, _ := debugFrames(t, exchangeSettled(t, c, nil))
 		if len(drawings) == 0 || drawings[0].name != moveName {
 			t.Fatalf("drawings on the first steps = %+v, want %s", drawings, moveName)
 		}
@@ -140,7 +140,7 @@ func TestAdminShowMoveAndPathDebugDrawWalk(t *testing.T) {
 		}
 	}
 
-	frames := exchangeZones(t, gm, encodeReportedPosition(spawnX, spawnY, geoZ))
+	frames := exchangeSettled(t, gm, encodeReportedPosition(spawnX, spawnY, geoZ))
 	drawings, _ := debugFrames(t, frames)
 	if len(drawings) != 1 || drawings[0].name != moveName {
 		t.Fatalf("drawings on the report = %+v, want %s", drawings, moveName)
