@@ -63,7 +63,7 @@ type Conn struct {
 	observeSend func(payload []byte)
 	// observeRead, when set, runs as each wait for an inbound frame begins,
 	// after its read deadline is set; see ObserveReads.
-	observeRead func()
+	observeRead func(timeout time.Duration)
 	// observePersistWait, when set, brackets each wait for queued saves;
 	// see ObservePersistWaits.
 	observePersistWait func(owners []int32) (done func())
@@ -244,10 +244,10 @@ func (c *Conn) ObserveSends(fn func(payload []byte)) {
 // ObserveReads installs fn to run on the reading goroutine each time a
 // Session on c starts waiting for the next inbound frame, which is when
 // every earlier frame has been fully handled and the wait's read deadline is
-// set. It is a test seam for knowing
+// set. fn gets how long that wait may last. It is a test seam for knowing
 // the server has caught up with a client. Call it before c reaches its
 // handler; unset, a read pays only a nil check.
-func (c *Conn) ObserveReads(fn func()) {
+func (c *Conn) ObserveReads(fn func(timeout time.Duration)) {
 	c.observeRead = fn
 }
 
