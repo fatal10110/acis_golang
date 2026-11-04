@@ -1,7 +1,8 @@
 # The killer's party loses its alliances (KetraOrcSupport onMyDying, testKetraDemote): Leader (Ketra 5,
 # level 5 badge), Mate (Ketra 2, level 2 badge) and Third (Varka 3, level 3 Varka badge) are one party;
 # Leader kills a Ketra footman. Leader and Mate lose the alliance, each badge going down a level; Third
-# keeps the Varka alliance and its badge. Not traced: the reference probe plays no member line.
+# keeps the Varka alliance and its badge. The reference probe plays the members and reads their standing.
+trace internal/gameserver/script/testdata/oracle/scenarios/alliance_support_demotes_party.golden
 character Leader 40
 standing 5
 hold 7215 1

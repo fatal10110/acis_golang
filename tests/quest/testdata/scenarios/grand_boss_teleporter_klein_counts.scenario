@@ -2,11 +2,17 @@
 # 31540-01.htm below 50 entries and 31540-02.htm from 50 on (onTalk); a character without a floating
 # stone is refused with 31540-06.htm (onAdvEvent); the count starts over when Valakas dies
 # (onMyDying). The character holds 50 stones, sends itself in 50 times and talks to a Klein
-# standing in the lair, as the first Klein is out of its reach. Expectations are derived from the
-# reference source; the reference probe replays one trip (grand_boss_teleporter_klein).
+# standing in the lair, as the first Klein is out of its reach. The reference probe plays the 50 trips
+# and records the last of each count of sends, as the run compares it. The reference sends a character that
+# has not been admitted to the lair's outer boss zone (110004) back to its town as it arrives (BossZone
+# onEnter, a zone with an invade time), so the scenario stands that zone away from the landing. The reference
+# keeps the count in a static, which an earlier scenario of the probe's run may have raised by one (the Klein
+# scenario's trip), so the scenario asks for the page only where a count of n and n + 1 answer the same page.
+trace internal/gameserver/script/testdata/oracle/scenarios/grand_boss_teleporter_klein_counts.golden
 character Pilgrim 60
 hold 7267 50
 item 7267
+zone boss 110004 5000 5000 5100 5100 -100 100
 script script.teleport.GrandBossTeleporter
 page default/31540.htm
 page script/teleport/GrandBossTeleporter/
@@ -43,7 +49,7 @@ bypass npc_{lair_klein}_Quest GrandBossTeleporter
   S NpcHtmlMessage obj=lair_klein item=0 page=script/teleport/GrandBossTeleporter/31540-01.htm
   S ActionFailed
   S ActionFailed
-bypass Quest GrandBossTeleporter 31540 x48
+bypass Quest GrandBossTeleporter 31540 x47
   S SystemMessage id=302 3:7267
   S ActionFailed
   S ActionFailed
@@ -53,7 +59,7 @@ bypass Quest GrandBossTeleporter 31540 x48
   S TeleportToLocation obj=player loc=183813,-115157,-3303 fast=0
   S DeleteObject obj=lair_klein
   S DeleteObject obj=valakas
-  items 7267=1
+  items 7267=2
 appear
 action lair_klein
 action lair_klein
@@ -64,7 +70,7 @@ bypass npc_{lair_klein}_Quest GrandBossTeleporter
   S NpcHtmlMessage obj=lair_klein item=0 page=script/teleport/GrandBossTeleporter/31540-01.htm
   S ActionFailed
   S ActionFailed
-bypass Quest GrandBossTeleporter 31540
+bypass Quest GrandBossTeleporter 31540 x2
   S SystemMessage id=302 3:7267
   S ActionFailed
   S ActionFailed

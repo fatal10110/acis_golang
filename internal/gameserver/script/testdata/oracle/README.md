@@ -168,14 +168,22 @@ what the reference does in the scenario's own world:
   not the ground's;
 - a `door <role> <door id> <dx> <dy> <dz>` line binds the role to the shipped door of that id (the offsets are the Go
   fixture's; the probe's door stands where the datapack puts it), which the probe closes before the scenario and after it.
-  An indented `open <role> <yes|no>`, `dungeon <yes|no>`, `standing player <n>` or `stance player <on|off>` line under a step
+  An indented `open <role> <yes|no>`, `dungeon <yes|no>`, `standing <player|member> <n>` or `stance player <on|off>` line under a step
   makes the probe write a `# check` line after the step with what its world holds (the door's open state, the player's
-  Seven Signs dungeon flag, Ketra/Varka standing, attack stance); the Go run compares its own world's answer line by line.
+  Seven Signs dungeon flag, the Ketra/Varka standing of the character or of a member, attack stance); the Go run compares its own world's answer line by line.
   A `stance player on|off` step adds the player to the attack stance task or removes it, and a scenario with such a step
   also runs the stance task after each slice of an `advance`, so the stance ends 15 seconds after it was set. The zone line,
   a `zone <boss|peace> <zone id> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>` line stands the shipped zone of that id (the datapack must have it)
-  in that box around where the character enters the world, for the scenario only; the `appear` step, the bypass `xN` count,
-  and a member's standing are the Go run's alone (a wanted `loc=x,y,z+-n` teleport line takes the trace's landing inside its box);
+  in that box around where the character enters the world, for the scenario only (a peace zone of an id the datapack
+  has no zone of is not played: no scenario the probe plays reads one) (a wanted `loc=x,y,z+-n` teleport line takes the trace's landing inside its box);
+- a `member <name> <level> [standing <n>] [hold <item> <count>]... [<dx> <dy> <dz>]` line makes a second character of an
+  account of its own (a dead member is not played): it enters the world where the character does, joins the character's
+  party (the first member forms it, the character leading) and stands at that offset, holding its items and standing
+  as the line says; its client's packets are not recorded, and a `standing <name> <n>` check under a step reads its standing;
+- the `appear` step is the client's Appearing (`C Appearing`): the character that a script's teleport sent has arrived and
+  may act again, as the reference ignores a bypass while it is teleporting. A bypass `xN` count sends the command N times,
+  with an Appearing between two sends when the character is teleporting, and records only the last send (its `C` line
+  and the packets it provoked), as the Go run compares only the last;
 - the `teleports` line gives the Go run the shipped gatekeeper teleport lists, which the probe
   always loads; the half-price weekend hours of a standard window read the probe wall clock
   (`ProbeClock.wallCalendar`, a Thursday while a scenario trace plays, as the Go run's clock start
@@ -424,9 +432,10 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
                                 no NPC line placed stand once the step is over, sorted (the step's
                                 spawned line); - for none
 # stance <on|off>               a scenario trace: the player's stance step
-# check <kind> <what> <value>   a scenario trace: an open, dungeon, standing or stance expectation of the step, with the
+# check <kind> <what> <value>   a scenario trace: an open, dungeon, standing (of the player or a member) or stance expectation of the step, with the
                                 value the probe's world holds
 C Action item <item id> (object <id>)   a scenario trace: the pickup's action on the ground item
+C Appearing                   a scenario trace: the appear step, the client's answer to the character's teleport
 # away                          a scenario trace: the player steps 1500 behind where it entered the world, one AI tick
 # mate <name> object <id>       a scenario trace with a mate that has a client: the mate's object id
 C@<mate> <client packet> <label>   a scenario trace: a client packet of the mate's client (an as step's, or the

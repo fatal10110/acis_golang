@@ -70,11 +70,12 @@ func (sc *Scenario) checkSeedRoles() error {
 // seedChecks are the checks of a step the reference probe reads, as the trace
 // writes them: a door's open state, the dungeon flag, the character's
 // standing and attack stance.
-func seedChecks(st Step) []string {
+func (sc *Scenario) seedChecks(st Step) []string {
 	var out []string
 	for _, ck := range st.Checks {
 		switch {
-		case ck.Kind == "open", ck.Kind == "dungeon", (ck.Kind == "standing" || ck.Kind == "stance") && ck.Args[0] == "player":
+		case ck.Kind == "open", ck.Kind == "dungeon", ck.Kind == "stance" && ck.Args[0] == "player",
+			ck.Kind == "standing" && (ck.Args[0] == "player" || sc.isMember(ck.Args[0])):
 			out = append(out, ck.Kind+" "+strings.Join(ck.Args, " "))
 		}
 	}
@@ -82,15 +83,11 @@ func seedChecks(st Step) []string {
 }
 
 // tracedSeeds reports what of the world seeds a traced scenario uses, "" for
-// none: the reference probe plays none of them.
+// none: the reference probe plays none of them. It plays every member line
+// but a dead member.
 func (sc *Scenario) tracedSeeds() string {
-	switch {
-	case slices.ContainsFunc(sc.Steps, func(st Step) bool {
-		return st.Verb == "appear" || st.Repeat > 1 || slices.ContainsFunc(st.Checks, func(ck Check) bool {
-			return ck.Kind == "standing" && ck.Args[0] != "player"
-		})
-	}):
-		return "appear step, bypass count or a member's standing check"
+	if slices.ContainsFunc(sc.Members, func(m Member) bool { return m.Dead }) {
+		return "dead member"
 	}
 	return ""
 }
