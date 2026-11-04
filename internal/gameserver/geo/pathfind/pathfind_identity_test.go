@@ -199,10 +199,17 @@ var geodataRegions = [][2]int{{19, 21}, {19, 22}, {20, 21}, {20, 22}}
 // when the geodata files are not present (they are not in the repository).
 func loadGeodataSample(t testing.TB) *engine.Engine {
 	t.Helper()
+	return loadGeodataTiles(t, geodataRegions)
+}
+
+// loadGeodataTiles loads the given L2OFF regions from the shared datapack,
+// skipping when any of their files is not present.
+func loadGeodataTiles(t testing.TB, tiles [][2]int) *engine.Engine {
+	t.Helper()
 
 	dir := datapack.Geodata(t)
 	e := engine.New()
-	for _, tile := range geodataRegions {
+	for _, tile := range tiles {
 		path := filepath.Join(dir, filepathRegion(tile))
 		if _, err := os.Stat(path); err != nil {
 			t.Skipf("geodata region %s missing: %v", path, err)
