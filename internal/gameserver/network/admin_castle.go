@@ -125,7 +125,7 @@ func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 		"%artifacts%", artifacts.String(),
 		"%ct%", towers.String(),
 	).Replace(page)
-	sendValidatedHTML(gm, 0, page, 0)
+	l.sendValidatedFile(gm, 0, file, page, 0)
 }
 
 // adminTeleportLink writes the n-th teleport link to x y z heading.

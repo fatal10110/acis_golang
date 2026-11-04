@@ -25,7 +25,7 @@ func wyvernRules(cfg *npc.WyvernRules) npc.WyvernRules {
 // false when the command stopped the handling: a plain doorman naming an
 // unknown door, or a door list that does not parse, after the doors before
 // the fault.
-func (l *GameClientLink) doormanDoors(live *livePlayer, f *npc.Folk, reply npc.BypassReply) bool {
+func (l *GameClientLink) doormanDoors(live *livePlayer, f *npc.Folk, reply npc.BypassReply, file string) bool {
 	c, h := l.npcResidence(f.Instance)
 	switch reply.DoorScope {
 	case npc.DoorsOfHall:
@@ -59,7 +59,7 @@ func (l *GameClientLink) doormanDoors(live *livePlayer, f *npc.Folk, reply npc.B
 		}
 	}
 	if reply.HTML != "" {
-		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+		l.sendFilePage(live, f.ObjectID(), file, reply.HTML, 0)
 	}
 	return true
 }
@@ -80,8 +80,8 @@ func (l *GameClientLink) setGateOfID(gates []string, id int, open bool) {
 
 // doormanBusy refuses live a doorman's gates during a siege: the busy page,
 // ActionFailed, then the message saying gates stay as they are.
-func doormanBusy(live *livePlayer, f *npc.Folk, html string) {
-	sendFilledHTML(live, f.ObjectID(), html, 0)
+func (l *GameClientLink) doormanBusy(live *livePlayer, f *npc.Folk, file, html string) {
+	l.sendFilePage(live, f.ObjectID(), file, html, 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageGatesNotOpenedClosedDuringSiege))
 }
@@ -90,7 +90,7 @@ func doormanBusy(live *livePlayer, f *npc.Folk, html string) {
 // leader is offline; the magician's page saying there is no portal, then
 // ActionFailed, when the leader opened none; the refusal message when
 // npc.ClanGateAllowed refuses; else the teleport to the leader.
-func (l *GameClientLink) clanGate(live *livePlayer, f *npc.Folk, html string) {
+func (l *GameClientLink) clanGate(live *livePlayer, f *npc.Folk, file, html string) {
 	cl, ok := l.clanService().ClanOf(live.Character)
 	if !ok {
 		return
@@ -100,7 +100,7 @@ func (l *GameClientLink) clanGate(live *livePlayer, f *npc.Folk, html string) {
 		return
 	}
 	if !hasClanGate(leader) {
-		sendFilledHTML(live, f.ObjectID(), html, 0)
+		l.sendFilePage(live, f.ObjectID(), file, html, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -147,11 +147,11 @@ func (l *GameClientLink) clanGateTalker(live *livePlayer) npc.ClanGateTalker {
 
 // massTeleport arms mass gatekeeper f's teleport of its castle's
 // defenders, unless one is pending, then shows reply's page.
-func (l *GameClientLink) massTeleport(live *livePlayer, f *npc.Folk, reply npc.BypassReply) {
+func (l *GameClientLink) massTeleport(live *livePlayer, f *npc.Folk, reply npc.BypassReply, file string) {
 	if c, _ := l.npcResidence(f.Instance); c != nil {
 		f.ArmMassTeleport(reply.Delay, func() { l.oustCastleDefenders(f, c) })
 	}
-	sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+	l.sendFilePage(live, f.ObjectID(), file, reply.HTML, 0)
 }
 
 // oustCastleDefenders is mass gatekeeper f's teleport of c's defenders:
@@ -199,7 +199,7 @@ func (l *GameClientLink) wireCastleTeleportZones(ix *zone.Index) {
 
 // mercenaryHire opens the untaxed buy window of the mercenary buylist reply
 // names at f, then reply's page. A list f may not sell answers nothing.
-func (l *GameClientLink) mercenaryHire(live *livePlayer, f *npc.Folk, reply npc.BypassReply) {
+func (l *GameClientLink) mercenaryHire(live *livePlayer, f *npc.Folk, reply npc.BypassReply, file string) {
 	list, ok := l.merchant.List(reply.ListID)
 	inv := live.Inventory()
 	if !ok || !list.AllowsNPC(f.NpcID()) || inv == nil {
@@ -212,5 +212,5 @@ func (l *GameClientLink) mercenaryHire(live *livePlayer, f *npc.Folk, reply npc.
 		return
 	}
 	live.SendFrame(frame)
-	sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+	l.sendFilePage(live, f.ObjectID(), file, reply.HTML, 0)
 }

@@ -76,7 +76,7 @@ func TestSetPageLimitsPageAsLoaded(t *testing.T) {
 		t.Fatalf("setPage(missing) = %q, want %q", got, want)
 	}
 
-	pages := setPages{gcl.html}
+	pages := gcl.pages()
 	if got, ok := pages.Get("data/html/short.htm"); !ok || got != short+"\n" {
 		t.Fatalf("setPages.Get(short) = %q, %v, want %q, true", got, ok, short+"\n")
 	}
@@ -85,5 +85,19 @@ func TestSetPageLimitsPageAsLoaded(t *testing.T) {
 	}
 	if _, ok := pages.Get("data/html/none.htm"); ok {
 		t.Fatal("setPages.Get(missing) found a page")
+	}
+}
+
+func TestPageFileNameKeepsWhatFollowsFirstHTMLDir(t *testing.T) {
+	for file, want := range map[string]string{
+		"data/html/admin/walker.htm":          "admin/walker.htm",
+		"./data/html/script/quest/Q001/1.htm": "script/quest/Q001/1.htm",
+		"data/html/html/x.htm":                "html/x.htm",
+		"signboard.htm":                       "signboard.htm",
+		"data/xhtml/a.htm":                    "a.htm",
+	} {
+		if got := pageFileName(file); got != want {
+			t.Errorf("pageFileName(%q) = %q, want %q", file, got, want)
+		}
 	}
 }

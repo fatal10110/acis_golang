@@ -67,12 +67,13 @@ func (l *GameClientLink) sevenSignsBypass(live *livePlayer, f *npc.Folk, command
 	case reply.HTML != "":
 		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
 	case reply.Page != "":
-		page := l.setPage("data/html/seven_signs/" + reply.Page)
+		file := "data/html/seven_signs/" + reply.Page
+		page := l.setPage(file)
 		for i := 0; i+1 < len(reply.Fill); i += 2 {
 			page = strings.ReplaceAll(page, reply.Fill[i], reply.Fill[i+1])
 		}
 		page = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID())))
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		l.sendFilePage(live, f.ObjectID(), file, page, 0)
 	}
 	if reply.Release {
 		live.SendFrame(serverpackets.FrameActionFailed())

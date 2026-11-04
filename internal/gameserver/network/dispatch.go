@@ -508,6 +508,10 @@ type GameClientLink struct {
 	// debugMoves holds the creatures //show move and //show path toggled
 	// on.
 	debugMoves debugMoves
+	// showPageFiles is the //show html toggle, one for every game master:
+	// while set, a game master shown a page set from a datapack file is
+	// told the file's name first.
+	showPageFiles atomic.Bool
 	// spawnAll runs one //unspawnall or //respawnall at a time, so two
 	// game masters respawning at once cannot leave both new populations
 	// in the world.

@@ -77,7 +77,8 @@ func (l *GameClientLink) requestSellItem(live *livePlayer, req clientpackets.Req
 	if err != nil || !sold {
 		return
 	}
-	if page, ok := f.SoldPage(setPages{l.html}); ok {
+	// The sold page is shown as read, never named as a set file.
+	if page, ok := f.SoldPage(l.pages()); ok {
 		sendFilledHTML(live, f.ObjectID(), page, 0)
 	}
 }

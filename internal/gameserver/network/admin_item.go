@@ -175,8 +175,9 @@ func (l *GameClientLink) sendArmorSets(gm *livePlayer) {
 			sb.WriteString("</tr>")
 		}
 	}
-	page := strings.ReplaceAll(l.setPage("data/html/admin/itemsets.htm"), "%sets%", sb.String())
-	sendFilledHTML(gm, 0, page, 0)
+	const file = "data/html/admin/itemsets.htm"
+	page := strings.ReplaceAll(l.setPage(file), "%sets%", sb.String())
+	l.sendFilePage(gm, 0, file, page, 0)
 }
 
 // createItem gives count units of item id to target, or with a radius to

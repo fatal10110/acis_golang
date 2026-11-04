@@ -96,7 +96,7 @@ func (l *GameClientLink) userCommandClanPenalty(live *livePlayer, _ int32) {
 	if content == "" {
 		content = clanPenaltyNone
 	}
-	sendFilledHTML(live, 0, strings.ReplaceAll(l.setPage(clanPenaltyPage), "%content%", content), 0)
+	l.sendFilePage(live, 0, clanPenaltyPage, strings.ReplaceAll(l.setPage(clanPenaltyPage), "%content%", content), 0)
 }
 
 // userCommandSiegeStatus (/siegestatus) shows a noble clan leader its
@@ -133,7 +133,7 @@ func (l *GameClientLink) userCommandSiegeStatus(live *livePlayer, _ int32) {
 		page = strings.ReplaceAll(page, "%kills%", strconv.Itoa(l.sieges.Kills(cl.ID())))
 		page = strings.ReplaceAll(page, "%deaths%", strconv.Itoa(l.sieges.Deaths(cl.ID())))
 		page = strings.ReplaceAll(page, "%content%", rows.String())
-		sendFilledHTML(live, 0, page, 0)
+		l.sendFilePage(live, 0, siegeStatusPage, page, 0)
 		return
 	}
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyDuringSiege))

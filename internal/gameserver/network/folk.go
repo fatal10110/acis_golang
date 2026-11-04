@@ -43,11 +43,11 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 // ActionFailed first or alone, after the page, or not at all. A Mammon NPC
 // refusing the talker says why instead, releasing the client after a cabal
 // refusal.
-func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOutcome) {
+func (l *GameClientLink) sendFolkChat(live *livePlayer, f *npc.Folk, file, html string, outcome npc.ChatOutcome) {
 	switch outcome {
 	case npc.ChatShownReleased:
 		live.SendFrame(serverpackets.FrameActionFailed())
-		sendFilledHTML(live, f.ObjectID(), html, 0)
+		l.sendFilePage(live, f.ObjectID(), file, html, 0)
 	case npc.ChatDawnOnly, npc.ChatDuskOnly:
 		message := serverpackets.SystemMessageCanBeUsedByDawn
 		if outcome == npc.ChatDuskOnly {
@@ -58,12 +58,16 @@ func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOu
 	case npc.ChatCompetitionOnly:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageQuestEventPeriod))
 	case npc.ChatPageOnly:
-		sendFilledHTML(live, f.ObjectID(), html, 0)
+		l.sendFilePage(live, f.ObjectID(), file, html, 0)
 	case npc.ChatReleasedOnly:
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.ChatSilent:
-	default:
+	case npc.ChatKarmaRefused:
+		// The refusal page is shown as read, never named as a set file.
 		sendFilledHTML(live, f.ObjectID(), html, 0)
+		live.SendFrame(serverpackets.FrameActionFailed())
+	default:
+		l.sendFilePage(live, f.ObjectID(), file, html, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 }

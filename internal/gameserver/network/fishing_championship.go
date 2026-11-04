@@ -35,14 +35,14 @@ func (l *GameClientLink) requestFishRanking(live *livePlayer) {
 	}
 	places, refreshing := champ.Running()
 	if refreshing {
-		sendFilledHTML(live, 0, l.setPage(fishchamp.PageRefreshing), 0)
+		l.sendFilePage(live, 0, fishchamp.PageRefreshing, l.setPage(fishchamp.PageRefreshing), 0)
 		return
 	}
 	prize, ok := l.fishChampPrizeName()
 	if !ok {
 		return
 	}
-	sendFilledHTML(live, 0, champ.FillRunning(l.setPage(fishchamp.PageRunning), places, prize), 0)
+	l.sendFilePage(live, 0, fishchamp.PageRunning, champ.FillRunning(l.setPage(fishchamp.PageRunning), places, prize), 0)
 }
 
 // fishermanChampionship opens fisherman f's championship page: the last
@@ -50,14 +50,14 @@ func (l *GameClientLink) requestFishRanking(live *livePlayer) {
 func (l *GameClientLink) fishermanChampionship(live *livePlayer, f *npc.Folk) {
 	champ := l.fishChamp
 	if !champ.Enabled() {
-		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageDisabled), 0)
+		l.sendFilePage(live, f.ObjectID(), fishchamp.PageDisabled, l.setPage(fishchamp.PageDisabled), 0)
 		return
 	}
 	prize, ok := l.fishChampPrizeName()
 	if !ok {
 		return
 	}
-	sendFilledHTML(live, f.ObjectID(), champ.FillWinners(l.setPage(fishchamp.PageWinners), f.ObjectID(), prize), 0)
+	l.sendFilePage(live, f.ObjectID(), fishchamp.PageWinners, champ.FillWinners(l.setPage(fishchamp.PageWinners), f.ObjectID(), prize), 0)
 }
 
 // fishermanReward pays live its fishing championship prize at fisherman f:
@@ -72,10 +72,10 @@ func (l *GameClientLink) fishermanReward(live *livePlayer, f *npc.Folk) {
 	champ := l.fishChamp
 	switch {
 	case !champ.Enabled():
-		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageDisabled), 0)
+		l.sendFilePage(live, f.ObjectID(), fishchamp.PageDisabled, l.setPage(fishchamp.PageDisabled), 0)
 		return
 	case !champ.IsWinner(live.CharacterName()):
-		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageNotWinner), 0)
+		l.sendFilePage(live, f.ObjectID(), fishchamp.PageNotWinner, l.setPage(fishchamp.PageNotWinner), 0)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), fishchamp.TaskTimeout)
@@ -90,7 +90,7 @@ func (l *GameClientLink) fishermanReward(live *livePlayer, f *npc.Folk) {
 			continue
 		}
 		live.AddCreatedItem(champ.Config().RewardItemID, int(count), l.nextObjectID)
-		sendFilledHTML(live, 0, l.setPage(fishchamp.PageRewarded), 0)
+		l.sendFilePage(live, 0, fishchamp.PageRewarded, l.setPage(fishchamp.PageRewarded), 0)
 	}
 }
 

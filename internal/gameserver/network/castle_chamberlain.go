@@ -131,7 +131,7 @@ func (d chamberlainDialog) allowed(p clan.Privilege) bool {
 	if d.r.Holds(p) {
 		return true
 	}
-	sendFilledHTML(d.live, d.f.ObjectID(), d.l.setPage(chamberlainPages+"noprivs.htm"), 0)
+	d.l.sendFilePage(d.live, d.f.ObjectID(), chamberlainPages+"noprivs.htm", d.l.setPage(chamberlainPages+"noprivs.htm"), 0)
 	return false
 }
 
@@ -152,12 +152,12 @@ func (d chamberlainDialog) sendFile(file string) {
 // pairs filled in order.
 func (d chamberlainDialog) send(file string, pairs ...string) {
 	page := fillPage(d.l.setPage(chamberlainPages+file), "%objectId%", objID(d.f))
-	sendFilledHTML(d.live, d.f.ObjectID(), fillPage(page, pairs...), 0)
+	d.l.sendFilePage(d.live, d.f.ObjectID(), chamberlainPages+file, fillPage(page, pairs...), 0)
 }
 
 // sendRaw opens the chamberlain page file with only pairs filled.
 func (d chamberlainDialog) sendRaw(file string, pairs ...string) {
-	sendFilledHTML(d.live, d.f.ObjectID(), fillPage(d.l.setPage(chamberlainPages+file), pairs...), 0)
+	d.l.sendFilePage(d.live, d.f.ObjectID(), chamberlainPages+file, fillPage(d.l.setPage(chamberlainPages+file), pairs...), 0)
 }
 
 // parseInt reads s as a decimal int32.
@@ -349,7 +349,7 @@ func (d chamberlainDialog) manor(val string, rest []string) bool {
 			path = chamberlainPages + "no.htm"
 		}
 	}
-	sendFilledHTML(d.live, d.f.ObjectID(), fillPage(d.l.setPage(path), "%objectId%", objID(d.f)), 0)
+	d.l.sendFilePage(d.live, d.f.ObjectID(), path, fillPage(d.l.setPage(path), "%objectId%", objID(d.f)), 0)
 	return true
 }
 
@@ -408,11 +408,11 @@ func (d chamberlainDialog) siegeTimeSet(val string, rest []string) bool {
 // one; another member gets the refusal page.
 func (d chamberlainDialog) giveCrown() {
 	if d.standing != npc.StandingLord {
-		sendFilledHTML(d.live, d.f.ObjectID(), d.l.setPage(chamberlainPages+"noprivs.htm"), 0)
+		d.l.sendFilePage(d.live, d.f.ObjectID(), chamberlainPages+"noprivs.htm", d.l.setPage(chamberlainPages+"noprivs.htm"), 0)
 		return
 	}
 	if inv := d.live.Inventory(); inv != nil && inv.HasItem(lordCrownItemID) {
-		sendFilledHTML(d.live, d.f.ObjectID(), d.l.setPage(chamberlainPages+"hascrown.htm"), 0)
+		d.l.sendFilePage(d.live, d.f.ObjectID(), chamberlainPages+"hascrown.htm", d.l.setPage(chamberlainPages+"hascrown.htm"), 0)
 		return
 	}
 	d.live.AddCreatedItem(lordCrownItemID, 1, d.l.nextObjectID)

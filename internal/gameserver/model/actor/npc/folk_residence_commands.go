@@ -395,9 +395,8 @@ func (f *Folk) hallWyvernCommand(pages Pages, rules ChatRules, talker Talker, r 
 // low a level; else the ride itself, page 4, or page 5 for a talker short of
 // the crystals. Each page then releases the client.
 func (f *Folk) wyvernRide(pages Pages, rules ChatRules, talker Talker, r ResidenceTalk, dir string, doorman bool, reply BypassReply) BypassReply {
-	page := func(val string) string {
-		return f.wyvernPage(pages, rules, "data/html/"+dir+"/wyvernmanager-"+val+".htm")
-	}
+	path := func(val string) string { return "data/html/" + dir + "/wyvernmanager-" + val + ".htm" }
+	page := func(val string) string { return f.wyvernPage(pages, rules, path(val)) }
 	strider := player.MountTypeOf(talker.MountNPCID) == player.MountTypeStrider
 	short := talker.MountLevel < rules.Wyvern.StriderLevel
 	reply.Outcome = BypassChatWindow
@@ -411,7 +410,8 @@ func (f *Folk) wyvernRide(pages Pages, rules ChatRules, talker Talker, r Residen
 	case short:
 		reply.HTML = page("6")
 	default:
-		reply.Outcome, reply.HTML, reply.ShortHTML = BypassWyvernRide, page("4"), page("5")
+		reply.ShortHTML, reply.ShortFile = page("5"), path("5")
+		reply.Outcome, reply.HTML = BypassWyvernRide, page("4")
 		reply.Count = rules.Wyvern.Crystals
 	}
 	return reply

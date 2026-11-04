@@ -23,6 +23,10 @@ const (
 	// BypassChatWindow opens HTML, then releases the client with
 	// ActionFailed.
 	BypassChatWindow
+	// BypassKarmaRefused opens HTML as BypassChatWindow does: the karma
+	// gate's refusal page, shown as read rather than set as the window's
+	// file.
+	BypassKarmaRefused
 	// BypassPage opens HTML alone.
 	BypassPage
 	// BypassRefused answers nothing: a Link naming a path that climbs out of
@@ -276,9 +280,11 @@ type BypassReply struct {
 	// Delay is how long BypassMassTeleport's teleport waits.
 	Delay time.Duration
 	// Count is the crystal count BypassWyvernRide takes, and ShortHTML the
-	// page it opens when the talker holds fewer.
+	// page it opens when the talker holds fewer, set from the datapack file
+	// ShortFile.
 	Count     int
 	ShortHTML string
+	ShortFile string
 	// Standing is the talker's standing at the chamberlain dialog
 	// BypassChamberlain runs.
 	Standing ChamberlainStanding
@@ -381,7 +387,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	chat := folkChats[kind]
 	if page, refused := f.pkRefusal(pages, chat, rules, karma); refused {
-		reply.Outcome, reply.HTML = BypassChatWindow, page
+		reply.Outcome, reply.HTML = BypassKarmaRefused, page
 		return reply
 	}
 	if kind == "Fisherman" {
@@ -400,7 +406,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return reply
 		}
 		if page, refused := f.pkRefusal(pages, folkChats["Merchant"], rules, karma); refused {
-			reply.Outcome, reply.HTML = BypassChatWindow, page
+			reply.Outcome, reply.HTML = BypassKarmaRefused, page
 			return reply
 		}
 	}

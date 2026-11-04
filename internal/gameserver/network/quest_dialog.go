@@ -27,7 +27,7 @@ func (l *GameClientLink) showDialogPage(live *livePlayer, e event.DialogPageShow
 	if e.ObjectID != 0 {
 		page = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(e.ObjectID)))
 	}
-	sendFilledHTML(live, e.ObjectID, page, 0)
+	l.sendFilePage(live, e.ObjectID, e.File, page, 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 }
 

@@ -24,7 +24,7 @@ func (l *GameClientLink) dungeonGate(live *livePlayer, f *npc.Folk, in bool) {
 // dungeonRefusal turns live away from the Seven Signs dungeon behind f: the
 // message naming the only cabal admitted, when the refusal names one, then
 // the refusal page.
-func dungeonRefusal(live *livePlayer, f *npc.Folk, reply npc.BypassReply) {
+func (l *GameClientLink) dungeonRefusal(live *livePlayer, f *npc.Folk, reply npc.BypassReply, file string) {
 	switch reply.DungeonOnly {
 	case sevensigns.Dawn:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCanBeUsedByDawn))
@@ -32,5 +32,5 @@ func dungeonRefusal(live *livePlayer, f *npc.Folk, reply npc.BypassReply) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCanBeUsedByDusk))
 	case sevensigns.NoCabal:
 	}
-	sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+	l.sendFilePage(live, f.ObjectID(), file, reply.HTML, 0)
 }

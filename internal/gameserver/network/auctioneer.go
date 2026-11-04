@@ -51,12 +51,12 @@ func (l *GameClientLink) auctioneerBypass(live *livePlayer, f *npc.Folk, command
 		l.showAuctionInfo(live, f, val)
 		return
 	case "location":
-		page := l.setPage("data/html/auction/map_agit_" + l.agitMap(live) + ".htm")
-		page = strings.ReplaceAll(page, "%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_start")
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		file := "data/html/auction/map_agit_" + l.agitMap(live) + ".htm"
+		page := strings.ReplaceAll(l.setPage(file), "%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_start")
+		l.sendFilePage(live, f.ObjectID(), file, page, 0)
 		return
 	case "start":
-		sendFilledHTML(live, f.ObjectID(), f.AuctioneerChat(setPages{l.html}), 0)
+		l.sendAuctioneerChat(live, f)
 		return
 	}
 	cl, ok := l.clanService().ClanOf(live.Character)
@@ -86,7 +86,7 @@ func (l *GameClientLink) auctioneerBypass(live *livePlayer, f *npc.Folk, command
 		if l.halls.CancelSale(cl) {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCanceledBid))
 		}
-		sendFilledHTML(live, f.ObjectID(), f.AuctioneerChat(setPages{l.html}), 0)
+		l.sendAuctioneerChat(live, f)
 	case "sale":
 		l.showSaleForm(live, f, cl)
 	case "rebid":
@@ -142,7 +142,7 @@ func (l *GameClientLink) saleCommand(live *livePlayer, f *npc.Folk, cl *clan.Cla
 			"%AGIT_AUCTION_DESC%", v.Description,
 			"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_sale2",
 			"%objectId%", objID(f))
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitSale3.htm", page, 0)
 	case "confirmauction":
 		switch l.halls.ConfirmSale(cl) {
 		case clanhall.SaleRegistered:
@@ -157,7 +157,7 @@ func (l *GameClientLink) saleCommand(live *livePlayer, f *npc.Folk, cl *clan.Cla
 			"%AGIT_LAST_PRICE%", strconv.Itoa(v.Lease),
 			"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_sale",
 			"%objectId%", objID(f))
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitSale2.htm", page, 0)
 	default:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("command", command).Msg("bypass: auctioneer command not modeled")
 	}
@@ -234,7 +234,7 @@ func (l *GameClientLink) showBidForm(live *livePlayer, f *npc.Folk, cl *clan.Cla
 		"%PLEDGE_ADENA%", strconv.Itoa(l.clanAdena(cl.ID())),
 		"%AGIT_AUCTION_MINBID%", strconv.Itoa(v.MinBid),
 		"npc_%objectId%_bid", "npc_"+objID(f)+"_bid "+val)
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitBid1.htm", page, 0)
 }
 
 // showBidderList opens the bidders of hall val, or of the hall cl bid on
@@ -266,7 +266,7 @@ func (l *GameClientLink) showBidderList(live *livePlayer, f *npc.Folk, cl *clan.
 		"%AGIT_LIST%", sb.String(),
 		"%AGIT_LINK_BACK%", back,
 		"%objectId%", objID(f))
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitBidderList.htm", page, 0)
 }
 
 // showBidCancel opens the confirmation of cancelling cl's bid: the bid and
@@ -286,7 +286,7 @@ func (l *GameClientLink) showBidCancel(live *livePlayer, f *npc.Folk, cl *clan.C
 		"%AGIT_BID_REMAIN%", strconv.Itoa(clanhall.TaxedRefund(b.Bid)),
 		"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_selectedItems",
 		"%objectId%", objID(f))
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitBidCancel.htm", page, 0)
 }
 
 // showSaleCancel opens the confirmation of cancelling the sale of the hall
@@ -301,7 +301,7 @@ func (l *GameClientLink) showSaleCancel(live *livePlayer, f *npc.Folk, cl *clan.
 		"%AGIT_DEPOSIT%", strconv.Itoa(v.Lease),
 		"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_selectedItems",
 		"%objectId%", objID(f))
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitSaleCancel.htm", page, 0)
 }
 
 // showSaleForm opens the first sale page of the hall cl owns: the deposit
@@ -317,7 +317,7 @@ func (l *GameClientLink) showSaleForm(live *livePlayer, f *npc.Folk, cl *clan.Cl
 		"%AGIT_PLEDGE_ADENA%", strconv.Itoa(l.clanAdena(cl.ID())),
 		"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_selectedItems",
 		"%objectId%", objID(f))
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitSale1.htm", page, 0)
 }
 
 // showRebidForm opens the rebid page of the hall cl bid on: its bid, the
@@ -338,7 +338,7 @@ func (l *GameClientLink) showRebidForm(live *livePlayer, f *npc.Folk, cl *clan.C
 		"%AGIT_AUCTION_END%", auctionTime(v.EndDate, auctionEndLayout),
 		"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_selectedItems",
 		"npc_%objectId%_bid1", "npc_"+objID(f)+"_bid1 "+strconv.Itoa(int(v.ID)))
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitBid2.htm", page, 0)
 }
 
 // ownedHallView returns the hall cl owns.
@@ -385,7 +385,7 @@ func (l *GameClientLink) showAuctionList(live *livePlayer, f *npc.Folk, val stri
 	html := fillPage(l.setPage("data/html/auction/AgitAuctionList.htm"),
 		"%AGIT_LIST%", sb.String(),
 		"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_start")
-	sendFilledHTML(live, f.ObjectID(), html, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitAuctionList.htm", html, 0)
 }
 
 // showAuctionInfo opens the details of hall val's auction. A hall that
@@ -422,7 +422,7 @@ func (l *GameClientLink) showAuctionInfo(live *livePlayer, f *npc.Folk, val stri
 		"%AGIT_LINK_RE%", "bypass -h npc_"+objID(f)+"_bid1 "+id,
 		"%OWNER_PLEDGE_NAME%", ownerName,
 		"%OWNER_PLEDGE_MASTER%", ownerMaster)
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitAuctionInfo.htm", page, 0)
 }
 
 // showSelectedItems opens cl's own page: for a clan owning no hall and
@@ -457,7 +457,7 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 			"%OWNER_PLEDGE_NAME%", ownerName,
 			"%OWNER_PLEDGE_MASTER%", ownerMaster,
 			"%AGIT_AUCTION_MINBID%", strconv.Itoa(minBid))
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitBidInfo.htm", page, 0)
 		return
 	}
 	if hallID := cl.HallID(); hallID > 0 {
@@ -494,7 +494,7 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 				"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_start",
 				"%objectId%", objID(f))
 		}
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitInfo.htm", page, 0)
 		return
 	}
 	l.showAuctionList(live, f, "1")
@@ -555,6 +555,13 @@ func auctionTime(ms int64, layout string) string {
 // toward zero.
 func auctionRemaining(ms int64) string {
 	return strconv.FormatInt(ms/3600000, 10) + " hours " + strconv.FormatInt((ms/60000)%60, 10) + " minutes"
+}
+
+// sendAuctioneerChat opens auctioneer f's chat window on live.
+func (l *GameClientLink) sendAuctioneerChat(live *livePlayer, f *npc.Folk) {
+	pages := l.pages()
+	page := f.AuctioneerChat(pages)
+	l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
 }
 
 // fillPage replaces each pattern of pairs in page, in order, with the

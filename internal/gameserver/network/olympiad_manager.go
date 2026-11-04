@@ -25,17 +25,19 @@ func (l *GameClientLink) olympiadNobleBypass(live *livePlayer, f *npc.Folk, choi
 		l.log.Debug().Int("choice", choice).Msg("bypass: olympiad manager without an Olympiad")
 		return
 	}
-	pages := setPages{l.html}
+	pages := l.pages()
 	id := live.ObjectID()
 	switch choice {
 	case 1:
 		l.sendUnregisterResult(live, o.Unregister(id, live.BaseClassID(), live.IsNoble()))
 	case 2:
 		classed, nonClassed := o.WaitingList()
-		sendFilledHTML(live, f.ObjectID(), f.OlympiadPage(pages, "noble_registered.htm",
-			"%listClassed%", strconv.Itoa(classed), "%listNonClassed%", strconv.Itoa(nonClassed)), 0)
+		page := f.OlympiadPage(pages, "noble_registered.htm",
+			"%listClassed%", strconv.Itoa(classed), "%listNonClassed%", strconv.Itoa(nonClassed))
+		l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
 	case 3:
-		sendFilledHTML(live, f.ObjectID(), f.OlympiadPage(pages, "noble_points1.htm", "%points%", strconv.Itoa(o.Points(id))), 0)
+		page := f.OlympiadPage(pages, "noble_points1.htm", "%points%", strconv.Itoa(o.Points(id)))
+		l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
 	case 4, 5:
 		kind := olympiad.NonClassed
 		if choice == 5 {
@@ -47,7 +49,7 @@ func (l *GameClientLink) olympiadNobleBypass(live *livePlayer, f *npc.Folk, choi
 		if o.Points(id) >= 50 || l.olympiadHero(live) {
 			page = "noble_settle.htm"
 		}
-		sendFilledHTML(live, f.ObjectID(), f.OlympiadPage(pages, page), 0)
+		l.sendFilePage(live, f.ObjectID(), pages.file, f.OlympiadPage(pages, page), 0)
 	case 7:
 		l.openMultisell(live, f, passesMultisell, false)
 	case 10:
@@ -109,7 +111,8 @@ func (l *GameClientLink) registerOlympiad(live *livePlayer, f *npc.Folk, kind ol
 	case olympiad.RegisterInMatch:
 		msg = serverpackets.SystemMessageAlreadyRegisteredInEventWaitingList
 	case olympiad.RegisterNoPoints:
-		sendFilledHTML(live, f.ObjectID(), f.OlympiadPage(setPages{l.html}, "noble_nopoints1.htm"), 0)
+		pages := l.pages()
+		l.sendFilePage(live, f.ObjectID(), pages.file, f.OlympiadPage(pages, "noble_nopoints1.htm"), 0)
 		return
 	}
 	live.SendFrame(serverpackets.FrameSystemMessage(msg))
@@ -171,5 +174,7 @@ func (l *GameClientLink) showClassRanking(live *livePlayer, f *npc.Folk, classID
 			names = nil
 		}
 	}
-	sendFilledHTML(live, f.ObjectID(), f.OlympiadRankingPage(setPages{l.html}, names), 0)
+	pages := l.pages()
+	page := f.OlympiadRankingPage(pages, names)
+	l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
 }

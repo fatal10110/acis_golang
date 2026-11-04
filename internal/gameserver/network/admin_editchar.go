@@ -29,7 +29,7 @@ func (l *GameClientLink) adminArgPlayer(gm *livePlayer, line string) *livePlayer
 // on gm, built on target's queue.
 func (l *GameClientLink) showCharInfo(gm, target *livePlayer) {
 	l.selectLiveTarget(gm, target)
-	onPlayer(gm, target, func() { sendFilledHTML(gm, 0, l.charInfoPage(target), 0) })
+	onPlayer(gm, target, func() { l.sendFilePage(gm, 0, adminFile("charinfo.htm"), l.charInfoPage(target), 0) })
 }
 
 // charInfoPage is target's character page: who it is, its clan and party,
@@ -102,7 +102,7 @@ func (l *GameClientLink) adminPartyInfo(gm *livePlayer, line string) {
 	page := l.adminHTML("partyinfo.htm")
 	page = strings.ReplaceAll(page, "%name%", target.CharacterName())
 	page = strings.ReplaceAll(page, "%party%", b.String())
-	sendFilledHTML(gm, 0, page, 0)
+	l.sendFilePage(gm, 0, adminFile("partyinfo.htm"), page, 0)
 }
 
 // adminRemove answers //remove clan_penalty|death_penalty|skill_reuse for

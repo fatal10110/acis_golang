@@ -204,7 +204,8 @@ func (l *GameClientLink) showHallSiegeMessenger(live *livePlayer, f *npc.Folk) b
 		live.SendFrame(l.frameHallSiegeInfo(live, s))
 		return true
 	}
-	sendFilledHTML(live, f.ObjectID(), l.setPage("data/html/siege/"+page+".htm"), 0)
+	file := "data/html/siege/" + page + ".htm"
+	l.sendFilePage(live, f.ObjectID(), file, l.setPage(file), 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }

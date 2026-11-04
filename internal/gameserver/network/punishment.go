@@ -141,7 +141,7 @@ func (l *GameClientLink) sendPunishmentPage(live *livePlayer, file string) {
 	if !ok {
 		page = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
 	}
-	sendValidatedHTML(live, 0, page, 0)
+	l.sendValidatedFile(live, 0, file, page, 0)
 }
 
 // storePunishment writes live's punishment on its persistence lane.

@@ -65,8 +65,7 @@ func assertStrokes(t *testing.T, p primitive, name string, want ...stroke) {
 // TestAdminShowUsageAndSilence pins the answers that draw nothing: no or an
 // unknown subcommand, or a page past int range, answers the usage; a
 // restart without area or point (matched case-sensitively) answers
-// nothing; html, whose file-name prefix is not served, is refused with
-// ActionFailed.
+// nothing.
 func TestAdminShowUsageAndSilence(t *testing.T) {
 	t.Parallel()
 	_, gm := bootShowAdmin(t)
@@ -77,9 +76,6 @@ func TestAdminShowUsageAndSilence(t *testing.T) {
 		if frames := exchangeZones(t, gm, encodeBuildCmd(cmd)); len(frames) != 0 {
 			t.Fatalf("//%s = %x, want nothing", cmd, opcodes(frames))
 		}
-	}
-	if frames := exchangeZones(t, gm, encodeBuildCmd("show html")); len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("//show html = %x, want ActionFailed", opcodes(frames))
 	}
 }
 

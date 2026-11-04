@@ -132,7 +132,7 @@ func (l *GameClientLink) adminZonePanel(gm *livePlayer) bool {
 		"%ZONES%", flags.String(),
 		"%ZLIST%", ids.String(),
 	).Replace(page)
-	sendValidatedHTML(gm, 0, page, 0)
+	l.sendValidatedFile(gm, 0, file, page, 0)
 	return true
 }
 

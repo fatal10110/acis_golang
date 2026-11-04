@@ -13,7 +13,12 @@ import (
 // malformed to answer, so that nothing more is sent.
 func (l *GameClientLink) schemeBufferBypass(live *livePlayer, f *npc.Folk, command string) bool {
 	talker := schemebuffer.Talker{ObjectID: live.ObjectID(), MaxBuffCount: live.MaxBuffCount()}
-	reply := l.schemeBuffer.Bypass(l.setPage, f.NpcID(), f.ObjectID(), talker, command)
+	var file string
+	setPage := func(path string) string {
+		file = path
+		return l.setPage(path)
+	}
+	reply := l.schemeBuffer.Bypass(setPage, f.NpcID(), f.ObjectID(), talker, command)
 	if reply.Aborted {
 		return false
 	}
@@ -38,7 +43,7 @@ func (l *GameClientLink) schemeBufferBypass(live *livePlayer, f *npc.Folk, comma
 		sendText(live, reply.Message)
 	}
 	if reply.Page != "" {
-		sendFilledHTML(live, 0, reply.Page, 0)
+		l.sendFilePage(live, 0, file, reply.Page, 0)
 	}
 	return true
 }

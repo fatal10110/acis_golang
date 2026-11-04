@@ -143,6 +143,7 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 		if path, ok := seller.BoughtPage(); ok {
 			if page, ok := l.html.Get(path); ok {
 				id := seller.ObjectID()
+				// The page is shown as read, never named as a set file.
 				sendFilledHTML(live, id, strings.ReplaceAll(serverpackets.NpcHtmlBody(page), "%objectId%", strconv.Itoa(int(id))), 0)
 			}
 		}

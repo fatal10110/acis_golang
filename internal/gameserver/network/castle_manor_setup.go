@@ -73,12 +73,12 @@ func (l *GameClientLink) bypassManorMenu(live *livePlayer, command string) {
 	case "Auctioneer":
 		l.auctioneerBypass(live, f, command)
 	case "Merchant", "Fisherman", "Gatekeeper", "WarehouseKeeper", "CastleWarehouseKeeper", "DungeonGatekeeper", "CastleBlacksmith":
-		reply := l.folkReply(live, f, command)
+		reply, file := l.folkReply(live, f, command)
 		if reply.Outcome == npc.BypassUnported {
 			// No command of these dialogs reads a manor window.
 			reply.Outcome = npc.BypassRefused
 		}
-		l.runFolkReply(live, f, command, reply)
+		l.runFolkReply(live, f, command, reply, file)
 	}
 }
 
@@ -152,7 +152,7 @@ func (l *GameClientLink) chamberlainManorMenu(live *livePlayer, f *npc.Folk, kin
 	}
 	r := l.residenceTalk(live, f)
 	if page := r.ChamberlainRefusal(kind, clan.PrivCastleManor); page != "" {
-		sendFilledHTML(live, f.ObjectID(), l.setPage(page), 0)
+		l.sendFilePage(live, f.ObjectID(), page, l.setPage(page), 0)
 		return
 	}
 	l.chamberlainManorWindows(live, r, command)

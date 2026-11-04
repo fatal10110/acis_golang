@@ -34,14 +34,15 @@ func (l *GameClientLink) showNPCChat(live *livePlayer, objectID int32) {
 // openFolkChat opens f's chat window on live, as its talk does when no
 // script answers and f shows no observer or siege window.
 func (l *GameClientLink) openFolkChat(live *livePlayer, f *npc.Folk) {
-	html, outcome := f.ChatWindow(setPages{l.html}, l.chatRules(), live.Karma(), folkChatState{l: l, live: live, f: f})
+	pages := l.pages()
+	html, outcome := f.ChatWindow(pages, l.chatRules(), live.Karma(), folkChatState{l: l, live: live, f: f})
 	switch outcome {
 	case npc.ChatWedding:
 		l.weddingGreeting(live, f)
 	case npc.ChatUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
 	default:
-		sendFolkChat(live, f, html, outcome)
+		l.sendFolkChat(live, f, pages.file, html, outcome)
 	}
 }
 
@@ -67,7 +68,7 @@ func (l *GameClientLink) sendNPCPage(live *livePlayer, objectID int32, file stri
 		page = l.setPage(file)
 	}
 	page = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(objectID)))
-	sendFilledHTML(live, objectID, page, 0)
+	l.sendFilePage(live, objectID, file, page, 0)
 }
 
 // callSkill makes live use the skill of e on its target, on live's queue, as a

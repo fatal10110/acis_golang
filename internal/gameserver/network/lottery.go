@@ -70,6 +70,7 @@ func (a lotteryAnnouncer) toAll(build func() wire.Frame) {
 // adds it to the jackpot and hands over the ticket. A claim answers no page.
 // It reports false for a negative n, which answers nothing at all.
 func (l *GameClientLink) lotteryBypass(live *livePlayer, f *npc.Folk, command string) bool {
+	pages := l.pages()
 	lot := l.lottery
 	val := lottery.Command(command)
 	var page string
@@ -78,7 +79,7 @@ func (l *GameClientLink) lotteryBypass(live *livePlayer, f *npc.Folk, command st
 		return false
 	case val == lottery.CommandIntro:
 		live.lottoPicks = lottery.Picks{}
-		page = l.lotteryPage(f, lottery.PageIntro)
+		page = l.lotteryPage(pages, f, lottery.PageIntro)
 	case val <= lottery.CommandBuy:
 		if !lotterySelling(live, lot.Status()) {
 			return true
@@ -87,22 +88,22 @@ func (l *GameClientLink) lotteryBypass(live *livePlayer, f *npc.Folk, command st
 			if !l.buyLotteryTicket(live) {
 				return true
 			}
-			page = l.lotteryPage(f, lottery.PageJackpot)
+			page = l.lotteryPage(pages, f, lottery.PageJackpot)
 			break
 		}
 		live.lottoPicks.Press(val)
-		page = live.lottoPicks.Mark(l.lotteryPage(f, lottery.PageForm))
+		page = live.lottoPicks.Mark(l.lotteryPage(pages, f, lottery.PageForm))
 	case val == lottery.CommandJackpot:
-		page = l.lotteryPage(f, lottery.PageJackpot)
+		page = l.lotteryPage(pages, f, lottery.PageJackpot)
 	case val == lottery.CommandClaims:
-		page = strings.ReplaceAll(l.lotteryPage(f, lottery.PageClaims), "%result%", lot.ClaimList(heldTickets(live)))
+		page = strings.ReplaceAll(l.lotteryPage(pages, f, lottery.PageClaims), "%result%", lot.ClaimList(heldTickets(live)))
 	case val == lottery.CommandInstructions:
-		page = lot.Instructions(l.lotteryPage(f, lottery.PageInstructions))
+		page = lot.Instructions(l.lotteryPage(pages, f, lottery.PageInstructions))
 	default:
 		l.claimLotteryTicket(live, int32(val))
 		return true
 	}
-	sendFilledHTML(live, f.ObjectID(), lot.Fill(page, f.ObjectID()), 0)
+	l.sendFilePage(live, f.ObjectID(), pages.file, lot.Fill(page, f.ObjectID()), 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }
@@ -123,12 +124,13 @@ func lotterySelling(live *livePlayer, st lottery.Status) bool {
 
 // lotteryPage is seller f's lottery page n as the window takes it, before
 // its placeholders are filled; a seller without the page shows the default
-// one.
-func (l *GameClientLink) lotteryPage(f *npc.Folk, n int) string {
+// one. pages remembers the file the page is set from.
+func (l *GameClientLink) lotteryPage(pages *setPages, f *npc.Folk, n int) string {
 	path := "data/html/default/" + strconv.Itoa(f.NpcID()) + "-" + strconv.Itoa(n) + ".htm"
 	if _, ok := l.html.Get(path); !ok {
 		path = "data/html/npcdefault.htm"
 	}
+	pages.file = path
 	return l.setPage(path)
 }
 

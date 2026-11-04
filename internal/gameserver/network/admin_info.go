@@ -20,11 +20,11 @@ func (l *GameClientLink) adminInfo(gm *livePlayer, line string) {
 	case *livePlayer:
 		l.showCharInfo(gm, target)
 	case *door.Object:
-		sendFilledHTML(gm, 0, l.doorInfoPage(target), 0)
+		l.sendFilePage(gm, 0, adminFile("doorinfo.htm"), l.doorInfoPage(target), 0)
 	case *summon.Actor:
-		sendFilledHTML(gm, 0, l.summonInfoPage(target), 0)
+		l.sendFilePage(gm, 0, adminFile("petinfo.htm"), l.summonInfoPage(target), 0)
 	case *staticobject.Object:
-		sendFilledHTML(gm, 0, l.staticInfoPage(target), 0)
+		l.sendFilePage(gm, 0, adminFile("staticinfo.htm"), l.staticInfoPage(target), 0)
 	default:
 		if inst := npcInstanceOf(target); inst != nil {
 			l.adminNpcInfo(gm, target, inst, spaceTokens(line)[1:])

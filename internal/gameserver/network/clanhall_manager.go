@@ -172,7 +172,7 @@ func (l *GameClientLink) clanHallManagerBypass(live *livePlayer, f *npc.Folk, co
 	case strings.EqualFold(actual, "support"):
 		d.support(val, tokens)
 	case strings.EqualFold(actual, "list_back"):
-		d.send(fillPage(d.page("chamberlain.htm"), "%npcname%", f.CharacterName(), "%objectId%", objID(f)))
+		d.sendFilled("chamberlain.htm", "%npcname%", f.CharacterName(), "%objectId%", objID(f))
 	case strings.EqualFold(actual, "support_back"):
 		d.supportBack()
 	case strings.EqualFold(actual, "banish_foreigner"):
@@ -222,8 +222,7 @@ func (d hallDialog) manageVault(v clanhall.HallView) {
 	if d.hall.IsSiegable() {
 		file = "vault-sch.htm"
 	}
-	d.send(fillPage(d.page(file),
-		"%rent%", strconv.Itoa(d.hall.Lease), "%date%", auctionTime(v.PaidUntil, hallFeeDateLayout), "%objectId%", objID(d.f)))
+	d.sendFilled(file, "%rent%", strconv.Itoa(d.hall.Lease), "%date%", auctionTime(v.PaidUntil, hallFeeDateLayout), "%objectId%", objID(d.f))
 }
 
 // door answers "door open" and "door close", which open or close the
@@ -310,12 +309,20 @@ func (d hallDialog) hallID() int32 { return int32(d.hall.ID) }
 // page is the manager page file, set as an HTML window takes it.
 func (d hallDialog) page(file string) string { return d.l.setPage(hallManagerPages + file) }
 
-// send opens page as the manager's window.
-func (d hallDialog) send(page string) { sendFilledHTML(d.live, d.f.ObjectID(), page, 0) }
+// send opens page, set from the manager page file, as the manager's
+// window.
+func (d hallDialog) send(file, page string) {
+	d.l.sendFilePage(d.live, d.f.ObjectID(), hallManagerPages+file, page, 0)
+}
+
+// sendFilled opens the manager page file with pairs filled in order.
+func (d hallDialog) sendFilled(file string, pairs ...string) {
+	d.send(file, fillPage(d.page(file), pairs...))
+}
 
 // sendPage opens the manager page file with its object id filled.
 func (d hallDialog) sendPage(file string) {
-	d.send(fillPage(d.page(file), "%objectId%", objID(d.f)))
+	d.sendFilled(file, "%objectId%", objID(d.f))
 }
 
 // allowed reports whether the talker holds privilege p in its clan, and
@@ -324,7 +331,7 @@ func (d hallDialog) allowed(p clan.Privilege) bool {
 	if d.cl.HasPrivilege(d.live.ObjectID(), p) {
 		return true
 	}
-	d.send(d.page("not_authorized.htm"))
+	d.sendFilled("not_authorized.htm")
 	return false
 }
 
@@ -375,16 +382,14 @@ func (d hallDialog) functions(val string, tokens []string) {
 			d.sendPage("functions-disabled.htm")
 			return
 		}
-		d.send(fillPage(d.page("support"+strconv.Itoa(fn.Level)+".htm"),
-			"%mp%", strconv.Itoa(int(d.f.MPValue())), "%objectId%", objID(d.f)))
+		d.sendFilled("support"+strconv.Itoa(fn.Level)+".htm", "%mp%", strconv.Itoa(int(d.f.MPValue())), "%objectId%", objID(d.f))
 	default:
 		level := func(funcType int) string {
 			return strconv.Itoa(d.l.hallFunctions.Level(d.hallID(), funcType))
 		}
-		d.send(fillPage(d.page("functions.htm"),
-			"%npcId%", strconv.Itoa(d.f.NpcID()), "%objectId%", objID(d.f),
+		d.sendFilled("functions.htm", "%npcId%", strconv.Itoa(d.f.NpcID()), "%objectId%", objID(d.f),
 			"%hp_regen%", level(hallmodel.FuncRestoreHP), "%mp_regen%", level(hallmodel.FuncRestoreMP),
-			"%xp_regen%", level(hallmodel.FuncRestoreExp)))
+			"%xp_regen%", level(hallmodel.FuncRestoreExp))
 	}
 }
 
@@ -428,8 +433,7 @@ func (d hallDialog) supportBack() {
 	if !ok || fn.Level == 0 {
 		return
 	}
-	d.send(fillPage(d.page("support"+strconv.Itoa(fn.Level)+".htm"),
-		"%mp%", strconv.Itoa(int(d.f.MPValue())), "%objectId%", objID(d.f)))
+	d.sendFilled("support"+strconv.Itoa(fn.Level)+".htm", "%mp%", strconv.Itoa(int(d.f.MPValue())), "%objectId%", objID(d.f))
 }
 
 // manage answers "manage [group ...]", for a member allowed to set the
@@ -598,7 +602,7 @@ func (d hallDialog) decoCommand(args []string) {
 
 // cancelPage asks to confirm a function's removal through apply.
 func (d hallDialog) cancelPage(apply string) {
-	d.send(fillPage(d.page("functions-cancel.htm"), "%apply%", apply, "%objectId%", objID(d.f)))
+	d.sendFilled("functions-cancel.htm", "%apply%", apply, "%objectId%", objID(d.f))
 }
 
 // linkLevel is the level args[1] names, false when it is missing or does
@@ -623,9 +627,8 @@ func (d hallDialog) offer(c hallChange, apply string, args []string) {
 	}
 	decos := d.l.hallFunctions.Decos()
 	cost := strconv.Itoa(decos.Fee(c.funcType, link)) + "</font> Adena / " + strconv.Itoa(decos.Days(c.funcType, link)) + " day(s)</font>)"
-	d.send(fillPage(d.page("functions-apply.htm"),
-		"%name%", c.name, "%cost%", cost, "%use%", c.use(c.shown(link)),
-		"%apply%", apply+strconv.Itoa(link), "%objectId%", objID(d.f)))
+	d.sendFilled("functions-apply.htm", "%name%", c.name, "%cost%", cost, "%use%", c.use(c.shown(link)),
+		"%apply%", apply+strconv.Itoa(link), "%objectId%", objID(d.f))
 }
 
 // change rents, changes or, at level 0, cancels c at the level args names,
@@ -652,7 +655,7 @@ func (d hallDialog) change(c hallChange, args []string) {
 		case c.stageShown:
 			used = "Stage " + strconv.Itoa(shown)
 		}
-		d.send(fillPage(d.page("functions-used.htm"), "%val%", used, "%objectId%", objID(d.f)))
+		d.sendFilled("functions-used.htm", "%val%", used, "%objectId%", objID(d.f))
 		return
 	}
 	file, fee := "functions-apply_confirmed.htm", cost
@@ -737,28 +740,31 @@ func (d hallDialog) siegeForm(plain, siegable string) string {
 
 // recoveryPage lists the HP, experience and MP recovery functions.
 func (d hallDialog) recoveryPage() {
-	page := d.page("edit_recovery.htm")
+	const file = "edit_recovery.htm"
+	page := d.page(file)
 	page = d.fillFunction(page, "hp", "%hp_recovery%", hallmodel.FuncRestoreHP, true, " ", removeHP, d.gradeLinks(hpLinks))
 	page = d.fillFunction(page, "exp", "%exp_recovery%", hallmodel.FuncRestoreExp, true, " ", removeExp, d.gradeLinks(expLinks))
 	page = d.fillFunction(page, "mp", "%mp_recovery%", hallmodel.FuncRestoreMP, true, " ", removeMP, d.gradeLinks(mpLinks))
-	d.send(fillPage(page, "%objectId%", objID(d.f)))
+	d.send(file, fillPage(page, "%objectId%", objID(d.f)))
 }
 
 // otherPage lists the teleport, support magic and item creation functions.
 func (d hallDialog) otherPage() {
-	page := d.page("edit_other.htm")
+	const file = "edit_other.htm"
+	page := d.page(file)
 	page = d.fillFunction(page, "tele", "%tele%", hallmodel.FuncTeleport, false, " ", removeTele, d.siegeForm(teleLevels, teleLevelsSCH))
 	page = d.fillFunction(page, "support", "%support%", hallmodel.FuncSupportMagic, false, " ", removeSupport, d.gradeLinks(supportLinks))
 	page = d.fillFunction(page, "item", "%item%", hallmodel.FuncCreateItem, false, " ", removeItem, d.siegeForm(itemLevels, itemLevelsSCH))
-	d.send(fillPage(page, "%objectId%", objID(d.f)))
+	d.send(file, fillPage(page, "%objectId%", objID(d.f)))
 }
 
 // decoPage lists the curtains and front platform decorations.
 func (d hallDialog) decoPage() {
-	page := d.page("deco.htm")
+	const file = "deco.htm"
+	page := d.page(file)
 	page = d.fillFunction(page, "curtain", "%curtain%", hallmodel.FuncDecoCurtains, false, "&nbsp;", removeCurtains, curtainLevels)
 	page = d.fillFunction(page, "fixture", "%fixture%", hallmodel.FuncDecoFixtures, false, "&nbsp;", removeFixtures, fixtureLevels)
-	d.send(fillPage(page, "%objectId%", objID(d.f)))
+	d.send(file, fillPage(page, "%objectId%", objID(d.f)))
 }
 
 // hallManagerSelfBuff lands on manager f the buff its idle AI checks once
@@ -793,7 +799,7 @@ func (l *GameClientLink) hallSupportAnswer(f *npc.Folk, e event.HallSupportCast)
 		file = "support-no_mana.htm"
 	}
 	page := fillPage(l.setPage(hallManagerPages+file), "%mp%", strconv.Itoa(e.MP), "%objectId%", objID(f))
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	l.sendFilePage(live, f.ObjectID(), hallManagerPages+file, page, 0)
 }
 
 // broadcastHallDecoration shows hall hallID's decorations to every player

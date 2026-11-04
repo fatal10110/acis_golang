@@ -61,7 +61,7 @@ func (l *GameClientLink) openBook(live *livePlayer, bookID int32) {
 	if !ok {
 		page = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
 	}
-	sendValidatedHTML(live, 0, page, bookID)
+	l.sendValidatedFile(live, 0, file, page, bookID)
 	live.SendFrame(serverpackets.FrameActionFailed())
 }
 

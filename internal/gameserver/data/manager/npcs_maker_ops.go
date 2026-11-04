@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // The spawn operations a maker makes on its spawns, and the spawn lookups
@@ -64,6 +65,48 @@ func (n *Npcs) FindSpawn(npcID int32) spawn.Locator {
 		return nil
 	}
 	return first
+}
+
+// FirstNPCOfAlias returns the object id of the NPC of the first spawn whose
+// NPC template has alias, ignoring case: the first npcmaker spawn in list
+// order, else the standalone spawn placed first of those still kept. Of a
+// spawn keeping several NPCs it is the one of lowest object id. ok is false
+// when no spawn has the alias or the first one keeps no NPC.
+func (n *Npcs) FirstNPCOfAlias(alias string) (id int32, ok bool) {
+	match := func(t *npc.Template) bool { return strings.EqualFold(t.Alias, alias) }
+	first, inMaker := n.findGroupSpawn(match)
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	var (
+		standalone task.SlotID
+		seq        int32
+	)
+	if !inMaker {
+		for key, slot := range n.slot {
+			if !slot.fixed || (seq != 0 && slot.seq >= seq) {
+				continue
+			}
+			if t, found := n.templates.Get(int(slot.entry.NPCID)); found && match(t) {
+				standalone, seq = key, slot.seq
+			}
+		}
+		if seq == 0 {
+			return 0, false
+		}
+	}
+	for oid, key := range n.live {
+		if inMaker {
+			if slot := n.slot[key]; slot.group != first.g || slot.spawnIdx != first.i {
+				continue
+			}
+		} else if key != standalone {
+			continue
+		}
+		if !ok || oid < id {
+			id, ok = oid, true
+		}
+	}
+	return id, ok
 }
 
 // standaloneSpawn is a standalone spawn as the point it places its NPC at.

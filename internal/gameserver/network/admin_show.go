@@ -48,10 +48,14 @@ func (l *GameClientLink) adminShow(gm *livePlayer, line string) {
 	case "door":
 		l.showDoors(gm)
 	case "html":
-		// The toggle prefixes every file page a game master is shown with
-		// the file's name; no page send carries its file name yet.
-		l.log.Warn().Str("command", "admin_show html").Msg("admin: command not implemented yet")
-		gm.SendFrame(serverpackets.FrameActionFailed())
+		// Flipping the toggle answers nothing, as the command has always
+		// done; an admin command leaves no client action pending.
+		for {
+			on := l.showPageFiles.Load()
+			if l.showPageFiles.CompareAndSwap(on, !on) {
+				break
+			}
+		}
 	case "move":
 		l.toggleDebugMove(gm, false)
 	case "path":
@@ -349,9 +353,24 @@ type walkerRow struct {
 	nodes []route.WalkerLocation
 }
 
+// firstSpawnedNPC is the NPC of the first spawn of the NPC alias, in the
+// world; false when there is none.
+func (l *GameClientLink) firstSpawnedNPC(alias string) (world.Tracked, bool) {
+	npcs := l.npcSpawns.Load()
+	if npcs == nil {
+		return nil, false
+	}
+	id, ok := npcs.FirstNPCOfAlias(alias)
+	if !ok {
+		return nil, false
+	}
+	return l.world.Object(id)
+}
+
 // sendWalkerPanel opens page of the walker panel: every walker route, by
-// route name then NPC name, the NPC walking it with the node it heads for
-// and its direction, or unspawned. A page below 1 with routes listed, or a
+// route name then NPC name, the NPC of the first spawn of that name with
+// the node it heads for and its direction, node 0 the regular way when it
+// walks no route, or unspawned without one. A page below 1 with routes listed, or a
 // walker heading for a node its listed route lacks, answers the usage.
 func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 	routes, walker := l.walkerRoutes()
@@ -375,26 +394,24 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 			b.WriteString("<table width=280><tr>")
 		}
 		show := `<td width=40 align=right><a action="bypass admin_show walker ` + strconv.Itoa(page) + " " + e.npc + `">Show</a></td>`
-		id, index, reverse, walking := int32(0), 0, false, false
-		if walker != nil {
-			id, index, reverse, walking = walker.Walking(e.npc)
-		}
-		if !walking {
+		obj, spawned := l.firstSpawnedNPC(e.npc)
+		if !spawned {
 			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.nodes[0].Location) + `">Unspawned</a></td><td width=40>-</td><td width=50 align=right>-</td>` + show)
 		} else {
+			var index int
+			var reverse bool
+			if walker != nil {
+				index, reverse, _ = walker.Walking(obj.ObjectID())
+			}
 			if index >= len(e.nodes) {
 				sendText(gm, showUsage)
 				return
-			}
-			name := ""
-			if obj, ok := l.world.Object(id); ok {
-				name = creatureName(obj)
 			}
 			direction := "Regular"
 			if reverse {
 				direction = "Reverse"
 			}
-			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.nodes[index].Location) + `">` + trimAndDress(name, 25) + "</a></td><td width=40>" + strconv.Itoa(index) + " / " + strconv.Itoa(len(e.nodes)) + "</td><td width=50 align=right>" + direction + "</td>" + show)
+			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.nodes[index].Location) + `">` + trimAndDress(creatureName(obj), 25) + "</a></td><td width=40>" + strconv.Itoa(index) + " / " + strconv.Itoa(len(e.nodes)) + "</td><td width=50 align=right>" + direction + "</td>" + show)
 		}
 		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
 	}
@@ -405,7 +422,7 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 	if !found {
 		html = "<html><body>My html is missing:<br>" + file + "</body></html>"
 	}
-	sendValidatedHTML(gm, 0, strings.ReplaceAll(html, "%content%", b.String()), 0)
+	l.sendValidatedFile(gm, 0, file, strings.ReplaceAll(html, "%content%", b.String()), 0)
 }
 
 // teleportLoc is at as the //teleport arguments: x y z.

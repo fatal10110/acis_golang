@@ -197,7 +197,7 @@ func (l *GameClientLink) showAdminClanHall(gm *livePlayer, v clanhall.HallView) 
 	} {
 		page = strings.ReplaceAll(page, r[0], r[1])
 	}
-	sendValidatedHTML(gm, 0, page, 0)
+	l.sendValidatedFile(gm, 0, file, page, 0)
 }
 
 // showAdminClanHalls opens the clan hall list for gm: for each town, its
@@ -232,5 +232,5 @@ func (l *GameClientLink) showAdminClanHalls(gm *livePlayer) {
 		b.WriteString("</table>")
 	}
 	page = strings.ReplaceAll(page, "%AGIT_LIST%", b.String())
-	sendValidatedHTML(gm, 0, page, 0)
+	l.sendValidatedFile(gm, 0, file, page, 0)
 }

@@ -117,7 +117,8 @@ func (l *GameClientLink) derbyBypass(live *livePlayer, f *npc.Folk, command stri
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("command", command).Msg("bypass: no race track running")
 		return true
 	}
-	reply := l.derby.Bypass(setPages{l.html}, f.NpcID(), f.ObjectID(), &live.derbyPicks, derbyHolder{live}, command)
+	pages := l.pages()
+	reply := l.derby.Bypass(pages, f.NpcID(), f.ObjectID(), &live.derbyPicks, derbyHolder{live}, command)
 	if reply.Aborted {
 		return false
 	}
@@ -135,7 +136,7 @@ func (l *GameClientLink) derbyBypass(live *livePlayer, f *npc.Folk, command stri
 		l.redeemDerbyTicket(live, redeem)
 	}
 	if reply.Page != "" {
-		sendFilledHTML(live, f.ObjectID(), reply.Page, 0)
+		l.sendFilePage(live, f.ObjectID(), pages.file, reply.Page, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	if reply.Chat {

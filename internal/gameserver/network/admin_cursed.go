@@ -207,7 +207,7 @@ func (l *GameClientLink) sendCursedWeaponsPage(gm *livePlayer) {
 		sb.WriteString("</table>")
 	}
 	page := strings.ReplaceAll(l.adminHTML("cwinfo.htm"), "%cwinfo%", sb.String())
-	sendFilledHTML(gm, 0, page, 0)
+	l.sendFilePage(gm, 0, adminFile("cwinfo.htm"), page, 0)
 }
 
 // cursedButton is a panel button labelled value running //cw command.

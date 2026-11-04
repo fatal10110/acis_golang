@@ -182,7 +182,7 @@ func (l *GameClientLink) showPetitions(gm *livePlayer, page int) {
 	html := l.adminHTML("petitions.htm")
 	html = strings.ReplaceAll(html, "%unfollow%", unfollow)
 	html = strings.ReplaceAll(html, "%content%", b.String())
-	sendFilledHTML(gm, 0, html, 0)
+	l.sendFilePage(gm, 0, adminFile("petitions.htm"), html, 0)
 }
 
 // showPetition opens petition id on gm and marks it read. A closed
@@ -223,12 +223,15 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", "")
 	}
 	html = strings.ReplaceAll(html, "%id%", strconv.Itoa(int(id)))
-	sendFilledHTML(gm, 0, html, 0)
+	l.sendFilePage(gm, 0, adminFile("petition.htm"), html, 0)
 }
 
 // adminHTML returns admin panel page name as set, before its placeholders
 // are filled: the page limited, or the missing-page notice when there is
 // none.
 func (l *GameClientLink) adminHTML(name string) string {
-	return l.setPage("data/html/admin/" + name)
+	return l.setPage(adminFile(name))
 }
+
+// adminFile is the datapack file of admin page name.
+func adminFile(name string) string { return "data/html/admin/" + name }

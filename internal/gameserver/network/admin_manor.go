@@ -36,5 +36,5 @@ func (l *GameClientLink) adminManor(gm *livePlayer, _ string) {
 		"%change%", m.NextModeChange().Format("02/01 15:04:05"),
 		"%castleInfo%", info.String(),
 	).Replace(page)
-	sendValidatedHTML(gm, 0, page, 0)
+	l.sendValidatedFile(gm, 0, file, page, 0)
 }

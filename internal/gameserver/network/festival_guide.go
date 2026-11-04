@@ -45,11 +45,12 @@ func (l *GameClientLink) festivalGuideBypass(live *livePlayer, f *npc.Folk, comm
 	case reply.HTML != "":
 		sendFilledHTML(live, f.ObjectID(), serverpackets.NpcHtmlBody(reply.HTML), 0)
 	case reply.Page != "":
-		page := strings.ReplaceAll(l.setPage("data/html/seven_signs/festival/"+reply.Page), "%objectId%", strconv.Itoa(int(f.ObjectID())))
+		file := "data/html/seven_signs/festival/" + reply.Page
+		page := strings.ReplaceAll(l.setPage(file), "%objectId%", strconv.Itoa(int(f.ObjectID())))
 		for i := 0; i+1 < len(reply.Fill); i += 2 {
 			page = strings.ReplaceAll(page, reply.Fill[i], reply.Fill[i+1])
 		}
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		l.sendFilePage(live, f.ObjectID(), file, page, 0)
 	}
 	if reply.Release {
 		live.SendFrame(serverpackets.FrameActionFailed())

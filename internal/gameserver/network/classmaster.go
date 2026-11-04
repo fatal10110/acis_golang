@@ -14,11 +14,11 @@ import (
 // nothing more is sent.
 func (l *GameClientLink) classMasterBypass(live *livePlayer, f *npc.Folk, command string) bool {
 	cmd, _ := classmaster.ParseCommand(command)
-	pages := setPages{l.html}
+	pages := l.pages()
 	switch cmd.Kind {
 	case classmaster.CommandMenu:
 		page := l.classMaster.MenuPage(pages, f.NpcID(), f.ObjectID(), live.ClassID(), live.Level(), cmd.Tier)
-		sendFilledHTML(live, f.ObjectID(), page, 0)
+		l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
 	case classmaster.CommandChangeClass:
 		if cmd.Malformed {
 			return false
@@ -28,7 +28,8 @@ func (l *GameClientLink) classMasterBypass(live *livePlayer, f *npc.Folk, comman
 			return false
 		}
 		if changed {
-			sendFilledHTML(live, f.ObjectID(), classmaster.ChangedPage(pages, f.NpcID(), cmd.ClassID), 0)
+			page := classmaster.ChangedPage(pages, f.NpcID(), cmd.ClassID)
+			l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
 		}
 	case classmaster.CommandBecomeNoble:
 		noble := live.IsNoble()
@@ -36,7 +37,8 @@ func (l *GameClientLink) classMasterBypass(live *livePlayer, f *npc.Folk, comman
 			l.makeNoble(live)
 			live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 		}
-		sendFilledHTML(live, f.ObjectID(), classmaster.NoblePage(pages, f.NpcID(), noble), 0)
+		page := classmaster.NoblePage(pages, f.NpcID(), noble)
+		l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)
 	case classmaster.CommandLearnSkills:
 		l.rewardLiveSkills(live)
 	}

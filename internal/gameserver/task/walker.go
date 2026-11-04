@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -140,19 +139,17 @@ func (w *Walker) SetRoutes(routes route.WalkerRoutes) {
 // Routes returns the loaded walker routes. The caller must not modify them.
 func (w *Walker) Routes() route.WalkerRoutes { return *w.routes.Load() }
 
-// Walking reports the actor walking a route under npcName, matched without
-// regard to case, with the lowest object id: that id, the index of the
-// route node it heads for, and whether it walks the route backwards. ok is
-// false when no such actor walks.
-func (w *Walker) Walking(npcName string) (id int32, index int, reverse, ok bool) {
+// Walking reports, for the actor of object id id, the index of the route
+// node it heads for and whether it walks its route backwards. ok is false
+// when the actor walks no route.
+func (w *Walker) Walking(id int32) (index int, reverse, ok bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	for oid, e := range w.entries {
-		if strings.EqualFold(e.npc, npcName) && (!ok || oid < id) {
-			id, index, reverse, ok = oid, e.index, e.reverse, true
-		}
+	e, ok := w.entries[id]
+	if !ok {
+		return 0, false, false
 	}
-	return id, index, reverse, ok
+	return e.index, e.reverse, true
 }
 
 // Start launches the fixed one-second walker task.
