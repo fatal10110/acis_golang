@@ -285,10 +285,13 @@ func (l *GameClientLink) toggleDebugMove(gm *livePlayer, path bool) {
 // them, nil without one.
 func (l *GameClientLink) walkerRoutes() (route.WalkerRoutes, *task.Walker) {
 	npcs := l.npcSpawns.Load()
-	if npcs == nil || npcs.Walker() == nil {
+	if npcs == nil {
 		return nil, nil
 	}
 	w := npcs.Walker()
+	if w == nil {
+		return nil, nil
+	}
 	return w.Routes(), w
 }
 
