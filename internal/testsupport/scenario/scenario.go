@@ -106,10 +106,15 @@
 //	skill <skill id> <level>                  optional: the character knows that shipped skill, which a cast step casts
 //	roll <role> <draw>                        optional: every combat draw of the NPC is that draw (n-1 for a draw of
 //	                                          [0, n) it is not inside): its skill landing rolls, as its hit and
-//	                                          critical rolls; with 0 every skill it casts lands (a landing rate is at
-//	                                          least 1), with 99 none does (at most 99), and every blow lands (a hit
-//	                                          rate is at least 300 of 1000). Role player pins the character's, set
-//	                                          each time it enters the world
+//	                                          critical rolls. A draw of 0 lands every effect skill it casts through a
+//	                                          landing roll of 100 (a rate is at least 1), 99 lands none (at most 99), and
+//	                                          0 lands every blow (a hit rate is at least 300 of 1000). A magic damage or
+//	                                          drain cast works the other way: it resists for a draw at or below its
+//	                                          landing rate (at least 100 of 10000) and lands above it, so pin it high
+//	                                          (5000 for a rate below 5000, as the wizard of lv3_wizard_private_blast).
+//	                                          The landing of an effect template with a power draws from the global
+//	                                          random and no pin reaches it. Role player pins the character's, set each
+//	                                          time it enters the world
 //	gauss <role> <value>                      optional: every normal (gaussian) draw of the NPC's formulas is that value: a
 //	                                          magic skill's landing check, which lands when its margin plus half the draw
 //	                                          is above 0 (against a defender of equal strength any draw above 0; an NPC
