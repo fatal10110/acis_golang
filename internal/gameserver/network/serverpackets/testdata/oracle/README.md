@@ -55,8 +55,15 @@ wrote into a byte buffer.
   for a state) and every page of `SSQStatus`
 - the game master's views and the raid point record (`ProbeGMView.java`): `GMViewCharacterInfo`, `GMViewSkillInfo`,
   `GMViewQuestList`, `GMViewWarehouseWithdrawList` and `ExGetBossRecord`
+- the remaining small families (`ProbeMisc.java`): `NpcHtmlMessage` (and its page size limit), the community
+  board pages as `BaseBBSManager.separateAndSend` and `send1001` cut them, `ExFishingStart`,
+  `ExFishingStartCombat`, `ExFishingHpRegen`, `ExStorageMaxCount`, `EnchantResult`, `ExShowVariationMakeWindow`,
+  `ExShowVariationCancelWindow`, `ExShowQuestInfo`, `ExConfirmCancelItem`, `Dice` (the landing point
+  `SpawnLocation.addOffsetBasedOnHeading` moves), `ObserverStart`, `ObserverEnd`, `ClanHallDecoration`,
+  `ExColosseumFenceInfo`, `NpcSay`, `PetStatusShow`, `SunRise`, `SunSet`, `AuthLoginFail`, `VersionCheck` and
+  `NewCharacterSuccess`
 - their base classes `L2GameServerPacket`, `commons/mmocore/{SendablePacket,AbstractPacket,MMOClient,MMOConnection}`
-- the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,Point2D}`, `model/manor/{Seed,SeedProduction,CropProcure}`,
+- the value types `model/{Macro,trade/TradeItem,trade/ItemRequest,craft/ManufactureList,buylist/NpcBuyList,multisell/{Entry,ListContainer}}`, `model/records/{MacroCmd,ManufactureItem}`, `enums/items/{ItemState,CrystalType}`, `enums/actors/HennaType`, `model/item/instance/ItemInfo`, `model/location/{Location,SpawnLocation,ObserverLocation,Point2D}`, `commons/math/MathUtil`, `communitybbs/manager/BaseBBSManager`, `enums/FailReason`, `model/manor/{Seed,SeedProduction,CropProcure}`,
   `model/records/CnfDlgData`, `model/CharSelectSlot`, `enums/{SayType,ZoneId,SiegeSide,Paperdoll}`,
   `enums/actors/{ClassId,ClassRace,Sex}`,
   `enums/actors/WeightPenalty`, `enums/skills/EffectFlag` and the rest of their closure.
@@ -67,7 +74,7 @@ engine classes the packets only read through getters): `Config` (debug flag),
 (plain value holders; `Creature` carries the title, run and water flags and the move
 destination), `BoatInfo`, `BoatMove`, `BoatStatus`, `World`, `PlayerInfoTable`,
 `RelationManager` (registries `FriendList` reads), `IntIntHolder` (the id/value pair
-`StatusUpdate` holds, minus the skill lookup), `StatSet` (map-backed), `MathUtil` (never reached)
+`StatusUpdate` holds, minus the skill lookup), `StatSet` (map-backed)
 and `EffectHolder` (never written). The engine graphs behind the last family are plain stand-ins too:
 `SystemMessageId` (id and parameter count; the shared no-parameter message is never cached),
 `ItemInstance`/`Item`/`PcInventory`/`ItemData`, `Playable`, `Augmentation`, `Product`, `Ingredient`, `MultisellData`,
@@ -77,7 +84,9 @@ and `EffectHolder` (never written). The engine graphs behind the last family are
 function of the stamp), the player's skill map (kept in the order the probe adds them), shortcut bar,
 quest log and reuse timers, `CastleManager`/`ClanHallManager`/`ClanTable`, `Monster` with its
 spoil state, the player's access level, appearance and status, `GameTimeTaskManager`,
-`CastleManorManager` (the reference's own lookups over tables the probe fills), and for the character
+`CastleManorManager` (the reference's own lookups over tables the probe fills), `HtmCache` (never reached: the
+probe sets every page itself), `ClanHall` (id and decoration depth per function), `Fence`, `PlayerData` and
+`PlayerTemplate` (the root class templates; the race is the class's own), and for the character
 list a `ConnectionPool` over `FakeDb`: in-memory tables answering the reference JDBC queries, so the
 list's own loading rules (subclass override, unset base class, augmentation read) run unchanged. They carry no packet logic: every byte comes from
 the reference `writeImpl`.
@@ -164,6 +173,20 @@ The skill list probe uses ids that one table run lists in ascending order (the G
 `StartPledgeWar`, `StopPledgeWar` and `SurrenderPledgeWar` are not probed: nothing in the reference ever builds
 them, and the Go side has no encoder for them.
 `Snoop` is not probed for the same reason.
+`ShowBoard.STATIC_CLOSE` (the board's close page) is not probed: the Go side has no encoder for it.
+
+The remaining families (`ProbeMisc.java`, `../../packets_oracle_misc_test.go`) run over the shared rows. The html
+dialog cases run each page through `setHtml`, whose limit counts UTF-16 code units (a page of 8192 units is kept,
+one more unit is replaced, a wide character counts one unit and a surrogate pair two); the Go cases run the page
+through `NpcHtmlBody`. The board page cases record what the board's send helpers send to a stub `Player`: a page is
+cut at 4090 and 8180 code units (a surrogate pair straddling the cut is split), a page of 12270 units or more sends
+nothing, and an edit page of 8180 units or more sends nothing; the Go cases take the frames `FramesShowBoardPage`
+and `FrameShowBoardEdit` build, so the number of parts is pinned too. `Dice` throws from a stub `Player`'s position
+through the reference `SpawnLocation` and `MathUtil` heading arithmetic; the Go cases move the same point with
+`OrientedLocation.Ahead`. `ExStorageMaxCount` reads plain limits from the status stand-in; the Go cases build a
+character whose configured bases and limit stats give the same values (the formula is pinned by
+`TestFrameExStorageMaxCountFollowsConfigAndLimitStats`). `NewCharacterSuccess` lists the root class templates in
+the reference order, each with its own base stats.
 
 The siege windows (`ProbeSiege.java`, `../../packets_oracle_siege_test.go`) run over stand-ins for the castle (its
 owner), the siege (its attacker, defender and pending lists, the side of each clan and the date), the siegable hall

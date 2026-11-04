@@ -29,6 +29,11 @@ public class Npc extends Creature
 		return template;
 	}
 
+	public int getNpcId()
+	{
+		return template.getNpcId();
+	}
+
 	public final NpcTemplate getPolymorphTemplate()
 	{
 		return polymorphTemplate;

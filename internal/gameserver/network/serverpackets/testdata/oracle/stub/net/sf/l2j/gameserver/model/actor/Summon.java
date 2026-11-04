@@ -45,6 +45,11 @@ public class Summon extends Playable
 		return summonStatus;
 	}
 
+	public int getNpcId()
+	{
+		return template.getNpcId();
+	}
+
 	public int getSummonType()
 	{
 		return summonType;

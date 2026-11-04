@@ -131,5 +131,6 @@ public final class PacketProbe
 		ProbeSiege.run();
 		ProbeSevenSigns.run();
 		ProbeGMView.run();
+		ProbeMisc.run();
 	}
 }
