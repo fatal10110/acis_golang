@@ -218,8 +218,9 @@ type folkControl struct {
 	log    *zerolog.Logger
 }
 
-// Emit advances the NPC's route on each arrival, and ends it when the NPC
-// dies.
+// Emit advances the NPC's route on each arrival, and takes the NPC off it
+// when it dies: its corpse keeps the node it headed for and its direction
+// until it decays.
 func (c *folkControl) Emit(ev event.Event) {
 	switch ev.(type) {
 	case event.Arrived:
@@ -227,7 +228,7 @@ func (c *folkControl) Emit(ev event.Event) {
 			c.log.Warn().Err(err).Msg("task: walker arrived")
 		}
 	case event.Died:
-		c.walker.StopRoute(c.ref)
+		c.walker.LeaveRoute(c.ref)
 	}
 }
 
