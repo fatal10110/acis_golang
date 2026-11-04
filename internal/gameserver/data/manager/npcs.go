@@ -81,9 +81,14 @@ type slotInfo struct {
 	// own: the NPC the slot brings back next is shown so from its first
 	// sight.
 	form *npc.Template
-	// left is the NPC the slot last let decay as the walker panel shows it
-	// while the slot waits to respawn it.
+	// left is the slot's NPC as it last left the world: the walker panel
+	// shows it so while the slot waits to respawn it, or keeps it hidden,
+	// and the NPC the slot brings back next takes up its walker route
+	// state.
 	left leftNPC
+	// hidden marks a slot whose NPC a script hid: it keeps the NPC, out of
+	// the world for good.
+	hidden bool
 	// fixed marks a standalone spawn placed at a point of its own, not
 	// declared under a maker: at and heading are that point. It never
 	// respawns. placed marks a script private created at a point of its
@@ -110,9 +115,9 @@ type slotInfo struct {
 	memory *slotMemory
 }
 
-// leftNPC is an NPC as it decayed: its name, and the walker route node it
-// headed for and its direction, node 0 the regular way when it walked
-// none.
+// leftNPC is an NPC as it left the world: its name, and the walker route
+// node it headed for and its direction, node 0 the regular way when it
+// walked none.
 type leftNPC struct {
 	name    string
 	index   int

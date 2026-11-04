@@ -116,8 +116,9 @@ func (n *Npcs) dropGoneScriptPrivates(master npc.PartyMember) {
 // DecayMe hides h without a decay: it leaves the
 // world with no decayed hook, and its spawn is not told, so it never
 // respawns and an npcmaker keeps counting it. It takes no more AI turns
-// and walks no route. The slot of a private a script created goes with it,
-// as nothing can bring that private back.
+// and walks no route; its spawn keeps it as it left, with the route node it
+// headed for and its direction. The slot of a private a script created
+// goes with it, as nothing can bring that private back.
 func (n *Npcs) DecayMe(h *npc.Hostile) {
 	if n.decay != nil {
 		n.decay.Cancel(h)
@@ -127,12 +128,23 @@ func (n *Npcs) DecayMe(h *npc.Hostile) {
 	}
 	id := h.ObjectID()
 	n.ai.Remove(h)
+	left := leftNPC{name: h.Instance.Name()}
+	left.index, left.reverse, _ = n.walker.Walking(id)
 	n.walker.StopRouteByID(id)
 
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	key, ok := n.live[id]
-	if !ok || !n.slot[key].scripted {
+	if !ok {
+		return
+	}
+	slot, ok := n.slot[key]
+	if !ok {
+		return
+	}
+	if !slot.scripted {
+		slot.hidden, slot.left = true, left
+		n.slot[key] = slot
 		return
 	}
 	delete(n.live, id)

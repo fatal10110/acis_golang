@@ -184,6 +184,7 @@ type options struct {
 	dataReloads            network.DataReloads
 	npcDropRates           item.Rates
 	walkerRoutes           route.WalkerRoutes
+	walkerPath             task.WalkerPath
 	npcSpawnSkills         actorcast.Definitions
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
@@ -2509,7 +2510,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			spawnStore: spawnStore, makerCatalog: o.makerCatalog, makerHeard: o.makerHeard, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.Combat.AttackStance, log: o.log, makers: o.npcSpawns, channels: o.lootChannels(gcl),
-			dropRates: o.npcDropRates, partyRange: o.partyRange, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes,
+			dropRates: o.npcDropRates, partyRange: o.partyRange, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes, walkerPath: o.walkerPath,
 			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange, noSpawns: o.configKeys.noSpawns,
 		})
 		// As the game server does once the spawns are up, every castle's

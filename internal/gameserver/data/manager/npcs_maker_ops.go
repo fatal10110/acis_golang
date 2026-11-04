@@ -67,13 +67,14 @@ func (n *Npcs) FindSpawn(npcID int32) spawn.Locator {
 	return first
 }
 
-// SpawnNPC is the NPC a spawn keeps: in the world under ID, or, when
-// Decayed, an npcmaker's NPC that decayed and waits for its spawn to
-// respawn it, with Name, Index and Reverse what it decayed with: the walker
-// route node it headed for and its direction.
+// SpawnNPC is the NPC a spawn keeps: in the world under ID, or, when Away,
+// out of it: an npcmaker's NPC that decayed and waits for its spawn to
+// respawn it, or one a script hid. Name, Index and Reverse are what an Away
+// NPC left the world with: its name, and the walker route node it headed
+// for and its direction.
 type SpawnNPC struct {
 	ID      int32
-	Decayed bool
+	Away    bool
 	Name    string
 	Index   int
 	Reverse bool
@@ -83,9 +84,9 @@ type SpawnNPC struct {
 // alias, ignoring case: the first npcmaker spawn in list order, else the
 // standalone spawn placed first of those still kept. An npcmaker spawn
 // keeps an NPC that decayed while it waits to respawn it; a spawn that
-// never respawns lets it go. Of a spawn keeping several NPCs it is the one
-// of lowest object id. ok is false when no spawn has the alias or the
-// first one keeps no NPC.
+// never respawns lets it go. Any spawn keeps an NPC a script hid. Of a
+// spawn keeping several NPCs it is the one of lowest object id. ok is false
+// when no spawn has the alias or the first one keeps no NPC.
 func (n *Npcs) FirstNPCOfAlias(alias string) (kept SpawnNPC, ok bool) {
 	match := func(t *npc.Template) bool { return strings.EqualFold(t.Alias, alias) }
 	first, inMaker := n.findGroupSpawn(match)
@@ -116,8 +117,12 @@ func (n *Npcs) FirstNPCOfAlias(alias string) (kept SpawnNPC, ok bool) {
 		} else if key != standalone {
 			continue
 		}
-		if !ok || oid < kept.ID {
-			kept, ok = SpawnNPC{ID: oid}, true
+		if ok && oid >= kept.ID {
+			continue
+		}
+		kept, ok = SpawnNPC{ID: oid}, true
+		if slot := n.slot[key]; slot.hidden {
+			kept = SpawnNPC{ID: oid, Away: true, Name: slot.left.name, Index: slot.left.index, Reverse: slot.left.reverse}
 		}
 	}
 	if !inMaker {
@@ -128,7 +133,7 @@ func (n *Npcs) FirstNPCOfAlias(alias string) (kept SpawnNPC, ok bool) {
 			slot.entry.RespawnDelay <= 0 || n.liveLocked(key) || (ok && slot.liveID >= kept.ID) {
 			continue
 		}
-		kept, ok = SpawnNPC{ID: slot.liveID, Decayed: true, Name: slot.left.name, Index: slot.left.index, Reverse: slot.left.reverse}, true
+		kept, ok = SpawnNPC{ID: slot.liveID, Away: true, Name: slot.left.name, Index: slot.left.index, Reverse: slot.left.reverse}, true
 	}
 	return kept, ok
 }

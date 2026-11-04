@@ -4,11 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/rs/zerolog"
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
@@ -166,4 +168,90 @@ func TestAdminShowWalkerDecayedMakerNPC(t *testing.T) {
 			assertWalkerRow(t, gm, "with the porter decayed", tc.row)
 		})
 	}
+}
+
+// TestAdminShowWalkerRespawnedWalkerBeforeItsRoute pins the walker panel
+// row of a walker its npcmaker spawn brought back, before its AI takes up
+// the route: the NPC comes back with the node its last life headed for and
+// its direction, not the route's first node.
+func TestAdminShowWalkerRespawnedWalkerBeforeItsRoute(t *testing.T) {
+	t.Parallel()
+	srv, gm := bootWalkerPorter(t, walkerPorterMakers(t, "90sec"))
+	porter := walkPorter(t, srv, gm)
+	if !porter.Kill(nil) {
+		t.Fatal("porter did not die")
+	}
+	porter.Queue().Post(func() { porter.DecayWithRespawn(srv.State, srv.NpcSpawns.RespawnHook) })
+	srv.Settle(t)
+	srv.RespawnSlot(t, "porter_maker#0#0")
+	srv.Settle(t)
+	drain(t, gm)
+	var back *npc.Folk
+	for _, obj := range srv.State.Objects() {
+		if f, ok := obj.(*npc.Folk); ok && f.Instance.Template.ID == walkerPorterID {
+			back = f
+		}
+	}
+	if back == nil || back.ObjectID() == porter.ObjectID() {
+		t.Fatal("the spawn brought no new porter back")
+	}
+	if back.IsMoving() {
+		t.Fatal("the respawned porter moves before its AI takes up its route")
+	}
+	assertWalkerRow(t, gm, "with the porter respawned", walkerPorterHeadingOn)
+}
+
+const walkerPatrolID, walkerPatrolAlias = 21301, "patrol"
+
+// TestAdminShowWalkerHiddenWalker pins the walker panel row of a walking
+// monster a script's decayMe hid: its spawn keeps it, so the row still
+// names it with the node it headed for and its direction.
+func TestAdminShowWalkerHiddenWalker(t *testing.T) {
+	t.Parallel()
+	tmpl := &npc.Template{
+		ID: walkerPatrolID, TemplateID: walkerPatrolID, Type: "Monster", Name: "Patrol", Alias: walkerPatrolAlias, Level: 1, HPMax: 100,
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true, CollisionRadius: 10,
+	}
+	var self atomic.Pointer[script.Script]
+	behavior := func() script.Script {
+		return script.Script{Behavior: true, NPCs: []int32{walkerPatrolID}, Hooks: script.Hooks{
+			OnCreated: func(s *script.Script, e script.Created) {
+				self.Store(s)
+				e.NPC.AddMoveRouteDesire(walkerPatrolAlias, 1_000_000)
+			},
+		}}
+	}
+	srv, gm := bootShowAdmin(t,
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{tmpl})),
+		gameservertest.WithNpcSpawns(nil),
+		gameservertest.WithWalkerRoutes(route.WalkerRoutes{walkerPatrolAlias: {walkerPatrolAlias: walkerPorterRoute}}),
+		gameservertest.WithNPCScripts(map[int32]script.NPCKind{walkerPatrolID: script.KindHostile},
+			[]script.Listing{{Path: "ai.Patrol"}}, script.Catalog{"ai.Patrol": behavior}),
+		gameservertest.WithAITask(),
+	)
+	n, err := srv.NpcSpawns.AddSpawn(walkerPatrolID, 400, 20, 30, 0, false, 0)
+	if err != nil {
+		t.Fatalf("spawn patrol: %v", err)
+	}
+	patrol := n.(*npc.Hostile)
+	for range 2 {
+		if err := srv.AI.Tick(); err != nil {
+			t.Fatalf("AI tick: %v", err)
+		}
+	}
+	drain(t, gm)
+	const headingOn = `<table width=280 bgcolor=000000><tr><td width=150><a action="bypass admin_teleport 410 20 50">Patrol</a></td><td width=40>1 / 2</td><td width=50 align=right>Regular</td><td width=40 align=right><a action="bypass admin_show walker 1 patrol">Show</a></td></tr></table>`
+	assertWalkerRow(t, gm, "with the patrol walking", headingOn)
+
+	s := self.Load()
+	if s == nil {
+		t.Fatal("the created hook did not run")
+	}
+	patrol.Queue().Post(func() { s.Spawner().DecayMe(script.NPCOf(attackable.Combatant(patrol))) })
+	srv.Settle(t)
+	drain(t, gm)
+	if _, inWorld := srv.State.Object(patrol.ObjectID()); inWorld {
+		t.Fatal("the hidden patrol is still in the world")
+	}
+	assertWalkerRow(t, gm, "with the patrol hidden", headingOn)
 }

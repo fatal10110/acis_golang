@@ -83,7 +83,7 @@ func (p GeoPath) HasPath(origin, target location.Location) bool {
 
 // Walker advances registered NPC route walkers and releases delayed walkers
 // on the one-second task tick. All methods are safe for concurrent use; mu
-// guards entries and their per-actor route state.
+// guards entries, their per-actor route state, and carried.
 type Walker struct {
 	// routes are the loaded walker routes; //reload npcwalker swaps them.
 	routes atomic.Pointer[route.WalkerRoutes]
@@ -94,6 +94,15 @@ type Walker struct {
 
 	mu      sync.Mutex
 	entries map[int32]*walkerEntry
+	// carried holds, by object id, the route node and direction an actor
+	// comes back with from an earlier life, until it takes up a route.
+	carried map[int32]carriedWalk
+}
+
+// carriedWalk is the route node an actor headed for and its direction.
+type carriedWalk struct {
+	index   int
+	reverse bool
 }
 
 type walkerEntry struct {
@@ -124,6 +133,7 @@ func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time,
 		now:     now,
 		state:   state,
 		entries: make(map[int32]*walkerEntry),
+		carried: make(map[int32]carriedWalk),
 	}
 	w.SetRoutes(routes)
 	return w, nil
@@ -140,16 +150,27 @@ func (w *Walker) SetRoutes(routes route.WalkerRoutes) {
 func (w *Walker) Routes() route.WalkerRoutes { return *w.routes.Load() }
 
 // Walking reports, for the actor of object id id, the index of the route
-// node it heads for and whether it walks its route backwards. ok is false
-// when the actor walks no route.
+// node it heads for and whether it walks its route backwards, or those it
+// carries into a route it has yet to take up. ok is false when the actor
+// has neither.
 func (w *Walker) Walking(id int32) (index int, reverse, ok bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	e, ok := w.entries[id]
-	if !ok {
-		return 0, false, false
+	if e, ok := w.entries[id]; ok {
+		return e.index, e.reverse, true
 	}
-	return e.index, e.reverse, true
+	c, ok := w.carried[id]
+	return c.index, c.reverse, ok
+}
+
+// Carry gives the actor of object id id, before it takes up a route, the
+// route node index and direction reverse it comes back with from an
+// earlier life: it reports them until then, and the route it takes up
+// keeps its direction from the node nearest to it on.
+func (w *Walker) Carry(id int32, index int, reverse bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.carried[id] = carriedWalk{index: index, reverse: reverse}
 }
 
 // Start launches the fixed one-second walker task.
@@ -171,9 +192,7 @@ func (w *Walker) StartRoute(actor WalkerActor, routeName, npcName string) error 
 	if _, err := w.nodes(routeName, npcName); err != nil {
 		return err
 	}
-	entry := &walkerEntry{actor: actor, route: routeName, npc: npcName}
-	w.entries[actor.ObjectID()] = entry
-	return w.moveToNextPoint(entry)
+	return w.moveToNextPoint(w.registerLocked(actor, routeName, npcName))
 }
 
 // HasRoute reports whether routeName holds nodes for npcName, the route
@@ -192,11 +211,13 @@ func (w *Walker) StopRoute(actor WalkerActor) {
 }
 
 // StopRouteByID removes an actor from route walking by object id, for a
-// caller (like despawn) that no longer holds a live WalkerActor reference.
+// caller (like despawn) that no longer holds a live WalkerActor reference,
+// with what it carries.
 func (w *Walker) StopRouteByID(id int32) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	delete(w.entries, id)
+	delete(w.carried, id)
 }
 
 // Arrived handles actor reaching its current route node.
@@ -274,9 +295,19 @@ func (w *Walker) Walk(actor WalkerActor, routeName, npcName string) error {
 	if _, err := w.nodes(routeName, npcName); err != nil {
 		return err
 	}
-	entry = &walkerEntry{actor: actor, route: routeName, npc: npcName}
-	w.entries[actor.ObjectID()] = entry
-	return w.moveToNextPoint(entry)
+	return w.moveToNextPoint(w.registerLocked(actor, routeName, npcName))
+}
+
+// registerLocked registers actor on routeName/npcName, off it until it
+// heads for the node nearest to it, with the node and direction it
+// carries. The caller holds w.mu.
+func (w *Walker) registerLocked(actor WalkerActor, routeName, npcName string) *walkerEntry {
+	id := actor.ObjectID()
+	c := w.carried[id]
+	delete(w.carried, id)
+	entry := &walkerEntry{actor: actor, route: routeName, npc: npcName, index: c.index, reverse: c.reverse}
+	w.entries[id] = entry
+	return entry
 }
 
 // MoveToNextPoint immediately requests actor's next route node.
