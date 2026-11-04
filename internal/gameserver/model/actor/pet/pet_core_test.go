@@ -167,16 +167,18 @@ func TestRestoreExp(t *testing.T) {
 		expBeforeDeath int64
 		currentExp     int64
 		restorePercent float64
-		want           int64
 	}{
-		{"half restore", 100000, 93160, 50, 3420},
-		{"33 percent restore", 50000, 40000, 33, 3300},
-		{"nothing lost", 100000, 100000, 100, 0},
+		{"half restore", 100000, 93160, 50},
+		{"33 percent restore", 50000, 40000, 33},
+		{"half point rounds up", 510, 481, 50},
+		{"nothing lost", 100000, 100000, 100},
+		{"no power", 510, 481, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := RestoreExp(tt.expBeforeDeath, tt.currentExp, tt.restorePercent); got != tt.want {
-				t.Errorf("RestoreExp() = %d, want %d", got, tt.want)
+			want := vitals.PetExpRestored(t, tt.expBeforeDeath, tt.currentExp, tt.restorePercent)
+			if got := RestoreExp(tt.expBeforeDeath, tt.currentExp, tt.restorePercent); got != want {
+				t.Errorf("RestoreExp() = %d, want %d", got, want)
 			}
 		})
 	}
