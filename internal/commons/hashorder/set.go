@@ -1,9 +1,11 @@
-package clan
+// Package hashorder keeps sets of ids in the order a concurrent hash table
+// lists them in, the order several client-visible lists (clan wars, clan
+// members and skills, clan hall bidders) are sent in.
+package hashorder
 
 import "slices"
 
-// Hash-table geometry of the concurrent hash set the client-visible war
-// order comes from.
+// Hash-table geometry of the listing order.
 const (
 	setMinTable    = 16 // buckets of a fresh table
 	setTreeifyAt   = 8  // chain length at which a bucket is treated as crowded
@@ -11,12 +13,12 @@ const (
 	setUntreeifyAt = 6  // a tree bucket this small or smaller turns back into a chain
 )
 
-// warSet is a set of ids (clan ids, skill ids) that remembers the order a
-// concurrent hash table lists them in: the table starts at 16 buckets and doubles whenever it
-// holds three quarters of its size, a bucket chains its ids in insertion
-// order, and a doubling reorders a chain (see grow). Removing an id only
-// unlinks it, so the table never shrinks and a clan that once held twelve
-// or more wars keeps its larger table after they end.
+// Set is a set of ids (clan ids, skill ids) that remembers the order a
+// concurrent hash table lists them in: the table starts at 16 buckets and
+// doubles whenever it holds three quarters of its size, a bucket chains its
+// ids in insertion order, and a doubling reorders a chain (see grow).
+// Removing an id only unlinks it, so the table never shrinks and a set that
+// once held twelve or more ids keeps its larger table after they leave.
 //
 // A chain that already holds eight ids when a ninth arrives is crowded: in
 // a table below 64 buckets the table doubles until three quarters of its
@@ -29,49 +31,49 @@ const (
 // fewer ids in a half.
 //
 // The zero value is an empty set. It is not safe for concurrent use; the
-// owning clan's lock guards it.
-type warSet struct {
-	table []warBin
+// owner's lock guards it.
+type Set struct {
+	table []bucket
 	count int
 }
 
-// warBin is one bucket: its ids in listing order and, for a tree bucket,
+// bucket is one bucket: its ids in listing order and, for a tree bucket,
 // the root of the red-black tree over them.
-type warBin struct {
+type bucket struct {
 	ids  []int32
-	root *warNode
+	root *treeNode
 }
 
-// warNode is a node of a tree bucket's red-black tree, ordered by hash and
+// treeNode is a node of a tree bucket's red-black tree, ordered by hash and
 // then by id. kid[0] is the left child, kid[1] the right one.
-type warNode struct {
+type treeNode struct {
 	id     int32
-	parent *warNode
-	kid    [2]*warNode
+	parent *treeNode
+	kid    [2]*treeNode
 	red    bool
 }
 
-// len returns how many ids the set holds.
-func (s *warSet) len() int { return s.count }
+// Len returns how many ids the set holds.
+func (s *Set) Len() int { return s.count }
 
-// has reports whether id is in the set.
-func (s *warSet) has(id int32) bool {
+// Has reports whether id is in the set.
+func (s *Set) Has(id int32) bool {
 	if s.count == 0 {
 		return false
 	}
 	return slices.Contains(s.table[s.index(id)].ids, id)
 }
 
-func (s *warSet) index(id int32) int {
+func (s *Set) index(id int32) int {
 	return int(foldedHash(id) & uint32(len(s.table)-1))
 }
 
-// add puts id in the set; an id already in it keeps its place.
-func (s *warSet) add(id int32) {
+// Add puts id in the set; an id already in it keeps its place.
+func (s *Set) Add(id int32) {
 	if s.table == nil {
-		s.table = make([]warBin, setMinTable)
+		s.table = make([]bucket, setMinTable)
 	}
-	if s.has(id) {
+	if s.Has(id) {
 		return
 	}
 	bin := &s.table[s.index(id)]
@@ -102,9 +104,9 @@ func (s *warSet) add(id int32) {
 // threshold is the count at which a table of n buckets doubles.
 func threshold(n int) int { return n - n/4 }
 
-// remove takes id out of the set; the table keeps its size.
-func (s *warSet) remove(id int32) {
-	if !s.has(id) {
+// Remove takes id out of the set; the table keeps its size.
+func (s *Set) Remove(id int32) {
+	if !s.Has(id) {
 		return
 	}
 	bin := &s.table[s.index(id)]
@@ -120,8 +122,14 @@ func (s *warSet) remove(id int32) {
 	}
 }
 
-// order lists the ids in the order the client is sent them.
-func (s *warSet) order() []int32 {
+// Clear empties the set; the table keeps its size.
+func (s *Set) Clear() {
+	clear(s.table)
+	s.count = 0
+}
+
+// Order lists the ids in the Order the client is sent them.
+func (s *Set) Order() []int32 {
 	out := make([]int32, 0, s.count)
 	for _, bin := range s.table {
 		out = append(out, bin.ids...)
@@ -143,9 +151,9 @@ func foldedHash(id int32) uint32 {
 // come out in reverse. A tree bucket splits keeping its order: a half of six
 // ids or fewer becomes a chain, a half holding every id keeps the tree as it
 // is, and any other half gets a new tree built in listing order.
-func (s *warSet) grow() {
+func (s *Set) grow() {
 	n := len(s.table)
-	next := make([]warBin, 2*n)
+	next := make([]bucket, 2*n)
 	for i, bin := range s.table {
 		if len(bin.ids) == 0 {
 			continue
@@ -191,7 +199,7 @@ func (s *warSet) grow() {
 // splitTree is the tree of one half of a tree bucket split by grow: none
 // for six ids or fewer, the bucket's own tree when the other half is empty,
 // else a new one.
-func splitTree(root *warNode, ids []int32, others int) *warNode {
+func splitTree(root *treeNode, ids []int32, others int) *treeNode {
 	switch {
 	case len(ids) <= setUntreeifyAt:
 		return nil
@@ -204,8 +212,8 @@ func splitTree(root *warNode, ids []int32, others int) *warNode {
 
 // buildTree makes the tree of a bucket that becomes a tree, inserting its
 // ids in listing order.
-func buildTree(ids []int32) *warNode {
-	var root *warNode
+func buildTree(ids []int32) *treeNode {
+	var root *treeNode
 	for _, id := range ids {
 		root = treeInsert(root, id)
 	}
@@ -214,13 +222,13 @@ func buildTree(ids []int32) *warNode {
 
 // shrinks reports whether a tree bucket losing an id is too small to stay a
 // tree, judged by its shape before the id's node is taken out.
-func shrinks(root *warNode) bool {
+func shrinks(root *treeNode) bool {
 	return root.kid[1] == nil || root.kid[0] == nil || root.kid[0].kid[0] == nil
 }
 
 // treeSide is the side of node a key belongs on in a tree: 0 (left) when id
 // sorts before node's id, else 1.
-func treeSide(node *warNode, id int32) int {
+func treeSide(node *treeNode, id int32) int {
 	if h, nh := foldedHash(id), foldedHash(node.id); h != nh {
 		return b2i(h > nh)
 	}
@@ -234,13 +242,13 @@ func b2i(b bool) int {
 	return 0
 }
 
-func isRed(n *warNode) bool { return n != nil && n.red }
+func isRed(n *treeNode) bool { return n != nil && n.red }
 
 // side is which child of parent n is: 0 for the left one, else 1.
-func side(parent, n *warNode) int { return b2i(parent.kid[0] != n) }
+func side(parent, n *treeNode) int { return b2i(parent.kid[0] != n) }
 
 // treeFind returns id's node, or nil.
-func treeFind(root *warNode, id int32) *warNode {
+func treeFind(root *treeNode, id int32) *treeNode {
 	for p := root; p != nil; p = p.kid[treeSide(p, id)] {
 		if p.id == id {
 			return p
@@ -250,8 +258,8 @@ func treeFind(root *warNode, id int32) *warNode {
 }
 
 // treeInsert adds id as a leaf and rebalances, returning the new root.
-func treeInsert(root *warNode, id int32) *warNode {
-	x := &warNode{id: id}
+func treeInsert(root *treeNode, id int32) *treeNode {
+	x := &treeNode{id: id}
 	if root == nil {
 		return x
 	}
@@ -268,7 +276,7 @@ func treeInsert(root *warNode, id int32) *warNode {
 
 // rotate turns p down to side d, raising its child from the other side,
 // and returns the root.
-func rotate(root, p *warNode, d int) *warNode {
+func rotate(root, p *treeNode, d int) *treeNode {
 	if p == nil || p.kid[1-d] == nil {
 		return root
 	}
@@ -288,7 +296,7 @@ func rotate(root, p *warNode, d int) *warNode {
 	return root
 }
 
-func balanceInsertion(root, x *warNode) *warNode {
+func balanceInsertion(root, x *treeNode) *treeNode {
 	x.red = true
 	for {
 		xp := x.parent
@@ -325,9 +333,9 @@ func balanceInsertion(root, x *warNode) *warNode {
 }
 
 // treeRemove takes node p out of the tree and returns the new root.
-func treeRemove(root, p *warNode) *warNode {
+func treeRemove(root, p *treeNode) *treeNode {
 	r := root
-	var replacement *warNode
+	var replacement *treeNode
 	pl, pr := p.kid[0], p.kid[1]
 	switch {
 	case pl != nil && pr != nil:
@@ -380,7 +388,7 @@ func treeRemove(root, p *warNode) *warNode {
 		} else {
 			pp.kid[side(pp, p)] = replacement
 		}
-		p.kid, p.parent = [2]*warNode{}, nil
+		p.kid, p.parent = [2]*treeNode{}, nil
 	}
 	if !p.red {
 		r = balanceDeletion(r, replacement)
@@ -398,7 +406,7 @@ func treeRemove(root, p *warNode) *warNode {
 	return r
 }
 
-func balanceDeletion(root, x *warNode) *warNode {
+func balanceDeletion(root, x *treeNode) *treeNode {
 	for {
 		if x == nil || x == root {
 			return root

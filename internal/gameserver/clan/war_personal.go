@@ -53,9 +53,9 @@ func (s *Service) EndSurrenderedWar(war War, peace func(objectID int32) (wants, 
 	if !s.endWarLocked(cl, target, now) {
 		return false
 	}
-	if target.wars.has(cl.id) {
-		target.wars.remove(cl.id)
-		cl.attackers.remove(target.id)
+	if target.wars.Has(cl.id) {
+		target.wars.Remove(cl.id)
+		cl.attackers.Remove(target.id)
 		clanID, targetID := target.id, cl.id
 		s.write(clanID, "end clan war", func(ctx context.Context, st Store) error { return st.EndWar(ctx, clanID, targetID, 0) })
 	}

@@ -47,7 +47,7 @@ func (cl *Clan) Skills() []Skill {
 func (cl *Clan) SkillsInTableOrder() []Skill {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	ids := cl.skillOrder.order()
+	ids := cl.skillOrder.Order()
 	out := make([]Skill, len(ids))
 	for i, id := range ids {
 		out[i] = Skill{ID: int(id), Level: cl.skills[int(id)]}
@@ -62,7 +62,7 @@ func (cl *Clan) putSkillLocked(id, level int) {
 		cl.skills = map[int]int{}
 	}
 	cl.skills[id] = level
-	cl.skillOrder.add(int32(id))
+	cl.skillOrder.Add(int32(id))
 }
 
 func (cl *Clan) skillsLocked() []Skill {

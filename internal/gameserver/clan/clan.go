@@ -7,6 +7,8 @@ package clan
 import (
 	"sort"
 	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 )
 
 // Sub-unit (pledge type) ids. The main clan is 0.
@@ -87,7 +89,7 @@ type Clan struct {
 	// come out when a member leaves; insertion order only breaks ties
 	// inside a bucket.
 	members     map[int32]*Member
-	memberOrder warSet
+	memberOrder hashorder.Set
 	// loginGrades holds the stored power grade of an offline member whose
 	// roster entry still shows an older one; the entry takes it when the
 	// member logs in.
@@ -96,15 +98,15 @@ type Clan struct {
 	// skills maps each skill the clan learnt to its level; skillOrder
 	// holds their ids in the order the clan skill list shows them.
 	skills     map[int]int
-	skillOrder warSet
+	skillOrder hashorder.Set
 	// subunits are the academy, royal guards and knight orders the clan
 	// founded, by pledge type.
 	subunits map[int]*SubPledge
 	// wars are the clans this clan declared war on; attackers the clans
 	// that declared war on it; warPenalties when this clan may declare
 	// war again on a clan it stopped a war with, in epoch milliseconds.
-	wars         warSet
-	attackers    warSet
+	wars         hashorder.Set
+	attackers    hashorder.Set
 	warPenalties map[int32]int64
 	// headquarters is the siege headquarters the clan put up; nil for none.
 	headquarters Headquarters
@@ -192,7 +194,7 @@ func (cl *Clan) infoLocked() Info {
 		DissolvingExpiry: cl.dissolvingExpiry,
 		AllyID:           cl.allyID, AllyName: cl.allyName, AllyCrestID: cl.allyCrestID,
 		AllyPenaltyExpiry: cl.allyPenaltyExpiry, AllyPenaltyType: cl.allyPenaltyType,
-		AtWar: cl.wars.len() > 0,
+		AtWar: cl.wars.Len() > 0,
 	}
 	if leader, ok := cl.members[cl.leaderID]; ok {
 		info.LeaderName = leader.Name

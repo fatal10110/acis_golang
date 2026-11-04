@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 )
 
 // dayMillis is one day in epoch milliseconds, the unit the clan penalties
@@ -77,7 +79,7 @@ type Table struct {
 	// order holds the clan ids in the registry's hash table order. Ids go in
 	// on boot restore in row order and as each clan is founded, and come out
 	// on dissolution; insertion order only breaks ties inside a bucket.
-	order warSet
+	order hashorder.Set
 }
 
 // NewTable returns an empty registry.
@@ -117,14 +119,14 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) (clamped []int3
 			}
 		}
 		t.clans[r.ID] = cl
-		t.order.add(r.ID)
+		t.order.Add(r.ID)
 	}
 	for _, m := range s.Members {
 		if cl, ok := t.clans[m.ClanID]; ok {
 			member := m.Member
 			member.Online = false
 			cl.members[member.ObjectID] = &member
-			cl.memberOrder.add(member.ObjectID)
+			cl.memberOrder.Add(member.ObjectID)
 		}
 	}
 	for _, p := range s.Privileges {
@@ -219,7 +221,7 @@ func (t *Table) insert(cl *Clan) bool {
 		return false
 	}
 	t.clans[cl.id] = cl
-	t.order.add(cl.id)
+	t.order.Add(cl.id)
 	return true
 }
 
@@ -228,5 +230,5 @@ func (t *Table) remove(id int32) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.clans, id)
-	t.order.remove(id)
+	t.order.Remove(id)
 }

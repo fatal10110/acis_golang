@@ -57,7 +57,7 @@ func (s *Service) RemoveSkill(cl *Clan, id int) bool {
 		return false
 	}
 	delete(cl.skills, id)
-	cl.skillOrder.remove(int32(id))
+	cl.skillOrder.Remove(int32(id))
 	clanID := cl.id
 	s.write(clanID, "remove clan skill", func(ctx context.Context, st Store) error { return st.RemoveSkill(ctx, clanID, id) })
 	return true
@@ -74,7 +74,7 @@ func (s *Service) RemoveAllSkills(cl *Clan) ([]Skill, bool) {
 	}
 	removed := cl.skillsLocked()
 	for _, sk := range removed {
-		cl.skillOrder.remove(int32(sk.ID))
+		cl.skillOrder.Remove(int32(sk.ID))
 	}
 	clear(cl.skills)
 	clanID := cl.id

@@ -66,7 +66,7 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 	leader.PledgeType = SubunitMain
 	leader.Online = true
 	cl.members[c.ID] = &leader
-	cl.memberOrder.add(c.ID)
+	cl.memberOrder.Add(c.ID)
 	if !s.table.insert(cl) {
 		return nil, CreateNameTaken
 	}
@@ -199,7 +199,7 @@ func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, blocksInv
 		return refusal
 	}
 	cl.members[c.ID] = &m
-	cl.memberOrder.add(c.ID)
+	cl.memberOrder.Add(c.ID)
 	s.saveMembershipLocked(MembershipRow{
 		ObjectID: c.ID, ClanID: cl.id, Title: m.Title, PowerGrade: m.PowerGrade, PledgeType: m.PledgeType,
 		LvlJoinedAcademy: m.LvlJoinedAcademy,
@@ -318,7 +318,7 @@ func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live 
 		return Member{}, false
 	}
 	delete(cl.members, objectID)
-	cl.memberOrder.remove(objectID)
+	cl.memberOrder.Remove(objectID)
 	delete(cl.loginGrades, objectID)
 	s.unlinkLeaverLocked(cl, m)
 	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil, KeepTitle: live != nil && live.IsNoble()}
