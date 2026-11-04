@@ -1,6 +1,7 @@
 package network
 
 import (
+	"cmp"
 	"maps"
 	"slices"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -36,8 +38,10 @@ func (l *GameClientLink) adminShow(gm *livePlayer, line string) {
 	case "boat":
 		l.showBoats(gm)
 	case "clear":
-		// Only a player holds drawings: another creature selected clears
-		// nothing.
+		// Only a player holds drawings. Another creature selected, or a
+		// player without drawings, clears nothing and nothing answers, as
+		// the command has always done; an admin command leaves no client
+		// action pending.
 		if p, ok := adminTargetCreature(gm).(*livePlayer); ok {
 			onPlayer(gm, p, p.clearDrawings)
 		}
@@ -163,7 +167,7 @@ func (l *GameClientLink) showDoors(gm *livePlayer) {
 			}
 		})
 	}
-	slices.SortFunc(doors, func(a, b *door.Object) int { return int(a.ObjectID()) - int(b.ObjectID()) })
+	slices.SortFunc(doors, func(a, b *door.Object) int { return cmp.Compare(a.ObjectID(), b.ObjectID()) })
 	for _, dr := range doors {
 		t := dr.Template
 		z := int32(t.Position.Z)
@@ -279,18 +283,13 @@ func (l *GameClientLink) toggleDebugMove(gm *livePlayer, path bool) {
 
 // walkerRoutes returns the loaded walker routes and the walker walking
 // them, nil without one.
-func (l *GameClientLink) walkerRoutes() (route.WalkerRoutes, walkerState) {
+func (l *GameClientLink) walkerRoutes() (route.WalkerRoutes, *task.Walker) {
 	npcs := l.npcSpawns.Load()
 	if npcs == nil || npcs.Walker() == nil {
 		return nil, nil
 	}
 	w := npcs.Walker()
 	return w.Routes(), w
-}
-
-// walkerState reports the actor walking a route under an NPC name.
-type walkerState interface {
-	Walking(npcName string) (id int32, index int, reverse, ok bool)
 }
 
 // showWalker answers //show walker [page] [route]: the route named both as
