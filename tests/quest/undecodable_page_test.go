@@ -1,30 +1,19 @@
 package quest
 
 import (
-	"os"
 	"slices"
 	"testing"
-	"unicode/utf8"
-
-	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // TestUndecodablePageShowsTheMissingNotice: a quest page file that is not
 // valid UTF-8 cannot be read, so a quest event answering it shows the
 // missing-page notice naming the page's path, then ActionFailed, while a
-// valid page of the same quest is shown. The page is Q123's 31961-02.htm
-// from the datapack, byte for byte.
+// valid page of the same quest is shown. The bad page carries a stray
+// Latin-1 byte.
 func TestUndecodablePageShowsTheMissingNotice(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile(datapack.Path(t, "data", "html", "script", "quest", "Q123_TheLeaderAndTheFollower", "31961-02.htm"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if utf8.Valid(raw) {
-		t.Fatal("Q123 31961-02.htm is valid UTF-8; the datapack changed")
-	}
 	w := bootDialog(t, map[string]string{
-		"script/quest/" + q950 + "/31961-02.htm": string(raw),
+		"script/quest/" + q950 + "/31961-02.htm": "<html><body>Hello \x97 there</body></html>",
 		"script/quest/" + q950 + "/next.htm":     "<html><body>next</body></html>",
 	}, nil)
 	w.spawnHostile(t, "guard", guardID, "Guard", 20)

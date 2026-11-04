@@ -2,6 +2,7 @@ package cache
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
@@ -39,41 +40,44 @@ func TestLoadHTMLLeavesOutUndecodablePages(t *testing.T) {
 	}
 }
 
-// TestLoadHTMLDatapackUndecodablePages: the datapack's page files a strict
-// UTF-8 line reader rejects with MalformedInputException, found by reading
-// every .htm/.html file under data/html that way (15297 files, 15285
-// read). Each is missing from the cache.
-func TestLoadHTMLDatapackUndecodablePages(t *testing.T) {
+// TestLoadHTMLDatapackPagesAllDecode: every .htm/.html file under the
+// datapack's data/html is valid UTF-8, so LoadHTML leaves none out. The
+// pages listed once carried a stray 0x97 byte or a UTF-16 encoding; each
+// now loads, with "--" where the stray byte was.
+func TestLoadHTMLDatapackPagesAllDecode(t *testing.T) {
 	dir := datapack.Path(t, "data", "html")
 
 	cache, undecodable, err := LoadHTML(dir)
 	if err != nil {
 		t.Fatalf("LoadHTML(%q): %v", dir, err)
 	}
-	want := []string{
-		"script/quest/Q114_ResurrectionOfAnOldManager/32041-04.htm",
-		"script/quest/Q114_ResurrectionOfAnOldManager/32041-26.htm",
-		"script/quest/Q114_ResurrectionOfAnOldManager/32047-33.htm",
-		"script/quest/Q114_ResurrectionOfAnOldManager/32047-37.htm",
-		"script/quest/Q123_TheLeaderAndTheFollower/31961-02.htm",
-		"script/quest/Q123_TheLeaderAndTheFollower/31961-14.htm",
-		"script/quest/Q215_TrialOfThePilgrim/30649-04.htm",
-		"script/quest/Q336_CoinsOfMagic/30232-13.htm",
-		"script/quest/Q336_CoinsOfMagic/30232-14.htm",
-		"script/quest/Q617_GatherTheFlames/31271-01.htm",
-		"script/quest/Q617_GatherTheFlames/31271-02.htm",
-		"script/siegablehall/BanditStronghold/agit_oel_mahum_messeger_20.htm",
+	if len(undecodable) != 0 {
+		t.Fatalf("undecodable = %q, want none", undecodable)
 	}
-	if !slices.Equal(undecodable, want) {
-		t.Fatalf("undecodable =\n%q\nwant\n%q", undecodable, want)
-	}
-	for _, name := range want {
-		if _, ok := cache.Get("./data/html/" + name); ok {
-			t.Errorf("Get(%q) ok = true, want missing", name)
+	for _, page := range []struct{ name, dashes string }{
+		{"script/quest/Q114_ResurrectionOfAnOldManager/32041-04.htm", "--"},
+		{"script/quest/Q114_ResurrectionOfAnOldManager/32041-26.htm", "--"},
+		{"script/quest/Q114_ResurrectionOfAnOldManager/32047-33.htm", "--"},
+		{"script/quest/Q114_ResurrectionOfAnOldManager/32047-37.htm", "--"},
+		{"script/quest/Q123_TheLeaderAndTheFollower/31961-02.htm", "--"},
+		{"script/quest/Q123_TheLeaderAndTheFollower/31961-14.htm", "--"},
+		{"script/quest/Q215_TrialOfThePilgrim/30649-04.htm", "--"},
+		{"script/quest/Q336_CoinsOfMagic/30232-13.htm", "--"},
+		{"script/quest/Q336_CoinsOfMagic/30232-14.htm", "--"},
+		{"script/quest/Q617_GatherTheFlames/31271-01.htm", "--"},
+		{"script/quest/Q617_GatherTheFlames/31271-02.htm", "--"},
+		{"script/siegablehall/BanditStronghold/agit_oel_mahum_messeger_20.htm", ""},
+	} {
+		got, ok := cache.Get(page.name)
+		if !ok {
+			t.Errorf("Get(%q) ok = false, want loaded", page.name)
+			continue
 		}
-	}
-	// A sibling page of the same quest that is valid UTF-8 stays loaded.
-	if _, ok := cache.Get("script/quest/Q123_TheLeaderAndTheFollower/31961-01.htm"); !ok {
-		t.Fatal("Get(Q123 31961-01.htm) ok = false, want loaded")
+		if !strings.HasPrefix(got, "<html>") || strings.ContainsAny(got, "\r\ufffd\ufeff") {
+			t.Errorf("Get(%q) = %q, want a clean page", page.name, got)
+		}
+		if !strings.Contains(got, page.dashes) {
+			t.Errorf("Get(%q) = %q, want it to hold %q", page.name, got, page.dashes)
+		}
 	}
 }

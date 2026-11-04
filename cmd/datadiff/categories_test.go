@@ -92,8 +92,8 @@ func TestLoadHTMLRecordsIncludesContentIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadHTMLRecords error: %v", err)
 	}
-	// The 12 pages that are not valid UTF-8 are left out.
-	if got, want := len(records), 15285; got != want {
+	// Every page file is valid UTF-8, so none is left out.
+	if got, want := len(records), 15297; got != want {
 		t.Fatalf("len(records) = %d, want %d", got, want)
 	}
 
