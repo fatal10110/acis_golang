@@ -54,25 +54,36 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 
 // sendCharSelectInfo lists client's characters, sends the resulting
 // CharSelectInfo, and returns the list so the caller can cache it for
-// subsequent slot-addressed requests.
-func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client) ([]*player.Character, error) {
-	chars, err := l.roster.List(ctx, client.AccountName())
+// subsequent slot-addressed requests. A list that cannot be read is logged
+// and goes out, and is cached, empty: the client stays at character select
+// with nothing to pick, and a slot-addressed request is refused as for an
+// unknown slot until a later list reads.
+func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client) []*player.Character {
+	chars, slots, err := l.characterSlots(ctx, client.AccountName())
 	if err != nil {
-		return nil, err
+		l.log.Error().Err(err).Str("account", client.AccountName()).Msg("list characters")
+		chars, slots = nil, nil
 	}
+	client.Session.SendFrame(serverpackets.FrameCharSelectInfo(client.AccountName(), client.SessionKey().PlayKey1, slots, -1))
+	return chars
+}
 
+// characterSlots reads account's characters and the slot each one shows.
+func (l *GameClientLink) characterSlots(ctx context.Context, account string) ([]*player.Character, []serverpackets.CharacterSlot, error) {
+	chars, err := l.roster.List(ctx, account)
+	if err != nil {
+		return nil, nil, err
+	}
 	slots := make([]serverpackets.CharacterSlot, len(chars))
 	now := time.Now() // character select runs on the connection goroutine, off any actor queue
 	for i, c := range chars {
 		items, err := l.belongings.items.ListByOwner(ctx, c.ID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		slots[i] = serverpackets.NewCharacterSlot(c, items, now)
 	}
-
-	client.Session.SendFrame(serverpackets.FrameCharSelectInfo(client.AccountName(), client.SessionKey().PlayKey1, slots, -1))
-	return chars, nil
+	return chars, slots, nil
 }
 
 // restoreItemRows resolves the rows a login restores an inventory from
