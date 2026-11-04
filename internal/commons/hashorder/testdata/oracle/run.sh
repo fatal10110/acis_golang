@@ -1,12 +1,17 @@
 #!/bin/sh
-# Regenerates ../order.golden from the reference clan registries. The two field
+# Regenerates ../order.golden (the war set lines) and
+# internal/gameserver/clan/testdata/subunit_order.golden (the sub-unit registry
+# lines) from the reference clan registries. The two field
 # declarations the probe lists are cut verbatim out of the reference source (see
 # README.md) and compiled unmodified inside ClanCopy.java.tmpl's harness.
 # ACIS_JAVA points at the reference source root (the directory holding net/);
 # by default it is the aCis_gameserver checkout next to the Go repository.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-ref=${ACIS_JAVA:-$(git -C "$here" rev-parse --show-toplevel)/../aCis_gameserver/java}
+root=$(git -C "$here" rev-parse --show-toplevel)
+ref=${ACIS_JAVA:-$root/../aCis_gameserver/java}
+all=$(mktemp)
+trap 'rm -f "$all"' EXIT
 docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alpine sh -c '
 	set -e
 	out=$(mktemp -d)
@@ -19,4 +24,6 @@ docker run --rm -v "$ref:/ref:ro" -v "$here:/p" -w /p eclipse-temurin:21-jdk-alp
 	done
 	sed -e "/@@SUBPLEDGES@@/{r $out/sub" -e "d}" -e "/@@ATWAR@@/{r $out/war" -e "d}" ClanCopy.java.tmpl > $out/ClanCopy.java
 	javac -nowarn -d $out $out/ClanCopy.java OrderProbe.java
-	java --add-opens java.base/java.util.concurrent=ALL-UNNAMED -cp $out OrderProbe' > "$here/../order.golden"
+	java --add-opens java.base/java.util.concurrent=ALL-UNNAMED -cp $out OrderProbe' > "$all"
+grep -v '^sub ' "$all" > "$here/../order.golden"
+grep '^sub ' "$all" > "$root/internal/gameserver/clan/testdata/subunit_order.golden"

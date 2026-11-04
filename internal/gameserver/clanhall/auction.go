@@ -3,9 +3,9 @@ package clanhall
 import (
 	"context"
 	"fmt"
-	"slices"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
@@ -28,17 +28,15 @@ type Bidder struct {
 	Time     int64
 }
 
-// auction is one hall's auction. bidders keeps the bids in the order they
-// were first made; listed gives the order every view and the highest-bid
-// search read them in.
+// auction is one hall's auction. bidders holds the bids by clan id and
+// order lists those clans in the order every view, refund and highest-bid
+// search reads the bids in.
 type auction struct {
 	endDate int64
 	seller  *Seller
-	bidders []*Bidder
+	bidders map[int32]*Bidder
+	order   hashorder.Set
 	highest *Bidder
-	// mostBidders is the most bids the auction ever held at once; it
-	// sizes the listing order's table.
-	mostBidders int
 	// draft is the sale the owner set up and has not confirmed yet: the
 	// sale it will register and the auction's end then.
 	draft *saleDraft
@@ -53,50 +51,40 @@ type saleDraft struct {
 	endDate int64
 }
 
-func (a *auction) bidder(clanID int32) *Bidder {
-	for _, b := range a.bidders {
-		if b.ClanID == clanID {
-			return b
-		}
-	}
-	return nil
-}
+func (a *auction) bidder(clanID int32) *Bidder { return a.bidders[clanID] }
 
+// add puts a new clan's bid at the end of its place in the listing order.
 func (a *auction) add(b *Bidder) {
-	a.bidders = append(a.bidders, b)
-	a.mostBidders = max(a.mostBidders, len(a.bidders))
+	if a.bidders == nil {
+		a.bidders = make(map[int32]*Bidder)
+	}
+	a.bidders[b.ClanID] = b
+	a.order.Add(b.ClanID)
 }
 
 func (a *auction) remove(clanID int32) *Bidder {
-	for i, b := range a.bidders {
-		if b.ClanID == clanID {
-			a.bidders = slices.Delete(a.bidders, i, i+1)
-			return b
-		}
+	b := a.bidders[clanID]
+	if b != nil {
+		delete(a.bidders, clanID)
+		a.order.Remove(clanID)
 	}
-	return nil
+	return b
 }
 
-// listed returns the bids in listing order: by the bucket each clan id falls in,
-// a table of 16 doubled each time the bids reached three quarters of it, then by
-// when each bid was first made. Past the first table the order within a bucket
-// is an approximation: a grown table splits its buckets in an order of its own.
+// clearBids drops every bid; the listing order's table keeps its size.
+func (a *auction) clearBids() {
+	clear(a.bidders)
+	a.order.Clear()
+}
+
+// listed returns the bids in listing order.
 func (a *auction) listed() []*Bidder {
-	size := 16
-	for a.mostBidders >= size-size/4 {
-		size *= 2
+	ids := a.order.Order()
+	out := make([]*Bidder, len(ids))
+	for i, id := range ids {
+		out[i] = a.bidders[id]
 	}
-	out := append([]*Bidder(nil), a.bidders...)
-	slices.SortStableFunc(out, func(x, y *Bidder) int {
-		return bucket(x.ClanID, size) - bucket(y.ClanID, size)
-	})
 	return out
-}
-
-// bucket is the bucket clan id id falls in in a table of size buckets.
-func bucket(id int32, size int) int {
-	h := uint32(id)
-	return int((h ^ h>>16) & 0x7fffffff & uint32(size-1))
 }
 
 // recalculateHighest makes the first of the highest positive bids, in
@@ -232,7 +220,7 @@ func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan, payouts ...credi
 	hs.writeThenCredit("remove clan hall bids", hallID, func(ctx context.Context, st HallStore) error {
 		return st.DeleteBids(ctx, hallID)
 	}, append(refunds, payouts...))
-	a.bidders = nil
+	a.clearBids()
 }
 
 // BidResult is how a bid ended.

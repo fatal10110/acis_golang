@@ -1,4 +1,4 @@
-package clan
+package hashorder
 
 import (
 	"math/rand/v2"
@@ -13,13 +13,13 @@ func TestWarSetTreeBucketsStayRedBlackTrees(t *testing.T) {
 	rng := rand.New(rand.NewPCG(1, 2))
 	trees := 0
 	for round := range 200 {
-		var set warSet
+		var set Set
 		stride := []int32{64, 128, 256, 4096}[round%4]
 		var held []int32
 		for step := range 400 {
 			if len(held) > 0 && rng.IntN(5) < 2 {
 				at := rng.IntN(len(held))
-				set.remove(held[at])
+				set.Remove(held[at])
 				held = slices.Delete(held, at, at+1)
 			} else {
 				id := 0x10000000 + stride*int32(rng.IntN(60))
@@ -29,7 +29,7 @@ func TestWarSetTreeBucketsStayRedBlackTrees(t *testing.T) {
 				if !slices.Contains(held, id) {
 					held = append(held, id)
 				}
-				set.add(id)
+				set.Add(id)
 			}
 			for i, bin := range set.table {
 				if bin.root == nil {
@@ -39,14 +39,14 @@ func TestWarSetTreeBucketsStayRedBlackTrees(t *testing.T) {
 				var got []int32
 				checkRedBlack(t, bin.root, nil, &got)
 				want := slices.Clone(bin.ids)
-				slices.SortFunc(want, func(a, b int32) int { return 2*treeSide(&warNode{id: b}, a) - 1 })
+				slices.SortFunc(want, func(a, b int32) int { return 2*treeSide(&treeNode{id: b}, a) - 1 })
 				if !slices.Equal(got, want) {
 					t.Fatalf("round %d step %d bucket %d: tree holds %v, bucket %v", round, step, i, got, bin.ids)
 				}
 			}
 		}
-		if set.len() != len(held) {
-			t.Fatalf("round %d: len %d, want %d", round, set.len(), len(held))
+		if set.Len() != len(held) {
+			t.Fatalf("round %d: len %d, want %d", round, set.Len(), len(held))
 		}
 	}
 	if trees == 0 {
@@ -57,7 +57,7 @@ func TestWarSetTreeBucketsStayRedBlackTrees(t *testing.T) {
 // checkRedBlack walks n in order, appending its ids, and returns its black
 // height; it fails on a broken parent link, a red root or red pair, unequal
 // black heights or ids out of order.
-func checkRedBlack(t *testing.T, n, parent *warNode, ids *[]int32) int {
+func checkRedBlack(t *testing.T, n, parent *treeNode, ids *[]int32) int {
 	t.Helper()
 	if n == nil {
 		return 1
@@ -72,7 +72,7 @@ func checkRedBlack(t *testing.T, n, parent *warNode, ids *[]int32) int {
 		t.Fatalf("red node %d has a red child", n.id)
 	}
 	left := checkRedBlack(t, n.kid[0], n, ids)
-	if len(*ids) > 0 && treeSide(&warNode{id: (*ids)[len(*ids)-1]}, n.id) == 0 {
+	if len(*ids) > 0 && treeSide(&treeNode{id: (*ids)[len(*ids)-1]}, n.id) == 0 {
 		t.Fatalf("node %d out of order", n.id)
 	}
 	*ids = append(*ids, n.id)

@@ -38,7 +38,7 @@ func (s *Service) CreditWarKill(victimID, victimClanID, killerID, killerClanID i
 	if !ok || killer.LvlJoinedAcademy > 0 {
 		return WarKill{}
 	}
-	victimAtWar, killerAtWar := victimClan.wars.has(killerClan.id), killerClan.wars.has(victimClan.id)
+	victimAtWar, killerAtWar := victimClan.wars.Has(killerClan.id), killerClan.wars.Has(victimClan.id)
 	if !victimAtWar || !killerAtWar {
 		return WarKill{}
 	}
