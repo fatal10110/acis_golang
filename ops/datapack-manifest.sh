@@ -6,6 +6,9 @@
 #
 #   ops/datapack-manifest.sh write   after resyncing the copy
 #   ops/datapack-manifest.sh check   compare the copy against the manifest
+#   ops/datapack-manifest.sh package OUT.tar.zst
+#                                    check, then archive exactly the manifest's
+#                                    files (needs GNU tar and zstd)
 #
 # A local data/geodata under the copy is ignored (it is not committed).
 set -eu
@@ -32,8 +35,22 @@ check)
 	fi
 	echo "datapack-manifest: ok, $(wc -l <"$manifest") files match"
 	;;
+package)
+	out=${2:?usage: $0 package OUT.tar.zst}
+	"$0" check
+	# Members are the manifest's paths, relative to the datapack root, in its
+	# order; data/geodata is never one of them. Fixed mtime, owner and modes
+	# make the same commit give the same bytes.
+	# tar writes a file, not a pipe: sh has no pipefail to report its failure.
+	cut -c67- "$manifest" >"$out.list"
+	tar -C "$root/aCis_datapack" --format=gnu --mtime=@0 --owner=0 --group=0 \
+		--numeric-owner --mode=u=rwX,go=rX --verbatim-files-from -T "$out.list" -cf "$out.tar"
+	rm "$out.list"
+	zstd -q -f -19 -T1 --rm -o "$out" "$out.tar"
+	echo "datapack-manifest: packaged $(wc -l <"$manifest") files into $out"
+	;;
 *)
-	echo "usage: $0 write|check" >&2
+	echo "usage: $0 write|check|package OUT.tar.zst" >&2
 	exit 2
 	;;
 esac

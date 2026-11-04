@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      # Attaches the built binaries to the release.
+      # Attaches the built binaries and the datapack to the release.
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
@@ -42,9 +42,16 @@ jobs:
         run: |
           go build -trimpath -o dist/gameserver ./cmd/gameserver
           go build -trimpath -o dist/loginserver ./cmd/loginserver
-          (cd dist && sha256sum gameserver loginserver > SHA256SUMS)
+      # The datapack ships next to the binaries, never geodata. The package
+      # step checks the copy against ops/datapack.sha256 first, so a copy that
+      # drifted from its manifest fails the job before anything is uploaded.
+      - name: Package the datapack
+        run: |
+          ops/datapack-manifest.sh package dist/datapack.tar.zst
+          cp ops/datapack.sha256 dist/datapack.sha256
+          (cd dist && sha256sum gameserver loginserver datapack.tar.zst datapack.sha256 > SHA256SUMS)
       # A re-run replaces the assets.
-      - name: Attach binaries to the release
+      - name: Attach the release assets
         run: gh release upload "$TAG" dist/* --clobber
       # The server pulls the release assets itself and answers after the swap
       # and restart, so a failed deploy fails this job; the gameserver stop can
