@@ -160,6 +160,20 @@ func Dial(t *testing.T, addr string) *ScriptedClient {
 	return &ScriptedClient{t: t, conn: conn}
 }
 
+// DialFrom is Dial from the local IP address local, so a suite can connect
+// as a second host (any 127.0.0.0/8 address on a loopback listener).
+func DialFrom(t *testing.T, addr, local string) *ScriptedClient {
+	t.Helper()
+	d := net.Dialer{LocalAddr: &net.TCPAddr{IP: net.ParseIP(local)}}
+	conn, err := d.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("dial %s from %s: %v", addr, local, err)
+	}
+	t.Cleanup(func() { conn.Close() })
+
+	return &ScriptedClient{t: t, conn: conn}
+}
+
 // ReadWithTimeout reads one frame within d, returning nil on timeout instead
 // of failing the test. Used to drain however many frames a rejected request
 // produces (a system message plus ActionFailed, or ActionFailed alone)

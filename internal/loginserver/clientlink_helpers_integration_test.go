@@ -287,6 +287,13 @@ func encodeRequestServerLogin(key1, key2 int32, serverID byte) []byte {
 
 func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool, opts ...func(*ClientLink)) (addr string, l *ClientLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
+	return newTestClientLinkOn(t, nil, accounts, autoCreate, opts...)
+}
+
+// newTestClientLinkOn is newTestClientLink serving on the listener wrap
+// returns for the bound one (the bound one itself when wrap is nil).
+func newTestClientLinkOn(t *testing.T, wrap func(net.Listener) net.Listener, accounts *fakeAccountStore, autoCreate bool, opts ...func(*ClientLink)) (addr string, l *ClientLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
+	t.Helper()
 
 	keyPair, err := commoncrypt.NewLoginKeyPair()
 	if err != nil {
@@ -323,7 +330,11 @@ func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	go l.Serve(ctx, ln)
+	served := ln
+	if wrap != nil {
+		served = wrap(ln)
+	}
+	go l.Serve(ctx, served)
 
 	return ln.Addr().String(), l, servers, sessions, bans
 }

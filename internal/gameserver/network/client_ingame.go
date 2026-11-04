@@ -383,15 +383,28 @@ func (l *GameClientLink) handleRequestLinkHTML(_ context.Context, cs *connState,
 
 // handleRequestBypassToServer runs a bypass command.
 func (l *GameClientLink) handleRequestBypassToServer(_ context.Context, cs *connState, req clientpackets.RequestBypassToServer) error {
-	client := cs.client
+	client, live := cs.client, cs.live
+	refused := false
 	// An empty command returns before the bypass reuse gate is
 	// consulted, so it never consumes the cooldown; a refused
-	// command is dropped silently.
-	if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig().ServerBypassDelay, time.Now()) {
+	// command is dropped silently. The gate belongs to this read loop,
+	// which stays parked in onLive while this runs; in the world it is
+	// timed on the player's queue clock.
+	onLive(live, func() {
+		now := time.Now()
+		if live != nil {
+			now = live.Now()
+		}
+		if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig().ServerBypassDelay, now) {
+			refused = true
+			return
+		}
+		l.requestBypassToServer(live, req)
+	})
+	if refused {
 		return nil
 	}
-	onLive(cs.live, func() { l.requestBypassToServer(cs.live, req) })
-	l.finishPendingClassChange(cs.live)
+	l.finishPendingClassChange(live)
 	return nil
 }
 
