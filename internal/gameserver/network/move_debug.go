@@ -59,7 +59,11 @@ func drawMoveDebug(w *world.State, mover world.Tracked, ev event.Event) bool {
 				drawMoveToPawn(gm, d, e)
 				return
 			}
-			d.AddLine(debugLine("MoveToLocation: "+locationText(e.Destination), serverpackets.PrimitiveWhite, e.Origin, e.Destination))
+			dest := locationText(e.Destination)
+			if e.Followed {
+				dest = headedText(e.Destination, e.DestinationHeading)
+			}
+			d.AddLine(debugLine("MoveToLocation: "+dest, serverpackets.PrimitiveWhite, e.Origin, e.Destination))
 			if docked {
 				d.AddLine(dockLine("Boat Entrance", entrance))
 				d.AddLine(dockLine("Boat Exit", exit))
@@ -75,16 +79,16 @@ func drawMoveDebug(w *world.State, mover world.Tracked, ev event.Event) bool {
 					from = to
 				}
 			}
-			sendText(gm, "Moving from "+locationText(e.Origin)+" to "+locationText(e.Destination))
+			sendText(gm, "Moving from "+headedText(e.Origin, e.OriginHeading)+" to "+dest)
 		})
 	case event.MoveDebugStep:
-		heading := strconv.Itoa(moverHeading(mover))
+		heading := strconv.Itoa(e.Heading)
 		moveDebugViewers(w, mover, func(gm *livePlayer) {
 			d := gm.drawing("MOVE" + id)
 			d.AddPoint(serverpackets.PrimitivePoint{Name: heading, Color: serverpackets.PrimitiveRed, NameColored: true, X: int32(e.To.X), Y: int32(e.To.Y), Z: int32(e.To.Z)})
 			sendDrawing(gm, d)
 			if e.Ground && max(e.From.Z-e.To.Z, e.To.Z-e.From.Z) > 100 {
-				sendText(gm, "Falling/Climb bug found when moving from "+locationText(e.From)+" to "+locationText(e.To))
+				sendText(gm, "Falling/Climb bug found when moving from "+locationText(e.From)+" to "+headedText(e.To, e.Heading))
 			}
 		})
 	case event.PathDebug:
@@ -139,17 +143,6 @@ func dockedBoat(w *world.State, mover world.Tracked) *boat.Boat {
 	return found
 }
 
-// moverHeading is mover's heading, 0 for a mover with none.
-func moverHeading(mover world.Tracked) int {
-	switch m := mover.(type) {
-	case interface{ Heading() int }:
-		return m.Heading()
-	case interface{ CurrentHeading() int }:
-		return m.CurrentHeading()
-	}
-	return 0
-}
-
 // debugLine is a labelled line of color from a to b.
 func debugLine(label string, color uint32, a, b location.Location) serverpackets.PrimitiveLine {
 	l := segment(label, a, b)
@@ -179,6 +172,11 @@ func addDebugStrokes(d *serverpackets.Drawing, strokes []event.DebugStroke) {
 // locationText writes at as "x, y, z".
 func locationText(at location.Location) string {
 	return strconv.Itoa(at.X) + ", " + strconv.Itoa(at.Y) + ", " + strconv.Itoa(at.Z)
+}
+
+// headedText writes at, facing heading, as "x, y, z, heading".
+func headedText(at location.Location, heading int) string {
+	return locationText(at) + ", " + strconv.Itoa(heading)
 }
 
 // spacedText writes at as "x y z".

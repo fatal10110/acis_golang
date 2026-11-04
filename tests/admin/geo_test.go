@@ -70,16 +70,17 @@ func wallGeo(t *testing.T) *engine.Engine {
 
 // bootGeoAdmin boots the game master on wallGeo, standing on its ground,
 // saving bug reports to a temporary directory it returns.
-func bootGeoAdmin(t *testing.T) (*gameservertest.Server, *testsupport.ScriptedClient, string) {
+func bootGeoAdmin(t *testing.T, opts ...gameservertest.Option) (*gameservertest.Server, *testsupport.ScriptedClient, string) {
 	t.Helper()
 	eng := wallGeo(t)
 	dir := t.TempDir()
 	bugs := engine.NewBugLog(dir)
 	t.Cleanup(func() { _ = bugs.Close() })
-	srv, objID := bootAdmin(t, adminLevel,
+	srv, objID := bootAdmin(t, adminLevel, append([]gameservertest.Option{
 		gameservertest.WithHTMLPages(shippedAdminPages(t, "walker.htm")),
 		gameservertest.WithGeo(move.NewGeo(eng, pathfind.New(eng, pathfind.DefaultOptions()))),
-		gameservertest.WithGeoBugLog(bugs))
+		gameservertest.WithGeoBugLog(bugs),
+	}, opts...)...)
 	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET z = ? WHERE obj_Id = ?", geoZ, objID); err != nil {
 		t.Fatal(err)
 	}

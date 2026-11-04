@@ -5,19 +5,27 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 // MoveDebugStart reports a move request accepted by a mover whose moves
 // are debugged. Destination is where the first leg ends and Route holds
 // the routed legs after it, none for an unrouted walk. Pawn marks a walk
-// that tracks a pawn standing at Destination, stopping Offset short of it.
+// that tracks a pawn standing at Destination, stopping Offset short of it;
+// Followed one that heads for the position of a followed pawn facing
+// DestinationHeading. OriginHeading is the mover's heading before the
+// request turned it.
 type MoveDebugStart struct {
 	Origin, Destination location.Location
 	Route               []location.Location
 	Pawn                bool
 	Offset              int
+	OriginHeading       int
+	Followed            bool
+	DestinationHeading  int
 }
 
 // MoveDebugStep reports one position step of a mover whose moves are
-// debugged, from From to To; Ground marks a step on the ground.
+// debugged, from From to To, after which it faces Heading; Ground marks a
+// step on the ground.
 type MoveDebugStep struct {
 	From, To location.Location
 	Ground   bool
+	Heading  int
 }
 
 // PathDebug reports the routed search of a mover whose paths are

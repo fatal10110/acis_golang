@@ -76,8 +76,8 @@ func RegionOf(x, y int) (int, int) {
 }
 
 // BlockName names the layout of the block holding geodata cell geoX, geoY,
-// as game masters are shown it. A block a geodata object overlays is named
-// for the layered cells it then keeps.
+// as game masters are shown it. A block a geodata object overlays, now or
+// at any time before, is named for the layered cells an overlay keeps.
 func (e *Engine) BlockName(geoX, geoY int) string {
 	b := e.blockAtGeo(geoX, geoY)
 	switch {
@@ -87,6 +87,12 @@ func (e *Engine) BlockName(geoX, geoY int) string {
 		return "BlockComplexDynamic"
 	case b.region == nil:
 		return "BlockNull"
+	}
+	if multilayer, ok := e.overlaid.Load(blockKey{geoX / block.CellsX, geoY / block.CellsY}); ok {
+		if multilayer.(bool) {
+			return "BlockMultilayerDynamic"
+		}
+		return "BlockComplexDynamic"
 	}
 	switch b.static().Kind() {
 	case block.KindFlat:

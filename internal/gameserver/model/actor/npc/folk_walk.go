@@ -118,6 +118,14 @@ func (f *Folk) EnableMovement(m FolkMovement) (*FolkWalker, error) {
 	return motion.walker, nil
 }
 
+// Move returns the NPC's movement state, nil for one without movement.
+func (f *Folk) Move() *move.CreatureMove {
+	if f.motion == nil {
+		return nil
+	}
+	return f.motion.move
+}
+
 // IsMoving reports whether the NPC is walking.
 func (f *Folk) IsMoving() bool {
 	return f.motion != nil && f.motion.move.Moving()
@@ -149,6 +157,8 @@ func (m *folkMotion) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		m.arrivedBlocked()
 		m.ctl.BroadcastBlockedCorrection()
+	case event.MoveDebugStart, event.MoveDebugStep, event.PathDebug:
+		m.emit(ev)
 	}
 }
 

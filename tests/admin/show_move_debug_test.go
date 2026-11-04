@@ -63,7 +63,8 @@ func debugFrames(t *testing.T, frames [][]byte) ([]primitive, []string) {
 
 // TestAdminShowMoveAndPathDebugDrawWalk pins the drawings of a debugged
 // walk: routed around wallGeo's wall, the search is drawn on PATH<id> and
-// sent at once; the walk is told as "Moving from <x, y, z> to <x, y, z>"
+// sent at once; the walk is told as "Moving from <x, y, z, heading> to
+// <x, y, z>", the heading the walker faced before it turned,
 // and drawn on MOVE<id> (the click white, the start a red point, the route
 // yellow), sent with the first step, each step a red point labelled with
 // the heading; a reported position adds a green point labelled with the
@@ -84,7 +85,7 @@ func TestAdminShowMoveAndPathDebugDrawWalk(t *testing.T) {
 	drain(t, bystander)
 
 	moveName, pathName := "MOVE"+strconv.Itoa(int(gmID)), "PATH"+strconv.Itoa(int(gmID))
-	moving := regexp.MustCompile(`^Moving from ` + itoa(spawnX) + `, ` + itoa(spawnY) + `, ` + itoa(geoZ) + ` to (-?\d+), (-?\d+), (-?\d+)$`)
+	moving := regexp.MustCompile(`^Moving from ` + itoa(spawnX) + `, ` + itoa(spawnY) + `, ` + itoa(geoZ) + `, 0 to (-?\d+), (-?\d+), (-?\d+)$`)
 	timing := regexp.MustCompile(`^\d+ms$`)
 	for _, c := range []*testsupport.ScriptedClient{gm, watcher} {
 		var frames [][]byte

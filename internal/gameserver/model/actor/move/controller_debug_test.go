@@ -17,6 +17,8 @@ func (g tracedGeo) FindPathTraced(origin, target location.Location, tr *engine.T
 	return g.FindPath(origin, target)
 }
 
+func (s *headingSelf) Heading() int { return s.heading }
+
 // debugEvents returns the debug events among events, in order.
 func debugEvents(events []event.Event) []event.Event {
 	var out []event.Event
@@ -32,14 +34,17 @@ func debugEvents(events []event.Event) []event.Event {
 // A debugged mover reports, to its sink: the routed search's drawing when
 // its paths are debugged, then the accepted request (first leg and the
 // routed legs after it, or the pawn it tracks) and each step when its moves
-// are; toggled off it reports nothing.
+// are, the start with the heading faced before the request turned the
+// mover and each step with the heading faced after it; toggled off it
+// reports nothing.
 func TestControllerReportsDebuggedMoves(t *testing.T) {
 	geo := tracedGeo{&recordingGeo{
 		canMove:    false,
 		findPath:   []location.Location{{X: 100, Y: 100}, {Y: 300}},
 		findPathOK: true,
 	}}
-	controller, mover, log, _ := newChaseController(t, &headingSelf{}, geo)
+	self := &headingSelf{}
+	controller, mover, log, _ := newChaseController(t, self, geo)
 	if ok, _ := controller.MoveToLocation(location.Location{Y: 300}); !ok {
 		t.Fatal("walk not accepted")
 	}
@@ -52,6 +57,7 @@ func TestControllerReportsDebuggedMoves(t *testing.T) {
 	}
 	log.events = nil
 	controller.Stop()
+	self.heading = 777
 	if ok, _ := controller.MoveToLocation(location.Location{Y: 300}); !ok {
 		t.Fatal("walk not accepted")
 	}
@@ -59,15 +65,15 @@ func TestControllerReportsDebuggedMoves(t *testing.T) {
 	controller.PositionUpdate()
 	want := []event.Event{
 		event.PathDebug{Strokes: []event.DebugStroke{{Label: "searched", Color: engine.TraceRed, LabelColored: true}}},
-		event.MoveDebugStart{Destination: location.Location{X: 100, Y: 100}, Route: []location.Location{{Y: 300}}},
+		event.MoveDebugStart{Destination: location.Location{X: 100, Y: 100}, Route: []location.Location{{Y: 300}}, OriginHeading: 777},
 	}
 	got := debugEvents(log.events)
 	if len(got) != 3 || !reflect.DeepEqual(got[:2], want) {
 		t.Fatalf("debugged walk reported %+v, want %+v then a step", got, want)
 	}
 	step, ok := got[2].(event.MoveDebugStep)
-	if !ok || step.From != (location.Location{}) || step.To == step.From || !step.Ground {
-		t.Fatalf("step = %+v, want a ground step from the start", got[2])
+	if !ok || step.From != (location.Location{}) || step.To == step.From || !step.Ground || step.Heading != self.heading || step.Heading == 777 {
+		t.Fatalf("step = %+v, want a ground step from the start facing %d", got[2], self.heading)
 	}
 
 	log.events = nil

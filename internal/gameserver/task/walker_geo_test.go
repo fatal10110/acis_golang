@@ -67,6 +67,7 @@ func (s *walkerCtlSelf) ObjectID() int32                    { return 1 }
 func (s *walkerCtlSelf) Position() (int, int, int)          { return s.x, s.y, s.z }
 func (s *walkerCtlSelf) CollisionRadius() float64           { return 0 }
 func (s *walkerCtlSelf) SetHeading(int)                     {}
+func (*walkerCtlSelf) Heading() int                         { return 0 }
 func (s *walkerCtlSelf) SyncPosition(pos location.Location) { s.x, s.y, s.z = pos.X, pos.Y, pos.Z }
 func (s *walkerCtlSelf) BroadcastMove(event.Move)           {}
 func (s *walkerCtlSelf) BroadcastStop()                     {}

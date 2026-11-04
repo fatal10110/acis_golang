@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 )
 
 func TestBugReportLine(t *testing.T) {
@@ -40,5 +42,28 @@ func TestBugLogAppends(t *testing.T) {
 	}
 	if want := "earlier\r\n16;10;0;0;0;0;7;a\r\n"; string(data) != want {
 		t.Fatalf("file = %q, want %q", data, want)
+	}
+}
+
+func TestBlockNameStaysDynamicAfterOverlayLeaves(t *testing.T) {
+	e := New()
+	region, err := block.NewRegionFromBlocks([]block.Block{block.NewFlat(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.BlockName(0, 0); got != "BlockFlat" {
+		t.Fatalf("BlockName() before any overlay = %q, want BlockFlat", got)
+	}
+	door := &dynamicStub{height: 32, data: [][]block.NSWE{{block.NoDirections}}}
+	e.AddObject(door)
+	if got := e.BlockName(0, 0); got != "BlockComplexDynamic" {
+		t.Fatalf("BlockName() under an overlay = %q, want BlockComplexDynamic", got)
+	}
+	e.RemoveObject(door)
+	if got := e.BlockName(0, 0); got != "BlockComplexDynamic" {
+		t.Fatalf("BlockName() after the overlay left = %q, want BlockComplexDynamic", got)
 	}
 }

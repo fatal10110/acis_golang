@@ -60,6 +60,10 @@ type Engine struct {
 	dynamicBlocksMu sync.Mutex
 	dynamicBlocks   atomic.Pointer[map[blockKey]*dynamic.Block]
 	dynamicMask     [regionTilesX][regionTilesY]atomic.Pointer[regionMask]
+	// overlaid records, per block key, whether a block that ever carried
+	// an overlay was multilayer: game masters keep seeing such a block named
+	// dynamic after its last object leaves. Written under dynamicBlocksMu.
+	overlaid sync.Map
 
 	maxObstacleHeight     int
 	partOfCharacterHeight int

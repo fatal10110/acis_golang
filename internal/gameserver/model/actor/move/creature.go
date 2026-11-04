@@ -199,6 +199,9 @@ type CreatureMove struct {
 	// the owner, reported once mu is released.
 	debug    atomic.Uint32
 	debugOut []event.Event
+	// debugFollowed is, under mu during a follow request, the creature
+	// whose position the request heads for.
+	debugFollowed headed
 }
 
 const (
@@ -275,18 +278,33 @@ func (m *CreatureMove) flushDebug() {
 }
 
 // debugStartLocked queues the debug report of a request accepted from
-// origin, whose first leg ends at destination. Callers hold mu.
-func (m *CreatureMove) debugStartLocked(origin, destination location.Location, pawn bool, offset int) {
+// origin, whose first leg ends at destination: a walk tracking pawn when
+// tracks is set, else one heading for the position of pawn or of the
+// creature a follow request follows. Callers hold mu.
+func (m *CreatureMove) debugStartLocked(origin, destination location.Location, pawn Pawn, tracks bool, offset int) {
 	if m.debug.Load()&debugMove == 0 {
 		return
 	}
-	m.debugOut = append(m.debugOut, event.MoveDebugStart{
+	ev := event.MoveDebugStart{
 		Origin:      origin,
 		Destination: destination,
 		Route:       append([]location.Location(nil), m.waypoints...),
-		Pawn:        pawn,
+		Pawn:        pawn != nil && tracks,
 		Offset:      offset,
-	})
+	}
+	followed := m.debugFollowed
+	if h, ok := pawn.(headed); ok && !tracks {
+		followed = h
+	}
+	if followed != nil {
+		ev.Followed, ev.DestinationHeading = true, followed.Heading()
+	}
+	m.debugOut = append(m.debugOut, ev)
+}
+
+// headed is a creature that faces a heading.
+type headed interface {
+	Heading() int
 }
 
 // NewCreatureMove builds movement state at origin with a non-negative ground
@@ -720,6 +738,19 @@ func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (
 	return m.moveToLocationLocked(target, nil, 0, false, catchUp, false)
 }
 
+// followToLocationWithPathOutcome is MoveToLocationWithPathOutcome toward
+// target, the position of followed: a debugged walk reports the heading
+// followed faces with it.
+func (m *CreatureMove) followToLocationWithPathOutcome(target location.Location, followed any) (event.Move, pathFindResult, error) {
+	catchUp := m.mayCatchUp(nil)
+	defer m.flushDebug()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.debugFollowed, _ = followed.(headed)
+	defer func() { m.debugFollowed = nil }()
+	return m.moveToLocationLocked(target, nil, 0, false, catchUp, false)
+}
+
 // MoveStraightToLocation starts a walk straight for target with
 // path-finding off: no route around a closed line, which ends the walk
 // blocked on the position update that meets it, its arrival timer included.
@@ -812,7 +843,7 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 		m.straight = straight
 		m.moving = true
 		m.rescheduleLocked(PositionUpdateInterval)
-		m.debugStartLocked(m.origin, target, pawn != nil && tracks, offset)
+		m.debugStartLocked(m.origin, target, pawn, tracks, offset)
 		return event.Move{Origin: m.origin, Destination: target, Speed: m.speed}, pathDirect, nil
 	}
 
@@ -846,7 +877,7 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	m.straight = straight
 	m.moving = true
 	m.rescheduleLocked(m.arrivalDelayLocked())
-	m.debugStartLocked(origin, destination, pawn != nil && tracks, offset)
+	m.debugStartLocked(origin, destination, pawn, tracks, offset)
 
 	return event.Move{
 		Origin:      origin,

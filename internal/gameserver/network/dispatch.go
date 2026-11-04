@@ -339,8 +339,8 @@ type GameClientLink struct {
 	npcs          *npc.Table
 	doors         WorldDoors
 	geo           move.Geo
-	// geoBugs saves //geo bug reports; nil when the report file did not
-	// open.
+	// geoBugs saves //geo bug reports; nil when no report log is
+	// configured.
 	geoBugs     *engine.BugLog
 	zones       *zone.Index
 	ids         idAllocator
