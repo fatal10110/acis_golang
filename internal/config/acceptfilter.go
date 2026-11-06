@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"net/netip"
 	"strings"
 	"time"
@@ -24,20 +25,20 @@ func AcceptFilter(p *Properties) (netutil.AcceptFilterConfig, error) {
 	if value, ok := p.Lookup("EnableAcceptFilter"); ok {
 		cfg.Enabled = strings.EqualFold(value, "true")
 	}
-	if ms, ok, err := nonNegativeInt(p, "AcceptFilterBurstTime"); err != nil {
+	if d, ok, err := nonNegativeDuration(p, "AcceptFilterBurstTime", time.Millisecond); err != nil {
 		return netutil.AcceptFilterConfig{}, err
 	} else if ok {
-		cfg.BurstWindow = time.Duration(ms) * time.Millisecond
+		cfg.BurstWindow = d
 	}
 	if limit, ok, err := nonNegativeInt(p, "AcceptFilterBurstLimit"); err != nil {
 		return netutil.AcceptFilterConfig{}, err
 	} else if ok {
 		cfg.BurstLimit = limit
 	}
-	if s, ok, err := nonNegativeInt(p, "AcceptFilterBanTime"); err != nil {
+	if d, ok, err := nonNegativeDuration(p, "AcceptFilterBanTime", time.Second); err != nil {
 		return netutil.AcceptFilterConfig{}, err
 	} else if ok {
-		cfg.BanTime = time.Duration(s) * time.Second
+		cfg.BanTime = d
 	}
 	if value, ok := p.Lookup("AcceptFilterAllowlist"); ok {
 		for _, entry := range splitTrimTrailingEmpty(defaultDelimitersRE, value) {
@@ -60,6 +61,20 @@ func nonNegativeInt(p *Properties, key string) (int, bool, error) {
 		err = fmt.Errorf("%s = %d: must not be negative", key, n)
 	}
 	return n, ok, err
+}
+
+// nonNegativeDuration reads key as a count of unit. A count whose duration
+// would overflow is rejected like a negative one: a wrapped value turns into
+// a negative window that disables the filter or forgets every ban.
+func nonNegativeDuration(p *Properties, key string, unit time.Duration) (time.Duration, bool, error) {
+	n, ok, err := nonNegativeInt(p, key)
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	if int64(n) > math.MaxInt64/int64(unit) {
+		return 0, false, fmt.Errorf("%s = %d: too large", key, n)
+	}
+	return time.Duration(n) * unit, true, nil
 }
 
 // allowlistPrefix parses an address, as a single-address prefix, or a CIDR

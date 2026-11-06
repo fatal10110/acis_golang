@@ -72,6 +72,8 @@ func TestAcceptFilterRejectsMalformedValues(t *testing.T) {
 		"AcceptFilterBurstLimit = many",
 		"AcceptFilterBurstLimit = -3",
 		"AcceptFilterBanTime = -300",
+		"AcceptFilterBurstTime = 9223372036855",
+		"AcceptFilterBanTime = 9300000000",
 		"AcceptFilterAllowlist = 10.0.0.256",
 		"AcceptFilterAllowlist = 10.0.0.0/33",
 		"AcceptFilterAllowlist = loadtest.local",
