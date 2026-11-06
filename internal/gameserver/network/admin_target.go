@@ -24,5 +24,5 @@ func (l *GameClientLink) adminTarget(gm *livePlayer, line string) {
 		l.selectLiveTarget(gm, target)
 		return
 	}
-	l.actOnPlayer(gm, target, false, false)
+	l.actOnTargetAgain(gm, target, false, false)
 }

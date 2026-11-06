@@ -96,6 +96,14 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	if !selected {
 		return
 	}
+	l.actOnTargetAgain(live, target, ctrl, shift)
+}
+
+// actOnTargetAgain answers a click on the target live already holds: while
+// live sits down or stands up the action is queued and the client released,
+// otherwise it attacks, interacts with or follows the target.
+func (l *GameClientLink) actOnTargetAgain(live *livePlayer, target world.Tracked, ctrl, shift bool) {
+	objectID := target.ObjectID()
 	busy := inPostureTransition(live)
 	if obj, static := target.(*staticobject.Object); static {
 		l.actOnStaticObject(live, obj, busy, shift)

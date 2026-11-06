@@ -113,6 +113,9 @@ func allASCIIDigits(s string) bool {
 
 // isCreature reports whether obj is a creature: a player, NPC, summon or
 // door.
+//
+// A boat is left out on purpose: it has no vitals and no death here, so
+// //kill over a radius that holds one cannot break it (#4513).
 func isCreature(obj world.Tracked) bool {
 	switch obj.(type) {
 	case *livePlayer, *summon.Actor, *door.Object:
