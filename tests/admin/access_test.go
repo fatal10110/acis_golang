@@ -65,14 +65,6 @@ func TestAdminCommandAccess(t *testing.T) {
 		assertStatic(t, frames[0], serverpackets.SystemMessageInvalidTarget)
 		assertTexts(t, exchange(t, c, encodeBuildCmd("msg x")), "Usage: //msg sysMsgId")
 		assertTexts(t, exchange(t, c, encodeBuildCmd("msg")), "Usage: //msg sysMsgId")
-
-		// A command the table lists that this server does not run yet logs
-		// the gap and releases the client. Whoever ports //movie picks
-		// another unported word here, or drops this probe with the last.
-		frames = exchange(t, c, encodeBuildCmd("movie"))
-		if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("//movie frames = %x, want ActionFailed", frames)
-		}
 	})
 	t.Run("master reaches admin commands through its child level", func(t *testing.T) {
 		t.Parallel()

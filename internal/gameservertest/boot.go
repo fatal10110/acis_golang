@@ -2398,6 +2398,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	couples, coupleRows := bootWedding(t, db, ids, o.weddingConfig)
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
+	gclConfig.Bookmarks = gamesql.NewBookmarkStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
 	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, questRates, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals

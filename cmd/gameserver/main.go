@@ -168,6 +168,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			gamesql.NewHennaStore,
 			gamesql.NewRecipeBookStore,
 			gamesql.NewMacroStore,
+			gamesql.NewBookmarkStore,
 			gamesql.NewRecommendationStore,
 			gamesql.NewQuestStore,
 			gamesql.NewMemoStore,
