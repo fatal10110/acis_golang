@@ -537,6 +537,8 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 			// still fighting is defeated.
 			hit.duelDefeat = c.DuelState() == duel.Duelling
 			hp = 1
+		} else if hp <= 0 && !c.Mortal() {
+			hp = 1
 		}
 		if hp < creature.DeathHP {
 			hp = 0

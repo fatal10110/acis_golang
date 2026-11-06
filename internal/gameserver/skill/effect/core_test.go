@@ -435,8 +435,8 @@ func TestPeriodRemainingTracksCurrentTickPeriod(t *testing.T) {
 		{name: "partial second truncates elapsed", at: 1500*time.Second + 900*time.Millisecond, want: 2100},
 		{name: "last whole second", at: 3599 * time.Second, want: 1},
 	} {
-		if got := e.periodRemaining(start.Add(tc.at)); got != tc.want {
-			t.Errorf("%s: periodRemaining = %d, want %d", tc.name, got, tc.want)
+		if got := e.PeriodRemaining(start.Add(tc.at)); got != tc.want {
+			t.Errorf("%s: PeriodRemaining = %d, want %d", tc.name, got, tc.want)
 		}
 	}
 
@@ -445,22 +445,22 @@ func TestPeriodRemainingTracksCurrentTickPeriod(t *testing.T) {
 	if run, _ := e.claimAction(start.Add(3600 * time.Second)); !run {
 		t.Fatal("first tick did not run")
 	}
-	if got := e.periodRemaining(start.Add(3700 * time.Second)); got != 3500 {
-		t.Errorf("after first tick: periodRemaining = %d, want 3500", got)
+	if got := e.PeriodRemaining(start.Add(3700 * time.Second)); got != 3500 {
+		t.Errorf("after first tick: PeriodRemaining = %d, want 3500", got)
 	}
 
 	// The remaining time drops below the 1200-second step the debuff-cancel
 	// rate adds per whole unit, so the same candidate rolls lower late in its
 	// period than a full-duration input would give it.
-	late := e.periodRemaining(start.Add(6100 * time.Second))
+	late := e.PeriodRemaining(start.Add(6100 * time.Second))
 	if got, full := formulas.EffectCancelDebuffSuccessRate(40, 20, late, 1), formulas.EffectCancelDebuffSuccessRate(40, 20, e.Template.Time, 1); got != 40 || full != 43 {
 		t.Errorf("late rate = %d (remaining %d), full-duration rate = %d, want 40 and 43", got, late, full)
 	}
 
 	unscheduled := &Effect{Template: modelskill.EffectTemplate{Name: "Debuff", Time: 0}}
 	unscheduled.startSchedule(start)
-	if got := unscheduled.periodRemaining(start.Add(time.Hour)); got != 0 {
-		t.Errorf("no-period effect: periodRemaining = %d, want 0", got)
+	if got := unscheduled.PeriodRemaining(start.Add(time.Hour)); got != 0 {
+		t.Errorf("no-period effect: PeriodRemaining = %d, want 0", got)
 	}
 }
 

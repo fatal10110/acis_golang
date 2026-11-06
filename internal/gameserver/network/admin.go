@@ -121,6 +121,16 @@ var adminCommands = map[string]adminCommand{
 	"admin_close":  (*GameClientLink).adminClose,
 	"admin_target": (*GameClientLink).adminTarget,
 
+	// Effects and sounds; see admin_effects.go and admin_effect_page.go.
+	"admin_abnormal":   (*GameClientLink).adminAbnormal,
+	"admin_earthquake": (*GameClientLink).adminEarthquake,
+	"admin_effect":     (*GameClientLink).adminEffect,
+	"admin_gmspeed":    (*GameClientLink).adminGMSpeed,
+	"admin_jukebox":    (*GameClientLink).adminJukebox,
+	"admin_play_sound": (*GameClientLink).adminPlaySound,
+	"admin_social":     (*GameClientLink).adminSocial,
+	"admin_undying":    (*GameClientLink).adminUndying,
+
 	// Olympiad and heroes; see admin_olympiad.go.
 	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
 	"admin_sethero": (*GameClientLink).adminSetHero,

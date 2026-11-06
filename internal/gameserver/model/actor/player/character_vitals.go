@@ -168,7 +168,8 @@ func (c *Character) CurrentCP() int {
 // compare against truncated HP: a character on 10.4 HP reports 10, pays a
 // cost of 10 in full, and lands on 0.4 — dead, displayed
 // at 0 HP either way. The remainder is then cleared so a repeat call sees
-// an already-dead character.
+// an already-dead character. An immortal character a cost would take to
+// or below zero is left on 1 HP instead.
 //
 // Every damage route applies the same threshold (creature.DeathHP).
 func (c *Character) ReduceCurrentHP(amount int) bool {
@@ -183,6 +184,9 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 		return false
 	}
 	hp := c.boundedLocked(c.curHP, maxHP) - float64(amount)
+	if hp <= 0 && !c.Mortal() {
+		hp = 1
+	}
 	if hp >= creature.DeathHP {
 		c.writeHPLocked(hp)
 		return false
