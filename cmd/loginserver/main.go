@@ -44,7 +44,10 @@ type loginServerConfig struct {
 	LoginTryBeforeBan   int
 	LoginBlockAfterBan  time.Duration
 	Flood               netutil.FloodGuardConfig
-	Database            db.Config
+	// AcceptFilter guards the login-client port; Flood guards only the
+	// game-server link.
+	AcceptFilter netutil.AcceptFilterConfig
+	Database     db.Config
 }
 
 func main() {
@@ -145,6 +148,10 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	if err != nil {
 		return loginServerConfig{}, err
 	}
+	acceptFilter, err := config.AcceptFilter(props)
+	if err != nil {
+		return loginServerConfig{}, err
+	}
 
 	return loginServerConfig{
 		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
@@ -161,6 +168,7 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 			FastConnectionTime:   time.Duration(fastConnectionTime) * time.Millisecond,
 			MaxConnectionsPerIP:  maxConnectionsPerIP,
 		},
+		AcceptFilter: acceptFilter,
 		Database: db.Config{
 			URL:            props.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:          props.String("Login", "root"),
@@ -330,7 +338,7 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 				defer wg.Done()
 				// Connection bursts from one address are refused at
 				// accept, before the IP ban list is consulted.
-				filtered := netutil.FilterAccepts(clientLn, netutil.NewAcceptFilter(), time.Now)
+				filtered := netutil.FilterAccepts(clientLn, netutil.NewAcceptFilter(cfg.AcceptFilter, log), time.Now)
 				if err := clients.Serve(runCtx, filtered); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ClientAddr).Msg("login client listener stopped")
 				}

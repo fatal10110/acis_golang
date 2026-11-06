@@ -21,6 +21,20 @@ import (
 // open issue that ports its consumer; the boot reports them as unsupported.
 var pendingKeys = map[string][]string{}
 
+// acceptFilterKeys are the client-port accept filter keys (AcceptFilter).
+var acceptFilterKeys = []string{
+	"AcceptFilterAllowlist", "AcceptFilterBanTime", "AcceptFilterBurstLimit",
+	"AcceptFilterBurstTime", "EnableAcceptFilter",
+}
+
+// ownKeys are read keys the reference loader has no counterpart for:
+// settings of mechanisms only this server has, and MaxConnections, the
+// database pool size.
+var ownKeys = map[string][]string{
+	"loginserver.properties": append(slices.Clone(acceptFilterKeys), "MaxConnections"),
+	"server.properties":      append(slices.Clone(acceptFilterKeys), "MaxConnections"),
+}
+
 // referenceKeys reads testdata/reference_keys.golden: the keys the
 // reference configuration loader reads, by file.
 func referenceKeys(t *testing.T) map[string][]string {
@@ -56,7 +70,7 @@ func tableOf(file string) (keySet, bool) {
 
 // TestKeyTablesCoverTheReferenceKeys pins the key tables against every key
 // the reference loader reads: each is read, ignored or pending, exactly
-// once, and the tables hold no other key.
+// once, and the tables hold no other key but this server's own.
 func TestKeyTablesCoverTheReferenceKeys(t *testing.T) {
 	t.Parallel()
 	ref := referenceKeys(t)
@@ -85,8 +99,17 @@ func TestKeyTablesCoverTheReferenceKeys(t *testing.T) {
 			}
 		}
 		for _, key := range got {
-			if _, found := slices.BinarySearch(want, key); !found {
+			_, found := slices.BinarySearch(want, key)
+			switch own := slices.Contains(ownKeys[file], key); {
+			case own && found:
+				t.Errorf("%s %s: listed as this server's own, but the reference reads it too", file, key)
+			case !own && !found:
 				t.Errorf("%s %s: in the key tables, but the reference reads no such key", file, key)
+			}
+		}
+		for _, key := range ownKeys[file] {
+			if !slices.Contains(set.Read, key) {
+				t.Errorf("%s %s: listed as this server's own, but not read", file, key)
 			}
 		}
 	}

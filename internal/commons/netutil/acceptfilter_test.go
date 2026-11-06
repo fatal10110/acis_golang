@@ -7,7 +7,17 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
+
+// defaultBanTime is the default config's BanTime.
+const defaultBanTime = 300 * time.Second
+
+// defaultFilter is an AcceptFilter on the default config.
+func defaultFilter() *AcceptFilter {
+	return NewAcceptFilter(DefaultAcceptFilterConfig(), zerolog.Nop())
+}
 
 var (
 	filterHost  = netip.MustParseAddr("192.0.2.1")
@@ -35,7 +45,7 @@ func wantAnswers(t *testing.T, what string, got []bool, want ...bool) {
 }
 
 func TestAcceptFilterBansTheFifthBurstConnection(t *testing.T) {
-	f := NewAcceptFilter()
+	f := defaultFilter()
 	ms := time.Millisecond
 	// The first creates the record, the next three each count a try, the
 	// fifth inside a second of the previous one bans.
@@ -49,7 +59,7 @@ func TestAcceptFilterBansTheFifthBurstConnection(t *testing.T) {
 }
 
 func TestAcceptFilterSlowConnectionKeepsTries(t *testing.T) {
-	f := NewAcceptFilter()
+	f := defaultFilter()
 	ms := time.Millisecond
 	// Three burst tries, then a connection a full second later: admitted,
 	// and the tries are not cleared, so the next burst connection bans.
@@ -57,7 +67,7 @@ func TestAcceptFilterSlowConnectionKeepsTries(t *testing.T) {
 }
 
 func TestAcceptFilterBurstWindowIsExclusive(t *testing.T) {
-	f := NewAcceptFilter()
+	f := defaultFilter()
 	// Exactly one second apart is not a burst: no try is counted.
 	wantAnswers(t, "spaced", allowAll(f, filterHost, 0, time.Second, 2*time.Second, 3*time.Second, 4*time.Second, 5*time.Second), true, true, true, true, true, true)
 	ms := time.Millisecond
@@ -65,22 +75,22 @@ func TestAcceptFilterBurstWindowIsExclusive(t *testing.T) {
 }
 
 func TestAcceptFilterSweepForgetsSilentAddresses(t *testing.T) {
-	f := NewAcceptFilter()
+	f := defaultFilter()
 	ms := time.Millisecond
 	allowAll(f, filterHost, 0, ms, 2*ms, 3*ms, 4*ms) // banned at 4ms
 	last := filterStart.Add(4 * ms)
 
-	f.Sweep(last.Add(acceptForgetAfter))
-	if f.Allow(filterHost, last.Add(acceptForgetAfter)) {
-		t.Fatal("sweep exactly acceptForgetAfter after the last attempt lifted the ban")
+	f.Sweep(last.Add(defaultBanTime))
+	if f.Allow(filterHost, last.Add(defaultBanTime)) {
+		t.Fatal("sweep exactly defaultBanTime after the last attempt lifted the ban")
 	}
-	last = last.Add(acceptForgetAfter)
-	f.Sweep(last.Add(acceptForgetAfter + ms))
-	if !f.Allow(filterHost, last.Add(acceptForgetAfter+ms)) {
-		t.Fatal("sweep past acceptForgetAfter of silence kept the ban")
+	last = last.Add(defaultBanTime)
+	f.Sweep(last.Add(defaultBanTime + ms))
+	if !f.Allow(filterHost, last.Add(defaultBanTime+ms)) {
+		t.Fatal("sweep past defaultBanTime of silence kept the ban")
 	}
 	// Forgotten means a fresh record: four burst connections pass again.
-	at := last.Add(acceptForgetAfter + ms)
+	at := last.Add(defaultBanTime + ms)
 	for i := 1; i <= 3; i++ {
 		if !f.Allow(filterHost, at.Add(time.Duration(i)*ms)) {
 			t.Fatalf("burst connection %d after the sweep refused", i+1)
@@ -105,7 +115,7 @@ func filterOn(t *testing.T, f *AcceptFilter, ticks <-chan time.Time) (*filteredL
 }
 
 func TestFilterAcceptsClosesRefusedConnectionUnanswered(t *testing.T) {
-	f := NewAcceptFilter()
+	f := defaultFilter()
 	l, _ := filterOn(t, f, nil)
 
 	accepted := make(chan net.Conn)
@@ -154,23 +164,23 @@ func TestFilterAcceptsClosesRefusedConnectionUnanswered(t *testing.T) {
 }
 
 func TestFilteredListenerSweepsOnEachTick(t *testing.T) {
-	f := NewAcceptFilter()
+	f := defaultFilter()
 	ticks := make(chan time.Time)
 	_, set := filterOn(t, f, ticks)
 
 	ms := time.Millisecond
 	allowAll(f, filterHost, 0, ms, 2*ms, 3*ms, 4*ms)
-	set(filterStart.Add(4*ms + acceptForgetAfter + ms))
+	set(filterStart.Add(4*ms + defaultBanTime + ms))
 	// The second send completes only once the first tick's sweep is done.
 	ticks <- time.Time{}
 	ticks <- time.Time{}
-	if !f.Allow(filterHost, filterStart.Add(4*ms+acceptForgetAfter+ms)) {
+	if !f.Allow(filterHost, filterStart.Add(4*ms+defaultBanTime+ms)) {
 		t.Fatal("tick did not sweep the silent banned address")
 	}
 }
 
 func TestFilteredListenerStopsSweepingWhenClosed(t *testing.T) {
-	l, _ := filterOn(t, NewAcceptFilter(), make(chan time.Time))
+	l, _ := filterOn(t, defaultFilter(), make(chan time.Time))
 	if err := l.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -182,7 +192,7 @@ func TestFilteredListenerStopsSweepingWhenClosed(t *testing.T) {
 }
 
 func TestFilteredListenerStopsSweepingWhenInnerListenerCloses(t *testing.T) {
-	l, _ := filterOn(t, NewAcceptFilter(), make(chan time.Time))
+	l, _ := filterOn(t, defaultFilter(), make(chan time.Time))
 	l.Listener.Close()
 	if _, err := l.Accept(); !errors.Is(err, net.ErrClosed) {
 		t.Fatalf("Accept on a closed listener = %v, want net.ErrClosed", err)

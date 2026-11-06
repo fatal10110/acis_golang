@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/rs/zerolog"
 )
 
 // The game-client port refuses connection bursts from one address at
@@ -40,7 +41,7 @@ func bootFiltered(t *testing.T) (*gameservertest.Server, *netutil.AcceptFilter, 
 	t.Helper()
 	clock := &filterClock{}
 	clock.set(time.Unix(1_000_000, 0))
-	f := netutil.NewAcceptFilter()
+	f := netutil.NewAcceptFilter(netutil.DefaultAcceptFilterConfig(), zerolog.Nop())
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1),
 		gameservertest.WithAcceptFilter(f, clock.now))
 	return srv, f, clock
