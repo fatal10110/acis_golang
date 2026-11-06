@@ -293,11 +293,11 @@ func (e *Effect) SaveState(now time.Time) (count, elapsed int32) {
 	return count, int32((period - remaining) / time.Second)
 }
 
-// periodRemaining reports the whole seconds left in e's current tick period
+// PeriodRemaining reports the whole seconds left in e's current tick period
 // at now: the template period minus the whole seconds elapsed since the
 // period started. An effect with no running schedule reports its full
 // template period.
-func (e *Effect) periodRemaining(now time.Time) int {
+func (e *Effect) PeriodRemaining(now time.Time) int {
 	_, elapsed := e.SaveState(now)
 	return e.Template.Time - int(elapsed)
 }
