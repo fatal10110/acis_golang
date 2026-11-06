@@ -98,6 +98,78 @@ curl -s 'http://127.0.0.1:6060/debug/pprof/goroutine?debug=1'
 
 **Bind this to loopback only.** The handlers are registered on `http.DefaultServeMux` with no authentication, and `net/http/pprof` exposes heap dumps, goroutine stacks, and `/debug/pprof/cmdline`. Never bind `-debug-addr` to `0.0.0.0` or a public interface. Omit the flag entirely to leave the listener off.
 
+### IP Ban API
+
+The debug listener also serves an IP ban API, with the same paths and JSON on both servers, so an
+operator can see and lift bans without a restart. It is on only when `-debug-addr` is set, and it
+answers only loopback clients (`403` otherwise), even if the listener is bound wider.
+
+| Server | `server` | Store | What it holds | Add | Remove |
+| --- | --- | --- | --- | --- | --- |
+| login | `login` | `login-ban` | The login IP ban list: `-banned-ips` entries (permanent), failed-login bans (`LoginTryBeforeBan` failures ban for `LoginBlockAfterBan` seconds), and API bans | yes | yes |
+| login | `login` | `login-accept-filter` | Burst bans on the login-client port | no | yes |
+| game | `game` | `game-ban` | The gameserver IP ban list, filled only through this API | yes | yes |
+| game | `game` | `game-accept-filter` | Burst bans on the game-client port | no | yes |
+
+A `login-ban` IP is refused on the login-client port and, as before, on the gameserver-link port
+(9014). With both servers on one host, banning `127.0.0.1` in `login-ban` also cuts the
+gameserver's link to the loginserver. A `game-ban` IP is closed at accept on the game-client port,
+before any byte and before the accept filter counts it.
+
+`GET /debug/bans` lists every ban in force:
+
+```json
+{
+  "server": "login",
+  "stores": [{"name": "login-ban", "add": true}, {"name": "login-accept-filter", "add": false}],
+  "bans": [
+    {"ip": "203.0.113.7", "store": "login-ban", "permanent": true},
+    {"ip": "198.51.100.9", "store": "login-ban", "permanent": false, "expires": "2026-11-06T12:10:00Z"},
+    {"ip": "192.0.2.4", "store": "login-accept-filter", "permanent": false, "expires": "2026-11-06T12:05:00Z"}
+  ]
+}
+```
+
+Rows come in `stores` order, then by IP. `expires` (UTC, RFC 3339) is absent for a permanent ban.
+An accept-filter ban's `expires` is its last attempt plus `AcceptFilterBanTime`: each further attempt
+pushes it back, and the ban lifts at the first 5 s sweep after it. `bans` is `[]` when there are none,
+and an accept-filter store is always empty when `EnableAcceptFilter = False`.
+
+Writes are `POST` with `Content-Type: application/json` and a JSON body of at most 4 KiB with no
+unknown fields:
+
+| Path | Body | Answer |
+| --- | --- | --- |
+| `/debug/bans/add` | `{"ip":"203.0.113.7","store":"game-ban","permanent":true}` or `{"ip":"203.0.113.7","store":"game-ban","seconds":600}` | `{"added":true}`; `{"added":false}` when the IP already has a ban in force, which keeps its expiry |
+| `/debug/bans/remove` | `{"ip":"203.0.113.7","store":"login-accept-filter"}` | `{"removed":true}`; `{"removed":false}` when the store held no ban in force for the IP |
+
+`ip` is a literal IPv4 or IPv6 address (no host names, no zones); an IPv4-mapped IPv6 address is
+its IPv4 address. `add` takes exactly one of `"permanent": true` or `"seconds"` from 1 to
+315360000 (ten years). To change a ban's length, remove it and add it again. Removing a ban does not
+reset a login IP's failed-login count, which the ban had already cleared; removing an accept-filter
+ban clears that IP's tries too.
+
+Errors answer `{"error":"message"}` with `400` (bad JSON, IP, store or duration, or `add` on a store
+that takes no bans), `403` (non-loopback client), `405` (wrong method), `413` (body too large),
+or `415` (not `application/json`). A binary from before this API answers `404` with a plain-text
+body on these paths.
+
+```bash
+curl -s http://127.0.0.1:6061/debug/bans
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"ip":"203.0.113.7","store":"login-ban","seconds":600}' http://127.0.0.1:6061/debug/bans/add
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"ip":"203.0.113.7","store":"game-accept-filter"}' http://127.0.0.1:6060/debug/bans/remove
+```
+
+Every add and remove is logged at warn level with the IP, store, duration and outcome.
+
+**API bans are not persisted.** They live in memory and are gone after a restart on both servers.
+The loginserver rebuilds `login-ban` from `-banned-ips` at boot and never writes that file, so a
+permanent login ban that must survive a restart also goes into `banned_ips.properties` (one IP per
+line). The gameserver has no ban file and starts with an empty `game-ban`. Removing a
+`banned_ips.properties` entry through the API lifts it until the next restart only.
+
 [Profiling And GC Tuning](profiling.md) covers reading these profiles, spotting goroutine leaks, the load-test profiling harness, and why the servers keep the default GC settings.
 
 ## Smoke Checks
@@ -148,7 +220,8 @@ counts as a try; the connection after the burst limit is reached bans the IP. A 
 is admitted but does not clear the tries. A banned IP's connections are closed unanswered, and each
 attempt restarts its silence timer: only an IP that stays silent for the ban time is forgotten,
 lifting the ban and clearing its tries. Every ban is logged at warn level with the IP and the
-filter's settings.
+filter's settings. The [IP Ban API](#ip-ban-api) lists these bans and lifts one without a
+restart.
 
 `loginserver.properties` and `server.properties` take the same keys; each server reads its own file.
 None is in the shipped files, and an absent key keeps its default:

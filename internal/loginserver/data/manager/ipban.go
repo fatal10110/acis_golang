@@ -5,12 +5,15 @@ package manager
 import (
 	"bufio"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
+
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 )
 
 // IPBanList tracks banned addresses and, for temporary bans, when the ban
@@ -68,14 +71,73 @@ func LoadIPBanList(path string, log zerolog.Logger) *IPBanList {
 	return l
 }
 
-// Ban adds addr to the list for d, or permanently if d <= 0. An address
-// that is already banned keeps its existing expiry.
-func (l *IPBanList) Ban(addr net.IP, d time.Duration) {
+// Ban adds addr to the list for d, or permanently if d <= 0, and reports
+// whether it did. An address that is already banned keeps its existing
+// expiry.
+func (l *IPBanList) Ban(addr net.IP, d time.Duration) bool {
 	until := time.Time{}
 	if d > 0 {
 		until = l.now().Add(d)
 	}
-	l.set(addr, until)
+	return l.set(addr, until)
+}
+
+// Add bans addr for d, or permanently if d <= 0, and reports whether it
+// did. Unlike Ban, it replaces a ban whose expiry has passed, so an
+// operator's ban always takes effect; a ban in force keeps its expiry.
+func (l *IPBanList) Add(addr netip.Addr, d time.Duration) bool {
+	key := net.IP(addr.Unmap().AsSlice()).String()
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	now := l.now()
+	if until, banned := l.bans[key]; banned && (until.IsZero() || !now.After(until)) {
+		return false
+	}
+	until := time.Time{}
+	if d > 0 {
+		until = now.Add(d)
+	}
+	l.bans[key] = until
+	return true
+}
+
+// Remove lifts the ban on addr and reports whether one was in force. A ban
+// whose expiry has passed is dropped too, but reported as not in force.
+func (l *IPBanList) Remove(addr netip.Addr) bool {
+	key := net.IP(addr.Unmap().AsSlice()).String()
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	until, banned := l.bans[key]
+	if !banned {
+		return false
+	}
+	delete(l.bans, key)
+	return until.IsZero() || !l.now().After(until)
+}
+
+// List returns every ban in force. An expired ban is left for IsBanned or
+// SweepExpired to drop.
+func (l *IPBanList) List() []netutil.BanEntry {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	now := l.now()
+	bans := make([]netutil.BanEntry, 0, len(l.bans))
+	for key, until := range l.bans {
+		if !until.IsZero() && now.After(until) {
+			continue
+		}
+		addr, err := netip.ParseAddr(key)
+		if err != nil {
+			continue // keys are net.IP strings, so this does not happen
+		}
+		bans = append(bans, netutil.BanEntry{Addr: addr, Expires: until})
+	}
+	return bans
 }
 
 // IsBanned reports whether addr is currently banned, removing the ban first
@@ -129,15 +191,17 @@ func (l *IPBanList) SweepExpired(now time.Time, retain func(addr string) bool) {
 	}
 }
 
-func (l *IPBanList) set(addr net.IP, until time.Time) {
+func (l *IPBanList) set(addr net.IP, until time.Time) bool {
 	key := addr.String()
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if _, exists := l.bans[key]; !exists {
-		l.bans[key] = until
+	if _, exists := l.bans[key]; exists {
+		return false
 	}
+	l.bans[key] = until
+	return true
 }
 
 // resolveAddress parses host as a literal IP, falling back to a DNS lookup

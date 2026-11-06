@@ -137,6 +137,35 @@ func (f *AcceptFilter) Sweep(now time.Time) {
 	}
 }
 
+// List returns every address f bans. A ban's Expires is BanTime after the
+// address's last attempt: the first sweep past it lifts the ban, and each
+// attempt before then pushes it back.
+func (f *AcceptFilter) List() []BanEntry {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var bans []BanEntry
+	for addr, h := range f.holders {
+		if h.banned {
+			bans = append(bans, BanEntry{Addr: addr, Expires: h.lastAccess.Add(f.cfg.BanTime)})
+		}
+	}
+	return bans
+}
+
+// Remove lifts f's ban on addr and reports whether there was one. The
+// address's record goes with it, so its next connection starts a new count.
+// An address f is only counting tries for is left as it is.
+func (f *AcceptFilter) Remove(addr netip.Addr) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	h, ok := f.holders[addr]
+	if !ok || !h.banned {
+		return false
+	}
+	delete(f.holders, addr)
+	return true
+}
+
 // FilterAccepts returns ln with f applied at accept: a connection f refuses,
 // timed by now, is closed before a byte is read or written, and Accept
 // waits for the next one. The returned listener sweeps f every

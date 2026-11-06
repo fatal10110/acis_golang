@@ -15,7 +15,7 @@ func TestListenBusyAddrFails(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = ln.Close() })
 
-	srv, err := Listen(ln.Addr().String())
+	srv, err := Listen(ln.Addr().String(), nil)
 	if err == nil {
 		_ = Shutdown(context.Background(), srv)
 		t.Fatalf("Listen(%s) on a bound address: got nil error", ln.Addr())

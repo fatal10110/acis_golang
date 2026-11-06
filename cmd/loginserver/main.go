@@ -83,6 +83,7 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 			manager.NewRSAKeyPool,
 			manager.NewLoginKeyPool,
 			provideIPBanList,
+			provideAcceptFilter,
 			provideFloodGuard,
 			loginserver.NewLinkRoster,
 			provideGameServerLink,
@@ -251,6 +252,12 @@ func provideIPBanList(paths loginServerPaths, log zerolog.Logger) *manager.IPBan
 	return manager.LoadIPBanList(paths.BannedIPsPath, log)
 }
 
+// provideAcceptFilter is the login-client port's accept filter, shared by
+// the listener and the ban API.
+func provideAcceptFilter(cfg loginServerConfig, log zerolog.Logger) *netutil.AcceptFilter {
+	return netutil.NewAcceptFilter(cfg.AcceptFilter, log)
+}
+
 func provideFloodGuard(cfg loginServerConfig, log zerolog.Logger) *netutil.FloodGuard {
 	return netutil.NewFloodGuard(cfg.Flood, log)
 }
@@ -284,15 +291,19 @@ func provideClientLink(
 	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, roster, cfg.AutoCreateAccounts, cfg.ShowLicence, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
 }
 
-func startDebugHTTP(lc fx.Lifecycle, paths loginServerPaths, log zerolog.Logger) {
+func startDebugHTTP(lc fx.Lifecycle, paths loginServerPaths, bans *manager.IPBanList, filter *netutil.AcceptFilter, log zerolog.Logger) {
 	if paths.DebugAddr == "" {
 		return
 	}
+	api := debughttp.BanHandler("login", []debughttp.BanStore{
+		{Name: "login-ban", Bans: bans},
+		{Name: "login-accept-filter", Bans: filter},
+	}, log)
 	var srv *http.Server
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			var err error
-			srv, err = debughttp.Listen(paths.DebugAddr)
+			srv, err = debughttp.Listen(paths.DebugAddr, api)
 			if err != nil {
 				return fmt.Errorf("listen for debug http on %s: %w", paths.DebugAddr, err)
 			}
@@ -305,7 +316,7 @@ func startDebugHTTP(lc fx.Lifecycle, paths loginServerPaths, log zerolog.Logger)
 	})
 }
 
-func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, clients *loginserver.ClientLink, log zerolog.Logger) {
+func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, clients *loginserver.ClientLink, filter *netutil.AcceptFilter, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 
@@ -338,7 +349,7 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 				defer wg.Done()
 				// Connection bursts from one address are refused at
 				// accept, before the IP ban list is consulted.
-				filtered := netutil.FilterAccepts(clientLn, netutil.NewAcceptFilter(cfg.AcceptFilter, log), time.Now)
+				filtered := netutil.FilterAccepts(clientLn, filter, time.Now)
 				if err := clients.Serve(runCtx, filtered); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ClientAddr).Msg("login client listener stopped")
 				}
