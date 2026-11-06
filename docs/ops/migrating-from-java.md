@@ -9,12 +9,17 @@ anything:
 - **Config**: the same `config/*.properties` files and keys. A key the Go server reads but does not
   find is logged as `config property missing; using default value`, with the default it uses. The
   few keys it reads but does not apply yet are logged by name and issue at boot (for example
-  `siege.properties keys are read but not applied yet`).
+  `siege.properties keys are read but not applied yet`). A key present in the file that the server
+  does not act on is logged as a warning at boot: `config key not supported; its value is ignored`
+  for a key it does not know, and `config key has no effect on this server` for a key that changes
+  nothing here (`Developer`, `PacketHandlerDebug`, `RequestServerID` and `SendMailTime` in
+  `server.properties`). You can remove those keys to silence the warnings.
 - **Datapack**: the same `data/xml`, `data/html`, `data/crests` and `serverNames.xml`.
 - **Geodata**: the same `data/geodata` files, `GeoDataPath` and `GeoDataType`. Exactly the regions
   listed in `geoengine.properties` are loaded.
 - **Registration**: the same `hexid.txt` and `gameservers` row, so you do not register the game
-  server again.
+  server again. The game server never registers itself: without `hexid.txt` it stops at boot, as
+  the reference server does, so `RequestServerID` is unused. Register a new server with `gsregister`.
 
 ## Layout: same directories, same relative paths
 
