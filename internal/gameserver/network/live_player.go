@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/bookmark"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -226,6 +227,9 @@ type livePlayer struct {
 	// storage is p's warehouse and freight state, set at attach and owned
 	// by p's queue from then on.
 	storage playerStorage
+	// bookmarks is p's //bk bookmark book, read on first use and owned
+	// by p's queue.
+	bookmarks *bookmark.Book
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.

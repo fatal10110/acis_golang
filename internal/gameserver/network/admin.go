@@ -143,6 +143,16 @@ var adminCommands = map[string]adminCommand{
 
 	// Server maintenance; see admin_server.go.
 	"admin_server": (*GameClientLink).adminServer,
+
+	// Lookups and tools; see admin_find.go, admin_knownlist.go,
+	// admin_bookmark.go, admin_movie.go and admin_testcmd.go.
+	"admin_find":      (*GameClientLink).adminFind,
+	"admin_knownlist": (*GameClientLink).adminKnownlist,
+	"admin_bk":        (*GameClientLink).adminBookmark,
+	"admin_delbk":     (*GameClientLink).adminDeleteBookmark,
+	"admin_movie":     (*GameClientLink).adminMovie,
+	"admin_sequence":  (*GameClientLink).adminSequence,
+	"admin_test":      (*GameClientLink).adminTest,
 }
 
 // adminEntry is one of the two ways a command reaches the server; they

@@ -337,8 +337,11 @@ type GameClientLink struct {
 	cursed        *cursedweapon.Manager // the cursed weapons' lifecycle; nil when disabled
 	world         *world.State
 	npcs          *npc.Table
-	doors         WorldDoors
-	geo           move.Geo
+	// movies holds the camera shots //sequence records for //movie, shared
+	// by every game master.
+	movies movieBoard
+	doors  WorldDoors
+	geo    move.Geo
 	// geoBugs saves //geo bug reports; nil when no report log is
 	// configured.
 	geoBugs     *engine.BugLog
@@ -446,6 +449,9 @@ type GameClientLink struct {
 	punishments punishmentStore
 	// macros persists each player's macro list; see macro.go.
 	macros macroStore
+	// bookmarks persists the game masters' //bk bookmarks; nil keeps them
+	// in memory only. See admin_bookmark.go.
+	bookmarks bookmarkStore
 	// recommendations persists who recommended whom and the counters; see
 	// recommendation.go.
 	recommendations recommendationStore
@@ -727,6 +733,9 @@ type GameClientLinkConfig struct {
 	// Macros persists each player's macro list; nil keeps macros in memory
 	// only.
 	Macros macroStore
+	// Bookmarks persists the game masters' bookmarks; nil keeps them in
+	// memory only.
+	Bookmarks bookmarkStore
 	// Recommendations persists who recommended whom and the counters; nil
 	// keeps them in memory only.
 	Recommendations recommendationStore
@@ -935,6 +944,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.questRates.Set(*playerConfig.QuestRates)
 	}
 	link.macros = cfg.Macros
+	link.bookmarks = cfg.Bookmarks
 	link.manor = cfg.Manor
 	link.classMaster = cfg.ClassMaster
 	link.reloads = cfg.Reloads

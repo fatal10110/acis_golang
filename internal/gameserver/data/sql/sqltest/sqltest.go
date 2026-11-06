@@ -177,6 +177,16 @@ const characterMacrosesSchema = "CREATE TABLE IF NOT EXISTS `character_macroses`
 	"  PRIMARY KEY (`char_obj_id`,`id`)\n" +
 	")"
 
+// bookmarksSchema mirrors the shipped bookmarks table definition verbatim.
+const bookmarksSchema = "CREATE TABLE IF NOT EXISTS `bookmarks` (\n" +
+	"  `name` VARCHAR(45) NOT NULL DEFAULT '',\n" +
+	"  `obj_Id` INT UNSIGNED NOT NULL DEFAULT '0',\n" +
+	"  `x` MEDIUMINT DEFAULT NULL,\n" +
+	"  `y` MEDIUMINT DEFAULT NULL,\n" +
+	"  `z` MEDIUMINT DEFAULT NULL,\n" +
+	"  PRIMARY KEY (`name`, `obj_Id`)\n" +
+	")"
+
 // characterQuestsSchema mirrors the shipped character_quests table
 // definition verbatim.
 const characterQuestsSchema = "CREATE TABLE IF NOT EXISTS `character_quests` (\n" +
@@ -528,7 +538,7 @@ var schemaStmts = []string{
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
 	sevenSignsSchema, sevenSignsStatusSchema, sevenSignsFestivalSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema, petitionSchema, petitionMessageSchema,
-	characterMacrosesSchema, characterRecommendsSchema, characterQuestsSchema, characterMemoSchema,
+	characterMacrosesSchema, bookmarksSchema, characterRecommendsSchema, characterQuestsSchema, characterMemoSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema, clanhallSchema, clanhallFunctionsSchema, auctionsSchema,
 	clanhallSiegeAttackersSchema, rainbowspringsAttackerListSchema,
 	clanhallFlagwarAttackersSchema, clanhallFlagwarMembersSchema, clanhallFlagwarOwnerNpcsSchema,
