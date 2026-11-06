@@ -206,11 +206,12 @@ func onCreature(gm *livePlayer, c world.Tracked, fn func()) {
 // adminGMSpeed answers //gmspeed <level>: the game master's Super Haste
 // ends, then levels 1 to 4 put that level on, any other number nothing. A
 // missing or malformed level, or a level the skill table lacks, answers the
-// usage. The game master's effect icons are refreshed in every case.
+// usage. The game master's effect icons, as it, its party and any
+// olympiad spectators see them, are refreshed in every case.
 func (l *GameClientLink) adminGMSpeed(gm *livePlayer, line string) {
 	const usage = "Use: //gmspeed value (0-4)."
 	gm.StopSkillEffectsByID(superHasteSkillID)
-	defer l.updateLiveAbnormalEffect(gm)
+	defer l.updateEffectIcons(gm)
 
 	args := handleradmin.Args(line)
 	var level int32
