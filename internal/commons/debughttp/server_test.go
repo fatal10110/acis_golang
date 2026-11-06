@@ -54,7 +54,7 @@ func TestMuxServesExpvarAndPprof(t *testing.T) {
 }
 
 func TestListenEmptyAddrIsNoop(t *testing.T) {
-	srv, err := Listen("")
+	srv, err := Listen("", nil)
 	if err != nil {
 		t.Fatalf("Listen empty: %v", err)
 	}

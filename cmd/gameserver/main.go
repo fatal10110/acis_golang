@@ -244,6 +244,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideCastleManor,
 			provideDataReloads,
 			provideGameClientLink,
+			provideClientBans,
 		),
 		fx.Invoke(requireDatabase),
 		fx.Invoke(reportConfigKeys),

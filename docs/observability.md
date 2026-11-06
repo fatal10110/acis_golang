@@ -84,7 +84,8 @@ the paperdoll at login. Stackable items are never recorded.
 
 `-debug-addr host:port` serves `expvar` at `/debug/vars` and `net/http/pprof` under
 `/debug/pprof/`. The variables and the loopback-only rule are listed under
-[Debug Endpoints](run-servers.md#debug-endpoints). Besides `connections`, `players-online` and
+[Debug Endpoints](run-servers.md#debug-endpoints); the same listener serves the
+[IP Ban API](run-servers.md#ip-ban-api). Besides `connections`, `players-online` and
 `tickers`, Go's `expvar` always publishes `cmdline` and `memstats` (`runtime.MemStats`).
 
 ```bash

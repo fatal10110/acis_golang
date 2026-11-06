@@ -350,16 +350,31 @@ func playerAuthResponseHandler(links *loginLinkState, validator *network.Session
 	}
 }
 
-func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, log zerolog.Logger) {
+// clientBans is the game-client port's IP ban list and accept filter,
+// shared by the listener and the ban API.
+type clientBans struct {
+	bans   *netutil.BanList
+	filter *netutil.AcceptFilter
+}
+
+func provideClientBans(cfg gameServerConfig, log zerolog.Logger) *clientBans {
+	return &clientBans{bans: netutil.NewBanList(time.Now), filter: netutil.NewAcceptFilter(cfg.AcceptFilter, log)}
+}
+
+func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, bans *clientBans, log zerolog.Logger) {
 	debughttp.SetPlayersOnlineFunc(func() int { return len(state.Players()) })
 	if paths.DebugAddr == "" {
 		return
 	}
+	api := debughttp.BanHandler("game", []debughttp.BanStore{
+		{Name: "game-ban", Bans: bans.bans},
+		{Name: "game-accept-filter", Bans: bans.filter},
+	}, log)
 	var srv *http.Server
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			var err error
-			srv, err = debughttp.Listen(paths.DebugAddr)
+			srv, err = debughttp.Listen(paths.DebugAddr, api)
 			if err != nil {
 				return fmt.Errorf("listen for debug http on %s: %w", paths.DebugAddr, err)
 			}
@@ -374,7 +389,7 @@ func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, 
 	})
 }
 
-func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, status *network.LoginStatus, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {
+func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, status *network.LoginStatus, clients *network.GameClientLink, state *world.State, bans *clientBans, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 	lc.Append(fx.Hook{
@@ -414,8 +429,10 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				// Connection bursts from one address are refused at accept.
-				filtered := netutil.FilterAccepts(ln, netutil.NewAcceptFilter(cfg.AcceptFilter, log), time.Now)
+				// Banned addresses, then connection bursts from one
+				// address, are refused at accept; a banned address's
+				// attempts do not count toward a burst.
+				filtered := netutil.FilterAccepts(netutil.RefuseBanned(ln, bans.bans), bans.filter, time.Now)
 				if err := network.Serve(runCtx, filtered, clients.Handle, log); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ListenAddr).Msg("game client listener stopped")
 				}

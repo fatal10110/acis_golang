@@ -203,6 +203,7 @@ type options struct {
 	characterDeleteAfter   time.Duration
 	serverBypassDelay      time.Duration
 	acceptFilter           *netutil.AcceptFilter
+	banList                *netutil.BanList
 	acceptFilterNow        func() time.Time
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
@@ -570,6 +571,12 @@ func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
 // point calls f.Sweep itself.
 func WithAcceptFilter(f *netutil.AcceptFilter, now func() time.Time) Option {
 	return func(o *options) { o.acceptFilter, o.acceptFilterNow = f, now }
+}
+
+// WithBanList installs b on the game-client listener ahead of any accept
+// filter, as the game server installs its IP ban list (default: none).
+func WithBanList(b *netutil.BanList) Option {
+	return func(o *options) { o.banList = b }
 }
 
 // WithAutoLearnSkills sets the players.properties AutoLearnSkills gate: a
@@ -2586,8 +2593,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gcl.Handle(ctx, conn)
 	}
 	gameLn := ln
+	if o.banList != nil {
+		gameLn = netutil.RefuseBanned(gameLn, o.banList)
+	}
 	if o.acceptFilter != nil {
-		gameLn = netutil.FilterAccepts(ln, o.acceptFilter, o.acceptFilterNow)
+		gameLn = netutil.FilterAccepts(gameLn, o.acceptFilter, o.acceptFilterNow)
 	}
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
 	go func() { _ = network.Serve(ctx, gameLn, serve, zerolog.Nop()) }()
