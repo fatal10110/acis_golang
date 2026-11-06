@@ -39,6 +39,9 @@ type Queue struct {
 
 	// draining is held while q's tasks run; AssertOwner probes it.
 	draining sync.Mutex
+	// running is the Pool worker slot draining q, nil otherwise. It is
+	// guarded by draining.
+	running *slot
 
 	mu        sync.Mutex
 	tasks     []func() // pending tasks; Pool only, Inline keeps one global FIFO
@@ -249,6 +252,7 @@ func (t *Timer) run() {
 		q.unlink(t)
 	}
 	q.mu.Unlock()
+	q.attribute(t.fn)
 	t.fn()
 }
 
@@ -302,6 +306,25 @@ func AssertOwner(q *Queue) {
 		panic("sim: state of queue " + q.name() + " touched off its queue")
 	}
 	assertDrainer(q)
+}
+
+// Attribute names fn, in place of the task itself, as the work q's running
+// task does in the pool's log lines for that task. A task that wraps the
+// work it was posted for in a closure of its own calls it, so a slow-task
+// report names that work. fn must be a function. Call it only from one of
+// q's tasks; on an Inline loop, or under RunOwned, it names nothing.
+func Attribute(q *Queue, fn any) {
+	AssertOwner(q)
+	q.attribute(fn)
+}
+
+// attribute is Attribute for a caller already known to own q.
+func (q *Queue) attribute(fn any) {
+	if s := q.running; s != nil {
+		s.mu.Lock()
+		s.task = fn
+		s.mu.Unlock()
+	}
 }
 
 // RunOwned runs fn on the calling goroutine as q's owner, once q's in-flight

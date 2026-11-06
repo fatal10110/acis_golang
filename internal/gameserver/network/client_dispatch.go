@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // errDisconnect is what an inbound handler returns to close the connection.
@@ -378,7 +379,10 @@ func decodeAndHandle[T any](
 func whenLive[T any](handle func(*GameClientLink, *livePlayer, T)) func(*GameClientLink, context.Context, *connState, T) error {
 	return func(l *GameClientLink, _ context.Context, cs *connState, req T) error {
 		if live := cs.live; live != nil {
-			onLive(live, func() { handle(l, live, req) })
+			onLive(live, func() {
+				sim.Attribute(live.Queue(), handle)
+				handle(l, live, req)
+			})
 		}
 		return nil
 	}
@@ -386,7 +390,10 @@ func whenLive[T any](handle func(*GameClientLink, *livePlayer, T)) func(*GameCli
 
 // whenLiveNoBody is whenLive for a request that carries no fields.
 func whenLiveNoBody(handle func(*GameClientLink, *livePlayer)) func(*GameClientLink, context.Context, *connState, struct{}) error {
-	return whenLive(func(l *GameClientLink, live *livePlayer, _ struct{}) { handle(l, live) })
+	return whenLive(func(l *GameClientLink, live *livePlayer, _ struct{}) {
+		sim.Attribute(live.Queue(), handle)
+		handle(l, live)
+	})
 }
 
 // serve runs the handler registered for op on payload. found reports that

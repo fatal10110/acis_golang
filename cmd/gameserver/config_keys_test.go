@@ -150,7 +150,7 @@ func TestReportConfigKeysCoversEveryFile(t *testing.T) {
 	want := []string{
 		"warn clans.properties clansTypo", "warn events.properties eventsTypo", "warn geoengine.properties geoengineTypo",
 		"warn npcs.properties npcsTypo", "warn players.properties playersTypo", "warn server.properties serverTypo",
-		"info server.properties Developer", "warn siege.properties siegeTypo",
+		"warn server.properties Developer", "warn siege.properties siegeTypo",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("report = %q, want %q", got, want)
