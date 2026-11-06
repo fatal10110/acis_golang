@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -31,6 +32,7 @@ import (
 
 type gameServerConfig struct {
 	ListenAddr          string
+	AcceptFilter        netutil.AcceptFilterConfig
 	LoginAddr           string
 	Auth                network.LoginServerAuth
 	Database            db.Config
@@ -1209,9 +1211,14 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
+	acceptFilter, err := config.AcceptFilter(serverProps)
+	if err != nil {
+		return gameServerConfig{}, err
+	}
 	return gameServerConfig{
-		ListenAddr: listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
-		LoginAddr:  net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
+		ListenAddr:   listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
+		AcceptFilter: acceptFilter,
+		LoginAddr:    net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
 		Auth: network.LoginServerAuth{
 			ServerID:          serverID,
 			AcceptAlternateID: serverProps.Bool("AcceptAlternateID", true),

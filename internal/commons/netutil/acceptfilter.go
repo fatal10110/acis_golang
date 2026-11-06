@@ -6,23 +6,43 @@ import (
 	"net/netip"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
-// The accept filter's limits are fixed; no configuration key changes them,
-// and flood protection being disabled does not turn the filter off.
-const (
-	// acceptBurstWindow is how close to the previous connection a new one
-	// must come to count toward the burst.
-	acceptBurstWindow = time.Second
-	// acceptBurstLimit is how many burst connections an address may open
-	// after its first one; the next burst connection bans it.
-	acceptBurstLimit = 3
-	// acceptForgetAfter is how long an address must stay silent before the
-	// sweep forgets it, lifting its ban.
-	acceptForgetAfter = 300 * time.Second
-	// acceptSweepInterval is how often a filtered listener sweeps.
-	acceptSweepInterval = 5 * time.Second
-)
+// acceptSweepInterval is how often a filtered listener sweeps.
+const acceptSweepInterval = 5 * time.Second
+
+// AcceptFilterConfig is how an AcceptFilter judges connection bursts.
+type AcceptFilterConfig struct {
+	// Enabled turns the filter on; FilterAccepts leaves the listener
+	// unfiltered when it is off.
+	Enabled bool
+	// BurstWindow is how close to the previous connection a new one must
+	// come to count toward the burst.
+	BurstWindow time.Duration
+	// BurstLimit is how many burst connections an address may open after
+	// its first one; the next burst connection bans it.
+	BurstLimit int
+	// BanTime is how long an address must stay silent before the sweep
+	// forgets it, lifting its ban.
+	BanTime time.Duration
+	// Allowlist holds the prefixes, IPv4 ones in IPv4 form, whose
+	// addresses the filter always admits and never records.
+	Allowlist []netip.Prefix
+}
+
+// DefaultAcceptFilterConfig is the filter both client ports run unless
+// configured otherwise: on, a 1 s burst window, 3 burst connections
+// allowed, forgotten after 300 s of silence, no allowlist.
+func DefaultAcceptFilterConfig() AcceptFilterConfig {
+	return AcceptFilterConfig{
+		Enabled:     true,
+		BurstWindow: time.Second,
+		BurstLimit:  3,
+		BanTime:     300 * time.Second,
+	}
+}
 
 // acceptHolder is one remote address's connection record.
 type acceptHolder struct {
@@ -32,54 +52,82 @@ type acceptHolder struct {
 }
 
 // AcceptFilter refuses remote addresses that open connections in fast
-// bursts. Every connection from an address within acceptBurstWindow of its
-// previous one counts as a try; the try after acceptBurstLimit bans the
-// address. A slower connection is admitted but does not clear the tries.
-// Only Sweep forgets an address, once it has been silent for
-// acceptForgetAfter, so a ban lasts as long as the attempts keep coming.
+// bursts. Every connection from an address within BurstWindow of its
+// previous one counts as a try; the try after BurstLimit bans the address.
+// A slower connection is admitted but does not clear the tries. Only Sweep
+// forgets an address, once it has been silent for BanTime, so a ban lasts
+// as long as the attempts keep coming.
 //
-// mu guards holders.
+// cfg and log are fixed at construction; mu guards holders.
 type AcceptFilter struct {
+	cfg AcceptFilterConfig
+	log zerolog.Logger
+
 	mu      sync.Mutex
 	holders map[netip.Addr]*acceptHolder
 }
 
-// NewAcceptFilter returns an AcceptFilter that knows no address.
-func NewAcceptFilter() *AcceptFilter {
-	return &AcceptFilter{holders: make(map[netip.Addr]*acceptHolder)}
+// NewAcceptFilter returns an AcceptFilter on cfg that knows no address and
+// logs each ban to log at warn level.
+func NewAcceptFilter(cfg AcceptFilterConfig, log zerolog.Logger) *AcceptFilter {
+	return &AcceptFilter{cfg: cfg, log: log, holders: make(map[netip.Addr]*acceptHolder)}
 }
 
 // Allow records a connection from addr at now and reports whether it is
 // admitted.
 func (f *AcceptFilter) Allow(addr netip.Addr, now time.Time) bool {
+	if f.allowlisted(addr) {
+		return true
+	}
+	allowed, banned := f.record(addr, now)
+	if banned {
+		f.log.Warn().Str("ip", addr.String()).Dur("burst_window", f.cfg.BurstWindow).
+			Int("burst_limit", f.cfg.BurstLimit).Dur("ban_time", f.cfg.BanTime).
+			Msg("connection burst; address banned at accept")
+	}
+	return allowed
+}
+
+func (f *AcceptFilter) allowlisted(addr netip.Addr) bool {
+	for _, p := range f.cfg.Allowlist {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
+// record is Allow for an address off the allowlist; banned reports that
+// this connection banned addr.
+func (f *AcceptFilter) record(addr netip.Addr, now time.Time) (allowed, banned bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	h, ok := f.holders[addr]
 	if !ok {
 		f.holders[addr] = &acceptHolder{lastAccess: now}
-		return true
+		return true, false
 	}
-	burst := h.lastAccess.Add(acceptBurstWindow).After(now)
+	burst := h.lastAccess.Add(f.cfg.BurstWindow).After(now)
 	h.lastAccess = now
 	switch {
 	case h.banned:
-		return false
+		return false, false
 	case !burst:
-		return true
-	case h.tries >= acceptBurstLimit:
+		return true, false
+	case h.tries >= f.cfg.BurstLimit:
 		h.banned = true
-		return false
+		return false, true
 	default:
 		h.tries++
-		return true
+		return true, false
 	}
 }
 
-// Sweep forgets every address whose last connection is more than
-// acceptForgetAfter before now.
+// Sweep forgets every address whose last connection is more than BanTime
+// before now.
 func (f *AcceptFilter) Sweep(now time.Time) {
-	cutoff := now.Add(-acceptForgetAfter)
+	cutoff := now.Add(-f.cfg.BanTime)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for addr, h := range f.holders {
@@ -94,8 +142,12 @@ func (f *AcceptFilter) Sweep(now time.Time) {
 // waits for the next one. The returned listener sweeps f every
 // acceptSweepInterval on a goroutine it owns, which stops once the listener
 // is closed or ln reports itself closed. A connection whose remote address
-// is not an IP address is admitted.
+// is not an IP address is admitted. A filter whose config is not Enabled
+// leaves ln as it is.
 func FilterAccepts(ln net.Listener, f *AcceptFilter, now func() time.Time) net.Listener {
+	if !f.cfg.Enabled {
+		return ln
+	}
 	ticker := time.NewTicker(acceptSweepInterval)
 	return newFilteredListener(ln, f, now, ticker.C, ticker.Stop)
 }
