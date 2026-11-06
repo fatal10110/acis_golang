@@ -51,15 +51,15 @@ func UnreadKeys(server Server, file string, p *Properties) (unsupported, ignored
 }
 
 // ReportUnreadKeys logs, once per key, each key of p, the properties file
-// named file, that server does not read: a warning for an unsupported key,
-// an info line for an ignored one.
+// named file, that server does not read, as a warning: an operator setting
+// such a key expects it to do something, unsupported or ignored alike.
 func ReportUnreadKeys(log zerolog.Logger, server Server, file string, p *Properties) {
 	unsupported, ignored := UnreadKeys(server, file, p)
 	for _, key := range unsupported {
 		log.Warn().Str("file", file).Str("key", key).Msg("config key not supported; its value is ignored")
 	}
 	for _, key := range ignored {
-		log.Info().Str("file", file).Str("key", key).Msg("config key has no effect on this server")
+		log.Warn().Str("file", file).Str("key", key).Msg("config key has no effect on this server")
 	}
 }
 
@@ -176,6 +176,11 @@ var gameServerKeys = map[string]keySet{
 			"ShowServerNews", "SinEaterXpRate", "SocialTime", "SubclassTime", "TestServer",
 			"TradeChatTime", "URL", "UseBlowfishCipher", "WearDelay", "WearPrice", "ZoneTown",
 		},
+		// Developer and PacketHandlerDebug only add debug logging; unknown and
+		// malformed packets are logged and counted without a switch here.
+		// RequestServerID only applies to a server booting without hexid.txt,
+		// and such a boot fails: registration is gsregister's job.
+		// SendMailTime throttles a mail action no packet performs.
 		Ignored: []string{"Developer", "PacketHandlerDebug", "RequestServerID", "SendMailTime"},
 	},
 	"siege.properties": {

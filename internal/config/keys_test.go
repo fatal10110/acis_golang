@@ -152,7 +152,7 @@ func sourceLiterals(t *testing.T, roots ...string) map[string]bool {
 
 // TestUnreadKeysSortsTheKeysNoReaderTakes pins the boot report: a read key
 // and a geodata region pass, an ignored key is reported as having no
-// effect, any other key as unsupported, each once.
+// effect, any other key as unsupported, each once and each at warn level.
 func TestUnreadKeysSortsTheKeysNoReaderTakes(t *testing.T) {
 	t.Parallel()
 	server, err := ParseString("GameserverPort = 7777\nDeveloper = True\nSendMailTime = 5\nTypoKey = 1\n")
@@ -184,8 +184,8 @@ func TestUnreadKeysSortsTheKeysNoReaderTakes(t *testing.T) {
 	ReportUnreadKeys(zerolog.New(&out), GameServer, "server.properties", server)
 	want := strings.Join([]string{
 		`{"level":"warn","file":"server.properties","key":"TypoKey","message":"config key not supported; its value is ignored"}`,
-		`{"level":"info","file":"server.properties","key":"Developer","message":"config key has no effect on this server"}`,
-		`{"level":"info","file":"server.properties","key":"SendMailTime","message":"config key has no effect on this server"}`,
+		`{"level":"warn","file":"server.properties","key":"Developer","message":"config key has no effect on this server"}`,
+		`{"level":"warn","file":"server.properties","key":"SendMailTime","message":"config key has no effect on this server"}`,
 	}, "\n") + "\n"
 	if out.String() != want {
 		t.Fatalf("report =\n%s\nwant\n%s", out.String(), want)
