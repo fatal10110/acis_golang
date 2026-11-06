@@ -368,6 +368,7 @@ func onQueue(q *sim.Queue, fn func()) (ok bool) {
 	// waiting goroutine sees the task goroutine's write.
 	if !q.Post(func() {
 		defer close(done)
+		sim.Attribute(q, fn)
 		fn()
 		ok = true
 	}) {

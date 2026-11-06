@@ -2,8 +2,10 @@ package sim
 
 import (
 	"context"
+	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,6 +50,9 @@ type slot struct {
 	queue *Queue
 	start time.Time // zero while idle
 	seq   uint64    // tasks started on this worker
+	// task is the work the running task does, named in its log lines: the
+	// posted func, or what the task named with Attribute.
+	task any
 }
 
 // NewPool returns a pool of workers goroutines, GOMAXPROCS when workers is
@@ -202,6 +207,8 @@ func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 		}
 	}()
 	drainAs(q, func() {
+		q.running = s
+		defer func() { q.running = nil }()
 		for ; i < n; i++ {
 			fn := batch[i]
 			batch[i] = nil
@@ -217,21 +224,24 @@ func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 func (p *Pool) run(s *slot, queue *Queue, fn func()) {
 	start := time.Now()
 	s.mu.Lock()
-	s.queue, s.start = queue, start
+	s.queue, s.start, s.task = queue, start, fn
 	s.seq++
 	s.mu.Unlock()
 	returned := false
 	defer func() {
 		s.mu.Lock()
-		s.start = time.Time{}
+		task := s.task
+		s.start, s.task = time.Time{}, nil
 		s.mu.Unlock()
 		if r := recover(); r != nil {
-			p.log.Error().Str("queue", queue.name()).Interface("panic", r).Msg("sim: recovered panic in queued task")
+			p.log.Error().Str("queue", queue.name()).Str("task", taskName(task)).Interface("panic", r).
+				Msg("sim: recovered panic in queued task")
 		} else if !returned {
-			p.log.Error().Str("queue", queue.name()).Msg("sim: queued task called runtime.Goexit; worker replaced")
+			p.log.Error().Str("queue", queue.name()).Str("task", taskName(task)).
+				Msg("sim: queued task called runtime.Goexit; worker replaced")
 		}
 		if d := time.Since(start); d > slowTask {
-			p.log.Warn().Str("queue", queue.name()).Dur("elapsed", d).Msg("sim: slow task")
+			p.log.Warn().Str("queue", queue.name()).Str("task", taskName(task)).Dur("elapsed", d).Msg("sim: slow task")
 		}
 	}()
 	fn()
@@ -252,14 +262,30 @@ func (p *Pool) watch(idle <-chan struct{}) {
 			for i := range p.slots {
 				s := &p.slots[i]
 				s.mu.Lock()
-				queue, start, seq := s.queue, s.start, s.seq
+				queue, start, seq, task := s.queue, s.start, s.seq, s.task
 				s.mu.Unlock()
 				if start.IsZero() || seq == reported[i] || now.Sub(start) <= slowTask {
 					continue
 				}
 				reported[i] = seq
-				p.log.Warn().Str("queue", queue.name()).Dur("elapsed", now.Sub(start)).Msg("sim: task still running")
+				p.log.Warn().Str("queue", queue.name()).Str("task", taskName(task)).Dur("elapsed", now.Sub(start)).
+					Msg("sim: task still running")
 			}
 		}
 	}
+}
+
+// taskName is the package-qualified name of the function task, or empty
+// when task is not one.
+func taskName(task any) string {
+	v := reflect.ValueOf(task)
+	if v.Kind() != reflect.Func || v.IsNil() {
+		return ""
+	}
+	f := runtime.FuncForPC(v.Pointer())
+	if f == nil {
+		return ""
+	}
+	name := f.Name()
+	return name[strings.LastIndexByte(name, '/')+1:]
 }
