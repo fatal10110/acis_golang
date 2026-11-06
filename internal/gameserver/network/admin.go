@@ -111,6 +111,16 @@ var adminCommands = map[string]adminCommand{
 	"admin_spawn_event":   (*GameClientLink).adminSpawnEvent,
 	"admin_despawn_event": (*GameClientLink).adminDespawnEvent,
 
+	// Creature vitals, doors and remote targeting; see admin_manage.go,
+	// admin_door.go and admin_target.go.
+	"admin_cancel": (*GameClientLink).adminCancel,
+	"admin_heal":   (*GameClientLink).adminHeal,
+	"admin_kill":   (*GameClientLink).adminKill,
+	"admin_res":    (*GameClientLink).adminRes,
+	"admin_open":   (*GameClientLink).adminOpen,
+	"admin_close":  (*GameClientLink).adminClose,
+	"admin_target": (*GameClientLink).adminTarget,
+
 	// Olympiad and heroes; see admin_olympiad.go.
 	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
 	"admin_sethero": (*GameClientLink).adminSetHero,

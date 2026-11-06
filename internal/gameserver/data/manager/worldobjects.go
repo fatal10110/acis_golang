@@ -408,6 +408,16 @@ func (w *WorldObjects) ReviveDoor(id int, restoreHP float64) bool {
 	return ok && w.reviveDoor(obj, restoreHP)
 }
 
+// RestoreDoorHP fills id's door HP to its maximum, and observers see its
+// HP whether or not it moved. A broken door stays as it is.
+func (w *WorldObjects) RestoreDoorHP(id int) {
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	if obj, ok := w.Door(id); ok {
+		w.setDoorHP(obj, float64(obj.MaxHP()), true)
+	}
+}
+
 // RespawnDoor stands id's door again as a siege's door respawn does: a
 // broken door revives as ReviveDoor does, regaining restoreHP of its
 // maximum HP; the door closes; then its HP is set to its maximum, or to

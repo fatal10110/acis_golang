@@ -182,6 +182,22 @@ func (f *Folk) SetHP(value float64) {
 	f.BroadcastStatus()
 }
 
+// SetMaxHpMp fills the NPC's MP, then its HP, to their maxima and offers
+// the targeters' health bar one refresh. A dead NPC keeps its values and
+// reports nothing.
+func (f *Folk) SetMaxHpMp() {
+	maxHP, maxMP := f.MaxHPValue(), f.MaxMPValue()
+	f.vitalsMu.Lock()
+	if f.dead {
+		f.vitalsMu.Unlock()
+		return
+	}
+	f.mp = maxMP
+	f.hp = maxHP
+	f.vitalsMu.Unlock()
+	f.BroadcastStatus()
+}
+
 // Kill puts the NPC to death whatever its HP, undying or not, and reports
 // whether this call killed it.
 func (f *Folk) Kill(killer attackable.Combatant) bool { return f.die(killer) }
