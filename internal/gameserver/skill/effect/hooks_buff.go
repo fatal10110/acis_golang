@@ -308,7 +308,7 @@ func cancelDebuffPass(list *List, candidates []*Effect, now time.Time, cancelLvl
 			continue
 		}
 
-		rate := formulas.EffectCancelDebuffSuccessRate(cancelLvl, cand.Skill.MagicLevel, cand.periodRemaining(now), vuln)
+		rate := formulas.EffectCancelDebuffSuccessRate(cancelLvl, cand.Skill.MagicLevel, cand.PeriodRemaining(now), vuln)
 		if !formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
 			continue
 		}
