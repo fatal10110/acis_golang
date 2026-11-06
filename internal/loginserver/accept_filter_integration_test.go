@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/rs/zerolog"
 )
 
 // TestClientLinkAcceptFilterRefusesBurstBeforeInit drives the login-client
@@ -23,7 +24,7 @@ func TestClientLinkAcceptFilterRefusesBurstBeforeInit(t *testing.T) {
 		clock.Add(int64(d))
 		return now()
 	}
-	filter := netutil.NewAcceptFilter()
+	filter := netutil.NewAcceptFilter(netutil.DefaultAcceptFilterConfig(), zerolog.Nop())
 	addr, _, _, _, _ := newTestClientLinkOn(t, func(ln net.Listener) net.Listener {
 		return netutil.FilterAccepts(ln, filter, now)
 	}, newFakeAccountStore(), false)

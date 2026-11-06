@@ -136,6 +136,46 @@ Requirements and limits:
   already has a character selects its first slot.
 - `-game-addr` replaces the game address the ServerList advertises, for a gameserver whose
   `GameserverHostname` is not reachable from the bot host.
+- Both client ports (loginserver 2106, gameserver 7777) refuse connection bursts from one IP, so
+  a swarm from one host is cut off after a few bots unless the filter is opened up. See
+  [Connection accept filter](#connection-accept-filter).
+
+### Connection Accept Filter
+
+Each client port runs an accept filter that judges every new connection by its source IP before a
+byte is exchanged. A connection that comes within the burst window of the same IP's previous one
+counts as a try; the connection after the burst limit is reached bans the IP. A slower connection
+is admitted but does not clear the tries. A banned IP's connections are closed unanswered, and each
+attempt restarts its silence timer: only an IP that stays silent for the ban time is forgotten,
+lifting the ban and clearing its tries. Every ban is logged at warn level with the IP and the
+filter's settings.
+
+`loginserver.properties` and `server.properties` take the same keys; each server reads its own file.
+None is in the shipped files, and an absent key keeps its default:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `EnableAcceptFilter` | `True` | `False` turns the filter off for that port. |
+| `AcceptFilterBurstTime` | `1000` | Burst window, in milliseconds. |
+| `AcceptFilterBurstLimit` | `3` | Burst connections an IP may open after its first one; the next one bans it. |
+| `AcceptFilterBanTime` | `300` | Seconds of silence after which an IP is forgotten, lifting its ban. |
+| `AcceptFilterAllowlist` | empty | IPs and CIDR prefixes (`127.0.0.1, 10.0.0.0/8`), separated by commas, semicolons or spaces, that the filter always admits. |
+
+So by default an IP may open four connections less than a second apart each; the fifth bans it for
+as long as it keeps trying plus 300 s. Burst time, limit and ban time must not be negative; a
+malformed value or allowlist entry fails the boot. The loginserver's `EnableFloodProtection`,
+`FastConnection*`, `NormalConnectionTime` and `MaxConnectionPerIP` keys guard only the game-server
+link port (9014), not login clients.
+
+For a load test, allowlist the swarm host in both files:
+
+```properties
+# loginserver.properties and server.properties
+AcceptFilterAllowlist = 127.0.0.1
+```
+
+Raising `AcceptFilterBurstLimit` instead (e.g. to the bot count) keeps the filter on for other
+hosts. `EnableAcceptFilter = False` drops it for every host; do not use it on a public server.
 
 Behaviors (`-behaviors`, default `move,validate,chat,attack,idle`) run one per `-interval` tick, each
 bot starting at its own offset into the cycle: `move` clicks a point within `-move-radius` of the

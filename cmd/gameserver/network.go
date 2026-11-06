@@ -415,7 +415,7 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			go func() {
 				defer wg.Done()
 				// Connection bursts from one address are refused at accept.
-				filtered := netutil.FilterAccepts(ln, netutil.NewAcceptFilter(), time.Now)
+				filtered := netutil.FilterAccepts(ln, netutil.NewAcceptFilter(cfg.AcceptFilter, log), time.Now)
 				if err := network.Serve(runCtx, filtered, clients.Handle, log); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ListenAddr).Msg("game client listener stopped")
 				}

@@ -155,16 +155,17 @@ var gameServerKeys = map[string]keySet{
 	},
 	"server.properties": {
 		Read: []string{
-			"AcceptAlternateID", "AllowBoat", "AllowCursedWeapons", "AllowDiscardItem",
+			"AcceptAlternateID", "AcceptFilterAllowlist", "AcceptFilterBanTime",
+			"AcceptFilterBurstLimit", "AcceptFilterBurstTime", "AllowBoat", "AllowCursedWeapons", "AllowDiscardItem",
 			"AllowFreight", "AllowLottery", "AllowManor", "AllowWarehouse", "AllowWater",
 			"AllowWear", "AutoDestroyEquipableItemTime", "AutoDestroyHerbTime",
 			"AutoDestroyItemTime", "AutoDestroySpecialItemTime", "AutoLoot", "AutoLootHerbs",
 			"AutoLootRaid", "BBSDefault", "CharacterSelectTime", "DeleteCharAfterDays",
-			"DropItemTime", "EnableCommunityBoard", "EnableFallingDamage", "GMAudit",
+			"DropItemTime", "EnableAcceptFilter", "EnableCommunityBoard", "EnableFallingDamage", "GMAudit",
 			"GameserverHostname", "GameserverPort", "GlobalChatTime", "HeroVoiceTime", "Hostname",
 			"KarmaDropLimit", "KarmaRateDrop", "KarmaRateDropEquip", "KarmaRateDropEquipWeapon",
 			"KarmaRateDropItem", "L2WalkerProtection", "LogChat", "LogItems", "Login", "LoginHost",
-			"LoginPort", "ManorTime", "ManufactureTime", "MaximumOnlineUsers", "MultipleItemDrop",
+			"LoginPort", "ManorTime", "ManufactureTime", "MaxConnections", "MaximumOnlineUsers", "MultipleItemDrop",
 			"MultisellTime", "NoSpawns", "Password", "PetFoodRate", "PetXpRate", "PlayerDropLimit",
 			"PlayerDroppedItemMultiplier", "PlayerRateDrop", "PlayerRateDropEquip",
 			"PlayerRateDropEquipWeapon", "PlayerRateDropItem", "PvpServer", "RateDropCurrency",
@@ -194,10 +195,12 @@ var gameServerKeys = map[string]keySet{
 var loginServerKeys = map[string]keySet{
 	"loginserver.properties": {
 		Read: []string{
-			"AcceptNewGameServer", "AutoCreateAccounts", "EnableFloodProtection",
+			"AcceptFilterAllowlist", "AcceptFilterBanTime", "AcceptFilterBurstLimit",
+			"AcceptFilterBurstTime", "AcceptNewGameServer", "AutoCreateAccounts",
+			"EnableAcceptFilter", "EnableFloodProtection",
 			"FastConnectionLimit", "FastConnectionTime", "Hostname", "Login", "LoginBlockAfterBan",
 			"LoginHostname", "LoginPort", "LoginTryBeforeBan", "LoginserverHostname",
-			"LoginserverPort", "MaxConnectionPerIP", "NormalConnectionTime", "Password",
+			"LoginserverPort", "MaxConnectionPerIP", "MaxConnections", "NormalConnectionTime", "Password",
 			"ShowLicence", "URL",
 		},
 	},
