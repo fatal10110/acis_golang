@@ -131,6 +131,23 @@ func (h *Hostile) SetHP(value float64) {
 	}
 }
 
+// SetMaxHpMp fills h's MP, then its HP, to their maxima and offers the
+// targeters' health bar one refresh. A dead NPC keeps its values and
+// reports nothing.
+func (h *Hostile) SetMaxHpMp() {
+	maxHP, maxMP := h.MaxHPValue(), h.MaxMPValue()
+	alive := false
+	h.whileAliveMP(func() {
+		h.mp = maxMP
+		alive = true
+	})
+	if !alive {
+		return
+	}
+	h.health.SetCurrent(maxHP)
+	h.BroadcastStatus()
+}
+
 // AddHP restores HP, clamped to MaxHP, and returns the applied amount. A
 // restore that applied anything refreshes the health bar of the players
 // targeting h; one that applied nothing stays silent.
