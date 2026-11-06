@@ -24,6 +24,11 @@ type WorldDoors interface {
 	SetDoorSiege(id int, s door.Siege)
 	// RespawnDoor stands door id again as a siege's door respawn does.
 	RespawnDoor(id int, restoreHP float64, weak bool)
+	// ReviveDoor stands broken door id again with restoreHP of its maximum
+	// HP and reports whether it was broken.
+	ReviveDoor(id int, restoreHP float64) bool
+	// RestoreDoorHP fills door id's HP to its maximum.
+	RestoreDoorHP(id int)
 }
 
 // clanHallBanishOffset is the random offset of a player thrown out of a
