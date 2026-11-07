@@ -58,7 +58,23 @@ func (h *Hostile) SetCurrentMP(mp int) {
 	h.whileAliveMP(func() { h.mp = float64(mp) })
 }
 
-// TakeDamage applies dmg physical damage from attacker, clamping at zero,
+// hostileMinHP is the HP an undying NPC's damage never takes it under.
+const hostileMinHP = 1
+
+// loseHP takes amount from h's HP, never under hostileMinHP for an undying
+// template nor under zero otherwise, and reports whether it newly left h
+// under DeathHP. Only damage goes through it: Kill, Die and SetCurrentHP
+// still reach zero.
+func (h *Hostile) loseHP(amount float64) bool {
+	floor := 0.0
+	if h.Instance.Template.Undying {
+		floor = hostileMinHP
+	}
+	return h.health.DamageValueAbove(amount, floor)
+}
+
+// TakeDamage applies dmg physical damage from attacker, clamping at zero
+// (at 1 HP for an undying template),
 // broadcasts the resulting HP to nearby observers, and — the first time it
 // reaches zero — runs this NPC's death sequence, passing the reward hook
 // installed by Attach (nil if none was). It reports whether this call
@@ -88,7 +104,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if dmg > 0 {
 		h.applyNonConsumptionDamageEffects(false)
 	}
-	newlyDead := h.health.Damage(dmg)
+	newlyDead := h.loseHP(float64(max(dmg, 0)))
 	h.BroadcastStatus()
 	if !newlyDead {
 		return false

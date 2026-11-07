@@ -267,7 +267,7 @@ func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant, sk mod
 	if amount == 0 {
 		return
 	}
-	newlyDead := h.health.DamageValue(amount)
+	newlyDead := h.loseHP(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
 		return
@@ -289,7 +289,7 @@ func (h *Hostile) ConsumeHP(amount float64) {
 	if amount <= 0 {
 		return
 	}
-	newlyDead := h.health.DamageValue(amount)
+	newlyDead := h.loseHP(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
 		return
@@ -327,7 +327,7 @@ func (h *Hostile) reduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 	if amount == 0 {
 		return
 	}
-	newlyDead := h.health.DamageValue(amount)
+	newlyDead := h.loseHP(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
 		return
