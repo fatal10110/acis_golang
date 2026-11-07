@@ -96,6 +96,12 @@ func (h *Health) Damage(dmg int) bool {
 // DamageValue applies non-negative fractional damage, clamps at zero, and
 // reports whether this damage newly left HP below DeathHP.
 func (h *Health) DamageValue(dmg float64) bool {
+	return h.DamageValueAbove(dmg, 0)
+}
+
+// DamageValueAbove is DamageValue that never leaves HP under floor. A floor
+// at or above DeathHP makes the damage unable to kill.
+func (h *Health) DamageValueAbove(dmg, floor float64) bool {
 	if dmg < 0 {
 		dmg = 0
 	}
@@ -105,7 +111,7 @@ func (h *Health) DamageValue(dmg float64) bool {
 		return false
 	}
 
-	*h.current -= dmg
+	*h.current = max(*h.current-dmg, floor)
 	if *h.current >= DeathHP {
 		return false
 	}
