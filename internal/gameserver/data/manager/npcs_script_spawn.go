@@ -89,8 +89,9 @@ func (n *Npcs) SpawnForClan(npcID int32, x, y, z, heading int, clanID int32) (at
 // left the world by then.
 //
 // A private follows its master: it is deleted with it, and one that cannot
-// respawn leaves master's privates when it decays. A template that spawns
-// as neither kind reports ErrNotPlaceable.
+// respawn leaves master's privates when it decays. A master that left the
+// world gets none: nil, with no error. A template that spawns as neither
+// kind reports ErrNotPlaceable.
 func (n *Npcs) CreatePrivate(master npc.PartyMember, npcID int32, at *location.Location, heading int, despawn time.Duration, params [3]int32) (npc.PartyMember, error) {
 	tmpl, ok := n.templates.Get(int(npcID))
 	if !ok {
@@ -103,8 +104,9 @@ func (n *Npcs) CreatePrivate(master npc.PartyMember, npcID int32, at *location.L
 // declares, or, when it declares none, the ones its template lists. Each is
 // placed as CreatePrivate places one, with the respawn delay and weight
 // point its declaration gives. master first forgets the privates it had;
-// they stay in the world. A declaration naming an NPC id no template has
-// stops the placement with an error, the privates before it placed.
+// they stay in the world. A master that left the world gets none. A
+// declaration naming an NPC id no template has stops the placement with an
+// error, the privates before it placed.
 func (n *Npcs) CreatePrivates(master npc.PartyMember) error {
 	privates := n.privatesOf(master)
 	if len(privates) == 0 {
@@ -119,6 +121,9 @@ func (n *Npcs) CreatePrivates(master npc.PartyMember) error {
 		private, err := n.createPrivate(master, tmpl, nil, 0, 0, [3]int32{}, p.RespawnDelay)
 		if err != nil {
 			return err
+		}
+		if private == nil {
+			return nil
 		}
 		private.Scratch().SetInt(npc.IntWeightPoint, int32(p.Weight))
 	}
@@ -147,7 +152,8 @@ func (n *Npcs) privatesOf(master npc.PartyMember) []spawn.Private {
 }
 
 // createPrivate places one private of tmpl for master under a slot of its
-// own that respawns after respawn, when a script asks it to.
+// own that respawns after respawn, when a script asks it to. It places
+// nothing, and reports no error, for a master that left the world.
 func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *location.Location, heading int, despawn time.Duration, params [3]int32, respawn time.Duration) (npc.PartyMember, error) {
 	if master == nil {
 		return nil, fmt.Errorf("%w: npc %d has no master", ErrNotPlaceable, tmpl.ID)
@@ -166,6 +172,10 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 	}
 	slot.key, slot.seq = n.newSlotID(), n.fixedSeq.Add(1)
 	n.mu.Lock()
+	if n.goneLocked(master) {
+		n.mu.Unlock()
+		return nil, nil
+	}
 	n.addSlotLocked(slot)
 	n.mu.Unlock()
 
@@ -212,4 +222,23 @@ func (n *Npcs) ScheduleDespawn(live attackable.Combatant, d time.Duration) {
 func (n *Npcs) RemoveFolk(f *npc.Folk) {
 	n.decay.Cancel(f)
 	f.DecayWithRespawn(n.state, n.RespawnHook)
+}
+
+// goneLocked reports whether master, an NPC the spawns placed, has left the
+// world for good: deleted (//unspawnall, its spawn's delete) or decayed,
+// though its own queue may not have taken it out of the world yet. An NPC
+// placed some other way is never gone. The caller holds n.mu.
+func (n *Npcs) goneLocked(master npc.PartyMember) bool {
+	var slot npc.SpawnSlot
+	switch o := master.(type) {
+	case *npc.Hostile:
+		slot = o.Instance.Slot
+	case *npc.Folk:
+		slot = o.Instance.Slot
+	}
+	if _, placed := slot.(*slotMemory); !placed {
+		return false
+	}
+	_, tracked := n.live[master.ObjectID()]
+	return !tracked
 }
