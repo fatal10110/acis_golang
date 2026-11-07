@@ -165,9 +165,8 @@ func TestAdminManageMonsterHeal(t *testing.T) {
 }
 
 // TestAdminManageRadius pins //kill and //res over a radius around the GM:
-// the monster in range dies, one out of range lives, and the GM is spared.
-// A dead monster cannot be revived yet, so //res over it answers
-// ActionFailed and leaves it dead.
+// the monster in range dies, one out of range lives, and the GM is spared;
+// the res then stands the dead monster up, telling the GM nothing.
 func TestAdminManageRadius(t *testing.T) {
 	t.Parallel()
 	srv, gmID := bootAdmin(t, adminLevel)
@@ -190,10 +189,13 @@ func TestAdminManageRadius(t *testing.T) {
 	drain(t, gm)
 
 	frames := exchange(t, gm, encodeBuildCmd("res 300"))
-	if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("//res 300 over a dead monster frames = %x, want ActionFailed alone", testsupport.FrameOpcodes(frames))
+	onParaQueue(t, near.Queue(), func() {})
+	frames = append(frames, settle(t, gm)...)
+	if !slices.Contains(opcodesOf(frames), serverpackets.OpcodeRevive) || slices.Contains(opcodesOf(frames), serverpackets.OpcodeActionFailed) {
+		t.Fatalf("//res 300 over a dead monster frames = %x, want its Revive and no ActionFailed", testsupport.FrameOpcodes(frames))
 	}
-	if !near.Dead() {
-		t.Fatal("//res 300 revived the monster")
+	requireNoSystemMessage(t, "//res 300", frames)
+	if near.Dead() || far.Dead() {
+		t.Fatalf("after //res 300: near dead %v, far dead %v, want both alive", near.Dead(), far.Dead())
 	}
 }

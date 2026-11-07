@@ -38,6 +38,16 @@ func (h *Health) Current() float64 {
 	return *h.current
 }
 
+// Revive sets current hit points to v even on a dead actor: the revive that
+// clears the actor's dead state sets its HP in the same step.
+func (h *Health) Revive(v float64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.current != nil {
+		*h.current = v
+	}
+}
+
 // SetCurrent overrides current hit points unless the actor is already dead,
 // and reports whether it did.
 func (h *Health) SetCurrent(v float64) bool {

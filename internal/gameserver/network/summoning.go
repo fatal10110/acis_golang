@@ -48,7 +48,7 @@ type summoning struct {
 	queued     queuedPets
 	petItems   *petitem.Service
 	// decay removes a dead summon's corpse at its deadline; nil leaves
-	// summon corpses in the world.
+	// summon corpses in the world. NPC corpses register with the same task.
 	decay *task.Decay
 }
 

@@ -58,6 +58,8 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.Died:
 		s.broadcast(func() wire.Frame { return frames.Die(h.ObjectID(), h.SpoilPool().Sweepable()) })
 		s.stopAttackStance()
+	case event.Revived:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameRevive(h.ObjectID()) })
 	case event.RaidBossKilled:
 		s.broadcast(func() wire.Frame {
 			return serverpackets.FrameSystemMessage(serverpackets.SystemMessageRaidWasSuccessful)

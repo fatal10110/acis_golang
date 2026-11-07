@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -115,7 +116,7 @@ func allASCIIDigits(s string) bool {
 // door.
 //
 // A boat is left out on purpose: it has no vitals and no death here, so
-// //kill over a radius that holds one cannot break it (#4513).
+// //kill over a radius that holds one cannot break it (#4531).
 func isCreature(obj world.Tracked) bool {
 	switch obj.(type) {
 	case *livePlayer, *summon.Actor, *door.Object:
@@ -171,7 +172,7 @@ func (l *GameClientLink) healCreature(gm *livePlayer, c world.Tracked) bool {
 // and a death credits gm. A door outside its siege takes no damage, and
 // holds no effects.
 //
-// A decoration or effect point cannot die yet.
+// A decoration or effect point cannot die yet (#4530).
 func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 	attacker := gm.Character
 	var skill modelskill.Definition
@@ -223,11 +224,12 @@ func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 }
 
 // reviveCreature stands a dead c up again: a player regains all the
-// experience its death took, a summon keeps its corpse from decaying, and a
-// broken door takes its template's open state back with the configured share
-// of its HP. A living c is left as it is.
+// experience its death took, a summon or an NPC keeps its corpse from
+// decaying, and an NPC stands up, as a broken door takes its template's open
+// state back, with the configured share of its HP. A living c is left as it
+// is.
 //
-// A dead NPC cannot be revived yet. A decoration or effect point never dies.
+// A decoration or effect point never dies (#4530).
 func (l *GameClientLink) reviveCreature(gm *livePlayer, c world.Tracked) bool {
 	switch t := c.(type) {
 	case *livePlayer:
@@ -245,9 +247,34 @@ func (l *GameClientLink) reviveCreature(gm *livePlayer, c world.Tracked) bool {
 			l.doors.ReviveDoor(t.DoorID(), l.playerConfig().RespawnRestoreHP)
 		}
 	case *npc.Hostile:
-		return !t.Dead()
+		l.reviveNPC(t)
 	case *npc.Folk:
-		return !t.Dead()
+		l.reviveNPC(t)
 	}
 	return true
+}
+
+// npcCorpse is an NPC //res can stand up.
+type npcCorpse interface {
+	task.DecayActor
+	Dead() bool
+	Revive(restoreHP float64) bool
+}
+
+// reviveNPC drops a dead n's pending corpse decay, so it neither leaves the
+// world nor respawns, then stands it up with the configured share of its HP,
+// on n's queue. Every corpse, a summon's or an NPC's, registers with the one
+// decay task.
+func (l *GameClientLink) reviveNPC(n npcCorpse) {
+	restore := l.playerConfig().RespawnRestoreHP
+	decay := l.summoning.decay
+	n.Queue().Post(func() {
+		if !n.Dead() {
+			return
+		}
+		if decay != nil {
+			decay.Cancel(n)
+		}
+		n.Revive(restore)
+	})
 }
