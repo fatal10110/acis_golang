@@ -39,7 +39,10 @@ func (h *Health) Current() float64 {
 }
 
 // Revive sets current hit points to v even on a dead actor: the revive that
-// clears the actor's dead state sets its HP in the same step.
+// clears the actor's dead state sets its HP in the same step. The caller
+// holds the actor's death lock while its dead flag is still set, and clears
+// that flag under the same lock, so no hit or heal sees a living actor at
+// zero HP.
 func (h *Health) Revive(v float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -82,8 +85,8 @@ func (h *Health) Add(amount, max float64) float64 {
 
 // WhileAlive runs fn under h's lock when the actor is alive, and reports
 // whether it ran. A write to another resource made inside fn cannot land
-// after a killing blow: Damage zeroes HP under the same lock, and nothing
-// brings it back above zero.
+// after a killing blow: Damage zeroes HP under the same lock, and only
+// Revive, which stands the dead actor up again, brings it back above zero.
 func (h *Health) WhileAlive(fn func()) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
