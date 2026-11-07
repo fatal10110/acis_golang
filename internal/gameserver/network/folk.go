@@ -184,6 +184,8 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.Died:
 		s.broadcast(func() wire.Frame { return frames.Die(f.ObjectID(), false) })
 		s.stopAttackStance()
+	case event.Revived:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameRevive(f.ObjectID()) })
 	case event.MagicSkillUse:
 		s.broadcast(func() wire.Frame {
 			return frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
