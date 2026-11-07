@@ -2586,7 +2586,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		sent, closed := frames.track(conn)
 		defer closed()
 		conn.ObserveSends(func(payload []byte) {
-			sent()
+			sent(payload)
 			if observe := sendObserver.Load(); observe != nil {
 				(*observe)(payload)
 			}
