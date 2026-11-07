@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -133,6 +134,11 @@ type connTraffic struct {
 	waits atomic.Int64 // reads started: frames fully handled + 1
 	sent  atomic.Int64 // frames queued to the client
 	done  atomic.Bool  // the connection's handler returned
+	// closing is set once ServerClose is queued to the client: the socket
+	// closes right behind it, though the handler may run on (it can wait on a
+	// timer), so only the connection's own stop tells the close is on the wire.
+	closing atomic.Bool
+	stopped <-chan struct{}
 	// expiresAt is the sent count that ends the wait of a read loop whose
 	// deadline had already run out when it began waiting; zero while none did.
 	expiresAt atomic.Int64
@@ -141,9 +147,10 @@ type connTraffic struct {
 	parked atomic.Pointer[[]int32]
 }
 
-// track starts counting conn's frames; the returned func marks it closed.
-func (t *traffic) track(conn *network.Conn) (sent func(), done func()) {
-	ct := new(connTraffic)
+// track starts counting conn's frames; sent takes each payload queued to the
+// client and the returned done func marks the connection closed.
+func (t *traffic) track(conn *network.Conn) (sent func(payload []byte), done func()) {
+	ct := &connTraffic{stopped: conn.Stopped()}
 	t.mu.Lock()
 	if t.conns == nil {
 		t.conns = make(map[string]*connTraffic)
@@ -165,7 +172,12 @@ func (t *traffic) track(conn *network.Conn) (sent func(), done func()) {
 		ct.parked.Store(&owners)
 		return func() { ct.parked.Store(nil) }
 	})
-	return func() { ct.sent.Add(1) }, func() { ct.done.Store(true) }
+	return func(payload []byte) {
+		if len(payload) > 0 && payload[0] == serverpackets.OpcodeServerClose {
+			ct.closing.Store(true)
+		}
+		ct.sent.Add(1)
+	}, func() { ct.done.Store(true) }
 }
 
 // caughtUp reports whether ct's read loop has handled every frame c wrote and
@@ -345,8 +357,21 @@ func (s *Server) awaitFrame(c *testsupport.ScriptedClient, d time.Duration) bool
 		if err := s.catchUp(); err != nil {
 			return true // let the read itself time out and report
 		}
-		if ct := s.traffic.conn(c.LocalAddr()); ct != nil && (ct.done.Load() || ct.sent.Load() > c.Received()) {
-			return true
+		if ct := s.traffic.conn(c.LocalAddr()); ct != nil {
+			if ct.done.Load() || ct.sent.Load() > c.Received() {
+				return true
+			}
+			// ServerClose is read and the socket is about to close: letting
+			// the clock run now would time the read out before the close
+			// reaches the client, so wait for the close in wall time (it does
+			// not depend on the clock).
+			if ct.closing.Load() {
+				select {
+				case <-ct.stopped:
+				case <-time.After(catchUpTimeout):
+				}
+				return true
+			}
 		}
 		now := inline.Now()
 		if !now.Before(end) {

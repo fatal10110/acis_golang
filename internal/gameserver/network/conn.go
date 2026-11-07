@@ -262,6 +262,12 @@ func (c *Conn) ObservePersistWaits(fn func(owners []int32) (done func())) {
 	c.observePersistWait = fn
 }
 
+// Stopped returns a channel that is closed once the writer has exited and
+// the underlying connection is closed, so the peer reads the close. It is a
+// test seam for telling a connection that has queued its last frame from one
+// whose close is on the wire.
+func (c *Conn) Stopped() <-chan struct{} { return c.stopped }
+
 func (c *Conn) signal() {
 	select {
 	case c.wake <- struct{}{}:
