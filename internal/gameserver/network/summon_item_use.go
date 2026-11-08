@@ -279,6 +279,7 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 	decoration.Attach(npc.DecorationRuntime{
 		World: l.world, Zones: l.zones, Sink: &decorationSink{world: l.world, d: decoration, link: l},
 		Queue: l.queues.NewQueue(fmt.Sprintf("decoration-%d", objectID)), Decay: l.summoning.decay,
+		Regen: l.playerRules,
 	})
 	decoration.Spawn(x, y, z, heading)
 	return true
