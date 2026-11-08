@@ -42,6 +42,10 @@ func (s *boatSink) Emit(ev event.Event) {
 		broadcastKnown(s.world, s.boat, func() wire.Frame {
 			return vehicleInfoFrame(s.boat)
 		})
+	case event.Revived:
+		broadcastKnown(s.world, s.boat, func() wire.Frame {
+			return serverpackets.FrameRevive(id)
+		})
 	case event.BoatAnnounced:
 		listeners := s.audience(e.Audience)
 		for _, msg := range e.MessageIDs {

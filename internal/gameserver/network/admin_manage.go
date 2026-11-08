@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -112,21 +113,18 @@ func allASCIIDigits(s string) bool {
 	return true
 }
 
-// isCreature reports whether obj is a creature: a player, NPC, summon or
-// door.
-//
-// A boat is left out on purpose: it has no vitals and no death here, so
-// //kill over a radius that holds one cannot break it (#4531).
+// isCreature reports whether obj is a creature: a player, NPC, summon, door
+// or boat.
 func isCreature(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, *summon.Actor, *door.Object:
+	case *livePlayer, *summon.Actor, *door.Object, *boat.Boat:
 		return true
 	}
 	return npcInstanceOf(obj) != nil
 }
 
-// cancelCreature ends every effect c holds, dead or alive. A door, and a
-// decoration, holds none.
+// cancelCreature ends every effect c holds, dead or alive. A door, a
+// decoration and a boat hold none.
 func (l *GameClientLink) cancelCreature(gm *livePlayer, c world.Tracked) bool {
 	switch t := c.(type) {
 	case *livePlayer:
@@ -144,7 +142,8 @@ func (l *GameClientLink) cancelCreature(gm *livePlayer, c world.Tracked) bool {
 }
 
 // healCreature fills a living c's HP and MP, and a player's CP, to their
-// maxima. An effect point takes no damage, so it is always full.
+// maxima. An effect point takes no damage, so it is always full. A boat has
+// no MP.
 func (l *GameClientLink) healCreature(gm *livePlayer, c world.Tracked) bool {
 	switch t := c.(type) {
 	case *livePlayer:
@@ -161,6 +160,8 @@ func (l *GameClientLink) healCreature(gm *livePlayer, c world.Tracked) bool {
 		if l.doors != nil {
 			l.doors.RestoreDoorHP(t.DoorID())
 		}
+	case *boat.Boat:
+		t.SetMaxHP()
 	}
 	return true
 }
@@ -169,9 +170,9 @@ func (l *GameClientLink) healCreature(gm *livePlayer, c world.Tracked) bool {
 // gm the attacker, for its maximum HP and CP and one more: the hit takes the
 // usual damage path, so invulnerability and gm's damage permission apply,
 // and a death credits gm. A door outside its siege takes no damage, and
-// holds no effects; nor does a decoration. An effect point is invulnerable,
-// so the hit never lands: only the strip runs, and its signet ending takes
-// the point out of the world.
+// holds no effects; nor does a decoration or a boat, which breaks where it
+// stands. An effect point is invulnerable, so the hit never lands: only the
+// strip runs, and its signet ending takes the point out of the world.
 func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 	attacker := gm.Character
 	var skill modelskill.Definition
@@ -224,6 +225,8 @@ func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 		})
 	case *npc.EffectPoint:
 		t.Queue().Post(func() { t.EffectList().StopAll() })
+	case *boat.Boat:
+		t.ReduceHP(boat.MaxHP+1, attacker)
 	}
 	return true
 }
@@ -231,8 +234,9 @@ func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 // reviveCreature stands a dead c up again: a player regains all the
 // experience its death took, a summon or an NPC keeps its corpse from
 // decaying, and an NPC stands up, as a broken door takes its template's open
-// state back, with the configured share of its HP. A living c is left as it
-// is, as is an effect point, which never dies.
+// state back, with the configured share of its HP, as does a broken boat,
+// which stays where it broke. A living c is left as it is, as is an effect
+// point, which never dies.
 func (l *GameClientLink) reviveCreature(gm *livePlayer, c world.Tracked) bool {
 	switch t := c.(type) {
 	case *livePlayer:
@@ -255,6 +259,8 @@ func (l *GameClientLink) reviveCreature(gm *livePlayer, c world.Tracked) bool {
 		l.reviveNPC(t)
 	case *npc.Decoration:
 		l.reviveNPC(t)
+	case *boat.Boat:
+		t.Revive(l.playerConfig().RespawnRestoreHP)
 	}
 	return true
 }
