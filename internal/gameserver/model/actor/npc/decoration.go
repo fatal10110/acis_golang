@@ -48,6 +48,12 @@ type Decoration struct {
 	// decay removes its corpse at the template corpse time; nil leaves a
 	// corpse in place.
 	decay *task.Decay
+	// regenSettings answers the base regeneration multipliers in force;
+	// nil takes the shipped ones.
+	regenSettings RegenSettings
+	// regen is the HP regeneration phase SettleRegen arms when its HP drops
+	// below max.
+	regen creature.Regen
 
 	// vitalsMu guards hp, dead and removed: they change on queue, and
 	// observers read them from their own queues.
@@ -70,14 +76,15 @@ type Decoration struct {
 // DecorationRuntime is what a placed decoration lives in: the world it
 // stands in, the zones its membership follows (nil for none), the sink its
 // observers are told of its changes through (nil tells nobody), the queue
-// its work runs on and the decay task its corpse registers with (nil for
-// none).
+// its work runs on, the decay task its corpse registers with (nil for none)
+// and the base regeneration multipliers in force (nil for the shipped ones).
 type DecorationRuntime struct {
 	World *world.State
 	Zones *zone.Index
 	Sink  event.Sink
 	Queue *sim.Queue
 	Decay *task.Decay
+	Regen RegenSettings
 }
 
 // NewDecoration builds an item-placed NPC from inst, titled with title.
@@ -106,6 +113,7 @@ func (d *Decoration) Attach(rt DecorationRuntime) {
 	d.world, d.sink = rt.World, rt.Sink
 	d.zones.ix = rt.Zones
 	d.queue, d.decay = rt.Queue, rt.Decay
+	d.regenSettings = rt.Regen
 }
 
 // Spawn places the decoration in the world at (x, y, z) facing heading,
@@ -167,6 +175,7 @@ func (d *Decoration) remove() bool {
 	d.zones.leave()
 	d.world.Despawn(d)
 	d.placeMu.Unlock()
+	d.SettleRegen()
 	if d.queue != nil {
 		d.queue.Close()
 	}
@@ -196,10 +205,10 @@ func (d *Decoration) Dead() bool {
 
 // ReduceHP takes amount from the decoration's HP, never under zero for a
 // template that is not undying nor under folkMinHP for one that is, and
-// kills it once its HP falls under folkDeathHP. A dead or removed
-// decoration, or a hit from an attacker without damage permission, takes
-// nothing. Nobody can select a decoration, so no player watches its health
-// bar and the loss shows nobody.
+// kills it once its HP falls under folkDeathHP; one left alive below its
+// maximum starts regenerating. A dead or removed decoration, or a hit from an
+// attacker without damage permission, takes nothing. Nobody can select a
+// decoration, so no player watches its health bar and the loss shows nobody.
 func (d *Decoration) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
 	if !creature.CanDealDamage(attacker) {
 		return
@@ -219,10 +228,12 @@ func (d *Decoration) ReduceHP(amount float64, attacker attackable.Combatant, _ m
 	}
 	if d.hp >= folkDeathHP {
 		d.vitalsMu.Unlock()
+		d.SettleRegen()
 		return
 	}
 	d.hp, d.dead = 0, true
 	d.vitalsMu.Unlock()
+	d.SettleRegen()
 	d.die()
 }
 
@@ -245,19 +256,22 @@ func (d *Decoration) die() {
 	}
 }
 
-// SetMaxHpMp fills a living decoration's HP to its maximum; its MP is
-// always full. Nobody watches its health bar, so the fill shows nobody.
+// SetMaxHpMp fills a living decoration's HP to its maximum, which ends its
+// regeneration; its MP is always full. Nobody watches its health bar, so the
+// fill shows nobody.
 func (d *Decoration) SetMaxHpMp() {
 	d.vitalsMu.Lock()
-	defer d.vitalsMu.Unlock()
 	if !d.dead && !d.removed {
 		d.hp = float64(d.stats.maxHP)
 	}
+	d.vitalsMu.Unlock()
+	d.SettleRegen()
 }
 
 // Revive stands this dead decoration up again with restoreHP of its
-// maximum HP and shows its observers it rise; nobody watches its health
-// bar, so the HP itself shows nobody. A living decoration, or one that has
+// maximum HP, which starts its regeneration when short of the maximum, and
+// shows its observers it rise; nobody watches its health bar, so the HP
+// itself shows nobody. A living decoration, or one that has
 // left the world, is left as it is, and Revive reports false. The caller
 // drops the corpse's pending decay first.
 func (d *Decoration) Revive(restoreHP float64) bool {
@@ -270,6 +284,7 @@ func (d *Decoration) Revive(restoreHP float64) bool {
 	d.dead = false
 	d.hp = min(maxHP*restoreHP, maxHP)
 	d.vitalsMu.Unlock()
+	d.SettleRegen()
 	if d.sink != nil {
 		d.sink.Emit(event.Revived{})
 	}
