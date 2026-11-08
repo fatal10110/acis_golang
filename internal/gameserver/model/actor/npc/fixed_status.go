@@ -6,22 +6,25 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// FixedStatus is the status of an NPC that holds no effects and takes no
-// damage, a decoration or an effect point: every stat finalized from its
-// template and passives, at full HP and MP.
-type FixedStatus struct{ fs fixedStats }
+// FixedStatus is the status of an NPC that holds no effects, a decoration
+// or an effect point: every stat finalized from its template and passives,
+// at full MP. An effect point takes no damage, so it is at full HP too.
+type FixedStatus struct {
+	fs fixedStats
+	hp float64
+}
 
-// Status returns the decoration's status.
-func (d *Decoration) Status() FixedStatus { return FixedStatus{d.stats} }
+// Status returns the decoration's status, with its current HP.
+func (d *Decoration) Status() FixedStatus { return FixedStatus{d.stats, d.HP()} }
 
 // Status returns the effect point's status.
-func (ep *EffectPoint) Status() FixedStatus { return FixedStatus{ep.stats} }
+func (ep *EffectPoint) Status() FixedStatus { return FixedStatus{ep.stats, float64(ep.stats.maxHP)} }
 
 // CalcStat finalizes base for s.
 func (s FixedStatus) CalcStat(st stat.Stat, base float64) float64 { return s.fs.calc(st, base) }
 
-// HP returns the current HP, always the maximum.
-func (s FixedStatus) HP() float64 { return s.MaxHPValue() }
+// HP returns the current HP.
+func (s FixedStatus) HP() float64 { return s.hp }
 
 // MaxHPValue returns the maximum HP in whole points.
 func (s FixedStatus) MaxHPValue() float64 { return float64(s.fs.maxHP) }

@@ -8,11 +8,16 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -22,20 +27,36 @@ import (
 const ChristmasTree InstanceKind = "ChristmasTree"
 
 // Decoration is an immobile, non-attackable NPC placed by an item. It holds
-// no effects, so its stats are fixed at spawn.
+// no effects, so its stats are fixed at spawn. Only an administrator's
+// //kill takes its HP; it then dies once and its corpse decays.
 type Decoration struct {
 	world.Presence
 	*Instance
 	stats fixedStats
 	// RespawnDelay is the respawn delay its spawn declares. It is set
-	// before Spawn and schedules nothing: a decoration never respawns.
+	// before Spawn and schedules nothing: a decoration never respawns, not
+	// even when its corpse decays.
 	RespawnDelay time.Duration
 
-	// world, sink and zones are installed by Attach, before the NPC is
-	// published.
+	// world, sink, zones, queue and decay are installed by Attach, before
+	// the NPC is published.
 	world *world.State
 	sink  event.Sink
 	zones *zoneMember
+	// queue runs the decoration's HP changes, death, revive and decay.
+	queue *sim.Queue
+	// decay removes its corpse at the template corpse time; nil leaves a
+	// corpse in place.
+	decay *task.Decay
+
+	// vitalsMu guards hp, dead and removed: they change on queue, and
+	// observers read them from their own queues.
+	vitalsMu sync.Mutex
+	hp       float64
+	dead     bool
+	// removed is set once the decoration has left the world for good: its
+	// corpse decayed or it was deleted.
+	removed bool
 	// running is its run stance, which Spawn sets under placeMu; observers
 	// read it from their own queues.
 	running atomic.Bool
@@ -47,12 +68,16 @@ type Decoration struct {
 }
 
 // DecorationRuntime is what a placed decoration lives in: the world it
-// stands in, the zones its membership follows (nil for none) and the sink
-// its observers are told of its changes through (nil tells nobody).
+// stands in, the zones its membership follows (nil for none), the sink its
+// observers are told of its changes through (nil tells nobody), the queue
+// its work runs on and the decay task its corpse registers with (nil for
+// none).
 type DecorationRuntime struct {
 	World *world.State
 	Zones *zone.Index
 	Sink  event.Sink
+	Queue *sim.Queue
+	Decay *task.Decay
 }
 
 // NewDecoration builds an item-placed NPC from inst, titled with title.
@@ -71,7 +96,7 @@ func NewDecoration(inst *Instance, title string, skills ...skillDefinitions) (*D
 		return nil, err
 	}
 	inst.SetTitle(title)
-	d := &Decoration{Instance: inst, stats: stats}
+	d := &Decoration{Instance: inst, stats: stats, hp: float64(stats.maxHP)}
 	d.zones = newZoneMember(d)
 	return d, nil
 }
@@ -80,6 +105,7 @@ func NewDecoration(inst *Instance, title string, skills ...skillDefinitions) (*D
 func (d *Decoration) Attach(rt DecorationRuntime) {
 	d.world, d.sink = rt.World, rt.Sink
 	d.zones.ix = rt.Zones
+	d.queue, d.decay = rt.Queue, rt.Decay
 }
 
 // Spawn places the decoration in the world at (x, y, z) facing heading,
@@ -111,17 +137,143 @@ func takeRunStance(running *atomic.Bool, stats fixedStats, sink event.Sink) {
 	sink.Emit(event.NPCInfoChanged{})
 }
 
-// Despawn takes the decoration out of its zones, while its observers still
-// know it, then out of the world. It is a no-op until Attach has installed
-// a world.
-func (d *Decoration) Despawn() {
+// Despawn deletes the decoration, dead or alive: its corpse, if any, no
+// longer decays, and it leaves its zones, while its observers still know
+// it, then the world, and its queue takes no more work. It runs once, and
+// is a no-op until Attach has installed a world.
+func (d *Decoration) Despawn() { d.remove() }
+
+// Decay removes the decoration's corpse as Despawn does and reports whether
+// this call removed it. The respawn hook is never run: a decoration never
+// respawns.
+func (d *Decoration) Decay(*world.State, func()) bool { return d.remove() }
+
+// remove is Despawn, reporting whether this call ran it.
+func (d *Decoration) remove() bool {
 	if d.world == nil {
-		return
+		return false
+	}
+	d.vitalsMu.Lock()
+	if d.removed {
+		d.vitalsMu.Unlock()
+		return false
+	}
+	d.removed = true
+	d.vitalsMu.Unlock()
+	if d.decay != nil {
+		d.decay.Cancel(d)
 	}
 	d.placeMu.Lock()
-	defer d.placeMu.Unlock()
 	d.zones.leave()
 	d.world.Despawn(d)
+	d.placeMu.Unlock()
+	if d.queue != nil {
+		d.queue.Close()
+	}
+	return true
+}
+
+// Queue returns the queue the decoration's work runs on.
+func (d *Decoration) Queue() *sim.Queue { return d.queue }
+
+// HP returns the current HP.
+func (d *Decoration) HP() float64 {
+	d.vitalsMu.Lock()
+	defer d.vitalsMu.Unlock()
+	return d.hp
+}
+
+// MaxHPValue returns the maximum HP in whole points.
+func (d *Decoration) MaxHPValue() float64 { return float64(d.stats.maxHP) }
+
+// Dead reports whether the decoration has died. A corpse stays dead once it
+// decays.
+func (d *Decoration) Dead() bool {
+	d.vitalsMu.Lock()
+	defer d.vitalsMu.Unlock()
+	return d.dead
+}
+
+// ReduceHP takes amount from the decoration's HP, never under zero for a
+// template that is not undying nor under folkMinHP for one that is, and
+// kills it once its HP falls under folkDeathHP. A dead or removed
+// decoration, or a hit from an attacker without damage permission, takes
+// nothing. Nobody can select a decoration, so no player watches its health
+// bar and the loss shows nobody.
+func (d *Decoration) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
+	if !creature.CanDealDamage(attacker) {
+		return
+	}
+	floor := 0.0
+	if d.Instance.Template.Undying {
+		floor = folkMinHP
+	}
+	d.vitalsMu.Lock()
+	if d.dead || d.removed {
+		d.vitalsMu.Unlock()
+		return
+	}
+	// A NaN amount takes nothing, like a negative one.
+	if amount > 0 {
+		d.hp = max(d.hp-amount, floor)
+	}
+	if d.hp >= folkDeathHP {
+		d.vitalsMu.Unlock()
+		return
+	}
+	d.hp, d.dead = 0, true
+	d.vitalsMu.Unlock()
+	d.die()
+}
+
+// die shows the decoration's observers it died, then registers its corpse
+// for decay after the template corpse time. A decoration deleted meanwhile
+// leaves no decay behind.
+func (d *Decoration) die() {
+	if d.sink != nil {
+		d.sink.Emit(event.Died{})
+	}
+	if d.decay == nil {
+		return
+	}
+	d.decay.Add(d, time.Duration(d.Instance.Template.CorpseTime)*time.Second)
+	d.vitalsMu.Lock()
+	removed := d.removed
+	d.vitalsMu.Unlock()
+	if removed {
+		d.decay.Cancel(d)
+	}
+}
+
+// SetMaxHpMp fills a living decoration's HP to its maximum; its MP is
+// always full. Nobody watches its health bar, so the fill shows nobody.
+func (d *Decoration) SetMaxHpMp() {
+	d.vitalsMu.Lock()
+	defer d.vitalsMu.Unlock()
+	if !d.dead && !d.removed {
+		d.hp = float64(d.stats.maxHP)
+	}
+}
+
+// Revive stands this dead decoration up again with restoreHP of its
+// maximum HP and shows its observers it rise; nobody watches its health
+// bar, so the HP itself shows nobody. A living decoration, or one that has
+// left the world, is left as it is, and Revive reports false. The caller
+// drops the corpse's pending decay first.
+func (d *Decoration) Revive(restoreHP float64) bool {
+	maxHP := d.MaxHPValue()
+	d.vitalsMu.Lock()
+	if !d.dead || d.removed {
+		d.vitalsMu.Unlock()
+		return false
+	}
+	d.dead = false
+	d.hp = min(maxHP*restoreHP, maxHP)
+	d.vitalsMu.Unlock()
+	if d.sink != nil {
+		d.sink.Emit(event.Revived{})
+	}
+	return true
 }
 
 // InsideZone reports whether the decoration's zones hold flag.
@@ -154,19 +306,21 @@ func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
 // infoSnapshot is NPCInfoSnapshot shown as the decoration itself, whatever
 // its form.
 func (d *Decoration) infoSnapshot() npcinfo.Snapshot {
-	return fixedNPCInfoSnapshot(d.Instance, d.stats, &d.Presence, d.zones.moveType(), d.running.Load())
+	s := fixedNPCInfoSnapshot(d.Instance, d.stats, &d.Presence, d.zones.moveType(), d.running.Load())
+	s.AlikeDead = d.Dead()
+	return s
 }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
 // always shown, the view an NPC that cannot move is announced with. It
-// shows the decoration attackable, with its full HP: like any civilian NPC
-// it may be attacked by force, though it can never be targeted. It never
+// shows the decoration attackable, with its HP: like any civilian NPC it
+// may be attacked by force, though it can never be targeted. It never
 // shows a form.
 func (d *Decoration) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	s := d.infoSnapshot()
 	s.Name = d.Instance.Name()
 	s.Attackable = true
-	s.CurrentHP, s.MaxHP = d.stats.maxHP, d.stats.maxHP
+	s.CurrentHP, s.MaxHP = int(d.HP()), d.stats.maxHP
 	return s
 }
 
