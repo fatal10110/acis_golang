@@ -12,7 +12,6 @@ func aiBossOrfenHandleOps() map[string]script.HandleOps {
 			"OnAttacked":      {"NPC.MaxMP"},
 			"OnClanAttacked":  {"NPC.MaxMP"},
 			"OnPartyAttacked": {"NPC.MaxMP"},
-			"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
 	}
 }

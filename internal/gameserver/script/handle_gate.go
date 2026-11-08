@@ -48,9 +48,6 @@ var kindOps = map[string]kindSet{
 	"NPC.SetEnchantEffect":            hostileOnly,
 	"NPC.SetTopDesireTarget":          hostileOnly,
 	"NPC.TopDesireTarget":             hostileOnly,
-	"Spawner.DecayMe":                 hostileOnly,
-	"Spawner.RespawnDelay":            hostileOnly,
-	"Spawner.ScheduleRespawn":         hostileOnly,
 }
 
 // hookByField returns the hook of the Hooks field name; the fields are in

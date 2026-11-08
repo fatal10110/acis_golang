@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ErrNotPrivate reports a script respawn request for an NPC that is no
@@ -41,17 +42,17 @@ func (n *Npcs) slotKeyLocked(id int32) (task.SlotID, bool) {
 	return 0, false
 }
 
-// RespawnDelay returns the respawn delay the spawn that placed h declares,
+// RespawnDelay returns the respawn delay the spawn that placed m declares,
 // without its random part; 0 for an NPC no spawn placed.
-func (n *Npcs) RespawnDelay(h *npc.Hostile) time.Duration {
-	slot, ok := n.slotOf(h.ObjectID())
+func (n *Npcs) RespawnDelay(m npc.PartyMember) time.Duration {
+	slot, ok := n.slotOf(m.ObjectID())
 	if !ok {
 		return 0
 	}
 	return slot.entry.RespawnDelay
 }
 
-// ScheduleRespawn asks the spawn of h, a master's private, to bring it back
+// ScheduleRespawn asks the spawn of m, a master's private, to bring it back
 // once d has passed: around its master, or at its own point when it was
 // created at one. It comes back only when its corpse has left the world by
 // then and its master is alive. Of two requests for one private, the first
@@ -62,13 +63,13 @@ func (n *Npcs) RespawnDelay(h *npc.Hostile) time.Duration {
 // decayed with nothing left to bring it back) asks nothing. An NPC that is
 // no private reports ErrNotPrivate: an npcmaker's NPCs come back through
 // their maker.
-func (n *Npcs) ScheduleRespawn(h *npc.Hostile, d time.Duration) error {
+func (n *Npcs) ScheduleRespawn(m npc.PartyMember, d time.Duration) error {
 	if d <= 0 {
 		return nil
 	}
-	slot, ok := n.slotOf(h.ObjectID())
+	slot, ok := n.slotOf(m.ObjectID())
 	if !ok {
-		if h.IsPrivate() {
+		if m.IsPrivate() {
 			return nil
 		}
 		return ErrNotPrivate
@@ -113,22 +114,35 @@ func (n *Npcs) dropGoneScriptPrivates(master npc.PartyMember) {
 	}
 }
 
-// DecayMe hides h without a decay: it leaves the
-// world with no decayed hook, and its spawn is not told, so it never
+// DecayMe hides m, a hostile or a civilian NPC, without a decay: it leaves
+// the world with no decayed hook, and its spawn is not told, so it never
 // respawns and an npcmaker keeps counting it. It takes no more AI turns
 // and walks no route; its spawn keeps it as it left, with the route node it
 // headed for and its direction. The slot of a private a script created
 // goes with it, as nothing can bring that private back.
-func (n *Npcs) DecayMe(h *npc.Hostile) {
-	if n.decay != nil {
-		n.decay.Cancel(h)
-	}
-	if !h.Hide(n.state) {
+func (n *Npcs) DecayMe(m npc.PartyMember) {
+	a, ok := m.(interface {
+		task.AIActor
+		Hide(worldState *world.State) bool
+	})
+	if !ok {
 		return
 	}
-	id := h.ObjectID()
-	n.ai.Remove(h)
-	left := leftNPC{name: h.Instance.Name()}
+	if n.decay != nil {
+		n.decay.Cancel(a)
+	}
+	if !a.Hide(n.state) {
+		return
+	}
+	n.ai.Remove(a)
+	var left leftNPC
+	switch o := m.(type) {
+	case *npc.Hostile:
+		left.name = o.Instance.Name()
+	case *npc.Folk:
+		left.name = o.Instance.Name()
+	}
+	id := m.ObjectID()
 	left.index, left.reverse, _ = n.walker.Walking(id)
 	n.walker.StopRouteByID(id)
 

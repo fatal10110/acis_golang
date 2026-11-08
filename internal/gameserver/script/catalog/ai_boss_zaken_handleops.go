@@ -10,7 +10,6 @@ func aiBossZakenHandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
 		"script.ai.boss.zaken.Zaken": {
 			"OnAttacked":    {"NPC.TopDesireTarget"},
-			"OnPartyDied":   {"Spawner.ScheduleRespawn"},
 			"OnSeeCreature": {"NPC.TopDesireTarget"},
 			"OnSeeSpell":    {"NPC.TopDesireTarget"},
 			"OnTimer":       {"NPC.TopDesireTarget"},
