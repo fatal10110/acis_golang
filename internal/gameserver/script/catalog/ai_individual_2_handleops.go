@@ -55,9 +55,6 @@ func aiIndividual2HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.RoyalRushWarriorStone": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 		},
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.SaintNinja": {
-			"OnTimer": {"Spawner.DecayMe"},
-		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPatrolWeaponEquipped": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 		},

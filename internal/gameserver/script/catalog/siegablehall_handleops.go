@@ -14,9 +14,8 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 			"OnTimer":         {"NPC.RandomizeAttack"},
 		},
 		"script.ai.siegablehall.Agit02Gustav": {
-			"OnPartyDied": {"Spawner.ScheduleRespawn"},
-			"OnSeeSpell":  {"NPC.TopDesireTarget"},
-			"OnTimer":     {"NPC.RandomizeAttack"},
+			"OnSeeSpell": {"NPC.TopDesireTarget"},
+			"OnTimer":    {"NPC.RandomizeAttack"},
 		},
 		"script.ai.siegablehall.Agit02Mikhail": {
 			"OnSeeSpell": {"NPC.TopDesireTarget"},
@@ -24,9 +23,6 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 		},
 		"script.ai.siegablehall.AzitWateringTreasureBox": {
 			"OnMyDying": {"NPC.DropItem"},
-		},
-		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka2": {
-			"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		},
 		"script.siegablehall.DevastatedCastle": {
 			"OnTimer":            {"NPC.CleanAllHate", "NPC.RandomizeAttack"},

@@ -34,7 +34,7 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 		},
 		"ai.FolkCombat":    behavior(1),
 		"ai.HostileCombat": behavior(2),
-		"quest.TimerDecay": func() Script {
+		"quest.TimerDrop": func() Script {
 			return Script{QuestID: 2, Bind: Bindings{EventTalked: {1}}, Hooks: Hooks{OnTalk: talk, OnTimer: func(*Script, Timer) string { return "" }}}
 		},
 		"ai.Unknown": behavior(2),
@@ -46,11 +46,11 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 		"quest.KillDrop":   {"OnMyDying": {"NPC.DropItem"}},
 		"ai.FolkCombat":    {"OnAttacked": {"NPC.InCombat"}},
 		"ai.HostileCombat": {"OnAttacked": {"NPC.InCombat", "NPC.MaxMP"}},
-		"quest.TimerDecay": {"OnTimer": {"Spawner.DecayMe"}},
+		"quest.TimerDrop":  {"OnTimer": {"NPC.DropItem"}},
 		"ai.Unknown":       {"OnAttacked": {"NPC.NoSuchOperation"}},
 		"ai.Timer":         {"OnTimer": {"NPC.HateList"}},
 	}
-	paths := []string{"quest.KillDrop", "ai.FolkCombat", "ai.HostileCombat", "quest.TimerDecay", "ai.Unknown", "ai.Timer"}
+	paths := []string{"quest.KillDrop", "ai.FolkCombat", "ai.HostileCombat", "quest.TimerDrop", "ai.Unknown", "ai.Timer"}
 	logs := &logBuffer{}
 	r := Build(listOf(paths...), catalog, Config{KindOf: kindOf, Log: zerolog.New(logs), HandleOps: ops, raises: raiseAll})
 
@@ -58,7 +58,7 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 	for _, e := range r.entries {
 		registered[e.path] = e.state == entryRegistered
 	}
-	want := map[string]bool{"quest.KillDrop": true, "ai.FolkCombat": false, "ai.HostileCombat": true, "quest.TimerDecay": false, "ai.Unknown": false, "ai.Timer": true}
+	want := map[string]bool{"quest.KillDrop": true, "ai.FolkCombat": false, "ai.HostileCombat": true, "quest.TimerDrop": false, "ai.Unknown": false, "ai.Timer": true}
 	if !reflect.DeepEqual(registered, want) {
 		t.Fatalf("registered = %v, want %v", registered, want)
 	}
@@ -67,7 +67,7 @@ func TestSeamGateRefusesMissingHandleOps(t *testing.T) {
 	}
 	for _, msg := range []string{
 		`onAttacked on npc 1 calls NPC.InCombat, which folk npcs do not have`,
-		`onTimer on npc 1 calls Spawner.DecayMe, which folk npcs do not have`,
+		`onTimer on npc 1 calls NPC.DropItem, which folk npcs do not have`,
 		`onAttacked calls NPC.NoSuchOperation, which is no kind-specific handle operation`,
 	} {
 		if !strings.Contains(logs.String(), msg) {

@@ -8,23 +8,17 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // handle operations each of its hooks reaches.
 func aiBossFrintezzaHandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
-		"script.ai.boss.frintezza.EvilateA": {
-			"OnPartyDied": {"Spawner.ScheduleRespawn"},
-		},
-		"script.ai.boss.frintezza.EvilateB": {
-			"OnPartyDied": {"Spawner.ScheduleRespawn"},
-		},
 		"script.ai.boss.frintezza.FollowerOfFrintezza": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnTimer":    {"NPC.EquipItem"},
 		},
 		"script.ai.boss.frintezza.PortraitSpirit": {
 			"OnTimer":            {"NPC.TopDesireTarget"},
-			"OnUseSkillFinished": {"NPC.TopDesireTarget", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.TopDesireTarget"},
 		},
 		"script.ai.boss.frintezza.PortraitSpiritWinged": {
 			"OnTimer":            {"NPC.TopDesireTarget"},
-			"OnUseSkillFinished": {"NPC.TopDesireTarget", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.TopDesireTarget"},
 		},
 		"script.ai.boss.frintezza.UndeadBandmaster": {
 			"OnMyDying": {"NPC.DropItem"},

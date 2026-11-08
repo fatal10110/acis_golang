@@ -20,9 +20,9 @@ type Population interface {
 	CreatePrivate(master npc.PartyMember, npcID int32, at *location.Location, heading int, despawn time.Duration, params [3]int32) (npc.PartyMember, error)
 	CreatePrivates(master npc.PartyMember) error
 	ScheduleDespawn(live attackable.Combatant, d time.Duration)
-	RespawnDelay(live *npc.Hostile) time.Duration
-	ScheduleRespawn(live *npc.Hostile, d time.Duration) error
-	DecayMe(live *npc.Hostile)
+	RespawnDelay(live npc.PartyMember) time.Duration
+	ScheduleRespawn(live npc.PartyMember, d time.Duration) error
+	DecayMe(live npc.PartyMember)
 	MakerEvent(maker, name string, int1, int2 int) bool
 	HasMaker(maker string) bool
 	DoRespawn(live npc.PartyMember)
