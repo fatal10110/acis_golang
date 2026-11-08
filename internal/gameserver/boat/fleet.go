@@ -88,7 +88,7 @@ func (f *Fleet) launch(itineraries []route.BoatItinerary) error {
 		if err != nil {
 			return fmt.Errorf("boat: itinerary %d: %w", i, err)
 		}
-		b := newBoat(id, f.state)
+		b := newBoat(id, f.state, &f.mu)
 		if f.newSink != nil {
 			b.Attach(f.newSink(b))
 		}

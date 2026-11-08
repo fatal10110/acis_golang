@@ -19,13 +19,15 @@ const worldZMax = 16410
 // Its position and heading live in the embedded world.Presence. Everything
 // else is driven by its fleet's tick goroutine; the fields under mu are the
 // ones other goroutines read (a player coming to know the boat), and the
-// tick goroutine writes them under it.
+// tick goroutine writes them under it. A break or a revive runs under
+// fleetMu, the lock the tick holds, as the tick does.
 type Boat struct {
 	world.Presence
 
 	objectID int32
 	sink     event.Sink
 	world    *world.State
+	fleetMu  *sync.Mutex
 
 	mu sync.Mutex
 	// moving reports a leg under way toward destination.
@@ -42,6 +44,10 @@ type Boat struct {
 	fare fareDue
 	// retired marks a boat taken out of its fleet: it takes no one aboard.
 	retired bool
+	// hp is the current HP; dead marks a broken boat. Both change under
+	// fleetMu too.
+	hp   float64
+	dead bool
 
 	// Owned by the tick goroutine.
 	xAccurate, yAccurate float64
@@ -50,8 +56,8 @@ type Boat struct {
 	engine               *engine
 }
 
-func newBoat(objectID int32, state *world.State) *Boat {
-	return &Boat{objectID: objectID, world: state}
+func newBoat(objectID int32, state *world.State, fleetMu *sync.Mutex) *Boat {
+	return &Boat{objectID: objectID, world: state, fleetMu: fleetMu, hp: MaxHP}
 }
 
 // ObjectID returns the boat's world object id.
