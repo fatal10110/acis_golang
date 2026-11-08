@@ -47,6 +47,11 @@ func (r *Registry) HostileHidden(h *npc.Hostile) {
 	r.timers.npcDecayed(h.Scratch())
 }
 
+// FolkHidden is HostileHidden for the civilian NPC f.
+func (r *Registry) FolkHidden(f *npc.Folk) {
+	r.timers.npcDecayed(f.Scratch())
+}
+
 // FolkDecayed is HostileDecayed for the civilian NPC f.
 func (r *Registry) FolkDecayed(f *npc.Folk) {
 	r.decayed(int32(f.NpcID()), f)

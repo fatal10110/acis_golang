@@ -9,8 +9,7 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 func aiBossQueenAntHandleOps() map[string]script.HandleOps {
 	return map[string]script.HandleOps{
 		"script.ai.boss.queenant.QueenAnt": {
-			"OnAttacked":  {"NPC.CanAutoAttack", "NPC.TopDesireTarget"},
-			"OnPartyDied": {"Spawner.ScheduleRespawn"},
+			"OnAttacked": {"NPC.CanAutoAttack", "NPC.TopDesireTarget"},
 		},
 		"script.ai.boss.queenant.QueenAntPrivateNurseAnt": {
 			"OnPartyAttacked": {"NPC.TopDesireTarget"},

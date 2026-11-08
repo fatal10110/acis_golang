@@ -113,21 +113,53 @@ func (f *Folk) Decay(worldState *world.State, respawn func()) bool {
 // winner claims the spawn's respawn, so it is armed exactly once.
 // respawnFor may be nil.
 func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int32) func()) bool {
-	f.vitalsMu.Lock()
-	if f.decayed {
-		f.vitalsMu.Unlock()
+	if !f.markDecayed() {
 		return false
 	}
-	f.decayed, f.dead = true, true
-	f.corpseDeadline = time.Time{}
-	f.vitalsMu.Unlock()
 	f.aiSleep.sleep()
 	var respawn func()
 	if respawnFor != nil {
 		respawn = respawnFor(f.ObjectID())
 	}
 	f.raiseDecayed()
+	f.leaveWorld(worldState, respawn)
+	return true
+}
 
+// Hide takes this NPC out of the world without a decay: it leaves its zones
+// and the players around it see it go. Unlike a decay, no decayed hook runs
+// and nothing respawns it. The hidden NPC takes no more work: its effects
+// end, its queue closes and its behavior timers stop, with no hook. It
+// reports whether this call hid it; an NPC already decayed or hidden is left
+// as it is.
+func (f *Folk) Hide(worldState *world.State) bool {
+	if !f.markDecayed() {
+		return false
+	}
+	f.aiSleep.sleep()
+	if f.scripts != nil {
+		f.scripts.FolkHidden(f)
+	}
+	f.leaveWorld(worldState, nil)
+	return true
+}
+
+// markDecayed marks this NPC decayed, and dead, and reports whether this
+// call did: of several concurrent decays, only one wins.
+func (f *Folk) markDecayed() bool {
+	f.vitalsMu.Lock()
+	defer f.vitalsMu.Unlock()
+	if f.decayed {
+		return false
+	}
+	f.decayed, f.dead = true, true
+	f.corpseDeadline = time.Time{}
+	return true
+}
+
+// leaveWorld takes this decayed NPC out of the world, then runs respawn
+// when it is not nil, and closes its queue.
+func (f *Folk) leaveWorld(worldState *world.State, respawn func()) {
 	// The NPC leaves its zones while its observers still know it.
 	f.zones.leave()
 	if worldState != nil {
@@ -145,7 +177,6 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 	if f.queue != nil {
 		f.queue.Close()
 	}
-	return true
 }
 
 // DeleteMe takes the NPC out of the world on its own queue, leaving no

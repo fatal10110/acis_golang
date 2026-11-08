@@ -309,7 +309,7 @@ func TestBehavesNamesTheIDsABehaviorIsBoundTo(t *testing.T) {
 
 // TestRegistryHasNoWritePath pins the registry's exported surface to
 // reads and hook raises: nothing changes it after Build. HostileDecayed,
-// HostileHidden and PlayerDetached change only the timers, a container of
+// HostileHidden, FolkHidden and PlayerDetached change only the timers, a container of
 // their own;
 // CharacterCreated only the new character's journal. NPCScripts,
 // AIClasses and NPCTimers read for the //info NPC script pages. ScriptRuns
@@ -324,7 +324,7 @@ func TestRegistryHasNoWritePath(t *testing.T) {
 	for i := range typ.NumMethod() {
 		got = append(got, typ.Method(i).Name)
 	}
-	if want := []string{"AIClasses", "AbnormalStatusChanged", "Behaves", "BindHallSieges", "CharacterCreated", "ClanAttacked", "ClanDied", "DeliverScriptEvent", "DoorAttacked", "Dump", "FirstTalk", "FolkAttacked", "FolkCreated", "FolkDecayed", "FolkDying", "FolkMoveToFinished", "FolkNoDesire", "FolkOutOfTerritory", "FolkSeeCreature", "HostileAttackFinished", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileHidden", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "HostileSeeCreature", "Interact", "Invoke", "ItemUsed", "JournalQuest", "NPCScripts", "NPCTimers", "PartyDied", "PickedItem", "PlayableDied", "PlayerDetached", "QuestEvent", "QuestWindow", "ScriptEvent", "ScriptRuns", "SeeItem", "SeeSpell", "SeesCreatures", "Spelled", "TutorialEvent", "UseSkillFinished", "WatchDoors", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
+	if want := []string{"AIClasses", "AbnormalStatusChanged", "Behaves", "BindHallSieges", "CharacterCreated", "ClanAttacked", "ClanDied", "DeliverScriptEvent", "DoorAttacked", "Dump", "FirstTalk", "FolkAttacked", "FolkCreated", "FolkDecayed", "FolkDying", "FolkHidden", "FolkMoveToFinished", "FolkNoDesire", "FolkOutOfTerritory", "FolkSeeCreature", "HostileAttackFinished", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileHidden", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "HostileSeeCreature", "Interact", "Invoke", "ItemUsed", "JournalQuest", "NPCScripts", "NPCTimers", "PartyDied", "PickedItem", "PlayableDied", "PlayerDetached", "QuestEvent", "QuestWindow", "ScriptEvent", "ScriptRuns", "SeeItem", "SeeSpell", "SeesCreatures", "Spelled", "TutorialEvent", "UseSkillFinished", "WatchDoors", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
 		t.Fatalf("Registry methods = %v, want only the reads %v; a new method must not change the registry", got, want)
 	}
 	for i := range reflect.TypeFor[Registry]().NumField() {

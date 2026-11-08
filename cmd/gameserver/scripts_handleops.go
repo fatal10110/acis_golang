@@ -9,15 +9,13 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // script whose hook reaches one that an NPC the hook runs for lacks.
 var scriptHandleOps = map[string]script.HandleOps{
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior": {
-		"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
-		"OnTimer":     {"NPC.CastingNow", "NPC.InCombat"},
+		"OnTimer": {"NPC.CastingNow", "NPC.InCombat"},
 	},
 	"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorBehavior": {
 		"OnAttackFinished": {"NPC.CanAutoAttack", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 		"OnAttacked":       {"NPC.CanAutoAttack", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 		"OnClanAttacked":   {"NPC.CanAutoAttack", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 		"OnPartyAttacked":  {"NPC.CanAutoAttack", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
-		"OnPartyDied":      {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		"OnScriptEvent":    {"NPC.CanAutoAttack", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
 		"OnSeeSpell":       {"NPC.InCombat"},
 		"OnTimer":          {"NPC.CastingNow", "NPC.InCombat"},
@@ -26,7 +24,6 @@ var scriptHandleOps = map[string]script.HandleOps{
 		"OnAttacked":      {"NPC.HateList", "NPC.Muted"},
 		"OnClanAttacked":  {"NPC.HateList"},
 		"OnPartyAttacked": {"NPC.HateList"},
-		"OnPartyDied":     {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
 		"OnSeeCreature":   {"NPC.HateList"},
 		"OnSeeSpell":      {"NPC.HateList", "NPC.TopDesireTarget"},
 		"OnTimer":         {"NPC.CastingNow", "NPC.HateList", "NPC.InCombat", "NPC.Muted"},
@@ -35,12 +32,6 @@ var scriptHandleOps = map[string]script.HandleOps{
 		"OnPartyAttacked": {"NPC.InsideZone", "NPC.TopDesireTarget"},
 		"OnSeeSpell":      {"NPC.TopDesireTarget"},
 		"OnTimer":         {"NPC.RandomizeAttack"},
-	},
-	"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior": {
-		"OnPartyDied": {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
-	},
-	"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateWarrior": {
-		"OnTimer": {"Spawner.DecayMe"},
 	},
 	"script.ai.individual.Monster.WizardBase.Wizard.Wizard": {
 		"OnAttacked":     {"NPC.HateList", "NPC.Muted"},
