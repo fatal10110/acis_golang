@@ -277,8 +277,8 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	})
 }
 
-// decorationSink shows one placed decoration's observers its view again
-// and its stance changes.
+// decorationSink shows one placed decoration's observers its view again,
+// its stance changes, its death and its revive.
 type decorationSink struct {
 	world *world.State
 	d     *npc.Decoration
@@ -295,6 +295,10 @@ func (s *decorationSink) Emit(ev event.Event) {
 		broadcastKnown(s.world, s.d, func() wire.Frame {
 			return serverpackets.NpcFrameBuilder{}.ChangeMoveType(s.d.ObjectID(), e.Running, s.d.InsideZone(zone.FlagWater))
 		})
+	case event.Died:
+		broadcastKnown(s.world, s.d, func() wire.Frame { return serverpackets.NpcFrameBuilder{}.Die(s.d.ObjectID(), false) })
+	case event.Revived:
+		broadcastKnown(s.world, s.d, func() wire.Frame { return serverpackets.FrameRevive(s.d.ObjectID()) })
 	}
 }
 

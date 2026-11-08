@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -256,6 +257,9 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 // the respawn delay respawn. It reports false,
 // placing nothing, when the NPC cannot be built.
 func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int, respawn time.Duration) bool {
+	if l.queues == nil {
+		return false
+	}
 	if l.geo != nil {
 		z = int(l.geo.Height(x, y, z))
 	}
@@ -272,7 +276,10 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 		return false
 	}
 	decoration.RespawnDelay = respawn
-	decoration.Attach(npc.DecorationRuntime{World: l.world, Zones: l.zones, Sink: &decorationSink{world: l.world, d: decoration, link: l}})
+	decoration.Attach(npc.DecorationRuntime{
+		World: l.world, Zones: l.zones, Sink: &decorationSink{world: l.world, d: decoration, link: l},
+		Queue: l.queues.NewQueue(fmt.Sprintf("decoration-%d", objectID)), Decay: l.summoning.decay,
+	})
 	decoration.Spawn(x, y, z, heading)
 	return true
 }

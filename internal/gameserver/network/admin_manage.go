@@ -144,10 +144,7 @@ func (l *GameClientLink) cancelCreature(gm *livePlayer, c world.Tracked) bool {
 }
 
 // healCreature fills a living c's HP and MP, and a player's CP, to their
-// maxima.
-//
-// A decoration or effect point is left as it is: it refuses selection, so
-// no player watches its vitals and the fill would show nowhere.
+// maxima. An effect point takes no damage, so it is always full.
 func (l *GameClientLink) healCreature(gm *livePlayer, c world.Tracked) bool {
 	switch t := c.(type) {
 	case *livePlayer:
@@ -155,6 +152,8 @@ func (l *GameClientLink) healCreature(gm *livePlayer, c world.Tracked) bool {
 	case *npc.Hostile:
 		t.Queue().Post(t.SetMaxHpMp)
 	case *npc.Folk:
+		t.Queue().Post(t.SetMaxHpMp)
+	case *npc.Decoration:
 		t.Queue().Post(t.SetMaxHpMp)
 	case *summon.Actor:
 		t.Post(t.SetMaxHpMp)
@@ -170,9 +169,9 @@ func (l *GameClientLink) healCreature(gm *livePlayer, c world.Tracked) bool {
 // gm the attacker, for its maximum HP and CP and one more: the hit takes the
 // usual damage path, so invulnerability and gm's damage permission apply,
 // and a death credits gm. A door outside its siege takes no damage, and
-// holds no effects.
-//
-// A decoration or effect point cannot die yet (#4530).
+// holds no effects; nor does a decoration. An effect point is invulnerable,
+// so the hit never lands: only the strip runs, and its signet ending takes
+// the point out of the world.
 func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 	attacker := gm.Character
 	var skill modelskill.Definition
@@ -217,8 +216,14 @@ func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 		if !t.Dead() {
 			t.ReduceHP(float64(t.MaxHP())+1, attacker, skill)
 		}
-	case *npc.Decoration, *npc.EffectPoint:
-		return false
+	case *npc.Decoration:
+		t.Queue().Post(func() {
+			if !t.Dead() {
+				t.ReduceHP(t.MaxHPValue()+1, attacker, skill)
+			}
+		})
+	case *npc.EffectPoint:
+		t.Queue().Post(func() { t.EffectList().StopAll() })
 	}
 	return true
 }
@@ -227,9 +232,7 @@ func (l *GameClientLink) killCreature(gm *livePlayer, c world.Tracked) bool {
 // experience its death took, a summon or an NPC keeps its corpse from
 // decaying, and an NPC stands up, as a broken door takes its template's open
 // state back, with the configured share of its HP. A living c is left as it
-// is.
-//
-// A decoration or effect point never dies (#4530).
+// is, as is an effect point, which never dies.
 func (l *GameClientLink) reviveCreature(gm *livePlayer, c world.Tracked) bool {
 	switch t := c.(type) {
 	case *livePlayer:
@@ -249,6 +252,8 @@ func (l *GameClientLink) reviveCreature(gm *livePlayer, c world.Tracked) bool {
 	case *npc.Hostile:
 		l.reviveNPC(t)
 	case *npc.Folk:
+		l.reviveNPC(t)
+	case *npc.Decoration:
 		l.reviveNPC(t)
 	}
 	return true
