@@ -216,3 +216,35 @@ func TestAdminKillBoatDuringFleetTick(t *testing.T) {
 		t.Fatalf("dead %v, moving %v; want broken and stopped", b.Dead(), b.Moving())
 	}
 }
+
+// TestAdminKillBoatWithoutDamage pins //kill over a boat by a game master
+// whose access level gives no damage: the hit takes nothing, so the boat
+// keeps its full HP and nobody is shown it stop.
+func TestAdminKillBoatWithoutDamage(t *testing.T) {
+	t.Parallel()
+	var fail atomic.Bool
+	srv, gm, me := bootReload(t, nil, &fail, passengerItinerary())
+	b := srv.Boats.Boats()[0]
+	watcher, _ := addRider(t, srv, "watcher", "Watcher", runeBoarding)
+	board(t, srv, gm, b.ObjectID())
+	sail(srv, 303)
+	srv.ReadQueued(t, gm)
+	srv.ReadQueued(t, watcher)
+
+	obj, ok := srv.State.Player(me)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", me)
+	}
+	denied, ok := obj.(interface{ SetCanGiveDamage(bool) })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no SetCanGiveDamage", me, obj)
+	}
+	denied.SetCanGiveDamage(false)
+
+	gm.Send(encodeBuildCmd("kill 100"))
+	assertLog(t, "game master aboard", vitalsLog(t, srv, gm))
+	assertLog(t, "dock", vitalsLog(t, srv, watcher))
+	if b.Dead() || b.HP() != boat.MaxHP || !b.Moving() {
+		t.Fatalf("after a damageless //kill: dead %v, HP %v, moving %v; want alive at %v, under way", b.Dead(), b.HP(), b.Moving(), boat.MaxHP)
+	}
+}
