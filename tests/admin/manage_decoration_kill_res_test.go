@@ -23,13 +23,14 @@ const (
 	killPointNpcID = 13018
 )
 
-// killTemplates are a Christmas tree with a corpse time and a signet effect
-// point.
-func killTemplates() *npc.Table {
+// killTemplates are a Christmas tree with a corpse time, mortal unless
+// undying, and a signet effect point.
+func killTemplates(undying bool) *npc.Table {
 	return npc.NewTable([]*npc.Template{
 		{
 			ID: killTreeID, TemplateID: killTreeID, Type: "ChristmasTree", Name: "Christmas Tree", Level: 1,
 			HPMax: 1000, CorpseTime: reviveCorpseTime, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true,
+			Undying: undying,
 		},
 		{ID: killPointNpcID, TemplateID: killPointNpcID, Type: "EffectPoint", CollisionRadius: 5, RunSpeed: 20, WalkSpeed: 50},
 	})
@@ -42,7 +43,7 @@ func bootTreeAdmin(t *testing.T, opts ...gameservertest.Option) (*gameservertest
 	t.Helper()
 	decay := newManualDecay(t)
 	opts = append([]gameservertest.Option{
-		gameservertest.WithNPCs(killTemplates()), gameservertest.WithNpcSpawns(nil), gameservertest.WithDecay(decay.task),
+		gameservertest.WithNPCs(killTemplates(false)), gameservertest.WithNpcSpawns(nil), gameservertest.WithDecay(decay.task),
 	}, opts...)
 	srv, gmID := bootAdmin(t, adminLevel, opts...)
 	decay.state = srv.State
@@ -209,7 +210,7 @@ func TestAdminManageSignetPointKill(t *testing.T) {
 	db := sqltest.SharedDB(t)
 	decay := newManualDecay(t)
 	srv, gmID := bootAdmin(t, adminLevel,
-		gameservertest.WithNPCs(killTemplates()), gameservertest.WithDecay(decay.task),
+		gameservertest.WithNPCs(killTemplates(false)), gameservertest.WithDecay(decay.task),
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{def}), gamesql.NewCharacterSkillStore(db))),
 	)
 	decay.state = srv.State
@@ -245,5 +246,53 @@ func TestAdminManageSignetPointKill(t *testing.T) {
 	requireNoSystemMessage(t, "//kill", frames)
 	if point.Dead() || decay.task.Tracked(point) {
 		t.Fatalf("killed point: dead %v decay tracked %v, want neither", point.Dead(), decay.task.Tracked(point))
+	}
+}
+
+// TestAdminManageUndyingDecorationKill pins //kill over an undying
+// Christmas tree, as the shipped trees are: the hit floors its HP at one
+// point and it never dies, so no Die goes out and no corpse is tracked, and
+// a following //res finds a living tree and stands nothing up.
+func TestAdminManageUndyingDecorationKill(t *testing.T) {
+	t.Parallel()
+	srv, _, decay, tree := bootTreeAdmin(t, gameservertest.WithNPCs(killTemplates(true)))
+
+	frames := manageAround(t, srv, tree, "kill")
+	if got := countFramesFor(frames, serverpackets.OpcodeDie, tree.ObjectID()); got != 0 {
+		t.Fatalf("//kill frames = %x, want no Die of an undying tree", testsupport.FrameOpcodes(frames))
+	}
+	if tree.Dead() || tree.HP() != 1 || decay.task.Tracked(tree) {
+		t.Fatalf("undying tree after //kill: dead %v HP %v decay tracked %v, want alive at 1 HP with no decay", tree.Dead(), tree.HP(), decay.task.Tracked(tree))
+	}
+
+	frames = manageAround(t, srv, tree, "res")
+	requireNoRevive(t, "//res on an undying tree", frames)
+	if tree.Dead() || tree.HP() != 1 {
+		t.Fatalf("undying tree after //res: dead %v HP %v, want alive at 1 HP", tree.Dead(), tree.HP())
+	}
+}
+
+// TestAdminManageDecorationKillWithoutDamage pins //kill over a mortal tree
+// by a GM whose access level gives no damage: the hit takes nothing, so the
+// tree keeps its full HP, never dies and leaves no corpse.
+func TestAdminManageDecorationKillWithoutDamage(t *testing.T) {
+	t.Parallel()
+	srv, gmID, decay, tree := bootTreeAdmin(t)
+	obj, ok := srv.State.Player(gmID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", gmID)
+	}
+	denied, ok := obj.(interface{ SetCanGiveDamage(bool) })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no SetCanGiveDamage", gmID, obj)
+	}
+	denied.SetCanGiveDamage(false)
+
+	frames := manageAround(t, srv, tree, "kill")
+	if got := countFramesFor(frames, serverpackets.OpcodeDie, tree.ObjectID()); got != 0 {
+		t.Fatalf("//kill frames = %x, want no Die from a GM that gives no damage", testsupport.FrameOpcodes(frames))
+	}
+	if tree.Dead() || tree.HP() != tree.MaxHPValue() || decay.task.Tracked(tree) {
+		t.Fatalf("tree after a damageless //kill: dead %v HP %v decay tracked %v, want alive at %v with no decay", tree.Dead(), tree.HP(), decay.task.Tracked(tree), tree.MaxHPValue())
 	}
 }
