@@ -19,15 +19,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
-// TestWalkToLowerFloorStopsAtClosedCastleDoor walks a player on the shipped
-// geodata from inside Gludio castle's station toward a point beyond its
-// closed door (gludio_castle_station), where the cell past the door has a
-// lower floor too. With no route search, the walk ends on the last point a
-// straight walk reaches: the door, not the lower floor behind it. It needs
-// the datapack geodata, which the repository and CI do not have, so it runs
-// locally (it skips otherwise).
-func TestWalkToLowerFloorStopsAtClosedCastleDoor(t *testing.T) {
-	t.Parallel()
+// gludioStationStart is a point inside Gludio castle's station, just short
+// of its closed door (gludio_castle_station, 19210008).
+var gludioStationStart = location.Location{X: -19032, Y: 108072, Z: -2032}
+
+// bootAtClosedGludioStationDoor boots a player on the shipped geodata of
+// the region holding Gludio castle's station door, with that door closed,
+// and places the player at gludioStationStart. It needs the datapack
+// geodata, which the repository and CI do not have, so its callers run
+// locally (they skip otherwise).
+func bootAtClosedGludioStationDoor(t *testing.T) (*gameservertest.Server, int32) {
+	t.Helper()
 	const doorID = 19210008
 	doors, err := xml.LoadDoors(datapack.Path(t, "data", "xml", "doors.xml"), zerolog.Nop())
 	if err != nil {
@@ -55,15 +57,21 @@ func TestWalkToLowerFloorStopsAtClosedCastleDoor(t *testing.T) {
 	geo.AddObject(shape)
 
 	srv, character, objID := bootInZones(t, zone.NewIndex(), gameservertest.WithGeo(move.NewGeo(geo, nil)))
-	start := location.Location{X: -19032, Y: 108072, Z: -2032}
+	start := gludioStationStart
 	character.TeleportTo(start.X, start.Y, start.Z, 0)
 	if got := teleportDestination(t, readUntilQuiet(srv.Client), objID); got != start {
 		t.Fatalf("teleport went to %+v, want %+v", got, start)
 	}
 	appear(t, srv.Client)
 	readUntilQuiet(srv.Client)
+	return srv, objID
+}
 
-	target := location.Location{X: -18952, Y: 108072, Z: -2032}
+// walkFromGludioStation clicks target from gludioStationStart and returns
+// where the walk ends.
+func walkFromGludioStation(t *testing.T, srv *gameservertest.Server, target location.Location) location.Location {
+	t.Helper()
+	start := gludioStationStart
 	srv.Client.Send(encodeMoveBackwardToLocation(target, start, 1))
 	expectGroundClickAck(t, srv.Client)
 	frame := srv.Client.Read()
@@ -71,10 +79,34 @@ func TestWalkToLowerFloorStopsAtClosedCastleDoor(t *testing.T) {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", frame[0], serverpackets.OpcodeMoveToLocation)
 	}
 	_, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
-	if want := (location.Location{X: -19009, Y: 108072, Z: -2032}); dest != want {
-		t.Fatalf("walk toward %+v ends at %+v, want the door at %+v", target, dest, want)
-	}
 	if origin != start {
 		t.Fatalf("walk origin = %+v, want %+v", origin, start)
+	}
+	return dest
+}
+
+// TestWalkToLowerFloorStopsAtClosedCastleDoor walks a player toward a point
+// beyond Gludio castle's closed station door on the same floor, where the
+// cell past the door has a lower floor too. With no route search, the walk
+// ends on the last point a straight walk reaches: the door, not the lower
+// floor behind it.
+func TestWalkToLowerFloorStopsAtClosedCastleDoor(t *testing.T) {
+	t.Parallel()
+	srv, _ := bootAtClosedGludioStationDoor(t)
+	target := location.Location{X: -18952, Y: 108072, Z: -2032}
+	if got, want := walkFromGludioStation(t, srv, target), (location.Location{X: -19009, Y: 108072, Z: -2032}); got != want {
+		t.Fatalf("walk toward %+v ends at %+v, want the door at %+v", target, got, want)
+	}
+}
+
+// TestWalkToLowerFloorTargetBehindClosedCastleDoorIsRefused clicks a point on
+// the lower floor behind Gludio castle's closed station door: the walk
+// stops at the door on the station's floor and never reaches the target.
+func TestWalkToLowerFloorTargetBehindClosedCastleDoorIsRefused(t *testing.T) {
+	t.Parallel()
+	srv, _ := bootAtClosedGludioStationDoor(t)
+	target := location.Location{X: -18952, Y: 108072, Z: -2560}
+	if got, want := walkFromGludioStation(t, srv, target), (location.Location{X: -19009, Y: 108072, Z: -2032}); got != want {
+		t.Fatalf("walk toward %+v ends at %+v, want the door at %+v on the station floor", target, got, want)
 	}
 }
