@@ -601,7 +601,6 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserInfoSnapshot {
 	return serverpackets.UserInfoSnapshot{
 		Character:          live.Character,
-		Template:           live.Template(),
 		Items:              live.inventoryItems(),
 		IsGM:               live.accessLevel().IsGM,
 		SpawnProtectedTeam: l.spawnProtectedTeam(live),

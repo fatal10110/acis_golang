@@ -12,7 +12,7 @@ func TestFrameCharInfoHeroFlag(t *testing.T) {
 	c := &player.Character{}
 	c.SetName("Observed")
 	hero := func() byte {
-		got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))
+		got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c}))
 		return got[len(got)-38]
 	}
 	if got := hero(); got != 0 {

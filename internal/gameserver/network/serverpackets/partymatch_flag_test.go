@@ -13,10 +13,10 @@ import (
 func TestPartyRoomFlag(t *testing.T) {
 	encoders := map[string]func(*player.Character) []byte{
 		"UserInfo": func(c *player.Character) []byte {
-			return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: &player.Template{}}))
+			return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c}))
 		},
 		"CharInfo": func(c *player.Character) []byte {
-			return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))
+			return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c}))
 		},
 	}
 	for name, encode := range encoders {

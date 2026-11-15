@@ -37,9 +37,8 @@ func recommendationDiff(t *testing.T, frame func(*player.Character) []byte) ([]b
 // fields (UserInfo.writeImpl): after the abnormal-effect int32, a byte and
 // the clan-privileges int32, recommendations left then held, each an int16.
 func TestFrameUserInfoCarriesRecommendations(t *testing.T) {
-	tmpl := &player.Template{}
 	base, got, i := recommendationDiff(t, func(c *player.Character) []byte {
-		return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+		return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c}))
 	})
 	if mask := binary.LittleEndian.Uint32(got[i-9:]); mask != 0x55aa33cc {
 		t.Fatalf("abnormal effect 9 bytes before the first difference = %#x, want the anchor mask", mask)
@@ -56,9 +55,8 @@ func TestFrameUserInfoCarriesRecommendations(t *testing.T) {
 // fields (CharInfo.writeImpl): right after the abnormal-effect int32,
 // recommendations left as a byte, then held as an int16.
 func TestFrameCharInfoCarriesRecommendations(t *testing.T) {
-	tmpl := &player.Template{}
 	base, got, i := recommendationDiff(t, func(c *player.Character) []byte {
-		return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
+		return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c}))
 	})
 	if mask := binary.LittleEndian.Uint32(got[i-4:]); mask != 0x55aa33cc {
 		t.Fatalf("abnormal effect right before the first difference = %#x, want the anchor mask", mask)
