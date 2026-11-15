@@ -139,7 +139,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 		l.notifyDisplaced(deactivate, pending)
 	}
 	if activate != nil {
-		*pending = append(*pending, l.beginActivate(activate, func(rejected *Effect) { l.removeRejectedStacked(rejected) }, true))
+		*pending = append(*pending, l.beginActivate(activate, true))
 	}
 }
 
@@ -153,22 +153,6 @@ func (l *List) notifyDisplaced(e *Effect, pending *[]func()) {
 	}
 	notifier, skillID, level := l.owner, e.Skill.ID, e.Skill.Level
 	*pending = append(*pending, func() { notifier.NotifyEffectDisappeared(skillID, level) })
-}
-
-func (l *List) removeRejectedStacked(e *Effect) {
-	e.stopSchedule()
-
-	stackType := e.stackType()
-	queue := l.stacks[stackType]
-	if index := slices.Index(queue, e); index >= 0 {
-		queue = slices.Delete(queue, index, index+1)
-	}
-	if len(queue) == 0 {
-		delete(l.stacks, stackType)
-	} else {
-		l.stacks[stackType] = queue
-	}
-	l.removeFromVisible(e)
 }
 
 // remove drops e from the list for good — the only place e's tick schedule
@@ -223,7 +207,7 @@ func (l *List) remove(e *Effect, pending, exits *[]func()) {
 		if len(queue) > 0 {
 			next := l.contained(queue[0])
 			if next != nil {
-				*pending = append(*pending, l.beginActivate(next, func(*Effect) {}, false))
+				*pending = append(*pending, l.beginActivate(next, false))
 			}
 		}
 	}

@@ -246,28 +246,41 @@ func catTemplate() *npc.Template {
 	}
 }
 
-// TestSiegeSummonRejectsFearAndBluff pins a siege summon's immunity: a Fear
-// landing on a Siege Golem is refused at start, so it is not afraid, holds
-// no effect and runs nowhere; a Bluff is refused the same way. The golem is
-// called on an active battlefield, the only ground it stays on.
-func TestSiegeSummonRejectsFearAndBluff(t *testing.T) {
+// TestSiegeSummonHoldsUnstartedFearAndBluff pins a siege summon's immunity:
+// a Fear landing on a Siege Golem fails to start, so it sends the golem
+// nowhere at once, yet the fear is held and in use and its flag counts.
+// Its first tick still runs its action and then ends it; that flee finds the
+// golem afraid, as every later tick of a started fear does, and leaves it in
+// place. A Bluff fails to start the same way and is held as well. The golem
+// is called on an active battlefield, the only ground it stays on.
+func TestSiegeSummonHoldsUnstartedFearAndBluff(t *testing.T) {
 	t.Parallel()
 	h, golem, hostile := bootFearServitor(t, siegeGolemTemplate(), summonGolemSkillID,
 		gameservertest.WithZones(battlefieldZones(t, -1_000, 1_000, true)))
 	fear := landPetFear(t, golem, hostile, 1092, 6, 2)
-	if golem.Afraid() || fear.InUse() {
-		t.Errorf("siege golem Afraid() = %v, fear in use = %v, want the fear refused", golem.Afraid(), fear.InUse())
+	if !golem.Afraid() || !fear.InUse() {
+		t.Errorf("siege golem Afraid() = %v, fear in use = %v, want the unstarted fear held", golem.Afraid(), fear.InUse())
 	}
 	if _, moved := petMoveDest(drainFrames(t, h.client), golem.ObjectID()); moved {
-		t.Error("fear sent a flee MoveToLocation for a siege golem, want none")
+		t.Error("an unstarted fear sent the siege golem a flee MoveToLocation at landing, want none")
 	}
 
 	bluff := landFearPetEffect(t, golem, hostile, "Bluff", 358, 1, 3)
-	if bluff.InUse() {
-		t.Error("siege golem holds the bluff, want it refused")
+	if !bluff.InUse() {
+		t.Error("siege golem dropped the unstarted bluff, want it held")
 	}
-	if got := len(golem.EffectList().All()); got != 0 {
-		t.Errorf("siege golem holds %d effects, want none", got)
+	if got := len(golem.EffectList().All()); got != 2 {
+		t.Errorf("siege golem holds %d effects, want the fear and the bluff", got)
+	}
+
+	h.srv.Advance(t, 2*time.Second)
+	h.srv.TickEffects()
+	if _, moved := petMoveDest(drainFrames(t, h.client), golem.ObjectID()); moved {
+		t.Error("the fear's first tick moved the afraid siege golem, want it left in place")
+	}
+	if golem.Afraid() || len(golem.EffectList().All()) != 1 {
+		t.Errorf("siege golem Afraid() = %v holding %d effects after the fear's first tick, want the fear ended and the bluff kept",
+			golem.Afraid(), len(golem.EffectList().All()))
 	}
 	if !golem.SiegeSummon() || !golem.FearImmune() || !golem.BluffExempt() {
 		t.Errorf("siege golem SiegeSummon/FearImmune/BluffExempt = %v/%v/%v, want all true",
