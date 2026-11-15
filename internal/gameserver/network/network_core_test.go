@@ -745,7 +745,7 @@ func BenchmarkSessionSendAuthLoginFailFrame(b *testing.B) {
 func benchmarkUserInfoSnapshot() serverpackets.UserInfoSnapshot {
 	c := &player.Character{}
 	c.SetName("Benchmark")
-	return serverpackets.UserInfoSnapshot{Character: c, Template: &player.Template{}}
+	return serverpackets.UserInfoSnapshot{Character: c}
 }
 
 func benchmarkUserInfoPayload(s serverpackets.UserInfoSnapshot) []byte {
