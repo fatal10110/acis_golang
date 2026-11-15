@@ -44,8 +44,9 @@ type RequestSetCrop struct {
 
 // DecodeRequestSetSeed parses a raw RequestSetSeed payload (opcode byte
 // included) of at most maxItems rows (player.InventorySlots.MaxItemInPacket).
-// A row count out of range or not matching the bytes left, or a row naming
-// no item or a negative amount or price, refuses the whole request.
+// A row count out of range or not matching the bytes left, a row naming no
+// item or a negative amount or price, or a seed named twice, refuses the
+// whole request.
 func DecodeRequestSetSeed(payload []byte, maxItems int) (RequestSetSeed, error) {
 	const name = "RequestSetSeed"
 	r, err := newExtendedReader(payload, name, OpcodeRequestSetSeed, manorSetHeaderSize)
@@ -58,11 +59,16 @@ func DecodeRequestSetSeed(payload []byte, maxItems int) (RequestSetSeed, error) 
 		return RequestSetSeed{}, err
 	}
 	req.Items = make([]ManorSeedSetting, count)
+	seen := make(map[int32]struct{}, count)
 	for i := range req.Items {
 		row := ManorSeedSetting{SeedID: r.ReadInt32(), Sales: r.ReadInt32(), Price: r.ReadInt32()}
 		if row.SeedID < 1 || row.Sales < 0 || row.Price < 0 {
 			return RequestSetSeed{}, fmt.Errorf("clientpackets: %s: invalid row seed=%d sales=%d price=%d", name, row.SeedID, row.Sales, row.Price)
 		}
+		if _, dup := seen[row.SeedID]; dup {
+			return RequestSetSeed{}, fmt.Errorf("clientpackets: %s: seed %d named twice", name, row.SeedID)
+		}
+		seen[row.SeedID] = struct{}{}
 		req.Items[i] = row
 	}
 	if err := r.Err(); err != nil {
@@ -73,7 +79,8 @@ func DecodeRequestSetSeed(payload []byte, maxItems int) (RequestSetSeed, error) 
 
 // DecodeRequestSetCrop parses a raw RequestSetCrop payload (opcode byte
 // included) of at most maxItems rows, refused as DecodeRequestSetSeed
-// refuses. A crop with no sales is left out of Items.
+// refuses. A crop with no sales is left out of Items before the repeat
+// check, so only a crop named twice with sales refuses the request.
 func DecodeRequestSetCrop(payload []byte, maxItems int) (RequestSetCrop, error) {
 	const name = "RequestSetCrop"
 	r, err := newExtendedReader(payload, name, OpcodeRequestSetCrop, manorSetHeaderSize)
@@ -86,14 +93,20 @@ func DecodeRequestSetCrop(payload []byte, maxItems int) (RequestSetCrop, error) 
 		return RequestSetCrop{}, err
 	}
 	req.Items = make([]ManorCropSetting, 0, count)
+	seen := make(map[int32]struct{}, count)
 	for range count {
 		row := ManorCropSetting{CropID: r.ReadInt32(), Sales: r.ReadInt32(), Price: r.ReadInt32(), Reward: r.ReadUint8()}
 		if row.CropID < 1 || row.Sales < 0 || row.Price < 0 {
 			return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: invalid row crop=%d sales=%d price=%d", name, row.CropID, row.Sales, row.Price)
 		}
-		if row.Sales > 0 {
-			req.Items = append(req.Items, row)
+		if row.Sales == 0 {
+			continue
 		}
+		if _, dup := seen[row.CropID]; dup {
+			return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: crop %d named twice", name, row.CropID)
+		}
+		seen[row.CropID] = struct{}{}
+		req.Items = append(req.Items, row)
 	}
 	if err := r.Err(); err != nil {
 		return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: %w", name, err)
