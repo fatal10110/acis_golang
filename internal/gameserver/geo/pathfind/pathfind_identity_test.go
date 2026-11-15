@@ -18,11 +18,12 @@ import (
 )
 
 // The fingerprints below were captured from the search before its open/closed
-// sets moved off Go maps. Every Find/FindInto/HasPath answer (found, cost and
-// every waypoint) over each sample folds into one hash, so any change in a
-// path, a cost or a MaxIterations cutoff changes it.
+// sets moved off Go maps; the synthetic one again once two equally close
+// layers resolved to the lower one. Every Find/FindInto/HasPath answer
+// (found, cost and every waypoint) over each sample folds into one hash, so
+// any change in a path, a cost or a MaxIterations cutoff changes it.
 const (
-	syntheticPathFingerprint = 0xd065b846733691c7
+	syntheticPathFingerprint = 0x501497fe39e0e1ba
 	geodataPathFingerprint   = 0xe6335cc8764b1bd5
 )
 

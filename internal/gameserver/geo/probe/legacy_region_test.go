@@ -168,10 +168,12 @@ func (r *legacyRegion) Nearest(bx, by, cx, cy int, z int32) int {
 		}
 		return 0
 	}
+	// Layers are stored bottom-up, the reverse of the file; the scan walks
+	// them in file order, so of two equally close layers the lower wins.
 	count := r.Layers(bx, by, cx, cy)
-	best := 0
+	best := count - 1
 	limit := int32(math.MaxInt32)
-	for i := range count {
+	for i := count - 1; i >= 0; i-- {
 		d := int32(block.DecodeCell(r.multilayerCodeAt(e, legacyCellIndex(cx, cy), i)).Height) - z
 		if d < 0 {
 			d = -d

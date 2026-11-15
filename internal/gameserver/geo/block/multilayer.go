@@ -54,15 +54,17 @@ func (b *Multilayer) NSWENearest(cellX, cellY int, worldZ int32) NSWE {
 }
 
 // Nearest returns a handle to the layer, at the given cell, closest to
-// worldZ. When two layers are equally close, the higher of the two wins.
+// worldZ. The scan runs from the topmost stored layer down and stops at the
+// first layer farther than the previous one, so of two equally close layers
+// the lower wins.
 func (b *Multilayer) Nearest(cellX, cellY int, worldZ int32) int {
 	ci := cellIndex(cellX, cellY)
 	layers := b.cells[ci]
 
-	best := 0
+	best := len(layers) - 1
 	limit := int32(math.MaxInt32)
-	for i, c := range layers {
-		d := abs32(int32(c.Height) - worldZ)
+	for i := len(layers) - 1; i >= 0; i-- {
+		d := abs32(int32(layers[i].Height) - worldZ)
 		if d > limit {
 			break
 		}
