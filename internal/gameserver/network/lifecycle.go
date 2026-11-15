@@ -175,9 +175,11 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		// The removal is silent: observers of a player leaving the world
 		// get no AutoAttackStop, only its DeleteObject. A stance that
 		// expired while a dropped connection lingered sent its own.
-		live.stanceMu.Lock()
-		l.combat.attackStance.Remove(live)
-		live.stanceMu.Unlock()
+		func() {
+			live.stanceMu.Lock()
+			defer live.stanceMu.Unlock()
+			l.combat.attackStance.Remove(live)
+		}()
 	}
 	// Out of sight, still listed online: out of its party and the
 	// Olympiad's waiting list, then the trade cancel decided above, then
