@@ -92,6 +92,7 @@ func (l *GameClientLink) handleLogout(_ context.Context, cs *connState, _ struct
 			refused = true
 			return
 		}
+		l.revokeBossEntries(cs.live)
 		// LeaveWorld is the last packet: what detach sends
 		// afterwards never reaches the client.
 		session.sendLast(serverpackets.FrameLeaveWorld())
@@ -487,6 +488,7 @@ func (l *GameClientLink) handleRequestRestart(ctx context.Context, cs *connState
 			refused = true
 			return
 		}
+		l.revokeBossEntries(cs.live)
 		cs.live.Character.DetachSession()
 		owners = l.detachLivePlayer(cs.live)
 	}) {

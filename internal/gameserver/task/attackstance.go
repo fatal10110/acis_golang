@@ -2,6 +2,7 @@ package task
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -51,6 +52,14 @@ type attackStanceSummoner interface {
 
 type attackStanceCubics interface {
 	Cubics() []AttackStanceCubic
+}
+
+// attackStanceLocker is an actor whose stance is also entered on goroutines
+// other than its queue's: its expiry holds the actor's lock, so a refresh
+// cannot land between the deadline check and the in-combat flag clear, nor
+// between that clear and the AutoAttackStop it sends.
+type attackStanceLocker interface {
+	StanceLock() sync.Locker
 }
 
 // AttackStance tracks actors whose combat animation should remain active
@@ -144,6 +153,11 @@ func (a *AttackStance) Tick() error {
 // expire ends actor's combat stance unless its deadline was refreshed after
 // the sweep observed it.
 func (a *AttackStance) expire(actor AttackStanceActor, deadline time.Time) {
+	if l, ok := actor.(attackStanceLocker); ok {
+		mu := l.StanceLock()
+		mu.Lock()
+		defer mu.Unlock()
+	}
 	if !a.expireIf(actor.ObjectID(), deadline) {
 		return
 	}
