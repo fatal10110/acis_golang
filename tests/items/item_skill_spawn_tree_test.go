@@ -47,8 +47,10 @@ func TestSummonRegularTreeSpawnsDecorationThatDespawns(t *testing.T) {
 	heading := player.Heading()
 
 	c.Send(encodeRequestMagicSkillUse(summonRegularTreeID))
+	// The cast must have begun before the loop below waits for it to end.
+	frames := readUntilOpcode(t, c, serverpackets.OpcodeMagicSkillUse)
 	srv.AdvanceUntil(t, "tree cast ends", func() bool { return !srv.PlayerCastingNow(t, objID) })
-	frames := collectUntilQuiet(t, c)
+	frames = append(frames, collectUntilQuiet(t, c)...)
 	var treeID int32
 	for _, f := range frames {
 		if f[0] != serverpackets.OpcodeNPCInfo {
