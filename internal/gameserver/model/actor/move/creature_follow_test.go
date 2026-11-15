@@ -123,7 +123,7 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 
 	want := event.Move{
 		Origin:      origin,
-		Destination: location.Location{X: 111, Y: 20, Z: 30},
+		Destination: location.Location{X: 111, Y: 20, Z: 999},
 		Speed:       50,
 		Duration:    2100 * time.Millisecond,
 	}

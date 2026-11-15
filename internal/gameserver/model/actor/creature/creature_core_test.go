@@ -207,7 +207,7 @@ func TestLiveOwnsOneMovementState(t *testing.T) {
 	if second != first {
 		t.Fatal("Move() returned a different movement state")
 	}
-	if got := second.Destination(); got != (location.Location{X: 60, Y: 20, Z: 30}) {
+	if got := second.Destination(); got != (location.Location{X: 60, Y: 20, Z: 999}) {
 		t.Fatalf("Destination() = %+v, want the accepted target", got)
 	}
 
@@ -217,7 +217,7 @@ func TestLiveOwnsOneMovementState(t *testing.T) {
 	if live.Move() != first {
 		t.Fatal("repeated movement replaced the embedded movement state")
 	}
-	if got := first.Destination(); got != (location.Location{X: 70, Y: 20, Z: 30}) {
+	if got := first.Destination(); got != (location.Location{X: 70, Y: 20, Z: 999}) {
 		t.Fatalf("Destination() = %+v, want the second accepted target", got)
 	}
 }
@@ -245,10 +245,10 @@ func TestLiveMovementStateIsPerCreature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := first.Move().Destination(); got != (location.Location{X: 50, Y: 0, Z: 30}) {
+	if got := first.Move().Destination(); got != (location.Location{X: 50, Y: 0, Z: 999}) {
 		t.Fatalf("first Destination() = %+v, want its own target", got)
 	}
-	if got := second.Move().Destination(); got != (location.Location{X: 150, Y: 0, Z: 30}) {
+	if got := second.Move().Destination(); got != (location.Location{X: 150, Y: 0, Z: 999}) {
 		t.Fatalf("second Destination() = %+v, want its own target", got)
 	}
 }
