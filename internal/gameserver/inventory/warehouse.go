@@ -23,8 +23,8 @@ type Holder struct {
 	MountCollar int32
 	// EnchantScroll is the enchant scroll the holder has selected, or 0.
 	EnchantScroll int32
-	// Casting reports a cast in flight; CastConsumeID is the item id that
-	// cast consumes, or 0.
+	// Casting reports a cast in flight. CastConsumeID is the item id the
+	// most recently started cast consumes, in flight or ended, or 0.
 	Casting       bool
 	CastConsumeID int32
 }
@@ -52,7 +52,7 @@ func (h Holder) manipulable(inst *item.Instance, tmpl *item.Template, count int)
 
 // available reports whether inst is free to be offered: not worn, not a
 // quest item, not the pet's collar, the selected enchant scroll or what the
-// cast in flight consumes, and tradable unless allowNonTradable.
+// last cast consumes, and tradable unless allowNonTradable.
 func (h Holder) available(inst *item.Instance, tmpl *item.Template, allowNonTradable bool) bool {
 	if inst.Equipped() || inst.QuestItem(tmpl) || h.petCollar(inst.ObjectID) {
 		return false
@@ -60,7 +60,7 @@ func (h Holder) available(inst *item.Instance, tmpl *item.Template, allowNonTrad
 	if h.EnchantScroll != 0 && inst.ObjectID == h.EnchantScroll {
 		return false
 	}
-	if h.Casting && h.CastConsumeID != 0 && inst.TemplateID == h.CastConsumeID {
+	if h.CastConsumeID != 0 && inst.TemplateID == h.CastConsumeID {
 		return false
 	}
 	return allowNonTradable || inst.Tradable(tmpl)

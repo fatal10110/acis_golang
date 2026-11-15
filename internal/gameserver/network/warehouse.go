@@ -135,7 +135,7 @@ func (l *GameClientLink) itemHolder(live *livePlayer) invops.Holder {
 		Casting:       live.Character.CastingNow(),
 	}
 	if live.cast != nil {
-		if def, ok := live.cast.CurrentSkill(); ok {
+		if def := live.cast.LastSkill(); def != nil {
 			h.CastConsumeID = int32(def.ItemConsumeID)
 		}
 	}

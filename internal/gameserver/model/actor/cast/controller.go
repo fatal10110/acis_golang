@@ -164,9 +164,12 @@ type DamageInterrupt struct {
 type Controller struct {
 	actor Actor
 
-	mu             sync.RWMutex
-	casting        bool
-	current        *modelskill.Definition
+	mu      sync.RWMutex
+	casting bool
+	current *modelskill.Definition
+	// last is the skill of the most recently started cast. Unlike current,
+	// it outlives the cast until the next one starts.
+	last           *modelskill.Definition
 	target         Target
 	plan           Plan
 	startedAt      time.Time
@@ -327,6 +330,14 @@ func (c *Controller) CurrentSkill() (*modelskill.Definition, bool) {
 		return nil, false
 	}
 	return c.current, true
+}
+
+// LastSkill returns the skill of the most recently started cast, ended or
+// not, or nil when the actor has cast nothing yet.
+func (c *Controller) LastSkill() *modelskill.Definition {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.last
 }
 
 // InFlight returns the skill and target of the cast in flight, and whether
@@ -604,6 +615,7 @@ func (c *Controller) claimLocked(now time.Time, target Target, def *modelskill.D
 	plan := c.buildPlan(def)
 	c.casting = true
 	c.current = def
+	c.last = def
 	c.target = target
 	c.plan = plan
 	c.startedAt = now
@@ -1018,6 +1030,7 @@ func (c *Controller) claimToggle(def *modelskill.Definition) (uint64, bool) {
 	}
 	c.casting = true
 	c.current = def
+	c.last = def
 	return c.castSeq, true
 }
 
