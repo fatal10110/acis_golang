@@ -673,7 +673,9 @@ func (m *Manager) save(ctx context.Context) error {
 }
 
 // snapshot returns every castle's lists as rows, castle by castle in
-// castle order, the running period's before the next one's.
+// castle order, the running period's before the next one's. A seed or crop
+// a period list holds twice gives one row, its first entry's, so one
+// castle's list never fails the store's save of every castle's.
 func (m *Manager) snapshot() ([]ProductionRow, []ProcureRow) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -687,12 +689,24 @@ func (m *Manager) snapshot() ([]ProductionRow, []ProcureRow) {
 		id := int32(c.ID)
 		for _, next := range []bool{false, true} {
 			seeds, crops := p.lists(next)
+			seen := make(map[int32]struct{}, len(seeds))
 			for _, sp := range seeds {
+				if _, dup := seen[sp.ID]; dup {
+					m.log.Error().Int32("castle", id).Int32("seed", sp.ID).Bool("next", next).Msg("manor: repeated seed left out of the save")
+					continue
+				}
+				seen[sp.ID] = struct{}{}
 				production = append(production, ProductionRow{
 					CastleID: id, SeedID: sp.ID, Amount: sp.Amount(), StartAmount: sp.StartAmount, Price: sp.Price, NextPeriod: next,
 				})
 			}
+			clear(seen)
 			for _, cp := range crops {
+				if _, dup := seen[cp.ID]; dup {
+					m.log.Error().Int32("castle", id).Int32("crop", cp.ID).Bool("next", next).Msg("manor: repeated crop left out of the save")
+					continue
+				}
+				seen[cp.ID] = struct{}{}
 				procure = append(procure, ProcureRow{
 					CastleID: id, CropID: cp.ID, Amount: cp.Amount(), StartAmount: cp.StartAmount, Price: cp.Price,
 					RewardType: cp.Reward, NextPeriod: next,
