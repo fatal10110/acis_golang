@@ -242,21 +242,30 @@ func TestChamberlainManorWindowsAndSettings(t *testing.T) {
 	))
 	wantOnly(t, "unknown ask", w.bypass(t, "manor_menu_select?ask=1&state=-1&time=0"))
 
-	// Seeds: within the limit and bounds, another castle's seed included,
-	// at no sales; over the limit, under or over the bounds, or unknown,
-	// left out. The list set answers nothing.
-	wantOnly(t, "set seeds", w.send(t, encodeSetSeed(1,
-		[3]int{5016, 100, 50}, [3]int{5016, 101, 5}, [3]int{5012, 10, 5}, [3]int{5012, 10, 101},
-		[3]int{5100, 30, 4}, [3]int{9999, 1, 1}, [3]int{5012, 0, 6},
+	// Seeds: over the limit, under or over the bounds, or unknown, left
+	// out, each request naming a seed once; within the limit and bounds,
+	// another castle's seed included, at no sales, kept. A list set
+	// answers nothing.
+	wantOnly(t, "set seeds out of the limit and bounds", w.send(t, encodeSetSeed(1,
+		[3]int{5016, 101, 5}, [3]int{5012, 10, 5}, [3]int{5100, 30, 71}, [3]int{9999, 1, 1},
 	)))
+	if got := m.SeedProduction(1, true); len(got) != 0 {
+		t.Fatalf("next seeds = %v, want none", productions(got))
+	}
+	wantOnly(t, "set seeds", w.send(t, encodeSetSeed(1, [3]int{5016, 100, 50}, [3]int{5100, 30, 4}, [3]int{5012, 0, 6})))
 	if got, want := productions(m.SeedProduction(1, true)), [][4]int32{{5016, 100, 100, 50}, {5100, 30, 30, 4}, {5012, 0, 0, 6}}; !equalRows(got, want) {
 		t.Fatalf("next seeds = %v, want %v", got, want)
 	}
 	// Crops: only Gludio's, within the limit and bounds; a crop with no
 	// sales is dropped before anything.
+	wantOnly(t, "set crops out of the limit and bounds", w.send(t, encodeSetCrop(1,
+		[4]int{5073, 201, 50, 1}, [4]int{5068, 10, 17, 1}, [4]int{5074, 10, 20, 1},
+	)))
+	if got := m.CropProcure(1, true); len(got) != 0 {
+		t.Fatalf("next crops = %v, want none", procures(got))
+	}
 	wantOnly(t, "set crops", w.send(t, encodeSetCrop(1,
-		[4]int{5073, 200, 30, 2}, [4]int{5073, 201, 50, 1}, [4]int{5068, 10, 17, 1}, [4]int{5068, 10, 300, 1},
-		[4]int{5068, 0, 50, 1}, [4]int{5074, 10, 20, 1},
+		[4]int{5073, 200, 30, 2}, [4]int{5068, 10, 300, 1}, [4]int{9999, 0, 50, 1},
 	)))
 	if got, want := procures(m.CropProcure(1, true)), [][5]int32{{5073, 200, 200, 30, 2}, {5068, 10, 10, 300, 1}}; !equalRows(got, want) {
 		t.Fatalf("next crops = %v, want %v", got, want)

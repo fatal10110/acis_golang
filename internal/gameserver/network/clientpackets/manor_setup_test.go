@@ -12,7 +12,8 @@ import (
 // are 12 bytes (seed id, sales, price), 13 for a crop (and a reward byte);
 // a count of 0, over the cap or not matching the bytes left, or a row with
 // an id under 1 or a negative sales or price, refuses the whole list; a
-// crop with no sales is left out.
+// crop with no sales is left out. An id named twice refuses the list too,
+// so the next period never holds one seed or crop twice.
 func TestDecodeRequestSetSeed(t *testing.T) {
 	got, err := DecodeRequestSetSeed(seedExtended(OpcodeRequestSetSeed, int32(3), int32(2),
 		int32(5016), int32(10), int32(5), int32(5017), int32(0), int32(0)), 2)
@@ -31,6 +32,7 @@ func TestDecodeRequestSetSeed(t *testing.T) {
 		"no item":        seedExtended(OpcodeRequestSetSeed, int32(1), int32(1), int32(0), int32(1), int32(1)),
 		"negative sales": seedExtended(OpcodeRequestSetSeed, int32(1), int32(1), int32(5016), int32(-1), int32(1)),
 		"negative price": seedExtended(OpcodeRequestSetSeed, int32(1), int32(1), int32(5016), int32(1), int32(-1)),
+		"repeated seed":  seedExtended(OpcodeRequestSetSeed, int32(1), int32(2), int32(5016), int32(1), int32(1), int32(5016), int32(2), int32(1)),
 	} {
 		if _, err := DecodeRequestSetSeed(payload, 2); err == nil || errors.Is(err, wire.ErrShortPacket) {
 			t.Errorf("%s: err = %v, want a refusal that is no underflow", name, err)
@@ -57,6 +59,10 @@ func TestDecodeRequestSetCrop(t *testing.T) {
 		"no item":        seedExtended(OpcodeRequestSetCrop, int32(1), int32(1), int32(0), int32(1), int32(1), byte(1)),
 		"negative price after a crop": seedExtended(OpcodeRequestSetCrop, int32(1), int32(2),
 			int32(5073), int32(1), int32(1), byte(1), int32(5068), int32(1), int32(-1), byte(1)),
+		"repeated crop": seedExtended(OpcodeRequestSetCrop, int32(1), int32(2),
+			int32(5073), int32(1), int32(1), byte(1), int32(5073), int32(2), int32(1), byte(1)),
+		"repeated crop with no sales": seedExtended(OpcodeRequestSetCrop, int32(1), int32(2),
+			int32(5073), int32(1), int32(1), byte(1), int32(5073), int32(0), int32(1), byte(1)),
 	} {
 		if _, err := DecodeRequestSetCrop(payload, 2); err == nil {
 			t.Errorf("%s: decoded, want a refusal", name)
