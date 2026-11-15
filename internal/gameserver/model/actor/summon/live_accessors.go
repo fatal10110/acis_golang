@@ -805,6 +805,10 @@ func (a *Actor) setFollowStatus(follow bool) {
 	a.TryToFollow(a.currentOwner())
 }
 
+// FollowOwner turns following the owner back on: the summon heads back to
+// its owner.
+func (a *Actor) FollowOwner() { a.setFollowStatus(true) }
+
 // idle cancels the attached AI's current intention without falling back to
 // following the owner.
 func (a *Actor) idle() {

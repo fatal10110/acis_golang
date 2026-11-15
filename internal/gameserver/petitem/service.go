@@ -142,13 +142,14 @@ func (s *Service) CheckGive(playerInv, petInv *itemcontainer.Inventory, pet *sum
 // perform the mutation after their own between-validation-and-mutation
 // side effects (e.g. cancelling an active enchant selection).
 //
-// A worn item comes off first, once count is one the transfer can move:
+// A worn item comes off first when count moves the whole of it and is one
+// the transfer can move; part of a worn stack leaves the rest worn.
 // Unequipped then lists every instance whose slots changed, for the caller
 // to take their equipment effects off the giver.
 func (s *Service) Transfer(from, to *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
 	var unequipped []*item.Instance
 	if validTransferCount(from, objectID, count) {
-		if inst := from.ItemByObjectID(objectID); inst.Equipped() {
+		if inst := from.ItemByObjectID(objectID); inst.Equipped() && count >= inst.Snapshot().Count {
 			unequipped = from.UnequipItem(inst)
 		}
 	}

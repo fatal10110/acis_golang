@@ -20,16 +20,19 @@ func (m *pickupMove) MoveStraightToLocation(at location.Location) (bool, error) 
 
 // recordingPickUp places ground items and records what the AI asks of them.
 type recordingPickUp struct {
-	items map[int32]location.Location
-	idles int
-	taken []int32
+	items   map[int32]location.Location
+	unseen  map[int32]bool
+	idles   int
+	follows int
+	taken   []int32
 }
 
-func (p *recordingPickUp) PickUpTarget(id int32) (location.Location, bool) {
+func (p *recordingPickUp) PickUpTarget(id int32) (location.Location, bool, bool) {
 	at, ok := p.items[id]
-	return at, ok
+	return at, ok, ok && !p.unseen[id]
 }
 func (p *recordingPickUp) Idle()           { p.idles++ }
+func (p *recordingPickUp) FollowOwner()    { p.follows++ }
 func (p *recordingPickUp) PickUp(id int32) { p.taken = append(p.taken, id) }
 
 func TestSummonPickUpWalksToTheItemThenTakesIt(t *testing.T) {
@@ -99,5 +102,48 @@ func TestSummonPickUpWithoutWiringIsRefused(t *testing.T) {
 	brain := NewSummon(actor(100), &pickupMove{}, &recordingAttack{})
 	if brain.TryToPickUp(7) {
 		t.Fatal("TryToPickUp() with no pick-up wiring = true, want refused")
+	}
+}
+
+func TestSummonPickUpOfAnUnseenItemFollowsTheOwner(t *testing.T) {
+	move := &pickupMove{}
+	pickup := &recordingPickUp{
+		items:  map[int32]location.Location{7: {X: 100}},
+		unseen: map[int32]bool{7: true},
+	}
+	brain := NewSummon(actor(100), move, &recordingAttack{})
+	brain.SetPickUp(pickup)
+
+	brain.TryToPickUp(7)
+	if len(move.straight) != 0 || len(pickup.taken) != 0 || pickup.follows != 1 || pickup.idles != 0 {
+		t.Fatalf("unseen item: walks %v, taken %v, follows %d, idles %d; want only one owner follow",
+			move.straight, pickup.taken, pickup.follows, pickup.idles)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle", got)
+	}
+}
+
+func TestSummonPickUpThinkKeepsTheWalkUnderWay(t *testing.T) {
+	pet := actor(100)
+	move := &pickupMove{}
+	item := location.Location{X: 500}
+	pickup := &recordingPickUp{items: map[int32]location.Location{7: item}}
+	brain := NewSummon(pet, move, &recordingAttack{})
+	brain.SetPickUp(pickup)
+
+	brain.TryToPickUp(7)
+	pet.moving = true
+	brain.Think()
+	brain.Think()
+	if len(move.straight) != 1 {
+		t.Fatalf("thinks mid-walk: walks %v, want the one walk started", move.straight)
+	}
+
+	// Stopped short (a stun, a blocked line), the next think walks again.
+	pet.moving = false
+	brain.Think()
+	if len(move.straight) != 2 {
+		t.Fatalf("think after the walk stopped short: walks %v, want a second walk", move.straight)
 	}
 }

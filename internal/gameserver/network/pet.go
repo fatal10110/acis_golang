@@ -219,10 +219,12 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// An object that is no ground item still becomes the pet's intention,
-	// which ends at once with the pet idle; the owner is answered too.
-	_, onGround := l.petPickUpGround(req.ObjectID)
-	if !pet.TryToPickUp(req.ObjectID) || !onGround {
+	// An object that is no ground item, or one out of the pet's sight,
+	// still becomes the pet's intention, which ends at once with the pet
+	// idle or back at its owner's heel; the owner is answered too.
+	ground, onGround := l.petPickUpGround(req.ObjectID)
+	seen := onGround && world.Knows(pet, ground)
+	if !pet.TryToPickUp(req.ObjectID) || !seen {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 }
