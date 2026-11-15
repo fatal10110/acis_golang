@@ -998,15 +998,16 @@ func liveOutOfControl(live *livePlayer) bool {
 }
 
 // startLiveAutoAttack enters or refreshes live's attack stance. Entering it
-// shows the stance on live's summon first, then on live.
+// shows the stance on live's summon first, then on live. A hit runs it on
+// the attacker's goroutine, ahead of the hit's damage, so its AutoAttackStart
+// leads the hit's StatusUpdate.
 func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	if l.combat.attackStance != nil {
-		l.combat.attackStance.Add(live)
-	}
-	if !live.SetInCombat(true) {
+	live.stanceMu.Lock()
+	defer live.stanceMu.Unlock()
+	if !l.enterLiveAttackStance(live) {
 		return
 	}
 	if l.world != nil {
@@ -1021,12 +1022,32 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	})
 }
 
+// enterLiveAttackStance refreshes live's stance entry and sets it in combat,
+// reporting whether live was out of combat before. The caller holds live's
+// stance lock. A player that has left the world is not tracked again: its
+// exit removes the entry under that lock once it is despawned, so an entry
+// added after that would never expire (its queue is closed) and would refuse
+// the next session's exit.
+func (l *GameClientLink) enterLiveAttackStance(live *livePlayer) bool {
+	if l.world != nil {
+		if obj, ok := l.world.Object(live.ObjectID()); !ok || obj != world.Tracked(live) {
+			return false
+		}
+	}
+	if l.combat.attackStance != nil {
+		l.combat.attackStance.Add(live)
+	}
+	return live.SetInCombat(true)
+}
+
 // stopLiveAttackStance ends the attack stance of live, which just died: it
 // is out of combat at once, and when it was in stance, live and its
 // observers see the stance end right after its Die. Its summon, whose stance
 // is this one, gets no AutoAttackStop: only the stance expiry sends that, and
 // it no longer runs.
 func (l *GameClientLink) stopLiveAttackStance(live *livePlayer) {
+	live.stanceMu.Lock()
+	defer live.stanceMu.Unlock()
 	live.SetInCombat(false)
 	if l.combat.attackStance == nil || !l.combat.attackStance.Remove(live) {
 		return
@@ -1070,10 +1091,9 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 	if !ok {
 		return
 	}
-	if l.combat.attackStance != nil {
-		l.combat.attackStance.Add(owner)
-	}
-	if !owner.SetInCombat(true) {
+	owner.stanceMu.Lock()
+	defer owner.stanceMu.Unlock()
+	if !l.enterLiveAttackStance(owner) {
 		return
 	}
 	l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))

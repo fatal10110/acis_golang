@@ -192,6 +192,7 @@ type options struct {
 	allowDelevel           bool
 	autoLearnSkills        bool
 	deepBlueDropRules      bool
+	dropMultiplier         int
 	autoLoot               bool
 	autoLootRaid           bool
 	singleItemDrop         bool
@@ -595,6 +596,13 @@ func WithAllowDelevel(allow bool) Option {
 // out-leveled kill cuts the drop chance (default false).
 func WithDeepBlueDropRules(enabled bool) Option {
 	return func(o *options) { o.deepBlueDropRules = enabled }
+}
+
+// WithPlayerDroppedMultiplier sets the PlayerDroppedItemMultiplier: how
+// many times longer than its plain destroy delay an item a player or its pet
+// dropped lasts on the ground (default 1).
+func WithPlayerDroppedMultiplier(m int) Option {
+	return func(o *options) { o.dropMultiplier = m }
 }
 
 // WithAutoLoot sets the server.properties AutoLoot gate: whether a
@@ -2080,7 +2088,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	cleanup(t, taskEffects.Reset)
 	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
 	groundStore := gamesql.NewGroundItemStore(db)
-	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
+	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: cmp.Or(o.dropMultiplier, 1)}, time.Now)
 	gameNow := o.gameClockNow
 	var drivenNow atomic.Pointer[func() time.Time]
 	if !o.drivenStart.IsZero() {

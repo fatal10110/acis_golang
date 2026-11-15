@@ -65,10 +65,11 @@ func TestBossZoneTeleportOutRevokesPermission(t *testing.T) {
 	}
 }
 
-// TestBossZoneLogoutKeepsPermission is the disconnect branch
-// (BossZone.java:148-151): a player logging out inside keeps its permission
-// and gets a fresh re-entry window.
-func TestBossZoneLogoutKeepsPermission(t *testing.T) {
+// TestBossZoneLogoutRevokesPermission pins an accepted Logout inside a lair
+// (Logout.java:52, Player.removeFromBossZone -> BossZone.removePlayer): the
+// permission and any re-entry window are withdrawn before the player leaves,
+// so the zone exit grants no window.
+func TestBossZoneLogoutRevokesPermission(t *testing.T) {
 	t.Parallel()
 	srv, boss, objID := bootInBossZone(t)
 
@@ -76,7 +77,11 @@ func TestBossZoneLogoutKeepsPermission(t *testing.T) {
 	if !srv.Client.AwaitClose(5 * time.Second) {
 		t.Fatal("server kept the connection open after Logout")
 	}
-	if !slices.Contains(boss.AllowedPlayers(), objID) {
-		t.Fatal("player logging out inside the boss zone lost its entry permission")
+	srv.AdvanceUntil(t, "player left the world", func() bool {
+		_, ok := srv.State.Player(objID)
+		return !ok
+	})
+	if slices.Contains(boss.AllowedPlayers(), objID) {
+		t.Fatal("player logging out inside the boss zone kept its entry permission")
 	}
 }

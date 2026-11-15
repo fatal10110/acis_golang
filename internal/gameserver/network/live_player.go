@@ -262,6 +262,19 @@ type livePlayer struct {
 	// (syncCubicTargets).
 	cubicsMu sync.Mutex
 	cubics   map[cubic.ID]*cubic.Runtime
+
+	// stanceMu serializes p's attack-stance transitions, each with the
+	// frames it sends: entering or refreshing the stance (tracker entry,
+	// in-combat flag, AutoAttackStart), which a hit runs on the attacker's
+	// goroutine, its expiry on p's queue, its end at death and its removal
+	// at exit. An expiry cannot clear the flag of a stance a hit has just
+	// refreshed, and no hit tracks p again once its exit removed the entry.
+	stanceMu sync.Mutex
+}
+
+// StanceLock returns the lock p's attack-stance transitions hold.
+func (p *livePlayer) StanceLock() sync.Locker {
+	return &p.stanceMu
 }
 
 // OnlineCharacter returns the character behind an online player registered

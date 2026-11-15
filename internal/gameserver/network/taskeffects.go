@@ -44,9 +44,10 @@ const autosaveSaveTimeout = 5 * time.Second
 // the player's own queue, but logout removes it from the zones on the
 // detach path.
 //
-// offGrid is set from a teleport's grid leave until the Appearing rejoin.
-// The player holds no zone in between, so position updates must not enter
-// any.
+// offGrid is set from a teleport's grid leave until the Appearing rejoin,
+// and for good once logout has removed the player from its zones. The
+// player holds no zone meanwhile, so neither position updates nor a zone
+// reload may enter any.
 //
 // steps counts the movement steps since the zones were last revalidated: a
 // step revalidates them only every zoneStepsPerRevalidation steps, while
@@ -262,6 +263,10 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index) {
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	// Off the grid for good: a zone reload that still lists the departing
+	// player (its world snapshot predates the despawn) must not admit it
+	// into the reloaded zones, where it would outlive its session.
+	a.offGrid = true
 	ix.RemoveFrom(a, a.held.X, a.held.Y)
 	a.syncFlags()
 	// A player logging out is no longer tracked for the pvp flag, so
