@@ -280,7 +280,7 @@ func (w *dialogWorld) expand(s string) string {
 // discards it.
 func (w *dialogWorld) offerAll(t *testing.T) {
 	t.Helper()
-	w.srv.Client.Send(encodeLinkHTML("test/any.htm"))
+	w.srv.ShowDialogPage(t, w.player, anyBypassPage)
 	w.srv.ReadQueued(t, w.srv.Client)
 }
 

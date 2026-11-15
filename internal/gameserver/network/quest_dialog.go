@@ -21,7 +21,7 @@ func (l *GameClientLink) showDialogPage(live *livePlayer, e event.DialogPageShow
 		if l.html != nil {
 			page = l.setPage(e.File)
 		} else {
-			page = "<html><body>My html is missing:<br>" + e.File + "</body></html>"
+			page = missingPage(e.File)
 		}
 	}
 	if e.ObjectID != 0 {
