@@ -434,11 +434,30 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 // inventory's base location) is already done — otherwise the unequip step
 // would clobber the drop reset.
 func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
-	if !inv.Container.Remove(inst) {
+	defer inv.lockHeld()()
+	return inv.removeLocked(inst, isDrop)
+}
+
+// lockHeld takes Container.mu then mu, the order Exchange takes, so the
+// read-then-change steps a caller makes on a held item are atomic against
+// transfers and every other mutation. The returned func releases both and
+// then reports queued deliveries.
+func (inv *Inventory) lockHeld() (unlock func()) {
+	inv.Container.mu.Lock()
+	inv.mu.Lock()
+	return func() {
+		inv.mu.Unlock()
+		inv.Container.mu.Unlock()
+		inv.fireDelivery()
+	}
+}
+
+// removeLocked is Remove for a caller holding Container.mu then mu.
+func (inv *Inventory) removeLocked(inst *item.Instance, isDrop bool) bool {
+	if _, ok := inv.Container.items[inst.ObjectID]; !ok {
 		return false
 	}
-
-	inv.mu.Lock()
+	inv.Container.dropLocked(inst.ObjectID)
 	for i, occupant := range inv.paperdoll {
 		if occupant == inst {
 			// A worn bow or rod leaving takes the left hand with it here
@@ -447,7 +466,6 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 			inv.unequipSlotLocked(i)
 		}
 	}
-	inv.mu.Unlock()
 
 	if isDrop {
 		st := inst.Snapshot()
@@ -455,24 +473,27 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 	}
 
 	st := inst.Snapshot()
-	inv.mu.Lock()
-	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
-	defer inv.mu.Unlock()
 	inv.logItemLocked(st, UpdateRemoved)
 	inv.queueRemovedLocked(st)
 	return true
 }
 
 // DestroyItem destroys count units of inst, unequipping and dequeuing it
-// first when it's fully consumed and was equipped.
+// first when it's fully consumed and was equipped. It returns nil when inst
+// is not held here. The count check and the change happen under the same
+// locks a transfer takes, so units cannot be both moved and destroyed.
 func (inv *Inventory) DestroyItem(inst *item.Instance, count int) *item.Instance {
 	if inst == nil {
 		return nil
 	}
+	defer inv.lockHeld()()
+	if inv.Container.items[inst.ObjectID] != inst {
+		return nil
+	}
 	return destroyItemCore(inst, count, func(inst *item.Instance) bool {
-		return inv.Remove(inst, false)
+		return inv.removeLocked(inst, false)
 	}, func(inst *item.Instance) {
-		inv.queueUpdate(inst, UpdateModified)
+		inv.queueUpdateLocked(inst, UpdateModified)
 	})
 }
 
@@ -544,10 +565,11 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 	if inst == nil {
 		return false
 	}
-	if inv.ItemByObjectID(inst.ObjectID) != inst || !inst.SetEnchantLevel(level) {
+	defer inv.lockHeld()()
+	if inv.Container.items[inst.ObjectID] != inst || !inst.SetEnchantLevel(level) {
 		return false
 	}
-	inv.queueUpdate(inst, UpdateModified)
+	inv.queueUpdateLocked(inst, UpdateModified)
 	return true
 }
 
@@ -555,11 +577,15 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 // modified inventory notification, even when the value was already set. It
 // returns false when inst is absent from this inventory.
 func (inv *Inventory) SetCustomType2(inst *item.Instance, value int) bool {
-	if inst == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
+	if inst == nil {
+		return false
+	}
+	defer inv.lockHeld()()
+	if inv.Container.items[inst.ObjectID] != inst {
 		return false
 	}
 	inst.SetCustomType2(value)
-	inv.queueUpdate(inst, UpdateModified)
+	inv.queueUpdateLocked(inst, UpdateModified)
 	return true
 }
 
@@ -570,10 +596,11 @@ func (inv *Inventory) SetAugmentation(inst *item.Instance, aug item.Augmentation
 	if inst == nil {
 		return false
 	}
-	if inv.ItemByObjectID(inst.ObjectID) != inst || !inst.SetAugmentation(&aug) {
+	defer inv.lockHeld()()
+	if inv.Container.items[inst.ObjectID] != inst || !inst.SetAugmentation(&aug) {
 		return false
 	}
-	inv.queueUpdate(inst, UpdateModified)
+	inv.queueUpdateLocked(inst, UpdateModified)
 	return true
 }
 
@@ -581,13 +608,17 @@ func (inv *Inventory) SetAugmentation(inst *item.Instance, aug item.Augmentation
 // inventory, and queues a modified inventory notification. It returns false
 // when inst is absent from this inventory or carries none.
 func (inv *Inventory) RemoveAugmentation(inst *item.Instance) bool {
-	if inst == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
+	if inst == nil {
+		return false
+	}
+	defer inv.lockHeld()()
+	if inv.Container.items[inst.ObjectID] != inst {
 		return false
 	}
 	if _, ok := inst.RemoveAugmentation(); !ok {
 		return false
 	}
-	inv.queueUpdate(inst, UpdateModified)
+	inv.queueUpdateLocked(inst, UpdateModified)
 	return true
 }
 
@@ -600,7 +631,8 @@ func (inv *Inventory) RemoveAugmentation(inst *item.Instance) bool {
 // Otherwise the whole instance is removed from the inventory and returned
 // as-is (newObjectID unused). It returns nil if objectID isn't held.
 func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *item.Instance {
-	inst := inv.ItemByObjectID(objectID)
+	defer inv.lockHeld()()
+	inst := inv.Container.items[objectID]
 	if inst == nil {
 		return nil
 	}
@@ -610,7 +642,7 @@ func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *it
 		if _, ok := inst.ReduceCount(count); !ok {
 			return nil
 		}
-		inv.queueUpdate(inst, UpdateModified)
+		inv.queueUpdateLocked(inst, UpdateModified)
 
 		tmpl, _ := inv.Templates().Get(st.TemplateID)
 		var manaLeft int
@@ -622,7 +654,7 @@ func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *it
 		return &item.Instance{ObjectID: newObjectID, TemplateID: st.TemplateID, Count: count, ManaLeft: manaLeft}
 	}
 
-	if !inv.Remove(inst, true) {
+	if !inv.removeLocked(inst, true) {
 		return nil
 	}
 	return inst
