@@ -1060,6 +1060,10 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, m.TargetName, int32(m.SkillID), int32(m.SkillLevel)))
 			}
+		case skillhandler.SummonFriendRefused:
+			if recipient, online := l.livePlayerByID(m.RecipientID); online {
+				sendSummonRefusal(send, recipient, m.Refusal)
+			}
 		case skillhandler.AttackFailedMessage:
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))

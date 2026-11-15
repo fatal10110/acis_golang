@@ -28,40 +28,33 @@ func (summonCreatureHandler) Use(cast Cast) {
 	caster.SummonCreature(cast.Skill, cast.Item)
 }
 
-type summonFriendActorState interface {
-	Mounted() bool
-	OlympiadMode() bool
-	ObserverMode() bool
-	NoSummonFriendZone() bool
-}
-
 type summonFriendCaster interface {
 	player.SummonFriendRequester
 }
 
-// summonFriendRequester is *player.Character's teleport-request/confirm-summon
-// surface (see actor_test.go's compile-time assertion). caster stays untyped
-// (any) rather than a Character-typed parameter: the plain
-// SUMMON_FRIEND/SUMMON_PARTY path also calls TeleportRequest/ConfirmSummon
-// with the caster forwarded opaquely, matching #1519/#1497's precedent for a
-// value used only for identity/state, not behavior, at this layer.
-type summonFriendRequester interface {
+// summonFriendTarget is *player.Character's summoned side (see actor_test.go's
+// compile-time assertion): the request a confirm-summon skill leaves pending
+// and the teleport toward the caster.
+type summonFriendTarget interface {
+	player.SummonFriendRequester
 	TeleportRequest(caster player.SummonFriendRequester, skill modelskill.Definition) bool
 	ClearTeleportRequest()
 	ConfirmSummon(caster player.SummonFriendRequester, skill modelskill.Definition, timeout time.Duration)
+	SummonTo(caster player.SummonFriendRequester, skill modelskill.Definition) player.SummonRefusal
 }
 
-type summonFriendTraveler interface {
-	TeleportTo(x, y, z, radius int)
-}
-
-type summonFriendItemConsumer interface {
-	ItemCount(itemID int) int
-	ConsumeItem(itemID, count int) bool
-}
-
+// summonPartyProvider is *player.Character's party roster, the caster
+// itself included.
 type summonPartyProvider interface {
-	PartyMembers() []Actor
+	PartyMembers() []*player.Character
+}
+
+// SummonFriendRefused tells the player RecipientID why a summon-friend skill
+// stopped: the caster for its own gates and a refused target, a summoned
+// player for its side of the teleport.
+type SummonFriendRefused struct {
+	RecipientID int32
+	Refusal     player.SummonRefusal
 }
 
 type summonFriendHandler struct{}
@@ -70,7 +63,11 @@ func (summonFriendHandler) Types() []string { return []string{"SUMMON_FRIEND", "
 
 func (summonFriendHandler) Use(cast Cast) {
 	caster, ok := cast.Caster.(summonFriendCaster)
-	if !ok || !canSummonFriend(caster) {
+	if !ok {
+		return
+	}
+	if r := player.SummonerRefusal(caster); r.Refused() {
+		cast.tellSummonRefusal(caster.ObjectID(), r)
 		return
 	}
 
@@ -79,67 +76,68 @@ func (summonFriendHandler) Use(cast Cast) {
 		if !ok {
 			return
 		}
-		for _, target := range party.PartyMembers() {
-			if !canBeSummoned(cast.Caster, target) {
+		for _, member := range party.PartyMembers() {
+			if member.ObjectID() == caster.ObjectID() {
 				continue
 			}
-			teleportSummonedFriend(caster, target, cast.Skill)
+			target, r := summonedTarget(caster, member)
+			if r.Refused() {
+				cast.tellSummonRefusal(caster.ObjectID(), r)
+				continue
+			}
+			cast.tellSummonRefusal(target.ObjectID(), target.SummonTo(caster, cast.Skill))
 		}
 		return
 	}
 
-	for _, target := range cast.Targets {
-		if !canBeSummoned(cast.Caster, target) {
+	for _, t := range cast.Targets {
+		target, r := summonedTarget(caster, t)
+		if r.Refused() {
+			cast.tellSummonRefusal(caster.ObjectID(), r)
 			continue
 		}
-		requester, ok := target.(summonFriendRequester)
-		if !ok || !requester.TeleportRequest(caster, cast.Skill) {
+		if !target.TeleportRequest(caster, cast.Skill) {
+			cast.tellSummonRefusal(caster.ObjectID(), player.SummonRefusal{Reason: player.SummonRefusedPending, Name: target.CharacterName()})
 			continue
 		}
 		if cast.Skill.ID == 1403 {
-			requester.ConfirmSummon(caster, cast.Skill, summonFriendConfirmTimeout)
+			target.ConfirmSummon(caster, cast.Skill, summonFriendConfirmTimeout)
 			continue
 		}
-		teleportSummonedFriend(caster, target, cast.Skill)
-		requester.ClearTeleportRequest()
+		cast.tellSummonRefusal(target.ObjectID(), target.SummonTo(caster, cast.Skill))
+		target.ClearTeleportRequest()
 	}
 }
 
-func canSummonFriend(actor summonFriendActorState) bool {
-	return !actor.Mounted() && !actor.OlympiadMode() && !actor.ObserverMode() && !actor.NoSummonFriendZone()
+// SummonFriendCastRefusal is the refusal a player's SUMMON_FRIEND cast gets
+// before it starts, told to caster: the summoner gate, then the summoned gate
+// on the cast's target.
+func SummonFriendCastRefusal(caster player.SummonFriendRequester, target Actor) player.SummonRefusal {
+	if r := player.SummonerRefusal(caster); r.Refused() {
+		return r
+	}
+	_, r := summonedTarget(caster, target)
+	return r
 }
 
-func canBeSummoned(caster, target Actor) bool {
-	if sameObject(caster, target) {
-		return false
+// summonedTarget resolves a as a player caster may summon; any other actor
+// is refused silently.
+func summonedTarget(caster player.SummonFriendRequester, a Actor) (summonFriendTarget, player.SummonRefusal) {
+	if _, ok := asPlayer(a); !ok {
+		return nil, player.SummonRefusal{Reason: player.SummonRefusedSilently}
 	}
-	state, ok := asPlayer(target)
+	target, ok := a.(summonFriendTarget)
 	if !ok {
-		return false
+		return nil, player.SummonRefusal{Reason: player.SummonRefusedSilently}
 	}
-	if state.AlikeDead() || state.Operating() || state.Rooted() || state.InCombat() {
-		return false
-	}
-	if state.OlympiadMode() || state.FestivalParticipant() || state.Mounted() {
-		return false
-	}
-	return !state.ObserverMode() && !state.NoSummonFriendZone()
+	return target, player.SummonedRefusal(caster, target)
 }
 
-func teleportSummonedFriend(caster summonFriendCaster, target Actor, skill modelskill.Definition) {
-	if skill.TargetConsumeID > 0 && skill.TargetConsumeCount > 0 {
-		consumer, ok := target.(summonFriendItemConsumer)
-		if !ok || consumer.ItemCount(skill.TargetConsumeID) < skill.TargetConsumeCount {
-			return
-		}
-		if !consumer.ConsumeItem(skill.TargetConsumeID, skill.TargetConsumeCount) {
-			return
-		}
-	}
-	traveler, ok := target.(summonFriendTraveler)
-	if !ok {
+// tellSummonRefusal records r for the player recipient; an allowed summon or
+// a silent refusal tells nothing.
+func (c Cast) tellSummonRefusal(recipient int32, r player.SummonRefusal) {
+	if r.Reason == player.SummonAllowed || r.Reason == player.SummonRefusedSilently {
 		return
 	}
-	x, y, z := caster.Position()
-	traveler.TeleportTo(x, y, z, 20)
+	c.record(SummonFriendRefused{RecipientID: recipient, Refusal: r})
 }

@@ -116,16 +116,6 @@ func newIdentityPlayer(id int32) *identityPlayer {
 	return &identityPlayer{fakeActor: fakeActor{objectID: id}}
 }
 
-func TestCanBeSummonedExcludesCasterByObjectID(t *testing.T) {
-	caster := newIdentityPlayer(nextFakeObjectID())
-	if canBeSummoned(caster, newIdentityPlayer(caster.objectID)) {
-		t.Fatal("canBeSummoned(caster, caster's own object) = true, want false")
-	}
-	if !canBeSummoned(caster, newIdentityPlayer(nextFakeObjectID())) {
-		t.Fatal("canBeSummoned(caster, another player) = false, want true")
-	}
-}
-
 // A provoked playable already targeting the caster's object attacks it; one
 // targeting a different object is retargeted onto the caster.
 func TestAggressionRetargetComparesObjectIDs(t *testing.T) {

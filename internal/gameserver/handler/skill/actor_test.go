@@ -58,11 +58,9 @@ var (
 	// Erase: the servitor surface disableErase reaches through, and the
 	// owner-facing notification it fires once erased.
 
-	// SummonFriend/SummonParty: the caster-side gate, the target-side gate,
-	// the pending teleport-request/confirm-summon surface, the required-item
-	// check, and the teleport itself.
-	_ summonFriendCaster       = (*player.Character)(nil)
-	_ summonFriendRequester    = (*player.Character)(nil)
-	_ summonFriendItemConsumer = (*player.Character)(nil)
-	_ summonFriendTraveler     = (*player.Character)(nil)
+	// SummonFriend/SummonParty: the caster, and the summoned side's pending
+	// teleport-request/confirm-summon surface and teleport.
+	_ summonFriendCaster  = (*player.Character)(nil)
+	_ summonFriendTarget  = (*player.Character)(nil)
+	_ summonPartyProvider = (*player.Character)(nil)
 )

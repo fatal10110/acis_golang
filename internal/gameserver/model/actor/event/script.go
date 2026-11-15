@@ -2,8 +2,8 @@ package event
 
 import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 
-// ItemsTaken reports units of ItemID a script took from the character, with
-// the chat line naming them; Short reports a take that found too few units
+// ItemsTaken reports units of ItemID a script or a summon-friend teleport
+// took from the character, with the chat line naming them; Short reports a take that found too few units
 // and removed nothing.
 type ItemsTaken struct {
 	ItemID int32
