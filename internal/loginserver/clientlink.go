@@ -294,6 +294,8 @@ type clientConn struct {
 	lastServer  int
 	loginKey1   int32
 	loginKey2   int32
+	playKey1    int32
+	playKey2    int32
 
 	// sendMu guards closed and serializes every write and the close.
 	// closed is set by the first close; from then on nothing else is
@@ -584,11 +586,20 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		c.account = account.Login
 		c.lastServer = account.LastServer
 		c.accessLevel = account.AccessLevel
+		// The whole session, play keys included, is issued here: a game
+		// server only ever sees play keys this login server drew, which the
+		// client learns from PlayOk once its server choice is admitted.
 		c.loginKey1, c.loginKey2 = rand.Int32(), rand.Int32()
+		c.playKey1, c.playKey2 = rand.Int32(), rand.Int32()
 		if l.holders == nil {
 			l.holders = make(map[string]*clientConn)
 		}
-		l.sessions.Put(c.account, link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2})
+		l.sessions.Put(c.account, link.SessionKey{
+			LoginKey1: c.loginKey1,
+			LoginKey2: c.loginKey2,
+			PlayKey1:  c.playKey1,
+			PlayKey2:  c.playKey2,
+		})
 		l.holders[c.account] = c
 	}
 	l.authMu.Unlock()
@@ -835,8 +846,8 @@ func (l *ClientLink) loginPossible(c *clientConn, serverID int) bool {
 
 // onRequestServerLogin validates the session keys where the licence window
 // is shown, gates the chosen game server on the account's eligibility, and
-// issues the play session. It replies with LoginFail/PlayFail and reports
-// false when the connection must close.
+// hands over the play keys issued at authentication. It replies with
+// LoginFail/PlayFail and reports false when the connection must close.
 func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, payload []byte) bool {
 	req, err := clientpackets.DecodeRequestServerLogin(payload)
 	if err != nil {
@@ -854,18 +865,11 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		return false
 	}
 
-	playKey1, playKey2 := rand.Int32(), rand.Int32()
-	l.sessions.Put(c.account, link.SessionKey{
-		LoginKey1: c.loginKey1,
-		LoginKey2: c.loginKey2,
-		PlayKey1:  playKey1,
-		PlayKey2:  playKey2,
-	})
 	c.joinedGame = true
 	if c.lastServer != serverID {
 		if err := l.accounts.SetLastServer(ctx, c.account, serverID); err != nil {
 			l.log.Error().Str("account", c.account).Err(err).Msg("set last server")
 		}
 	}
-	return c.send(serverpackets.EncodePlayOk(playKey1, playKey2)) == nil
+	return c.send(serverpackets.EncodePlayOk(c.playKey1, c.playKey2)) == nil
 }

@@ -25,7 +25,10 @@ func waitForPendingValidation(t *testing.T, v *SessionValidator, account string)
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		v.mu.Lock()
-		_, pending := v.waiting[account]
+		pending := false
+		for _, req := range v.pending[account] {
+			pending = pending || !req.abandoned
+		}
 		v.mu.Unlock()
 		if pending {
 			return
@@ -84,10 +87,13 @@ func TestDuplicateAuthLoginEvictsPendingConnectionAndValidatesReplacement(t *tes
 		t.Fatal("evicted connection did not close")
 	}
 
-	// B's request is the one now in flight; resolving it as a login-server
-	// success lets B finish authenticating exactly like a fresh connection
-	// would, proving the account is usable again right away.
+	// B's request is the one now in flight, queued behind A's. The login
+	// server's first answer is the one to A's request and is dropped, so
+	// its rejection never reaches B; the second, a success, lets B finish
+	// authenticating exactly like a fresh connection would, proving the
+	// account is usable again right away.
 	waitForPendingValidation(t, validator, "player1")
+	validator.Resolve("player1", false)
 	validator.Resolve("player1", true)
 
 	reply := b.Read()
