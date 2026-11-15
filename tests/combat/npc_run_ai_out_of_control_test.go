@@ -92,7 +92,9 @@ func assertNoAttackFrame(t *testing.T, srv *gameservertest.Server, what string) 
 // nothing on event or periodic passes, so its wander stays current and its
 // last executed desire stays the wander. The first pass after the stun
 // therefore latches the attack, which swings once more after its desire
-// decays, and only the pass after that idles.
+// decays, and only the pass after that idles. The periodic step that decays
+// the desire finds the monster attacking and switches its wander walk to run
+// stance first.
 func TestStunnedMonsterTakesLatchOnFirstPassAfterStun(t *testing.T) {
 	t.Parallel()
 	srv, hostile, victim := spawnLatchMonster(t)
@@ -127,6 +129,7 @@ func TestStunnedMonsterTakesLatchOnFirstPassAfterStun(t *testing.T) {
 	readUntil(t, srv.Client, serverpackets.OpcodeAttack, "first swing after the stun")
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(hostile.AttackSpeed())) * time.Millisecond
 	decayAttackDesire(t, hostile)
+	assertStanceShown(t, srv.Client, "attacking monster's periodic run", hostile.ObjectID(), true)
 
 	assertLatchedSwingThenIdle(t, srv, hostile, attackTime)
 }

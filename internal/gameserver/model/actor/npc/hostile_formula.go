@@ -76,14 +76,15 @@ func (h *Hostile) Gaussian() float64 {
 	return rnd.NextGaussian()
 }
 
-// RandomDamageSpread returns the template-defined random-damage spread, or
-// -1 (RandomDamageMultiplier's "use the weaponless fallback" sentinel) when
-// no spread is configured.
+// RandomDamageSpread returns the random damage of the weapon in this NPC's
+// right hand, 0 included, or -1 (RandomDamageMultiplier's "use the
+// weaponless fallback" sentinel) when it holds none. The template's
+// baseRandomDamage plays no part.
 func (h *Hostile) RandomDamageSpread() int {
-	if h.Instance.Template.BaseRandomDamage <= 0 {
-		return -1
+	if w := h.ActiveWeaponItem(); w != nil {
+		return int(w.RandomDamage)
 	}
-	return h.Instance.Template.BaseRandomDamage
+	return -1
 }
 
 // HP returns current HP as a floating-point skill-resource value.

@@ -4,13 +4,11 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack
 
 // CleanAllHate zeroes the hate of every threat entry, keeping the entries
 // and their damage, and drops every queued attack desire. Unlike
-// StopAggroHate it never sends the NPC back to peace.
+// StopAggroHate it never sends the NPC back to peace. Both tables are
+// internally synchronized, so it takes no mu: a return home started from
+// inside the think loop calls it.
 func (a *Attackable) CleanAllHate() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for _, t := range a.threats.Load().Snapshot() {
-		a.threats.Load().StopHate(t.Attacker)
-	}
+	a.threats.Load().ZeroHate()
 	a.desires.Load().RemoveIf(func(d *Desire) bool { return d.Kind == IntentionAttack })
 }
 

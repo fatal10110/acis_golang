@@ -49,9 +49,10 @@ func (h *Hostile) SkillAttacked(caster attackable.Combatant, sk skill.Definition
 // twice (#2326, #2328) — one place to keep the ordering right. The hit
 // observer sees the hit first, ahead of everything it causes.
 //
-// The damage enters the threat table at zero hate. The attacked hooks then
-// run with the damage truncated to an int, the party is called, and then
-// the clan: the NPC itself, then every NPC of its clan in range.
+// The damage enters the threat table at zero hate and the NPC switches to
+// run stance. The attacked hooks then run with the damage truncated to an
+// int, the party is called, and then the clan: the NPC itself, then every
+// NPC of its clan in range.
 func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, sk skill.Ref) {
 	if combatant == nil {
 		return
@@ -61,6 +62,7 @@ func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, sk
 	}
 	h.AddDamageHate(combatant, amount, 0)
 	h.lastAttacker.Store(&attackerRef{c: combatant})
+	h.ForceRunStance()
 	damage := int(commons.TruncInt32Sat(amount))
 	h.raiseAttacked(combatant, int32(damage), sk)
 	propagatePartyAttacked(h, combatant, damage, false)
