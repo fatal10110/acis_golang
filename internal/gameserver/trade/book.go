@@ -1,6 +1,7 @@
 package trade
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -119,6 +120,10 @@ type Session struct {
 	// LeftID is the participant who left the world with the window still
 	// open, or 0.
 	LeftID int32
+	// FirstConfirmed and SecondConfirmed report which participants have
+	// confirmed.
+	FirstConfirmed  bool
+	SecondConfirmed bool
 }
 
 // NewBook returns an empty direct-trade book.
@@ -379,9 +384,12 @@ func (b *Book) AddItem(playerID int32, inv *itemcontainer.Inventory, bound Bound
 	if inv == nil {
 		return AddResult{Status: AddInvalidItem, PartnerID: partnerID}
 	}
-	inst, ok := itemForOffer(inv, bound, playerID, objectID, count)
-	if !ok {
+	inst := manipulableItem(inv, bound, playerID, objectID)
+	if inst == nil {
 		return AddResult{Status: AddInvalidItem, PartnerID: partnerID}
+	}
+	if !offerable(inv, inst, count) {
+		return AddResult{Status: AddNotOffered, PartnerID: partnerID}
 	}
 	added, ok := s.offers[playerID].add(inst, count)
 	if !ok {
@@ -504,6 +512,18 @@ func (s Session) PartnerLeft(playerID int32) bool {
 	return ok && s.LeftID == partnerID
 }
 
+// Confirmed reports whether playerID has confirmed the session.
+func (s Session) Confirmed(playerID int32) bool {
+	switch playerID {
+	case s.FirstID:
+		return s.FirstConfirmed
+	case s.SecondID:
+		return s.SecondConfirmed
+	default:
+		return false
+	}
+}
+
 // Offer returns playerID's offer from the session.
 func (s Session) Offer(playerID int32) Offer {
 	switch playerID {
@@ -534,8 +554,8 @@ type Holdings interface {
 
 // Check re-validates a ready session against both participants' inventories
 // and bound items as they stand when it settles: every offered item still
-// tradeable, then the partner's offer within each receiver's weight and
-// slots.
+// tradeable, then the partner's offer within each receiver's weight, slots
+// and stack count limit.
 func (s Session) Check(first, second Holdings, firstBound, secondBound BoundItems) SettlementStatus {
 	if !ValidOfferItems(first, firstBound, s.FirstID, s.FirstOffer) || !ValidOfferItems(second, secondBound, s.SecondID, s.SecondOffer) {
 		return SettlementInvalidItems
@@ -546,7 +566,28 @@ func (s Session) Check(first, second Holdings, firstBound, secondBound BoundItem
 	case ReceiverSlotsFull:
 		return SettlementSlotsFull
 	}
+	if !ReceiverCountFits(first, s.SecondOffer) || !ReceiverCountFits(second, s.FirstOffer) {
+		return SettlementCountOverflow
+	}
 	return SettlementOK
+}
+
+// ReceiverCountFits reports whether every row of offer fits the item count
+// limit once added to the receiver's stack of the same stackable item. Each
+// row is measured on its own against the receiver's current stack.
+func ReceiverCountFits(receiver Holdings, offer Offer) bool {
+	for _, row := range offer.Items {
+		count := int64(row.Count)
+		if tmpl, ok := receiver.Templates().Get(row.Snapshot.TemplateID); ok && tmpl.Stackable {
+			if held := receiver.ItemByTemplateID(row.Snapshot.TemplateID); held != nil {
+				count += int64(held.Snapshot().Count)
+			}
+		}
+		if count > math.MaxInt32 {
+			return false
+		}
+	}
+	return true
 }
 
 // ReceiverStatus reports whether both participants can receive their partner's offer.
@@ -650,11 +691,13 @@ func (s *session) partnerID(playerID int32) (int32, bool) {
 
 func (s *session) snapshot() Session {
 	return Session{
-		FirstID:     s.firstID,
-		SecondID:    s.secondID,
-		FirstOffer:  s.offers[s.firstID].snapshot(),
-		SecondOffer: s.offers[s.secondID].snapshot(),
-		LeftID:      s.leftID,
+		FirstID:         s.firstID,
+		SecondID:        s.secondID,
+		FirstOffer:      s.offers[s.firstID].snapshot(),
+		SecondOffer:     s.offers[s.secondID].snapshot(),
+		LeftID:          s.leftID,
+		FirstConfirmed:  s.confirmed[s.firstID],
+		SecondConfirmed: s.confirmed[s.secondID],
 	}
 }
 
@@ -735,26 +778,40 @@ func (b *Book) processingTransactionLocked(objectID int32) bool {
 }
 
 func itemForOffer(inv Holdings, bound BoundItems, ownerID, objectID int32, count int) (*item.Instance, bool) {
-	if count <= 0 {
-		return nil, false
-	}
-	inst := inv.ItemByObjectID(objectID)
-	if inst == nil {
-		return nil, false
-	}
-	st := inst.Snapshot()
-	if st.OwnerID != ownerID || st.Equipped() || st.Count < count {
-		return nil, false
-	}
-	if bound != nil && bound(objectID) {
-		return nil, false
-	}
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || !inst.Tradable(tmpl) || inst.QuestItem(tmpl) {
-		return nil, false
-	}
-	if !tmpl.Stackable && count > 1 {
+	inst := manipulableItem(inv, bound, ownerID, objectID)
+	if inst == nil || !offerable(inv, inst, count) {
 		return nil, false
 	}
 	return inst, true
+}
+
+// manipulableItem returns ownerID's item objectID when the owner may move it
+// at all: held, not worn and not bound where it is. Otherwise it returns nil.
+func manipulableItem(inv Holdings, bound BoundItems, ownerID, objectID int32) *item.Instance {
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return nil
+	}
+	st := inst.Snapshot()
+	if st.OwnerID != ownerID || st.Equipped() {
+		return nil
+	}
+	if bound != nil && bound(objectID) {
+		return nil
+	}
+	return inst
+}
+
+// offerable reports whether count units of inst may be put in a trade offer:
+// a tradable non-quest item, a positive count within the held count, and at
+// most one of an item that does not stack.
+func offerable(inv Holdings, inst *item.Instance, count int) bool {
+	if count <= 0 || inst.Snapshot().Count < count {
+		return false
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || !inst.Tradable(tmpl) || inst.QuestItem(tmpl) {
+		return false
+	}
+	return tmpl.Stackable || count <= 1
 }
