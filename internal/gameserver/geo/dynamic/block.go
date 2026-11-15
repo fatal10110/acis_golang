@@ -289,6 +289,7 @@ func (b *Block) rebuild() {
 	minBY := b.blockY * block.CellsY
 	maxBX := minBX + block.CellsX
 	maxBY := minBY + block.CellsY
+	multilayer := b.base.Kind() == block.KindMultilayer
 
 	for _, obj := range b.objects {
 		data := obj.GeoData()
@@ -313,22 +314,22 @@ func (b *Block) rebuild() {
 				ov := b.override(lx, ly)
 				ov.active = true
 
-				currentIndex, ok1 := nearestLayerIndex(ov.current, int32(minOZ))
-				originalIndex, ok2 := nearestLayerIndex(ov.original, int32(minOZ))
-				if !ok1 || !ok2 {
-					continue
-				}
-				if ov.current[currentIndex].Height != ov.original[originalIndex].Height {
+				// A layer another object already lifted is inside that
+				// object: its height and passability stay as they are.
+				currentIndex, ok := nearestLayerIndex(ov.current, int32(minOZ))
+				if !ok || ov.current[currentIndex].Height != ov.original[currentIndex].Height {
 					continue
 				}
 
 				if objNSWE == block.NoDirections {
+					// On a multilayer block the lift stops short of the
+					// next layer up, even when the cell has one layer
+					// only; on flat and complex blocks it reaches the
+					// object's top.
 					z := maxOZ
-					if len(ov.current) > 1 {
-						above := firstAboveIndex(ov.current, int32(minOZ))
-						if above >= 0 {
-							az := int(ov.current[above].Height)
-							if az <= maxOZ {
+					if multilayer {
+						if above := firstAboveIndex(ov.current, int32(minOZ)); above >= 0 {
+							if az := int(ov.current[above].Height); az <= maxOZ {
 								z = az - block.CellIgnoreHeight
 							}
 						}
@@ -368,15 +369,17 @@ func decodeDelegated(h int) int {
 }
 
 // nearestLayerIndex returns the index into layers whose Height is closest
-// to z, or false if layers is empty.
+// to z, or false if layers is empty. The scan runs from the last (topmost
+// stored) layer down and stops at the first layer farther than the previous
+// one, so of two equally close layers the lower wins.
 func nearestLayerIndex(layers []block.Cell, z int32) (int, bool) {
 	if len(layers) == 0 {
 		return 0, false
 	}
-	best := 0
+	best := len(layers) - 1
 	limit := int32(^uint32(0) >> 1)
-	for i, c := range layers {
-		d := abs32(int32(c.Height) - z)
+	for i := len(layers) - 1; i >= 0; i-- {
+		d := abs32(int32(layers[i].Height) - z)
 		if d > limit {
 			break
 		}
@@ -386,6 +389,7 @@ func nearestLayerIndex(layers []block.Cell, z int32) (int, bool) {
 	return best, true
 }
 
+// firstAboveIndex returns the lowest stored layer above z, or -1.
 func firstAboveIndex(layers []block.Cell, z int32) int {
 	for i := 0; i < len(layers); i++ {
 		if int32(layers[i].Height) > z {
@@ -395,8 +399,9 @@ func firstAboveIndex(layers []block.Cell, z int32) int {
 	return -1
 }
 
+// firstBelowIndex returns the topmost stored layer below z, or -1.
 func firstBelowIndex(layers []block.Cell, z int32) int {
-	for i := 0; i < len(layers); i++ {
+	for i := len(layers) - 1; i >= 0; i-- {
 		if int32(layers[i].Height) < z {
 			return i
 		}
