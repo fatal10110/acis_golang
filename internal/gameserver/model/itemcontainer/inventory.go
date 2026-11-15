@@ -577,11 +577,15 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 // modified inventory notification, even when the value was already set. It
 // returns false when inst is absent from this inventory.
 func (inv *Inventory) SetCustomType2(inst *item.Instance, value int) bool {
-	if inst == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
+	if inst == nil {
+		return false
+	}
+	defer inv.lockHeld()()
+	if inv.Container.items[inst.ObjectID] != inst {
 		return false
 	}
 	inst.SetCustomType2(value)
-	inv.queueUpdate(inst, UpdateModified)
+	inv.queueUpdateLocked(inst, UpdateModified)
 	return true
 }
 
