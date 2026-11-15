@@ -360,7 +360,9 @@ func (b *Book) processingRequestLocked(playerID int32) bool {
 // BoundItems tells which of a participant's items are bound where they are
 // and may not change hands whatever their own state: the control item of a
 // pet that is out, or the enchant scroll the participant has selected. It is
-// asked again at settlement. A nil BoundItems binds nothing.
+// asked again at settlement, while the settling exchange holds both
+// inventories, so it must not take an inventory lock then. A nil BoundItems
+// binds nothing.
 type BoundItems func(objectID int32) bool
 
 // AddItem adds an item to a player's active direct-trade offer. bound is
