@@ -424,12 +424,14 @@ func (b multilayerBlock) layer(data []byte, l int) Cell {
 	return Cell{Height: int16(q * CellHeight), NSWE: NSWE(b.nibbles >> (v >> k * 4) & 0xf)}
 }
 
-// nearest returns the cell's layer closest to worldZ and that layer; of two
-// equally close layers the higher wins.
+// nearest returns the cell's layer closest to worldZ and that layer. The
+// scan runs from the topmost stored layer down and stops at the first layer
+// farther than the previous one, so of two equally close layers the lower
+// wins.
 func (b multilayerBlock) nearest(data []byte, start, count int, worldZ int32) (int, Cell) {
 	best, cell := 0, Cell{}
 	limit := int32(math.MaxInt32)
-	for l := 0; l < count; l++ {
+	for l := count - 1; l >= 0; l-- {
 		c := b.layer(data, start+l)
 		d := abs32(int32(c.Height) - worldZ)
 		if d > limit {
