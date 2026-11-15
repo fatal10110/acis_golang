@@ -40,10 +40,9 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 	if l.moveByTeleport(live, target) {
 		return
 	}
-	// Reject any target farther than 9900 units from the packet's own
-	// origin (not the
-	// server-authoritative position used below to simulate the walk).
-	if target.Distance3D(packetOrigin) > 9900 {
+	// Reject any target 9900 units or more from the packet's own origin (not
+	// the server-authoritative position used below to simulate the walk).
+	if target.Distance3D(packetOrigin) >= 9900 {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

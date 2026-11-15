@@ -300,6 +300,12 @@ func (l *GameClientLink) handleRequestActionUse(ctx context.Context, cs *connSta
 		return nil
 	}
 	onLive(cs.live, func() {
+		// A dead or out-of-control player is only released, whatever the
+		// action; a fake-dead one too, unless it sits or stands.
+		if (cs.live.FakeDead() && req.ActionID != actionSitStand) || cs.live.Dead() || liveOutOfControl(cs.live) {
+			cs.live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 		if refuseObserverActionUse(cs.live) {
 			return
 		}
@@ -441,13 +447,14 @@ func (l *GameClientLink) handleStartRotating(_ context.Context, cs *connState, r
 	return nil
 }
 
-// handleFinishRotating sets the heading the player turned to.
+// handleFinishRotating shows the end of the player's turn to everyone around.
+// The degree is the client's claim and only echoed: the server-side heading,
+// which every behind and front check reads, is left as it was.
 func (l *GameClientLink) handleFinishRotating(_ context.Context, cs *connState, req clientpackets.FinishRotating) error {
 	if cs.live == nil {
 		return nil
 	}
 	onLive(cs.live, func() {
-		cs.live.SetHeading(int(req.Degree))
 		l.broadcastLiveFrame(cs.live, func() wire.Frame {
 			return serverpackets.FrameStopRotation(cs.live.ObjectID(), int(req.Degree), 0)
 		})

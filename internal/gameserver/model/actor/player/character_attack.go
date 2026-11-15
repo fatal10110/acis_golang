@@ -300,16 +300,17 @@ func (c *Character) DenyAIAction() bool {
 }
 
 // MovementDisabled reports whether this player is in a state where they
-// cannot move, including the stand-up transition.
+// cannot move, including the stand-up transition and a zero move speed (a
+// fully overloaded player).
 func (c *Character) MovementDisabled() bool {
 	if c.AlikeDead() || !c.Standing() || c.StandingNow() {
 		return true
 	}
-	live := c.liveLocked()
-	if live == nil {
-		return false
+	if live := c.liveLocked(); live != nil &&
+		(live.Stunned() || live.ImmobileUntilAttacked() || live.Rooted() || live.Sleeping() || live.Paralyzed() || live.Immobilized() || live.Teleporting()) {
+		return true
 	}
-	return live.Stunned() || live.ImmobileUntilAttacked() || live.Rooted() || live.Sleeping() || live.Paralyzed() || live.Immobilized() || live.Teleporting()
+	return c.MoveSpeed() == 0
 }
 
 // IsMoving reports whether this player has an in-flight movement request.

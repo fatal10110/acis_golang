@@ -48,6 +48,7 @@ func TestCharacterCrowdControlGettersTrackActiveEffectsAndClearOnRemoval(t *test
 
 func TestCharacterMovementDisabledTracksImmobilityNotFear(t *testing.T) {
 	c := &Character{ID: 1}
+	c.AttachRuntime(&Template{RunSpeed: 120, WalkSpeed: 80}, nil)
 	if c.MovementDisabled() {
 		t.Fatal("MovementDisabled() = true on a fresh standing character")
 	}
@@ -98,6 +99,22 @@ func TestCharacterMovementDisabledTracksImmobilityNotFear(t *testing.T) {
 	}
 	if !c.MovementDisabled() {
 		t.Fatal("MovementDisabled() = false while dead")
+	}
+}
+
+// TestCharacterMovementDisabledAtZeroMoveSpeed pins the playable term of the
+// movement gate: a player whose move speed is zero cannot move.
+func TestCharacterMovementDisabledAtZeroMoveSpeed(t *testing.T) {
+	c := &Character{ID: 1}
+	c.AttachRuntime(&Template{RunSpeed: 120, WalkSpeed: 0}, nil)
+	attachTestLive(t, c)
+	c.SetRunning(true)
+	if c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true while running at a nonzero speed")
+	}
+	c.SetRunning(false)
+	if !c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while walking at zero speed")
 	}
 }
 

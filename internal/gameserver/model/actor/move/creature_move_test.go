@@ -126,7 +126,7 @@ func (heightGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 
 func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
-	previous := location.Location{X: 60, Y: 20, Z: 30}
+	requested := location.Location{X: 60, Y: 20, Z: 999}
 	minInt := -int(^uint(0)>>1) - 1
 	maxInt := int(^uint(0) >> 1)
 	extremeOrigin := location.Location{X: minInt, Y: minInt, Z: 30}
@@ -145,27 +145,27 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 		wantMoving        bool
 	}{
 		{
-			name:            "normalizes height and uses Java tick duration",
+			name:            "keeps the requested height and uses Java tick duration",
 			canMove:         true,
-			target:          location.Location{X: 60, Y: 20, Z: 999},
-			wantEvent:       event.Move{Origin: origin, Destination: previous, Speed: 50, Duration: time.Second},
-			wantDestination: previous,
+			target:          requested,
+			wantEvent:       event.Move{Origin: origin, Destination: requested, Speed: 50, Duration: time.Second},
+			wantDestination: requested,
 			wantMoving:      true,
 		},
 		{
 			name:            "rounds one unit up to one tick",
 			canMove:         true,
 			target:          location.Location{X: 11, Y: 20, Z: 999},
-			wantEvent:       event.Move{Origin: origin, Destination: location.Location{X: 11, Y: 20, Z: 30}, Speed: 50, Duration: 100 * time.Millisecond},
-			wantDestination: location.Location{X: 11, Y: 20, Z: 30},
+			wantEvent:       event.Move{Origin: origin, Destination: location.Location{X: 11, Y: 20, Z: 999}, Speed: 50, Duration: 100 * time.Millisecond},
+			wantDestination: location.Location{X: 11, Y: 20, Z: 999},
 			wantMoving:      true,
 		},
 		{
 			name:            "rounds fifty-one units up to eleven ticks",
 			canMove:         true,
 			target:          location.Location{X: 61, Y: 20, Z: 999},
-			wantEvent:       event.Move{Origin: origin, Destination: location.Location{X: 61, Y: 20, Z: 30}, Speed: 50, Duration: 1100 * time.Millisecond},
-			wantDestination: location.Location{X: 61, Y: 20, Z: 30},
+			wantEvent:       event.Move{Origin: origin, Destination: location.Location{X: 61, Y: 20, Z: 999}, Speed: 50, Duration: 1100 * time.Millisecond},
+			wantDestination: location.Location{X: 61, Y: 20, Z: 999},
 			wantMoving:      true,
 		},
 		{
@@ -188,8 +188,8 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			speed:           math.SmallestNonzeroFloat64,
 			canMove:         true,
 			target:          location.Location{X: origin.X, Y: origin.Y, Z: 999},
-			wantEvent:       event.Move{Origin: origin, Destination: origin, Speed: math.SmallestNonzeroFloat64},
-			wantDestination: origin,
+			wantEvent:       event.Move{Origin: origin, Destination: location.Location{X: origin.X, Y: origin.Y, Z: 999}, Speed: math.SmallestNonzeroFloat64},
+			wantDestination: location.Location{X: origin.X, Y: origin.Y, Z: 999},
 			wantMoving:      true,
 		},
 		{
@@ -255,7 +255,10 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 	}
 }
 
-func TestCreatureMove_MoveToLocationPassesGeodataCoordinates(t *testing.T) {
+// TestCreatureMove_MoveToLocationPassesRequestedCoordinates pins the request
+// height: no floor read at request time, and the reachability check runs to
+// the height asked for.
+func TestCreatureMove_MoveToLocationPassesRequestedCoordinates(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	target := location.Location{X: 60, Y: 70, Z: 999}
 	geo := &recordingGeo{canMove: true, height: 42}
@@ -269,10 +272,10 @@ func TestCreatureMove_MoveToLocationPassesGeodataCoordinates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(geo.heightCalls) != 1 || geo.heightCalls[0] != target {
-		t.Fatalf("Height() calls = %+v, want [%+v]", geo.heightCalls, target)
+	if len(geo.heightCalls) != 0 {
+		t.Fatalf("Height() calls = %+v, want none", geo.heightCalls)
 	}
-	wantMove := geoCall{origin: origin, target: location.Location{X: target.X, Y: target.Y, Z: 42}}
+	wantMove := geoCall{origin: origin, target: target}
 	if len(geo.moveCalls) != 1 || geo.moveCalls[0] != wantMove {
 		t.Fatalf("CanMove() calls = %+v, want [%+v]", geo.moveCalls, wantMove)
 	}
@@ -604,8 +607,8 @@ func TestCreatureMove_UpdatePositionBiasesGroundHeightAndCapsWorldZ(t *testing.T
 		t.Fatal("UpdatePosition() stopped move, want moving")
 	}
 
-	wantHeightCalls := []location.Location{target, {X: target.X, Z: 16420}, {X: 10, Z: 116}}
-	if len(geo.heightCalls) != len(wantHeightCalls) || geo.heightCalls[0] != wantHeightCalls[0] || geo.heightCalls[1] != wantHeightCalls[1] || geo.heightCalls[2] != wantHeightCalls[2] {
+	wantHeightCalls := []location.Location{target, {X: 10, Z: 116}}
+	if len(geo.heightCalls) != len(wantHeightCalls) || geo.heightCalls[0] != wantHeightCalls[0] || geo.heightCalls[1] != wantHeightCalls[1] {
 		t.Fatalf("Height() calls = %+v, want %+v", geo.heightCalls, wantHeightCalls)
 	}
 	if got := mover.Position(); got != (location.Location{X: 10, Z: 16410}) {
@@ -641,7 +644,7 @@ func TestCreatureMove_MoveToLocationUsesCurrentPosition(t *testing.T) {
 
 	want := event.Move{
 		Origin:      current,
-		Destination: location.Location{X: 70, Y: 20, Z: 30},
+		Destination: location.Location{X: 70, Y: 20, Z: 999},
 		Speed:       50,
 		Duration:    200 * time.Millisecond,
 	}
