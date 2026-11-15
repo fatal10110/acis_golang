@@ -800,6 +800,7 @@ func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "toggle stop")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle activation")
 	assertCasterMPStatus(t, srv, c.Read(), objID, 18)
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, skillID, 1)
 	assertAbnormalStatusUpdate(t, c, skillID, 1, 0)
 	drainUntilQuiet(t, c)
 }

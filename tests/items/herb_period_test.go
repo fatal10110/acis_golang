@@ -103,8 +103,10 @@ func TestHerbBuffHalvedWithSummon(t *testing.T) {
 			if !ok {
 				t.Fatal("herb pickup sent no AbnormalStatusUpdate listing skill 2280")
 			}
-			if got != tc.want {
-				t.Fatalf("Herb of Power icon time = %d s, want %d", got, tc.want)
+			// The icon time is the whole seconds left until expiry, so the
+			// milliseconds the pickup itself takes may round it down by one.
+			if got != tc.want && got != tc.want-1 {
+				t.Fatalf("Herb of Power icon time = %d s, want %d (or %d)", got, tc.want, tc.want-1)
 			}
 			if servitor != nil {
 				held := servitor.EffectList().All()
