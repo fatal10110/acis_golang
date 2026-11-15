@@ -45,6 +45,10 @@ type SummonMoveController interface {
 	// walks after it, returning target's position and true when it is out
 	// of reach, for the summon to head for a boat entrance instead.
 	MaybeStartEntranceFollow(target attackable.Combatant, offset int) (location.Location, bool)
+	// MoveStraightToLocation walks straight for a point with path-finding
+	// off: a closed line ends the walk blocked instead of being routed
+	// around.
+	MoveStraightToLocation(location.Location) (bool, error)
 }
 
 // SummonCastController is the cast controller a summon AI drives: the shared
@@ -67,6 +71,7 @@ type Summon struct {
 	attack AttackController
 	cast   SummonCastController
 	boats  BoatEntrance
+	pickup SummonPickUp
 	log    zerolog.Logger
 
 	// mu guards current, next and previous. A Betray effect turns the
@@ -533,6 +538,8 @@ func (s *Summon) thinkLocked() {
 		_, err = s.thinkFollowLocked()
 	case IntentionCast:
 		_, err = s.thinkCastLocked()
+	case IntentionPickUp:
+		err = s.thinkPickUpLocked()
 	}
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")

@@ -568,6 +568,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIControll
 	attackController.SetQueue(queue)
 	brain := ai.NewSummon(actor, moveController, attackController)
 	brain.SetBoatEntrance(summonBoatEntrance{link: l, actor: actor})
+	if actor.IsPet() {
+		brain.SetPickUp(petPickUp{link: l, actor: actor})
+	}
 	sink.brain = brain
 	sink.attack = attackController
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
@@ -762,10 +765,14 @@ func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant,
 }
 
 func (inertSummonMoveController) MoveToLocation(location.Location) (bool, error) { return false, nil }
-func (inertSummonMoveController) CanMoveTo(location.Location) bool               { return true }
-func (inertSummonMoveController) MoveHome(location.Location) error               { return nil }
-func (inertSummonMoveController) Stop()                                          {}
-func (inertSummonMoveController) CancelFollow()                                  {}
+
+func (inertSummonMoveController) MoveStraightToLocation(location.Location) (bool, error) {
+	return false, nil
+}
+func (inertSummonMoveController) CanMoveTo(location.Location) bool { return true }
+func (inertSummonMoveController) MoveHome(location.Location) error { return nil }
+func (inertSummonMoveController) Stop()                            {}
+func (inertSummonMoveController) CancelFollow()                    {}
 func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }
