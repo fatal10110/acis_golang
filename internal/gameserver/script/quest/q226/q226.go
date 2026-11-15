@@ -128,6 +128,12 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 			htmltext = "30473-04a.htm"
 		}
 	case strings.EqualFold(e.Name, "30473-09.htm"):
+		// Bandellos offers the hand-over only on the test's last step to a
+		// holder of the Golden Statue, a quest item the end of the test
+		// takes: anything else pays nothing.
+		if st.Status() != questlog.StatusStarted || st.Cond() < 23 || !p.HasItem(goldenStatue) {
+			return ""
+		}
 		s.TakeItems(p, goldenStatue, 1)
 		s.GiveItems(p, markOfHealer, 1)
 		s.RewardExpAndSp(p, 134839, 50000)

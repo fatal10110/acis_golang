@@ -96,7 +96,11 @@ func normalizeHTML(content string) string {
 // Get returns the loaded HTML content for name. name may be relative to
 // data/html, or prefixed with data/html/.
 func (h *HTML) Get(name string) (string, bool) {
-	content, ok := h.loaded()[htmlKey(name)]
+	key := htmlKey(name)
+	if key == "" {
+		return "", false
+	}
+	content, ok := h.loaded()[key]
 	return content, ok
 }
 
@@ -119,8 +123,17 @@ func (h *HTML) Paths() []string {
 	return paths
 }
 
+// htmlKey is the cache key of name, "" for none. A name with a ".."
+// segment names no page: it is refused rather than resolved to the page it
+// climbs to.
 func htmlKey(name string) string {
-	key := path.Clean(strings.ReplaceAll(name, "\\", "/"))
+	name = strings.ReplaceAll(name, "\\", "/")
+	for _, seg := range strings.Split(name, "/") {
+		if seg == ".." {
+			return ""
+		}
+	}
+	key := path.Clean(name)
 	if key == "." {
 		return ""
 	}

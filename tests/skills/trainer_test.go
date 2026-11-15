@@ -204,7 +204,7 @@ func TestTrainerSkillListBypass(t *testing.T) {
 		startInWorld(t, c)
 		f := selectTrainer(t, srv, c, objID, 0)
 
-		frames := trainerBypass(t, c, f, "SkillList")
+		frames := trainerBypass(t, srv, c, objID, f, "SkillList")
 		if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeAcquireSkillList, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}; string(got) != string(want) {
 			t.Fatalf("SkillList = %x, want %x", got, want)
 		}
@@ -226,7 +226,7 @@ func TestTrainerSkillListBypass(t *testing.T) {
 		startInWorld(t, c)
 		f := selectTrainer(t, srv, c, objID, 0)
 
-		frames := trainerBypass(t, c, f, "SkillList")
+		frames := trainerBypass(t, srv, c, objID, f, "SkillList")
 		if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeAcquireSkillDone, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}; string(got) != string(want) {
 			t.Fatalf("SkillList = %x, want %x", got, want)
 		}
@@ -238,7 +238,7 @@ func TestTrainerSkillListBypass(t *testing.T) {
 		startInWorld(t, c)
 		f := selectTrainer(t, srv, c, objID, 10)
 
-		frames := trainerBypass(t, c, f, "SkillList")
+		frames := trainerBypass(t, srv, c, objID, f, "SkillList")
 		if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeActionFailed}; string(got) != string(want) {
 			t.Fatalf("SkillList = %x, want %x", got, want)
 		}
@@ -263,7 +263,7 @@ func TestTrainerEnchantSkillListBypass(t *testing.T) {
 		startInWorld(t, c)
 		f := selectTrainer(t, srv, c, objID, duelistParentClass)
 
-		frames := trainerBypass(t, c, f, "EnchantSkillList")
+		frames := trainerBypass(t, srv, c, objID, f, "EnchantSkillList")
 		if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeExtended, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}; string(got) != string(want) {
 			t.Fatalf("EnchantSkillList = %x, want %x", got, want)
 		}
@@ -284,7 +284,7 @@ func TestTrainerEnchantSkillListBypass(t *testing.T) {
 		startInWorld(t, c)
 		f := selectTrainer(t, srv, c, objID, 0)
 
-		frames := trainerBypass(t, c, f, "EnchantSkillList")
+		frames := trainerBypass(t, srv, c, objID, f, "EnchantSkillList")
 		if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeActionFailed}; string(got) != string(want) {
 			t.Fatalf("EnchantSkillList = %x, want %x", got, want)
 		}
@@ -296,7 +296,7 @@ func TestTrainerEnchantSkillListBypass(t *testing.T) {
 		startInWorld(t, c)
 		f := selectTrainer(t, srv, c, objID, duelistParentClass)
 
-		frames := trainerBypass(t, c, f, "EnchantSkillList")
+		frames := trainerBypass(t, srv, c, objID, f, "EnchantSkillList")
 		want := []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeAcquireSkillDone, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}
 		if got := frameOpcodes(frames); string(got) != string(want) {
 			t.Fatalf("EnchantSkillList = %x, want %x", got, want)
@@ -331,7 +331,7 @@ func TestTrainerFishSkillListBypass(t *testing.T) {
 			f := spawnTrainer(t, srv, c, objID, "Fisherman", 50)
 			selectNpc(t, srv, c, objID, f)
 
-			frames := trainerBypass(t, c, f, "FishSkillList")
+			frames := trainerBypass(t, srv, c, objID, f, "FishSkillList")
 			if got := frameOpcodes(frames); string(got) != string(tc.want) {
 				t.Fatalf("FishSkillList = %x, want %x", got, tc.want)
 			}

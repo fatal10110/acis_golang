@@ -68,12 +68,14 @@ func (w *folkWorld) bypass(t *testing.T, command string) [][]byte {
 	return drainFrames(t, w.c)
 }
 
-// openAnyNpcPage opens the page that admits every npc_ and Quest command.
+// openAnyNpcPage opens, as a script's dialog page, the page that admits
+// every npc_ and Quest command.
 func (w *folkWorld) openAnyNpcPage(t *testing.T) {
 	t.Helper()
-	w.c.Send(encodeLinkHTML("test/any.htm"))
-	if frames := drainFrames(t, w.c); string(opcodes(frames)) != string([]byte{serverpackets.OpcodeNpcHtmlMessage}) {
-		t.Fatalf("link page = %x, want NpcHtmlMessage", opcodes(frames))
+	w.srv.ShowDialogPage(t, w.player, anyNpcPage)
+	want := []byte{serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeActionFailed}
+	if frames := drainFrames(t, w.c); string(opcodes(frames)) != string(want) {
+		t.Fatalf("any-command page = %x, want %x", opcodes(frames), want)
 	}
 }
 
