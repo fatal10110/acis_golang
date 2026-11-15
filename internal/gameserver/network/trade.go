@@ -313,9 +313,9 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	// first confirm.
 	if !partnerLeft && !session.Confirmed(live.ObjectID()) && !livePlayersInRange(live, partner, tradeInteractionDistance) {
 		l.cancelActiveEnchant(partner)
-		// The interaction radius is validated on every confirm, and an
-		// out-of-range confirm is answered by cancelling the whole
-		// trade for both players, not with a per-player error message.
+		// An out-of-range first confirm is answered by cancelling the
+		// whole trade for both players, not with a per-player error
+		// message.
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
