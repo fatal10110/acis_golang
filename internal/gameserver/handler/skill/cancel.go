@@ -67,7 +67,7 @@ func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRat
 			}
 		}
 
-		rate := formulas.CancelSuccessRate(e.Template.Time, diffLevel, float64(cast.Skill.Power), vuln, minRate, maxRate)
+		rate := formulas.CancelSuccessRate(e.Period(), diffLevel, float64(cast.Skill.Power), vuln, minRate, maxRate)
 		if formulas.CancelSucceeds(rate, rnd.Get(100)) {
 			list.Remove(e)
 		}

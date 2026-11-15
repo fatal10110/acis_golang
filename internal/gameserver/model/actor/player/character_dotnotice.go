@@ -78,6 +78,11 @@ func (c *Character) NotifyEffectFelt(skillID modelskill.ID, level int) {
 	c.emit(event.EffectFelt{SkillID: skillID, Level: level})
 }
 
+// NotifyToggleUsed sends USE_S1 for a toggle skill's effect created on c.
+func (c *Character) NotifyToggleUsed(skillID modelskill.ID, level int) {
+	c.emit(event.ToggleUsed{SkillID: skillID, Level: level})
+}
+
 // NotifyAttackFailed sends ATTACK_FAILED for a half-damage magic resist.
 func (c *Character) NotifyAttackFailed() {
 	c.emit(event.AttackFailed{})

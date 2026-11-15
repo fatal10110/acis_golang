@@ -592,7 +592,9 @@ func wireHooks(e *Effect) {
 	case TypePhoenixBless:
 		e.OnExit = phoenixBlessExit
 	case TypeProtectionBless:
-		e.startRefused = true
+		// Its start always fails: the blessing is held and flagged, but adds
+		// no stats and runs no exit hook when it simply ends.
+		e.OnStart = func(*Effect) bool { return false }
 		e.OnExit = protectionBlessExit
 	case TypeCancel:
 		e.OnStart = cancelStart
@@ -647,7 +649,8 @@ func wireHooks(e *Effect) {
 	case TypeSignetGround:
 		// Only reached via New() (relog restore, load validation), never a
 		// live cast — see the coreKinds comment above. No actor exists to
-		// drive it here, so it declines rather than fake-apply.
+		// drive it here, so its start fails rather than fake-apply: like
+		// any failed start, it is held until its first tick ends it.
 		e.OnStart = func(*Effect) bool { return false }
 	case TypeClanGate:
 		e.OnStart = func(e *Effect) bool {

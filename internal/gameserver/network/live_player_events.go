@@ -126,7 +126,7 @@ func sessionOnly(ev event.Event) bool {
 	switch ev.(type) {
 	case event.Attack, event.BowDrawn, event.Died, event.DeathSettled, event.HerbConsumed, event.ItemObtained,
 		event.RegenMax, event.EffectRemovedLackHP, event.EffectRemovedLackMP,
-		event.RelaxHPFull, event.Restored, event.EffectEnded, event.EffectFelt, event.SpoilResult,
+		event.RelaxHPFull, event.Restored, event.EffectEnded, event.EffectFelt, event.ToggleUsed, event.SpoilResult,
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
 		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.ServitorDamageShared, event.SkillDamageDealt, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
@@ -358,6 +358,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(messageID, int32(e.SkillID), int32(e.Level)))
 	case event.EffectFelt:
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageYouFeelS1Effect, int32(e.SkillID), int32(e.Level)))
+	case event.ToggleUsed:
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(e.SkillID), int32(e.Level)))
 	case event.SpoilResult:
 		if e.Already {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadySpoiled))

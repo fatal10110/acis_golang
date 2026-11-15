@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -45,14 +46,22 @@ type Effect struct {
 	landing location.Location
 
 	inUse bool
-	// startRefused marks a kind whose start always fails while the effect
-	// stays held: TypeProtectionBless. It is still marked in use (the in-use
-	// flag is set before the start runs), so its flag counts, but the failed
-	// start leaves its start conditions unmet: activation adds no stat funcs
-	// and sends no felt message, and ending it by expiry, dispel, death or
+	// startFailed records that e's latest activation ran an on-start hook
+	// that reported false. e stays held and in use all the same, so its flag
+	// counts, it keeps its stack group's head and a playable shows its icon,
+	// but the failed start leaves its start conditions unmet: the activation
+	// adds no stat funcs and sends no felt message, its next tick runs its
+	// action and then ends it, and ending it by expiry, dispel, death or
 	// replacement skips onExit. Only losing its stack group's head runs
 	// onExit, because clearing the in-use flag calls it unconditionally.
-	startRefused bool
+	// Written under the list lock on each activation; the effect tick reads
+	// it without that lock.
+	startFailed atomic.Bool
+
+	// halvedPeriod marks a herb effect landing on a servitor, or on a player
+	// with a summon: it runs at half its template period (see Period). Set
+	// once, before e joins a list.
+	halvedPeriod bool
 
 	// strippedAll marks an effect a stop-all is ending. Its holder removes
 	// its stat funcs without reporting the change (see ModOwner.Stripped):
@@ -126,10 +135,43 @@ func (e *Effect) ActionTime() bool {
 }
 
 func (e *Effect) period() time.Duration {
-	if e == nil {
+	if e == nil || e.Period() <= 0 {
 		return 0
 	}
-	return templatePeriod(e.Template)
+	return time.Duration(e.Period()) * time.Second
+}
+
+// Period is e's tick period in seconds: the template's, halved for a herb
+// effect on a servitor or on a player with a summon. The cancel rates, the
+// icon time and the schedule all read it.
+func (e *Effect) Period() int {
+	if e.halvedPeriod {
+		return e.Template.Time / 2
+	}
+	return e.Template.Time
+}
+
+// herbHalvedSkill reports whether id is one of the herb skills whose effects
+// run at half period on a servitor or on a player with a summon.
+func herbHalvedSkill(id modelskill.ID) bool {
+	return id > 2277 && id < 2286
+}
+
+// halvesHerbPeriod reports whether a herb skill's effect landing on effected
+// runs at half period: effected is a servitor, or a player with any summon,
+// a pet included. A pet itself does not count.
+func halvesHerbPeriod(effected Actor) bool {
+	switch {
+	case effected == nil:
+		return false
+	case effected.Kind() == actor.KindSummon:
+		p, ok := effected.(interface{ IsPet() bool })
+		return ok && !p.IsPet()
+	case effected.Kind() == actor.KindPlayer:
+		h, ok := effected.(interface{ HasSummon() bool })
+		return ok && h.HasSummon()
+	}
+	return false
 }
 
 // templatePeriod is the tick period of an effect built from tmpl; zero for
@@ -299,7 +341,7 @@ func (e *Effect) SaveState(now time.Time) (count, elapsed int32) {
 // template period.
 func (e *Effect) PeriodRemaining(now time.Time) int {
 	_, elapsed := e.SaveState(now)
-	return e.Template.Time - int(elapsed)
+	return e.Period() - int(elapsed)
 }
 
 func (e *Effect) stopSchedule() {
@@ -361,25 +403,25 @@ func (e *Effect) beginExit() func() {
 }
 
 // finishExit is beginExit for an effect that is ending for good (expiry,
-// dispel, removal). A startRefused effect runs no exit hook there and stays
-// marked in use. A buff an insertion replaces or evicts ends through
+// dispel, removal). An effect whose start failed runs no exit hook there and
+// stays marked in use. A buff an insertion replaces or evicts ends through
 // retireExit instead.
 func (e *Effect) finishExit() func() {
-	if e.startRefused {
+	if e.startFailed.Load() {
 		return nil
 	}
 	return e.beginExit()
 }
 
 // retireExit returns the exit hook one ending pass over a buff an insertion
-// replaces or evicts runs, or nil when e is inactive, start-refused or has
+// replaces or evicts runs, or nil when e is inactive, its start failed or it has
 // no hook. Unlike finishExit it leaves e marked in use, because the
 // insertion still holds e and every later pass over it runs the hook again
 // while e stays active: a cap eviction reaching a buff the identical check
 // already retired, then the stack-head change (beginExit), which clears the
 // flag. add clears it for good before e's list removal, which runs no hook.
 func (e *Effect) retireExit() func() {
-	if !e.inUse || e.startRefused || e.OnExit == nil {
+	if !e.inUse || e.startFailed.Load() || e.OnExit == nil {
 		return nil
 	}
 	return func() { e.OnExit(e) }
@@ -430,7 +472,7 @@ func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
 		if period := e.period(); period > 0 && !next.IsZero() {
 			elapsed = int64(now.Sub(next.Add(-period)) / time.Second)
 		}
-		return int32((int64(e.Remaining())*int64(e.Template.Time) - elapsed) * 1000), true
+		return int32((int64(e.Remaining())*int64(e.Period()) - elapsed) * 1000), true
 	}
 	return e.partyIconDuration(now)
 }

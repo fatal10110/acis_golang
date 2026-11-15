@@ -208,6 +208,12 @@ type EffectFelt struct {
 	Level   int
 }
 
+// ToggleUsed reports a toggle skill's effect created on the player.
+type ToggleUsed struct {
+	SkillID modelskill.ID
+	Level   int
+}
+
 // AttackFailed reports a half-damage magic resist on the caster.
 type AttackFailed struct{}
 
@@ -405,6 +411,7 @@ func (ServitorVanished) event()        {}
 func (ShieldBlocked) event()           {}
 func (EffectEnded) event()             {}
 func (EffectFelt) event()              {}
+func (ToggleUsed) event()              {}
 func (AttackFailed) event()            {}
 func (SkillResisted) event()           {}
 func (MagicResisted) event()           {}

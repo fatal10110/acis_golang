@@ -26,13 +26,20 @@ func (l *List) tickAt(now time.Time) {
 			}
 			continue
 		}
-		if e.InUse() && !e.ActionTime() {
+		if e.InUse() && e.actionEnds() {
 			remove = true
 		}
 		if remove {
 			l.Remove(e)
 		}
 	}
+}
+
+// actionEnds runs in-use e's tick action and reports whether that tick ends
+// e: the action reported false, or e's start failed, which lets the action
+// run once and then ends e.
+func (e *Effect) actionEnds() bool {
+	return !e.ActionTime() || e.startFailed.Load()
 }
 
 // Add inserts e and activates it when it wins its stack group.
@@ -112,6 +119,11 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 	if !l.Admits(e) {
 		return
 	}
+	if announce && e.Skill.Toggle {
+		if n, ok := l.owner.(toggleNotifier); ok {
+			n.NotifyToggleUsed(e.Skill.ID, e.Skill.Level)
+		}
+	}
 	var pending []func()
 	l.mu.Lock()
 	l.silent = !announce
@@ -138,6 +150,12 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 	l.notifyAbnormalUpdate()
 	runHooks(exits)
 	l.notifyActivityTransition()
+}
+
+// toggleNotifier is an owner told of each toggle effect created on it, before
+// the effect joins its list: a player, which reports the toggle's use.
+type toggleNotifier interface {
+	NotifyToggleUsed(skillID modelskill.ID, level int)
 }
 
 // catchUp runs, in time order, the ticks of the restored effects that came
@@ -187,7 +205,7 @@ func (l *List) catchUpTick(e *Effect, now time.Time) []func() {
 	l.catchingUp.Add(1)
 	defer l.catchingUp.Add(-1)
 	run, remove := e.claimAction(now)
-	if run && e.InUse() && !e.ActionTime() {
+	if run && e.InUse() && e.actionEnds() {
 		remove = true
 	}
 	if !remove {
@@ -294,12 +312,12 @@ func (l *List) Remove(e *Effect) {
 // registry if they disagree, in one critical section under l.mu.
 //
 // It is called after runHooks has already run, rather than deciding the
-// transition immediately after add/remove: a queued OnStart hook can still
-// reject the effect (removeFromVisible), draining a list that looked
-// active right back to empty before the caller returns. Reading the
-// settled state here means a rejected effect never registers a phantom
-// empty list, and a hook that reactivates a stack member never
-// deregisters a list that's actually still live.
+// transition immediately after add/remove: a queued hook can still end
+// effects (an exit hook's Drop, a start hook removing others), draining a
+// list that looked active right back to empty before the caller returns.
+// Reading the settled state here means such a list never registers as a
+// phantom, and a hook that reactivates a stack member never deregisters a
+// list that's actually still live.
 //
 // Comparing against l.tracked instead of a wasEmpty value the caller
 // captured before releasing mu — and calling the registry without releasing
@@ -466,18 +484,26 @@ func appendThunk(pending *[]func(), thunk func()) {
 
 // beginActivate returns a thunk that runs e's on-start hook once the
 // caller's lock is released, then briefly re-acquires l.mu to apply the
-// result: e activates and gains its stat funcs on success, or onReject
-// runs (still under l.mu) on failure. The owner reports the stat change
-// after l.mu is released again. With announce set, a successful
+// result: e becomes in use either way, and gains its stat funcs only when
+// its start succeeded (see Effect.startFailed). The owner reports the stat
+// change after l.mu is released again. With announce set, a successful
 // activation of an icon effect then tells the owner it feels e's effect —
 // the add path's stack-head promotion does this (unless l.silent, read here
 // under l.mu), the removal path's does not.
+//
+// The start hook runs unlocked, so by the time the thunk re-acquires l.mu a
+// concurrent add or removal may have retired e or displaced it from its
+// stack group's head, or another activation may have made it active
+// already. Such a stale activation changes nothing: e stays as that other
+// path left it and gains no stat funcs nothing would remove. A start that
+// succeeded for an e no longer held or no longer heading its group is undone
+// through e's exit hook.
 //
 // It does not (re)start e's tick schedule: that starts once, in add, when e
 // is first created, unconditionally for every created effect — so a
 // promoted stack loser resumes with whatever count it drained down to while
 // displaced instead of restarting from the template.
-func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) func() {
+func (l *List) beginActivate(e *Effect, announce bool) func() {
 	announce = announce && !l.quietLocked()
 	return func() {
 		ok := true
@@ -491,28 +517,54 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 			fns = e.attachableFuncs()
 		}
 
-		attached := false
 		l.mu.Lock()
-		if ok {
+		heads := l.headsLocked(e)
+		already := e.inUse
+		if heads && !already {
 			e.inUse = true
-			if !e.startRefused {
+			e.startFailed.Store(!ok)
+			if ok {
 				l.attachStatFuncs(fns)
-				attached = true
 			}
-		} else {
-			onReject(e)
 		}
 		l.mu.Unlock()
 
+		// The undo below and the already branch are not ordered with the
+		// activation of the effect that displaced e: an undo may clear shared
+		// owner state the new head set, and a doubled OnStart goes unmatched.
+		// Tracked in #5190.
+		if !heads {
+			if ok && e.OnExit != nil {
+				e.OnExit(e)
+			}
+			return
+		}
+		if already || !ok {
+			return
+		}
 		// The stat refresh runs outside l.mu: a RUN_SPEED change rebuilds the
 		// owner's appearance for its observers, which reads this list's flags.
-		if attached && l.owner != nil {
+		if l.owner != nil {
 			l.owner.StatFuncsAttached(fns)
 		}
-		if ok && announce && !e.startRefused && e.Template.Icon && l.owner != nil {
+		if announce && e.Template.Icon && l.owner != nil {
 			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)
 		}
 	}
+}
+
+// headsLocked reports whether l holds e as an effect that may be active: in
+// its visible list and, for a stacked effect, at the head of its stack
+// group. Caller must hold l.mu.
+func (l *List) headsLocked(e *Effect) bool {
+	if l.contained(e) == nil {
+		return false
+	}
+	if e.stackType() == "none" {
+		return true
+	}
+	queue := l.stacks[e.stackType()]
+	return len(queue) > 0 && queue[0] == e
 }
 
 // add inserts e, starting its tick schedule unconditionally first — every
@@ -536,6 +588,7 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 // again: once when retired, again if the cap eviction reaches it, and again
 // when it loses its stack group's head to e.
 func (l *List) add(e *Effect, pending *[]func()) {
+	e.halvedPeriod = herbHalvedSkill(e.Skill.ID) && halvesHerbPeriod(e.Effected)
 	e.startSchedule(l.now())
 
 	if e.RejectsIfAffected && l.flagsLocked()&e.Flag != 0 {
@@ -589,7 +642,7 @@ func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
 	}
 
 	if e.stackType() == "none" {
-		*pending = append(*pending, l.beginActivate(e, func(rejected *Effect) { l.removeFromVisible(rejected) }, false))
+		*pending = append(*pending, l.beginActivate(e, false))
 		return
 	}
 

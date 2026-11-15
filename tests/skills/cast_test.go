@@ -715,9 +715,11 @@ func TestGroundCastIgnoresNonGroundAndUnknownSkill(t *testing.T) {
 
 // TestToggleActivatesThenDeactivates reproduces recasting a toggle skill:
 // the first request pays MP and applies the buff; the second finds the
-// instance active and turns it off at no cost instead of refreshing it. Both
-// directions answer with only the instantaneous MagicSkillUse ack plus the
-// icon refresh — no message, cast bar, or launch report.
+// instance active and turns it off at no cost instead of refreshing it.
+// Turning it on answers with the instantaneous MagicSkillUse ack, the MP
+// status, USE_S1 naming the toggle and the icon refresh; turning it off with
+// the ack, the aborted message and the icon refresh. Neither shows a cast
+// bar or a launch report.
 func TestToggleActivatesThenDeactivates(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -750,6 +752,7 @@ func TestToggleActivatesThenDeactivates(t *testing.T) {
 	}
 	// The MP payment sends its own status, between the ack and the effect.
 	assertCasterMPStatus(t, srv, c.Read(), objID, 18)
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 288, 1)
 	assertAbnormalStatusUpdate(t, c, 288, 1, 0)
 	drainUntilQuiet(t, c)
 
@@ -797,6 +800,7 @@ func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "toggle stop")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle activation")
 	assertCasterMPStatus(t, srv, c.Read(), objID, 18)
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, skillID, 1)
 	assertAbnormalStatusUpdate(t, c, skillID, 1, 0)
 	drainUntilQuiet(t, c)
 }

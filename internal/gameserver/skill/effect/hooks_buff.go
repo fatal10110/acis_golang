@@ -92,7 +92,7 @@ func phoenixBlessExit(e *Effect) {
 }
 
 // protectionBlessExit runs only when a Blessing of Protection loses its
-// stack group's head, never when it simply ends: see Effect.startRefused.
+// stack group's head, never when it simply ends: see Effect.startFailed.
 func protectionBlessExit(e *Effect) {
 	if target, ok := asPlayer(e.Effected); ok {
 		target.EffectList().Drop(e)
@@ -139,7 +139,7 @@ func cancelStart(e *Effect) bool {
 			continue
 		}
 
-		rate := formulas.EffectCancelSuccessRate(e.Skill.MagicLevel, cand.Skill.MagicLevel, cand.Template.Time, e.Template.EffectPower, vuln)
+		rate := formulas.EffectCancelSuccessRate(e.Skill.MagicLevel, cand.Skill.MagicLevel, cand.Period(), e.Template.EffectPower, vuln)
 		if formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
 			list.Remove(cand)
 		}
