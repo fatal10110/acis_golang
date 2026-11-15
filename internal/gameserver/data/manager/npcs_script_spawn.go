@@ -47,6 +47,19 @@ func (n *Npcs) AddSpawn(npcID int32, x, y, z, heading int, scatter bool, despawn
 	return live, nil
 }
 
+// SpawnTemporary places one NPC of tmpl at (x, y) on the ground below z,
+// facing heading, as a standalone spawn that never respawns, and returns
+// it. A positive despawn deletes the NPC once it has passed, unless it has
+// left the world by then.
+func (n *Npcs) SpawnTemporary(tmpl *npc.Template, x, y, z, heading int, despawn time.Duration) (attackable.Combatant, error) {
+	live, err := n.placeStandalone(tmpl, x, y, z, heading, nil)
+	if err != nil {
+		return nil, err
+	}
+	n.ScheduleDespawn(live, despawn)
+	return live, nil
+}
+
 // SpawnSummoned is SpawnFixed for an NPC spawned for summoner: the NPC
 // keeps summoner as the creature it was spawned for.
 func (n *Npcs) SpawnSummoned(tmpl *npc.Template, x, y, z, heading int, summoner attackable.Combatant) error {

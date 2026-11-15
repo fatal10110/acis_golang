@@ -109,9 +109,10 @@ func FrameGMViewCharacterInfo(s UserInfoSnapshot) wire.Frame {
 	w.WriteFloat64(collisionRadius)
 	w.WriteFloat64(collisionHeight)
 
-	w.WriteInt32(int32(c.HairStyle))
-	w.WriteInt32(int32(c.HairColor))
-	w.WriteInt32(int32(c.Face))
+	face, hairStyle, hairColor := c.Appearance()
+	w.WriteInt32(int32(hairStyle))
+	w.WriteInt32(int32(hairColor))
+	w.WriteInt32(int32(face))
 	w.WriteInt32(boolInt32(s.IsGM))
 	w.WriteString(c.Title())
 	w.WriteInt32(c.ClanID())

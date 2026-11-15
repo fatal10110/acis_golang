@@ -111,9 +111,10 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteFloat64(collisionRadius)
 	w.WriteFloat64(collisionHeight)
 
-	w.WriteInt32(int32(c.HairStyle))
-	w.WriteInt32(int32(c.HairColor))
-	w.WriteInt32(int32(c.Face))
+	face, hairStyle, hairColor := c.Appearance()
+	w.WriteInt32(int32(hairStyle))
+	w.WriteInt32(int32(hairColor))
+	w.WriteInt32(int32(face))
 	title := c.Title()
 	abnormal := c.AbnormalEffect()
 	if s.Revealed {
