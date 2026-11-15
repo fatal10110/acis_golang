@@ -148,10 +148,13 @@ func assertNoSwingFor(t *testing.T, srv *gameservertest.Server, d time.Duration)
 // _nextDesire latch: a monster whose first attack after wandering loses its
 // desire still swings at the latched target on the next runAI, the one its
 // first swing's finish runs, instead of idling. The runAI after that idles.
+// The periodic step that decays the desire finds the monster attacking and
+// switches its wander walk to run stance first.
 func TestLatchedFirstAttackSwingsOnceAfterDesireLost(t *testing.T) {
 	t.Parallel()
 	srv, hostile, _, attackTime := startHostileAttackAfter(t, latchAtkSpd, 0, wanderThenStop)
 	decayAttackDesire(t, hostile)
+	assertStanceShown(t, srv.Client, "attacking monster's periodic run", hostile.ObjectID(), true)
 
 	assertLatchedSwingThenIdle(t, srv, hostile, attackTime)
 }

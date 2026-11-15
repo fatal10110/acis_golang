@@ -1295,7 +1295,7 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 	if !h.Instance.HasHome || h.location().In2DRadius(h.Instance.Home, h.driftRange()) {
 		return false
 	}
-	h.brain.ThreatsIfBuilt().ZeroHate()
+	h.brain.CleanAllHate()
 	if h.SiegeGuard() {
 		h.ForceRunStance()
 	} else {

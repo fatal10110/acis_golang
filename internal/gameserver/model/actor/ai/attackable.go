@@ -1337,7 +1337,8 @@ func (a *Attackable) Tick() {
 }
 
 // cycleDecayLocked runs the periodic hate refresh and weight decay if a Tick
-// marked them due.
+// marked them due. An actor attacking or casting then switches to run
+// stance.
 func (a *Attackable) cycleDecayLocked() {
 	if !a.cycleDecayDue {
 		return
@@ -1348,6 +1349,9 @@ func (a *Attackable) cycleDecayLocked() {
 	a.desires.Load().DecreaseWeightByType(IntentionAttack, attackHateDecay)
 	a.desires.Load().DecreaseWeightByType(IntentionCast, castDesireDecay)
 	a.desires.Load().DecreaseWeightByType(IntentionNothing, nothingDesireDecay)
+	if a.current.kind == IntentionAttack || a.current.kind == IntentionCast {
+		a.actor.ForceRunStance()
+	}
 }
 
 // KeepTerritory makes m the actor's out-of-territory state, the one its

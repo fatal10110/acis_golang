@@ -27,7 +27,7 @@ func (h *Hostile) ThinkFollow(target attackable.Combatant, lastWasFollow bool) (
 	if h.DenyAIAction() || h.MovementDisabled() {
 		return false
 	}
-	if target == nil || target.ObjectID() == h.ObjectID() || target.AlikeDead() {
+	if target == nil || target.ObjectID() == h.ObjectID() || target.Dead() {
 		return true
 	}
 	if h.GeoPathFailCount() >= escortGeoFailLimit {
@@ -181,7 +181,7 @@ func (h *Hostile) thinkLooseFollow(target attackable.Combatant) {
 	if h.IsMoving() {
 		return
 	}
-	if h.location().Distance2D(pos) <= float64(escortLooseRadius) {
+	if h.location().Distance2D(pos) < float64(escortLooseRadius) {
 		return
 	}
 	if h.roll(100) > 50 {

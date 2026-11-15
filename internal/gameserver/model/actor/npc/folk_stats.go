@@ -227,13 +227,14 @@ func (f *Folk) BlessedSpiritshotCharged() bool { return false }
 // WeaponGradePenalty reports false: NPCs carry no weapon grade.
 func (f *Folk) WeaponGradePenalty() bool { return false }
 
-// RandomDamageSpread returns the template random-damage spread, or -1 when
-// none is set.
+// RandomDamageSpread returns the random damage of the template's right-hand
+// weapon, 0 included, or -1 (the weaponless fallback) when it holds none.
+// The template's baseRandomDamage plays no part.
 func (f *Folk) RandomDamageSpread() int {
-	if f.Instance.Template.BaseRandomDamage <= 0 {
-		return -1
+	if w := f.fight.weapon; w != nil {
+		return int(w.RandomDamage)
 	}
-	return f.Instance.Template.BaseRandomDamage
+	return -1
 }
 
 // AttackSpeed returns the physical attack speed.
