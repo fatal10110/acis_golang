@@ -25,6 +25,12 @@ func (c *Character) Summon() (skilltarget.Actor, bool) {
 	return summon, ok
 }
 
+// HasSummon reports whether c has a summon in the world, dead or alive.
+func (c *Character) HasSummon() bool {
+	_, ok := c.Summon()
+	return ok
+}
+
 // The NPC, corpse and door facts never apply to players: every method
 // below is the neutral answer target resolution gives a player. The duel
 // lookups are in character_duel.go; the Olympiad ones in

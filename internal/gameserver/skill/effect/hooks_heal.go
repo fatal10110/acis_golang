@@ -31,11 +31,11 @@ func healOverTimeAction(e *Effect) bool {
 }
 
 func healOverTimeStart(e *Effect) bool {
-	if e.Template.Count <= 0 || e.Template.Time <= 0 {
+	if e.Template.Count <= 0 || e.Period() <= 0 {
 		return true
 	}
 	if target, ok := asPlayer(e.Effected); ok {
-		target.SendRegenMax(int32(e.Template.Count)*int32(e.Template.Time), int32(e.Template.Time), e.Template.Value)
+		target.SendRegenMax(int32(e.Template.Count)*int32(e.Period()), int32(e.Period()), e.Template.Value)
 	}
 	return true
 }

@@ -120,23 +120,28 @@ func TestListActivityStaysRegisteredWithEffectsRemaining(t *testing.T) {
 	}
 }
 
-// TestListActivityRejectedOnStartNeverRegisters is the regression case for
-// firing the activity hook from a pre-runHooks snapshot: AbortCast's
-// OnStart (abortCastStart) deterministically returns false when e.Effected
-// is nil, draining the list back to empty inside runHooks before Add
-// returns. The hook must reflect that settled state, not the transient
-// "just inserted" one, or a resisted effect leaves a permanent phantom
-// registration that Effects.Tick then scans forever.
-func TestListActivityRejectedOnStartNeverRegisters(t *testing.T) {
+// TestListActivityFailedStartRegistersUntilFirstTick pins the registration
+// of an effect whose start fails: AbortCast's OnStart (abortCastStart)
+// returns false when e.Effected is nil, yet the effect stays held, so the
+// list registers active. Its first tick ends it, and the list deregisters
+// from that settled state.
+func TestListActivityFailedStartRegistersUntilFirstTick(t *testing.T) {
 	rec := withActivityRecorder(t)
 	list := newTestList(activityTestOwner{}, WithEnv(Env{Activity: rec}))
 
-	e := mustNewEffect(t, Skill{ID: 1}, "AbortCast")
-	// e.Effected is left nil: abortCastStart rejects unconditionally.
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "AbortCast", Count: 1, Time: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// e.Effected is left nil: abortCastStart fails unconditionally.
 	list.Add(e)
 
-	if rec.isActive(list) {
-		t.Fatal("list registered active after an OnStart-rejected effect drained it back to empty")
+	if !rec.isActive(list) || !e.InUse() {
+		t.Fatalf("list active = %v, effect in use = %v after a failed start, want the effect held", rec.isActive(list), e.InUse())
+	}
+	list.tickAt(time.Now().Add(time.Hour))
+	if rec.isActive(list) || len(list.All()) != 0 {
+		t.Fatal("failed-start effect still held after its first tick, want it gone and the list deregistered")
 	}
 }
 
