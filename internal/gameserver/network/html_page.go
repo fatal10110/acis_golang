@@ -1,6 +1,7 @@
 package network
 
 import (
+	"html"
 	"strings"
 
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
@@ -23,6 +24,12 @@ func sendFilledHTML(live *livePlayer, objectID int32, page string, itemID int32)
 // page built rather than set from a file has no file and is never named.
 func (l *GameClientLink) sendFilePage(live *livePlayer, objectID int32, file, page string, itemID int32) {
 	sendFilledHTML(live, objectID, page, itemID)
+	l.namePageFile(live, file)
+}
+
+// namePageFile tells live the name of file, the page file of the window it
+// was just sent, while //show html is on and live is a game master.
+func (l *GameClientLink) namePageFile(live *livePlayer, file string) {
 	if file != "" && l.showPageFiles.Load() && live.IsGM() {
 		live.SendFrame(serverpackets.FrameCreatureSay(0, serverpackets.SayTypeAll, "HTML", pageFileName(file)))
 	}
@@ -49,9 +56,16 @@ func pageFileName(file string) string {
 func (l *GameClientLink) setPage(file string) string {
 	page, ok := l.html.Get(file)
 	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
+		page = missingPage(file)
 	}
 	return serverpackets.NpcHtmlBody(page)
+}
+
+// missingPage is the notice a window shows for a page file the cache does
+// not hold. The name is escaped, since it may carry text a player typed:
+// the notice shows it as text and offers no link of its own.
+func missingPage(file string) string {
+	return "<html><body>My html is missing:<br>" + html.EscapeString(file) + "</body></html>"
 }
 
 // setPages reads the datapack pages an NPC dialog fills in the way an HTML

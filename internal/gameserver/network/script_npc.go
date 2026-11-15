@@ -63,7 +63,7 @@ func (l *GameClientLink) openHostileChat(live *livePlayer, h *npc.Hostile, val i
 // objectID, with %objectId% naming it; a missing page reads as a "My html
 // is missing" notice naming it.
 func (l *GameClientLink) sendNPCPage(live *livePlayer, objectID int32, file string) {
-	page := "<html><body>My html is missing:<br>" + file + "</body></html>"
+	page := missingPage(file)
 	if l.html != nil {
 		page = l.setPage(file)
 	}

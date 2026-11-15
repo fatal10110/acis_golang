@@ -52,12 +52,6 @@ func selectNpc(t *testing.T, srv *gameservertest.Server, c *testsupport.Scripted
 // whole command after npc_ from an edit box.
 const anyNpcLinkPage = `<html><body><edit var="c"><a action="bypass -h npc_$c">Go</a></body></html>`
 
-func encodeLinkHTML(link string) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestLinkHtml)
-	w.WriteString(link)
-	return w.Bytes()
-}
-
 func encodeBypass(command string) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestBypassToServer)
 	w.WriteString(command)
@@ -66,9 +60,9 @@ func encodeBypass(command string) []byte {
 
 // trainerBypass opens the page admitting every npc_ command, then sends
 // npc_<f>_<command> and returns every frame it is answered with.
-func trainerBypass(t *testing.T, c *testsupport.ScriptedClient, f *npc.Folk, command string) [][]byte {
+func trainerBypass(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, f *npc.Folk, command string) [][]byte {
 	t.Helper()
-	c.Send(encodeLinkHTML("test/any.htm"))
+	srv.ShowDialogPage(t, objID, anyNpcLinkPage)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeNpcHtmlMessage, "any-command page")
 	drainUntilQuiet(t, c)
 	c.Send(encodeBypass("npc_" + strconv.Itoa(int(f.ObjectID())) + "_" + command))

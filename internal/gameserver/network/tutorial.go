@@ -67,7 +67,7 @@ func (l *GameClientLink) sendTutorial(live *livePlayer, ev event.Event) {
 			page, ok = l.html.Get(e.File)
 		}
 		if !ok {
-			page = "<html><body>My html is missing:<br>" + e.File + "</body></html>"
+			page = missingPage(e.File)
 		}
 		live.SendFrame(serverpackets.FrameTutorialShowHTML(page))
 	case event.TutorialPageClosed:

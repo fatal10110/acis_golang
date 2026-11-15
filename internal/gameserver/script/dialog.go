@@ -215,6 +215,9 @@ func containsScript(list []*Script, s *Script) bool {
 func (s *Script) show(c *player.Character, n *NPC, res Result) {
 	switch res.Kind {
 	case ResultPageFile:
+		if !isPageFile(res.Text) {
+			return
+		}
 		c.ShowDialogPage(n.ObjectID(), s.pagePath(res.Text), "")
 	case ResultPage:
 		c.ShowDialogPage(n.ObjectID(), "", res.Text)
@@ -230,6 +233,25 @@ func (s *Script) pagePath(file string) string {
 		return "./data/html/script/quest/" + s.Name + "/" + file
 	}
 	return "./data/html/script/" + s.Dir + "/" + s.Name + "/" + file
+}
+
+// isPageFile reports whether name can name a page file of a script: one
+// or more '/'-separated segments of ASCII letters, digits, '.', '-' and
+// '_', none of them "." or "..". A hook may answer with the event text a
+// player typed, so a name that climbs out of the script's directory or
+// carries markup names no page, and the answer is nothing.
+func isPageFile(name string) bool {
+	for _, seg := range strings.Split(name, "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return false
+		}
+		for _, r := range seg {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '-' || r == '_') {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // lidiasHeart is the quest whose diary the help page diaryPage marks read.

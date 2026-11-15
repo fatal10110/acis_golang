@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -18,9 +17,13 @@ func (l *GameClientLink) requestLinkHTML(live *livePlayer, req clientpackets.Req
 	}
 	html, ok := l.html.Get(req.Link)
 	if !ok {
-		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", req.Link)
+		html = missingPage(req.Link)
 	}
-	l.sendValidatedFile(live, 0, req.Link, html, 0)
+	// The player names this page; no dialog offered it. Its links are kept
+	// out of the bypass whitelist, which keeps the last dialog's links, so
+	// a quest event or NPC command found on any cached page stays refused.
+	live.SendFrame(serverpackets.FrameNpcHtmlMessage(0, serverpackets.NpcHtmlBody(html), 0))
+	l.namePageFile(live, req.Link)
 }
 
 // sendPlayerHelp opens a help page. Its links are not validated, so the
@@ -61,7 +64,7 @@ func (l *GameClientLink) sendPlayerHelp(live *livePlayer, requestedPath string) 
 
 	html, ok := l.html.Get(file)
 	if !ok {
-		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
+		html = missingPage(file)
 	}
 	live.SendFrame(serverpackets.FrameNpcHtmlMessage(0, serverpackets.NpcHtmlBody(html), itemID))
 }

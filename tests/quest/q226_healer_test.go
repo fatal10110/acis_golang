@@ -71,7 +71,7 @@ func q226World(t *testing.T, cond string, hold ...int32) *dialogWorld {
 			srv.GiveItem(t, objID, id, 1)
 		}
 	},
-		x1Items([]int32{q226OrderOfSorius, q226Letter1, q226Letter2, q226Letter3, q226Letter4}),
+		x1Items([]int32{q226OrderOfSorius, q226Letter1, q226Letter2, q226Letter3, q226Letter4, q226GoldenStatue, q226Mark}),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{
 			proofMonster(q226Leader), proofMonster(q226Assassin), proofMonster(q226Sniper),
 			proofMonster(q226Wizard), proofMonster(q226Lord), proofMonster(q226Tatoma),

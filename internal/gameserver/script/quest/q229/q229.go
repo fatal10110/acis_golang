@@ -198,6 +198,12 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 		s.GiveItems(p, orimLetter1, 1)
 		s.GiveItems(p, orimLetter2, 1)
 	case strings.EqualFold(e.Name, "30630-22.htm"):
+		// Orim offers the last hand-over only on cond 10 to a holder of
+		// Zeruel's crystal, a quest item the end of the test takes:
+		// anything else pays nothing.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 10 || !p.HasItem(zeruelBindCrystal) {
+			return ""
+		}
 		s.TakeItems(p, ikerAmulet, 1)
 		s.TakeItems(p, orimInstructions, 1)
 		s.TakeItems(p, purgatoryKey, 1)
