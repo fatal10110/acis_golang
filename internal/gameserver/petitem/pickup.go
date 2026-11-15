@@ -34,7 +34,8 @@ func PickupAvailable(pet *summon.Actor) bool {
 	return pet != nil && !pet.Dead() && !pet.OutOfControl()
 }
 
-// ClaimGround runs every check a pet's pickup of ground must pass and claims
+// ClaimGround runs every check a pet's pickup of ground must pass, once the
+// pet stands within reach of it (a pet that cannot act is refused), and claims
 // it, keeping the claim only on PickupOK; herb reports a herb, which the pet
 // uses instead of carrying. The caller then stores the item (StoreGround) or
 // hands it on, as the owner's party loot rule does.
@@ -42,13 +43,13 @@ func ClaimGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gro
 	if pet == nil || petInv == nil || ground == nil || ground.Template == nil || ground.Count() <= 0 {
 		return false, PickupNoop
 	}
-	if !PickupAvailable(pet) {
+	if pet.DenyAIAction() {
 		return false, PickupPetUnavailable
 	}
 
 	picked := ground.Instance.Clone()
 	herb = ground.Template.EtcItem != nil && ground.Template.EtcItem.Type == modelitem.EtcItemHerb
-	if !herb && ForbiddenForPet(picked, ground.Template) {
+	if Ammunition(ground.Template) {
 		return false, PickupItemNotForPets
 	}
 	// Every rejection from here on puts the claimed item back on the ground.

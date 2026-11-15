@@ -102,6 +102,7 @@ func TestPetPickupGroundItem(t *testing.T) {
 	h.srv.InventoryUpdates.Tick()
 	drainFrames(t, h.client)
 
+	h.petOntoGround(t, groundID)
 	h.client.Send(encodeRequestPetGetItem(groundID))
 	frame = mustRead(t, h.client, "pickup GetItem")
 	assertFrameOpcode(t, frame, serverpackets.OpcodeGetItem, "GetItem")
@@ -175,6 +176,8 @@ func TestPetPickupAttentionAnnouncedToObservers(t *testing.T) {
 			drainUntilQuiet(t, observer)
 			drainUntilQuiet(t, h.client)
 
+			h.petOntoGround(t, groundID)
+			drainUntilQuiet(t, observer)
 			h.client.Send(encodeRequestPetGetItem(groundID))
 			assertFrameOpcode(t, mustRead(t, h.client, "GetItem"), serverpackets.OpcodeGetItem, "GetItem")
 			ownerFrames := drainFrames(t, h.client)
@@ -225,6 +228,8 @@ func TestPetPickupAttentionEnchantedWeapon(t *testing.T) {
 	drainUntilQuiet(t, observer)
 	drainUntilQuiet(t, h.client)
 
+	h.petOntoGround(t, groundID)
+	drainUntilQuiet(t, observer)
 	h.client.Send(encodeRequestPetGetItem(groundID))
 	assertFrameOpcode(t, mustRead(t, h.client, "GetItem"), serverpackets.OpcodeGetItem, "GetItem")
 	ownerFrames := drainFrames(t, h.client)
@@ -261,6 +266,8 @@ func TestPetPickupAttentionSkippedForEtcItems(t *testing.T) {
 	drainUntilQuiet(t, observer)
 	drainUntilQuiet(t, h.client)
 
+	h.petOntoGround(t, groundID)
+	drainUntilQuiet(t, observer)
 	h.client.Send(encodeRequestPetGetItem(groundID))
 	assertFrameOpcode(t, mustRead(t, h.client, "GetItem"), serverpackets.OpcodeGetItem, "GetItem")
 	for _, f := range drainFrames(t, observer) {

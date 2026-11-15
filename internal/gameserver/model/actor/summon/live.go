@@ -64,6 +64,10 @@ type AI interface {
 	// report handled false.
 	CastStopped(follow attackable.Combatant) (idled, handled bool)
 	TryToCast(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool
+	// TryToPickUp makes picking up the ground item itemObjectID the
+	// current intention (queued behind a swing or cast), reporting false
+	// when the summon cannot act on it.
+	TryToPickUp(itemObjectID int32) bool
 	// AbortAll stops movement, the attack cycle and any in-flight cast.
 	AbortAll()
 	// AbortAllForEffect is AbortAll for an effect taking hold: a stopped
@@ -222,7 +226,6 @@ type Actor struct {
 	named    bool
 	lifetime LifetimeState
 	dead     bool
-	disabled bool
 	// corpseTime is how long a servitor's corpse lasts; see DecayDelay.
 	corpseTime time.Duration
 	// corpseDeadline is when this summon's corpse decays, zero while it has

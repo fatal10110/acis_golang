@@ -231,6 +231,8 @@ type intention struct {
 	// moveToTarget is an attack or cast intention's desire to close in on
 	// its target; every other kind never moves toward one.
 	moveToTarget bool
+	// walking marks a summon pick-up whose walk to its item is under way.
+	walking bool
 	// route is a route walk's route name.
 	route string
 }

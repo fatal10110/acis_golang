@@ -73,8 +73,10 @@ func (o *petInventoryOwner) SendInventoryUpdate(updates []itemcontainer.Update) 
 	o.live.SendFrame(frame)
 }
 
+// giveItemToPet hands an item to the owner's pet. A dead or fake-dead owner
+// may still do so; every other gate applies.
 func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGiveItemToPet) {
-	if req.Count <= 0 || !liveItemOpsAllowed(live) {
+	if req.Count <= 0 || live == nil {
 		return
 	}
 	pet, petInv, ok := l.activePet(live)
@@ -133,6 +135,12 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	end := l.belongings.itemInstances.BeginOperation(playerInv.OwnerID(), petInv.OwnerID())
 	defer end()
 	res, ok, err := l.summoning.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
+	// A worn item came off before it moved: its equipment effects leave
+	// the owner, and the owner's look is resent.
+	if len(res.Unequipped) > 0 {
+		l.applyEquipStatChanges(live, playerInv, invops.Result{EquipmentChanged: true, Changed: res.Unequipped})
+		l.broadcastCharacterInfo(live)
+	}
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
 		return
@@ -187,7 +195,9 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 // with ActionFailed so the command always resolves — the same "accepted
 // action packet must never go unanswered" rule the player's own pickup path
 // follows, since this opcode's client-side command state waits on a
-// response exactly the same way.
+// response exactly the same way. An accepted command makes the pickup the
+// pet's intention: it walks to the item first, and waits out a swing or
+// cast in flight (see petTakeGround for the pickup itself).
 func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetGetItem) {
 	if live == nil {
 		return
@@ -196,8 +206,12 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	pet, petInv, ok := l.activePet(live)
+	pet, _, ok := l.activePet(live)
 	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if _, ok := l.world.Object(req.ObjectID); !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -205,14 +219,47 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	obj, ok := l.world.Object(req.ObjectID)
-	if !ok {
+	// An object that is no ground item, or one out of the pet's sight,
+	// still becomes the pet's intention, which ends at once with the pet
+	// idle or back at its owner's heel; the owner is answered too.
+	ground, onGround := l.petPickUpGround(req.ObjectID)
+	seen := onGround && world.Knows(pet, ground)
+	if !pet.TryToPickUp(req.ObjectID) || !seen {
 		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+	}
+}
+
+// petPickUpGround returns the ground item objectID while it is still in the
+// world and on the ground.
+func (l *GameClientLink) petPickUpGround(objectID int32) (*grounditem.Item, bool) {
+	if l.world == nil {
+		return nil, false
+	}
+	obj, ok := l.world.Object(objectID)
+	if !ok {
+		return nil, false
 	}
 	ground, ok := obj.(*grounditem.Item)
 	if !ok || ground.Template == nil || ground.Count() <= 0 {
-		live.SendFrame(serverpackets.FrameActionFailed())
+		return nil, false
+	}
+	return ground, true
+}
+
+// petTakeGround is the pickup a pet's pick-up intention ends with, once the
+// pet stands within reach of the ground item objectID: every refusal is
+// told to live, its owner.
+func (l *GameClientLink) petTakeGround(live *livePlayer, pet *summon.Actor, objectID int32) {
+	if l.belongings.groundItems == nil {
+		return
+	}
+	active, petInv, ok := l.activePet(live)
+	if !ok || active != pet {
+		return
+	}
+	// An item that left the ground on the way ends the intention silently.
+	ground, ok := l.petPickUpGround(objectID)
+	if !ok {
 		return
 	}
 	// A pet never takes a cursed weapon: its owner hears the pickup
