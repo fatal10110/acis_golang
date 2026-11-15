@@ -9,7 +9,8 @@ import (
 
 // TestManorSetRepeatedID pins a setting request naming one seed or crop
 // twice, which no setting window sends: the whole request is refused as an
-// invalid row refuses it, silently, and the lists stand. Lists that still
+// invalid row refuses it, silently, and the lists stand. A crop row with no
+// sales is dropped first, so it repeats nothing. Lists that still
 // hold a repeated seed or crop save each one once, so the manor save of
 // every castle goes through and the stored rows keep the first entry.
 func TestManorSetRepeatedID(t *testing.T) {
@@ -21,12 +22,16 @@ func TestManorSetRepeatedID(t *testing.T) {
 
 	wantOnly(t, "repeated seed", w.send(t, encodeSetSeed(1, [3]int{5016, 1, 5}, [3]int{5012, 1, 6}, [3]int{5016, 2, 5})))
 	wantOnly(t, "repeated crop", w.send(t, encodeSetCrop(1, [4]int{5073, 1, 30, 1}, [4]int{5073, 2, 30, 1})))
-	wantOnly(t, "repeated crop, once with no sales", w.send(t, encodeSetCrop(1, [4]int{5073, 1, 30, 1}, [4]int{5073, 0, 30, 1})))
 	if got := productions(m.SeedProduction(1, true)); !equalRows(got, seeds) {
 		t.Fatalf("next seeds = %v, want unchanged %v", got, seeds)
 	}
 	if got := procures(m.CropProcure(1, true)); !equalRows(got, crops) {
 		t.Fatalf("next crops = %v, want unchanged %v", got, crops)
+	}
+	// A row with no sales is dropped before the repeat check.
+	wantOnly(t, "repeated crop, once with no sales", w.send(t, encodeSetCrop(1, [4]int{5073, 1, 30, 1}, [4]int{5073, 0, 30, 1})))
+	if got, want := procures(m.CropProcure(1, true)), [][5]int32{{5073, 1, 1, 30, 1}}; !equalRows(got, want) {
+		t.Fatalf("next crops = %v, want %v", got, want)
 	}
 
 	m.SetNextSeedProduction(1, []*castlemanor.Production{

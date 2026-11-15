@@ -61,11 +61,21 @@ func TestDecodeRequestSetCrop(t *testing.T) {
 			int32(5073), int32(1), int32(1), byte(1), int32(5068), int32(1), int32(-1), byte(1)),
 		"repeated crop": seedExtended(OpcodeRequestSetCrop, int32(1), int32(2),
 			int32(5073), int32(1), int32(1), byte(1), int32(5073), int32(2), int32(1), byte(1)),
-		"repeated crop with no sales": seedExtended(OpcodeRequestSetCrop, int32(1), int32(2),
-			int32(5073), int32(1), int32(1), byte(1), int32(5073), int32(0), int32(1), byte(1)),
 	} {
 		if _, err := DecodeRequestSetCrop(payload, 2); err == nil {
 			t.Errorf("%s: decoded, want a refusal", name)
 		}
+	}
+
+	// A row with no sales never reaches Items, so naming its crop again is
+	// no repeat.
+	got, err = DecodeRequestSetCrop(seedExtended(OpcodeRequestSetCrop, int32(1), int32(2),
+		int32(5073), int32(1), int32(1), byte(1), int32(5073), int32(0), int32(1), byte(1)), 2)
+	if err != nil {
+		t.Fatalf("repeated crop with no sales: %v", err)
+	}
+	want = RequestSetCrop{ManorID: 1, Items: []ManorCropSetting{{CropID: 5073, Sales: 1, Price: 1, Reward: 1}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("repeated crop with no sales = %+v, want %+v", got, want)
 	}
 }

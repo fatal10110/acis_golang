@@ -79,8 +79,8 @@ func DecodeRequestSetSeed(payload []byte, maxItems int) (RequestSetSeed, error) 
 
 // DecodeRequestSetCrop parses a raw RequestSetCrop payload (opcode byte
 // included) of at most maxItems rows, refused as DecodeRequestSetSeed
-// refuses, a crop named twice refusing it whether or not either row has
-// sales. A crop with no sales is left out of Items.
+// refuses. A crop with no sales is left out of Items before the repeat
+// check, so only a crop named twice with sales refuses the request.
 func DecodeRequestSetCrop(payload []byte, maxItems int) (RequestSetCrop, error) {
 	const name = "RequestSetCrop"
 	r, err := newExtendedReader(payload, name, OpcodeRequestSetCrop, manorSetHeaderSize)
@@ -99,13 +99,14 @@ func DecodeRequestSetCrop(payload []byte, maxItems int) (RequestSetCrop, error) 
 		if row.CropID < 1 || row.Sales < 0 || row.Price < 0 {
 			return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: invalid row crop=%d sales=%d price=%d", name, row.CropID, row.Sales, row.Price)
 		}
+		if row.Sales == 0 {
+			continue
+		}
 		if _, dup := seen[row.CropID]; dup {
 			return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: crop %d named twice", name, row.CropID)
 		}
 		seen[row.CropID] = struct{}{}
-		if row.Sales > 0 {
-			req.Items = append(req.Items, row)
-		}
+		req.Items = append(req.Items, row)
 	}
 	if err := r.Err(); err != nil {
 		return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: %w", name, err)
