@@ -529,6 +529,10 @@ func (l *List) beginActivate(e *Effect, announce bool) func() {
 		}
 		l.mu.Unlock()
 
+		// The undo below and the already branch are not ordered with the
+		// activation of the effect that displaced e: an undo may clear shared
+		// owner state the new head set, and a doubled OnStart goes unmatched.
+		// Tracked in #5190.
 		if !heads {
 			if ok && e.OnExit != nil {
 				e.OnExit(e)
