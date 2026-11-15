@@ -1284,13 +1284,7 @@ func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsu
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
 	s.sessions.Put(account, key)
-	w := wire.NewPacketWriter(clientpackets.OpcodeAuthLogin)
-	w.WriteString(account)
-	w.WriteInt32(key.PlayKey2)
-	w.WriteInt32(key.PlayKey1)
-	w.WriteInt32(key.LoginKey1)
-	w.WriteInt32(key.LoginKey2)
-	c.Send(w.Bytes())
+	c.Send(encodeAuthLogin(account, key))
 
 	readCharSelectInfo(t, c, account, wantChars)
 	// Registered once logged in: the handshake reads wait on the wall

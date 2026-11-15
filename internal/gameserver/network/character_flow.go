@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"time"
+	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -35,13 +36,22 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 		client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 		return false, nil
 	}
+	// The login server issues sessions only to names that fit its account
+	// field, so a longer one is refused here, as the login server would
+	// refuse it, without claiming the account or reaching the shared link.
+	if !accountNameFits(req.LoginName) {
+		client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
+		return false, nil
+	}
 	// A second AuthLogin for an account already claimed takes it over: the
 	// prior connection's own in-flight validation (if any) is unblocked with
 	// a rejection so it releases the account promptly, then its session is
-	// closed ahead of the new player-auth request to the login server.
+	// closed ahead of the new player-auth request to the login server. The
+	// login server's answer to the prior request is dropped, never taken as
+	// the answer to the new one.
 	if l.clients != nil {
 		if evicted, replaced := l.clients.Take(req.LoginName, client); replaced {
-			l.flow.validator.Resolve(req.LoginName, false)
+			l.flow.validator.Evict(req.LoginName)
 			evicted.Session.Close()
 		}
 	}
@@ -50,6 +60,23 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 		l.clients.Release(req.LoginName, client)
 	}
 	return ok, err
+}
+
+// maxAccountNameUnits is the longest account name, in UTF-16 code units,
+// the login server can issue a session for: its credential block holds 14
+// name bytes.
+const maxAccountNameUnits = 14
+
+// accountNameFits reports whether name is short enough to name an account.
+func accountNameFits(name string) bool {
+	units := 0
+	for _, r := range name {
+		units += utf16.RuneLen(r)
+		if units > maxAccountNameUnits {
+			return false
+		}
+	}
+	return true
 }
 
 // sendCharSelectInfo lists client's characters, sends the resulting

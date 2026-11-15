@@ -281,13 +281,21 @@ func (l *LoginLink) readFrame() ([]byte, error) {
 	return payload, nil
 }
 
+// send writes payload as one frame. A payload too large for a frame fails
+// before anything is written, so only that message fails and the link
+// stays up; a failed write may have left a partial frame, so it closes the
+// link.
 func (l *LoginLink) send(payload []byte) error {
 	l.sendMu.Lock()
 	defer l.sendMu.Unlock()
+	frame, err := wire.FrameBytes(l.crypt.Encrypt(payload))
+	if err != nil {
+		return err
+	}
 	if err := l.conn.SetWriteDeadline(time.Now().Add(time.Minute)); err != nil {
 		return err
 	}
-	if err := wire.WriteFrame(l.conn, l.crypt.Encrypt(payload)); err != nil {
+	if _, err := l.conn.Write(frame); err != nil {
 		_ = l.conn.Close()
 		return err
 	}

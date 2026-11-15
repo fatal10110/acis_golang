@@ -32,6 +32,9 @@ type shutdownHarness struct {
 
 	mu    sync.Mutex
 	stops []bool
+
+	// hold queues the login server's answers while a test holds them.
+	hold loginAnswerQueue
 }
 
 func newShutdownHarness(servers *manager.ServerRegistry) *shutdownHarness {
@@ -39,14 +42,15 @@ func newShutdownHarness(servers *manager.ServerRegistry) *shutdownHarness {
 }
 
 // authResponse routes the login server's PlayerAuthResponse: LoginEntry's
-// own answer to it, every other to resolve.
+// own answer to it, every other to resolve, or to the held queue while a
+// test holds answers.
 func (h *shutdownHarness) authResponse(resolve func(string, bool)) func(string, bool) {
 	return func(account string, ok bool) {
 		if account == loginSyncAccount {
 			h.synced <- struct{}{}
 			return
 		}
-		resolve(account, ok)
+		h.hold.deliver(account, ok, resolve)
 	}
 }
 
