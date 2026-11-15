@@ -553,6 +553,8 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		cubicHandler{},
 		unlockHandler{},
 		extractableHandler{},
+		createItemHandler{},
+		appearanceHandler{},
 		sowHandler{},
 		harvestHandler{},
 		spoilHandler{},
@@ -571,7 +573,8 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 
 // SignetDeps carries the world-spawning collaborators the signet cast
 // shape needs beyond skill definitions. IDs also gives the item-creating
-// handlers (sweep, harvest, capsule extraction) their object ids.
+// handlers (sweep, harvest, capsule extraction, item creation) their object
+// ids.
 type SignetDeps struct {
 	Effects   effect.Env
 	Templates signetTemplates
@@ -599,6 +602,7 @@ func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, healSps 
 	r := newDefaultRegistry(defs, magicFailures, healSps)
 	if signet.IDs != nil {
 		r.Register(extractableHandler{ids: signet.IDs})
+		r.Register(createItemHandler{ids: signet.IDs})
 		r.Register(harvestHandler{ids: signet.IDs, cropRate: signet.ManorCropRate})
 		r.Register(sweepHandler{ids: signet.IDs})
 	}

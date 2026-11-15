@@ -212,6 +212,25 @@ type Definition struct {
 	// until something consumes it.
 	ExtractableItems string
 
+	// CreateItemIDs, CreateItemCount and CreateItemRandomCount are what a
+	// CREATE_ITEM skill gives its caster: one of CreateItemIDs, picked at
+	// random, in CreateItemCount units plus 0 to CreateItemRandomCount-1
+	// more, also picked at random. No ids or a zero count gives nothing.
+	CreateItemIDs         []int32
+	CreateItemCount       int
+	CreateItemRandomCount int
+
+	// AppearanceFace, AppearanceHairColor and AppearanceHairStyle are the
+	// look a CHANGE_APPEARANCE skill gives every player it lands on; a
+	// negative value leaves that part as it is.
+	AppearanceFace      int
+	AppearanceHairColor int
+	AppearanceHairStyle int
+
+	// DespawnDelay is how long, in milliseconds, the NPC a SPAWN skill
+	// places (NpcID) stays in the world; 0 or less keeps it there.
+	DespawnDelay int
+
 	// RecallType and TeleCoords are a RECALL or TELEPORT skill's
 	// destination: TeleCoords, when set, wins over RecallType.
 	RecallType RecallType
@@ -358,6 +377,16 @@ type DefinitionAttrs struct {
 
 	ExtractableItems string
 
+	CreateItemIDs         []int32
+	CreateItemCount       int
+	CreateItemRandomCount int
+
+	AppearanceFace      int
+	AppearanceHairColor int
+	AppearanceHairStyle int
+
+	DespawnDelay int
+
 	RecallType RecallType
 	TeleCoords *location.Location
 }
@@ -488,6 +517,16 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 		SimultaneousCast: a.SimultaneousCast,
 
 		ExtractableItems: a.ExtractableItems,
+
+		CreateItemIDs:         a.CreateItemIDs,
+		CreateItemCount:       a.CreateItemCount,
+		CreateItemRandomCount: a.CreateItemRandomCount,
+
+		AppearanceFace:      a.AppearanceFace,
+		AppearanceHairColor: a.AppearanceHairColor,
+		AppearanceHairStyle: a.AppearanceHairStyle,
+
+		DespawnDelay: a.DespawnDelay,
 
 		RecallType: a.RecallType,
 		TeleCoords: a.TeleCoords,

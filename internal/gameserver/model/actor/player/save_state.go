@@ -28,6 +28,8 @@ type SaveState struct {
 	OnlineTime int64
 	Location   location.Location
 	Heading    int
+	// Face, HairStyle and HairColor are the look at the copy.
+	Face, HairStyle, HairColor int
 	// WantsPeace is the personal-surrender flag (see WantsPeace).
 	WantsPeace bool
 	// Noble is the noblesse status (see IsNoble).
@@ -60,6 +62,7 @@ func (c *Character) SaveState() SaveState {
 	} else if saved, ok := c.SavedLocation(); ok && c.ObserverMode() {
 		at = saved
 	}
+	face, hairStyle, hairColor := c.Appearance()
 	return SaveState{
 		ID:                 c.ID,
 		ClassID:            classID,
@@ -74,6 +77,9 @@ func (c *Character) SaveState() SaveState {
 		OnlineTime:         c.TotalOnlineTime(time.Now()), // persisted wall-clock total, not a queue deadline
 		Location:           at,
 		Heading:            c.CurrentHeading(),
+		Face:               face,
+		HairStyle:          hairStyle,
+		HairColor:          hairColor,
 		WantsPeace:         c.WantsPeace(),
 		Noble:              c.IsNoble(),
 		In7sDungeon:        c.In7sDungeon(),

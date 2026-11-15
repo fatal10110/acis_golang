@@ -1104,6 +1104,10 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingInsideThat))
 			}
+		case skillhandler.PreparedForReuseMessage:
+			if live != nil {
+				send(live, serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(m.SkillID), int32(m.Level)))
+			}
 		case skillhandler.ManorMessage:
 			if live != nil {
 				send(live, manorMessageFrame(m))

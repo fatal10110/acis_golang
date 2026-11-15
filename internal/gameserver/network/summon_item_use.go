@@ -246,7 +246,7 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	live.move.Stop()
 	x, y, z := live.Position()
-	if !l.placeDecoration(template, live.Character.CharacterName(), x, y, z, live.Heading(), 0) {
+	if l.placeDecoration(template, live.Character.CharacterName(), x, y, z, live.Heading(), 0) == nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 	}
 	return true
@@ -254,26 +254,26 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 
 // placeDecoration places a decoration NPC of template, titled title, at
 // (x, y) on the ground height below z, facing heading, its spawn declaring
-// the respawn delay respawn. It reports false,
-// placing nothing, when the NPC cannot be built.
-func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int, respawn time.Duration) bool {
+// the respawn delay respawn, and returns it. It returns nil, placing
+// nothing, when the NPC cannot be built.
+func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int, respawn time.Duration) *npc.Decoration {
 	if l.queues == nil {
-		return false
+		return nil
 	}
 	if l.geo != nil {
 		z = int(l.geo.Height(x, y, z))
 	}
 	objectID, err := l.ids.NextID()
 	if err != nil {
-		return false
+		return nil
 	}
 	instance, err := npc.NewInstance(objectID, template)
 	if err != nil {
-		return false
+		return nil
 	}
 	decoration, err := npc.NewDecoration(instance, title, l.skills)
 	if err != nil {
-		return false
+		return nil
 	}
 	decoration.RespawnDelay = respawn
 	decoration.Attach(npc.DecorationRuntime{
@@ -282,7 +282,7 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 		Regen: l.playerRules,
 	})
 	decoration.Spawn(x, y, z, heading)
-	return true
+	return decoration
 }
 
 // mountWyvern puts live on the mount npcID called by its collar

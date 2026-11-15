@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -687,7 +688,21 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 
 		ExtractableItems: a.strDefault("capsuled_items_skill", ""),
 
+		CreateItemCount:       a.intDefault("create_item_count", 0),
+		CreateItemRandomCount: a.intDefault("random_count", 1),
+
+		AppearanceFace:      a.intDefault("faceId", -1),
+		AppearanceHairColor: a.intDefault("hairColorId", -1),
+		AppearanceHairStyle: a.intDefault("hairStyleId", -1),
+
+		DespawnDelay: a.intDefault("despawnDelay", 0),
+
 		RecallType: skill.ParseRecallType(a.strDefault("recallType", "")),
+	}
+
+	// Only a CREATE_ITEM skill reads its item ids, and it must name them.
+	if attrs.SkillType == "CREATE_ITEM" {
+		attrs.CreateItemIDs = attrInt32Array(a, "create_item_id")
 	}
 
 	if a.has("teleCoords") {
@@ -764,4 +779,19 @@ func parseCommaInts(raw string) ([]int, error) {
 		out[i] = n
 	}
 	return out, nil
+}
+
+// attrInt32Array reads the required ";"-separated id list at key, each part
+// a 32-bit int.
+func attrInt32Array(a *attrValues, key string) []int32 {
+	ints := a.intArray(key)
+	out := make([]int32, 0, len(ints))
+	for _, n := range ints {
+		if n < math.MinInt32 || n > math.MaxInt32 {
+			a.fail(fmt.Errorf("attribute %q: %d out of 32-bit range", key, n))
+			return nil
+		}
+		out = append(out, int32(n))
+	}
+	return out
 }

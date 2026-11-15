@@ -1016,6 +1016,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.combat.skillHandlers.Register(takeCastleHandler{l: link})
 	link.combat.skillHandlers.Register(siegeFlagHandler{l: link})
 	link.combat.skillHandlers.Register(handlerskill.NewStriderSiegeAssault(link.siegeAssaultCheck))
+	link.combat.skillHandlers.Register(handlerskill.NewSpawn(link.placeSkillNPC))
 	link.combat.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.combat.targets, Skills: link.combat.skillHandlers, Deliver: link.deliverChanceCast}
 	link.wireZones(link.zones)
 	link.wireCastleTickets()
