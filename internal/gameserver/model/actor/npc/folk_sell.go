@@ -14,6 +14,7 @@ var soldPageDirs = map[InstanceKind]string{
 	"CastleChamberlain":  "merchant",
 	"ManorManagerNpc":    "merchant",
 	"ClanHallManagerNpc": "merchant",
+	"WyvernManagerNpc":   "merchant",
 }
 
 // BuysItems reports whether players may sell items to f: a merchant-type
