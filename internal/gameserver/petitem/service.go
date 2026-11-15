@@ -73,6 +73,9 @@ type TransferResult struct {
 	WasWorn bool
 	// ItemID is the transferred item's template id, valid whenever WasWorn is true.
 	ItemID int32
+	// Unequipped lists the instances whose paperdoll slots changed as the
+	// transferred item came off its giver (set only by Transfer).
+	Unequipped []*item.Instance
 }
 
 // UseResult carries item-store operations and owner-visible item data for pet equipment changes.
@@ -138,8 +141,19 @@ func (s *Service) CheckGive(playerInv, petInv *itemcontainer.Inventory, pet *sum
 // Transfer moves one item between inventories, exported so handlers can
 // perform the mutation after their own between-validation-and-mutation
 // side effects (e.g. cancelling an active enchant selection).
+//
+// A worn item comes off first, once count is one the transfer can move:
+// Unequipped then lists every instance whose slots changed, for the caller
+// to take their equipment effects off the giver.
 func (s *Service) Transfer(from, to *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
+	var unequipped []*item.Instance
+	if validTransferCount(from, objectID, count) {
+		if inst := from.ItemByObjectID(objectID); inst.Equipped() {
+			unequipped = from.UnequipItem(inst)
+		}
+	}
 	result, failure, err := s.transfer(from, to, objectID, count)
+	result.Unequipped = unequipped
 	return result, failure == GiveOK, err
 }
 

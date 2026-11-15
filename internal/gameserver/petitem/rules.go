@@ -10,7 +10,13 @@ func ForbiddenForPet(inst *item.Instance, tmpl *item.Template) bool {
 	if tmpl.HeroItem() || !inst.Dropable(tmpl) || !inst.Destroyable(tmpl) || !inst.Tradable(tmpl) {
 		return true
 	}
-	return tmpl.EtcItem != nil && (tmpl.EtcItem.Type == item.EtcItemArrow || tmpl.EtcItem.Type == item.EtcItemShot)
+	return Ammunition(tmpl)
+}
+
+// Ammunition reports whether tmpl is arrows or shots, which a pet neither
+// holds nor picks up.
+func Ammunition(tmpl *item.Template) bool {
+	return tmpl != nil && tmpl.EtcItem != nil && (tmpl.EtcItem.Type == item.EtcItemArrow || tmpl.EtcItem.Type == item.EtcItemShot)
 }
 
 // Equippable reports whether tmpl is a pet equipment item.

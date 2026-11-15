@@ -32,6 +32,7 @@ func TestPetPickupCursedWeaponIsRefused(t *testing.T) {
 	}
 	groundID := snaps[0].ObjectID
 
+	h.petOntoGround(t, groundID)
 	h.client.Send(encodeRequestPetGetItem(groundID))
 	assertFrameOpcode(t, mustRead(t, h.client, "refusal ActionFailed"), serverpackets.OpcodeActionFailed, "ActionFailed")
 	frame := mustRead(t, h.client, "FAILED_TO_PICKUP_S1")

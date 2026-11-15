@@ -603,9 +603,17 @@ func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant, ctrl bool)
 }
 
 // OutOfControl reports whether the owner cannot currently command this
-// summon: the creature out-of-control state, or a betrayed summon.
+// summon: stunned, immobile until attacked, asleep, paralyzed, afraid,
+// confused, teleporting, dead, or betrayed.
 func (a *Actor) OutOfControl() bool {
-	return a.disabled || a.Betrayed()
+	return a.effects.IsAffected(effect.FlagStunned|effect.FlagMeditating|effect.FlagSleep|effect.FlagFear|effect.FlagConfused) ||
+		a.Paralyzed() || a.Teleporting() || a.Dead() || a.Betrayed()
+}
+
+// TryToPickUp forwards a pick-up request on the ground item itemObjectID to
+// the attached AI, reporting whether the AI took it.
+func (a *Actor) TryToPickUp(itemObjectID int32) bool {
+	return a.brain != nil && a.brain.TryToPickUp(itemObjectID)
 }
 
 // InCombat reports the owner's attack-stance state: an owner exists and is
