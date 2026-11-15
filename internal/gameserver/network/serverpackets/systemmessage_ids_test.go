@@ -30,6 +30,16 @@ func TestSystemMessageIDs(t *testing.T) {
 		{SystemMessageS2S3SCreatedForS1ForS4Adena, 1147},
 		{SystemMessageS2WasDroppedInTheS1Region, 1815},
 		{SystemMessageServerDownInS1Seconds, 1},
+		{SystemMessageCannotUseOnYourself, 51},
+		{SystemMessageCannotSummonFromLocation, 650},
+		{SystemMessageS1EngagedInCombatCannotBeSummoned, 1843},
+		{SystemMessageS1DeadCannotBeSummoned, 1844},
+		{SystemMessageS1InSummonBlockingArea, 1895},
+		{SystemMessageS1AlreadySummoned, 1896},
+		{SystemMessageS1RequiredForSummoning, 1897},
+		{SystemMessageS1OperatingCannotBeSummoned, 1898},
+		{SystemMessageTargetInSummonBlockingArea, 1899},
+		{SystemMessageCannotSummonOlympiadPlayers, 1911},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("system message id = %d, want %d", tc.got, tc.want)

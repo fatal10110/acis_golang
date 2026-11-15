@@ -10,13 +10,14 @@ import (
 // its answer), the summon-friend request, the marriage request and a clan
 // hall door's open or close question. An answer finding no pending state
 // does nothing, as it would with no dialog open. The dialog itself closes
-// client-side, so no answer is owed on any branch.
+// client-side, so no answer is owed on any branch beyond a refused summon's
+// reason.
 func (l *GameClientLink) handleDlgAnswer(live *livePlayer, req clientpackets.DlgAnswer) {
 	switch req.MessageID {
 	case serverpackets.ConfirmDlgResurrectionRequest, serverpackets.ConfirmDlgRestoreRequest:
 		live.Character.ReviveAnswer(req.Answer)
 	case serverpackets.ConfirmDlgSummonFriendRequest:
-		live.Character.TeleportAnswer(req.Answer, req.RequesterID)
+		sendSummonRefusal(sendFrameTo, live, live.Character.TeleportAnswer(req.Answer, req.RequesterID))
 	case serverpackets.ConfirmDlgEngageRequest:
 		l.engageAnswer(live, req.Answer)
 	case serverpackets.ConfirmDlgOpenGate:
