@@ -156,8 +156,8 @@ func TestRootedPetFearedStaysPutAndStaysAfraid(t *testing.T) {
 	if got := petActor.Move().Position(); got != origin {
 		t.Fatalf("rooted pet position = %+v after fear, want %+v", got, origin)
 	}
-	if !petActor.Afraid() || !fear.InUse() {
-		t.Fatalf("Afraid() = %v, fear in use = %v on a rooted pet, want the fear held", petActor.Afraid(), fear.InUse())
+	if inUse := effectInUse(t, petActor, fear); !petActor.Afraid() || !inUse {
+		t.Fatalf("Afraid() = %v, fear in use = %v on a rooted pet, want the fear held", petActor.Afraid(), inUse)
 	}
 
 	h.srv.Advance(t, 2*time.Second)
@@ -258,15 +258,15 @@ func TestSiegeSummonHoldsUnstartedFearAndBluff(t *testing.T) {
 	h, golem, hostile := bootFearServitor(t, siegeGolemTemplate(), summonGolemSkillID,
 		gameservertest.WithZones(battlefieldZones(t, -1_000, 1_000, true)))
 	fear := landPetFear(t, golem, hostile, 1092, 6, 2)
-	if !golem.Afraid() || !fear.InUse() {
-		t.Errorf("siege golem Afraid() = %v, fear in use = %v, want the unstarted fear held", golem.Afraid(), fear.InUse())
+	if inUse := effectInUse(t, golem, fear); !golem.Afraid() || !inUse {
+		t.Errorf("siege golem Afraid() = %v, fear in use = %v, want the unstarted fear held", golem.Afraid(), inUse)
 	}
 	if _, moved := petMoveDest(drainFrames(t, h.client), golem.ObjectID()); moved {
 		t.Error("an unstarted fear sent the siege golem a flee MoveToLocation at landing, want none")
 	}
 
 	bluff := landFearPetEffect(t, golem, hostile, "Bluff", 358, 1, 3)
-	if !bluff.InUse() {
+	if !effectInUse(t, golem, bluff) {
 		t.Error("siege golem dropped the unstarted bluff, want it held")
 	}
 	if got := len(golem.EffectList().All()); got != 2 {
@@ -299,7 +299,7 @@ func TestOrdinaryServitorTakesBluff(t *testing.T) {
 			cat.SiegeSummon(), cat.FearImmune(), cat.BluffExempt())
 	}
 	bluff := landFearPetEffect(t, cat, hostile, "Bluff", 358, 1, 3)
-	if !bluff.InUse() {
+	if !effectInUse(t, cat, bluff) {
 		t.Fatal("servitor refused bluff, want it held")
 	}
 }
