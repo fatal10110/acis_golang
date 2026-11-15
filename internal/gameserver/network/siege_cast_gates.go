@@ -16,10 +16,10 @@ import (
 // checks passed; the refusal is already told.
 var errSiegeCastRefused = errors.New("siege cast refused")
 
-// siegeCastAfterCanCast is the siege rule a player's cast of def runs once
-// its can-cast checks passed, nil for a skill type no siege rule covers;
-// target resolves the cast's final target. A refusal answers the reason
-// alone.
+// siegeCastAfterCanCast is the siege or summon-friend rule a player's cast
+// of def runs once its can-cast checks passed, nil for a skill type no such
+// rule covers; target resolves the cast's final target. A refusal answers
+// the reason alone, before the cast pays anything.
 func (l *GameClientLink) siegeCastAfterCanCast(live *livePlayer, def modelskill.Definition, target func() skilltarget.Actor) func() error {
 	switch def.SkillType {
 	case "RESURRECT":
@@ -29,6 +29,17 @@ func (l *GameClientLink) siegeCastAfterCanCast(live *livePlayer, def modelskill.
 				return errSiegeCastRefused
 			}
 			return nil
+		}
+	case "SUMMON_FRIEND":
+		// SUMMON_PARTY has no such gate: its refusals come from the
+		// handler, once the cast paid.
+		return func() error {
+			r := skillhandler.SummonFriendCastRefusal(live.Character, target())
+			if !r.Refused() {
+				return nil
+			}
+			sendSummonRefusal(sendFrameTo, live, r)
+			return errSiegeCastRefused
 		}
 	case "STRIDER_SIEGE_ASSAULT":
 		return func() error {

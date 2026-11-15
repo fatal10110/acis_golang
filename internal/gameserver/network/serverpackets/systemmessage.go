@@ -25,6 +25,15 @@ const (
 	SystemMessageUseS1                             = 46
 	SystemMessageS1PreparedForReuse                = 48
 	SystemMessageCannotUseOnYourself               = 51
+	SystemMessageCannotSummonFromLocation          = 650  // no parameter
+	SystemMessageS1EngagedInCombatCannotBeSummoned = 1843 // text parameter: the player's name
+	SystemMessageS1DeadCannotBeSummoned            = 1844 // text parameter: the player's name
+	SystemMessageS1InSummonBlockingArea            = 1895 // text parameter: the player's name
+	SystemMessageS1AlreadySummoned                 = 1896 // text parameter: the player's name
+	SystemMessageS1RequiredForSummoning            = 1897 // item-name parameter
+	SystemMessageS1OperatingCannotBeSummoned       = 1898 // text parameter: the player's name
+	SystemMessageTargetInSummonBlockingArea        = 1899 // no parameter
+	SystemMessageCannotSummonOlympiadPlayers       = 1911 // no parameter
 	SystemMessageSkillReadyToUseAgain              = 2015
 	SystemMessageS1HasBeenActivated                = 2012
 	SystemMessageEarnedS2S1S                       = 53
