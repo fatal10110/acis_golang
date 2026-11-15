@@ -409,7 +409,7 @@ func (l *GameServerLink) onChangeAccessLevel(ctx context.Context, c *gameServerC
 
 // onPlayerAuthRequest validates a client's session keys, presented by the
 // game server the client is entering, against the session this login
-// server issued (ClientLink.onRequestAuthLogin/onRequestServerLogin).
+// server issued (ClientLink.onRequestAuthLogin).
 func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) {
 	req, err := link.DecodePlayerAuthRequest(payload)
 	if err != nil {

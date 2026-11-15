@@ -340,15 +340,17 @@ func onlineAccounts(state *world.State) []string {
 
 // playerAuthResponseHandler reports a successfully authed account to the
 // login server before resolving the waiting game client, so the online
-// roster grows before the client proceeds into the world.
+// roster grows before the client proceeds into the world. An approval no
+// client waits on any more (evicted, timed out) reports nothing.
 func playerAuthResponseHandler(links *loginLinkState, validator *network.SessionValidator, log zerolog.Logger) func(string, bool) {
 	return func(account string, ok bool) {
-		if link := links.get(); ok && link != nil {
-			if err := link.SendPlayerInGame([]string{account}); err != nil {
-				log.Debug().Err(err).Str("account", account).Msg("notify player in game")
+		validator.ResolveThen(account, ok, func() {
+			if link := links.get(); link != nil {
+				if err := link.SendPlayerInGame([]string{account}); err != nil {
+					log.Debug().Err(err).Str("account", account).Msg("notify player in game")
+				}
 			}
-		}
-		validator.Resolve(account, ok)
+		})
 	}
 }
 
