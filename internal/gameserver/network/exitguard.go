@@ -43,6 +43,19 @@ func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
 	return exitAllowed
 }
 
+// revokeBossEntries withdraws live's entry permission, and any re-entry
+// window, from every boss zone, as an accepted logout or restart does: the
+// zone exit that follows grants no window, so a relog inside a lair is
+// ejected. A dropped connection keeps both.
+func (l *GameClientLink) revokeBossEntries(live *livePlayer) {
+	if l.zones == nil {
+		return
+	}
+	for _, boss := range zone.OfKind[*zone.Boss](l.zones) {
+		boss.RevokeEntry(live.ObjectID())
+	}
+}
+
 // refuseExit answers a refused restart or logout with the reason's system
 // message followed by the flow's rejection frame, leaving the session in
 // game.

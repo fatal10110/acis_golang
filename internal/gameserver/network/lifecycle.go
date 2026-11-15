@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -70,6 +71,13 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// A rider gets off before it leaves, so the meal a pet's mount had left
 	// goes back to the pet's row.
 	live.Character.Dismount()
+	// A timed punishment stops with the session and keeps the time it had
+	// left, stored for the next login to resume; the character save below
+	// does not carry it.
+	if live.punishTimer != nil {
+		live.stopPunishTimer(true)
+		l.storePunishment(live)
+	}
 
 	if l.roster != nil || l.skills != nil {
 		roster, skills, log := l.roster, l.skills, l.log
@@ -118,18 +126,6 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.shadowItems != nil {
 		l.shadowItems.Remove(live.ObjectID())
 	}
-	if l.combat.attackStance != nil {
-		// Unconditional, alongside the other registry removals: the stance
-		// entry is dropped here, between the water and pvp-flag removals,
-		// whatever live.Stop left of the in-combat flag. Left behind, the
-		// sweep would re-post its expiry to the owner's queue, which q.Close
-		// below has shut, so nothing would ever remove it.
-		//
-		// The removal is silent: observers of a player leaving the world
-		// get no AutoAttackStop, only its DeleteObject. A stance that
-		// expired while a dropped connection lingered sent its own.
-		l.combat.attackStance.Remove(live)
-	}
 	if l.combat.pvpFlags != nil {
 		// reset=false, as the disconnect cleanup requires: a
 		// disconnecting character's flag isn't persisted, so there's
@@ -167,6 +163,21 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	l.gms.Remove(live)
 	if l.world != nil {
 		l.world.Despawn(live)
+	}
+	if l.combat.attackStance != nil {
+		// Unconditional, whatever live.Stop left of the in-combat flag, and
+		// only once live is despawned, under its stance lock: a hit landing
+		// from another goroutine either refreshed the entry before this, or
+		// finds live gone and leaves it untracked. Left behind, the sweep
+		// would re-post its expiry to the owner's queue, which q.Close below
+		// has shut, so nothing would ever remove it.
+		//
+		// The removal is silent: observers of a player leaving the world
+		// get no AutoAttackStop, only its DeleteObject. A stance that
+		// expired while a dropped connection lingered sent its own.
+		live.stanceMu.Lock()
+		l.combat.attackStance.Remove(live)
+		live.stanceMu.Unlock()
 	}
 	// Out of sight, still listed online: out of its party and the
 	// Olympiad's waiting list, then the trade cancel decided above, then
@@ -361,9 +372,22 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 		l.log.Error().Err(err).Int32("object_id", objectID).Msg("build pet inventory overflow drop")
 		return
 	}
+	// It lands at a random spot within petOverflowDropOffset of the pet that
+	// geodata lets it reach, and lasts as long as an item a player dropped.
 	x, y, z := actor.Position()
-	l.belongings.groundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z, DropperID: actor.ObjectID()})
+	tx := x + rnd.GetRange(-petOverflowDropOffset, petOverflowDropOffset)
+	ty := y + rnd.GetRange(-petOverflowDropOffset, petOverflowDropOffset)
+	tz := z
+	if l.geo != nil {
+		at := l.geo.ValidLocation(x, y, z, tx, ty, tz)
+		tx, ty, tz = at.X, at.Y, at.Z
+	}
+	l.belongings.groundItems.Drop(ground, task.DropOptions{X: tx, Y: ty, Z: tz, PlayerDropped: true, DropperID: actor.ObjectID()})
 }
+
+// petOverflowDropOffset bounds how far, on each axis, a returning pet's item
+// the owner has no room for lands from the pet.
+const petOverflowDropOffset = 70
 
 // flushItemPersistence releases inv's persistence dependency, so its items stop
 // scheduling with the lazy persistence task, and writes their state on the
