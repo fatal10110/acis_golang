@@ -78,11 +78,12 @@ func (l *GameClientLink) showWearWindow(live *livePlayer, f *npc.Folk, listID in
 // completed purchase shows the merchant's -bought page when it has one,
 // then the full item list.
 //
-// Every refusal specified with a system message answers so here; the
-// others (an unknown list, a game master's list sent by anyone else, an
-// untargeted or unreachable seller, an item off
-// the list, an unpriced item, a count over the stock, a price overflowing
-// the adena range) answer nothing, as specified. The
+// Every refusal specified with a system message answers so here; a row
+// whose price or weight leaves the int32 range answers as too little adena
+// or too much weight, then ActionFailed. The others (an unknown list, a
+// game master's list sent by anyone else, an untargeted or unreachable
+// seller, an item off the list, an unpriced item, a count over the stock,
+// a total price overflowing the adena range) answer nothing, as specified. The
 // buy window's submit leaves no client action pending, so that silence
 // cannot hang the client.
 func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.RequestBuyItem) {
@@ -126,11 +127,19 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 	case merchant.BuyWeightExceeded:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWeightLimitExceeded))
 		return
+	case merchant.BuyWeightOverflow:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWeightLimitExceeded))
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
 	case merchant.BuySlotsFull:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
 		return
 	case merchant.BuyNotEnoughAdena:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
+		return
+	case merchant.BuyPriceOverflow:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case merchant.BuyDone:
 	default:

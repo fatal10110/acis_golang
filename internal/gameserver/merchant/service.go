@@ -131,16 +131,22 @@ type BuyOutcome int
 const (
 	// BuyDropped refuses the purchase with no answer: an item not on the
 	// list, an unpriced item for a player who is not a GM, a count over the
-	// remaining stock, or a price overflowing the adena range.
+	// remaining stock, or a total price overflowing the adena range.
 	BuyDropped BuyOutcome = iota
 	// BuyQuantityExceeded asks for more than one of a non-stackable item.
 	BuyQuantityExceeded
 	// BuyWeightExceeded would carry the buyer over its weight limit.
 	BuyWeightExceeded
+	// BuyWeightOverflow has a row whose count times unit weight leaves the
+	// int32 range.
+	BuyWeightOverflow
 	// BuySlotsFull would take more inventory slots than the buyer has free.
 	BuySlotsFull
 	// BuyNotEnoughAdena costs more adena than the buyer holds.
 	BuyNotEnoughAdena
+	// BuyPriceOverflow has a row whose count times taxed unit price leaves
+	// the int32 range.
+	BuyPriceOverflow
 	// BuyDone paid for the items and put them in the inventory.
 	BuyDone
 )
@@ -155,15 +161,16 @@ type Purchase struct {
 // Buy sells rows of list to the owner of inv at taxRate on top of the list
 // prices; gm lets a GM take unpriced items. The rows are all checked
 // before anything changes: each item must be on the list, a non-stackable
-// one bought singly, a limited one within its remaining count, and the
-// total within the adena range, the buyer's weight limit, free slots and
-// adena. Then the adena is taken and each item created; a limited item
+// one bought singly, a limited one within its remaining count, each row's
+// taxed price and weight within the int32 range, and the total within the
+// adena range, the buyer's weight limit, free slots and adena. Then the adena is taken and each item created; a limited item
 // whose count ran out in the meantime is not created, its price already
 // paid. A reload never lands between the checks and the sale.
 func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []BuyRow, taxRate float64, gm bool) (Purchase, error) {
 	s.reloadMu.RLock()
 	defer s.reloadMu.RUnlock()
 	var subtotal, slots, weight int64
+	weightOverflow := false
 	for _, row := range rows {
 		p, ok := list.FindProduct(row.ItemID)
 		if !ok {
@@ -189,20 +196,30 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		if math.MaxInt32/row.Count < price {
 			return Purchase{}, nil
 		}
-		// The tax applies to the unit price, before the count; the 32-bit
-		// products wrap as int32 arithmetic does.
+		// The tax applies to the unit price, before the count.
 		price = commons.TruncInt32Sat(float64(price) * (1 + taxRate))
-		subtotal += int64(row.Count * price)
+		total := int64(row.Count) * int64(price)
+		if total > math.MaxInt32 {
+			return Purchase{Outcome: BuyPriceOverflow}, nil
+		}
+		subtotal += total
 		if subtotal > math.MaxInt32 {
 			return Purchase{}, nil
 		}
-		weight += int64(row.Count * tmpl.Weight)
+		if rowWeight := int64(row.Count) * int64(tmpl.Weight); rowWeight > math.MaxInt32 {
+			weightOverflow = true
+		} else if !weightOverflow {
+			weight += rowWeight
+		}
 		switch {
 		case !tmpl.Stackable:
 			slots += int64(row.Count)
 		case inv.ItemByTemplateID(row.ItemID) == nil:
 			slots++
 		}
+	}
+	if weightOverflow {
+		return Purchase{Outcome: BuyWeightOverflow}, nil
 	}
 	if weight > math.MaxInt32 || weight < 0 || !inv.ValidateWeight(int(weight)) {
 		return Purchase{Outcome: BuyWeightExceeded}, nil

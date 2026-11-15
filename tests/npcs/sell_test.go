@@ -74,6 +74,7 @@ func sellPages() map[string]string {
 		"fisherman/31562-sold.htm":  fisherSold,
 		"merchant/31562-sold.htm":   soldPage,
 		"merchant/35102-sold.htm":   soldPage,
+		"merchant/35420-sold.htm":   soldPage,
 		"warehouse/30005.htm":       sellPage,
 	}
 }
