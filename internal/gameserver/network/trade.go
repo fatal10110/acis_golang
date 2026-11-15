@@ -167,7 +167,7 @@ func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpa
 }
 
 func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.AddTradeItem) {
-	if live == nil || req.Count <= 0 {
+	if live == nil {
 		return
 	}
 	session, ok := l.tradeBook().Session(live.ObjectID())
@@ -223,6 +223,12 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		return
 	case tradebook.AddInvalidItem:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
+		return
+	case tradebook.AddNotOffered:
+		// An item the trader may move but not offer as asked (a bad count,
+		// an item that cannot change hands) is dropped without an answer;
+		// the trade window holds no pending state for an add, so the
+		// client is left waiting on nothing.
 		return
 	}
 
@@ -302,11 +308,14 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}
-	if !partnerLeft && !livePlayersInRange(live, partner, tradeInteractionDistance) {
+	// A trader who already confirmed only repeats a confirm that changes
+	// nothing, wherever the partner stands: the range check belongs to a
+	// first confirm.
+	if !partnerLeft && !session.Confirmed(live.ObjectID()) && !livePlayersInRange(live, partner, tradeInteractionDistance) {
 		l.cancelActiveEnchant(partner)
-		// The interaction radius is validated on every confirm, and an
-		// out-of-range confirm is answered by cancelling the whole
-		// trade for both players, not with a per-player error message.
+		// An out-of-range first confirm is answered by cancelling the
+		// whole trade for both players, not with a per-player error
+		// message.
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
@@ -478,7 +487,7 @@ func (l *GameClientLink) finishTrade(first, second *livePlayer, success bool) {
 
 func (l *GameClientLink) sendTradeStart(live, partner *livePlayer) bool {
 	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageBeginTradeWithS1, partner.CharacterName()))
-	frame, err := serverpackets.FrameTradeStart(partner.ObjectID(), live.Inventory().Items(), live.Inventory().Templates())
+	frame, err := serverpackets.FrameTradeStart(partner.ObjectID(), l.inventory.SendableItems(live.Inventory(), l.itemHolder(live)), live.Inventory().Templates())
 	if err != nil {
 		l.log.Error().Err(err).Msg("build TradeStart")
 		return false
