@@ -814,11 +814,12 @@ func (m *CreatureMove) mayCatchUp(pawn Pawn) bool {
 // moveToLocationLocked starts a request toward target. catchUp lets a
 // player's walk in flight first run its retarget catch-up; straight makes a
 // walk to a fixed point that does not path-find. Callers hold mu.
+//
+// The requested height is kept as asked: the route search starts from it and
+// a direct walk broadcasts it. Only each step and the arrival land a ground
+// mover on the floor (see stepLocked and finishLocked).
 func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn, offset int, tracks, catchUp, straight bool) (event.Move, pathFindResult, error) {
 	moveType := m.moveTypeLocked()
-	if moveType == MoveGround {
-		target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
-	}
 	// Retargeting an in-flight walk keeps a mid-route block sticky through
 	// the new destination, and the start-speed update count running. Only a
 	// fresh request (not currently moving) clears them. A player's walk in
@@ -906,7 +907,7 @@ func (m *CreatureMove) setPawnLocked(pawn Pawn, offset int, tracks bool) {
 // the route cannot complete (tier 3). The returned destination is the
 // first segment to walk; waypoints holds the remaining segments, if any.
 //
-// origin and target carry geodata-snapped Z.
+// origin carries geodata-snapped Z; target carries the requested Z.
 //
 // A player that swims or flies from the origin takes no routed search: a
 // flier's line is open by the fly corridor (a swimmer's by the ground line),
@@ -1167,7 +1168,11 @@ func (m *CreatureMove) finishLocked() func() {
 		m.timer.Stop()
 		m.timer = nil
 	}
-	// Snap to the just-completed segment's destination.
+	// Snap to the just-completed segment's destination, on the floor there
+	// for a ground mover: a leg finished without a step still lands on it.
+	if m.moveTypeLocked() == MoveGround {
+		m.destination.Z = int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z))
+	}
 	m.destination.Z = min(m.destination.Z, m.maxZLocked())
 	m.origin = m.destination
 	m.setAccurateLocked(m.destination)

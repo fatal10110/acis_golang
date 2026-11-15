@@ -146,17 +146,13 @@ func refuseObserverAttack(live *livePlayer) bool {
 	return true
 }
 
-// refuseObserverActionUse answers an action-bar command of an observer.
-// One unable to act, as a viewpoint's observer is, is only released; any
-// other is told observers cannot take part, with no release.
+// refuseObserverActionUse tells an observer that observers cannot take part
+// in an action-bar command, with no release. One unable to act, as a
+// viewpoint's observer is, never gets here: the caller releases it first.
 func refuseObserverActionUse(live *livePlayer) bool {
 	if !live.ObserverMode() {
 		return false
 	}
-	if liveOutOfControl(live) {
-		live.SendFrame(serverpackets.FrameActionFailed())
-	} else {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageObserversCannotParticipate))
-	}
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageObserversCannotParticipate))
 	return true
 }
