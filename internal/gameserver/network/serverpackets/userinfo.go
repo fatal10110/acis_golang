@@ -39,15 +39,10 @@ func statInt32(value float64) int32 {
 // visible state.
 const OpcodeUserInfo = 0x04
 
-// weaponEquippedBonusSlots and noWeaponBonusSlots are the two values the
-// client's per-character bonus-slot field takes, gated on whether a weapon
-// is equipped. The client-side meaning of "bonus slots" here (commonly
-// documented elsewhere as a talisman-slot count) isn't stated anywhere in
-// this behavior's own source — only the 20/40 branch on weapon presence is.
-const (
-	noWeaponBonusSlots       = 20
-	weaponEquippedBonusSlots = 40
-)
+// userInfoBonusSlots is the bonus-slot field every character reports: a
+// character always holds a weapon, its class's fists when the right hand is
+// empty, so the field never takes its no-weapon value.
+const userInfoBonusSlots = 40
 
 // crystallizeSkillID is the skill that lets a character crystallize items;
 // the client draws the crystallize entry for whoever has it.
@@ -68,7 +63,6 @@ const teamBlue = 1
 // level and passives all reach the status window.
 type UserInfoSnapshot struct {
 	Character *player.Character
-	Template  *player.Template
 	Items     []*item.Instance
 	// IsGM is the accessLevels.xml isGM flag for Character's access level,
 	// not merely AccessLevel > 0.
@@ -143,22 +137,12 @@ func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
 }
 
 func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
-	c, t := s.Character, s.Template
+	c := s.Character
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
 	progression := c.ProgressionValues()
 	paperdoll := item.Paperdoll(s.Items)
-	rhand := paperdoll[rhandPaperdollIndex]
-
-	bonusSlots := int32(noWeaponBonusSlots)
-	if rhand.ObjectID != 0 {
-		bonusSlots = weaponEquippedBonusSlots
-	}
-
-	collisionRadius, collisionHeight := t.CollisionRadius, t.CollisionHeight
-	if c.Sex() != player.SexMale {
-		collisionRadius, collisionHeight = t.CollisionRadiusFemale, t.CollisionHeightFemale
-	}
+	collisionRadius, collisionHeight := c.CollisionRadius(), c.CollisionHeight()
 
 	inventoryLimit := c.InventoryLimit()
 
@@ -191,7 +175,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(progression.SP))
 	w.WriteInt32(clampInt32(c.CurrentWeight()))
 	w.WriteInt32(clampInt32(c.WeightLimit()))
-	w.WriteInt32(bonusSlots)
+	w.WriteInt32(userInfoBonusSlots)
 
 	for _, pos := range paperdollWriteOrder {
 		w.WriteInt32(paperdoll[pos].ObjectID)

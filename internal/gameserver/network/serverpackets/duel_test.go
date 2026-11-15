@@ -16,12 +16,11 @@ import (
 // CharInfo write: a duellist's side colour (BLUE 1, RED 2), alone in the
 // payload changing with it. Spawn protection still shows BLUE in both.
 func TestFrameUserAndCharInfoCarryDuelTeam(t *testing.T) {
-	tmpl := &player.Template{}
 	c := &player.Character{}
 	c.SetName("M")
 	encode := map[string]func() []byte{
-		"UserInfo": func() []byte { return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl})) },
-		"CharInfo": func() []byte { return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl})) },
+		"UserInfo": func() []byte { return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c})) },
+		"CharInfo": func() []byte { return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c})) },
 	}
 	for name, frame := range encode {
 		c.SetDuelTeam(duel.TeamNone)
@@ -48,16 +47,16 @@ func TestFrameUserAndCharInfoCarryDuelTeam(t *testing.T) {
 		}
 	}
 	c.SetDuelTeam(duel.TeamRed)
-	protected := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, SpawnProtectedTeam: true}))
+	protected := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, SpawnProtectedTeam: true}))
 	c.SetDuelTeam(duel.TeamBlue)
-	blue := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+	blue := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c}))
 	if !bytes.Equal(protected, blue) {
 		t.Fatal("a spawn-protected duellist's UserInfo differs from a blue one's, want BLUE shown")
 	}
 	c.SetDuelTeam(duel.TeamRed)
-	protected = framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl, SpawnProtectedTeam: true}))
+	protected = framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, SpawnProtectedTeam: true}))
 	c.SetDuelTeam(duel.TeamBlue)
-	blue = framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
+	blue = framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c}))
 	if !bytes.Equal(protected, blue) {
 		t.Fatal("a spawn-protected duellist's CharInfo differs from a blue one's, want BLUE shown")
 	}

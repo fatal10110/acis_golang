@@ -15,7 +15,6 @@ var charInfoPaperdollOrder = [...]int{16, 6, 7, 8, 9, 10, 11, 12, 13, 7, 15, 14}
 // CharInfoSnapshot is everything CharInfo needs for one visible player.
 type CharInfoSnapshot struct {
 	Character *player.Character
-	Template  *player.Template
 	Items     []*item.Instance
 	// Clan is Character's clan as others see it; Leader and Privileges are
 	// not shown.
@@ -46,15 +45,12 @@ func FrameCharInfo(s CharInfoSnapshot) wire.Frame {
 }
 
 func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
-	c, t := s.Character, s.Template
+	c := s.Character
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
 	paperdoll := item.Paperdoll(s.Items)
 
-	collisionRadius, collisionHeight := t.CollisionRadius, t.CollisionHeight
-	if c.Sex() != player.SexMale {
-		collisionRadius, collisionHeight = t.CollisionRadiusFemale, t.CollisionHeightFemale
-	}
+	collisionRadius, collisionHeight := c.CollisionRadius(), c.CollisionHeight()
 
 	w.WriteInt32(int32(x))
 	w.WriteInt32(int32(y))

@@ -218,6 +218,7 @@ func newOraclePlayer(r int, v [10]int32, live bool) *oraclePlayer {
 	if live {
 		c.AttachRuntime(tmpl, nil)
 	}
+	c.SetBaseTemplate(tmpl)
 
 	o := &oraclePlayer{c: c, tmpl: tmpl, clan: ClanFields{
 		CrestID: rowField(v, 3), AllyID: rowField(v, 4), AllyCrestID: rowField(v, 5),
@@ -243,14 +244,14 @@ func newOraclePlayer(r int, v [10]int32, live bool) *oraclePlayer {
 
 func (o *oraclePlayer) user() UserInfoSnapshot {
 	return UserInfoSnapshot{
-		Character: o.c, Template: o.tmpl, Items: o.items, Clan: o.clan,
+		Character: o.c, Items: o.items, Clan: o.clan,
 		IsGM: o.gm, HeroAura: o.heroAura, SpawnProtectedTeam: o.spawnProtected,
 	}
 }
 
 func (o *oraclePlayer) char() CharInfoSnapshot {
 	return CharInfoSnapshot{
-		Character: o.c, Template: o.tmpl, Items: o.items, Clan: o.clan,
+		Character: o.c, Items: o.items, Clan: o.clan,
 		HeroAura: o.heroAura, SpawnProtectedTeam: o.spawnProtected,
 		Hidden: o.hidden, Revealed: o.revealed,
 	}

@@ -40,8 +40,8 @@ func TestFrameCharInfoAndUserInfoWriteLiveSpeedMultipliers(t *testing.T) {
 	want = appendF64(want, tmpl.CollisionHeight)
 
 	for name, got := range map[string][]byte{
-		"CharInfo": framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl})),
-		"UserInfo": framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl})),
+		"CharInfo": framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c})),
+		"UserInfo": framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c})),
 	} {
 		if !bytes.Contains(got, want) {
 			t.Fatalf("%s missing multiplier/collision block %x", name, want)
@@ -72,7 +72,7 @@ func TestFrameRelationChanged(t *testing.T) {
 // liveStatsCharacter is a level 1 fighter wearing a weapon, a chest piece
 // and a ring, with a buff-shaped stat func on every status-window stat, for
 // the UserInfo/CharInfo live stat oracles.
-func liveStatsCharacter() (*player.Character, *player.Template) {
+func liveStatsCharacter() *player.Character {
 	tmpl := &player.Template{
 		FistsItemID: 1,
 		STR:         40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25,
@@ -108,7 +108,7 @@ func liveStatsCharacter() (*player.Character, *player.Template) {
 		{Stat: stat.CriticalRate, Op: effect.OpMul, Value: 1.5},
 		{Stat: stat.MagicAttackSpeed, Op: effect.OpMul, Value: 1.3},
 	})
-	return c, tmpl
+	return c
 }
 
 // TestFrameUserInfoWritesLiveStats pins UserInfo.java:42-47 and :127-136:
@@ -128,8 +128,8 @@ func liveStatsCharacter() (*player.Character, *player.Template) {
 //	M.Spd   333 * 0.64 * 1.3                     = 277.06 -> 277
 //	M.Def   (15 - 5 ring) * 1.28 * 0.9           = 11.52  -> 11
 func TestFrameUserInfoWritesLiveStats(t *testing.T) {
-	c, tmpl := liveStatsCharacter()
-	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+	c := liveStatsCharacter()
+	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c}))
 
 	attrs := 1 + 5*4 + (len(c.CharacterName())+1)*2 + 4*4 + 8
 	wantAttrs := []uint32{42, 30, 43, 21, 11, 25}
@@ -166,8 +166,8 @@ func TestFrameUserInfoWritesLiveStats(t *testing.T) {
 // the M.Atk. and P.Atk. speeds between the two PvP flag/karma pairs are the
 // live values.
 func TestFrameCharInfoWritesLiveCastAndAttackSpeed(t *testing.T) {
-	c, tmpl := liveStatsCharacter()
-	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
+	c := liveStatsCharacter()
+	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c}))
 	offset := 1 + 5*4 + (len(c.CharacterName())+1)*2 + 3*4 + len(charInfoPaperdollOrder)*4 + 4*2 + 4 + 12*2 + 4 + 4*2 + 2*4
 	if v := binary.LittleEndian.Uint32(got[offset:]); v != 277 {
 		t.Errorf("M.Atk. speed = %d, want 277", v)
@@ -178,13 +178,12 @@ func TestFrameCharInfoWritesLiveCastAndAttackSpeed(t *testing.T) {
 }
 
 func TestFrameUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
-	tmpl := &player.Template{}
 	humanChar := &player.Character{Race: player.RaceHuman}
 	humanChar.SetName("H")
-	human := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: humanChar, Template: tmpl}))
+	human := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: humanChar}))
 	dwarfChar := &player.Character{Race: player.RaceDwarf}
 	dwarfChar.SetName("H")
-	dwarf := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: dwarfChar, Template: tmpl}))
+	dwarf := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: dwarfChar}))
 
 	if len(human) != len(dwarf) {
 		t.Fatalf("human and dwarf encodings differ in length: %d vs %d", len(human), len(dwarf))
@@ -213,10 +212,10 @@ func TestStorageLimitPacketsReportLiveInventoryLimit(t *testing.T) {
 		t.Fatalf("ExStorageMaxCount inventory limit = %d, want 118", got)
 	}
 
-	full := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: &player.Template{}}))
+	full := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c}))
 	plain := &player.Character{Race: player.RaceDwarf}
 	plain.SetName("D")
-	base := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: plain, Template: &player.Template{}}))
+	base := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: plain}))
 	if len(full) != len(base) {
 		t.Fatalf("UserInfo lengths differ: %d vs %d", len(full), len(base))
 	}

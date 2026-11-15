@@ -2,7 +2,6 @@ package serverpackets
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
@@ -27,16 +26,13 @@ const gmViewRunningMark = 321 & 0xff
 // under the character's own name and title, without the party, cubic,
 // fishing and cursed weapon state.
 func FrameGMViewCharacterInfo(s UserInfoSnapshot) wire.Frame {
-	c, t := s.Character, s.Template
+	c := s.Character
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
 	progression := c.ProgressionValues()
 	paperdoll := item.Paperdoll(s.Items)
 
-	collisionRadius, collisionHeight := t.CollisionRadius, t.CollisionHeight
-	if c.Sex() != player.SexMale {
-		collisionRadius, collisionHeight = t.CollisionRadiusFemale, t.CollisionHeightFemale
-	}
+	collisionRadius, collisionHeight := c.CollisionRadius(), c.CollisionHeight()
 
 	w := newFrameWriter(OpcodeGMViewCharacterInfo)
 	w.WriteInt32(int32(x))

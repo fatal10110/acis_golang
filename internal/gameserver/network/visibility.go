@@ -82,7 +82,6 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 			hidden := hiddenFrom(o, p)
 			p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
 				Character:          o.Character,
-				Template:           o.Template(),
 				Items:              o.inventoryItems(),
 				Clan:               p.link.clanFields(o.Character),
 				Hidden:             hidden,
@@ -443,7 +442,8 @@ func (l *GameClientLink) summonInfoSnapshot(a *summon.Actor, viewer *livePlayer,
 }
 
 // petInfoSnapshot resolves a's owner-visible PetInfo fields, given owner
-// (a's confirmed owner) and npcs to look up a's template. It returns
+// (a's confirmed owner) and npcs to look up a's template; a summon's title
+// is its owner's name. It returns
 // (zero, false) if the template is missing: an unresolvable summon is a
 // silent no-op.
 func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serverpackets.PetInfoSnapshot, bool) {
@@ -505,7 +505,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		InCombat:          owner.InCombat(),
 		AlikeDead:         a.AlikeDead(),
 		Name:              a.Name(),
-		Title:             tmpl.Title,
+		Title:             owner.CharacterName(),
 		PvpFlag:           int(owner.PvPFlagState()),
 		Karma:             owner.Karma(),
 		CurFed:            curFed,
