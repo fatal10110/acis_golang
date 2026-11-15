@@ -25,11 +25,12 @@ const tradeChaoticRefusal = "You cannot trade in a chaotic state."
 // boundItems reports which of live's items may not leave its inventory by
 // drop, trade or hand-over to its pet: the collar of its pet that is out or
 // of its mount, the enchant scroll it has selected, and any cursed weapon.
-// Each call reads them as they stand then.
-func (l *GameClientLink) boundItems(live *livePlayer) tradebook.BoundItems {
+// Each call reads them as they stand then, resolving items through items:
+// live's inventory, or the held view of it while an exchange locks it.
+func (l *GameClientLink) boundItems(live *livePlayer, items itemLookup) tradebook.BoundItems {
 	return func(objectID int32) bool {
 		return live.ControlItemInUse(objectID) || objectID == l.enchanting.scrolls.Active(live.ObjectID()) ||
-			l.cursedItem(live.Inventory(), objectID)
+			l.cursedItem(items, objectID)
 	}
 }
 
@@ -211,7 +212,7 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		return
 	}
 
-	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), l.boundItems(live), req.ObjectID, int(req.Count))
+	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), l.boundItems(live, live.Inventory()), req.ObjectID, int(req.Count))
 	switch result.Status {
 	case tradebook.AddNoSession:
 		return
@@ -376,7 +377,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
 			func(firstHeld, secondHeld itemcontainer.Held) bool {
-				status = session.Check(firstHeld, secondHeld, l.boundItems(first), l.boundItems(second))
+				status = session.Check(firstHeld, secondHeld, l.boundItems(first, firstHeld), l.boundItems(second, secondHeld))
 				return status == tradebook.SettlementOK
 			})
 		switch {

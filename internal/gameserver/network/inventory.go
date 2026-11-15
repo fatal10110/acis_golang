@@ -611,7 +611,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 	count := int(req.Count)
-	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig().DiscardItemDisabled && !live.accessLevel().IsGM)
+	refused := l.boundItems(live, live.Inventory())(req.ObjectID) || (l.playerConfig().DiscardItemDisabled && !live.accessLevel().IsGM)
 	switch l.inventory.DropItemFailure(inv, req.ObjectID, count, refused) {
 	case invops.DropOK:
 	case invops.DropCannotDiscard:
@@ -738,9 +738,15 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	}
 }
 
+// itemLookup resolves an inventory's items by object id: the inventory
+// itself, or the held view of one an exchange has locked.
+type itemLookup interface {
+	ItemByObjectID(objectID int32) *item.Instance
+}
+
 // cursedItem reports whether the item objectID in inv is a configured
 // cursed weapon, which no request may destroy whatever its template says.
-func (l *GameClientLink) cursedItem(inv *itemcontainer.Inventory, objectID int32) bool {
+func (l *GameClientLink) cursedItem(inv itemLookup, objectID int32) bool {
 	if l.cursedWeapons == nil {
 		return false
 	}
