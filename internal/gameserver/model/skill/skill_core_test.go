@@ -349,8 +349,34 @@ func TestParseExtractableItems(t *testing.T) {
 			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 2147483647}}, Chance: 20.5}},
 		},
 		{
-			"even field count is skipped",
-			"57,10;57,10,20.5",
+			// An even field count reads its last field as both the last
+			// quantity and the chance; a single field is a row of no items.
+			"shipped skill 2215 level 1 head",
+			"57;100000,8;3456,1,10",
+			[]ExtractableProduct{
+				{Items: []ExtractableItem{}, Chance: 57},
+				{Items: []ExtractableItem{{ItemID: 100000, Quantity: 8}}, Chance: 8},
+				{Items: []ExtractableItem{{ItemID: 3456, Quantity: 1}}, Chance: 10},
+			},
+		},
+		{
+			"four fields make two pairs, the last quantity the chance",
+			"57,10,58,20",
+			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 10}, {ItemID: 58, Quantity: 20}}, Chance: 20}},
+		},
+		{
+			"even field count with a fractional last field is skipped",
+			"57,10,58,20.5;57,10,20.5",
+			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 10}}, Chance: 20.5}},
+		},
+		{
+			"trailing empty groups and fields are ignored",
+			"57,10,20.5,;;",
+			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 10}}, Chance: 20.5}},
+		},
+		{
+			"a group of empty fields is skipped",
+			",,;57,10,20.5",
 			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 10}}, Chance: 20.5}},
 		},
 	}
@@ -361,6 +387,42 @@ func TestParseExtractableItems(t *testing.T) {
 				t.Errorf("ParseExtractableItems(%q) = %#v, want %#v", tt.raw, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestPickExtractableProductShippedSkill2215 rolls the shipped skill 2215
+// level 1 rows with fixed draws, as the capsule handler subtracts
+// (int)(chance * 1000) per row until the draw goes below zero: the empty
+// row at 57 takes [0, 57000), item 100000 x8 at 8 takes [57000, 65000), and
+// every later row's window starts after them.
+func TestPickExtractableProductShippedSkill2215(t *testing.T) {
+	products := ParseExtractableItems("57;100000,8;3456,1,10;3454,1,5.5;3455,1,5.5;3448,1,17.6;3449,1,17;3446,1,18;3468,1,18.4")
+	if len(products) != 9 {
+		t.Fatalf("parsed %d rows, want 9", len(products))
+	}
+	for _, tt := range []struct {
+		roll  int
+		items []ExtractableItem
+	}{
+		{0, []ExtractableItem{}},
+		{56999, []ExtractableItem{}},
+		{57000, []ExtractableItem{{ItemID: 100000, Quantity: 8}}},
+		{64999, []ExtractableItem{{ItemID: 100000, Quantity: 8}}},
+		{65000, []ExtractableItem{{ItemID: 3456, Quantity: 1}}},
+		{74999, []ExtractableItem{{ItemID: 3456, Quantity: 1}}},
+		{75000, []ExtractableItem{{ItemID: 3454, Quantity: 1}}},
+	} {
+		got, ok := PickExtractableProduct(products, tt.roll)
+		if !ok || !reflect.DeepEqual(got.Items, tt.items) {
+			t.Errorf("PickExtractableProduct(roll %d) = %#v, %v; want items %#v", tt.roll, got, ok, tt.items)
+		}
+	}
+	// The rows' chances add up past 100, so every draw picks one.
+	if _, ok := PickExtractableProduct(products, 99999); !ok {
+		t.Error("PickExtractableProduct(roll 99999) picked nothing")
+	}
+	if _, ok := PickExtractableProduct(ParseExtractableItems("57,1,10"), 10000); ok {
+		t.Error("a draw past every row picked one")
 	}
 }
 

@@ -122,7 +122,12 @@ type Character struct {
 	// PartyWindowStale.
 	partyBars partyBars
 
+	// Face, HairStyle and HairColor are the character's look. appearanceMu
+	// guards them once the character is live: a skill changes them on its
+	// caster's queue while other players' queues read them for CharInfo
+	// and the autosave reads them to persist.
 	Face, HairStyle, HairColor int
+	appearanceMu               sync.RWMutex
 
 	// Location and LastHeading are the character's last known world
 	// location. The field is named LastHeading, not Heading, so it doesn't

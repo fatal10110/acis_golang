@@ -119,6 +119,25 @@ func TestExtractableRollMissingEveryRowReportsNothingInside(t *testing.T) {
 	}
 }
 
+// TestExtractablePickedEmptyRowReportsNothingInside pins a picked row of no
+// items: nothing is created, so the capsule reports nothing inside.
+func TestExtractablePickedEmptyRowReportsNothingInside(t *testing.T) {
+	caster := &extractableFakeCaster{free: 10}
+
+	result, _ := extractableRegistry().UseResult(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "100;57,10,100"},
+		Targets: []Actor{},
+	})
+
+	if len(caster.granted) != 0 {
+		t.Fatalf("granted = %v, want none from the empty row", caster.granted)
+	}
+	if len(result.Messages) != 1 || result.Messages[0] != (NothingInsideMessage{}) {
+		t.Fatalf("messages = %v, want one NothingInsideMessage", result.Messages)
+	}
+}
+
 func TestExtractableNoDataIsNoop(t *testing.T) {
 	caster := &extractableFakeCaster{free: 10}
 

@@ -95,7 +95,7 @@ func (l *GameClientLink) placeAdminSpawn(tmpl *npc.Template, at positioned, resp
 	x, y, z := at.Position()
 	heading := at.Heading()
 	if npc.InstanceKind(tmpl.Type) == npc.ChristmasTree {
-		return l.ids != nil && l.placeDecoration(tmpl, tmpl.Title, x, y, z, heading, respawn)
+		return l.ids != nil && l.placeDecoration(tmpl, tmpl.Title, x, y, z, heading, respawn) != nil
 	}
 	npcs := l.npcSpawns.Load()
 	if npcs == nil {

@@ -8,7 +8,7 @@ import (
 
 // SlotsFullMessage reports a capsule whose rolled product does not fit the
 // caster's inventory slots. NothingInsideMessage reports a capsule whose
-// roll picked none of its products.
+// roll created nothing: it picked none of its products, or one of no items.
 type (
 	SlotsFullMessage     struct{}
 	NothingInsideMessage struct{}
@@ -31,9 +31,9 @@ func (extractableHandler) Types() []string { return []string{"EXTRACTABLE", "EXT
 // Use rolls one of the skill's capsule product rows (weighted by percent
 // chance out of 100000) and grants every item in it to a player caster.
 // A row whose items together need more inventory slots than are free
-// grants nothing and reports SlotsFullMessage; a roll that picks no row
-// reports NothingInsideMessage. The cast has already spent the capsule
-// either way.
+// grants nothing and reports SlotsFullMessage; a roll that picks no row, or
+// a row of no items, reports NothingInsideMessage. The cast has already
+// spent the capsule either way.
 func (h extractableHandler) Use(cast Cast) {
 	if h.ids == nil || cast.Caster == nil || cast.Caster.Kind() != actor.KindPlayer {
 		return
@@ -48,13 +48,8 @@ func (h extractableHandler) Use(cast Cast) {
 		return
 	}
 
-	chance := rnd.Get(100000)
-	for _, product := range products {
-		chance -= int(product.Chance * 1000)
-		if chance >= 0 {
-			continue
-		}
-
+	product, picked := modelskill.PickExtractableProduct(products, rnd.Get(100000))
+	if picked {
 		slots := 0
 		for _, it := range product.Items {
 			slots += caster.ItemSlotsNeeded(it.ItemID, it.Quantity)
@@ -63,11 +58,12 @@ func (h extractableHandler) Use(cast Cast) {
 			cast.record(SlotsFullMessage{})
 			return
 		}
-
 		for _, it := range product.Items {
 			caster.AddCreatedItem(it.ItemID, it.Quantity, h.ids.NextID)
 		}
-		return
 	}
-	cast.record(NothingInsideMessage{})
+	// An item that could not be added still counts as created.
+	if len(product.Items) == 0 {
+		cast.record(NothingInsideMessage{})
+	}
 }
