@@ -68,10 +68,11 @@ func TestTradeRequestRejectsBusyTarget(t *testing.T) {
 	drainUntilQuiet(t, h.second)
 }
 
-// TestAddTradeItemRejectsUntradableItem pins the NothingHappened answer for
-// offering an item the reference marks untradable: no offer packets on either
-// side and no inventory mutation.
-func TestAddTradeItemRejectsUntradableItem(t *testing.T) {
+// TestAddTradeItemDropsUntradableItem pins the silent drop of an offer of an
+// untradable item: the item passes the manipulation check, so no
+// NOTHING_HAPPENED, and TradeList.addItem refuses it without an answer. No
+// offer packets reach either side and nothing is mutated.
+func TestAddTradeItemDropsUntradableItem(t *testing.T) {
 	t.Parallel()
 	h := bootTraders(t)
 	shots := h.srv.GiveItem(t, h.firstID, 1463, 5) // soulshot templates are not tradable
@@ -79,10 +80,8 @@ func TestAddTradeItemRejectsUntradableItem(t *testing.T) {
 	h.startTrade(t)
 
 	h.first.Send(encodeAddTradeItem(0, shots, 1))
-	assertStaticSystemMessage(t, h.first.Read(), serverpackets.SystemMessageNothingHappened)
-	if queued := h.second.ReadQueued(); len(queued) != 0 {
-		t.Fatalf("partner received opcode %#x for an untradable offer, want silence", queued[0][0])
-	}
+	assertSilent(t, h.first, "first offering an untradable item")
+	assertSilent(t, h.second, "partner of an untradable offer")
 
 	h.srv.FlushItems(t)
 	rows, err := h.srv.Items.ListByOwner(context.Background(), h.firstID)

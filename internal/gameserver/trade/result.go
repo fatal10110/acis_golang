@@ -56,8 +56,14 @@ const (
 	AddSelfConfirmed
 	// AddPartnerConfirmed means the partner already confirmed the trade.
 	AddPartnerConfirmed
-	// AddInvalidItem means the requested item cannot be offered.
+	// AddInvalidItem means the player may not move the requested item at
+	// all: it is missing, not the player's, worn or bound where it is.
 	AddInvalidItem
+	// AddNotOffered means the player may move the item but not offer it as
+	// asked: a non-positive count or more than held, more than one of an
+	// item that does not stack, or an item that cannot change hands. The
+	// add is dropped without an answer.
+	AddNotOffered
 )
 
 // AddResult is returned after adding an item to a direct-trade offer.
@@ -136,6 +142,9 @@ const (
 	SettlementWeightExceeded
 	// SettlementSlotsFull means a receiver lacks slots for the partner's offer.
 	SettlementSlotsFull
+	// SettlementCountOverflow means a receiver's stack would pass the item
+	// count limit with the partner's offer added.
+	SettlementCountOverflow
 	// SettlementTransferFailed means an inventory mutation failed during exchange.
 	SettlementTransferFailed
 )
