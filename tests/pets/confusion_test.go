@@ -81,7 +81,7 @@ func TestPetFollowsOwnerWhenConfusionEnds(t *testing.T) {
 
 	h.srv.Advance(t, time.Second)
 	h.srv.TickEffects()
-	if confusion.InUse() {
+	if effectInUse(t, petActor, confusion) {
 		t.Fatal("confusion still in use after its single tick")
 	}
 	frames := drainFrames(t, h.client)

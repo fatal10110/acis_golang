@@ -58,7 +58,7 @@ func TestReturnedBuffedPetStopsItsEffectsBeforePetDelete(t *testing.T) {
 	if held := pet.EffectList().All(); len(held) != 0 {
 		t.Fatalf("returned pet still holds %d effects", len(held))
 	}
-	if might.InUse() {
+	if effectInUse(t, pet, might) {
 		t.Fatal("might still in use on the returned pet")
 	}
 	if got := pet.PAtk(); got != basePAtk {

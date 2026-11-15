@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -56,8 +57,36 @@ func drainSwingWorld(t *testing.T, atkSpd float64) (*clanWorld, *npc.Hostile, *f
 		h.AI().Desires().Clear()
 		h.AI().AddAttackDesire(golem, 1e9)
 	})
-	untilTicking(t, w, "the gatekeeper's swing killing the golem", golem.Dead)
+	untilSwung(t, w, "the gatekeeper's swing killing the golem", golem.Dead)
 	return w, h, log, golem.ObjectID()
+}
+
+// swingStep is how far untilSwung moves the clock between looks at its
+// condition, well inside the 100ms between a swing's finish and the AI's
+// re-run after it.
+const swingStep = 20 * time.Millisecond
+
+// untilSwung runs AI task cycles, a second apart, until done holds, moving the
+// clock in swingStep pieces and leaving the cycle's AI task out once done
+// holds. A whole second per step would let done hold in the middle of a swing
+// and the next cycle's task re-run the AI ahead of the swing's own finish,
+// which finds nothing to do and idles the gatekeeper, aborting that finish.
+func untilSwung(t *testing.T, w *clanWorld, what string, done func() bool) {
+	t.Helper()
+	for i := 0; !done(); i++ {
+		if i == 30 {
+			t.Fatalf("%s not observed within 30 AI cycles", what)
+		}
+		if err := w.srv.AI.Tick(); err != nil {
+			t.Fatalf("AI.Tick() error: %v", err)
+		}
+		for range time.Second / swingStep {
+			w.srv.Advance(t, swingStep)
+			if done() {
+				return
+			}
+		}
+	}
 }
 
 // TestDoormanOfDrainTurnsOnTheOwnerOfASummonItsSwingKills runs
@@ -73,9 +102,14 @@ func TestDoormanOfDrainTurnsOnTheOwnerOfASummonItsSwingKills(t *testing.T) {
 	t.Parallel()
 	w, h, log, golemID := drainSwingWorld(t, 1250)
 	live, killed := fmt.Sprintf("target=%d dead=false", golemID), fmt.Sprintf("target=%d dead=true", golemID)
-	untilTicking(t, w, "the attack-finished hook on the dead golem", func() bool {
-		return slices.Contains(log.snapshot(), killed)
-	})
+	// No AI task runs from here: the hook has to come from the swing's own
+	// finish, 200ms after its hit.
+	for i := 0; !slices.Contains(log.snapshot(), killed); i++ {
+		if i == int(300*time.Millisecond/swingStep) {
+			t.Fatalf("the attack-finished hook on the dead golem not observed; hooks = %q", log.snapshot())
+		}
+		w.srv.Advance(t, swingStep)
+	}
 	lines := log.snapshot()
 	at := slices.Index(lines, killed)
 	for i, l := range lines {
