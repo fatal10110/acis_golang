@@ -1,7 +1,6 @@
 package network
 
 import (
-	"cmp"
 	"regexp"
 	"slices"
 	"strconv"
@@ -114,15 +113,15 @@ func textAfter(line, sep string) string {
 	return strings.TrimFunc(after, func(r rune) bool { return r <= ' ' })
 }
 
-// worldPlayersByID returns the players in the world, by object id.
-func (l *GameClientLink) worldPlayersByID() []*livePlayer {
+// listedPlayers returns the players in the world, in the order the
+// online-player table lists them.
+func (l *GameClientLink) listedPlayers() []*livePlayer {
 	var out []*livePlayer
-	for _, p := range l.world.Players() {
+	for _, p := range l.world.ListedPlayers() {
 		if live, ok := p.(*livePlayer); ok {
 			out = append(out, live)
 		}
 	}
-	slices.SortFunc(out, func(a, b *livePlayer) int { return cmp.Compare(a.ObjectID(), b.ObjectID()) })
 	return out
 }
 
@@ -131,7 +130,7 @@ func (l *GameClientLink) worldPlayersByID() []*livePlayer {
 // nothing, for a page below 1 when players are found.
 func (l *GameClientLink) findPlayers(gm *livePlayer, page int, search string) bool {
 	var found []*livePlayer
-	for _, p := range l.worldPlayersByID() {
+	for _, p := range l.listedPlayers() {
 		if strings.Contains(strings.ToLower(p.CharacterName()), search) {
 			found = append(found, p)
 		}
@@ -169,7 +168,7 @@ func (l *GameClientLink) findPlayersByIP(gm *livePlayer, ip string) {
 	disconnected := ip == "disconnected"
 	var b strings.Builder
 	found := 0
-	for _, p := range l.worldPlayersByID() {
+	for _, p := range l.listedPlayers() {
 		if p.clientDetached() != disconnected || (!disconnected && p.remoteIP != ip) {
 			continue
 		}
@@ -209,11 +208,11 @@ func (l *GameClientLink) findAccount(gm *livePlayer, name string) {
 
 // findDualbox opens the addresses at least multibox connected players
 // share, in the order a hash table of the addresses lists them, put in as
-// players taken by object id reach multibox.
+// players taken in listing order reach multibox.
 func (l *GameClientLink) findDualbox(gm *livePlayer, multibox int) {
 	perIP := map[string]int{}
 	var shared []string
-	for _, p := range l.worldPlayersByID() {
+	for _, p := range l.listedPlayers() {
 		if p.clientDetached() {
 			continue
 		}

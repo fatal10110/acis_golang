@@ -3,6 +3,8 @@ package world
 import (
 	"strings"
 	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 )
 
 // State tracks every live object, player, and pet currently in the game
@@ -22,6 +24,9 @@ type State struct {
 	// blocks a later, different player from registering under that name.
 	playersMu   sync.RWMutex
 	playerNames map[string]int32
+	// playerOrder holds the online players' ids in the order the
+	// online-player table lists them (ListedPlayers); playersMu guards it.
+	playerOrder hashorder.Set
 
 	// mu is the world lock. It serializes every change of region membership
 	// and region activity, and every placement except a Move that stays in
@@ -100,6 +105,7 @@ func (s *State) AddPlayer(obj Player) {
 	defer s.playersMu.Unlock()
 
 	s.players.add(obj.ObjectID(), obj)
+	s.playerOrder.Add(obj.ObjectID())
 
 	name := strings.ToLower(obj.CharacterName())
 	if _, exists := s.playerNames[name]; !exists {
@@ -119,6 +125,7 @@ func (s *State) RemovePlayer(obj Player) {
 	if !s.players.removeIfSame(id, obj) {
 		return
 	}
+	s.playerOrder.Remove(id)
 	name := strings.ToLower(obj.CharacterName())
 	if s.playerNames[name] == id {
 		delete(s.playerNames, name)
@@ -166,8 +173,25 @@ func (s *State) PlayerByName(name string) (Player, bool) {
 	return s.Player(id)
 }
 
-// Players returns a snapshot of every online player.
+// Players returns a snapshot of every online player, in no fixed order.
 func (s *State) Players() []Player { return s.players.appendAll(nil) }
+
+// ListedPlayers returns a snapshot of every online player in the order the
+// online-player table lists them, the order a listing of online players
+// shows them in: by the hash bucket of the player's id, a bucket's players
+// in the order they came online (see hashorder.Set).
+func (s *State) ListedPlayers() []Player {
+	s.playersMu.RLock()
+	defer s.playersMu.RUnlock()
+	ids := s.playerOrder.Order()
+	out := make([]Player, 0, len(ids))
+	for _, id := range ids {
+		if p, ok := s.players.get(id); ok {
+			out = append(out, p)
+		}
+	}
+	return out
+}
 
 // AddSummon marks summon as ownerID's active pet or servitor, unless that
 // owner already has one tracked.

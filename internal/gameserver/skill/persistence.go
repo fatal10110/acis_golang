@@ -1334,7 +1334,8 @@ func (p *Persistence) DuelState(c *player.Character) SaveState {
 // RestoreDuelState puts back on c the reuse timers st saved that are still
 // running and the effects st saved, with the time they had left then. Call
 // it on c's queue once c's effects are stopped; the rows the duel wrote are
-// ClearSaved's to delete.
+// ClearSaved's to delete. c is told of each effect it feels again, as when
+// it is cast, ahead of the one icon refresh.
 func (p *Persistence) RestoreDuelState(c *player.Character, st SaveState) {
 	if p == nil || c == nil {
 		return
@@ -1342,7 +1343,7 @@ func (p *Persistence) RestoreDuelState(c *player.Character, st SaveState) {
 	// c is in the world: its effects run from the replay, which runs none
 	// of their ticks.
 	p.stageSkillState(c, st.rows, c.Now(), time.Time{})
-	p.ReplayEffects(c, nil)
+	p.replayEffects(c, nil, true)
 }
 
 // ClearSaved deletes the rows st's character saved for st's class.
