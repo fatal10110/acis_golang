@@ -266,13 +266,8 @@ func (q quest) enterRoom(s *script.Script, e script.Event) string {
 		if mst == nil || mst.Status() != questlog.StatusStarted {
 			return fillName(s, "rift_watcher_03a.htm", member.Name())
 		}
-		if member.ItemCount(dimensionalFragment) < cost {
-			// Memo state 2 with a slot 1 stamp under an hour old: the member
-			// goes in without the fragments.
-			since := s.MemoStateEx(member, questID, 1)
-			if s.MemoState(member, questID) != 2 || tick-since > 3600 {
-				return fillName(s, "rift_watcher_03.htm", member.Name())
-			}
+		if member.ItemCount(dimensionalFragment) < cost && !entersFree(s, member, tick) {
+			return fillName(s, "rift_watcher_03.htm", member.Name())
 		}
 	}
 
@@ -300,7 +295,11 @@ func (q quest) enterRoom(s *script.Script, e script.Event) string {
 		if npc.Distance2D(member) > 1500 {
 			continue
 		}
-		s.DestroyItems(member, dimensionalFragment, cost, true)
+		// A member whose fragments are gone by the take stays behind,
+		// unless it goes in free anyway.
+		if !s.DestroyItems(member, dimensionalFragment, cost, true) && cost > 0 && !entersFree(s, member, tick) {
+			continue
+		}
 		s.SetMemoState(member, questID, now)
 		leads := int32(0)
 		if member.ObjectID() == leader.ObjectID() {
@@ -310,6 +309,12 @@ func (q quest) enterRoom(s *script.Script, e script.Event) string {
 		member.TeleportTo(at, 0)
 	}
 	return e.Name
+}
+
+// entersFree reports whether member goes in without the fragments: memo
+// state 2 with a slot 1 stamp under an hour old at tick.
+func entersFree(s *script.Script, member *script.Player, tick int32) bool {
+	return s.MemoState(member, questID) == 2 && tick-s.MemoStateEx(member, questID, 1) <= 3600
 }
 
 // takeRoom gives the party of p one of the eight rooms and returns its

@@ -107,7 +107,7 @@ Quest.giveItems script.Script.GiveItems
 Quest.playSound script.Script.PlaySound
 Quest.rewardExpAndSp script.Script.RewardExpAndSp
 Quest.rewardItems script.Script.RewardItems
-Quest.takeItems script.Script.TakeItems
+Quest.takeItems script.Script.TakeItems,script.Script.TakeHeldItems
 QuestState.getCond script.QuestState.Cond
 QuestState.getPlayer script.QuestState.Player
 Rnd.get script.Script.Rnd

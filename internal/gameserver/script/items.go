@@ -66,6 +66,14 @@ func (s *Script) TakeItems(p *Player, itemID, count int32) {
 	p.character().TakeScriptItems(itemID, int(count))
 }
 
+// TakeHeldItems takes count units of itemID from p as TakeItems does, but
+// only when p holds that many, and returns how many it took; a negative
+// count takes them all. Units p moved away between the script's count and
+// this take are not taken, so the script grants nothing for them.
+func (s *Script) TakeHeldItems(p *Player, itemID, count int32) int32 {
+	return int32(p.character().TakeHeldScriptItems(itemID, int(count)))
+}
+
 // AddItems gives p count units of itemID as GiveItems does, with the chat
 // line of items picked up.
 func (s *Script) AddItems(p *Player, itemID, count int32) {
