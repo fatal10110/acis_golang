@@ -67,7 +67,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 
 // Save persists a character's progress — the active and base classes, the base
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
-// karma/pvpkills/pkkills, death_penalty_level, the accumulated session
+// karma/pvpkills/pkkills (clamped to their column ranges), death_penalty_level, the accumulated session
 // playtime, the personal-surrender flag, the noblesse status, the Seven Signs
 // dungeon membership, the Ketra/Varka faction standing, the face and hair
 // and each subclass's progression — so a later reload reflects everything
@@ -81,7 +81,7 @@ func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, face = ?, hairStyle = ?, hairColor = ?, online = ?
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
+		progression.Exp, progression.ExpBeforeDeath, progression.SP, karmaColumn(int64(st.Karma)), killsColumn(int64(st.PvPKills)), killsColumn(int64(st.PKKills)), st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
 		st.WantsPeace, st.Noble, st.In7sDungeon, st.VarkaKetraAlliance, st.Face, st.HairStyle, st.HairColor, onlineColumn(st.ClientDetached), st.ID,
 	)
 	if err != nil {
@@ -91,6 +91,21 @@ func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	// subclass keeps its own in its row.
 	return updateSubclasses(ctx, s.db, st.ID, st.Subclasses)
 }
+
+// Column ranges of the characters counters: pvpkills and pkkills are
+// SMALLINT UNSIGNED, karma is INT UNSIGNED.
+const (
+	maxKillsColumn = 65535
+	maxKarmaColumn = 4294967295
+)
+
+// killsColumn is a PvP or PK count as its column stores it: clamped to the
+// column range, so a count past it never fails the save of the whole row.
+func killsColumn(n int64) int64 { return min(max(n, 0), maxKillsColumn) }
+
+// karmaColumn is karma clamped to the characters.karma range, for the same
+// reason as killsColumn.
+func karmaColumn(n int64) int64 { return min(max(n, 0), maxKarmaColumn) }
 
 // onlineColumn is the characters.online value of a character in game: 1,
 // or 2 once its client detached.
