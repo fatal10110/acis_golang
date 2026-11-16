@@ -31,23 +31,16 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	left.index, left.reverse, _ = n.walker.Walking(actorID)
 	n.mu.Lock()
 	key, tracked := n.live[actorID]
-	if tracked {
+	slot, ok := n.slot[key]
+	// The NPC of an npcmaker's slot counts alive until its group takes
+	// its leave, in turn (see leaveGroup).
+	grouped := tracked && ok && slot.group != nil
+	if tracked && !grouped {
 		delete(n.live, actorID)
 		n.liveCount--
-	}
-	slot, ok := n.slot[key]
-	// leftSeq is the npcmaker's leave count once this NPC no longer
-	// counts alive; 0 for an NPC of no npcmaker.
-	var leftSeq int
-	if tracked && ok {
-		slot.form, slot.left, slot.leftID = form, left, actorID
-		n.slot[key] = slot
-		if g := slot.group; g != nil {
-			if slot.orphan {
-				g.orphansAlive--
-			}
-			g.left++
-			leftSeq = g.left
+		if ok {
+			slot.form, slot.left, slot.leftID = form, left, actorID
+			n.slot[key] = slot
 		}
 	}
 	n.mu.Unlock()
@@ -79,8 +72,9 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 	n.walker.StopRouteByID(actorID)
 
-	if g := slot.group; g != nil {
-		return func() { n.groupNPCDeleted(g, slot, leftSeq) }
+	if grouped {
+		leave := groupLeave{id: actorID, key: key, form: form, left: left}
+		return func() { n.leaveGroup(slot.group, leave) }
 	}
 
 	if slot.scripted {
@@ -102,26 +96,21 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 // groupNPCDeleted answers the NPC of an npcmaker's slot leaving the world:
 // the maker decides whether it respawns, then a database-tracked row
 // records a respawn time of its own when the spawn respawns at all, and a
-// spawn that never respawns drops its slot.
+// spawn that never respawns drops its slot. It runs in its group's turn
+// (see leaveGroup), slot as the NPC left it.
 //
 // An NPC that leaves during its slot's first placement, before the maker
 // counts it as one of its spawn's NPCs, is not reported to the maker, and
 // its slot stays, decayed, whatever the respawn delay. A spawn that never
 // respawns drops the slot of an NPC its maker armed a respawn for anyway
 // from its list: the slot lives on as an orphan.
-//
-// The hook sees its group's alive count as it was once this NPC left, the
-// NPCs that entered since counted in and those it took out itself counted
-// out, but not those that left on their own meanwhile: of several NPCs of
-// one npcmaker leaving at once, each on its own queue, only the last to
-// leave finds none left (leftSeq is g's leave count as this NPC left).
-func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo, leftSeq int) {
+func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 	if slot.orphan {
 		n.orphanNPCDeleted(slot)
 		return
 	}
 	if !slot.first {
-		scope := &hookScope{deleted: g, left: leftSeq}
+		scope := &hookScope{deleted: g}
 		g.behavior.NPCDeleted(g.in(scope), groupSpawn{g: g, i: slot.spawnIdx, scope: scope}, groupNPC{n: n, slot: slot, scope: scope})
 		n.mu.Lock()
 		scope.deleted = nil
@@ -146,11 +135,11 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo, leftSeq int) {
 	n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(*slot.entry), now)
 }
 
-// orphanNPCDeleted answers the NPC of an orphan slot leaving the
-// world: no maker hook runs, it no longer counts alive (RespawnHook took it
-// off as it left), a database-tracked row records a respawn time when the
-// spawn respawns at all, and the slot goes unless a respawn is armed for
-// it.
+// orphanNPCDeleted answers the NPC of an orphan slot leaving the world:
+// no maker hook runs, it no longer counts alive (its group took it off as
+// it took its leave), a database-tracked row records a respawn time when
+// the spawn respawns at all, and the slot goes unless a respawn is armed
+// for it.
 func (n *Npcs) orphanNPCDeleted(slot slotInfo) {
 	now := n.now()
 	n.mu.Lock()
@@ -164,6 +153,108 @@ func (n *Npcs) orphanNPCDeleted(slot slotInfo) {
 	if !n.respawn.Tracked(slot.key) {
 		n.dropSlotLocked(slot.key)
 	}
+}
+
+// groupLeave is an NPC of an npcmaker's slot that left the world, waiting
+// for its group to take its leave: the slot key it held and the look and
+// walk it left in.
+type groupLeave struct {
+	id   int32
+	key  task.SlotID
+	form *npc.Template
+	left leftNPC
+}
+
+// leaveGroup has g take the leave of the NPC that left, after every NPC of
+// g that left before it, one at a time: an NPC is out of g's alive count,
+// and its slot's maker hook and bookkeeping run, only once those of the
+// earlier ones are done, the later ones still counted alive, as decays
+// that run one after the other leave them.
+func (n *Npcs) leaveGroup(g *makerGroup, leave groupLeave) {
+	n.mu.Lock()
+	g.leaving = append(g.leaving, leave)
+	n.mu.Unlock()
+	n.drainLeaves(g)
+}
+
+// drainLeaves takes the leaves g has waiting, in order, unless another
+// goroutine is taking them: that one takes the new ones too. No caller
+// waits on another, so a hook that deletes an NPC of its own group never
+// waits on itself; an NPC-deleted hook runs the hooks of the NPCs it
+// deletes itself nested in it (see leaveNowIn).
+func (n *Npcs) drainLeaves(g *makerGroup) {
+	n.mu.Lock()
+	if g.draining {
+		n.mu.Unlock()
+		return
+	}
+	g.draining = true
+	done := false
+	defer func() {
+		// A hook that panicked leaves the rest to the next leave.
+		if !done {
+			n.mu.Lock()
+			g.draining = false
+			n.mu.Unlock()
+		}
+	}()
+	for len(g.leaving) > 0 {
+		next := g.leaving[0]
+		g.leaving = slices.Delete(g.leaving, 0, 1)
+		slot, ok := n.takeLeaveLocked(g, next)
+		n.mu.Unlock()
+		if ok {
+			n.groupNPCDeleted(g, slot)
+		}
+		n.mu.Lock()
+	}
+	g.draining = false
+	done = true
+	n.mu.Unlock()
+}
+
+// leaveNowIn takes the leave of g's NPC id, which a hook running in scope
+// just deleted, at once when that hook is g's NPC-deleted hook: that hook
+// runs in g's turn, so the NPC's own hook runs nested in it, before it
+// carries on. Any other caller has g take its leaves in turn.
+func (n *Npcs) leaveNowIn(g *makerGroup, id int32, scope *hookScope) {
+	n.mu.Lock()
+	i := slices.IndexFunc(g.leaving, func(l groupLeave) bool { return l.id == id })
+	if i < 0 || scope == nil || scope.deleted != g {
+		n.mu.Unlock()
+		n.drainLeaves(g)
+		return
+	}
+	leave := g.leaving[i]
+	g.leaving = slices.Delete(g.leaving, i, i+1)
+	slot, ok := n.takeLeaveLocked(g, leave)
+	n.mu.Unlock()
+	if ok {
+		n.groupNPCDeleted(g, slot)
+	}
+}
+
+// takeLeaveLocked takes leave's NPC out of g's alive count, recording on
+// its slot the look and walk it left in, and returns that slot; none when
+// its slot no longer counts it alive (a DeleteAll, DeleteNPCs or
+// DespawnAll took it since, its maker hook never to run). The caller holds
+// n.mu.
+func (n *Npcs) takeLeaveLocked(g *makerGroup, leave groupLeave) (slotInfo, bool) {
+	if key, ok := n.live[leave.id]; !ok || key != leave.key {
+		return slotInfo{}, false
+	}
+	delete(n.live, leave.id)
+	n.liveCount--
+	slot, ok := n.slot[leave.key]
+	if !ok {
+		return slotInfo{}, false
+	}
+	slot.form, slot.left, slot.leftID = leave.form, leave.left, leave.id
+	n.slot[leave.key] = slot
+	if slot.orphan {
+		g.orphansAlive--
+	}
+	return slot, true
 }
 
 // unlistGroupSlotLocked takes the slot of g off its spawn's list: dropped,
