@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -26,12 +27,28 @@ func (cubicHandler) Use(cast Cast) {
 }
 
 func (cubicHandler) UseResult(cast Cast) Result {
+	// A caster dead or playing dead summons nothing and keeps its shot.
+	if alikeDead(cast.Caster) {
+		return Result{}
+	}
 	if !cast.Skill.IsCubic {
+		// The servitor spawn spends the spiritshot itself, and only when
+		// the servitor goes through.
 		if summoner, ok := cast.Caster.(servitorSummoner); ok {
 			summoner.SummonServitor(cast.Skill)
 		}
 		return Result{}
 	}
+	result := addCubics(cast)
+	if cast.Caster != nil && cast.Caster.Kind() == actor.KindPlayer {
+		dischargeSpiritshot(cast)
+	}
+	return result
+}
+
+// addCubics admits the cast's cubic: on every targeted player for a mass
+// cubic, else on the caster.
+func addCubics(cast Cast) Result {
 	id := cubic.ID(cast.Skill.NpcID)
 
 	if len(cast.Targets) > 1 {

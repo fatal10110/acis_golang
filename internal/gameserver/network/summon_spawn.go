@@ -530,6 +530,8 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if offBattlefield {
 		servitor.Vanish()
 	}
+	// Only a summon that went through spends the cast's spiritshot.
+	live.Character.SpendSpiritshot(def.StaticReuse)
 	return true
 }
 

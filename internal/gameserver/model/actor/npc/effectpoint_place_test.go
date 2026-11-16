@@ -30,7 +30,7 @@ func TestEffectPointRemovedWhileSpawningLeavesNoZoneOccupant(t *testing.T) {
 	ix, water := waterIndex(t)
 	w := world.New()
 	q := sim.NewInline(time.Unix(0, 0)).NewQueue("point")
-	ep, err := NewEffectPoint(7, &Template{ID: 13018, Type: "EffectPoint", RunSpeed: 20, WalkSpeed: 20}, 1, q, nil)
+	ep, err := NewEffectPoint(7, &Template{ID: 13018, Type: "EffectPoint", RunSpeed: 20, WalkSpeed: 20}, 1, q)
 	if err != nil {
 		t.Fatal(err)
 	}

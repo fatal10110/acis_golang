@@ -64,12 +64,10 @@ type folkCombat struct {
 
 	effects *effect.List
 
-	// statMu guards statCalcs, its slots and passives; each Calculator
-	// guards its own mods. A Stat without a slot computes from passives,
-	// the template's shared Mods.
+	// statMu guards statCalcs and its slots; each Calculator guards its own
+	// mods. A Stat without a slot computes from the builtin funcs alone.
 	statMu    sync.RWMutex
 	statCalcs *[stat.Count]*effect.Calculator
-	passives  *effect.StatMods
 	// speedMu orders move-speed hand-offs to a walking NPC's movement.
 	speedMu sync.Mutex
 
@@ -151,21 +149,18 @@ type FolkRemover interface {
 	RemoveFolk(f *Folk)
 }
 
-// folkAdmits reports whether a civilian NPC holds e: only plain buffs and
-// debuffs land on one; every other effect is dropped before it starts.
-func folkAdmits(e *effect.Effect) bool {
-	return e.Type == effect.TypeBuff || e.Type == effect.TypeDebuff
+// admits reports whether the NPC holds e: a control tower holds every
+// effect; any other civilian NPC only plain buffs and debuffs, every other
+// effect being dropped before it starts.
+func (f *Folk) admits(e *effect.Effect) bool {
+	return f.Tower() || e.Type == effect.TypeBuff || e.Type == effect.TypeDebuff
 }
 
-// initCombat settles the NPC's stats from its template passives and fills
-// its HP and MP.
-func (f *Folk) initCombat(passives *compiledPassives) {
-	f.effects = effect.NewList(f, effect.WithAdmission(folkAdmits))
+// initCombat fills the NPC's HP and MP. Its template passives give it no
+// stats: they only count for an attackable NPC.
+func (f *Folk) initCombat() {
+	f.effects = effect.NewList(f, effect.WithAdmission(f.admits))
 	f.running.Store(true)
-	_, byStat := passives.attached(f.ConditionActor())
-	f.statMu.Lock()
-	f.passives = byStat
-	f.statMu.Unlock()
 	f.hp = float64(f.MaxHP())
 	f.mp = math.Trunc(f.MaxMPValue())
 	f.hpBar.Calibrate(float64(f.MaxHP()))
@@ -189,7 +184,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	f.Scratch().setLife(f)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	f.resolveWeapon(rt.Items)
-	f.effects = effect.NewList(f, effect.WithEnv(rt.Effects), effect.WithAdmission(folkAdmits))
+	f.effects = effect.NewList(f, effect.WithEnv(rt.Effects), effect.WithAdmission(f.admits))
 	f.effects.SetQueue(rt.Queue)
 	f.keepTerritory()
 	return nil
@@ -204,11 +199,11 @@ func (f *Folk) emit(ev event.Event) {
 	}
 }
 
-// OnInactiveRegion stops every effect the NPC holds once no player is near
-// its region, and puts its AI to sleep unless it is a noSleepMode NPC or
-// stands outside its territory. The departing player's goroutine calls it,
-// so the stop runs on the NPC's own queue, and only if the region is still
-// inactive then.
+// OnInactiveRegion stops every effect the NPC holds and clears its threat
+// table once no player is near its region, and puts its AI to sleep unless
+// it is a noSleepMode NPC or stands outside its territory. The departing
+// player's goroutine calls it, so the reset runs on the NPC's own queue,
+// and only if the region is still inactive then.
 func (f *Folk) OnInactiveRegion() {
 	f.aiSleep.settle(f.world, f)
 	if f.queue == nil {
@@ -221,6 +216,7 @@ func (f *Folk) OnInactiveRegion() {
 			}
 		}
 		f.effects.StopAll()
+		f.fight.aggro.Clear()
 	})
 }
 

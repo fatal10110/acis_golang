@@ -47,9 +47,10 @@ func TestFolkAttachRefusesNilQueue(t *testing.T) {
 }
 
 // TestFolkInactiveRegionStopsEffects follows Npc.onInactiveRegion
-// (stopAllEffects): a debuffed civilian NPC whose region loses its last
-// player drops its effects, unless a player wakes the region again before
-// the stop posted to the NPC's queue runs.
+// (stopAllEffects, NpcAI.setBackToPeace): a debuffed civilian NPC whose
+// region loses its last player drops its effects and forgets its
+// attackers, unless a player wakes the region again before the reset
+// posted to the NPC's queue runs.
 func TestFolkInactiveRegionStopsEffects(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -78,6 +79,7 @@ func TestFolkInactiveRegionStopsEffects(t *testing.T) {
 			if got := len(f.EffectList().All()); got != 1 {
 				t.Fatalf("merchant holds %d effects after the debuff, want 1", got)
 			}
+			f.Aggro().AddDamage(visitor, 10, 0)
 
 			w.Despawn(visitor)
 			if _, active := w.RegionActivity(f); active {
@@ -90,6 +92,9 @@ func TestFolkInactiveRegionStopsEffects(t *testing.T) {
 
 			if got := len(f.EffectList().All()); got != tc.wantHeld {
 				t.Fatalf("merchant holds %d effects after the region stop ran, want %d", got, tc.wantHeld)
+			}
+			if forgot := f.Aggro().IsEmpty(); forgot == tc.reactivate {
+				t.Fatalf("merchant's threat table empty = %v after the region stop ran, want %v", forgot, !tc.reactivate)
 			}
 		})
 	}

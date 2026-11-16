@@ -138,23 +138,14 @@ type Folk struct {
 	siegePreHour atomic.Int32
 }
 
-// NewFolk builds a civilian NPC from inst. skills, when provided, resolves
-// the template's passive skills into its stats. Attach gives it the runtime
-// it fights with before it is published.
-func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
+// NewFolk builds a civilian NPC from inst. Attach gives it the runtime it
+// fights with before it is published.
+func NewFolk(inst *Instance) (*Folk, error) {
 	if inst == nil || inst.Template == nil {
 		return nil, errors.New("npc: nil folk instance")
 	}
 	if !FolkKind(inst) {
 		return nil, fmt.Errorf("npc %d: instance type %q is not a folk type", inst.Template.ID, hostileKind(inst))
-	}
-	var lookup skillDefinitions
-	if len(skills) > 0 {
-		lookup = skills[0]
-	}
-	passives, err := inst.Template.passiveMods(lookup)
-	if err != nil {
-		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
 	soul, spirit, err := shotCounts(inst.Template)
 	if err != nil {
@@ -165,7 +156,7 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()
 	f.fight.aggro = attackable.NewThreatTable(f, f.now)
-	f.initCombat(passives)
+	f.initCombat()
 	f.siegePreHour.Store(DefaultSiegePreHour)
 	return f, nil
 }

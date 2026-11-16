@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -465,12 +466,13 @@ func (f *Folk) cancelFollow() {
 }
 
 // denyAIAction reports a state in which the NPC's AI does nothing: a
-// teleport under way, death or paralysis. The stun, sleep, fear and
-// hold-until-attacked states never hold here: folkAdmits keeps every
-// effect but a plain buff or debuff off the NPC, and those carry no such
-// flag.
+// teleport under way, death, paralysis, a stun, a sleep, fear or a
+// hold-until-attacked. Only a control tower holds the effects behind the
+// last four.
 func (f *Folk) denyAIAction() bool {
-	return f.AlikeDead() || f.Paralyzed() || (f.motion != nil && f.motion.teleporting.Load())
+	return f.AlikeDead() || f.Paralyzed() || f.Stunned() || f.Afraid() ||
+		f.effects.IsAffected(effect.FlagSleep) || f.effects.IsAffected(effect.FlagMeditating) ||
+		(f.motion != nil && f.motion.teleporting.Load())
 }
 
 // outOfReach reports whether target stands at castRange plus both bodies,
@@ -634,7 +636,7 @@ func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 // ConsumeHP takes a skill's HP cost from f, never below its floor. The
 // cost is a consumption, not a hit: it raises no attacked hook and makes no
 // clan call.
-func (f *Folk) ConsumeHP(amount float64) { f.loseHP(amount, f, modelskill.Ref{}, false) }
+func (f *Folk) ConsumeHP(amount float64) { f.loseHP(amount, f, modelskill.Ref{}, lossCost) }
 
 // SkillDisabled reports whether f may not use the skill of reuse key key.
 // With no skill waiting for its reuse, it may. Otherwise a paralysis locks

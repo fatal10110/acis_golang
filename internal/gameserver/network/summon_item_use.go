@@ -271,7 +271,7 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 	if err != nil {
 		return nil
 	}
-	decoration, err := npc.NewDecoration(instance, title, l.skills)
+	decoration, err := npc.NewDecoration(instance, title)
 	if err != nil {
 		return nil
 	}

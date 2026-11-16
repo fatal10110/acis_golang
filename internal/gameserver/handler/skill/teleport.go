@@ -38,8 +38,9 @@ func (instantJumpHandler) Use(cast Cast) {
 	radians := math.Pi * degrees / 180
 
 	tx, ty, tz := target.Position()
-	x := tx + int(25*math.Cos(radians))
-	y := ty + int(25*math.Sin(radians))
+	// The landing truncates the offset coordinate as a whole, toward zero.
+	x := int(float64(tx) + 25*math.Cos(radians))
+	y := int(float64(ty) + 25*math.Sin(radians))
 
 	caster.AbortAll(false)
 	caster.SetXYZ(x, y, tz)

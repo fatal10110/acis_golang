@@ -15,8 +15,8 @@ import (
 
 var _ effect.StatOwner = (*Folk)(nil)
 
-// statCalc returns s's Calculator, creating it from s's template passives
-// and builtin finalize step on first use.
+// statCalc returns s's Calculator, creating it with s's builtin finalize
+// step on first use.
 func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
 	f.statMu.Lock()
 	defer f.statMu.Unlock()
@@ -26,7 +26,7 @@ func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
 	if calc := f.statCalcs[s]; calc != nil {
 		return calc
 	}
-	calc := f.passives.NewCalculator(s, f.builtin(s))
+	calc := effect.NewCalculator(f.builtin(s))
 	f.statCalcs[s] = &calc
 	return &calc
 }
@@ -40,15 +40,8 @@ func (f *Folk) builtin(s stat.Stat) funcs.Func {
 	return defaultBuiltin(s)
 }
 
-// ownerCalcs returns the NPC's stat slots, with one created for every Stat
-// a template passive of owner modifies so that its Mods can be dropped.
-func (f *Folk) ownerCalcs(owner effect.ModOwner) [stat.Count]*effect.Calculator {
-	f.statMu.RLock()
-	passives := f.passives
-	f.statMu.RUnlock()
-	for s := range passives.StatsOwnedBy(owner) {
-		f.statCalc(s)
-	}
+// calcSlots returns the NPC's stat slots.
+func (f *Folk) calcSlots() [stat.Count]*effect.Calculator {
 	f.statMu.RLock()
 	defer f.statMu.RUnlock()
 	if f.statCalcs == nil {
@@ -57,9 +50,8 @@ func (f *Folk) ownerCalcs(owner effect.ModOwner) [stat.Count]*effect.Calculator 
 	return *f.statCalcs
 }
 
-// CalcStat finalizes base for s through the NPC's builtin funcs, template
-// passives and the funcs of the effects it holds, against no target and no
-// skill.
+// CalcStat finalizes base for s through the NPC's builtin funcs and the
+// funcs of the effects it holds, against no target and no skill.
 func (f *Folk) CalcStat(s stat.Stat, base float64) float64 {
 	return f.calcFor(s, base, nil, nil)
 }
@@ -73,14 +65,12 @@ func (f *Folk) calcFor(s stat.Stat, base float64, target conditions.Actor, skill
 	if f.statCalcs != nil {
 		calc = f.statCalcs[s]
 	}
-	passives := f.passives
 	f.statMu.RUnlock()
-	var value float64
-	if calc != nil {
-		value = calc.Calc(f.statActor(), base, target, skill)
-	} else {
-		value = passives.Calc(s, f.builtin(s), f.statActor(), base, target, skill)
+	if calc == nil {
+		bare := effect.NewCalculator(f.builtin(s))
+		calc = &bare
 	}
+	value := calc.Calc(f.statActor(), base, target, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -112,7 +102,7 @@ func (f *Folk) RemoveStatsByOwner(owner effect.ModOwner) {
 		return
 	}
 	var modified []stat.Stat
-	for s, calc := range f.ownerCalcs(owner) {
+	for s, calc := range f.calcSlots() {
 		if calc != nil && calc.RemoveOwner(owner) > 0 {
 			modified = append(modified, stat.Stat(s))
 		}
