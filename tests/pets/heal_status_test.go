@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -60,7 +61,10 @@ func bootOwnerHealer(t *testing.T) (*petWorld, *summon.Actor) {
 }
 
 // TestOwnerHealOnPetRefreshesPetWindow has the owner heal, then mana heal,
-// its wounded, drained wolf. The player's hit first republishes the pet's
+// its wounded, drained wolf. A heal tells only a player target what it
+// restored (Heal.java:47-53), so the owner reads no HP message; a mana heal
+// tells any target (ManaHeal.java), and the wolf forwards it to its owner
+// (Summon.sendPacket), as S2_MP_RESTORED_BY_S1 with the owner's name. The player's hit first republishes the pet's
 // status before the restore lands (CreatureCast.onMagicHitTimer,
 // CreatureCast.java:274-288 -> Summon.updateAndBroadcastStatus): one
 // PetStatusUpdate with the old values to the owner and one NpcInfo to a
@@ -70,12 +74,13 @@ func bootOwnerHealer(t *testing.T) (*petWorld, *summon.Actor) {
 func TestOwnerHealOnPetRefreshesPetWindow(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name  string
-		skill int32
-		step  petVitals
+		name    string
+		skill   int32
+		step    petVitals
+		message int
 	}{
 		{name: "heal", skill: ownerHealSkill, step: petVitals{hp: ownerHealPower}},
-		{name: "mana heal", skill: ownerManaHealSkill, step: petVitals{mp: ownerManaHealPower}},
+		{name: "mana heal", skill: ownerManaHealSkill, step: petVitals{mp: ownerManaHealPower}, message: serverpackets.SystemMessageS2MPRestoredByS1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -94,7 +99,8 @@ func TestOwnerHealOnPetRefreshesPetWindow(t *testing.T) {
 			h.srv.AdvanceUntil(t, "the restore landing on the pet", func() bool { return currentPetVitals(pet) == want })
 
 			var updates []petVitals
-			for _, frame := range drainFrames(t, h.client) {
+			frames := drainFrames(t, h.client)
+			for _, frame := range frames {
 				if frame[0] == serverpackets.OpcodePetStatusUpdate {
 					updates = append(updates, readPetStatusVitals(t, frame))
 				}
@@ -102,10 +108,52 @@ func TestOwnerHealOnPetRefreshesPetWindow(t *testing.T) {
 			if len(updates) != 2 || updates[0] != before || updates[1] != want {
 				t.Fatalf("owner PetStatusUpdates = %+v, want the pre-skill %+v then %+v", updates, before, want)
 			}
+			assertPetRestoreMessage(t, frames, tc.message, int(tc.step.mp))
 			if n := countNPCInfoFor(drainFrames(t, watcher.client), pet.ObjectID()); n != 2 {
 				t.Fatalf("watcher got %d pet NpcInfo, want 2 (pre-skill refresh, then the restore)", n)
 			}
 		})
+	}
+}
+
+// assertPetRestoreMessage requires frames to hold exactly one restored
+// system message: messageID carrying the owner's name and amount, or none at
+// all when messageID is 0.
+func assertPetRestoreMessage(t *testing.T, frames [][]byte, messageID, amount int) {
+	t.Helper()
+	var got [][]byte
+	for _, id := range []int{
+		serverpackets.SystemMessageS1HPRestored, serverpackets.SystemMessageS2HPRestoredByS1,
+		serverpackets.SystemMessageS1MPRestored, serverpackets.SystemMessageS2MPRestoredByS1,
+	} {
+		if f := findSystemMessage(t, frames, id); f != nil {
+			got = append(got, f)
+		}
+	}
+	if messageID == 0 {
+		if len(got) != 0 {
+			t.Fatalf("owner got restored message %d, want none", systemMessageID(t, got[0]))
+		}
+		return
+	}
+	if len(got) != 1 {
+		t.Fatalf("owner got %d restored messages, want one %d", len(got), messageID)
+	}
+	r := wire.NewReader(got[0][1:])
+	if id := r.ReadInt32(); id != int32(messageID) {
+		t.Fatalf("restored message = %d, want %d", id, messageID)
+	}
+	if n := r.ReadInt32(); n != 2 {
+		t.Fatalf("restored message params = %d, want 2", n)
+	}
+	if typ, name := r.ReadInt32(), r.ReadString(); typ != serverpackets.SystemMessageParamText || name != "Owner" {
+		t.Fatalf("restored message name param = %d %q, want text \"Owner\"", typ, name)
+	}
+	if typ, n := r.ReadInt32(), r.ReadInt32(); typ != serverpackets.SystemMessageParamNumber || n != int32(amount) {
+		t.Fatalf("restored message amount param = %d %d, want number %d", typ, n, amount)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read restored message: %v", err)
 	}
 }
 
