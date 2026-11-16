@@ -1,11 +1,10 @@
 package antharas
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 )
 
 // heartID is the Heart of Warding; portalStone the item an entrant gives
@@ -13,14 +12,6 @@ import (
 const (
 	heartID     = 13001
 	portalStone = 3865
-)
-
-// The global memo keys the Heart reads the small, normal and large
-// Antharas under.
-const (
-	gmID1 = 4
-	gmID2 = 5
-	gmID3 = 6
 )
 
 // The Heart's script memory.
@@ -90,16 +81,18 @@ func heartEvent(s *script.Script, e script.Event) string {
 
 	if strings.EqualFold(e.Name, "enter") {
 		n, player := e.NPC, e.Player
-		i0 := s.GlobalMemo().Int(strconv.Itoa(gmID1), -1)
-		i1 := s.GlobalMemo().Int(strconv.Itoa(gmID2), -1)
-		i2 := s.GlobalMemo().Int(strconv.Itoa(gmID3), -1)
+		// The Heart reads the keys the lair's Antharas spawns store
+		// themselves under (owner-approved divergence, #4682).
+		i0 := s.GlobalMemo().Int(bossmemo.AntharasSmall, -1)
+		i1 := s.GlobalMemo().Int(bossmemo.AntharasNormal, -1)
+		i2 := s.GlobalMemo().Int(bossmemo.AntharasLarge, -1)
 
 		if i0 != -1 && i1 != -1 && i2 != -1 {
-			c0 := antharasOf(s, gmID1)
-			c1 := antharasOf(s, gmID2)
-			c2 := antharasOf(s, gmID3)
+			c0 := antharasOf(s, bossmemo.AntharasSmall)
+			c1 := antharasOf(s, bossmemo.AntharasNormal)
+			c2 := antharasOf(s, bossmemo.AntharasLarge)
 
-			if !c0.Dead() && !c1.Dead() && !c2.Dead() {
+			if c0 != nil && c1 != nil && c2 != nil && !c0.Dead() && !c1.Dead() && !c2.Dead() {
 				c0Value := c0.DBValue()
 				c1Value := c1.DBValue()
 				c2Value := c2.DBValue()
@@ -141,14 +134,10 @@ func heartEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// antharasOf returns the NPC whose object id the global memo key holds.
-// The key must name a creature in the world, and that creature an NPC:
-// otherwise the hook aborts, answering nothing.
-func antharasOf(s *script.Script, gmID int) *script.NPC {
-	key := strconv.Itoa(gmID)
-	c, ok := s.GlobalMemo().Creature(key).(*script.NPC)
-	if !ok {
-		panic(fmt.Sprintf("antharas: global memo %q names no NPC", key))
-	}
+// antharasOf returns the NPC whose object id the global memo key holds,
+// nil when the key names no NPC in the world (owner-approved: the entry
+// treats it as a missing Antharas, #4682).
+func antharasOf(s *script.Script, key string) *script.NPC {
+	c, _ := s.GlobalMemo().Creature(key).(*script.NPC)
 	return c
 }

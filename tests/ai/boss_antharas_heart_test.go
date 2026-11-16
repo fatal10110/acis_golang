@@ -49,10 +49,10 @@ var heartSizes = []struct {
 // the Heart, at its shipped spot.
 var heartCharacter = location.Location{X: 154595, Y: 121097, Z: -3757}
 
-// heartSpawnlist is the lair's npcmaker with the three Antharas sizes under
-// global memo keys 4, 5 and 6, the keys the Heart reads, the exit cubes'
-// maker, and the Heart's shipped maker.
-const heartSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
+// heartLair is the lair's npcmaker with the three Antharas sizes under
+// their shipped GM_ID global memo keys 1, 9 and 10, and the exit cubes'
+// maker.
+const heartLair = `<?xml version="1.0" encoding="utf-8"?>
 <list>
 	<territory name="antaras_2521_01" minZ="-7712" maxZ="-6212">
 		<node x="175201" y="110789"/>
@@ -69,17 +69,17 @@ const heartSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 		</ai>
 		<npc id="29066" pos="184500;114835;-7678;0" total="1" respawn="264hour" respawnRand="0sec" dbName="antaras_min" dbSaving="DEATH_TIME;PARAMETERS;POS">
 			<ai>
-				<set name="GM_ID" val="4"/>
+				<set name="GM_ID" val="1"/>
 			</ai>
 		</npc>
 		<npc id="29067" pos="184500;114835;-7678;0" total="1" respawn="264hour" respawnRand="0sec" dbName="antaras_normal" dbSaving="DEATH_TIME;PARAMETERS;POS">
 			<ai>
-				<set name="GM_ID" val="5"/>
+				<set name="GM_ID" val="9"/>
 			</ai>
 		</npc>
 		<npc id="29068" pos="184500;114835;-7678;0" total="1" respawn="264hour" respawnRand="0sec" dbName="antaras_max" dbSaving="DEATH_TIME;PARAMETERS;POS">
 			<ai>
-				<set name="GM_ID" val="6"/>
+				<set name="GM_ID" val="10"/>
 			</ai>
 		</npc>
 	</npcmaker>
@@ -89,6 +89,11 @@ const heartSpawnlist = `<?xml version="1.0" encoding="utf-8"?>
 		</ai>
 		<npc id="31859" pos="177615;114941;-7709;0" total="20" respawn="no"/>
 	</npcmaker>
+</list>`
+
+// heartMaker is the Heart's shipped maker.
+const heartMaker = `<?xml version="1.0" encoding="utf-8"?>
+<list>
 	<territory name="giran04_npc2421_03" minZ="-3856" maxZ="-3556">
 		<node x="154556" y="120988"/>
 		<node x="154756" y="120988"/>
@@ -121,11 +126,17 @@ func heartItems() *item.Table {
 	}))
 }
 
-// bootHeart boots the Heart and Antharas's lair backed by the spawn_data
-// table, after saving rows as live or dead rows of the Antharas sizes,
-// every script draw 0, and the character entering the world beside the
-// Heart holding stones Portal Stones.
+// bootHeart boots the Heart and the heartLair fixture of Antharas's lair
+// backed by the spawn_data table, after saving rows as live or dead rows of
+// the Antharas sizes, every script draw 0, and the character entering the
+// world beside the Heart holding stones Portal Stones.
 func bootHeart(t *testing.T, rows map[string]*spawn.State, stones int32) *baiumWorld {
+	t.Helper()
+	return bootHeartLair(t, heartLair, rows, stones)
+}
+
+// bootHeartLair is bootHeart with the lair's spawnlist read from lair.
+func bootHeartLair(t *testing.T, lair string, rows map[string]*spawn.State, stones int32) *baiumWorld {
 	t.Helper()
 	if len(rows) > 0 {
 		if err := gamesql.NewSpawnStore(sqltest.SharedDB(t)).SaveStates(context.Background(), rows); err != nil {
@@ -134,8 +145,10 @@ func bootHeart(t *testing.T, rows map[string]*spawn.State, stones int32) *baiumW
 	}
 	w := &baiumWorld{start: time.Now()}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "heart.xml"), []byte(heartSpawnlist), 0o644); err != nil {
-		t.Fatal(err)
+	for name, list := range map[string]string{"lair.xml": lair, "heart.xml": heartMaker} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(list), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	spawns, err := gamexml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {

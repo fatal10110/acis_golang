@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -91,7 +92,7 @@ func FrintezzaTeleporter() script.Script {
 		Hooks: base.With(script.Hooks{
 			OnCreated: func(s *script.Script, e script.Created) {
 				n := e.NPC
-				c0 := memoNPC(s, "4")
+				c0 := memoNPC(s, bossmemo.Frintezza)
 
 				if c0 == nil {
 					n.SetInt(script.SlotIntAI0, 0)
@@ -117,8 +118,8 @@ func FrintezzaTeleporter() script.Script {
 				n := e.NPC
 				switch {
 				case strings.EqualFold(e.Name, "2006"):
-					c0 := memoNPC(s, "4")
-					c2 := memoNPC(s, "5")
+					c0 := memoNPC(s, bossmemo.Frintezza)
+					c2 := memoNPC(s, bossmemo.FrintezzaFollower)
 					if c0 != nil && c2 != nil && c0.DBValue() >= 2 && c2.DBValue() >= 2 {
 						return base.Timer(s, e)
 					}
@@ -127,7 +128,7 @@ func FrintezzaTeleporter() script.Script {
 
 					s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 				case strings.EqualFold(e.Name, "2001"):
-					c0 := memoNPC(s, "4")
+					c0 := memoNPC(s, bossmemo.Frintezza)
 					if c0 != nil && c0.DBValue() < 2 {
 						n.SetInt(script.SlotIntAI0, 0)
 						s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
@@ -136,15 +137,15 @@ func FrintezzaTeleporter() script.Script {
 
 						resetTomb(s)
 
-						if c1 := memoNPC(s, "5"); c1 != nil {
+						if c1 := memoNPC(s, bossmemo.FrintezzaFollower); c1 != nil {
 							s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 						}
 
 						s.StartTimer("5000", n, nil, 30*60*1000*time.Millisecond)
 					}
 				case strings.EqualFold(e.Name, "5000"):
-					c0 := memoNPC(s, "4")
-					c2 := memoNPC(s, "5")
+					c0 := memoNPC(s, bossmemo.Frintezza)
+					c2 := memoNPC(s, bossmemo.FrintezzaFollower)
 					if c0 != nil && c2 != nil {
 						if c0.DBValue() == 0 && c2.DBValue() == 0 {
 							n.SetInt(script.SlotIntAI0, 0)
@@ -229,7 +230,7 @@ func FrintezzaTeleporter() script.Script {
 				return base.Timer(s, e)
 			},
 			OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
-				c0 := memoNPC(s, "4")
+				c0 := memoNPC(s, bossmemo.Frintezza)
 				if c0 != nil && e.EventID == c0.ObjectID() {
 					switch e.Arg1 {
 					case 0:
@@ -258,9 +259,9 @@ func (t *teleporter) event(s *script.Script, e script.Event) string {
 			return htmltext
 		}
 
-		c1 := memoNPC(s, "4")
-		c2 := memoNPC(s, "5")
-		c3 := memoNPC(s, "6")
+		c1 := memoNPC(s, bossmemo.Frintezza)
+		c2 := memoNPC(s, bossmemo.FrintezzaFollower)
+		c3 := memoNPC(s, bossmemo.FrintezzaTransform)
 
 		if n.Int(script.SlotIntAI0) != 0 {
 			if c1 == nil || c3 == nil {
@@ -359,8 +360,8 @@ func (t *teleporter) admit(s *script.Script, n *script.NPC, player *script.Playe
 // tombAwake reports whether Frintezza and his follower are both named and
 // Frintezza's db value is 2 or over, which ends the countdown.
 func tombAwake(s *script.Script) bool {
-	c0 := memoNPC(s, "4")
-	c2 := memoNPC(s, "5")
+	c0 := memoNPC(s, bossmemo.Frintezza)
+	c2 := memoNPC(s, bossmemo.FrintezzaFollower)
 	return c0 != nil && c2 != nil && c0.DBValue() >= 2
 }
 

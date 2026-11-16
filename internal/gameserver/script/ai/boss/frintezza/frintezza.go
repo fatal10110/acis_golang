@@ -1,18 +1,15 @@
 package frintezza
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
-
-// frintezzaGMID is the global memo key that holds Frintezza's object id.
-const frintezzaGMID = 4
 
 // Frintezza's songs, all cast on himself.
 func music() skill.Ref          { return skill.Ref{ID: 5006, Level: 1} }
@@ -52,19 +49,19 @@ func Frintezza() script.Script {
 		OnCreated: func(s *script.Script, e script.Created) {
 			n := e.NPC
 			ai1 := n.Int(script.SlotIntAI1)
-			c0 := s.GlobalMemo().Creature(strconv.Itoa(frintezzaGMID))
+			c0 := s.GlobalMemo().Creature(bossmemo.Frintezza)
 			if c0 == nil {
-				s.GlobalMemo().Set(strconv.Itoa(frintezzaGMID), int(n.ObjectID()))
+				s.GlobalMemo().Set(bossmemo.Frintezza, int(n.ObjectID()))
 			}
 			switch {
 			case !n.DBLoaded():
 				n.SetDBValue(0)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1001", 0, 0)
 				setTombDoors(s, 0)
-				if c1 := memoNPC(s, "5"); c1 != nil {
+				if c1 := memoNPC(s, bossmemo.FrintezzaFollower); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
-				if c1 := memoNPC(s, "6"); c1 != nil {
+				if c1 := memoNPC(s, bossmemo.FrintezzaTransform); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
 			case n.DBValue() == 1:
@@ -122,7 +119,7 @@ func Frintezza() script.Script {
 			case strings.EqualFold(e.Name, "1010"):
 				s.StartTimer("1011", n, nil, 3500*time.Millisecond)
 			case strings.EqualFold(e.Name, "1011"):
-				if c0 := memoNPC(s, "5"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 4, 0)
 					n.SetDBValue(4)
 				}
@@ -133,7 +130,7 @@ func Frintezza() script.Script {
 				s.StartTimer("1013", n, nil, 3000*time.Millisecond)
 			case strings.EqualFold(e.Name, "1500"):
 				s.SendScriptEvent(n, n.ObjectID(), 3, 0)
-				if c0 := memoNPC(s, "5"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 3, 0)
 				}
 			case strings.EqualFold(e.Name, "2000"):
@@ -167,7 +164,7 @@ func Frintezza() script.Script {
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
-			if c0 := memoNPC(s, "5"); c0 != nil && e.EventID == c0.ObjectID() {
+			if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil && e.EventID == c0.ObjectID() {
 				switch e.Arg1 {
 				case 5:
 					n.SetDBValue(5)
@@ -196,7 +193,7 @@ func Frintezza() script.Script {
 			}
 			switch e.Arg1 {
 			case 0:
-				if memoNPC(s, "5") == nil || memoNPC(s, "6") == nil {
+				if memoNPC(s, bossmemo.FrintezzaFollower) == nil || memoNPC(s, bossmemo.FrintezzaTransform) == nil {
 					return
 				}
 				setTombDoors(s, 0)
@@ -206,12 +203,12 @@ func Frintezza() script.Script {
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1001", 0, 0)
 			case 1:
 				n.SetDBValue(1)
-				if c0 := memoNPC(s, "5"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 1, 0)
 				}
 			case 2:
 				n.SetDBValue(2)
-				if c0 := memoNPC(s, "5"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 2, 0)
 				}
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1000", 0, 0)
@@ -250,7 +247,7 @@ func Frintezza() script.Script {
 		},
 		OnMyDying: func(s *script.Script, e script.MyDying) {
 			n := e.NPC
-			s.GlobalMemo().Remove(strconv.Itoa(frintezzaGMID))
+			s.GlobalMemo().Remove(bossmemo.Frintezza)
 			setTombDoors(s, 0)
 			n.SetDBValue(0)
 			s.Spawner().SendMakerEvent("frintessa_teleportcuve", "1001", 0, 0)
