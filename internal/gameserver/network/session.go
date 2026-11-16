@@ -185,6 +185,16 @@ func (s *Session) Evict() {
 	s.conn.closeLater()
 }
 
+// evictedNow reports whether the session has been evicted.
+func (s *Session) evictedNow() bool {
+	select {
+	case <-s.evicted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Close is Evict, then waits until the connection is closed: a stopping
 // server drains every client's writer before it goes on.
 func (s *Session) Close() {

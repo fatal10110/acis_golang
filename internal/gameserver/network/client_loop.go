@@ -91,6 +91,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			return
 		}
+		// An evicted session serves its client nothing more: its last
+		// frame is queued, and the connection closes once that is flushed,
+		// however long a client that stopped reading keeps it waiting.
+		if session.evictedNow() {
+			return
+		}
 		if len(payload) == 0 && client.State() != StateConnected {
 			// A frame with no body is skipped unread, and the client waits
 			// on no answer to it. Before authentication gateFrame still
