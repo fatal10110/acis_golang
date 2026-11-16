@@ -117,13 +117,14 @@ func (t *Table) PointIndexAt(loc location.Location) int {
 	return -1
 }
 
-// CalculatedPoint resolves the restart point that applies to a creature of
-// the given race standing at loc: an area's class restriction takes
-// priority over the region's general restart point, and a point banning
-// race redirects to its alternate point.
-func (t *Table) CalculatedPoint(loc location.Location, race player.Race) (Point, bool) {
+// CalculatedPoint resolves the restart point that applies to a creature
+// standing at loc: an area's restriction for classRace, the race of the
+// class it currently plays, takes priority over the region's general
+// restart point, and a point banning baseRace, the race it was created as,
+// redirects to its alternate point.
+func (t *Table) CalculatedPoint(loc location.Location, classRace, baseRace player.Race) (Point, bool) {
 	if area, ok := t.AreaAt(loc); ok {
-		name, ok := area.ClassRestriction(race)
+		name, ok := area.ClassRestriction(classRace)
 		if !ok {
 			return Point{}, false
 		}
@@ -134,18 +135,18 @@ func (t *Table) CalculatedPoint(loc location.Location, race player.Race) (Point,
 	if !ok {
 		return Point{}, false
 	}
-	if point.HasBannedRace && point.BannedRace == race {
+	if point.HasBannedRace && point.BannedRace == baseRace {
 		return t.PointByName(point.BannedPoint)
 	}
 	return point, true
 }
 
-// NearestLocation resolves the destination a creature of the given race and
-// karma lands on when restarting at loc: a random point from the resolved
-// restart point's chaotic list when karma is positive, otherwise from its
-// regular list.
-func (t *Table) NearestLocation(loc location.Location, race player.Race, karma int) (location.Location, bool) {
-	point, ok := t.CalculatedPoint(loc, race)
+// NearestLocation resolves the destination a creature lands on when
+// restarting at loc, its races resolving the point as in CalculatedPoint: a
+// random point from that restart point's chaotic list when karma is
+// positive, otherwise from its regular list.
+func (t *Table) NearestLocation(loc location.Location, classRace, baseRace player.Race, karma int) (location.Location, bool) {
+	point, ok := t.CalculatedPoint(loc, classRace, baseRace)
 	if !ok {
 		return location.Location{}, false
 	}

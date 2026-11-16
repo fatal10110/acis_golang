@@ -5,6 +5,7 @@ import (
 
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -29,6 +30,14 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 	})
 	if !ok {
 		return
+	}
+	// An item shortcut carries its etc item's shared reuse group from the
+	// start, so the bar shows a cooldown shared with the group without a
+	// relog.
+	if sc.Type == shortcut.Item {
+		if group, held := l.itemSharedReuseGroup(live.Inventory(), sc.ID); held {
+			sc.SharedReuseGroup = group
+		}
 	}
 	live.SendFrame(serverpackets.FrameShortCutRegister(l.serverShortcut(live, sc)))
 	// An item no longer held, a recipe the book lacks or a macro the list
@@ -145,6 +154,24 @@ func (l *GameClientLink) serverShortcutList(live *livePlayer, shortcuts []shortc
 		out = append(out, l.serverShortcut(live, sc))
 	}
 	return out
+}
+
+// itemSharedReuseGroup returns the shared reuse group of the item inv holds
+// under objectID: its etc item's group, or -1 for any other item. held is
+// false when inv holds no such item.
+func (l *GameClientLink) itemSharedReuseGroup(inv *itemcontainer.Inventory, objectID int32) (group int32, held bool) {
+	if inv == nil {
+		return 0, false
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return 0, false
+	}
+	tmpl, ok := l.itemTemplates.Get(inst.TemplateID)
+	if !ok || tmpl.EtcItem == nil {
+		return -1, true
+	}
+	return tmpl.EtcItem.SharedReuseGroup, true
 }
 
 // serverShortcut builds live's wire entry of sc. An item shortcut on an

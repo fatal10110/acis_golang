@@ -94,7 +94,7 @@ func TestCalculatedPoint(t *testing.T) {
 
 	// Inside the monster-race arena, the area's class restriction wins over
 	// the region's own restart point regardless of race.
-	p, ok := table.CalculatedPoint(location.Location{X: 13000, Y: 182000, Z: -3500}, player.RaceHuman)
+	p, ok := table.CalculatedPoint(location.Location{X: 13000, Y: 182000, Z: -3500}, player.RaceHuman, player.RaceHuman)
 	if !ok || p.Name != "monster_race" {
 		t.Fatalf("CalculatedPoint() in arena = (%+v, %v), want monster_race", p, ok)
 	}
@@ -102,18 +102,18 @@ func TestCalculatedPoint(t *testing.T) {
 	elfTownLoc := location.Location{X: 45487, Y: 49767, Z: -2950}
 
 	// Outside any area, a non-banned race resolves straight to the region's point.
-	p, ok = table.CalculatedPoint(elfTownLoc, player.RaceHuman)
+	p, ok = table.CalculatedPoint(elfTownLoc, player.RaceHuman, player.RaceHuman)
 	if !ok || p.Name != "elf_town" {
 		t.Fatalf("CalculatedPoint() human = (%+v, %v), want elf_town", p, ok)
 	}
 
 	// A banned race redirects to the point's alternate.
-	p, ok = table.CalculatedPoint(elfTownLoc, player.RaceDarkElf)
+	p, ok = table.CalculatedPoint(elfTownLoc, player.RaceDarkElf, player.RaceDarkElf)
 	if !ok || p.Name != "darkelf_town" {
 		t.Fatalf("CalculatedPoint() dark elf = (%+v, %v), want darkelf_town", p, ok)
 	}
 
-	if _, ok := table.CalculatedPoint(location.Location{X: 0, Y: 0, Z: 0}, player.RaceHuman); ok {
+	if _, ok := table.CalculatedPoint(location.Location{X: 0, Y: 0, Z: 0}, player.RaceHuman, player.RaceHuman); ok {
 		t.Fatal("CalculatedPoint() = true at the world origin, want false")
 	}
 }
@@ -123,7 +123,7 @@ func TestNearestLocation(t *testing.T) {
 	elfTownLoc := location.Location{X: 45487, Y: 49767, Z: -2950}
 
 	// No karma: picks from the regular point list.
-	loc, ok := table.NearestLocation(elfTownLoc, player.RaceHuman, 0)
+	loc, ok := table.NearestLocation(elfTownLoc, player.RaceHuman, player.RaceHuman, 0)
 	if !ok {
 		t.Fatal("NearestLocation() ok = false, want true")
 	}
@@ -132,12 +132,56 @@ func TestNearestLocation(t *testing.T) {
 	}
 
 	// Positive karma: picks from the chaotic list (elf_town has only one entry).
-	loc, ok = table.NearestLocation(elfTownLoc, player.RaceHuman, 5)
+	loc, ok = table.NearestLocation(elfTownLoc, player.RaceHuman, player.RaceHuman, 5)
 	if !ok || loc != (location.Location{X: 40720, Y: 56064, Z: -3580}) {
 		t.Fatalf("NearestLocation() karma = (%+v, %v), want elf_town's chaotic point", loc, ok)
 	}
 
-	if _, ok := table.NearestLocation(location.Location{X: 0, Y: 0, Z: 0}, player.RaceHuman, 0); ok {
+	if _, ok := table.NearestLocation(location.Location{X: 0, Y: 0, Z: 0}, player.RaceHuman, player.RaceHuman, 0); ok {
 		t.Fatal("NearestLocation() ok = true at the world origin, want false")
+	}
+}
+
+// elvenForestEdgeArea is the restartPointAreas.xml area that sends elves to
+// elf_town and every other race to darkelf_town.
+func elvenForestEdgeArea(t *testing.T) Area {
+	t.Helper()
+	nodes := []location.Point{{X: -33804, Y: 86223}, {X: -26832, Y: 88453}, {X: -32248, Y: 88884}}
+	restrictions := map[player.Race]string{
+		player.RaceHuman: "darkelf_town", player.RaceDarkElf: "darkelf_town",
+		player.RaceOrc: "darkelf_town", player.RaceDwarf: "darkelf_town", player.RaceElf: "elf_town",
+	}
+	area, err := NewArea(nodes, -3777, -1277, restrictions)
+	if err != nil {
+		t.Fatalf("NewArea() error: %v", err)
+	}
+	return area
+}
+
+// TestCalculatedPointSplitsClassAndBaseRace pins which race each rule reads:
+// an area's restriction follows the class played, a point's banned race the
+// race the character was created as.
+func TestCalculatedPointSplitsClassAndBaseRace(t *testing.T) {
+	table := fixtureTable(t)
+	table.Areas = append(table.Areas, elvenForestEdgeArea(t))
+	inArea := location.Location{X: -30961, Y: 87853, Z: -2500}
+	elfTownLoc := location.Location{X: 45487, Y: 49767, Z: -2950}
+
+	tests := []struct {
+		name            string
+		at              location.Location
+		classRace, base player.Race
+		want            string
+	}{
+		{"area, human playing an elven subclass", inArea, player.RaceElf, player.RaceHuman, "elf_town"},
+		{"area, elf playing a human subclass", inArea, player.RaceHuman, player.RaceElf, "darkelf_town"},
+		{"banned point, dark elf playing a human subclass", elfTownLoc, player.RaceHuman, player.RaceDarkElf, "darkelf_town"},
+		{"banned point, human playing a dark elven subclass", elfTownLoc, player.RaceDarkElf, player.RaceHuman, "elf_town"},
+	}
+	for _, tc := range tests {
+		p, ok := table.CalculatedPoint(tc.at, tc.classRace, tc.base)
+		if !ok || p.Name != tc.want {
+			t.Errorf("%s: CalculatedPoint() = (%q, %v), want %q", tc.name, p.Name, ok, tc.want)
+		}
 	}
 }
