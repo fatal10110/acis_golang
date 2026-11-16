@@ -470,7 +470,7 @@ call Quest.showQuestionMark classes 2 sites 24 go ShowQuestionMark
 call Quest.showTutorialHTML classes 1 sites 2 go ShowTutorialHTML
 call Quest.startQuestTimer classes 135 sites 479 go script.Script.StartTimer
 call Quest.startQuestTimerAtFixedRate classes 66 sites 77 go script.Script.StartTimerAtFixedRate
-call Quest.takeItems classes 320 sites 1987 go script.Script.TakeItems
+call Quest.takeItems classes 320 sites 1987 go script.Script.TakeItems,script.Script.TakeHeldItems
 call QuestList.getAllQuests classes 2 sites 2 go script.Player.StartedQuests
 call QuestList.getQuestState classes 318 sites 693 go script.Script.QuestState
 call QuestList.setLastQuestNpcObjectId classes 1 sites 1 go inline
