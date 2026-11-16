@@ -179,6 +179,20 @@ func WithDataReloads(reloads network.DataReloads) Option {
 	return func(o *options) { o.dataReloads = reloads }
 }
 
+// WithBossZoneStore wraps the store //reload zone saves the boss zone
+// permissions to; wrap gets the database-backed one.
+func WithBossZoneStore(wrap func(network.BossZoneStore) network.BossZoneStore) Option {
+	return func(o *options) { o.bossZoneStore = wrap }
+}
+
+// wrapBossZones is store, wrapped as WithBossZoneStore asked.
+func (o *options) wrapBossZones(store network.BossZoneStore) network.BossZoneStore {
+	if o.bossZoneStore == nil {
+		return store
+	}
+	return o.bossZoneStore(store)
+}
+
 // bootNpcSpawns builds the WithNpcSpawns population over deps and hands it
 // to link. It returns the population and its respawn timers.
 func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps) (*gamemanager.Npcs, *task.Respawn) {

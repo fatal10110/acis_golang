@@ -37,10 +37,12 @@ type Boss struct {
 	// time.Now.
 	now func() time.Time
 
-	// bmu guards allowed and deadlines.
+	// bmu guards allowed, deadlines and successor. successor is the zone a
+	// zone reload handed this one's permissions over to; nil until then.
 	bmu       sync.Mutex
 	allowed   map[int32]struct{}
 	deadlines map[int32]time.Time
+	successor *Boss
 }
 
 // NewBoss builds a boss lair zone with entry policing off (no invade
@@ -191,20 +193,64 @@ func (z *Boss) isAllowed(id int32) bool {
 // stored players are read before the zone's InvadeTime is known, so the
 // entry lapses at once and only the permission itself (summons, the next
 // save) survives the restart.
+//
+// Once the zone was handed over (HandOver), the permission reaches the zone
+// it was handed over to as well.
 func (z *Boss) AllowEntry(id int32, window time.Duration) {
 	z.bmu.Lock()
-	defer z.bmu.Unlock()
+	deadline := z.now().Add(window)
 	z.allowed[id] = struct{}{}
-	z.deadlines[id] = z.now().Add(window)
+	z.deadlines[id] = deadline
+	next := z.successor
+	z.bmu.Unlock()
+	if next != nil {
+		next.allowUntil(id, deadline)
+	}
+}
+
+// allowUntil permits the player to enter until deadline, here and in the
+// zone this one was handed over to.
+func (z *Boss) allowUntil(id int32, deadline time.Time) {
+	z.bmu.Lock()
+	z.allowed[id] = struct{}{}
+	z.deadlines[id] = deadline
+	next := z.successor
+	z.bmu.Unlock()
+	if next != nil {
+		next.allowUntil(id, deadline)
+	}
 }
 
 // RevokeEntry withdraws the player's entry permission and any pending
-// deadline.
+// deadline, here and in the zone this one was handed over to.
 func (z *Boss) RevokeEntry(id int32) {
 	z.bmu.Lock()
-	defer z.bmu.Unlock()
 	delete(z.allowed, id)
 	delete(z.deadlines, id)
+	next := z.successor
+	z.bmu.Unlock()
+	if next != nil {
+		next.RevokeEntry(id)
+	}
+}
+
+// HandOver gives next, the zone a zone reload read in place of this one,
+// every entry permission this zone holds as a stored permission is restored
+// (its entry window already lapsed), and from then on every permission
+// granted, with its window, or revoked here: a script that resolved this
+// zone before the reload swapped it out still reaches next. next must not
+// be handed back to this zone.
+func (z *Boss) HandOver(next *Boss) {
+	z.bmu.Lock()
+	defer z.bmu.Unlock()
+	next.bmu.Lock()
+	lapsed := next.now()
+	for id := range z.allowed {
+		next.allowed[id] = struct{}{}
+		next.deadlines[id] = lapsed
+	}
+	next.bmu.Unlock()
+	z.successor = next
 }
 
 // AllowedPlayers snapshots the ids currently holding entry permission,

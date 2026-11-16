@@ -57,13 +57,19 @@ func (f Flag) String() string {
 // active until every zone that raised it has released it. The zero value
 // is ready to use.
 //
-// mu guards counts and synced. Revalidation writes them from whichever
+// Holds come from two sources kept apart: counts are the zones' own holds,
+// which a zone reload drops with the zones that raised them, and held are
+// those something other than a zone raised (a boat keeping its passengers
+// in peace), which a zone reload leaves alone.
+//
+// mu guards counts, held and synced. Revalidation writes them from whichever
 // queue moved the actor (a summon-friend teleport runs on the caster's),
 // while movement and exit checks read them from the actor's own queue.
 // synced is the zone set the holds were last raised against.
 type Flags struct {
 	mu     sync.RWMutex
 	counts [FlagCount]int32
+	held   [FlagCount]int32
 	synced *zoneSet
 }
 
@@ -80,20 +86,37 @@ func (f *Flags) Set(flag Flag, state bool) {
 	}
 }
 
+// Hold raises (state true) or releases (state false) one hold on flag that
+// no zone imposes: it counts toward Has like a zone's hold, but a zone
+// reload keeps it. Releasing an already-clear hold is a no-op.
+func (f *Flags) Hold(flag Flag, state bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if state {
+		f.held[flag]++
+	} else if f.held[flag] > 0 {
+		f.held[flag]--
+	}
+}
+
 // Has reports whether flag is active. FlagPvP is special-cased: peace
 // overrides combat, so it reads active only while no peace hold exists.
 func (f *Flags) Has(flag Flag) bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	if flag == FlagPvP {
-		return f.counts[FlagPvP] > 0 && f.counts[FlagPeace] == 0
+		return f.total(FlagPvP) > 0 && f.total(FlagPeace) == 0
 	}
-	return f.counts[flag] > 0
+	return f.total(flag) > 0
 }
+
+// total is every hold on flag, from zones or not. Callers hold mu.
+func (f *Flags) total(flag Flag) int32 { return f.counts[flag] + f.held[flag] }
 
 // resync records set as the zone set the holds are raised against from now
 // on. When the holds were raised against another set, it releases every
-// one of them and returns that set; otherwise it returns nil.
+// zone hold and returns that set; otherwise it returns nil. The holds no
+// zone raised (Hold) stay.
 func (f *Flags) resync(set *zoneSet) *zoneSet {
 	f.mu.Lock()
 	defer f.mu.Unlock()

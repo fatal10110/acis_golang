@@ -29,7 +29,7 @@ func (s *zoneSet) sync(a Actor) []Kind {
 	}
 	held := prev.holders()[a.ObjectID()]
 	for _, k := range held {
-		k.Core().evict(a)
+		k.Core().drop(a)
 	}
 	return held
 }
@@ -75,6 +75,7 @@ func (ix *Index) Clear() {
 		z := k.Core()
 		z.mu.Lock()
 		clear(z.occupants)
+		clear(z.switched)
 		z.mu.Unlock()
 	}
 }
