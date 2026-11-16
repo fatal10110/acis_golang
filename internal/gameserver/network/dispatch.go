@@ -823,8 +823,9 @@ type GameClientLinkConfig struct {
 	// read; nil gives the link its own, holding PlayerConfig.QuestRates or
 	// else the shipped rates.
 	QuestRates *script.RateBook
-	// BossZones saves and restores who may enter the boss zones around a
-	// zone reload; nil keeps nobody's permission across one.
+	// BossZones stores who may enter the boss zones as a zone reload
+	// starts; nil stores nothing. The reloaded boss zones get the
+	// permissions from the zones they replace either way.
 	BossZones BossZoneStore
 	// Shutdown is the timed shutdown //server starts and aborts; required
 	// for //server.

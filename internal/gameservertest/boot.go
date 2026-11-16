@@ -182,6 +182,7 @@ type options struct {
 	makerCatalog           script.MakerCatalog
 	makerHeard             func(maker, event string, int1, int2 int)
 	dataReloads            network.DataReloads
+	bossZoneStore          func(network.BossZoneStore) network.BossZoneStore
 	npcDropRates           item.Rates
 	walkerRoutes           route.WalkerRoutes
 	walkerPath             task.WalkerPath
@@ -2317,7 +2318,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		HTML:             HTMLCache(t, o.pages()),
 		Reloads:          o.dataReloads,
 		Boats:            boats,
-		BossZones:        gamesql.NewBossZoneStore(db),
+		BossZones:        o.wrapBossZones(gamesql.NewBossZoneStore(db)),
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,

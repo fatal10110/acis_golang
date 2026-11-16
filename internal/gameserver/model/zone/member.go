@@ -49,6 +49,14 @@ type Member struct {
 // ZoneFlags is the creature's zone flag ledger.
 func (m *Member) ZoneFlags() *Flags { return &m.flags }
 
+// ReplayZoneRules runs fn, a zone switching its rules replaying them on the
+// creature, with the creature's zone membership locked.
+func (m *Member) ReplayZoneRules(fn func()) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	fn()
+}
+
 // teleporter is an actor that can be mid-teleport.
 type teleporter interface{ Teleporting() bool }
 
