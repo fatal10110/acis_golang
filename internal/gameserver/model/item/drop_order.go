@@ -1,5 +1,7 @@
 package item
 
+import "math"
+
 // dropMerger sums a category roll's quantities per item id and keeps them in
 // the order the kill hands them out: the bucket order of a chained hash
 // table that starts at capacity 1 and doubles past a 0.75 load factor, each
@@ -18,7 +20,7 @@ type dropMerger struct {
 
 // merge adds qty to itemID: the table resizes at the start of the call once a
 // previous call left it over its threshold, and a new key goes to the head of
-// its bucket.
+// its bucket. A sum past the int32 range saturates at math.MaxInt32.
 func (m *dropMerger) merge(itemID, qty int32) {
 	if m.table == nil {
 		m.threshold = 1
@@ -29,7 +31,7 @@ func (m *dropMerger) merge(itemID, qty int32) {
 	b := bucketOf(itemID, len(m.table))
 	for i := range m.table[b] {
 		if m.table[b][i].ItemID == itemID {
-			m.table[b][i].Count += qty
+			m.table[b][i].Count = int32(min(int64(m.table[b][i].Count)+int64(qty), math.MaxInt32))
 			return
 		}
 	}

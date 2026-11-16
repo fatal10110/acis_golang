@@ -1,7 +1,5 @@
 package item
 
-import "slices"
-
 // KillDrop is one reward a kill's roll hands its killer: an item drop of
 // Count, or, with Herb set, one herb pickup (see SplitHerbDrop) whose
 // AutoLoot says whether the killer takes it on the spot.
@@ -16,8 +14,8 @@ type KillDrop struct {
 // order.
 //
 //   - A spoil category only rolls once the monster already carries a spoil
-//     marker (pool.IsSpoiled), and its results merge into pool rather than
-//     the returned drops.
+//     marker (pool.IsSpoiled), and its results merge into pool, in
+//     dropMerger's order, rather than the returned drops.
 //   - A herb category's results are split per SplitHerbDrop into herb
 //     pickups.
 //   - Every other category (currency, normal item) returns its results as
@@ -42,13 +40,10 @@ func RollKillReward(categories []DropCategory, pool *SpoilPool, levelMultiplier 
 
 		switch cat.Kind {
 		case DropSpoil:
-			// The pool keeps the order items are added in, which Sweep
-			// reads; add them in the category's drop order.
-			for _, d := range cat.Drops {
-				if i := slices.IndexFunc(rolled, func(r rolledDrop) bool { return r.ItemID == d.ItemID }); i >= 0 {
-					pool.Add(d.ItemID, rolled[i].Count)
-					rolled = slices.Delete(rolled, i, i+1)
-				}
+			// The pool keeps the order items are added in within a bucket,
+			// which Sweep reads; add them in the roll's merged order.
+			for _, d := range rolled {
+				pool.Add(d.ItemID, d.Count)
 			}
 		case DropHerb:
 			for _, d := range rolled {
