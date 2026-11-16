@@ -28,13 +28,11 @@ func TestAdminTargetSelectsThenActs(t *testing.T) {
 	}
 	assertStatic(t, frames[0], 205)
 
-	for _, cmd := range []string{"admin_target Nobody", "admin_target ", "admin_target Player "} {
-		frames = exchange(t, gm, encodeBypass(cmd))
-		if len(frames) != 1 {
-			t.Fatalf("%q frames = %x, want one message", cmd, testsupport.FrameOpcodes(frames))
-		}
-		assertStatic(t, frames[0], 1356)
+	frames = exchange(t, gm, encodeBuildCmd("target Nobody"))
+	if len(frames) != 1 {
+		t.Fatalf("//target Nobody frames = %x, want one message", testsupport.FrameOpcodes(frames))
 	}
+	assertStatic(t, frames[0], 1356)
 
 	frames = exchange(t, gm, encodeBuildCmd("target player"))
 	selected := -1

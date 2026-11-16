@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // The memo board's pages are built in code, not read from page files.
@@ -92,7 +94,7 @@ func RenderMemoTopics(f ForumView, index int32, clans int) string {
 		}
 		if i >= topicsPerPage*(index-1) {
 			b.WriteString(`<table border=0 cellspacing=0 cellpadding=5 WIDTH=610><tr><td FIXWIDTH=5></td><td FIXWIDTH=415><a action="bypass _bbsposts;read;`)
-			b.WriteString(id + ";" + itoa(t.ID) + `">` + t.Name)
+			b.WriteString(id + ";" + itoa(t.ID) + `">` + commons.HTMLText(t.Name))
 			b.WriteString(`</a></td><td FIXWIDTH=120 align=center></td><td FIXWIDTH=70 align=center>`)
 			b.WriteString(ShortDate(t.Date))
 			b.WriteString(`</td></tr></table><img src="L2UI.Squaregray" width="610" height="1">`)
@@ -135,17 +137,15 @@ func RenderMemoNewTopic(forumID int32) string {
 }
 
 // RenderMemoPost is the page of memo topic t, showing its post p. The
-// post's text shows as written: its angle brackets escaped and its line
-// breaks kept.
+// post's text, like the topic's name, shows as written: its markup
+// escaped and its line breaks kept.
 func RenderMemoPost(t Topic, p Post) string {
-	mes := strings.ReplaceAll(p.Text, ">", "&gt;")
-	mes = strings.ReplaceAll(mes, "<", "&lt;")
-	mes = strings.ReplaceAll(mes, "\n", "<br1>")
+	mes := strings.ReplaceAll(commons.HTMLText(p.Text), "\n", "<br1>")
 	forumID, topicID, date := itoa(t.ForumID), itoa(t.ID), FullDate(p.Date)
 	return `<html><body><br><br><table border=0 width=610><tr><td width=10></td><td width=600 align=left><a action="bypass _bbshome">HOME</a>&nbsp;>&nbsp;<a action="bypass _bbsmemo">Memo Form</a></td></tr></table><img src="L2UI.squareblank" width="1" height="10"><center><table border=0 cellspacing=0 cellpadding=0 bgcolor=333333><tr><td height=10></td></tr><tr><td fixWIDTH=55 align=right valign=top>&$413; : &nbsp;</td><td fixWIDTH=380 valign=top>` +
-		t.Name +
+		commons.HTMLText(t.Name) +
 		`</td><td fixwidth=5></td><td fixwidth=50></td><td fixWIDTH=120></td></tr><tr><td height=10></td></tr><tr><td align=right><font color="AAAAAA" >&$417; : &nbsp;</font></td><td><font color="AAAAAA">` +
-		t.OwnerName +
+		commons.HTMLText(t.OwnerName) +
 		`</font></td><td></td><td><font color="AAAAAA">&$418; :</font></td><td><font color="AAAAAA">` +
 		date +
 		`</font></td></tr><tr><td height=10></td></tr></table><br><table border=0 cellspacing=0 cellpadding=0><tr><td fixwidth=5></td><td FIXWIDTH=600 align=left>` +
@@ -166,7 +166,7 @@ func RenderMemoPost(t Topic, p Post) string {
 // RenderPostEdit is the edit form of topic t of forum forumID; its text
 // field is filled apart (see EditFields).
 func RenderPostEdit(forumID int32, t Topic) string {
-	name, topicID := t.Name, itoa(t.ID)
+	name, topicID := commons.HTMLText(t.Name), itoa(t.ID)
 	return `<html><body><br><br><table border=0 width=610><tr><td width=10></td><td width=600 align=left><a action="bypass _bbshome">HOME</a>&nbsp;>&nbsp;<a action="bypass _bbsmemo">Memo Form</a></td></tr></table><img src="L2UI.squareblank" width="1" height="10"><center><table border=0 cellspacing=0 cellpadding=0><tr><td width=610><img src="sek.cbui355" width="610" height="1"><br1><img src="sek.cbui355" width="610" height="1"></td></tr></table><table fixwidth=610 border=0 cellspacing=0 cellpadding=0><tr><td><img src="l2ui.mini_logo" width=5 height=20></td></tr><tr><td><img src="l2ui.mini_logo" width=5 height=1></td><td align=center FIXWIDTH=60 height=29>&$413;</td><td FIXWIDTH=540>` +
 		name +
 		`</td><td><img src="l2ui.mini_logo" width=5 height=1></td></tr></table><table fixwidth=610 border=0 cellspacing=0 cellpadding=0><tr><td><img src="l2ui.mini_logo" width=5 height=10></td></tr><tr><td><img src="l2ui.mini_logo" width=5 height=1></td><td align=center FIXWIDTH=60 height=29 valign=top>&$427;</td><td align=center FIXWIDTH=540><MultiEdit var ="Content" width=535 height=313></td><td><img src="l2ui.mini_logo" width=5 height=1></td></tr><tr><td><img src="l2ui.mini_logo" width=5 height=10></td></tr></table><table fixwidth=610 border=0 cellspacing=0 cellpadding=0><tr><td><img src="l2ui.mini_logo" width=5 height=10></td></tr><tr><td><img src="l2ui.mini_logo" width=5 height=1></td><td align=center FIXWIDTH=60 height=29>&nbsp;</td><td align=center FIXWIDTH=70><button value="&$140;" action="Write Post ` +

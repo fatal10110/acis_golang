@@ -12,5 +12,4 @@ func TestAdminTest(t *testing.T) {
 
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("test")), "Usage : //test ...")
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("test skill 1")), "Usage : //test ...")
-	assertTexts(t, exchange(t, gm, encodeBypass("admin_test")), "Usage : //test ...")
 }

@@ -98,7 +98,7 @@ func TestAdminManor(t *testing.T) {
 		t.Fatalf("expected page misses the last castle:\n%s", want)
 	}
 
-	for _, payload := range [][]byte{encodeBuildCmd("manor"), encodeBypass("admin_manor")} {
+	for _, payload := range [][]byte{encodeBuildCmd("manor"), encodeBuildCmd("manor")} {
 		frames := exchange(t, gm, payload)
 		if len(frames) != 1 {
 			t.Fatalf("frames = %x, want one NpcHtmlMessage", testsupport.FrameOpcodes(frames))

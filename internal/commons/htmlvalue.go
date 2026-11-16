@@ -32,3 +32,14 @@ func StripLinkWords(text string) string {
 	}
 	return text
 }
+
+// htmlTextEscaper turns the markup characters of player text into
+// entities.
+var htmlTextEscaper = strings.NewReplacer("<", "&lt;", ">", "&gt;", `"`, "&quot;")
+
+// HTMLText is text a player wrote as a server HTML page shows it: its <, >
+// and " become entities, so it opens no tag, ends no attribute value and
+// carries no link, whoever views the page.
+func HTMLText(text string) string {
+	return htmlTextEscaper.Replace(text)
+}

@@ -109,7 +109,7 @@ func TestAdminItemCreatesForTheGM(t *testing.T) {
 	srv, _, gmID := bootItemAdmin(t)
 	c := srv.Client
 
-	main := htmlBody(t, exchange(t, c, encodeBypass("admin_admin"))[0])
+	main := htmlBody(t, exchange(t, c, encodeBuildCmd("admin"))[0])
 	if !strings.Contains(main, `action="bypass -h admin_item"`) {
 		t.Fatalf("main panel has no Item button: %q", main)
 	}
@@ -159,7 +159,7 @@ func TestAdminItemSetListsAndGives(t *testing.T) {
 	srv, sets, gmID := bootItemAdmin(t)
 	c := srv.Client
 
-	gmShop := htmlBody(t, exchange(t, c, encodeBypass("admin_buy"))[0])
+	gmShop := htmlBody(t, exchange(t, c, encodeBuildCmd("buy"))[0])
 	if !strings.Contains(gmShop, `action="bypass -h admin_item set"`) {
 		t.Fatalf("GM shop page has no Create armor set link: %q", gmShop)
 	}
@@ -206,8 +206,8 @@ func TestAdminItemSetListsAndGives(t *testing.T) {
 		t.Fatalf("stored set pieces = %d (%v), want 4", stored, err)
 	}
 
-	assertTexts(t, exchange(t, c, encodeBypass("admin_item set 1")), "This chest has no set.")
-	frames := exchange(t, c, encodeBypass("admin_item set x"))
+	assertTexts(t, exchange(t, c, encodeBuildCmd("item set 1")), "This chest has no set.")
+	frames := exchange(t, c, encodeBuildCmd("item set x"))
 	assertTexts(t, frames[:1], "Usage: //item set [chestId]")
 	assertList(frames[1:])
 }
@@ -241,11 +241,11 @@ func TestAdminItemGivesToOthers(t *testing.T) {
 	exchange(t, gm, encodeAction(playerID))
 	drain(t, player)
 
-	frames := readUntilPage(t, gm, exchange(t, gm, encodeBypass("admin_item 57 10")))
+	frames := readUntilPage(t, gm, exchange(t, gm, encodeBuildCmd("item 57 10")))
 	assertTexts(t, frames[:len(frames)-1], "You have spawned 10 Adena (57) in Target's inventory.")
 	readItemNotice(t, player, item.AdenaID, 10)
 
-	frames = readUntilPage(t, gm, exchange(t, gm, encodeBypass("admin_item set 58")))
+	frames = readUntilPage(t, gm, exchange(t, gm, encodeBuildCmd("item set 58")))
 	assertTexts(t, frames[:len(frames)-1], "You have spawned Mithril Heavy Set in Target's inventory.")
 	for _, id := range []int32{58, 59, 47, mithrilShieldID} {
 		if got := srv.PlayerItemCount(t, playerID, id); got != 1 {
@@ -267,7 +267,7 @@ func TestAdminItemGivesToOthers(t *testing.T) {
 		t.Fatalf("//give over capacity = %q", got)
 	}
 
-	frames = readUntilPage(t, gm, exchange(t, gm, encodeBypass("admin_item 57 7 1000")))
+	frames = readUntilPage(t, gm, exchange(t, gm, encodeBuildCmd("item 57 7 1000")))
 	assertTexts(t, frames[:len(frames)-1], "Surrounding players were rewarded with 7 Adena in a 1000 radius.")
 	readItemNotice(t, player, item.AdenaID, 7)
 	if got := srv.PlayerItemCount(t, playerID, item.AdenaID); got != 20 {

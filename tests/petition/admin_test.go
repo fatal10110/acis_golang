@@ -68,7 +68,7 @@ func TestAdminPetitionActions(t *testing.T) {
 	r := boot(t)
 	r.enterAll(t)
 	id := r.submit(t)
-	join := encodeBypass("admin_petition join " + itoa(id))
+	join := encodeBuildCmd("petition join " + itoa(id))
 	exchange(t, r.gm, join)
 	collect(t, r.player)
 	line := say{r.playerID, sayPetitionPlayer, "Player", "hello"}
@@ -76,7 +76,7 @@ func TestAdminPetitionActions(t *testing.T) {
 	collect(t, r.gm)
 
 	// The last game master leaving puts the petition back to pending.
-	frames := exchange(t, r.gm, encodeBypass("admin_petition unfollow"))
+	frames := exchange(t, r.gm, encodeBuildCmd("petition unfollow"))
 	if len(frames) != 2 {
 		t.Fatalf("unfollow frames = %x, want the end notice then the list", testsupport.FrameOpcodes(frames))
 	}
@@ -86,7 +86,7 @@ func TestAdminPetitionActions(t *testing.T) {
 		t.Fatalf("state after unfollow = %v, want PENDING", list[0].State)
 	}
 
-	frames = exchange(t, r.gm, encodeBypass("admin_petition show "+itoa(id)))
+	frames = exchange(t, r.gm, encodeBuildCmd("petition show "+itoa(id)))
 	assertSays(t, frames[:1], line)
 	htmlBody(t, frames[1])
 
@@ -100,20 +100,20 @@ func TestAdminPetitionActions(t *testing.T) {
 	}
 
 	// A reset waits for every petition being answered.
-	assertMessages(t, exchange(t, r.gm, encodeBypass("admin_petition reset")), msg(serverpackets.SystemMessagePetitionUnderProcess))
+	assertMessages(t, exchange(t, r.gm, encodeBuildCmd("petition reset")), msg(serverpackets.SystemMessagePetitionUnderProcess))
 
-	frames = exchange(t, r.gm, encodeBypass("admin_petition reject "+itoa(id)))
+	frames = exchange(t, r.gm, encodeBuildCmd("petition reject "+itoa(id)))
 	assertMessages(t, frames[:1], msg(serverpackets.SystemMessagePetitionEndedWithS1, "Player"))
 	assertPage(t, frames[1], "State:</font> REJECTED")
 	if frames := collect(t, r.player); len(frames) != 0 {
 		t.Fatalf("petitioner frames on a reject = %x, want none", testsupport.FrameOpcodes(frames))
 	}
-	frames = exchange(t, r.gm, encodeBypass("admin_petition reject "+itoa(id)))
+	frames = exchange(t, r.gm, encodeBuildCmd("petition reject "+itoa(id)))
 	assertMessages(t, frames[:1], msg(serverpackets.SystemMessageFailedCancelPetitionTryLater))
-	frames = exchange(t, r.gm, encodeBypass("admin_petition join "+itoa(id)))
+	frames = exchange(t, r.gm, encodeBuildCmd("petition join "+itoa(id)))
 	assertMessages(t, frames[:1], msg(serverpackets.SystemMessageNotUnderPetitionConsultation))
 
-	frames = exchange(t, r.gm, encodeBypass("admin_petition reset"))
+	frames = exchange(t, r.gm, encodeBuildCmd("petition reset"))
 	if len(frames) != 1 || strings.Contains(htmlBody(t, frames[0]), "admin_petition view") {
 		t.Fatalf("reset frames = %x, want an empty list", testsupport.FrameOpcodes(frames))
 	}
@@ -179,7 +179,7 @@ func TestAdminForcePetitionAndAddChat(t *testing.T) {
 	assertMessages(t, collect(t, r.gm), left)
 	assertMessages(t, collect(t, r.player), left)
 
-	exchange(t, r.gm, encodeBypass("admin_petition unfollow"))
+	exchange(t, r.gm, encodeBuildCmd("petition unfollow"))
 	drain(t, r.player)
 	assertMessages(t, exchange(t, r.gm, encodeBuildCmd("add_peti_chat")), msg(serverpackets.SystemMessagePetitionAddingS1FailedErrorNumberS2, "Helper", int32(2)))
 }
@@ -199,7 +199,7 @@ func TestPetitionTextCannotCarryLinks(t *testing.T) {
 	exchange(t, r.player, encodePetition(`<a action="bypass -h admin_set access 8">Join</a> a\b \\ <a act\ion="by\pass -h admin_x">J</a> <a actactionion="bypbypassass -h admin_y">K</a> end\`, 3))
 	collect(t, r.gm)
 	id := r.srv.Petitions.List()[0].ID
-	page := htmlBody(t, exchange(t, r.gm, encodeBypass("admin_petition view "+itoa(id)))[0])
+	page := htmlBody(t, exchange(t, r.gm, encodeBuildCmd("petition view "+itoa(id)))[0])
 	for _, link := range []string{"admin_set", "admin_x", "admin_y"} {
 		if strings.Contains(page, "bypass -h "+link) {
 			t.Fatalf("petition page carries the player's link to %s: %q", link, page)
@@ -208,14 +208,19 @@ func TestPetitionTextCannotCarryLinks(t *testing.T) {
 	if want := `<a =" -h admin_set access 8">Join</a> ab \ <a =" -h admin_x">J</a> <a =" -h admin_y">K</a> end\`; !strings.Contains(page, want) {
 		t.Fatalf("petition page = %q, want %q", page, want)
 	}
+	// Sending the planted command anyway runs nothing: the page does not
+	// offer it as a link (owner-approved, #4654).
+	if frames := exchange(t, r.gm, encodeBypass("admin_set access 8")); len(frames) != 0 {
+		t.Fatalf("planted admin command answered %d frames, want none", len(frames))
+	}
 
 	// The feedback a closed petition shows goes through the same guard.
-	exchange(t, r.gm, encodeBypass("admin_petition join "+itoa(id)))
+	exchange(t, r.gm, encodeBuildCmd("petition join "+itoa(id)))
 	collect(t, r.player)
 	exchange(t, r.gm, encodePetitionCancel())
 	collect(t, r.player)
 	exchange(t, r.player, encodeVote(0, `<a act\ion="bypbypassass -h admin_z">\$1</a>\`))
-	page = htmlBody(t, exchange(t, r.gm, encodeBypass("admin_petition view "+itoa(id)))[0])
+	page = htmlBody(t, exchange(t, r.gm, encodeBuildCmd("petition view "+itoa(id)))[0])
 	if want := `Feedback: <a =" -h admin_z">$1</a>\`; !strings.Contains(page, want) {
 		t.Fatalf("petition page = %q, want %q", page, want)
 	}

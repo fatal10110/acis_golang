@@ -106,7 +106,7 @@ func TestAdminEffectsEarthquake(t *testing.T) {
 			}
 		}
 	}
-	gm.Send(encodeBypass("admin_earthquake -3 2147483647"))
+	gm.Send(encodeBuildCmd("earthquake -3 2147483647"))
 	for i, c := range clients {
 		if got, want := c.Read(), earthquakeBytes(x, y, z, -3, 2147483647); !bytes.Equal(got, want) {
 			t.Fatalf("admin_earthquake bypass client %d frame = % x, want % x", i, got, want)
@@ -148,7 +148,7 @@ func TestAdminEffectsPlaySound(t *testing.T) {
 			t.Fatalf("//%s known player frames = %x, want % x", tc.command, frames, tc.want)
 		}
 	}
-	requireOnly(t, "admin_play_sound bypass", exchange(t, gm, encodeBypass("admin_play_sound Rm01_B")), playSoundBytes(1, "Rm01_B"))
+	requireOnly(t, "admin_play_sound bypass", exchange(t, gm, encodeBuildCmd("play_sound Rm01_B")), playSoundBytes(1, "Rm01_B"))
 	settle(t, near)
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("play_sound")), "Usage: //play_sound soundFile")
 	if frames := settle(t, near); len(frames) != 0 {
@@ -188,7 +188,7 @@ func TestAdminEffectsSocialPlayers(t *testing.T) {
 	}
 
 	selectPlayer(t, gm, user, userID)
-	frames := exchange(t, gm, encodeBypass("admin_social 16"))
+	frames := exchange(t, gm, encodeBuildCmd("social 16"))
 	if !holdsFrame(frames, socialBytes(userID, 16)) {
 		t.Fatalf("admin_social 16 GM frames = %x, want the player's social action", frames)
 	}
@@ -275,7 +275,7 @@ func TestAdminEffectsUndying(t *testing.T) {
 	}
 
 	// The GM on 1 HP may be shown regenerating meanwhile.
-	if texts, _ := effectReply(t, exchange(t, gm, encodeBypass("admin_undying"))); len(texts) != 1 || texts[0] != "You are now mortal." {
+	if texts, _ := effectReply(t, exchange(t, gm, encodeBuildCmd("undying"))); len(texts) != 1 || texts[0] != "You are now mortal." {
 		t.Fatalf("admin_undying texts = %q, want \"You are now mortal.\"", texts)
 	}
 	onLearnerQueue(t, srv, gmID, lethal)

@@ -63,7 +63,7 @@ func TestAdminKnownlist(t *testing.T) {
 	}
 
 	exchange(t, gm, encodeAction(otherID))
-	frames = exchange(t, gm, encodeBypass("admin_knownlist"))
+	frames = exchange(t, gm, encodeBuildCmd("knownlist"))
 	if len(frames) != 1 {
 		t.Fatalf("//knownlist on Other frames = %x, want one page", testsupport.FrameOpcodes(frames))
 	}

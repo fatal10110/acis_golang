@@ -16,7 +16,9 @@ const clanBoardLevel = 2
 // or the clan list without one; _bbsclan;<clan|home|mail|management>;<n>
 // shows the list page n or clan n's home, mail form or management form;
 // _bbsclan;notice[;<true|false>] shows the player's clan notice settings,
-// first switching the login notice on or off. Any other command shows
+// first switching the login notice on or off, which only the clan leader
+// may: any other member is refused as the management page refuses them.
+// Any other command shows
 // nothing, as the management page's permission links do.
 func (l *GameClientLink) boardClan(live *livePlayer, command string) {
 	if strings.EqualFold(command, "_bbsclan") {
@@ -35,6 +37,9 @@ func (l *GameClientLink) boardClan(live *livePlayer, command string) {
 	if strings.EqualFold(action, "notice") {
 		if len(tokens) > 2 {
 			if cl, ok := l.clanService().ClanOf(live.Character); ok {
+				if !l.clanLeaderPage(live, cl) {
+					return
+				}
 				l.clanService().EnableNotice(cl, strings.EqualFold(tokens[2], "true"))
 			}
 		}
@@ -62,20 +67,21 @@ func (l *GameClientLink) boardClan(live *livePlayer, command string) {
 
 // boardClanWrite submits a clan board form: intro (clan id, introduction),
 // notice (notice text in the fourth argument) or mail (clan id, subject
-// and message in the fourth and fifth arguments). The introduction and the
-// clan mail take any member of the clan the form names; the notice takes
-// any member of a clan.
+// and message in the fourth and fifth arguments). The introduction takes
+// the leader of the clan the form names, the notice the leader of a clan:
+// any other member is refused as the management page refuses them and the
+// text is kept. The clan mail takes any member of the clan the form names.
 func (l *GameClientLink) boardClanWrite(live *livePlayer, args [5]string) {
 	switch {
 	case strings.EqualFold(args[0], "intro"):
 		cl, ok := l.boardFormClan(live, args[1])
-		if !ok {
+		if !ok || !l.clanLeaderPage(live, cl) {
 			return
 		}
 		l.clanService().SetIntroduction(cl, args[2])
 		l.showClanManagement(live, cl.ID())
 	case args[0] == "notice":
-		if cl, ok := l.clanService().ClanOf(live.Character); ok {
+		if cl, ok := l.clanService().ClanOf(live.Character); ok && l.clanLeaderPage(live, cl) {
 			l.clanService().SetNotice(cl, args[3])
 			l.showClanNotice(live, cl.ID())
 		}

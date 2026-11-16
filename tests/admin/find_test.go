@@ -140,7 +140,7 @@ func TestAdminFind(t *testing.T) {
 		assertOnePage(t, "//"+cmd, frames, both)
 	}
 	assertOnePage(t, "//find player oth", exchange(t, gm, encodeBuildCmd("find player oth")), findPlayerPage("oth", findPlayerRow(0, "Other")))
-	assertOnePage(t, "//find player 1 OTH", exchange(t, gm, encodeBypass("admin_find player 1 OTH")), findPlayerPage("oth", findPlayerRow(0, "Other")))
+	assertOnePage(t, "//find player 1 OTH", exchange(t, gm, encodeBuildCmd("find player 1 OTH")), findPlayerPage("oth", findPlayerRow(0, "Other")))
 	// A name is matched as typed against lower-cased names.
 	assertOnePage(t, "//find player Oth", exchange(t, gm, encodeBuildCmd("find player Oth")), findPlayerPage("Oth"))
 
@@ -178,8 +178,8 @@ func TestAdminFind(t *testing.T) {
 
 	swords := findTablePage("item", "sword", findItemRow(0, 1, "Short Sword"), findItemRow(1, 2, "Long Sword"), findItemRow(2, 3, "Sword of the Very Long Na..."))
 	assertOnePage(t, "//find item sword", exchange(t, gm, encodeBuildCmd("find item sword")), swords)
-	assertOnePage(t, "//find item 1 sword", exchange(t, gm, encodeBypass("admin_find item 1 sword")), swords)
-	assertOnePage(t, "//find item 1 long  SWORD", exchange(t, gm, encodeBypass("admin_find item 1 long  SWORD")),
+	assertOnePage(t, "//find item 1 sword", exchange(t, gm, encodeBuildCmd("find item 1 sword")), swords)
+	assertOnePage(t, "//find item 1 long  SWORD", exchange(t, gm, encodeBuildCmd("find item 1 long  SWORD")),
 		findTablePage("item", "long  SWORD", findItemRow(0, 2, "Long Sword"), findItemRow(1, 3, "Sword of the Very Long Na...")))
 	// Page 0 searches the page too.
 	assertOnePage(t, "//find item 0 sword", exchange(t, gm, encodeBuildCmd("find item 0 sword")), findTablePage("item", "0 sword"))

@@ -176,8 +176,14 @@ var (
 )
 
 // bypassAdmin runs a clicked admin_ link. Its word is the command up to
-// its first space.
+// its first space. Like an npc_ link, it must be one the last validated
+// page offered: any other is dropped silently, so a link planted in text
+// a player wrote, or a forged packet, runs nothing. A "//command" typed in
+// chat takes no page.
 func (l *GameClientLink) bypassAdmin(live *livePlayer, command string) {
+	if !live.bypasses.allows(command) {
+		return
+	}
 	word, _, _ := strings.Cut(command, " ")
 	l.runAdminCommand(live, adminBypassEntry, word, command, command)
 }

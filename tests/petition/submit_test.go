@@ -88,7 +88,7 @@ func TestPetitionLimits(t *testing.T) {
 	assertMessages(t, exchange(t, r.gm, encodePetition("mine", 3)), msg(serverpackets.SystemMessagePetitionSystemCurrentUnavailable))
 
 	id := r.srv.Petitions.List()[1].ID
-	exchange(t, r.gm, encodeBypass("admin_petition join "+itoa(id)))
+	exchange(t, r.gm, encodeBuildCmd("petition join "+itoa(id)))
 	exchange(t, r.gm, encodePetitionCancel())
 	drain(t, r.player)
 	assertMessages(t, exchange(t, r.player, encodePetition("help", 3)), msg(serverpackets.SystemMessageWeHaveReceivedS1PetitionsToday, int32(2)))

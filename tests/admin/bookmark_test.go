@@ -98,8 +98,8 @@ func TestAdminBookmark(t *testing.T) {
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("bk abcdefghijklmnop")), "The bookmark name is too long.")
 	assertOnePage(t, "//bk abcdefghijklmno", exchange(t, gm, encodeBuildCmd("bk abcdefghijklmno")),
 		bookmarkPage(t, append(saved, home, bookmarkRow(3, "abcdefghijklmno", spawnX, spawnY, spawnZ))...))
-	assertOnePage(t, "//delbk ABCDEFGHIJKLMNO", exchange(t, gm, encodeBypass("admin_delbk ABCDEFGHIJKLMNO")), bookmarkPage(t, append(saved, home)...))
-	assertOnePage(t, "//bk 2", exchange(t, gm, encodeBypass("admin_bk 2")), bookmarkPage(t, append(saved, home)...))
+	assertOnePage(t, "//delbk ABCDEFGHIJKLMNO", exchange(t, gm, encodeBuildCmd("delbk ABCDEFGHIJKLMNO")), bookmarkPage(t, append(saved, home)...))
+	assertOnePage(t, "//bk 2", exchange(t, gm, encodeBuildCmd("bk 2")), bookmarkPage(t, append(saved, home)...))
 	if frames := exchange(t, gm, encodeBuildCmd("bk 0")); len(frames) != 0 {
 		t.Fatalf("//bk 0 frames = %x, want none", testsupport.FrameOpcodes(frames))
 	}

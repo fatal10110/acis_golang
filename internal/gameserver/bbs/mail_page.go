@@ -3,6 +3,8 @@ package bbs
 import (
 	"strconv"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // The mail board's pages, under the board's page folder.
@@ -109,7 +111,7 @@ func RenderMailList(page string, box []Mail, q MailQuery, writer func(int32) str
 		if mail.Unread {
 			rows.WriteString(`<font color="LEVEL">`)
 		}
-		rows.WriteString(ellipsize(mail.Subject, subjectListLength))
+		rows.WriteString(commons.HTMLText(ellipsize(mail.Subject, subjectListLength)))
 		if mail.Unread {
 			rows.WriteString(`</font>`)
 		}
@@ -172,32 +174,25 @@ func mailPager(q MailQuery, shown, pages int) string {
 	return b.String()
 }
 
-// escapeMarkup turns the markup characters <, > and " of s into entities.
-func escapeMarkup(s string) string {
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	return strings.ReplaceAll(s, `"`, "&quot;")
-}
-
 // RenderMailView fills page, the mail page, with mail; writer names its
 // sender. The message's line breaks become <br> before the markup is
 // escaped, so they show as text, as the line breaks stored at send do.
 func RenderMailView(page string, mail Mail, writer string) string {
-	page = strings.ReplaceAll(page, "%maillink%", folders[mail.Folder].link+"&nbsp;&gt;&nbsp;"+mail.Subject)
+	page = strings.ReplaceAll(page, "%maillink%", folders[mail.Folder].link+"&nbsp;&gt;&nbsp;"+commons.HTMLText(mail.Subject))
 	page = strings.ReplaceAll(page, "%writer%", writer)
 	page = strings.ReplaceAll(page, "%sentDate%", mail.SentText())
-	page = strings.ReplaceAll(page, "%receiver%", mail.Recipients)
+	page = strings.ReplaceAll(page, "%receiver%", commons.HTMLText(mail.Recipients))
 	page = strings.ReplaceAll(page, "%delDate%", "Unknown")
-	page = strings.ReplaceAll(page, "%title%", escapeMarkup(mail.Subject))
-	page = strings.ReplaceAll(page, "%mes%", escapeMarkup(strings.ReplaceAll(mail.Message, "\r\n", "<br>")))
+	page = strings.ReplaceAll(page, "%title%", commons.HTMLText(mail.Subject))
+	page = strings.ReplaceAll(page, "%mes%", commons.HTMLText(strings.ReplaceAll(mail.Message, "\r\n", "<br>")))
 	return strings.ReplaceAll(page, "%mailId%", strconv.Itoa(int(mail.ID)))
 }
 
 // RenderMailReply fills page, the reply form, for a reply to mail;
 // recipients is the list the reply goes to.
 func RenderMailReply(page string, mail Mail, recipients string) string {
-	link := folders[mail.Folder].link + `&nbsp;&gt;&nbsp;<a action="bypass _bbsmail;view;` + strconv.Itoa(int(mail.ID)) + `">` + mail.Subject + "</a>&nbsp;&gt;&nbsp;"
+	link := folders[mail.Folder].link + `&nbsp;&gt;&nbsp;<a action="bypass _bbsmail;view;` + strconv.Itoa(int(mail.ID)) + `">` + commons.HTMLText(mail.Subject) + "</a>&nbsp;&gt;&nbsp;"
 	page = strings.ReplaceAll(page, "%maillink%", link)
-	page = strings.ReplaceAll(page, "%recipients%", recipients)
+	page = strings.ReplaceAll(page, "%recipients%", commons.HTMLText(recipients))
 	return strings.ReplaceAll(page, "%mailId%", strconv.Itoa(int(mail.ID)))
 }

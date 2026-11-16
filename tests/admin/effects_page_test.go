@@ -185,7 +185,7 @@ func TestAdminEffectsEffectPageSelf(t *testing.T) {
 	requireEffectReply(t, "//effect visual", frames, nil, links)
 
 	// The page's own links reach the same command.
-	requireEffectReply(t, "admin_effect bypass", append(exchange(t, gm, encodeBypass("admin_effect set 1020 1")), settle(t, gm)...),
+	requireEffectReply(t, "admin_effect bypass", append(exchange(t, gm, encodeBuildCmd("effect set 1020 1")), settle(t, gm)...),
 		nil, effectRow(0, effectsBuff, "Buff", "60s"))
 }
 
@@ -330,7 +330,7 @@ func TestAdminEffectsJukebox(t *testing.T) {
 	enterWorld(t, gm)
 	drain(t, gm)
 	assertPage(t, exchange(t, gm, encodeBuildCmd("jukebox")), "jukeBox -- Main")
-	assertPage(t, exchange(t, gm, encodeBypass("admin_jukebox")), "admin_play_sound ls01_f")
+	assertPage(t, exchange(t, gm, encodeBuildCmd("jukebox")), "admin_play_sound ls01_f")
 }
 
 // abnormalMasks returns the abnormal mask each frame of opcode about objID
@@ -399,7 +399,7 @@ func TestAdminEffectsAbnormal(t *testing.T) {
 	drain(t, gm)
 	exchange(t, gm, encodeAction(h.ObjectID()))
 	for _, want := range []uint32{0x2, 0x0} {
-		frames := exchange(t, gm, encodeBypass("admin_abnormal 2"))
+		frames := exchange(t, gm, encodeBuildCmd("abnormal 2"))
 		onParaQueue(t, h.Queue(), func() {})
 		frames = append(frames, settle(t, gm)...)
 		if got := last("admin_abnormal 2 on NPC", frames, serverpackets.OpcodeNPCInfo, h.ObjectID()) & 0x2; got != want {

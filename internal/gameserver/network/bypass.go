@@ -14,8 +14,8 @@ import (
 )
 
 // bypassWhitelist holds the bypass commands of the last validated HTML
-// page a player was sent. A validated npc_ or Quest command must be one of
-// them: equal to a link's command, or starting with the part before the
+// page a player was sent. A validated npc_, admin_ or Quest command must
+// be one of them: equal to a link's command, or starting with the part before the
 // '$' of a link that takes an edit-box value.
 type bypassWhitelist struct {
 	mu     sync.Mutex

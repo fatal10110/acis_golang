@@ -127,14 +127,14 @@ func TestAnnounceText(t *testing.T) {
 	}
 	assertSay(t, frames[0], 0, sayAnnouncement, "", "Server restart in  5 minutes")
 
-	frames = exchange(t, gm, encodeBypass("admin_say  now"))
+	frames = exchange(t, gm, encodeBuildCmd("say  now"))
 	if len(frames) != 1 {
 		t.Fatalf("//say frames = %x, want one CreatureSay", testsupport.FrameOpcodes(frames))
 	}
 	assertSay(t, frames[0], 0, sayCritical, "", " now")
 	assertSay(t, pending(t, user)[0], 0, sayCritical, "", " now")
 
-	for _, command := range [][]byte{encodeBuildCmd("ann"), encodeBypass("admin_say ")} {
+	for _, command := range [][]byte{encodeBuildCmd("ann"), encodeBuildCmd("say ")} {
 		if frames := exchange(t, gm, command); len(frames) != 0 {
 			t.Fatalf("empty announcement frames = %x, want none", testsupport.FrameOpcodes(frames))
 		}
@@ -232,7 +232,7 @@ func TestAnnounceManagesLoginAnnouncements(t *testing.T) {
 	assertPage(t, exchange(t, gm, encodeBuildCmd("announce del 0 1")), "Announcements Menu")
 	assertPage(t, exchange(t, gm, encodeBuildCmd("announce del")), "Announcements Menu")
 
-	assertList(t, exchange(t, gm, encodeBypass("admin_announce del 0")), listedAnnouncement("1", "Welcome", "false", "false"))
+	assertList(t, exchange(t, gm, encodeBuildCmd("announce del 0")), listedAnnouncement("1", "Welcome", "false", "false"))
 	assertAnnouncementFile(t, srv,
 		`<announcement message="Welcome" critical="false" auto="false" initial_delay="0" delay="0" limit="0" />`)
 

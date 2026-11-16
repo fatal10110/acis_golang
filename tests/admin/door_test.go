@@ -47,7 +47,7 @@ func TestAdminDoorOpenClose(t *testing.T) {
 	if !d.Opened() {
 		t.Fatal("door closed after //open id")
 	}
-	requireDoorShown(t, "//close id", exchange(t, gm, encodeBypass("admin_close "+id)), d, true)
+	requireDoorShown(t, "//close id", exchange(t, gm, encodeBuildCmd("close "+id)), d, true)
 	if d.Opened() {
 		t.Fatal("door open after //close id")
 	}

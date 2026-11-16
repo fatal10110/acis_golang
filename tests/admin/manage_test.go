@@ -101,7 +101,7 @@ func TestAdminManageSelfAndName(t *testing.T) {
 		t.Fatal("//kill with a bad radius killed the player")
 	}
 
-	exchange(t, gm, encodeBypass("admin_kill player"))
+	exchange(t, gm, encodeBuildCmd("kill player"))
 	settle(t, user)
 	if !pc.Dead() {
 		t.Fatal("//kill player left the named player alive")

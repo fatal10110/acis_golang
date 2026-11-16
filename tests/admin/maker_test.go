@@ -146,7 +146,7 @@ func TestAdminMakerPages(t *testing.T) {
 	if strings.Contains(page, "admin_away") || strings.Contains(page, "grouped_000") {
 		t.Fatalf("first page = %q, want only admin_field", page)
 	}
-	assertContains(t, pageOf(t, exchangeZones(t, c, encodeBypass("admin_maker 2"))),
+	assertContains(t, pageOf(t, exchangeZones(t, c, encodeBuildCmd("maker 2"))),
 		`<font color=LEVEL>grouped_000</font>`, "min=-2000, max=500",
 		`<a action="bypass -h admin_maker admin_grp">admin_grp</a>`)
 

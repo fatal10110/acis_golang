@@ -31,7 +31,7 @@ func TestPetitionConsultation(t *testing.T) {
 	// Pending, the petition has no chat yet.
 	assertMessages(t, exchange(t, r.player, encodeSay2(sayPetitionPlayer, "anyone?")), msg(serverpackets.SystemMessageYouAreNotInPetitionChat))
 
-	frames := exchange(t, r.gm, encodeBypass("admin_petition join "+itoa(id)))
+	frames := exchange(t, r.gm, encodeBuildCmd("petition join "+itoa(id)))
 	if len(frames) != 2 {
 		t.Fatalf("join frames = %x, want the consultation notice then the list", testsupport.FrameOpcodes(frames))
 	}
@@ -79,7 +79,7 @@ func TestPetitionConsultation(t *testing.T) {
 	// Only the first vote counts.
 	exchange(t, r.player, encodeVote(4, "changed my mind"))
 
-	frames = exchange(t, r.gm, encodeBypass("admin_petition view "+itoa(id)))
+	frames = exchange(t, r.gm, encodeBuildCmd("petition view "+itoa(id)))
 	if len(frames) != 1 {
 		t.Fatalf("view frames = %x, want the petition page", testsupport.FrameOpcodes(frames))
 	}
@@ -135,7 +135,7 @@ func TestPetitionAcceptedWithoutChatStoresPending(t *testing.T) {
 	r := boot(t)
 	r.enterAll(t)
 	id := r.submit(t)
-	exchange(t, r.gm, encodeBypass("admin_petition join "+itoa(id)))
+	exchange(t, r.gm, encodeBuildCmd("petition join "+itoa(id)))
 	r.srv.SavePetitions(t)
 	var state, responders string
 	if err := r.srv.DB.QueryRowContext(context.Background(), "SELECT state, responders FROM petition WHERE oid = ?", id).Scan(&state, &responders); err != nil {
