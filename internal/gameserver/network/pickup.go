@@ -63,7 +63,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	taken := false
 	defer func() {
 		if !taken {
-			ground.Release()
+			l.releaseGround(ground)
 		}
 	}()
 	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {

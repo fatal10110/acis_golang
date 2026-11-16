@@ -28,7 +28,7 @@ func (l *GameClientLink) TakeGround(ground *grounditem.Item) {
 		l.despawnGround(ground)
 		end.GroundObjectID = 0
 	} else {
-		ground.Release()
+		l.releaseGround(ground)
 	}
 	l.endCursedWeapon(end, nil)
 }

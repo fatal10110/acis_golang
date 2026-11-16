@@ -67,7 +67,8 @@ func (m *Manager) Weapons() []Info {
 }
 
 // End ends itemID's weapon wherever it is, out or not: endOfLife, which a
-// game master's removal runs. ok is false for an item that is no cursed
+// game master's removal runs. A ground item a pickup holds is left to the
+// pickup, dead (gmEndLocked). ok is false for an item that is no cursed
 // weapon.
 func (m *Manager) End(itemID int32) (EndOfLife, bool) {
 	if m == nil {
@@ -79,7 +80,7 @@ func (m *Manager) End(itemID int32) (EndOfLife, bool) {
 	if w == nil {
 		return EndOfLife{}, false
 	}
-	return m.endOfLifeLocked(w), true
+	return m.gmEndLocked(w), true
 }
 
 // Reserve claims itemID's weapon, not out yet, for a game master to hand
@@ -136,6 +137,7 @@ func (m *Manager) StartLife(itemID, holderID int32) bool {
 
 // Reload ends every weapon, out or not, in the order Weapons lists them,
 // then takes table's weapons in place of the ones it had, none of them out.
+// A ground item a pickup holds is left to the pickup, dead (gmEndLocked).
 // It returns the ends for the caller to apply.
 func (m *Manager) Reload(table *entity.CursedWeaponTable) []EndOfLife {
 	if m == nil {
@@ -145,7 +147,7 @@ func (m *Manager) Reload(table *entity.CursedWeaponTable) []EndOfLife {
 	defer m.mu.Unlock()
 	ends := make([]EndOfLife, 0, len(m.order))
 	for _, w := range m.order {
-		ends = append(ends, m.endOfLifeLocked(w))
+		ends = append(ends, m.gmEndLocked(w))
 	}
 	m.byID, m.order = weapons(table)
 	return ends

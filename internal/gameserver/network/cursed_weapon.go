@@ -133,13 +133,23 @@ func (l *GameClientLink) obtainCursedWeapon(live *livePlayer, itemID int32) {
 	if inv == nil || l.inventory == nil {
 		return
 	}
-	res, ok := l.cursed.Activate(itemID, cursedweapon.Holder{
+	h := cursedweapon.Holder{
 		ObjectID:   live.ObjectID(),
 		Karma:      int32(live.Karma()),
 		PKKills:    int32(live.ProgressionValues().PKKills),
 		HeldItemID: live.CursedWeaponID(),
-	}, live.Roll)
+	}
+	if inst := inv.ItemByTemplateID(itemID); inst != nil {
+		h.ItemObjectID = inst.ObjectID
+	}
+	res, ok := l.cursed.Activate(itemID, h, live.Roll)
 	if !ok {
+		return
+	}
+	if res.Dead {
+		// A game master ended the weapon while live's pickup held it: the
+		// item ends with it.
+		inv.DestroyByTemplateID(itemID, 1)
 		return
 	}
 	if res.Assimilated {
@@ -355,6 +365,29 @@ func (l *GameClientLink) releaseCursedHolder(live *livePlayer, end cursedweapon.
 	}
 	l.broadcastCharacterInfo(live)
 	l.cursed.ReleaseHolder(end)
+}
+
+// releaseGround lets go of ground, which a pickup that took nothing held.
+// The item of a cursed weapon a game master ended meanwhile, and a
+// mercenary ticket its castle's owner removal passed over, leave the world
+// instead: nothing else takes them off the ground.
+func (l *GameClientLink) releaseGround(ground *grounditem.Item) {
+	if l.cursed != nil && l.isCursedWeapon(ground.ItemID()) {
+		if l.cursed.LetGo(ground) {
+			l.despawnGround(ground)
+		}
+		return
+	}
+	if l.sieges != nil {
+		x, y, z := ground.Position()
+		if c, ok := l.castleAt(x, y, z); ok {
+			if c.LetGoTicket(ground.ObjectID(), ground) {
+				l.despawnGround(ground)
+			}
+			return
+		}
+	}
+	ground.Release()
 }
 
 // removeCursedGroundItem takes the ground item objectID out of the world,

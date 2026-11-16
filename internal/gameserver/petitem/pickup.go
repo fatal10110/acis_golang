@@ -36,41 +36,38 @@ func PickupAvailable(pet *summon.Actor) bool {
 
 // ClaimGround runs every check a pet's pickup of ground must pass, once the
 // pet stands within reach of it (a pet that cannot act is refused), and claims
-// it, keeping the claim only on PickupOK; herb reports a herb, which the pet
-// uses instead of carrying. The caller then stores the item (StoreGround) or
-// hands it on, as the owner's party loot rule does.
-func ClaimGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *grounditem.Item) (herb bool, failure PickupFailure) {
+// it; herb reports a herb, which the pet uses instead of carrying. held
+// reports the caller holds the claim: on PickupOK it then stores the item
+// (StoreGround) or hands it on, as the owner's party loot rule does; on a
+// rejection it lets the item go.
+func ClaimGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *grounditem.Item) (herb, held bool, failure PickupFailure) {
 	if pet == nil || petInv == nil || ground == nil || ground.Template == nil || ground.Count() <= 0 {
-		return false, PickupNoop
+		return false, false, PickupNoop
 	}
 	if pet.DenyAIAction() {
-		return false, PickupPetUnavailable
+		return false, false, PickupPetUnavailable
 	}
 
 	picked := ground.Instance.Clone()
 	herb = ground.Template.EtcItem != nil && ground.Template.EtcItem.Type == modelitem.EtcItemHerb
 	if Ammunition(ground.Template) {
-		return false, PickupItemNotForPets
+		return false, false, PickupItemNotForPets
 	}
-	// Every rejection from here on puts the claimed item back on the ground.
 	if !ground.Claim() {
-		return false, PickupTaken
+		return false, false, PickupTaken
 	}
 	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(picked, ground.Template)) {
-		ground.Release()
-		return false, PickupPetCannotCarryMore
+		return false, true, PickupPetCannotCarryMore
 	}
 	// A herb is used, never carried; anything else must fit the pet's
 	// stack of it within the item count limit.
 	if !herb && !stackFits(petInv, ground.Template.ID, ground.Template, ground.Count()) {
-		ground.Release()
-		return false, PickupPetCannotCarryMore
+		return false, true, PickupPetCannotCarryMore
 	}
 	if ownerLootLocked(pet, ground.Instance.Snapshot().OwnerID) {
-		ground.Release()
-		return false, PickupLootLocked
+		return false, true, PickupLootLocked
 	}
-	return herb, PickupOK
+	return herb, true, PickupOK
 }
 
 // StoreGround moves a claimed ground item into the pet inventory and

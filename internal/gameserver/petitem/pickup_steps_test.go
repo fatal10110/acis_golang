@@ -18,8 +18,11 @@ type pickupResult struct {
 // claimAndStore runs a pet's pickup the way the server does when the pet
 // keeps the item: ClaimGround, then StoreGround unless it is a herb.
 func claimAndStore(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *grounditem.Item) (pickupResult, PickupFailure) {
-	herb, failure := ClaimGround(pet, petInv, ground)
+	herb, held, failure := ClaimGround(pet, petInv, ground)
 	if failure != PickupOK {
+		if held {
+			ground.Release()
+		}
 		return pickupResult{}, failure
 	}
 	if herb {
