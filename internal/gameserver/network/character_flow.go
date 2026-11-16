@@ -838,6 +838,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetSeesInvisible(access.IsGM)
 	live.attack, live.move, live.combat = attackCtl, moveCtl, combat
 	live.kick = client.Session.Close
+	live.performFloodProtected = client.performFloodProtected
 	live.zoneActor = &liveZoneActor{live: live}
 	if l.scripts != nil {
 		live.zoneActor.scripts = l.scripts

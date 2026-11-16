@@ -364,7 +364,20 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 // replays them too, ahead of its saves. applied, when set, runs once every
 // effect is back with its stats, before any tick due since the restore:
 // what the restore does with the full maxima, it does ahead of those ticks.
+// The replay sends c none of the stack system messages: at login c has no
+// client yet.
 func (p *Persistence) ReplayEffects(c *player.Character, applied func()) {
+	p.replayEffects(c, applied, false)
+}
+
+// ReplayClassEffects is ReplayEffects for a character in the world whose
+// class changed: c is told of each effect it feels again, as when it is
+// cast, ahead of the one icon refresh.
+func (p *Persistence) ReplayClassEffects(c *player.Character) {
+	p.replayEffects(c, nil, true)
+}
+
+func (p *Persistence) replayEffects(c *player.Character, applied func(), announce bool) {
 	if p == nil || c == nil {
 		return
 	}
@@ -380,7 +393,11 @@ func (p *Persistence) ReplayEffects(c *player.Character, applied func()) {
 	}
 	// One restore for all of them: the ticks due since the restore run in
 	// time order across the effects, and the icons refresh once.
-	list.Restore(func() {
+	restore := list.Restore
+	if announce {
+		restore = list.RestoreAnnounced
+	}
+	restore(func() {
 		for _, eff := range c.ActiveSkillEffects() {
 			def, ok := p.definition(eff.Skill)
 			if !ok {

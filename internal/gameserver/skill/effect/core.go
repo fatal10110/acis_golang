@@ -387,8 +387,10 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // effector and effected are both the relogging character: the original
 // caster identity is not persisted, so every reinstated effect is treated as
 // self-applied, and a template whose attached condition rejects that pair
-// (see Admits) is not reinstated. The replay is silent (see List.AddRestored): it activates and refreshes icons
-// but sends no stack or expiry system messages.
+// (see Admits) is not reinstated. It activates and refreshes icons; inside a
+// List.RestoreAnnounced it sends the stack system messages an add sends,
+// otherwise it sends no stack or expiry system messages (see
+// List.AddRestored).
 //
 // restoredAt, when set, is the instant the saved state was read back: each
 // effect's schedule runs from there, not from the replay. One whose ticks
