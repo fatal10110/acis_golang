@@ -212,26 +212,24 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		player.SetMemo(memo, strconv.Itoa(int(e.NPC.NpcID())))
 		player.TeleportTo(riftEntrance(), 0)
 
+	// The link stays usable after its page, so the level, the fragment and
+	// the fee are checked again here: a player that lost any of them since
+	// is refused with the gatekeeper's page and pays nothing.
 	case strings.EqualFold(e.Name, "zigurratDimensional"):
 		level := player.Level()
-		if level >= 20 && level < 30 {
-			s.TakeItems(player, adena, 2000)
-		} else if level >= 30 && level < 40 {
-			s.TakeItems(player, adena, 4500)
-		} else if level >= 40 && level < 50 {
-			s.TakeItems(player, adena, 8000)
-		} else if level >= 50 && level < 60 {
-			s.TakeItems(player, adena, 12500)
-		} else if level >= 60 && level < 70 {
-			s.TakeItems(player, adena, 18000)
-		} else if level >= 70 {
-			s.TakeItems(player, adena, 24500)
+		switch {
+		case level < 20:
+			htmltext = "ziggurat_lowlevel.htm"
+		case !player.HasItem(dimensionFragment):
+			htmltext = "ziggurat_nofrag.htm"
+		case s.TakeHeldItems(player, adena, riftFee(level)) == 0:
+			htmltext = "ziggurat_noadena.htm"
+		default:
+			htmltext = "ziggurat_rift.htm"
+
+			player.SetMemo(memo, strconv.Itoa(int(e.NPC.NpcID())))
+			player.TeleportTo(riftEntrance(), 0)
 		}
-
-		htmltext = "ziggurat_rift.htm"
-
-		player.SetMemo(memo, strconv.Itoa(int(e.NPC.NpcID())))
-		player.TeleportTo(riftEntrance(), 0)
 
 	case strings.EqualFold(e.Name, "Dimensional"):
 		htmltext = "oracle.htm"
@@ -285,6 +283,25 @@ func onTalk(_ *script.Script, e script.Talk) string {
 	}
 
 	return htmltext
+}
+
+// riftFee is the adena a ziggurat gatekeeper charges a player of level, 20
+// or more, for the rift.
+func riftFee(level int32) int32 {
+	switch {
+	case level < 30:
+		return 2000
+	case level < 40:
+		return 4500
+	case level < 50:
+		return 8000
+	case level < 60:
+		return 12500
+	case level < 70:
+		return 18000
+	default:
+		return 24500
+	}
 }
 
 // memoInteger reads the player's memo key as a 32-bit number, def when it

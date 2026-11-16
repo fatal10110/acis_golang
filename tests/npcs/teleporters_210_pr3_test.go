@@ -390,29 +390,40 @@ func TestOracleTeleporterRiftLinks(t *testing.T) {
 }
 
 // TestOracleTeleporterZigguratFees: the rift link takes the fee of the
-// player's level band, whatever it holds, answers ziggurat_rift.htm,
-// remembers the gatekeeper and sends the player to the rift's entrance; a
-// player short of the fee loses all it holds, and one below level 20 pays
-// nothing.
+// player's level band, answers ziggurat_rift.htm, remembers the gatekeeper
+// and sends the player to the rift's entrance. The link checks again what
+// the gatekeeper's page did (owner-approved divergence, #5158): below level
+// 20, without a dimension fragment or short of the band's fee the player is
+// answered the gatekeeper's refusal, pays nothing, stays and is not
+// remembered.
 func TestOracleTeleporterZigguratFees(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
-		level int
-		held  int32
-		left  int
+		level  int
+		held   int32
+		noFrag bool
+		left   int
+		page   string
 	}{
-		{level: 19, held: 30000, left: 30000},
+		{level: 19, held: 30000, left: 30000, page: "ziggurat_lowlevel.htm"},
 		{level: 20, held: 30000, left: 28000},
+		{level: 20, held: 30000, noFrag: true, left: 30000, page: "ziggurat_nofrag.htm"},
+		{level: 20, held: 1999, left: 1999, page: "ziggurat_noadena.htm"},
+		{level: 29, held: 2000, left: 0},
 		{level: 39, held: 30000, left: 25500},
 		{level: 40, held: 30000, left: 22000},
 		{level: 59, held: 30000, left: 17500},
 		{level: 60, held: 30000, left: 12000},
 		{level: 70, held: 30000, left: 5500},
-		{level: 70, held: 1000, left: 0},
+		{level: 70, held: 1000, left: 1000, page: "ziggurat_noadena.htm"},
 	} {
-		t.Run(fmt.Sprintf("level %d holding %d", tt.level, tt.held), func(t *testing.T) {
+		t.Run(fmt.Sprintf("level %d holding %d without fragment %t", tt.level, tt.held, tt.noFrag), func(t *testing.T) {
 			t.Parallel()
-			w := bootOracles(t, oracleSetup{level: tt.level, held: map[int32]int32{int32(item.AdenaID): tt.held}})
+			held := map[int32]int32{int32(item.AdenaID): tt.held}
+			if !tt.noFrag {
+				held[tpFragment] = 1
+			}
+			w := bootOracles(t, oracleSetup{level: tt.level, held: held})
 			gk := w.spawnFolk(t, folkTemplate("DungeonGatekeeper", tpZiggurat), 50)
 			w.openThrough(t, gk)
 			frames := w.tripFrames(t, "Quest OracleTeleporter zigurratDimensional")
@@ -420,11 +431,26 @@ func TestOracleTeleporterZigguratFees(t *testing.T) {
 			if page == nil {
 				t.Fatalf("the rift link answered no page: %x", opcodes(frames))
 			}
+			want := map[int32]int{int32(item.AdenaID): tt.left}
+			if !tt.noFrag {
+				want[tpFragment] = 1
+			}
+			if tt.page != "" {
+				if _, html, _ := htmlMessage(t, page); html != teleportPage(t, gk, "OracleTeleporter", tt.page) {
+					t.Fatalf("page = %q, want %s", html, tt.page)
+				}
+				w.requireNoTrip(t, frames)
+				w.requireSaved(t, want)
+				if got := w.oracleMemo(t); got != "" {
+					t.Fatalf("saved memo = %q, want none", got)
+				}
+				return
+			}
 			if _, html, _ := htmlMessage(t, page); html != teleportPage(t, gk, "OracleTeleporter", "ziggurat_rift.htm") {
 				t.Fatalf("page = %q, want ziggurat_rift.htm", html)
 			}
 			w.requireTrip(t, frames, tpRiftEntrance)
-			w.requireSaved(t, map[int32]int{int32(item.AdenaID): tt.left})
+			w.requireSaved(t, want)
 			if got := w.oracleMemo(t); got != strconv.Itoa(tpZiggurat) {
 				t.Fatalf("saved memo = %q, want %d", got, tpZiggurat)
 			}

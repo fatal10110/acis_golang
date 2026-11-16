@@ -113,12 +113,19 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 				s.PlaySound(p, script.SoundItemGet)
 				s.TakeItems(p, qitemPenitentManacles, -1)
 				s.GiveItems(p, penitentManacles, 1)
-			// Back with the leftover manacles of a previous round.
+			// Back with the leftover manacles of a previous round. The link
+			// stays usable after its page, so a player that no longer holds
+			// them is sent back to bring them and gets nothing.
 			case 16:
+				if !p.HasItem(leftPenitentManacles) {
+					htmltext = "30981-18.htm"
+					break
+				}
 				st.Set(varLevel, strconv.Itoa(int(p.Level())))
 				s.PlaySound(p, script.SoundItemGet)
-				s.TakeItems(p, leftPenitentManacles, -1)
-				s.GiveItems(p, penitentManacles, 1)
+				if s.TakeHeldItems(p, leftPenitentManacles, -1) > 0 {
+					s.GiveItems(p, penitentManacles, 1)
+				}
 			}
 		}
 	case strings.EqualFold(e.Name, "30981-19.htm"):
