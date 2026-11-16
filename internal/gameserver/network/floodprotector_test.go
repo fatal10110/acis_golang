@@ -21,11 +21,8 @@ func TestPreAuthPacketCapDisconnects(t *testing.T) {
 	c := testsupport.Dial(t, addr)
 	c.SendProtocolVersion(746) // processed packet 1
 
-	for i := 0; i < 2; i++ { // processed packets 2 and 3
-		c.Send(encodeProtocolVersion(746))
-		if got := c.Read(); got == nil || got[0] != serverpackets.OpcodeVersionCheck {
-			t.Fatalf("accepted pre-auth frame %d: opcode = %#x, want VersionCheck", i+2, got[0])
-		}
+	for range 2 { // processed packets 2 and 3
+		c.RepeatProtocolVersion(746) // fails unless answered by VersionCheck
 	}
 
 	c.Send(encodeProtocolVersion(746)) // processed packet 4: over the cap
