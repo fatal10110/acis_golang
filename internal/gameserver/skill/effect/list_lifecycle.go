@@ -517,28 +517,37 @@ func (l *List) beginActivate(e *Effect, announce bool) func() {
 // list from deadlocking; the activations it causes run once it returns.
 // The exit hooks of a displaced or removed head are not ordered by this:
 // one still running late can clear state a later head set (#5221).
+//
+// A hook that panics ends the run but not the list: the activations still
+// queued stay queued, in order, and run ahead of the next one added.
 func (l *List) activate(act activation) {
 	l.mu.Lock()
+	l.deferred = append(l.deferred, act)
 	if l.activating {
-		l.deferred = append(l.deferred, act)
 		l.mu.Unlock()
 		return
 	}
 	l.activating = true
-	var after []func()
-	for {
-		l.mu.Unlock()
-		appendThunk(&after, l.activateOne(act))
-		l.mu.Lock()
-		if len(l.deferred) == 0 {
-			break
+	finished := false
+	defer func() {
+		if !finished {
+			l.mu.Lock()
+			l.activating = false
+			l.mu.Unlock()
 		}
-		act = l.deferred[0]
+	}()
+	var after []func()
+	for len(l.deferred) > 0 {
+		next := l.deferred[0]
 		l.deferred = l.deferred[1:]
+		l.mu.Unlock()
+		appendThunk(&after, l.activateOne(next))
+		l.mu.Lock()
 	}
 	l.activating = false
 	l.deferred = nil
 	l.mu.Unlock()
+	finished = true
 	runHooks(after)
 }
 
