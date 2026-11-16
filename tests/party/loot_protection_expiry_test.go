@@ -45,6 +45,9 @@ func TestLootProtectionLiftsAtItsDeadline(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			g := bootGroup(t, []seat{{"Killer", 40}, {"Looter", 40}})
+			if !g.srv.DrivesClock() {
+				t.Skip("pinning the lift to the millisecond needs the driven clock")
+			}
 			mob := g.spawnBesideLeader(t, tc.tmpl())
 			if !mob.TakeDamage(1_000_000, g.combatant(t, 0)) {
 				t.Fatal("Killer's hit did not kill the mob")
