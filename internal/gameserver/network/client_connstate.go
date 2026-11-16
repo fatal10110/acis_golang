@@ -14,9 +14,6 @@ type connState struct {
 	// conn is the connection client's session runs over, for the waits on
 	// pending persistence that tie a request to this connection.
 	conn *Conn
-	// key is the connection's cipher key, which VersionCheck hands the
-	// client.
-	key []byte
 	// chars resolves the character-list slot indices RequestCharacterDelete,
 	// CharacterRestore and RequestGameStart address.
 	chars []*player.Character

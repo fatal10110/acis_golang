@@ -53,7 +53,7 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 	}
 	if l.clients != nil {
 		if evicted, replaced := l.clients.Take(req.LoginName, client); replaced {
-			evicted.Session.Close()
+			evicted.Session.Evict()
 		}
 	}
 	return true, nil
@@ -837,7 +837,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetCanGiveDamage(access.GiveDamage)
 	c.SetSeesInvisible(access.IsGM)
 	live.attack, live.move, live.combat = attackCtl, moveCtl, combat
-	live.kick = client.Session.Close
+	live.kick = client.Session.Evict
 	live.performFloodProtected = client.performFloodProtected
 	live.zoneActor = &liveZoneActor{live: live}
 	if l.scripts != nil {

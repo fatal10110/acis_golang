@@ -299,10 +299,17 @@ func (c *Conn) stop() {
 // closes the underlying connection. Safe to call more than once; every
 // call blocks until the underlying connection is actually closed.
 func (c *Conn) Close() error {
+	c.closeLater()
+	<-c.stopped
+	return c.closeErr
+}
+
+// closeLater is Close without the wait: the writer flushes what is queued
+// and closes the underlying connection on its own, which for a peer that
+// stopped reading happens only once the write deadline gives up on it.
+func (c *Conn) closeLater() {
 	c.mu.Lock()
 	c.closed = true
 	c.mu.Unlock()
 	c.signal()
-	<-c.stopped
-	return c.closeErr
 }

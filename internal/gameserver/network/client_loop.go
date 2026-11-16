@@ -47,14 +47,14 @@ func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte
 // handle signature, so a caller wires it in directly:
 // network.Serve(ctx, ln, link.Handle, log).
 func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
-	key, session, ok := l.openSession(conn)
+	session, ok := l.openSession(conn)
 	if !ok {
 		return
 	}
 	client := NewClient(session)
 	stopOnShutdown := closeOnShutdown(ctx, client, conn)
 	defer stopOnShutdown()
-	cs := &connState{client: client, conn: conn, key: key}
+	cs := &connState{client: client, conn: conn}
 	defer l.endConnection(ctx, cs)
 
 	for {
@@ -89,6 +89,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if !hangUp(err) && !errors.Is(err, net.ErrClosed) && endSession(ctx, client) {
 				_ = conn.Close()
 			}
+			return
+		}
+		// An evicted session serves its client nothing more: its last
+		// frame is queued, and the connection closes once that is flushed,
+		// however long a client that stopped reading keeps it waiting.
+		if session.evictedNow() {
 			return
 		}
 		if len(payload) == 0 && client.State() != StateConnected {
@@ -133,21 +139,17 @@ func endSession(ctx context.Context, client *Client) bool {
 }
 
 // openSession builds the connection's cipher and session, logging and
-// reporting false when either cannot be made.
-func (l *GameClientLink) openSession(conn *Conn) (key []byte, session *Session, ok bool) {
-	key, err := randomCipherKey()
-	if err != nil {
-		l.log.Error().Err(err).Msg("generate game cipher key")
-		return nil, nil, false
-	}
-	gameCipher, err := gamecipher.NewCipher(key)
+// reporting false when either cannot be made. The cipher starts from a zero
+// key: nothing crosses encrypted before ProtocolVersion sets the real one.
+func (l *GameClientLink) openSession(conn *Conn) (session *Session, ok bool) {
+	gameCipher, err := gamecipher.NewCipher(make([]byte, gamecipher.KeySize))
 	if err != nil {
 		l.log.Error().Err(err).Msg("build game cipher")
-		return nil, nil, false
+		return nil, false
 	}
 	session = NewSession(conn, gameCipher)
 	session.idleTimeout = l.readIdleTimeout
-	return key, session, true
+	return session, true
 }
 
 // closeOnShutdown ends the connection when ctx (the server) stops. A client

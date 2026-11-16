@@ -17,12 +17,25 @@ func noPayload([]byte) (struct{}, error) { return struct{}{}, nil }
 // handleProtocolVersion answers a supported protocol revision with
 // VersionCheck, which carries the cipher key, and closes the connection on
 // any other.
+//
+// Every accepted ProtocolVersion takes a fresh key and restarts both
+// rolling keys from it before VersionCheck goes out. A repeated one thus
+// answers with a VersionCheck already encrypted with the new key, and every
+// later frame in either direction crosses under it.
 func (l *GameClientLink) handleProtocolVersion(_ context.Context, cs *connState, req clientpackets.ProtocolVersion) error {
 	session := cs.client.Session
 	if !validProtocolRevision(req.Revision) {
 		return errDisconnect
 	}
-	if !session.SendFrame(serverpackets.FrameVersionCheck(cs.key, !l.flow.noCipher)) {
+	key, err := randomCipherKey()
+	if err == nil {
+		err = session.SetCipherKey(key)
+	}
+	if err != nil {
+		l.log.Error().Err(err).Msg("game client: set cipher key")
+		return errDisconnect
+	}
+	if !session.SendFrame(serverpackets.FrameVersionCheck(key, !l.flow.noCipher)) {
 		return errDisconnect
 	}
 	// The key is out; every later frame crosses encrypted: crypt

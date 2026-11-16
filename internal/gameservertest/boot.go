@@ -206,6 +206,7 @@ type options struct {
 	serverBypassDelay      time.Duration
 	acceptFilter           *netutil.AcceptFilter
 	banList                *netutil.BanList
+	writeStalls            *writeStalls
 	acceptFilterNow        func() time.Time
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
@@ -1230,6 +1231,8 @@ type Server struct {
 	heldLanes    [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
 	log          zerolog.Logger
 	sendObserver *atomic.Pointer[func(payload []byte)]
+	// writeStalls is the write gates WithWriteStalls installed; nil without.
+	writeStalls *writeStalls
 	// refreshRecommendations runs the link's daily recommendation refresh.
 	refreshRecommendations func(context.Context) error
 
@@ -2664,6 +2667,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.acceptFilter != nil {
 		gameLn = netutil.FilterAccepts(gameLn, o.acceptFilter, o.acceptFilterNow)
 	}
+	if o.writeStalls != nil {
+		gameLn = stallListener{Listener: gameLn, stalls: o.writeStalls}
+	}
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
 	go func() { _ = network.Serve(ctx, gameLn, serve, zerolog.Nop()) }()
 
@@ -2892,6 +2898,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		cancel:              cancel,
 		waitHandlers:        waitHandlers,
 		sendObserver:        sendObserver,
+		writeStalls:         o.writeStalls,
 	}
 	srv.AnnounceFile = announcementsPath
 	srv.refreshRecommendations = gcl.RefreshDailyRecommendations

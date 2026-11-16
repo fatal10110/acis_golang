@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -251,8 +252,21 @@ func clearsSpawnProtection(opcode byte) bool {
 // dispatch serves an accepted frame through gameInbound and reports whether
 // the connection keeps reading. An accepted opcode with no handler is
 // logged and the frame dropped.
+//
+// A handler that panics on this goroutine stopped part-way through and told
+// its client nothing: the panic is logged and the session ends as one whose
+// queued handler panicked does, so the connection's own teardown releases
+// the account and detaches the player.
 func (l *GameClientLink) dispatch(ctx context.Context, cs *connState, payload []byte) (open bool) {
 	opcode := payload[0]
+	defer func() {
+		if r := recover(); r != nil {
+			l.log.Error().Interface("panic", r).Bytes("stack", debug.Stack()).
+				Str("opcode", fmt.Sprintf("%#x", opcode)).Str("account", cs.client.AccountName()).
+				Msg("game client disconnected: panic in packet handler")
+			open = false
+		}
+	}()
 	found, open := gameInbound.serve(l, ctx, cs, opcode, payload)
 	if !found {
 		l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", cs.client.State().String()).

@@ -173,6 +173,21 @@ func TestDecodeMoveBackwardToLocation(t *testing.T) {
 				OriginY:      41247,
 				OriginZ:      -3532,
 				MoveMovement: 0,
+
+				MovementMissing: true,
+			},
+		},
+		{
+			name: "movement mode cut short",
+			hex:  "0150b4000015a1000032f2ffff25b400001fa1000034f2ffff0100",
+			want: MoveBackwardToLocation{
+				TargetX:         46160,
+				TargetY:         41237,
+				TargetZ:         -3534,
+				OriginX:         46117,
+				OriginY:         41247,
+				OriginZ:         -3532,
+				MovementMissing: true,
 			},
 		},
 	}
