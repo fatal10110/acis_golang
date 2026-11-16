@@ -48,10 +48,33 @@ func TestCycleMatchesReferenceProbe(t *testing.T) {
 			t.Fatalf("unknown step %q", action)
 		}
 		h.clock.Advance(0)
-		if got := h.cycleState(t); got != l[1] {
-			t.Errorf("cycle %s:\n got %s\nwant %s", l[0], got, l[1])
+		want := l[1]
+		if w, ok := cycleDivergences[l[0]]; ok {
+			want = w
+		}
+		if got := h.cycleState(t); got != want {
+			t.Errorf("cycle %s:\n got %s\nwant %s", l[0], got, want)
 		}
 	}
+}
+
+// cycleDivergences are the cycle lines that differ from the reference by
+// owner decision (#5108, #5140): the next period's lists, costing 3050, are
+// charged to the treasury as they go live, and do not go live when it
+// cannot pay; the next period holds its own copies, which a sale in the
+// running period leaves as set.
+var cycleDivergences = map[string]string{
+	"12:00 5000 89 2 run":    "mode MAINTENANCE delay 360000 stores 1 sent - warehouse 5103:54,5098:1 income 2063 treasury 1950 gludio 5016:10 | 5073:100 / 5016:10 | 5073:100 dion 5017:3 | / |",
+	"12:00 5000 89 3 sell 3": "mode MAINTENANCE delay 360000 stores 1 sent - warehouse - income 2063 treasury 1950 gludio 5016:7 | 5073:100 / 5016:10 | 5073:100 dion 5017:3 | / |",
+	"12:00 5000 89 4 run":    "mode MODIFIABLE delay 35640000 stores 1 sent THE_MANOR_INFORMATION_HAS_BEEN_UPDATED warehouse - income 2063 treasury 1950 gludio 5016:7 | 5073:100 / 5016:10 | 5073:100 dion 5017:3 | / |",
+	"12:00 5000 89 5 run":    "mode APPROVED delay 50400000 stores 1 sent - warehouse - income 2063 treasury 1950 gludio 5016:7 | 5073:100 / 5016:10 | 5073:100 dion 5017:3 | / |",
+	"12:00 5000 89 6 run":    "mode MAINTENANCE delay 360000 stores 2 sent - warehouse - income 5063 treasury 1950 gludio | / | dion 5017:3 | / |",
+	"19:00 3049 90 2 run":    "mode MAINTENANCE delay 360000 stores 1 sent - warehouse 5103:54 income 2063 treasury 3049 gludio | / | dion 5017:3 | / |",
+	"19:00 3049 90 3 run":    "mode MODIFIABLE delay 35640000 stores 1 sent THE_MANOR_INFORMATION_HAS_BEEN_UPDATED warehouse - income 2063 treasury 3049 gludio | / | dion 5017:3 | / |",
+	"19:00 3049 90 4 run":    "mode APPROVED delay 50400000 stores 1 sent - warehouse - income 2063 treasury 3049 gludio | / | dion 5017:3 | / |",
+	"19:00 3049 90 5 run":    "mode MAINTENANCE delay 360000 stores 2 sent - warehouse - income 2063 treasury 3049 gludio | / | dion 5017:3 | / |",
+	"21:03 5000 0 1 start":   "mode MODIFIABLE delay 32220000 stores 1 sent THE_MANOR_INFORMATION_HAS_BEEN_UPDATED warehouse 5103:54,5098:1 income 2063 treasury 1950 gludio 5016:10 | 5073:100 / 5016:10 | 5073:100 dion 5017:3 | / |",
+	"06:00 5000 0 2 run":     "mode MAINTENANCE delay 360000 stores 1 sent - warehouse 5103:54,5098:1 income 2063 treasury 1950 gludio 5016:10 | 5073:100 / 5016:10 | 5073:100 dion 5017:3 | / |",
 }
 
 // cycleState renders the manor as a cycle line does, taking the effects

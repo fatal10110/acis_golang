@@ -147,8 +147,9 @@ func WithRoll(roll func(n int) int) Option {
 }
 
 // periods is one castle's lists: the running period's and the next one's.
-// A list is replaced, never changed in place; a Production in it may be in
-// both periods' lists at once.
+// A list is replaced, never changed in place, and the two periods never
+// share an entry, so a sale in the running period leaves the next one as
+// set.
 type periods struct {
 	production, productionNext []*Production
 	procure, procureNext       []*Procure
@@ -402,11 +403,13 @@ func (m *Manager) changeMode() {
 // Each crop the castle bought, at least one bought and not all wanted
 // bought, pays 90% of the count bought, truncated, into the owning clan's
 // warehouse as the crop's mature item; a count truncated to 0 pays 1 with a
-// 90 in 99 chance. The money set aside for crops still wanted goes back to
-// the castle as seed income. The new running lists are the next period's;
-// the next period then starts over from the same lists, each amount back
-// at its start amount, unless the treasury cannot cover the new running
-// period's cost, which leaves the next period empty.
+// 90 in 99 chance. The money set aside for crops still wanted, charged when
+// the period went live, goes back to the castle as seed income.
+//
+// The next period's lists then go live: their whole cost is charged to the
+// treasury, and lists the treasury cannot pay for do not go live, leaving
+// both periods empty. Lists that go live start with every amount at its
+// start amount, and the next period starts over from fresh copies of them.
 func (m *Manager) rolloverLocked() []func() {
 	var out []func()
 	sink := m.effects
@@ -441,20 +444,32 @@ func (m *Manager) rolloverLocked() []func() {
 		}
 		out = append(out, func() { c.RiseSeedIncome(refund) })
 
-		production, procure := p.productionNext, p.procureNext
+		production, procure := restocked(p.productionNext), restockedCrops(p.procureNext)
+		if cost := m.listCost(production, procure, false); cost > 0 && !c.EditTreasury(-cost, true) {
+			production, procure = nil, nil
+		}
 		p.production, p.procure = production, procure
-		if c.Treasury() < m.costLocked(p, false) {
-			p.productionNext, p.procureNext = nil, nil
-			continue
-		}
-		p.productionNext = slices.Clone(production)
-		for _, sp := range p.productionNext {
-			sp.SetAmount(sp.StartAmount)
-		}
-		p.procureNext = slices.Clone(procure)
-		for _, cp := range p.procureNext {
-			cp.SetAmount(cp.StartAmount)
-		}
+		p.productionNext, p.procureNext = restocked(production), restockedCrops(procure)
+	}
+	return out
+}
+
+// restocked returns a fresh copy of each seed of list, with its whole start
+// amount left.
+func restocked(list []*Production) []*Production {
+	var out []*Production
+	for _, sp := range list {
+		out = append(out, NewProduction(sp.ID, sp.StartAmount, sp.Price, sp.StartAmount))
+	}
+	return out
+}
+
+// restockedCrops returns a fresh copy of each crop of list, with its whole
+// start amount still wanted.
+func restockedCrops(list []*Procure) []*Procure {
+	var out []*Procure
+	for _, cp := range list {
+		out = append(out, NewProcure(cp.ID, cp.StartAmount, cp.Price, cp.StartAmount, cp.Reward))
 	}
 	return out
 }
@@ -611,6 +626,19 @@ func (m *Manager) ManorCost(castleID int, next bool) int64 {
 // on overflow. Runs under mu.
 func (m *Manager) costLocked(p *periods, next bool) int64 {
 	production, procure := p.lists(next)
+	return m.listCost(production, procure, true)
+}
+
+// listCost is what the lists production and procure cost, as ManorCost
+// counts it. With wrap set each product is a 32-bit product, wrapping on
+// overflow; otherwise it is exact.
+func (m *Manager) listCost(production []*Production, procure []*Procure, wrap bool) int64 {
+	mul := func(a, b int32) int64 {
+		if wrap {
+			return int64(a * b)
+		}
+		return int64(a) * int64(b)
+	}
 	var total int64
 	for _, sp := range production {
 		s, ok := m.seeds.Seed(sp.ID)
@@ -618,10 +646,10 @@ func (m *Manager) costLocked(p *periods, next bool) int64 {
 			total++
 			continue
 		}
-		total += int64(s.SeedReferencePrice * sp.StartAmount)
+		total += mul(s.SeedReferencePrice, sp.StartAmount)
 	}
 	for _, cp := range procure {
-		total += int64(cp.Price * cp.StartAmount)
+		total += mul(cp.Price, cp.StartAmount)
 	}
 	return total
 }

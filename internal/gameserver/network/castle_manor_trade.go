@@ -208,7 +208,8 @@ type cropSale struct {
 // requestProcureCropList sells held crops to the castles' running crop
 // lists at the manor manager live last talked to, within reach. Every row
 // is checked first: the held item is the crop, in that count, the castle
-// still wants that many, then the reward items' weight and slots. Each row
+// still wants that many, rows of one stack or one castle's crop counted
+// together, then the reward items' weight and slots. Each row
 // is then paid in its reward item, as many as its price buys at the
 // reward's reference price; a crop sold to another castle than the
 // manager's own costs a 5% fee in adena. A row whose price buys no reward,
@@ -241,13 +242,18 @@ func (l *GameClientLink) requestProcureCropList(live *livePlayer, req clientpack
 	seeds := l.manorSeeds()
 	var weight, slots int64
 	sales := make([]cropSale, 0, len(req.Items))
+	// Rows naming one held stack, or one castle's crop, are checked on
+	// their total, so repeated rows never sell more than is held or wanted.
+	held := map[int32]int64{}
+	wanted := map[*castlemanor.Procure]int64{}
 	for _, row := range req.Items {
 		inst := inv.ItemByObjectID(row.ObjectID)
 		if inst == nil {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
-		if st := inst.Snapshot(); st.Count < int(row.Count) || st.TemplateID != row.CropID {
+		held[row.ObjectID] += int64(row.Count)
+		if st := inst.Snapshot(); int64(st.Count) < held[row.ObjectID] || st.TemplateID != row.CropID {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
@@ -255,7 +261,10 @@ func (l *GameClientLink) requestProcureCropList(live *livePlayer, req clientpack
 			return
 		}
 		cp, ok := l.castleManor.CropProcureOf(int(row.ManorID), row.CropID, false)
-		if !ok || cp.Amount() < row.Count {
+		if ok {
+			wanted[cp] += int64(row.Count)
+		}
+		if !ok || int64(cp.Amount()) < wanted[cp] {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
@@ -312,10 +321,32 @@ func (l *GameClientLink) sellCrop(live *livePlayer, s cropSale, ownCastleID int)
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
 		return
 	}
-	if !s.cp.DecreaseAmount(s.row.Count) || (fee > 0 && !reduceAdena(live, int(fee))) || !destroyHeldObject(live, s.row.ObjectID, int(s.row.Count)) {
+	if !s.cp.DecreaseAmount(s.row.Count) {
+		return
+	}
+	// The castle's count is given back when the crops are not taken, and
+	// the fee is taken only once the crops are known to be held.
+	if !holdsObject(live, s.row.ObjectID, int(s.row.Count)) {
+		s.cp.IncreaseAmount(s.row.Count)
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+		return
+	}
+	if (fee > 0 && !reduceAdena(live, int(fee))) || !destroyHeldObject(live, s.row.ObjectID, int(s.row.Count)) {
+		s.cp.IncreaseAmount(s.row.Count)
 		return
 	}
 	live.AddCreatedItem(s.reward.ID, int(rewardCount), l.nextObjectID)
+}
+
+// holdsObject reports whether live holds at least count units of item
+// objectID.
+func holdsObject(live *livePlayer, objectID int32, count int) bool {
+	inv := live.Inventory()
+	if inv == nil {
+		return false
+	}
+	inst := inv.ItemByObjectID(objectID)
+	return inst != nil && inst.Snapshot().Count >= count
 }
 
 // destroyHeldObject destroys count units of item objectID out of live's

@@ -316,12 +316,13 @@ func TestSellCrops(t *testing.T) {
 	}
 
 	// 3 crops at 20 cost a fee of 3 the seller cannot pay; 1 crop costs 1
-	// and buys 2 rewards worth 10.
-	wantOnly(t, "sell to Dion", w.send(t, encodeProcureCropList(
-		[4]int32{w.dionCrop, tradeDionCrop, tradeDionID, 3}, [4]int32{w.dionCrop, tradeDionCrop, tradeDionID, 1},
-	)),
+	// and buys 2 rewards worth 10. The two go in separate sales: rows of one
+	// stack are checked on their total (#5109).
+	wantOnly(t, "sell to Dion past the adena", w.send(t, encodeProcureCropList([4]int32{w.dionCrop, tradeDionCrop, tradeDionID, 3})),
 		sysMsg(serverpackets.SystemMessageFailedInTradingS2OfCropS1, itemNameParam(tradeDionCrop), itemNumberParam(3)),
 		sysMsg(serverpackets.SystemMessageYouNotEnoughAdena),
+	)
+	wantOnly(t, "sell to Dion", w.send(t, encodeProcureCropList([4]int32{w.dionCrop, tradeDionCrop, tradeDionID, 1})),
 		sysMsg(serverpackets.SystemMessageS1DisappearedAdena, numberParam(1)),
 		sysMsg(serverpackets.SystemMessageS1Disappeared, itemNameParam(tradeDionCrop)),
 		sysMsg(serverpackets.SystemMessageYouPickedUpS2S1, itemNameParam(tradeDionReward), itemNumberParam(2)),

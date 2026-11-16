@@ -38,29 +38,32 @@ func TestBuySeedsDuplicateRows(t *testing.T) {
 }
 
 // TestSellCropsDuplicateRows pins a sale naming the same 12 held crops twice
-// for 7 each: the first row destroys 7 crops for 3 rewards; the second takes
-// 7 from what the castle wants, finds only 5 crops left to destroy, answers
-// not enough items and pays nothing.
+// for 7 each. Owner-approved divergence (#5109): the rows are checked on
+// their total, 14 of 12 held, so the whole sale is refused with
+// ActionFailed and nothing changes, instead of the second row taking 7 from
+// what the castle wants for crops it never destroys. Two rows of 6 sell all
+// 12 and lower the castle's count by 12.
 func TestSellCropsDuplicateRows(t *testing.T) {
 	t.Parallel()
 	w := bootManorTrade(t, 0)
 	spawnManorNPC(t, w.folkWorld, "ManorManagerNpc", castleManorID, 30)
 
-	wantOnly(t, "sell twice", w.send(t, encodeProcureCropList(
+	wantOnly(t, "sell twice past the stack", w.send(t, encodeProcureCropList(
 		[4]int32{w.darkCoda, tradeDarkCodaCrop, 1, 7}, [4]int32{w.darkCoda, tradeDarkCodaCrop, 1, 7},
-	)),
-		sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(tradeDarkCodaCrop), itemNumberParam(7)),
-		sysMsg(serverpackets.SystemMessageYouPickedUpS2S1, itemNameParam(tradeGludioReward), itemNumberParam(3)),
-		sysMsg(serverpackets.SystemMessageNotEnoughItems),
-	)
-	if got := w.held(t, tradeDarkCodaCrop); got != tradeHeldDarkCoda-7 {
-		t.Fatalf("crops held = %d, want %d", got, tradeHeldDarkCoda-7)
+	)), []byte{serverpackets.OpcodeActionFailed})
+	if w.held(t, tradeDarkCodaCrop) != tradeHeldDarkCoda || w.held(t, tradeGludioReward) != 0 || w.amountLeft(t, 1, tradeDarkCodaCrop, true) != 40 {
+		t.Fatal("a refused sale changed the crops, the rewards or the castle's wants")
 	}
-	if got := w.held(t, tradeGludioReward); got != 3 {
-		t.Fatalf("rewards = %d, want 3", got)
+
+	half := int32(tradeHeldDarkCoda / 2)
+	w.send(t, encodeProcureCropList(
+		[4]int32{w.darkCoda, tradeDarkCodaCrop, 1, half}, [4]int32{w.darkCoda, tradeDarkCodaCrop, 1, half},
+	))
+	if got := w.held(t, tradeDarkCodaCrop); got != 0 {
+		t.Fatalf("crops held = %d, want 0", got)
 	}
-	if got := w.amountLeft(t, 1, tradeDarkCodaCrop, true); got != 26 {
-		t.Fatalf("crops wanted = %d, want 26", got)
+	if got := w.amountLeft(t, 1, tradeDarkCodaCrop, true); got != 40-2*half {
+		t.Fatalf("crops wanted = %d, want %d", got, 40-2*half)
 	}
 }
 
