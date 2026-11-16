@@ -62,17 +62,27 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 		})
-		if res.MirroredSummon != nil {
-			summonObject := skillCastObject(res.MirroredSummon)
-			l.broadcastLiveFrame(live, func() wire.Frame {
-				return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
-			})
-		}
 		// USE_S1 is sent unconditionally on an instant cast; the herb guard
 		// only skips the item destroy, not this message.
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 		applyItemCastCharges(live, res)
 		// A restore the herb applies reports the user's status itself.
 		l.sendSkillHandlerResult(live, res.Apply())
+		l.castHerbMirror(live, res)
 	}
+}
+
+// castHerbMirror runs res's mirrored herb cast on the user's servitor, when
+// there is one: its MagicSkillUse reaches the players that know the
+// servitor, then its effects land. It follows the user's whole cast, so
+// callers invoke it once the user's own effects are applied.
+func (l *GameClientLink) castHerbMirror(live *livePlayer, res itemhandler.UseResult) {
+	if res.MirroredSummon == nil {
+		return
+	}
+	servitor := skillCastObject(res.MirroredSummon)
+	l.broadcastCreatureFrame(res.MirroredSummon, func() wire.Frame {
+		return serverpackets.FrameMagicSkillUse(servitor, servitor, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+	})
+	l.sendSkillHandlerResult(live, res.ApplyMirror())
 }

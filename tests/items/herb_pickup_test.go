@@ -107,6 +107,7 @@ func TestHerbPickupMirrorsOntoServitor(t *testing.T) {
 	}
 	servitor.SetQueue(srv.PlayerQueue(t, objID))
 	srv.State.AddSummon(objID, servitor)
+	srv.State.Spawn(servitor, spawnX, spawnY, spawnZ, 0)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))

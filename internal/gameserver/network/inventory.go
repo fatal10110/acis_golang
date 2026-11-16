@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -529,10 +528,10 @@ func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
 	return ok
 }
 
-// activeServitorTarget returns live's active servitor as a
-// skilltarget.Actor, or nil if it has none, has a pet instead, or doesn't
-// expose that surface. Only a servitor qualifies: a pet alone does not.
-func (l *GameClientLink) activeServitorTarget(live *livePlayer) skilltarget.Actor {
+// activeServitorTarget returns live's active servitor as the target a herb
+// mirrors onto, or nil if it has none, has a pet instead, or doesn't expose
+// that surface. Only a servitor qualifies: a pet alone does not.
+func (l *GameClientLink) activeServitorTarget(live *livePlayer) itemhandler.HerbMirror {
 	if l.world == nil || live == nil {
 		return nil
 	}
@@ -543,7 +542,7 @@ func (l *GameClientLink) activeServitorTarget(live *livePlayer) skilltarget.Acto
 	if pet, ok := obj.(*summon.Actor); ok && pet.IsPet() {
 		return nil
 	}
-	target, ok := obj.(skilltarget.Actor)
+	target, ok := obj.(itemhandler.HerbMirror)
 	if !ok {
 		return nil
 	}

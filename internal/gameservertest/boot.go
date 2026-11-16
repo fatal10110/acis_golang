@@ -1301,6 +1301,13 @@ func (s *Server) SeedCharacterFor(tb testing.TB, account, name string, level, sp
 	return s.seedCharacter(tb, account, name, level, sp)
 }
 
+// SeedCharacterForAt inserts a selectable character for account, as
+// SeedCharacterFor does, saved at at: it enters the world there, so a suite
+// can place another client a chosen distance away.
+func (s *Server) SeedCharacterForAt(tb testing.TB, account, name string, level, sp int, at location.Location) *player.Character {
+	return s.seedCharacterAt(tb, account, name, level, sp, &at)
+}
+
 // DialClient connects a second scripted client as account: handshake,
 // AuthLogin, and the initial CharSelectInfo (whose character count must be
 // wantChars). The primary client keeps using Server.Client.
