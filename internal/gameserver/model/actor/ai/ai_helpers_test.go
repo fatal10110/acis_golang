@@ -247,6 +247,8 @@ type recordingMove struct {
 	// outOfReach is what HoldOffensiveFollow reports; holdCalls counts it.
 	outOfReach bool
 	holdCalls  int
+	// cancelFollows counts CancelFollow calls.
+	cancelFollows int
 }
 
 func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
@@ -272,7 +274,7 @@ func (m *recordingMove) CanMoveTo(location.Location) bool { return !m.denyMove }
 
 func (m *recordingMove) Stop() { m.stopCount++ }
 
-func (m *recordingMove) CancelFollow() {}
+func (m *recordingMove) CancelFollow() { m.cancelFollows++ }
 
 type recordingAttack struct {
 	canAttack       bool

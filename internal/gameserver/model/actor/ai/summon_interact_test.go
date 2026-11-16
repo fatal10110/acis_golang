@@ -8,15 +8,18 @@ import (
 
 // TestSummonAITryToInteractQueuesWhileSwinging pins PlayableAI.tryToInteract's
 // queueing: a summon mid-swing takes the interact as its next intention and
-// keeps its attack; the swing ending makes it current.
+// keeps its attack; the swing ending makes it current and cancels the
+// follow the attack armed.
 func TestSummonAITryToInteractQueuesWhileSwinging(t *testing.T) {
 	owner := actor(100)
 	monster := actor(200)
 	object := actor(300)
 	strike := &recordingAttack{canAttack: true}
-	brain := NewSummon(owner, &summonMove{}, strike)
+	move := &summonMove{}
+	brain := NewSummon(owner, move, strike)
 	brain.TryToAttack(monster, false)
 	strike.attackingNow = true
+	cancelsBefore := move.cancelFollows
 
 	if !brain.TryToInteract(object, false) {
 		t.Fatal("TryToInteract() mid-swing = false, want queued")
@@ -28,10 +31,17 @@ func TestSummonAITryToInteractQueuesWhileSwinging(t *testing.T) {
 		t.Fatalf("NextIntention() = (%v, %v), want interact", kind, ok)
 	}
 
+	if move.cancelFollows != cancelsBefore {
+		t.Fatalf("CancelFollow calls while queued = %d, want %d", move.cancelFollows, cancelsBefore)
+	}
+
 	strike.attackingNow = false
 	brain.FinishedAttack(nil)
 	if got := brain.CurrentIntention(); got != IntentionInteract {
 		t.Fatalf("CurrentIntention() after the swing = %v, want interact", got)
+	}
+	if move.cancelFollows <= cancelsBefore {
+		t.Fatal("promoting the queued interact kept the attack's follow, want it cancelled")
 	}
 }
 

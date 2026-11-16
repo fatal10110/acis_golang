@@ -28,17 +28,18 @@ func (s *Summon) TryToInteract(target world.Tracked, shift bool) bool {
 		return true
 	}
 	s.setCurrentLocked(in)
-	s.move.CancelFollow()
 	s.thinkInteractLocked()
 	return true
 }
 
-// thinkInteractLocked is one run of the interact intention. A summon never
-// walks to such a target: a lost one turns following the owner back on and
+// thinkInteractLocked is one run of the interact intention. It first stops
+// any follow, so an interact promoted from the queue drops the follow the
+// attack before it armed. A summon never walks to such a target: a lost one turns following the owner back on and
 // sends the summon idle; a shift-held one out of the summon's physical
 // attack range (3D, no footprints) sends it idle; otherwise the summon keeps
 // the intention where it stands.
 func (s *Summon) thinkInteractLocked() {
+	s.move.CancelFollow()
 	target := s.current.object
 	at, ok := target.(positioned)
 	if target == nil || !ok || !s.actor.KnowsObject(target) {
