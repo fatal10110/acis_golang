@@ -75,7 +75,7 @@ func schemeBufferBuffs(t *testing.T) *modelskill.BufferTable {
 
 // schemeBufferWorld enters the world holding adena next to the shipped
 // scheme buffer's pages, wired to buffer.
-func schemeBufferWorld(t *testing.T, buffer *schemebuffer.Manager, adena int32) (*folkWorld, *npc.Folk) {
+func schemeBufferWorld(t *testing.T, buffer *schemebuffer.Manager, adena int32, extra ...gameservertest.Option) (*folkWorld, *npc.Folk) {
 	t.Helper()
 	pages := dialogPages()
 	for _, name := range []string{"50002.htm", "50002-1.htm", "50002-2.htm", "50002-3.htm"} {
@@ -85,13 +85,13 @@ func schemeBufferWorld(t *testing.T, buffer *schemebuffer.Manager, adena int32) 
 		}
 		pages["mods/buffer/"+name] = string(data)
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Talker", playerLevel, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithHTMLPages(pages),
 		gameservertest.WithSchemeBuffer(buffer),
 		noBypassReuse,
-	)
+	}, extra...)...)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
 	if adena > 0 {
 		srv.GiveItem(t, w.player, item.AdenaID, adena)
