@@ -60,6 +60,12 @@ func ClaimGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gro
 		ground.Release()
 		return false, PickupPetCannotCarryMore
 	}
+	// A herb is used, never carried; anything else must fit the pet's
+	// stack of it within the item count limit.
+	if !herb && !stackFits(petInv, ground.Template.ID, ground.Template, ground.Count()) {
+		ground.Release()
+		return false, PickupPetCannotCarryMore
+	}
 	if ownerLootLocked(pet, ground.Instance.Snapshot().OwnerID) {
 		ground.Release()
 		return false, PickupLootLocked
@@ -68,8 +74,13 @@ func ClaimGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gro
 }
 
 // StoreGround moves a claimed ground item into the pet inventory and
-// returns the writes that persist it.
+// returns the writes that persist it. It stores nothing, reporting false,
+// when the pet's stack of the item can no longer take the ground count
+// without passing the item count limit.
 func StoreGround(petInv *itemcontainer.Inventory, ground *grounditem.Item) ([]inventory.Persist, bool) {
+	if !stackFits(petInv, ground.Template.ID, ground.Template, ground.Count()) {
+		return nil, false
+	}
 	picked := ground.Instance.Clone()
 	result, absorbed := petInv.Add(picked)
 	if result == nil {
