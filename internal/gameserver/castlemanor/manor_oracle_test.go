@@ -196,8 +196,16 @@ func TestRolloverMatchesReferenceProbe(t *testing.T) {
 			running += fmt.Sprintf(" %d:%d", c.ID, c.Amount())
 		}
 		got := fmt.Sprintf("warehouse %s income %d next %s running%s mode %s delay %d", warehouse, gl.SeedIncome(), next, running, h.m.Status(), h.m.NextModeChange().Sub(h.clock.Now()).Milliseconds())
-		if got != l[1] {
-			t.Errorf("rollover of %s at treasury %d, roll %d:\n got %s\nwant %s", f[0], treasury, roll, got, l[1])
+		// Owner-approved divergence (#5108, #5140): the next period's lists,
+		// costing 10 x 5 + 100 x 30 = 3050, are charged as they go live, and
+		// lists the treasury cannot pay for do not go live, where the
+		// reference runs the sold-down entries uncharged.
+		want, wantTreasury := l[1], treasury-3050
+		if treasury < 3050 {
+			want, wantTreasury = strings.Replace(want, " running 5016:4 | 5073:70", " running |", 1), treasury
+		}
+		if got != want || gl.Treasury() != wantTreasury {
+			t.Errorf("rollover of %s at treasury %d, roll %d:\n got %s treasury %d\nwant %s treasury %d", f[0], treasury, roll, got, gl.Treasury(), want, wantTreasury)
 		}
 	}
 }

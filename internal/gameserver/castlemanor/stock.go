@@ -4,8 +4,9 @@ import "sync/atomic"
 
 // Production is one seed a castle sells over a manor period: StartAmount
 // seeds at Price each, of which Amount are left. It is shared by pointer:
-// the period lists hand the same Production around, and a sale takes its
-// seeds with DecreaseAmount from any goroutine.
+// a period list hands the same Production around, and a sale takes its
+// seeds with DecreaseAmount from any goroutine. It belongs to one period's
+// list only.
 type Production struct {
 	// ID is the seed's item id.
 	ID          int32
@@ -43,6 +44,10 @@ func (p *Production) DecreaseAmount(n int32) bool {
 		}
 	}
 }
+
+// IncreaseAmount gives back n taken by DecreaseAmount for a sale that did
+// not go through.
+func (p *Production) IncreaseAmount(n int32) { p.amount.Add(n) }
 
 // Procure is one crop a castle buys over a manor period: StartAmount crops
 // at Price each, of which Amount are still wanted, paid for with reward
