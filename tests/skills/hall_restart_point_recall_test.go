@@ -10,6 +10,7 @@ import (
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
@@ -90,6 +91,10 @@ func TestHallSiegeClanRestartPointRecall(t *testing.T) {
 			s.SetClanRestartPoint(tt.clanID, point)
 			c.Send(encodeRequestGameStart(0))
 			c.Send(encodeEnterWorld())
+			drainUntilQuiet(t, c)
+			// Entering a siege battlefield off the defending side lands the
+			// caster in town; a request made before the landing is refused.
+			c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
 			drainUntilQuiet(t, c)
 
 			c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
