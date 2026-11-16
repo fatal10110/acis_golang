@@ -62,7 +62,7 @@ func (l *List) evictForCap(e *Effect, pending *[]func(), retiring *[]*Effect) {
 		if existing == nil || !existing.Skill.buffSlot() {
 			continue
 		}
-		retire(existing, pending, retiring)
+		l.retire(existing, pending, retiring)
 		remaining--
 		if remaining < 0 {
 			break
@@ -135,7 +135,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 	if deactivate != nil {
 		l.holdExit(deactivate)
 		*pending = append(*pending, func() { l.removeStats(deactivate) })
-		appendThunk(pending, deactivate.beginExit())
+		appendThunk(pending, l.orderExit(deactivate, deactivate.beginExit()))
 		l.notifyDisplaced(deactivate, pending)
 	}
 	if activate != nil {
@@ -203,13 +203,16 @@ func (l *List) remove(e *Effect, pending, exits *[]func()) {
 	queue = slices.Delete(queue, index, index+1)
 	if index == 0 {
 		*pending = append(*pending, func() { l.removeStats(e) })
-		appendThunk(exits, e.finishExit())
+		// The promoted member starts before e's exit hook runs, so its
+		// activation is decided before that hook joins the group's open
+		// exits and does not wait for it.
 		if len(queue) > 0 {
 			next := l.contained(queue[0])
 			if next != nil {
 				*pending = append(*pending, l.beginActivate(next, false))
 			}
 		}
+		appendThunk(exits, l.orderExit(e, e.finishExit()))
 	}
 
 	if len(queue) == 0 {
