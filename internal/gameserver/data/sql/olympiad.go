@@ -110,9 +110,8 @@ func (s *OlympiadStore) LoadNobles(ctx context.Context) (map[int32]olympiad.Nobl
 	return nobles, nil
 }
 
-// SaveNobles inserts each record, or updates its points, competition
-// counts and rewarded flag when the noble already has one; a stored class
-// is kept.
+// SaveNobles inserts each record, or updates its class, points,
+// competition counts and rewarded flag when the noble already has one.
 func (s *OlympiadStore) SaveNobles(ctx context.Context, nobles map[int32]olympiad.Noble) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -121,7 +120,7 @@ func (s *OlympiadStore) SaveNobles(ctx context.Context, nobles map[int32]olympia
 	defer func() { _ = tx.Rollback() }()
 	stmt, err := tx.PrepareContext(ctx,
 		"INSERT INTO olympiad_nobles (`char_id`,`class_id`,`olympiad_points`,`competitions_done`,`competitions_won`,`competitions_lost`,`competitions_drawn`,`rewarded`) VALUES (?,?,?,?,?,?,?,?) "+
-			"ON DUPLICATE KEY UPDATE olympiad_points=VALUES(olympiad_points), competitions_done=VALUES(competitions_done), competitions_won=VALUES(competitions_won), "+
+			"ON DUPLICATE KEY UPDATE class_id=VALUES(class_id), olympiad_points=VALUES(olympiad_points), competitions_done=VALUES(competitions_done), competitions_won=VALUES(competitions_won), "+
 			"competitions_lost=VALUES(competitions_lost), competitions_drawn=VALUES(competitions_drawn), rewarded=VALUES(rewarded)")
 	if err != nil {
 		return fmt.Errorf("save olympiad nobles: %w", err)

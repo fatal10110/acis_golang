@@ -46,7 +46,7 @@ func TestOlympiadMatchTimeoutTie(t *testing.T) {
 	if got := m.character(t, a).OlympiadGameID(); got != 0 {
 		t.Fatalf("drawn competitor's game = %d, want 0", got)
 	}
-	if !m.srv.Olympiad.IsRegisteredInComp(a.id, m.character(t, a).BaseClassID()) {
+	if !m.srv.Olympiad.IsRegisteredInComp(a.id) {
 		t.Fatal("a drawn competitor is not in competition")
 	}
 	m.fighting(t)

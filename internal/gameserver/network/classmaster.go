@@ -89,7 +89,7 @@ func (l *GameClientLink) classMasterTransfer(live *livePlayer, classID int) (cha
 		live.AddCreatedItem(it.ID, it.Count, l.nextObjectID)
 	}
 	if l.changeOccupation(live, classID, tmpl) && !live.SubclassActive() {
-		live.SetBaseClass(classID, tmpl)
+		l.setLiveBaseClass(live, classID, tmpl)
 	}
 	live.RefreshHennaStats()
 	live.SendFrame(serverpackets.FrameHennaInfo(live.HennaSnapshot()))
