@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"slices"
 	"strings"
 	"time"
 
@@ -63,6 +62,9 @@ type makerGroup struct {
 	// tickers are the tickers armed through g, stopped once DespawnAll or
 	// RespawnAll retires it. Guarded by n.mu.
 	tickers []*sim.Ticker
+	// retired is set once RespawnAll puts another npcmaker in g's place.
+	// Guarded by n.mu.
+	retired bool
 }
 
 // newGroups builds the run-time npcmakers of spawns for RespawnAll run gen
@@ -92,6 +94,9 @@ func (n *Npcs) newGroups(spawns *Spawns, gen int) []*makerGroup {
 	}
 	n.mu.Lock()
 	retired := n.groups
+	for _, g := range retired {
+		g.retired = true
+	}
 	n.groups = groups
 	stop := n.takeTickersLocked(retired)
 	n.mu.Unlock()
@@ -120,7 +125,7 @@ func stopTickers(tickers []*sim.Ticker) {
 // DespawnAll run epoch: neither DespawnAll nor RespawnAll retired it since.
 // The caller holds n.mu.
 func (g *makerGroup) currentLocked(epoch int) bool {
-	return g.n.despawns == epoch && slices.Contains(g.n.groups, g)
+	return g.n.despawns == epoch && !g.retired
 }
 
 // epoch returns the DespawnAll run in progress.
@@ -461,7 +466,7 @@ func orphanKey(slot slotInfo) task.SlotID {
 // npcmaker, nor one DespawnAll or RespawnAll dropped. The caller holds
 // n.mu.
 func (n *Npcs) adoptOrphanLocked(slot slotInfo) (task.SlotID, bool) {
-	if slot.group == nil || slot.key == 0 || slot.epoch != n.despawns || !slices.Contains(n.groups, slot.group) {
+	if slot.group == nil || slot.key == 0 || slot.epoch != n.despawns || slot.group.retired {
 		return 0, false
 	}
 	slot.key = orphanKey(slot)
@@ -481,7 +486,7 @@ func (n *Npcs) liveLocked(key task.SlotID) bool {
 // entry keeps a single slot: once it has one, it spawns nothing more.
 func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
 	n.mu.Lock()
-	retired := !slices.Contains(n.groups, g)
+	retired := g.retired
 	n.mu.Unlock()
 	if retired {
 		// RespawnAll put another npcmaker in its place.

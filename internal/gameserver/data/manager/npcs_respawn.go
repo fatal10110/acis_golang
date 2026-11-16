@@ -235,7 +235,7 @@ func (n *Npcs) respawnSlot(key task.SlotID) {
 		n.mu.Unlock()
 		return
 	}
-	if slot.group != nil && !slices.Contains(n.groups, slot.group) {
+	if slot.group != nil && slot.group.retired {
 		// DespawnAll or RespawnAll retired its npcmaker since.
 		n.dropSlotLocked(key)
 		n.mu.Unlock()
