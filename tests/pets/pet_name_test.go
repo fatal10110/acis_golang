@@ -30,24 +30,27 @@ func sysMessages(frames [][]byte) [][]byte {
 }
 
 // TestRenamePetAppliesAndPersists renames an unnamed pet: the pet's name
-// changes in world state and the pets row is written immediately.
+// changes in world state and the pets row is written immediately. The owner
+// gets only the refreshed PetInfo carrying the new name (no status update,
+// and no effect icons for a pet holding none); a watching player gets
+// nothing.
 func TestRenamePetAppliesAndPersists(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
+	watcher := h.joinSecondPlayer(t, "Watcher")
+	drainUntilQuiet(t, h.client)
+	drainUntilQuiet(t, watcher.client)
 
 	frames := renameTo(t, h, "Fenrir")
-	var sawRefresh bool
-	for _, frame := range frames {
-		if frame[0] == serverpackets.OpcodePetInfo {
-			sawRefresh = true
-			if _, name := readPetInfoName(t, frame); name != "Fenrir" {
-				t.Fatalf("refreshed PetInfo name = %q, want Fenrir", name)
-			}
-		}
+	if len(frames) != 1 || frames[0][0] != serverpackets.OpcodePetInfo {
+		t.Fatalf("rename frames = opcodes %x, want only a refreshed PetInfo", frameOpcodes(frames))
 	}
-	if !sawRefresh {
-		t.Fatalf("rename frames = opcodes %x, want a refreshed PetInfo", frameOpcodes(frames))
+	if _, name := readPetInfoName(t, frames[0]); name != "Fenrir" {
+		t.Fatalf("refreshed PetInfo name = %q, want Fenrir", name)
+	}
+	if seen := drainFrames(t, watcher.client); len(seen) != 0 {
+		t.Fatalf("watcher saw rename frames = opcodes %x, want none", frameOpcodes(seen))
 	}
 	if got := pet.Name(); got != "Fenrir" {
 		t.Fatalf("actor Name() = %q, want Fenrir", got)
