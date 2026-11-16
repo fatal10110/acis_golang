@@ -52,6 +52,7 @@ func (Actor) BluffExempt() bool                                        { return 
 func (Actor) FlyTo(location.Location, modelskill.Flight)               {}
 func (Actor) SetXYZ(int, int, int)                                     {}
 func (Actor) BroadcastPosition()                                       {}
+func (Actor) ForceHeading(int)                                         {}
 func (Actor) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }

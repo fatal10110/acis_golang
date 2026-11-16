@@ -20,7 +20,9 @@ type Actor interface {
 	CharacterName() string
 	Position() (x, y, z int)
 	Heading() int
-	SetHeading(int)
+	// ForceHeading spins the actor at once to heading, showing its observers
+	// the turn.
+	ForceHeading(heading int)
 	RaidRelated() bool
 
 	EffectList() *List
@@ -118,7 +120,7 @@ type PlayerActor interface {
 	StartFakeDeath() bool
 	StopFakeDeath() bool
 	MarkRecentFakeDeath()
-	HPFull() bool
+	MaxHPValue() float64
 
 	// ReduceHPByToggleUpkeep takes a toggle skill's own damage-over-time
 	// upkeep as spent HP: the tick lands like ReduceHPByDOT's but never

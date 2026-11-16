@@ -201,6 +201,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameValidateLocation(live.ObjectID(), live.CurrentLocation(), live.CurrentHeading())
 		})
+	case event.ForcedTurn:
+		start, stop := forcedTurnFrames(live.ObjectID(), e)
+		l.broadcastLiveFrame(live, start)
+		l.broadcastLiveFrame(live, stop)
 	case event.Stopped:
 		// Stopping a move revalidates the zones at once, before observers
 		// see the stop.

@@ -482,73 +482,126 @@ func appendThunk(pending *[]func(), thunk func()) {
 	}
 }
 
-// beginActivate returns a thunk that runs e's on-start hook once the
-// caller's lock is released, then briefly re-acquires l.mu to apply the
-// result: e becomes in use either way, and gains its stat funcs only when
-// its start succeeded (see Effect.startFailed). The owner reports the stat
-// change after l.mu is released again. With announce set, a successful
-// activation of an icon effect then tells the owner it feels e's effect —
-// the add path's stack-head promotion does this (unless l.silent, read here
-// under l.mu), the removal path's does not.
-//
-// The start hook runs unlocked, so by the time the thunk re-acquires l.mu a
-// concurrent add or removal may have retired e or displaced it from its
-// stack group's head, or another activation may have made it active
-// already. Such a stale activation changes nothing: e stays as that other
-// path left it and gains no stat funcs nothing would remove. A start that
-// succeeded for an e no longer held or no longer heading its group is undone
-// through e's exit hook.
+// activation is one queued stack-head (or plain effect) activation: e, and
+// whether its success tells the owner it feels e's effect.
+type activation struct {
+	e        *Effect
+	announce bool
+}
+
+// beginActivate returns a thunk that activates e once the caller's lock is
+// released (see activate). With announce set, a successful activation of an
+// icon effect then tells the owner it feels e's effect — the add path's
+// stack-head promotion does this (unless l.silent, read here under l.mu),
+// the removal path's does not.
 //
 // It does not (re)start e's tick schedule: that starts once, in add, when e
 // is first created, unconditionally for every created effect — so a
 // promoted stack loser resumes with whatever count it drained down to while
 // displaced instead of restarting from the template.
 func (l *List) beginActivate(e *Effect, announce bool) func() {
-	announce = announce && !l.quietLocked()
-	return func() {
-		ok := true
-		if e.OnStart != nil {
-			ok = e.OnStart(e)
-		}
-		// Each activation tests the funcs' attached conditions afresh, before
-		// l.mu: a condition may read this same list.
-		var fns []Mod
-		if ok {
-			fns = e.attachableFuncs()
-		}
+	act := activation{e: e, announce: announce && !l.quietLocked()}
+	return func() { l.activate(act) }
+}
 
-		l.mu.Lock()
-		heads := l.headsLocked(e)
-		already := e.inUse
-		if heads && !already {
-			e.inUse = true
-			e.startFailed.Store(!ok)
-			if ok {
-				l.attachStatFuncs(fns)
-			}
-		}
+// activate runs act, and every activation queued on l while it runs, one at
+// a time: an activation that finds another one running hands itself to that
+// goroutine and returns at once. The owner's stat refresh and felt message
+// of each successful activation run after the hand-over ends.
+//
+// Running activations one at a time keeps a stale activation's start and
+// its undo (see activateOne) from interleaving with the start of the effect
+// that displaced it, which is queued behind it: the undo never clears owner
+// state the new head set, and an effect promoted twice starts once. Handing
+// over instead of waiting keeps a start or exit hook that changes this same
+// list from deadlocking; the activations it causes run once it returns.
+// The exit hooks of a displaced or removed head are not ordered by this:
+// one still running late can clear state a later head set (#5221).
+func (l *List) activate(act activation) {
+	l.mu.Lock()
+	if l.activating {
+		l.deferred = append(l.deferred, act)
 		l.mu.Unlock()
+		return
+	}
+	l.activating = true
+	var after []func()
+	for {
+		l.mu.Unlock()
+		appendThunk(&after, l.activateOne(act))
+		l.mu.Lock()
+		if len(l.deferred) == 0 {
+			break
+		}
+		act = l.deferred[0]
+		l.deferred = l.deferred[1:]
+	}
+	l.activating = false
+	l.deferred = nil
+	l.mu.Unlock()
+	runHooks(after)
+}
 
-		// The undo below and the already branch are not ordered with the
-		// activation of the effect that displaced e: an undo may clear shared
-		// owner state the new head set, and a doubled OnStart goes unmatched.
-		// Tracked in #5190.
-		if !heads {
-			if ok && e.OnExit != nil {
-				e.OnExit(e)
-			}
-			return
+// activateOne runs act's on-start hook unlocked, then briefly re-acquires
+// l.mu to apply the result: e becomes in use either way, and gains its stat
+// funcs only when its start succeeded (see Effect.startFailed). It returns
+// the owner's stat refresh and felt message, or nil.
+//
+// An effect that is no longer held, no longer heads its stack group, or is
+// already active when its turn comes does not start. One that loses its
+// place while its start hook runs (a concurrent add or removal retired or
+// displaced it) changes nothing: it stays as that other path left it, gains
+// no stat funcs nothing would remove, and a start that succeeded is undone
+// through its exit hook.
+func (l *List) activateOne(act activation) func() {
+	e := act.e
+	l.mu.Lock()
+	live := l.headsLocked(e) && !e.inUse
+	l.mu.Unlock()
+	if !live {
+		return nil
+	}
+
+	ok := true
+	if e.OnStart != nil {
+		ok = e.OnStart(e)
+	}
+	// Each activation tests the funcs' attached conditions afresh, before
+	// l.mu: a condition may read this same list.
+	var fns []Mod
+	if ok {
+		fns = e.attachableFuncs()
+	}
+
+	// Only activations set inUse, and they run one at a time, so e is still
+	// inactive here.
+	l.mu.Lock()
+	heads := l.headsLocked(e)
+	if heads {
+		e.inUse = true
+		e.startFailed.Store(!ok)
+		if ok {
+			l.attachStatFuncs(fns)
 		}
-		if already || !ok {
-			return
+	}
+	l.mu.Unlock()
+
+	if !heads {
+		if ok && e.OnExit != nil {
+			e.OnExit(e)
 		}
+		return nil
+	}
+	if !ok || l.owner == nil {
+		return nil
+	}
+	owner := l.owner
+	return func() {
 		// The stat refresh runs outside l.mu: a RUN_SPEED change rebuilds the
 		// owner's appearance for its observers, which reads this list's flags.
-		if l.owner != nil {
-			l.owner.StatFuncsAttached(fns)
-		}
-		if announce && e.Template.Icon && l.owner != nil {
-			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)
+		owner.StatFuncsAttached(fns)
+		if act.announce && e.Template.Icon {
+			owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)
 		}
 	}
 }

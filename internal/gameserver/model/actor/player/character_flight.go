@@ -40,3 +40,11 @@ func (c *Character) SetXYZ(x, y, z int) {
 func (c *Character) BroadcastPosition() {
 	c.emit(event.PositionCorrected{})
 }
+
+// ForceHeading spins the player at once to heading, showing the turn to the
+// player and its observers.
+func (c *Character) ForceHeading(heading int) {
+	from := c.Heading()
+	c.SetHeading(heading)
+	c.emit(event.ForcedTurn{From: from, To: heading})
+}

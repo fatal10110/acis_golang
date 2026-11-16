@@ -107,3 +107,11 @@ func (h *Hostile) SetXYZ(x, y, z int) {
 func (h *Hostile) BroadcastPosition() {
 	h.emit(event.PositionCorrected{})
 }
+
+// ForceHeading spins the NPC at once to heading, showing the turn to its
+// observers.
+func (h *Hostile) ForceHeading(heading int) {
+	from := h.Heading()
+	h.SetHeading(heading)
+	h.emit(event.ForcedTurn{From: from, To: heading})
+}
