@@ -466,7 +466,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.fleeLivePlayer(live, e)
 	case event.Retargeted:
 		if e.Target == nil {
-			l.clearLiveTarget(live)
+			l.unselectLiveTarget(live)
 			return
 		}
 		l.selectLiveTarget(live, e.Target)

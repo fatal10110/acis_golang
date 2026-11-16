@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -68,9 +69,10 @@ func TestAttackWalksIntoRangeThenLandsSwing(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
-// TestTargetCancelStopsSwingLoop pins that cancelling the target ends the
-// swing loop: the cancel answers ActionFailed and no further swings land.
-func TestTargetCancelStopsSwingLoop(t *testing.T) {
+// TestTargetCancelKeepsSwingLoop pins that Esc clears only the selection:
+// the cancel answers ActionFailed then TargetUnselected, and the attack
+// intention keeps swinging at the hostile it already holds.
+func TestTargetCancelKeepsSwingLoop(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -89,26 +91,37 @@ func TestTargetCancelStopsSwingLoop(t *testing.T) {
 
 	c.Send(encodeRequestTargetCancel(1))
 	// The swing loop may broadcast one more in-flight Attack, and land its
-	// hit with damage feedback, before the cancel lands; skip such trailing
-	// combat frames to reach the ack.
-	for {
-		frame := mustRead(t, c, "cancel ack")
-		if frame[0] == serverpackets.OpcodeActionFailed {
-			break
+	// hit with damage feedback, around the cancel; skip such combat frames
+	// to reach the ack and the unselect.
+	var answer []byte
+	for len(answer) < 2 {
+		frame := mustRead(t, c, "cancel answer")
+		switch {
+		case frame[0] == serverpackets.OpcodeActionFailed || frame[0] == serverpackets.OpcodeTargetUnselected:
+			answer = append(answer, frame[0])
+		case frame[0] == serverpackets.OpcodeSystemMessage && slices.Contains(damageFeedbackIDs, wireReader(frame[1:]).ReadInt32()):
+		case frame[0] == serverpackets.OpcodeAttack || frame[0] == serverpackets.OpcodeStatusUpdate || frame[0] == serverpackets.OpcodeAutoAttackStart:
+		default:
+			t.Fatalf("cancel answer opcode = %#x, want ActionFailed then TargetUnselected", frame[0])
 		}
-		if frame[0] == serverpackets.OpcodeSystemMessage && slices.Contains(damageFeedbackIDs, wireReader(frame[1:]).ReadInt32()) {
-			continue
-		}
-		if frame[0] != serverpackets.OpcodeAttack && frame[0] != serverpackets.OpcodeStatusUpdate && frame[0] != serverpackets.OpcodeAutoAttackStart {
-			t.Fatalf("cancel ack opcode = %#x, want ActionFailed", frame[0])
-		}
+	}
+	if answer[0] != serverpackets.OpcodeActionFailed || answer[1] != serverpackets.OpcodeTargetUnselected {
+		t.Fatalf("cancel answer = % x, want ActionFailed then TargetUnselected", answer)
+	}
+	obj, ok := srv.State.Player(srv.SoleObjectID(t))
+	if !ok {
+		t.Fatal("player not online")
+	}
+	ch, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("player = %T is not an online character", obj)
+	}
+	if cur := ch.Target(); cur != nil {
+		t.Fatalf("target = %v after cancel, want none", cur)
 	}
 	drainUntilQuiet(t, c)
 	afterCancel := hostile.CurrentHP()
-	srv.Advance(t, 1200*time.Millisecond)
-	if got := hostile.CurrentHP(); got != afterCancel {
-		t.Fatalf("hostile HP = %d after cancel, want frozen at %d", got, afterCancel)
-	}
+	srv.AdvanceUntil(t, "swing after cancel", func() bool { return hostile.CurrentHP() < afterCancel })
 }
 
 // silentStanceEffects drops the combat-stance expiry broadcast: every
