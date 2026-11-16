@@ -87,10 +87,13 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.Set("memoStateEx", itoa(0))
 		s.PlaySound(p, script.SoundAccept)
 	case strings.EqualFold(e.Name, "30834-08.htm"):
+		// Only the orbs the take removes are paid for.
+		taken := int32(0)
 		if p.HasItem(nebuliteOrb) {
-			count := p.ItemCount(nebuliteOrb) * 120
-			s.TakeItems(p, nebuliteOrb, -1)
-			s.GiveItems(p, 57, count)
+			taken = s.TakeHeldItems(p, nebuliteOrb, -1)
+		}
+		if taken > 0 {
+			s.GiveItems(p, 57, taken*120)
 		} else {
 			htmltext = "30834-08a.htm"
 		}
@@ -107,11 +110,11 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		if st.GetInt("memoState") == 1 {
 			memoStateEx := st.GetInt("memoStateEx")
 			if memoStateEx >= 1 && memoStateEx < 25 {
-				if p.ItemCount(nebuliteOrb) < 10 {
+				// The bet starts only once its ten orbs are taken.
+				if p.ItemCount(nebuliteOrb) < 10 || s.TakeHeldItems(p, nebuliteOrb, 10) == 0 {
 					htmltext = "30934-06.htm"
 				} else {
 					st.Set("memoState", itoa(2))
-					s.TakeItems(p, nebuliteOrb, 10)
 					htmltext = "30934-07.htm"
 				}
 			}

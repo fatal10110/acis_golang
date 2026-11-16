@@ -399,9 +399,11 @@ func enter(s *script.Script, keeper *script.NPC, p *script.Player) string {
 		if mst == nil {
 			continue
 		}
+		// A member whose pass is gone by the take stays behind.
+		if s.TakeHeldItems(member, entrancePass, 1) == 0 {
+			continue
+		}
 		mst.Set("completed", strconv.FormatBool(false))
-
-		s.TakeItems(member, entrancePass, 1)
 		if !member.HasItem(antiqueBrooch) {
 			s.GiveItems(member, usedGravePass, 1)
 		}

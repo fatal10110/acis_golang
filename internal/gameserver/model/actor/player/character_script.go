@@ -69,34 +69,61 @@ func (c *Character) TakeScriptItems(itemID int32, count int) {
 	if c.inventory == nil {
 		return
 	}
-	c.whileAttached(func() { c.takeScriptItems(itemID, count) })
+	c.whileAttached(func() { c.takeScriptItems(itemID, count, false) })
 }
 
-func (c *Character) takeScriptItems(itemID int32, count int) {
+// TakeHeldScriptItems takes count units of itemID as TakeScriptItems does,
+// but only when c holds that many: short of count, or for a count of zero,
+// it takes and says nothing. A negative count takes them all. It returns
+// how many units left the inventory, so a script pays and grants only for
+// those: units moved away between a script's count and this take are not
+// taken and not reported.
+func (c *Character) TakeHeldScriptItems(itemID int32, count int) int {
+	if c.inventory == nil || count == 0 {
+		return 0
+	}
+	taken := 0
+	c.whileAttached(func() { taken = c.takeScriptItems(itemID, count, true) })
+	return taken
+}
+
+// takeScriptItems takes count units of itemID and returns how many it took.
+// With held, a count above what c holds takes nothing instead of all.
+func (c *Character) takeScriptItems(itemID int32, count int, held bool) int {
 	tmpl, ok := c.inventory.Templates().Get(itemID)
 	if !ok {
-		return
+		return 0
 	}
 	if !tmpl.Stackable {
-		removed := 0
-		for _, inst := range c.inventory.ItemsByTemplateID(itemID) {
+		insts := c.inventory.ItemsByTemplateID(itemID)
+		if held && count > len(insts) {
+			return 0
+		}
+		removed, total := 0, 0
+		for _, inst := range insts {
 			if count >= 0 && removed == count {
 				break
 			}
 			c.unequipForTake(inst)
-			held := inst.CountValue()
-			taken := c.inventory.DestroyItem(inst, held) != nil
-			c.emit(event.ItemsTaken{ItemID: itemID, Count: held, Short: !taken})
+			units := inst.CountValue()
+			taken := c.inventory.DestroyItem(inst, units) != nil
+			c.emit(event.ItemsTaken{ItemID: itemID, Count: units, Short: !taken})
 			removed++
+			if taken {
+				total += units
+			}
 		}
-		return
+		return total
 	}
 	inst := c.inventory.ItemByTemplateID(itemID)
 	if inst == nil {
-		return
+		return 0
 	}
-	if held := inst.CountValue(); count < 0 || count > held {
-		count = held
+	if units := inst.CountValue(); count < 0 || count > units {
+		if held && count > units {
+			return 0
+		}
+		count = units
 	}
 	c.unequipForTake(inst)
 	if count == 0 {
@@ -104,10 +131,14 @@ func (c *Character) takeScriptItems(itemID int32, count int) {
 		if itemID != item.AdenaID {
 			c.emit(event.ItemsTaken{ItemID: itemID})
 		}
-		return
+		return 0
 	}
 	taken := c.inventory.DestroyItem(inst, count) != nil
 	c.emit(event.ItemsTaken{ItemID: itemID, Count: count, Short: !taken})
+	if !taken {
+		return 0
+	}
+	return count
 }
 
 // ReduceScriptAdena takes count adena from c for a script, and reports
