@@ -47,8 +47,8 @@ func TestAdminSetPlayerNameStoredBeforeReported(t *testing.T) {
 }
 
 // TestAdminSetPlayerNameLookupFailure pins that a name the characters
-// table cannot be asked about is refused with INCORRECT_NAME_TRY_AGAIN and
-// changes nothing.
+// table cannot be asked about is refused with INCORRECT_NAME_TRY_AGAIN,
+// changes nothing, and is free again for character creation (#4765).
 func TestAdminSetPlayerNameLookupFailure(t *testing.T) {
 	t.Parallel()
 	srv, _ := bootAdmin(t, adminLevel,
@@ -64,11 +64,13 @@ func TestAdminSetPlayerNameLookupFailure(t *testing.T) {
 		t.Fatalf("GM frames = %x, want INCORRECT_NAME_TRY_AGAIN alone", testsupport.FrameOpcodes(frames))
 	}
 	assertNotRenamed(t, srv, user, userID)
+	assertNameCreatable(t, srv, "Renamed7")
 }
 
 // TestAdminSetPlayerNameStoreFailure pins that a name the characters table
 // does not take is refused with INCORRECT_NAME_TRY_AGAIN: the player keeps
-// its old name, is still found by it, and nobody is shown the new one.
+// its old name, is still found by it, nobody is shown the new one, and
+// the name is free again for character creation (#4765).
 func TestAdminSetPlayerNameStoreFailure(t *testing.T) {
 	t.Parallel()
 	srv, _ := bootAdmin(t, adminLevel,
@@ -84,6 +86,7 @@ func TestAdminSetPlayerNameStoreFailure(t *testing.T) {
 		t.Fatalf("GM frames = %x, want INCORRECT_NAME_TRY_AGAIN alone", testsupport.FrameOpcodes(frames))
 	}
 	assertNotRenamed(t, srv, user, userID)
+	assertNameCreatable(t, srv, "Renamed7")
 }
 
 // assertNotRenamed asserts the player named Player was shown nothing and

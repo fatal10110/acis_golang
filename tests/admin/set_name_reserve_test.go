@@ -33,6 +33,20 @@ func nameRows(t *testing.T, srv *gameservertest.Server, name string) int {
 	return n
 }
 
+// assertNameCreatable asserts a new client creates a character named
+// name: a refused rename has given its hold on the name back.
+func assertNameCreatable(t *testing.T, srv *gameservertest.Server, name string) {
+	t.Helper()
+	creator := srv.DialClient(t, "creator", 0)
+	creator.Send(encodeCreateCharacter(name))
+	if reply := creator.Read(); reply[0] != serverpackets.OpcodeCharCreateOk {
+		t.Fatalf("creation of %s reply = %x, want CharCreateOk", name, reply)
+	}
+	if n := nameRows(t, srv, name); n != 1 {
+		t.Fatalf("%d rows hold %s, want 1", n, name)
+	}
+}
+
 // nameHold is a hold a test releases once it has acted in it. A test
 // also frees it at cleanup, registered after the boot so it runs before
 // the server stops: a test failing first leaves no goroutine held. The
