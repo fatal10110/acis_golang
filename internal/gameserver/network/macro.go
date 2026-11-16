@@ -28,8 +28,8 @@ const (
 )
 
 // restoreMacros loads the player's macros for world entry. A failed read
-// leaves the list empty; a malformed row keeps the macros read before it.
-// Either way the failure is logged and the login goes on.
+// leaves the list empty; a malformed row is left out and the other rows
+// are kept. Either way the failure is logged and the login goes on.
 func (l *GameClientLink) restoreMacros(ctx context.Context, ownerID int32) *macro.List {
 	if l.macros == nil {
 		return macro.NewList()

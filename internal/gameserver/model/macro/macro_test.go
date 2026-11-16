@@ -38,6 +38,78 @@ func TestEncodeCommandsCutsAt255CodeUnits(t *testing.T) {
 	}
 }
 
+// TestEncodeCommandsEscapesSeparators pins the escaped command format,
+// an owner-approved divergence (#5061) so that text holding ',' or ';'
+// survives a store and restore: those separators, and a backslash that
+// would otherwise read as an escape (one before '\', ',' or ';', or
+// ending the text), are written with a leading backslash. Text without them
+// is stored as before.
+func TestEncodeCommandsEscapesSeparators(t *testing.T) {
+	cases := []struct{ text, want string }{
+		{"/say hi", "3,0,0,/say hi;"},
+		{`C:\x`, `3,0,0,C:\x;`},
+		{"/say hello, world", `3,0,0,/say hello\, world;`},
+		{"/say hi;oops,1,2", `3,0,0,/say hi\;oops\,1\,2;`},
+		{`end\`, `3,0,0,end\\;`},
+		{`a\,b`, `3,0,0,a\\\,b;`},
+		{`a\\b`, `3,0,0,a\\\b;`},
+		{",", `3,0,0,\,;`},
+	}
+	for _, tc := range cases {
+		if got := EncodeCommands([]Command{{Type: CommandAction, Text: tc.text}}); got != tc.want {
+			t.Errorf("EncodeCommands(%q) = %q, want %q", tc.text, got, tc.want)
+		}
+	}
+}
+
+func TestCommandsRoundTrip(t *testing.T) {
+	texts := []string{
+		"", "/say hi", "/say hello, world", "/say hi;oops,1,2", ";", ",", ";;,,",
+		`\`, `\\`, `\,`, `\;`, `a\b`, `a\\b`, `C:\dir\`, `\\,\;\`, "日本語, ok; \U0001F600",
+	}
+	for _, text := range texts {
+		cmds := []Command{
+			{Type: CommandSkill, D1: 1177},
+			{Type: CommandShortcut, D1: 1, D2: 5, Text: text},
+			{Type: CommandAction, D1: 2, Text: text + "x"},
+		}
+		if text == "" {
+			cmds[1].Text = ""
+		}
+		got, err := DecodeCommands(EncodeCommands(cmds))
+		if err != nil {
+			t.Fatalf("round trip of %q: %v", text, err)
+		}
+		if !reflect.DeepEqual(got, cmds) {
+			t.Errorf("round trip of %q = %+v, want %+v", text, got, cmds)
+		}
+	}
+}
+
+// TestEncodeCommandsCutKeepsEscapesWhole: when the 255-unit cut falls
+// between an escaping backslash and the separator it escapes, the lone
+// backslash goes too, so the restored text never gains a character the
+// player did not write.
+func TestEncodeCommandsCutKeepsEscapesWhole(t *testing.T) {
+	// "1,2,3," is 6 units, 248 more reach 254, the escape pair would take
+	// units 255 and 256.
+	text := strings.Repeat("a", 248) + ",b"
+	got := EncodeCommands([]Command{{Type: 1, D1: 2, D2: 3, Text: text}})
+	if want := "1,2,3," + strings.Repeat("a", 248); got != want {
+		t.Fatalf("cut through an escape = %q, want %q", got, want)
+	}
+	// An escaped backslash split the same way keeps nothing of it either.
+	got = EncodeCommands([]Command{{Type: 1, D1: 2, D2: 3, Text: strings.Repeat("a", 248) + `\`}})
+	if want := "1,2,3," + strings.Repeat("a", 248); got != want {
+		t.Fatalf("cut through an escaped backslash = %q, want %q", got, want)
+	}
+	// A literal backslash (not an escape) at the cut stays.
+	got = EncodeCommands([]Command{{Type: 1, D1: 2, D2: 3, Text: strings.Repeat("a", 248) + `\b`}})
+	if want := "1,2,3," + strings.Repeat("a", 248) + `\`; got != want {
+		t.Fatalf("cut after a literal backslash = %q, want %q", got, want)
+	}
+}
+
 func TestDecodeCommands(t *testing.T) {
 	cases := []struct {
 		name string
@@ -50,7 +122,10 @@ func TestDecodeCommands(t *testing.T) {
 		}},
 		{"empty pieces skipped", ";;3,,2,,0;;", []Command{{Type: 3, D1: 2, D2: 0}}},
 		{"short line skipped and not numbered", "1,2;3,4,5;", []Command{{Type: 3, D1: 4, D2: 5}}},
-		{"comma in text keeps only the fourth field", "3,0,0,/say a,b;", []Command{{Type: 3, Text: "/say a"}}},
+		{"unescaped comma in text keeps only the fourth field", "3,0,0,/say a,b;", []Command{{Type: 3, Text: "/say a"}}},
+		{"escaped separators", `3,0,0,/say a\,b\;c;1,2,3;`, []Command{{Type: 3, Text: "/say a,b;c"}, {Type: 1, D1: 2, D2: 3}}},
+		{"backslash before another character is literal", `3,0,0,C:\x\\;`, []Command{{Type: 3, Text: `C:\x\`}}},
+		{"backslash ending the input is literal", `3,0,0,a\`, []Command{{Type: 3, Text: `a\`}}},
 		{"signed numbers", "+1,-5,0;", []Command{{Type: 1, D1: -5}}},
 		{"empty", "", nil},
 	}
@@ -70,22 +145,35 @@ func TestDecodeCommands(t *testing.T) {
 	}
 }
 
-// TestRestoreStopsAtMalformedRow pins the restore's failure shape: a
-// non-numeric field aborts the read, keeping the macros read before it.
-func TestRestoreStopsAtMalformedRow(t *testing.T) {
+// TestRestoreSkipsMalformedRows: a row whose command column is NULL or
+// does not decode is left out and reported, and the rows after it are
+// still restored. Owner-approved divergence (#5061): the restore used to
+// stop at the first such row, dropping every later macro.
+func TestRestoreSkipsMalformedRows(t *testing.T) {
 	list, err := Restore([]Row{
 		{ID: 1000, Name: "A", Commands: "1,2,3;", CommandsValid: true},
 		{ID: 1001, Name: "B", Commands: "1,z,3;", CommandsValid: true},
 		{ID: 1002, Name: "C", Commands: "", CommandsValid: true},
+		{ID: 1003, Name: "N"},
+		{ID: 1004, Name: "D", Commands: "3,0,0,x;", CommandsValid: true},
 	})
 	if err == nil {
-		t.Fatal("Restore of a malformed row returned no error")
+		t.Fatal("Restore of malformed rows returned no error")
 	}
-	if list.Len() != 1 || !list.Has(1000) {
-		t.Fatalf("restored %+v, want only macro 1000", list.All())
+	for _, id := range []string{"1001", "1003"} {
+		if !strings.Contains(err.Error(), id) {
+			t.Errorf("Restore error %q does not name macro %s", err, id)
+		}
 	}
-	if _, err := Restore([]Row{{ID: 5, Name: "N"}}); err == nil {
-		t.Fatal("Restore of a NULL command column returned no error")
+	var ids []int32
+	for _, m := range list.All() {
+		ids = append(ids, m.ID)
+	}
+	if want := []int32{1000, 1002, 1004}; !reflect.DeepEqual(ids, want) {
+		t.Fatalf("restored ids %v, want %v", ids, want)
+	}
+	if _, err := Restore([]Row{{ID: 1000, Name: "A", Commands: "1,2,3;", CommandsValid: true}}); err != nil {
+		t.Fatalf("Restore of good rows: %v", err)
 	}
 }
 
