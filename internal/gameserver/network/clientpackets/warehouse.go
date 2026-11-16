@@ -84,16 +84,15 @@ func DecodeRequestPackageSend(payload []byte, maxItems int) (RequestPackageSend,
 	}
 	req := RequestPackageSend{ObjectID: r.ReadInt32()}
 	count := r.ReadInt32()
-	// The row loop is guarded by a silent decode refusal for count < 0 or
-	// count above the per-packet item cap, before ever attempting a row
-	// read: neither case is a buffer underflow, so neither counts toward the
-	// underflow threshold. Only a count inside that range
-	// can genuinely underflow reading its rows below.
+	// A count below zero or above the per-packet item cap discards the
+	// request before any row is read: neither is a buffer underflow, so
+	// neither counts toward the underflow threshold. Only a count inside
+	// that range can genuinely underflow reading its rows below.
 	if count < 0 {
-		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: negative item count %d", count)
+		return RequestPackageSend{}, discarded(fmt.Errorf("clientpackets: RequestPackageSend: negative item count %d", count))
 	}
 	if int(count) > maxItems {
-		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: item count %d exceeds max %d", count, maxItems)
+		return RequestPackageSend{}, discarded(fmt.Errorf("clientpackets: RequestPackageSend: item count %d exceeds max %d", count, maxItems))
 	}
 	if r.Remaining() < int(count)*itemRequestSize {
 		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need %d item bytes, got %d: %w", int(count)*itemRequestSize, r.Remaining(), wire.ErrShortPacket)
@@ -115,23 +114,23 @@ func decodeExactItemRequestBatch(payload []byte, name string, maxItems int) ([]I
 	}
 	count := r.ReadInt32()
 	if count <= 0 {
-		return nil, fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
+		return nil, discarded(fmt.Errorf("clientpackets: %s: invalid item count %d", name, count))
 	}
 	if int(count) > maxItems {
-		return nil, fmt.Errorf("clientpackets: %s: item count %d exceeds max %d", name, count, maxItems)
+		return nil, discarded(fmt.Errorf("clientpackets: %s: item count %d exceeds max %d", name, count, maxItems))
 	}
 	// A row-count/remaining-length mismatch (count * row size differs from
 	// the bytes left) is a silent decode refusal, not a buffer underflow: it
 	// never counts toward the underflow threshold, so this stays unwrapped.
 	if r.Remaining() != int(count)*itemRequestSize {
-		return nil, fmt.Errorf("clientpackets: %s: item bytes = %d, want %d", name, r.Remaining(), int(count)*itemRequestSize)
+		return nil, discarded(fmt.Errorf("clientpackets: %s: item bytes = %d, want %d", name, r.Remaining(), int(count)*itemRequestSize))
 	}
 
 	items := make([]ItemRequest, int(count))
 	for i := range items {
 		items[i] = ItemRequest{ObjectID: r.ReadInt32(), Count: r.ReadInt32()}
 		if items[i].ObjectID < 1 || items[i].Count < 0 {
-			return nil, fmt.Errorf("clientpackets: %s: invalid item request %+v", name, items[i])
+			return nil, discarded(fmt.Errorf("clientpackets: %s: invalid item request %+v", name, items[i]))
 		}
 	}
 	if err := r.Err(); err != nil {

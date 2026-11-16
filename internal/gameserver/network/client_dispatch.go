@@ -60,7 +60,7 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeRequestSetAllyCrest, clientpackets.DecodeRequestSetAllyCrest, whenLive((*GameClientLink).requestSetAllyCrest))
 	register(reg, clientpackets.OpcodeRequestAllyInfo, noPayload, whenLiveNoBody((*GameClientLink).requestAllyInfo))
 	registerFrame(reg, clientpackets.OpcodeExtended, (*GameClientLink).handleExtended)
-	register(reg, clientpackets.OpcodeRequestSkillCoolTime, noPayload, (*GameClientLink).handleRequestSkillCoolTime)
+	register(reg, clientpackets.OpcodeSnoopQuit, clientpackets.DecodeSnoopQuit, ignoreRequest)
 	register(reg, clientpackets.OpcodeRequestMagicSkillUse, clientpackets.DecodeRequestMagicSkillUse, whenLive((*GameClientLink).handleMagicSkillUse))
 	register(reg, clientpackets.OpcodeAction, clientpackets.DecodeAction, (*GameClientLink).handleAction)
 	register(reg, clientpackets.OpcodeAttackRequest, clientpackets.DecodeAttackRequest, (*GameClientLink).handleAttackRequest)
@@ -213,8 +213,11 @@ func newGameInbound() inboundRegistry[byte] {
 	}
 	register(reg, clientpackets.OpcodeRequestQuestAbort, clientpackets.DecodeRequestQuestAbort, (*GameClientLink).handleRequestQuestAbort)
 	for _, op := range unwiredOpcodes {
-		registerFrame(reg, op, func(l *GameClientLink, _ context.Context, _ *connState, _ []byte) error {
-			l.logNotWired(op)
+		registerFrame(reg, op, func(*GameClientLink, context.Context, *connState, []byte) error { return nil })
+	}
+	for _, op := range noRequestOpcodes {
+		registerFrame(reg, op, func(_ *GameClientLink, _ context.Context, cs *connState, _ []byte) error {
+			cs.acted = false
 			return nil
 		})
 	}
@@ -223,18 +226,27 @@ func newGameInbound() inboundRegistry[byte] {
 
 // unwiredOpcodes are accepted in-game opcodes that do nothing a client can
 // observe: the client's filler packets and its game-guard reply, whose
-// recorded answer nothing reads. Each one is read and dropped without an
-// answer, and without counting as an unknown packet; the client waits on
-// nothing after sending any of them.
+// recorded answer nothing reads. Each one is read and dropped silently,
+// without an answer and without counting as an unknown packet; the client
+// waits on nothing after sending any of them. Each still counts as the
+// player acting.
 var unwiredOpcodes = []byte{
 	clientpackets.OpcodeDummy1A, clientpackets.OpcodeDummy23, clientpackets.OpcodeDummy2E,
 	clientpackets.OpcodeDummy34, clientpackets.OpcodeDummy3E, clientpackets.OpcodeGameGuardReply,
 }
 
-// logNotWired logs a frame of one of the unwiredOpcodes.
-func (l *GameClientLink) logNotWired(opcode byte) {
-	l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")
+// noRequestOpcodes are accepted in-game opcodes no request is built for:
+// their frames are neither read nor answered, never count as unknown
+// packets, and, since nothing runs for them, never count as the player
+// acting either.
+var noRequestOpcodes = []byte{
+	clientpackets.OpcodeRequestDismissParty, clientpackets.OpcodeRequestSkillCoolTime,
+	clientpackets.OpcodeMessengerDialog,
 }
+
+// ignoreRequest serves a request that was read but asks for nothing: no
+// answer, though the player acted.
+func ignoreRequest(*GameClientLink, context.Context, *connState, struct{}) error { return nil }
 
 // clearsSpawnProtection reports whether a frame of opcode ends the player's
 // spawn protection once its handler is done.
@@ -298,6 +310,7 @@ func newGameExInbound() inboundRegistry[uint16] {
 	register(reg, clientpackets.OpcodeRequestGetBossRecord, clientpackets.DecodeRequestGetBossRecord, (*GameClientLink).handleRequestGetBossRecord)
 	register(reg, clientpackets.OpcodeRequestWriteHeroWords, clientpackets.DecodeRequestWriteHeroWords, whenLive((*GameClientLink).writeHeroWords))
 	register(reg, clientpackets.OpcodeRequestExFishRanking, noPayload, whenLiveNoBody((*GameClientLink).requestFishRanking))
+	register(reg, clientpackets.OpcodeRequestPCCafeCouponUse, clientpackets.DecodeRequestPCCafeCouponUse, ignoreRequest)
 	register(reg, clientpackets.OpcodeRequestCursedWeaponList, noPayload, (*GameClientLink).handleRequestCursedWeaponList)
 	register(reg, clientpackets.OpcodeRequestExMagicSkillUseGround, clientpackets.DecodeRequestExMagicSkillUseGround, whenLive((*GameClientLink).handleMagicSkillUseGround))
 	register(reg, clientpackets.OpcodeRequestConfirmTargetItem, clientpackets.DecodeRequestConfirmTargetItem, whenLive((*GameClientLink).confirmAugmentTarget))

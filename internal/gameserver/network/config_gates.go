@@ -29,10 +29,12 @@ func (l *GameClientLink) handleRequestDropItem(_ context.Context, cs *connState,
 // unlessWarehouseDisabled runs handle unless AllowWarehouse is off. Off, the
 // frame is neither read nor answered, as the specified behavior does: a
 // malformed one is not even noticed, and the client, which closed its
-// deposit window as it sent the list, waits for nothing.
+// deposit window as it sent the list, waits for nothing. With nothing run,
+// the player did not act either.
 func unlessWarehouseDisabled(handle inboundFunc) inboundFunc {
 	return func(l *GameClientLink, ctx context.Context, cs *connState, payload []byte) error {
 		if l.playerConfig().WarehouseDisabled {
+			cs.acted = false
 			return nil
 		}
 		return handle(l, ctx, cs, payload)

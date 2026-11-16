@@ -44,9 +44,9 @@ type RequestSetCrop struct {
 
 // DecodeRequestSetSeed parses a raw RequestSetSeed payload (opcode byte
 // included) of at most maxItems rows (player.InventorySlots.MaxItemInPacket).
-// A row count out of range or not matching the bytes left, a row naming no
-// item or a negative amount or price, or a seed named twice, refuses the
-// whole request.
+// A row count out of range or not matching the bytes left refuses the
+// request; a row naming no item or a negative amount or price, or a seed
+// named twice, discards it (ErrDiscarded).
 func DecodeRequestSetSeed(payload []byte, maxItems int) (RequestSetSeed, error) {
 	const name = "RequestSetSeed"
 	r, err := newExtendedReader(payload, name, OpcodeRequestSetSeed, manorSetHeaderSize)
@@ -63,10 +63,10 @@ func DecodeRequestSetSeed(payload []byte, maxItems int) (RequestSetSeed, error) 
 	for i := range req.Items {
 		row := ManorSeedSetting{SeedID: r.ReadInt32(), Sales: r.ReadInt32(), Price: r.ReadInt32()}
 		if row.SeedID < 1 || row.Sales < 0 || row.Price < 0 {
-			return RequestSetSeed{}, fmt.Errorf("clientpackets: %s: invalid row seed=%d sales=%d price=%d", name, row.SeedID, row.Sales, row.Price)
+			return RequestSetSeed{}, discarded(fmt.Errorf("clientpackets: %s: invalid row seed=%d sales=%d price=%d", name, row.SeedID, row.Sales, row.Price))
 		}
 		if _, dup := seen[row.SeedID]; dup {
-			return RequestSetSeed{}, fmt.Errorf("clientpackets: %s: seed %d named twice", name, row.SeedID)
+			return RequestSetSeed{}, discarded(fmt.Errorf("clientpackets: %s: seed %d named twice", name, row.SeedID))
 		}
 		seen[row.SeedID] = struct{}{}
 		req.Items[i] = row
@@ -97,13 +97,13 @@ func DecodeRequestSetCrop(payload []byte, maxItems int) (RequestSetCrop, error) 
 	for range count {
 		row := ManorCropSetting{CropID: r.ReadInt32(), Sales: r.ReadInt32(), Price: r.ReadInt32(), Reward: r.ReadUint8()}
 		if row.CropID < 1 || row.Sales < 0 || row.Price < 0 {
-			return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: invalid row crop=%d sales=%d price=%d", name, row.CropID, row.Sales, row.Price)
+			return RequestSetCrop{}, discarded(fmt.Errorf("clientpackets: %s: invalid row crop=%d sales=%d price=%d", name, row.CropID, row.Sales, row.Price))
 		}
 		if row.Sales == 0 {
 			continue
 		}
 		if _, dup := seen[row.CropID]; dup {
-			return RequestSetCrop{}, fmt.Errorf("clientpackets: %s: crop %d named twice", name, row.CropID)
+			return RequestSetCrop{}, discarded(fmt.Errorf("clientpackets: %s: crop %d named twice", name, row.CropID))
 		}
 		seen[row.CropID] = struct{}{}
 		req.Items = append(req.Items, row)
