@@ -275,7 +275,7 @@ func TestNPCPicksUpCursedWeapon(t *testing.T) {
 	}
 	zariche := w.drop(t, zaricheItemID, 215)
 	x, y, z := zariche.Position()
-	w.srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche.ObjectID(), location.Location{X: x, Y: y, Z: z})
+	w.srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche, location.Location{X: x, Y: y, Z: z})
 
 	w.look(t, h.Queue(), script.NPCOf(h), 500, zaricheItemID, 8689)
 	if want := []string{line("see %d q=1 [%d/%d]", pickerHostileID, zariche.ObjectID(), zaricheItemID)}; !slices.Equal(w.log.take(), want) {

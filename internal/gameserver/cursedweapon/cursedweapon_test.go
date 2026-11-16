@@ -176,12 +176,13 @@ func TestGroundExpiry(t *testing.T) {
 	if !ok {
 		t.Fatal("no drop")
 	}
-	m.PlaceOnGround(id, 4242, location.Location{X: 1, Y: 2, Z: 3})
+	ground := &fakeGround{id: 4242}
+	m.PlaceOnGround(id, ground, location.Location{X: 1, Y: 2, Z: 3})
 	if ends, _ := m.Tick(now.Add(59 * time.Minute)); len(ends) != 0 {
 		t.Fatalf("ends after 59 minutes = %+v, want none", ends)
 	}
 	ends, _ := m.Tick(now.Add(time.Hour))
-	if want := []EndOfLife{{ItemID: id, GroundObjectID: 4242}}; !slices.Equal(ends, want) {
+	if want := []EndOfLife{{ItemID: id, GroundObjectID: 4242, GroundClaimed: true}}; !slices.Equal(ends, want) || !ground.claimed {
 		t.Fatalf("ends after an hour = %+v, want %+v", ends, want)
 	}
 	if len(m.Active()) != 0 {

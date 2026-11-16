@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -418,7 +419,17 @@ func TestAdminCursedWeaponsOnGround(t *testing.T) {
 	if itemID, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || itemID != akamanahID {
 		t.Fatalf("drop = %d %v, want Akamanah", itemID, ok)
 	}
-	srv.CursedWeapons.PlaceOnGround(akamanahID, 1, location.Location{X: 1000, Y: 2000, Z: -300})
+	srv.SeedGroundItem(t, 0, akamanahID, 1, 1000, 2000, -300)
+	var ground *grounditem.Item
+	for _, obj := range srv.State.Objects() {
+		if g, ok := obj.(*grounditem.Item); ok && g.ItemID() == akamanahID {
+			ground = g
+		}
+	}
+	if ground == nil {
+		t.Fatal("Akamanah not on the ground")
+	}
+	srv.CursedWeapons.PlaceOnGround(akamanahID, ground, location.Location{X: 1000, Y: 2000, Z: -300})
 
 	want := cwPage(t, cwOnGround("Blood Sword Akamanah", "8689", "3d. 0h. 0m.")+cwNotOut("Demonic Sword Zariche", "8190"))
 	if got := lastPage(t, exchange(t, gm, encodeBuildCmd("cw"))); got != want {

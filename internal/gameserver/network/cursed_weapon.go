@@ -84,7 +84,7 @@ func (l *GameClientLink) DropCursedWeapon(killer *player.Character, dropperID in
 		tx, ty, tz = at.X, at.Y, at.Z
 	}
 	l.belongings.groundItems.Drop(ground, task.DropOptions{X: tx, Y: ty, Z: tz, DropperID: dropperID})
-	l.cursed.PlaceOnGround(itemID, ground.ObjectID(), location.Location{X: tx, Y: ty, Z: tz})
+	l.cursed.PlaceOnGround(itemID, ground, location.Location{X: tx, Y: ty, Z: tz})
 	l.toAllPlayers(func() wire.Frame { return serverpackets.FrameExRedSky(cursedDropRedSky) })
 	l.toAllPlayers(func() wire.Frame {
 		return serverpackets.FrameEarthquake(tx, ty, tz, cursedDropQuakeIntensity, cursedDropQuakeDuration, false)
@@ -266,7 +266,7 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 			}
 			if ground, ok := l.dropHeldItem(live, inv, inst, true); ok {
 				gx, gy, gz := ground.Position()
-				l.cursed.PlaceOnGround(itemID, ground.ObjectID(), location.Location{X: gx, Y: gy, Z: gz})
+				l.cursed.PlaceOnGround(itemID, ground, location.Location{X: gx, Y: gy, Z: gz})
 			}
 		}
 	}
@@ -324,7 +324,7 @@ func (l *GameClientLink) endCursedWeaponThen(end cursedweapon.EndOfLife, current
 		})
 		return
 	case end.GroundObjectID != 0:
-		l.removeCursedGroundItem(end.GroundObjectID)
+		l.removeCursedGroundItem(end.GroundObjectID, end.GroundClaimed)
 	}
 	announce()
 }
@@ -358,8 +358,8 @@ func (l *GameClientLink) releaseCursedHolder(live *livePlayer, end cursedweapon.
 }
 
 // removeCursedGroundItem takes the ground item objectID out of the world,
-// unless a pickup already holds it.
-func (l *GameClientLink) removeCursedGroundItem(objectID int32) {
+// unless a pickup already holds it; claimed: the caller already holds it.
+func (l *GameClientLink) removeCursedGroundItem(objectID int32, claimed bool) {
 	if l.world == nil {
 		return
 	}
@@ -368,7 +368,7 @@ func (l *GameClientLink) removeCursedGroundItem(objectID int32) {
 		return
 	}
 	ground, ok := obj.(*grounditem.Item)
-	if !ok || !ground.Claim() {
+	if !ok || (!claimed && !ground.Claim()) {
 		return
 	}
 	if l.belongings.groundItems != nil {

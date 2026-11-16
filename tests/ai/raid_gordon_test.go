@@ -79,7 +79,7 @@ func layZariche(t *testing.T, srv *gameservertest.Server, at location.Location) 
 	srv.SeedGroundItem(t, 0, zaricheItemID, 1, at.X, at.Y, at.Z)
 	zariche := gordonGroundItem(t, srv, zaricheItemID)
 	x, y, z := zariche.Position()
-	srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche.ObjectID(), location.Location{X: x, Y: y, Z: z})
+	srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche, location.Location{X: x, Y: y, Z: z})
 	srv.ReadQueued(t, srv.Client)
 	return zariche
 }
