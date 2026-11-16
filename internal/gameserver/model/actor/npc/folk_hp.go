@@ -55,25 +55,30 @@ func (f *Folk) BroadcastStatus() {
 // TakeDamage applies a landed auto-attack hit and reports whether it
 // killed the NPC.
 func (f *Folk) TakeDamage(damage int, attacker attackable.Combatant) bool {
-	return f.reduceHP(float64(damage), attacker, modelskill.Ref{})
+	return f.reduceHP(float64(damage), attacker, modelskill.Ref{}, lossHit)
 }
 
 // ReduceHP applies skill damage.
 func (f *Folk) ReduceHP(amount float64, attacker attackable.Combatant, def modelskill.Definition) {
-	f.reduceHP(amount, attacker, skillRef(def))
+	f.reduceHP(amount, attacker, skillRef(def), lossHit)
 }
 
-// ReduceHPByDOT applies periodic damage.
-func (f *Folk) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
+// ReduceHPByDOT applies periodic damage; isDOT false takes it as a plain
+// hit.
+func (f *Folk) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
 	killer, _ := attacker.(attackable.Combatant)
-	f.reduceHP(amount, killer, modelskill.Ref{})
+	loss := lossDOT
+	if !isDOT {
+		loss = lossHit
+	}
+	f.reduceHP(amount, killer, modelskill.Ref{}, loss)
 }
 
 // ReduceHPBySkillDOT is ReduceHPByDOT for one damage-over-time tick of the
 // skill sk: the hit it registers names sk.
 func (f *Folk) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, sk modelskill.Ref) {
 	killer, _ := attacker.(attackable.Combatant)
-	f.reduceHP(amount, killer, sk)
+	f.reduceHP(amount, killer, sk, lossDOT)
 }
 
 // SkillAttacked is caster's offensive skill def landing on this NPC, once
@@ -104,31 +109,44 @@ func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk mod
 // truncated to an int and sk the skill that dealt it, then calls its party,
 // then makes its clan calls: itself, then every NPC of its clan in range. An
 // invulnerable NPC, or a hit from an attacker without damage permission,
-// then takes nothing.
+// then takes nothing. A hit that is no damage-over-time tick then wakes the
+// NPC (wakeOnHit).
 // The HP left is never under folkMinHP for an undying template, nor under
 // zero otherwise, and an NPC left under folkDeathHP dies. It reports
-// whether this call killed the NPC. A hit has no sleep, hold or stun to
-// break: none lands on a civilian NPC. A holy artifact takes no hit at all;
+// whether this call killed the NPC. A holy artifact takes no hit at all;
 // a siege headquarters runs its own hit first (headquartersHit), and a
 // Swoop Cannon's hit on it stops there; a control tower runs its own after
 // (towerHit).
-func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref) bool {
+func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref, loss hpLoss) bool {
 	if f.HolyThing() {
 		return false
 	}
 	if f.SiegeFlag() && !f.headquartersHit(attacker) {
 		return false
 	}
-	killed := f.loseHP(amount, attacker, sk, true)
+	killed := f.loseHP(amount, attacker, sk, loss)
 	if f.Tower() {
 		f.towerHit()
 	}
 	return killed
 }
 
-// loseHP is reduceHP; hit false leaves out the aggro, the attacked hooks
-// and the clan calls, for an HP loss that is not a hit.
-func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref, hit bool) bool {
+// hpLoss is what takes an NPC's HP.
+type hpLoss uint8
+
+const (
+	// lossHit is a hit: it adds aggro, runs the attacked hooks and the clan
+	// calls, and wakes the NPC.
+	lossHit hpLoss = iota
+	// lossDOT is a damage-over-time tick: a hit that wakes nothing.
+	lossDOT
+	// lossCost is a skill's HP cost: no hit at all.
+	lossCost
+)
+
+// loseHP is reduceHP; lossCost leaves out the aggro, the attacked hooks and
+// the clan calls.
+func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref, loss hpLoss) bool {
 	if f.Dead() {
 		return false
 	}
@@ -136,7 +154,7 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 	if attacker != nil {
 		f.forceRunStance()
 	}
-	if attacker != nil && hit {
+	if attacker != nil && loss != lossCost {
 		f.fight.aggro.AddDamage(attacker, amount, 0)
 		damage := commons.TruncInt32Sat(amount)
 		f.raiseAttacked(attacker, damage, sk)
@@ -145,6 +163,9 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 	}
 	if f.Invul() || !creature.CanDealDamage(attacker) {
 		return false
+	}
+	if loss == lossHit {
+		f.wakeOnHit()
 	}
 	floor := 0.0
 	if f.Instance.Template.Undying {
@@ -166,6 +187,16 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 		f.BroadcastStatus()
 	}
 	return dying && f.die(attacker)
+}
+
+// wakeOnHit ends the sleep and the hold-until-attacked effects the NPC
+// holds, and one time in ten its stun. Only a control tower holds any.
+func (f *Folk) wakeOnHit() {
+	f.effects.StopByType(effect.TypeSleep)
+	f.effects.StopByType(effect.TypeImmobileUntilAttacked)
+	if f.Stunned() && f.Roll(10) == 0 {
+		f.effects.StopByType(effect.TypeStun)
+	}
 }
 
 // SetHP sets the current HP, clamped to [0, max HP], and offers the

@@ -272,29 +272,23 @@ func TestHostileConcurrentBuffsOnColdNPC(t *testing.T) {
 	assertStatsMatch(t, "template chain", newSharedPassivesHostile(t, tpl, table, 2), mods)
 }
 
-// TestFolkSharesTemplatePassives: civilian NPCs of one template share its
-// compiled passives, compute what attaching each passive func in turn gave
-// and keep reads cold.
-func TestFolkSharesTemplatePassives(t *testing.T) {
-	table, refs := sharedPassivesTable()
+// TestFolkIgnoresTemplatePassives (L2Skill.getStatFuncs): a civilian NPC
+// is no attackable NPC, so its template passives give it no stat funcs:
+// its stats read as the builtin funcs alone give them, and reads stay
+// cold.
+func TestFolkIgnoresTemplatePassives(t *testing.T) {
+	_, refs := sharedPassivesTable()
 	tpl := NewTemplate(Template{ID: 30102, TemplateID: 30102, Type: "Merchant", Level: 40, HPMax: 2000, MPMax: 500, CON: 43, MEN: 25, RunSpeed: 160}, TemplateSkills{Passives: refs})
-	mods := templatePassiveMods(t, table, refs)
-	var folks [2]*Folk
-	for i := range folks {
-		inst, err := NewInstance(int32(i+1), tpl)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if folks[i], err = NewFolk(inst, table); err != nil {
-			t.Fatal(err)
-		}
+	inst, err := NewInstance(1, tpl)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if folks[0].passives == nil || folks[0].passives != folks[1].passives {
-		t.Fatalf("passives = %p and %p, want one shared non-nil set", folks[0].passives, folks[1].passives)
+	f, err := NewFolk(inst)
+	if err != nil {
+		t.Fatal(err)
 	}
-	f := folks[0]
 	for _, tc := range sharedPassiveStats {
-		want := attachedOneByOne(mods, tc.stat, f.statActor(), tc.base)
+		want := attachedOneByOne(nil, tc.stat, f.statActor(), tc.base)
 		if got := f.CalcStat(tc.stat, tc.base); got != want {
 			t.Errorf("CalcStat(%v, %v) = %v, want %v", tc.stat, tc.base, got, want)
 		}

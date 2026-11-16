@@ -47,7 +47,7 @@ func TestFixedNPCPolymorphView(t *testing.T) {
 		}},
 		{"effect point", own(13018, "EffectPoint"), func(t *testing.T, tmpl *Template) morphing {
 			q := sim.NewInline(time.Unix(0, 0)).NewQueue("point")
-			ep, err := NewEffectPoint(7, tmpl, 1, q, nil)
+			ep, err := NewEffectPoint(7, tmpl, 1, q)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -2,7 +2,6 @@ package npc
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -88,20 +87,11 @@ type DecorationRuntime struct {
 }
 
 // NewDecoration builds an item-placed NPC from inst, titled with title.
-// skills, when provided, resolves the template's passive skills into the
-// stats it is shown with.
-func NewDecoration(inst *Instance, title string, skills ...skillDefinitions) (*Decoration, error) {
+func NewDecoration(inst *Instance, title string) (*Decoration, error) {
 	if inst == nil || inst.Template == nil {
 		return nil, errors.New("npc: nil decoration instance")
 	}
-	var lookup skillDefinitions
-	if len(skills) > 0 {
-		lookup = skills[0]
-	}
-	stats, err := settleFixedStats(inst, lookup)
-	if err != nil {
-		return nil, err
-	}
+	stats := settleFixedStats(inst)
 	inst.SetTitle(title)
 	d := &Decoration{Instance: inst, stats: stats, hp: float64(stats.maxHP)}
 	d.zones = newZoneMember(d)
@@ -370,7 +360,8 @@ func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, m
 func (d *Decoration) Kind() actor.Kind { return actor.KindNPC }
 
 // fixedStats are the client-visible stats of an NPC that holds no effects,
-// settled once at spawn from its template and passive skills.
+// settled once at spawn from its template. Its template passives give it
+// no stats: they only count for an attackable NPC.
 type fixedStats struct {
 	maxHP, pAtkSpd, mAtkSpd          int
 	moveMultiplier, atkSpdMultiplier float64
@@ -378,23 +369,14 @@ type fixedStats struct {
 	walkMoveMultiplier float64
 	// moveSpeed is the speed the NPC runs at.
 	moveSpeed float64
-	// template and mods are what every other stat is finalized from: the
-	// NPC's template and its passives' stat funcs.
+	// template is what every other stat is finalized from.
 	template *Template
-	mods     []effect.Mod
 }
 
-// settleFixedStats finalizes inst's stats through the builtin stat funcs
-// and the template passives lookup resolves.
-func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, error) {
-	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
-	if err != nil {
-		return fixedStats{}, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
-	}
+// settleFixedStats finalizes inst's stats through the builtin stat funcs.
+func settleFixedStats(inst *Instance) fixedStats {
 	t := inst.Template
-	// A decoration has no condition view: a func with an attached condition
-	// never attaches.
-	fs := fixedStats{template: t, mods: effect.Attachable(mods, nil)}
+	fs := fixedStats{template: t}
 	fs.maxHP = int(fs.calc(stat.MaxHP, t.HPMax))
 	fs.pAtkSpd = int(fs.calc(stat.PowerAttackSpeed, t.AtkSpd))
 	fs.mAtkSpd = int(fs.calc(stat.MagicAttackSpeed, magicAttackSpeedBase))
@@ -403,7 +385,7 @@ func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, erro
 	// it; 0 for a stance whose base is 0.
 	fs.moveSpeed, fs.moveMultiplier = fs.stanceSpeed(int(t.RunSpeed))
 	_, fs.walkMoveMultiplier = fs.stanceSpeed(int(t.WalkSpeed))
-	return fs, nil
+	return fs
 }
 
 // stanceSpeed is the move speed over the stance base speed base, narrowed
@@ -417,15 +399,10 @@ func (fs fixedStats) stanceSpeed(base int) (speed, multiplier float64) {
 	return float64(s), float64(s / float32(base))
 }
 
-// calc finalizes base for s through the builtin stat funcs and the
-// passives, flooring a non-positive stat that can't go negative at one.
+// calc finalizes base for s through the builtin stat funcs, flooring a
+// non-positive stat that can't go negative at one.
 func (fs fixedStats) calc(s stat.Stat, base float64) float64 {
 	c := effect.NewCalculator(defaultBuiltin(s))
-	for _, m := range fs.mods {
-		if m.Stat == s {
-			c.AddMod(m)
-		}
-	}
 	v := c.Calc(templateStatActor{t: fs.template}, base, nil, nil)
 	if s.CantBeNegative() && v <= 0 {
 		return 1

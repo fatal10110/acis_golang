@@ -634,7 +634,7 @@ func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 // ConsumeHP takes a skill's HP cost from f, never below its floor. The
 // cost is a consumption, not a hit: it raises no attacked hook and makes no
 // clan call.
-func (f *Folk) ConsumeHP(amount float64) { f.loseHP(amount, f, modelskill.Ref{}, false) }
+func (f *Folk) ConsumeHP(amount float64) { f.loseHP(amount, f, modelskill.Ref{}, lossCost) }
 
 // SkillDisabled reports whether f may not use the skill of reuse key key.
 // With no skill waiting for its reuse, it may. Otherwise a paralysis locks

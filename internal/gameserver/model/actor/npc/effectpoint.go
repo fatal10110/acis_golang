@@ -47,17 +47,12 @@ type EffectPoint struct {
 
 // NewEffectPoint creates an unspawned EffectPoint from template, attributed
 // to ownerID (the acting player's object id), whose work runs on queue.
-// skills, when not nil, resolves the template's passive skills into the
-// stats it is shown with.
-func NewEffectPoint(objectID int32, template *Template, ownerID int32, queue *sim.Queue, skills skillDefinitions, opts ...effect.Option) (*EffectPoint, error) {
+func NewEffectPoint(objectID int32, template *Template, ownerID int32, queue *sim.Queue, opts ...effect.Option) (*EffectPoint, error) {
 	inst, err := NewInstance(objectID, template)
 	if err != nil {
 		return nil, err
 	}
-	stats, err := settleFixedStats(inst, skills)
-	if err != nil {
-		return nil, err
-	}
+	stats := settleFixedStats(inst)
 	ep := &EffectPoint{objectID: objectID, Instance: inst, ownerID: ownerID, stats: stats}
 	ep.zones = newZoneMember(ep)
 	ep.effects = effect.NewList(ep, opts...)
