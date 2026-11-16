@@ -90,11 +90,11 @@ func TestHashOrder(t *testing.T) {
 	// A monster kill rolls them in that order: with every roll passing,
 	// Akamanah drops first.
 	m, _ := newManager(t, &fakeStore{}, time.Unix(1000, 0))
-	if id, ok := m.RollDrop(always(0)); !ok || id != akamanah {
-		t.Fatalf("first drop = %d, %v, want Akamanah", id, ok)
+	if d, ok := m.RollDrop(always(0)); !ok || d.ItemID != akamanah {
+		t.Fatalf("first drop = %d, %v, want Akamanah", d.ItemID, ok)
 	}
-	if id, ok := m.RollDrop(always(0)); !ok || id != zariche {
-		t.Fatalf("second drop = %d, %v, want Zariche", id, ok)
+	if d, ok := m.RollDrop(always(0)); !ok || d.ItemID != zariche {
+		t.Fatalf("second drop = %d, %v, want Zariche", d.ItemID, ok)
 	}
 	if _, ok := m.RollDrop(always(0)); ok {
 		t.Fatal("a third drop with both weapons out")
@@ -172,12 +172,15 @@ func TestGroundExpiry(t *testing.T) {
 	now := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
 	store := &fakeStore{}
 	m, _ := newManager(t, store, now)
-	id, ok := m.RollDrop(always(0))
+	d, ok := m.RollDrop(always(0))
 	if !ok {
 		t.Fatal("no drop")
 	}
+	id := d.ItemID
 	ground := &fakeGround{id: 4242}
-	m.PlaceOnGround(id, ground, location.Location{X: 1, Y: 2, Z: 3})
+	if !m.PlaceOnGround(d, ground, location.Location{X: 1, Y: 2, Z: 3}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 	if ends, _ := m.Tick(now.Add(59 * time.Minute)); len(ends) != 0 {
 		t.Fatalf("ends after 59 minutes = %+v, want none", ends)
 	}

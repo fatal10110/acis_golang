@@ -15,14 +15,17 @@ import (
 // weapons' clock.
 func dropAkamanahAt(t *testing.T, srv *gameservertest.Server, c *scriptedClient, id int32) *grounditem.Item {
 	t.Helper()
-	if itemID, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || itemID != akamanahID {
-		t.Fatalf("drop = %d %v, want Akamanah", itemID, ok)
+	drop, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 })
+	if !ok || drop.ItemID != akamanahID {
+		t.Fatalf("drop = %d %v, want Akamanah", drop.ItemID, ok)
 	}
 	x, y, z := srv.PlayerPosition(t, id)
 	srv.SeedGroundItem(t, 0, akamanahID, 1, x, y, z)
 	drainUntilQuiet(t, c)
 	ground := groundWeapon(t, srv, akamanahID)
-	srv.CursedWeapons.PlaceOnGround(akamanahID, ground, location.Location{X: x, Y: y, Z: z})
+	if !srv.CursedWeapons.PlaceOnGround(drop, ground, location.Location{X: x, Y: y, Z: z}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 	return ground
 }
 
