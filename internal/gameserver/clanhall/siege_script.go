@@ -106,8 +106,8 @@ func (s *HallSiege) UpdateNextSiege() {
 }
 
 // AddAttacker makes clanID an attacker of the siege, and stores it,
-// reporting false when no script runs the siege or the clan attacks it
-// already.
+// reporting false when no script runs the siege, the clan attacks it
+// already, or it bids on a hall at auction: it could win both halls.
 func (s *HallSiege) AddAttacker(clanID int32) bool {
 	hs := s.hs
 	hs.mu.Lock()
@@ -115,12 +115,20 @@ func (s *HallSiege) AddAttacker(clanID int32) bool {
 	hs.siegeMu.Lock()
 	defer hs.siegeMu.Unlock()
 	st := s.h.siege
-	if st.script == nil || clanID == 0 || slices.Contains(st.attackers, clanID) {
+	if st.script == nil || clanID == 0 || hs.bidAt[clanID] != 0 || slices.Contains(st.attackers, clanID) {
 		return false
 	}
 	st.attackers = append(st.attackers, clanID)
 	hs.saveAttackersLocked(s.h)
 	return true
+}
+
+// Bidding reports whether clanID bids on a hall at auction, which keeps it
+// out of every hall's siege.
+func (s *HallSiege) Bidding(clanID int32) bool {
+	s.hs.mu.Lock()
+	defer s.hs.mu.Unlock()
+	return s.hs.bidAt[clanID] != 0
 }
 
 // RemoveAttacker drops clanID from the attackers, and stores it, whatever

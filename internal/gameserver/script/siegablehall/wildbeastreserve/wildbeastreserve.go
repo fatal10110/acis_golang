@@ -209,14 +209,16 @@ func checkAndRegisterClan(s *script.Script, w *flagwar.War, h *script.Hall, p *s
 	}
 	cd, ok := w.Clan(clan.ID())
 	if !ok {
+		// Registering first keeps the items of a clan refused for a bid
+		// placed since its registration was checked.
+		if cd, ok = w.RegisterClan(s, h, clan.ID()); !ok {
+			return "farm_messenger_q0655_04.htm"
+		}
 		s.TakeItems(p, crystalOfPurity, -1)
 		s.TakeItems(p, trainerLicense, 1)
 		if st := s.QuestState(p, questName); st != nil {
 			s.PlaySound(p, script.SoundFinish)
 			st.Exit(true)
-		}
-		if cd, ok = w.RegisterClan(s, h, clan.ID()); !ok {
-			panic(fmt.Sprintf("wildbeastreserve: clan %d owns another hall and holds no registration", clan.ID()))
 		}
 	}
 	return flagHTML(cd.Flag)
@@ -234,6 +236,11 @@ func clanRegisterStatus(s *script.Script, w *flagwar.War, h *script.Hall, p *scr
 	}
 	if clan != nil && h.OwnerID() == p.ClanID() {
 		return "farm_kel_mahum_messenger_22.htm"
+	}
+	if clan != nil && h.ClanBidding(clan.ID()) {
+		// A clan bidding at auction could win both halls (owner-approved
+		// refusal).
+		return "farm_messenger_q0655_04.htm"
 	}
 	if !s.DestroyItems(p, trainerLicense, 1, true) {
 		return "farm_kel_mahum_messenger_27.htm"

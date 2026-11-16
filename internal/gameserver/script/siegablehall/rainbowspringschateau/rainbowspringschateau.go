@@ -230,7 +230,9 @@ func register(s *script.Script, h *script.Hall, p *script.Player) string {
 	switch {
 	case p.ClanLevel() < 3 || s.Clan(clanID).MembersCount() < minClanMemberCount:
 		return "messenger_yetti011.htm"
-	case p.ClanHallID() > 0:
+	case p.ClanHallID() > 0 || h.ClanBidding(clanID):
+		// A clan bidding at auction could win both halls (owner-approved
+		// refusal).
 		return "messenger_yetti012.htm"
 	case !h.Registering():
 		return "messenger_yetti014.htm"
@@ -349,7 +351,9 @@ func (c *chateau) setFinalAttackers(s *script.Script, h *script.Hall) {
 			}
 			continue
 		}
-		if clan == nil || clan.DissolvingExpiry() > 0 {
+		if clan == nil || clan.DissolvingExpiry() > 0 || h.ClanBidding(clanID) {
+			// A clan that bid at auction since it registered could win
+			// both halls (owner-approved refusal).
 			h.DropDecrees(clanID)
 		} else {
 			c.accepted.Add(clan.ID())
@@ -362,7 +366,10 @@ func (c *chateau) setFinalAttackers(s *script.Script, h *script.Hall) {
 		h.SetSiegeStatus(script.SiegeRegistrationOver)
 		h.ClearAttackers()
 		for _, clanID := range c.accepted.Items() {
-			h.AddAttacker(clanID)
+			if !h.AddAttacker(clanID) {
+				// A bid placed since the choice keeps the clan out.
+				c.accepted.Remove(clanID)
+			}
 		}
 		return
 	}

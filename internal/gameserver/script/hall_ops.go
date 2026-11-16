@@ -188,8 +188,13 @@ func (h *Hall) UpdateNextSiege() { h.s.UpdateNextSiege() }
 func (h *Hall) Attackers() []int32 { return h.s.Attackers() }
 
 // AddAttacker makes clanID an attacker of the siege, and stores it,
-// reporting false when the clan attacks it already.
+// reporting false when the clan attacks it already or bids on a hall at
+// auction.
 func (h *Hall) AddAttacker(clanID int32) bool { return h.s.AddAttacker(clanID) }
+
+// ClanBidding reports whether clanID bids on a hall at auction: such a clan
+// may not join a hall's siege, since it could win both halls.
+func (h *Hall) ClanBidding(clanID int32) bool { return h.s.Bidding(clanID) }
 
 // RemoveAttacker drops clanID from the attackers, and stores it.
 func (h *Hall) RemoveAttacker(clanID int32) { h.s.RemoveAttacker(clanID) }
