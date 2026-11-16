@@ -1,6 +1,7 @@
 package olympiad
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // sendUnlanded has p send payload and returns what p was sent for it,
@@ -35,9 +37,9 @@ func (s *spectate) sendUnlanded(t *testing.T, p *competitor, payload []byte) [][
 
 // TestOlympiadSpectateWaitsForTheEntryJump pins the Go-only guard on a
 // spectator whose jump into a stadium its client has not yet reported
-// landed: RequestOlympiadObserverEnd and "arenachange" to another stadium
-// are both ignored, as the jump they would start is refused while the
-// first is in flight, and would otherwise leave a plain player inside the
+// landed: RequestOlympiadObserverEnd is ignored and "arenachange" to
+// another stadium is refused with ActionFailed (owner-approved, #5152), as
+// the jump they would start is refused while the first is in flight, and would otherwise leave a plain player inside the
 // stadium or a hidden spectator of one stadium standing in another. Once
 // it has appeared, leaving brings it back where it left.
 func TestOlympiadSpectateWaitsForTheEntryJump(t *testing.T) {
@@ -59,12 +61,13 @@ func TestOlympiadSpectateWaitsForTheEntryJump(t *testing.T) {
 	for _, early := range []struct {
 		name    string
 		payload []byte
+		want    []byte
 	}{
-		{"RequestOlympiadObserverEnd", encodeExRequest(clientpackets.OpcodeRequestOlympiadObserverEnd)},
-		{"arenachange 1", encodeHeroBypass("arenachange 1")},
+		{"RequestOlympiadObserverEnd", encodeExRequest(clientpackets.OpcodeRequestOlympiadObserverEnd), nil},
+		{"arenachange 1", encodeHeroBypass("arenachange 1"), []byte{serverpackets.OpcodeActionFailed}},
 	} {
-		if got := s.sendUnlanded(t, w, early.payload); len(got) != 0 {
-			t.Fatalf("%s before Appearing answered %q, want silence", early.name, spectatorLines(w.id, got))
+		if got := s.sendUnlanded(t, w, early.payload); !bytes.Equal(testsupport.FrameOpcodes(got), early.want) {
+			t.Fatalf("%s before Appearing answered %x, want %x", early.name, testsupport.FrameOpcodes(got), early.want)
 		}
 		if saved, ok := c.SavedLocation(); !c.ObserverMode() || !c.Invisible() || !c.Invul() || c.OlympiadGameID() != 0 || !ok || saved != left {
 			t.Fatalf("after early %s: observer=%v invisible=%v invul=%v game=%d saved=%+v/%v, want watching stadium 0 from %+v",

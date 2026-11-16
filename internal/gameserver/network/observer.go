@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
@@ -101,6 +102,14 @@ func (l *GameClientLink) observerReturn(live *livePlayer) {
 // leaveObserverMode brings observer live back to the position it left to
 // watch, visible, vulnerable and free to act again.
 func (l *GameClientLink) leaveObserverMode(live *livePlayer) {
+	saved := l.stopObserving(live)
+	l.teleportLivePlayer(live, saved, 0)
+	live.ClearSavedLocation()
+}
+
+// stopObserving makes observer live visible, vulnerable and free to act
+// again and closes its view, and returns the position it left to watch.
+func (l *GameClientLink) stopObserving(live *livePlayer) location.Location {
 	live.tryToIdle(live.DenyAIAction())
 	l.clearLiveTarget(live)
 	live.SetInvisible(false)
@@ -108,7 +117,21 @@ func (l *GameClientLink) leaveObserverMode(live *livePlayer) {
 	live.SetParalyzed(false)
 	saved, _ := live.SavedLocation()
 	live.SendFrame(serverpackets.FrameObserverEnd(saved))
-	l.teleportLivePlayer(live, saved, 0)
+	return saved
+}
+
+// endObservationInPlace ends live's watch, from a viewpoint or of a
+// stadium, where it stands, forgetting the position it left: the caller
+// moves it on. A player watching nothing is left alone.
+func (l *GameClientLink) endObservationInPlace(live *livePlayer) {
+	if !live.ObserverMode() {
+		return
+	}
+	if live.OlympiadGameID() >= 0 {
+		l.stopWatchingStadium(live)
+	} else {
+		l.stopObserving(live)
+	}
 	live.ClearSavedLocation()
 }
 

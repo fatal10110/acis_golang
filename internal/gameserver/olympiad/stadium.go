@@ -64,6 +64,9 @@ type Fitness struct {
 	// CursedWeaponID is the cursed weapon the competitor holds, 0 for none.
 	CursedWeaponID int32
 	Overweight     bool
+	// Away reports the competitor stands outside the stadium it competes
+	// in: its entry jump is still held for a landing of its own.
+	Away bool
 }
 
 // Arena carries out a stadium's match on its players and its zone. Every
@@ -389,6 +392,28 @@ func (s *Stadium) checkDefection(g *Game) bool {
 	return g.defected()
 }
 
+// checkAway marks each competitor of g that is not standing in the stadium
+// as the fight would start a defector, tells its opponent and lets it go
+// from the match, back to the town near where it entered; it reports
+// whether either was away. A competitor holding back the landing of its
+// own teleport cannot so keep its entry from being made and stall the
+// match into a tie (owner-approved, #5121).
+func (s *Stadium) checkAway(g *Game) bool {
+	a := s.games.arena
+	away := false
+	for i, p := range g.players {
+		if !a.Fitness(p.ObjectID).Away {
+			continue
+		}
+		away = true
+		g.Defect(p.ObjectID)
+		a.Tell(g.players[1-i].ObjectID, Message{Kind: MessageOpponentUnfit})
+		a.Release(p.ObjectID)
+		a.SendBack(p.ObjectID)
+	}
+	return away
+}
+
 // unfit reports whether objectID can no longer compete, with the message
 // its opponent gets; the competitor itself is told why first when it is
 // still there to hear it.
@@ -427,9 +452,10 @@ func (s *Stadium) fighting(g *Game) bool {
 	return true
 }
 
-// startBattle starts the fight: both competitors must still be there.
+// startBattle starts the fight: both competitors must still be there,
+// standing in the stadium.
 func (s *Stadium) startBattle(g *Game) bool {
-	if !s.fighting(g) {
+	if !s.fighting(g) || s.checkAway(g) {
 		return false
 	}
 	a := s.games.arena
