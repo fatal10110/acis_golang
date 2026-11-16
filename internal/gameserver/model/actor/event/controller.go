@@ -44,6 +44,12 @@ type SkillMasteryProc struct{}
 // a swing.
 type AttackFinished struct{ BowReuse bool }
 
+// AttackAborted reports a playable's swing stopped at its first hit: its
+// main target was gone or dead, or a raid curse blocked the hit. The AI goes
+// idle, and a player is answered ActionFailed. Only playable attack
+// controllers emit it.
+type AttackAborted struct{}
+
 // AttackEnded reports, from an attackable NPC's attack controller only, that
 // its attack on Target ended: a swing finished, or a bow shot landed (not
 // its reuse delay). It precedes everything else that end reports.
@@ -132,6 +138,7 @@ func (CastFinished) event()           {}
 func (CastStopAck) event()            {}
 func (SkillMasteryProc) event()       {}
 func (AttackFinished) event()         {}
+func (AttackAborted) event()          {}
 func (AttackEnded) event()            {}
 func (AttackRethink) event()          {}
 func (ShotsRechargeRequested) event() {}

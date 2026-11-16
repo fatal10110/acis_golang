@@ -507,6 +507,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.startLiveAutoAttack(live)
 	case event.Evaded:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, e.Attacker.CharacterName()))
+	case event.AttackAborted:
+		// A swing stopped at its hit sends the player idle, then answers
+		// ActionFailed on top of any the idle sent.
+		live.tryToIdle(live.DenyAIAction())
+		live.SendFrame(serverpackets.FrameActionFailed())
 	case event.AttackFinished:
 		if l.finishDeferredAction(live) {
 			return

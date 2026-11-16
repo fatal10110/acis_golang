@@ -283,6 +283,10 @@ func (s *summonSink) Emit(ev event.Event) {
 		s.relinkToOwner()
 	case event.AttackFinished:
 		actor.FinishedAttack()
+	case event.AttackAborted:
+		// A swing stopped at its hit sends the summon idle; its owner is
+		// told nothing.
+		actor.TryToIdle()
 	case event.CastFinished:
 		if !e.Interrupted {
 			actor.FinishedCasting()
