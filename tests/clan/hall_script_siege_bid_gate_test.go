@@ -104,3 +104,45 @@ func TestRainbowSpringsDropsAClanThatBidSinceItRegistered(t *testing.T) {
 		t.Fatalf("status = %v, want registration opened", w.siege.Status())
 	}
 }
+
+// TestWildBeastReserveBiddingClanMayNotRegister: Besiegers bids on
+// Moonstone Hall and holds the licenses and crystals that register it for
+// the Wild Beast Reserve's flag war. The messenger refuses it with the page
+// for a clan owning a hall before taking its license: it could win both
+// halls (owner-approved divergence, #5110). Nothing is taken, the quest
+// stays, nothing is registered, and the siege itself refuses the bidder as
+// an attacker.
+func TestWildBeastReserveBiddingClanMayNotRegister(t *testing.T) {
+	t.Parallel()
+	items := map[int32]int32{trainerLicenseID: 2, crystalOfPurityID: 10}
+	w := bootBeastFarm(t, flagWarSetup{items: items, seed: bidOnMoonstone(besiegersClanID)})
+	messenger := w.beastMessenger(t)
+	w.srv.Advance(t, time.Duration(w.date-w.srv.Halls.Now()-3_600_000)*time.Millisecond)
+	if !w.siege.WaitingBattle() {
+		t.Fatal("the registrations did not close")
+	}
+	drainFrames(t, w.c)
+
+	w.talk(t, messenger)
+	wantBeastPage(t, "register after the close", w.beastBypass(t, "register"), "farm_kel_mahum_messenger_1.htm", messenger.ObjectID())
+	wantBeastPage(t, "the bidder's registration", w.beastBypass(t, "register_clan"), "farm_messenger_q0655_04.htm", messenger.ObjectID())
+	w.srv.RunScript(t, w.objID, beastScriptName, func(_ *script.Script, p *script.Player) {
+		for id, want := range items {
+			if n := p.ItemCount(id); n != want {
+				t.Errorf("item %d after the refusal = %d, want %d", id, n, want)
+			}
+		}
+	})
+	if got := w.rows(t, "SELECT COUNT(*) FROM character_quests WHERE name = '"+q655Name+"'"); slices.Equal(got, []string{"0"}) {
+		t.Fatal("the refusal ended Q655")
+	}
+	if got := w.flagWarClans(t); len(got) != 0 {
+		t.Fatalf("flag war clans = %v, want none", got)
+	}
+	if w.siege.AddAttacker(besiegersClanID) {
+		t.Fatal("the siege took the bidder as an attacker")
+	}
+	if got := w.siege.Attackers(); len(got) != 0 {
+		t.Fatalf("attackers = %#x, want none", got)
+	}
+}
