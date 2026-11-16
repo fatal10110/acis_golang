@@ -103,7 +103,7 @@ type continuousFake struct {
 
 	// recordSuccessInput, when set, is called with every SkillSuccessInput
 	// invocation's raw arguments, letting tests assert on the resolved
-	// caster/shield state without duplicating checkSkillSuccess's logic.
+	// caster/shield state without duplicating checkSkillSuccessBSSWithShield's logic.
 	recordSuccessInput func(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense)
 
 	// aggression-event recording: which optional surface fired, and with
@@ -253,7 +253,7 @@ type disablerFake struct {
 	templateLandings []templateLanding
 
 	// lastBss and lastShield record the most recent SkillSuccessInput call's
-	// resolved caster/target state, for tests asserting checkSkillSuccess
+	// resolved caster/target state, for tests asserting checkSkillSuccessBSSWithShield
 	// threaded them through correctly.
 	lastBss    bool
 	lastShield formulas.ShieldDefense
@@ -293,7 +293,7 @@ func (d *disablerFake) SkillSuccessInput(caster creature.FormulaActor, def model
 func (d *disablerFake) CharacterName() string { return d.name }
 
 // ShieldDefense reports d's pre-set shield-block outcome, letting tests
-// exercise checkSkillSuccess's shield-block threading.
+// exercise checkSkillSuccessBSSWithShield's shield-block threading.
 func (d *disablerFake) ShieldDefense(caster creature.FormulaActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	d.shieldRolls++
 	return d.shield
@@ -341,7 +341,7 @@ func (d *disablerFake) NotifyAggression(source attackable.Combatant, power int) 
 }
 
 // bssCasterFake exposes a fixed blessed-spiritshot charge state for tests
-// asserting checkSkillSuccess resolves it from the caster.
+// asserting checkSkillSuccessBSSWithShield resolves it from the caster.
 type bssCasterFake struct {
 	neutralCreature
 	world.Presence
@@ -486,6 +486,7 @@ type skillTarget struct {
 	hitLog []string
 
 	isPlayer     bool
+	kind         actor.Kind
 	name         string
 	noticeKind   string
 	noticeName   string
@@ -540,8 +541,11 @@ func (t *skillTarget) CanBeHealed() bool {
 func (t *skillTarget) IsPlayer() bool { return t.isPlayer }
 
 // Kind follows the fake's isPlayer flag, so the player-only handler paths
-// resolve exactly when the test asks for a player.
+// resolve exactly when the test asks for a player; a set kind overrides it.
 func (t *skillTarget) Kind() actor.Kind {
+	if t.kind != 0 {
+		return t.kind
+	}
 	if t.isPlayer {
 		return actor.KindPlayer
 	}

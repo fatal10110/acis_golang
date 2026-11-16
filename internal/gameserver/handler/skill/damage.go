@@ -138,6 +138,11 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		if !ok || target.Dead() {
 			continue
 		}
+		// A fear-bearing strike that spares playables skips them whole: no
+		// evasion, effects, damage or lethal strike.
+		if obj.Kind().Playable() && fearImmunePlayableSkillIDs[cast.Skill.ID] {
+			continue
+		}
 		in, ok := target.PhysicalSkillInput(cast.Caster, cast.Skill)
 		if !ok {
 			continue
@@ -544,8 +549,10 @@ func (blowHandler) UseResult(cast Cast) Result {
 		// The lethal chance is rolled unconditionally per target, outside
 		// the landing gate — a missed blow can still proc it.
 		applyLethalHit(cast, cast.Skill, target, &result)
+		// The self effects refresh once per target that was neither skipped
+		// nor evaded, landed or not; a blow that reached nobody grants none.
+		applySelfEffects(cast, cast.Skill)
 	}
-	applySelfEffects(cast, cast.Skill)
 	return result
 }
 
@@ -825,6 +832,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 	if alikeDead(cast.Caster) {
 		return result
 	}
+	_, bsps := spiritshotCharges(cast.Caster)
 	for _, obj := range cast.Targets {
 		if d, ok := asDoor(obj); ok {
 			manaDamageDoor(cast, d, &result)
@@ -862,9 +870,12 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		}
 		if effected != nil && len(cast.Skill.Effects) > 0 {
 			stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-			succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+			// One shield sample serves the skill roll and every template's
+			// landing roll.
+			shield := resolveShieldDefense(cast.Caster, effected, cast.Skill)
+			succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, bsps, shield)
 			if ok && succeeded {
-				appendResistedCount(&result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false))
+				appendResistedCount(&result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, bsps))
 			} else if ok {
 				appendResisted(&result, effected, cast.Skill, cast.Skill.Level, true)
 			}
