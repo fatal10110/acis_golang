@@ -49,6 +49,7 @@ func (ep *EffectPoint) BluffExempt() bool                                       
 func (ep *EffectPoint) FlyTo(location.Location, modelskill.Flight)               {}
 func (ep *EffectPoint) SetXYZ(int, int, int)                                     {}
 func (ep *EffectPoint) BroadcastPosition()                                       {}
+func (ep *EffectPoint) ForceHeading(int)                                         {}
 func (ep *EffectPoint) UpdateEffectIcons()                                       {}
 func (ep *EffectPoint) NotifyEffectWornOff(modelskill.ID, int)                   {}
 func (ep *EffectPoint) NotifyEffectDisappeared(modelskill.ID, int)               {}

@@ -110,6 +110,10 @@ func (s *hostileSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame {
 			return frames.ValidateLocation(h.ObjectID(), location.Location{X: x, Y: y, Z: z}, h.Heading())
 		})
+	case event.ForcedTurn:
+		start, stop := forcedTurnFrames(h.ObjectID(), e)
+		s.broadcast(start)
+		s.broadcast(stop)
 	case event.SocialAction:
 		s.broadcast(func() wire.Frame { return frames.SocialAction(h.ObjectID(), e.ID) })
 	case event.NpcSay:
@@ -356,4 +360,13 @@ func (s *doorSink) Emit(ev event.Event) {
 		return
 	}
 	broadcastKnown(s.world, s.door, build)
+}
+
+// forcedTurnFrames builds the rotation pair that shows a forced turn: a spin
+// starting from the old heading at full speed, then a stop on the new one.
+func forcedTurnFrames(objectID int32, turn event.ForcedTurn) (start, stop func() wire.Frame) {
+	const side, speed = 1, 65535
+	start = func() wire.Frame { return serverpackets.FrameStartRotation(objectID, turn.From, side, speed) }
+	stop = func() wire.Frame { return serverpackets.FrameStopRotation(objectID, turn.To, speed) }
+	return start, stop
 }

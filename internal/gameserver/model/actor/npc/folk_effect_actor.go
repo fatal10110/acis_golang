@@ -67,6 +67,7 @@ func (f *Folk) ClearTarget()                               {}
 func (f *Folk) FearImmune() bool                           { return true }
 func (f *Folk) FleeFrom(effect.Actor, int)                 {}
 func (f *Folk) BluffExempt() bool                          { return true }
+func (f *Folk) ForceHeading(int)                           {}
 func (f *Folk) FlyTo(location.Location, modelskill.Flight) {}
 func (f *Folk) BroadcastPosition()                         {}
 func (f *Folk) CurrentTarget() world.Tracked               { return nil }

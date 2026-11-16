@@ -73,6 +73,10 @@ type EffectIconsChanged struct{}
 // landed.
 type PositionCorrected struct{}
 
+// ForcedTurn reports that an effect spun the actor at once from heading From
+// to heading To.
+type ForcedTurn struct{ From, To int }
+
 // WeightPenaltyChanged reports a change of the carried-weight penalty band.
 type WeightPenaltyChanged struct{}
 
@@ -386,6 +390,7 @@ func (PostureSettled) event()          {}
 func (DeathSettled) event()            {}
 func (EffectIconsChanged) event()      {}
 func (PositionCorrected) event()       {}
+func (ForcedTurn) event()              {}
 func (WeightPenaltyChanged) event()    {}
 func (UserInfoChanged) event()         {}
 func (RunSpeedChanged) event()         {}

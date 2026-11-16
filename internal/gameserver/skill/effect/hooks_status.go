@@ -201,16 +201,21 @@ func relaxStart(e *Effect) bool {
 	return true
 }
 
-// relaxAction drains MP each tick while the target stays seated and its HP
-// isn't already full, reusing the same lack-MP handling as the other
-// mana-drain ticks in this file. Unlike TypeChameleonRest, this tick has no
-// continuous-skill gate: the relax effect never checks one.
+// relaxAction drains MP each tick while the target stays seated and is
+// short of full HP by at least one point, reusing the same lack-MP handling
+// as the other mana-drain ticks in this file: HP within one point of the
+// maximum ends it, though fractional HP may still be below it. Unlike
+// TypeChameleonRest, this tick has no continuous-skill gate: the relax
+// effect never checks one.
 func relaxAction(e *Effect) bool {
+	if e.Effected.Dead() {
+		return false
+	}
 	if player, ok := asPlayer(e.Effected); ok {
 		if player.Standing() {
 			return false
 		}
-		if player.HPFull() {
+		if player.HP()+1 > player.MaxHPValue() {
 			player.NotifyRelaxDeactivatedHPFull(e)
 			return false
 		}
@@ -241,7 +246,6 @@ func fakeDeathStart(e *Effect) bool {
 	if player, ok := asPlayer(e.Effected); ok {
 		player.StartFakeDeath()
 	}
-	refresh(e.Effected)
 	return true
 }
 
@@ -258,7 +262,6 @@ func fakeDeathExit(e *Effect) {
 		player.MarkRecentFakeDeath()
 		player.StopFakeDeath()
 	}
-	refresh(e.Effected)
 }
 
 // sit seats a player target; other kinds have no sitting stance.

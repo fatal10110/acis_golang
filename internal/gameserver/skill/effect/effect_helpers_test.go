@@ -37,7 +37,7 @@ type liveEffectTarget struct {
 	list              *List
 	vuln              float64
 	standing          bool
-	hpFull            bool
+	maxHP             float64
 	relaxNotice       int
 	recentFakeDeath   bool
 	objectID          int32
@@ -203,9 +203,9 @@ func (t *liveEffectTarget) TryToAttack(target world.Tracked) {
 
 func (t *liveEffectTarget) Heading() int { return t.heading }
 
-func (t *liveEffectTarget) SetHeading(h int) {
+func (t *liveEffectTarget) ForceHeading(h int) {
+	t.events = append(t.events, fmt.Sprintf("turn:%d->%d", t.heading, h))
 	t.heading = h
-	t.events = append(t.events, fmt.Sprintf("heading:%d", h))
 }
 
 func (t *liveEffectTarget) BluffExempt() bool { return t.bluffExempt }
@@ -241,7 +241,7 @@ func (t *liveEffectTarget) SetStanding(v bool) bool {
 	return changed
 }
 
-func (t *liveEffectTarget) HPFull() bool { return t.hpFull }
+func (t *liveEffectTarget) MaxHPValue() float64 { return t.maxHP }
 
 func (t *liveEffectTarget) NotifyRelaxDeactivatedHPFull(*Effect) {
 	t.relaxNotice++

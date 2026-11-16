@@ -50,6 +50,7 @@ func (neutralActor) BluffExempt() bool                                 { return 
 func (neutralActor) FlyTo(location.Location, modelskill.Flight)        {}
 func (neutralActor) SetXYZ(int, int, int)                              {}
 func (neutralActor) BroadcastPosition()                                {}
+func (neutralActor) ForceHeading(int)                                  {}
 func (neutralActor) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
