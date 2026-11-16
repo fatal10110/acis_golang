@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -430,8 +431,10 @@ func TestFishingCastRefusals(t *testing.T) {
 			r.c.Send(encodeUseItem(r.rod, false))
 			drainUntilQuiet(t, r.c)
 		}, want: "msg 1453"},
+		// An open store already refuses the cast request itself, so the
+		// fishing refusal is reached from a store still being set up.
 		{name: "operating", equipLure: true, setup: func(t *testing.T, r *fishingRig) {
-			r.srv.SetPlayerOperating(t, r.objID, true)
+			r.srv.SetPlayerOperateType(t, r.objID, privatestore.OperateSellManage)
 		}, want: "msg 1638"},
 		{name: "no lure", want: "msg 1454"},
 		{name: "no fishing water", equipLure: true, opts: []gameservertest.Option{gameservertest.WithZones(zone.NewIndex())}, want: "msg 1457"},

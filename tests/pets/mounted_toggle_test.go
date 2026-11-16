@@ -3,6 +3,7 @@ package pets
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -58,6 +59,10 @@ func TestDismountedRiderSwitchesToggleAgain(t *testing.T) {
 	if rider.Mounted() {
 		t.Fatal("rider still mounted after the starving tick")
 	}
+	// The starving mount drops its rider in town; a request made before the
+	// landing is refused.
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	drainUntilQuiet(t, h.client)
 
 	h.client.Send(encodeRequestMagicSkillUse(riderToggleSkill))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "toggle MagicSkillUse")
