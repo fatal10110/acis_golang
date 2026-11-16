@@ -1,0 +1,5 @@
+# Owner-approved divergences from fly.golden (#4846): a line may not cross a
+# layer of its first or last cell while it climbs or sinks inside it.
+# Block (0,0) has its floor at 0, so the same-cell drop to -500 is refused and
+# stops at the origin.
+fly	same cell	-131064 -262136 100	32.0	-131060 -262141 -500	false	-131064 -262136 100
