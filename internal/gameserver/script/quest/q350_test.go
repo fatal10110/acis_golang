@@ -13,10 +13,12 @@ import (
 // Exempt: the absorb lookups key on the player handle and read the
 // crystal's object id as a field, so no object id call is made; the five
 // soul crystal system messages and the three absorb types are named
-// constants in the reference.
+// constants in the reference. The crystal is taken with TakeHeldItems, which
+// reports the take, so a crystal moved away first stages nothing
+// (owner-approved divergence, #5164).
 func TestQ350MatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check("q350", []string{"quest.Q350_EnhanceYourWeapon"},
-		"call WorldObject.getObjectId",
+		"call WorldObject.getObjectId", "call Quest.takeItems",
 		"number 974", "number 975", "number 976", "number 977", "number 978",
 		`string "FULL_PARTY"`, `string "LAST_HIT"`, `string "PARTY_ONE_RANDOM"`)
 	if err != nil {

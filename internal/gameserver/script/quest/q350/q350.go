@@ -226,9 +226,12 @@ func (q quest) tryToStageCrystal(s *script.Script, p *script.Player, monster *sc
 }
 
 // exchangeCrystal takes p's crystal and gives the next stage, or the
-// broken crystal when it broke and the crystal has one.
+// broken crystal when it broke and the crystal has one. A crystal no longer
+// held when it is taken gives nothing.
 func exchangeCrystal(s *script.Script, p *script.Player, crystal item.SoulCrystal, stage bool) {
-	s.TakeItems(p, crystal.InitialItemID, 1)
+	if s.TakeHeldItems(p, crystal.InitialItemID, 1) == 0 {
+		return
+	}
 	if stage {
 		p.SystemMessage(msgAbsorbSucceeded)
 		s.GiveItems(p, crystal.StagedItemID, 1)

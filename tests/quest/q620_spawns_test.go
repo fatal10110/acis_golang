@@ -97,6 +97,7 @@ type q620Spec struct {
 	questless string // a member that has not started the quest
 	brooch    string // a member holding the antique brooch
 	past      string // a member past the first step: the quest at its second condition
+	extra     []gameservertest.Option
 }
 
 func q620Template(id int, kind string) *npc.Template {
@@ -182,6 +183,7 @@ func q620Boot(t *testing.T, spec q620Spec) *q620World {
 	if spec.rules != nil {
 		opts = append(opts, gameservertest.WithEventRules(*spec.rules))
 	}
+	opts = append(opts, spec.extra...)
 	srv := gameservertest.Boot(t, opts...)
 	w.srv = srv
 
