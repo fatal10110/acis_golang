@@ -16,11 +16,13 @@ const (
 )
 
 // SpawnGuards spawns c's siege guards. With an owner, its owner's guard
-// makers start, then each ticket on its grounds, newest first, hires a
-// mercenary of the ticket's NPC where it lies, and the ticket leaves the
-// world; a ticket that is not one of c's, or whose mercenary cannot be
-// placed, stays on the ground. The castle's tickets are forgotten either
-// way. With no owner, the ownerless castle's guard makers start.
+// makers start, then each ticket on its grounds, newest first, is claimed
+// off the ground, hires a mercenary of the ticket's NPC where it lay, and
+// leaves the world. A ticket a pickup already holds hires no one and is
+// left to its picker; a ticket that is not one of c's, or whose mercenary
+// cannot be placed, stays on the ground. The castle's tickets are
+// forgotten either way. With no owner, the ownerless castle's guard
+// makers start.
 func (n siegeNotices) SpawnGuards(c *castle.Castle) {
 	l := n.l
 	npcs := l.npcSpawns.Load()
@@ -38,15 +40,20 @@ func (n siegeNotices) SpawnGuards(c *castle.Castle) {
 		if !ok {
 			continue
 		}
+		// The claim comes first: a pickup racing the start either holds the
+		// ticket already, and keeps it, or loses it to the mercenary.
+		ground, ok := l.resolveTarget(t.ObjectID).(*grounditem.Item)
+		if !ok || !ground.Claim() {
+			continue
+		}
 		guard, err := npcs.SpawnMercenary(ticket.NPCID, t.Location, c.ID)
 		if err != nil {
+			ground.Release()
 			l.log.Error().Err(err).Int("npc_id", ticket.NPCID).Int("castle", c.ID).Msg("siege: cannot spawn mercenary")
 			continue
 		}
 		c.AddMercenary(guard)
-		if ground, ok := l.resolveTarget(t.ObjectID).(*grounditem.Item); ok && ground.Claim() {
-			l.despawnGround(ground)
-		}
+		l.despawnGround(ground)
 	}
 }
 
