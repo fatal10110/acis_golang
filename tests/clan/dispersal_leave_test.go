@@ -27,19 +27,19 @@ func comeDue(t *testing.T, w *clanWorld, c *testsupport.ScriptedClient) [][]byte
 	return frames
 }
 
-// TestNobleKeepsTitleWhenClanDisperses has Knights disperse, its
-// dissolution come due, with the titled recruit in the world: a noble
-// keeps its title, in the UserInfo it gets and in its stored row, while a
-// member that is no noble, the founder among them, loses it.
-func TestNobleKeepsTitleWhenClanDisperses(t *testing.T) {
+// TestDispersalClearsEveryTitle has Knights disperse, its dissolution
+// come due, with the titled recruit in the world: noble or not, the recruit
+// loses its title, in the UserInfo it gets, the CharInfo the founder sees
+// and its stored row, and so does the founder (ClanTable.destroyClan ->
+// Clan.removeClanMember -> Player.setClan(null)).
+func TestDispersalClearsEveryTitle(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name  string
 		noble bool
-		want  string
 	}{
-		{"noble", true, "Lord"},
-		{"member", false, ""},
+		{"noble", true},
+		{"member", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -58,13 +58,17 @@ func TestNobleKeepsTitleWhenClanDisperses(t *testing.T) {
 				t.Fatalf("stored title before the dispersal = %q, want Lord", got)
 			}
 
-			if got := leaverTitle(t, comeDue(t, w, w.member)); got != tc.want {
-				t.Fatalf("recruit's UserInfo title = %q, want %q", got, tc.want)
+			if got := leaverTitle(t, comeDue(t, w, w.member)); got != "" {
+				t.Fatalf("recruit's UserInfo title = %q, want it cleared", got)
 			}
-			if got := storedTitle(t, w, w.memberID); got != tc.want {
-				t.Fatalf("recruit's stored title = %q, want %q", got, tc.want)
+			if got := storedTitle(t, w, w.memberID); got != "" {
+				t.Fatalf("recruit's stored title = %q, want it cleared", got)
 			}
-			if got := leaverTitle(t, drainFrames(t, w.leader)); got != "" {
+			founder := drainFrames(t, w.leader)
+			if got := charInfoTitleOf(t, founder, w.memberID); got != "" {
+				t.Fatalf("recruit's CharInfo title = %q, want it cleared", got)
+			}
+			if got := leaverTitle(t, founder); got != "" {
 				t.Fatalf("founder's UserInfo title = %q, want it cleared", got)
 			}
 			if got := storedTitle(t, w, w.leaderID); got != "" {

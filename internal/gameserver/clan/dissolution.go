@@ -2,6 +2,7 @@ package clan
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -102,9 +103,10 @@ func (s *Service) RecoverClan(c *player.Character) (*Clan, RecoverResult) {
 	case cl.dissolvingExpiry <= 0:
 		return cl, RecoverNothing
 	}
+	// The timer of the recovered request stays armed: should the leader
+	// ask again before it runs out, the clan goes at that earlier deadline.
 	cl.dissolvingExpiry = 0
 	s.updateClanLocked(cl)
-	s.dissolutions.cancel(cl.id)
 	return cl, Recovered
 }
 
@@ -182,13 +184,12 @@ func (s *Service) forgetWars(cl *Clan) {
 
 // ApplyDispersed clears the clan state of m, removed at now when its clan
 // was dissolved, on its live character; it runs on that character's queue.
-// A noble keeps its title; the siege state clears. No join penalty
-// follows, and any the member held is lifted unless it was in the academy;
+// Its title and siege state clear; a personal surrender stays. No join
+// penalty follows, and any the member held is lifted unless it was in the academy;
 // the clan's leader may not found another clan for CreateDays.
 func (s *Service) ApplyDispersed(c *player.Character, m Member, leader bool, now time.Time) {
-	clearLeaverTitle(c)
+	c.SetTitle("")
 	c.SetClanID(0)
-	c.SetWantsPeace(false)
 	c.SetSiegeState(player.SiegeStateNone)
 	if m.PledgeType != SubunitAcademy {
 		c.SetClanJoinExpiryTime(0)
@@ -205,14 +206,14 @@ type Dissolver interface {
 	DissolveDue(cl *Clan)
 }
 
-// dissolutions holds the timer of each clan whose dissolution is pending.
-// mu guards every field; it may be taken while a clan's mu is held, never
-// the other way round.
+// dissolutions holds the timers of each clan whose dissolution was
+// requested or restored. mu guards every field; it may be taken while a
+// clan's mu is held, never the other way round.
 type dissolutions struct {
 	mu     sync.Mutex
 	queue  *sim.Queue
 	out    Dissolver
-	timers map[int32]*sim.Timer
+	timers map[int32][]*sim.Timer
 }
 
 // StartDissolutions runs the pending dissolutions on queue from now on,
@@ -233,42 +234,44 @@ func (s *Service) StartDissolutions(queue *sim.Queue, out Dissolver) {
 	}
 }
 
-// schedule arms cl's dissolution to come due after delay, a minute at the
-// soonest, replacing the timer of an earlier request.
+// schedule arms a timer for cl's dissolution after delay, a minute at the
+// soonest, beside any earlier request's. Each timer, as it runs out, hands
+// cl over if any dissolution is pending then, so a recovered request's
+// timer still destroys a clan whose leader asked again since.
 func (d *dissolutions) schedule(cl *Clan, delay time.Duration) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.queue == nil {
 		return
 	}
-	if t := d.timers[cl.id]; t != nil {
-		t.Stop()
-	}
 	var timer *sim.Timer
 	timer = d.queue.After(max(delay, minDissolveDelay), func() {
 		d.mu.Lock()
-		current := d.timers[cl.id] == timer
-		if current {
-			delete(d.timers, cl.id)
+		armed := slices.Index(d.timers[cl.id], timer)
+		if armed >= 0 {
+			d.timers[cl.id] = slices.Delete(d.timers[cl.id], armed, armed+1)
+			if len(d.timers[cl.id]) == 0 {
+				delete(d.timers, cl.id)
+			}
 		}
 		out := d.out
 		d.mu.Unlock()
-		if current && cl.Info().DissolvingExpiry != 0 {
+		if armed >= 0 && cl.Info().DissolvingExpiry != 0 {
 			out.DissolveDue(cl)
 		}
 	})
 	if d.timers == nil {
-		d.timers = map[int32]*sim.Timer{}
+		d.timers = map[int32][]*sim.Timer{}
 	}
-	d.timers[cl.id] = timer
+	d.timers[cl.id] = append(d.timers[cl.id], timer)
 }
 
-// cancel stops the timer of clanID's dissolution, if one is armed.
+// cancel stops every timer of clanID's dissolution.
 func (d *dissolutions) cancel(clanID int32) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if t := d.timers[clanID]; t != nil {
+	for _, t := range d.timers[clanID] {
 		t.Stop()
-		delete(d.timers, clanID)
 	}
+	delete(d.timers, clanID)
 }
