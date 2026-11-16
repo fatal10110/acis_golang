@@ -13,7 +13,7 @@ func TestShadowItems_Track_NonShadowItemIgnored(t *testing.T) {
 	tmpl := &item.Template{Duration: -1}
 	inst := &item.Instance{ObjectID: 1, ManaLeft: -1}
 
-	s.Track(10, inst, tmpl)
+	s.Track(idOwner(10), inst, tmpl)
 	if s.Tracked(inst) {
 		t.Errorf("Track() should ignore a non-shadow item")
 	}
@@ -26,14 +26,14 @@ func TestShadowItems_Track_ReequipCostsOneMinute(t *testing.T) {
 	tmpl := &item.Template{Duration: 5}
 	inst := &item.Instance{ObjectID: 1, ManaLeft: tmpl.InitialManaLeft()}
 
-	s.Track(10, inst, tmpl)
+	s.Track(idOwner(10), inst, tmpl)
 	s.Tick() // let a second elapse so mana drifts off the full-duration value
 	s.Untrack(inst)
 	if inst.ManaLeft != 299 {
 		t.Fatalf("ManaLeft before re-equip = %d, want 299", inst.ManaLeft)
 	}
 
-	s.Track(10, inst, tmpl) // re-equip: mana no longer at full duration
+	s.Track(idOwner(10), inst, tmpl) // re-equip: mana no longer at full duration
 	if inst.ManaLeft != 239 {
 		t.Errorf("re-equipping after mana has already drifted should cost one extra minute, ManaLeft = %d, want 239", inst.ManaLeft)
 	}
@@ -49,9 +49,9 @@ func TestShadowItems_Track_ReequipFreeWhenManaNeverMoved(t *testing.T) {
 	tmpl := &item.Template{Duration: 5}
 	inst := &item.Instance{ObjectID: 1, ManaLeft: tmpl.InitialManaLeft()}
 
-	s.Track(10, inst, tmpl)
+	s.Track(idOwner(10), inst, tmpl)
 	s.Untrack(inst)
-	s.Track(10, inst, tmpl)
+	s.Track(idOwner(10), inst, tmpl)
 	if inst.ManaLeft != 300 {
 		t.Errorf("ManaLeft = %d, want 300 (no tick elapsed, so re-equip is free)", inst.ManaLeft)
 	}
@@ -63,7 +63,7 @@ func TestShadowItems_Tick_FiresThresholdsAndExpiry(t *testing.T) {
 
 	tmpl := &item.Template{Duration: 5} // 300 seconds of mana
 	inst := &item.Instance{ObjectID: 1, ManaLeft: tmpl.InitialManaLeft()}
-	s.Track(10, inst, tmpl)
+	s.Track(idOwner(10), inst, tmpl)
 	effects.take()
 
 	// Fast-forward straight to just above the 1-minute threshold instead
@@ -94,10 +94,10 @@ func TestShadowItems_Remove_StopsTrackingByActor(t *testing.T) {
 	tmpl := &item.Template{Duration: 5}
 	instA := &item.Instance{ObjectID: 1, ManaLeft: tmpl.InitialManaLeft()}
 	instB := &item.Instance{ObjectID: 2, ManaLeft: tmpl.InitialManaLeft()}
-	s.Track(10, instA, tmpl)
-	s.Track(20, instB, tmpl)
+	s.Track(idOwner(10), instA, tmpl)
+	s.Track(idOwner(20), instB, tmpl)
 
-	s.Remove(10)
+	s.Remove(idOwner(10))
 	if s.Tracked(instA) {
 		t.Errorf("Remove(10) should stop tracking actor 10's item")
 	}
@@ -105,3 +105,8 @@ func TestShadowItems_Remove_StopsTrackingByActor(t *testing.T) {
 		t.Errorf("Remove(10) must not affect actor 20's item")
 	}
 }
+
+// idOwner is a shadow-item owner known by its object id alone.
+type idOwner int32
+
+func (o idOwner) ObjectID() int32 { return int32(o) }

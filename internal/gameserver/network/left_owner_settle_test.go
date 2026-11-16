@@ -34,15 +34,24 @@ func TestSelectingOwnersLeavesAnOwnerInTheWorldToTheCaller(t *testing.T) {
 	}
 }
 
-// TestSelectingOwnersHoldsSettlesUntilTheLastSelectionEnds: settles of an
-// owner a selection is under way for wait, in order, until the last
-// selection of that owner ends; another owner's settle does not.
-func TestSelectingOwnersHoldsSettlesUntilTheLastSelectionEnds(t *testing.T) {
+// TestSelectingOwnersHoldsSettlesUntilTheSelectionEnds: settles of an owner
+// a selection is under way for wait, in order, until that selection ends;
+// another owner's settle does not. A second selection of the owner is
+// refused while the first is under way.
+func TestSelectingOwnersHoldsSettlesUntilTheSelectionEnds(t *testing.T) {
 	var s selectingOwners
 	var ran []string
 	record := func(name string) func() { return func() { ran = append(ran, name) } }
-	s.begin(7)
-	s.begin(7)
+	if !s.begin(7) {
+		t.Fatal("first selection refused")
+	}
+	if s.begin(7) {
+		t.Fatal("second selection of the owner claimed while the first is under way")
+	}
+	if !s.begin(8) {
+		t.Fatal("another owner's selection refused")
+	}
+	s.end(8)
 	if _, ok := s.settle(7, noOwner, record("offline items"), record("retry items"), false); ok {
 		t.Fatal("settle returned a session while a selection is under way")
 	}
@@ -54,13 +63,13 @@ func TestSelectingOwnersHoldsSettlesUntilTheLastSelectionEnds(t *testing.T) {
 		t.Fatalf("ran %v during the selection, want only the other owner's settle", ran)
 	}
 	s.end(7)
-	if !slices.Equal(ran, []string{"offline other"}) {
-		t.Fatalf("ran %v with a selection still under way, want nothing more", ran)
+	if want := []string{"offline other", "retry items", "retry collar"}; !slices.Equal(ran, want) {
+		t.Fatalf("ran %v after the selection ended, want %v", ran, want)
+	}
+	if !s.begin(7) {
+		t.Fatal("selection refused after the earlier one ended")
 	}
 	s.end(7)
-	if want := []string{"offline other", "retry items", "retry collar"}; !slices.Equal(ran, want) {
-		t.Fatalf("ran %v after the last selection ended, want %v", ran, want)
-	}
 	s.settle(7, noOwner, record("offline after"), record("retry after"), false)
 	if got := ran[len(ran)-1]; got != "offline after" {
 		t.Fatalf("settle after the selection ended ran %q, want it offline", got)

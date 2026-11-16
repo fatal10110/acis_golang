@@ -27,9 +27,14 @@ type ShadowItemEffects interface {
 	Expire(actorID int32, inst *item.Instance)
 }
 
+// ShadowItemOwner is the actor wearing a tracked shadow item.
+type ShadowItemOwner interface {
+	ObjectID() int32
+}
+
 type shadowItemEntry struct {
-	actorID int32
-	inst    *item.Instance
+	owner ShadowItemOwner
+	inst  *item.Instance
 }
 
 // ShadowItems tracks equipped shadow items — time-limited weapons or armor
@@ -65,13 +70,13 @@ func (s *ShadowItems) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(ShadowItemTick, s.Tick, log)
 }
 
-// Track starts decaying inst's mana while it stays equipped by actorID.
+// Track starts decaying inst's mana while it stays equipped by owner.
 // tmpl must be inst's own template; a non-shadow item is ignored. Every
 // equip after the very first one (mana still at tmpl's full duration)
 // costs an extra minute of mana, discouraging repeated equip/unequip
 // cycles to stall the decay.
-func (s *ShadowItems) Track(actorID int32, inst *item.Instance, tmpl *item.Template) {
-	if inst == nil || tmpl == nil || !inst.ShadowItem(tmpl) {
+func (s *ShadowItems) Track(owner ShadowItemOwner, inst *item.Instance, tmpl *item.Template) {
+	if owner == nil || inst == nil || tmpl == nil || !inst.ShadowItem(tmpl) {
 		return
 	}
 	if inst.Snapshot().ManaLeft != tmpl.InitialManaLeft() {
@@ -79,7 +84,7 @@ func (s *ShadowItems) Track(actorID int32, inst *item.Instance, tmpl *item.Templ
 	}
 
 	s.mu.Lock()
-	s.entries[inst.ObjectID] = shadowItemEntry{actorID: actorID, inst: inst}
+	s.entries[inst.ObjectID] = shadowItemEntry{owner: owner, inst: inst}
 	s.mu.Unlock()
 }
 
@@ -93,13 +98,14 @@ func (s *ShadowItems) Untrack(inst *item.Instance) {
 	s.mu.Unlock()
 }
 
-// Remove stops tracking every item currently tracked for actorID (e.g. the
-// player disconnected).
-func (s *ShadowItems) Remove(actorID int32) {
+// Remove stops tracking every item currently tracked for owner (e.g. the
+// player disconnected). Items another owner with the same object id wears
+// stay tracked.
+func (s *ShadowItems) Remove(owner ShadowItemOwner) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for id, e := range s.entries {
-		if e.actorID == actorID {
+		if e.owner == owner {
 			delete(s.entries, id)
 		}
 	}
@@ -141,12 +147,12 @@ func (s *ShadowItems) Tick() {
 
 		if manaLeft <= 0 {
 			s.Untrack(e.inst)
-			s.effects.Expire(e.actorID, e.inst)
+			s.effects.Expire(e.owner.ObjectID(), e.inst)
 			continue
 		}
 
 		if manaThreshold(manaLeft) {
-			s.effects.ManaThreshold(e.actorID, e.inst, manaLeft)
+			s.effects.ManaThreshold(e.owner.ObjectID(), e.inst, manaLeft)
 		}
 	}
 }

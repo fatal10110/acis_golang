@@ -502,7 +502,7 @@ func (l *GameClientLink) handleRequestRestart(ctx context.Context, cs *connState
 	cs.entering = nil
 	client.SetState(StateAuthed)
 	session.SendFrame(serverpackets.FrameRestartResponse(true))
-	cs.chars = l.sendCharSelectInfo(ctx, client)
+	cs.chars = l.sendCharSelectInfo(ctx, client, highlightLastPlayed)
 	return nil
 }
 

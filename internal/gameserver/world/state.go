@@ -107,20 +107,22 @@ func (s *State) AddPlayer(obj Player) {
 	}
 }
 
-// RemovePlayer marks the player with the given id offline and drops its
-// name index entry, under the same lock as AddPlayer.
-func (s *State) RemovePlayer(id int32) {
+// RemovePlayer marks obj offline and drops its name index entry, under the
+// same lock as AddPlayer. It leaves another player tracked under obj's id in
+// place: a session that lost its character's registration to another one
+// does not take that one offline.
+func (s *State) RemovePlayer(obj Player) {
 	s.playersMu.Lock()
 	defer s.playersMu.Unlock()
 
-	if obj, ok := s.players.get(id); ok {
-		name := strings.ToLower(obj.CharacterName())
-		if s.playerNames[name] == id {
-			delete(s.playerNames, name)
-		}
+	id := obj.ObjectID()
+	if !s.players.removeIfSame(id, obj) {
+		return
 	}
-
-	s.players.remove(id)
+	name := strings.ToLower(obj.CharacterName())
+	if s.playerNames[name] == id {
+		delete(s.playerNames, name)
+	}
 }
 
 // RenamePlayer runs rename, which changes the name of the online player

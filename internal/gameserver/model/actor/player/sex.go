@@ -3,8 +3,8 @@ package player
 import "fmt"
 
 // Sex is a character's sex, encoded on the wire and in the characters table
-// as 0 (male) or 1 (female). 2 (etc) is no sex a client creates, but an
-// admin can set it.
+// as 0 (male), 1 (female) or 2 (etc). A real client only creates 0 or 1,
+// but creation accepts 2 as well, and an admin can set it.
 type Sex byte
 
 const (
@@ -24,21 +24,6 @@ func (s Sex) String() string {
 		return "etc"
 	default:
 		return fmt.Sprintf("sex(%d)", byte(s))
-	}
-}
-
-// ParseSex validates a wire-supplied sex value. Only 0 and 1 are ever sent
-// by a real client; anything else is rejected rather than stored, since
-// nothing downstream (hairstyle bounds, appearance) has a defined meaning
-// for it.
-func ParseSex(v int32) (Sex, error) {
-	switch v {
-	case 0:
-		return SexMale, nil
-	case 1:
-		return SexFemale, nil
-	default:
-		return 0, fmt.Errorf("player: invalid sex value %d", v)
 	}
 }
 

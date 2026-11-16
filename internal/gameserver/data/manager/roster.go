@@ -35,7 +35,8 @@ const (
 	CreateOK CreateOutcome = iota
 	// CreateRejected covers every appearance/profession validation failure
 	// that has no more specific outcome below (bad race/face/hairstyle/hair
-	// color, or a profession id that isn't a selectable root profession).
+	// color, a profession id that isn't a selectable root profession, or a
+	// sex past SexEtc).
 	CreateRejected
 	CreateTooManyCharacters
 	CreateNameTaken
@@ -219,6 +220,11 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 		// Only a root profession (the 9 starting classes) may be chosen at
 		// creation; every upgrade is reached by playing, not by picking it
 		// up front.
+		return nil, CreateRejected, nil
+	}
+	// A sex past SexEtc is checked last, once every other check has
+	// passed: a bad name with a bad sex still answers the name's failure.
+	if req.Sex > player.SexEtc {
 		return nil, CreateRejected, nil
 	}
 
