@@ -35,7 +35,7 @@ func TestControllerRaidCurseGateBeforeDamage(t *testing.T) {
 			target := &timingTarget{id: 2, raidRelated: true}
 			ctrl := NewPlayable(actor, nil)
 
-			ctrl.deliverHits(0, []Hit{{Target: target, Damage: 1}}, nil)
+			ctrl.deliverFirstHits(0, []Hit{{Target: target, Damage: 1}}, func() {})
 
 			if actor.curseCalls != 1 {
 				t.Fatalf("curse checks = %d, want 1", actor.curseCalls)
@@ -885,7 +885,7 @@ func TestControllerReportsHitFeedbackPerActorKind(t *testing.T) {
 			hit := tt.hit
 			hit.Target = target
 
-			ctrl.deliverHits(0, []Hit{hit}, nil)
+			ctrl.deliverFirstHits(0, []Hit{hit}, func() {})
 
 			if got := event.Of[event.HitDealt](rec); !slices.Equal(got, tt.want) {
 				t.Fatalf("HitDealt = %+v, want %+v", got, tt.want)
@@ -1003,14 +1003,14 @@ func TestControllerNotifiesHitTargets(t *testing.T) {
 	}
 	plain.onDamage = func() { log = append(log, "damage 5") }
 
-	ctrl.deliverHits(0, []Hit{
+	ctrl.deliverFirstHits(0, []Hit{
 		{Target: primary, Damage: 30},
 		{Target: secondary, Miss: true},
 		{Target: zero},
 		{Target: plain, Damage: 10},
-	}, nil)
+	}, func() {})
 	// A dual weapon's second hit lands as its own group.
-	ctrl.deliverHits(0, []Hit{{Target: primary, Miss: true}}, nil)
+	ctrl.deliverHits(0, []Hit{{Target: primary, Miss: true}})
 
 	want := []string{
 		"feedback miss=false", "stance", "attacked 2 by 1", "damage 2", "landed 2",
@@ -1160,7 +1160,7 @@ func TestControllerReflectAbsorbOrder(t *testing.T) {
 				target.dead = tc.killed
 			}
 
-			ctrl.deliverHit(Hit{Target: target, Damage: tc.damage}, nil)
+			ctrl.deliverHit(Hit{Target: target, Damage: tc.damage})
 
 			if !slices.Equal(*events, tc.want) {
 				t.Fatalf("hit steps =\n%q\nwant\n%q", *events, tc.want)

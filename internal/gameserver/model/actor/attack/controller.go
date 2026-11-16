@@ -465,11 +465,12 @@ func (c *Controller) scheduleHitLocked(seq uint64, groups []scheduledHit, index 
 		delay -= groups[index-1].delay
 	}
 	c.scheduleLocked(delay, func() {
-		var onHitTimer func()
+		var landed bool
 		if index == 0 {
-			onHitTimer = c.swingHitTimer(groups)
+			landed = c.deliverFirstHits(seq, group.hits, c.swingHitTimer(groups))
+		} else {
+			landed = c.deliverHits(seq, group.hits)
 		}
-		landed := c.deliverHits(seq, group.hits, onHitTimer)
 
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -578,44 +579,76 @@ func (c *Controller) breakCursedCP(target Target) {
 	}
 }
 
-// deliverHits lands one hit group and reports whether it got past the
-// main-target checks, whether or not the hits themselves connect.
-// onHitTimer, when set, runs as the group's first hit lands, after the
-// acting player's PvP flag.
-func (c *Controller) deliverHits(seq uint64, hits []Hit, onHitTimer func()) bool {
-	c.mu.RLock()
-	active := seq == c.attackSeq
-	c.mu.RUnlock()
-	if !active || len(hits) == 0 || hits[0].Target == nil || c.actor.AlikeDead() {
+// deliverFirstHits lands the first hit group of the swing seq and reports
+// whether it got past the main-target checks, whether or not the hits
+// themselves connect. A main target no longer known or dead, or a
+// raid-related one whose curse blocks a playable, aborts the swing instead.
+// Past the checks the acting player's PvP flag notes the main target and
+// onHitTimer runs, both once per swing, ahead of the first hit's feedback.
+func (c *Controller) deliverFirstHits(seq uint64, hits []Hit, onHitTimer func()) bool {
+	if !c.swingLive(seq) || len(hits) == 0 || hits[0].Target == nil {
 		return false
 	}
+	main := hits[0].Target
 	// A fake-dead target is not dead: the hit lands and the attack goes on.
-	if !c.actor.Knows(hits[0].Target) || hits[0].Target.Dead() {
-		c.Stop()
+	if !c.actor.Knows(main) || main.Dead() {
+		c.abort()
 		return false
 	}
-	if hits[0].Target.RaidRelated() {
-		if c.playable != nil && c.playable.TestCursesOnAttack(hits[0].Target) {
-			c.Stop()
+	if main.RaidRelated() {
+		if c.playable != nil && c.playable.TestCursesOnAttack(main) {
+			c.abort()
 			return false
 		}
 	}
+	if c.playable != nil {
+		c.playable.NotePvPAttack(main)
+	}
+	onHitTimer()
 	for _, hit := range hits {
-		c.deliverHit(hit, onHitTimer)
-		onHitTimer = nil
+		c.deliverHit(hit)
 	}
 	return true
 }
 
-func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
-	if hit.Target == nil || !c.actor.Knows(hit.Target) || hit.Target.Dead() {
-		return
+// deliverHits lands a later hit group of the swing seq, the second hit of a
+// dual swing, and reports whether it landed. Only the swing still running
+// gates it: whatever became of the target since the first group landed,
+// the hit reports, refreshes the stance and reaches the target.
+func (c *Controller) deliverHits(seq uint64, hits []Hit) bool {
+	if !c.swingLive(seq) {
+		return false
 	}
+	for _, hit := range hits {
+		c.deliverHit(hit)
+	}
+	return true
+}
+
+// swingLive reports whether the swing seq is still the running one and the
+// attacker is still standing to land it.
+func (c *Controller) swingLive(seq uint64) bool {
+	c.mu.RLock()
+	active := seq == c.attackSeq
+	c.mu.RUnlock()
+	return active && !c.actor.AlikeDead()
+}
+
+// abort stops the swing at its hit for lack of a target to land it on.
+// Unlike Stop, it is not silent for a playable: its AI hears of the abort.
+func (c *Controller) abort() {
+	c.Stop()
 	if c.playable != nil {
-		c.playable.NotePvPAttack(hit.Target)
+		c.emit(event.AttackAborted{})
 	}
-	if onHitTimer != nil {
-		onHitTimer()
+}
+
+// deliverHit lands one hit. A target that died or left since the swing
+// started still has the hit reported, and a damaging hit still refreshes
+// the stance and reaches it; a dead target takes no damage from it.
+func (c *Controller) deliverHit(hit Hit) {
+	if hit.Target == nil {
+		return
 	}
 	// The target hears of a miss before the attacker's feedback goes out.
 	if hit.Miss {
