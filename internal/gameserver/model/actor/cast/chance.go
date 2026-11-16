@@ -133,21 +133,22 @@ func (p *ChanceProcs) AttackHit(attacker any, hit event.HitLanded) {
 	}
 }
 
-// skillHit runs the procs of def landing on each of targets, before its
-// handler runs: the caster's on-magic procs against the target, then the
-// target's on-attacked procs against the caster when def deals damage.
-func (p *ChanceProcs) skillHit(caster any, targets []skilltarget.Actor, def modelskill.Definition) {
+// skillHitProcs returns the procs of def landing on one target, run
+// before its handler: the caster's on-magic procs against the target, then
+// the target's on-attacked procs against the caster when def deals damage.
+// It is nil when def sets off none.
+func (p *ChanceProcs) skillHitProcs(caster any, def modelskill.Definition) func(target skilltarget.Actor) {
 	if p == nil {
-		return
+		return nil
 	}
 	// A toggle and a fusion skill reach their handler directly, without the
 	// cast-hit steps that raise these events; crafting raises none.
 	if def.Activation == modelskill.ActivationToggle {
-		return
+		return nil
 	}
 	switch def.SkillType {
 	case "FUSION", "COMMON_CRAFT", "DWARVEN_CRAFT":
-		return
+		return nil
 	}
 	var cast, taken chanceEvents
 	switch {
@@ -157,7 +158,7 @@ func (p *ChanceProcs) skillHit(caster any, targets []skilltarget.Actor, def mode
 	case !def.Offensive:
 		cast = eventsOf(modelskill.TriggerOnMagicGood)
 	}
-	for _, target := range targets {
+	return func(target skilltarget.Actor) {
 		if !target.Dead() {
 			p.weaponMagicSkill(caster, target, def)
 		}
@@ -265,7 +266,7 @@ func (p *ChanceProcs) weaponMagicSkill(casterObj any, target skilltarget.Actor, 
 	// target NPC when it is not offensive; a summon's is not reported.
 	if player, ok := caster.(skilltarget.Actor); ok && caster.Kind() == actor.KindPlayer {
 		targets := []skilltarget.Actor{target}
-		seeSpell(caster, player, *def, targets, false)
+		seeSpell(caster, player, *def, targets, false, nil)
 		spelled(player, *def, targets)
 	}
 }

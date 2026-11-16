@@ -26,9 +26,13 @@ type launchActor struct {
 	sees        bool
 	knows       bool
 	inPeaceZone bool
+	// gone marks an actor that left the world.
+	gone bool
 }
 
 func (a *launchActor) ObjectID() int32 { return a.id }
+
+func (a *launchActor) Spawned() bool { return !a.gone }
 
 func (a *launchActor) Position() (int, int, int) { return a.x, a.y, a.z }
 
@@ -85,6 +89,19 @@ func TestRevalidateLaunchTargetLost(t *testing.T) {
 
 	if got := RevalidateLaunch(caster, target, &def); got != LaunchAbortTargetLost {
 		t.Fatalf("RevalidateLaunch() = %v, want LaunchAbortTargetLost", got)
+	}
+}
+
+// TestRevalidateLaunchSummonFriendTargetGoneIsLost: a summon-friend skill
+// reaches a target the caster no longer knows, but not one that left the
+// world.
+func TestRevalidateLaunchSummonFriendTargetGoneIsLost(t *testing.T) {
+	caster := &launchActor{id: 1, knows: true}
+	target := &launchActor{id: 2, gone: true}
+	def := modelskill.Definition{SkillType: "SUMMON_FRIEND"}
+
+	if got := RevalidateLaunch(caster, target, &def); got != LaunchAbortTargetLost {
+		t.Fatalf("RevalidateLaunch(SUMMON_FRIEND, target gone) = %v, want LaunchAbortTargetLost", got)
 	}
 }
 
@@ -197,10 +214,15 @@ func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := RevalidateLaunch(caster, target, &modelskill.Definition{Offensive: true}); got != LaunchAbortTargetPeaceZone {
+	if got := RevalidateLaunch(caster, spawnedPet{target}, &modelskill.Definition{Offensive: true}); got != LaunchAbortTargetPeaceZone {
 		t.Fatalf("RevalidateLaunch(summon target in peace zone) = %v, want LaunchAbortTargetPeaceZone", got)
 	}
 }
+
+// spawnedPet is a pet standing in the world without a grid to place it on.
+type spawnedPet struct{ *summon.Actor }
+
+func (spawnedPet) Spawned() bool { return true }
 
 type launchZoneQuery bool
 

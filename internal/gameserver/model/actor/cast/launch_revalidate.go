@@ -122,7 +122,18 @@ func launchCanSee(caster LaunchCaster, target Target) bool {
 	return !ok || caster.CanSeeTarget(creature)
 }
 
+// spawnedTarget is a target that can leave the world.
+type spawnedTarget interface {
+	Spawned() bool
+}
+
+// launchTargetLost reports whether target left the world or, except for a
+// summon-friend skill, which reaches a target anywhere, the caster's
+// surroundings.
 func launchTargetLost(caster LaunchCaster, target Target, skillType string) bool {
+	if s, ok := target.(spawnedTarget); ok && !s.Spawned() {
+		return true
+	}
 	if skillType == "SUMMON_FRIEND" {
 		return false
 	}
