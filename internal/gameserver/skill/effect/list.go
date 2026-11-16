@@ -229,6 +229,10 @@ type List struct {
 	// are read and written under mu.
 	activating bool
 	deferred   []activation
+	// openExits holds, per stack group, the exit hooks decided under mu
+	// that have not finished running (see exitTicket). Read and written
+	// under mu.
+	openExits map[string][]*exitTicket
 
 	// queue is the owner's queue: periodic effect actions run on it and
 	// effect periods are measured on its clock. Set before the owner is
