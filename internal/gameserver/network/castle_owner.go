@@ -15,9 +15,10 @@ const siegeVictoryMusic = "Siege_Victory"
 // setCastleOwner gives c to cl, reporting false when cl already owns a
 // castle. The clan that held c loses it; its leader, riding a wyvern, is
 // dismounted. cl's members in the world then see its clan header refreshed
-// and hear the siege victory music. actor is the player whose queue the
-// caller runs on. A siege under way at the castle then turns to its new
-// owner (siege.Siege.MidVictory).
+// and hear the siege victory music, each on its own queue, behind what was
+// posted there before: the engraving notice that took the castle comes
+// first. actor is the player whose queue the caller runs on. A siege under
+// way at the castle then turns to its new owner (siege.Siege.MidVictory).
 func (l *GameClientLink) setCastleOwner(actor *livePlayer, c *castle.Castle, cl *clan.Clan) bool {
 	former, ok := l.castles.SetOwner(c, cl)
 	if !ok {
@@ -32,7 +33,7 @@ func (l *GameClientLink) setCastleOwner(actor *livePlayer, c *castle.Castle, cl 
 			})
 		}
 	}
-	l.broadcastToClan(cl, 0,
+	l.broadcastToClanQueued(cl, nil,
 		func() wire.Frame { return framePledgeShowInfoUpdate(cl) },
 		func() wire.Frame {
 			return serverpackets.FramePlaySoundAt(serverpackets.Sound{Type: 1, File: siegeVictoryMusic})

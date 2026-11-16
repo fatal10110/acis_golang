@@ -94,6 +94,18 @@ func (s *Siege) armStartLocked(d time.Duration) {
 	s.start = s.e.queue.After(max(d, 0), func() { s.step(gen) })
 }
 
+// DateMoved takes the calendar's next step a second from now, from the
+// siege date as it now stands: the date was moved and closed to change, so
+// the registrations close a day before the new date rather than when the
+// step armed for the old one comes. A calendar not running is left idle.
+func (s *Siege) DateMoved() {
+	s.e.mu.Lock()
+	defer s.e.mu.Unlock()
+	if s.start != nil {
+		s.armStartLocked(time.Second)
+	}
+}
+
 // step is the calendar's step towards the siege, gen the generation its
 // timer was armed with. While the siege date is open to change, it waits
 // for the registrations' end, a day before the siege, and closes the date
