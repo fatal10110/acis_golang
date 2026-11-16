@@ -43,10 +43,17 @@ type PhysicalAttackInput struct {
 	CritDamagePosMul  float64
 	CritVulnMul       float64
 	CritDamageAddBase float64 // raw critical-damage-add stat, pre 77/Defence scaling
+
+	// NoDamage marks an attacker without damage permission: the attack
+	// deals 0 whatever the other inputs.
+	NoDamage bool
 }
 
 // PhysicalAttackDamage computes a normal physical attack's damage.
 func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
+	if in.NoDamage {
+		return 0
+	}
 	addCritPower := 0.0
 	critDamMul, critDamPosMul, critVuln := 1.0, 1.0, 1.0
 	if in.Crit {

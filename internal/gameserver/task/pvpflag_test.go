@@ -20,6 +20,8 @@ type pvpFlagFakeActor struct {
 
 func (a *pvpFlagFakeActor) ObjectID() int32 { return a.id }
 
+func (a *pvpFlagFakeActor) PvPFlagState() PvPFlagState { return a.flag }
+
 func (a *pvpFlagFakeActor) UpdatePvPFlag(flag PvPFlagState) {
 	if a.flag == flag {
 		return
