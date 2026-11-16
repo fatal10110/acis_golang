@@ -592,13 +592,13 @@ func (a *Actor) CanUseSkill() bool {
 // does not feed back into the result here. TryUseSkill returns false only
 // for an unknown skill, the level gap, or no attached AI; a dispatched cast reports
 // true even if the AI goes on to reject it. ctrl is the command's
-// forced-use modifier.
-func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant, ctrl bool) bool {
+// forced-use modifier, shift its hold modifier.
+func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant, ctrl, shift bool) bool {
 	ref, ok := a.GetSkill(skillID)
 	if !ok || !a.CanUseSkill() || a.brain == nil {
 		return false
 	}
-	a.brain.TryToCast(target, ref, ctrl)
+	a.brain.TryToCast(target, ref, ctrl, shift)
 	return true
 }
 
@@ -651,32 +651,32 @@ func (a *Actor) AttackTarget(target world.Tracked) { a.TryToAttack(target) }
 // a live combatant.
 func (a *Actor) TryToAttack(target world.Tracked) {
 	combatant, _ := target.(attackable.Combatant)
-	a.tryToAttack(combatant)
+	a.tryToAttack(combatant, false)
 }
 
 // tryToAttack forwards an attack request on target, when there is one, to
-// the attached AI.
-func (a *Actor) tryToAttack(target attackable.Combatant) {
+// the attached AI, with the command's shift modifier.
+func (a *Actor) tryToAttack(target attackable.Combatant, shift bool) {
 	if target == nil || a.brain == nil {
 		return
 	}
-	a.brain.TryToAttack(target)
+	a.brain.TryToAttack(target, shift)
 }
 
 // TryToFollow forwards a follow request to the attached AI when target is
 // a live combatant.
 func (a *Actor) TryToFollow(target world.Tracked) {
 	combatant, _ := target.(attackable.Combatant)
-	a.tryToFollow(combatant)
+	a.tryToFollow(combatant, false)
 }
 
 // tryToFollow forwards a follow request on target, when there is one, to
-// the attached AI.
-func (a *Actor) tryToFollow(target attackable.Combatant) {
+// the attached AI, with the command's shift modifier.
+func (a *Actor) tryToFollow(target attackable.Combatant, shift bool) {
 	if target == nil || a.brain == nil {
 		return
 	}
-	a.brain.TryToFollow(target)
+	a.brain.TryToFollow(target, shift)
 }
 
 // TryToIdle sends the summon idle the way an effect, an interrupted action
@@ -772,6 +772,18 @@ func (a *Actor) CastStopped() {
 	}
 	a.TryToIdle()
 }
+
+// GoneIdle records that the AI sent the summon idle and returns who an idle
+// summon follows: its owner while following is on, otherwise nil.
+func (a *Actor) GoneIdle() attackable.Combatant {
+	follow := a.idleFollow()
+	a.noteIdled(follow)
+	return follow
+}
+
+// SetFollowOwner turns following the owner on or off without moving the
+// summon: its AI settles where it goes.
+func (a *Actor) SetFollowOwner(follow bool) { a.followOff.Store(!follow) }
 
 // noteIdled records the intent of a summon its AI just sent idle, following
 // follow when non-nil.

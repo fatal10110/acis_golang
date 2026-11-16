@@ -783,6 +783,8 @@ func (inertSummonMoveController) RecheckOffensiveFollow(attackable.Combatant, in
 	return false, nil
 }
 
+func (inertSummonMoveController) HoldOffensiveFollow(attackable.Combatant, int) bool { return false }
+
 func (inertSummonMoveController) MaybeStartEntranceFollow(attackable.Combatant, int) (location.Location, bool) {
 	return location.Location{}, false
 }

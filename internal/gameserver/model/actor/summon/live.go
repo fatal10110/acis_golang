@@ -41,8 +41,9 @@ type Settings interface {
 
 // AI is the summon intention loop controlled by owner commands and effects.
 type AI interface {
-	TryToAttack(attackable.Combatant) bool
-	TryToFollow(attackable.Combatant) bool
+	// TryToAttack and TryToFollow take the command's shift (hold) modifier.
+	TryToAttack(target attackable.Combatant, shift bool) bool
+	TryToFollow(target attackable.Combatant, shift bool) bool
 	TryToIdle()
 	// WaitOutIdle reports whether an idle request has to wait for the
 	// summon's swing or cast to end, dropping the queued intention if so.
@@ -63,7 +64,7 @@ type AI interface {
 	// AbortAllForEffect stopped only resumes the attack it replaced; both
 	// report handled false.
 	CastStopped(follow attackable.Combatant) (idled, handled bool)
-	TryToCast(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool
+	TryToCast(target attackable.Combatant, ref modelskill.Ref, ctrl, shift bool) bool
 	// TryToPickUp makes picking up the ground item itemObjectID the
 	// current intention (queued behind a swing or cast), reporting false
 	// when the summon cannot act on it.
@@ -396,6 +397,9 @@ type CommandContext struct {
 	TargetIsCreature     bool
 	TargetIsDeadCreature bool
 	TargetAttackable     bool
+	// Shift is the command's hold modifier: the summon does not walk to
+	// its target.
+	Shift bool
 	// Creature is Target as the creature an attack or follow acts on, when
 	// Target is not one itself: a door through its hit surface. Nil means
 	// Target is used as it is.

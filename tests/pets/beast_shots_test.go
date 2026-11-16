@@ -259,7 +259,7 @@ func TestPetMagicCastRechargesAutoBeastSpiritshots(t *testing.T) {
 	}
 	before := h.ownerItemCount(t, beastSpiritshotID)
 
-	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(magicOwnerPetSkillID, owner, false) })
+	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(magicOwnerPetSkillID, owner, false, false) })
 	h.srv.AdvanceUntil(t, "the pet's heal finishing", func() bool { return !petActor.CastingNow() })
 	frames := drainFrames(t, h.client)
 	if !petActor.SpiritshotCharged() {

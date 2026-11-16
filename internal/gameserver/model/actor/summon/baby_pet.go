@@ -165,7 +165,7 @@ func (a *Actor) tryBabyHeal(owner Owner, skillID modelskill.ID, wounded bool) bo
 	if (a.cast != nil && a.cast.SkillOnCooldown(def)) || a.MPValue() < float64(def.MPConsume) || !wounded {
 		return false
 	}
-	a.brain.TryToCast(owner, ref, false)
+	a.brain.TryToCast(owner, ref, false, false)
 	a.emit(event.PetUsedSkill{SkillID: int32(ref.ID), Level: int32(ref.Level)})
 	return true
 }

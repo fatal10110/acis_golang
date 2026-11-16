@@ -76,7 +76,7 @@ func TestSummonFollowOfOwnerSkipsBoatEntrance(t *testing.T) {
 	boats := &recordingBoats{}
 	brain := newEntranceSummon(gateSummonFake(2, owner), move, boats)
 
-	if !brain.TryToFollow(owner) {
+	if !brain.TryToFollow(owner, false) {
 		t.Fatal("TryToFollow(owner) = false, want accepted")
 	}
 	if move.friendlyTarget != owner || move.entranceTarget != nil || len(boats.probes) != 0 {
@@ -94,7 +94,7 @@ func TestSummonFollowOfOtherProbesBoatEntrance(t *testing.T) {
 	boats := &recordingBoats{}
 	brain := newEntranceSummon(gateSummonFake(2, owner), move, boats)
 
-	if !brain.TryToFollow(other) {
+	if !brain.TryToFollow(other, false) {
 		t.Fatal("TryToFollow(other) = false, want accepted")
 	}
 	if move.entranceTarget != other || move.friendlyRange != summonFollowOffset || move.friendlyTarget != nil {
@@ -125,7 +125,7 @@ func TestSummonFollowOfOtherWalksToBoatEntrance(t *testing.T) {
 	move := &entranceMove{dest: location.Location{X: 500}, out: true}
 	boats := &recordingBoats{entrance: entrance, walk: true}
 	brain := newEntranceSummon(gateSummonFake(2, owner), move, boats)
-	brain.TryToFollow(actor(200))
+	brain.TryToFollow(actor(200), false)
 	if len(move.walks) != 1 || move.walks[0] != entrance || move.cancels != 1 {
 		t.Fatalf("walks %v, follow cancels %d; want one walk to %v replacing the follow", move.walks, move.cancels, entrance)
 	}
@@ -136,7 +136,7 @@ func TestSummonFollowOfOtherWalksToBoatEntrance(t *testing.T) {
 	rootedMove := &entranceMove{dest: location.Location{X: 500}, out: true}
 	rootedBoats := &recordingBoats{entrance: entrance, walk: true}
 	rooted := newEntranceSummon(rootedSummon{gateSummonFake(3, owner)}, rootedMove, rootedBoats)
-	rooted.TryToFollow(actor(200))
+	rooted.TryToFollow(actor(200), false)
 	if len(rootedMove.walks) != 0 || rootedBoats.refusals != 1 || rooted.CurrentIntention() != IntentionIdle {
 		t.Fatalf("rooted: walks %v, refusals %d, intention %v; want idle, refused", rootedMove.walks, rootedBoats.refusals, rooted.CurrentIntention())
 	}

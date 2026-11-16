@@ -86,7 +86,7 @@ func TestOwnerPetSkillTargetsLiveOwner(t *testing.T) {
 		t.Fatalf("OWNER_PET final target of a live pet = %v, want owner %d", final, h.ownerID)
 	}
 
-	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(ownerPetSkillID, owner, false) })
+	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(ownerPetSkillID, owner, false, false) })
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "pet MagicSkillUse")
 	r := wire.NewReader(frames[len(frames)-1][1:])
 	if caster, target := r.ReadInt32(), r.ReadInt32(); caster != petActor.ObjectID() || target != h.ownerID {
@@ -104,7 +104,7 @@ func TestOwnerPetSkillOnDeadOwnerIsRefusedByName(t *testing.T) {
 	h.srv.MarkPlayerDead(t, h.ownerID)
 	drainUntilQuiet(t, h.client)
 
-	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(ownerPetSkillID, owner, false) })
+	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(ownerPetSkillID, owner, false, false) })
 	assertSummonCastRejected(t, h, petActor, h.ownerID, func(frame []byte) {
 		assertSystemMessageSkill(t, frame, serverpackets.SystemMessageS1CannotBeUsed, ownerPetSkillID, 1)
 	})
@@ -120,7 +120,7 @@ func TestOwnerPetSkillAimedElsewhereCastsOnOwner(t *testing.T) {
 	hostile := h.srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, h.client)
 
-	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(ownerPetSkillID, hostile, false) })
+	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(ownerPetSkillID, hostile, false, false) })
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "pet MagicSkillUse")
 	for _, frame := range frames {
 		if frame[0] == serverpackets.OpcodeSystemMessage {
