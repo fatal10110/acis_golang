@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 )
 
@@ -50,6 +51,24 @@ type Settings struct {
 	MaxLevel   int32
 	Loot       int32
 	Title      string
+}
+
+// Bounds on room terms: the sizes and levels the room window offers, and
+// a title short enough that every listed room fits one room-list frame.
+const (
+	MinRoomSize  int32 = 2
+	MaxRoomSize  int32 = 12
+	MaxTitleSize       = 64 // UTF-16 code units
+)
+
+// Valid reports whether s are terms a room may take: a size from
+// MinRoomSize to MaxRoomSize, a level range within 1 to maxLevel whose
+// lowest level is not above its highest, and a title of at most
+// MaxTitleSize UTF-16 code units.
+func (s Settings) Valid(maxLevel int32) bool {
+	return s.MaxMembers >= MinRoomSize && s.MaxMembers <= MaxRoomSize &&
+		s.MinLevel >= 1 && s.MinLevel <= s.MaxLevel && s.MaxLevel <= maxLevel &&
+		commons.UTF16Len(s.Title) <= MaxTitleSize
 }
 
 // Room is a copy of one room. Its leader is Members[0].
