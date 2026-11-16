@@ -15,10 +15,7 @@ import (
 // for the login server to answer a session validation request.
 const DefaultValidationTimeout = 5 * time.Second
 
-var (
-	errValidationPending = errors.New("session validation already pending")
-	errLoginLinkClosed   = errors.New("login link closed during session validation")
-)
+var errLoginLinkClosed = errors.New("login link closed during session validation")
 
 // SessionValidator confirms game clients' presented session keys with the
 // login server over a LoginLink. A game server keeps exactly one link to
@@ -29,7 +26,7 @@ var (
 // A response names only the account, and the login server answers a
 // link's requests in the order it reads them, so responses are matched to
 // requests per account in send order. A request whose client stopped
-// waiting (evicted by a newer login, timed out, canceled) keeps its place
+// waiting (evicted by a kick, timed out, canceled) keeps its place
 // in that order until its response arrives and is dropped: the response
 // can never reach a later request for the same account.
 //
@@ -100,8 +97,8 @@ func (v *SessionValidator) ResolveThen(accountName string, ok bool, approved fun
 
 // Evict rejects accountName's outstanding validation, if any, so its client
 // stops waiting at once. The request keeps its place in the queue, so the
-// login server's answer to it is dropped instead of reaching the request
-// of the client that evicted it.
+// login server's answer to it is dropped instead of reaching a later
+// request for the account.
 func (v *SessionValidator) Evict(accountName string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -181,7 +178,8 @@ func (v *SessionValidator) abandon(req *authRequest) {
 //
 // A confirmed match advances client to StateAuthed and records its session
 // key, and Validate reports (true, nil). A confirmed mismatch sends client
-// an AuthLoginFail notice and reports (false, nil); the caller is
+// an AuthLoginFail notice and reports (false, nil), as does a request
+// refused because the account already has one in flight; the caller is
 // responsible for closing the connection afterward, same as for any other
 // definitive rejection. A transport error or a canceled ctx reports
 // (false, err) without notifying client, since no definitive answer came
@@ -194,8 +192,11 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 	pending := &authRequest{linkDone: loginLink.Done(), result: make(chan bool, 1)}
 	v.sendMu.Lock()
 	if !v.enqueue(req.LoginName, pending) {
+		// The account already has a request in flight: this one is refused
+		// as a definitive rejection, without reaching the login server.
 		v.sendMu.Unlock()
-		return false, errValidationPending
+		client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
+		return false, nil
 	}
 	err := loginLink.SendPlayerAuthRequest(link.PlayerAuthRequest{
 		Account: req.LoginName,
