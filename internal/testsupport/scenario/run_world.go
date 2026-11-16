@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -154,7 +155,12 @@ func (r *run) lay(t *testing.T, g Ground) {
 		if !before[s.ObjectID] && s.TemplateID == g.Item {
 			r.roles[s.ObjectID], r.objs[g.Role], r.grounds[s.ObjectID] = g.Role, s.ObjectID, true
 			if g.Cursed {
-				r.srv.CursedWeapons.PlaceOnGround(g.Item, s.ObjectID, at)
+				obj, _ := r.srv.State.Object(s.ObjectID)
+				ground, ok := obj.(*grounditem.Item)
+				if !ok {
+					t.Fatalf("%s: ground %s: object %d is %T, want a ground item", r.sc.Name, g.Role, s.ObjectID, obj)
+				}
+				r.srv.CursedWeapons.PlaceOnGround(g.Item, ground, at)
 			}
 			return
 		}

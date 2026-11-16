@@ -111,12 +111,13 @@ type weapon struct {
 
 	// playerID is the holder, or the last one while the weapon lies where
 	// its holder dropped it.
-	playerID                   int32
-	playerKarma, playerPK      int32
-	nbKills, stage, nextAt     int32
-	hungry                     int32
-	endTime                    int64
-	groundObjectID             int32
+	playerID               int32
+	playerKarma, playerPK  int32
+	nbKills, stage, nextAt int32
+	hungry                 int32
+	endTime                int64
+	// ground is the item the weapon lies on the ground as, nil for none.
+	ground                     Ground
 	groundAt                   location.Location
 	hasGroundAt                bool
 	dailyAt, overallAt, dropAt time.Time
@@ -311,9 +312,16 @@ func (m *Manager) RollDrop(roll Roll) (int32, bool) {
 	return 0, false
 }
 
-// PlaceOnGround records where itemID's weapon lies: the ground item
-// objectID, at.
-func (m *Manager) PlaceOnGround(itemID, objectID int32, at location.Location) {
+// Ground is a weapon's item lying on the ground. Whatever takes it out of
+// the world claims it first, and only one claim ever succeeds: a pickup's,
+// or the weapon's end.
+type Ground interface {
+	ObjectID() int32
+	Claim() bool
+}
+
+// PlaceOnGround records where itemID's weapon lies: as ground, at.
+func (m *Manager) PlaceOnGround(itemID int32, ground Ground, at location.Location) {
 	if m == nil {
 		return
 	}
@@ -323,7 +331,7 @@ func (m *Manager) PlaceOnGround(itemID, objectID int32, at location.Location) {
 	if w == nil {
 		return
 	}
-	w.groundObjectID, w.groundAt, w.hasGroundAt = objectID, at, true
+	w.ground, w.groundAt, w.hasGroundAt = ground, at, true
 }
 
 // Holder is the player obtaining a weapon.
@@ -368,7 +376,7 @@ func (m *Manager) Activate(itemID int32, h Holder, roll Roll) (Activation, bool)
 		// The new weapon ends in the player's inventory, which the caller
 		// takes it out of: it no longer lies on the ground.
 		if !w.activated {
-			w.groundObjectID = 0
+			w.ground = nil
 		}
 		end := m.endOfLifeLocked(w)
 		return Activation{Assimilated: true, HeldItemID: h.HeldItemID, RankedUp: ranked, End: end, Stage: held.stage}, true
@@ -380,6 +388,8 @@ func (m *Manager) Activate(itemID int32, h Holder, roll Roll) (Activation, bool)
 	w.hungry = int32(w.def.DurationLost * 60)
 	w.dailyAt, w.dailyRuns = now.Add(minute), 0
 	w.dropAt = time.Time{}
+	// The ground item, if any, is the holder's now.
+	w.ground = nil
 	row := w.row()
 	m.writeLocked("insert", func(ctx context.Context, st Store) error { return st.Insert(ctx, row) })
 	return Activation{Stage: w.stage}, true
@@ -494,8 +504,10 @@ type EndOfLife struct {
 	Karma    int32
 	PKKills  int32
 	// GroundObjectID is the ground item to take out of the world, when
-	// the weapon was not held; 0 for none.
+	// the weapon was not held; 0 for none. GroundClaimed: the end already
+	// holds its claim.
 	GroundObjectID int32
+	GroundClaimed  bool
 }
 
 // Expire ends itemID's weapon wherever it is. ok is false when it is not
@@ -523,8 +535,8 @@ func (m *Manager) endOfLifeLocked(w *weapon) EndOfLife {
 	if w.activated {
 		end.Held = true
 		end.HolderID, end.Karma, end.PKKills = w.playerID, w.playerKarma, w.playerPK
-	} else {
-		end.GroundObjectID = w.groundObjectID
+	} else if w.ground != nil {
+		end.GroundObjectID = w.ground.ObjectID()
 	}
 	m.deleteRowLocked(w.def.ItemID)
 	*w = weapon{def: w.def, stage: 1}
@@ -582,21 +594,40 @@ func (m *Manager) tickLocked(w *weapon, now time.Time) (EndOfLife, []Reminder, b
 				reminders = append(reminders, Reminder{ItemID: w.def.ItemID, HolderID: w.playerID, Left: left})
 			}
 		case timerOverall:
-			w.overallAt = w.overallAt.Add(minute)
 			if now.UnixMilli() >= w.endTime {
-				return m.endOfLifeLocked(w), reminders, true
+				return m.groundEndLocked(w, reminders)
 			}
+			w.overallAt = w.overallAt.Add(minute)
 			if w.activated {
 				row := w.row()
 				m.writeLocked("update", func(ctx context.Context, st Store) error { return st.Update(ctx, row) })
 			}
 		case timerDrop:
-			w.dropAt = time.Time{}
 			if w.dropped && !w.activated {
-				return m.endOfLifeLocked(w), reminders, true
+				return m.groundEndLocked(w, reminders)
 			}
+			w.dropAt = time.Time{}
 		}
 	}
+}
+
+// groundEndLocked ends w from its timers, with reminders already due. A
+// weapon lying on the ground ends only once its end claims the ground
+// item: while a pickup holds the item, the timer that came due stays due
+// for the next tick, and the pickup either makes its picker the holder of
+// the weapon, life and all, or lets the item go for that next try. The
+// caller holds mu.
+func (m *Manager) groundEndLocked(w *weapon, reminders []Reminder) (EndOfLife, []Reminder, bool) {
+	claimed := false
+	if !w.activated && w.ground != nil {
+		if !w.ground.Claim() {
+			return EndOfLife{}, reminders, false
+		}
+		claimed = true
+	}
+	end := m.endOfLifeLocked(w)
+	end.GroundClaimed = claimed
+	return end, reminders, true
 }
 
 type timerKind int
