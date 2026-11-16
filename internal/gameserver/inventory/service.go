@@ -62,7 +62,7 @@ const (
 	DestroyInvalidCount
 	// DestroyNotDestroyable means the item cannot be destroyed.
 	DestroyNotDestroyable
-	// DestroyHeroItem means the item is a hero item.
+	// DestroyHeroItem means the item is a hero item that cannot be destroyed.
 	DestroyHeroItem
 )
 
@@ -338,10 +338,10 @@ func (s *Service) DestroyItemFailure(inv *itemcontainer.Inventory, objectID int3
 	if !tmpl.Stackable && count > 1 {
 		return DestroyNoop
 	}
-	if tmpl.HeroItem() {
-		return DestroyHeroItem
-	}
 	if !inst.Destroyable(tmpl) {
+		if tmpl.HeroItem() {
+			return DestroyHeroItem
+		}
 		return DestroyNotDestroyable
 	}
 	return DestroyOK
