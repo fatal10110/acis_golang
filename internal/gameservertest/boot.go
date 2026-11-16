@@ -1191,6 +1191,7 @@ type Server struct {
 	login         *loginSide
 	groundStore   *gamesql.GroundItemStore
 	spawnStore    *gamesql.SpawnStore
+	serverCrash   *gamesql.ServerCrashStore
 	cursedWeapons *entity.CursedWeaponTable
 	autosave      *task.Autosave
 	gameClock     *task.GameClock
@@ -1745,8 +1746,9 @@ const shutdownDrainTimeout = 10 * time.Second
 // Drain runs the production stop hooks' final saves without stopping the
 // server — pending item mutations through one final ItemInstances save,
 // sealed quest journals and every persistence lane, tracked ground items
-// back into items_on_ground, spawn data — while connected players stay in
-// game, so none of their logout saves has written anything yet.
+// back into items_on_ground, spawn data, then the server_memo crash flag
+// cleared — while connected players stay in game, so none of their logout
+// saves has written anything yet.
 //
 // It first settles, as the production stop order closes the listener and
 // stops the actor pool before those saves: a request still being handled —
@@ -1772,6 +1774,9 @@ func (s *Server) Drain(tb testing.TB) {
 		if err := s.NpcSpawns.Spawns().Save(ctx, s.spawnStore); err != nil {
 			tb.Fatalf("shutdown spawn data save: %v", err)
 		}
+	}
+	if err := s.serverCrash.MarkStopped(ctx); err != nil {
+		tb.Fatalf("shutdown server crash flag save: %v", err)
 	}
 }
 
@@ -2930,6 +2935,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		sessions:            sessions,
 		login:               login,
 		groundStore:         gamesql.NewGroundItemStore(db),
+		serverCrash:         gamesql.NewServerCrashStore(db),
 		cursedWeapons:       cursed,
 		autosave:            autosave,
 		gameClock:           clock,
@@ -2948,6 +2954,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	srv.AnnounceFile = announcementsPath
 	srv.refreshRecommendations = gcl.RefreshDailyRecommendations
 	srv.addClient(c)
+	// As the game server does once boot completes: log a crash of the
+	// previous session on this database, or else mark this one running.
+	switch crashed, err := srv.serverCrash.MarkRunning(context.Background()); {
+	case err != nil:
+		o.log.Error().Err(err).Msg("server crash flag")
+	case crashed:
+		o.log.Info().Msg("Server crashed on last session!")
+	}
 	return srv
 }
 

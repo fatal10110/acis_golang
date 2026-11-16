@@ -199,9 +199,7 @@ func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Ma
 }
 
 func startGameClock(lc fx.Lifecycle, clock *task.GameClock, log zerolog.Logger) {
-	startTicker(lc, log, func(log zerolog.Logger) *scheduler.Ticker {
-		return scheduler.Start(task.GameMinute, clock.Tick, log)
-	})
+	startTicker(lc, log, clock.Start)
 }
 
 func providePlayerClock(clock *task.GameClock, state *world.State) (*task.PlayerClock, error) {

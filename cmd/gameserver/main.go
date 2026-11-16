@@ -64,6 +64,7 @@ const (
 		shutdownSaveTimeout + // mods_wedding
 		fishchamp.TaskTimeout + shutdownSaveTimeout + // fishing_championship and its server_memo end, behind a save already running
 		castlemanor.TaskTimeout + shutdownSaveTimeout + // castle_manor_production and castle_manor_procure, behind a save already running
+		shutdownSaveTimeout + // server_memo crash flag, the last save
 		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (the reachability
 	// ping, id scan, ground-item restore, spawn-state load). These run inside fx.New's constructor graph,
@@ -191,6 +192,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGroundItemOptions,
 			provideGroundItems,
 			provideGameClock,
+			provideServerSession,
 			provideSevenSignsState,
 			provideFestival,
 			loadSignsPriestConfig,
@@ -248,10 +250,10 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGameClientLink,
 			provideClientBans,
 		),
-		fx.Invoke(requireDatabase),
+		fx.Invoke(requireDatabase, clearServerSessionOnStop),
 		fx.Invoke(reportConfigKeys),
 		fx.Invoke(buildScripts),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startCastleArtifacts, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startCastleArtifacts, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, markServerSession, startGameServer),
 	}
 }

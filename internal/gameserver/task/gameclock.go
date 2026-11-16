@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
+
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 )
 
 const (
 	// GameMinute is how much real time one in-game minute takes: one in-game
 	// day lasts four real hours, so its 1440 minutes pass one per ten real
-	// seconds. Advance a GameClock at this period, e.g.
-	// scheduler.Start(task.GameMinute, clock.Tick, log).
+	// seconds. GameClock.Start advances the clock at this period.
 	GameMinute = 10 * time.Second
 
 	minutesPerDay  = 24 * 60 // in-game minutes in one in-game day
@@ -18,8 +21,9 @@ const (
 )
 
 // GameClock tracks in-game time, which runs six times faster than real time.
-// The clock is aligned at construction so in-game midnight coincides with the
-// local midnight preceding boot, then advances one in-game minute per Tick.
+// The clock is aligned so in-game midnight coincides with the local midnight
+// preceding the current time, at construction and again by Start, then
+// advances one in-game minute per Tick.
 // Night spans 00:00-05:59 in-game.
 //
 // All methods are safe for concurrent use; mu guards minutes, night and the
@@ -44,14 +48,29 @@ func NewGameClock(now func() time.Time) *GameClock {
 		now = time.Now
 	}
 	n := now()
+	c := &GameClock{now: now, start: n}
+	c.align(n)
+	return c
+}
+
+// align sets the clock to the in-game minutes elapsed between the local
+// midnight preceding n and n. Callers hold mu or own c exclusively.
+func (c *GameClock) align(n time.Time) {
 	midnight := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, n.Location())
-	minutes := int(n.Sub(midnight) / GameMinute)
-	return &GameClock{
-		now:     now,
-		start:   n,
-		minutes: minutes,
-		night:   minutes%minutesPerDay < nightEndMinute,
-	}
+	c.minutes = int(n.Sub(midnight) / GameMinute)
+	c.night = c.minutes%minutesPerDay < nightEndMinute
+}
+
+// Start realigns the clock to the current time and starts the ticker that
+// advances it one in-game minute per GameMinute from this instant on, so the
+// time spent booting between construction and Start is not lost. The
+// realignment fires no listener. The ticker runs at a fixed rate: ticks a
+// stall delays all still run, so the clock stays locked to wall time.
+func (c *GameClock) Start(log zerolog.Logger) *scheduler.Ticker {
+	c.mu.Lock()
+	c.align(c.now())
+	c.mu.Unlock()
+	return scheduler.Start(GameMinute, c.Tick, log)
 }
 
 // Tick advances the clock by one in-game minute and, when that minute crosses
@@ -104,7 +123,7 @@ func (c *GameClock) TimeOfDay() int {
 }
 
 // Minutes returns the absolute number of in-game minutes elapsed since the
-// midnight alignment at construction. Use this rather than TimeOfDay when a
+// midnight alignment. Use this rather than TimeOfDay when a
 // caller needs a monotonic counter that increases across in-game days
 // (for example, to schedule periodic reminders that survive the wrap).
 func (c *GameClock) Minutes() int {
@@ -128,7 +147,7 @@ func (c *GameClock) Minute() int {
 }
 
 // Day returns how many whole in-game days have elapsed since the midnight
-// alignment at construction.
+// alignment.
 func (c *GameClock) Day() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
