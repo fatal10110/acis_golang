@@ -557,11 +557,13 @@ func TestAntharasRanksWhatItSees(t *testing.T) {
 // TestAntharasRanksItsAttackers ports the fight's ranking of plain hits and
 // its skill choice (phase 4), every draw 0 (every even draw true), before
 // its AI first runs. Restored fighting at 3 and idle, a hit of 7 from the
-// character, 1000 due west of it, ranks it first with 7000; its cast then
-// drops it to 500 and, the character in its narrow cone, wants 4107 on
-// itself. A hit of 5 from a monster 500 due north takes the second slot
-// with 5000, the best: dropped to 500, and out of the cone, the monster
-// draws 4108 on it with its draw of 10 in 100.
+// character, 1000 due west of it, ranks it first with 7000, then once more
+// as a spell at high HP into the third slot with trunc(7/150*1000) = 46;
+// its cast then drops the first to 500 and, the character in its narrow
+// cone, wants 4107 on itself. A hit of 5 from a monster 500 due north takes
+// the second slot with 5000, the best, then the third with 33; dropped to
+// 500, and out of the cone, the monster draws 4108 on it with its draw of
+// 10 in 100.
 func TestAntharasRanksItsAttackers(t *testing.T) {
 	w := bootAntharas(t, antharasLiveRow(3), "1hour")
 	boss := soleBaiumNPC(t, w, antharasID).(*npc.Hostile)
@@ -579,6 +581,12 @@ func TestAntharasRanksItsAttackers(t *testing.T) {
 	if got := handle.Int(script.SlotIntAI2); got != 500 {
 		t.Fatalf("the character's points after its hit and the cast = %d, want 500", got)
 	}
+	if got := handle.Slot(script.SlotCreature4); got == nil || got.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("Antharas's third target after the character's hit = %v, want the character", got)
+	}
+	if got := handle.Int(script.SlotIntAI4); got != 46 {
+		t.Fatalf("the character's points in the third slot = %d, want 46", got)
+	}
 	if got, want := antharasCasts(boss, roles), []string{"4107@antharas=1e+06"}; !slices.Equal(got, want) {
 		t.Fatalf("Antharas's cast desires after the character's hit = %q, want %q", got, want)
 	}
@@ -592,6 +600,12 @@ func TestAntharasRanksItsAttackers(t *testing.T) {
 	}
 	if got := handle.Int(script.SlotIntAI2); got != 500 {
 		t.Fatalf("the character's points after the monster's hit = %d, want 500", got)
+	}
+	if got := handle.Slot(script.SlotCreature4); got == nil || got.ObjectID() != hitter.ObjectID() {
+		t.Fatalf("Antharas's third target after the monster's hit = %v, want the monster", got)
+	}
+	if got := handle.Int(script.SlotIntAI4); got != 33 {
+		t.Fatalf("the monster's points in the third slot = %d, want 33", got)
 	}
 	if got, want := antharasCasts(boss, roles), []string{"4107@antharas=1e+06", "4108@hitter=1e+06"}; !slices.Equal(got, want) {
 		t.Fatalf("Antharas's cast desires after the monster's hit = %q, want %q", got, want)

@@ -135,17 +135,23 @@ func Baium() script.Script {
 					n.SetInt(slotDamage, n.Int(slotDamage)+damage)
 					n.SetInt(slotLastHit, s.CurrentTick())
 
+					// A hit that gave the player a new slot ranks it once
+					// more, on the standings it just changed, with the points
+					// of a spell at high HP: that second pass may move it to
+					// another slot, so it can hold two. A spell at high HP
+					// ranks it only once.
+					high := (damage / 150) * 1000
 					switch hp, maxHP := n.HP(), float64(n.MaxHP()); {
 					case e.Skill.ID == 0:
-						rank(s, n, attacker, damage*1000)
+						settle(s, n, attacker, rank(s, n, attacker, damage*1000), high)
 					case hp < (maxHP*1.0)/4.0:
-						rank(s, n, attacker, (damage/30)*1000)
+						settle(s, n, attacker, rank(s, n, attacker, (damage/30)*1000), high)
 					case hp < (maxHP*2.0)/4.0:
-						rank(s, n, attacker, (damage/50)*1000)
+						settle(s, n, attacker, rank(s, n, attacker, (damage/50)*1000), high)
 					case hp < (maxHP*3.0)/4.0:
-						rank(s, n, attacker, (damage/100)*1000)
+						settle(s, n, attacker, rank(s, n, attacker, (damage/100)*1000), high)
 					default:
-						rank(s, n, attacker, (damage/150)*1000)
+						rank(s, n, attacker, high)
 					}
 				}
 			} else {
@@ -173,16 +179,21 @@ func Baium() script.Script {
 			}
 
 			if p != nil && script.ClassTypeOf(p.ClassID()) == player.ClassTypePriest {
+				var v int32
 				switch hpRatio := n.HPRatio(); {
 				case hpRatio < 0.25:
-					rank(s, n, c, 10*1000)
+					v = 10 * 1000
 				case hpRatio < 0.5:
-					rank(s, n, c, 6*1000)
+					v = 6 * 1000
 				case hpRatio < 0.75:
-					rank(s, n, c, 3*1000)
+					v = 3 * 1000
 				default:
-					rank(s, n, c, 2*1000)
+					v = 2 * 1000
 				}
+				// A priest given a new slot is ranked once more with the
+				// points of anyone seen, which may move it to another slot,
+				// so it can hold two.
+				settle(s, n, c, rank(s, n, c, v), 1*1000)
 			} else {
 				rank(s, n, c, 1*1000)
 			}
@@ -306,8 +317,9 @@ func Baium() script.Script {
 // rank weighs c with points among Baium's three targets. A creature
 // already ranked keeps its slot, raised to points (plus a random share)
 // when that beats its standing by more than 1000; any other takes the
-// weakest slot, a tie broken at random.
-func rank(s *script.Script, n *script.NPC, c script.Creature, points int32) {
+// weakest slot, a tie broken at random. It returns the slot it gave c, 2 to
+// 4, or 0 when it gave none.
+func rank(s *script.Script, n *script.NPC, c script.Creature, points int32) int32 {
 	pts, who := targetSlots()
 	q0, q1, q2 := n.Int(pts[0]), n.Int(pts[1]), n.Int(pts[2])
 	var i1 int32
@@ -331,10 +343,18 @@ func rank(s *script.Script, n *script.NPC, c script.Creature, points int32) {
 	case q0 < q1:
 		i1 = 2
 	}
+	return settle(s, n, c, i1, points)
+}
 
+// settle gives c slot i1 (2 to 4) with points, plus a random share, unless
+// the third slot stands lower: then c takes that one, a tie broken at
+// random. It returns the slot it gave c, or 0 when i1 names none.
+func settle(s *script.Script, n *script.NPC, c script.Creature, i1, points int32) int32 {
+	pts, who := targetSlots()
+	q2 := n.Int(pts[2])
 	switch i1 {
 	case 2:
-		switch {
+		switch q0 := n.Int(pts[0]); {
 		case q0 > q2:
 			i1 = 4
 		case q0 == q2:
@@ -343,7 +363,7 @@ func rank(s *script.Script, n *script.NPC, c script.Creature, points int32) {
 			i1 = 2
 		}
 	case 3:
-		switch {
+		switch q1 := n.Int(pts[1]); {
 		case q1 > q2:
 			i1 = 4
 		case q1 == q2:
@@ -357,7 +377,9 @@ func rank(s *script.Script, n *script.NPC, c script.Creature, points int32) {
 	case 2, 3, 4:
 		n.SetInt(pts[i1-2], points+int32(s.Rnd(3000)))
 		n.SetSlot(who[i1-2], c)
+		return i1
 	}
+	return 0
 }
 
 // pick returns a or b on an even draw.

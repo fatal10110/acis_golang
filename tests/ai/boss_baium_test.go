@@ -137,6 +137,13 @@ func bootBaium(t *testing.T, pos string, opts ...gameservertest.Option) *baiumWo
 // Fabrics as it enters the world.
 func bootBaiumHolding(t *testing.T, pos string, fabrics int32, opts ...gameservertest.Option) *baiumWorld {
 	t.Helper()
+	return bootBaiumWith(t, pos, fabrics, nil, opts...)
+}
+
+// bootBaiumWith is bootBaiumHolding with a ready step run before the
+// character enters the world.
+func bootBaiumWith(t *testing.T, pos string, fabrics int32, ready func(*gameservertest.Server, int32), opts ...gameservertest.Option) *baiumWorld {
+	t.Helper()
 	w := &baiumWorld{start: time.Now()}
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "baium.xml"), []byte(fmt.Sprintf(baiumSpawnlist, pos)), 0o644); err != nil {
@@ -192,6 +199,9 @@ func bootBaiumHolding(t *testing.T, pos string, fabrics int32, opts ...gameserve
 	}, opts...)...)
 	if fabrics > 0 {
 		srv.GiveItem(t, srv.SoleObjectID(t), bloodedFabric, fabrics)
+	}
+	if ready != nil {
+		ready(srv, srv.SoleObjectID(t))
 	}
 	c := srv.Client
 	c.Send(encodeGameStart())
