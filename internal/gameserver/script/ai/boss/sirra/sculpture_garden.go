@@ -3,6 +3,7 @@ package sirra
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -23,9 +24,9 @@ func SculptureGarden() script.Script {
 		Dir: dir, Behavior: true, NPCs: []int32{32030},
 		Hooks: base.With(script.Hooks{
 			OnCreated: func(s *script.Script, e script.Created) {
-				c0 := s.GlobalMemo().Creature("7")
+				c0 := s.GlobalMemo().Creature(bossmemo.SculptureGarden)
 				if c0 == nil {
-					s.GlobalMemo().Set("7", int(e.NPC.ObjectID()))
+					s.GlobalMemo().Set(bossmemo.SculptureGarden, int(e.NPC.ObjectID()))
 				}
 
 				base.Created(s, e)

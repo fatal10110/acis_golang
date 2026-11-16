@@ -29,8 +29,9 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		// leader through Player.ChannelLeader where the census records the
 		// group getter AbstractGroup.getLeader, and walks each entering
 		// party's members in the lists Player.ChannelParties returns where
-		// the census records Party.getMembers.
-	}, "number 1010643", "number 1118",
+		// the census records Party.getMembers. The global memo keys are
+		// named from the shared bossmemo table.
+	}, `string "4"`, `string "5"`, `string "6"`, "number 1010643", "number 1118",
 		"call AbstractGroup.getLeader", "call Party.getMembers",
 		"number 1010630", "number 1010631", "number 1000522", "number 1000523", "number 1000524",
 		"number 1000525", "number 1000526", "number 1000527",

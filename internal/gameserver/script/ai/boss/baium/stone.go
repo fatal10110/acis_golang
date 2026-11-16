@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 )
 
 // slotWoken is the stone's script memory: 1 once a talk woke Baium.
@@ -41,9 +42,9 @@ func stoneTalk(s *script.Script, e script.Talk) string {
 	if n.Int(slotWoken) == 0 {
 		n.SetInt(slotWoken, 1)
 
-		i0 := s.GlobalMemo().Int(memoKey, noMemo)
+		i0 := s.GlobalMemo().Int(bossmemo.Baium, noMemo)
 		if i0 == noMemo {
-			panic(fmt.Sprintf("baium: global memo %q holds no value", memoKey))
+			panic(fmt.Sprintf("baium: global memo %q holds no value", bossmemo.Baium))
 		}
 		if i0 != -1 {
 			if c0 := s.Object(int32(i0)); c0 != nil {

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -47,7 +48,7 @@ func HeartOfVolcano() script.Script {
 				if strings.EqualFold(e.Name, "2002") {
 					npcDBValue := n.DBValue()
 					if npcDBValue != 0 {
-						if c0, ok := s.GlobalMemo().Creature(memoKey).(*script.NPC); ok && !c0.Dead() {
+						if c0, ok := s.GlobalMemo().Creature(bossmemo.Valakas).(*script.NPC); ok && !c0.Dead() {
 							c0DBValue := c0.DBValue()
 							if c0DBValue != 0 {
 								return base.Timer(s, e)
@@ -71,7 +72,7 @@ func heartEvent(s *script.Script, e script.Event) string {
 
 	if strings.EqualFold(e.Name, "enter") {
 		n, player := e.NPC, e.Player
-		if c0, ok := s.GlobalMemo().Creature(memoKey).(*script.NPC); ok && !c0.Dead() {
+		if c0, ok := s.GlobalMemo().Creature(bossmemo.Valakas).(*script.NPC); ok && !c0.Dead() {
 			dbValue := c0.DBValue()
 			if dbValue == 0 {
 				s.SendScriptEvent(c0, 0, 0, 0)

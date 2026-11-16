@@ -8,11 +8,9 @@ import (
 
 // TestMatchesReferenceFingerprints compares the package with the reference
 // classes: literals, engine calls and hook shapes. The NpcString id Antharas
-// shows is a named constant in the reference, a number in Go; the Heart's
-// abort on a memo key naming no NPC is the reference's thrown exception.
+// shows is a named constant in the reference, a number in Go.
 func TestMatchesReferenceFingerprints(t *testing.T) {
-	problems, err := scriptfp.Check(".", []string{"script.ai.boss.antharas.Antharas", "script.ai.boss.antharas.HeartOfWarding"}, "number 1000520",
-		`string "antharas: global memo %q names no NPC"`)
+	problems, err := scriptfp.Check(".", []string{"script.ai.boss.antharas.Antharas", "script.ai.boss.antharas.HeartOfWarding"}, "number 1000520")
 	if err != nil {
 		t.Fatal(err)
 	}

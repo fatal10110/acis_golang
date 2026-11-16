@@ -8,15 +8,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
 // dir is the directory the Baium scripts are listed under.
 const dir = "ai/boss/baium"
-
-// memoKey is the global memo key under which Baium leaves its object id
-// while it lives.
-const memoKey = "2"
 
 // The NPCs Baium creates: its archangels, the stone it sleeps as, and the
 // teleport cube it leaves behind.
@@ -89,7 +86,7 @@ func Baium() script.Script {
 			n := e.NPC
 			n.SetInt(slotFighting, 0)
 
-			s.GlobalMemo().Set(memoKey, int(n.ObjectID()))
+			s.GlobalMemo().Set(bossmemo.Baium, int(n.ObjectID()))
 			n.SetDBValue(0)
 
 			if n.InMyTerritory() {
@@ -116,7 +113,7 @@ func Baium() script.Script {
 
 			n.PlayMusic("BS01_D")
 
-			s.GlobalMemo().Remove(memoKey)
+			s.GlobalMemo().Remove(bossmemo.Baium)
 		},
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			n, attacker := e.NPC, e.Attacker
