@@ -3,7 +3,6 @@ package manager
 import (
 	"math"
 	"slices"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -14,7 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -25,7 +23,6 @@ type deathRewards struct {
 	categories []item.DropCategory
 	config     KillRewardConfig
 	raid       bool
-	decay      *task.Decay
 	ids        idAllocator
 	items      *item.Table
 	ground     groundPlacer
@@ -44,7 +41,6 @@ type playerRewardEntry struct {
 
 // CalculateRewards implements creature.Rewarder.
 func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
-	d.scheduleDecay()
 	d.creditRaidKill(killer)
 
 	// A corpse nobody fought pays nothing: no loot, no spoil, no exp.
@@ -146,18 +142,6 @@ func dropReceiver(killer attackable.Combatant, maxDealer *player.Character) atta
 	return nil
 }
 
-func (d *deathRewards) scheduleDecay() {
-	if d.tmpl.CorpseTime <= 0 || d.decay == nil {
-		return
-	}
-	interval := time.Duration(d.tmpl.CorpseTime) * time.Second
-	if d.hostile.Spoiled() || d.hostile.Seeded() {
-		interval *= 2
-	}
-	deadline := d.decay.Add(d.hostile, interval)
-	d.hostile.SetCorpseDeadline(deadline)
-}
-
 // rewardEntries credits each playable attacker's damage to its acting
 // player; a summon's damage is also kept under the summon's id for its
 // owner's pet share. The top dealer is the first player whose combined
@@ -240,6 +224,7 @@ func (d *deathRewards) rollDrops(s *KillRewardSettings, receiver attackable.Comb
 	}
 
 	NewKillReward(d.droppingCategories(), d.hostile.SpoilPool(), levelMultiplier, d.raid, s.Rates, autoLootItems, s.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).
+		LogTo(d.hostile.Logger(), d.tmpl.ID).
 		From(d.hostile).
 		MultipleItemDrop(s.MultipleItemDrop).
 		AnnounceTo(d.hostile).
@@ -353,14 +338,32 @@ func petReward(expType int, petDamage, totalDamage float64, exp int64, sp int) (
 	return int64(math.Round(float64(exp) * share)), int(math.Round(float64(sp) * share))
 }
 
-// DropItem drops count units of itemID around the NPC, as its death drops
-// fall: a stackable as one stack, a non-stackable as count items under
-// MultipleItemDrop, else one. The drop is reserved for to when to acts
-// for a player, for as long as a drop of this NPC's death is.
-func (d *deathRewards) DropItem(to attackable.Combatant, itemID int32, count int) {
-	s := d.config.Settings.Settings()
-	x, y, z := d.hostile.Position()
-	k := NewKillReward(nil, nil, 1, d.raid, s.Rates, false, false, d.ids, d.items, d.ground, d.geo, x, y, z, d.hostile.Heading(), d.hostile.ObjectID()).
+// groundDrops places the items a script drops around a live NPC, as its
+// death drops fall.
+type groundDrops struct {
+	config KillRewardConfig
+	ids    idAllocator
+	items  *item.Table
+	ground groundPlacer
+	geo    move.Geo
+}
+
+// NewGroundDrops returns the production script item drop for a hostile
+// spawned outside the spawn table, placing through ids and ground with no
+// geodata scatter check.
+func NewGroundDrops(config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer) npc.ItemDropper {
+	return groundDrops{config: config, ids: ids, items: items, ground: ground}
+}
+
+// DropItem drops count units of itemID around h, as its death drops fall:
+// a stackable as one stack, a non-stackable as count items under
+// MultipleItemDrop, else one. The drop is reserved for to when to acts for
+// a player, for as long as a drop of h's death is.
+func (g groundDrops) DropItem(h *npc.Hostile, to attackable.Combatant, itemID int32, count int) {
+	s := g.config.Settings.Settings()
+	x, y, z := h.Position()
+	k := NewKillReward(nil, nil, 1, h.RaidBoss(), s.Rates, false, false, g.ids, g.items, g.ground, g.geo, x, y, z, h.Heading(), h.ObjectID()).
+		LogTo(h.Logger(), h.Instance.Template.ID).
 		MultipleItemDrop(s.MultipleItemDrop)
 	if to != nil {
 		if _, acting := actingCharacter(to); acting {

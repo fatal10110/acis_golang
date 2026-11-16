@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"errors"
+	"fmt"
 	"math/rand/v2"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/rs/zerolog"
 )
 
 // dropScatterOffset is the +/- range applied to each ground item's drop
@@ -96,7 +99,15 @@ type KillReward struct {
 	// announcer names a raid kill's every dropped or auto-looted item to
 	// the boss's observers; nil announces nothing.
 	announcer raidDropAnnouncer
+
+	// log takes a line for each rolled item the reward cannot place,
+	// naming the NPC npcID; nil logs nothing.
+	log   *zerolog.Logger
+	npcID int
 }
+
+// errUnknownDropItem is a rolled item id the item table does not hold.
+var errUnknownDropItem = errors.New("unknown item id")
 
 // NewKillReward returns a Rewarder that rolls categories against pool and
 // rates, then places the results on the ground at (x, y, z, heading).
@@ -141,6 +152,13 @@ func (k *KillReward) From(origin party.LootOrigin) *KillReward {
 // one either way. It returns k.
 func (k *KillReward) MultipleItemDrop(enabled bool) *KillReward {
 	k.multipleItemDrop = enabled
+	return k
+}
+
+// LogTo sets the logger that takes a line for each rolled item this reward
+// cannot place, naming the dying NPC's template npcID. It returns k.
+func (k *KillReward) LogTo(log *zerolog.Logger, npcID int) *KillReward {
+	k.log, k.npcID = log, npcID
 	return k
 }
 
@@ -246,8 +264,8 @@ func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, c
 // stack of count, a non-stackable one as count separate single items under
 // MultipleItemDrop, or else as just one. It is a best-effort placement:
 // running out of allocatable object ids or an unknown item id skips the
-// rest of that roll rather than failing the whole reward, since
-// CalculateRewards has no error return to report a partial failure
+// rest of that roll, logged once, rather than failing the whole reward,
+// since CalculateRewards has no error return to report a partial failure
 // through.
 func (k *KillReward) drop(itemID int32, count int) {
 	if count <= 0 {
@@ -255,33 +273,47 @@ func (k *KillReward) drop(itemID int32, count int) {
 	}
 	tmpl, ok := k.items.Get(itemID)
 	if !ok {
+		k.logSkipped(errUnknownDropItem, itemID, count)
 		return
 	}
 	if tmpl.Stackable {
-		k.place(tmpl, count)
+		if err := k.place(tmpl, count); err != nil {
+			k.logSkipped(err, itemID, count)
+		}
 		return
 	}
 	if !k.multipleItemDrop {
 		count = 1
 	}
-	for range count {
-		if !k.place(tmpl, 1) {
+	for placed := range count {
+		if err := k.place(tmpl, 1); err != nil {
+			k.logSkipped(err, itemID, count-placed)
 			return
 		}
 	}
 }
 
+// logSkipped logs the count units of itemID a drop could not place, and
+// why.
+func (k *KillReward) logSkipped(err error, itemID int32, count int) {
+	if k.log == nil {
+		return
+	}
+	k.log.Warn().Err(err).Int("npc_id", k.npcID).Int32("object_id", k.dropperID).
+		Int32("item_id", itemID).Int("count", count).Msg("kill reward: drop skipped")
+}
+
 // place drops one ground item of tmpl holding count units, scattered
-// around the corpse on its own, and reports whether it was placed.
-func (k *KillReward) place(tmpl *item.Template, count int) bool {
+// around the corpse on its own, or reports why it could not.
+func (k *KillReward) place(tmpl *item.Template, count int) error {
 	id, err := k.ids.NextID()
 	if err != nil {
-		return false
+		return fmt.Errorf("allocate object id: %w", err)
 	}
 	inst := item.Instance{ObjectID: id, TemplateID: tmpl.ID, Count: count, Location: item.LocationVoid}
 	ground, err := grounditem.New(inst, tmpl)
 	if err != nil {
-		return false
+		return fmt.Errorf("build ground item: %w", err)
 	}
 
 	x, y, z := k.x, k.y, k.z
@@ -303,5 +335,5 @@ func (k *KillReward) place(tmpl *item.Template, count int) bool {
 		ProtectOwnerID: k.protectOwnerID,
 		ProtectFor:     protectFor,
 	})
-	return true
+	return nil
 }
