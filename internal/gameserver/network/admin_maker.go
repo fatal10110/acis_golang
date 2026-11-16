@@ -40,8 +40,10 @@ func (l *GameClientLink) adminMaker(gm *livePlayer, line string) {
 		return
 	case 1:
 		if isDigits(args[0]) {
-			if page, err := strconv.Atoi(args[0]); err == nil {
-				l.sendMakersPage(gm, npcs, page)
+			// A page number past int32 answers nothing either: the command
+			// has always failed on it before showing a page.
+			if page, ok := parseInt32(args[0]); ok {
+				l.sendMakersPage(gm, npcs, int(page))
 			}
 			return
 		}

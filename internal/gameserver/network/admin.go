@@ -283,11 +283,35 @@ func (l *GameClientLink) adminNamedPlayer(gm *livePlayer, name string, orSelf bo
 
 // onPlayer runs fn for target on target's queue: at once when target is gm,
 // whose queue the command already runs on, else posted there. It reports
-// whether fn will run: a target that left the world meanwhile drops it.
+// whether fn was posted: a target that left the world meanwhile drops it.
+// A posted fn that finds target leaving the world does not run either, so
+// no admin action reaches a departed player; see onPlayerOr.
 func onPlayer(gm, target *livePlayer, fn func()) bool {
+	return onPlayerOr(gm, target, fn, nil)
+}
+
+// onPlayerOr is onPlayer running left, when given, wherever fn does not run
+// because target has begun leaving the world: on target's queue, once the
+// detach that marked it has queued its saves, or on the calling goroutine
+// when target's queue, closed after those saves, refuses the post. A write
+// left makes so lands after the character's logout saves, and state fn
+// would have released is released.
+func onPlayerOr(gm, target *livePlayer, fn, left func()) bool {
 	if target == gm {
 		fn()
 		return true
 	}
-	return postLive(target, fn)
+	posted := postLive(target, func() {
+		if target.detached() {
+			if left != nil {
+				left()
+			}
+			return
+		}
+		fn()
+	})
+	if !posted && left != nil {
+		left()
+	}
+	return posted
 }

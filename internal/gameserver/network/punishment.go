@@ -16,8 +16,7 @@ import (
 // punishmentStore stores a character's chat ban or jail term.
 type punishmentStore interface {
 	SetPunishment(ctx context.Context, objectID int32, level int, timer int64) error
-	SetPunishmentByName(ctx context.Context, name string, level int, timer int64) (bool, error)
-	SetPunishmentAtByName(ctx context.Context, name string, level int, timer int64, at location.Location) (bool, error)
+	SetPunishmentAt(ctx context.Context, objectID int32, level int, timer int64, at location.Location) error
 }
 
 // punishmentWriteTimeout bounds one punishment write.
@@ -183,6 +182,12 @@ func (l *GameClientLink) storePunishment(live *livePlayer) {
 // storePunishmentOf writes kind and timer as objectID's punishment on its
 // persistence lane, ahead of any save its logout queues after.
 func (l *GameClientLink) storePunishmentOf(objectID int32, kind player.Punishment, timer int64) {
+	l.storePunishmentAt(objectID, kind, timer, nil)
+}
+
+// storePunishmentAt is storePunishmentOf moving the character to at as
+// well, when at is set.
+func (l *GameClientLink) storePunishmentAt(objectID int32, kind player.Punishment, timer int64, at *location.Location) {
 	if l.punishments == nil {
 		return
 	}
@@ -190,7 +195,13 @@ func (l *GameClientLink) storePunishmentOf(objectID int32, kind player.Punishmen
 	if !l.persist.Enqueue(objectID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), punishmentWriteTimeout)
 		defer cancel()
-		if err := store.SetPunishment(ctx, objectID, int(kind), timer); err != nil {
+		var err error
+		if at != nil {
+			err = store.SetPunishmentAt(ctx, objectID, int(kind), timer, *at)
+		} else {
+			err = store.SetPunishment(ctx, objectID, int(kind), timer)
+		}
+		if err != nil {
 			log.Error().Err(err).Int32("object_id", objectID).Msg("store punishment")
 		}
 	}) {
@@ -200,33 +211,19 @@ func (l *GameClientLink) storePunishmentOf(objectID int32, kind player.Punishmen
 
 // punishTarget applies kind to the online target for minutes on target's
 // queue. A target already leaving the world gets the punishment stored
-// instead, which its next login resumes.
+// instead, after its logout saves, which its next login resumes: a jail
+// stores it in the jail and a release from jail in Floran village, as for a
+// character out of the world, since the move it would have made online
+// can no longer reach its logout save.
 func (l *GameClientLink) punishTarget(gm, target *livePlayer, kind player.Punishment, minutes int32) {
-	if onPlayer(gm, target, func() { l.punish(target, kind, minutes) }) {
-		return
-	}
-	l.storePunishmentOf(target.ObjectID(), kind, player.PunishmentMillis(minutes))
-}
-
-// storePunishmentByName writes level and timer as the punishment of the
-// offline character named name, moving it to at when at is set, and reports
-// whether one has that name. ok is false when the write failed; it is
-// logged.
-func (l *GameClientLink) storePunishmentByName(name string, level player.Punishment, timer int64, at *location.Location) (found, ok bool) {
-	if l.punishments == nil {
-		return false, true
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), punishmentWriteTimeout)
-	defer cancel()
-	var err error
-	if at != nil {
-		found, err = l.punishments.SetPunishmentAtByName(ctx, name, int(level), timer, *at)
-	} else {
-		found, err = l.punishments.SetPunishmentByName(ctx, name, int(level), timer)
-	}
-	if err != nil {
-		l.log.Error().Err(err).Str("name", name).Msg("store punishment")
-		return false, false
-	}
-	return found, true
+	onPlayerOr(gm, target, func() { l.punish(target, kind, minutes) }, func() {
+		var at *location.Location
+		switch current, _ := target.Punishment(); {
+		case kind == player.PunishJail:
+			at = &jailLocation
+		case kind == player.PunishNone && current == player.PunishJail:
+			at = &jailReleaseLocation
+		}
+		l.storePunishmentAt(target.ObjectID(), kind, player.PunishmentMillis(minutes), at)
+	})
 }

@@ -127,10 +127,16 @@ func (l *GameClientLink) adminUnjail(gm *livePlayer, line string) {
 
 // reportOfflinePunishment stores kind and timer as the punishment of the
 // offline character named name, moving it to at when at is set, and tells
-// gm done, or that no character has that name. A failed write is logged
-// and answers nothing.
+// gm done, or that no character has that name. A failed lookup is logged
+// and answers nothing. A session of the character found by its id, or one a
+// selection under way ends with, serves the punishment the stored row would
+// have given it.
 func (l *GameClientLink) reportOfflinePunishment(gm *livePlayer, name string, kind player.Punishment, timer int64, at *location.Location, done string) {
-	found, ok := l.storePunishmentByName(name, kind, timer, at)
+	found, ok := l.adminByName(name, func(target *livePlayer) {
+		l.punish(target, kind, int32(timer/player.PunishmentMillis(1)))
+	}, func(objectID int32) {
+		l.storePunishmentAt(objectID, kind, timer, at)
+	})
 	switch {
 	case !ok:
 	case !found:

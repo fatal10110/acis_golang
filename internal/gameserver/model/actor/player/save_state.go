@@ -38,6 +38,9 @@ type SaveState struct {
 	In7sDungeon bool
 	// VarkaKetraAlliance is the faction standing (see VarkaKetraAlliance).
 	VarkaKetraAlliance int
+	// AccessLevel is the access level played under at the copy. The
+	// character model does not know it once in game, so the caller sets it.
+	AccessLevel int
 	// ClientDetached marks a copy taken while the character lingers in the
 	// world after its connection dropped: the row's online column then records
 	// 2 instead of 1. The character model does not know its session, so the

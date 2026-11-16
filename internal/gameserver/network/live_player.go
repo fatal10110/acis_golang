@@ -560,8 +560,16 @@ func (p *livePlayer) clientDetached() bool {
 // saveState copies p's character row for an in-game save, marking a copy
 // taken while p lingers after its connection dropped.
 func (p *livePlayer) saveState() player.SaveState {
-	st := p.Character.SaveState()
+	st := p.characterSaveState()
 	st.ClientDetached = p.clientDetached()
+	return st
+}
+
+// characterSaveState copies p's character row with the access level p
+// plays under.
+func (p *livePlayer) characterSaveState() player.SaveState {
+	st := p.Character.SaveState()
+	st.AccessLevel = p.accessLevel().Level
 	return st
 }
 
