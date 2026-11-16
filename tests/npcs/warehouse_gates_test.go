@@ -42,8 +42,9 @@ func setCharacterColumn(t *testing.T, srv *gameservertest.Server, objID int32, c
 // nothing; the receiver's freight opens as WarehouseDepositList(4) held to
 // the base freight size, counting only rows of the keeper's region; the
 // deposited row carries the keeper's region; at the receiver's next login a
-// keeper of that region lists it while a row tagged for another region
-// stays out of the list.
+// keeper of that region lists it and hands it out, while a row tagged for
+// another region stays out of the list and is not handed out, even named by
+// its object id.
 func TestFreightCharDepositsIntoAccountCharacter(t *testing.T) {
 	t.Parallel()
 	var elsewhere int32
@@ -129,12 +130,22 @@ func TestFreightCharDepositsIntoAccountCharacter(t *testing.T) {
 	if _, _, _, listed := decodeWarehouseList(t, frames[1], serverpackets.OpcodeWarehouseWithdrawList); len(listed) != 1 || listed[sword] != (listRow{swordID, 1}) {
 		t.Fatalf("receiver's freight here = %v, want only the sword, not the potion of the other region", listed)
 	}
-	// The withdrawal looks a row up by object id across every region, as
-	// the reference's does: a row named directly still comes out.
+	// A row of the other region stays where it is even named by object id:
+	// the withdrawal is dropped, silently, as one naming a row not held.
 	rw.c.Send(encodeWithdraw(whRow{elsewhere, 2}))
+	if frames := drainFrames(t, rw.c); len(frames) != 0 {
+		t.Fatalf("withdrawal of the other region's potions answered %x, want nothing", opcodes(frames))
+	}
+	if got := rw.held(t, elsewhere); got != 0 {
+		t.Fatalf("potions of the other region withdrawn by object id = %d, want 0", got)
+	}
+	if got := saved(t, w.srv, w.receiver.ID)[elsewhere]; got != (savedRow{potionID, 2, item.LocationFreight}) {
+		t.Fatalf("other region's potion row = %+v, want 2 potions still in freight", got)
+	}
+	rw.c.Send(encodeWithdraw(whRow{sword, 1}))
 	drainUntilQuiet(t, rw.c)
-	if got := rw.held(t, elsewhere); got != 2 {
-		t.Fatalf("potions of the other region withdrawn by object id = %d, want 2", got)
+	if got := rw.held(t, sword); got != 1 {
+		t.Fatalf("sword withdrawn here = %d, want 1", got)
 	}
 }
 

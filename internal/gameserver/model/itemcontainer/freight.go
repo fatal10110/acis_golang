@@ -1,6 +1,7 @@
 package itemcontainer
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
@@ -12,9 +13,11 @@ import (
 // town is active.
 //
 // Freight exposes Visible* methods for town-filtered reads. It also provides
-// its own Add/AddNew/ItemByTemplateID so transfers use active-town semantics;
-// the embedded Container's Items/Size/ItemsByTemplateID still see every item
-// regardless of town, which restore/persistence code needs.
+// its own Add/AddNew/ItemByTemplateID so transfers use active-town semantics,
+// and its own ItemByObjectID/Transfer so a withdrawal only takes an item the
+// active town lists; the embedded Container's Items/Size/ItemsByTemplateID
+// still see every item regardless of town, which restore/persistence code
+// needs.
 type Freight struct {
 	*Container
 
@@ -60,6 +63,10 @@ func (f *Freight) VisibleSize() int {
 
 // VisibleItems returns untagged items plus those tagged for the active town.
 // A zero ActiveLocation lists only untagged items; it is not a wildcard.
+//
+// The items come in the order the freight withdrawal list shows them: that
+// of a plain hash table filled with them in container order and holding
+// just them, each filed under 31 plus its object id.
 func (f *Freight) VisibleItems() []*item.Instance {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -70,7 +77,31 @@ func (f *Freight) VisibleItems() []*item.Instance {
 		}
 	}
 	sortContainerOrder(out)
+	hashorder.SortMap(out, func(inst *item.Instance) int32 { return 31 + inst.ObjectID })
 	return out
+}
+
+// ItemByObjectID returns the instance identified by objectID when the
+// active town lists it (VisibleItems), or nil: an item tagged for another
+// town is not withdrawn here, even named by its object id.
+func (f *Freight) ItemByObjectID(objectID int32) *item.Instance {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	inst := f.items[objectID]
+	if inst == nil || !f.listed(inst) {
+		return nil
+	}
+	return inst
+}
+
+// Transfer is Container.Transfer of an item the active town lists; any other
+// objectID moves nothing. An item's town tag is fixed while it stays in the
+// freight, so the check holds through the move.
+func (f *Freight) Transfer(objectID int32, count int, target Receiver, nextID func() (int32, error)) (result *item.Instance, freedObjectID int32, freed bool, err error) {
+	if f.ItemByObjectID(objectID) == nil {
+		return nil, 0, false, nil
+	}
+	return f.Container.Transfer(objectID, count, target, nextID)
 }
 
 // VisibleItemByTemplateID returns the first instance of templateID visible

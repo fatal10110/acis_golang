@@ -319,3 +319,15 @@ func (i *ItemInstances) OperationHolds(owner int32) bool {
 	}
 	return i.ops.holds(owner)
 }
+
+// ParkedOperations reports how many operations wait to begin
+// (BeginOperation). Like OperationOpen it is a probe for a handler's tests,
+// which hold an owner's operation and need to know the handler waits on it
+// before they let another side go on.
+func (i *ItemInstances) ParkedOperations() int {
+	if i == nil {
+		return 0
+	}
+	ops, _ := i.ops.parked()
+	return ops
+}

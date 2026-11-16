@@ -132,18 +132,24 @@ func TestFreight_VisibleItems_ZeroActiveLocationReturnsOnlyUntagged(t *testing.T
 	}
 }
 
-func TestFreight_VisibleItems_OrderedByEntryTimeThenObjectID(t *testing.T) {
+// TestFreight_VisibleItems_HashSetOrder pins the withdrawal list's order:
+// that of a 16-bucket hash table filled in container order (newest entry
+// first, then descending object id), each item filed under 31 plus its
+// object id folded with its high half. 0x20000001 and 0x20000011 share
+// bucket 0 and keep their container order there; 0x20000002 and 0x20000003
+// fall in buckets 1 and 2.
+func TestFreight_VisibleItems_HashSetOrder(t *testing.T) {
 	f := NewFreight(0x10000001, freightTestTemplates())
 	f.ActiveLocation = 1
 
-	for _, objectID := range []int32{0x20000003, 0x20000001, 0x20000004, 0x20000002} {
+	for _, objectID := range []int32{0x20000003, 0x20000001, 0x20000011, 0x20000002} {
 		f.AddNew(freightTestItemID, 1, objectID)
 	}
 	// Pin the entry times rather than relying on four AddNew calls landing in
-	// the same millisecond: 0x20000001 is the newest, the other three tie and
+	// the same millisecond: 0x20000011 is the newest, the other three tie and
 	// fall through to descending object id.
 	for _, inst := range f.VisibleItems() {
-		if inst.ObjectID == 0x20000001 {
+		if inst.ObjectID == 0x20000011 {
 			inst.SetTime(2000)
 		} else {
 			inst.SetTime(1000)
@@ -155,7 +161,7 @@ func TestFreight_VisibleItems_OrderedByEntryTimeThenObjectID(t *testing.T) {
 	for i, inst := range visible {
 		got[i] = inst.ObjectID
 	}
-	want := []int32{0x20000001, 0x20000004, 0x20000003, 0x20000002}
+	want := []int32{0x20000011, 0x20000001, 0x20000002, 0x20000003}
 	if !slices.Equal(got, want) {
 		t.Fatalf("VisibleItems() object ids = %v, want %v", got, want)
 	}

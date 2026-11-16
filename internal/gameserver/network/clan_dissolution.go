@@ -127,7 +127,9 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 
 // destroyClanWarehouse destroys every item in the warehouse of the
 // dissolved clan clanID, restoring it first when no member opened it, and
-// deletes their rows; the warehouse is then forgotten.
+// deletes their rows; the warehouse is forgotten inside the same item
+// operation, so a member's deposit or withdrawal waiting on that operation
+// finds it gone (storeStillOpen).
 func (l *GameClientLink) destroyClanWarehouse(clanID int32) {
 	defer l.clanWarehouses.forget(clanID)
 	wh, err := l.clanWarehouse(clanID)
@@ -145,6 +147,7 @@ func (l *GameClientLink) destroyClanWarehouse(clanID int32) {
 		}
 	}
 	l.applyPersistActions(persist)
+	l.clanWarehouses.forget(clanID)
 	end()
 	wh.ReleasePersistence()
 }
