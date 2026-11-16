@@ -35,9 +35,22 @@ func NewCipher(key []byte) (*Cipher, error) {
 		return nil, fmt.Errorf("game cipher key must be %d bytes, got %d", KeySize, len(key))
 	}
 	c := &Cipher{}
+	if err := c.SetKey(key); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// SetKey restarts both the inbound and the outbound rolling key from key,
+// which must be exactly 16 bytes. Whether the cipher is armed is left as it
+// is: once armed, the next Encrypt already transforms with key.
+func (c *Cipher) SetKey(key []byte) error {
+	if len(key) != KeySize {
+		return fmt.Errorf("game cipher key must be %d bytes, got %d", KeySize, len(key))
+	}
 	copy(c.inKey[:], key)
 	copy(c.outKey[:], key)
-	return c, nil
+	return nil
 }
 
 // Decrypt transforms buf in place using the inbound key, or leaves it

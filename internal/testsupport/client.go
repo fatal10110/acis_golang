@@ -261,6 +261,46 @@ func (f *ScriptedClient) SendProtocolVersion(revision int32) {
 	f.handshaken = true
 }
 
+// RepeatProtocolVersion sends ProtocolVersion again on a handshaken
+// connection and returns the decrypted VersionCheck reply. The server
+// answers it with a fresh key, already encrypted with that key, so the
+// client reads the key's random half off the ciphertext and restarts its
+// cipher from it.
+func (f *ScriptedClient) RepeatProtocolVersion(revision int32) []byte {
+	f.t.Helper()
+	w := wire.NewPacketWriter(clientpackets.OpcodeProtocolVersion)
+	w.WriteInt32(revision)
+	f.Send(w.Bytes())
+	raw, err := f.readFrame(5 * time.Second)
+	if err != nil {
+		f.t.Fatalf("read VersionCheck: %v", err)
+	}
+	if len(raw) != 18 {
+		f.t.Fatalf("VersionCheck payload size = %d, want 18", len(raw))
+	}
+	// Each ciphertext byte is the plaintext byte XOR the key byte XOR the
+	// previous ciphertext byte; the plaintext opens with the opcode, 0x01
+	// and the key's random half, so the half unrolls byte by byte.
+	key := make([]byte, gamecipher.KeySize)
+	key[0] = raw[0] ^ serverpackets.OpcodeVersionCheck
+	key[1] = raw[1] ^ raw[0] ^ 0x01
+	for i := 2; i < 8; i++ {
+		key[i] = raw[i] ^ raw[i-1] ^ key[i-2]
+	}
+	copy(key[8:], gamecipher.StaticKey[:])
+	c, err := gamecipher.NewCipher(key)
+	if err != nil {
+		f.t.Fatalf("NewCipher: %v", err)
+	}
+	c.Encrypt(nil)
+	c.Decrypt(raw)
+	if raw[0] != serverpackets.OpcodeVersionCheck || !bytes.Equal(raw[2:10], key[:8]) {
+		f.t.Fatalf("repeated VersionCheck = %x, want one carrying its own key", raw)
+	}
+	f.cipher = c
+	return raw
+}
+
 // Send writes one encrypted payload frame to the server.
 func (f *ScriptedClient) Send(payload []byte) {
 	f.t.Helper()

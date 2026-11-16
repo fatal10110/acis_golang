@@ -14,11 +14,14 @@ const moveBackwardToLocationSize = 6 * 4
 
 // MoveBackwardToLocation asks the server to move the active character toward
 // Target from Origin. MoveMovement is 0 for keyboard movement and 1 for mouse
-// movement.
+// movement. MovementMissing reports a frame that ended before a whole
+// MoveMovement, which the game client always sends and bot clients omit;
+// MoveMovement is 0 then.
 type MoveBackwardToLocation struct {
 	TargetX, TargetY, TargetZ int32
 	OriginX, OriginY, OriginZ int32
 	MoveMovement              int32
+	MovementMissing           bool
 }
 
 // DecodeMoveBackwardToLocation parses a raw movement request payload (opcode
@@ -38,6 +41,8 @@ func DecodeMoveBackwardToLocation(payload []byte) (MoveBackwardToLocation, error
 	}
 	if r.Remaining() >= 4 {
 		req.MoveMovement = r.ReadInt32()
+	} else {
+		req.MovementMissing = true
 	}
 	if err := r.Err(); err != nil {
 		return MoveBackwardToLocation{}, fmt.Errorf("clientpackets: MoveBackwardToLocation: %w", err)

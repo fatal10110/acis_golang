@@ -104,10 +104,16 @@ func (l *GameClientLink) handleLogout(_ context.Context, cs *connState, _ struct
 }
 
 // handleMoveBackwardToLocation moves the player towards a clicked point.
+// With walker protection on, a request missing its movement mode, which
+// only a bot client sends, ends the session with ServerClose.
 func (l *GameClientLink) handleMoveBackwardToLocation(_ context.Context, cs *connState, req clientpackets.MoveBackwardToLocation) error {
 	session := cs.client.Session
 	if cs.live == nil {
 		return nil
+	}
+	if req.MovementMissing && l.chat.WalkerProtection {
+		cs.client.closeNow()
+		return errDisconnect
 	}
 	if req.MoveMovement == 0 {
 		session.SendFrame(serverpackets.FrameActionFailed())
