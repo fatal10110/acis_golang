@@ -58,6 +58,35 @@ func TestInstantJumpRepositionsBehindTarget(t *testing.T) {
 	}
 }
 
+// TestInstantJumpTruncatesLandingSum pins InstantJump.useSkill
+// (InstantJump.java): the landing is (int)(targetX + 25*cos), the sum
+// truncated toward zero, not the target coordinate plus a truncated offset.
+func TestInstantJumpTruncatesLandingSum(t *testing.T) {
+	for _, tc := range []struct {
+		heading, x, y int
+		wantX, wantY  int
+	}{
+		// 45 degrees: the jump point is 225 degrees, offset (-17.68,-17.68).
+		{heading: 8192, x: 100, y: 100, wantX: 82, wantY: 82},
+		// 135 degrees: offset (+17.68,-17.68).
+		{heading: 24576, x: 100, y: 100, wantX: 117, wantY: 82},
+		// Negative coordinates truncate toward zero: -100-17.68 = -117.68.
+		{heading: 8192, x: -100, y: -100, wantX: -117, wantY: -117},
+		{heading: 0, x: 100, y: 100, wantX: 75, wantY: 100},
+	} {
+		target := &jumpFakeTarget{heading: tc.heading, x: tc.x, y: tc.y, z: 50}
+		caster := &jumpFakeCaster{}
+		NewDefaultRegistry().Use(Cast{
+			Caster:  caster,
+			Skill:   modelskill.Definition{SkillType: "INSTANT_JUMP"},
+			Targets: []Actor{target},
+		})
+		if caster.x != tc.wantX || caster.y != tc.wantY {
+			t.Errorf("heading %d at (%d,%d): landed (%d,%d), want (%d,%d)", tc.heading, tc.x, tc.y, caster.x, caster.y, tc.wantX, tc.wantY)
+		}
+	}
+}
+
 func TestInstantJumpNoTargetsIsNoop(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &jumpFakeCaster{}

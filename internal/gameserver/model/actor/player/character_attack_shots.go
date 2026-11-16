@@ -36,6 +36,17 @@ func (c *Character) SetChargedShot(kind item.ShotKind, charged bool) {
 	}
 }
 
+// SpendSpiritshot spends the blessed spiritshot when one is charged,
+// otherwise the plain one. A static-reuse skill leaves the spent kind
+// charged.
+func (c *Character) SpendSpiritshot(staticReuse bool) {
+	kind := item.ShotSpirit
+	if c.BlessedSpiritshotCharged() {
+		kind = item.ShotBlessedSpirit
+	}
+	c.SetChargedShot(kind, staticReuse)
+}
+
 // ChargeShotResult distinguishes why a direct-use shot charge attempt did
 // or didn't take, so the network layer can pick the matching client
 // message (or suppress it for an auto-shot-enabled item).

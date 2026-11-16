@@ -109,7 +109,10 @@ func (manaHealHandler) Use(cast Cast) {
 		}
 		restored := target.AddMP(mp)
 		sendRestoreStatus(obj, restored)
-		notifyRestored(obj, cast.Caster, restored, restoredMP, true)
+		// A summon target's message reaches its owner.
+		if sink, ok := restoreSink(obj); ok {
+			notifyRestoredTo(sink, obj, cast.Caster, restored, restoredMP, true)
+		}
 	}
 	applySelfEffects(cast, cast.Skill)
 	if !cast.Skill.Potion {
@@ -159,11 +162,28 @@ func sendRestoreStatus(target Actor, applied float64) {
 	}
 }
 
-func notifyRestored(target, caster Actor, amount float64, resource restoredResource, playerCasterOnly bool) {
-	notifier, ok := asPlayer(target)
-	if !ok {
-		return
+// restoreSink returns the player that receives the messages sent to target:
+// a player itself, or a summon's owner.
+func restoreSink(target Actor) (Player, bool) {
+	if s, ok := asSummon(target); ok {
+		return asPlayer(s.SummonOwner())
 	}
+	return asPlayer(target)
+}
+
+// notifyRestored tells a player target what a restore gave it; any other
+// target is told nothing.
+func notifyRestored(target, caster Actor, amount float64, resource restoredResource, playerCasterOnly bool) {
+	if notifier, ok := asPlayer(target); ok {
+		notifyRestoredTo(notifier, target, caster, amount, resource, playerCasterOnly)
+	}
+}
+
+// notifyRestoredTo sends notifier the restored message for target: the
+// caster's name and the amount when another actor restored it, else the
+// amount alone. With playerCasterOnly only a player caster counts as
+// another actor.
+func notifyRestoredTo(notifier Player, target, caster Actor, amount float64, resource restoredResource, playerCasterOnly bool) {
 	name := actorName(caster)
 	byOther := !sameObject(caster, target)
 	if playerCasterOnly {

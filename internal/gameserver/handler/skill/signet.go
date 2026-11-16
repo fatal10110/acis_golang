@@ -39,12 +39,6 @@ type signetPositioned interface {
 	Position() (x, y, z int)
 }
 
-// signetHeaded optionally reports a caster's facing, applied to the
-// spawned actor; a caster without one spawns facing 0.
-type signetHeaded interface {
-	Heading() int
-}
-
 // signetGrounded optionally reports the ground point a player caster picked
 // for a ground-targeted signet; a caster without one spawns the actor on
 // itself.
@@ -203,11 +197,8 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 			x, y, z = ground.GroundTarget()
 		}
 	}
-	heading := 0
-	if hd, ok := caster.(signetHeaded); ok {
-		heading = hd.Heading()
-	}
-	point.Spawn(x, y, z, heading)
+	// The point never takes its caster's facing: it is placed facing 0.
+	point.Spawn(x, y, z, 0)
 	return point, true
 }
 
