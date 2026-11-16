@@ -7,8 +7,8 @@ import (
 )
 
 // FixedStatus is the status of an NPC that holds no effects, a decoration
-// or an effect point: every stat finalized from its template and passives,
-// at full MP. An effect point takes no damage, so it is at full HP too.
+// or an effect point: every stat finalized from its template, at full MP. An
+// effect point takes no damage, so it is at full HP too.
 type FixedStatus struct {
 	fs fixedStats
 	hp float64

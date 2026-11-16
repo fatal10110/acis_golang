@@ -88,7 +88,7 @@ func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 		t.Run("effect point "+tc.name, func(t *testing.T) {
 			ix, water := waterIndex(t)
 			q := sim.NewInline(time.Unix(0, 0)).NewQueue("point")
-			ep, err := NewEffectPoint(7, &Template{ID: 13018, Type: "EffectPoint", RunSpeed: tc.runSpeed, WalkSpeed: tc.runSpeed}, 1, q, nil)
+			ep, err := NewEffectPoint(7, &Template{ID: 13018, Type: "EffectPoint", RunSpeed: tc.runSpeed, WalkSpeed: tc.runSpeed}, 1, q)
 			if err != nil {
 				t.Fatal(err)
 			}

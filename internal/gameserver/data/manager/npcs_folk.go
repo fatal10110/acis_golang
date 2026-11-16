@@ -35,8 +35,8 @@ type FolkSpawner struct {
 	// through; nil leaves them unseen.
 	NewSink func(*npc.Folk) event.Sink
 	Zones   *zone.Index
-	// Skills resolves template passives into the NPC's stats and the skills
-	// it casts; nil leaves it without a cast runtime.
+	// Skills resolves the skills the NPC casts; nil leaves it without a cast
+	// runtime.
 	Skills actorcast.Definitions
 	// CastEffects dispatches the effects of the NPC's casts, and runs the
 	// chance procs of its casts and of the hits it lands.
@@ -84,7 +84,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 // what a control tower works with.
 func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember, tower npc.TowerRuntime) (*npc.Folk, error) {
 	inst.Slot = slot
-	f, err := npc.NewFolk(inst, s.Skills)
+	f, err := npc.NewFolk(inst)
 	if err != nil {
 		return nil, err
 	}

@@ -13,10 +13,10 @@ var _ skilltarget.Actor = (*Folk)(nil)
 
 // Folk and FolkOrGuard mark the civilian NPC for target resolution: its
 // aura skills reach nearby playables, and as a single offensive target it
-// accepts only a CTRL-pressed damage skill. A control tower takes any
-// offensive skill as a single target.
+// accepts only a CTRL-pressed damage skill. A control tower or a siege
+// headquarters takes any offensive skill as a single target.
 func (f *Folk) Folk() bool        { return true }
-func (f *Folk) FolkOrGuard() bool { return !f.Tower() }
+func (f *Folk) FolkOrGuard() bool { return !f.Tower() && !f.SiegeFlag() }
 
 // AttackableBy reports whether caster may affect this NPC offensively: any
 // other creature may while the NPC lives, with a forced attack, unless the

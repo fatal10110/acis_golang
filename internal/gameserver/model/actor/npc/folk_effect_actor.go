@@ -188,9 +188,9 @@ func (f *Folk) LethalInput(caster creature.FormulaActor, def modelskill.Definiti
 func (f *Folk) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, def modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
-		f.reduceHP(f.HP()-1, caster, skillRef(def))
+		f.reduceHP(f.HP()-1, caster, skillRef(def), lossHit)
 	case formulas.LethalHalf:
-		f.reduceHP(f.HP()/2, caster, skillRef(def))
+		f.reduceHP(f.HP()/2, caster, skillRef(def), lossHit)
 	}
 }
 
