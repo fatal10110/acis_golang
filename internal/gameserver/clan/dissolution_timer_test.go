@@ -100,10 +100,11 @@ func TestRecoveredDissolutionNeverComesDue(t *testing.T) {
 	}
 }
 
-// TestRerequestedDissolutionComesDueAtTheSecondDeadline dissolves,
-// recovers and dissolves again an hour later: the clan is destroyed once,
-// at the second request's deadline, not at the first one's.
-func TestRerequestedDissolutionComesDueAtTheSecondDeadline(t *testing.T) {
+// TestRerequestedDissolutionComesDueAtTheFirstDeadline dissolves,
+// recovers and dissolves again an hour later: recovering leaves the first
+// request's timer armed, and as it runs out a dissolution is pending
+// again, so the clan is destroyed once, at the first request's deadline.
+func TestRerequestedDissolutionComesDueAtTheFirstDeadline(t *testing.T) {
 	s, in, r := dissolutionTimerWorld(t, 0)
 	leader := inClan(dtLeader, "Leader", dtClan)
 	delay := dissolveDelay(s)
@@ -119,16 +120,16 @@ func TestRerequestedDissolutionComesDueAtTheSecondDeadline(t *testing.T) {
 		t.Fatalf("second RequestDissolve = %d, want DissolveScheduled", got)
 	}
 
-	in.AdvanceBefore(delay) // an hour past the first deadline, up to the second
+	in.AdvanceBefore(delay - time.Hour) // up to the first deadline
 	if len(r.due) != 0 {
-		t.Fatalf("dissolution came due at %v, before the second deadline", r.due)
-	}
-	if _, ok := s.table.Get(dtClan); !ok {
-		t.Fatal("clan destroyed at the first request's deadline")
+		t.Fatalf("dissolution came due at %v, before the first deadline", r.due)
 	}
 	in.Advance(0)
-	if want := dtStart.Add(time.Hour + delay); len(r.due) != 1 || !r.due[0].Equal(want) {
+	if want := dtStart.Add(delay); len(r.due) != 1 || !r.due[0].Equal(want) {
 		t.Fatalf("dissolution came due at %v, want once at %v", r.due, want)
+	}
+	if _, ok := s.table.Get(dtClan); ok {
+		t.Fatal("clan still stands after the first request's deadline")
 	}
 	in.Advance(2 * delay)
 	if len(r.due) != 1 {
@@ -136,12 +137,12 @@ func TestRerequestedDissolutionComesDueAtTheSecondDeadline(t *testing.T) {
 	}
 }
 
-// TestRequestReplacesARestoredTimer restores a clan whose dissolution
-// passed while the server was down, so its timer waits the one-minute
-// minimum, and has its leader request a new dissolution within that
-// minute: the new request's timer replaces the restored one, so the clan
-// comes due once, at the new deadline.
-func TestRequestReplacesARestoredTimer(t *testing.T) {
+// TestRequestOverARestoredTimerComesDueAtTheMinute restores a clan whose
+// dissolution passed while the server was down, so its timer waits the
+// one-minute minimum, and has its leader request a new dissolution within
+// that minute: the restored timer, running out with a dissolution pending,
+// destroys the clan at the minute, once.
+func TestRequestOverARestoredTimerComesDueAtTheMinute(t *testing.T) {
 	s, in, r := dissolutionTimerWorld(t, dtStart.Add(-time.Hour).UnixMilli())
 	leader := inClan(dtLeader, "Leader", dtClan)
 	in.Advance(30 * time.Second)
@@ -149,12 +150,12 @@ func TestRequestReplacesARestoredTimer(t *testing.T) {
 		t.Fatalf("RequestDissolve over a lapsed expiry = %d, want DissolveScheduled", got)
 	}
 
-	in.Advance(time.Hour)
-	if len(r.due) != 0 {
-		t.Fatalf("replaced restored timer came due at %v", r.due)
-	}
-	in.Advance(dissolveDelay(s))
-	if want := dtStart.Add(30*time.Second + dissolveDelay(s)); len(r.due) != 1 || !r.due[0].Equal(want) {
+	in.Advance(30 * time.Second)
+	if want := dtStart.Add(time.Minute); len(r.due) != 1 || !r.due[0].Equal(want) {
 		t.Fatalf("dissolution came due at %v, want once at %v", r.due, want)
+	}
+	in.Advance(2 * dissolveDelay(s))
+	if len(r.due) != 1 {
+		t.Fatalf("dissolution came due %d times, want once", len(r.due))
 	}
 }
