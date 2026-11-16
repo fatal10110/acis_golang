@@ -23,14 +23,26 @@ func (c *Character) CurrentWeight() int {
 }
 
 // RefreshWeightPenalty updates the overload band and notifies the runtime only
-// when it changes.
+// when it changes. It runs from several queues: penaltyMu holds from the
+// weight read to the speed hand-off, so an older weight never lands after a
+// newer one.
 func (c *Character) RefreshWeightPenalty() {
 	if c == nil || c.Inventory() == nil {
 		return
 	}
+	if c.refreshWeightPenalty() {
+		c.emit(event.WeightPenaltyChanged{})
+	}
+}
+
+// refreshWeightPenalty is RefreshWeightPenalty without the change event,
+// reporting whether the band changed.
+func (c *Character) refreshWeightPenalty() bool {
+	c.penaltyMu.Lock()
+	defer c.penaltyMu.Unlock()
 	limit := c.WeightLimit()
 	if limit <= 0 {
-		return
+		return false
 	}
 	weight := c.CurrentWeight() - int(c.calcFor(stat.WeightPenalty, 0, c.ConditionActor(), nil))
 	penalty := 4
@@ -51,9 +63,7 @@ func (c *Character) RefreshWeightPenalty() {
 	if changed {
 		c.refreshMoveSpeed()
 	}
-	if changed {
-		c.emit(event.WeightPenaltyChanged{})
-	}
+	return changed
 }
 
 // WeightPenalty returns the current overload band ordinal.
