@@ -105,11 +105,12 @@ func (w festivalWorld) Locate(objectID int32) (festival.Spot, bool) {
 
 // Admit stops what the player does, teleports it within 20 of (x, y, z),
 // ends its effects but for those lasting through death and destroys its
-// blood offerings, naming them.
+// blood offerings, naming them. A teleport refused while the player's own
+// is landing is made once it lands, while it still takes part.
 func (w festivalWorld) Admit(objectID int32, x, y, z int) {
 	w.postOnline(objectID, func(live *livePlayer) {
 		live.tryToIdle(live.DenyAIAction())
-		w.l.teleportLivePlayer(live, location.Location{X: x, Y: y, Z: z}, restartTeleportOffset)
+		w.l.forceTeleportLivePlayer(live, location.Location{X: x, Y: y, Z: z}, restartTeleportOffset, live.FestivalParticipant)
 		live.EffectList().StopAllExceptThoseThatLastThroughDeath()
 		if inv := live.Inventory(); inv != nil {
 			if inst := inv.ItemByTemplateID(festival.BloodOfferingID); inst != nil {
@@ -120,14 +121,16 @@ func (w festivalWorld) Admit(objectID int32, x, y, z int) {
 }
 
 // Relocate stops what the player does and teleports it within 20 of at, or
-// to the nearest town, then tells it it left the arena.
+// to the nearest town, then tells it it left the arena. A teleport refused
+// while the player's own is landing is made once it lands, unless it is
+// jailed or competing in the Olympiad by then.
 func (w festivalWorld) Relocate(objectID int32, at *festival.Spot) {
 	w.postOnline(objectID, func(live *livePlayer) {
 		live.tryToIdle(live.DenyAIAction())
 		if at != nil {
-			w.l.teleportLivePlayer(live, location.Location{X: at.X, Y: at.Y, Z: at.Z}, restartTeleportOffset)
+			w.l.forceTeleportLivePlayer(live, location.Location{X: at.X, Y: at.Y, Z: at.Z}, restartTeleportOffset, atLarge(live))
 		} else if dest, ok := w.l.restartDestination(live); ok {
-			w.l.teleportLivePlayer(live, dest, restartTeleportOffset)
+			w.l.forceTeleportLivePlayer(live, dest, restartTeleportOffset, atLarge(live))
 		}
 		sendText(live, "You have been removed from the festival arena.")
 	})

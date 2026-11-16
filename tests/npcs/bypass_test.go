@@ -332,9 +332,9 @@ func TestBypassCommandFamilies(t *testing.T) {
 		assertAnswer(t, w.bypass(t, command), []byte{serverpackets.OpcodeSystemMessage}, nil, "")
 	}
 	// A stadium is watched only from an Olympiad manager's list or while
-	// watching one (tests/olympiad); anyone else's arenachange answers
-	// nothing.
-	assertAnswer(t, w.bypass(t, "arenachange 1"), nil, nil, "")
+	// watching one (tests/olympiad); anyone else's arenachange is refused
+	// with ActionFailed (owner-approved, #5152).
+	assertAnswer(t, w.bypass(t, "arenachange 1"), []byte{serverpackets.OpcodeActionFailed}, nil, "")
 	// The manor windows answer only on a manor manager or a castle
 	// chamberlain targeted (tests/npcs/manor_setup_test.go).
 	assertAnswer(t, w.bypass(t, "manor_menu_select?ask=1"), nil, nil, "")

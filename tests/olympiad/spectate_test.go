@@ -73,14 +73,14 @@ type spectate struct {
 	pages   map[string]string
 }
 
-func bootSpectate(t *testing.T) *spectate {
+func bootSpectate(t *testing.T, opts ...gameservertest.Option) *spectate {
 	t.Helper()
 	pages := spectatePages(t)
-	m := bootMatch(t, func(cfg *olympiad.Config) { cfg.BattleMillis = 120_000 },
+	m := bootMatch(t, func(cfg *olympiad.Config) { cfg.BattleMillis = 120_000 }, append([]gameservertest.Option{
 		gameservertest.WithZones(spectateStadiums(t)),
 		gameservertest.WithHTMLPages(pages),
 		gameservertest.WithReuseDelays(3*time.Second, 0),
-	)
+	}, opts...)...)
 	id := m.srv.SeedCharacterFor(t, "charlie", "Charlie", 40, 0).ID
 	w := &competitor{c: m.srv.DialClient(t, "charlie", 1), id: id, name: "Charlie"}
 	startInWorld(t, w.c)
@@ -320,8 +320,9 @@ func TestOlympiadSpectateWatchSwitchAndLeave(t *testing.T) {
 // arenachange, RequestOlympiadObserverEnd, RequestOlympiadMatchList): a
 // registered noble at the manager is told it may not watch from the
 // waiting list; a player neither at the manager nor watching, a stadium
-// that is not and a number that does not parse answer nothing, and so do
-// leaving and listing from a player who watches nothing.
+// that is not and a number that does not parse are refused with
+// ActionFailed (owner-approved, #5152), and leaving and listing from a
+// player who watches nothing answer nothing.
 func TestOlympiadSpectateRefusals(t *testing.T) {
 	t.Parallel()
 	s := bootSpectate(t)
@@ -332,8 +333,8 @@ func TestOlympiadSpectateRefusals(t *testing.T) {
 		t.Fatalf("registered noble's arenachange = %q, want only the waiting-list refusal", got)
 	}
 
+	s.assertArenaChangeRefused(t, w, "away from the manager")
 	for _, payload := range [][]byte{
-		encodeHeroBypass("arenachange 0"),
 		encodeExRequest(clientpackets.OpcodeRequestOlympiadObserverEnd),
 		encodeExRequest(clientpackets.OpcodeRequestOlympiadMatchList),
 	} {
@@ -344,8 +345,8 @@ func TestOlympiadSpectateRefusals(t *testing.T) {
 
 	s.atManager(t, w)
 	for _, command := range []string{"arenachange 2", "arenachange -1", "arenachange x", "arenachange"} {
-		if got := s.send(t, w, encodeHeroBypass(command)); len(got) != 0 {
-			t.Fatalf("%q answered %q, want nothing", command, spectatorLines(w.id, got))
+		if got := s.send(t, w, encodeHeroBypass(command)); len(got) != 1 || got[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("%q answered %q, want only ActionFailed", command, spectatorLines(w.id, got))
 		}
 	}
 	if c := s.char(t, w); c.ObserverMode() || c.Invisible() || c.OlympiadGameID() != -1 {

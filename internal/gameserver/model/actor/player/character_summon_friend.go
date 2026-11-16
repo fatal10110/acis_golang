@@ -40,6 +40,13 @@ func (c *Character) TeleportOnQueue(x, y, z, radius int) {
 	c.emit(event.TeleportRequested{X: x, Y: y, Z: z, Radius: radius, OwnQueue: true})
 }
 
+// ForceTeleport is TeleportTo, or TeleportOnQueue when ownQueue, for a
+// move that must happen: one refused while the character's own teleport is
+// still landing is made once that landing completes.
+func (c *Character) ForceTeleport(x, y, z, radius int, ownQueue bool) {
+	c.emit(event.TeleportRequested{X: x, Y: y, Z: z, Radius: radius, OwnQueue: ownQueue, Forced: true})
+}
+
 // ItemCount is the held count of itemID, for the summon teleport's
 // item-requirement check.
 func (c *Character) ItemCount(itemID int) int {
