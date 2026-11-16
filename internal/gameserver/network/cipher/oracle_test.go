@@ -10,9 +10,10 @@ import (
 
 // TestCipherMatchesReferenceProbe replays testdata/cipher.golden, the output
 // of testdata/oracle/CipherProbe.java driving the unmodified reference cipher:
-// each "key" line starts a fresh cipher, and every "enc"/"dec" line must
-// transform its input exactly as the reference did at that point of the
-// sequence (arming, no-op decrypt before arming, key roll).
+// each "key" line starts a fresh cipher, a "setkey" line re-keys the current
+// one, and every "enc"/"dec" line must transform its input exactly as the
+// reference did at that point of the sequence (arming, no-op decrypt before
+// arming, key roll, re-keying an armed cipher).
 func TestCipherMatchesReferenceProbe(t *testing.T) {
 	f, err := os.Open("testdata/cipher.golden")
 	if err != nil {
@@ -29,6 +30,10 @@ func TestCipherMatchesReferenceProbe(t *testing.T) {
 		switch {
 		case len(fields) == 2 && fields[0] == "key":
 			if c, err = NewCipher(mustHex(fields[1])); err != nil {
+				t.Fatal(err)
+			}
+		case len(fields) == 2 && c != nil && fields[0] == "setkey":
+			if err := c.SetKey(mustHex(fields[1])); err != nil {
 				t.Fatal(err)
 			}
 		case len(fields) == 3 && c != nil && (fields[0] == "enc" || fields[0] == "dec"):

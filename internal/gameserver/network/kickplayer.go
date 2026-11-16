@@ -21,5 +21,5 @@ func (l *GameClientLink) KickPlayer(account string) {
 	if !ok {
 		return
 	}
-	client.Session.Close()
+	client.Session.Evict()
 }

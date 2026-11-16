@@ -18,7 +18,8 @@ type ChatConfig struct {
 	// (LogChat); the zero logger records nothing.
 	Log zerolog.Logger
 	// WalkerProtection drops whispers that start with a bot script command
-	// (L2WalkerProtection).
+	// and disconnects a client whose movement request lacks its movement
+	// mode (L2WalkerProtection).
 	WalkerProtection bool
 	// GlobalDelay is the reuse delay between two lines said on the general
 	// and shout channels by one client session (GlobalChatTime).

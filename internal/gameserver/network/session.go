@@ -165,12 +165,29 @@ func (s *Session) EnableCrypt() {
 	s.cipher.Encrypt(nil)
 }
 
-// Close sends the ServerClose packet as the connection's last and waits until
-// the connection is closed. It is the server-initiated eviction path for a
-// client whose session another selection took over; safe to call from any
-// goroutine.
-func (s *Session) Close() {
+// SetCipherKey restarts both rolling cipher keys from key. Encryption stays
+// on once on, so the next frame sent is already encrypted with key. It is
+// called on the read goroutine, the only one decrypting, so the inbound key
+// changes between two frames.
+func (s *Session) SetCipherKey(key []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cipher.SetKey(key)
+}
+
+// Evict ends the session from the server's side: ServerClose goes out as
+// the connection's last frame and the connection closes once what is queued
+// is flushed. It does not wait for that, so a kick never stalls its caller
+// on a client that stopped reading. Safe to call from any goroutine.
+func (s *Session) Evict() {
 	s.evictOnce.Do(func() { close(s.evicted) })
 	s.sendLast(serverpackets.FrameServerClose())
+	s.conn.closeLater()
+}
+
+// Close is Evict, then waits until the connection is closed: a stopping
+// server drains every client's writer before it goes on.
+func (s *Session) Close() {
+	s.Evict()
 	_ = s.conn.Close()
 }

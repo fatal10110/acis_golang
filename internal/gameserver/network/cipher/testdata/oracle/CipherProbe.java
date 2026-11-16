@@ -6,6 +6,7 @@ import net.sf.l2j.gameserver.network.GameCrypt;
 // reference tree by run.sh, against stub/net/sf/l2j/Config.java) through
 // fixed packet sequences and prints every transform in order:
 //   key <16-byte key>   starts a fresh cipher instance
+//   setkey <16-byte key> setKey on the current instance
 //   enc <in> <out>      encrypt(raw, 0, raw.length)
 //   dec <in> <out>      decrypt(raw, 0, raw.length)
 // The first encrypt on an instance only arms it, as on the wire.
@@ -74,6 +75,20 @@ public class CipherProbe
 			{
 				dec(c, fill(n));
 				enc(c, fill(n));
+			}
+		}
+		
+		// Re-keying an armed instance restarts both rolling keys and keeps it
+		// armed, as a repeated ProtocolVersion does.
+		for (int k = 0; k < 2; k++)
+		{
+			final byte[] key = fill(16);
+			c.setKey(key);
+			System.out.println("setkey " + HEX.formatHex(key));
+			for (int n : sizes)
+			{
+				enc(c, fill(n));
+				dec(c, fill(n));
 			}
 		}
 	}
