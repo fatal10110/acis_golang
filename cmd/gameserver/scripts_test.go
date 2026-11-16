@@ -83,6 +83,36 @@ var questHookMethods = map[string]bool{
 	"onStart": true,
 }
 
+// approvedBindDivergences: bind lines a script registers differently from
+// the reference on an owner decision, keyed by script path and then by the
+// reference line, with the line the port registers instead. Each entry
+// names the issue that records the decision.
+var approvedBindDivergences = map[string]map[string]string{
+	// #5161: the soul of the well also frees its cell and its timers when
+	// it decays, whoever killed it.
+	"quest.Q022_TragedyInVonHellmannForest": {"bind DECAYED 31528": "bind DECAYED 27217,31528"},
+}
+
+// applyApprovedDivergences rewrites the reference bind lines an owner
+// decision diverges from, and fails when such a line is gone, so a stale
+// entry cannot linger.
+func applyApprovedDivergences(t *testing.T, scripts map[string]*manifestScript) {
+	t.Helper()
+	for path, lines := range approvedBindDivergences {
+		s, ok := scripts[path]
+		if !ok {
+			t.Fatalf("approved divergence for %s: script not in the reference manifest", path)
+		}
+		for ref, port := range lines {
+			i := slices.Index(s.binds, ref)
+			if i < 0 {
+				t.Fatalf("approved divergence for %s: reference line %q not found", path, ref)
+			}
+			s.binds[i] = port
+		}
+	}
+}
+
 func readScriptManifest(t *testing.T) map[string]*manifestScript {
 	t.Helper()
 	f, err := os.Open(filepath.Join("..", "..", "internal", "gameserver", "script", "testdata", "oracle", "manifest.golden"))
@@ -137,6 +167,7 @@ func readScriptManifest(t *testing.T) map[string]*manifestScript {
 func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Catalog, cfg script.Config) []string {
 	t.Helper()
 	want := readScriptManifest(t)
+	applyApprovedDivergences(t, want)
 	var dump strings.Builder
 	if err := script.Build(list, catalog, cfg).Dump(&dump); err != nil {
 		t.Fatal(err)
