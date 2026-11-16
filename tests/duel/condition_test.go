@@ -2,6 +2,7 @@ package duel
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -28,14 +29,15 @@ const (
 )
 
 // conditionArena boots a challenger and a rival whose challenger knows
-// both buffs, with saved effects kept across sessions.
+// both buffs, each an icon effect in a stack group of its own, with saved
+// effects kept across sessions.
 func conditionArena(t *testing.T) *arena {
 	t.Helper()
 	buff := func(id modelskill.ID) modelskill.Definition {
 		return modelskill.Definition{
 			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			HitTime: 500, StaticHitTime: true, MPConsume: 1, SkillType: "BUFF",
-			Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 2, Time: 300}},
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 2, Time: 300, Icon: true, StackType: "buff" + strconv.Itoa(int(id)), StackOrder: 1}},
 		}
 	}
 	db := sqltest.SharedDB(t)
