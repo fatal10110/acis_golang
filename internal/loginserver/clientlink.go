@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/crypto/bcrypt"
 
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
@@ -660,7 +659,15 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 		return account, true
 
 	default:
-		if bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(req.Password)) != nil {
+		match, cerr := model.CheckPassword(account.Password, req.Password)
+		if cerr != nil {
+			// A stored hash that cannot be checked is the server's fault, not
+			// the client's: refuse without counting toward the IP ban.
+			l.log.Error().Str("account", account.Login).Err(cerr).Msg("check stored password hash")
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+			return model.Account{}, false
+		}
+		if !match {
 			l.recordFailedAttempt(c.remoteIP, time.Now())
 			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailPasswordWrong))
 			return model.Account{}, false

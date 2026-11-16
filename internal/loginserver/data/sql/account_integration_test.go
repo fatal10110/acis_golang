@@ -120,7 +120,7 @@ func TestAccountStore_UpsertAccount(t *testing.T) {
 	store := newIntegrationStore(t)
 	ctx := context.Background()
 
-	changed, err := store.UpsertAccount(ctx, "player1", "hash1", 2)
+	changed, err := store.UpsertAccount(ctx, "player1", "hash1", "2")
 	if err != nil {
 		t.Fatalf("UpsertAccount() create unexpected error: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestAccountStore_UpsertAccount(t *testing.T) {
 		t.Fatalf("Account() after create = %+v, want password=hash1 accessLevel=2", got)
 	}
 
-	changed, err = store.UpsertAccount(ctx, "player1", "hash2", 3)
+	changed, err = store.UpsertAccount(ctx, "player1", "hash2", "3")
 	if err != nil {
 		t.Fatalf("UpsertAccount() update unexpected error: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestAccountStore_ChangeAccessLevel(t *testing.T) {
 		t.Fatalf("CreateAccount() unexpected error: %v", err)
 	}
 
-	changed, err := store.ChangeAccessLevel(ctx, "player1", 4)
+	changed, err := store.ChangeAccessLevel(ctx, "player1", "4")
 	if err != nil {
 		t.Fatalf("ChangeAccessLevel() unexpected error: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestAccountStore_ChangeAccessLevel(t *testing.T) {
 		t.Error("ChangeAccessLevel() on existing account changed = false, want true")
 	}
 
-	changed, err = store.ChangeAccessLevel(ctx, "ghost", 4)
+	changed, err = store.ChangeAccessLevel(ctx, "ghost", "4")
 	if err != nil {
 		t.Fatalf("ChangeAccessLevel() on missing account unexpected error: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestAccountStore_ListAccounts(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
 	ctx := context.Background()
-	for login, level := range map[string]int{"banned1": -1, "regular1": 0, "gm1": 1} {
+	for login, level := range map[string]string{"banned1": "-1", "regular1": "0", "gm1": "1"} {
 		if _, err := store.CreateAccount(ctx, login, "hash", createdAt); err != nil {
 			t.Fatalf("CreateAccount(%s) unexpected error: %v", login, err)
 		}

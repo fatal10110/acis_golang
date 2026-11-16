@@ -201,8 +201,8 @@ func (s *ItemStore) DeleteOwned(ctx context.Context, ownerID, objectID int32) (b
 }
 
 // SetEnchantOwned sets the enchant level of the items row identified by
-// objectID only while ownerID still owns it, and reports whether a row was
-// changed.
+// objectID only while ownerID still owns it, and reports whether such a row
+// exists, including one already at enchant.
 func (s *ItemStore) SetEnchantOwned(ctx context.Context, ownerID, objectID int32, enchant int) (bool, error) {
 	res, err := s.db.ExecContext(ctx, "UPDATE items SET enchant_level = ? WHERE object_id = ? AND owner_id = ?", enchant, objectID, ownerID)
 	if err != nil {

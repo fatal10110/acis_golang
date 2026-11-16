@@ -66,11 +66,16 @@ func Open(cfg Config) (*sql.DB, error) {
 }
 
 // OpenDSN builds a connection pool on a go-sql-driver/mysql DSN.
+//
+// The pool always reports matched rows, not changed rows, as an UPDATE's
+// rows affected: an UPDATE that finds its row but writes the values it
+// already holds still counts that row.
 func OpenDSN(dsn string) (*sql.DB, error) {
 	driverCfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database pool: %w", err)
 	}
+	driverCfg.ClientFoundRows = true
 	connector, err := mysql.NewConnector(driverCfg)
 	if err != nil {
 		return nil, fmt.Errorf("open database pool: %w", err)
