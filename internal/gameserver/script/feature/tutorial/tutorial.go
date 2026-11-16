@@ -210,9 +210,9 @@ func onTimer(s *script.Script, e script.Timer) string {
 		}
 		setInt(st, "Ex", -3)
 		p.PlayTutorialVoice(evt.initialVoice)
-		// Every player's pending QT timer is cancelled, not only this
-		// player's.
-		s.CancelTimers(script.TimerName("QT"))
+		// Only this player's pending QT timer is cancelled: another
+		// newbie's tutorial steps keep running.
+		s.CancelTimers(script.TimerName("QT"), script.TimerPlayer(p))
 		s.StartTimer("QT", nil, p, 30000*time.Millisecond)
 		p.ShowTutorialHTML(evt.initialHtm)
 	case -3:
