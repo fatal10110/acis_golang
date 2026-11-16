@@ -27,6 +27,9 @@ func TestLoadCastleManorConfig(t *testing.T) {
 			castlemanor.Config{Enabled: true, CropRate: 2, RefreshHour: 21, RefreshMin: 30, ApproveHour: 7, ApproveMin: 15, MaintenanceMin: 10, SavePeriod: 3 * time.Hour},
 			false,
 		},
+		// The save period is counted in 32-bit milliseconds: 597 hours wrap
+		// negative, which leaves the lists unsaved between cycles.
+		{"ManorSavePeriodRate = 597\n", castlemanor.Config{Enabled: true, CropRate: 2, RefreshHour: 20, ApproveHour: 6, MaintenanceMin: 6, SavePeriod: -2145767296 * time.Millisecond}, false},
 		{"ManorRefreshTime = late\n", castlemanor.Config{}, true},
 	} {
 		path := filepath.Join(t.TempDir(), "clans.properties")

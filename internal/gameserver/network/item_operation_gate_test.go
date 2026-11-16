@@ -155,7 +155,7 @@ func TestSettleConfirmedTradeHoldsOperationFromExchangeToWrite(t *testing.T) {
 func TestPickupEndsOperationBeforeTheBroadcasts(t *testing.T) {
 	link, _, _, _, first, _ := newDirectTradeFixture(t)
 	probe := newGateProbe(link)
-	removes := &probingGroundItems{groundItemDropper: task.NewGroundItems(link.world, task.DefaultGroundItemOptions(), nil), probe: probe}
+	removes := &probingGroundItems{groundItemDropper: task.NewGroundItems(link.world, task.DefaultGroundItemOptions(), nil, nil), probe: probe}
 	link.belongings.groundItems = removes
 
 	const heldStack, groundObject int32 = 5500, 5501

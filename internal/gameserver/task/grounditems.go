@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -52,7 +53,12 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 	regular := f.Int("AutoDestroyItemTime", int(opts.ItemAutoDestroy/time.Second))
 	equipable := f.Int("AutoDestroyEquipableItemTime", int(opts.EquipableAutoDestroy/time.Second))
 	multiplier := f.Int("PlayerDroppedItemMultiplier", opts.PlayerDroppedMultiplier)
-	pairs := f.IntPairsComma("AutoDestroySpecialItemTime", "57-0,5575-0,6673-0")
+	// An absent key gives no special times: every item then falls back to
+	// its herb, equipment or regular delay.
+	var pairs []config.IntPair
+	if _, ok := props.Lookup("AutoDestroySpecialItemTime"); ok {
+		pairs = f.IntPairsComma("AutoDestroySpecialItemTime", "")
+	}
 	if err := f.Err(); err != nil {
 		return GroundItemOptions{}, err
 	}
@@ -62,15 +68,23 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 		if pair.First < math.MinInt32 || pair.First > math.MaxInt32 {
 			return GroundItemOptions{}, fmt.Errorf("AutoDestroySpecialItemTime: item id %d overflows int32", pair.First)
 		}
-		special[int32(pair.First)] = time.Duration(pair.Second) * time.Second
+		special[int32(pair.First)] = wrappedSeconds(pair.Second)
 	}
 
-	opts.HerbAutoDestroy = time.Duration(herb) * time.Second
-	opts.ItemAutoDestroy = time.Duration(regular) * time.Second
-	opts.EquipableAutoDestroy = time.Duration(equipable) * time.Second
+	opts.HerbAutoDestroy = wrappedSeconds(herb)
+	opts.ItemAutoDestroy = wrappedSeconds(regular)
+	opts.EquipableAutoDestroy = wrappedSeconds(equipable)
 	opts.PlayerDroppedMultiplier = multiplier
 	opts.SpecialAutoDestroy = special
 	return opts, nil
+}
+
+// wrappedSeconds converts a configured number of seconds to the delay the
+// cleanup uses, counted in 32-bit milliseconds: a value past 2147483 seconds
+// wraps, so its delay can come out negative (a drop then expires at the next
+// sweep) or shorter than configured.
+func wrappedSeconds(seconds int) time.Duration {
+	return time.Duration(int32(seconds)*1000) * time.Millisecond
 }
 
 // DropOptions describes where and how an item was dropped.
@@ -85,16 +99,18 @@ type DropOptions struct {
 
 	// ProtectOwnerID, when non-zero, reserves the drop to that object id
 	// for ProtectFor: inventory.LootLocked rejects pickup by anyone but it
-	// and its party or command channel until the deadline passes. ProtectFor <= 0 disables the lock even if
-	// ProtectOwnerID is set.
+	// and its party or command channel until ProtectFor has passed, when the
+	// lock lifts. ProtectFor <= 0 disables the lock even if ProtectOwnerID
+	// is set.
 	ProtectOwnerID int32
 	ProtectFor     time.Duration
 }
 
 type groundItemEntry struct {
-	item          *grounditem.Item
-	expiresAt     time.Time
-	lootExpiresAt time.Time
+	item      *grounditem.Item
+	expiresAt time.Time
+	// lootLock lifts the drop's loot protection; nil when it has none.
+	lootLock *sim.Timer
 }
 
 // GroundItems owns dropped ground items and their cleanup deadlines.
@@ -105,6 +121,8 @@ type GroundItems struct {
 	state *world.State
 	now   func() time.Time
 	opts  GroundItemOptions
+	// loot runs the timers that lift loot protection at its deadline.
+	loot *sim.Queue
 
 	mu    sync.RWMutex
 	items map[int32]groundItemEntry
@@ -113,8 +131,10 @@ type GroundItems struct {
 	kept func(itemID int32, x, y, z int) bool
 }
 
-// NewGroundItems returns an empty ground-item owner.
-func NewGroundItems(state *world.State, opts GroundItemOptions, now func() time.Time) *GroundItems {
+// NewGroundItems returns an empty ground-item owner. loot runs the timers
+// that lift loot protection; it may be nil only when no drop is
+// loot-protected.
+func NewGroundItems(state *world.State, opts GroundItemOptions, now func() time.Time, loot *sim.Queue) *GroundItems {
 	if state == nil {
 		state = world.New()
 	}
@@ -125,6 +145,7 @@ func NewGroundItems(state *world.State, opts GroundItemOptions, now func() time.
 		state: state,
 		now:   now,
 		opts:  opts,
+		loot:  loot,
 		items: make(map[int32]groundItemEntry),
 	}
 }
@@ -153,13 +174,16 @@ func (g *GroundItems) Drop(ground *grounditem.Item, opts DropOptions) {
 		defer ground.Release()
 	}
 
-	var lootExpiresAt time.Time
+	var lootLock *sim.Timer
 	if opts.ProtectOwnerID != 0 && opts.ProtectFor > 0 {
 		ground.Instance.SetOwner(opts.ProtectOwnerID)
-		lootExpiresAt = g.now().Add(opts.ProtectFor)
+		// Lifting the lock touches only the ground copy: a pickup moves a
+		// copy of it into the picker's inventory, so a lift after the item
+		// is gone changes nothing anyone holds.
+		lootLock = g.loot.After(opts.ProtectFor, func() { ground.Instance.SetOwner(0) })
 	}
 	if !ground.DestroyProtected() {
-		g.track(ground, g.destroyDelay(ground, opts.PlayerDropped), lootExpiresAt)
+		g.track(ground, g.destroyDelay(ground, opts.PlayerDropped), lootLock)
 	}
 
 	ground.SetDropperID(opts.DropperID)
@@ -203,8 +227,8 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table, lo
 			continue
 		}
 		row.Instance.ManaLeft = tmpl.InitialManaLeft()
-		// A loot-protection owner has no persisted deadline (only
-		// lootExpiresAt tracks it, in-memory only), so a restart can never
+		// A loot-protection owner has no persisted deadline (only its
+		// in-memory lift timer tracks it), so a restart can never
 		// correctly resume it. Drop protection is in-memory-only state, so the
 		// lock does not survive past this reload.
 		row.Instance.OwnerID = 0
@@ -240,11 +264,6 @@ func (g *GroundItems) Tick() {
 
 	g.mu.Lock()
 	for id, entry := range g.items {
-		if !entry.lootExpiresAt.IsZero() && !now.Before(entry.lootExpiresAt) {
-			entry.item.Instance.SetOwner(0)
-			entry.lootExpiresAt = time.Time{}
-			g.items[id] = entry
-		}
 		if entry.expiresAt.IsZero() || now.Before(entry.expiresAt) {
 			continue
 		}
@@ -254,6 +273,7 @@ func (g *GroundItems) Tick() {
 			continue
 		}
 		delete(g.items, id)
+		stopLootLock(entry)
 		expired = append(expired, entry.item)
 	}
 	g.mu.Unlock()
@@ -267,8 +287,20 @@ func (g *GroundItems) Remove(ground *grounditem.Item) {
 		return
 	}
 	g.mu.Lock()
+	entry, ok := g.items[ground.ObjectID()]
 	delete(g.items, ground.ObjectID())
 	g.mu.Unlock()
+	if ok {
+		stopLootLock(entry)
+	}
+}
+
+// stopLootLock cancels entry's loot-protection lift, whose item has left
+// the ground.
+func stopLootLock(entry groundItemEntry) {
+	if entry.lootLock != nil {
+		entry.lootLock.Stop()
+	}
 }
 
 // Len returns the number of tracked ground items.
@@ -304,13 +336,13 @@ func (g *GroundItems) Snapshots(skip func(itemID int32) bool) []item.GroundSnaps
 	return out
 }
 
-func (g *GroundItems) track(ground *grounditem.Item, delay time.Duration, lootExpiresAt time.Time) {
+func (g *GroundItems) track(ground *grounditem.Item, delay time.Duration, lootLock *sim.Timer) {
 	var expiresAt time.Time
 	if delay != 0 {
 		expiresAt = g.now().Add(delay)
 	}
 	g.mu.Lock()
-	g.items[ground.ObjectID()] = groundItemEntry{item: ground, expiresAt: expiresAt, lootExpiresAt: lootExpiresAt}
+	g.items[ground.ObjectID()] = groundItemEntry{item: ground, expiresAt: expiresAt, lootLock: lootLock}
 	g.mu.Unlock()
 }
 

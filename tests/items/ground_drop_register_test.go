@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -62,7 +63,7 @@ func (p *spawnPicker) Discover(obj world.Tracked) {
 func TestDropRegistersBeforeItIsVisible(t *testing.T) {
 	t.Parallel()
 	state := world.New()
-	g := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Minute, PlayerDroppedMultiplier: 1}, nil)
+	g := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Minute, PlayerDroppedMultiplier: 1}, nil, sim.NewInline(time.Unix(0, 0)).NewQueue("ground-items"))
 	picker := &spawnPicker{ground: g, ownerAt: map[int32]int32{}}
 	state.Spawn(picker, 100, 100, 0, 0)
 
@@ -104,7 +105,7 @@ func TestDropRegistersBeforeItIsVisible(t *testing.T) {
 func TestConcurrentDropsAndPickupsLeaveNoPickedEntry(t *testing.T) {
 	t.Parallel()
 	state := world.New()
-	g := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Minute, PlayerDroppedMultiplier: 1}, nil)
+	g := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Minute, PlayerDroppedMultiplier: 1}, nil, nil)
 	tmpl := &item.Template{ID: 57, Stackable: true}
 
 	const drops = 400
@@ -196,7 +197,7 @@ func TestPickedItemNeverSavedOrRestoredTwice(t *testing.T) {
 	}
 
 	templates := item.NewTable([]*item.Template{groundItem(t, srv, lying[0].ObjectID).Template})
-	restored := task.NewGroundItems(world.New(), task.DefaultGroundItemOptions(), nil)
+	restored := task.NewGroundItems(world.New(), task.DefaultGroundItemOptions(), nil, nil)
 	if err := restored.Load(append(rows, rows[0]), templates, zerolog.Nop()); err != nil {
 		t.Fatalf("restore ground items: %v", err)
 	}
