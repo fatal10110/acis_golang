@@ -19,7 +19,7 @@ func TestSummonAITryToAttackExecutesPhysicalAttack(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewSummon(owner, move, strike)
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want accepted attack")
 	}
 	if strike.target != target {
@@ -39,7 +39,7 @@ func TestSummonAITryToAttackQueuesWhileSwingingAndExecutesOnThink(t *testing.T) 
 	strike := &recordingAttack{canAttack: true, attackingNow: true}
 	brain := NewSummon(owner, &summonMove{}, strike)
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want queued attack accepted while already attacking")
 	}
 	if strike.target != nil {
@@ -63,7 +63,7 @@ func TestSummonAIThinkPreservesQueuedRetargetWhileCurrentAttackIsBusy(t *testing
 	strike := &recordingAttack{canAttack: true}
 	brain := NewSummon(owner, &summonMove{}, strike)
 
-	if !brain.TryToAttack(firstTarget) {
+	if !brain.TryToAttack(firstTarget, false) {
 		t.Fatal("TryToAttack(first) = false, want accepted attack")
 	}
 	if strike.target != firstTarget {
@@ -71,7 +71,7 @@ func TestSummonAIThinkPreservesQueuedRetargetWhileCurrentAttackIsBusy(t *testing
 	}
 
 	strike.attackingNow = true
-	if !brain.TryToAttack(secondTarget) {
+	if !brain.TryToAttack(secondTarget, false) {
 		t.Fatal("TryToAttack(second) = false, want queued retarget accepted while busy")
 	}
 	brain.Think()
@@ -94,7 +94,7 @@ func TestSummonThinkStopsMovementAndAttacksOnTheSameTick(t *testing.T) {
 	var buf bytes.Buffer
 	brain.SetLogger(zerolog.New(&buf))
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want accepted attack")
 	}
 
@@ -124,7 +124,7 @@ func TestSummonAITryToAttackContinuesAgainstFakeDeadTarget(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewSummon(owner, move, strike)
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false against a fake-dead target, want the swing to proceed")
 	}
 	if strike.target != target {
@@ -138,7 +138,7 @@ func TestSummonAITryToFollowStartsFriendlyFollow(t *testing.T) {
 	move := &summonMove{}
 	brain := NewSummon(owner, move, &recordingAttack{})
 
-	if !brain.TryToFollow(target) {
+	if !brain.TryToFollow(target, false) {
 		t.Fatal("TryToFollow() = false, want accepted follow")
 	}
 	if move.friendlyTarget != target || move.friendlyRange != 70 {
@@ -156,7 +156,7 @@ func TestSummonAITryToAttackDoesNotWaitForDisabledSkills(t *testing.T) {
 	brain := NewSummon(owner, &summonMove{}, strike)
 	brain.SetCastController(&recordingCast{disabled: true})
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want attack accepted while skills are disabled")
 	}
 	if strike.target != target {
@@ -191,7 +191,7 @@ func TestSummonAIRecheckOffensiveFollowReissuesOnMovingTarget(t *testing.T) {
 	move := &summonMove{recordingMove: recordingMove{followStarted: true}}
 	brain := NewSummon(owner, move, &recordingAttack{canAttack: true})
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want accepted attack")
 	}
 	if move.followCalls != 1 {
@@ -224,7 +224,7 @@ func TestSummonAIRecheckOffensiveFollowDoesNotReattackInRange(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewSummon(owner, move, strike)
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want accepted attack")
 	}
 	if strike.doAttackCalls != 1 {
@@ -253,7 +253,7 @@ func TestSummonAIRecheckOffensiveFollowDoesNotRecastInRange(t *testing.T) {
 	brain.SetCastController(cast)
 	ref := skill.Ref{ID: 4139, Level: 8}
 
-	if !brain.TryToCast(target, ref, false) {
+	if !brain.TryToCast(target, ref, false, false) {
 		t.Fatal("TryToCast() = false, want accepted cast approach")
 	}
 	if cast.castCalls != 0 {
@@ -286,7 +286,7 @@ func TestSummonAIRecheckOffensiveFollowIgnoresFriendlyFollow(t *testing.T) {
 	move := &summonMove{}
 	brain := NewSummon(owner, move, &recordingAttack{})
 
-	if !brain.TryToFollow(target) {
+	if !brain.TryToFollow(target, false) {
 		t.Fatal("TryToFollow() = false, want accepted follow")
 	}
 
@@ -308,7 +308,7 @@ func TestSummonAITargetLostDuringOffensiveFollowRecheckCancelsStaleMove(t *testi
 	move := &summonMove{recordingMove: recordingMove{followStarted: true}}
 	brain := NewSummon(owner, move, &recordingAttack{canAttack: true})
 
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want accepted attack")
 	}
 	if move.stopCount != 0 {
@@ -323,6 +323,37 @@ func TestSummonAITargetLostDuringOffensiveFollowRecheckCancelsStaleMove(t *testi
 	}
 	if got := brain.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle after target lost", got)
+	}
+	if !owner.followOff {
+		t.Fatal("follow mode on after the follow task lost its target, want off")
+	}
+}
+
+// TestSummonAITargetLostOnThinkFollowsOwner pins the think path of a target
+// loss: an attack think that no longer knows its target turns following the
+// owner back on and follows the owner.
+func TestSummonAITargetLostOnThinkFollowsOwner(t *testing.T) {
+	self := actor(100)
+	self.owner = actor(1)
+	self.followOff = true
+	target := actor(200)
+	move := &summonMove{recordingMove: recordingMove{followStarted: true}}
+	brain := NewSummon(self, move, &recordingAttack{canAttack: true})
+
+	if !brain.TryToAttack(target, false) {
+		t.Fatal("TryToAttack() = false, want accepted attack")
+	}
+	self.known[target.id] = false
+	brain.Think()
+
+	if self.followOff {
+		t.Fatal("follow mode off after the think lost its target, want on")
+	}
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() = %v, want follow", got)
+	}
+	if move.friendlyTarget != self.owner {
+		t.Fatalf("friendly follow target = %v, want the owner", move.friendlyTarget)
 	}
 }
 
@@ -356,7 +387,7 @@ func TestSummonAIStepAsideOnlyFromIdleOrFollow(t *testing.T) {
 		{
 			name: "follow",
 			setup: func(t *testing.T, brain *Summon, _ *fakeActor, _ *recordingAttack, _ *recordingCast) {
-				if !brain.TryToFollow(actor(1)) {
+				if !brain.TryToFollow(actor(1), false) {
 					t.Fatal("TryToFollow() = false, want accepted follow")
 				}
 			},
@@ -366,7 +397,7 @@ func TestSummonAIStepAsideOnlyFromIdleOrFollow(t *testing.T) {
 		{
 			name: "attack",
 			setup: func(t *testing.T, brain *Summon, _ *fakeActor, strike *recordingAttack, _ *recordingCast) {
-				if !brain.TryToAttack(actor(200)) {
+				if !brain.TryToAttack(actor(200), false) {
 					t.Fatal("TryToAttack() = false, want accepted attack")
 				}
 				// Between swings: only the intention holds the summon back.
@@ -379,7 +410,7 @@ func TestSummonAIStepAsideOnlyFromIdleOrFollow(t *testing.T) {
 			setup: func(t *testing.T, brain *Summon, _ *fakeActor, _ *recordingAttack, cast *recordingCast) {
 				// The summon is still closing distance, so the cast intention
 				// stays current with no cast in flight.
-				brain.TryToCast(actor(200), ref, false)
+				brain.TryToCast(actor(200), ref, false, false)
 				if cast.castCalled {
 					t.Fatal("Cast() called while closing distance, want the approach only")
 				}
@@ -448,10 +479,10 @@ func TestSummonAIRefusedTargetKeepsCurrentIntention(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewSummon(pet, &summonMove{}, strike)
 
-	if !brain.TryToFollow(owner) {
+	if !brain.TryToFollow(owner, false) {
 		t.Fatal("TryToFollow(owner) = false, want accepted")
 	}
-	if brain.TryToAttack(blessed) {
+	if brain.TryToAttack(blessed, false) {
 		t.Fatal("TryToAttack(blessed) = true, want refused")
 	}
 	if pet.refusals != 1 {
@@ -485,7 +516,7 @@ func TestSummonAISkipsGateWhileDeniedOrBusy(t *testing.T) {
 			tc.set(pet, strike)
 			brain := NewSummon(pet, &summonMove{}, strike)
 
-			brain.TryToAttack(blessed)
+			brain.TryToAttack(blessed, false)
 			if pet.refusals != 0 {
 				t.Fatalf("refusals = %d, want 0 while %s", pet.refusals, tc.name)
 			}
@@ -509,7 +540,7 @@ func TestSummonAIFinishedAttackIdlesOnUnkeepableTarget(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	move := &summonMove{}
 	brain := NewSummon(pet, move, strike)
-	if !brain.TryToAttack(target) {
+	if !brain.TryToAttack(target, false) {
 		t.Fatal("TryToAttack() = false, want the first swing")
 	}
 	strike.attackingNow = false
@@ -528,7 +559,7 @@ func TestSummonAIFinishedAttackIdlesOnUnkeepableTarget(t *testing.T) {
 	}
 
 	still := NewSummon(gateSummonFake(4, owner), &summonMove{}, &recordingAttack{canAttack: true})
-	still.TryToAttack(target)
+	still.TryToAttack(target, false)
 	if !still.FinishedAttack(nil) || still.CurrentIntention() != IntentionIdle {
 		t.Fatalf("follow-off FinishedAttack: intention = %v, want idle", still.CurrentIntention())
 	}
@@ -542,7 +573,7 @@ func TestSummonAIFinishedAttackKeepsKeepableTargets(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewSummon(pet, &summonMove{}, strike)
 	karma := gatePlayerFake(2, 40, 500)
-	brain.TryToAttack(karma)
+	brain.TryToAttack(karma, false)
 	strike.attackingNow = false
 
 	if brain.FinishedAttack(owner) {
@@ -554,7 +585,7 @@ func TestSummonAIFinishedAttackKeepsKeepableTargets(t *testing.T) {
 
 	white := gatePlayerFake(5, 40, 0)
 	strike.attackingNow = true
-	brain.TryToAttack(white)
+	brain.TryToAttack(white, false)
 	strike.attackingNow = false
 	if brain.FinishedAttack(owner) {
 		t.Fatal("FinishedAttack() with a queued attack = true, want it run")

@@ -31,6 +31,12 @@ type SummonActor interface {
 	// RefuseAttackTarget tells the owner an attack target was refused
 	// (TARGET_IS_INCORRECT).
 	RefuseAttackTarget()
+	// GoneIdle records that the AI sent the summon idle and returns who an
+	// idle summon follows: its owner while following is on, otherwise nil.
+	GoneIdle() attackable.Combatant
+	// SetFollowOwner turns following the owner on or off, leaving the
+	// summon's intentions to the caller.
+	SetFollowOwner(bool)
 }
 
 // SummonMoveController controls movement requests emitted by a summon AI.
@@ -41,6 +47,9 @@ type SummonMoveController interface {
 	// answers like MaybeStartOffensiveFollow, but measures whether target is
 	// already in reach as the follow task does (3D while swimming or flying).
 	RecheckOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error)
+	// HoldOffensiveFollow reports whether target is out of attackRange plus
+	// both footprints, never walking toward it (a shift-held command).
+	HoldOffensiveFollow(target attackable.Combatant, attackRange int) bool
 	// MaybeStartEntranceFollow arms a friendly follow of target that never
 	// walks after it, returning target's position and true when it is out
 	// of reach, for the summon to head for a boat entrance instead.
@@ -138,8 +147,10 @@ func (s *Summon) NextIntention() (Intention, attackable.Combatant, bool) {
 
 // TryToAttack sets target as the attack intention and evaluates it once.
 // Past the deny and busy checks, a target the playable attack gate refuses
-// is reported to the owner and leaves the current intention untouched.
-func (s *Summon) TryToAttack(target attackable.Combatant) bool {
+// is reported to the owner and leaves the current intention untouched. shift
+// is the command's hold modifier: a target out of reach is not walked to,
+// and the summon goes idle instead.
+func (s *Summon) TryToAttack(target attackable.Combatant, shift bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -147,14 +158,14 @@ func (s *Summon) TryToAttack(target attackable.Combatant) bool {
 		return false
 	}
 	if s.busyLocked() {
-		s.next = intention{kind: IntentionAttack, target: target}
+		s.next = intention{kind: IntentionAttack, target: target, shift: shift}
 		return true
 	}
 	if refusesPlayableTarget(s.actor, target) {
 		s.actor.RefuseAttackTarget()
 		return false
 	}
-	s.setCurrentLocked(intention{kind: IntentionAttack, target: target})
+	s.setCurrentLocked(intention{kind: IntentionAttack, target: target, shift: shift})
 	accepted, err := s.thinkAttackLocked()
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -163,7 +174,8 @@ func (s *Summon) TryToAttack(target attackable.Combatant) bool {
 }
 
 // TryToFollow sets target as the follow intention and evaluates it once.
-func (s *Summon) TryToFollow(target attackable.Combatant) bool {
+// With shift held the summon keeps the intention without following.
+func (s *Summon) TryToFollow(target attackable.Combatant, shift bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -171,10 +183,10 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 		return false
 	}
 	if s.busyLocked() {
-		s.next = intention{kind: IntentionFollow, target: target}
+		s.next = intention{kind: IntentionFollow, target: target, shift: shift}
 		return true
 	}
-	s.setCurrentLocked(intention{kind: IntentionFollow, target: target})
+	s.setCurrentLocked(intention{kind: IntentionFollow, target: target, shift: shift})
 	accepted, err := s.thinkFollowLocked()
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -186,12 +198,13 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 // evaluates it once, mirroring TryToAttack's shape for an owner-commanded
 // special-skill cast. target is the commanded one, nil when there is none;
 // a skill with no final target for it is dropped. ctrl is the command's
-// forced-use modifier, read by the target conditions.
+// forced-use modifier, read by the target conditions; shift its hold
+// modifier, as in TryToAttack.
 //
 // A skill still cooling down is reported to the owner here, on the command,
 // and not again by the periodic think: the message belongs to the command
 // alone, so re-reporting it each tick would repeat the message.
-func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool) bool {
+func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl, shift bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -203,10 +216,10 @@ func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool
 		return false
 	}
 	if s.busyLocked() {
-		s.next = intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl}
+		s.next = intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl, shift: shift}
 		return true
 	}
-	s.setCurrentLocked(intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl})
+	s.setCurrentLocked(intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl, shift: shift})
 	accepted, err := s.thinkCastLocked()
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -387,9 +400,15 @@ func (s *Summon) recheckOffensiveFollow() {
 		return
 	}
 
-	if lost, err := s.targetLostLocked(target); lost {
-		if err != nil {
-			s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	// A shift-held intention never armed a follow task to run.
+	if s.current.shift {
+		return
+	}
+	if s.targetLost(target) {
+		// The follow task stops while the summon swings or casts: the
+		// swing's or cast's end finds the loss instead.
+		if !s.attack.AttackingNow() && (s.cast == nil || !s.cast.CastingNow()) {
+			s.followTargetLostLocked(target)
 		}
 		return
 	}
@@ -408,6 +427,13 @@ func (s *Summon) Think() {
 
 	if s.current.kind == IntentionIdle && !s.busyLocked() {
 		s.runNextLocked()
+	}
+	// The periodic think stands in for the friendly follow task, which
+	// drops follow mode once it loses its target. A shift-held follow never
+	// armed one.
+	if s.current.kind == IntentionFollow && !s.current.shift && !s.actor.DenyAIAction() &&
+		s.followTargetLostLocked(s.current.target) {
+		return
 	}
 	s.thinkLocked()
 }
@@ -512,6 +538,12 @@ func (s *Summon) idleOrFollowLocked(follow attackable.Combatant) {
 	}
 }
 
+// goIdleLocked sends the summon idle: one that follows its owner goes back
+// to following it, any other stops where it is.
+func (s *Summon) goIdleLocked() {
+	s.idleOrFollowLocked(s.actor.GoneIdle())
+}
+
 // runNextLocked makes the queued intention current, if there is one.
 func (s *Summon) runNextLocked() bool {
 	if s.next.kind == IntentionIdle {
@@ -548,18 +580,17 @@ func (s *Summon) thinkLocked() {
 
 func (s *Summon) thinkAttackLocked() (bool, error) {
 	if s.actor.DenyAIAction() {
-		s.current = intention{kind: IntentionIdle}
+		s.goIdleLocked()
 		return false, nil
 	}
 
 	target := s.current.target
-	if lost, err := s.targetLostLocked(target); lost {
-		return false, err
+	if s.thinkTargetLostLocked(target) {
+		return false, nil
 	}
 
-	following, err := s.move.MaybeStartOffensiveFollow(target, s.actor.PhysicalAttackRange())
-	if following {
-		return true, err
+	if following, held, err := s.offensiveFollowLocked(target, s.actor.PhysicalAttackRange()); following || held {
+		return following, err
 	}
 
 	if s.busyLocked() {
@@ -569,7 +600,7 @@ func (s *Summon) thinkAttackLocked() (bool, error) {
 	s.move.Stop()
 	// The owner is told a sight or peace-zone refusal, once per think.
 	if refusesAttack(s.attack, target) {
-		s.current = intention{kind: IntentionIdle}
+		s.goIdleLocked()
 		return false, nil
 	}
 
@@ -578,28 +609,23 @@ func (s *Summon) thinkAttackLocked() (bool, error) {
 }
 
 func (s *Summon) thinkCastLocked() (bool, error) {
-	if s.actor.DenyAIAction() || s.cast == nil {
-		s.current = intention{kind: IntentionIdle}
-		return false, nil
-	}
-	if s.cast.Disabled() {
-		s.current = intention{kind: IntentionIdle}
+	if s.actor.DenyAIAction() || s.cast == nil || s.cast.Disabled() {
+		s.goIdleLocked()
 		return false, nil
 	}
 
 	target := s.current.target
 	ref := s.current.skill
-	if lost, err := s.targetLostLocked(target); lost {
-		return false, err
+	if s.thinkTargetLostLocked(target) {
+		return false, nil
 	}
 
 	if !s.cast.CanAttempt(target, ref) {
 		return false, nil
 	}
 
-	following, err := s.move.MaybeStartOffensiveFollow(target, s.cast.Range(ref))
-	if following {
-		return true, err
+	if following, held, err := s.offensiveFollowLocked(target, s.cast.Range(ref)); following || held {
+		return following, err
 	}
 
 	if s.cast.StopsMovement(ref) {
@@ -610,10 +636,10 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 	}
 
 	if !s.cast.CanCastPlayable(target, ref, s.current.ctrl) {
-		s.current = intention{kind: IntentionIdle}
 		if target.ObjectID() != s.actor.ObjectID() {
 			s.actor.BroadcastMoveToPawn(target)
 		}
+		s.goIdleLocked()
 		return false, nil
 	}
 
@@ -626,10 +652,18 @@ func (s *Summon) thinkFollowLocked() (bool, error) {
 	if s.actor.DenyAIAction() {
 		return false, nil
 	}
+	// A shift-held follow keeps the intention without following.
+	if s.current.shift {
+		s.move.CancelFollow()
+		return false, nil
+	}
 
+	// A target already lost waits for the next periodic think to drop the
+	// follow (see Think): the follow task first runs after the follow
+	// starts, once a teleport has refreshed what the summon knows.
 	target := s.current.target
-	if lost, err := s.targetLostLocked(target); lost {
-		return false, err
+	if s.targetLost(target) {
+		return false, nil
 	}
 
 	if handled, err := s.followThroughBoatEntranceLocked(target); handled {
@@ -649,21 +683,50 @@ func (s *Summon) AttackingNow() bool {
 	return s.attack != nil && s.attack.AttackingNow()
 }
 
-// targetLostLocked applies the generic target-lost rule, which a summon
-// keeps: only a nil or no-longer-known target counts as lost. Death (true
-// or fake) is not a loss condition here — a dead target keeps the
-// attack/follow intention until it despawns. On loss it also cancels any
-// in-flight movement leg (losing the target from the known list forces
-// the idle path's move stop rather than leaving a stale follow/chase
-// running toward a target the actor no longer knows about).
-func (s *Summon) targetLostLocked(target attackable.Combatant) (bool, error) {
-	if target == nil || !s.actor.Knows(target) {
-		s.current = intention{kind: IntentionIdle}
-		if sameCombatant(s.next.target, target) {
-			s.next = intention{}
+// offensiveFollowLocked closes in on target for an attack or cast in reach
+// at attackRange. following reports a chase under way, which the intention
+// waits out. A shift-held intention never walks: held reports target out of
+// reach, and the summon has gone idle instead.
+func (s *Summon) offensiveFollowLocked(target attackable.Combatant, attackRange int) (following, held bool, err error) {
+	if s.current.shift {
+		if !s.move.HoldOffensiveFollow(target, attackRange) {
+			return false, false, nil
 		}
-		s.move.Stop()
-		return true, nil
+		s.goIdleLocked()
+		return false, true, nil
 	}
-	return false, nil
+	following, err = s.move.MaybeStartOffensiveFollow(target, attackRange)
+	return following, false, err
+}
+
+// targetLost applies the generic target-lost rule, which a summon keeps:
+// only a nil or no-longer-known target counts as lost. Death (true or fake)
+// is not a loss condition here: a dead target keeps the attack/follow
+// intention until it despawns.
+func (s *Summon) targetLost(target attackable.Combatant) bool {
+	return target == nil || !s.actor.Knows(target)
+}
+
+// thinkTargetLostLocked reports whether an attack or cast think lost its
+// target. A lost target turns following the owner back on and sends the
+// summon idle, so it heads back to its owner.
+func (s *Summon) thinkTargetLostLocked(target attackable.Combatant) bool {
+	if !s.targetLost(target) {
+		return false
+	}
+	s.actor.SetFollowOwner(true)
+	s.goIdleLocked()
+	return true
+}
+
+// followTargetLostLocked reports whether a follow task lost its target. A
+// lost target turns following the owner off and sends the summon idle where
+// it stands.
+func (s *Summon) followTargetLostLocked(target attackable.Combatant) bool {
+	if !s.targetLost(target) {
+		return false
+	}
+	s.actor.SetFollowOwner(false)
+	s.goIdleLocked()
+	return true
 }

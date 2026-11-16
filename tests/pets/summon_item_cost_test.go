@@ -37,7 +37,7 @@ func TestSummonItemCostChecksOwnerStack(t *testing.T) {
 			strike.ItemConsumeID, strike.ItemConsumeCount = int(strikeItemID), 3
 			h, petActor, hostile := bootWolfStrikerSeeded(t, strike, []seedItem{{TemplateID: strikeItemID, Count: tc.held}})
 
-			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false) })
+			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false, false) })
 			if !tc.casts {
 				assertSummonCastRejected(t, h, petActor, hostile.ObjectID(), func(f []byte) {
 					assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)

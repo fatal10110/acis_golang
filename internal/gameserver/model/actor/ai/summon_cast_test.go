@@ -15,7 +15,7 @@ func TestSummonAITryToCastExecutesImmediately(t *testing.T) {
 	brain.SetCastController(cast)
 	ref := skill.Ref{ID: 4139, Level: 8}
 
-	if !brain.TryToCast(target, ref, false) {
+	if !brain.TryToCast(target, ref, false, false) {
 		t.Fatal("TryToCast() = false, want accepted cast")
 	}
 	if cast.castedTarget != target || cast.castedRef != ref {
@@ -33,7 +33,7 @@ func TestSummonAITryToCastAimsAtTheFinalTarget(t *testing.T) {
 	brain := NewSummon(owner, &summonMove{}, &recordingAttack{})
 	brain.SetCastController(cast)
 
-	if !brain.TryToCast(clicked, skill.Ref{ID: 4139, Level: 8}, false) {
+	if !brain.TryToCast(clicked, skill.Ref{ID: 4139, Level: 8}, false, false) {
 		t.Fatal("TryToCast() = false, want accepted cast")
 	}
 	if cast.castedTarget != owner {
@@ -46,7 +46,7 @@ func TestSummonAITryToCastWithoutFinalTargetIsDropped(t *testing.T) {
 	brain := NewSummon(actor(100), &summonMove{}, &recordingAttack{})
 	brain.SetCastController(cast)
 
-	if brain.TryToCast(actor(200), skill.Ref{ID: 4139, Level: 8}, false) {
+	if brain.TryToCast(actor(200), skill.Ref{ID: 4139, Level: 8}, false, false) {
 		t.Fatal("TryToCast() = true with no final target, want the request dropped")
 	}
 	if cast.castCalled || brain.CurrentIntention() != IntentionIdle {
@@ -62,7 +62,7 @@ func TestSummonAITryToCastApproachesBeforeCasting(t *testing.T) {
 	brain := NewSummon(owner, move, &recordingAttack{})
 	brain.SetCastController(cast)
 
-	brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false)
+	brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false, false)
 	if cast.castCalled {
 		t.Fatal("Cast() called while summon is closing distance")
 	}
@@ -79,9 +79,11 @@ func TestSummonAITryToCastStopsFacesAndReportsFinalFailure(t *testing.T) {
 	brain := NewSummon(owner, move, &recordingAttack{})
 	brain.SetCastController(cast)
 
-	brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false)
-	if move.stopCount != 1 {
-		t.Fatalf("Stop calls = %d, want 1", move.stopCount)
+	brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false, false)
+	// The cast stops the summon, then the refusal sends it idle, which
+	// stops it again (a no-op on a summon already standing).
+	if move.stopCount != 2 {
+		t.Fatalf("Stop calls = %d, want 2", move.stopCount)
 	}
 	if owner.headingTarget != target {
 		t.Fatalf("heading target = %v, want target", owner.headingTarget)
@@ -99,7 +101,7 @@ func TestSummonAITryToCastDropsBusyCastIntention(t *testing.T) {
 	brain := NewSummon(owner, &summonMove{}, strike)
 	brain.SetCastController(cast)
 
-	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false) {
+	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false, false) {
 		t.Fatal("TryToCast() = false, want queued cast intention")
 	}
 	strike.attackingNow = false
@@ -119,7 +121,7 @@ func TestSummonAITryToCastQueuesWhileBusyAndExecutesOnThink(t *testing.T) {
 	brain.SetCastController(cast)
 	ref := skill.Ref{ID: 4139, Level: 8}
 
-	if !brain.TryToCast(target, ref, false) {
+	if !brain.TryToCast(target, ref, false, false) {
 		t.Fatal("TryToCast() = false, want queued cast accepted while attacking")
 	}
 	if cast.castedTarget != nil {
@@ -139,7 +141,7 @@ func TestSummonAITryToCastQueuesWhileBusyAndExecutesOnThink(t *testing.T) {
 func TestSummonAITryToCastRejectsWithoutCastController(t *testing.T) {
 	brain := NewSummon(actor(100), &summonMove{}, &recordingAttack{})
 
-	if brain.TryToCast(actor(200), skill.Ref{ID: 4139, Level: 8}, false) {
+	if brain.TryToCast(actor(200), skill.Ref{ID: 4139, Level: 8}, false, false) {
 		t.Fatal("TryToCast() = true with no CastController attached, want false")
 	}
 }
@@ -150,7 +152,7 @@ func TestSummonAITryToCastRejectsWhenCanAttemptFails(t *testing.T) {
 	brain := NewSummon(actor(100), &summonMove{}, &recordingAttack{})
 	brain.SetCastController(cast)
 
-	if brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false) {
+	if brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}, false, false) {
 		t.Fatal("TryToCast() = true when CanAttempt rejects the skill, want false")
 	}
 	if cast.castedTarget != nil {
@@ -179,7 +181,7 @@ func TestSummonAIFinishedCastingAppliesTheFollowItself(t *testing.T) {
 		t.Fatalf("friendly follow target = %v, want the owner", move.friendlyTarget)
 	}
 
-	if !brain.TryToAttack(owner) {
+	if !brain.TryToAttack(owner, false) {
 		t.Fatal("Betray TryToAttack(owner) = false, want accepted")
 	}
 	if got := brain.CurrentIntention(); got != IntentionAttack {
@@ -214,10 +216,10 @@ func castingAfterAttack(t *testing.T) (*Summon, *fakeActor, *recordingAttack, *r
 	cast := &recordingCast{canAttempt: true, canCast: true}
 	brain := NewSummon(self, &summonMove{}, strike)
 	brain.SetCastController(cast)
-	if !brain.TryToAttack(target) || strike.doAttackCalls != 1 {
+	if !brain.TryToAttack(target, false) || strike.doAttackCalls != 1 {
 		t.Fatalf("TryToAttack() did not swing (DoAttack calls %d)", strike.doAttackCalls)
 	}
-	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 1}, false) || cast.castCalls != 1 {
+	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 1}, false, false) || cast.castCalls != 1 {
 		t.Fatal("TryToCast() did not cast")
 	}
 	cast.casting = true
@@ -259,7 +261,7 @@ func TestSummonAICastStoppedDropsTheQueuedCast(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			brain, target, strike, cast := castingAfterAttack(t)
-			if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false); cast.castCalls != 1 {
+			if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false, false); cast.castCalls != 1 {
 				t.Fatalf("TryToCast() while casting started a cast (calls %d), want it queued", cast.castCalls)
 			}
 			cast.casting = false
@@ -285,7 +287,7 @@ func TestSummonAICastStoppedDropsTheQueuedCast(t *testing.T) {
 // cast that completes starts the cast queued behind it.
 func TestSummonAIFinishedCastingStartsTheQueuedCast(t *testing.T) {
 	brain, target, _, cast := castingAfterAttack(t)
-	if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false); cast.castCalls != 1 {
+	if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false, false); cast.castCalls != 1 {
 		t.Fatalf("TryToCast() while casting started a cast (calls %d), want it queued", cast.castCalls)
 	}
 	cast.casting = false
@@ -307,7 +309,7 @@ func TestSummonAICastStoppedWithoutAttackFollowsOwner(t *testing.T) {
 	cast := &recordingCast{canAttempt: true, canCast: true}
 	brain := NewSummon(self, move, &recordingAttack{})
 	brain.SetCastController(cast)
-	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 1}, false) {
+	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 1}, false, false) {
 		t.Fatal("TryToCast() did not cast")
 	}
 

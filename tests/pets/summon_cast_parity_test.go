@@ -58,7 +58,7 @@ func TestSummonAreaSkillWithoutFinalTargetStartsNothing(t *testing.T) {
 	area.Target, area.Radius = modelskill.TargetArea, 200
 	h, petActor, _ := bootWolfStrikerWith(t, area)
 
-	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, petActor, false) })
+	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, petActor, false, false) })
 	if frames := drainFrames(t, h.client); len(frames) != 0 {
 		t.Fatalf("area strike on the pet itself sent opcodes %x, want nothing", frameOpcodes(frames))
 	}
@@ -161,7 +161,7 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			geo.blind.Store(tc.blind)
 			mp, hp := petActor.MPValue(), petActor.HP()
 
-			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false) })
+			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false, false) })
 			assertSummonCastRejected(t, h, petActor, hostile.ObjectID(), func(frame []byte) { tc.message(t, frame) })
 			if petActor.CastingNow() {
 				t.Fatal("refused strike left the pet casting")
@@ -215,7 +215,7 @@ func TestArmedPetCastNeedsAllowedWeapon(t *testing.T) {
 			drainUntilQuiet(t, h.client)
 			mp := petActor.MPValue()
 
-			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false) })
+			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false, false) })
 			if tc.casts {
 				frames := readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "armed pet strike MagicSkillUse")
 				requireSkillUseOnto(t, frames, petActor, hostile.ObjectID())
@@ -250,7 +250,7 @@ func TestSummonCostRefusalComesBeforeSight(t *testing.T) {
 	h, petActor, hostile := bootWolfStrikerWith(t, strike, gameservertest.WithGeo(geo))
 	geo.blind.Store(true)
 
-	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false) })
+	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false, false) })
 	assertSummonCastRejected(t, h, petActor, hostile.ObjectID(), func(frame []byte) {
 		assertStaticSystemMessage(t, frame, serverpackets.SystemMessageNotEnoughMP)
 	})

@@ -215,6 +215,9 @@ type intention struct {
 	skill  skill.Ref
 	// ctrl is a summon cast's CTRL (forced-use) modifier.
 	ctrl bool
+	// shift is a summon command's SHIFT (hold) modifier: the summon does not
+	// walk to the target.
+	shift bool
 	// loc is a walk's destination, or where a flee started.
 	loc location.Location
 	// standing and heading mark a walk's destination as a creature's

@@ -12,24 +12,26 @@ import (
 // thinkCountingAI is a summon AI that only counts Think calls.
 type thinkCountingAI struct{ thinks int }
 
-func (a *thinkCountingAI) Think()                                                  { a.thinks++ }
-func (*thinkCountingAI) TryToAttack(attackable.Combatant) bool                     { return false }
-func (*thinkCountingAI) TryToFollow(attackable.Combatant) bool                     { return false }
-func (*thinkCountingAI) TryToIdle()                                                {}
-func (*thinkCountingAI) WaitOutIdle() bool                                         { return false }
-func (*thinkCountingAI) FinishedAttack(attackable.Combatant) bool                  { return false }
-func (*thinkCountingAI) FinishedCasting(attackable.Combatant) bool                 { return false }
-func (*thinkCountingAI) CastStopped(attackable.Combatant) (bool, bool)             { return false, false }
-func (*thinkCountingAI) TryToCast(attackable.Combatant, modelskill.Ref, bool) bool { return false }
-func (*thinkCountingAI) TryToPickUp(int32) bool                                    { return false }
-func (*thinkCountingAI) AbortAll()                                                 {}
-func (*thinkCountingAI) AbortAllForEffect()                                        {}
-func (*thinkCountingAI) FollowInstead(attackable.Combatant)                        {}
-func (*thinkCountingAI) TryToMoveTo(location.Location) bool                        { return false }
-func (*thinkCountingAI) StepAside(location.Location) bool                          { return false }
-func (*thinkCountingAI) StopMove()                                                 {}
-func (*thinkCountingAI) StopAttack()                                               {}
-func (*thinkCountingAI) AttackingNow() bool                                        { return false }
+func (a *thinkCountingAI) Think()                                      { a.thinks++ }
+func (*thinkCountingAI) TryToAttack(attackable.Combatant, bool) bool   { return false }
+func (*thinkCountingAI) TryToFollow(attackable.Combatant, bool) bool   { return false }
+func (*thinkCountingAI) TryToIdle()                                    {}
+func (*thinkCountingAI) WaitOutIdle() bool                             { return false }
+func (*thinkCountingAI) FinishedAttack(attackable.Combatant) bool      { return false }
+func (*thinkCountingAI) FinishedCasting(attackable.Combatant) bool     { return false }
+func (*thinkCountingAI) CastStopped(attackable.Combatant) (bool, bool) { return false, false }
+func (*thinkCountingAI) TryToCast(attackable.Combatant, modelskill.Ref, bool, bool) bool {
+	return false
+}
+func (*thinkCountingAI) TryToPickUp(int32) bool             { return false }
+func (*thinkCountingAI) AbortAll()                          {}
+func (*thinkCountingAI) AbortAllForEffect()                 {}
+func (*thinkCountingAI) FollowInstead(attackable.Combatant) {}
+func (*thinkCountingAI) TryToMoveTo(location.Location) bool { return false }
+func (*thinkCountingAI) StepAside(location.Location) bool   { return false }
+func (*thinkCountingAI) StopMove()                          {}
+func (*thinkCountingAI) StopAttack()                        {}
+func (*thinkCountingAI) AttackingNow() bool                 { return false }
 
 // TestSummonCrowdControlExitWakesAI drives Root, Sleep and Paralyze through
 // the summon's real effect list: EffectRoot/EffectSleep/EffectParalyze.onExit

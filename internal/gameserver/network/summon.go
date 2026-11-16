@@ -34,7 +34,9 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
-	result := actor.ApplyCommand(l.summonCommandContext(live, command, req.CtrlPressed))
+	cmd := l.summonCommandContext(live, command, req.CtrlPressed)
+	cmd.Shift = req.ShiftPressed
+	result := actor.ApplyCommand(cmd)
 	if id, ok := systemMessageForSummonFeedback(result.Feedback); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(id))
 	}
@@ -165,7 +167,7 @@ func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpacket
 	}
 
 	target := l.summonSkillTarget(live, actor, entry.TargetKind)
-	if actor.TryUseSkill(entry.SkillID, target, req.CtrlPressed) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
+	if actor.TryUseSkill(entry.SkillID, target, req.CtrlPressed, req.ShiftPressed) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
 		l.broadcastSummonFrame(actor, serverpackets.FrameNpcSay(actor.ObjectID(), actor.NPCID(), serverpackets.SayTypeAll, sinEaterActionStrings[actor.Roll(len(sinEaterActionStrings))]))
 	}
 	live.SendFrame(serverpackets.FrameActionFailed())

@@ -102,7 +102,22 @@ type fakeActor struct {
 	ground   map[int32]location.Location
 	picked   []int32
 	onPickUp func()
+	// owner is who an idle summon follows while followOff is unset;
+	// idles counts GoneIdle calls.
+	owner     attackable.Combatant
+	followOff bool
+	idles     int
 }
+
+func (a *fakeActor) GoneIdle() attackable.Combatant {
+	a.idles++
+	if a.followOff || a.owner == nil {
+		return nil
+	}
+	return a.owner
+}
+
+func (a *fakeActor) SetFollowOwner(follow bool) { a.followOff = !follow }
 
 func actor(id int32) *fakeActor {
 	return &fakeActor{id: id, attackRange: 40, known: make(map[int32]bool), inTerritory: true}
@@ -433,6 +448,8 @@ func (g *gateFake) Standing() bool                           { return true }
 func (g *gateFake) SetHeadingTo(attackable.Combatant)        {}
 func (g *gateFake) BroadcastMoveToPawn(attackable.Combatant) {}
 func (g *gateFake) RefuseAttackTarget()                      { g.refusals++ }
+func (g *gateFake) GoneIdle() attackable.Combatant           { return nil }
+func (g *gateFake) SetFollowOwner(bool)                      {}
 func (g *gateFake) Owner() (attackable.Combatant, bool) {
 	if g.owner == nil {
 		return nil, false
