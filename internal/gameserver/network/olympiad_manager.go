@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 )
@@ -29,7 +30,7 @@ func (l *GameClientLink) olympiadNobleBypass(live *livePlayer, f *npc.Folk, choi
 	id := live.ObjectID()
 	switch choice {
 	case 1:
-		l.sendUnregisterResult(live, o.Unregister(id, live.BaseClassID(), live.IsNoble()))
+		l.sendUnregisterResult(live, o.Unregister(id, live.IsNoble()))
 	case 2:
 		classed, nonClassed := o.WaitingList()
 		page := f.OlympiadPage(pages, "noble_registered.htm",
@@ -140,14 +141,26 @@ func (l *GameClientLink) sendUnregisterResult(live *livePlayer, result olympiad.
 // olympiadRegistered reports whether live waits for an Olympiad match or
 // competes in one.
 func (l *GameClientLink) olympiadRegistered(live *livePlayer) bool {
-	return l.olympiad != nil && l.olympiad.IsRegisteredInComp(live.ObjectID(), live.BaseClassID())
+	return l.olympiad != nil && l.olympiad.IsRegisteredInComp(live.ObjectID())
 }
 
 // leaveOlympiadOnSubclass drops live's Olympiad registration as a village
 // master's subclass command starts, with the answer an unregistration gets.
 func (l *GameClientLink) leaveOlympiadOnSubclass(live *livePlayer) {
 	if l.olympiadRegistered(live) {
-		l.sendUnregisterResult(live, l.olympiad.Unregister(live.ObjectID(), live.BaseClassID(), live.IsNoble()))
+		l.sendUnregisterResult(live, l.olympiad.Unregister(live.ObjectID(), live.IsNoble()))
+	}
+}
+
+// setLiveBaseClass makes classID, played with tmpl, live's base class. A
+// base class that moves takes live off the Olympiad waiting list it is on,
+// with the answer an unregistration gets, and has its Olympiad record count
+// for the new class (olympiad.ChangeClass, #5116).
+func (l *GameClientLink) setLiveBaseClass(live *livePlayer, classID int, tmpl *player.Template) {
+	moved := live.BaseClassID() != classID
+	live.SetBaseClass(classID, tmpl)
+	if moved && l.olympiad != nil && l.olympiad.ChangeClass(live.ObjectID(), classID) {
+		l.sendUnregisterResult(live, olympiad.Unregistered)
 	}
 }
 
@@ -156,7 +169,7 @@ func (l *GameClientLink) leaveOlympiadOnSubclass(live *livePlayer) {
 // Olympiad's waiting list.
 func (l *GameClientLink) dropOlympiadCompetitor(live *livePlayer) {
 	if l.olympiad != nil {
-		l.olympiad.RemoveDisconnectedCompetitor(live.ObjectID(), live.BaseClassID(), live.OlympiadGameID())
+		l.olympiad.RemoveDisconnectedCompetitor(live.ObjectID(), live.OlympiadGameID())
 	}
 }
 

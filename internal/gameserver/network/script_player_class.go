@@ -23,7 +23,7 @@ func (l *GameClientLink) applyScriptClassEvent(live *livePlayer, ev event.Event)
 		}
 	case event.BaseClassChangeRequested:
 		if tmpl, ok := l.scriptClassTemplate(live, e.ClassID); ok {
-			live.SetBaseClass(e.ClassID, tmpl)
+			l.setLiveBaseClass(live, e.ClassID, tmpl)
 		}
 	case event.UserInfoBroadcast:
 		l.broadcastCharacterInfo(live)

@@ -233,7 +233,7 @@ func TestOlympiadRegistration(t *testing.T) {
 
 	w.assertNoble(t, manager, "1", smDeletedFromWaitingList)
 	w.assertNobleAgain(t, manager, "1", smNotOnWaitingList)
-	if w.srv.Olympiad.IsRegistered(w.player, duelistClass) {
+	if w.srv.Olympiad.IsRegistered(w.player) {
 		t.Fatal("still registered after leaving")
 	}
 
@@ -281,7 +281,7 @@ func TestOlympiadRegistrationRefusals(t *testing.T) {
 		if got, want := w.managerPage(t, manager, "OlympiadNoble 4"), wantOlympiadPage(t, manager, "noble_cant_thirdclass.htm"); got != want {
 			t.Fatalf("page = %q, want %q", got, want)
 		}
-		if w.srv.Olympiad.IsRegistered(w.player, 2) {
+		if w.srv.Olympiad.IsRegistered(w.player) {
 			t.Fatal("a Gladiator registered")
 		}
 	})
@@ -291,7 +291,7 @@ func TestOlympiadRegistrationRefusals(t *testing.T) {
 		if got, want := w.managerPage(t, manager, "OlympiadNoble 4"), wantOlympiadPage(t, manager, "noble_nopoints1.htm"); got != want {
 			t.Fatalf("page = %q, want %q", got, want)
 		}
-		if w.srv.Olympiad.IsRegistered(w.player, duelistClass) {
+		if w.srv.Olympiad.IsRegistered(w.player) {
 			t.Fatal("a noble without points registered")
 		}
 	})
@@ -304,7 +304,7 @@ func TestOlympiadRegistrationRefusals(t *testing.T) {
 			gameservertest.WithInventorySlots(1, 1), gameservertest.WithOlympiadCompetition(time.Hour))
 		w.assertNoble(t, manager, "4", smOlympiadInventoryFull)
 		w.assertNoble(t, manager, "5", smOlympiadInventoryFull)
-		if w.srv.Olympiad.IsRegistered(w.player, duelistClass) {
+		if w.srv.Olympiad.IsRegistered(w.player) {
 			t.Fatal("a noble with a full inventory registered")
 		}
 	})
@@ -411,7 +411,7 @@ func TestOlympiadRegistrationLeftOnLogout(t *testing.T) {
 	w.c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
 	drainFrames(t, w.c)
 	w.srv.Settle(t)
-	if w.srv.Olympiad.IsRegistered(w.player, duelistClass) {
+	if w.srv.Olympiad.IsRegistered(w.player) {
 		t.Fatal("still registered after leaving the world")
 	}
 }
@@ -432,7 +432,7 @@ func TestOlympiadRegistrationSubclassCommand(t *testing.T) {
 	if ids := systemMessageIDs(frames); len(ids) == 0 || ids[0] != smDeletedFromWaitingList {
 		t.Fatalf("Subclass 1 messages = %v, want 1505 first", ids)
 	}
-	if w.srv.Olympiad.IsRegistered(w.player, duelistClass) {
+	if w.srv.Olympiad.IsRegistered(w.player) {
 		t.Fatal("still registered after a subclass command")
 	}
 }

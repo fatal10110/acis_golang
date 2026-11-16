@@ -139,15 +139,15 @@ func TestRegisterWaitingLists(t *testing.T) {
 			t.Fatalf("second Register(%v) = %v, want RegisterAlreadyNonClassed", kind, got)
 		}
 	}
-	if !o.IsRegistered(1, 88) || o.IsRegistered(1, 93) || !o.IsRegistered(2, 93) || !o.IsRegisteredInComp(2, 93) {
+	if !o.IsRegistered(1) || !o.IsRegistered(2) || !o.IsRegisteredInComp(2) || o.IsRegistered(3) {
 		t.Fatal("IsRegistered does not follow the lists")
 	}
 	if classed, nonClassed := o.WaitingList(); classed != 1 || nonClassed != 1 {
 		t.Fatalf("WaitingList = %d, %d; want 1, 1", classed, nonClassed)
 	}
-	o.RemoveDisconnectedCompetitor(1, 88, -1)
-	o.RemoveDisconnectedCompetitor(2, 93, -1)
-	if o.IsRegistered(1, 88) || o.IsRegistered(2, 93) {
+	o.RemoveDisconnectedCompetitor(1, -1)
+	o.RemoveDisconnectedCompetitor(2, -1)
+	if o.IsRegistered(1) || o.IsRegistered(2) {
 		t.Fatal("RemoveDisconnectedCompetitor left a registration")
 	}
 	if classed, nonClassed := o.WaitingList(); classed != 1 || nonClassed != 0 {
@@ -164,8 +164,8 @@ func TestRegisterWithoutPoints(t *testing.T) {
 	if got := o.Register(eligible(1), Classed); got != RegisterNoPoints {
 		t.Fatalf("Register = %v, want RegisterNoPoints", got)
 	}
-	if n, _ := o.Noble(1); n.CompDone != 4 || o.IsRegistered(1, 88) {
-		t.Fatalf("record = %+v, registered %v", n, o.IsRegistered(1, 88))
+	if n, _ := o.Noble(1); n.CompDone != 4 || o.IsRegistered(1) {
+		t.Fatalf("record = %+v, registered %v", n, o.IsRegistered(1))
 	}
 
 	o, _ = newRegistrationOlympiad(Competition, time.Hour, nil)
@@ -183,23 +183,23 @@ func TestRegisterWithoutPoints(t *testing.T) {
 func TestUnregister(t *testing.T) {
 	t.Parallel()
 	o, _ := newRegistrationOlympiad(Competition, time.Hour, nil)
-	if got := o.Unregister(1, 88, false); got != UnregisterNotNoble {
+	if got := o.Unregister(1, false); got != UnregisterNotNoble {
 		t.Fatalf("non-noble Unregister = %v", got)
 	}
-	if got := o.Unregister(1, 88, true); got != UnregisterNotRegistered {
+	if got := o.Unregister(1, true); got != UnregisterNotRegistered {
 		t.Fatalf("unregistered Unregister = %v", got)
 	}
 	o.Register(eligible(1), Classed)
 	o.Register(Applicant{ObjectID: 2, BaseClass: 90, Noble: true}, NonClassed)
-	if got := o.Unregister(1, 88, true); got != Unregistered || o.IsRegistered(1, 88) {
+	if got := o.Unregister(1, true); got != Unregistered || o.IsRegistered(1) {
 		t.Fatalf("classed Unregister = %v", got)
 	}
-	if got := o.Unregister(2, 90, true); got != Unregistered || o.IsRegistered(2, 90) {
+	if got := o.Unregister(2, true); got != Unregistered || o.IsRegistered(2) {
 		t.Fatalf("non-classed Unregister = %v", got)
 	}
 	o.Register(eligible(1), Classed)
 	o.period = Validation
-	if got := o.Unregister(1, 88, false); got != UnregisterNotInProgress || !o.IsRegistered(1, 88) {
+	if got := o.Unregister(1, false); got != UnregisterNotInProgress || !o.IsRegistered(1) {
 		t.Fatalf("Unregister in validation = %v", got)
 	}
 }
@@ -278,7 +278,7 @@ func TestPassesRace(t *testing.T) {
 			paid <- passes(t, o, 1, false)
 			o.saveNobles()
 			o.Register(eligible(3), Classed)
-			_ = o.IsRegisteredInComp(3, 88)
+			_ = o.IsRegisteredInComp(3)
 		})
 	}
 	wg.Wait()
