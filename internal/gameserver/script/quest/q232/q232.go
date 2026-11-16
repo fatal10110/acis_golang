@@ -132,8 +132,13 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 	case strings.EqualFold(e.Name, "30567-02.htm"):
 		s.GiveItems(p, tantusCharm, 1)
 		s.PlaySound(p, script.SoundItemGet)
+	// The link stays usable after its page, so the price is taken only when
+	// it is still held; short of it the player is told so and gets nothing.
 	case strings.EqualFold(e.Name, "30558-02.htm"):
-		s.TakeItems(p, adena, 1000)
+		if s.TakeHeldItems(p, adena, 1000) == 0 {
+			htmltext = "30558-03.htm"
+			break
+		}
 		s.GiveItems(p, nerugaAxeBlade, 1)
 		s.PlaySound(p, script.SoundItemGet)
 	case strings.EqualFold(e.Name, "30568-02.htm"):

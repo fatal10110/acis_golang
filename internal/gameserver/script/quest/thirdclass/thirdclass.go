@@ -234,15 +234,24 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 		htmltext = "1-05.htm"
 		st.SetCond(3)
 		s.PlaySound(p, script.SoundMiddle)
+	// The link stays usable after its page, so what the page asked for is
+	// checked again: without it the player is told so, keeps the step and
+	// gets nothing.
 	case strings.EqualFold(e.Name, "1-4"):
+		if !p.HasItem(iceCrystal) || (sg.ItemOptional != 0 && !p.HasItem(sg.ItemOptional)) {
+			htmltext = "1-02.htm"
+			break
+		}
 		htmltext = "1-06.htm"
 		st.SetCond(4)
 		s.PlaySound(p, script.SoundMiddle)
-		s.TakeItems(p, iceCrystal, 1)
+		paid := s.TakeHeldItems(p, iceCrystal, 1) > 0
 		if sg.ItemOptional != 0 {
-			s.TakeItems(p, sg.ItemOptional, 1)
+			paid = s.TakeHeldItems(p, sg.ItemOptional, 1) > 0 && paid
 		}
-		s.GiveItems(p, sg.ItemReward, 1)
+		if paid {
+			s.GiveItems(p, sg.ItemReward, 1)
+		}
 	// First Tablet of Vision.
 	case strings.EqualFold(e.Name, "5-1"):
 		htmltext = "5-02.htm"
