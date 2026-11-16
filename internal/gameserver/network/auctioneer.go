@@ -466,9 +466,10 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 		if !ok || !v.Auction {
 			return
 		}
-		var page string
+		var file, page string
 		if v.Seller != nil {
-			page = fillPage(l.setPage("data/html/auction/AgitSaleInfo.htm"),
+			file = "data/html/auction/AgitSaleInfo.htm"
+			page = fillPage(l.setPage(file),
 				"%AGIT_NAME%", v.Name,
 				"%AGIT_OWNER_PLEDGE_NAME%", v.Seller.ClanName,
 				"%OWNER_PLEDGE_MASTER%", v.Seller.Name,
@@ -485,7 +486,8 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 				"%objectId%", objID(f))
 		} else {
 			info := cl.Info()
-			page = fillPage(l.setPage("data/html/auction/AgitInfo.htm"),
+			file = "data/html/auction/AgitInfo.htm"
+			page = fillPage(l.setPage(file),
 				"%AGIT_NAME%", v.Name,
 				"%AGIT_OWNER_PLEDGE_NAME%", info.Name,
 				"%OWNER_PLEDGE_MASTER%", info.LeaderName,
@@ -495,7 +497,7 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 				"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_start",
 				"%objectId%", objID(f))
 		}
-		l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitInfo.htm", page, 0)
+		l.sendFilePage(live, f.ObjectID(), file, page, 0)
 		return
 	}
 	l.showAuctionList(live, f, "1")
