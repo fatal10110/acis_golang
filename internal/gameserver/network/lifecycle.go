@@ -115,16 +115,16 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// dock's shore as its position.
 	dropBoat(live)
 	if l.flow.playerClock != nil {
-		l.flow.playerClock.Remove(live.ObjectID())
+		l.flow.playerClock.Remove(live)
 	}
 	if l.flow.autosave != nil {
-		l.flow.autosave.Remove(live.ObjectID())
+		l.flow.autosave.Remove(live)
 	}
 	if l.water != nil {
 		l.water.Remove(live)
 	}
 	if l.shadowItems != nil {
-		l.shadowItems.Remove(live.ObjectID())
+		l.shadowItems.Remove(live)
 	}
 	if l.combat.pvpFlags != nil {
 		// reset=false, as the disconnect cleanup requires: a
@@ -191,7 +191,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	}
 	if l.world != nil {
 		l.notifyFriends(live, false)
-		l.world.RemovePlayer(live.ObjectID())
+		l.world.RemovePlayer(live)
 	}
 	l.leaveClanOnLogout(live)
 	// Stop the periodic effect sweep from reaching this character's list:

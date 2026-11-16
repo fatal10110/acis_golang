@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -188,6 +189,17 @@ func (l *GameClientLink) expelFromStadium(a zone.Actor) {
 			l.teleportLivePlayer(owner, dest, 20)
 		}
 	})
+}
+
+// inStadium reports whether c stands inside a stadium zone.
+func (l *GameClientLink) inStadium(c *player.Character) bool {
+	x, y, z := c.Position()
+	for _, st := range l.stadiumZones() {
+		if st.ContainsPoint(x, y, z) {
+			return true
+		}
+	}
+	return false
 }
 
 // onlineLive is the player objectID while it is in the world and not

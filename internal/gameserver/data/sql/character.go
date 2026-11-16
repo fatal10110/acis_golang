@@ -28,7 +28,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(heading,0), COALESCE(x,0), COALESCE(y,0), COALESCE(z,0),
 	exp, COALESCE(expBeforeDeath,0), sp, COALESCE(karma,0), COALESCE(pvpkills,0), COALESCE(pkkills,0), COALESCE(clanid,0),
 	COALESCE(race,0), COALESCE(classid,0), base_class,
-	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0),
+	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(lastAccess,0),
 	COALESCE(onlinetime,0),
 	COALESCE(death_penalty_level,0), rec_have, rec_left,
 	clan_join_expiry_time, clan_create_expiry_time,
@@ -148,7 +148,6 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var c player.Character
 	var sex byte
 	var race, classID int
-	var hero int
 	var maxHP, curHP, maxCP, curCP, maxMP, curMP float64
 	var deathPenaltyLevel, onlineTime int
 	var recHave, recLeft int
@@ -170,7 +169,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
 		&c.Exp, &c.ExpBeforeDeath, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &clanID,
 		&race, &classID, &baseClassID,
-		&c.DeleteAt, &title, &c.AccessLevel, &hero, &c.LastAccess,
+		&c.DeleteAt, &title, &c.AccessLevel, &c.LastAccess,
 		&onlineTime,
 		&deathPenaltyLevel, &recHave, &recLeft,
 		&clanJoinExpiry, &clanCreateExpiry,
@@ -193,7 +192,6 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.Race = player.Race(race)
 	c.SetClassID(classID)
 	c.SetBaseClassID(baseClassID)
-	c.SetHero(hero != 0)
 	c.SetDeathPenaltyLevel(deathPenaltyLevel)
 	c.SetRecommendationCounts(recHave, recLeft)
 	c.RestorePunishment(punishLevel, punishTimer)

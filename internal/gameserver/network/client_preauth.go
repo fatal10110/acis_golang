@@ -48,7 +48,7 @@ func (l *GameClientLink) handleAuthLogin(ctx context.Context, cs *connState, req
 		return errDisconnect
 	}
 	session.CompleteHandshake()
-	cs.chars = l.sendCharSelectInfo(ctx, client)
+	cs.chars = l.sendCharSelectInfo(ctx, client, highlightLastPlayed)
 	return nil
 }
 
@@ -56,13 +56,10 @@ func (l *GameClientLink) handleAuthLogin(ctx context.Context, cs *connState, req
 // answers with the outcome and the refreshed character list.
 func (l *GameClientLink) handleRequestCharacterCreate(ctx context.Context, cs *connState, req clientpackets.RequestCharacterCreate) error {
 	client, session := cs.client, cs.client.Session
-	sex, err := player.ParseSex(req.Sex)
-	if err != nil {
-		session.SendFrame(serverpackets.FrameCharCreateFail(serverpackets.CharCreateFailReasonCreationFailed))
-		return nil
-	}
+	// The sex byte is passed on as is, a negative one wrapping past
+	// SexEtc: the roster checks it in its place among the other fields.
 	created, outcome, err := l.roster.Create(ctx, client.AccountName(), manager.CreateRequest{
-		Name: req.Name, ClassID: int(req.ClassID), Race: int(req.Race), Sex: sex,
+		Name: req.Name, ClassID: int(req.ClassID), Race: int(req.Race), Sex: player.Sex(req.Sex),
 		HairStyle: req.HairStyle, HairColor: req.HairColor, Face: req.Face,
 		AccessLevel: l.playerConfig().DefaultAccessLevel,
 	})
@@ -81,7 +78,7 @@ func (l *GameClientLink) handleRequestCharacterCreate(ctx context.Context, cs *c
 	if l.scripts != nil {
 		l.scripts.CharacterCreated(created)
 	}
-	cs.chars = l.sendCharSelectInfo(ctx, client)
+	cs.chars = l.sendCharSelectInfo(ctx, client, highlightLastPlayed)
 	return nil
 }
 
@@ -100,7 +97,7 @@ func (l *GameClientLink) handleRequestCharacterDelete(ctx context.Context, cs *c
 	if !ok {
 		// An unknown slot sends no failure reply — only the
 		// refreshed character list every delete attempt ends with.
-		cs.chars = l.sendCharSelectInfo(ctx, client)
+		cs.chars = l.sendCharSelectInfo(ctx, client, highlightFirst)
 		return nil
 	}
 	// A clan's members and leader may not be deleted. The roster
@@ -122,12 +119,14 @@ func (l *GameClientLink) handleRequestCharacterDelete(ctx context.Context, cs *c
 		// fails the delete rather than purge under those saves.
 		session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 	} else if err := l.roster.MarkForDeletion(ctx, c.ID); err != nil {
+		// A database fault, scheduling or purging alike, sends no
+		// failure reply: the refreshed list below shows the character
+		// still there.
 		l.log.Error().Err(err).Msg("mark character for deletion")
-		session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 	} else {
 		session.SendFrame(serverpackets.FrameCharDeleteOk())
 	}
-	cs.chars = l.sendCharSelectInfo(ctx, client)
+	cs.chars = l.sendCharSelectInfo(ctx, client, highlightFirst)
 	return nil
 }
 
@@ -145,7 +144,7 @@ func (l *GameClientLink) handleCharacterRestore(ctx context.Context, cs *connSta
 			l.log.Error().Err(err).Msg("restore character")
 		}
 	}
-	cs.chars = l.sendCharSelectInfo(ctx, client)
+	cs.chars = l.sendCharSelectInfo(ctx, client, highlightFirst)
 	return nil
 }
 
@@ -192,31 +191,6 @@ func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connSta
 	if !ok || c.AccessLevel < 0 {
 		return nil
 	}
-	// A character already in the world belongs to another live
-	// session: that session is closed with ServerClose and this
-	// selection aborts silently.
-	if l.world != nil {
-		if obj, exists := l.world.Player(c.ObjectID()); exists {
-			if prev, isLive := obj.(*livePlayer); isLive {
-				l.log.Info().Int32("object_id", c.ObjectID()).
-					Msg("game client: duplicate character login, closing previous session")
-				prev.kickClient()
-			}
-			return nil
-		}
-		// Another character of the account still in the world is a
-		// previous session of the account that has not finished
-		// leaving, and it may hold this character's freight, which it
-		// writes on its way out. The selection aborts silently until
-		// that session is gone; its writes are then on this
-		// character's lane, which the wait below covers.
-		if prev, ok := l.accountPlayerInWorld(cs.chars); ok {
-			l.log.Info().Int32("object_id", prev.ObjectID()).
-				Msg("game client: account character still in the world, closing previous session")
-			prev.kickClient()
-			return nil
-		}
-	}
 	selected, next := l.selectCharacter(ctx, cs.conn, client, cs.chars, req.Slot, c)
 	if selected != nil {
 		cs.entering = selected
@@ -230,7 +204,7 @@ func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connSta
 		// what returns a client to character select after a restart or a
 		// delete, so it answers here too: the player is back at the list and
 		// can retry. With the database down the list goes out empty.
-		cs.chars = l.sendCharSelectInfo(ctx, client)
+		cs.chars = l.sendCharSelectInfo(ctx, client, highlightLastPlayed)
 	}
 	return nil
 }

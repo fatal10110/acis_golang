@@ -11,9 +11,11 @@ const OpcodeRequestCharacterCreate = 0x0b
 // checking it against actual bounds and building a character from it is the
 // roster's job, not this decoder's.
 type RequestCharacterCreate struct {
-	Name                       string
-	Race                       int32
-	Sex                        int32
+	Name string
+	Race int32
+	// Sex is the low byte of the client's 32-bit field, sign included: the
+	// value is truncated on read, so 0x100 reads as 0 and 0xff as -1.
+	Sex                        int8
 	ClassID                    int32
 	HairStyle, HairColor, Face byte
 }
@@ -29,7 +31,7 @@ func DecodeRequestCharacterCreate(payload []byte) (RequestCharacterCreate, error
 	req := RequestCharacterCreate{
 		Name:    r.ReadString(),
 		Race:    r.ReadInt32(),
-		Sex:     r.ReadInt32(),
+		Sex:     int8(r.ReadInt32()),
 		ClassID: r.ReadInt32(),
 	}
 	for i := 0; i < 6; i++ {

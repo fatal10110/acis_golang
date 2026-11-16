@@ -300,7 +300,7 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 				continue
 			}
 			if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
-				l.shadowItems.Track(live.ObjectID(), inst, tmpl)
+				l.shadowItems.Track(live, inst, tmpl)
 			}
 		}
 	}

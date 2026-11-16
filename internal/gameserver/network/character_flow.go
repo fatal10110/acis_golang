@@ -79,19 +79,27 @@ func accountNameFits(name string) bool {
 	return true
 }
 
+// The slot a CharSelectInfo highlights: a delete or a restore answers with
+// the first slot, every other list with the slot played most recently.
+const (
+	highlightLastPlayed int32 = -1
+	highlightFirst      int32 = 0
+)
+
 // sendCharSelectInfo lists client's characters, sends the resulting
-// CharSelectInfo, and returns the list so the caller can cache it for
+// CharSelectInfo highlighting slot active (highlightLastPlayed or
+// highlightFirst), and returns the list so the caller can cache it for
 // subsequent slot-addressed requests. A list that cannot be read is logged
 // and goes out, and is cached, empty: the client stays at character select
 // with nothing to pick, and a slot-addressed request is refused as for an
 // unknown slot until a later list reads.
-func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client) []*player.Character {
+func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client, active int32) []*player.Character {
 	chars, slots, err := l.characterSlots(ctx, client.AccountName())
 	if err != nil {
 		l.log.Error().Err(err).Str("account", client.AccountName()).Msg("list characters")
 		chars, slots = nil, nil
 	}
-	client.Session.SendFrame(serverpackets.FrameCharSelectInfo(client.AccountName(), client.SessionKey().PlayKey1, slots, -1))
+	client.Session.SendFrame(serverpackets.FrameCharSelectInfo(client.AccountName(), client.SessionKey().PlayKey1, slots, active))
 	return chars
 }
 
@@ -353,7 +361,6 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: build ItemList")
 		return false
 	}
-	l.activateSpawnProtection(live)
 	// An item's equip-delay reuse timer, armed when the selection restored
 	// the worn equipment, is included in the login SkillCoolTime snapshot.
 	now := c.Now()
@@ -395,6 +402,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	l.enterWorldClan(client, live)
 	// The Seal of Strife skill follows the clan block, ahead of the spawn.
 	l.enterWorldStrifeSkills(live)
+	// Spawn protection starts last before the spawn, its UserInfo behind
+	// the clan block and the Seal of Strife skill.
+	l.activateSpawnProtection(live)
 	// Taken once the clan block has given the clan's skills and the Seal of
 	// Strife skill is settled, so the login SkillList carries them.
 	skillList := skillListEntries(c, l.skills)
@@ -454,6 +464,12 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// Friends hear of the entry last, just ahead of the reuse timers.
 	l.notifyFriends(live, true)
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
+	// A player back in a stadium is sent to town, a game master too.
+	if l.inStadium(c) {
+		if dest, ok := l.restartDestination(live); ok {
+			l.teleportLivePlayer(live, dest, restartTeleportOffset)
+		}
+	}
 	// A character still serving a clan join penalty is reminded it was
 	// expelled or left.
 	if c.ClanJoinExpiryTime() > time.Now().UnixMilli() {
@@ -863,7 +879,7 @@ func (l *GameClientLink) trackShadowItems(live *livePlayer) {
 	}
 	for _, inst := range inv.PaperdollItems() {
 		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
-			l.shadowItems.Track(live.ObjectID(), inst, tmpl)
+			l.shadowItems.Track(live, inst, tmpl)
 		}
 	}
 }

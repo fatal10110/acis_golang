@@ -20,10 +20,9 @@ func enterAfterRestart(t *testing.T, srv *gameservertest.Server) [][]byte {
 	assertFrameOpcode(t, mustRead(t, c, "SSQInfo"), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertFrameOpcode(t, mustRead(t, c, "CharSelected"), serverpackets.OpcodeCharSelected, "CharSelected")
 	c.Send(encodeEnterWorld())
-	// With a protection window configured, EnterWorld activates it and its
-	// status snapshot (UserInfo) leads the reply burst.
-	assertFrameOpcode(t, mustRead(t, c, "protection UserInfo"), serverpackets.OpcodeUserInfo, "protection UserInfo")
-	readEnterWorldBurst(t, c)
+	// With a protection window configured, EnterWorld activates it just
+	// ahead of the spawn, and its status snapshot (UserInfo) goes out there.
+	readProtectedEnterWorldBurst(t, c)
 	drainUntilQuiet(t, c)
 	objID := srv.SoleObjectID(t)
 	srv.MarkPlayerDead(t, objID)

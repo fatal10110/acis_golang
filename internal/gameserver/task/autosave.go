@@ -81,10 +81,16 @@ func (a *Autosave) Add(actor AutosaveActor) {
 	a.entries[actor.ObjectID()] = autosaveEntry{actor: actor, deadline: a.now().Add(AutosaveInitialDelay)}
 }
 
-// Remove stops actor's autosave schedule, if tracked.
-func (a *Autosave) Remove(objectID int32) {
+// Remove stops actor's autosave schedule, if tracked. Another actor tracked
+// under the same object id keeps its schedule.
+func (a *Autosave) Remove(actor AutosaveActor) {
+	if actor == nil {
+		return
+	}
 	a.mu.Lock()
-	delete(a.entries, objectID)
+	if e, ok := a.entries[actor.ObjectID()]; ok && e.actor == actor {
+		delete(a.entries, actor.ObjectID())
+	}
 	a.mu.Unlock()
 }
 

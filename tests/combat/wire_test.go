@@ -130,6 +130,20 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 // interleave whenever someone is already in the shared spawn region.
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
+	readEnterWorldBurstOf(t, c, false)
+}
+
+// readProtectedEnterWorldBurst is readEnterWorldBurst with a spawn
+// protection window configured: the protection's UserInfo follows the
+// EtcStatusUpdate (after the clan block and the Seal of Strife skill) and
+// leads the spawn's compass (EnterWorld.java:188-191).
+func readProtectedEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
+	t.Helper()
+	readEnterWorldBurstOf(t, c, true)
+}
+
+func readEnterWorldBurstOf(t *testing.T, c *testsupport.ScriptedClient, protected bool) {
+	t.Helper()
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -161,6 +175,11 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			if protected {
+				if frame := c.Read(); frame == nil || frame[0] != serverpackets.OpcodeUserInfo {
+					t.Fatalf("frame after EtcStatusUpdate = %x, want the spawn protection UserInfo", frame)
+				}
+			}
 			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged)
 		}
 	}
