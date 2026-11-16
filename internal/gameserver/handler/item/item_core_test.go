@@ -791,6 +791,15 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 				t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 			}
 			res.Apply()
+			if got := res.ApplyMirror != nil; got != tc.wantMirror {
+				t.Fatalf("ApplyMirror set = %v, want %v", got, tc.wantMirror)
+			}
+			if tc.wantMirror {
+				if got := servitor.HP(); got != 1 {
+					t.Fatalf("servitor HP after the caster's Apply = %v, want 1 (the mirror applies on its own)", got)
+				}
+				res.ApplyMirror()
+			}
 			if got := caster.HP(); got != healed {
 				t.Fatalf("caster HP = %v, want %v (1 + 50%% of its max HP)", got, healed)
 			}

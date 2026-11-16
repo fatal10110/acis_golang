@@ -735,6 +735,13 @@ func HTMLCache(t testing.TB, pages map[string]string) *cache.HTML {
 // character (with its object id).
 func (s *Server) seedCharacter(tb testing.TB, account, name string, level, sp int) *player.Character {
 	tb.Helper()
+	return s.seedCharacterAt(tb, account, name, level, sp, nil)
+}
+
+// seedCharacterAt is seedCharacter with the character's saved position
+// replaced by at, when at is not nil.
+func (s *Server) seedCharacterAt(tb testing.TB, account, name string, level, sp int, at *location.Location) *player.Character {
+	tb.Helper()
 	tmpl, ok := s.templates.Get(0)
 	if !ok {
 		tb.Fatal("missing test class template")
@@ -745,6 +752,9 @@ func (s *Server) seedCharacter(tb testing.TB, account, name string, level, sp in
 	}
 	ch.CharLevel = level
 	ch.SP = sp
+	if at != nil {
+		ch.Location = *at
+	}
 	if err := s.Chars.Create(context.Background(), ch); err != nil {
 		tb.Fatalf("seed character store: %v", err)
 	}

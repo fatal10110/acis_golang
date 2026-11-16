@@ -57,16 +57,11 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 			l.broadcastLiveFrame(live, func() wire.Frame {
 				return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 			})
-			if res.MirroredSummon != nil {
-				summonObject := skillCastObject(res.MirroredSummon)
-				l.broadcastLiveFrame(live, func() wire.Frame {
-					return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
-				})
-			}
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 			applyItemCastCharges(live, res)
 			// A restore the skill applies reports the user's status itself.
 			l.sendSkillHandlerResult(live, res.Apply())
+			l.castHerbMirror(live, res)
 			if res.HasShortBuff {
 				live.Character.UpdateShortBuff(res.ShortBuffSkillID, res.ShortBuffLevel, res.ShortBuffDurationSeconds)
 			}
