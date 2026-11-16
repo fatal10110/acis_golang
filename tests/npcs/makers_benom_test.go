@@ -125,6 +125,9 @@ func (w *folkWorld) benomCount(step string, t *testing.T, gatekeepers, benoms in
 func TestBenomMakerFollowsTheSiege(t *testing.T) {
 	t.Parallel()
 	w, log, gludio := bootBenom(t, 2)
+	if !w.srv.DrivesClock() {
+		t.Skip("the registration timer fires on the wall clock on the real pool, so its Advance can land either side of the deadline")
+	}
 	w.benomCount("boot", t, 1, 0)
 	drainUntilQuiet(t, w.c)
 
@@ -169,6 +172,9 @@ func TestBenomMakerFollowsTheSiege(t *testing.T) {
 func TestBenomMakerTowerCheckLoadsBenom(t *testing.T) {
 	t.Parallel()
 	w, log, gludio := bootBenom(t, 1)
+	if !w.srv.DrivesClock() {
+		t.Skip("the real pool cannot stop the wall clock one millisecond before the second tower check")
+	}
 	w.srv.Advance(t, time.Second)
 	w.benomCount("registrations closed", t, 1, 1)
 	w.srv.NpcSpawns.MakerEvent(benomMaker, "1000", 0, 0)

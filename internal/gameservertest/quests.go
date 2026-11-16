@@ -35,6 +35,9 @@ type scriptOptions struct {
 	rand    func(n int) int
 	// kinds are the NPC ids that have a template, with its kind.
 	kinds map[int32]script.NPCKind
+	// fromTemplates reads each NPC id's kind off the boot's NPC templates
+	// instead of kinds.
+	fromTemplates bool
 	// skills are the skill definitions the scripts read.
 	skills []modelskill.Definition
 	// itemIDs wraps the object id allocator of the scripts' gives.
@@ -47,6 +50,7 @@ type scriptOptions struct {
 // production boot builds it from scripts.xml and its catalogs; without it
 // the registry is empty. Every NPC id reads as having no template, so a
 // script's NPC bindings are dropped: the scripts serve the quest journal.
+// WithNPCScripts and WithTemplateScripts keep the bindings.
 func WithScripts(list []script.Listing, catalog script.Catalog) Option {
 	return func(o *options) {
 		so := o.scriptHelpers()
@@ -104,6 +108,16 @@ func WithNPCScripts(kinds map[int32]script.NPCKind, list []script.Listing, catal
 	return func(o *options) {
 		so := o.scriptHelpers()
 		so.list, so.catalog, so.kinds = list, catalog, kinds
+	}
+}
+
+// WithTemplateScripts is WithNPCScripts where every NPC template the boot
+// holds (WithNPCs) has its kind as the production boot classifies it, so
+// the scripts' bindings to any template id hold.
+func WithTemplateScripts(list []script.Listing, catalog script.Catalog) Option {
+	return func(o *options) {
+		so := o.scriptHelpers()
+		so.list, so.catalog, so.fromTemplates = list, catalog, true
 	}
 }
 
@@ -239,6 +253,9 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 	kindOf := func(id int32) (script.NPCKind, bool) {
 		k, ok := so.kinds[id]
 		return k, ok
+	}
+	if so.fromTemplates && o.npcs != nil {
+		kindOf = script.NPCKindOf(o.npcs)
 	}
 	cfg := script.Config{KindOf: kindOf, Log: o.log, Env: env, Queue: engine}
 	if so.heard != nil {

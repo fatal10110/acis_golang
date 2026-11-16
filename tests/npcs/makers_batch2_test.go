@@ -121,6 +121,9 @@ func TestAlarmDeviceMakersRaiseEachOther(t *testing.T) {
 		gameservertest.WithMakers(batch2Makers()),
 		gameservertest.WithNPCScripts(kinds, []script.Listing{{Path: alarmListenerKey}}, script.Catalog{alarmListenerKey: log.script}),
 	)
+	if !w.srv.DrivesClock() {
+		t.Skip("the device timers chain on the wall clock on the real pool, so each Advance can land either side of its deadline")
+	}
 	mw := &makerWorld{srv: w.srv}
 	devices := []struct {
 		maker string

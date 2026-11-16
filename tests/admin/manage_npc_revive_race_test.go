@@ -179,14 +179,14 @@ func TestAdminManageMonsterResAheadOfDecay(t *testing.T) {
 	srv, gm, decay, h := bootReviveRace(t)
 
 	release := holdQueue(t, h)
-	frames := exchange(t, gm, encodeBuildCmd("res"))
+	frames := exchangeBarrier(t, gm, encodeBuildCmd("res"))
 	decay.tickHeld(t, 2*reviveCorpseTime*time.Second)
 	if decay.task.Tracked(h) {
 		t.Fatal("decay still tracks the corpse after its deadline")
 	}
 	release()
 	srv.Settle(t)
-	frames = append(frames, settle(t, gm)...)
+	frames = append(frames, settleBarrier(t, gm)...)
 
 	revive, deleted := frameIndex(frames, serverpackets.OpcodeRevive, h.ObjectID()), frameIndex(frames, serverpackets.OpcodeDeleteObject, h.ObjectID())
 	if revive < 0 || deleted < revive {
@@ -205,7 +205,7 @@ func TestAdminManageMonsterResBehindDecay(t *testing.T) {
 
 	release := holdQueue(t, h)
 	decay.tickHeld(t, 2*reviveCorpseTime*time.Second)
-	frames := exchange(t, gm, encodeBuildCmd("res"))
+	frames := exchangeBarrier(t, gm, encodeBuildCmd("res"))
 	requireNoRevive(t, "//res behind the decay", frames)
 	requireNoSystemMessage(t, "//res behind the decay", frames)
 	release()
@@ -214,7 +214,7 @@ func TestAdminManageMonsterResBehindDecay(t *testing.T) {
 	// What the GM then sees is the decay alone: its selection of the
 	// monster is cleared (ActionFailed, TargetUnselected) and the monster
 	// leaves its view.
-	later := settle(t, gm)
+	later := settleBarrier(t, gm)
 	want := []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeTargetUnselected, serverpackets.OpcodeDeleteObject}
 	if got := opcodesOf(later); !slices.Equal(got, want) {
 		t.Fatalf("frames after the decay = %x, want %x: the decay's selection reset and DeleteObject, no Revive", got, want)

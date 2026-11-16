@@ -93,8 +93,17 @@ func charInfoColors(t *testing.T, frame []byte) (name, title int32) {
 	return int32(binary.LittleEndian.Uint32(frame[n-24:])), int32(binary.LittleEndian.Uint32(frame[n-8:]))
 }
 
-// settle returns c's frames received up to now: a barrier sent after them.
+// settle returns c's frames queued up to now, once every actor queue has run
+// what was posted to it (see exchangeSettled). A test that holds an actor
+// queue on purpose reads with settleBarrier instead.
 func settle(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
+	t.Helper()
+	return exchangeSettled(t, c, nil)
+}
+
+// settleBarrier returns c's frames received up to now: a barrier sent after
+// them, which does not wait for the actor queues.
+func settleBarrier(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	return testsupport.SyncBarrierFrames(t, c, func() { c.Send(encodeManorBarrier()) }, serverpackets.OpcodeExtended)
 }

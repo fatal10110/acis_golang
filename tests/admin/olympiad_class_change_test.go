@@ -42,7 +42,7 @@ func TestClassChangeDropsOlympiadRegistration(t *testing.T) {
 
 	exchange(t, gm, encodeBuildCmd("set class 1"))
 	settle(t, user)
-	srv.Advance(t, respawnDelay)
+	advanceRespawn(t, srv)
 	var ids []int
 	for _, f := range settle(t, user) {
 		if id := systemMessageID(f); id >= 0 {

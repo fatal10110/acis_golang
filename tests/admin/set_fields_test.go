@@ -21,6 +21,17 @@ import (
 // the grid (AdminEditChar.java, ThreadPool.schedule(..., 4000)).
 const respawnDelay = 4 * time.Second
 
+// advanceRespawn lets respawnDelay pass. The real pool waits it out on the
+// wall clock, where the player's frames can land either side of the Advance
+// that ends it, so the rest of the test is pinned on the driven clock.
+func advanceRespawn(t *testing.T, srv *gameservertest.Server) {
+	t.Helper()
+	if !srv.DrivesClock() {
+		t.Skip("the respawn delay's end is pinned on the driven clock")
+	}
+	srv.Advance(t, respawnDelay)
+}
+
 // bootSetAdmin boots the GM with the class list page, then brings "Player"
 // (account player2) into the world next to it.
 func bootSetAdmin(t *testing.T) (srv *gameservertest.Server, gm, user *testsupport.ScriptedClient, gmID, userID int32) {
@@ -106,7 +117,7 @@ func TestAdminSetClass(t *testing.T) {
 		t.Fatal("the GM still knows the player taken off the grid")
 	}
 
-	srv.Advance(t, respawnDelay)
+	advanceRespawn(t, srv)
 	frames = settle(t, user)
 	if !hasOpcodes(frames, serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeCharInfo,
 		serverpackets.OpcodeHennaInfo, serverpackets.OpcodeUserInfo, serverpackets.OpcodeUserInfo, serverpackets.OpcodeActionFailed) {
@@ -168,7 +179,7 @@ func TestAdminSetSex(t *testing.T) {
 		t.Fatalf("player sex %v abnormal %#x before the delay, want still male and held", target.Sex(), target.AbnormalEffect())
 	}
 	settle(t, gm)
-	srv.Advance(t, respawnDelay)
+	advanceRespawn(t, srv)
 	frames := settle(t, user)
 	if !hasOpcodes(frames, serverpackets.OpcodeCharInfo, serverpackets.OpcodeUserInfo, serverpackets.OpcodeUserInfo, serverpackets.OpcodeActionFailed) {
 		t.Fatalf("player frames after the delay = %x, want the GM's CharInfo, UserInfo twice, ActionFailed", testsupport.FrameOpcodes(frames))
@@ -198,7 +209,7 @@ func TestAdminSetSexTargetLeaves(t *testing.T) {
 	srv.FlushPersistence(t)
 	storedColumn(t, srv, userID, "sex", "0")
 
-	srv.Advance(t, respawnDelay)
+	advanceRespawn(t, srv)
 	srv.FlushPersistence(t)
 	if got := messages(settle(t, gm)); len(got) != 0 {
 		t.Fatalf("GM messages after the player left = %d, want none", len(got))

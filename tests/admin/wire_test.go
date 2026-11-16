@@ -167,9 +167,20 @@ func encodeManorBarrier() []byte {
 	return w.Bytes()
 }
 
-// exchange sends payload and returns every frame it drew, read up to the
-// manor-list barrier sent after it.
+// exchange sends payload and returns every frame it drew, in wire order,
+// once the server has handled it and every actor queue has run what it
+// posted (see exchangeSettled). A test that holds an actor queue on purpose
+// reads with exchangeBarrier instead, which does not wait for the queues.
 func exchange(t *testing.T, c *testsupport.ScriptedClient, payload []byte) [][]byte {
+	t.Helper()
+	return exchangeSettled(t, c, payload)
+}
+
+// exchangeBarrier sends payload and returns every frame it drew, read up to
+// the manor-list barrier sent after it: the barrier is answered on the
+// connection goroutine, so a frame an actor queue is still to draw is not
+// waited for.
+func exchangeBarrier(t *testing.T, c *testsupport.ScriptedClient, payload []byte) [][]byte {
 	t.Helper()
 	return testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(payload)

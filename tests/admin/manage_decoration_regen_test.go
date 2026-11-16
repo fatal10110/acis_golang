@@ -92,11 +92,12 @@ func TestAdminManageDecorationRegenAfterRes(t *testing.T) {
 	// The subtests run in order so the second compares against the shipped
 	// rate the first reads.
 	var rates [2]float64
+	var ran [2]bool
 	for i, opts := range [][]gameservertest.Option{nil, {gameservertest.WithRegenMultipliers(2, 1, 1)}} {
 		t.Run([]string{"shipped", "multiplied"}[i], func(t *testing.T) {
 			opts = append([]gameservertest.Option{gameservertest.WithNPCs(regenTreeTemplates(false))}, opts...)
 			srv, tree, sweep := bootRegenTreeAdmin(t, opts...)
-			rates[i] = tree.HPRegenRate()
+			rates[i], ran[i] = tree.HPRegenRate(), true
 			manageAround(t, srv, tree, "kill")
 			if !tree.Dead() || tree.Regen().Active() {
 				t.Fatalf("killed tree: dead %v regen armed %v, want dead with no regeneration", tree.Dead(), tree.Regen().Active())
@@ -107,6 +108,9 @@ func TestAdminManageDecorationRegenAfterRes(t *testing.T) {
 	}
 	if t.Failed() {
 		return
+	}
+	if !ran[0] || !ran[1] {
+		t.Skip("pinning the regeneration grid needs the driven clock")
 	}
 	if rates[0] <= 0 || math.Abs(rates[1]-2*rates[0]) > 1e-9 {
 		t.Fatalf("tree HP regen rates shipped %v, at HpRegenMultiplier 2 %v; want a positive rate, doubled", rates[0], rates[1])
