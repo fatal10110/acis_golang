@@ -21,6 +21,9 @@ import (
 const (
 	questName         = "NewbieHelper"
 	questNameTutorial = "Tutorial"
+
+	// guideRewardVar marks a character the newbie guides have paid.
+	guideRewardVar = "guideReward"
 )
 
 // Quest items.
@@ -369,7 +372,10 @@ func onFirstTalk(s *script.Script, e script.FirstTalk) string {
 	}
 
 	if npcID >= 30598 && npcID <= 30602 {
-		if !st.IsCompleted() {
+		// The helper's first talk starts the shared state again, so the
+		// payout keys on its own variable too. A state completed without it
+		// was paid before the variable was kept.
+		if !st.IsCompleted() && st.GetInt(guideRewardVar) == 0 {
 			if p.IsMageClass() {
 				p.PlayTutorialVoice("tutorial_voice_027")
 				s.GiveItems(p, spiritshotNoGradeForBeginners, 100)
@@ -378,6 +384,7 @@ func onFirstTalk(s *script.Script, e script.FirstTalk) string {
 				s.GiveItems(p, soulshotNoGradeForBeginners, 200)
 			}
 			s.GiveItems(p, newbieTravelToken, 12)
+			st.Set(guideRewardVar, strconv.Itoa(1))
 			st.SetStatus(questlog.StatusCompleted)
 		}
 		return page + ".htm"
