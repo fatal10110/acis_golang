@@ -45,7 +45,8 @@ func assertMoveTypes(t *testing.T, when string, got []byte, want ...move.MoveTyp
 // walking on the ground, again walking and swimming for the crossing
 // (WaterZone.java:28-39: NpcInfo, its move speed is not 0), then
 // ChangeMoveType to running flagged swimming, and its NpcInfo running and
-// swimming.
+// swimming, then, as the kit puts it back to walking, ChangeMoveType to
+// walking flagged swimming and its NpcInfo walking and swimming.
 // Removed, it leaves the zone, showing its NpcInfo out of the water before
 // it goes (WaterZone.java:48-59).
 func TestDecorationJoinsTheZonesItStandsIn(t *testing.T) {
@@ -79,11 +80,13 @@ func TestDecorationJoinsTheZonesItStandsIn(t *testing.T) {
 	if !tree.InsideZone(zone.FlagWater) {
 		t.Fatal("tree placed in water is not in it")
 	}
-	assertMoveTypes(t, "placed in water", npcInfoMoveTypes(frames, tree.ObjectID()), move.MoveGround, move.MoveSwim, move.MoveSwim)
+	assertMoveTypes(t, "placed in water", npcInfoMoveTypes(frames, tree.ObjectID()), move.MoveGround, move.MoveSwim, move.MoveSwim, move.MoveSwim)
 	stance := npcStanceFrames(t, frames, tree.ObjectID())
-	if len(stance) != 4 || stance[0].running || stance[1].running ||
-		stance[2] != (npcStanceFrame{opcode: serverpackets.OpcodeChangeMoveType, running: true, swimming: true}) || !stance[3].running {
-		t.Fatalf("tree placed in water: stance frames = %+v, want NpcInfo walking twice, ChangeMoveType running and swimming, NpcInfo running", stance)
+	if len(stance) != 6 || stance[0].running || stance[1].running ||
+		stance[2] != (npcStanceFrame{opcode: serverpackets.OpcodeChangeMoveType, running: true, swimming: true}) || !stance[3].running ||
+		stance[4] != (npcStanceFrame{opcode: serverpackets.OpcodeChangeMoveType, running: false, swimming: true}) ||
+		stance[5].opcode != serverpackets.OpcodeNPCInfo || stance[5].running {
+		t.Fatalf("tree placed in water: stance frames = %+v, want NpcInfo walking twice, ChangeMoveType running and swimming, NpcInfo running, ChangeMoveType walking and swimming, NpcInfo walking", stance)
 	}
 
 	tree.Despawn()

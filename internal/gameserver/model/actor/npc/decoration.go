@@ -108,8 +108,8 @@ func (d *Decoration) Attach(rt DecorationRuntime) {
 
 // Spawn places the decoration in the world at (x, y, z) facing heading,
 // walking, so the players who see it appear are shown it so, then enters the
-// zones at its position and takes its run stance. It is a no-op until Attach
-// has installed a world.
+// zones at its position and takes its run stance; a special Christmas tree
+// then starts its aura. It is a no-op until Attach has installed a world.
 func (d *Decoration) Spawn(x, y, z, heading int) {
 	if d.world == nil {
 		return
@@ -119,20 +119,57 @@ func (d *Decoration) Spawn(x, y, z, heading int) {
 	d.running.Store(false)
 	d.world.Spawn(d, x, y, z, heading)
 	d.zones.enter()
-	takeRunStance(&d.running, d.stats, d.sink)
+	takeStance(&d.running, true, d.stats, d.sink)
+	d.startAura()
 }
 
-// takeRunStance puts a walking fixed-stats NPC in its run stance and shows
-// its observers, through sink, the change: ChangeMoveType when it can move
-// at its run speed, then its info again.
-func takeRunStance(running *atomic.Bool, stats fixedStats, sink event.Sink) {
-	if !running.CompareAndSwap(false, true) || sink == nil {
+// TakeWalkStance puts the decoration back in its walk stance, showing its
+// observers the change as Spawn shows its run stance. It is a no-op while
+// it already walks.
+func (d *Decoration) TakeWalkStance() {
+	d.placeMu.Lock()
+	defer d.placeMu.Unlock()
+	takeStance(&d.running, false, d.stats, d.sink)
+}
+
+// takeStance puts a fixed-stats NPC in its run stance when run and its walk
+// stance otherwise and shows its observers, through sink, the change:
+// ChangeMoveType when it can move at the new stance's speed, then its info
+// again. It does nothing when the NPC already stands so.
+func takeStance(running *atomic.Bool, run bool, stats fixedStats, sink event.Sink) {
+	if !running.CompareAndSwap(!run, run) || sink == nil {
 		return
 	}
-	if stats.moveSpeed != 0 {
-		sink.Emit(event.MoveTypeChanged{Running: true})
+	speed := stats.walkMoveSpeed
+	if run {
+		speed = stats.moveSpeed
+	}
+	if speed != 0 {
+		sink.Emit(event.MoveTypeChanged{Running: run})
 	}
 	sink.Emit(event.NPCInfoChanged{})
+}
+
+// The special Christmas tree's aura: every auraPeriod, from auraPeriod
+// after it spawns until it leaves the world, dead or alive, each player
+// within auraRadius of it not affected by auraSkill lands that skill on
+// itself.
+const (
+	specialTreeID = 13007
+	auraSkillID   = 2139
+	auraRadius    = 200
+	auraPeriod    = 3 * time.Second
+)
+
+// startAura starts the aura of a special Christmas tree on its queue, which
+// stops it when it closes. Any other decoration has none.
+func (d *Decoration) startAura() {
+	if d.Instance.Template.ID != specialTreeID || d.queue == nil || d.sink == nil {
+		return
+	}
+	d.queue.Every(auraPeriod, func() {
+		d.sink.Emit(event.AuraPulse{SkillID: auraSkillID, SkillLevel: 1, Radius: auraRadius})
+	})
 }
 
 // Despawn deletes the decoration, dead or alive: its corpse, if any, no
@@ -339,9 +376,12 @@ func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, m
 		moveMultiplier = stats.moveMultiplier
 	}
 	x, y, z := p.Position()
-	name := ""
+	name, title := "", ""
 	if t.UsingServerSideName {
 		name = inst.Name()
+	}
+	if t.UsingServerSideTitle {
+		title = inst.Title()
 	}
 	return npcinfo.Snapshot{
 		ObjectID: inst.ObjectID, TemplateID: t.TemplateID,
@@ -352,7 +392,7 @@ func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, m
 		MoveType:        moveType,
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
-		Running: running, SummonAnimation: 2, Name: name, Title: inst.Title(),
+		Running: running, SummonAnimation: 2, Name: name, Title: title,
 	}
 }
 
@@ -367,8 +407,9 @@ type fixedStats struct {
 	moveMultiplier, atkSpdMultiplier float64
 	// walkMoveMultiplier is moveMultiplier in the walk stance.
 	walkMoveMultiplier float64
-	// moveSpeed is the speed the NPC runs at.
-	moveSpeed float64
+	// moveSpeed is the speed the NPC runs at, walkMoveSpeed the one it
+	// walks at.
+	moveSpeed, walkMoveSpeed float64
 	// template is what every other stat is finalized from.
 	template *Template
 }
@@ -384,7 +425,7 @@ func settleFixedStats(inst *Instance) fixedStats {
 	// The move speed over the stance's base speed, as a moving NPC computes
 	// it; 0 for a stance whose base is 0.
 	fs.moveSpeed, fs.moveMultiplier = fs.stanceSpeed(int(t.RunSpeed))
-	_, fs.walkMoveMultiplier = fs.stanceSpeed(int(t.WalkSpeed))
+	fs.walkMoveSpeed, fs.walkMoveMultiplier = fs.stanceSpeed(int(t.WalkSpeed))
 	return fs
 }
 

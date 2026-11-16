@@ -246,9 +246,14 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	live.move.Stop()
 	x, y, z := live.Position()
-	if l.placeDecoration(template, live.Character.CharacterName(), x, y, z, live.Heading(), 0) == nil {
+	decoration := l.placeDecoration(template, live.Character.CharacterName(), x, y, z, live.Heading(), 0)
+	if decoration == nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		return true
 	}
+	// An item-placed decoration walks once it has taken its spawn run
+	// stance.
+	decoration.TakeWalkStance()
 	return true
 }
 

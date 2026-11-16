@@ -112,6 +112,15 @@ type HallSupportCast struct {
 func (HallManagerBuffCheck) event() {}
 func (HallSupportCast) event()      {}
 
+// AuraPulse reports one pulse of an NPC's aura: each player within Radius
+// of it not affected by skill SkillID lands that skill's level SkillLevel
+// effects on itself.
+type AuraPulse struct {
+	SkillID, SkillLevel, Radius int
+}
+
+func (AuraPulse) event() {}
+
 // HeadquartersAttacked reports a hit on a siege headquarters whose clan
 // was not warned of an attack in the last 30 seconds: the clan's members
 // are to be warned their base is under attack.
