@@ -55,6 +55,16 @@ type subclassState struct {
 // ClassID returns the class c currently plays.
 func (c *Character) ClassID() int { return int(c.activeClassID.Load()) }
 
+// ActiveClassRace returns the race of the class c currently plays. A
+// subclass of another race's line makes it differ from Race, the race c was
+// created as.
+func (c *Character) ActiveClassRace() Race {
+	if race, ok := ClassRace(c.ClassID()); ok {
+		return race
+	}
+	return c.Race
+}
+
 // SetClassID records the class c plays. Only restore and character
 // creation call it; a live class change goes through SwitchClass or
 // ChangeOccupation.

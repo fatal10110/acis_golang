@@ -76,7 +76,7 @@ func (l *GameClientLink) userCommandLoc(live *livePlayer, _ int32) {
 		return
 	}
 	at := live.CurrentLocation()
-	point, ok := l.restarts.CalculatedPoint(at, live.Race)
+	point, ok := l.restarts.CalculatedPoint(at, live.ActiveClassRace(), live.Race)
 	if !ok {
 		return
 	}
