@@ -30,17 +30,66 @@ func TestSwimmerCannotTargetUnderTheFloor(t *testing.T) {
 	for i := range block.RegionBlocksX * block.RegionBlocksY {
 		floor.SetFlat(i, 0)
 	}
+	swim := bootSwimmer(t, zones, floor.Build())
+
+	under := location.Location{X: 300, Y: 200, Z: -500}
+	if dest := swim(under); dest == under || dest.Z < 0 {
+		t.Fatalf("swim toward %+v under the floor ends at %+v, want a point at or over the floor at 0", under, dest)
+	}
+	over := location.Location{X: 300, Y: 200, Z: 100}
+	if dest := swim(over); dest != over {
+		t.Fatalf("swim toward %+v in the water ends at %+v, want the target", over, dest)
+	}
+}
+
+// TestSwimmerTargetsUnderADeck swims a player in water under a deck: every
+// cell has a seabed at -800 and a deck at 120 over it. A click at 100, just
+// under the deck, is over the seabed and is swum to straight: the deck over
+// it, the layer nearest the target, is no floor under it, and the swimmer's
+// fly-corridor fallback, which the deck would cut short, is not taken
+// (#4846).
+func TestSwimmerTargetsUnderADeck(t *testing.T) {
+	t.Parallel()
+	form, err := zone.NewCuboid(-1_000, 1_000, -1_000, 1_000, -1_000, 150)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewWater(1, form))
+
+	var cells [block.CellCount][]block.Cell
+	for i := range cells {
+		cells[i] = []block.Cell{{Height: -800, NSWE: block.AllDirections}, {Height: 120, NSWE: block.AllDirections}}
+	}
+	decked := block.NewRegionBuilder()
+	for i := range block.RegionBlocksX * block.RegionBlocksY {
+		if err := decked.SetMultilayer(i, cells); err != nil {
+			t.Fatal(err)
+		}
+	}
+	swim := bootSwimmer(t, zones, decked.Build())
+
+	target := location.Location{X: 300, Y: 200, Z: 100}
+	if dest := swim(target); dest != target {
+		t.Fatalf("swim toward %+v under the deck ends at %+v, want the target", target, dest)
+	}
+}
+
+// bootSwimmer boots a player in zones over region as the geodata of the
+// region holding the world origin, and returns a swim that clicks a target
+// and answers where the move goes once the player stands there.
+func bootSwimmer(t *testing.T, zones *zone.Index, region *block.Region) func(location.Location) location.Location {
+	t.Helper()
 	geo := engine.New()
 	tileX := engine.TileXMin + (0-engine.WorldXMin)/engine.TileSize
 	tileY := engine.TileYMin + (0-engine.WorldYMin)/engine.TileSize
-	if err := geo.SetRegion(tileX, tileY, floor.Build()); err != nil {
+	if err := geo.SetRegion(tileX, tileY, region); err != nil {
 		t.Fatalf("SetRegion: %v", err)
 	}
 
 	srv, _, objID := bootInZones(t, zones, gameservertest.WithGeo(move.NewGeo(geo, nil)))
 	c := srv.Client
-
-	swim := func(target location.Location) location.Location {
+	return func(target location.Location) location.Location {
 		t.Helper()
 		c.Send(encodeMoveBackwardToLocation(target, target, 1))
 		expectGroundClickAck(t, c)
@@ -51,14 +100,5 @@ func TestSwimmerCannotTargetUnderTheFloor(t *testing.T) {
 		_, dest, _ := gameservertest.ReadMoveToLocationCoords(t, frame)
 		waitForWorldPosition(t, srv, objID, dest)
 		return dest
-	}
-
-	under := location.Location{X: 300, Y: 200, Z: -500}
-	if dest := swim(under); dest == under || dest.Z < 0 {
-		t.Fatalf("swim toward %+v under the floor ends at %+v, want a point at or over the floor at 0", under, dest)
-	}
-	over := location.Location{X: 300, Y: 200, Z: 100}
-	if dest := swim(over); dest != over {
-		t.Fatalf("swim toward %+v in the water ends at %+v, want the target", over, dest)
 	}
 }

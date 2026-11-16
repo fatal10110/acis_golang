@@ -28,8 +28,8 @@ func roofedEngine(t *testing.T) *Engine {
 	return newTestEngine(t, b)
 }
 
-// The fly line also checks the span it climbs or sinks inside its first and
-// last cell, not only the borders it crosses: an owner-approved divergence
+// The fly line also checks the span it climbs or sinks inside every cell,
+// not only the borders it crosses: an owner-approved divergence
 // from the reference, whose line ends anywhere in its last cell (#4846).
 func TestD19W2ReproFlyThroughRoofSameCell(t *testing.T) {
 	e := roofedEngine(t)
@@ -69,9 +69,9 @@ func TestD19W2ReproFlyThroughRoofSameCell(t *testing.T) {
 	}
 }
 
-// A line leaving its first cell through the roof, or ending in its last one
-// past the roof, is refused even though every border it crosses is clear
-// (#4846, owner-approved divergence).
+// A line crossing the roof inside any cell it walks, first, middle or last,
+// is refused even though every border it crosses is clear (#4846,
+// owner-approved divergence).
 func TestD19W2ReproFlyThroughRoofAcrossCells(t *testing.T) {
 	e := roofedEngine(t)
 	y := worldY(1)
@@ -104,6 +104,27 @@ func TestD19W2ReproFlyThroughRoofAcrossCells(t *testing.T) {
 	want := location.Location{X: worldX(4) - 9, Y: y, Z: 407}
 	if got := e.ValidFlyLocation(from.X, from.Y, from.Z, 32, tx, y, 350); got != want {
 		t.Fatalf("ValidFlyLocation down through the last cell's roof = %+v, want the border into column 4 %+v", got, want)
+	}
+
+	// A steep line between roofed columns crosses the roof inside column
+	// 5, a middle cell, both ways: borders into column 5 over the roof
+	// sinking, under it climbing. Each flight stops on the border it
+	// entered column 5 by, the last unit of the cell it came from.
+	downFrom := location.Location{X: worldX(4), Y: y, Z: 600}
+	if e.CanFly(downFrom.X, downFrom.Y, downFrom.Z, 32, worldX(7), y, 100) {
+		t.Fatal("CanFly down through a middle cell's roof = true, want false")
+	}
+	want = location.Location{X: worldX(5) - 9, Y: y, Z: 528}
+	if got := e.ValidFlyLocation(downFrom.X, downFrom.Y, downFrom.Z, 32, worldX(7), y, 100); got != want {
+		t.Fatalf("ValidFlyLocation down through a middle cell's roof = %+v, want the border into column 5 %+v", got, want)
+	}
+	upFrom := location.Location{X: worldX(7), Y: y, Z: 100}
+	if e.CanFly(upFrom.X, upFrom.Y, upFrom.Z, 32, worldX(4), y, 600) {
+		t.Fatal("CanFly up through a middle cell's roof = true, want false")
+	}
+	want = location.Location{X: worldX(6) - 8, Y: y, Z: 350}
+	if got := e.ValidFlyLocation(upFrom.X, upFrom.Y, upFrom.Z, 32, worldX(4), y, 600); got != want {
+		t.Fatalf("ValidFlyLocation up through a middle cell's roof = %+v, want the border into column 5 %+v", got, want)
 	}
 
 	// Controls: the same lines kept over the roof, or under it from the

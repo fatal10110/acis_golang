@@ -11,9 +11,9 @@ import (
 // CanFly reports whether a flier oheight tall can travel the straight 3D line
 // from (ox,oy,oz) to (tx,ty,tz): every cell the line crosses must keep its
 // floor at or below the line and its ceiling at or above the line plus
-// oheight at each border it crosses, and the line may cross no layer of its
-// first or last cell while it climbs or sinks inside them. A target outside the world
-// never is reachable.
+// oheight at each border it crosses, and the line may cross no layer of any
+// cell while it climbs or sinks inside it. A target outside the world never
+// is reachable.
 func (e *Engine) CanFly(ox, oy, oz int, oheight float64, tx, ty, tz int) bool {
 	if OutOfWorld(tx, ty) {
 		return false
@@ -25,8 +25,9 @@ func (e *Engine) CanFly(ox, oy, oz int, oheight float64, tx, ty, tz int) bool {
 // ValidFlyLocation returns the last point a flier oheight tall reaches on the
 // straight 3D line from (ox,oy,oz) toward (tx,ty,tz): the border of the last
 // cell it clears, at the line's height there, or the target itself when the
-// whole line is clear. A line blocked inside its first cell stops at the
-// origin, and one blocked inside its last cell where it entered that cell. The walk stops at the border of the geodata grid too.
+// whole line is clear. A line blocked inside a cell stops where it entered
+// that cell: the origin for its first cell. The walk stops at the border of
+// the geodata grid too.
 func (e *Engine) ValidFlyLocation(ox, oy, oz int, oheight float64, tx, ty, tz int) location.Location {
 	return e.ValidFlyLocationTraced(ox, oy, oz, oheight, tx, ty, tz, nil)
 }
@@ -46,10 +47,10 @@ func (e *Engine) ValidFlyLocationTraced(ox, oy, oz int, oheight float64, tx, ty,
 // the walk stopped at and whether it ran the whole line. bounded stops the
 // walk at the geodata grid border, a point at the last geodata height read.
 //
-// Inside its first and last cell the line climbs or sinks between the origin,
-// the borders and the target; flySpanClear checks those vertical spans too,
-// so a line can neither leave its first cell nor end in its last one through
-// a roof or floor (#4846).
+// Inside every cell the line climbs or sinks between where it enters the
+// cell (the origin or a border) and where it leaves it (a border or the
+// target); flySpanClear checks those vertical spans too, so a line crosses
+// no roof or floor inside a cell either (#4846).
 func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounded bool, tr *Trace) (location.Location, bool) {
 	gox := GeoX(ox)
 	goy := GeoY(oy)
@@ -78,9 +79,9 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 	// entry is where the line enters the cell the walk stands on: the
 	// origin, then each border crossed at the line's height there.
 	entry := location.Location{X: ox, Y: oy, Z: oz}
-	first := true
 	for gox != gtx || goy != gty {
 		fromX, fromY := gox, goy
+		fromGridX, fromGridY := gridX, gridY
 		checkX := gridX + dir.offsetX
 		checkY := int(float64(oy) + m*float64(checkX-ox))
 
@@ -106,13 +107,12 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 		stepDY := int32(checkY - oy)
 		bottomZ := int32(oz) + commons.TruncInt32Sat(mz*math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY)))
 
-		// Leaving its first cell, the line climbs or sinks from the origin
-		// to bottomZ: that span crosses no layer either.
-		if first && !e.flySpanClear(fromX, fromY, oz, int(bottomZ), height) {
-			tr.cellSquare(TraceRed, alignCell(ox), alignCell(oy), oz-flyTraceDrop)
+		// Inside the cell it leaves, the line climbs or sinks from where it
+		// entered to bottomZ: that span crosses no layer either.
+		if !e.flySpanClear(fromX, fromY, checkZ, int(bottomZ), height) {
+			tr.cellSquare(TraceRed, fromGridX, fromGridY, checkZ-flyTraceDrop)
 			return entry, false
 		}
-		first = false
 
 		// Some geodata always lies below a flier: the highest layer under
 		// the corridor top must stay at or under its bottom.

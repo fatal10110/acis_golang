@@ -66,10 +66,14 @@ outside `_blocks` (an exception), so the probe never asks for one; only the targ
 same line format; `TestFlyMatchesReferenceProbe` replaces the golden line of the same name (and
 query) with it, so `fly.golden` stays the probe's own output and regenerates unchanged.
 
-- `same cell` (#4846): a fly line may not cross a layer of its first or last cell while it climbs
-  or sinks inside it. The reference checks only the borders the line crosses, so its same-cell
+- `same cell` (#4846): a fly line may not cross a layer of any cell while it climbs or sinks
+  inside it. The reference checks only the borders the line crosses, so its same-cell
   drop from 100 to -500 through the floor at 0 is clear; here it is refused and stops at the
-  origin. No other golden line changes.
+  origin.
+- `descent into the floor`, `shallow descent over steps and flat`, `steep descent into flat`,
+  `down into the trench`, `diagonal through ceilings` (#4846): still refused, but each line sinks
+  through the floor of the cell before the border the reference stops at, so it stops one cell
+  earlier, where it entered that cell. No other golden line changes.
 
 ## Regenerating
 

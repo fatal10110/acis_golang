@@ -13,8 +13,8 @@ import (
 // over the top layer down to 40 over the lower one, inside the cell and into
 // the cell east of it. The reference allows all of them inside the cell and
 // nearly all into the next one; here a line that crosses a layer while it
-// sinks inside its first or last cell is refused, an owner-approved
-// divergence (#4846). Inside the cell every line
+// sinks inside a cell is refused, an owner-approved divergence (#4846).
+// Inside the cell every line
 // crosses the top layer. Into the next cell a line with a small gap still
 // crosses the border over the top layer, and is refused only when the east
 // cell has a layer it would sink through. It needs the datapack geodata,
