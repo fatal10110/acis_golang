@@ -5,9 +5,7 @@ import "testing"
 func queuedRequest(t *testing.T, v *SessionValidator, account string, linkDone <-chan struct{}) *authRequest {
 	t.Helper()
 	req := &authRequest{linkDone: linkDone, result: make(chan bool, 1)}
-	if !v.enqueue(account, req) {
-		t.Fatalf("enqueue for %q refused", account)
-	}
+	v.enqueue(account, req)
 	return req
 }
 
@@ -88,14 +86,39 @@ func TestSessionValidatorForgetsRequestsOnClosedLink(t *testing.T) {
 	expectAnswer(t, next, true, "request on the new link")
 }
 
-// TestSessionValidatorRefusesSecondWaitingRequest keeps one waiting client
-// per account: a second request is refused until the first is evicted.
-func TestSessionValidatorRefusesSecondWaitingRequest(t *testing.T) {
+// TestSessionValidatorAnswersEveryWaitingRequestInSendOrder queues several
+// clients waiting on one account, one of them abandoned: each live client
+// gets its own answer in send order, the abandoned one's answer is dropped
+// without running the approval hook, and the hook runs only for the
+// approved client.
+func TestSessionValidatorAnswersEveryWaitingRequestInSendOrder(t *testing.T) {
 	v := newSessionValidator(0)
-	queuedRequest(t, v, "acc", nil)
-	if v.enqueue("acc", &authRequest{result: make(chan bool, 1)}) {
-		t.Fatal("second waiting request for the account accepted")
+	first := queuedRequest(t, v, "acc", nil)
+	gone := queuedRequest(t, v, "acc", nil)
+	v.abandon(gone)
+	third := queuedRequest(t, v, "acc", nil)
+	owner := queuedRequest(t, v, "acc", nil)
+
+	approvals := 0
+	approve := func() { approvals++ }
+	v.ResolveThen("acc", false, approve)
+	expectAnswer(t, first, false, "first request")
+	expectNoAnswer(t, third, "third request after the first answer")
+
+	v.ResolveThen("acc", true, approve)
+	expectNoAnswer(t, third, "third request after the abandoned request's answer")
+	expectNoAnswer(t, owner, "owner request after the abandoned request's answer")
+	if approvals != 0 {
+		t.Fatalf("approvals = %d after the abandoned request's answer, want 0", approvals)
 	}
-	v.Evict("acc")
-	queuedRequest(t, v, "acc", nil)
+
+	v.ResolveThen("acc", false, approve)
+	expectAnswer(t, third, false, "third request")
+	expectNoAnswer(t, owner, "owner request after the third answer")
+
+	v.ResolveThen("acc", true, approve)
+	expectAnswer(t, owner, true, "owner request")
+	if approvals != 1 {
+		t.Fatalf("approvals = %d, want 1", approvals)
+	}
 }
