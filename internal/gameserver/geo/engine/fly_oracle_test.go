@@ -109,12 +109,35 @@ type flyGoldenLine struct {
 	stop   location.Location
 }
 
-// flyGolden reads testdata/fly.golden, the output of testdata/oracle/run.sh:
-// "fly <name> <ox oy oz> <oheight> <tx ty tz> <canFly> <stop x y z>", tab
-// separated.
+// flyGolden reads testdata/fly.golden, the output of testdata/oracle/run.sh,
+// with each line testdata/fly_divergence.golden names replaced by the answer
+// it records there: an owner-approved divergence from the reference.
 func flyGolden(t *testing.T) []flyGoldenLine {
 	t.Helper()
-	f, err := os.Open("testdata/fly.golden")
+	lines := readFlyGolden(t, "testdata/fly.golden")
+	for _, d := range readFlyGolden(t, "testdata/fly_divergence.golden") {
+		found := false
+		for i := range lines {
+			if lines[i].name == d.name {
+				if lines[i].from != d.from || lines[i].to != d.to || lines[i].height != d.height {
+					t.Fatalf("divergence %q asks a different query than the golden line", d.name)
+				}
+				lines[i], found = d, true
+			}
+		}
+		if !found {
+			t.Fatalf("divergence %q names no golden line", d.name)
+		}
+	}
+	return lines
+}
+
+// readFlyGolden reads one fly golden file: "fly <name> <ox oy oz> <oheight>
+// <tx ty tz> <canFly> <stop x y z>", tab separated; a line starting with #
+// is a comment.
+func readFlyGolden(t *testing.T, path string) []flyGoldenLine {
+	t.Helper()
+	f, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,6 +160,9 @@ func flyGolden(t *testing.T) []flyGoldenLine {
 	var out []flyGoldenLine
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
+		if strings.HasPrefix(sc.Text(), "#") {
+			continue
+		}
 		fields := strings.Split(sc.Text(), "\t")
 		if len(fields) != 7 || fields[0] != "fly" {
 			t.Fatalf("golden line %q: want 7 tab separated fields starting with fly", sc.Text())

@@ -5,6 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
@@ -157,6 +159,19 @@ func (e *Engine) NodeBelow(geoX, geoY, worldZ int) (height int16, nswe block.NSW
 		return 0, 0, false
 	}
 	return cell.Height, cell.NSWE, true
+}
+
+// HasLayerAtOrBelow reports whether the geodata cell under world (x,y) has a
+// layer at or below worldZ, a floor something at worldZ stands over. A cell
+// without geodata always has one.
+func (e *Engine) HasLayerAtOrBelow(x, y, worldZ int) bool {
+	geoX, geoY := GeoX(x), GeoY(y)
+	b := e.blockAtGeo(geoX, geoY)
+	if !b.HasGeodata() {
+		return true
+	}
+	layer, _ := b.belowCell(localCell(geoX), localCell(geoY), satAdd32(commons.TruncInt32Sat(float64(worldZ)), 1), nil)
+	return layer != -1
 }
 
 // NodeAtOrAbove returns the resolved height and own decoded NSWE mask of the

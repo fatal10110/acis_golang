@@ -39,6 +39,15 @@ type pathIntoFinder interface {
 
 var _ pathIntoFinder = EngineGeo{}
 
+// floorFinder is a Geo that tells whether a cell has a layer at or below a
+// height: a swimmer's target must stand over one. A Geo without it puts no
+// floor under a swimmer.
+type floorFinder interface {
+	HasLayerAtOrBelow(x, y, z int) bool
+}
+
+var _ floorFinder = EngineGeo{}
+
 // tracedPathFinder is a Geo whose routed search can record the shapes it
 // draws, the search a mover whose paths are debugged runs.
 type tracedPathFinder interface {
@@ -101,6 +110,10 @@ func (g EngineGeo) CanFly(ox, oy, oz int, oheight float64, tx, ty, tz int) bool 
 
 func (g EngineGeo) ValidFlyLocation(ox, oy, oz int, oheight float64, tx, ty, tz int) location.Location {
 	return g.Engine.ValidFlyLocation(ox, oy, oz, oheight, tx, ty, tz)
+}
+
+func (g EngineGeo) HasLayerAtOrBelow(x, y, z int) bool {
+	return g.Engine.HasLayerAtOrBelow(x, y, z)
 }
 
 func (g EngineGeo) Walkable(x, y, z int) bool {
