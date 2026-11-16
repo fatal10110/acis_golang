@@ -402,8 +402,7 @@ func TestMerchantBuyRefusals(t *testing.T) {
 
 // TestMerchantStockSellsOutAndRestocks pins a limited product: selling the
 // last one leaves it out of the window, and the restock puts it back to
-// its full count and deletes its row. A count past the stock already paid
-// for creates nothing.
+// its full count and deletes its row.
 func TestMerchantStockSellsOutAndRestocks(t *testing.T) {
 	t.Parallel()
 	w := bootShop(t, 10000)
