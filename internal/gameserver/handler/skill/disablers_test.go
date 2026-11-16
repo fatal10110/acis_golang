@@ -595,7 +595,7 @@ func TestCheckSkillSuccessResolvesCasterBlessedSpiritshotCharge(t *testing.T) {
 	})
 
 	if !target.lastBss {
-		t.Fatal("checkSkillSuccess should have resolved the caster's blessed-spiritshot charge as true")
+		t.Fatal("checkSkillSuccessBSSWithShield should have resolved the caster's blessed-spiritshot charge as true")
 	}
 }
 

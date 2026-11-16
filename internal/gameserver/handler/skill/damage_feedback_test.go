@@ -298,7 +298,7 @@ func TestChargeDamEvasionReportsDodgeBeforeEffects(t *testing.T) {
 }
 
 // TestManaDamageTagsResistedByOrigin mirrors TestMdamTagsResistedByOrigin
-// for MANADAM's checkSkillSuccess-gated resist (Manadam.java:55) vs. the
+// for MANADAM's checkSkillSuccessBSSWithShield-gated resist (Manadam.java:55) vs. the
 // per-effect-template one it produces on a successful roll.
 func TestManaDamageTagsResistedByOrigin(t *testing.T) {
 	registry := NewDefaultRegistry()

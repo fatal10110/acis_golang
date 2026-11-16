@@ -98,23 +98,11 @@ func (disablersHandler) Use(cast Cast) {
 	writeSpiritshot(cast.Caster, bsps, cast.Skill.StaticReuse)
 }
 
-// checkSkillSuccess rolls an effect-landing attempt of def against target,
-// folding in the caster's blessed-spiritshot charge and the target's
-// shield-block outcome against this cast. ok is false when target exposes
-// no resolved-landing-rate source, letting a caller decide whether to treat
-// that as "doesn't apply" or fall back.
-func checkSkillSuccess(caster Creature, target Actor, def modelskill.Definition) (succeeded, ok bool) {
-	return checkSkillSuccessBSS(caster, target, def, blessedSpiritshotCharged(caster))
-}
-
-// checkSkillSuccessBSS is checkSkillSuccess with the blessed-spiritshot
-// input forced to bss rather than read from caster's real charge state —
-// a blow's landing roll forces this input true regardless of the caster's
-// actual charge, unlike every other landing-rate roll.
-func checkSkillSuccessBSS(caster Creature, target Actor, def modelskill.Definition, bss bool) (succeeded, ok bool) {
-	return checkSkillSuccessBSSWithShield(caster, target, def, bss, resolveShieldDefense(caster, target, def))
-}
-
+// checkSkillSuccessBSSWithShield rolls an effect-landing attempt of def
+// against target with the caster's blessed-spiritshot input bss and the
+// target's already sampled shield-block outcome. ok is false when target
+// exposes no resolved-landing-rate source, letting a caller decide whether to
+// treat that as "doesn't apply" or fall back.
 func checkSkillSuccessBSSWithShield(caster Creature, target Actor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (succeeded, ok bool) {
 	src, ok := asCreature(target)
 	if !ok {

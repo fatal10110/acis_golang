@@ -10,7 +10,8 @@ import (
 // fearImmunePlayableSkillIDs are the skills whose FEAR effect must not land on
 // a player-controlled target even when the success roll would otherwise pass.
 // The list is fixed by the fear effect itself; the continuous handler applies
-// it as a caster-side gate.
+// it as a caster-side gate, and a PDAM among them skips playable targets
+// outright.
 var fearImmunePlayableSkillIDs = map[modelskill.ID]bool{98: true, 1272: true, 1381: true}
 
 type continuousHandler struct {
