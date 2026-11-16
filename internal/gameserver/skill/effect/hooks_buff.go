@@ -180,8 +180,8 @@ func shuffleEffects(candidates []*Effect) {
 
 // negateStart strips every active effect on the effected actor that's owned
 // by one of e.Skill.NegateIDs, plus every active effect whose classification
-// matches one of e.Skill.NegateTypes and whose abnormal level (per-effect
-// when its owning skill sets EffectType, per-skill otherwise) is within
+// matches one of e.Skill.NegateTypes and whose effect or skill abnormal level
+// is within
 // e.Skill.NegateLevel — or any level when NegateLevel is -1.
 func negateStart(e *Effect) bool {
 	list := e.Effected.EffectList()
@@ -216,7 +216,7 @@ func negateStart(e *Effect) bool {
 }
 
 // negateTypeMatches reports whether candidate's classification (its own
-// skill type, or its own effect-type tag when set) matches negType.
+// skill type, or its resolved effect type) matches negType.
 func negateTypeMatches(candidate Skill, negType string) bool {
 	if strings.EqualFold(candidate.SkillType, negType) {
 		return true
@@ -224,9 +224,9 @@ func negateTypeMatches(candidate Skill, negType string) bool {
 	return candidate.EffectType != "" && strings.EqualFold(candidate.EffectType, negType)
 }
 
-// negateLevelAllows reports whether candidate's applicable abnormal level
-// (EffectAbnormalLevel when its own EffectType is set, AbnormalLevel
-// otherwise) is within negateLvl, or negateLvl is -1 (unrestricted).
+// negateLevelAllows reports whether either of candidate's set abnormal
+// levels (EffectAbnormalLevel or AbnormalLevel) is within negateLvl, or
+// negateLvl is -1 (unrestricted).
 func negateLevelAllows(candidate Skill, negateLvl int) bool {
 	if negateLvl == -1 {
 		return true
