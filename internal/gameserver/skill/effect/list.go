@@ -151,7 +151,7 @@ func (l *List) HasHeld() bool {
 }
 
 // quietLocked reports whether the owner-message helpers leave their
-// messages out: during an AddRestored's insertion (silent) or a restored
+// messages out: during a silent AddRestored's insertion (silent) or a restored
 // tick's catch-up (catchingUp). Caller must hold l.mu.
 func (l *List) quietLocked() bool {
 	return l.silent || l.catchingUp.Load() > 0
@@ -199,7 +199,8 @@ type List struct {
 	tracked bool
 	// untracked records that Untrack ran; l never registers again.
 	untracked bool
-	// silent is set only for the duration of an AddRestored's l.mu holds.
+	// silent is set only for the duration of a silent AddRestored's l.mu
+	// holds (one outside a RestoreAnnounced).
 	// The owner-message helpers read it while queueing, so the messages
 	// that insertion would queue are left out.
 	silent bool
