@@ -30,9 +30,15 @@ type Ticker struct {
 }
 
 // Start launches a goroutine that calls fn every period, starting after the
-// first period elapses. A panic inside fn is recovered and logged so one bad
-// tick never stops later ticks or crashes the process. A zero-value logger
-// disables logging. Callers must call Stop to release the goroutine.
+// first period elapses. Runs are due at fixed instants, start + k*period, and
+// never overlap. A run that overruns, or a goroutine stalled past one or more
+// due instants, does not drop the missed runs: every overdue run then follows
+// the previous one back to back until the ticker catches up with the clock,
+// so fn is called once per elapsed period and a callback that counts its
+// calls stays locked to real time. A Stop between two overdue runs ends the
+// catch-up. A panic inside fn is recovered and logged so one bad tick never
+// stops later ticks or crashes the process. A zero-value logger disables
+// logging. Callers must call Stop to release the goroutine.
 func Start(period time.Duration, fn func(), log zerolog.Logger) *Ticker {
 	return start(period, func(context.Context) { fn() }, statsFor(fn), log)
 }
@@ -55,16 +61,29 @@ func start(period time.Duration, fn func(context.Context), stats *tickStat, log 
 func (t *Ticker) run(ctx context.Context, period time.Duration, fn func(context.Context), log zerolog.Logger, stats *tickStat) {
 	defer close(t.done)
 
-	ticker := time.NewTicker(period)
-	defer ticker.Stop()
-
+	// due is the instant the next run is owed. It advances by exactly one
+	// period per run, never from the time a run ends, so an overrun leaves it
+	// in the past and the owed runs follow at once.
+	due := time.Now().Add(period)
+	timer := time.NewTimer(period)
+	defer timer.Stop()
 	for {
-		select {
-		case <-t.stop:
-			return
-		case <-ticker.C:
-			tick(ctx, fn, log, stats)
+		if wait := time.Until(due); wait > 0 {
+			timer.Reset(wait)
+			select {
+			case <-t.stop:
+				return
+			case <-timer.C:
+			}
+		} else {
+			select {
+			case <-t.stop:
+				return
+			default:
+			}
 		}
+		tick(ctx, fn, log, stats)
+		due = due.Add(period)
 	}
 }
 
