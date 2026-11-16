@@ -37,8 +37,10 @@ func logger() *zerolog.Logger {
 
 var defaultWarnLog = zerolog.New(os.Stderr).With().Timestamp().Logger()
 
-// DefaultDelimiters is the split pattern used by the legacy typed array getters.
-const DefaultDelimiters = `[\s,;]+`
+// DefaultDelimiters is the split pattern used by the legacy typed array
+// getters. Its whitespace class includes the vertical tab, which RE2's \s
+// leaves out.
+const DefaultDelimiters = `[\s\x0B,;]+`
 
 // ShippedFiles is the config/*.properties set expected by the current server.
 var ShippedFiles = []string{
@@ -239,10 +241,18 @@ func (p *Properties) Bool(key string, def bool) bool {
 	return def
 }
 
-// Int returns an int property or def when key is missing.
+// parseInt32 parses a base-10 int that must fit in 32 bits, as every int
+// config value does.
+func parseInt32(s string) (int, error) {
+	n, err := strconv.ParseInt(s, 10, 32)
+	return int(n), err
+}
+
+// Int returns an int property or def when key is missing. The value must
+// fit in 32 bits.
 func (p *Properties) Int(key string, def int) (int, error) {
 	if value, ok := p.Lookup(key); ok {
-		n, err := strconv.Atoi(value)
+		n, err := parseInt32(value)
 		if err != nil {
 			return 0, fmt.Errorf("parse %s as int: %w", key, err)
 		}
@@ -261,7 +271,7 @@ func (p *Properties) OptionalInt(key string) (int, bool, error) {
 	if !ok {
 		return 0, false, nil
 	}
-	n, err := strconv.Atoi(value)
+	n, err := parseInt32(value)
 	if err != nil {
 		return 0, false, fmt.Errorf("parse %s as int: %w", key, err)
 	}
@@ -324,7 +334,7 @@ func (p *Properties) Ints(key string, def []int) ([]int, error) {
 		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]int, len(parts))
 		for i, part := range parts {
-			n, err := strconv.Atoi(part)
+			n, err := parseInt32(part)
 			if err != nil {
 				return nil, fmt.Errorf("parse %s[%d] as int: %w", key, i, err)
 			}
@@ -373,67 +383,75 @@ func (p *Properties) Float64s(key string, def []float64) ([]float64, error) {
 	return def, nil
 }
 
-// pairSep is the separator between entries in an IntPairs list value.
-const pairSep = ";"
-
 // IntPairs returns pairs parsed from a value shaped like "57-100;6651-3",
-// or def parsed the same way when key is missing. A malformed entry, a
-// number outside int32 included, logs and returns an empty list.
+// or def parsed the same way when key is missing; a missing key is not
+// logged. Entries and numbers are taken as written, untrimmed. A malformed
+// entry — not exactly two '-'-separated parts, or a number that is not an
+// int32 — logs and returns an empty list.
 func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
-	return p.intPairsSep(pairSep, key, def, true)
+	value, ok := p.Lookup(key)
+	if !ok {
+		value = def
+	}
+	entries := splitLiteralTrimTrailingEmpty(value, ";")
+	if len(entries) == 0 {
+		return nil, nil
+	}
+	out := make([]IntPair, len(entries))
+	for i, entry := range entries {
+		bounds := splitLiteralTrimTrailingEmpty(entry, "-")
+		if len(bounds) != 2 {
+			logger().Warn().Str("key", key).Str("entry", entry).Msg("config item pair malformed, want first-second; using empty list")
+			return nil, nil
+		}
+		pair, err := parseIntPair(bounds)
+		if err != nil {
+			logger().Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
+			return nil, nil
+		}
+		out[i] = pair
+	}
+	return out, nil
 }
 
 // IntPairsComma returns pairs parsed from a comma-separated list of
-// first-second entries. A malformed entry is an error: this form backs
-// config keys whose reference readers let a bad number abort loading.
+// first-second entries, or def parsed the same way when key is missing.
+// Entries and numbers are taken as written, untrimmed, and parts after the
+// second are ignored. An entry with fewer than two parts or a number that
+// is not an int32 is an error: this form backs config keys whose readers
+// let a bad value abort loading.
 func (p *Properties) IntPairsComma(key, def string) ([]IntPair, error) {
-	return p.intPairsSep(",", key, def, false)
-}
-
-func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair, error) {
-	value := def
-	if found, ok := p.Lookup(key); ok {
-		value = found
-	} else {
+	value, ok := p.Lookup(key)
+	if !ok {
 		warnMissing(key, def)
+		value = def
 	}
-	if strings.TrimSpace(value) == "" {
-		return nil, nil
-	}
-
-	parts := trimTrailingEmpty(strings.Split(value, sep))
-	out := make([]IntPair, len(parts))
-	for i, part := range parts {
-		bounds := splitLiteralTrimTrailingEmpty(strings.TrimSpace(part), "-")
-		if len(bounds) != 2 {
-			err := fmt.Errorf("parse %s[%d]: want first-second", key, i)
-			if tolerant {
-				logger().Warn().Err(err).Str("key", key).Msg("config item pair malformed; using empty list")
-				return nil, nil
-			}
-			return nil, err
+	entries := splitLiteralTrimTrailingEmpty(value, ",")
+	out := make([]IntPair, len(entries))
+	for i, entry := range entries {
+		bounds := splitLiteralTrimTrailingEmpty(entry, "-")
+		if len(bounds) < 2 {
+			return nil, fmt.Errorf("parse %s[%d] %q: want first-second", key, i, entry)
 		}
-		first, err := strconv.ParseInt(strings.TrimSpace(bounds[0]), 10, 32)
+		pair, err := parseIntPair(bounds[:2])
 		if err != nil {
-			err = fmt.Errorf("parse %s[%d] first: %w", key, i, err)
-			if tolerant {
-				logger().Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
-				return nil, nil
-			}
-			return nil, err
+			return nil, fmt.Errorf("parse %s[%d]: %w", key, i, err)
 		}
-		second, err := strconv.ParseInt(strings.TrimSpace(bounds[1]), 10, 32)
-		if err != nil {
-			err = fmt.Errorf("parse %s[%d] second: %w", key, i, err)
-			if tolerant {
-				logger().Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
-				return nil, nil
-			}
-			return nil, err
-		}
-		out[i] = IntPair{First: int(first), Second: int(second)}
+		out[i] = pair
 	}
 	return out, nil
+}
+
+func parseIntPair(bounds []string) (IntPair, error) {
+	first, err := parseInt32(bounds[0])
+	if err != nil {
+		return IntPair{}, fmt.Errorf("first: %w", err)
+	}
+	second, err := parseInt32(bounds[1])
+	if err != nil {
+		return IntPair{}, fmt.Errorf("second: %w", err)
+	}
+	return IntPair{First: first, Second: second}, nil
 }
 
 // decodeLatin1 reads every byte of data as the ISO-8859-1 character of the
@@ -633,8 +651,15 @@ func splitLiteralTrimTrailingEmpty(s, sep string) []string {
 	return trimTrailingEmpty(strings.Split(s, sep))
 }
 
+// trimTrailingEmpty gives a split result the shape the config format
+// expects: an input the separator never matched stays one element, even
+// when empty, and otherwise every trailing empty element is dropped, so a
+// value made only of separators has none.
 func trimTrailingEmpty(parts []string) []string {
-	for len(parts) > 1 && parts[len(parts)-1] == "" {
+	if len(parts) == 1 {
+		return parts
+	}
+	for len(parts) > 0 && parts[len(parts)-1] == "" {
 		parts = parts[:len(parts)-1]
 	}
 	return parts
