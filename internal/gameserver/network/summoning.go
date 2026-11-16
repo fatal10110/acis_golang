@@ -27,6 +27,10 @@ type SummoningConfig struct {
 	FeedPeriod time.Duration
 	// Decay removes a dead summon's corpse once its decay delay has passed.
 	Decay *task.Decay
+	// SpawnDirection picks the compass direction a summon called out
+	// appears in from its owner, -1, 0 or 1 along each axis and never both
+	// 0; nil draws each of the eight equally often.
+	SpawnDirection func() (dx, dy int)
 }
 
 // summoning is the summon feature: the summon items and pet rows, the pet
@@ -50,6 +54,9 @@ type summoning struct {
 	// decay removes a dead summon's corpse at its deadline; nil leaves
 	// summon corpses in the world. NPC corpses register with the same task.
 	decay *task.Decay
+	// spawnDirection picks the compass direction every summon called out
+	// appears in from its owner.
+	spawnDirection func() (dx, dy int)
 }
 
 // petStore is the narrow persistence surface a pet-collar restore needs:
@@ -63,6 +70,10 @@ type petStore interface {
 // newSummoning builds the summon feature from cfg's tables, store, pet
 // settings and dice.
 func newSummoning(cfg GameClientLinkConfig) summoning {
+	spawnDirection := cfg.Summoning.SpawnDirection
+	if spawnDirection == nil {
+		spawnDirection = randomCompassDirection
+	}
 	return summoning{
 		items:      cfg.Summoning.Items,
 		store:      cfg.Summoning.Store,
@@ -71,6 +82,8 @@ func newSummoning(cfg GameClientLinkConfig) summoning {
 		feedPeriod: cfg.Summoning.FeedPeriod,
 		petItems:   petitem.NewService(cfg.IDs),
 		decay:      cfg.Summoning.Decay,
+
+		spawnDirection: spawnDirection,
 	}
 }
 

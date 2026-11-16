@@ -259,6 +259,7 @@ type options struct {
 	fish                   *fish.Table
 	fishingRoll            func(n int) int
 	petRoll                func(n int) int
+	randomSummonSpawn      bool
 	petFeedPeriod          time.Duration
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
@@ -906,6 +907,23 @@ func WithFish(table *fish.Table) Option {
 // the random source), so a pet's hunger is deterministic.
 func WithPetRoll(roll func(n int) int) Option {
 	return func(o *options) { o.petRoll = roll }
+}
+
+// WithRandomSummonSpawn lets every summon called out appear in a random one
+// of the eight compass directions around its owner, as the server does. By
+// default each appears due east of its owner (+X), so a suite knows where it
+// stands.
+func WithRandomSummonSpawn() Option {
+	return func(o *options) { o.randomSummonSpawn = true }
+}
+
+// summonSpawnDirection is the summon spawn direction a harness hands the
+// server: due east, or nil, the server's own random draw, when random.
+func summonSpawnDirection(random bool) func() (dx, dy int) {
+	if random {
+		return nil
+	}
+	return func() (int, int) { return 1, 0 }
 }
 
 // WithPetFeedPeriod makes every pet called out eat every period (default:
@@ -2309,6 +2327,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			Roll:       o.petRoll,
 			FeedPeriod: o.petFeedPeriod,
 			Decay:      o.decay,
+
+			SpawnDirection: summonSpawnDirection(o.randomSummonSpawn),
 		},
 		Enchanting: network.EnchantingConfig{
 			Roll:      o.enchantRoll,

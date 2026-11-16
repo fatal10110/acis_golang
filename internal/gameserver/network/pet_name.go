@@ -148,6 +148,7 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 	if inv := live.Inventory(); inv != nil {
 		inv.SetCustomType2(inv.ItemByObjectID(actor.ControlItemID()), 1)
 	}
-	actor.UpdateStatus()
+	// Only the owner's pet window shows the new name now: watchers read it
+	// with the pet's next broadcast.
 	sendSummonInfosToOwner(actor)
 }

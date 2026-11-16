@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -36,7 +37,37 @@ type gameSummonSpawner struct {
 	live *livePlayer
 }
 
-const petSpawnOffset = 40
+// summonSpawnOffset is how far, along each axis its direction points, a
+// summon appears from its owner.
+const summonSpawnOffset = 40
+
+// summonSoullessSkillID is the servitor summon whose caster pays for it with
+// the Contract Payment upkeep debuff.
+const summonSoullessSkillID modelskill.ID = 1278
+
+// summonSpawnPoint returns where live's summon appears and the heading it
+// faces: summonSpawnOffset from live along each axis of one of the eight
+// compass directions, facing live, then pulled back to where geodata lets it
+// stand on the way out from live.
+func (l *GameClientLink) summonSpawnPoint(live *livePlayer) (location.Location, int) {
+	owner := live.CurrentLocation()
+	dx, dy := l.summoning.spawnDirection()
+	at := location.Location{X: owner.X + dx*summonSpawnOffset, Y: owner.Y + dy*summonSpawnOffset, Z: owner.Z}
+	heading := at.HeadingTo(owner)
+	if l.geo != nil {
+		at = l.geo.ValidLocation(owner.X, owner.Y, owner.Z, at.X, at.Y, at.Z)
+	}
+	return at, heading
+}
+
+// randomCompassDirection draws one of the eight compass directions, each
+// equally often, as -1, 0 or 1 along each axis.
+func randomCompassDirection() (dx, dy int) {
+	for dx == 0 && dy == 0 {
+		dx, dy = rnd.GetRange(-1, 1), rnd.GetRange(-1, 1)
+	}
+	return dx, dy
+}
 
 // petRestoreTimeout bounds the pet-restore DB read: it runs on the cast's
 // Hit-phase timer, not a request goroutine, so there's no connection-scoped
@@ -382,8 +413,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// reject it" (live_accessors.go), which is exactly what a cast
 	// controller-less ai.Summon already does by design.
 	//
-	// Attach must run before SpawnBesideOwner publishes pet into world.State:
-	// SpawnBesideOwner's registry writes take a mutex, giving a
+	// Attach must run before SpawnAt publishes pet into world.State:
+	// SpawnAt's registry writes take a mutex, giving a
 	// happens-before edge to any other goroutine's registry read (e.g. the
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
 	// Setting brain first means that edge also covers the brain field,
@@ -391,8 +422,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	link.wireSummonAI(pet)
 	pet.SyncControlItemEnchant()
 
-	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
-	summon.SpawnBesideOwner(link.world, pet, live, offset)
+	at, heading := link.summonSpawnPoint(live)
+	summon.SpawnAt(link.world, pet, live, at, heading)
 	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
 	// The NPCs around the pet see it arrive.
@@ -517,7 +548,8 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		return false
 	}
 	link.wireSummonAI(servitor)
-	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
+	at, heading := link.summonSpawnPoint(live)
+	summon.SpawnAt(link.world, servitor, live, at, heading)
 	// A siege summon that lands off an active battlefield is shown, then
 	// vanishes at once; it never starts following.
 	offBattlefield := servitor.OffBattlefield()
@@ -530,9 +562,24 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if offBattlefield {
 		servitor.Vanish()
 	}
+	if def.ID == summonSoullessSkillID {
+		link.payContract(live, def.Level)
+	}
 	// Only a summon that went through spends the cast's spiritshot.
 	live.Character.SpendSpiritshot(def.StaticReuse)
 	return true
+}
+
+// payContract lands the Contract Payment upkeep on live, from live, at the
+// summon skill's level less two, kept within the debuff's twelve levels.
+func (l *GameClientLink) payContract(live *livePlayer, summonLevel int) {
+	if l.skills == nil {
+		return
+	}
+	ref := modelskill.Ref{ID: modelskill.ContractPaymentSkillID, Level: min(max(summonLevel-2, 1), 12)}
+	if def, ok := l.skills.Definition(ref); ok {
+		handlerskill.LandEffects(live.Character, live.Character, *def)
+	}
 }
 
 // wireSummonAI attaches actor's AI brain, cast controller, status/damage
