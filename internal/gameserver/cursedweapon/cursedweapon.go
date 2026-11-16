@@ -98,6 +98,10 @@ type Manager struct {
 	// byID and order are set at construction and by Reload.
 	byID  map[int32]*weapon
 	order []*weapon
+	// dead holds the object ids of ground items a game master ended the
+	// weapon of while a pickup held them: the pickup arms nothing with one
+	// (Activate), and one that lets go takes it out of the world (LetGo).
+	dead map[int32]struct{}
 }
 
 // weapon is one cursed weapon's definition and state.
@@ -314,10 +318,11 @@ func (m *Manager) RollDrop(roll Roll) (int32, bool) {
 
 // Ground is a weapon's item lying on the ground. Whatever takes it out of
 // the world claims it first, and only one claim ever succeeds: a pickup's,
-// or the weapon's end.
+// or the weapon's end. A claim that took nothing is let go (Release).
 type Ground interface {
 	ObjectID() int32
 	Claim() bool
+	Release()
 }
 
 // PlaceOnGround records where itemID's weapon lies: as ground, at.
@@ -341,6 +346,8 @@ type Holder struct {
 	PKKills  int32
 	// HeldItemID is the weapon the player already holds, 0 for none.
 	HeldItemID int32
+	// ItemObjectID is the item the player obtained, 0 for none known.
+	ItemObjectID int32
 }
 
 // Activation is what obtaining a weapon did.
@@ -355,6 +362,9 @@ type Activation struct {
 	End         EndOfLife
 	// Stage is the stage of the weapon the player now holds.
 	Stage int32
+	// Dead: the item obtained lay on the ground for a weapon a game master
+	// ended meanwhile. It arms nothing, and the caller destroys it.
+	Dead bool
 }
 
 // Activate makes h the holder of itemID's weapon, which it just obtained.
@@ -370,6 +380,10 @@ func (m *Manager) Activate(itemID int32, h Holder, roll Roll) (Activation, bool)
 	w := m.byID[itemID]
 	if w == nil {
 		return Activation{}, false
+	}
+	if _, dead := m.dead[h.ItemObjectID]; dead && h.ItemObjectID != 0 {
+		delete(m.dead, h.ItemObjectID)
+		return Activation{Dead: true}, true
 	}
 	if held := m.byID[h.HeldItemID]; held != nil && h.HeldItemID != 0 {
 		ranked := held.rankUp()
@@ -609,6 +623,48 @@ func (m *Manager) tickLocked(w *weapon, now time.Time) (EndOfLife, []Reminder, b
 			w.dropAt = time.Time{}
 		}
 	}
+}
+
+// gmEndLocked ends w for a game master. A weapon lying on the ground ends
+// with its ground item claimed for the removal; while a pickup holds the
+// item, the end leaves it to the pickup instead, dead: the pickup arms
+// nothing with it. The caller holds mu.
+func (m *Manager) gmEndLocked(w *weapon) EndOfLife {
+	var claimed bool
+	var held int32
+	if !w.activated && w.ground != nil {
+		if claimed = w.ground.Claim(); !claimed {
+			held = w.ground.ObjectID()
+		}
+	}
+	end := m.endOfLifeLocked(w)
+	end.GroundClaimed = claimed
+	if held != 0 {
+		end.GroundObjectID = 0
+		if m.dead == nil {
+			m.dead = make(map[int32]struct{})
+		}
+		m.dead[held] = struct{}{}
+	}
+	return end
+}
+
+// LetGo lets go of g, which a pickup that took nothing claimed. When g is
+// the item of a weapon a game master ended meanwhile, it keeps the claim
+// instead and reports true: the caller takes g out of the world.
+func (m *Manager) LetGo(g Ground) bool {
+	if m == nil {
+		g.Release()
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, dead := m.dead[g.ObjectID()]; dead {
+		delete(m.dead, g.ObjectID())
+		return true
+	}
+	g.Release()
+	return false
 }
 
 // groundEndLocked ends w from its timers, with reminders already due. A

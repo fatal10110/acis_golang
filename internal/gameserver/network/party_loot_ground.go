@@ -85,7 +85,7 @@ func (l *GameClientLink) petPickupForParty(owner *livePlayer, pet *summon.Actor,
 		defer end()
 		persist, ok := petitem.StoreGround(petInv, ground)
 		if !ok {
-			ground.Release()
+			l.releaseGround(ground)
 			owner.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
@@ -96,7 +96,7 @@ func (l *GameClientLink) petPickupForParty(owner *livePlayer, pet *summon.Actor,
 		return
 	}
 	if !l.storeGroundWith(looter.Inventory(), ground) {
-		ground.Release()
+		l.releaseGround(ground)
 		owner.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

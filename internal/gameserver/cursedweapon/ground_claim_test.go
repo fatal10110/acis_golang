@@ -24,6 +24,8 @@ func (g *fakeGround) Claim() bool {
 	return true
 }
 
+func (g *fakeGround) Release() { g.claimed = false }
+
 // TestGroundEndWaitsForAPickupHoldingTheItem: a pickup holding the ground
 // item as the weapon's hour on the ground runs out keeps the weapon out,
 // and finishing it makes the picker the holder with the life the drop
