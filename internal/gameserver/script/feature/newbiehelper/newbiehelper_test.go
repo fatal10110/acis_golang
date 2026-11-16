@@ -13,10 +13,13 @@ const path = "script.feature.NewbieHelper"
 // class: literals, engine calls and hook shapes. The reference names the
 // starting classes by enum and the blessing by its frequent-skill entry;
 // the port writes their ids. 32 is the bit size of the radar id parse,
-// the range Integer.parseInt accepts.
+// the range Integer.parseInt accepts. The guide's own payout variable is
+// an owner-approved fix (#5159): the reference keys the payout on the
+// state's status alone, which the helper's first talk reopens.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{path},
-		"number 18", "number 31", "number 38", "number 44", "number 49", "number 53", "number 5182", "number 32")
+		"number 18", "number 31", "number 38", "number 44", "number 49", "number 53", "number 5182", "number 32",
+		"string \"guideReward\"")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -367,7 +367,7 @@ func TestNewbieGuideShotsTokensAdviceAndRadar(t *testing.T) {
 	expectLines(t, "guide, first talk", w.talk(t, guide.ObjectID()), "ActionFailed", "sound tutorial_voice_026", "page 30598.htm", "ActionFailed")
 	expectCount(t, w, beginnerShots, 200)
 	expectCount(t, w, travelToken, 12)
-	expectVars(t, w, newbieHelper, map[string]string{"<state>": "COMPLETED"})
+	expectVars(t, w, newbieHelper, map[string]string{"<state>": "COMPLETED", "guideReward": "1"})
 	expectLines(t, "guide, second talk", w.talk(t, guide.ObjectID()), "ActionFailed", "page 30598.htm", "ActionFailed")
 	expectCount(t, w, beginnerShots, 200)
 	expectCount(t, w, travelToken, 12)
