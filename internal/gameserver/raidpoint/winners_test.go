@@ -32,8 +32,9 @@ func (w *laneWriter) Enqueue(ownerID int32, job func()) bool {
 }
 
 // TestWinnersRanksFirstHundred: players with no points are left out, the
-// highest totals come first, equal totals by object id, and no more than
-// 100 are returned.
+// highest totals come first, equal totals in hash-table order (here by
+// object id, as each of the 118 holders has its own bucket of 256), and no
+// more than 100 are returned.
 func TestWinnersRanksFirstHundred(t *testing.T) {
 	p := New(&opStore{}, nil, zerolog.Nop())
 	for id := int32(1); id <= 120; id++ {

@@ -105,7 +105,8 @@ func members(t *testing.T, r *Registry[*fake], roomID int32) []int32 {
 func onWaiting(r *Registry[*fake], p *fake) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return slices.ContainsFunc(r.waiting, func(m *fake) bool { return m.id == p.id })
+	_, ok := r.waiting[p.id]
+	return ok
 }
 
 func TestOpenLeavesDepartedPartyMemberOut(t *testing.T) {

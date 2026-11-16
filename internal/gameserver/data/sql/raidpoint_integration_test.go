@@ -76,10 +76,11 @@ func TestRaidPointsWriteThroughStore(t *testing.T) {
 		t.Fatalf("restored zero-point record = %+v, want found, unranked", got)
 	}
 
-	// Equal totals rank by object id.
-	again.Add(0x10000003, 25003, 15)
-	if a, b := again.Record(0x10000001).Rank, again.Record(0x10000003).Rank; a != 1 || b != 2 {
-		t.Fatalf("tied ranks = %d, %d; want 1, 2", a, b)
+	// Equal totals rank in hash-table order: 0x10000010 folds into
+	// bucket 0, ahead of 0x10000001 in bucket 1.
+	again.Add(0x10000010, 25003, 15)
+	if a, b := again.Record(0x10000001).Rank, again.Record(0x10000010).Rank; a != 2 || b != 1 {
+		t.Fatalf("tied ranks = %d, %d; want 2, 1", a, b)
 	}
 }
 
