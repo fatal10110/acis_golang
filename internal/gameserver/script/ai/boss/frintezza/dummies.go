@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -40,7 +41,7 @@ func FrintezzaSeeker() script.Script {
 			if !n.DBLoaded() {
 				return
 			}
-			c0 := memoNPC(s, "4")
+			c0 := memoNPC(s, bossmemo.Frintezza)
 			if c0 != nil && !c0.Dead() {
 				if c0.DBValue() > 1 {
 					n.DeleteMe()
@@ -53,7 +54,7 @@ func FrintezzaSeeker() script.Script {
 			if !e.Creature.Playable() {
 				return
 			}
-			c0 := memoNPC(s, "4")
+			c0 := memoNPC(s, bossmemo.Frintezza)
 			if c0 != nil && !c0.Dead() && c0.DBValue() <= 1 {
 				s.SendScriptEvent(c0, 0, 2, 0)
 				e.NPC.DeleteMe()

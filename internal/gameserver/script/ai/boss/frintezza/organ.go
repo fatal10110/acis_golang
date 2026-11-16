@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -24,7 +25,7 @@ func OrganDummy() script.Script {
 	base := defaultnpc.New().Hooks
 	return script.Script{Dir: dir, Behavior: true, NPCs: []int32{29052}, Hooks: base.With(script.Hooks{
 		OnCreated: func(s *script.Script, e script.Created) {
-			if c0 := memoNPC(s, "4"); c0 != nil && c0.DBValue() >= 4 {
+			if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil && c0.DBValue() >= 4 {
 				s.StartTimer("1020", e.NPC, nil, 1000*time.Millisecond)
 				return
 			}
@@ -63,7 +64,7 @@ func OrganDummy() script.Script {
 				s.StartTimer("1009", n, nil, 400*time.Millisecond)
 			case strings.EqualFold(e.Name, "1009"):
 				n.SpecialCamera(script.CameraShot{Distance: 50, Yaw: 180, Pitch: 20, Time: 4000, Duration: 10000, Turn: 0, Rise: -5, Widescreen: 1, Unknown: 1})
-				if c0 := memoNPC(s, "4"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					n.AddAttackDesire(c0, 200)
 				}
 				s.StartTimer("1010", n, nil, 5000*time.Millisecond)
@@ -98,7 +99,7 @@ func OrganDummy() script.Script {
 				n.SpecialCamera(script.CameraShot{Distance: 2000, Yaw: 180, Pitch: 1, Time: 2000, Duration: 3000, Turn: 0, Rise: -5, Widescreen: 1, Unknown: 1})
 				s.StartTimer("1020", n, nil, 3000*time.Millisecond)
 			case strings.EqualFold(e.Name, "1020"):
-				if c0 := memoNPC(s, "4"); c0 != nil && n.Distance2D(c0) < 20 {
+				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil && n.Distance2D(c0) < 20 {
 					n.AddAttackDesire(c0, 200)
 				} else {
 					n.DeleteMe()
@@ -127,7 +128,7 @@ func OrganDummy() script.Script {
 				s.StartTimer("3001", n, nil, 100*time.Millisecond)
 			case strings.EqualFold(e.Name, "3001"):
 				n.RemoveAllDesire()
-				if c0 := memoNPC(s, "4"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					n.AddCastDesire(c0, skill.Ref{ID: 5005, Level: 1}, 1000000)
 				}
 				n.SpecialCamera(script.CameraShot{Distance: 0, Yaw: 230, Pitch: 10, Time: 0, Duration: 10000, Turn: 0, Rise: -5, Widescreen: 1, Unknown: 1})

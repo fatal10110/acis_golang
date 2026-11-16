@@ -8,11 +8,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
-
-// memoKey is the global memo key under which Valakas leaves its object id.
-const memoKey = "3"
 
 // lavasaurusID is the Lavasaurus Elder Valakas raises against a creature
 // that hits it.
@@ -64,8 +62,8 @@ func Valakas() script.Script {
 		},
 		OnCreated: func(s *script.Script, e script.Created) {
 			n := e.NPC
-			if s.GlobalMemo().Int(memoKey, -1) == -1 {
-				s.GlobalMemo().Set(memoKey, int(n.ObjectID()))
+			if s.GlobalMemo().Int(bossmemo.Valakas, -1) == -1 {
+				s.GlobalMemo().Set(bossmemo.Valakas, int(n.ObjectID()))
 			}
 
 			if !n.DBLoaded() {
@@ -336,7 +334,7 @@ func Valakas() script.Script {
 		},
 		OnMyDying: func(s *script.Script, e script.MyDying) {
 			n := e.NPC
-			s.GlobalMemo().Remove(memoKey)
+			s.GlobalMemo().Remove(bossmemo.Valakas)
 
 			n.SetDBValue(0)
 			n.PlayMusic("B03_D")

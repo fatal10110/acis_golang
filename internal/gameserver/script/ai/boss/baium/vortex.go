@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 )
 
 // bloodedFabric is what the Angelic Vortex takes for the way to Baium.
@@ -38,7 +39,7 @@ func vortexEvent(s *script.Script, e script.Event) string {
 	case strings.EqualFold(e.Name, "baium_story"):
 		htmltext = "31862-02.htm"
 	case strings.EqualFold(e.Name, "enter"):
-		c0 := s.GlobalMemo().Creature(memoKey)
+		c0 := s.GlobalMemo().Creature(bossmemo.Baium)
 
 		player := e.Player
 		switch {

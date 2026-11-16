@@ -1,18 +1,15 @@
 package frintezza
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
-
-// transformGMID is the global memo key that holds the transform's object id.
-const transformGMID = 6
 
 // The transform's own skills; it also swings 5014 level 1 and casts the
 // anti-gravity 5016 level 1 of the follower.
@@ -45,17 +42,17 @@ func FollowerOfFrintezzaTransform() script.Script {
 	return script.Script{Dir: dir, Behavior: true, NPCs: []int32{29047}, Hooks: base.With(script.Hooks{
 		OnCreated: func(s *script.Script, e script.Created) {
 			n := e.NPC
-			c0 := memoNPC(s, strconv.Itoa(transformGMID))
+			c0 := memoNPC(s, bossmemo.FrintezzaTransform)
 			if c0 == nil {
-				s.GlobalMemo().Set(strconv.Itoa(transformGMID), int(n.ObjectID()))
+				s.GlobalMemo().Set(bossmemo.FrintezzaTransform, int(n.ObjectID()))
 			}
 			if !n.DBLoaded() {
 				n.SetDBValue(0)
-				if c1 := memoNPC(s, "4"); c1 != nil {
+				if c1 := memoNPC(s, bossmemo.Frintezza); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
 				n.SetDBValue(5)
-				if c1 := memoNPC(s, "6"); c1 != nil {
+				if c1 := memoNPC(s, bossmemo.FrintezzaTransform); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
 			} else if n.DBValue() == 7 {
@@ -63,7 +60,7 @@ func FollowerOfFrintezzaTransform() script.Script {
 				if n.HPRatio() < 0.75 {
 					stage = 30021
 				}
-				if c0 := memoNPC(s, "4"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), stage, 0)
 				}
 				n.SetInt(script.SlotIntAI4, stage)
@@ -88,7 +85,7 @@ func FollowerOfFrintezzaTransform() script.Script {
 			if n.HPRatio() < 0.75 {
 				stage = 30021
 			}
-			if c0 := memoNPC(s, "4"); c0 != nil {
+			if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 				s.SendScriptEvent(c0, n.ObjectID(), stage, 0)
 			}
 			n.SetInt(script.SlotIntAI4, stage)
@@ -141,7 +138,7 @@ func FollowerOfFrintezzaTransform() script.Script {
 			switch {
 			case strings.EqualFold(e.Name, "1001"):
 				n.SetInt(npc.IntQuest1, s.CurrentTick())
-				if c3 := memoNPC(s, "4"); c3 != nil {
+				if c3 := memoNPC(s, bossmemo.Frintezza); c3 != nil {
 					s.SendScriptEvent(c3, n.ObjectID(), 7, 0)
 				}
 				s.StartTimer("1900", n, nil, 2000*time.Millisecond)
@@ -179,10 +176,10 @@ func FollowerOfFrintezzaTransform() script.Script {
 				if n.Int(script.SlotIntAI0) == 7 {
 					if s.ElapsedTicks(n.Int(npc.IntQuest1)) > 15*60 {
 						n.SetDBValue(0)
-						if c0 := memoNPC(s, "4"); c0 != nil {
+						if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 							s.SendScriptEvent(c0, n.ObjectID(), 0, 0)
 						}
-						if c0 := memoNPC(s, "5"); c0 != nil {
+						if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 							s.SendScriptEvent(c0, n.ObjectID(), 0, 0)
 						}
 						n.RemoveAllDesire()
@@ -208,7 +205,7 @@ func FollowerOfFrintezzaTransform() script.Script {
 		},
 		OnMyDying: func(s *script.Script, e script.MyDying) {
 			n := e.NPC
-			s.GlobalMemo().Remove(strconv.Itoa(transformGMID))
+			s.GlobalMemo().Remove(bossmemo.FrintezzaTransform)
 			s.BroadcastScriptEvent(n, n.ObjectID(), 8, 8000)
 			s.StartTimer("2000", n, nil, 1*time.Millisecond)
 		},

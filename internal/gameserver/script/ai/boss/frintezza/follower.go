@@ -1,24 +1,23 @@
 package frintezza
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
 // dir is the page directory of the Frintezza behaviors.
 const dir = "ai/boss/frintezza"
 
-// The follower's weapons, and the global memo key that holds its object id.
+// The follower's weapons.
 const (
 	changeWeapon      = 7903
 	changeWeaponStart = 8204
-	gmID              = 5
 )
 
 // The follower's skills.
@@ -56,16 +55,16 @@ func FollowerOfFrintezza() script.Script {
 	return script.Script{Dir: dir, Behavior: true, NPCs: []int32{29046}, Hooks: base.With(script.Hooks{
 		OnCreated: func(s *script.Script, e script.Created) {
 			n := e.NPC
-			c0 := memoNPC(s, strconv.Itoa(gmID))
+			c0 := memoNPC(s, bossmemo.FrintezzaFollower)
 			if c0 == nil {
-				s.GlobalMemo().Set(strconv.Itoa(gmID), int(n.ObjectID()))
+				s.GlobalMemo().Set(bossmemo.FrintezzaFollower, int(n.ObjectID()))
 			}
 			if !n.DBLoaded() {
 				n.SetDBValue(0)
-				if c1 := memoNPC(s, "4"); c1 != nil {
+				if c1 := memoNPC(s, bossmemo.Frintezza); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
-				if c1 := memoNPC(s, "6"); c1 != nil {
+				if c1 := memoNPC(s, bossmemo.FrintezzaTransform); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
 			} else if n.DBValue() == 5 {
@@ -82,7 +81,7 @@ func FollowerOfFrintezza() script.Script {
 				n.SetInt(npc.IntQuest4, 0)
 				n.AddCastDesire(n, changeBodySkill(), 1000000)
 				n.SetDBValue(6)
-				if c0 := memoNPC(s, "4"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 6, 0)
 				}
 				n.SetInt(script.SlotIntAI3, 6)
@@ -132,13 +131,13 @@ func FollowerOfFrintezza() script.Script {
 				n.SetInt(npc.IntQuest4, 0)
 				n.AddCastDesire(n, changeBodySkill(), 1000000)
 				n.SetDBValue(6)
-				if c0 := memoNPC(s, "4"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 6, 0)
 				}
 				n.SetInt(script.SlotIntAI3, 6)
 				s.StartTimer("4000", n, nil, 2000*time.Millisecond)
 			case n.DBValue() == 6 && hpRatio < 0.5 && n.Int(script.SlotIntAI3) == 6:
-				if c0 := memoNPC(s, "4"); c0 != nil {
+				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 30010, 0)
 				}
 				n.SetInt(script.SlotIntAI3, 30010)
@@ -232,7 +231,7 @@ func FollowerOfFrintezza() script.Script {
 				n.SpecialCamera(script.CameraShot{Distance: 250, Yaw: 180, Pitch: 20, Time: 0, Duration: 10000, Turn: 0, Rise: 6, Widescreen: 1, Unknown: 1})
 				s.StartTimer("2100", n, nil, 400*time.Millisecond)
 			case strings.EqualFold(e.Name, "2100"):
-				if c4 := memoNPC(s, "6"); c4 != nil {
+				if c4 := memoNPC(s, bossmemo.FrintezzaTransform); c4 != nil {
 					c4.SetHeading(16384)
 					c4.TeleportTo(n)
 					s.SendScriptEvent(c4, 7, 0, 0)
@@ -263,7 +262,7 @@ func FollowerOfFrintezza() script.Script {
 				n.SpecialCamera(script.CameraShot{Distance: 300, Yaw: 180, Pitch: 10, Time: 2000, Duration: 2000, Turn: 0, Rise: 5, Widescreen: 1, Unknown: 1})
 				s.StartTimer("2109", n, nil, 2000*time.Millisecond)
 			case strings.EqualFold(e.Name, "2109"):
-				s.GlobalMemo().Remove(strconv.Itoa(gmID))
+				s.GlobalMemo().Remove(bossmemo.FrintezzaFollower)
 				n.SetDBValue(0)
 				n.DeleteMe()
 			case strings.EqualFold(e.Name, "3000"):
@@ -322,10 +321,10 @@ func FollowerOfFrintezza() script.Script {
 		},
 		OnMyDying: func(s *script.Script, e script.MyDying) {
 			n := e.NPC
-			if c0 := memoNPC(s, "4"); c0 != nil {
+			if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 				s.SendScriptEvent(c0, n.ObjectID(), 30011, 0)
 			}
-			s.GlobalMemo().Remove(strconv.Itoa(gmID))
+			s.GlobalMemo().Remove(bossmemo.FrintezzaFollower)
 			n.SetDBValue(0)
 			s.StartTimer("2000", n, nil, 500*time.Millisecond)
 		},
@@ -367,10 +366,10 @@ func fighting(n *script.NPC) bool {
 // fallAsleep puts n back to sleep after 15 minutes with no hit.
 func fallAsleep(s *script.Script, n *script.NPC) {
 	n.SetDBValue(0)
-	if c0 := memoNPC(s, "4"); c0 != nil {
+	if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 		s.SendScriptEvent(c0, n.ObjectID(), 0, 0)
 	}
-	if c0 := memoNPC(s, "6"); c0 != nil {
+	if c0 := memoNPC(s, bossmemo.FrintezzaTransform); c0 != nil {
 		s.SendScriptEvent(c0, n.ObjectID(), 0, 0)
 	}
 	s.BroadcastScriptEvent(n, 0, 40000, 8000)

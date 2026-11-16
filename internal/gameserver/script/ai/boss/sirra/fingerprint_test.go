@@ -13,14 +13,15 @@ import (
 // itself and shows it through Player.ShowHTML, so the page file it reads
 // is no Player.ShowPage call. It walks the party through
 // Player.PartyMembers, the Go name it shares with the quest helper
-// Quest.getPartyMembers, which the class does not call.
+// Quest.getPartyMembers, which the class does not call. The garden's
+// global memo key is named from the shared bossmemo table.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"script.ai.boss.sirra.FreyaDeacon",
 		"script.ai.boss.sirra.SculptureGarden",
 	},
 		"number 1118", "number 1121000", "number 1121001", "number 1121003", "number 1121004", "number 1121005", "number 1121007",
-		"call NpcHtmlMessage.setFile", "call Quest.getPartyMembers")
+		"call NpcHtmlMessage.setFile", "call Quest.getPartyMembers", `string "7"`)
 	if err != nil {
 		t.Fatal(err)
 	}

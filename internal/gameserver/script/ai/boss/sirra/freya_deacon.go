@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -114,7 +115,7 @@ func FreyaDeacon() script.Script {
 						}
 					}
 				case strings.EqualFold(e.Name, "1005"):
-					if c0 := s.GlobalMemo().Creature("7"); c0 != nil {
+					if c0 := s.GlobalMemo().Creature(bossmemo.SculptureGarden); c0 != nil {
 						s.SendScriptEvent(c0.(*script.NPC), 10027, 0, 0)
 					}
 
