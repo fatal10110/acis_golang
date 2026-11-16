@@ -59,9 +59,10 @@ func spelled(player skilltarget.Actor, def modelskill.Definition, targets []skil
 
 // seeSpell reports player's skill def, cast by caster (the player itself
 // or, when isPet, its summon) on targets, doors included, to every NPC within
-// spellSeenRadius of caster that sees it (see spellUnseen). The hooks run
-// once the scan is done.
-func seeSpell(caster any, player skilltarget.Actor, def modelskill.Definition, targets []skilltarget.Actor, isPet bool) {
+// spellSeenRadius of caster that sees it (see spellUnseen), except the
+// corpses in gone, which the skill already removed from the world. The
+// hooks run once the scan is done.
+func seeSpell(caster any, player skilltarget.Actor, def modelskill.Definition, targets []skilltarget.Actor, isPet bool, gone []int32) {
 	who, ok := player.(attackable.Combatant)
 	if !ok {
 		return
@@ -72,7 +73,7 @@ func seeSpell(caster any, player skilltarget.Actor, def modelskill.Definition, t
 	}
 	var watchers []spellWatcher
 	scan.ForEachKnownCombatantInRadius(spellSeenRadius, func(c attackable.Combatant) {
-		if n, ok := c.(spellWatcher); ok && !spellUnseen(player, def, targets, c) {
+		if n, ok := c.(spellWatcher); ok && !spellUnseen(player, def, targets, c) && !slices.Contains(gone, c.ObjectID()) {
 			watchers = append(watchers, n)
 		}
 	})

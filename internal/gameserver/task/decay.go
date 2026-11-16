@@ -90,6 +90,18 @@ func (d *Decay) Cancel(actor DecayActor) bool {
 	return d.remove(actor.ObjectID())
 }
 
+// ForceDecay removes actor's corpse at once, ahead of its deadline: when
+// actor has a pending deadline it is dropped and the decay runs on actor's
+// queue as a due one would. It reports whether a decay was posted; an
+// actor with no pending deadline is left alone.
+func (d *Decay) ForceDecay(actor DecayActor) bool {
+	if !d.Cancel(actor) {
+		return false
+	}
+	d.post(actor)
+	return true
+}
+
 // Tracked reports whether actor currently has a pending decay deadline.
 func (d *Decay) Tracked(actor DecayActor) bool {
 	if actor == nil {

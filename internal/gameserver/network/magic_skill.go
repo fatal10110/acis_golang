@@ -970,10 +970,14 @@ func (l *GameClientLink) playerMessageSink(live *livePlayer, onStatus func()) sk
 }
 
 // castEffects returns the effect handlers a cast dispatches through: the
-// link's target and skill registries and its chance procs, all read-only
-// after construction and shared by every actor's queue.
+// link's target and skill registries, its chance procs and the corpse-decay
+// task, all safe to share by every actor's queue.
 func (l *GameClientLink) castEffects() actorcast.EffectHandlers {
-	return actorcast.EffectHandlers{Targets: l.combat.targets, Skills: l.combat.skillHandlers, Chance: l.combat.chance}
+	handlers := actorcast.EffectHandlers{Targets: l.combat.targets, Skills: l.combat.skillHandlers, Chance: l.combat.chance}
+	if l.summoning.decay != nil {
+		handlers.Corpses = l.summoning.decay
+	}
+	return handlers
 }
 
 // frameSender sends frame to recipient's client.

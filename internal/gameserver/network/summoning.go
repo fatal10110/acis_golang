@@ -25,7 +25,8 @@ type SummoningConfig struct {
 	// standard ten seconds. Harnesses lengthen it so a meal cannot land
 	// inside a timed exchange.
 	FeedPeriod time.Duration
-	// Decay removes a dead summon's corpse once its decay delay has passed.
+	// Decay removes a dead summon's corpse once its decay delay has passed,
+	// and every corpse a corpse skill consumes.
 	Decay *task.Decay
 	// SpawnDirection picks the compass direction a summon called out
 	// appears in from its owner, -1, 0 or 1 along each axis and never both

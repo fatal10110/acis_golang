@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // EffectHandlers groups the target-resolution and skill-effect handler
@@ -27,6 +28,16 @@ type EffectHandlers struct {
 	// Chance fires the chance procs a landing skill sets off on its caster
 	// and targets; nil fires none.
 	Chance *ChanceProcs
+	// Corpses, when set, removes at once each corpse a player's or summon's
+	// corpse skill lands on; nil leaves every corpse to its deadline.
+	Corpses CorpseDecayer
+}
+
+// CorpseDecayer removes a corpse ahead of its decay deadline.
+type CorpseDecayer interface {
+	// ForceDecay removes actor's corpse when it has a pending decay and
+	// reports whether it did.
+	ForceDecay(actor task.DecayActor) bool
 }
 
 // EffectResult reports whether effect dispatch reached a skill handler and
@@ -204,7 +215,19 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 			notifyTargets = append(notifyTargets, c)
 		}
 	}
-	handlers.Chance.skillHit(castCaster, affected, def)
+	// Each target is armed for overhit before the procs the skill sets off
+	// on it, so a proc that kills it already counts as an overhit. Only a
+	// monster keeps the flag.
+	procs := handlers.Chance.skillHitProcs(castCaster, def)
+	overhit := def.Overhit && caster.Kind().Playable()
+	for _, target := range affected {
+		if creature, ok := target.(handlerskill.Creature); ok && overhit {
+			creature.EnableOverhit()
+		}
+		if procs != nil {
+			procs(target)
+		}
+	}
 	if def.Offensive {
 		switch def.SkillType {
 		case "AGGREDUCE", "AGGREMOVE", "AGGREDUCE_CHAR":
@@ -212,14 +235,6 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 			for _, target := range affected {
 				target.RecordAttacker(castCaster)
 				target.NotifyAttacked(castCaster)
-			}
-		}
-	}
-
-	if def.Overhit && caster.Kind().Playable() {
-		for _, t := range affected {
-			if creature, ok := t.(handlerskill.Creature); ok {
-				creature.EnableOverhit()
 			}
 		}
 	}
@@ -242,16 +257,38 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 	// caster a PKer flags it again after the kill ended its flag.
 	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 	// A player's skill, or its summon's, then reaches the NPCs whose
-	// scripts watch spells: the targets it landed on, then the NPCs around
-	// the caster.
+	// scripts watch spells: the targets it landed on, which a corpse skill
+	// then consumes, then the NPCs around the caster.
 	if player, isPet, acting := actingPlayer(caster); acting {
 		spelled(player, def, affected)
-		seeSpell(castCaster, player, def, affected, isPet)
+		gone := consumeCorpses(handlers.Corpses, def, affected)
+		seeSpell(castCaster, player, def, affected, isPet, gone)
 	}
 	if !ok {
 		return EffectResult{}
 	}
 	return effectResultOf(result)
+}
+
+// consumeCorpses removes at once the corpse of each of targets a
+// corpse-mob skill landed on, a harvest excepted, and returns the ids of the
+// corpses it removed. A corpse with no pending decay stays.
+func consumeCorpses(corpses CorpseDecayer, def modelskill.Definition, targets []skilltarget.Actor) []int32 {
+	if corpses == nil || def.SkillType == "HARVEST" {
+		return nil
+	}
+	switch def.Target {
+	case modelskill.TargetCorpseMob, modelskill.TargetAreaCorpseMob:
+	default:
+		return nil
+	}
+	var gone []int32
+	for _, t := range targets {
+		if corpse, ok := t.(task.DecayActor); ok && corpses.ForceDecay(corpse) {
+			gone = append(gone, corpse.ObjectID())
+		}
+	}
+	return gone
 }
 
 // CallSkill lands def's effects from caster on target alone, through def's

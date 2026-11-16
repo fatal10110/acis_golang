@@ -70,6 +70,10 @@ type fakeCastCreature struct {
 
 func (f *fakeCastCreature) ObjectID() int32 { return f.id }
 
+// Spawned is true: the fixture stands in the world without being placed on
+// a grid.
+func (f *fakeCastCreature) Spawned() bool { return true }
+
 func (f *fakeCastCreature) Position() (int, int, int) { return f.x, f.y, f.z }
 
 func (f *fakeCastCreature) Heading() int { return 0 }
