@@ -30,9 +30,12 @@ func (wallGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
 
-// soleGroundAt requires a single ground item, at want.
+// soleGroundAt requires a single ground item, at want. The drop's
+// broadcast goes out before the item is tracked, so it settles the server
+// first: reading DropItem alone does not prove the tracking happened.
 func soleGroundAt(t *testing.T, srv *gameservertest.Server, want location.Location) {
 	t.Helper()
+	srv.Settle(t)
 	snaps := srv.GroundItems.Snapshots(nil)
 	if len(snaps) != 1 {
 		t.Fatalf("ground items = %+v, want one", snaps)
