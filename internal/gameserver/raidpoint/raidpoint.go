@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/rs/zerolog"
 )
@@ -65,6 +66,10 @@ type Points struct {
 	// queue order is the order the points changed in.
 	mu      sync.Mutex
 	records map[int32]*record
+	// owners lists the players holding a record in the order a
+	// concurrent hash table of the records lists them; the ranking takes
+	// the players in this order (see ranking).
+	owners hashorder.Set
 }
 
 // New returns empty raid points persisting through store, their writes
@@ -139,30 +144,17 @@ func (p *Points) Record(objectID int32) Record {
 	}
 	out := Record{Total: r.total(), Entries: r.entries(), Found: true}
 	if out.Total > 0 {
-		out.Rank = 1 + p.aheadLocked(objectID, out.Total)
+		out.Rank = 1 + int32(slices.IndexFunc(ranking(p.standingsLocked()), func(s standing) bool { return s.id == objectID }))
 	}
 	return out
 }
 
 // Winners returns the object ids of the first 100 players of the ranking,
-// first place first: totals above 0, the highest first, equal totals by
-// object id, as Record ranks them.
+// first place first, as Record ranks them.
 func (p *Points) Winners() []int32 {
-	type standing struct{ id, total int32 }
 	p.mu.Lock()
-	ranked := make([]standing, 0, len(p.records))
-	for id, r := range p.records {
-		if t := r.total(); t > 0 {
-			ranked = append(ranked, standing{id, t})
-		}
-	}
+	ranked := ranking(p.standingsLocked())
 	p.mu.Unlock()
-	slices.SortFunc(ranked, func(a, b standing) int {
-		if c := cmp.Compare(b.total, a.total); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.id, b.id)
-	})
 	out := make([]int32, 0, min(len(ranked), winnerCount))
 	for _, s := range ranked[:min(len(ranked), winnerCount)] {
 		out = append(out, s.id)
@@ -177,20 +169,36 @@ func (p *Points) CleanUp() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	clear(p.records)
+	p.owners.Clear()
 	p.writeLocked("clean up", func(ctx context.Context, st Store) error { return st.Clear(ctx) })
 }
 
-// aheadLocked counts the players ranked before objectID, whose total is
-// total: those with more points, and those with as many and a lower object
-// id.
-func (p *Points) aheadLocked(objectID, total int32) int32 {
-	var n int32
-	for id, r := range p.records {
-		if t := r.total(); t > total || (t == total && id < objectID) {
-			n++
+// standing is a player's total in the ranking.
+type standing struct{ id, total int32 }
+
+// standingsLocked lists the players with points, in owners order.
+func (p *Points) standingsLocked() []standing {
+	out := make([]standing, 0, p.owners.Len())
+	for _, id := range p.owners.Order() {
+		if t := p.records[id].total(); t > 0 {
+			out = append(out, standing{id, t})
 		}
 	}
-	return n
+	return out
+}
+
+// ranking sorts standings, given in owners order, into the ranking, first
+// place first: the highest totals first, equal totals in the order a plain
+// hash table filled with every standing, in the order given, lists them.
+func ranking(standings []standing) []standing {
+	n := len(standings)
+	slices.SortStableFunc(standings, func(a, b standing) int {
+		if c := cmp.Compare(b.total, a.total); c != 0 {
+			return c
+		}
+		return cmp.Compare(hashorder.MapIndex(a.id, n), hashorder.MapIndex(b.id, n))
+	})
+	return standings
 }
 
 func (p *Points) recordOf(objectID int32) *record {
@@ -198,6 +206,7 @@ func (p *Points) recordOf(objectID int32) *record {
 	if r == nil {
 		r = &record{points: map[int32]int32{}}
 		p.records[objectID] = r
+		p.owners.Add(objectID)
 	}
 	return r
 }

@@ -7,6 +7,8 @@ package partymatch
 import (
 	"slices"
 	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 )
 
 // Member is a player as party matching sees it.
@@ -69,11 +71,24 @@ type Registry[M Member] struct {
 	mu     sync.Mutex
 	nextID int32
 	rooms  map[int32]*room[M]
+	// roomOrder lists the room ids in the order a concurrent hash table
+	// keyed by them lists them, the order rooms are browsed in.
+	roomOrder hashorder.Set
 	// byMember is the room each player is in.
 	byMember map[int32]*room[M]
-	// waiting is the waiting list, in the order players joined it.
-	waiting []M
+	// waiting is the waiting list by object id.
+	waiting map[int32]M
+	// waitOrder lists the waiting players in the order a concurrent hash
+	// set of them lists them, each keyed by its hash (see waitKey).
+	waitOrder hashorder.Set
 }
+
+// waitSeed is what a waiting player's hash adds to its object id.
+const waitSeed = 31
+
+// waitKey is a waiting player's hash: waitSeed plus its object id,
+// wrapping as int32 arithmetic does.
+func waitKey(objectID int32) int32 { return waitSeed + objectID }
 
 type room[M Member] struct {
 	id       int32
@@ -89,6 +104,7 @@ func NewRegistry[M Member]() *Registry[M] {
 	return &Registry[M]{
 		rooms:    make(map[int32]*room[M]),
 		byMember: make(map[int32]*room[M]),
+		waiting:  make(map[int32]M),
 	}
 }
 
@@ -119,12 +135,13 @@ func (r *Registry[M]) RemoveWaiting(player M) {
 }
 
 // Waiting returns the listed players other than player whose level lies
-// in [minLevel, maxLevel], in the order they joined the list.
+// in [minLevel, maxLevel], in waitOrder.
 func (r *Registry[M]) Waiting(player M, minLevel, maxLevel int32) []M {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var out []M
-	for _, m := range r.waiting {
+	for _, key := range r.waitOrder.Order() {
+		m := r.waiting[key-waitSeed]
 		if m.ObjectID() == player.ObjectID() {
 			continue
 		}
@@ -137,7 +154,7 @@ func (r *Registry[M]) Waiting(player M, minLevel, maxLevel int32) []M {
 }
 
 // Rooms returns the rooms player may browse with the given location and
-// level mode, by ascending id: none that is full; with NearMe only those
+// level mode, in roomOrder: none that is full; with NearMe only those
 // whose leader near reports in player's world region, with AnyLocation all
 // of them, otherwise only those at location; with LevelsMine only those
 // whose level range holds player's level.
@@ -148,13 +165,8 @@ func (r *Registry[M]) Rooms(player M, location, levelMode int32, near func(leade
 }
 
 func (r *Registry[M]) available(player M, location, levelMode int32, near func(leader M) bool) []Room[M] {
-	ids := make([]int32, 0, len(r.rooms))
-	for id := range r.rooms {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
 	var out []Room[M]
-	for _, id := range ids {
+	for _, id := range r.roomOrder.Order() {
 		rm := r.rooms[id]
 		if rm.full() {
 			continue
@@ -191,6 +203,7 @@ func (r *Registry[M]) Open(leader M, s Settings, location int32, partyMembers []
 	r.nextID++
 	rm := &room[M]{id: r.nextID, settings: s, location: location, members: []M{leader}}
 	r.rooms[rm.id] = rm
+	r.roomOrder.Add(rm.id)
 	r.byMember[leader.ObjectID()] = rm
 
 	var out notices
@@ -480,6 +493,7 @@ func (r *Registry[M]) remove(out *notices, rm *room[M], player M) {
 
 func (r *Registry[M]) disband(out *notices, rm *room[M]) {
 	delete(r.rooms, rm.id)
+	r.roomOrder.Remove(rm.id)
 	for _, m := range rm.members {
 		out.add(Close[M]{To: m})
 		out.add(Msg[M]{To: []M{m}, ID: MsgRoomDisbanded})
@@ -494,21 +508,22 @@ func (r *Registry[M]) addWaiting(player M) {
 	if player.Departed() || r.byMember[player.ObjectID()] != nil {
 		return
 	}
-	for _, m := range r.waiting {
-		if m.ObjectID() == player.ObjectID() {
-			return
-		}
+	id := player.ObjectID()
+	if _, ok := r.waiting[id]; ok {
+		return
 	}
-	r.waiting = append(r.waiting, player)
+	r.waiting[id] = player
+	r.waitOrder.Add(waitKey(id))
 }
 
 // removeWaiting reports whether player was on the waiting list.
 func (r *Registry[M]) removeWaiting(player M) bool {
-	i := slices.IndexFunc(r.waiting, func(m M) bool { return m.ObjectID() == player.ObjectID() })
-	if i < 0 {
+	id := player.ObjectID()
+	if _, ok := r.waiting[id]; !ok {
 		return false
 	}
-	r.waiting = slices.Delete(r.waiting, i, i+1)
+	delete(r.waiting, id)
+	r.waitOrder.Remove(waitKey(id))
 	return true
 }
 

@@ -177,6 +177,21 @@ func hashOrder(ids []int32) []int32 {
 	return out
 }
 
+// IDs lists every weapon's item id, out or not, in hash order (see
+// hashOrder).
+func (m *Manager) IDs() []int32 {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ids := make([]int32, 0, len(m.order))
+	for _, w := range m.order {
+		ids = append(ids, w.def.ItemID)
+	}
+	return ids
+}
+
 // IsCursed reports whether itemID is a cursed weapon.
 func (m *Manager) IsCursed(itemID int32) bool {
 	if m == nil {

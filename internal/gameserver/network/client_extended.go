@@ -101,13 +101,14 @@ func (l *GameClientLink) handleRequestGetBossRecord(_ context.Context, cs *connS
 	return nil
 }
 
-// handleRequestCursedWeaponList sends the cursed weapon ids.
+// handleRequestCursedWeaponList sends the cursed weapon ids in hash order;
+// with cursed weapons disabled the list is empty.
 func (l *GameClientLink) handleRequestCursedWeaponList(_ context.Context, cs *connState, _ struct{}) error {
 	session := cs.client.Session
 	if cs.live == nil {
 		return nil
 	}
-	session.SendFrame(serverpackets.FrameExCursedWeaponList(l.cursedWeapons.IDs()))
+	session.SendFrame(serverpackets.FrameExCursedWeaponList(l.cursed.IDs()))
 	return nil
 }
 
