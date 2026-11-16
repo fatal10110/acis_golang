@@ -81,6 +81,50 @@ func (c *Castle) RemoveDroppedTicket(objectID int32) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.droppedTickets, objectID)
+	delete(c.decayOnLetGo, objectID)
+}
+
+// Claimable is a ground item whatever takes it out of the world claims
+// first; only one claim ever succeeds, and a claim that took nothing is let
+// go (Release).
+type Claimable interface {
+	Claim() bool
+	Release()
+}
+
+// DecayDroppedTicket claims g, the ticket objectID on the castle's grounds,
+// for the owner's removal, forgets it and reports true: the caller takes g
+// out of the world. A ticket a pickup holds stays counted and reports
+// false; if that pickup lets it go (LetGoTicket), it leaves then.
+func (c *Castle) DecayDroppedTicket(objectID int32, g Claimable) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !g.Claim() {
+		if c.decayOnLetGo == nil {
+			c.decayOnLetGo = make(map[int32]struct{})
+		}
+		c.decayOnLetGo[objectID] = struct{}{}
+		return false
+	}
+	delete(c.droppedTickets, objectID)
+	delete(c.decayOnLetGo, objectID)
+	return true
+}
+
+// LetGoTicket lets go of g, the ground item objectID on the castle's
+// grounds that a pickup claimed and took nothing from. A ticket the owner's
+// removal passed over keeps the claim instead: the castle forgets it and
+// reports true, and the caller takes g out of the world.
+func (c *Castle) LetGoTicket(objectID int32, g Claimable) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, decay := c.decayOnLetGo[objectID]; decay {
+		delete(c.decayOnLetGo, objectID)
+		delete(c.droppedTickets, objectID)
+		return true
+	}
+	g.Release()
+	return false
 }
 
 // DroppedTicketsNewestFirst returns every ticket on the castle's grounds,

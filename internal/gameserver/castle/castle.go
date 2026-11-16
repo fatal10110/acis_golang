@@ -50,6 +50,10 @@ type Castle struct {
 	// droppedTickets are the mercenary tickets lying on the castle's
 	// grounds, by ground item object id.
 	droppedTickets map[int32]DroppedTicket
+	// decayOnLetGo are the dropped tickets the owner's removal passed over
+	// while a pickup held them: they leave the world if that pickup lets
+	// them go.
+	decayOnLetGo map[int32]struct{}
 	// mercenaries are the object ids of the NPCs the castle's siege hired
 	// from its dropped tickets, in hiring order.
 	mercenaries []int32

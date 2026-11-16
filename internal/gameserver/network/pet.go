@@ -378,7 +378,7 @@ func (l *GameClientLink) petTakeGround(live *livePlayer, pet *summon.Actor, obje
 	if !herb {
 		var ok bool
 		if persist, ok = petitem.StoreGround(petInv, ground); !ok {
-			ground.Release()
+			l.releaseGround(ground)
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}

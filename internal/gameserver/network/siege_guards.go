@@ -51,7 +51,7 @@ func (n siegeNotices) SpawnGuards(c *castle.Castle) {
 		}
 		guard, err := npcs.SpawnMercenary(ticket.NPCID, t.Location, c.ID)
 		if err != nil {
-			ground.Release()
+			l.releaseGround(ground)
 			l.log.Error().Err(err).Int("npc_id", ticket.NPCID).Int("castle", c.ID).Msg("siege: cannot spawn mercenary")
 			continue
 		}

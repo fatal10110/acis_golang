@@ -368,16 +368,26 @@ func (l *GameClientLink) releaseCursedHolder(live *livePlayer, end cursedweapon.
 }
 
 // releaseGround lets go of ground, which a pickup that took nothing held.
-// The item of a cursed weapon a game master ended meanwhile leaves the
-// world instead: nothing else takes it off the ground.
+// The item of a cursed weapon a game master ended meanwhile, and a
+// mercenary ticket its castle's owner removal passed over, leave the world
+// instead: nothing else takes them off the ground.
 func (l *GameClientLink) releaseGround(ground *grounditem.Item) {
-	if l.cursed == nil || !l.isCursedWeapon(ground.ItemID()) {
-		ground.Release()
+	if l.cursed != nil && l.isCursedWeapon(ground.ItemID()) {
+		if l.cursed.LetGo(ground) {
+			l.despawnGround(ground)
+		}
 		return
 	}
-	if l.cursed.LetGo(ground) {
-		l.despawnGround(ground)
+	if l.sieges != nil {
+		x, y, z := ground.Position()
+		if c, ok := l.castleAt(x, y, z); ok {
+			if c.LetGoTicket(ground.ObjectID(), ground) {
+				l.despawnGround(ground)
+			}
+			return
+		}
 	}
+	ground.Release()
 }
 
 // removeCursedGroundItem takes the ground item objectID out of the world,

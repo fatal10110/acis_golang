@@ -172,7 +172,8 @@ func (l *GameClientLink) forgetPickedTicket(ground *grounditem.Item) {
 
 // decayDroppedTickets takes every mercenary ticket on c's grounds out of
 // the world. A ticket being picked up meanwhile is left to its picker, and
-// stays counted until the pickup takes it or lets it go back on the ground.
+// stays counted until the pickup takes it, or lets it go and it leaves the
+// world then (releaseGround).
 func (l *GameClientLink) decayDroppedTickets(c *castle.Castle) {
 	for _, t := range c.DroppedTicketsNewestFirst() {
 		ground, ok := l.resolveTarget(t.ObjectID).(*grounditem.Item)
@@ -180,10 +181,8 @@ func (l *GameClientLink) decayDroppedTickets(c *castle.Castle) {
 			c.RemoveDroppedTicket(t.ObjectID)
 			continue
 		}
-		if !ground.Claim() {
-			continue
+		if c.DecayDroppedTicket(t.ObjectID, ground) {
+			l.despawnGround(ground)
 		}
-		c.RemoveDroppedTicket(t.ObjectID)
-		l.despawnGround(ground)
 	}
 }

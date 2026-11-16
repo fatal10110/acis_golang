@@ -49,6 +49,9 @@ func pickUpDeadAkamanah(t *testing.T, srv *gameservertest.Server, gmID int32, gr
 	if _, lying := srv.State.Object(ground.ObjectID()); !lying {
 		t.Fatal("the end took the held ground item off the ground")
 	}
+	// A raw Release models the held claim's end; a production pickup that
+	// took nothing lets go through the weapon instead, which takes the
+	// ended weapon's item out of the world.
 	ground.Release()
 	gm.Send(encodeAction(ground.ObjectID()))
 	srv.AdvanceUntil(t, "weapon picked up", func() bool {
