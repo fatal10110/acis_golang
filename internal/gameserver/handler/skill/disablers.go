@@ -298,10 +298,9 @@ func disableAggRemove(cast Cast, target Creature, land landing) {
 }
 
 // disableNegate strips effects matching the skill's negate configuration,
-// then applies the skill's own effects. Explicit negate-by-id lists and an
-// unconditional (NegateLevel == -1) negate-by-type list are ported; a
-// level-gated negate-by-type needs each active effect's abnormal level,
-// which isn't tracked on a live effect yet, so it's skipped.
+// then applies the skill's own effects. A negate-by-id list strips every
+// effect of those skills. Otherwise each effect outside stack order 99 is
+// stripped when it matches one of the negate types (see negateMatches).
 func disableNegate(cast Cast, target Creature, land landing) {
 	effected := reflectTarget(cast, target)
 	if effected == nil {
@@ -318,16 +317,37 @@ func disableNegate(cast Cast, target Creature, land landing) {
 				return int(e.Skill.ID) == id
 			})
 		}
-	} else if cast.Skill.NegateLevel == -1 {
-		for _, negateType := range cast.Skill.NegateTypes {
-			removeMatching(list, 0, func(e *effect.Effect) bool {
-				return e.Template.StackOrder != 99 &&
-					(strings.EqualFold(e.Skill.SkillType, negateType) || strings.EqualFold(e.Template.EffectType, negateType))
-			})
-		}
+	} else {
+		removeMatching(list, 0, func(e *effect.Effect) bool {
+			if e.Template.StackOrder == 99 {
+				return false
+			}
+			for _, negateType := range cast.Skill.NegateTypes {
+				if negateMatches(e.Skill, negateType, cast.Skill.NegateLevel) {
+					return true
+				}
+			}
+			return false
+		})
 	}
 
 	land.apply(cast, effected)
+}
+
+// negateMatches reports whether a negate of negateType at negateLevel
+// strips an effect owned by s. At level -1 it matches s's skill type or
+// resolved effect type at any abnormal level. Otherwise a skill with an
+// effect abnormal level matches by its resolved effect type at or below
+// negateLevel; one without matches by its skill type with its abnormal
+// level at or below negateLevel.
+func negateMatches(s effect.Skill, negateType string, negateLevel int) bool {
+	if negateLevel == -1 {
+		return strings.EqualFold(s.SkillType, negateType) || strings.EqualFold(s.EffectType, negateType)
+	}
+	if s.EffectAbnormalLevel >= 0 {
+		return strings.EqualFold(s.EffectType, negateType) && s.EffectAbnormalLevel <= negateLevel
+	}
+	return strings.EqualFold(s.SkillType, negateType) && s.AbnormalLevel <= negateLevel
 }
 
 func disableCancelDebuff(cast Cast, target Creature) {

@@ -25,10 +25,10 @@ func (d Definition) LandingPower() float64 {
 	return float64(d.Power)
 }
 
-// LandingEffectType is the skill type a skill's own landing roll resists
-// as: the first effect type among its effect templates, else its own
-// effectType, else STUN for PDAM and PARALYZE for MDAM, else its skill
-// type.
+// LandingEffectType is the skill's resolved effect type, the type its own
+// landing roll resists as and a negate matches its effects by: the first
+// effect type among its effect templates, else its own effectType, else
+// STUN for PDAM and PARALYZE for MDAM, else its skill type.
 func (d Definition) LandingEffectType() string {
 	for _, t := range d.Effects {
 		if t.EffectType != "" {
