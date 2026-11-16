@@ -22,7 +22,16 @@ func (a HostileActor) AttackSpeed(magic bool) int {
 	}
 	return a.Hostile.AttackSpeed()
 }
-func (HostileActor) ReuseRate(bool) float64 { return 1 }
+
+// ReuseRate reports the caster's reuse-delay multiplier for a magic or
+// physical skill, its live mReuse or pReuse stat.
+func (a HostileActor) ReuseRate(magic bool) float64 {
+	if a.Hostile == nil {
+		return 1
+	}
+	return a.Hostile.CalcStat(reuseStat(magic), 1)
+}
+
 func (a HostileActor) MP() int {
 	if a.Hostile == nil {
 		return 0

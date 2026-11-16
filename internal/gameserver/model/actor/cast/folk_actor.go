@@ -19,9 +19,13 @@ func (a FolkActor) AttackSpeed(magic bool) int {
 	}
 	return a.Folk.AttackSpeed()
 }
-func (FolkActor) ReuseRate(bool) float64 { return 1 }
-func (a FolkActor) MP() int              { return int(a.Folk.MPValue()) }
-func (a FolkActor) HP() int              { return int(a.Folk.HP()) }
+
+// ReuseRate reports the caster's reuse-delay multiplier for a magic or
+// physical skill, its live mReuse or pReuse stat.
+func (a FolkActor) ReuseRate(magic bool) float64 { return a.Folk.CalcStat(reuseStat(magic), 1) }
+
+func (a FolkActor) MP() int { return int(a.Folk.MPValue()) }
+func (a FolkActor) HP() int { return int(a.Folk.HP()) }
 
 // MPInitialCost and MPCost apply the caster's magical or physical MP
 // consume rate to def's raw cost.

@@ -20,7 +20,16 @@ func (a SummonActor) AttackSpeed(magic bool) int {
 	}
 	return int(a.Summon.PhysicalAttackSpeed())
 }
-func (SummonActor) ReuseRate(bool) float64 { return 1 }
+
+// ReuseRate reports the caster's reuse-delay multiplier for a magic or
+// physical skill, its live mReuse or pReuse stat.
+func (a SummonActor) ReuseRate(magic bool) float64 {
+	if a.Summon == nil {
+		return 1
+	}
+	return a.Summon.CalcStat(reuseStat(magic), 1)
+}
+
 func (a SummonActor) MP() int {
 	if a.Summon == nil {
 		return 0

@@ -113,17 +113,19 @@ func (s *Server) killRewards() gamemanager.KillRewardConfig {
 // spawnHostile builds and world-spawns a stationary hostile NPC from tmpl at
 // at, wired with attackCtl. It is the parked-stub and real-attack fixtures'
 // shared construction path (SpawnHostileNPCKindAt, SpawnAttackingHostileNPCTemplate).
-func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Location, attackCtl ai.AttackController) *npc.Hostile {
+// skills, when given, resolves the template's passives as the boot skill
+// table does for a live monster.
+func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Location, attackCtl ai.AttackController, skills ...actorcast.Definitions) *npc.Hostile {
 	t.Helper()
 	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	return s.spawnHostileInstance(t, inst, at, attackCtl)
+	return s.spawnHostileInstance(t, inst, at, attackCtl, skills...)
 }
 
 // spawnHostileInstance is spawnHostile for an instance the caller built.
-func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, attackCtl ai.AttackController) *npc.Hostile {
+func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, attackCtl ai.AttackController, skills ...actorcast.Definitions) *npc.Hostile {
 	t.Helper()
 	tmpl := inst.Template
 	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil, effect.WithEnv(s.effectEnv))
@@ -134,7 +136,12 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 	if ctl, ok := attackCtl.(*attack.Controller); ok {
 		ctl.SetQueue(live.Queue())
 	}
-	hostile, err := npc.NewHostile(inst, live, parkedMove{}, attackCtl)
+	var hostile *npc.Hostile
+	if len(skills) > 0 && skills[0] != nil {
+		hostile, err = npc.NewHostile(inst, live, parkedMove{}, attackCtl, skills[0])
+	} else {
+		hostile, err = npc.NewHostile(inst, live, parkedMove{}, attackCtl)
+	}
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
 	}
@@ -168,9 +175,10 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 // AI loop drives resolves skills through defs and dispatches their effects
 // through the link's HostileCastEffects, as boot wires every live monster. Suites start a cast with
 // AIController.Cast on the monster's queue, exactly as the AI loop does.
+// defs also resolves the template's passives.
 func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs actorcast.Definitions) (*npc.Hostile, *actorcast.AIController) {
 	t.Helper()
-	hostile := s.spawnHostile(t, tmpl, hostileNPCSpawn, parkedAttack{})
+	hostile := s.spawnHostile(t, tmpl, hostileNPCSpawn, parkedAttack{}, defs)
 	return hostile, s.installCastSeam(hostile, defs)
 }
 

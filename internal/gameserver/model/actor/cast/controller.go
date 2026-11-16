@@ -11,6 +11,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 var (
@@ -985,7 +986,7 @@ func (c *Controller) buildPlan(def *modelskill.Definition) Plan {
 	reuseDelay := def.ReuseDelay
 	if !def.StaticReuse && !fusion {
 		reuseDelay = int(float64(reuseDelay) * c.actor.ReuseRate(def.Magic))
-		reuseDelay = int(float64(reuseDelay) * 333.0 / float64(positive(c.actor.AttackSpeed(def.Magic))))
+		reuseDelay = int(float64(reuseDelay) * (333.0 / float64(positive(c.actor.AttackSpeed(def.Magic)))))
 	}
 
 	plan := Plan{
@@ -1008,6 +1009,14 @@ func (c *Controller) buildPlan(def *modelskill.Definition) Plan {
 		plan.FinalDelay = plan.CoolTime + npcFinishPad
 	}
 	return plan
+}
+
+// reuseStat is the stat that scales a magic or physical skill's reuse delay.
+func reuseStat(magic bool) stat.Stat {
+	if magic {
+		return stat.MagicReuseRate
+	}
+	return stat.PReuse
 }
 
 // npcFinishPad is how much longer than its cool time an NPC's cast stays in
