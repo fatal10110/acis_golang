@@ -120,6 +120,10 @@ func TestFakeDeathSendsOnlyPostureFrames(t *testing.T) {
 		t.Fatalf("Fake Death start frames %x, want %x", start, wantStart)
 	}
 	srv.Advance(t, lieDown)
+	// On the wall clock the lie-down timer can fire just after the delay
+	// advanced by; a request made while the player is still lying down is
+	// deferred behind an ActionFailed (#5247).
+	awaitPostureSettled(t, srv, objID)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(fakeDeathSkillID, false, false))
