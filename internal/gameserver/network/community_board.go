@@ -106,7 +106,14 @@ func (l *GameClientLink) boardHome(live *livePlayer, command string) {
 		if len(tokens) < 2 {
 			return
 		}
-		l.sendBoardFile(live, bbs.TopFolder+tokens[1])
+		// A token that is not a home page file name is refused as a
+		// missing page is: nothing shows.
+		name, ok := bbs.TopPage(tokens[1])
+		if !ok {
+			l.log.Debug().Str("page", tokens[1]).Msg("community board: page token refused")
+			return
+		}
+		l.sendBoardFile(live, name)
 	default:
 		l.sendBoard(live, bbs.NotImplemented(command))
 	}
