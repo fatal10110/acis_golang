@@ -35,15 +35,18 @@ func (n siegeNotices) SpawnGuards(c *castle.Castle) {
 		return
 	}
 	npcs.StartSpawnTime(ownedSiegeGuards, id)
-	for _, t := range c.TakeDroppedTickets() {
-		ticket, ok := c.Ticket(t.ItemID)
-		if !ok {
+	for _, t := range c.DroppedTicketsNewestFirst() {
+		ticket, isTicket := c.Ticket(t.ItemID)
+		ground, ok := l.resolveTarget(t.ObjectID).(*grounditem.Item)
+		if !isTicket || !ok {
+			c.RemoveDroppedTicket(t.ObjectID)
 			continue
 		}
 		// The claim comes first: a pickup racing the start either holds the
-		// ticket already, and keeps it, or loses it to the mercenary.
-		ground, ok := l.resolveTarget(t.ObjectID).(*grounditem.Item)
-		if !ok || !ground.Claim() {
+		// ticket already, and keeps it, or loses it to the mercenary. A held
+		// ticket stays counted until its pickup takes it, or lets it go back
+		// on the ground.
+		if !ground.Claim() {
 			continue
 		}
 		guard, err := npcs.SpawnMercenary(ticket.NPCID, t.Location, c.ID)
@@ -52,6 +55,7 @@ func (n siegeNotices) SpawnGuards(c *castle.Castle) {
 			l.log.Error().Err(err).Int("npc_id", ticket.NPCID).Int("castle", c.ID).Msg("siege: cannot spawn mercenary")
 			continue
 		}
+		c.RemoveDroppedTicket(t.ObjectID)
 		c.AddMercenary(guard)
 		l.despawnGround(ground)
 	}

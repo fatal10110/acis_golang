@@ -83,16 +83,15 @@ func (c *Castle) RemoveDroppedTicket(objectID int32) {
 	delete(c.droppedTickets, objectID)
 }
 
-// TakeDroppedTickets forgets every ticket on the castle's grounds and
-// returns them, the latest entry time first, then the highest object id.
-func (c *Castle) TakeDroppedTickets() []DroppedTicket {
+// DroppedTicketsNewestFirst returns every ticket on the castle's grounds,
+// the latest entry time first, then the highest object id.
+func (c *Castle) DroppedTicketsNewestFirst() []DroppedTicket {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	out := make([]DroppedTicket, 0, len(c.droppedTickets))
 	for _, t := range c.droppedTickets {
 		out = append(out, t)
 	}
-	clear(c.droppedTickets)
 	slices.SortFunc(out, func(a, b DroppedTicket) int {
 		return cmp.Or(cmp.Compare(b.Time, a.Time), cmp.Compare(b.ObjectID, a.ObjectID))
 	})
