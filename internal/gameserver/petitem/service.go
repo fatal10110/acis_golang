@@ -1,6 +1,8 @@
 package petitem
 
 import (
+	"math"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -36,6 +38,9 @@ const (
 	// GivePetCannotWear means the pet cannot wear the equipment item its
 	// owner uses on it.
 	GivePetCannotWear
+	// GiveStackFull means the receiver's stack of the item would pass the
+	// item count limit with the moved units added, so nothing moves.
+	GiveStackFull
 )
 
 // UseFailure is the non-mutating reason a pet-use-item request failed.
@@ -135,6 +140,9 @@ func (s *Service) CheckGive(playerInv, petInv *itemcontainer.Inventory, pet *sum
 	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(inst, tmpl)) {
 		return GivePetCannotCarryMore
 	}
+	if !stackFits(petInv, inst.TemplateID, tmpl, count) {
+		return GiveStackFull
+	}
 	if !petInv.ValidateWeight(int(tmpl.Weight) * count) {
 		return GivePetTooEncumbered
 	}
@@ -175,7 +183,7 @@ func CheckWear(petInv *itemcontainer.Inventory, pet *summon.Actor, inst *item.In
 // to take their equipment effects off the giver.
 func (s *Service) Transfer(from, to *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
 	var unequipped []*item.Instance
-	if validTransferCount(from, objectID, count) {
+	if checkTransfer(from, to, objectID, count) == GiveOK {
 		if inst := from.ItemByObjectID(objectID); inst.Equipped() && count >= inst.Snapshot().Count {
 			unequipped = from.UnequipItem(inst)
 		}
@@ -198,8 +206,9 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 // inventory. A worn item is taken off as it leaves the pet's inventory, inside
 // the transfer, so a failed transfer leaves the pet's equip state untouched.
 // The reported WasWorn, read before the transfer, drives the PET_TOOK_OFF_S1
-// notification.
-func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
+// notification. GiveStackFull reports an owner stack that cannot take the
+// count; any other failure is GiveNoop.
+func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) (TransferResult, GiveFailure, error) {
 	wasWorn := false
 	itemID := int32(0)
 	if petInv != nil {
@@ -212,11 +221,11 @@ func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectI
 	}
 	result, failure, err := s.transfer(petInv, playerInv, objectID, count)
 	if failure != GiveOK {
-		return result, false, err
+		return result, failure, err
 	}
 	result.WasWorn = wasWorn
 	result.ItemID = itemID
-	return result, true, err
+	return result, GiveOK, err
 }
 
 // UseItem equips or unequips one pet equipment item.
@@ -320,13 +329,15 @@ func wear(petInv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Templ
 // transfer moves count units of objectID from one inventory to the other.
 // Unlike the shared inventory transfer, which moves at most what is there,
 // a count the item cannot satisfy moves nothing: below one, several units
-// of an unstackable item, or more than the stack holds.
+// of an unstackable item, or more than the stack holds. Nor does a count
+// the receiver's stack cannot take without passing the item count limit:
+// the source keeps every unit rather than the merge clamping them away.
 func (s *Service) transfer(from, to *itemcontainer.Inventory, objectID int32, count int) (TransferResult, GiveFailure, error) {
 	if s == nil {
 		s = NewService(nil)
 	}
-	if !validTransferCount(from, objectID, count) {
-		return TransferResult{}, GiveNoop, nil
+	if failure := checkTransfer(from, to, objectID, count); failure != GiveOK {
+		return TransferResult{}, failure, nil
 	}
 	res, ok, err := s.inventory.TransferItem(from, to, objectID, count)
 	if err != nil {
@@ -338,17 +349,37 @@ func (s *Service) transfer(from, to *itemcontainer.Inventory, objectID int32, co
 	return TransferResult{Persist: res.Persist}, GiveOK, nil
 }
 
-func validTransferCount(from *itemcontainer.Inventory, objectID int32, count int) bool {
-	if from == nil || count < 1 {
-		return false
+// checkTransfer reports whether count units of objectID can move from one
+// inventory to the other: GiveNoop for a count the item cannot satisfy,
+// GiveStackFull for one the receiver's stack cannot take.
+func checkTransfer(from, to *itemcontainer.Inventory, objectID int32, count int) GiveFailure {
+	if from == nil || to == nil || count < 1 {
+		return GiveNoop
 	}
 	inst := from.ItemByObjectID(objectID)
 	if inst == nil {
-		return false
+		return GiveNoop
 	}
 	tmpl, ok := from.Templates().Get(inst.TemplateID)
-	if !ok || (count > 1 && !tmpl.Stackable) {
-		return false
+	if !ok || (count > 1 && !tmpl.Stackable) || count > inst.Snapshot().Count {
+		return GiveNoop
 	}
-	return count <= inst.Snapshot().Count
+	if !stackFits(to, inst.TemplateID, tmpl, count) {
+		return GiveStackFull
+	}
+	return GiveOK
+}
+
+// stackFits reports whether count units of a templateID item fit the
+// receiver: a stackable item merges into the receiver's stack of it, whose
+// count may not pass the item count limit. Unstackable units never merge.
+func stackFits(receiver *itemcontainer.Inventory, templateID int32, tmpl *item.Template, count int) bool {
+	if !tmpl.Stackable {
+		return true
+	}
+	total := int64(count)
+	if held := receiver.ItemByTemplateID(templateID); held != nil {
+		total += int64(held.Snapshot().Count)
+	}
+	return total <= math.MaxInt32
 }
