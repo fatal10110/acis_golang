@@ -162,18 +162,22 @@ func (w *War) AddMember(h *script.Hall, clanID, objectID int32) {
 
 // RegisterClan registers clanID, its leader as its first member, and
 // stores it: the owner under the royal flag with the owner's NPC, any other
-// clan under the next free flag. A clan owning another hall, or no clan,
-// is refused (false).
+// clan under the next free flag. A clan owning another hall or bidding on
+// one at auction, which could win both halls, or no clan, is refused
+// (false).
 func (w *War) RegisterClan(s *script.Script, h *script.Hall, clanID int32) (ClanData, bool) {
 	clan := s.Clan(clanID)
 	if clan == nil {
 		return ClanData{}, false
 	}
-	if clan.ClanHallID() > 0 && clan.ClanHallID() != h.ID() {
+	if clan.ClanHallID() > 0 && clan.ClanHallID() != h.ID() || h.ClanBidding(clan.ID()) {
 		return ClanData{}, false
 	}
 	isOwner := clan.ID() == h.OwnerID()
-	h.AddAttacker(clan.ID())
+	if !h.AddAttacker(clan.ID()) && !slices.Contains(h.Attackers(), clan.ID()) {
+		// A bid placed since the check above keeps the clan out.
+		return ClanData{}, false
+	}
 	flag := w.RoyalFlag
 	if !isOwner {
 		flag = w.RoyalFlag + int32(w.data.Len()) + 1

@@ -215,15 +215,17 @@ func checkAndRegisterClan(s *script.Script, w *flagwar.War, h *script.Hall, p *s
 	}
 	cd, ok := w.Clan(clan.ID())
 	if !ok {
+		// Registering first keeps the items of a clan refused for a bid
+		// placed since its registration was checked.
+		if cd, ok = w.RegisterClan(s, h, clan.ID()); !ok {
+			return "azit_messenger_q0504_10.htm"
+		}
 		s.TakeItems(p, tarlkAmulet, 30)
 		s.TakeItems(p, contestCertificate, -1)
 		s.TakeItems(p, trophyOfAlliance, -1)
 		if st := s.QuestState(p, questName); st != nil {
 			s.PlaySound(p, script.SoundFinish)
 			st.Exit(true)
-		}
-		if cd, ok = w.RegisterClan(s, h, clan.ID()); !ok {
-			panic(fmt.Sprintf("banditstronghold: clan %d owns another hall and holds no registration", clan.ID()))
 		}
 	}
 	return flagHTML(cd.Flag)
@@ -242,6 +244,11 @@ func clanRegisterStatus(s *script.Script, w *flagwar.War, h *script.Hall, p *scr
 	}
 	if clan != nil && h.OwnerID() == p.ClanID() {
 		return "agit_oel_mahum_messeger_22.htm"
+	}
+	if clan != nil && h.ClanBidding(clan.ID()) {
+		// A clan bidding at auction could win both halls (owner-approved
+		// refusal).
+		return "azit_messenger_q0504_10.htm"
 	}
 	if !withAdena {
 		if !s.DestroyItems(p, trophyOfAlliance, 1, true) {

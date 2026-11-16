@@ -127,6 +127,8 @@ type rainbowSetup struct {
 	// heldDecrees is how many war decrees the Attacker holds.
 	heldDecrees int
 	members     []rainbowMember
+	// seed are more statements, run after the clans and the hall row.
+	seed []string
 }
 
 type rainbowWorld struct {
@@ -298,6 +300,9 @@ func seedRainbow(t *testing.T, db *sql.DB, s rainbowSetup, date time.Time) {
 	if s.heldDecrees > 0 {
 		exec("INSERT INTO items (owner_id, object_id, item_id, count, loc, loc_data) SELECT obj_Id, ?, ?, ?, 'INVENTORY', 0 FROM characters WHERE char_name = 'Attacker'",
 			rainbowDecreeObject, rainbowDecree, s.heldDecrees)
+	}
+	for _, q := range s.seed {
+		exec(q)
 	}
 }
 
