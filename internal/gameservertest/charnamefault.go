@@ -7,12 +7,14 @@ import (
 )
 
 // CharacterNameFault makes the character-name calls admin edits issue
-// fail: a non-nil Lookup fails every name uniqueness lookup, a non-nil
-// Store every name write. Every other character edit reaches the database
-// as usual, and so does character creation.
+// fail or wait: a non-nil Lookup fails every name uniqueness lookup, a
+// non-nil Store every name write, and a non-nil StoreHold runs ahead of
+// every name write, on the renamed player's queue. Every other character
+// edit reaches the database as usual, and so does character creation.
 type CharacterNameFault struct {
-	Lookup error
-	Store  error
+	Lookup    error
+	Store     error
+	StoreHold func()
 }
 
 // WithCharacterNameFault installs fault on the store admin edits use, so a
@@ -37,6 +39,9 @@ func (s faultyCharacterNameStore) NameTaken(ctx context.Context, name string) (b
 }
 
 func (s faultyCharacterNameStore) SetName(ctx context.Context, objectID int32, name string) error {
+	if s.fault.StoreHold != nil {
+		s.fault.StoreHold()
+	}
 	if s.fault.Store != nil {
 		return s.fault.Store
 	}

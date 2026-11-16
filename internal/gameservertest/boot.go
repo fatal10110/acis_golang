@@ -124,6 +124,7 @@ type options struct {
 	itemFlushFault         *ItemFlushFault
 	dbFault                *dbtest.Fault
 	selectionHold          func(objectID int32)
+	characterCreateHold    func(name string) error
 	scripts                *scriptOptions
 	memoLoadErr            error
 	respawnRestoreHP       float64
@@ -1064,7 +1065,8 @@ func WithCapturedLog() Option { return func(o *options) { o.captureLog = true } 
 
 // WithRealPool runs this Boot's actor queues on the production sim.Pool even
 // in a suite that drives its clock, for a test that needs the pool itself:
-// its slow-task watchdog (Server.SlowTaskLogs) exists only there.
+// its slow-task watchdog (Server.SlowTaskLogs) exists only there, and only
+// there may a handler or queue stay held while other clients' reads go on.
 func WithRealPool() Option { return func(o *options) { o.realPool = true } }
 
 // WithGeo supplies the movement geodata collaborator wired into live
@@ -2328,7 +2330,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if rosterNPCs == nil {
 		rosterNPCs = npc.NewTable(nil)
 	}
-	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold}, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold, createHold: o.characterCreateHold}, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
 	if o.admin != nil {
 		roster.SetAccessLevels(o.admin, o.log)
@@ -2484,7 +2486,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	gclConfig.CharacterEdits = chars
-	if f := o.characterNameFault; f.Lookup != nil || f.Store != nil {
+	if f := o.characterNameFault; f.Lookup != nil || f.Store != nil || f.StoreHold != nil {
 		gclConfig.CharacterEdits = faultyCharacterNameStore{CharacterStore: chars, fault: o.characterNameFault}
 	}
 	gclConfig.Punishments = chars

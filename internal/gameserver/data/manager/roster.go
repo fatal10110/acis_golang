@@ -108,9 +108,9 @@ type subclassStore interface {
 
 // Roster creates, lists, deletes and restores the characters on an
 // account, keeping the characters and items tables consistent with each
-// other. A Roster holds no mutable state of its own beyond its
-// dependencies, so it is safe for concurrent use exactly to the extent its
-// stores and id allocator are.
+// other. Its only mutable state of its own is the set of names being taken
+// (ReserveName), guarded by its own lock; otherwise it is safe for
+// concurrent use exactly to the extent its stores and id allocator are.
 type Roster struct {
 	characters characterStore
 	items      itemStore
@@ -129,6 +129,8 @@ type Roster struct {
 	// resolves every level to the user level.
 	accessLevels *admin.Data
 	log          zerolog.Logger
+	// names holds the names creations and renames are taking.
+	names nameReservations
 }
 
 // SetAccessLevels has Create resolve the level a new character is granted
@@ -207,6 +209,14 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 		return nil, CreateTooManyCharacters, nil
 	}
 
+	// The name is held from before the check until Create returns, by
+	// when its row holds it, so a concurrent creation or rename of the
+	// same name is refused rather than both passing the check.
+	release, ok := r.names.reserve(req.Name)
+	if !ok {
+		return nil, CreateNameTaken, nil
+	}
+	defer release()
 	taken, err := r.characters.NameTaken(ctx, req.Name)
 	if err != nil {
 		return nil, CreateRejected, err

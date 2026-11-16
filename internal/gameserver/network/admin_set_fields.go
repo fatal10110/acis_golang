@@ -195,15 +195,29 @@ func (l *GameClientLink) adminSetName(gm *livePlayer, name string, hasName bool)
 
 // adminRenamePlayer renames target to name for gm. A name that is not 1
 // to 16 ASCII letters or digits, an NPC's name or a character's, online
-// or not, is refused with INCORRECT_NAME_TRY_AGAIN. Otherwise, on target's
+// or not, or one a character creation is taking, is refused with
+// INCORRECT_NAME_TRY_AGAIN. Otherwise, on target's
 // queue, target takes the name, is found by it from then on, shows it to
 // itself and the players around it, and is stored before gm is told.
 func (l *GameClientLink) adminRenamePlayer(gm, target *livePlayer, name string) {
-	if !shortNamePattern.MatchString(name) || l.npcNamed(name) || l.characterNamed(name) {
+	if !shortNamePattern.MatchString(name) || l.npcNamed(name) {
 		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
 		return
 	}
-	onPlayer(gm, target, func() {
+	// The name is held from before the check until it is stored or the
+	// rename gives up, so no character creation takes it in between.
+	release, ok := l.reserveName(name)
+	if !ok {
+		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
+		return
+	}
+	if l.characterNamed(name) {
+		release()
+		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
+		return
+	}
+	if !onPlayer(gm, target, func() {
+		defer release()
 		if !l.renamePlayer(target, name) {
 			// A player that took the name online since the check, or a
 			// name the database did not take.
@@ -213,7 +227,20 @@ func (l *GameClientLink) adminRenamePlayer(gm, target *livePlayer, name string) 
 		l.broadcastCharacterInfo(target)
 		l.storeLive(target)
 		sendText(gm, "You successfully set your target's name to "+target.CharacterName()+".")
-	})
+	}) {
+		// A target that left the world drops the rename unrun.
+		release()
+	}
+}
+
+// reserveName holds name against character creation and other renames
+// until release is called, reporting false when one of them holds it. A
+// link with no roster creates no characters, so it holds nothing.
+func (l *GameClientLink) reserveName(name string) (release func(), ok bool) {
+	if l.roster == nil {
+		return func() {}, true
+	}
+	return l.roster.ReserveName(name)
 }
 
 // npcNamed reports whether an NPC template is named name, matched
