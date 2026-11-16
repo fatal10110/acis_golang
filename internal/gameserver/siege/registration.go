@@ -58,14 +58,21 @@ func (s *Siege) RegisterDefender(cl *clan.Clan) (refusal Message, refused bool) 
 }
 
 // Unregister drops cl's registration, unless cl owns the castle, and stores
-// it.
-func (s *Siege) Unregister(cl *clan.Clan) {
+// it. Only while the registrations are open: a clan leaving once they
+// closed would keep its members' siege state and its headquarters past the
+// siege's end, which clears only the clans still registered. It returns the
+// message refusing cl then.
+func (s *Siege) Unregister(cl *clan.Clan) (Message, bool) {
 	if cl == nil || cl.CastleID() == int32(s.castle.ID) {
-		return
+		return Message{}, false
 	}
 	s.e.mu.Lock()
 	defer s.e.mu.Unlock()
+	if s.status != StatusRegistrationOpened {
+		return castleMsg(MsgDeadlinePassed, s.castle.ID), true
+	}
 	s.unregisterLocked(cl.ID())
+	return Message{}, false
 }
 
 func (s *Siege) unregisterLocked(clanID int32) {

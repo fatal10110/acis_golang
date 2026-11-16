@@ -249,6 +249,14 @@ func (hs *Halls) Besieging(clanID int32) bool {
 	return false
 }
 
+// attackingLocked is participatingLocked for a caller holding only the
+// halls' mu.
+func (hs *Halls) attackingLocked(clanID int32) bool {
+	hs.siegeMu.Lock()
+	defer hs.siegeMu.Unlock()
+	return hs.participatingLocked(clanID)
+}
+
 func (hs *Halls) participatingLocked(clanID int32) bool {
 	for _, h := range hs.order {
 		if s := h.siege; s != nil && s.script != nil && slices.Contains(s.attackers, clanID) {
@@ -396,9 +404,10 @@ const (
 
 // Register makes cl an attacker of the siege, refusing, in this order, a
 // clan below the configured level, a siege whose registrations closed or
-// that is fought, the hall's owner, a clan owning a castle or a hall, a
-// clan registered already, here or on another hall's siege, and a full
-// attacker side. Registering is stored.
+// that is fought, the hall's owner, a clan owning a castle or a hall or
+// bidding on one at auction (it could win both), a clan registered
+// already, here or on another hall's siege, and a full attacker side.
+// Registering is stored.
 func (s *HallSiege) Register(cl *clan.Clan) (RegisterResult, siege.Message) {
 	hs := s.hs
 	hs.mu.Lock()
@@ -417,7 +426,7 @@ func (s *HallSiege) Register(cl *clan.Clan) (RegisterResult, siege.Message) {
 		return refuse(siege.Message{ID: msgNotRegistrationTime})
 	case s.h.ownerID == cl.ID():
 		return refuse(siege.Message{ID: siege.MsgOwnerAutomaticallyDefends})
-	case cl.CastleID() != 0 || cl.HallID() != 0:
+	case cl.CastleID() != 0 || cl.HallID() != 0 || hs.bidAt[cl.ID()] != 0:
 		return refuse(siege.Message{ID: siege.MsgOwnerCannotJoinOther})
 	case st.script == nil:
 		return RegisterNoSiege, siege.Message{}

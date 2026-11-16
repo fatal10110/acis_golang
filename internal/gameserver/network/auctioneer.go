@@ -202,7 +202,8 @@ func (l *GameClientLink) placeHallBid(live *livePlayer, cl *clan.Clan, tokens []
 
 // showBidForm opens the bid form of hall val for cl: refused, with the
 // list's first page and a notice, for a clan below level 2, one owning a
-// hall or one that bid on another hall.
+// hall, dissolving or attacking a hall's siege, or one that bid on another
+// hall.
 func (l *GameClientLink) showBidForm(live *livePlayer, f *npc.Folk, cl *clan.Clan, val string) {
 	if val == "" {
 		return
@@ -215,7 +216,7 @@ func (l *GameClientLink) showBidForm(live *livePlayer, f *npc.Folk, cl *clan.Cla
 	switch at := l.halls.BidAt(cl.ID()); {
 	case cl.Level() < 2:
 		refusal = serverpackets.SystemMessageAuctionOnlyClanLevel2Higher
-	case cl.HallID() > 0:
+	case cl.HallID() > 0 || l.halls.Now() < cl.Info().DissolvingExpiry || l.halls.ClanParticipating(cl.ID()):
 		refusal = serverpackets.SystemMessageCannotParticipateInAuction
 	case at > 0 && at != int32(hallID):
 		refusal = serverpackets.SystemMessageAlreadySubmittedBid

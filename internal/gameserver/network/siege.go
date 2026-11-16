@@ -72,8 +72,8 @@ func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.Re
 		if refused {
 			live.SendFrame(frameSiegeMessage(refusal))
 		}
-	} else {
-		s.Unregister(cl)
+	} else if refusal, refused := s.Unregister(cl); refused {
+		live.SendFrame(frameSiegeMessage(refusal))
 	}
 	live.SendFrame(l.frameSiegeInfo(live, s.Castle()))
 }

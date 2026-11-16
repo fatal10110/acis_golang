@@ -170,9 +170,12 @@ func (hs *Halls) resetAuctionLocked(h *hall) {
 
 // endAuctionLocked ends h's auction. Without a bid a free hall's auction
 // starts over, and a hall for sale stays its owner's: the selling clan is
-// told it found no buyer and the sale is dropped. Otherwise the selling
-// clan, if any, is paid the highest bid minus the tax and its deposit back,
-// and the hall goes to the highest bidder.
+// told it found no buyer and the sale is dropped. A highest bidder that
+// came to own a hall while its bid stood cannot take a second one, and one
+// dissolving would leave the hall to a clan about to go: the auction
+// restarts (restartAuctionLocked). Otherwise the selling clan, if
+// any, is paid the highest bid minus the tax and its deposit back, and the
+// hall goes to the highest bidder.
 func (hs *Halls) endAuctionLocked(h *hall) {
 	a := h.auction
 	if a.highest == nil {
@@ -186,13 +189,33 @@ func (hs *Halls) endAuctionLocked(h *hall) {
 		hs.updateLocked(h)
 		return
 	}
+	winner, _ := hs.clans.ByName(a.highest.ClanName)
+	if winner != nil && (winner.HallID() > 0 || hs.nowLocked() < winner.Info().DissolvingExpiry) {
+		hs.restartAuctionLocked(h)
+		return
+	}
 	var payouts []credit
 	if a.seller != nil {
 		seller, _ := hs.clans.ByName(a.seller.ClanName)
 		payouts = append(owedBack(seller, a.highest.Bid, true), owedBack(seller, h.data.Lease, false)...)
 	}
-	winner, _ := hs.clans.ByName(a.highest.ClanName)
 	hs.setOwnerLocked(h, winner, payouts...)
+}
+
+// restartAuctionLocked runs h's auction again for a week from now, stored:
+// every bid is dropped and refunded minus the tax, the highest one too,
+// and nobody is told of a winner. A hall for sale stays for sale, its
+// seller's deposit still held: the sale found no buyer it could pay.
+func (hs *Halls) restartAuctionLocked(h *hall) {
+	a := h.auction
+	hs.removeBidsLocked(h, nil)
+	a.highest = nil
+	a.endDate = hs.nowLocked() + weekMs
+	hallID, end := h.id(), a.endDate
+	hs.write("store clan hall auction end", hallID, func(ctx context.Context, st HallStore) error {
+		return st.UpdateEndDate(ctx, hallID, end)
+	})
+	hs.armAuctionLocked(h, weekMs)
 }
 
 // removeBidsLocked drops every bid on h, stored and live. Each bidding
@@ -238,7 +261,8 @@ const (
 	BidNoAdena
 	// BidClanTooLow is a clan below level 2.
 	BidClanTooLow
-	// BidNotAllowed is a clan owning a hall, or a hall not up for auction.
+	// BidNotAllowed is a clan owning a hall, dissolving or registered on a
+	// hall's siege, or a hall not up for auction.
 	BidNotAllowed
 	// BidElsewhere is a clan that already bid on another hall.
 	BidElsewhere
@@ -247,7 +271,8 @@ const (
 // Bid has player name of clan cl bid amount on hall hallID. A bid must
 // beat the minimum bid and the clan's earlier bid, and the clan's
 // warehouse must hold what it adds. The clan must be level 2 or higher,
-// own no hall and have bid on no other hall, and the hall must be up for
+// own no hall, not be dissolving, attack no hall's siege (it could win
+// both halls) and have bid on no other hall, and the hall must be up for
 // auction: the same gates that open the bid form, checked again as the
 // form may be stale. A placed bid is the clan's leader's in the bid list
 // and stored under name; the clan is recorded as bidding on the hall. The
@@ -267,7 +292,7 @@ func (hs *Halls) Bid(hallID int32, cl *clan.Clan, name string, amount int) BidRe
 	switch {
 	case info.Level < 2:
 		return BidClanTooLow
-	case info.HallID > 0 || !h.listedLocked():
+	case info.HallID > 0 || !h.listedLocked() || hs.nowLocked() < info.DissolvingExpiry || hs.attackingLocked(cl.ID()):
 		return BidNotAllowed
 	case hs.bidAt[cl.ID()] != 0 && hs.bidAt[cl.ID()] != hallID:
 		return BidElsewhere
