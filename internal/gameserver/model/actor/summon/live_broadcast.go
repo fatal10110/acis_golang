@@ -16,7 +16,7 @@ type Runtime struct {
 	Sink event.Sink
 }
 
-// Attach installs rt. Call it once, before SpawnBesideOwner publishes the
+// Attach installs rt. Call it once, before SpawnAt publishes the
 // summon into the world; a nil Sink drops every event so domain tests need no
 // packet layer, a nil AI leaves commands unexecuted, and a nil Cast leaves
 // nothing for damage or effects to stop.

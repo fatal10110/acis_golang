@@ -413,8 +413,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// reject it" (live_accessors.go), which is exactly what a cast
 	// controller-less ai.Summon already does by design.
 	//
-	// Attach must run before SpawnBesideOwner publishes pet into world.State:
-	// SpawnBesideOwner's registry writes take a mutex, giving a
+	// Attach must run before SpawnAt publishes pet into world.State:
+	// SpawnAt's registry writes take a mutex, giving a
 	// happens-before edge to any other goroutine's registry read (e.g. the
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
 	// Setting brain first means that edge also covers the brain field,
