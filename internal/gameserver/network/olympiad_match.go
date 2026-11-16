@@ -356,7 +356,9 @@ func (a olympiadArena) Announce(stadium int, m olympiad.Message) {
 
 // Enter keeps where p stands for its return, clears its selection, makes it
 // a competitor of stadium on its side, not yet fighting, and teleports it
-// onto its side's spawn, then switches its client to its side.
+// onto its side's spawn, then switches its client to its side. A teleport
+// refused while p's own is landing is made once it lands, while p still
+// competes there.
 func (a olympiadArena) Enter(stadium int, p olympiad.Participant) bool {
 	z, ok := a.l.stadiumZone(stadium)
 	if !ok {
@@ -374,7 +376,9 @@ func (a olympiadArena) Enter(stadium int, p olympiad.Participant) bool {
 		live.SetOlympiadMode(true)
 		live.SetOlympiadStarted(false)
 		live.SetOlympiadSide(p.Side)
-		a.l.teleportLivePlayer(live, at, 0)
+		a.l.forceTeleportLivePlayer(live, at, 0, func() bool {
+			return live.OlympiadMode() && live.OlympiadGameID() == stadium
+		})
 		live.SendFrame(serverpackets.FrameExOlympiadMode(p.Side))
 	})
 }
@@ -570,7 +574,8 @@ func (a olympiadArena) Release(objectID int32) {
 
 // SendBack returns live from where it entered the stadium to a random point
 // of the restart point of that region, or to that very spot when it has
-// none, and forgets it.
+// none, and forgets it. A teleport refused while live's own is landing is
+// made once it lands, unless it is jailed or competes again by then.
 func (a olympiadArena) SendBack(objectID int32) {
 	a.postOnline(objectID, func(live *livePlayer) {
 		saved, ok := live.SavedLocation()
@@ -583,7 +588,9 @@ func (a olympiadArena) SendBack(objectID int32) {
 				dest = point.Points[a.l.olympiadRoll(len(point.Points))]
 			}
 		}
-		a.l.teleportLivePlayer(live, dest, 0)
+		a.l.forceTeleportLivePlayer(live, dest, 0, func() bool {
+			return !jailed(live) && !live.OlympiadMode()
+		})
 		live.ClearSavedLocation()
 	})
 }

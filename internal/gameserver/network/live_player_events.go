@@ -488,7 +488,13 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.TeleportRequested:
 		at := location.Location{X: e.X, Y: e.Y, Z: e.Z}
 		radius := e.Radius
-		onOwnQueue(live, e.OwnQueue, func() { l.teleportLivePlayer(live, at, radius) })
+		if !e.Forced {
+			onOwnQueue(live, e.OwnQueue, func() { l.teleportLivePlayer(live, at, radius) })
+			break
+		}
+		// A forced move waiting for live's own landing yields to a jail
+		// term begun meanwhile.
+		onOwnQueue(live, e.OwnQueue, func() { l.forceTeleportLivePlayer(live, at, radius, notJailed(live)) })
 	case event.InstantTeleportRequested:
 		// A script asks it from any queue (a swap moves two players from
 		// an NPC hook): the jump runs on live's own queue, inside the call

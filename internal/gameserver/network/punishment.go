@@ -65,7 +65,11 @@ func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minute
 	case player.JailLifted:
 		l.sendPunishmentPage(live, jailOutPage)
 		live.stopPunishTimer(true)
-		l.teleportLivePlayer(live, jailReleaseLocation, jailReleaseOffset)
+		// A release refused mid-landing is made once live lands, unless
+		// it is jailed again or out of the jail by then.
+		l.forceTeleportLivePlayer(live, jailReleaseLocation, jailReleaseOffset, func() bool {
+			return !jailed(live) && inJail(live)
+		})
 	case player.ChatBanStarted:
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 		live.stopPunishTimer(false)
@@ -87,7 +91,10 @@ func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minute
 		}
 		l.sendPunishmentPage(live, jailInPage)
 		live.SetIn7sDungeon(false)
-		l.teleportLivePlayer(live, jailLocation, jailEntryOffset)
+		// An observer stops watching where it stands first, so that
+		// nothing of its watch can take it back out of the jail.
+		l.endObservationInPlace(live)
+		l.forceTeleportLivePlayer(live, jailLocation, jailEntryOffset, jailedOutside(live))
 	}
 	l.storePunishment(live)
 }
@@ -104,9 +111,32 @@ func (l *GameClientLink) enterWorldPunishment(live *livePlayer) {
 		l.armPunishTimer(live)
 		sendText(live, "You are still "+kind.Description()+" for "+strconv.Itoa(int(player.PunishmentMinutesLeft(timer)))+" minutes.")
 	}
-	if kind == player.PunishJail && (live.zoneActor == nil || !live.zoneActor.ZoneFlags().Has(zone.FlagJail)) {
-		l.teleportLivePlayer(live, jailLocation, jailReturnOffset)
+	if kind == player.PunishJail && !inJail(live) {
+		l.forceTeleportLivePlayer(live, jailLocation, jailReturnOffset, jailedOutside(live))
 	}
+}
+
+// jailed reports whether live serves a jail term.
+func jailed(live *livePlayer) bool {
+	kind, _ := live.Punishment()
+	return kind == player.PunishJail
+}
+
+// inJail reports whether live stands in a jail.
+func inJail(live *livePlayer) bool {
+	return live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagJail)
+}
+
+// notJailed is the condition of a move made once live's own teleport
+// lands that yields to a jail term begun meanwhile.
+func notJailed(live *livePlayer) func() bool {
+	return func() bool { return !jailed(live) }
+}
+
+// jailedOutside is the condition of taking live to the jail once its own
+// teleport lands: it is still jailed and has not landed in a jail.
+func jailedOutside(live *livePlayer) func() bool {
+	return func() bool { return jailed(live) && !inJail(live) }
 }
 
 // armPunishTimer lifts live's punishment once its timer has run, counted

@@ -341,6 +341,8 @@ func (l *GameClientLink) sendToDuel(v duel.View[*livePlayer], build func() wire.
 }
 
 // teleportDuelParties moves both parties of v to the arena, side by side.
+// A teleport refused while a player's own is landing is made once it
+// lands, while the player is still in a duel.
 func (l *GameClientLink) teleportDuelParties(v duel.View[*livePlayer]) {
 	for side, team := range [][]*livePlayer{v.TeamA, v.TeamB} {
 		dy := -150
@@ -349,7 +351,7 @@ func (l *GameClientLink) teleportDuelParties(v duel.View[*livePlayer]) {
 		}
 		for i, m := range team {
 			at := location.Location{X: duel.Arena.X + 40*i - 180, Y: duel.Arena.Y + dy, Z: duel.Arena.Z}
-			postLive(m, func() { l.teleportLivePlayer(m, at, 0) })
+			postLive(m, func() { l.forceTeleportLivePlayer(m, at, 0, m.InDuel) })
 		}
 	}
 }
@@ -517,7 +519,7 @@ func (l *GameClientLink) restoreDuelCondition(live *livePlayer, abnormal bool) {
 		return
 	}
 	if cond.at != nil {
-		l.teleportLivePlayer(live, *cond.at, 0)
+		l.forceTeleportLivePlayer(live, *cond.at, 0, notJailed(live))
 	}
 	if abnormal {
 		return
@@ -560,7 +562,7 @@ func (l *GameClientLink) cancelPartyDuel(leader *livePlayer) {
 	for _, m := range v.All() {
 		postLive(m, func() {
 			if cond := m.duelCondition; cond != nil && cond.at != nil {
-				l.teleportLivePlayer(m, *cond.at, 0)
+				l.forceTeleportLivePlayer(m, *cond.at, 0, notJailed(m))
 			}
 			m.LeaveDuel()
 		})

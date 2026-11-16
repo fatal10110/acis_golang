@@ -251,6 +251,10 @@ type livePlayer struct {
 	// teleports this player from the caster's queue, while Appearing runs on
 	// this player's own.
 	teleportMu sync.Mutex
+	// deferredTeleports are the forced teleports refused while this
+	// player's own teleport was landing, in the order they were asked,
+	// run once it lands. teleportMu guards it.
+	deferredTeleports []func()
 
 	// interactMu is taken from another actor's queue for the same reason
 	// as pickupMu.

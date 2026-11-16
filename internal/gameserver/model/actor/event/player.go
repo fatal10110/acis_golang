@@ -321,10 +321,13 @@ type SummonConfirmRequested struct {
 // TeleportRequested reports a discontinuous relocation of a player to
 // (X, Y, Z) within Radius. OwnQueue marks a request raised on the
 // character's own queue, which moves it inside the call; any other runs on
-// that queue once the raising task is done.
+// that queue once the raising task is done. Forced marks a move that,
+// refused while the player's own teleport is still landing, is made once
+// that landing completes instead of being dropped.
 type TeleportRequested struct {
 	X, Y, Z, Radius int
 	OwnQueue        bool
+	Forced          bool
 }
 
 // SummonTeleportRequested reports an ordinary teleport of a summon to

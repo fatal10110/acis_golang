@@ -52,14 +52,14 @@ func (p *Player) HasAtLeastOneItem(itemIDs ...int32) bool {
 // the death hook, the tutorial events a death, a level-up or an HP loss
 // raise) it runs on the player's own queue once the calling task is done,
 // and the rest of the hook still reads the old position.
+//
+// A move refused because the player's own teleport is still landing is
+// made once it lands: what the script took or set for the move stays
+// paid for.
 func (p *Player) TeleportTo(at Place, offset int) {
 	loc := at.loc()
 	c := p.character()
-	if c.OnOwnQueue() {
-		c.TeleportOnQueue(loc.X, loc.Y, loc.Z, offset)
-		return
-	}
-	c.TeleportTo(loc.X, loc.Y, loc.Z, offset)
+	c.ForceTeleport(loc.X, loc.Y, loc.Z, offset, c.OnOwnQueue())
 }
 
 // After runs fn on the player's queue once d has passed, as a hook on that

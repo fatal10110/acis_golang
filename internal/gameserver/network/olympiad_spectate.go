@@ -7,6 +7,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
@@ -23,16 +25,17 @@ const (
 // spectators watch from: past the two sides' spawns.
 const spectatorSpawn = 2
 
-// bypassArenaChange answers "arenachange <n>": a player whose last selected
-// NPC is an Olympiad manager, or one watching a stadium, goes to watch
-// stadium n; one on a waiting list or in a match is told it may not watch.
-// Anyone else, a player mid-teleport, a number that does not parse and a
-// stadium that is not answer nothing: the link click leaves no client
-// action pending. The teleport gate keeps a refused jump from leaving the
-// player a spectator wherever it stands.
+// bypassArenaChange answers "arenachange <n>": a player that has an
+// Olympiad manager selected within reach, or one watching a stadium, goes
+// to watch stadium n; one on a waiting list or in a match is told it may
+// not watch. Anyone else, a player whose state bars watching
+// (mayWatchStadium), a player mid-teleport, a number that does not parse
+// and a stadium that is not are refused with ActionFailed. The teleport
+// gate keeps a refused jump from leaving the player a spectator wherever
+// it stands.
 func (l *GameClientLink) bypassArenaChange(live *livePlayer, command string) {
-	f := live.currentFolk.Load()
-	if (f == nil || !f.OlympiadManager()) && (!live.ObserverMode() || live.OlympiadGameID() < 0) {
+	if !(live.ObserverMode() && live.OlympiadGameID() >= 0) && !l.atOlympiadManager(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if l.olympiadRegistered(live) {
@@ -40,10 +43,26 @@ func (l *GameClientLink) bypassArenaChange(live *livePlayer, command string) {
 		return
 	}
 	id, ok := arenaChangeID(command)
-	if !ok || live.Teleporting() {
-		return
+	if !ok || live.Teleporting() || !mayWatchStadium(live) || !l.enterOlympiadObserverMode(live, id) {
+		live.SendFrame(serverpackets.FrameActionFailed())
 	}
-	l.enterOlympiadObserverMode(live, id)
+}
+
+// atOlympiadManager reports whether live has an Olympiad manager selected
+// and may interact with it from where it stands.
+func (l *GameClientLink) atOlympiadManager(live *livePlayer) bool {
+	f, ok := live.Target().(*npc.Folk)
+	return ok && f.OlympiadManager() && l.playerCanDoInteract(live, f)
+}
+
+// mayWatchStadium reports whether live's state lets it watch a stadium:
+// alive, out of combat, unflagged and without karma, in no duel, siege or
+// festival, holding no cursed weapon, neither mounted nor aboard a boat,
+// and running no private store.
+func mayWatchStadium(live *livePlayer) bool {
+	return !live.Dead() && !live.InCombat() && !live.PvPFlagged() && live.Karma() <= 0 &&
+		!live.InDuel() && live.SiegeState() == player.SiegeStateNone && !live.FestivalParticipant() &&
+		!live.CursedWeaponEquipped() && !live.Mounted() && !live.InBoat() && !live.Operating()
 }
 
 // arenaChangeID reads the stadium of an "arenachange" command: what
@@ -64,22 +83,23 @@ func arenaChangeID(command string) (int, bool) {
 // cubics go, it leaves its party, stands up, keeps where it stands for its
 // return unless it already watches a stadium, drops its selection and,
 // hidden and unhurtable, lands on the stadium's spectator spawn, its client
-// switched to spectating. A stadium that is not answers nothing.
-func (l *GameClientLink) enterOlympiadObserverMode(live *livePlayer, id int) {
+// switched to spectating. It reports false, doing nothing, for a stadium
+// that is not.
+func (l *GameClientLink) enterOlympiadObserverMode(live *livePlayer, id int) bool {
 	if l.olympiad == nil {
-		return
+		return false
 	}
 	if _, ok := l.olympiad.Stadium(id); !ok {
-		return
+		return false
 	}
 	z, ok := l.stadiumZone(id)
 	if !ok {
-		return
+		return false
 	}
 	spawns := z.Spawn(zone.SpawnNormal)
 	if len(spawns) <= spectatorSpawn {
 		l.log.Warn().Int("stadium", id).Int("spawns", len(spawns)).Msg("olympiad: stadium has no spectator spawn")
-		return
+		return false
 	}
 	l.dropAllSummons(live)
 	if l.parties != nil {
@@ -95,6 +115,7 @@ func (l *GameClientLink) enterOlympiadObserverMode(live *livePlayer, id int) {
 	live.SetInvisible(true)
 	l.teleportLivePlayer(live, spawns[spectatorSpawn], 0)
 	live.SendFrame(serverpackets.FrameExOlympiadMode(serverpackets.OlympiadModeObserver))
+	return true
 }
 
 // requestOlympiadObserverEnd answers RequestOlympiadObserverEnd: a stadium's
@@ -115,6 +136,15 @@ func (l *GameClientLink) leaveOlympiadObserverMode(live *livePlayer) {
 	if live.OlympiadGameID() == -1 {
 		return
 	}
+	saved := l.stopWatchingStadium(live)
+	l.teleportLivePlayer(live, saved, 0)
+	live.ClearSavedLocation()
+}
+
+// stopWatchingStadium makes stadium spectator live a plain player again,
+// shown, hurtable and idle, its client out of spectating, and returns the
+// position it left to watch.
+func (l *GameClientLink) stopWatchingStadium(live *livePlayer) location.Location {
 	live.SetOlympiadGameID(-1)
 	live.tryToIdle(live.DenyAIAction())
 	l.clearLiveTarget(live)
@@ -122,8 +152,7 @@ func (l *GameClientLink) leaveOlympiadObserverMode(live *livePlayer) {
 	live.SetInvul(false)
 	live.SendFrame(serverpackets.FrameExOlympiadMode(serverpackets.OlympiadModeNone))
 	saved, _ := live.SavedLocation()
-	l.teleportLivePlayer(live, saved, 0)
-	live.ClearSavedLocation()
+	return saved
 }
 
 // requestOlympiadMatchList answers RequestOlympiadMatchList: a spectator is

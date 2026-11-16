@@ -168,7 +168,34 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 // reports it appeared (completeLivePlayerTeleport). A player lingering after
 // its connection dropped has no client to report it, so it lands at once,
 // before the enchant, trade and boat cancels. The caller runs on live's queue.
+// A teleport asked while live's own is still landing is dropped.
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
+	l.jumpOrDefer(live, target, randomOffset, nil)
+}
+
+// maxDeferredTeleports bounds the forced teleports held for one landing; a
+// client holding its landing back cannot pile up more.
+const maxDeferredTeleports = 8
+
+// forceTeleportLivePlayer is teleportLivePlayer for a move live may not
+// slip past by being mid-teleport: refused while live's own teleport is
+// still landing, it is made once that landing completes, provided still
+// (nil for always) holds then. Moves refused so are retried in the order
+// they were asked, each re-checking its own condition, so a later one
+// that undoes an earlier one wins. The caller runs on live's queue.
+func (l *GameClientLink) forceTeleportLivePlayer(live *livePlayer, target location.Location, randomOffset int, still func() bool) {
+	var retry func()
+	retry = func() {
+		if still == nil || still() {
+			l.jumpOrDefer(live, target, randomOffset, retry)
+		}
+	}
+	l.jumpOrDefer(live, target, randomOffset, retry)
+}
+
+// jumpOrDefer is teleportLivePlayer, holding retry, nil for none, for
+// live's landing when live is still teleporting.
+func (l *GameClientLink) jumpOrDefer(live *livePlayer, target location.Location, randomOffset int, retry func()) {
 	live.teleportMu.Lock()
 	locked := true
 	defer func() {
@@ -177,6 +204,9 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 		}
 	}()
 	if !l.relocateLivePlayer(live, target, randomOffset) {
+		if retry != nil && len(live.deferredTeleports) < maxDeferredTeleports {
+			live.deferredTeleports = append(live.deferredTeleports, retry)
+		}
 		return
 	}
 	if live.clientDetached() && !live.detached() {
@@ -286,22 +316,34 @@ func (l *GameClientLink) inWater(at location.Location) bool {
 // see-creature hooks may teleport live again. live's own landing tells
 // nobody: the see-creature re-fire runs before an Appearing gives a
 // player its region back.
-func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
+//
+// It returns the forced teleports refused while live was landing
+// (forceTeleportLivePlayer), for the caller to run on live's queue once it
+// has answered the landing.
+func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) []func() {
 	if live == nil {
-		return
+		return nil
 	}
-	if _, followed := l.landLivePlayer(live); followed != nil {
+	followed, deferred := l.landLivePlayer(live)
+	if followed != nil {
 		npc.ForceSeeCreature(l.world, followed)
 	}
+	return deferred
 }
 
 // landLivePlayer is completeLivePlayerTeleport under live's teleport lock.
-// It reports whether live was teleporting and landed, and returns the summon
-// that jumped to it, nil for none.
-func (l *GameClientLink) landLivePlayer(live *livePlayer) (bool, *summon.Actor) {
+// It returns the summon that jumped to live, nil for none, and, when live
+// was teleporting and landed, the forced teleports held for that landing.
+func (l *GameClientLink) landLivePlayer(live *livePlayer) (*summon.Actor, []func()) {
 	live.teleportMu.Lock()
 	defer live.teleportMu.Unlock()
-	return l.landTeleportedPlayer(live)
+	landed, followed := l.landTeleportedPlayer(live)
+	if !landed {
+		return nil, nil
+	}
+	deferred := live.deferredTeleports
+	live.deferredTeleports = nil
+	return followed, deferred
 }
 
 // landTeleportedPlayer is landLivePlayer with live's teleport lock held.

@@ -420,8 +420,11 @@ func (l *GameClientLink) handleRequestBypassToServer(_ context.Context, cs *conn
 func (l *GameClientLink) handleAppearing(_ context.Context, cs *connState, _ clientpackets.Appearing) error {
 	if cs.live != nil {
 		onLive(cs.live, func() {
-			l.completeLivePlayerTeleport(cs.live)
+			deferred := l.completeLivePlayerTeleport(cs.live)
 			cs.live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(cs.live)))
+			for _, teleport := range deferred {
+				teleport()
+			}
 		})
 	}
 	return nil
