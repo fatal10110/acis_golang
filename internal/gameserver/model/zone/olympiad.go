@@ -93,20 +93,29 @@ func (z *Olympiad) exit(a Actor) {
 // UpdateCombatStatus re-syncs every occupant's combat state with the
 // stadium's match state: called when a match starts or ends while people
 // are already inside. Each occupant is replayed under its own zone
-// membership, and only one whose combat state changes is told.
+// membership. A start tells only the players it put in combat; a stop
+// releases only the holds the stadium raised but tells every player still
+// inside it left the combat zone, closing the scoreboard even when the
+// match ended before the fight.
 func (z *Olympiad) UpdateCombatStatus() {
 	for _, a := range z.Occupants() {
-		replayOn(a, func() {
-			running := z.battleRunning()
-			var changed bool
-			if running {
-				changed = z.raise(a)
-			} else {
-				changed = z.release(a)
-			}
-			if changed && a.Class() == ClassPlayer && z.CombatNotice != nil {
-				z.CombatNotice(a, running)
-			}
-		})
+		replayOn(a, func() { z.replay(a) })
+	}
+}
+
+// replay brings a's ring combat in line with whether the fight runs now.
+func (z *Olympiad) replay(a Actor) {
+	if z.battleRunning() {
+		if z.raise(a) && a.Class() == ClassPlayer && z.CombatNotice != nil {
+			z.CombatNotice(a, true)
+		}
+		return
+	}
+	z.mu.Lock()
+	z.switchOffLocked(a, setRingHolds)
+	_, inside := z.occupants[a.ObjectID()]
+	z.mu.Unlock()
+	if inside && a.Class() == ClassPlayer && z.CombatNotice != nil {
+		z.CombatNotice(a, false)
 	}
 }
