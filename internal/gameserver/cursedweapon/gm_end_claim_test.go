@@ -16,12 +16,15 @@ import (
 // claim it.
 func droppedHeld(t *testing.T, m *Manager) (int32, *fakeGround) {
 	t.Helper()
-	id, ok := m.RollDrop(always(0))
+	d, ok := m.RollDrop(always(0))
 	if !ok {
 		t.Fatal("no drop")
 	}
+	id := d.ItemID
 	ground := &fakeGround{id: 4242}
-	m.PlaceOnGround(id, ground, location.Location{X: 1, Y: 2, Z: 3})
+	if !m.PlaceOnGround(d, ground, location.Location{X: 1, Y: 2, Z: 3}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 	if !ground.Claim() {
 		t.Fatal("the pickup could not claim the fresh drop")
 	}

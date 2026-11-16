@@ -102,6 +102,9 @@ type Manager struct {
 	// weapon of while a pickup held them: the pickup arms nothing with one
 	// (Activate), and one that lets go takes it out of the world (LetGo).
 	dead map[int32]struct{}
+	// drops numbers every drop (RollDrop, HolderDied), never reset: a
+	// weapon ended and dropped again, or reloaded, carries a new number.
+	drops uint64
 }
 
 // weapon is one cursed weapon's definition and state.
@@ -121,9 +124,12 @@ type weapon struct {
 	hungry                 int32
 	endTime                int64
 	// ground is the item the weapon lies on the ground as, nil for none.
-	ground                     Ground
-	groundAt                   location.Location
-	hasGroundAt                bool
+	ground      Ground
+	groundAt    location.Location
+	hasGroundAt bool
+	// drop numbers the drop that put the weapon on the ground, 0 for none;
+	// PlaceOnGround places only that drop's item.
+	drop                       uint64
 	dailyAt, overallAt, dropAt time.Time
 	// dailyRuns counts the hunger checks since the holder took the weapon,
 	// for the hourly reminder.
@@ -289,13 +295,21 @@ func (m *Manager) Active() []Status {
 // game master to hand out.
 func (w *weapon) active() bool { return w.activated || w.dropped || w.reserved }
 
+// Drop is one drop of a cursed weapon on the ground, by a monster kill
+// (RollDrop) or its holder's death (HolderDied), for its caller to lay the
+// item down and report where (PlaceOnGround).
+type Drop struct {
+	ItemID int32
+	seq    uint64
+}
+
 // RollDrop rolls a monster kill's cursed weapon: each weapon not out yet
 // rolls its drop rate in a million, in turn, until one drops. The dropped
 // weapon starts its life and its hour on the ground; the caller lays it
 // down and reports where with PlaceOnGround.
-func (m *Manager) RollDrop(roll Roll) (int32, bool) {
+func (m *Manager) RollDrop(roll Roll) (Drop, bool) {
 	if m == nil {
-		return 0, false
+		return Drop{}, false
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -311,9 +325,16 @@ func (m *Manager) RollDrop(roll Roll) (int32, bool) {
 		w.endTime = now.Add(time.Duration(w.def.Duration) * time.Hour).UnixMilli()
 		w.overallAt = now.Add(minute)
 		w.dropAt = now.Add(groundLifetime)
-		return w.def.ItemID, true
+		return m.dropLocked(w), true
 	}
-	return 0, false
+	return Drop{}, false
+}
+
+// dropLocked numbers w's drop that just happened. The caller holds mu.
+func (m *Manager) dropLocked(w *weapon) Drop {
+	m.drops++
+	w.drop = m.drops
+	return Drop{ItemID: w.def.ItemID, seq: w.drop}
 }
 
 // Ground is a weapon's item lying on the ground. Whatever takes it out of
@@ -325,18 +346,25 @@ type Ground interface {
 	Release()
 }
 
-// PlaceOnGround records where itemID's weapon lies: as ground, at.
-func (m *Manager) PlaceOnGround(itemID int32, ground Ground, at location.Location) {
+// PlaceOnGround records where d's weapon lies: as ground, at. The caller
+// laid ground down claimed, so nothing could pick it up before it was
+// recorded here; ground is let go once it is. ok is false when d's weapon
+// no longer lies on the ground from d, which a game master's end or reload
+// in between does: ground keeps its claim, for the caller to take it out
+// of the world.
+func (m *Manager) PlaceOnGround(d Drop, ground Ground, at location.Location) bool {
 	if m == nil {
-		return
+		return false
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	w := m.byID[itemID]
-	if w == nil {
-		return
+	w := m.byID[d.ItemID]
+	if w == nil || d.seq == 0 || w.drop != d.seq || !w.dropped || w.activated || w.ground != nil {
+		return false
 	}
 	w.ground, w.groundAt, w.hasGroundAt = ground, at, true
+	ground.Release()
+	return true
 }
 
 // Holder is the player obtaining a weapon.
@@ -433,8 +461,10 @@ type Death struct {
 	// reports where with PlaceOnGround.
 	Disappeared bool
 	End         EndOfLife
-	Karma       int32
-	PKKills     int32
+	// Drop is the weapon's drop when it did not disappear.
+	Drop    Drop
+	Karma   int32
+	PKKills int32
 }
 
 // HolderDied settles itemID's weapon when its holder dies: it ends when
@@ -461,7 +491,7 @@ func (m *Manager) HolderDied(itemID int32, roll Roll) (Death, bool) {
 	w.dropAt = m.now().Add(groundLifetime)
 	w.stage = 1
 	m.deleteRowLocked(w.def.ItemID)
-	return Death{Karma: w.playerKarma, PKKills: w.playerPK}, true
+	return Death{Drop: m.dropLocked(w), Karma: w.playerKarma, PKKills: w.playerPK}, true
 }
 
 // Kill counts a player kill by the holder playerID of itemID's weapon: its

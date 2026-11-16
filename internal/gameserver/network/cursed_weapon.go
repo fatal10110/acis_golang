@@ -61,15 +61,18 @@ func (l *GameClientLink) announceCursedRegion(id int, x, y, z int, itemID int32)
 // the monster dropperID at (x, y, z) may drop a cursed weapon not yet out.
 // One that drops lands near the monster, kept from the ground cleanup; every
 // sky turns red, the ground around it shakes, and every player hears in
-// which region, killer's, it dropped.
+// which region, killer's, it dropped. One a game master ended or
+// reloaded before it was recorded on the ground leaves the world at once,
+// unseen by any pickup, and nothing more is told.
 func (l *GameClientLink) DropCursedWeapon(killer *player.Character, dropperID int32, x, y, z int) {
 	if l == nil || l.cursed == nil || killer == nil || l.belongings.groundItems == nil {
 		return
 	}
-	itemID, ok := l.cursed.RollDrop(killer.Roll)
+	drop, ok := l.cursed.RollDrop(killer.Roll)
 	if !ok {
 		return
 	}
+	itemID := drop.ItemID
 	ground, ok := l.newCursedGroundItem(itemID)
 	if !ok {
 		// Nothing reached the world: the weapon goes back on the shelf.
@@ -83,8 +86,14 @@ func (l *GameClientLink) DropCursedWeapon(killer *player.Character, dropperID in
 		at := l.geo.ValidLocation(x, y, z, tx, ty, tz)
 		tx, ty, tz = at.X, at.Y, at.Z
 	}
+	// Claimed until recorded: no pickup takes an item whose weapon ended
+	// before PlaceOnGround.
+	ground.Claim()
 	l.belongings.groundItems.Drop(ground, task.DropOptions{X: tx, Y: ty, Z: tz, DropperID: dropperID})
-	l.cursed.PlaceOnGround(itemID, ground, location.Location{X: tx, Y: ty, Z: tz})
+	if !l.cursed.PlaceOnGround(drop, ground, location.Location{X: tx, Y: ty, Z: tz}) {
+		l.removeCursedGroundItem(ground.ObjectID(), true)
+		return
+	}
 	l.toAllPlayers(func() wire.Frame { return serverpackets.FrameExRedSky(cursedDropRedSky) })
 	l.toAllPlayers(func() wire.Frame {
 		return serverpackets.FrameEarthquake(tx, ty, tz, cursedDropQuakeIntensity, cursedDropQuakeDuration, false)
@@ -250,7 +259,8 @@ func (l *GameClientLink) feedCursedWeapon(live *livePlayer) {
 // loseCursedWeapon settles the cursed weapon live held when it was
 // killed: the weapon ends, or it drops next to live, kept from the ground
 // cleanup, and live gets its karma and PK kills back and loses the
-// weapon's skill; every player then hears in which region it dropped.
+// weapon's skill; every player then hears in which region it dropped,
+// unless a game master ended it before it was recorded on the ground.
 func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 	itemID := live.CursedWeaponID()
 	if l.cursed == nil || itemID == 0 {
@@ -267,6 +277,7 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 	if live.attack != nil {
 		live.attack.Stop()
 	}
+	announce := true
 	if inv := live.Inventory(); inv != nil && l.inventory != nil && l.belongings.groundItems != nil {
 		if inst := inv.ItemByTemplateID(itemID); inst != nil {
 			if inst.Equipped() {
@@ -276,7 +287,12 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 			}
 			if ground, ok := l.dropHeldItem(live, inv, inst, true); ok {
 				gx, gy, gz := ground.Position()
-				l.cursed.PlaceOnGround(itemID, ground, location.Location{X: gx, Y: gy, Z: gz})
+				if !l.cursed.PlaceOnGround(death.Drop, ground, location.Location{X: gx, Y: gy, Z: gz}) {
+					// A game master ended the weapon meanwhile: its item
+					// leaves the world, and no region hears of the drop.
+					l.removeCursedGroundItem(ground.ObjectID(), true)
+					announce = false
+				}
 			}
 		}
 	}
@@ -286,8 +302,10 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 	if skillID, ok := l.cursed.Skill(itemID); ok {
 		l.removeCursedSkill(live, skillID)
 	}
-	x, y, z := live.Position()
-	l.announceCursedRegion(serverpackets.SystemMessageS2WasDroppedInTheS1Region, x, y, z, itemID)
+	if announce {
+		x, y, z := live.Position()
+		l.announceCursedRegion(serverpackets.SystemMessageS2WasDroppedInTheS1Region, x, y, z, itemID)
+	}
 }
 
 // endCursedWeapon applies a weapon's end, then tells every player it

@@ -19,8 +19,8 @@ func TestReserveHoldsTheWeaponForTheGM(t *testing.T) {
 	if !m.Reserve(zariche) || m.Reserve(zariche) {
 		t.Fatal("Reserve: want the first to claim Zariche, the second refused")
 	}
-	if id, ok := m.RollDrop(always(0)); !ok || id != akamanah {
-		t.Fatalf("drop = %d %v, want Akamanah: Zariche is reserved", id, ok)
+	if d, ok := m.RollDrop(always(0)); !ok || d.ItemID != akamanah {
+		t.Fatalf("drop = %d %v, want Akamanah: Zariche is reserved", d.ItemID, ok)
 	}
 	m.Unreserve(zariche)
 	if !m.Reserve(zariche) {

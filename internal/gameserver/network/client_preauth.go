@@ -205,11 +205,7 @@ func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connSta
 	if !ok || c.AccessLevel < 0 || c.DeleteAt > 0 {
 		return nil
 	}
-	selected, next := l.selectCharacter(ctx, cs.conn, client, cs.chars, req.Slot, c)
-	if selected != nil {
-		cs.entering = selected
-	}
-	switch next {
+	switch l.selectCharacter(ctx, cs, req.Slot, c) {
 	case selectionStopped:
 		return errDisconnect
 	case selectionFailed:

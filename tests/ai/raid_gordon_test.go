@@ -73,13 +73,16 @@ func gordonGroundItem(t *testing.T, srv *gameservertest.Server, itemID int32) *g
 // it at at.
 func layZariche(t *testing.T, srv *gameservertest.Server, at location.Location) *grounditem.Item {
 	t.Helper()
-	if id, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || id != zaricheItemID {
-		t.Fatalf("RollDrop = %d, %v; want Zariche", id, ok)
+	drop, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 })
+	if !ok || drop.ItemID != zaricheItemID {
+		t.Fatalf("RollDrop = %d, %v; want Zariche", drop.ItemID, ok)
 	}
 	srv.SeedGroundItem(t, 0, zaricheItemID, 1, at.X, at.Y, at.Z)
 	zariche := gordonGroundItem(t, srv, zaricheItemID)
 	x, y, z := zariche.Position()
-	srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche, location.Location{X: x, Y: y, Z: z})
+	if !srv.CursedWeapons.PlaceOnGround(drop, zariche, location.Location{X: x, Y: y, Z: z}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 	srv.ReadQueued(t, srv.Client)
 	return zariche
 }
