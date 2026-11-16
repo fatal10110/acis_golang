@@ -32,6 +32,10 @@ const (
 	// LoginTimeout is how long an authenticated client may hold its
 	// session without joining a game server before the purge loop drops it.
 	LoginTimeout = 60 * time.Second
+	// loginDBTimeout bounds every account-store call a login makes, so a
+	// stalled database fails that one request instead of holding its
+	// connection indefinitely.
+	loginDBTimeout = 10 * time.Second
 	// minFailedAttemptWindow is the shortest idle time after which an IP's
 	// failed-attempt count is forgotten; see failedAttemptWindow.
 	minFailedAttemptWindow = time.Hour
@@ -90,11 +94,19 @@ type ClientLink struct {
 	liveMu sync.Mutex
 	live   map[string]int
 
-	// authMu guards the authenticated-account mapping: sessions plus
-	// holders. A second authentication for a mapped account closes both the
-	// old holder and the new client, so check-and-insert must be atomic.
+	// authMu guards the authenticated-account mapping: every session this
+	// link issues or drops, plus holders and unclaimed. A second
+	// authentication for a mapped account closes both the old holder and
+	// the new client, so check-and-insert must be atomic. A connection only
+	// drops a session while it is still the account's holder, so a client
+	// that was replaced can never remove its replacement's session. The
+	// game-server link claims sessions outside authMu through
+	// SessionStore.Take, which only removes the exact key it validated.
 	authMu  sync.Mutex
 	holders map[string]*clientConn
+	// unclaimed holds the sessions whose connection closed after PlayOk,
+	// kept for the game server to claim until the login timeout.
+	unclaimed map[string]unclaimedSession
 
 	// newKeyPair, newSessionKey, and newSessionID supply each connection's
 	// RSA key pair, dynamic Blowfish key, and Init session id; overridden in
@@ -145,6 +157,7 @@ func NewClientLink(
 		purgeable:          make(map[*clientConn]struct{}),
 		live:               make(map[string]int),
 		holders:            make(map[string]*clientConn),
+		unclaimed:          make(map[string]unclaimedSession),
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
 		newSessionID:       rand.Int32,
@@ -192,6 +205,7 @@ func (l *ClientLink) purgeLoop(ctx context.Context) {
 func (l *ClientLink) sweep(now time.Time) {
 	if l.loginTimeout > 0 {
 		l.purgeStale(now)
+		l.expireUnclaimed(now)
 	}
 	l.sweepFailedAttempts(now)
 	l.bans.SweepExpired(now, l.hasLiveConnection)
@@ -263,13 +277,54 @@ func (l *ClientLink) unregisterPurgeable(c *clientConn) {
 	l.purgeMu.Unlock()
 }
 
-// clearHolder drops the tracked holder for account if it is still c, so a
-// replacement holder is never removed by the connection it replaced.
-func (l *ClientLink) clearHolder(account string, c *clientConn) {
+// unclaimedSession is a session whose login connection closed after PlayOk:
+// the game server may still claim key until expires.
+type unclaimedSession struct {
+	key     link.SessionKey
+	expires time.Time
+}
+
+// releaseSession gives up c's session when its connection closes at now.
+// Nothing happens unless c is still its account's holder, so a replaced
+// connection never touches its replacement. A session whose play keys went
+// out is kept for the game server until the connection's login timeout;
+// any other is dropped at once.
+func (l *ClientLink) releaseSession(c *clientConn, now time.Time) {
 	l.authMu.Lock()
 	defer l.authMu.Unlock()
-	if l.holders[account] == c {
-		delete(l.holders, account)
+	if l.holders[c.account] != c {
+		return
+	}
+	delete(l.holders, c.account)
+	key := c.sessionKey()
+	if !c.joinedGame {
+		l.sessions.Take(c.account, key)
+		return
+	}
+	if l.loginTimeout <= 0 {
+		return // purging disabled: the game server's claim is the only way out
+	}
+	expires := c.connectedAt.Add(l.loginTimeout)
+	if now.After(expires) {
+		l.sessions.Take(c.account, key)
+		return
+	}
+	if l.unclaimed == nil {
+		l.unclaimed = make(map[string]unclaimedSession)
+	}
+	l.unclaimed[c.account] = unclaimedSession{key: key, expires: expires}
+}
+
+// expireUnclaimed drops every unclaimed session past its login timeout at
+// now. Take leaves a newer session for the same account alone.
+func (l *ClientLink) expireUnclaimed(now time.Time) {
+	l.authMu.Lock()
+	defer l.authMu.Unlock()
+	for account, u := range l.unclaimed {
+		if now.After(u.expires) {
+			l.sessions.Take(account, u.key)
+			delete(l.unclaimed, account)
+		}
 	}
 }
 
@@ -306,6 +361,11 @@ type clientConn struct {
 	// set, the next send or close writes that packet instead and closes the
 	// connection, so a requested close wins over any later reply or close.
 	closeRequest atomic.Pointer[[]byte]
+}
+
+// sessionKey is the session issued to c at authentication.
+func (c *clientConn) sessionKey() link.SessionKey {
+	return link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2, PlayKey1: c.playKey1, PlayKey2: c.playKey2}
 }
 
 // errFrameTooLarge rejects a payload whose frame would exceed the wire
@@ -410,14 +470,7 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 		c.closeWith(nil)
 		l.unregisterPurgeable(c)
 		if c.account != "" {
-			l.clearHolder(c.account, c)
-			// An account that joined a game server keeps its session until
-			// the server claims it; once the connection has also outstayed
-			// the login timeout, nothing can claim it anymore and the
-			// mapping is dropped.
-			if !c.joinedGame || (l.loginTimeout > 0 && time.Since(c.connectedAt) > l.loginTimeout) {
-				l.sessions.Delete(c.account)
-			}
+			l.releaseSession(c, time.Now())
 		}
 	}()
 
@@ -488,35 +541,38 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 			return
 		}
 
-		switch payload[0] {
-		case clientpackets.OpcodeAuthGameGuard:
+		// Each state accepts only its own opcodes: AuthGameGuard before the
+		// GameGuard exchange, RequestAuthLogin between it and a successful
+		// login, and the server list and server choice after.
+		op := payload[0]
+		switch {
+		case op == clientpackets.OpcodeAuthGameGuard && !c.ggAuthed:
 			if !l.onAuthGameGuard(c, payload) {
 				return
 			}
-		case clientpackets.OpcodeRequestAuthLogin:
-			if !c.ggAuthed {
-				l.log.Warn().Str("ip", c.remoteIP.String()).Msg("login client sent credentials before the GameGuard exchange")
-				continue
-			}
+		case op == clientpackets.OpcodeRequestAuthLogin && c.ggAuthed && !c.authed:
 			if !l.onRequestAuthLogin(ctx, c, payload) {
 				return
 			}
+		case op == clientpackets.OpcodeRequestServerList && c.authed:
+			if !l.onRequestServerList(c, payload) {
+				return
+			}
+		case op == clientpackets.OpcodeRequestServerLogin && c.authed:
+			if !l.onRequestServerLogin(ctx, c, payload) {
+				return
+			}
 		default:
-			if !c.authed {
-				return
-			}
-			switch payload[0] {
-			case clientpackets.OpcodeRequestServerList:
-				if !l.onRequestServerList(c, payload) {
-					return
-				}
-			case clientpackets.OpcodeRequestServerLogin:
-				if !l.onRequestServerLogin(ctx, c, payload) {
-					return
-				}
-			default:
-				return
-			}
+			// An unknown opcode, or one the connection's state does not
+			// accept, is dropped without a reply and the connection stays
+			// open: the reference server is silent here too, and the client
+			// only sends the opcode its own state calls for, so it awaits no
+			// answer. The frame keeps the current read deadline, like an
+			// empty one, so such frames cannot hold a connection open.
+			l.log.Debug().Str("ip", c.remoteIP.String()).Uint8("opcode", op).
+				Bool("gg_authed", c.ggAuthed).Bool("authed", c.authed).
+				Msg("login client sent an opcode its state does not accept")
+			rearm = false
 		}
 	}
 }
@@ -548,7 +604,15 @@ func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) bool {
 // reports false when the connection must close.
 func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payload []byte) bool {
 	req, err := clientpackets.DecodeRequestAuthLogin(payload, c.key.Private)
+	if errors.Is(err, clientpackets.ErrCredentialBlockShort) {
+		// Too short to carry a credential block: the packet is dropped
+		// unanswered and the connection waits for a complete one.
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
+		return true
+	}
 	if err != nil {
+		// A block the RSA key cannot decrypt is refused before any account
+		// lookup, so it never counts as a failed attempt.
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
 		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
@@ -580,6 +644,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	_, mapped := l.sessions.Get(account.Login)
 	old := l.holders[account.Login]
 	delete(l.holders, account.Login)
+	delete(l.unclaimed, account.Login)
 	l.sessions.Delete(account.Login)
 	if !mapped {
 		c.account = account.Login
@@ -593,12 +658,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		if l.holders == nil {
 			l.holders = make(map[string]*clientConn)
 		}
-		l.sessions.Put(c.account, link.SessionKey{
-			LoginKey1: c.loginKey1,
-			LoginKey2: c.loginKey2,
-			PlayKey1:  c.playKey1,
-			PlayKey2:  c.playKey2,
-		})
+		l.sessions.Put(c.account, c.sessionKey())
 		l.holders[c.account] = c
 	}
 	l.authMu.Unlock()
@@ -629,7 +689,9 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 // allowed, and verifies its password. It sends the appropriate LoginFail
 // itself on any failure, so the caller only needs to check the bool result.
 func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req clientpackets.RequestAuthLogin) (model.Account, bool) {
-	account, err := l.accounts.Account(ctx, req.Username)
+	dbCtx, cancel := context.WithTimeout(ctx, loginDBTimeout)
+	defer cancel()
+	account, err := l.accounts.Account(dbCtx, req.Username)
 	switch {
 	case err != nil:
 		// A failed lookup is treated exactly like an unknown account: with
@@ -650,7 +712,9 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 			return model.Account{}, false
 		}
-		account, err = l.accounts.CreateAccount(ctx, req.Username, hashed, time.Now())
+		createCtx, cancel := context.WithTimeout(ctx, loginDBTimeout)
+		defer cancel()
+		account, err = l.accounts.CreateAccount(createCtx, req.Username, hashed, time.Now())
 		if err != nil {
 			l.log.Error().Str("account", req.Username).Err(err).Msg("auto-create account")
 			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
@@ -673,7 +737,9 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 			return model.Account{}, false
 		}
 		l.clearFailedAttempts(c.remoteIP)
-		if err := l.accounts.SetLastActive(ctx, account.Login, time.Now()); err != nil {
+		activeCtx, cancel := context.WithTimeout(ctx, loginDBTimeout)
+		defer cancel()
+		if err := l.accounts.SetLastActive(activeCtx, account.Login, time.Now()); err != nil {
 			l.log.Error().Str("account", account.Login).Err(err).Msg("set last-active time")
 			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 			return model.Account{}, false
@@ -872,11 +938,19 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		return false
 	}
 
-	c.joinedGame = true
 	if c.lastServer != serverID {
-		if err := l.accounts.SetLastServer(ctx, c.account, serverID); err != nil {
+		dbCtx, cancel := context.WithTimeout(ctx, loginDBTimeout)
+		err := l.accounts.SetLastServer(dbCtx, c.account, serverID)
+		cancel()
+		if err != nil {
 			l.log.Error().Str("account", c.account).Err(err).Msg("set last server")
 		}
 	}
-	return c.send(serverpackets.EncodePlayOk(c.playKey1, c.playKey2)) == nil
+	if err := c.send(serverpackets.EncodePlayOk(c.playKey1, c.playKey2)); err != nil {
+		return false
+	}
+	// Only a session whose play keys went out outlives its connection; see
+	// releaseSession.
+	c.joinedGame = true
+	return true
 }

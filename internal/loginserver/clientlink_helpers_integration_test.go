@@ -43,6 +43,17 @@ type fakeAccountStore struct {
 	accountErr  error
 	createErr   error
 	createCalls int
+	// gate, when set before the link serves, runs first in every call with
+	// the call's context, operation name, and login; a non-nil result fails
+	// the call. Tests use it to hold or time out a database call.
+	gate func(ctx context.Context, op, login string) error
+}
+
+func (s *fakeAccountStore) pass(ctx context.Context, op, login string) error {
+	if s.gate == nil {
+		return nil
+	}
+	return s.gate(ctx, op, login)
 }
 
 func newFakeAccountStore(accs ...model.Account) *fakeAccountStore {
@@ -53,7 +64,10 @@ func newFakeAccountStore(accs ...model.Account) *fakeAccountStore {
 	return &fakeAccountStore{accounts: m, lastActive: make(map[string]time.Time)}
 }
 
-func (s *fakeAccountStore) Account(_ context.Context, login string) (model.Account, error) {
+func (s *fakeAccountStore) Account(ctx context.Context, login string) (model.Account, error) {
+	if err := s.pass(ctx, "Account", login); err != nil {
+		return model.Account{}, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.accountErr != nil {
@@ -66,7 +80,10 @@ func (s *fakeAccountStore) Account(_ context.Context, login string) (model.Accou
 	return a, nil
 }
 
-func (s *fakeAccountStore) CreateAccount(_ context.Context, login, hashedPassword string, _ time.Time) (model.Account, error) {
+func (s *fakeAccountStore) CreateAccount(ctx context.Context, login, hashedPassword string, _ time.Time) (model.Account, error) {
+	if err := s.pass(ctx, "CreateAccount", login); err != nil {
+		return model.Account{}, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.createCalls++
@@ -78,7 +95,10 @@ func (s *fakeAccountStore) CreateAccount(_ context.Context, login, hashedPasswor
 	return a, nil
 }
 
-func (s *fakeAccountStore) SetLastServer(_ context.Context, login string, serverID int) error {
+func (s *fakeAccountStore) SetLastServer(ctx context.Context, login string, serverID int) error {
+	if err := s.pass(ctx, "SetLastServer", login); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	a := s.accounts[login]
@@ -87,7 +107,10 @@ func (s *fakeAccountStore) SetLastServer(_ context.Context, login string, server
 	return nil
 }
 
-func (s *fakeAccountStore) SetLastActive(_ context.Context, login string, at time.Time) error {
+func (s *fakeAccountStore) SetLastActive(ctx context.Context, login string, at time.Time) error {
+	if err := s.pass(ctx, "SetLastActive", login); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.lastActiveErr != nil {
@@ -355,6 +378,13 @@ func loginFailReason(t *testing.T, reply []byte) serverpackets.LoginFailReason {
 func (f *fakeLoginClient) login(l *ClientLink, username, password string) (key1, key2 int32) {
 	f.t.Helper()
 	f.gameGuard()
+	return f.authLogin(l, username, password)
+}
+
+// authLogin sends RequestAuthLogin on a connection past the GameGuard
+// exchange, requires LoginOk, and returns its session-key halves.
+func (f *fakeLoginClient) authLogin(l *ClientLink, username, password string) (key1, key2 int32) {
+	f.t.Helper()
 	f.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, username, password))
 	reply := f.read()
 	if reply[0] != serverpackets.OpcodeLoginOk {
