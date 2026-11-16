@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
@@ -112,21 +111,13 @@ func run(ctx context.Context, in io.Reader, out io.Writer, store *sql.AccountSto
 		}
 
 		switch mode {
+		// The access level goes to the database as typed; a value the
+		// column cannot hold is reported as the database's error.
 		case "1":
-			level, err := strconv.Atoi(levelText)
-			if err != nil {
-				fmt.Fprintln(out, "Type a valid access level.")
-				break
-			}
-			addOrUpdateAccount(ctx, out, store, login, password, level)
+			addOrUpdateAccount(ctx, out, store, login, password, levelText)
 
 		case "2":
-			level, err := strconv.Atoi(levelText)
-			if err != nil {
-				fmt.Fprintln(out, "Type a valid access level.")
-				break
-			}
-			changeAccountLevel(ctx, out, store, login, level)
+			changeAccountLevel(ctx, out, store, login, levelText)
 
 		case "3":
 			fmt.Fprintln(out, "WARNING: This will not delete the gameserver data (characters, items, etc..) it will only delete the account login server data.")
@@ -190,7 +181,7 @@ func printAccountInfo(ctx context.Context, out io.Writer, store *sql.AccountStor
 	fmt.Fprintf(out, "Displayed accounts: %d\n", len(accounts))
 }
 
-func addOrUpdateAccount(ctx context.Context, out io.Writer, store *sql.AccountStore, login, password string, level int) {
+func addOrUpdateAccount(ctx context.Context, out io.Writer, store *sql.AccountStore, login, password, level string) {
 	hashed, err := model.HashPassword(password)
 	if err != nil {
 		fmt.Fprintln(out, "There was error while adding/updating account:")
@@ -210,7 +201,7 @@ func addOrUpdateAccount(ctx context.Context, out io.Writer, store *sql.AccountSt
 	}
 }
 
-func changeAccountLevel(ctx context.Context, out io.Writer, store *sql.AccountStore, login string, level int) {
+func changeAccountLevel(ctx context.Context, out io.Writer, store *sql.AccountStore, login, level string) {
 	changed, err := store.ChangeAccessLevel(ctx, login, level)
 	if err != nil {
 		fmt.Fprintln(out, "There was error while updating account:")

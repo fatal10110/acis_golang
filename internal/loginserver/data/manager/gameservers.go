@@ -1,7 +1,9 @@
 package manager
 
 import (
+	"cmp"
 	"net"
+	"slices"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -63,15 +65,16 @@ func (r *ServerRegistry) Get(id int) (ServerEntry, bool) {
 	return e, ok
 }
 
-// All returns a snapshot of every registered server, in no particular
-// order.
+// All returns a snapshot of every registered server in ascending id order,
+// the order the client's server list shows them in.
 func (r *ServerRegistry) All() []ServerEntry {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
 	out := make([]ServerEntry, 0, len(r.servers))
 	for _, e := range r.servers {
 		out = append(out, e)
 	}
+	r.mu.RUnlock()
+	slices.SortFunc(out, func(a, b ServerEntry) int { return cmp.Compare(a.ID, b.ID) })
 	return out
 }
 
