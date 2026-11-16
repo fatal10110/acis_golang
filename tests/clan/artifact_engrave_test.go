@@ -212,7 +212,9 @@ func TestHolyArtifactShownAndRefusedOutsideSiege(t *testing.T) {
 // Ruler tells the lord's clan OPPONENT_STARTED_ENGRAVING; the three-minute
 // cast landing tells both sides CLAN_S1_ENGRAVED_RULER naming Knights, and
 // Knights owns the castle at once, stored, the siege turning: Knights owns
-// its defending side and Rivals attacks.
+// its defending side and Rivals attacks. The founder hears the engraving
+// before Knights' header refresh and the victory music, then the
+// temporary alliance ending and its new siege state.
 func TestSealOfRulerTakesCastle(t *testing.T) {
 	t.Parallel()
 	w := engraveWorld(t)
@@ -255,8 +257,27 @@ func TestSealOfRulerTakesCastle(t *testing.T) {
 		}
 		t.Fatalf("%s got %x with messages %v, want CLAN_S1_ENGRAVED_RULER", who, opcodes(frames), messages(t, frames))
 	}
-	engraved(drainFrames(t, w.leader), "the founder")
-	engraved(drainFrames(t, w.member), "the lord's clan")
+	// The engraver hears its own engraving before its clan's header refresh
+	// and the victory music, then the attackers' alliance ending and its
+	// siege state.
+	founder := drainFrames(t, w.leader)
+	engraved(founder, "the founder")
+	wantFounder := []byte{
+		serverpackets.OpcodeMagicSkillLaunched, serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodePledgeShowInfoUpdate, serverpackets.OpcodePlaySound,
+		serverpackets.OpcodeSystemMessage, serverpackets.OpcodeUserInfo,
+	}
+	if got := opcodes(founder); !slices.Equal(got, wantFounder) {
+		t.Fatalf("the founder got %x with messages %v, want %x", got, messages(t, founder), wantFounder)
+	}
+	if got := messages(t, founder); !slices.Equal(got, []int{siege.MsgClanEngravedRuler, siege.MsgTemporaryAllianceDissolved}) {
+		t.Fatalf("the founder told %v, want CLAN_S1_ENGRAVED_RULER then TEMPORARY_ALLIANCE_DISSOLVED", got)
+	}
+	lord := drainFrames(t, w.member)
+	engraved(lord, "the lord's clan")
+	if got, want := opcodes(lord), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeUserInfo}; !slices.Equal(got, want) {
+		t.Fatalf("the lord's clan got %x, want %x", got, want)
+	}
 
 	if got := gludio.Castle().OwnerID(); got != knightsClanID {
 		t.Fatalf("Gludio owner = %#x, want Knights", got)

@@ -107,6 +107,8 @@ func (h takeCastleHandler) Use(c skillhandler.Cast) {
 		return
 	}
 	if s.Engrave(cl, artifact.ObjectID()) {
-		h.l.setCastleOwner(live, s.Castle(), cl)
+		// nil: the engraver hears the engraving notice already on its queue
+		// before the clan header and the music.
+		h.l.setCastleOwner(nil, s.Castle(), cl)
 	}
 }

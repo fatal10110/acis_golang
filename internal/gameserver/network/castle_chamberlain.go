@@ -374,8 +374,8 @@ func (d chamberlainDialog) siegeChange() {
 // siegeTimeSet answers "siege_time_set 1 <hour>", which makes hour the
 // NPC's siege hour choice, and "siege_time_set <other>", which keeps it.
 // A choice other than the default moves the siege to 12 hours past it,
-// closing the date to change, with siegetime8.htm; the default opens
-// siegetime6.htm.
+// closing the date to change, and the siege's calendar steps on from the
+// new date, with siegetime8.htm; the default opens siegetime6.htm.
 func (d chamberlainDialog) siegeTimeSet(val string, rest []string) bool {
 	if !d.allowed(clan.PrivCastleSiege) {
 		return true
@@ -396,6 +396,9 @@ func (d chamberlainDialog) siegeTimeSet(val string, rest []string) bool {
 	}
 	if hour := d.f.SiegePreHour(); hour != npc.DefaultSiegePreHour {
 		d.c.SetSiegeHour(hour + 12)
+		if s, ok := d.l.castleSiege(int32(d.c.ID)); ok {
+			s.DateMoved()
+		}
 		d.sendFile("siegetime8.htm")
 		return true
 	}
