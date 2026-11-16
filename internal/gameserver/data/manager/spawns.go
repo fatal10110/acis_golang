@@ -17,6 +17,34 @@ type spawnStateStore interface {
 	SaveStates(ctx context.Context, states map[string]*spawn.State) error
 }
 
+// spawnRowStore writes one spawn_data row, or the whole list in one go.
+type spawnRowStore interface {
+	spawnStateStore
+	SaveState(ctx context.Context, state spawn.State) error
+}
+
+// spawnRowQueue runs the row writes off the callers' goroutines.
+type spawnRowQueue interface {
+	Enqueue(ownerID int32, job func()) bool
+	Flush(ctx context.Context, ownerIDs ...int32) error
+}
+
+// spawnWriteLane is the persistence owner every row write is queued under,
+// so the writes of one row land in the order they were made.
+const spawnWriteLane int32 = 0
+
+// SpawnRowWriteTimeout bounds one row write.
+const SpawnRowWriteTimeout = 10 * time.Second
+
+// rowWrites writes a row on the persistence queue as soon as its death,
+// respawn deadline or db value changes, so a stop without the shutdown save
+// keeps it.
+type rowWrites struct {
+	store spawnRowStore
+	queue spawnRowQueue
+	log   zerolog.Logger
+}
+
 // Spawns combines the static spawnlist table with dynamic DB-backed state.
 type Spawns struct {
 	table *spawn.Table
@@ -25,6 +53,8 @@ type Spawns struct {
 	// It is a leaf lock: no other lock is taken under it.
 	mu     sync.Mutex
 	states map[string]*spawn.State
+	// writes is nil when rows are saved only as a whole.
+	writes *rowWrites
 }
 
 // LoadSpawns loads spawnlist XML from dir, restores dynamic rows from store,
@@ -105,13 +135,18 @@ func (s *Spawns) DBValue(name string) (int, bool) {
 	return state.DBValue, true
 }
 
-// SetDBValue stores v as the script value of the row name, saved with the
-// row; nothing when the spawn list has no such row.
+// SetDBValue stores v as the script value of the row name, written with the
+// row when it changes; nothing when the spawn list has no such row.
 func (s *Spawns) SetDBValue(name string, v int) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if state := s.row(name); state != nil {
+	state := s.row(name)
+	changed := state != nil && state.DBValue != v
+	if changed {
 		state.DBValue = v
+	}
+	s.mu.Unlock()
+	if changed {
+		s.write(name)
 	}
 }
 
@@ -160,30 +195,128 @@ func (s *Spawns) SetStats(name string, hp, mp int, loc location.Location, headin
 
 // SetRespawn saves the row name dead, respawning delay after now.
 func (s *Spawns) SetRespawn(name string, delay time.Duration, now time.Time) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if state := s.row(name); state != nil {
-		state.SetRespawn(delay, now)
-	}
+	s.update(name, func(state *spawn.State) { state.SetRespawn(delay, now) })
 }
 
 // CancelRespawn clears the respawn deadline of the row name.
 func (s *Spawns) CancelRespawn(name string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if state := s.row(name); state != nil {
-		state.CancelRespawn()
-	}
+	s.update(name, (*spawn.State).CancelRespawn)
 }
 
 // Uninitialize marks the row name not spawned yet: it is not saved until a
 // placement makes it live again.
 func (s *Spawns) Uninitialize(name string) {
+	s.update(name, func(state *spawn.State) { state.Status = spawn.StatusUninitialized })
+}
+
+// uninitializeTracked marks every database-tracked row of the spawn list not
+// spawned yet, writing nothing; writeAll then lands them in one save.
+func (s *Spawns) uninitializeTracked() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if state := s.row(name); state != nil {
-		state.Status = spawn.StatusUninitialized
+	if s.table == nil {
+		return
 	}
+	for _, maker := range s.table.Makers() {
+		for _, entry := range maker.Entries {
+			if entry.DBName == "" {
+				continue
+			}
+			if state := s.row(entry.DBName); state != nil {
+				state.Status = spawn.StatusUninitialized
+			}
+		}
+	}
+}
+
+// update applies change to the row name, then writes the row; nothing when
+// the spawn list has no such row.
+func (s *Spawns) update(name string, change func(*spawn.State)) {
+	s.mu.Lock()
+	state := s.row(name)
+	if state != nil {
+		change(state)
+	}
+	s.mu.Unlock()
+	if state != nil {
+		s.write(name)
+	}
+}
+
+// WriteRows makes every later death, respawn deadline and db value change
+// write its row through store on queue (owner-approved divergence, #4685:
+// otherwise rows reach the database only with a whole save).
+func (s *Spawns) WriteRows(store spawnRowStore, queue spawnRowQueue, log zerolog.Logger) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writes = &rowWrites{store: store, queue: queue, log: log}
+}
+
+// writeRowsLike makes s write its rows the way from does.
+func (s *Spawns) writeRowsLike(from *Spawns) {
+	if from == nil || from == s {
+		return
+	}
+	from.mu.Lock()
+	writes := from.writes
+	from.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writes = writes
+}
+
+// write queues a write of the row name. The job reads the row when it runs,
+// so a write never lands older than the one queued before it. The caller
+// holds no lock: a queue with no worker runs the job inline.
+func (s *Spawns) write(name string) {
+	s.mu.Lock()
+	w := s.writes
+	s.mu.Unlock()
+	if w == nil {
+		return
+	}
+	w.queue.Enqueue(spawnWriteLane, func() {
+		row, ok := s.State(name)
+		if !ok {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), SpawnRowWriteTimeout)
+		defer cancel()
+		if err := w.store.SaveState(ctx, row); err != nil {
+			w.log.Error().Err(err).Str("spawn", name).Msg("save spawn data row")
+		}
+	})
+}
+
+// writeAll queues one whole-list save of the rows, read when it runs, so a
+// change to every row costs one transaction rather than a write per row. The
+// caller holds no lock: a queue with no worker runs the job inline.
+func (s *Spawns) writeAll() {
+	s.mu.Lock()
+	w := s.writes
+	s.mu.Unlock()
+	if w == nil {
+		return
+	}
+	w.queue.Enqueue(spawnWriteLane, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), SpawnRowWriteTimeout)
+		defer cancel()
+		if err := s.Save(ctx, w.store); err != nil {
+			w.log.Error().Err(err).Msg("save spawn data")
+		}
+	})
+}
+
+// FlushRowWrites waits until every row write queued so far has landed, or
+// ctx ends.
+func (s *Spawns) FlushRowWrites(ctx context.Context) error {
+	s.mu.Lock()
+	w := s.writes
+	s.mu.Unlock()
+	if w == nil {
+		return nil
+	}
+	return w.queue.Flush(ctx, spawnWriteLane)
 }
 
 // Save persists initialized dynamic state rows through store. The rows are

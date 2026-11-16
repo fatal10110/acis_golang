@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -149,6 +150,9 @@ type npcSpawnDeps struct {
 	// spawnStore restores and saves the database-tracked spawns' rows; nil
 	// keeps them in memory only.
 	spawnStore *gamesql.SpawnStore
+	// spawnWrites is the persistence worker the rows' writes run on as they
+	// change, used with spawnStore.
+	spawnWrites *persist.Worker
 	// rand is the scripts' random source the makers draw from; nil draws
 	// at random.
 	rand func(n int) int
@@ -256,7 +260,11 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if deps.driftRange != 0 {
 		limits.DriftRange = deps.driftRange
 	}
-	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
+	spawns := gamemanager.NewSpawns(deps.makers, states)
+	if deps.spawnStore != nil {
+		spawns.WriteRows(deps.spawnStore, deps.spawnWrites, deps.log)
+	}
+	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(spawns, templates, deps.geo, deps.state, deps.ids,
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1}), Channels: deps.channels}, time.Now, deps.log,
 		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		limits, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,

@@ -54,6 +54,12 @@ func despawnTable(t *testing.T, body string) *spawn.Table {
 
 func newDespawnFixture(t *testing.T, states map[string]*spawn.State) *despawnFixture {
 	t.Helper()
+	return newDespawnFixtureOf(t, NewSpawns(despawnTable(t, despawnSpawnlist), states))
+}
+
+// newDespawnFixtureOf is newDespawnFixture over spawns.
+func newDespawnFixtureOf(t *testing.T, spawns *Spawns) *despawnFixture {
+	t.Helper()
 	f := &despawnFixture{state: world.New(), queues: npcQueues()}
 	f.decay, _ = task.NewDecay(nopDecayEffects{}, time.Now)
 	f.respawn, _ = task.NewRespawn(nopRespawnEffects{}, time.Now)
@@ -64,7 +70,7 @@ func newDespawnFixture(t *testing.T, states map[string]*spawn.State) *despawnFix
 		{ID: 3, TemplateID: 3, Type: "ChristmasTree", Name: "Tree", HPMax: 100},
 	})
 	var err error
-	f.npcs, err = NewNpcs(NewSpawns(despawnTable(t, despawnSpawnlist), states), f.templates, fakeGeo{}, f.state, &sequentialIDs{}, f.decay, f.respawn,
+	f.npcs, err = NewNpcs(spawns, f.templates, fakeGeo{}, f.state, &sequentialIDs{}, f.decay, f.respawn,
 		task.NewAI(f.state, zerolog.Nop()), task.NewPositionUpdates(f.state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(),
 		nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, f.queues, testMakers())
 	if err != nil {

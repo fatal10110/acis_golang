@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -83,14 +84,16 @@ func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
 
 // provideSpawns loads the spawnlist XML and restores dynamic spawn_data
 // rows, returning the store alongside so it can be reused to persist state
-// back at shutdown.
-func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, log zerolog.Logger, gameplay gameplayConfig) (*manager.Spawns, *gamesql.SpawnStore, error) {
+// back at shutdown. A row's death, respawn deadline and db value changes are
+// written as they happen, on the persistence worker.
+func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, worker *persist.Worker, log zerolog.Logger, gameplay gameplayConfig) (*manager.Spawns, *gamesql.SpawnStore, error) {
 	store := gamesql.NewSpawnStore(pool)
 	dir := filepath.Join(paths.DataRoot, "data", "xml", "spawnlist")
 	spawns, err := manager.LoadSpawns(ctx, dir, store, log, float64(gameplay.SpawnMultiplier))
 	if err != nil {
 		return nil, nil, err
 	}
+	spawns.WriteRows(store, worker, log)
 	log.Info().
 		Int("spawn_makers", spawns.Table().MakerCount()).
 		Int("spawn_entries", spawns.Table().SpawnCount()).
@@ -141,7 +144,8 @@ func startNpcs(npcs *manager.Npcs, log zerolog.Logger) {
 
 // startNpcPersistence syncs every live database-tracked spawn's current
 // HP/position into its spawn.State row and saves spawn_data at shutdown,
-// from the spawn list in use (a //respawnall replaces the boot one). The
+// from the spawn list in use (a //respawnall replaces the boot one), once
+// the row writes already queued have landed. The
 // save runs under its own budget: it stops ahead of the final item flush, and on a
 // slow database it would otherwise spend the rest of the stop budget.
 func startNpcPersistence(lc fx.Lifecycle, npcs *manager.Npcs, store *gamesql.SpawnStore, log zerolog.Logger) {
@@ -149,7 +153,11 @@ func startNpcPersistence(lc fx.Lifecycle, npcs *manager.Npcs, store *gamesql.Spa
 		OnStop: func(ctx context.Context) error {
 			npcs.SyncPersistedState()
 			saveOnStop(ctx, shutdownSaveTimeout, log, "save spawn data", func(ctx context.Context) error {
-				return npcs.Spawns().Save(ctx, store)
+				spawns := npcs.Spawns()
+				if err := spawns.FlushRowWrites(ctx); err != nil {
+					return err
+				}
+				return spawns.Save(ctx, store)
 			})
 			return nil
 		},
