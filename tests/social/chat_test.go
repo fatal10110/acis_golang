@@ -273,17 +273,25 @@ func TestChatDroppedLines(t *testing.T) {
 // player online, however far.
 func TestChatHeroVoice(t *testing.T) {
 	t.Parallel()
-	p := bootPair(t)
-	if _, err := p.srv.DB.ExecContext(context.Background(), "UPDATE characters SET hero = 1 WHERE obj_Id = ?", p.bobbyID); err != nil {
-		t.Fatal(err)
-	}
+	p := bootPair(t, withHero(t, "Alice"))
 	p.enterAll(t)
 	carol, _ := p.enterAt(t, "player3", "Carol", farX, 20, gameservertest.SpawnZ)
 
-	p.bobby.Send(encodeSay2(sayHeroVoice, "glory"))
-	assertSay(t, p.alice, p.bobbyID, sayHeroVoice, "Bobby", "glory")
-	assertSay(t, p.bobby, p.bobbyID, sayHeroVoice, "Bobby", "glory")
-	assertSay(t, carol, p.bobbyID, sayHeroVoice, "Bobby", "glory")
+	p.alice.Send(encodeSay2(sayHeroVoice, "glory"))
+	assertSay(t, p.alice, p.aliceID, sayHeroVoice, "Alice", "glory")
+	assertSay(t, p.bobby, p.aliceID, sayHeroVoice, "Alice", "glory")
+	assertSay(t, carol, p.aliceID, sayHeroVoice, "Alice", "glory")
+}
+
+// withHero makes the named boot character an active hero: hero status comes
+// from the heroes table the server loads at boot, not from characters.hero.
+func withHero(t *testing.T, name string) gameservertest.Option {
+	t.Helper()
+	return gameservertest.WithOlympiadSeed(func(db *sql.DB) {
+		if _, err := db.ExecContext(context.Background(), `INSERT INTO heroes (char_id, class_id, count, played, active) SELECT obj_Id, classid, 1, 1, 1 FROM characters WHERE char_name = ?`, name); err != nil {
+			t.Fatalf("seed hero %s: %v", name, err)
+		}
+	})
 }
 
 // TestChatFloodProtection pins the chat reuse delays: general and shout
@@ -292,10 +300,7 @@ func TestChatHeroVoice(t *testing.T) {
 // delay is per client.
 func TestChatFloodProtection(t *testing.T) {
 	t.Parallel()
-	p := bootPair(t, gameservertest.WithChat(network.ChatConfig{GlobalDelay: time.Hour, TradeDelay: time.Hour, HeroVoiceDelay: time.Hour}))
-	if _, err := p.srv.DB.ExecContext(context.Background(), "UPDATE characters SET hero = 1 WHERE obj_Id = ?", p.aliceID); err != nil {
-		t.Fatal(err)
-	}
+	p := bootPair(t, withHero(t, "Alice"), gameservertest.WithChat(network.ChatConfig{GlobalDelay: time.Hour, TradeDelay: time.Hour, HeroVoiceDelay: time.Hour}))
 	p.enterAll(t)
 
 	p.alice.Send(encodeSay2(sayAll, "one"))
