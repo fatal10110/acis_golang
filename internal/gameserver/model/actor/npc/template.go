@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -216,13 +217,23 @@ func (t *Table) CollisionBody(npcID int32) (radius, height float64, ok bool) {
 	return tpl.CollisionRadius, tpl.CollisionHeight, true
 }
 
-// GetByName returns the first template whose name matches name
-// case-insensitively, or false if none does.
+// GetByName returns the first template, in listing order, whose name
+// matches name case-insensitively, or false if none does.
 func (t *Table) GetByName(name string) (*Template, bool) {
-	for _, tpl := range t.All() {
+	for _, tpl := range t.Listed() {
 		if strings.EqualFold(tpl.Name, name) {
 			return tpl, true
 		}
 	}
 	return nil, false
+}
+
+// Listed returns every template in the order the table lists them: by the
+// bucket of their id in a hash table holding every template, then by id.
+// The table keeps no load order, which a bucket lists its ids in; no two
+// templates sharing a name share a bucket of the shipped data.
+func (t *Table) Listed() []*Template {
+	all := t.All() // ascending id
+	hashorder.SortMap(all, func(tpl *Template) int32 { return int32(tpl.ID) })
+	return all
 }

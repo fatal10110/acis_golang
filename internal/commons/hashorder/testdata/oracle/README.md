@@ -41,10 +41,30 @@ Line formats:
 - `sub <types, ascending> => <iteration order of the registry>`: every subset of the seven
   sub-unit types.
 
+## Plain hash tables (`MapProbe.java`)
+
+`MapProbe.java` fills plain `java.util.HashMap` tables and prints their iteration order, the
+model of `hashorder.MapIndex`, `TextHash` and `SortMap`:
+
+- `int <ids in insertion order> => <iteration order>` (`../map_order.golden`): id-keyed tables
+  such as the NPC template table, from one id to 700, with high halves and signs.
+- `str <keys in insertion order> => <iteration order>` (`../map_order.golden`): text-keyed
+  tables such as the dualbox address map and the walker route maps. The lines include keys that
+  hash alike (one bucket, kept in insertion order), non-ASCII keys and a surrogate pair.
+- `walker <route> => <its NPCs>`
+  (`internal/gameserver/data/xml/testdata/walker_order.golden`): the datapack's
+  `walkerRoutes.xml` put route by route, NPC by NPC, into a `HashMap` of `HashMap`s. The route
+  table declares both maps as `new HashMap<>()`. There is one line per route, in iteration order.
+- `npccount <n>` and `npc <lower-cased name> => <ids>`
+  (`internal/gameserver/data/xml/testdata/npc_name_order.golden`): every datapack NPC template,
+  put by id into a `HashMap`. Each name that more than one template shares (ignoring case) is
+  listed with its ids in iteration order. The first id is the template a lookup by name finds.
+
 ## Regenerating
 
 ```sh
-ACIS_JAVA=/path/to/aCis_gameserver/java internal/commons/hashorder/testdata/oracle/run.sh
+ACIS_JAVA=/path/to/aCis_gameserver/java ACIS_DATAPACK=/path/to/aCis_datapack \
+  internal/commons/hashorder/testdata/oracle/run.sh
 ```
 
 Needs docker with `eclipse-temurin:21-jdk-alpine`.

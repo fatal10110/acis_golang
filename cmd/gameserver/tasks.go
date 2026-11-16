@@ -213,7 +213,12 @@ func providePlayerClock(clock *task.GameClock, state *world.State) (*task.Player
 func startPlayerClock(_ *task.PlayerClock) {}
 
 func provideWalker(data *gameData, state *world.State) (*task.Walker, error) {
-	return task.NewWalker(data.Routes, task.GeoPath{Geo: data.Geo, Finder: data.Finder}, time.Now, state)
+	w, err := task.NewWalker(data.Routes, task.GeoPath{Geo: data.Geo, Finder: data.Finder}, time.Now, state)
+	if err != nil {
+		return nil, err
+	}
+	w.SetRoutes(data.Routes, data.RoutesLoaded)
+	return w, nil
 }
 
 func startWalker(lc fx.Lifecycle, walker *task.Walker, log zerolog.Logger) {

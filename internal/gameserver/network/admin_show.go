@@ -2,7 +2,6 @@ package network
 
 import (
 	"cmp"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -346,13 +345,6 @@ func (l *GameClientLink) showWalker(gm *livePlayer, args []string) {
 	l.sendWalkerPanel(gm, page)
 }
 
-// walkerRow is one row of the walker panel: the NPC name a route is
-// keyed under and its nodes.
-type walkerRow struct {
-	npc   string
-	nodes []route.WalkerLocation
-}
-
 // walkerRowNPC is the NPC the walker panel row of the NPC alias shows:
 // the one of the first spawn of that name, its name, the route node it
 // heads for and its direction; false when that spawn keeps none.
@@ -378,21 +370,18 @@ func (l *GameClientLink) walkerRowNPC(alias string, walker *task.Walker) (name s
 	return creatureName(obj), index, reverse, true
 }
 
-// sendWalkerPanel opens page of the walker panel: every walker route, by
-// route name then NPC name, the NPC of the first spawn of that name with
+// sendWalkerPanel opens page of the walker panel: every walker route, in
+// listing order (see route.WalkerRoutes.Listing), the NPC of the first spawn of that name with
 // the node it heads for and its direction, node 0 the regular way when it
 // never walked its route, or unspawned without one. A dead walker keeps
 // its node and direction, through its decay while its spawn waits to
 // respawn it. A page below 1 with routes listed, or a
 // walker heading for a node its listed route lacks, answers the usage.
 func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
-	routes, walker := l.walkerRoutes()
-	var rows []walkerRow
-	for _, name := range slices.Sorted(maps.Keys(routes)) {
-		byNPC := routes[name]
-		for _, npcName := range slices.Sorted(maps.Keys(byNPC)) {
-			rows = append(rows, walkerRow{npc: npcName, nodes: byNPC[npcName]})
-		}
+	_, walker := l.walkerRoutes()
+	var rows []route.WalkerRow
+	if walker != nil {
+		rows = walker.Listing()
 	}
 	pg, ok := handleradmin.Paginate(len(rows), page, walkerPageLimit)
 	if !ok {
@@ -406,12 +395,12 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 		} else {
 			b.WriteString("<table width=280><tr>")
 		}
-		show := `<td width=40 align=right><a action="bypass admin_show walker ` + strconv.Itoa(page) + " " + e.npc + `">Show</a></td>`
-		name, index, reverse, spawned := l.walkerRowNPC(e.npc, walker)
+		show := `<td width=40 align=right><a action="bypass admin_show walker ` + strconv.Itoa(page) + " " + e.NPC + `">Show</a></td>`
+		name, index, reverse, spawned := l.walkerRowNPC(e.NPC, walker)
 		if !spawned {
-			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.nodes[0].Location) + `">Unspawned</a></td><td width=40>-</td><td width=50 align=right>-</td>` + show)
+			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.Nodes[0].Location) + `">Unspawned</a></td><td width=40>-</td><td width=50 align=right>-</td>` + show)
 		} else {
-			if index >= len(e.nodes) {
+			if index >= len(e.Nodes) {
 				sendText(gm, showUsage)
 				return
 			}
@@ -419,7 +408,7 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 			if reverse {
 				direction = "Reverse"
 			}
-			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.nodes[index].Location) + `">` + trimAndDress(name, 25) + "</a></td><td width=40>" + strconv.Itoa(index) + " / " + strconv.Itoa(len(e.nodes)) + "</td><td width=50 align=right>" + direction + "</td>" + show)
+			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.Nodes[index].Location) + `">` + trimAndDress(name, 25) + "</a></td><td width=40>" + strconv.Itoa(index) + " / " + strconv.Itoa(len(e.Nodes)) + "</td><td width=50 align=right>" + direction + "</td>" + show)
 		}
 		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
 	}

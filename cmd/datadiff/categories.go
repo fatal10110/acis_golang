@@ -442,7 +442,7 @@ func loadBoatRouteRecords(root string) ([]datadiff.Record, error) {
 }
 
 func loadWalkerRouteRecords(root string) ([]datadiff.Record, error) {
-	routes, err := xml.LoadWalkerRoutes(xmlPath(root, "walkerRoutes.xml"))
+	routes, _, err := xml.LoadWalkerRoutes(xmlPath(root, "walkerRoutes.xml"))
 	if err != nil {
 		return nil, err
 	}
