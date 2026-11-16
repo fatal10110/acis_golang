@@ -78,12 +78,15 @@ func EnchantOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 }
 
 // EnchantResult describes the visible state changed by an enchant attempt.
+// PreviousLevel is the skill's level before the attempt; a roll that leaves
+// AppliedLevel equal to it changed nothing.
 type EnchantResult struct {
-	SkillID      int
-	Level        int
-	AppliedLevel int
-	SP           int
-	Exp          int
+	SkillID       int
+	Level         int
+	PreviousLevel int
+	AppliedLevel  int
+	SP            int
+	Exp           int
 }
 
 // Enchant applies a skill-enchant attempt against a loaded offer: SP and
@@ -91,7 +94,10 @@ type EnchantResult struct {
 // spBookNeeded is false), exp/sp deduction, and a rate roll. roll must
 // return a value in [0,99]; the attempt succeeds when roll <= the offer's
 // rate, raising the skill to the requested level, and otherwise resets it
-// to its current max normal (non-enchanted) level.
+// to its current max normal (non-enchanted) level. A reset to the level the
+// skill already has leaves the known skill, its row and its stats untouched.
+// An error reports a passive definition whose stat functions failed to build;
+// the attempt is still paid and applied and the outcome stands.
 func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Template, trees *modelskill.Trees, skills *Persistence, spBookNeeded bool, pay PayItem, roll func() int, skillID, level int) (EnchantResult, EnchantOutcome, error) {
 	if c == nil {
 		return EnchantResult{}, EnchantUnavailable, nil
@@ -101,7 +107,7 @@ func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Templat
 		return EnchantResult{}, EnchantUnavailable, nil
 	}
 	node := offer.Skill
-	result := EnchantResult{SkillID: skillID, Level: level, SP: node.SP, Exp: node.Exp}
+	result := EnchantResult{SkillID: skillID, Level: level, PreviousLevel: c.SkillLevel(skillID), SP: node.SP, Exp: node.Exp}
 
 	progression := c.ProgressionValues()
 	if progression.SP < node.SP {
@@ -132,6 +138,9 @@ func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Templat
 
 	maxLevel := skills.skills.MaxLevel(modelskill.ID(skillID))
 	result.AppliedLevel = maxLevel
+	if maxLevel == result.PreviousLevel {
+		return result, EnchantFailed, nil
+	}
 	if err := setKnownSkill(skills, c, skillID, maxLevel); err != nil {
 		return result, EnchantFailed, err
 	}

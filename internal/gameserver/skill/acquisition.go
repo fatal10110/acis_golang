@@ -50,13 +50,14 @@ func ValidAcquireRequest(skillID, level int32) bool {
 }
 
 // LearnableGeneral returns the general skill grant for the requested skill
-// when it is the next learnable level for the character.
-func LearnableGeneral(tmpl *player.Template, playerLevel int, known player.SkillLevels, skillID, level int) (player.SkillGrant, bool) {
+// when it is the next level of a skill the character's template teaches.
+// Like a learn, it asks neither the grant's minimum level nor its cost.
+func LearnableGeneral(tmpl *player.Template, known player.SkillLevels, skillID, level int) (player.SkillGrant, bool) {
 	if tmpl == nil {
 		return player.SkillGrant{}, false
 	}
 	grant, ok := tmpl.FindSkillGrant(skillID, level)
-	if !ok || grant.MinLevel > playerLevel || grant.Cost == 0 || known.Level(skillID) != level-1 {
+	if !ok || known.Level(skillID) != level-1 {
 		return player.SkillGrant{}, false
 	}
 	return grant, true
@@ -67,7 +68,7 @@ func GeneralOfferFor(c *player.Character, tmpl *player.Template, skills *Persist
 	if c == nil {
 		return GeneralOffer{}, false
 	}
-	grant, ok := LearnableGeneral(tmpl, c.Level(), c.SkillLevels(), skillID, level)
+	grant, ok := LearnableGeneral(tmpl, c.SkillLevels(), skillID, level)
 	if !ok || !definitionLoaded(skills, skillID, level) {
 		return GeneralOffer{}, false
 	}
