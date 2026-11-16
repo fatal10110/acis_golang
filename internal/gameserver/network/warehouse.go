@@ -322,6 +322,9 @@ func (l *GameClientLink) requestWarehouseDeposit(live *livePlayer, req clientpac
 	// stop the deposit between the fee and the moves.
 	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
+	if !l.storeStillOpen(live, active) {
+		return
+	}
 	res, outcome, err := l.inventory.Deposit(live.Inventory(), active.store, storeMoves(req.Items), l.itemHolder(live),
 		active.private, len(req.Items)*depositFeePerItem, active.fits)
 	if err != nil {
@@ -344,6 +347,9 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 	}
 	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
+	if !l.storeStillOpen(live, active) {
+		return
+	}
 	res, outcome, err := l.inventory.Withdraw(active.store, live.Inventory(), storeMoves(req.Items))
 	if err != nil {
 		l.log.Error().Err(err).Msg("warehouse withdraw")
@@ -355,21 +361,25 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 
 // requestPackageSend sends the requested inventory rows to the freight of
 // another character of live's account, for the configured price a row.
-// It needs a civilian NPC selected within interaction reach, which a GM
-// does not. Every refusal but the access level, the freight's capacity and
-// the fee is silent; the client closes its window when it sends the
-// request.
+// It needs a warehouse keeper selected within interaction reach, which a GM
+// does not. The package is tagged with the keeper's town, whatever town the
+// target freight was last opened at; a GM sending with no keeper selected
+// tags it with the town the GM stands in. Every refusal but the access
+// level, the freight's capacity and the fee is silent; the client closes
+// its window when it sends the request.
 func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.RequestPackageSend) {
 	freight := l.playerConfig().freight()
 	if live == nil || len(req.Items) == 0 || !freight.Allow {
 		return
 	}
-	if _, ok := l.activateDeposit(live, req.ObjectID); !ok {
+	target, ok := l.activateDeposit(live, req.ObjectID)
+	if !ok {
 		return
 	}
 	active := live.storage.active
 	f := live.currentFolk.Load()
-	if (f == nil || !interactInRange(live, f, interactionDistance)) && !live.accessLevel().IsGM {
+	keeper := f != nil && f.Warehouse()
+	if (!keeper || !interactInRange(live, f, interactionDistance)) && !live.accessLevel().IsGM {
 		return
 	}
 	if !live.accessLevel().AllowTransaction {
@@ -378,6 +388,15 @@ func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.
 	}
 	if !l.playerConfig().KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
 		return
+	}
+	switch {
+	case keeper:
+		target.ActiveLocation = freightLocation(f, freight)
+	case freight.RegionBased:
+		x, y, _ := live.Position()
+		target.ActiveLocation = world.RegionKey(x, y)
+	default:
+		target.ActiveLocation = 0
 	}
 	inv := live.Inventory()
 	end := l.belongings.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())

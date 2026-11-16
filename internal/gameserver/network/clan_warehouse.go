@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -49,6 +50,37 @@ func (b *clanWarehouseBook) forget(clanID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.byClan, clanID)
+}
+
+// holds reports whether store is still the warehouse of the clan clanID:
+// a dissolution forgets it inside the item operation that destroys its
+// items.
+func (b *clanWarehouseBook) holds(clanID int32, store invops.Store) bool {
+	b.mu.Lock()
+	e := b.byClan[clanID]
+	b.mu.Unlock()
+	if e == nil {
+		return false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.wh != nil && invops.Store(e.wh) == store
+}
+
+// storeStillOpen reports whether live's active store may still take items
+// in or out; the caller holds the item operation naming the store's owner.
+// A clan warehouse its clan's dissolution destroyed while the request
+// waited for that operation is closed: the request is dropped silently, as
+// the gate drops one from a player who already left the clan, and nothing
+// is charged.
+func (l *GameClientLink) storeStillOpen(live *livePlayer, active activeStore) bool {
+	if active.clanID == 0 || l.clanWarehouses.holds(active.clanID, active.store) {
+		return true
+	}
+	if live.storage.active.store == active.store {
+		live.storage.active = activeStore{}
+	}
+	return false
 }
 
 // clanWarehouse returns the warehouse of the clan clanID, restoring it
