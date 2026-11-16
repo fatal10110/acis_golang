@@ -232,13 +232,13 @@ func TestAdminReloadRaceFree(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for range 10 {
-			for _, frame := range exchange(t, reader, encodeBuildCmd("admin")) {
+			for _, frame := range exchangeBarrier(t, reader, encodeBuildCmd("admin")) {
 				if frame[0] != serverpackets.OpcodeNpcHtmlMessage {
 					t.Errorf("//admin during reloads answered %#x", frame[0])
 					return
 				}
 			}
-			for _, text := range textsIn(t, exchange(t, reader, encodeBuildCmd("spawn 20120"))) {
+			for _, text := range textsIn(t, exchangeBarrier(t, reader, encodeBuildCmd("spawn 20120"))) {
 				if text != "You spawned Wolf. - Cmd: admin_spawn" && text != "You spawned Dire Wolf. - Cmd: admin_spawn" {
 					t.Errorf("//spawn during reloads answered %q", text)
 					return
@@ -250,7 +250,7 @@ func TestAdminReloadRaceFree(t *testing.T) {
 	// messages count.
 	want := []string{"The HTM cache has been reloaded.", "NPCs templates have been reloaded; scripts were not reloaded.", "Admin data has been reloaded."}
 	for range 10 {
-		if got := textsIn(t, exchange(t, gm, encodeBuildCmd("reload htm npc admin"))); !slices.Equal(got, want) {
+		if got := textsIn(t, exchangeBarrier(t, gm, encodeBuildCmd("reload htm npc admin"))); !slices.Equal(got, want) {
 			t.Fatalf("//reload during reads answered %q, want %q", got, want)
 		}
 	}

@@ -123,6 +123,9 @@ func TestAdminMovie(t *testing.T) {
 	assertCameras(t, "Other after //sequence broadcast 1", settle(t, other), shot1)
 
 	// //movie play: shot 1 at 500 ms, shot 2 at 500 + 2000 - 100 ms.
+	if !srv.DrivesClock() {
+		t.Skip("pinning the shot times at 499 and 500 ms needs the driven clock")
+	}
 	if frames := exchange(t, gm, encodeBuildCmd("movie play")); len(frames) != 0 {
 		t.Fatalf("//movie play frames = %x, want none at once", testsupport.FrameOpcodes(frames))
 	}

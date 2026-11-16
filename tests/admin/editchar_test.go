@@ -326,7 +326,7 @@ func TestAdminCharacterPages(t *testing.T) {
 	}
 
 	// //info on the selected player opens the same page.
-	if body := htmlBody(t, only(exchange(t, gm, encodeBuildCmd("info")), serverpackets.OpcodeNpcHtmlMessage)[0]); body != page {
+	if body := htmlBody(t, onlyPage(t, exchange(t, gm, encodeBuildCmd("info")))); body != page {
 		t.Fatalf("//info page differs from //debug's:\n%s", body)
 	}
 
@@ -339,7 +339,7 @@ func TestAdminCharacterPages(t *testing.T) {
 	drain(t, gm)
 	drain(t, user)
 	frames = exchange(t, gm, encodeBuildCmd("party_info"))
-	page = htmlBody(t, only(frames, serverpackets.OpcodeNpcHtmlMessage)[0])
+	page = htmlBody(t, onlyPage(t, frames))
 	for _, want := range []string{
 		`<a action="bypass -h admin_debug Player"><font color="LEVEL">Player (1)</font></a></td><td width=120 align=right>Human Fighter</td>`,
 		`<a action="bypass -h admin_debug Admin">Admin (1)</a>`,
@@ -348,8 +348,19 @@ func TestAdminCharacterPages(t *testing.T) {
 			t.Fatalf("//party_info page lacks %q:\n%s", want, page)
 		}
 	}
-	page = htmlBody(t, only(exchange(t, gm, encodeBuildCmd("debug")), serverpackets.OpcodeNpcHtmlMessage)[0])
+	page = htmlBody(t, onlyPage(t, exchange(t, gm, encodeBuildCmd("debug"))))
 	if !strings.Contains(page, `<a action="bypass -h admin_party_info Player">2 members</a>`) {
 		t.Fatalf("//debug page lacks the party link:\n%s", page)
 	}
+}
+
+// onlyPage returns the first NpcHtmlMessage among frames, failing the test
+// when there is none.
+func onlyPage(t *testing.T, frames [][]byte) []byte {
+	t.Helper()
+	pages := only(frames, serverpackets.OpcodeNpcHtmlMessage)
+	if len(pages) == 0 {
+		t.Fatalf("frames = %x, want an NpcHtmlMessage", testsupport.FrameOpcodes(frames))
+	}
+	return pages[0]
 }

@@ -19,7 +19,6 @@ import (
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -234,7 +233,7 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 		engine.Close()
 		return nil
 	}})
-	return script.Build(list, joined, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, HandleOps: handleOps(), Queue: engine}), nil
+	return script.Build(list, joined, script.Config{KindOf: script.NPCKindOf(data.NPCs), Log: log, Env: env, HandleOps: handleOps(), Queue: engine}), nil
 }
 
 // handleOps returns the handle operations of every catalog script: those
@@ -327,25 +326,6 @@ func provideScriptEnv(rewards manager.KillRewardConfig, journals *script.Quests,
 // player's journal writes on its persistence lane.
 func provideQuestJournals(store *gamesql.QuestStore, worker *persist.Worker, log zerolog.Logger) *script.Quests {
 	return script.NewQuests(store, worker, log)
-}
-
-// npcKindOf returns the kind each NPC template spawns as.
-func npcKindOf(templates *npc.Table) func(int32) (script.NPCKind, bool) {
-	return func(id int32) (script.NPCKind, bool) {
-		tmpl, ok := templates.Get(int(id))
-		if !ok {
-			return script.KindOther, false
-		}
-		probe := &npc.Instance{Template: tmpl}
-		switch {
-		case npc.FolkKind(probe):
-			return script.KindFolk, true
-		case npc.Attackable(probe):
-			return script.KindHostile, true
-		default:
-			return script.KindOther, true
-		}
-	}
 }
 
 // buildScripts makes the boot build the registry, so scripts.xml is read

@@ -140,14 +140,14 @@ func TestAdminReloadTemplatesRaceFree(t *testing.T) {
 	gm := srv.Client
 	reader, _ := addPlayer(t, srv, "reader", "Reader", adminLevel)
 	drain(t, reader)
-	exchange(t, reader, encodeAction(wolfObjID))
+	exchangeBarrier(t, reader, encodeAction(wolfObjID))
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for range 10 {
-			frames := exchange(t, reader, encodeBuildCmd("info drop"))
+			frames := exchangeBarrier(t, reader, encodeBuildCmd("info drop"))
 			if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeNpcHtmlMessage {
 				t.Errorf("//info drop during reloads answered %x", testsupport.FrameOpcodes(frames))
 				return
@@ -156,7 +156,7 @@ func TestAdminReloadTemplatesRaceFree(t *testing.T) {
 				t.Errorf("//info drop during reloads = %q, want either pelt name", page)
 				return
 			}
-			for _, frame := range exchange(t, reader, encodeBuildCmd("skill list")) {
+			for _, frame := range exchangeBarrier(t, reader, encodeBuildCmd("skill list")) {
 				if frame[0] != serverpackets.OpcodeNpcHtmlMessage {
 					t.Errorf("//skill list during reloads answered %#x", frame[0])
 					return
@@ -166,7 +166,7 @@ func TestAdminReloadTemplatesRaceFree(t *testing.T) {
 	}()
 	want := []string{"Items' templates have been reloaded.", "Skills' XMLs have been reloaded."}
 	for range 10 {
-		if got := textsIn(t, exchange(t, gm, encodeBuildCmd("reload item skill"))); !slices.Equal(got, want) {
+		if got := textsIn(t, exchangeBarrier(t, gm, encodeBuildCmd("reload item skill"))); !slices.Equal(got, want) {
 			t.Fatalf("//reload during reads answered %q, want %q", got, want)
 		}
 	}

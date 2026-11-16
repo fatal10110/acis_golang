@@ -96,7 +96,7 @@ func TestAdminSetPlayerNameRefusedWhileCreateHoldsIt(t *testing.T) {
 
 	creator.Send(encodeCreateCharacter("renamed7"))
 	<-hold.entered
-	frames := append(exchange(t, gm, encodeBuildCmd("set name Renamed7")), settle(t, gm)...)
+	frames := append(exchangeBarrier(t, gm, encodeBuildCmd("set name Renamed7")), settleBarrier(t, gm)...)
 	if !incorrectName(frames) {
 		t.Fatalf("GM frames = %x, want INCORRECT_NAME_TRY_AGAIN alone", testsupport.FrameOpcodes(frames))
 	}

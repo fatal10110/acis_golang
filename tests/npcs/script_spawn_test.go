@@ -209,6 +209,9 @@ func TestScriptSpawnRandomOffsetAndAtCreature(t *testing.T) {
 func TestScriptSpawnTimedDespawn(t *testing.T) {
 	t.Parallel()
 	w := bootScriptSpawns(t)
+	if !w.srv.DrivesClock() {
+		t.Skip("the real pool cannot stop the wall clock a second before the despawn delay")
+	}
 
 	wolf := w.spawner.AddSpawn(spawnWolfID, script.Loc{X: w.at.X + 50, Y: w.at.Y, Z: w.at.Z}, false, 30*time.Second)
 	grocer := w.spawner.AddSpawn(spawnGrocerID, script.Loc{X: w.at.X - 50, Y: w.at.Y, Z: w.at.Z}, false, 30*time.Second)

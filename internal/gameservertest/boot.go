@@ -315,6 +315,9 @@ type characterSpec struct {
 	// class is the class template the character is created from, and so
 	// its race.
 	class int
+	// at is where the character is saved; nil keeps the class template's
+	// start.
+	at *location.Location
 }
 
 // WithAccount sets the login account the scripted client authenticates as
@@ -721,6 +724,14 @@ func WithCharacter(name string, level, sp int) Option {
 func WithCharacterSex(name string, level, sp int, sex player.Sex) Option {
 	return func(o *options) {
 		o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp, sex: sex})
+	}
+}
+
+// WithCharacterAt seeds a selectable character as WithCharacter does, saved
+// at at, so it enters the world there.
+func WithCharacterAt(name string, level, sp int, at location.Location) Option {
+	return func(o *options) {
+		o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp, sex: player.SexMale, at: &at})
 	}
 }
 
@@ -2429,7 +2440,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		GeoBugs:          o.geoBugs,
 		IDs:              ids,
 		Positions:        positions,
-		GameClock:        task.NewGameClock(time.Now),
+		GameClock:        clock,
 		SevenSigns:       sevenSigns,
 		Festival:         fest,
 		Persist:          persistWorker,
@@ -2720,6 +2731,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		}
 		ch.CharLevel = spec.level
 		ch.SP = spec.sp
+		if spec.at != nil {
+			ch.Location = *spec.at
+		}
 		if err := chars.Create(context.Background(), ch); err != nil {
 			t.Fatalf("seed character store: %v", err)
 		}

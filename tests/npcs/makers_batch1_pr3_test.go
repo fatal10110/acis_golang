@@ -375,6 +375,9 @@ func TestInstantSpawnRandomMakerWakesADrawnMaker(t *testing.T) {
 		gameservertest.WithMakers(batch1Makers()),
 		gameservertest.WithScriptRand(draws.draw),
 	)
+	if !w.srv.DrivesClock() {
+		t.Skip("the real pool cannot stop the wall clock a second before the wake delay")
+	}
 	mw := &makerWorld{srv: w.srv}
 	count := func(step string, want ...int) {
 		t.Helper()

@@ -326,6 +326,9 @@ func TestFrintezzaEvilateMakerFillsPastItsMaximum(t *testing.T) {
 		gameservertest.WithNpcSpawns(batch1Table(t, evilateSpawnlist)),
 		gameservertest.WithMakers(batch3Makers(nil)),
 	)
+	if !w.srv.DrivesClock() {
+		t.Skip("the real pool cannot stop the wall clock one millisecond before the int1 timer")
+	}
 	mw := &makerWorld{srv: w.srv}
 	count := func(step string, a, b int) {
 		t.Helper()
@@ -426,6 +429,9 @@ func TestVelociraptorMakerWakesTheLair(t *testing.T) {
 		gameservertest.WithMakers(batch3Makers(makers.catalog())),
 		log.option(),
 	)
+	if !w.srv.DrivesClock() {
+		t.Skip("the spawn and the 11049 timers chain on the wall clock on the real pool, so each Advance can land either side of its deadline")
+	}
 	mw := &makerWorld{srv: w.srv}
 	count := func(step string, want int) {
 		t.Helper()
