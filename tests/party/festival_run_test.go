@@ -482,8 +482,10 @@ func TestFestivalSignupRunAndScore(t *testing.T) {
 	if err := f.srv.DB.QueryRow(`SELECT dawn_festival_score FROM seven_signs_status WHERE id = 0`).Scan(&dawnScore); err != nil || dawnScore != 60 {
 		t.Fatalf("dawn festival score = %d (%v), want 60", dawnScore, err)
 	}
-	if got := texts(f.command(t, 0, "3")); !equalStrings(got, []string{"You do not have any blood offerings to contribute."}) {
-		t.Fatalf("second registration told %q, want no offerings", got)
+	// The run is registered: its party no longer waits to register
+	// (owner-approved divergence, #5112).
+	if got := festivalPage(t, f.command(t, 0, "3")); got != "page 3b" {
+		t.Fatalf("second registration = %q, want page 3b", got)
 	}
 }
 
