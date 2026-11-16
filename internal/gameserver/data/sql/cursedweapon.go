@@ -76,12 +76,12 @@ func (s *CursedWeaponStore) Delete(ctx context.Context, itemID int32) error {
 }
 
 // ReleaseHolder deletes the weapon from the former holder's stored items
-// and sets its karma and PK kills back.
+// and sets its karma and PK kills back, clamped to their column ranges.
 func (s *CursedWeaponStore) ReleaseHolder(ctx context.Context, playerID, itemID, karma, pkKills int32) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM items WHERE owner_id = ? AND item_id = ?`, playerID, itemID); err != nil {
 		return fmt.Errorf("remove cursed weapon %d from %d: %w", itemID, playerID, err)
 	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET karma = ?, pkkills = ? WHERE obj_Id = ?`, karma, pkKills, playerID); err != nil {
+	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET karma = ?, pkkills = ? WHERE obj_Id = ?`, karmaColumn(int64(karma)), killsColumn(int64(pkKills)), playerID); err != nil {
 		return fmt.Errorf("restore karma of cursed weapon %d holder %d: %w", itemID, playerID, err)
 	}
 	return nil
