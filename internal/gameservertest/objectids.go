@@ -17,3 +17,11 @@ func (s *Server) IssuedObjectIDs() int {
 	defer s.ids.mu.Unlock()
 	return s.ids.issued
 }
+
+// ObjectIDsInUse reports how many of the object ids the server's allocator
+// handed out it has not been given back.
+func (s *Server) ObjectIDsInUse() int {
+	s.ids.mu.Lock()
+	defer s.ids.mu.Unlock()
+	return s.ids.issued - len(s.ids.released)
+}
