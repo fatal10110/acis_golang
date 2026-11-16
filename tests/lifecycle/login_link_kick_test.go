@@ -46,6 +46,9 @@ func TestSecondLoginKicksAccountInPlay(t *testing.T) {
 	}
 
 	expectAccountInUse(t, loginAddr, account)
+	if got := srv.AwaitLoginKick(t); got != account {
+		t.Fatalf("kick handled for %q, want %s", got, account)
+	}
 
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeServerClose, "kick ServerClose")
 	srv.Client.ExpectClosed()
