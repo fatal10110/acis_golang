@@ -91,7 +91,7 @@ func (l *GameClientLink) adminZonePanel(gm *livePlayer) bool {
 		return false
 	}
 	pos := gm.CurrentLocation()
-	calculated, ok := l.restarts.CalculatedPoint(pos, gm.Race)
+	calculated, ok := l.restarts.CalculatedPoint(pos, gm.ActiveClassRace(), gm.Race)
 	if !ok {
 		return false
 	}

@@ -885,15 +885,7 @@ func (l *GameClientLink) trackShadowItems(live *livePlayer) {
 // still holds, each with its item's shared reuse group.
 func (l *GameClientLink) restoreItemShortcuts(c *player.Character, shortcuts []shortcut.Shortcut) []shortcut.Shortcut {
 	return shortcut.RestoreItemShortcuts(shortcuts, func(objectID int32) (int32, bool) {
-		inst := c.Inventory().ItemByObjectID(objectID)
-		if inst == nil {
-			return 0, false
-		}
-		tmpl, ok := l.itemTemplates.Get(inst.TemplateID)
-		if !ok || tmpl.EtcItem == nil {
-			return -1, true
-		}
-		return tmpl.EtcItem.SharedReuseGroup, true
+		return l.itemSharedReuseGroup(c.Inventory(), objectID)
 	})
 }
 
