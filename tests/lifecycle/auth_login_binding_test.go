@@ -12,8 +12,8 @@ import (
 // TestAuthLoginWhileAccountValidatesLeavesFirstAlone holds the login
 // server's answers so a second AuthLogin for the account, with keys the
 // login server never issued, lands while the answer to the first is still
-// in flight. The second connection is closed without reaching the login
-// server, and the first, untouched, enters on its own approval. A pending
+// in flight. The second connection is refused with AuthLoginFail and
+// ServerClose without reaching the login server, and the first, untouched, enters on its own approval. A pending
 // login is never displaced by an unapproved one: owner-approved divergence
 // (#4652).
 func TestAuthLoginWhileAccountValidatesLeavesFirstAlone(t *testing.T) {
@@ -28,6 +28,8 @@ func TestAuthLoginWhileAccountValidatesLeavesFirstAlone(t *testing.T) {
 	hold.Await(t, 1) // the login server approved the first request
 
 	second := srv.DialAuthLogin(t, account, link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4})
+	assertFrameOpcode(t, second.Read(), serverpackets.OpcodeAuthLoginFail, "second AuthLogin answer")
+	assertFrameOpcode(t, second.Read(), serverpackets.OpcodeServerClose, "second AuthLogin ServerClose")
 	second.ExpectClosed()
 	hold.Release()
 

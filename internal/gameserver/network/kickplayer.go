@@ -6,8 +6,7 @@ package network
 // check stops waiting, a character in the world detaches without the
 // lost-connection linger, and the end of the connection reports the logout
 // to the login server. An account no connection claims or waits on is
-// ignored. Assign
-// it as the login link's LoginLinkHandlers.KickPlayer.
+// ignored. Assign it as the login link's LoginLinkHandlers.KickPlayer.
 func (l *GameClientLink) KickPlayer(account string) {
 	if l.clients == nil {
 		return

@@ -15,10 +15,7 @@ import (
 // for the login server to answer a session validation request.
 const DefaultValidationTimeout = 5 * time.Second
 
-var (
-	errValidationPending = errors.New("session validation already pending")
-	errLoginLinkClosed   = errors.New("login link closed during session validation")
-)
+var errLoginLinkClosed = errors.New("login link closed during session validation")
 
 // SessionValidator confirms game clients' presented session keys with the
 // login server over a LoginLink. A game server keeps exactly one link to
@@ -181,7 +178,8 @@ func (v *SessionValidator) abandon(req *authRequest) {
 //
 // A confirmed match advances client to StateAuthed and records its session
 // key, and Validate reports (true, nil). A confirmed mismatch sends client
-// an AuthLoginFail notice and reports (false, nil); the caller is
+// an AuthLoginFail notice and reports (false, nil), as does a request
+// refused because the account already has one in flight; the caller is
 // responsible for closing the connection afterward, same as for any other
 // definitive rejection. A transport error or a canceled ctx reports
 // (false, err) without notifying client, since no definitive answer came
@@ -194,8 +192,11 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 	pending := &authRequest{linkDone: loginLink.Done(), result: make(chan bool, 1)}
 	v.sendMu.Lock()
 	if !v.enqueue(req.LoginName, pending) {
+		// The account already has a request in flight: this one is refused
+		// as a definitive rejection, without reaching the login server.
 		v.sendMu.Unlock()
-		return false, errValidationPending
+		client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
+		return false, nil
 	}
 	err := loginLink.SendPlayerAuthRequest(link.PlayerAuthRequest{
 		Account: req.LoginName,
