@@ -281,7 +281,7 @@ func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) boo
 	// The change saves the class left, with its effects and reuse timers,
 	// before the class switched to is read.
 	l.abortFusionTargeting(live)
-	charState := live.SaveState()
+	charState := live.characterSaveState()
 	var skillState skillstate.SaveState
 	if l.skills != nil {
 		skillState = l.skills.SaveState(live.Character)

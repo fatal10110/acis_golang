@@ -58,7 +58,11 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 			})
 			return
 		}
-		found, ok := l.storeAccessLevelByName(name, int(level))
+		found, ok := l.adminByName(name, func(target *livePlayer) {
+			l.moveToAccessLevel(target, int(level))
+		}, func(objectID int32) {
+			l.storeOfflineAccessLevel(objectID, int(level))
+		})
 		switch {
 		case !ok:
 		case !found:
@@ -86,15 +90,21 @@ func adminSelectedPlayer(gm *livePlayer) (*livePlayer, bool) {
 // disconnects it when level bans it, then runs report. A target already
 // leaving the world gets level stored from gm's goroutine instead.
 func (l *GameClientLink) changeAccessLevel(gm, target *livePlayer, level int, report func()) {
-	if !onPlayer(gm, target, func() {
-		l.setAccessLevel(target, level)
-		if level < 0 {
-			target.kickClient()
-		}
+	onPlayerOr(gm, target, func() {
+		l.moveToAccessLevel(target, level)
 		report()
-	}) {
+	}, func() {
 		l.storeLeavingAccessLevel(target, level)
 		report()
+	})
+}
+
+// moveToAccessLevel moves live, on live's queue, to level, and disconnects
+// it when level bans it: its logout save then stores the ban.
+func (l *GameClientLink) moveToAccessLevel(live *livePlayer, level int) {
+	l.setAccessLevel(live, level)
+	if level < 0 {
+		live.kickClient()
 	}
 }
 
@@ -233,12 +243,12 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 // level of the character named name changes.
 func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name string, level int) {
 	if target != nil {
-		if !onPlayer(gm, target, func() {
+		onPlayerOr(gm, target, func() {
 			l.setAccessLevel(target, level)
 			target.kickClient()
-		}) {
+		}, func() {
 			l.storeLeavingAccessLevel(target, level)
-		}
+		})
 		sendText(gm, target.CharacterName()+" has been banned.")
 		return
 	}
@@ -250,7 +260,16 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 		}
 		return
 	}
-	found, ok := l.storeAccessLevelByName(name, level)
+	// A session found by the character's id rather than by name, or one a
+	// selection under way ends with, takes a ban as an online target does;
+	// it is not banned, so an unban leaves it as it is.
+	found, ok := l.adminByName(name, func(target *livePlayer) {
+		if level < 0 {
+			l.moveToAccessLevel(target, level)
+		}
+	}, func(objectID int32) {
+		l.storeOfflineAccessLevel(objectID, level)
+	})
 	switch {
 	case !ok:
 	case !found:

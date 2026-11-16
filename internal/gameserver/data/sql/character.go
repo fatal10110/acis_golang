@@ -69,8 +69,8 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
 // karma/pvpkills/pkkills (clamped to their column ranges), death_penalty_level, the accumulated session
 // playtime, the personal-surrender flag, the noblesse status, the Seven Signs
-// dungeon membership, the Ketra/Varka faction standing, the face and hair
-// and each subclass's progression — so a later reload reflects everything
+// dungeon membership, the Ketra/Varka faction standing, the face and hair,
+// the access level and each subclass's progression — so a later reload reflects everything
 // gained since the last save instead of the row's creation-time values.
 // Location columns are not written here. The row is also marked online: Save only runs
 // for characters currently in game. Online is 1, or 2 for a character lingering
@@ -78,11 +78,11 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, face = ?, hairStyle = ?, hairColor = ?, online = ?
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, face = ?, hairStyle = ?, hairColor = ?, accesslevel = ?, online = ?
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		progression.Exp, progression.ExpBeforeDeath, progression.SP, karmaColumn(int64(st.Karma)), killsColumn(int64(st.PvPKills)), killsColumn(int64(st.PKKills)), st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
-		st.WantsPeace, st.Noble, st.In7sDungeon, st.VarkaKetraAlliance, st.Face, st.HairStyle, st.HairColor, onlineColumn(st.ClientDetached), st.ID,
+		st.WantsPeace, st.Noble, st.In7sDungeon, st.VarkaKetraAlliance, st.Face, st.HairStyle, st.HairColor, st.AccessLevel, onlineColumn(st.ClientDetached), st.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", st.ID, err)
