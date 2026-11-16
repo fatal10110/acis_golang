@@ -842,13 +842,14 @@ type positionedTarget interface {
 }
 
 // selectLiveTarget makes target live's selection, showing it to live and
-// its observers. A festival monster stays out of reach of a player who is
-// no festival participant: the selection is cleared instead.
+// its observers. An object off the grid, unless it is a player of live's
+// own party, and a festival monster for a player who is no festival
+// participant stay out of reach: the selection is cleared instead.
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
 	if live == nil || target == nil {
 		return false
 	}
-	if h, ok := target.(*npc.Hostile); ok && h.FestivalMonster() && !live.FestivalParticipant() {
+	if !l.selectable(live, target) {
 		l.announceTargetCleared(live, live.TakeTarget())
 		return false
 	}
@@ -856,14 +857,20 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 		return true
 	}
 	live.StoreTarget(target)
+	// A static object is shown to the selector alone, with a neutral color
+	// and its info refreshed; observers learn nothing of it.
+	if obj, ok := target.(*staticobject.Object); ok {
+		live.SendFrame(serverpackets.FrameMyTargetSelected(obj.ObjectID(), 0))
+		live.SendFrame(serverpackets.FrameStaticObjectInfo(obj))
+		return true
+	}
 	// Setting a target sends ValidateLocation for the new target before
 	// MyTargetSelected, skipped only when the target is the selecting player
 	// itself or a player aboard a boat.
 	if target.ObjectID() != live.ObjectID() && !aboardBoat(target) {
 		// Every creature target (players, NPCs including decorations,
-		// summons, doors) gets a ValidateLocation; static objects and items
-		// send none.
-		if kind := target.Kind(); kind != actor.KindStatic && kind != actor.KindItem {
+		// summons, doors) gets a ValidateLocation; items send none.
+		if target.Kind() != actor.KindItem {
 			if creature, ok := target.(positionedTarget); ok {
 				x, y, z := creature.Position()
 				live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, creature.Heading()))
@@ -895,19 +902,45 @@ func (l *GameClientLink) requestTargetCancel(live *livePlayer, req clientpackets
 		}
 		return
 	}
-	l.clearLiveTarget(live)
+	// Clearing the selection leaves the attack intention alone: an
+	// auto-attack keeps swinging at its target.
+	l.unselectLiveTarget(live)
 }
 
+// selectable reports whether live may select target: an object off the
+// grid only when it is a player of live's own party, and a festival
+// monster only by a festival participant.
+func (l *GameClientLink) selectable(live *livePlayer, target world.Tracked) bool {
+	if v, ok := target.(interface{ Visible() bool }); ok && !v.Visible() {
+		mate, isPlayer := target.(*livePlayer)
+		if !isPlayer || l.parties == nil || !l.parties.SameParty(live.ObjectID(), mate.ObjectID()) {
+			return false
+		}
+	}
+	if h, ok := target.(*npc.Hostile); ok && h.FestivalMonster() && !live.FestivalParticipant() {
+		return false
+	}
+	return true
+}
+
+// clearLiveTarget drops live's attack intention, then clears its selection.
 func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	old := live.Target()
-	live.StoreTarget(nil)
 	if live.combat != nil {
 		live.combat.Stop()
 	}
-	l.announceTargetCleared(live, old)
+	l.unselectLiveTarget(live)
+}
+
+// unselectLiveTarget clears live's selection without touching its
+// intentions.
+func (l *GameClientLink) unselectLiveTarget(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	l.announceTargetCleared(live, live.TakeTarget())
 }
 
 // announceTargetCleared answers a cleared selection: ActionFailed to live,
@@ -1204,6 +1237,8 @@ func targetLevel(target world.Tracked) int {
 	case *npc.Folk:
 		return t.Level()
 	case *summon.Actor:
+		return t.Level()
+	case *door.Object:
 		return t.Level()
 	}
 	return 0
