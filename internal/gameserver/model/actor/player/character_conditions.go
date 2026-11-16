@@ -134,8 +134,9 @@ func (a characterStatActor) ActiveEffectLevel(effectID int) (int, bool) {
 // IsNight satisfies conditions.Actor.
 func (a characterStatActor) IsNight() bool { return a.c.EffectList().IsNight() }
 
-// IsSitting satisfies conditions.PlayerActor.
-func (a characterStatActor) IsSitting() bool { return !a.c.Standing() }
+// IsSitting satisfies conditions.PlayerActor: the character rests only
+// once it has finished sitting down (or lying down into fake death).
+func (a characterStatActor) IsSitting() bool { return a.c.Seated() }
 
 // IsInOlympiadMode satisfies conditions.PlayerActor with c's Olympiad
 // match standing.

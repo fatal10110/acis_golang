@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -69,6 +70,10 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 	}
 	if live.Fishing() && tmpl.DefaultAction != item.ActionFishingShot {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDoWhileFishing))
+		return
+	}
+	if petitem.Equippable(tmpl) {
+		l.useItemOnPet(live, inv, inst, tmpl)
 		return
 	}
 	if !inst.Equipped() && rejectUseItemConditions(live, tmpl) {
@@ -603,7 +608,8 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 // neither gets this far, since an augmented item is not
 // droppable and a quest item is ignored above.
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
-	if !liveItemOpsAllowed(live) || l.belongings.groundItems == nil {
+	// A fake-dead player still drops; only a dead one is ignored.
+	if live == nil || live.Dead() || l.belongings.groundItems == nil {
 		return
 	}
 	inv := live.Inventory()
@@ -645,10 +651,11 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 	}
 }
 
-// dropToGround drops count of live's item objectID on the ground at
-// (x, y, z) and returns it there, reporting false when nothing was
-// dropped. A worn item leaves the paperdoll before it reaches the ground:
-// its stat functions, item skills and shot charges go with it.
+// dropToGround drops count of live's item objectID on the ground at the
+// point geodata lets it reach on the way from live to (x, y, z), and
+// returns it there, reporting false when nothing was dropped. A worn item
+// leaves the paperdoll before it reaches the ground: its stat functions,
+// item skills and shot charges go with it.
 func (l *GameClientLink) dropToGround(live *livePlayer, inv *itemcontainer.Inventory, objectID int32, count, x, y, z int) (*grounditem.Item, bool) {
 	res, ok, err := l.inventory.DropItem(inv, objectID, count)
 	if err != nil {
@@ -672,6 +679,11 @@ func (l *GameClientLink) dropToGround(live *livePlayer, inv *itemcontainer.Inven
 		return nil, false
 	}
 
+	if l.geo != nil {
+		ox, oy, oz := live.Position()
+		at := l.geo.ValidLocation(ox, oy, oz, x, y, z)
+		x, y, z = at.X, at.Y, at.Z
+	}
 	l.belongings.groundItems.Drop(ground, task.DropOptions{
 		X:             x,
 		Y:             y,
@@ -686,7 +698,7 @@ func (l *GameClientLink) dropToGround(live *livePlayer, inv *itemcontainer.Inven
 // destroyLiveItem answers RequestDestroyItem. A player running a private
 // store or tied up in a direct trade is refused before anything else; a
 // configured cursed weapon that passes the count checks is refused like a
-// non-destroyable item (a hero item keeps its own message); a destroy that
+// non-destroyable item, a hero one with the hero message; a destroy that
 // goes through names what disappeared.
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
 	if live == nil {
@@ -703,6 +715,11 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	failure := l.inventory.DestroyItemFailure(inv, objectID, count)
 	if failure == invops.DestroyOK && l.cursedItem(inv, objectID) {
 		failure = invops.DestroyNotDestroyable
+		// The hero flag only picks the refusal's message.
+		inst := inv.ItemByObjectID(objectID)
+		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok && tmpl.HeroItem() {
+			failure = invops.DestroyHeroItem
+		}
 	}
 	switch failure {
 	case invops.DestroyOK:
@@ -938,13 +955,9 @@ func (l *GameClientLink) processingTransaction(live *livePlayer) bool {
 	return l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())
 }
 
-// liveItemOpsAllowed reports whether live may currently manipulate items at
-// all: not gone and not dead. Drop/destroy/crystallize/enchant/pet-use gate
-// on this alone — a drop checks only death, destroy and enchant check
-// nothing, and pet item use checks the owner's death-like state or the
-// pet's death. Pickup does
-// not gate on this alone; see liveItemInteractionAllowed and
-// livePickupBlockedDeferrable's comment (pickup.go).
+// liveItemOpsAllowed reports whether live is present and neither dead nor
+// playing dead. It is the base of liveItemInteractionAllowed; a drop checks
+// only real death and does not use it.
 func liveItemOpsAllowed(live *livePlayer) bool {
 	return live != nil && !live.AlikeDead()
 }

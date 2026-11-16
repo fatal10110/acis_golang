@@ -152,6 +152,65 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	end()
 }
 
+// useItemOnPet answers the owner's use of a pet equipment item from their
+// own inventory: one unit moves to the summoned pet, which puts it on. Each
+// refusal is its system message alone.
+func (l *GameClientLink) useItemOnPet(live *livePlayer, playerInv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) {
+	pet, petInv, ok := l.activePet(live)
+	if !ok {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotEquipPetItem))
+		return
+	}
+	switch petitem.CheckWear(petInv, pet, inst, tmpl) {
+	case petitem.GiveOK:
+	case petitem.GivePetCannotWear:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotUseItem))
+		return
+	case petitem.GiveDeadPet:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotGiveItemsToDeadPet))
+		return
+	case petitem.GivePetCannotCarryMore:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotCarryMoreItems))
+		return
+	case petitem.GivePetTooEncumbered:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetTooEncumbered))
+		return
+	default:
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+
+	end := l.belongings.itemInstances.BeginOperation(playerInv.OwnerID(), petInv.OwnerID())
+	defer end()
+	res, ok, err := l.summoning.petItems.Transfer(playerInv, petInv, inst.ObjectID, 1)
+	if len(res.Unequipped) > 0 {
+		l.applyEquipStatChanges(live, playerInv, invops.Result{EquipmentChanged: true, Changed: res.Unequipped})
+		l.broadcastCharacterInfo(live)
+	}
+	if err != nil {
+		l.log.Error().Err(err).Msg("transfer pet item to pet")
+	}
+	if err != nil || !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	l.applyPersistActions(res.Persist)
+	// The unit that moved is the one the pet puts on (or, were it already
+	// worn, takes off).
+	worn, ok := petitem.Wear(petInv, inst.ObjectID)
+	if !ok {
+		end()
+		return
+	}
+	l.applyPersistActions(worn.Persist)
+	end()
+	if worn.Outcome == petitem.Unequipped {
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, worn.ItemID))
+		return
+	}
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPutOnS1, worn.ItemID))
+}
+
 func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGetItemFromPet) {
 	if req.Count <= 0 || live == nil {
 		return

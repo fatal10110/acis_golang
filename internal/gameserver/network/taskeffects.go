@@ -200,6 +200,7 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 		ix.Revalidate(a)
 	}
 	a.syncFlags()
+	a.keepBreath()
 	code, changed, flagPvP := a.compassUpdate()
 	leftBattlefield := a.takeLeftBattlefield()
 	a.mu.Unlock()
@@ -251,6 +252,7 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, reason zoneRevalidation) 
 		}
 	}
 	a.syncFlags()
+	a.keepBreath()
 	code, changed, flagPvP := a.compassUpdate()
 	leftBattlefield := a.takeLeftBattlefield()
 	a.mu.Unlock()
@@ -304,6 +306,7 @@ func (a *liveZoneActor) rejoin(ix *zone.Index) {
 		ix.Revalidate(a)
 	}
 	a.syncFlags()
+	a.keepBreath()
 	code, changed, flagPvP := a.compassUpdate()
 	leftBattlefield := a.takeLeftBattlefield()
 	a.mu.Unlock()
@@ -595,11 +598,32 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		return
 	}
 	if swimming {
-		breath := time.Duration(live.Against(live.ConditionActor(), nil).CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
-		l.water.Add(live, breath)
+		l.water.Add(live, breathTime(live))
 		return
 	}
 	l.water.Remove(live)
+}
+
+// breathTime is how long live holds its breath under water before drowning
+// damage begins.
+func breathTime(live *livePlayer) time.Duration {
+	return time.Duration(live.Against(live.ConditionActor(), nil).CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
+}
+
+// keepBreath starts the breath countdown of a living player a revalidation
+// finds swimming, with AllowWater, when none runs: every position update
+// and zone revalidation checks it, not only a water boundary crossing, so a
+// player revived in the water starts drowning again. The countdown of a
+// player already tracked runs on, and a dead one is never tracked. A
+// teleport handles the countdown itself. It runs under mu and deliveryMu,
+// as the zone callbacks do.
+func (a *liveZoneActor) keepBreath() {
+	live := a.live
+	l := live.link
+	if l == nil || l.water == nil || !l.playerConfig().AllowWater || !live.InWater() || live.Teleporting() {
+		return
+	}
+	l.water.Add(live, breathTime(live))
 }
 
 // DangerStateChanged is the player's reaction to entering a damage or

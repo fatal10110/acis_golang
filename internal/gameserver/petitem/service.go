@@ -33,6 +33,9 @@ const (
 	GivePetCannotCarryMore
 	// GivePetTooEncumbered means the pet lacks remaining weight capacity.
 	GivePetTooEncumbered
+	// GivePetCannotWear means the pet cannot wear the equipment item its
+	// owner uses on it.
+	GivePetCannotWear
 )
 
 // UseFailure is the non-mutating reason a pet-use-item request failed.
@@ -133,6 +136,30 @@ func (s *Service) CheckGive(playerInv, petInv *itemcontainer.Inventory, pet *sum
 		return GivePetCannotCarryMore
 	}
 	if !petInv.ValidateWeight(int(tmpl.Weight) * count) {
+		return GivePetTooEncumbered
+	}
+	return GiveOK
+}
+
+// CheckWear runs the checks an owner's use of a pet equipment item from
+// their own inventory goes through before the item moves to the pet, in
+// their order: the pet must be able to wear it, be alive, and have a free
+// slot and the weight to spare for one unit. Unlike a give, nothing checks
+// the distance to the pet or whether the item may be handed to a pet.
+func CheckWear(petInv *itemcontainer.Inventory, pet *summon.Actor, inst *item.Instance, tmpl *item.Template) GiveFailure {
+	if petInv == nil || pet == nil || inst == nil || tmpl == nil {
+		return GiveNoop
+	}
+	if !pet.CanWearPetItem(tmpl) {
+		return GivePetCannotWear
+	}
+	if pet.Dead() {
+		return GiveDeadPet
+	}
+	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(inst, tmpl)) {
+		return GivePetCannotCarryMore
+	}
+	if !petInv.ValidateWeight(int(tmpl.Weight)) {
 		return GivePetTooEncumbered
 	}
 	return GiveOK
@@ -239,13 +266,43 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	if !pet.CanWearPetItem(tmpl) {
 		return UseResult{}, UsePetCannotUseItem
 	}
+	res := wear(petInv, inst, tmpl)
+	if res.ItemID == 0 {
+		return UseResult{}, UseNoop
+	}
+	return res, UseOK
+}
 
+// Wear puts the pet equipment item objectID, already in petInv, on the pet,
+// or takes it off when it is worn, and reports false when petInv holds no
+// such item.
+func Wear(petInv *itemcontainer.Inventory, objectID int32) (UseResult, bool) {
+	if petInv == nil {
+		return UseResult{}, false
+	}
+	inst := petInv.ItemByObjectID(objectID)
+	if inst == nil {
+		return UseResult{}, false
+	}
+	tmpl, ok := petInv.Templates().Get(inst.TemplateID)
+	if !ok || !Equippable(tmpl) {
+		return UseResult{}, false
+	}
+	res := wear(petInv, inst, tmpl)
+	return res, res.ItemID != 0
+}
+
+// wear takes the worn inst off, or puts it on in its slot (a pet weapon in
+// the right hand, pet armor on the chest), replacing what is worn there.
+// A worn item whose slot is already empty yields a zero result.
+func wear(petInv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) UseResult {
+	st := inst.Snapshot()
 	if st.Equipped() {
 		old := petInv.UnequipSlot(st.LocationData)
 		if old == nil {
-			return UseResult{}, UseNoop
+			return UseResult{}
 		}
-		return UseResult{Outcome: Unequipped, ItemID: old.TemplateID, Persist: []inventory.Persist{inventory.Update(old)}}, UseOK
+		return UseResult{Outcome: Unequipped, ItemID: old.TemplateID, Persist: []inventory.Persist{inventory.Update(old)}}
 	}
 
 	slot := itemcontainer.Chest
@@ -257,7 +314,7 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	if old != nil {
 		actions = append([]inventory.Persist{inventory.Update(old)}, actions...)
 	}
-	return UseResult{Outcome: Equipped, ItemID: inst.TemplateID, Persist: actions}, UseOK
+	return UseResult{Outcome: Equipped, ItemID: inst.TemplateID, Persist: actions}
 }
 
 // transfer moves count units of objectID from one inventory to the other.
