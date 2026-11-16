@@ -20,8 +20,9 @@ import (
 // ground item the way a pickup's click does.
 func heldAkamanah(t *testing.T, srv *gameservertest.Server, gmID int32) *grounditem.Item {
 	t.Helper()
-	if itemID, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || itemID != akamanahID {
-		t.Fatalf("drop = %d %v, want Akamanah", itemID, ok)
+	drop, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 })
+	if !ok || drop.ItemID != akamanahID {
+		t.Fatalf("drop = %d %v, want Akamanah", drop.ItemID, ok)
 	}
 	x, y, z := srv.PlayerPosition(t, gmID)
 	srv.SeedGroundItem(t, 0, akamanahID, 1, x, y, z)
@@ -34,7 +35,9 @@ func heldAkamanah(t *testing.T, srv *gameservertest.Server, gmID int32) *groundi
 	if ground == nil {
 		t.Fatal("Akamanah not on the ground")
 	}
-	srv.CursedWeapons.PlaceOnGround(akamanahID, ground, location.Location{X: x, Y: y, Z: z})
+	if !srv.CursedWeapons.PlaceOnGround(drop, ground, location.Location{X: x, Y: y, Z: z}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 	if !ground.Claim() {
 		t.Fatal("the fresh drop refused its first claim")
 	}

@@ -270,12 +270,15 @@ func TestNPCPicksUpCursedWeapon(t *testing.T) {
 	h := w.spawn(t, pickerHostileID, 200).(*npc.Hostile)
 	// Zariche drops as a monster kill drops it: its life starts, then it is
 	// laid down.
-	if id, ok := w.srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || id != zaricheItemID {
-		t.Fatalf("RollDrop = %d, %v; want Zariche", id, ok)
+	drop, ok := w.srv.CursedWeapons.RollDrop(func(int) int { return 0 })
+	if !ok || drop.ItemID != zaricheItemID {
+		t.Fatalf("RollDrop = %d, %v; want Zariche", drop.ItemID, ok)
 	}
 	zariche := w.drop(t, zaricheItemID, 215)
 	x, y, z := zariche.Position()
-	w.srv.CursedWeapons.PlaceOnGround(zaricheItemID, zariche, location.Location{X: x, Y: y, Z: z})
+	if !w.srv.CursedWeapons.PlaceOnGround(drop, zariche, location.Location{X: x, Y: y, Z: z}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 
 	w.look(t, h.Queue(), script.NPCOf(h), 500, zaricheItemID, 8689)
 	if want := []string{line("see %d q=1 [%d/%d]", pickerHostileID, zariche.ObjectID(), zaricheItemID)}; !slices.Equal(w.log.take(), want) {

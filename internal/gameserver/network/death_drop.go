@@ -72,8 +72,9 @@ func (l *GameClientLink) dropDeathItem(live *livePlayer, inv *itemcontainer.Inve
 
 // dropHeldItem is dropDeathItem returning the ground item it laid down.
 // cursed drops a cursed weapon: the item's droppable flag cannot refuse
-// it, and the ground cleanup leaves it be. ok is false when nothing
-// dropped.
+// it, the ground cleanup leaves it be, and it lies claimed until the
+// caller recorded it (cursedweapon.Manager.PlaceOnGround), so no pickup
+// takes it before. ok is false when nothing dropped.
 func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, cursed bool) (*grounditem.Item, bool) {
 	var (
 		res invops.DropResult
@@ -98,6 +99,9 @@ func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inven
 		return nil, false
 	}
 	ground.SetDestroyProtected(cursed)
+	if cursed {
+		ground.Claim()
+	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageYouDroppedS1, res.Template.ID))
 	x, y, z := live.Position()
 	tx := x + rnd.GetRange(-deathDropOffset, deathDropOffset)

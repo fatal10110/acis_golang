@@ -416,8 +416,9 @@ func TestAdminCursedWeaponsOnGround(t *testing.T) {
 	srv, gmID := bootCursedAdmin(t, 0)
 	gm := srv.Client
 	enterWorld(t, gm)
-	if itemID, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 }); !ok || itemID != akamanahID {
-		t.Fatalf("drop = %d %v, want Akamanah", itemID, ok)
+	drop, ok := srv.CursedWeapons.RollDrop(func(int) int { return 0 })
+	if !ok || drop.ItemID != akamanahID {
+		t.Fatalf("drop = %d %v, want Akamanah", drop.ItemID, ok)
 	}
 	srv.SeedGroundItem(t, 0, akamanahID, 1, 1000, 2000, -300)
 	var ground *grounditem.Item
@@ -429,7 +430,9 @@ func TestAdminCursedWeaponsOnGround(t *testing.T) {
 	if ground == nil {
 		t.Fatal("Akamanah not on the ground")
 	}
-	srv.CursedWeapons.PlaceOnGround(akamanahID, ground, location.Location{X: 1000, Y: 2000, Z: -300})
+	if !srv.CursedWeapons.PlaceOnGround(drop, ground, location.Location{X: 1000, Y: 2000, Z: -300}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 
 	want := cwPage(t, cwOnGround("Blood Sword Akamanah", "8689", "3d. 0h. 0m.")+cwNotOut("Demonic Sword Zariche", "8190"))
 	if got := lastPage(t, exchange(t, gm, encodeBuildCmd("cw"))); got != want {

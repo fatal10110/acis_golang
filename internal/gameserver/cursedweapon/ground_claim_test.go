@@ -35,12 +35,15 @@ func (g *fakeGround) Release() { g.claimed = false }
 func TestGroundEndWaitsForAPickupHoldingTheItem(t *testing.T) {
 	now := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
 	m, c := newManager(t, &fakeStore{}, now)
-	id, ok := m.RollDrop(always(0))
+	d, ok := m.RollDrop(always(0))
 	if !ok {
 		t.Fatal("no drop")
 	}
+	id := d.ItemID
 	ground := &fakeGround{id: 4242}
-	m.PlaceOnGround(id, ground, location.Location{X: 1, Y: 2, Z: 3})
+	if !m.PlaceOnGround(d, ground, location.Location{X: 1, Y: 2, Z: 3}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 
 	if !ground.Claim() {
 		t.Fatal("the pickup could not claim the fresh drop")
@@ -73,12 +76,15 @@ func TestGroundEndWaitsForAPickupHoldingTheItem(t *testing.T) {
 func TestGroundEndRetriesOnceThePickupLetsGo(t *testing.T) {
 	now := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
 	m, c := newManager(t, &fakeStore{}, now)
-	id, ok := m.RollDrop(always(0))
+	d, ok := m.RollDrop(always(0))
 	if !ok {
 		t.Fatal("no drop")
 	}
+	id := d.ItemID
 	ground := &fakeGround{id: 4242}
-	m.PlaceOnGround(id, ground, location.Location{X: 1, Y: 2, Z: 3})
+	if !m.PlaceOnGround(d, ground, location.Location{X: 1, Y: 2, Z: 3}) {
+		t.Fatal("PlaceOnGround refused the drop")
+	}
 	ground.Claim()
 	if ends, _ := m.Tick(now.Add(time.Hour)); len(ends) != 0 {
 		t.Fatalf("ends with the ground item held = %+v, want none", ends)
@@ -90,18 +96,21 @@ func TestGroundEndRetriesOnceThePickupLetsGo(t *testing.T) {
 	}
 
 	// The weapon's life runs out while it lies where its holder died.
-	if id, ok = m.RollDrop(always(0)); !ok {
+	if d, ok = m.RollDrop(always(0)); !ok || d.ItemID != id {
 		t.Fatal("no second drop")
 	}
 	if _, ok := m.Activate(id, Holder{ObjectID: 7}, always(0)); !ok {
 		t.Fatal("Activate refused")
 	}
 	c.now = now.Add(2 * time.Hour)
-	if death, ok := m.HolderDied(id, always(99)); !ok || death.Disappeared {
+	death, ok := m.HolderDied(id, always(99))
+	if !ok || death.Disappeared {
 		t.Fatalf("death = %+v %v, want the weapon dropped", death, ok)
 	}
 	dropped := &fakeGround{id: 4343}
-	m.PlaceOnGround(id, dropped, location.Location{X: 1, Y: 2, Z: 3})
+	if !m.PlaceOnGround(death.Drop, dropped, location.Location{X: 1, Y: 2, Z: 3}) {
+		t.Fatal("PlaceOnGround refused the holder's drop")
+	}
 	dropped.Claim()
 	if ends, _ := m.Tick(now.Add(73 * time.Hour)); len(ends) != 0 {
 		t.Fatalf("ends past the life with the ground item held = %+v, want none", ends)
