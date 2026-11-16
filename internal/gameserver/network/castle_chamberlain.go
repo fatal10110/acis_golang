@@ -293,19 +293,34 @@ func (d chamberlainDialog) operateDoor(val string, rest []string) bool {
 // the refusal page to anyone else. Both show the rate in force and the
 // next one.
 func (d chamberlainDialog) taxSet() {
-	current, next := strconv.Itoa(d.c.CurrentTaxPercent()), strconv.Itoa(d.c.NextTaxPercent())
-	if !d.allowed(clan.PrivCastleTaxes) {
-		d.sendRaw("tax-member.htm", "%currentTaxRate%", current, "%nextTaxRate%", next, "%objectId%", objID(d.f))
+	if !d.taxesAllowed() {
 		return
 	}
-	d.sendRaw("tax-leader.htm", "%currentTaxRate%", current, "%nextTaxRate%", next, "%objectId%", objID(d.f),
-		"%taxLimit%", strconv.Itoa(sevensigns.CastleTaxCap(d.r.StrifeOwner)))
+	d.sendRaw("tax-leader.htm", "%currentTaxRate%", strconv.Itoa(d.c.CurrentTaxPercent()), "%nextTaxRate%", strconv.Itoa(d.c.NextTaxPercent()),
+		"%objectId%", objID(d.f), "%taxLimit%", strconv.Itoa(sevensigns.CastleTaxCap(d.r.StrifeOwner)))
 }
 
-// taxAdjust answers "tax_adjust <rate>", 0 when it names none: a rate from
-// 0 to the limit the Seal of Strife allows becomes the next tax rate,
-// stored, with tax-after.htm; any other opens tax-toohigh.htm.
+// taxesAllowed reports whether the talker may set the taxes. When it may
+// not, it opens the refusal page and then tax-member.htm with the rate in
+// force and the next one.
+func (d chamberlainDialog) taxesAllowed() bool {
+	if d.allowed(clan.PrivCastleTaxes) {
+		return true
+	}
+	d.sendRaw("tax-member.htm", "%currentTaxRate%", strconv.Itoa(d.c.CurrentTaxPercent()), "%nextTaxRate%", strconv.Itoa(d.c.NextTaxPercent()),
+		"%objectId%", objID(d.f))
+	return false
+}
+
+// taxAdjust answers "tax_adjust <rate>", 0 when it names none. A talker not
+// allowed to set the taxes gets the tax_set refusal whatever the rate. For
+// anyone else, a rate from 0 to the limit the Seal of Strife allows becomes
+// the next tax rate, stored, with tax-after.htm; any other opens
+// tax-toohigh.htm.
 func (d chamberlainDialog) taxAdjust(val string) bool {
+	if !d.taxesAllowed() {
+		return true
+	}
 	limit := sevensigns.CastleTaxCap(d.r.StrifeOwner)
 	rate := 0
 	if val != "" {
