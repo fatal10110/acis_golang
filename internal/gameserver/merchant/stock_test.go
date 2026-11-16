@@ -53,7 +53,7 @@ func TestRestockDeleteCannotOvertakeNextSaleSave(t *testing.T) {
 	// at the point the stock issues them.
 	s := NewStock(lists, store, nil, func() time.Time { return now }, zerolog.Nop())
 
-	if !s.Decrease(product, 1) {
+	if !s.Take(Lot{product, 1}) {
 		t.Fatal("first sale refused")
 	}
 	now = base.Add(3 * time.Hour)
@@ -65,14 +65,14 @@ func TestRestockDeleteCannotOvertakeNextSaleSave(t *testing.T) {
 			return // the delete runs under the lock: no buyer can act here
 		}
 		s.mu.Unlock()
-		if !s.Decrease(product, 1) {
+		if !s.Take(Lot{product, 1}) {
 			t.Error("sale after the restock refused")
 		}
 	}
 	s.Restock()
 	if s.Count(product) == 1 {
 		// No sale ran inside the restock: the buyer comes next.
-		if !s.Decrease(product, 1) {
+		if !s.Take(Lot{product, 1}) {
 			t.Fatal("sale after the restock refused")
 		}
 	}

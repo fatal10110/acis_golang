@@ -45,7 +45,7 @@ type stockKey struct {
 // The restock puts the product back to its full count and deletes the row.
 //
 // Only the products of the current lists have a stock: a product given to
-// Count or Decrease that differs from the current one of its list and item,
+// Count, Take or Return that differs from the current one of its list and item,
 // as one read from the lists a reload replaced can, has none.
 type Stock struct {
 	store  StockStore
@@ -159,37 +159,72 @@ func (s *Stock) current(key stockKey, p buylist.Product) bool {
 	return ok && cur == p
 }
 
-// Decrease takes n off p's count and reports whether the count stayed at
-// 0 or above. The count is lowered either way, so an oversold count reads
-// as 0 until the restock. A successful decrease on a product not waiting
-// for a restock starts its restock timer and saves its row. A product
-// that is not current is refused and changes nothing.
-func (s *Stock) Decrease(p buylist.Product, n int) bool {
-	if !p.LimitedStock() {
-		return false
-	}
-	key := stockKey{p.BuyListID, p.ItemID}
+// Lot is a count of one limited product.
+type Lot struct {
+	Product buylist.Product
+	Count   int
+}
+
+// Take takes every lot off its product's count, or none of them: it
+// refuses, changing nothing, when a lot is not of a current limited
+// product or is of fewer than one unit, or the lots of one product add up to more than its count. Each
+// product the take leaves not waiting for a restock starts its restock
+// timer and saves its row.
+func (s *Stock) Take(lots ...Lot) bool {
+	need := make(map[stockKey]int, len(lots))
 	s.mu.Lock()
-	if !s.current(key, p) {
-		s.mu.Unlock()
-		return false
+	defer s.mu.Unlock()
+	for _, l := range lots {
+		key := stockKey{l.Product.BuyListID, l.Product.ItemID}
+		if !l.Product.LimitedStock() || l.Count < 1 || !s.current(key, l.Product) {
+			return false
+		}
+		need[key] += l.Count
+		if need[key] > s.counts[key] {
+			return false
+		}
 	}
-	count := s.counts[key] - n
-	s.counts[key] = count
-	if count < 0 {
-		s.mu.Unlock()
-		return false
+	for _, l := range lots {
+		key := stockKey{l.Product.BuyListID, l.Product.ItemID}
+		n, ok := need[key]
+		if !ok {
+			continue
+		}
+		delete(need, key)
+		count := s.counts[key] - n
+		s.counts[key] = count
+		if _, pending := s.restock[key]; pending {
+			continue
+		}
+		p := l.Product
+		next := s.now().Add(time.Duration(p.RestockDelayMillis) * time.Millisecond)
+		s.restock[key] = next
+		row := StockRow{ListID: p.BuyListID, ItemID: p.ItemID, Count: count, NextRestock: next}
+		s.write(p.BuyListID, func(ctx context.Context) error { return s.store.SaveStock(ctx, row) })
 	}
-	if _, pending := s.restock[key]; pending {
-		s.mu.Unlock()
-		return true
-	}
-	next := s.now().Add(time.Duration(p.RestockDelayMillis) * time.Millisecond)
-	s.restock[key] = next
-	row := StockRow{ListID: p.BuyListID, ItemID: p.ItemID, Count: count, NextRestock: next}
-	s.write(p.BuyListID, func(ctx context.Context) error { return s.store.SaveStock(ctx, row) })
-	s.mu.Unlock()
 	return true
+}
+
+// Return gives the lots a Take took back to their products, never above a
+// product's full count. A product back at its full count has nothing left
+// to restock: its timer ends and its row is deleted. Otherwise, as after a
+// later sale, only the count in memory changes. A lot of a product that is
+// no longer current changes nothing.
+func (s *Stock) Return(lots ...Lot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, l := range lots {
+		key := stockKey{l.Product.BuyListID, l.Product.ItemID}
+		if !l.Product.LimitedStock() || l.Count <= 0 || !s.current(key, l.Product) {
+			continue
+		}
+		count := min(s.counts[key]+l.Count, l.Product.MaxCount)
+		s.counts[key] = count
+		if _, pending := s.restock[key]; pending && count == l.Product.MaxCount {
+			delete(s.restock, key)
+			s.deleteRow(key)
+		}
+	}
 }
 
 // Restock puts every product whose restock time has come back to its full

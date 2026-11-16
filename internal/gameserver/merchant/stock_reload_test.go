@@ -31,7 +31,7 @@ func TestStockReloadRefusesReplacedProducts(t *testing.T) {
 	if got := s.Count(old); got != 0 {
 		t.Fatalf("replaced product count = %d, want 0", got)
 	}
-	if s.Decrease(old, 1) {
+	if s.Take(Lot{old, 1}) {
 		t.Fatal("replaced product sold")
 	}
 	if got := s.Count(fresh); got != 5 {
@@ -41,7 +41,7 @@ func TestStockReloadRefusesReplacedProducts(t *testing.T) {
 	if err := s.Reload(context.Background(), reloadLists(fresh)); err != nil {
 		t.Fatal(err)
 	}
-	if !s.Decrease(fresh, 1) || s.Count(fresh) != 4 {
+	if !s.Take(Lot{fresh, 1}) || s.Count(fresh) != 4 {
 		t.Fatalf("unchanged product after a reload: count %d, want a sale to 4", s.Count(fresh))
 	}
 }
@@ -69,7 +69,7 @@ func TestStockReloadRacesSales(t *testing.T) {
 	for _, p := range []buylist.Product{a, b} {
 		wg.Go(func() {
 			for range 200 {
-				s.Decrease(p, 1)
+				s.Take(Lot{p, 1})
 				if n := s.Count(p); n < 0 || n > p.MaxCount {
 					t.Errorf("count %d out of range", n)
 					return

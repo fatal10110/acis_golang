@@ -130,8 +130,9 @@ type BuyOutcome int
 
 const (
 	// BuyDropped refuses the purchase with no answer: an item not on the
-	// list, an unpriced item for a player who is not a GM, a count over the
-	// remaining stock, or a total price overflowing the adena range.
+	// list, an unpriced item for a player who is not a GM, rows of a limited
+	// item adding up to more than its remaining stock, or a total price
+	// overflowing the adena range.
 	BuyDropped BuyOutcome = iota
 	// BuyQuantityExceeded asks for more than one of a non-stackable item.
 	BuyQuantityExceeded
@@ -161,16 +162,22 @@ type Purchase struct {
 // Buy sells rows of list to the owner of inv at taxRate on top of the list
 // prices; gm lets a GM take unpriced items. The rows are all checked
 // before anything changes: each item must be on the list, a non-stackable
-// one bought singly, a limited one within its remaining count, each row's
-// taxed price and weight within the int32 range, and the total within the
-// adena range, the buyer's weight limit, free slots and adena. Then the adena is taken and each item created; a limited item
-// whose count ran out in the meantime is not created, its price already
-// paid. A reload never lands between the checks and the sale.
+// one bought singly, the rows of a limited one within its remaining count
+// together, each row's taxed price and weight within the int32 range, and
+// the total within the adena range, the buyer's weight limit, free slots
+// and adena. Then the limited items are taken off their stock in one step,
+// all or none, so a buyer who reached the last units first leaves the
+// other refused before it pays; the adena is taken, the stock
+// given back if it cannot be, and every item created. A purchase is never
+// charged for an item it does not get. A reload never lands between the
+// checks and the sale.
 func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []BuyRow, taxRate float64, gm bool) (Purchase, error) {
 	s.reloadMu.RLock()
 	defer s.reloadMu.RUnlock()
 	var subtotal, slots, weight int64
 	weightOverflow := false
+	var lots []Lot
+	lotOf := map[int32]int{}
 	for _, row := range rows {
 		p, ok := list.FindProduct(row.ItemID)
 		if !ok {
@@ -190,8 +197,17 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		if price < 0 || (price == 0 && !gm) {
 			return Purchase{}, nil
 		}
-		if p.LimitedStock() && int(row.Count) > s.Count(p) {
-			return Purchase{}, nil
+		if p.LimitedStock() {
+			i, ok := lotOf[row.ItemID]
+			if !ok {
+				i = len(lots)
+				lotOf[row.ItemID] = i
+				lots = append(lots, Lot{Product: p})
+			}
+			lots[i].Count += int(row.Count)
+			if lots[i].Count > s.Count(p) {
+				return Purchase{}, nil
+			}
 		}
 		if math.MaxInt32/row.Count < price {
 			return Purchase{}, nil
@@ -227,16 +243,21 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 	if slots > math.MaxInt32 || slots < 0 || !inv.ValidateCapacity(int(slots)) {
 		return Purchase{Outcome: BuySlotsFull}, nil
 	}
-	if subtotal < 0 || !reduceAdena(inv, subtotal) {
+	if subtotal < 0 || subtotal > int64(inv.Adena()) {
+		return Purchase{Outcome: BuyNotEnoughAdena}, nil
+	}
+	if len(lots) > 0 && (s.stock == nil || !s.stock.Take(lots...)) {
+		return Purchase{}, nil
+	}
+	if !reduceAdena(inv, subtotal) {
+		if len(lots) > 0 {
+			s.stock.Return(lots...)
+		}
 		return Purchase{Outcome: BuyNotEnoughAdena}, nil
 	}
 
 	var errs []error
 	for _, row := range rows {
-		p, _ := list.FindProduct(row.ItemID)
-		if p.LimitedStock() && (s.stock == nil || !s.stock.Decrease(p, int(row.Count))) {
-			continue
-		}
 		if _, err := inv.AddCreated(row.ItemID, int(row.Count), s.ids.NextID); err != nil {
 			errs = append(errs, err)
 		}
