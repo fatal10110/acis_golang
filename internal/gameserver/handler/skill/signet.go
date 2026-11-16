@@ -214,7 +214,10 @@ func signetEffectMeta(def modelskill.Definition) effect.Skill {
 		SkillType:  def.SkillType,
 		StackType:  effect.SkillFromDefinition(def).StackType,
 		Debuff:     def.Debuff,
-		EffectType: def.EffectType,
+		EffectType: def.LandingEffectType(),
+
+		AbnormalLevel:       def.AbnormalLevel,
+		EffectAbnormalLevel: def.EffectAbnormalLevel,
 	}
 }
 

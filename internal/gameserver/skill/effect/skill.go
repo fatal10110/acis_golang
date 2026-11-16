@@ -65,10 +65,12 @@ type Skill struct {
 	// only when the candidate's applicable level is within its threshold.
 	AbnormalLevel       int
 	EffectAbnormalLevel int
-	// EffectType is the owning skill's classification tag (distinct from
-	// the per-effect-template tag exposed by Effect.ClassTag), consulted
-	// alongside SkillType when a negate-family effect matches a candidate
-	// by classification.
+	// EffectType is the owning skill's resolved classification (see
+	// modelskill.Definition.LandingEffectType: its first effect template's
+	// type, else its own effectType, else STUN for PDAM and PARALYZE for
+	// MDAM, else its skill type), distinct from the per-effect-template tag
+	// exposed by Effect.ClassTag. A negate matches a candidate by it
+	// alongside SkillType.
 	EffectType string
 
 	// MaxNegatedEffects caps how many candidates a cancel-family effect

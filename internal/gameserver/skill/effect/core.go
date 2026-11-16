@@ -351,7 +351,7 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 		LevelDepend:         def.LevelDepend,
 		AbnormalLevel:       def.AbnormalLevel,
 		EffectAbnormalLevel: def.EffectAbnormalLevel,
-		EffectType:          def.EffectType,
+		EffectType:          def.LandingEffectType(),
 		MaxNegatedEffects:   def.MaxNegatedEffects,
 		NegateLevel:         def.NegateLevel,
 		NegateIDs:           def.NegateIDs,
