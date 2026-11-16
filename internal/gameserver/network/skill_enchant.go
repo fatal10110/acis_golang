@@ -55,9 +55,10 @@ func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.R
 	}
 	result, status, err := skillstate.Enchant(live.Character, l.levels, live.Template(), l.skillTrees, l.skills, l.playerConfig().SkillEnchantSPBookNeeded, payTrainerItem(live), l.enchanting.skillRoll, int(req.SkillID), int(req.SkillLevel))
 	if err != nil {
-		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("enchant skill")
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
-		return
+		// The enchant is paid for and its level applied; only its passive stats
+		// failed to build from a malformed definition, which never undoes the
+		// roll, so the client gets the full enchant reply.
+		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("enchant skill: bad passive definition")
 	}
 	switch status {
 	case skillstate.EnchantSucceeded, skillstate.EnchantFailed:
@@ -74,7 +75,11 @@ func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.R
 		return
 	}
 
-	l.refreshSkillShortcuts(live, int32(result.SkillID), int32(result.AppliedLevel))
+	// A failed roll that puts the skill back at the level it already has
+	// changes nothing, so its shortcuts are neither re-registered nor saved.
+	if result.AppliedLevel != result.PreviousLevel {
+		l.refreshSkillShortcuts(live, int32(result.SkillID), int32(result.AppliedLevel))
+	}
 	if status == skillstate.EnchantSucceeded {
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageSucceededEnchantingSkillS1, req.SkillID, req.SkillLevel))
 	} else {
