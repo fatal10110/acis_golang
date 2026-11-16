@@ -1,9 +1,11 @@
 package clientpackets
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/binary"
+	"errors"
 	"math/big"
 	"testing"
 )
@@ -85,8 +87,26 @@ func TestDecodeRequestAuthLoginShort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	if _, err := DecodeRequestAuthLogin(make([]byte, 10), key); err == nil {
-		t.Error("DecodeRequestAuthLogin: want error on short payload, got nil")
+	if _, err := DecodeRequestAuthLogin(make([]byte, 10), key); !errors.Is(err, ErrCredentialBlockShort) {
+		t.Errorf("DecodeRequestAuthLogin(short) error = %v, want ErrCredentialBlockShort", err)
+	}
+}
+
+// A block equal to or above the modulus is no raw RSA ciphertext under the
+// key and must not be decrypted.
+func TestDecodeRequestAuthLoginBlockNotBelowModulus(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, credentialBlockSize*8)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	for name, block := range map[string][]byte{
+		"all 0xff": bytes.Repeat([]byte{0xff}, credentialBlockSize),
+		"modulus":  key.N.FillBytes(make([]byte, credentialBlockSize)),
+	} {
+		payload := append([]byte{OpcodeRequestAuthLogin}, block...)
+		if _, err := DecodeRequestAuthLogin(payload, key); !errors.Is(err, ErrCredentialBlockRange) {
+			t.Errorf("%s: DecodeRequestAuthLogin error = %v, want ErrCredentialBlockRange", name, err)
+		}
 	}
 }
 

@@ -15,6 +15,7 @@ for f in ../aCis_datapack/sql/*.sql; do mysql -uroot acis < "$f"; done
 ```
 
 - `../aCis_gameserver/config/loginserver.properties` and `../aCis_gameserver/config/server.properties` point at that database with the `URL`, `Login`, and `Password` keys.
+- Optional: append `?socketTimeout=<ms>` (and `connectTimeout=<ms>`) to `URL`, for example `jdbc:mariadb://localhost/acis?socketTimeout=10000`, to bound each database read and write at the driver. The login server also bounds every account and registration call at 10 seconds on its own; a call that runs out fails that one request with the same reply as any other database failure.
 - `server.properties` has `LoginHost = 127.0.0.1` and `LoginPort = 9014`, matching `loginserver.properties`.
 - Optional: `MaxConnections` in `loginserver.properties` / `server.properties` sets that process's database pool size. The key is absent from the shipped files; omitting it keeps the current pool size of 8. Values below 1 are rejected at boot.
 - XML datapack files stay on disk under `../aCis_datapack`; do not import them into the database.

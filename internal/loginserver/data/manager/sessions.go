@@ -8,8 +8,10 @@ import (
 
 // SessionStore tracks the session key issued to each currently
 // authenticated account. An entry lives until the game server claims it
-// (PlayerAuthRequest) or its login connection is torn down; there is no
-// time-based expiry.
+// (PlayerAuthRequest), its login connection gives it up, or the login link
+// expires it at the login timeout. Removals that may race a newer login for
+// the same account go through Take, which only removes the exact key the
+// caller holds.
 //
 // mu guards sessions.
 type SessionStore struct {
@@ -42,4 +44,17 @@ func (s *SessionStore) Delete(account string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.sessions, account)
+}
+
+// Take removes account's session if it is still key and reports whether it
+// did. A newer session issued for the account in the meantime is left in
+// place, so two callers holding the same key cannot both claim it.
+func (s *SessionStore) Take(account string, key link.SessionKey) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if cur, ok := s.sessions[account]; !ok || cur != key {
+		return false
+	}
+	delete(s.sessions, account)
+	return true
 }

@@ -171,6 +171,9 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 		},
 		AcceptFilter: acceptFilter,
 		Database: db.Config{
+			// The driver read/write timeout comes from a socketTimeout=<ms>
+			// URL option (for example ...?socketTimeout=10000); each login
+			// database call is bounded on its own as well.
 			URL:            props.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:          props.String("Login", "root"),
 			Password:       props.String("Password", ""),

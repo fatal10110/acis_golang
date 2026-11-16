@@ -33,7 +33,7 @@ func TestClientLinkSkipsEmptyFrames(t *testing.T) {
 	c.sendEmptyFrames()
 	c.gameGuard()
 	c.sendEmptyFrames()
-	key1, key2 := c.login(l, "player1", "s3cret")
+	key1, key2 := c.authLogin(l, "player1", "s3cret")
 	c.sendEmptyFrames()
 
 	c.send(encodeRequestServerList(key1, key2))

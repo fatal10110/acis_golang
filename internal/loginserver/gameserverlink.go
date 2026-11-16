@@ -29,7 +29,7 @@ type GameServerLink struct {
 	keys            *manager.RSAKeyPool
 	sessions        *manager.SessionStore
 	bans            *manager.IPBanList
-	accounts        *sql.AccountStore
+	accounts        accessLevelStore
 	registrations   registrationStore
 	allowNewServers bool
 	flood           *netutil.FloodGuard
@@ -42,6 +42,10 @@ type GameServerLink struct {
 
 type registrationStore interface {
 	CreateGameServer(ctx context.Context, server model.GameServer) error
+}
+
+type accessLevelStore interface {
+	SetAccessLevel(ctx context.Context, login string, level int) error
 }
 
 // NewGameServerLink builds a GameServerLink from its collaborators.
@@ -62,13 +66,12 @@ func NewGameServerLink(
 	roster *LinkRoster,
 	log zerolog.Logger,
 ) *GameServerLink {
-	return &GameServerLink{
+	l := &GameServerLink{
 		servers:         servers,
 		names:           names,
 		keys:            keys,
 		sessions:        sessions,
 		bans:            bans,
-		accounts:        accounts,
 		registrations:   registrations,
 		allowNewServers: allowNewServers,
 		flood:           flood,
@@ -76,6 +79,10 @@ func NewGameServerLink(
 		log:             log,
 		lookupHost:      net.LookupHost,
 	}
+	if accounts != nil {
+		l.accounts = accounts
+	}
+	return l
 }
 
 // Serve accepts game-server connections on ln until ctx is canceled or
@@ -108,8 +115,52 @@ type gameServerConn struct {
 	key      *rsa.PrivateKey
 	id       int
 	authed   bool
+	writes   *linkWriter
 
 	sendMu sync.Mutex
+}
+
+// linkWriteQueue is how many database writes one link may have queued
+// before its read loop waits for a free slot.
+const linkWriteQueue = 64
+
+// linkWriter runs one link's database writes on a goroutine of its own, in
+// arrival order and each bounded by loginDBTimeout, so a stalled database
+// never holds up the requests the read loop answers. The read loop owns
+// enqueue and close; the writer goroutine owns the calls and exits once
+// close has been called and the queue is drained.
+type linkWriter struct {
+	ctx  context.Context
+	jobs chan func(context.Context)
+	done chan struct{}
+}
+
+func startLinkWriter(ctx context.Context) *linkWriter {
+	w := &linkWriter{ctx: ctx, jobs: make(chan func(context.Context), linkWriteQueue), done: make(chan struct{})}
+	go func() {
+		defer close(w.done)
+		for job := range w.jobs {
+			jobCtx, cancel := context.WithTimeout(ctx, loginDBTimeout)
+			job(jobCtx)
+			cancel()
+		}
+	}()
+	return w
+}
+
+// enqueue queues job. With the queue full it waits for a slot, which the
+// per-write timeout bounds, unless the link is shutting down.
+func (w *linkWriter) enqueue(job func(context.Context)) {
+	select {
+	case w.jobs <- job:
+	case <-w.ctx.Done():
+	}
+}
+
+// close stops the writer and waits for the writes already queued.
+func (w *linkWriter) close() {
+	close(w.jobs)
+	<-w.done
 }
 
 func (c *gameServerConn) send(payload []byte) error {
@@ -172,6 +223,10 @@ func (c *gameServerConn) forceClose(reason link.LoginServerFailReason) {
 }
 
 func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
+	writes := startLinkWriter(ctx)
+	// Deferred before the close, so queued writes finish after the
+	// connection is already closed rather than holding it open.
+	defer writes.close()
 	defer conn.Close()
 
 	c := &gameServerConn{
@@ -179,6 +234,7 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 		remoteIP: remoteIP(conn),
 		crypt:    crypt.NewLinkCrypt(),
 		key:      l.keys.Random(),
+		writes:   writes,
 	}
 	defer func() {
 		if c.authed {
@@ -243,7 +299,7 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 			case link.OpcodePlayerLogout:
 				l.onPlayerLogout(c, payload)
 			case link.OpcodeChangeAccessLevel:
-				l.onChangeAccessLevel(ctx, c, payload)
+				l.onChangeAccessLevel(c, payload)
 			case link.OpcodePlayerAuthRequest:
 				l.onPlayerAuthRequest(c, payload)
 			case link.OpcodeServerStatus:
@@ -377,6 +433,11 @@ func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID 
 		l.log.Error().Int("server_id", id).Msg("persist gameserver registration")
 		return
 	}
+	// Runs on the read loop: the server awaits its AuthResponse before it
+	// may send anything else, so no request can queue behind this write,
+	// and the timeout bounds how long the answer waits on the database.
+	ctx, cancel := context.WithTimeout(ctx, loginDBTimeout)
+	defer cancel()
 	if err := l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, host)); err != nil {
 		l.log.Error().Int("server_id", id).Err(err).Msg("persist gameserver registration")
 	}
@@ -402,15 +463,23 @@ func (l *GameServerLink) onPlayerLogout(c *gameServerConn, payload []byte) {
 	l.servers.RemoveOnlineAccount(c.id, account)
 }
 
-func (l *GameServerLink) onChangeAccessLevel(ctx context.Context, c *gameServerConn, payload []byte) {
+// onChangeAccessLevel queues the access-level write on the link's writer, so
+// the read loop goes on answering requests while the database works.
+func (l *GameServerLink) onChangeAccessLevel(c *gameServerConn, payload []byte) {
 	cal, err := link.DecodeChangeAccessLevel(payload)
 	if err != nil {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
-	if err := l.accounts.SetAccessLevel(ctx, cal.Account, int(cal.Level)); err != nil {
-		l.log.Error().Str("account", cal.Account).Err(err).Msg("change access level")
+	if l.accounts == nil {
+		l.log.Error().Str("account", cal.Account).Msg("change access level: no account store")
+		return
 	}
+	c.writes.enqueue(func(ctx context.Context) {
+		if err := l.accounts.SetAccessLevel(ctx, cal.Account, int(cal.Level)); err != nil {
+			l.log.Error().Str("account", cal.Account).Err(err).Msg("change access level")
+		}
+	})
 }
 
 // onPlayerAuthRequest validates a client's session keys, presented by the
@@ -423,11 +492,9 @@ func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) 
 		return
 	}
 
-	key, ok := l.sessions.Get(req.Account)
-	valid := ok && key == req.SessionKey
-	if valid {
-		l.sessions.Delete(req.Account)
-	}
+	// Validation consumes the session atomically, so two linked servers
+	// presenting the same keys cannot both be admitted.
+	valid := l.sessions.Take(req.Account, req.SessionKey)
 
 	if err := c.send(link.EncodePlayerAuthResponse(req.Account, valid)); err != nil {
 		return

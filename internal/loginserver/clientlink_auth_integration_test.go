@@ -1,9 +1,12 @@
 package loginserver
 
 import (
+	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -116,26 +119,55 @@ func TestClientLinkLoginSuccess(t *testing.T) {
 	}
 }
 
-func TestClientLinkLoginDecodeFailureSendsAccessFailed(t *testing.T) {
-	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
+// A RequestAuthLogin body shorter than the 128-byte RSA credential block is
+// dropped unanswered and the connection stays open: the next, complete
+// RequestAuthLogin is the one answered.
+func TestClientLinkShortRequestAuthLoginIsDropped(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
 	c := dialLoginClient(t, addr)
 
 	c.gameGuard()
 
-	// A RequestAuthLogin body shorter than the 128-byte RSA credential block
-	// fails to decode before any account lookup happens.
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAuthLogin)
 	w.WriteBytes(make([]byte, 16))
 	c.send(w.Bytes())
 
-	reply := c.read()
-	if reply[0] != serverpackets.OpcodeLoginFail {
-		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeLoginOk {
+		t.Fatalf("opcode after a short RequestAuthLogin = %#x, want LoginOk (%#x) for the next one", reply[0], serverpackets.OpcodeLoginOk)
 	}
-	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailAccessFailed {
-		t.Fatalf("reason = %d, want REASON_ACCESS_FAILED (%d)", reason, serverpackets.LoginFailAccessFailed)
+	if n := failedAttemptCount(l); n != 0 {
+		t.Fatalf("failed attempts tracked = %d, want 0", n)
 	}
-	c.expectClosed()
+}
+
+// A credential block not below the RSA modulus cannot be decrypted: the
+// login is refused with REASON_ACCESS_FAILED and closed before any account
+// lookup, so it is not counted as a failed attempt.
+func TestClientLinkCredentialBlockAboveModulusSendsAccessFailed(t *testing.T) {
+	accounts := newFakeAccountStore()
+	var lookups atomic.Int32
+	accounts.gate = func(context.Context, string, string) error {
+		lookups.Add(1)
+		return nil
+	}
+	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
+	c := dialLoginClient(t, addr)
+
+	c.gameGuard()
+
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAuthLogin)
+	w.WriteBytes(bytes.Repeat([]byte{0xff}, 128))
+	c.send(w.Bytes())
+
+	c.expectLoginFail(serverpackets.LoginFailAccessFailed)
+	if n := failedAttemptCount(l); n != 0 {
+		t.Fatalf("failed attempts tracked = %d, want 0", n)
+	}
+	if n := lookups.Load(); n != 0 {
+		t.Fatalf("account store calls = %d, want 0", n)
+	}
 }
 
 func TestClientLinkLoginLastActiveWriteFailureSendsAccessFailed(t *testing.T) {
@@ -285,12 +317,14 @@ func TestClientLinkBannedIPRejected(t *testing.T) {
 	}
 }
 
-func TestClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
+// RequestServerList before the GameGuard exchange is dropped unanswered and
+// the connection stays open: the next frame answered is GGAuth.
+func TestClientLinkOpcodeBeforeAuthIsDropped(t *testing.T) {
 	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
 	c := dialLoginClient(t, addr)
 
 	c.send(encodeRequestServerList(1, 2))
-	c.expectClosed()
+	c.gameGuard()
 }
 
 var errStoreDown = errors.New("account store unavailable")
