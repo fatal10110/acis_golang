@@ -13,12 +13,9 @@ import (
 type BossZoneStore interface {
 	// SaveZones replaces the stored permissions with those of zones.
 	SaveZones(ctx context.Context, zones []*zone.Boss) error
-	// Restore gives the stored permissions to zones.
-	Restore(ctx context.Context, zones []*zone.Boss) error
 }
 
-// reloadZonesTimeout bounds the boss zone save and restore of //reload
-// zone.
+// reloadZonesTimeout bounds the boss zone save of //reload zone.
 const reloadZonesTimeout = 30 * time.Second
 
 // wireZones gives the zones of ix the effects the link carries out for
@@ -44,8 +41,8 @@ func (l *GameClientLink) wireZones(ix *zone.Index) {
 }
 
 // reloadZones reads the zones anew and puts every creature in the new ones:
-// the boss zones' entry permissions are saved, the new boss zones given
-// the saved ones, the new zones wired and the sieges moved onto their new
+// each boss zone hands its entry permissions over to its new self, and they
+// are saved; the new zones are wired and the sieges moved onto their new
 // battlefields; then every holder of the zone index sees the new zones at
 // once, and each creature leaves the zones it stood in and enters those
 // around it.
@@ -62,7 +59,8 @@ func (l *GameClientLink) reloadZones() error {
 	if next == nil {
 		return errors.New("zone reload read no zones")
 	}
-	l.carryBossPermissions(next)
+	handOverBossZones(l.zones, next)
+	l.saveBossPermissions()
 	l.wireZones(next)
 	l.sieges.Rebind(zone.OfKind[*zone.Siege](next))
 	l.halls.RebindBattlefields(zone.OfKind[*zone.Siege](next))
@@ -71,10 +69,9 @@ func (l *GameClientLink) reloadZones() error {
 	return nil
 }
 
-// carryBossPermissions saves who may enter the current boss zones, then
-// gives the boss zones of next the saved permissions. A failure is logged
-// and the reload goes on.
-func (l *GameClientLink) carryBossPermissions(next *zone.Index) {
+// saveBossPermissions stores who may enter the current boss zones. A
+// failure is logged and the reload goes on.
+func (l *GameClientLink) saveBossPermissions() {
 	if l.bossZones == nil {
 		return
 	}
@@ -83,8 +80,20 @@ func (l *GameClientLink) carryBossPermissions(next *zone.Index) {
 	if err := l.bossZones.SaveZones(ctx, zone.OfKind[*zone.Boss](l.zones)); err != nil {
 		l.log.Error().Err(err).Msg("admin: //reload zone could not save the boss zones")
 	}
-	if err := l.bossZones.Restore(ctx, zone.OfKind[*zone.Boss](next)); err != nil {
-		l.log.Error().Err(err).Msg("admin: //reload zone could not restore the boss zones")
+}
+
+// handOverBossZones hands each boss zone of cur over to the boss zone of
+// next with its id (Boss.HandOver): next gets the permissions it holds as
+// stored ones, and every one granted or revoked through it from then on, so
+// a grant made while the reload saves and swaps, through a zone resolved
+// before the swap, reaches the new zone with its entry window.
+func handOverBossZones(cur, next *zone.Index) {
+	for _, old := range zone.OfKind[*zone.Boss](cur) {
+		if k, ok := next.ByID(old.ID()); ok {
+			if b, ok := k.(*zone.Boss); ok {
+				old.HandOver(b)
+			}
+		}
 	}
 }
 

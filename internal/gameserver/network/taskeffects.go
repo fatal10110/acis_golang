@@ -328,6 +328,19 @@ func (a *liveZoneActor) flagLeftBattlefield(left bool) {
 	}
 }
 
+// ReplayZoneRules runs fn, a battlefield or stadium switching its rules
+// replaying them on the player, under the player's zone locks as a
+// revalidation would, then mirrors the flags it changed onto the character.
+// The compass is left for the player's next revalidation.
+func (a *liveZoneActor) ReplayZoneRules(fn func()) {
+	a.deliveryMu.Lock()
+	defer a.deliveryMu.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	fn()
+	a.syncFlags()
+}
+
 func (a *liveZoneActor) syncFlags() {
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
 	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))

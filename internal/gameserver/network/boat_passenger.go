@@ -427,8 +427,8 @@ func (l *GameClientLink) oustPassenger(live *livePlayer, oust location.Location)
 
 // holdBoatPeace raises (on) or releases the peace a boat keeps its
 // passengers in: a peace zone's hold, and summoning friends barred, kept
-// apart from the zones' own holds. The compass follows on the next zone
-// revalidation, as specified.
+// apart from the zones' own holds, so a zone reload keeps them. The
+// compass follows on the next zone revalidation, as specified.
 func (a *liveZoneActor) holdBoatPeace(on bool) {
 	if a == nil {
 		return
@@ -437,8 +437,8 @@ func (a *liveZoneActor) holdBoatPeace(on bool) {
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.flags.Set(zone.FlagPeace, on)
-	a.flags.Set(zone.FlagNoSummonFriend, on)
+	a.flags.Hold(zone.FlagPeace, on)
+	a.flags.Hold(zone.FlagNoSummonFriend, on)
 	a.syncFlags()
 }
 
