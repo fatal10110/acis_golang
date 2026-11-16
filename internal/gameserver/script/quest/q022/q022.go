@@ -67,7 +67,7 @@ func New() script.Script {
 			script.EventQuestStart: {tifaren, innocentin},
 			script.EventTalked:     {innocentin, tifaren, ghostOfPriest, ghostOfAdventurer, well},
 			script.EventAttacked:   {soulOfWell},
-			script.EventDecayed:    {ghostOfPriest},
+			script.EventDecayed:    {ghostOfPriest, soulOfWell},
 			script.EventMyDying:    {soulOfWell, 21553, 21554, 21555, 21556, 21561},
 		},
 		Hooks: script.Hooks{
@@ -154,12 +154,16 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 
 // onTimer takes the ghost of the priest away three seconds after its last
 // word, and swaps the green jewel for the red one once the player has held
-// the soul of the well in a fight for twenty seconds.
+// the soul of the well in a fight for twenty seconds; a soul that died
+// meanwhile swaps nothing.
 func (q quest) onTimer(s *script.Script, e script.Timer) string {
 	switch {
 	case strings.EqualFold(e.Name, "ghost_delete"):
 		q.ghost.Get().DeleteMe()
 	case strings.EqualFold(e.Name, "attack_timer"):
+		if e.NPC.Dead() {
+			return ""
+		}
 		if st := s.QuestState(e.Player, questName); st != nil {
 			st.SetCond(11)
 			s.PlaySound(e.Player, script.SoundMiddle)
@@ -341,8 +345,13 @@ func (q quest) onAttacked(s *script.Script, e script.Attacked) {
 }
 
 // onDecayed sends the ghost of the priest away with its last word and its
-// pending departure.
+// pending departure, and frees the well of a soul that is gone, whoever
+// killed it, with the soul's pending timers.
 func (q quest) onDecayed(s *script.Script, e script.Decayed) {
+	if q.soul.ClearIf(e.NPC) {
+		s.CancelTimers(script.TimerNPC(e.NPC))
+		return
+	}
 	if !q.ghost.ClearIf(e.NPC) {
 		return
 	}

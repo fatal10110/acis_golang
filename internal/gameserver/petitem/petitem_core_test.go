@@ -383,12 +383,12 @@ func TestGetFromPetLeavesEquipmentUntouchedOnFailedTransfer(t *testing.T) {
 		t.Fatalf("setup: weapon = %+v, want equipped in pet RHand", weapon)
 	}
 
-	_, ok, err := NewService(&testIDs{next: 900}).GetFromPet(petInv, playerInv, weapon.ObjectID, 0)
+	_, failure, err := NewService(&testIDs{next: 900}).GetFromPet(petInv, playerInv, weapon.ObjectID, 0)
 	if err != nil {
 		t.Fatalf("GetFromPet error = %v", err)
 	}
-	if ok {
-		t.Fatalf("GetFromPet ok = true, want false for count<=0")
+	if failure != GiveNoop {
+		t.Fatalf("GetFromPet failure = %v, want GiveNoop for count<=0", failure)
 	}
 	if weapon.Location != item.LocationPetEquip || petInv.ItemAt(itemcontainer.RHand) != weapon {
 		t.Fatalf("weapon = %+v after failed transfer, want still equipped in pet RHand", weapon)

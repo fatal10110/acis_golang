@@ -111,7 +111,9 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	case petitem.GiveTooFar:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 		return
-	case petitem.GivePetCannotCarryMore:
+	case petitem.GivePetCannotCarryMore, petitem.GiveStackFull:
+		// A pet stack the count would push past the item count limit
+		// refuses the give as a full pet does: the owner keeps every unit.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotCarryMoreItems))
 		return
 	case petitem.GivePetTooEncumbered:
@@ -234,12 +236,21 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 
 	end := l.belongings.itemInstances.BeginOperation(petInv.OwnerID(), playerInv.OwnerID())
 	defer end()
-	res, ok, err := l.summoning.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
+	res, failure, err := l.summoning.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item from pet")
 		return
 	}
-	if !ok {
+	switch failure {
+	case petitem.GiveOK:
+	case petitem.GiveStackFull:
+		// The owner's stack cannot take the count without passing the item
+		// count limit: the pet keeps every unit and the drag is refused.
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	default:
+		// A drag out of the pet's window is not an action click, so a
+		// take-back that moves nothing leaves no client action pending.
 		return
 	}
 	l.applyPersistActions(res.Persist)
