@@ -92,7 +92,14 @@ func clearTargets(h *script.NPC, who []script.CreatureSlot, pts []script.IntSlot
 // are unranked again.
 func wanderingBaium(t *testing.T) (*baiumWorld, *npc.Hostile, *script.NPC) {
 	t.Helper()
-	w := bootBaium(t, "116033;17447;10107;0")
+	return wanderingBaiumWith(t, nil)
+}
+
+// wanderingBaiumWith is wanderingBaium with a ready step run before the
+// character enters the world, and extra boot options.
+func wanderingBaiumWith(t *testing.T, ready func(*gameservertest.Server, int32), opts ...gameservertest.Option) (*baiumWorld, *npc.Hostile, *script.NPC) {
+	t.Helper()
+	w := bootBaiumWith(t, "116033;17447;10107;0", 0, ready, opts...)
 	w.advance(t, 5*time.Second)
 	boss := soleBaiumNPC(t, w, baiumID).(*npc.Hostile)
 	handle := script.NPCOf(boss)
@@ -139,6 +146,48 @@ func TestBaiumRanksANewAttackerTwice(t *testing.T) {
 
 	w.hit(t, boss, 300)
 	wantBaiumTargets(t, "after the hit", handle, []int32{pc, 0, pc}, []int32{500, 0, 2000})
+}
+
+// TestBaiumRanksANewSpellCasterTwice ports the second ranking pass of a
+// spell (phase 4), every draw 0 (every even draw true): awake, wandering,
+// with no target and between 1/2 and 3/4 of its HP, a spell of damage d
+// from the character gives it the first slot with (d/100)*1000, then,
+// ranked once more as a spell at high HP on the standings it just changed,
+// the third with (d/150)*1000. Its cast then drops the first, the best, to
+// 500.
+func TestBaiumRanksANewSpellCasterTwice(t *testing.T) {
+	bolt := modelskill.Definition{
+		ID: antharasBoltID, Level: 1, Activation: modelskill.ActivationActive,
+		Target: modelskill.TargetOne, Offensive: true, Magic: true, SkillType: "MDAM",
+		CastRange: 1500, HitTime: 500, StaticHitTime: true, StaticReuse: true, Power: 400,
+	}
+	db := sqltest.SharedDB(t)
+	table := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}, bolt})
+	w, boss, handle := wanderingBaiumWith(t, func(srv *gameservertest.Server, objID int32) {
+		if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, int(antharasBoltID), 1); err != nil {
+			t.Fatalf("seed the spell: %v", err)
+		}
+	},
+		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), table, gamesql.NewCharacterSkillStore(db))),
+		gameservertest.WithScriptSkills(bolt),
+		gameservertest.WithMagicFailures(false), // 55 levels below Baium, every spell would fail
+	)
+	pc := w.player.ObjectID()
+	w.srv.Client.Send(encodeFolkAction(boss.ObjectID(), w.at))
+	w.srv.Settle(t)
+	w.srv.ReadQueued(t, w.srv.Client)
+
+	w.onQueue(t, boss, func() {
+		boss.SetCurrentHP(boss.MaxHP() * 5 / 8)
+		clearTargets(handle, baiumTargetSlots, baiumTargetInts)
+	})
+	before := boss.CurrentHP()
+	w.castFrames(t, antharasBoltID)
+	d := int32(before - boss.CurrentHP())
+	if d < 150 {
+		t.Fatalf("the spell did %d damage, want at least 150", d)
+	}
+	wantBaiumTargets(t, "after the spell", handle, []int32{pc, 0, pc}, []int32{500, 0, (d / 150) * 1000})
 }
 
 // TestBaiumRanksASeenPriestTwice ports the second ranking pass of a
