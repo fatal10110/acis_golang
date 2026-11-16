@@ -275,22 +275,65 @@ func leaverTitle(t *testing.T, frames [][]byte) string {
 	return userInfoTitle(t, frame)
 }
 
-// TestNobleLeavingClanKeepsTitle has a noble leave its clan in the world,
-// by withdrawing or being expelled: it keeps its title, in the world and
-// in its stored row. A member that is no noble loses its title, and so
-// does an expelled noble out of the world, whose stored row is cleared.
-func TestNobleLeavingClanKeepsTitle(t *testing.T) {
+// charInfoTitleOf decodes the title of the CharInfo among frames that
+// draws objectID, failing the test when there is none.
+func charInfoTitleOf(t *testing.T, frames [][]byte, objectID int32) string {
+	t.Helper()
+	for _, f := range frames {
+		if f[0] != serverpackets.OpcodeCharInfo {
+			continue
+		}
+		r := wire.NewReader(f[1:])
+		r.ReadBytes(4 * 4) // x, y, z, boat
+		if r.ReadInt32() != objectID {
+			continue
+		}
+		r.ReadString()        // name
+		r.ReadBytes(3 * 4)    // race, sex, class
+		r.ReadBytes(12 * 4)   // paperdoll
+		r.ReadBytes(4*2 + 4)  // padding, right-hand augmentation
+		r.ReadBytes(12*2 + 4) // padding, left-hand augmentation
+		r.ReadBytes(4 * 2)    // padding
+		r.ReadBytes(6 * 4)    // pvp flag, karma, casting/attack speed, pvp flag, karma
+		r.ReadBytes(8 * 4)    // speeds
+		r.ReadBytes(4 * 8)    // speed multipliers, collision
+		r.ReadBytes(3 * 4)    // hair style, hair color, face
+		title := r.ReadString()
+		if err := r.Err(); err != nil {
+			t.Fatalf("decode CharInfo: %v", err)
+		}
+		return title
+	}
+	t.Fatalf("no CharInfo of %d among %x", objectID, opcodes(frames))
+	return ""
+}
+
+// TestLeavingClanClearsTitle has a titled member leave its clan in the
+// world, by withdrawing or being expelled: noble or not, it loses its
+// title in its own UserInfo, in the CharInfo the leader sees, and in its
+// stored row (Clan.removeClanMember -> Player.setClan(null) clears every
+// online leaver's title). An expelled noble out of the world has its
+// stored title cleared too.
+func TestLeavingClanClearsTitle(t *testing.T) {
 	t.Parallel()
+	withdraw := func(t *testing.T, w *clanWorld) (leaver, leader [][]byte) {
+		leaver = withdrawRecruit(t, w)
+		return leaver, drainFrames(t, w.leader)
+	}
+	expel := func(t *testing.T, w *clanWorld) (leaver, leader [][]byte) {
+		w.leader.Send(encodeRequestOustPledgeMember("Recruit"))
+		leader = drainFrames(t, w.leader)
+		return drainFrames(t, w.member), leader
+	}
 	for _, tc := range []struct {
 		name  string
 		noble bool
-		leave func(t *testing.T, w *clanWorld) [][]byte
-		want  string
+		leave func(t *testing.T, w *clanWorld) (leaver, leader [][]byte)
 	}{
-		{"noble withdraws", true, withdrawRecruit, "Lord"},
-		{"noble expelled", true, expelRecruit, "Lord"},
-		{"member withdraws", false, withdrawRecruit, ""},
-		{"member expelled", false, expelRecruit, ""},
+		{"noble withdraws", true, withdraw},
+		{"noble expelled", true, expel},
+		{"member withdraws", false, withdraw},
+		{"member expelled", false, expel},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -302,11 +345,15 @@ func TestNobleLeavingClanKeepsTitle(t *testing.T) {
 			if got := storedTitle(t, w, w.memberID); got != "Lord" {
 				t.Fatalf("stored title before leaving = %q, want Lord", got)
 			}
-			if got := leaverTitle(t, tc.leave(t, w)); got != tc.want {
-				t.Fatalf("leaver's UserInfo title = %q, want %q", got, tc.want)
+			leaver, leader := tc.leave(t, w)
+			if got := leaverTitle(t, leaver); got != "" {
+				t.Fatalf("leaver's UserInfo title = %q, want it cleared", got)
 			}
-			if got := storedTitle(t, w, w.memberID); got != tc.want {
-				t.Fatalf("stored title after leaving = %q, want %q", got, tc.want)
+			if got := charInfoTitleOf(t, leader, w.memberID); got != "" {
+				t.Fatalf("leaver's CharInfo title = %q, want it cleared", got)
+			}
+			if got := storedTitle(t, w, w.memberID); got != "" {
+				t.Fatalf("stored title after leaving = %q, want it cleared", got)
 			}
 		})
 	}
@@ -340,15 +387,19 @@ func expelRecruit(t *testing.T, w *clanWorld) [][]byte {
 	return drainFrames(t, w.member)
 }
 
-// TestJoiningClanKeepsTitle has a noble that titled itself join a clan: it
-// keeps its title, in the world and in its stored row, as the reference
-// clears no title on joining.
-func TestJoiningClanKeepsTitle(t *testing.T) {
+// TestJoiningClanClearsTitle has a noble that titled itself join a clan:
+// its title is cleared in its own UserInfo, in the CharInfo the inviting
+// leader sees, in the clan's roster and in its stored row, as
+// Clan.addClanMember -> Player.setClan clears it.
+func TestJoiningClanClearsTitle(t *testing.T) {
 	t.Parallel()
 	w := bootSeededClan(t, 3, 0, true)
 	w.member.Send(encodeRequestGiveNickName("Recruit", "Lord"))
 	drainFrames(t, w.member)
 	drainFrames(t, w.leader)
+	if got := storedTitle(t, w, w.memberID); got != "Lord" {
+		t.Fatalf("stored title before joining = %q, want Lord", got)
+	}
 
 	w.leader.Send(encodeRequestJoinPledge(w.memberID, 0))
 	drainFrames(t, w.member)
@@ -357,10 +408,20 @@ func TestJoiningClanKeepsTitle(t *testing.T) {
 	if _, ok := firstOpcode(joined, serverpackets.OpcodeJoinPledge); !ok {
 		t.Fatalf("recruit's join = %x, want JoinPledge", opcodes(joined))
 	}
-	if got := leaverTitle(t, joined); got != "Lord" {
-		t.Fatalf("recruit's UserInfo title after joining = %q, want Lord", got)
+	if got := leaverTitle(t, joined); got != "" {
+		t.Fatalf("recruit's UserInfo title after joining = %q, want it cleared", got)
 	}
-	if got := storedTitle(t, w, w.memberID); got != "Lord" {
-		t.Fatalf("stored title after joining = %q, want Lord", got)
+	if got := charInfoTitleOf(t, drainFrames(t, w.leader), w.memberID); got != "" {
+		t.Fatalf("recruit's CharInfo title after joining = %q, want it cleared", got)
+	}
+	cl, ok := w.srv.Clans.Table().Get(titleClanID)
+	if !ok {
+		t.Fatal("Knights missing from the registry")
+	}
+	if m, ok := cl.Member(w.memberID); !ok || m.Title != "" {
+		t.Fatalf("recruit's roster row = %+v (found %v), want an empty title", m, ok)
+	}
+	if got := storedTitle(t, w, w.memberID); got != "" {
+		t.Fatalf("stored title after joining = %q, want it cleared", got)
 	}
 }

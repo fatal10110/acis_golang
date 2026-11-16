@@ -119,8 +119,9 @@ func TestPersonalSurrenderEndsWar(t *testing.T) {
 // personally while Sentry, who surrendered before, is offline: the war goes
 // on, as an offline member cannot be counted, and a second surrender is
 // refused. Sentry's stored flag comes back with it, refusing its own
-// surrender, and leaving the clan clears the flag for good. The founder's
-// flag is stored on logout.
+// surrender, and leaving the clan in the world keeps the flag, stored and
+// live (Clan.removeClanMember leaves it alone). The founder's flag is
+// stored on logout.
 func TestPersonalSurrenderWaitsForOfflineMember(t *testing.T) {
 	t.Parallel()
 	w := bootSurrenderWorld(t, warStmt(knightsClanID, rivalsClanID), warStmt(rivalsClanID, knightsClanID),
@@ -144,12 +145,12 @@ func TestPersonalSurrenderWaitsForOfflineMember(t *testing.T) {
 	sentry.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestWithdrawPledge).Bytes())
 	drainFrames(t, sentry)
 	w.srv.FlushPersistence(t)
-	if got := queryInt(t, w, `SELECT wantspeace FROM characters WHERE obj_Id = ?`, sentryID); got != 0 {
-		t.Fatalf("wantspeace after leaving = %d, want 0", got)
+	if got := queryInt(t, w, `SELECT wantspeace FROM characters WHERE obj_Id = ?`, sentryID); got != 1 {
+		t.Fatalf("wantspeace after leaving = %d, want 1", got)
 	}
 	w.leaveWorld(t, sentry)
-	if got := queryInt(t, w, `SELECT wantspeace FROM characters WHERE obj_Id = ?`, sentryID); got != 0 {
-		t.Fatalf("wantspeace saved after leaving = %d, want 0", got)
+	if got := queryInt(t, w, `SELECT wantspeace FROM characters WHERE obj_Id = ?`, sentryID); got != 1 {
+		t.Fatalf("wantspeace saved after leaving = %d, want 1", got)
 	}
 	if got := queryInt(t, w, `SELECT COUNT(*) FROM clan_wars WHERE expiry_time = 0`); got != 2 {
 		t.Fatalf("stored wars = %d, want both still on", got)
