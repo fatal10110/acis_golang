@@ -17,8 +17,9 @@ type spawnStateStore interface {
 	SaveStates(ctx context.Context, states map[string]*spawn.State) error
 }
 
-// spawnRowStore writes one spawn_data row.
+// spawnRowStore writes one spawn_data row, or the whole list in one go.
 type spawnRowStore interface {
+	spawnStateStore
 	SaveState(ctx context.Context, state spawn.State) error
 }
 
@@ -208,6 +209,26 @@ func (s *Spawns) Uninitialize(name string) {
 	s.update(name, func(state *spawn.State) { state.Status = spawn.StatusUninitialized })
 }
 
+// uninitializeTracked marks every database-tracked row of the spawn list not
+// spawned yet, writing nothing; writeAll then lands them in one save.
+func (s *Spawns) uninitializeTracked() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.table == nil {
+		return
+	}
+	for _, maker := range s.table.Makers() {
+		for _, entry := range maker.Entries {
+			if entry.DBName == "" {
+				continue
+			}
+			if state := s.row(entry.DBName); state != nil {
+				state.Status = spawn.StatusUninitialized
+			}
+		}
+	}
+}
+
 // update applies change to the row name, then writes the row; nothing when
 // the spawn list has no such row.
 func (s *Spawns) update(name string, change func(*spawn.State)) {
@@ -263,6 +284,25 @@ func (s *Spawns) write(name string) {
 		defer cancel()
 		if err := w.store.SaveState(ctx, row); err != nil {
 			w.log.Error().Err(err).Str("spawn", name).Msg("save spawn data row")
+		}
+	})
+}
+
+// writeAll queues one whole-list save of the rows, read when it runs, so a
+// change to every row costs one transaction rather than a write per row. The
+// caller holds no lock: a queue with no worker runs the job inline.
+func (s *Spawns) writeAll() {
+	s.mu.Lock()
+	w := s.writes
+	s.mu.Unlock()
+	if w == nil {
+		return
+	}
+	w.queue.Enqueue(spawnWriteLane, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), SpawnRowWriteTimeout)
+		defer cancel()
+		if err := s.Save(ctx, w.store); err != nil {
+			w.log.Error().Err(err).Msg("save spawn data")
 		}
 	})
 }

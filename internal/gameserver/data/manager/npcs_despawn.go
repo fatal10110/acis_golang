@@ -13,7 +13,7 @@ import (
 //   - every spawn slot is dropped and its pending respawn cancelled, so no
 //     NPC comes back, not even one whose corpse decays meanwhile;
 //   - every database-tracked spawn row of the spawn list is reset to
-//     uninitialized, so the next save drops it;
+//     uninitialized and dropped from the database in one save;
 //   - every maker timer armed so far runs nothing, its tickers stopped;
 //   - every NPC in the world is deleted: the ones the spawn list placed,
 //     the standalone ones, and the ones no spawn placed (item decorations,
@@ -29,14 +29,8 @@ func (n *Npcs) DespawnAll() int {
 	for key := range n.slot {
 		n.respawn.Cancel(key)
 	}
-	for _, maker := range n.spawns.Table().Makers() {
-		for _, entry := range maker.Entries {
-			if entry.DBName == "" {
-				continue
-			}
-			n.spawns.Uninitialize(entry.DBName)
-		}
-	}
+	spawns := n.spawns
+	spawns.uninitializeTracked()
 	clear(n.slot)
 	clear(n.privates)
 	for _, g := range n.groups {
@@ -48,6 +42,7 @@ func (n *Npcs) DespawnAll() int {
 	clear(n.live)
 	n.liveCount = 0
 	n.mu.Unlock()
+	spawns.writeAll()
 	stopTickers(stop)
 
 	deleted := 0
