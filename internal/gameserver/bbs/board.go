@@ -30,6 +30,17 @@ const (
 	TopIndex  = "index.htm"
 )
 
+// TopPage is the home board page a command's page token names, under
+// PageFolder; false when the token is not a plain file name in TopFolder (a
+// path separator of either kind, or a "." or ".." step), so a token cannot
+// reach a page outside the home folder.
+func TopPage(token string) (string, bool) {
+	if token == "" || token == "." || token == ".." || strings.ContainsAny(token, `/\`) {
+		return "", false
+	}
+	return TopFolder + token, true
+}
+
 // NotImplemented is the page a board command no board handles shows.
 func NotImplemented(command string) string {
 	return "<html><body><br><br><center>The command: " + command + " isn't implemented.</center></body></html>"
