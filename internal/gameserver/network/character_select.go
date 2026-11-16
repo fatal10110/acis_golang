@@ -94,9 +94,9 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client
 		l.log.Error().Err(err).Int32("object_id", objectID).Msg("select character: reload row")
 		return nil, selectionFailed
 	}
-	// The list may predate a ban stored since; the row is what counts, and a
-	// ban refuses silently, as the list's own ban check does.
-	if fresh.AccessLevel < 0 {
+	// The list may predate a ban or a deletion stored since; the row is what
+	// counts, and both refuse silently, as the list's own checks do.
+	if fresh.AccessLevel < 0 || fresh.DeleteAt > 0 {
 		return nil, selectionRefused
 	}
 	// A journal that does not load refuses the selection, as an unwritten
