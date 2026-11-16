@@ -245,11 +245,12 @@ func TestInvulnerableHostileTakesNoMeleeDamage(t *testing.T) {
 	}
 }
 
-// TestAttackerWithoutDamagePermissionDealsNoMeleeDamage pins
-// CreatureStatus.java:221-226 through the real client attack flow: an
-// attacker whose access level lacks canGiveDamage deals no melee damage,
-// even to a live target, but — same Npc.reduceCurrentHp layering as
-// above — the NPC still aggroes on the attacker.
+// TestAttackerWithoutDamagePermissionDealsNoMeleeDamage pins the
+// damage-denied attacker through the real client attack flow: an attacker
+// whose access level lacks canGiveDamage works each melee hit out to 0
+// damage (Formulas.calcPhysicalAttackDamage), so the hit never reaches the
+// NPC (CreatureAttack.doHit's damage > 0 gate): the NPC keeps its HP and
+// never turns on the attacker.
 func TestAttackerWithoutDamagePermissionDealsNoMeleeDamage(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, withWarriorBehavior(),
@@ -269,9 +270,10 @@ func TestAttackerWithoutDamagePermissionDealsNoMeleeDamage(t *testing.T) {
 	c.Send(encodeAction(target.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertAttackBy(t, c, objID)
 
-	srv.AdvanceUntil(t, "NPC registers damage-denied attacker hate", func() bool {
-		return target.AI().CurrentIntention() == ai.IntentionAttack
-	})
+	srv.Advance(t, 3*time.Second)
+	if got := target.AI().CurrentIntention(); got == ai.IntentionAttack {
+		t.Fatal("NPC turned on the damage-denied attacker")
+	}
 	if got := target.CurrentHP(); got != beforeHP {
 		t.Fatalf("NPC HP after damage-denied melee = %d, want unchanged %d", got, beforeHP)
 	}

@@ -29,6 +29,7 @@ const (
 type PvPFlagActor interface {
 	ObjectID() int32
 	Queued
+	PvPFlagState() PvPFlagState
 	UpdatePvPFlag(PvPFlagState)
 }
 
@@ -112,15 +113,20 @@ func (p *PvPFlags) Start(log zerolog.Logger) *scheduler.Ticker {
 // AddNormal tracks actor for the configured normal-player timeout.
 func (p *PvPFlags) AddNormal(actor PvPFlagActor) {
 	p.Add(actor, p.times.Load().Normal)
-	if actor != nil {
-		actor.UpdatePvPFlag(PvPFlagOn)
-	}
+	raisePvPFlag(actor)
 }
 
 // AddFlagged tracks actor for the configured flagged-player timeout.
 func (p *PvPFlags) AddFlagged(actor PvPFlagActor) {
 	p.Add(actor, p.times.Load().Flagged)
-	if actor != nil {
+	raisePvPFlag(actor)
+}
+
+// raisePvPFlag turns an unflagged actor's flag on. A flag already up, steady
+// or blinking, is left as it is: the next tick sets it from the refreshed
+// deadline.
+func raisePvPFlag(actor PvPFlagActor) {
+	if actor != nil && actor.PvPFlagState() == PvPFlagNone {
 		actor.UpdatePvPFlag(PvPFlagOn)
 	}
 }
