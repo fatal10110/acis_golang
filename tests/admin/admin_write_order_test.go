@@ -164,6 +164,9 @@ func parkQueue(t *testing.T, q *sim.Queue) (release func()) {
 func commandBehindLogout(t *testing.T, line string) (*gameservertest.Server, int32) {
 	t.Helper()
 	srv, gmID := bootAdmin(t, adminLevel)
+	if !srv.DrivesClock() {
+		t.Skip("counting queue posts across a parked detach needs the one-FIFO inline executor")
+	}
 	gm := srv.Client
 	enterWorld(t, gm)
 	user, userID := addPlayer(t, srv, "player2", "Player", userLevel)

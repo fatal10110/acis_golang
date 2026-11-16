@@ -23,6 +23,9 @@ func TestSiegeAttackerRevivedDuringWaitStays(t *testing.T) {
 	// stands in cast range outside it.
 	srv, objID, _ := bootSiegeRestart(t, siegeRestarter{side: "ATTACKER", fieldEast: 300},
 		gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{resurrectSkill()})))
+	if !srv.DrivesClock() {
+		t.Skip("the 500 ms cast ends within 100 ms of the wall-clock advance on the real pool")
+	}
 	victim := srv.Client
 	healer := srv.SeedCharacterFor(t, "healer", "Healer", 5, 0)
 	seedKnownSkill(t, srv, healer.ID, resurrectSkillID, 1)

@@ -121,6 +121,8 @@ func bootPunish(t *testing.T) *gameservertest.Server {
 // storedPunishment reads objID's stored punishment.
 func storedPunishment(t *testing.T, srv *gameservertest.Server, objID int32) (level int, timer int64) {
 	t.Helper()
+	// An offline write rides the character's persistence lane.
+	srv.FlushPersistence(t)
 	if err := srv.DB.QueryRowContext(context.Background(), "SELECT punish_level, punish_timer FROM characters WHERE obj_Id = ?", objID).Scan(&level, &timer); err != nil {
 		t.Fatalf("read punishment: %v", err)
 	}
@@ -147,6 +149,7 @@ func waitPunishment(t *testing.T, srv *gameservertest.Server, objID int32, level
 // storedPosition reads objID's stored position.
 func storedPosition(t *testing.T, srv *gameservertest.Server, objID int32) [3]int32 {
 	t.Helper()
+	srv.FlushPersistence(t)
 	var at [3]int32
 	if err := srv.DB.QueryRowContext(context.Background(), "SELECT x, y, z FROM characters WHERE obj_Id = ?", objID).Scan(&at[0], &at[1], &at[2]); err != nil {
 		t.Fatalf("read position: %v", err)
