@@ -106,50 +106,46 @@ func TestNegateStripsSeededEffects(t *testing.T) {
 			startInWorld(t, c)
 			onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.SetRollSource(func(int) int { return 0 }) })
 
-			for _, id := range all {
-				castSelfThrough(t, c, int32(id))
+			for i, id := range all {
+				castSelfUntilIcons(t, c, int32(id), all[:i+1])
 			}
 			if got := negateEffectSkills(t, srv, objID); !slices.Equal(got, all) {
 				t.Fatalf("seeded effects = %v, want %v", got, all)
 			}
 			drainUntilQuiet(t, c)
 
-			castSelfThrough(t, c, int32(tc.negate.ID))
+			castSelfUntilIcons(t, c, int32(tc.negate.ID), tc.want)
 			if got := negateEffectSkills(t, srv, objID); !slices.Equal(got, tc.want) {
 				t.Fatalf("effects after negate = %v, want %v", got, tc.want)
-			}
-			var icons []abnormalStatusEntry
-			seen := false
-			for _, frame := range c.ReadQueued() {
-				if frame[0] == serverpackets.OpcodeAbnormalStatusUpdate {
-					icons, seen = readAbnormalStatusUpdateEntriesFromFrame(t, frame), true
-				}
-			}
-			if !seen {
-				t.Fatal("negate sent no AbnormalStatusUpdate")
-			}
-			var shown []int
-			for _, e := range icons {
-				shown = append(shown, int(e.SkillID))
-			}
-			slices.Sort(shown)
-			if !slices.Equal(shown, tc.want) {
-				t.Fatalf("icons after negate = %v, want %v", shown, tc.want)
 			}
 		})
 	}
 }
 
-// castSelfThrough casts skillID and reads up to its MagicSkillLaunched.
-func castSelfThrough(t *testing.T, c *testsupport.ScriptedClient, skillID int32) {
+// castSelfUntilIcons casts skillID and reads frames until the client receives
+// an AbnormalStatusUpdate listing exactly the skill ids in want. That frame is
+// the cast's client-visible result: a launch frame only says the cast began,
+// and on the pool executor the hit that applies or strips effects can land
+// after it. Earlier icon lists of the same cast are skipped.
+func castSelfUntilIcons(t *testing.T, c *testsupport.ScriptedClient, skillID int32, want []int) {
 	t.Helper()
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	var last []int
 	for range 20 {
-		if c.Read()[0] == serverpackets.OpcodeMagicSkillLaunched {
+		frame := c.Read()
+		if frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+			continue
+		}
+		last = last[:0]
+		for _, e := range readAbnormalStatusUpdateEntriesFromFrame(t, frame) {
+			last = append(last, int(e.SkillID))
+		}
+		slices.Sort(last)
+		if slices.Equal(last, want) {
 			return
 		}
 	}
-	t.Fatalf("cast of skill %d sent no MagicSkillLaunched", skillID)
+	t.Fatalf("cast of skill %d never sent an AbnormalStatusUpdate listing %v; last icons = %v", skillID, want, last)
 }
 
 // negateEffectSkills returns the sorted skill ids of the player's live
