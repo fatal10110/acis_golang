@@ -45,7 +45,9 @@ func mailRowHTML(writer string, id int32, subject string, unread bool, sent stri
 // mail sound, ExMailArrived), Alice is told it went out (SENT_MAIL) and
 // shown her sent box. The mail is stored twice, unread in Bobby's inbox
 // and read in Alice's sent box, with the line breaks of its message turned
-// into <br1>. Bobby's inbox lists it unread; opening it shows it with its
+// into <br1>. Bobby's inbox lists it unread; the list, the mail page and
+// the reply form show its subject with its markup escaped (owner-approved,
+// #4654); opening it shows it with its
 // markup escaped and stores it read; reply opens the form addressed to
 // Alice; store files it in the archive; del removes it and goes back to
 // the list page last shown.
@@ -77,16 +79,16 @@ func TestMailSendReadAndFile(t *testing.T) {
 	if inbox != wantInbox || sent != wantSent {
 		t.Fatalf("bbs_mail rows = %+v, want %+v and %+v", rows, wantInbox, wantSent)
 	}
-	if got, want := pageOf(t, alice[1:]), mailListPage(0, 1, 0, 0, "SENTBOX", mailRowHTML("Alice", sent.id, "Hello <b>", false, sentText), onePagePager("SENTBOX")); got != want {
+	if got, want := pageOf(t, alice[1:]), mailListPage(0, 1, 0, 0, "SENTBOX", mailRowHTML("Alice", sent.id, "Hello &lt;b&gt;", false, sentText), onePagePager("SENTBOX")); got != want {
 		t.Fatalf("sent box page =\n%q\nwant\n%q", got, want)
 	}
 
-	if got, want := pageOf(t, command(t, p.bobby, "_maillist_0_1_0_")), mailListPage(1, 0, 0, 0, "INBOX", mailRowHTML("Alice", inbox.id, "Hello <b>", true, sentText), onePagePager("INBOX")); got != want {
+	if got, want := pageOf(t, command(t, p.bobby, "_maillist_0_1_0_")), mailListPage(1, 0, 0, 0, "INBOX", mailRowHTML("Alice", inbox.id, "Hello &lt;b&gt;", true, sentText), onePagePager("INBOX")); got != want {
 		t.Fatalf("inbox page =\n%q\nwant\n%q", got, want)
 	}
 
 	view := pageOf(t, command(t, p.bobby, "_bbsmail;view;"+strconv.Itoa(int(inbox.id))))
-	wantView := `SHOW link=<a action="bypass _bbsmail">Inbox</a>&nbsp;&gt;&nbsp;Hello <b> writer=Alice date=` + sentText +
+	wantView := `SHOW link=<a action="bypass _bbsmail">Inbox</a>&nbsp;&gt;&nbsp;Hello &lt;b&gt; writer=Alice date=` + sentText +
 		` to=bOBBY del=Unknown title=Hello &lt;b&gt; mes=line one&lt;br1&gt;line two id=` + strconv.Itoa(int(inbox.id)) + "\n"
 	if view != wantView {
 		t.Fatalf("mail page =\n%q\nwant\n%q", view, wantView)
@@ -99,7 +101,7 @@ func TestMailSendReadAndFile(t *testing.T) {
 	if len(reply) != 2 {
 		t.Fatalf("reply answer = %x, want the 1001 form and its 1002 fields", opcodes(reply))
 	}
-	wantReply := `1001` + "\b" + `REPLY link=<a action="bypass _bbsmail">Inbox</a>&nbsp;&gt;&nbsp;<a action="bypass _bbsmail;view;` + strconv.Itoa(int(inbox.id)) + `">Hello <b></a>&nbsp;&gt;&nbsp; to=Alice id=` + strconv.Itoa(int(inbox.id)) + "\n"
+	wantReply := `1001` + "\b" + `REPLY link=<a action="bypass _bbsmail">Inbox</a>&nbsp;&gt;&nbsp;<a action="bypass _bbsmail;view;` + strconv.Itoa(int(inbox.id)) + `">Hello &lt;b&gt;</a>&nbsp;&gt;&nbsp; to=Alice id=` + strconv.Itoa(int(inbox.id)) + "\n"
 	if got := boardPart(t, reply[0]); got != wantReply {
 		t.Fatalf("reply form = %q, want %q", got, wantReply)
 	}
@@ -108,7 +110,7 @@ func TestMailSendReadAndFile(t *testing.T) {
 		t.Fatalf("reply fields = %q, want %q", got, wantFields)
 	}
 
-	if got, want := pageOf(t, command(t, p.bobby, "_bbsmail;store;"+strconv.Itoa(int(inbox.id)))), mailListPage(0, 0, 1, 0, "ARCHIVE", mailRowHTML("Alice", inbox.id, "Hello <b>", false, sentText), onePagePager("ARCHIVE")); got != want {
+	if got, want := pageOf(t, command(t, p.bobby, "_bbsmail;store;"+strconv.Itoa(int(inbox.id)))), mailListPage(0, 0, 1, 0, "ARCHIVE", mailRowHTML("Alice", inbox.id, "Hello &lt;b&gt;", false, sentText), onePagePager("ARCHIVE")); got != want {
 		t.Fatalf("archive page =\n%q\nwant\n%q", got, want)
 	}
 	if rows := mailRows(t, p.srv); rows[0].location != "archive" {

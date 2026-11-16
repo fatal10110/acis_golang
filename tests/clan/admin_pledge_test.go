@@ -178,7 +178,7 @@ func TestAdminPledgeInfo(t *testing.T) {
 	w.recruit(t)
 	w.selectFor(t, w.leaderID)
 
-	w.gm.Send(encodeBypass("admin_pledge info Elsewhere"))
+	w.gm.Send(encodeBuildCmd("pledge info Elsewhere"))
 	frames := drainFrames(t, w.gm)
 	wantAnswer(t, "//pledge info", pledgeAnswer(t, frames), "gmview Founder", gameMenu)
 

@@ -77,7 +77,7 @@ func (w *adminClanWorld) selectFor(t *testing.T, objectID int32) {
 // frames and the leader's and recruit's.
 func (w *adminClanWorld) clanSkill(t *testing.T, args string) (gm, leader, member [][]byte) {
 	t.Helper()
-	w.gm.Send(encodeBypass(strings.TrimSpace("admin_clan_skill " + args)))
+	w.gm.Send(encodeBuildCmd(strings.TrimSpace("clan_skill " + args)))
 	return drainFrames(t, w.gm), drainFrames(t, w.leader), drainFrames(t, w.member)
 }
 
@@ -395,7 +395,7 @@ func TestAdminClanSkillWaitsForLeaderQueue(t *testing.T) {
 		t.Fatal("post to the leader's queue: queue closed")
 	}
 	<-held
-	w.gm.Send(encodeBypass("admin_clan_skill set 370 1"))
+	w.gm.Send(encodeBuildCmd("clan_skill set 370 1"))
 	w.srv.AwaitHandled(t)
 	ran := make(chan struct{})
 	if !w.srv.PlayerQueue(t, w.gmID).Post(func() { close(ran) }) {

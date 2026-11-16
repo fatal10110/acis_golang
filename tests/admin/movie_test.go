@@ -77,7 +77,7 @@ func TestAdminMovie(t *testing.T) {
 			t.Fatalf("//%s frames = %x, want none", cmd, testsupport.FrameOpcodes(frames))
 		}
 	}
-	assertOnePage(t, "//sequence add", exchange(t, gm, encodeBypass("admin_sequence add")), shippedPage(t, "movie/add_sequence.htm"))
+	assertOnePage(t, "//sequence add", exchange(t, gm, encodeBuildCmd("sequence add")), shippedPage(t, "movie/add_sequence.htm"))
 
 	for _, c := range []struct{ cmd, text string }{
 		{"sequence add -1", "The sequence id is invalid."},
@@ -108,8 +108,8 @@ func TestAdminMovie(t *testing.T) {
 	settle(t, other)
 	both := shippedPage(t, "movie/main_notempty.htm", "%sequences%",
 		sequenceRow(1, 100, -30, 40, 200, 2000, 0, 0, 1)+sequenceRow(2, 300, 10, 20, 500, 3000, 5, 6, 0))
-	assertOnePage(t, "//sequence add 1", exchange(t, gm, encodeBypass("admin_sequence add 1 100 -30 40 200 2000 0 0 1")), both)
-	assertOnePage(t, "//sequence add 2 (edit)", exchange(t, gm, encodeBypass("admin_sequence add 2")), shippedPage(t, "movie/edit_sequence.htm",
+	assertOnePage(t, "//sequence add 1", exchange(t, gm, encodeBuildCmd("sequence add 1 100 -30 40 200 2000 0 0 1")), both)
+	assertOnePage(t, "//sequence add 2 (edit)", exchange(t, gm, encodeBuildCmd("sequence add 2")), shippedPage(t, "movie/edit_sequence.htm",
 		"%sId%", "2", "%sDist%", "300", "%sYaw%", "10", "%sPitch%", "20", "%sTime%", "500",
 		"%sDuration%", "3000", "%sTurn%", "5", "%sRise%", "6", "%sWidescreen%", "0"))
 

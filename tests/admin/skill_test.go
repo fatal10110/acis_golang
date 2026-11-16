@@ -160,7 +160,7 @@ func TestAdminSkillPage(t *testing.T) {
 	drain(t, gm)
 
 	assertPage(t, exchange(t, gm, encodeBuildCmd("skill")), skillRow(freeSkill, "Free", 1))
-	assertPage(t, exchange(t, gm, encodeBypass("admin_skill 2")), skillRow(freeSkill, "Free", 1))
+	assertPage(t, exchange(t, gm, encodeBuildCmd("skill 2")), skillRow(freeSkill, "Free", 1))
 	if frames := exchange(t, gm, encodeBuildCmd("skill 0")); len(frames) != 0 {
 		t.Fatalf("//skill 0 frames = %x, want none", testsupport.FrameOpcodes(frames))
 	}

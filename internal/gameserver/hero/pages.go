@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // The entries a diary page and a fight history page show.
@@ -21,7 +23,7 @@ func pageButton(label, command string, heroClass, page int32) string {
 
 // DiaryPage fills template, the diary page, with page page of the diary
 // as objectID, the hero heroName of class heroClass, shows it: newest
-// first, ten to a page, under the hero's message. ok is false when the
+// first, ten to a page, under the hero's message, shown as text. ok is false when the
 // page is not sent: objectID has no diary page or no message, the page
 // starts before the first entry, or it shows an entry without its text.
 // The page numbers are 32-bit and wrap.
@@ -38,7 +40,7 @@ func (m *Manager) DiaryPage(template, heroName string, heroClass, objectID, page
 	if !ok {
 		return "", false
 	}
-	if html, ok = replacePlaceholder(html, "%message%", message); !ok {
+	if html, ok = replacePlaceholder(html, "%message%", commons.HTMLText(message)); !ok {
 		return "", false
 	}
 	if len(entries) == 0 {

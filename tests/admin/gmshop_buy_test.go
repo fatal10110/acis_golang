@@ -59,27 +59,27 @@ func TestAdminBuyOpensShippedGMLists(t *testing.T) {
 	srv, table, _ := bootGMShop(t)
 	c := srv.Client
 
-	main := htmlBody(t, exchange(t, c, encodeBypass("admin_admin"))[0])
+	main := htmlBody(t, exchange(t, c, encodeBuildCmd("admin"))[0])
 	if !regexp.MustCompile(`action="bypass -h admin_buy"`).MatchString(main) {
 		t.Fatalf("main panel has no GM Shop button: %q", main)
 	}
-	assertPage(t, exchange(t, c, encodeBypass("admin_buy")), "GM Shop")
+	assertPage(t, exchange(t, c, encodeBuildCmd("buy")), "GM Shop")
 
 	// Every link's list is pinned by the datapack's own tests; the window
 	// is the same code for each, so the first and last of every page are
 	// opened, which keeps the clicks under the flood limit.
 	for _, page := range []string{"gmshop/weapon.htm", "gmshop/armor.htm", "gmshop/items.htm"} {
-		body := htmlBody(t, exchange(t, c, encodeBypass("admin_link "+page))[0])
+		body := htmlBody(t, exchange(t, c, encodeBuildCmd("link "+page))[0])
 		links := gmShopBuyLink.FindAllStringSubmatch(body, -1)
 		if len(links) == 0 {
 			t.Fatalf("%s has no admin_buy link", page)
 		}
 		for _, m := range [][]string{links[0], links[len(links)-1]} {
 			id, _ := strconv.Atoi(m[1])
-			assertBuyWindow(t, exchange(t, c, encodeBypass("admin_buy "+m[1])), table, id)
+			assertBuyWindow(t, exchange(t, c, encodeBuildCmd("buy "+m[1])), table, id)
 		}
 	}
-	assertBuyWindow(t, exchange(t, c, encodeBypass("admin_buy 1006 1")), table, 1006)
+	assertBuyWindow(t, exchange(t, c, encodeBuildCmd("buy 1006 1")), table, 1006)
 	assertBuyWindow(t, exchange(t, c, encodeBuildCmd("buy 18")), table, 18)
 }
 
@@ -124,7 +124,7 @@ func TestAdminBuyRefusesBadListIDs(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := bootGMShop(t)
 	for _, arg := range []string{"x", "99999999999", "999999999", "-1"} {
-		assertTexts(t, exchange(t, srv.Client, encodeBypass("admin_buy "+arg)), "Invalid buylist id.")
+		assertTexts(t, exchange(t, srv.Client, encodeBuildCmd("buy "+arg)), "Invalid buylist id.")
 	}
 }
 
@@ -150,7 +150,7 @@ func TestAdminBuyGMListPurchase(t *testing.T) {
 		t.Fatalf("list 1006 = %+v, want a GM list", list)
 	}
 	p := list.Products[0]
-	exchange(t, c, encodeBypass("admin_buy 1006"))
+	exchange(t, c, encodeBuildCmd("buy 1006"))
 
 	assertStatic(t, exchange(t, c, encodeGMShopBuy(1006, p.ItemID, 2))[0], serverpackets.SystemMessageYouHaveExceededQuantityThatCanBeInputted)
 	frames := exchange(t, c, encodeGMShopBuy(1006, p.ItemID, 1))

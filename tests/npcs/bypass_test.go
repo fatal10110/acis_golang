@@ -317,9 +317,9 @@ func TestBypassRefusedWhileTradeRequestPending(t *testing.T) {
 // last page, like an npc_ one, and is dropped silently when it is not, or
 // when the player talked to no NPC about quests (tests/quest pins the
 // rest of it). An
-// admin_ command from a player without the access rights is refused with a
-// message only, as is every community board command while the board is
-// off (the default).
+// admin_ command no validated page offered is dropped with no answer
+// (owner-approved, #4654), and every community board command while the
+// board is off (the default) is refused with a message only.
 func TestBypassCommandFamilies(t *testing.T) {
 	t.Parallel()
 	w := bootFolkWorld(t, dialogPages(), noBypassReuse)
@@ -327,7 +327,7 @@ func TestBypassCommandFamilies(t *testing.T) {
 	assertAnswer(t, w.bypass(t, "Quest Q001_LettersOfLove 30048-03.htm"), nil, nil, "")
 	w.openAnyNpcPage(t)
 	assertAnswer(t, w.bypass(t, "Quest Q001_LettersOfLove 30048-03.htm"), nil, nil, "")
-	assertAnswer(t, w.bypass(t, "admin_admin"), []byte{serverpackets.OpcodeSystemMessage}, nil, "")
+	assertAnswer(t, w.bypass(t, "admin_admin"), nil, nil, "")
 	for _, command := range []string{"bbs_default", "_bbshome", "_friendlist_0_", "_maillist_0_1_0_", "_block"} {
 		assertAnswer(t, w.bypass(t, command), []byte{serverpackets.OpcodeSystemMessage}, nil, "")
 	}

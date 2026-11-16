@@ -143,7 +143,7 @@ func TestAdminFences(t *testing.T) {
 	}
 
 	// The list's link removes the fence and lists again.
-	frames = fenceExchange(t, gm, encodeBypass(fmt.Sprintf("admin_deletefence %d 1", fenceID)))
+	frames = fenceExchange(t, gm, encodeBuildCmd(fmt.Sprintf("deletefence %d 1", fenceID)))
 	gone := [][]byte{deleteObject(layerID), deleteObject(fenceID)}
 	if len(frames) != 3 {
 		t.Fatalf("admin_deletefence frames %x, want two DeleteObject and a page", testsupport.FrameOpcodes(frames))

@@ -3,6 +3,7 @@ package schemebuffer
 import (
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -161,16 +162,17 @@ func (d dialog) menu() string {
 
 // give answers givebuffs <scheme> <cost> [pet]: the scheme's buffs on the
 // talker, or on the summon for a third word "pet" in any case; any other
-// third word names nobody.
+// third word names nobody. The fee is the scheme's, as the schemes page
+// shows it; the cost word must be a number but its value is ignored, so a
+// forged link cannot lower the fee.
 func (d dialog) give(args []string) Reply {
 	if len(args) < 2 {
 		return Reply{Aborted: true}
 	}
-	cost, err := strconv.ParseInt(args[1], 10, 32)
-	if err != nil {
+	if _, err := strconv.ParseInt(args[1], 10, 32); err != nil {
 		return Reply{Aborted: true}
 	}
-	reply := Reply{Action: ActionGive, GiveTo: GiveSelf, Cost: int32(cost)}
+	reply := Reply{Action: ActionGive, GiveTo: GiveSelf}
 	if len(args) > 2 {
 		reply.GiveTo = GiveNobody
 		if equalIgnoreCase(args[2], "pet") {
@@ -178,6 +180,7 @@ func (d dialog) give(args []string) Reply {
 		}
 	}
 	if s, ok := d.m.lookup(d.talker.ObjectID, args[0]); ok {
+		reply.Cost = d.m.fee(s.skills)
 		for _, id := range s.skills {
 			buff, ok := d.m.buff(id)
 			if !ok || d.m.skills == nil {
@@ -193,9 +196,10 @@ func (d dialog) give(args []string) Reply {
 
 // selectSkill answers skillselect and skillunselect <group> <scheme>
 // <skillId> <page>: the skill is added to the scheme while it holds fewer
-// buffs than the talker can carry, or taken out of it, then the editor
-// shows that page again. Adding to a scheme the talker does not keep
-// stops the dialog, unless the scheme is named "none".
+// buffs than the talker can carry and the buffer offers it, or taken out
+// of it, then the editor shows that page again. Adding to a scheme the
+// talker does not keep stops the dialog, unless the scheme is named
+// "none".
 func (d dialog) selectSkill(command string, args []string) Reply {
 	if len(args) < 4 {
 		return Reply{Aborted: true}
@@ -224,7 +228,9 @@ func (d dialog) selectSkill(command string, args []string) Reply {
 		if !kept {
 			return Reply{Aborted: true}
 		}
-		s.skills = append(s.skills, int32(id))
+		if _, offered := d.m.buff(int32(id)); offered {
+			s.skills = append(s.skills, int32(id))
+		}
 	case strings.HasPrefix(command, "skillunselect") && kept:
 		for i, sk := range s.skills {
 			if sk == int32(id) {
@@ -243,15 +249,17 @@ func (d dialog) selectSkill(command string, args []string) Reply {
 
 // create answers createscheme <name>: a name of at most 14 characters the
 // talker does not keep yet, while under the maximum, becomes an empty
-// scheme, trimmed, and the schemes page opens. Every refusal is a notice
-// alone.
+// scheme, trimmed, and the schemes page opens. A name holding a character
+// that would change the links the schemes page builds from it ($, ", <, >
+// or a control character) is refused with the name notice. Every refusal
+// is a notice alone.
 func (d dialog) create(args []string) Reply {
 	const nameNotice = "Scheme's name must contain up to 14 chars. Spaces are trimmed."
 	if len(args) == 0 {
 		return Reply{Message: nameNotice}
 	}
 	name := args[0]
-	if commons.UTF16Len(name) > 14 {
+	if commons.UTF16Len(name) > 14 || strings.ContainsFunc(name, linkBreaking) {
 		return Reply{Message: nameNotice}
 	}
 	if o := d.m.owners[d.talker.ObjectID]; o != nil {
@@ -511,3 +519,15 @@ func equalIgnoreCase(a, b string) bool { return compareIgnoreCase(a, b) == 0 }
 // isCtrlOrSpace is the set trimmed around a scheme name: every character up to
 // and including the space.
 func isCtrlOrSpace(r rune) bool { return r <= ' ' }
+
+// linkBreaking reports whether r, in a scheme name, would change the
+// links the schemes page builds from the name: '$' widens a link into an
+// edit-box prefix, '"', '<' and '>' end the link, and a control character
+// is trimmed out of it.
+func linkBreaking(r rune) bool {
+	switch r {
+	case '$', '"', '<', '>':
+		return true
+	}
+	return unicode.IsControl(r)
+}

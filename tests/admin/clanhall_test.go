@@ -139,7 +139,7 @@ func (w *chWorld) seed(t *testing.T, db *sql.DB, inClan bool, more []string) {
 // ch sends //ch args as a clicked link and returns the frames it drew.
 func (w *chWorld) ch(t *testing.T, args string) [][]byte {
 	t.Helper()
-	return exchange(t, w.gm, encodeBypass("admin_ch "+args))
+	return exchange(t, w.gm, encodeBuildCmd("ch "+args))
 }
 
 // storedOwner is hall id's stored ownerId and endDate.
@@ -266,7 +266,7 @@ func TestAdminClanHallPagesAndCommands(t *testing.T) {
 	if !strings.Contains(wantList, "Topaz Hall [0]") || !strings.Contains(wantList, "Fortress of Resistance</a>") {
 		t.Fatalf("expected list misses its rows:\n%s", wantList)
 	}
-	for _, payload := range [][]byte{encodeBuildCmd("ch"), encodeBypass("admin_ch"), encodeBypass("admin_ch 99")} {
+	for _, payload := range [][]byte{encodeBuildCmd("ch"), encodeBuildCmd("ch"), encodeBuildCmd("ch 99")} {
 		frames := exchange(t, w.gm, payload)
 		if len(frames) != 1 {
 			t.Fatalf("list frames = %x, want one page", testsupport.FrameOpcodes(frames))

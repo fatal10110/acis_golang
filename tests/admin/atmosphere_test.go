@@ -67,7 +67,7 @@ func TestAdminAtmosphere(t *testing.T) {
 	}
 
 	// The effects panel buttons reach the same command as a clicked link.
-	gm.Send(encodeBypass("admin_atmosphere sky day"))
+	gm.Send(encodeBuildCmd("atmosphere sky day"))
 	for i, c := range clients {
 		if got := c.Read(); !bytes.Equal(got, []byte{serverpackets.OpcodeSunRise}) {
 			t.Fatalf("admin_atmosphere bypass client %d frame = % x, want SunRise", i, got)

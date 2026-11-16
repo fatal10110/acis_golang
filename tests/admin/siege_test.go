@@ -170,7 +170,7 @@ func TestAdminSiegeCastleList(t *testing.T) {
 	for _, payload := range [][]byte{
 		encodeBuildCmd("siege"),
 		encodeBuildCmd("castle"),
-		encodeBypass("admin_siege"),
+		encodeBuildCmd("siege"),
 		encodeBuildCmd("siege nowhere_castle"),
 		encodeBuildCmd("siege list nowhere_castle"),
 		encodeBuildCmd("castle set nowhere_castle"),
@@ -179,7 +179,7 @@ func TestAdminSiegeCastleList(t *testing.T) {
 		assertCastleList(t, exchange(t, w.gm, payload), want)
 	}
 	assertPage(t, w.siege(t, "gludio_castle"), gludioPage)
-	assertPage(t, exchange(t, w.gm, encodeBypass("admin_siege gludio_castle")), gludioPage)
+	assertPage(t, exchange(t, w.gm, encodeBuildCmd("siege gludio_castle")), gludioPage)
 }
 
 // TestAdminSiegeRegistration pins //siege attack, defend, list, clear and an

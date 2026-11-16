@@ -262,7 +262,7 @@ func TestAdminSkillList(t *testing.T) {
 		t.Fatalf("list page 1 = %q, want skill 13 on page 2", page)
 	}
 
-	frames = exchange(t, gm, encodeBypass("admin_skill list 2"))
+	frames = exchange(t, gm, encodeBuildCmd("skill list 2"))
 	if len(frames) != 1 {
 		t.Fatalf("//skill list 2 frames = %x, want the list page alone", testsupport.FrameOpcodes(frames))
 	}

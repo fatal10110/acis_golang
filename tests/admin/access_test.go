@@ -28,8 +28,10 @@ func TestAdminCommandAccess(t *testing.T) {
 		enterWorld(t, c)
 
 		assertTexts(t, exchange(t, c, encodeBuildCmd("admin")), "You don't have the access right to use this command.")
-		assertTexts(t, exchange(t, c, encodeBypass("admin_admin")), "You don't have the access rights to use this command.")
-		assertTexts(t, exchange(t, c, encodeBypass("admin_teleport 1 2 3")), "You don't have the access rights to use this command.")
+		// An admin_ link no validated page offered is dropped before the
+		// gate (owner-approved, #4654): a player is never sent one.
+		assertTexts(t, exchange(t, c, encodeBypass("admin_admin")))
+		assertTexts(t, exchange(t, c, encodeBypass("admin_teleport 1 2 3")))
 		// An unknown command answers a non-GM nothing; neither entry leaves
 		// a client action pending.
 		assertTexts(t, exchange(t, c, encodeBuildCmd("nosuchcommand")))
@@ -42,7 +44,8 @@ func TestAdminCommandAccess(t *testing.T) {
 		enterWorld(t, c)
 
 		assertTexts(t, exchange(t, c, encodeBuildCmd("nosuchcommand x")), "The command nosuchcommand doesn't exist.")
-		assertTexts(t, exchange(t, c, encodeBypass("admin_nosuchcommand")), "The command nosuchcommand doesn't exist.")
+		// A link no validated page offered is dropped (owner-approved, #4654).
+		assertTexts(t, exchange(t, c, encodeBypass("admin_nosuchcommand")))
 		// Command words are matched as spelled: the table's admin_admin is
 		// not admin_ADMIN.
 		assertTexts(t, exchange(t, c, encodeBuildCmd("ADMIN")), "The command ADMIN doesn't exist.")

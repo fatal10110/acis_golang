@@ -3,6 +3,8 @@ package bbs
 import (
 	"strconv"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // The clan board's pages, under the board's page folder.
@@ -88,14 +90,15 @@ func RenderClanList(page string, clans []ClanCard, index int, ownClan int32) str
 	return strings.ReplaceAll(page, "%clanlist%", b.String())
 }
 
-// RenderClanHome fills page, one of the clan home pages, with cl.
+// RenderClanHome fills page, one of the clan home pages, with cl; its
+// introduction, written by a player, shows as text.
 func RenderClanHome(page string, cl ClanCard) string {
 	ally := ""
 	if cl.AllyID > 0 {
 		ally = cl.AllyName
 	}
 	page = strings.ReplaceAll(page, "%clanid%", strconv.Itoa(int(cl.ID)))
-	page = strings.ReplaceAll(page, "%clanIntro%", cl.Introduction)
+	page = strings.ReplaceAll(page, "%clanIntro%", commons.HTMLText(cl.Introduction))
 	page = strings.ReplaceAll(page, "%clanName%", cl.Name)
 	page = strings.ReplaceAll(page, "%clanLvL%", strconv.Itoa(cl.Level))
 	page = strings.ReplaceAll(page, "%clanMembers%", strconv.Itoa(cl.Members))

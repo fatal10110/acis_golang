@@ -236,7 +236,7 @@ func TestAdminZoneShowID(t *testing.T) {
 		}
 	}
 
-	frames = exchangeZones(t, gm, encodeBypass("admin_zone show clear"))
+	frames = exchangeZones(t, gm, encodeBuildCmd("zone show clear"))
 	if len(frames) != 3 || frames[2][0] != serverpackets.OpcodeNpcHtmlMessage {
 		t.Fatalf("//zone show clear = %x, want ZONE, ZONE1, the panel", opcodes(frames))
 	}
