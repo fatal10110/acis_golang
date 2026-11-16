@@ -2,6 +2,7 @@ package festival
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,12 +14,16 @@ import (
 type fakeCalendar struct {
 	period     sevensigns.Period
 	nextChange time.Time
+	// festivalScore is the festival score each side gained.
+	festivalScore [2]atomic.Int64
 }
 
-func (c *fakeCalendar) CurrentPeriod() sevensigns.Period       { return c.period }
-func (c *fakeCalendar) NextChange() time.Time                  { return c.nextChange }
-func (c *fakeCalendar) AddFestivalScore(sevensigns.Cabal, int) {}
-func (c *fakeCalendar) SaveStatus(context.Context) error       { return nil }
+func (c *fakeCalendar) CurrentPeriod() sevensigns.Period { return c.period }
+func (c *fakeCalendar) NextChange() time.Time            { return c.nextChange }
+func (c *fakeCalendar) AddFestivalScore(cabal sevensigns.Cabal, n int) {
+	c.festivalScore[side(cabal)].Add(int64(n))
+}
+func (c *fakeCalendar) SaveStatus(context.Context) error { return nil }
 
 // memStore keeps the festival rows in memory.
 type memStore struct {
