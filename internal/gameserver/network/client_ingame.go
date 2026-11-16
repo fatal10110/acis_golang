@@ -10,15 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// handleRequestSkillCoolTime takes the reuse-timer request.
-//
-// This opcode is accepted and answered with nothing: reuse
-// timers reach the client unsolicited (e.g. in the EnterWorld
-// burst), never as a request reply.
-func (l *GameClientLink) handleRequestSkillCoolTime(_ context.Context, cs *connState, _ struct{}) error {
-	return nil
-}
-
 // handleAction selects the clicked object, or acts on it when it is
 // already selected.
 func (l *GameClientLink) handleAction(ctx context.Context, cs *connState, req clientpackets.Action) error {

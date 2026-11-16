@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -65,7 +66,18 @@ func (l *GameClientLink) dispatchPrivateStore(client *Client, live *livePlayer, 
 	case clientpackets.OpcodeRequestRecipeShopListSet:
 		var req clientpackets.RequestRecipeShopListSet
 		req, err = decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestRecipeShopListSet, error) {
-			return clientpackets.DecodeRequestRecipeShopListSet(p, maxItems)
+			req, err := clientpackets.DecodeRequestRecipeShopListSet(p, maxItems)
+			if err != nil {
+				return req, err
+			}
+			// Reading a row resolves its recipe, so a list naming one that is
+			// not loaded cannot be read at all.
+			for _, row := range req.Items {
+				if _, ok := l.craft.Recipe(int(row.RecipeID)); !ok {
+					return clientpackets.RequestRecipeShopListSet{}, fmt.Errorf("network: RequestRecipeShopListSet: unknown recipe %d", row.RecipeID)
+				}
+			}
+			return req, nil
 		})
 		run = func() { l.setWorkshopList(live, req) }
 	case clientpackets.OpcodeRequestRecipeShopMakeInfo:

@@ -174,13 +174,13 @@ func DecodeRequestBuyItem(payload []byte, maxItems int) (RequestBuyItem, error) 
 	req := RequestBuyItem{ListID: r.ReadInt32()}
 	count := r.ReadInt32()
 	if err := validateShopRows("RequestBuyItem", count, maxItems, shopBuyRowSize, r.Remaining()); err != nil {
-		return RequestBuyItem{}, err
+		return RequestBuyItem{}, discarded(err)
 	}
 	req.Items = make([]BuyItemRequest, count)
 	for i := range req.Items {
 		row := BuyItemRequest{ItemID: r.ReadInt32(), Count: r.ReadInt32()}
 		if row.ItemID < 1 || row.Count < 1 {
-			return RequestBuyItem{}, fmt.Errorf("clientpackets: RequestBuyItem: invalid row item=%d count=%d", row.ItemID, row.Count)
+			return RequestBuyItem{}, discarded(fmt.Errorf("clientpackets: RequestBuyItem: invalid row item=%d count=%d", row.ItemID, row.Count))
 		}
 		req.Items[i] = row
 	}
@@ -202,7 +202,7 @@ type RequestPreviewItem struct {
 
 // DecodeRequestPreviewItem parses a raw RequestPreviewItem payload (opcode
 // byte included). A negative item count reads as none; one over
-// maxPreviewItems is refused without reading the rows.
+// maxPreviewItems is discarded without reading the rows.
 func DecodeRequestPreviewItem(payload []byte) (RequestPreviewItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < 3*4 {
@@ -212,7 +212,7 @@ func DecodeRequestPreviewItem(payload []byte) (RequestPreviewItem, error) {
 	req := RequestPreviewItem{ListID: r.ReadInt32()}
 	count := max(r.ReadInt32(), 0)
 	if count > maxPreviewItems {
-		return RequestPreviewItem{}, fmt.Errorf("clientpackets: RequestPreviewItem: item count %d exceeds max %d", count, maxPreviewItems)
+		return RequestPreviewItem{}, discarded(fmt.Errorf("clientpackets: RequestPreviewItem: item count %d exceeds max %d", count, maxPreviewItems))
 	}
 	if r.Remaining() < int(count)*4 {
 		return RequestPreviewItem{}, fmt.Errorf("clientpackets: RequestPreviewItem: %d items need %d bytes, got %d: %w", count, count*4, r.Remaining(), wire.ErrShortPacket)
@@ -252,7 +252,7 @@ func DecodeRequestSellItem(payload []byte, maxItems int) (RequestSellItem, error
 	req := RequestSellItem{ListID: r.ReadInt32()}
 	count := r.ReadInt32()
 	if err := validateShopRows("RequestSellItem", count, maxItems, shopSellRowSize, r.Remaining()); err != nil {
-		return RequestSellItem{}, err
+		return RequestSellItem{}, discarded(err)
 	}
 	req.Items = make([]SellItemRequest, count)
 	for i := range req.Items {
@@ -262,7 +262,7 @@ func DecodeRequestSellItem(payload []byte, maxItems int) (RequestSellItem, error
 			Count:    r.ReadInt32(),
 		}
 		if row.ObjectID < 1 || row.ItemID < 1 || row.Count < 1 {
-			return RequestSellItem{}, fmt.Errorf("clientpackets: RequestSellItem: invalid row object=%d item=%d count=%d", row.ObjectID, row.ItemID, row.Count)
+			return RequestSellItem{}, discarded(fmt.Errorf("clientpackets: RequestSellItem: invalid row object=%d item=%d count=%d", row.ObjectID, row.ItemID, row.Count))
 		}
 		req.Items[i] = row
 	}

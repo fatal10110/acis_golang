@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -24,14 +26,24 @@ const (
 
 var errMalformedPacketDisconnect = errors.New("malformed packet requires disconnect")
 
+// rejectedFrameHeadBytes is how much of a frame the state gate rejected its
+// log line shows: enough to identify the request, and a fixed bound however
+// long a frame a client sends.
+const rejectedFrameHeadBytes = 16
+
 // decodeClientPacket disconnects buffer-underflow-equivalent pre-auth packets
 // (insufficient bytes, wire.ErrShortPacket) immediately. Once authenticated,
 // that same error class (char-select or in-game) is tolerated up to
 // maxUnderflowsPerMin within a 60s sliding window, then disconnect. Other
 // decode validation errors (e.g. an out-of-range field) are logged and the
-// packet dropped without counting or disconnecting.
+// packet dropped without counting or disconnecting. A request the decoder
+// discarded (clientpackets.ErrDiscarded) was read in full: it is dropped
+// without a word, yet counts as the player acting.
 func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
 	req, err := decode(payload)
+	if errors.Is(err, clientpackets.ErrDiscarded) {
+		return req, err
+	}
 	if err != nil {
 		client.frameUnread = true
 		l.log.Warn().Err(err).Msg("game client")
@@ -245,7 +257,9 @@ func (l *GameClientLink) gateFrame(client *Client, payload []byte) (serve, open 
 		return false, true
 	}
 	if !client.Accept(payload[0]) {
-		l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")
+		l.log.Warn().Str("state", client.State().String()).Str("opcode", fmt.Sprintf("%#02x", payload[0])).
+			Int("length", len(payload)).Str("head", hex.EncodeToString(payload[:min(len(payload), rejectedFrameHeadBytes)])).
+			Msg("Accept opcode")
 		// Pre-auth, any rejected opcode disconnects immediately; once
 		// authenticated, tolerate up to maxUnknownPerMin within a 60s
 		// sliding window.

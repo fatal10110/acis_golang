@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/rs/zerolog"
 )
@@ -39,28 +39,27 @@ func TestEveryAcceptedOpcodeHasAHandler(t *testing.T) {
 	}
 }
 
-// TestUnwiredOpcodeLogsNotWired pins the stub every unwired opcode shares:
-// the frame is read on, nothing is counted, and the warning keeps its exact
-// format.
-func TestUnwiredOpcodeLogsNotWired(t *testing.T) {
-	for _, op := range []byte{
-		clientpackets.OpcodeDummy1A, clientpackets.OpcodeDummy23, clientpackets.OpcodeDummy2E,
-		clientpackets.OpcodeDummy34, clientpackets.OpcodeDummy3E, clientpackets.OpcodeGameGuardReply,
-	} {
+// TestSilentOpcodesLogNothing pins the frames read and dropped without a
+// word: nothing is logged or counted, and only the opcodes no request is
+// built for leave the player not having acted.
+func TestSilentOpcodesLogNothing(t *testing.T) {
+	for _, op := range append(append([]byte(nil), unwiredOpcodes...), noRequestOpcodes...) {
 		t.Run(fmt.Sprintf("%#x", op), func(t *testing.T) {
 			var logged bytes.Buffer
 			l := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.New(&logged)})
-			cs := &connState{client: newDispatchTestClient(t)}
+			cs := &connState{client: newDispatchTestClient(t), acted: true}
 
 			if open := l.dispatch(context.Background(), cs, []byte{op, 0x01, 0x02}); !open {
 				t.Fatalf("dispatch(%#x) open = false, want true", op)
 			}
-			want := fmt.Sprintf(`{"level":"warn","opcode":"%#x","message":"Opcode not wired"}`+"\n", op)
-			if got := logged.String(); got != want {
-				t.Errorf("log = %q, want %q", got, want)
+			if got := logged.String(); got != "" {
+				t.Errorf("log = %q, want nothing", got)
 			}
 			if cs.client.unknownCount != 0 {
 				t.Errorf("unknown-packet count = %d, want 0", cs.client.unknownCount)
+			}
+			if want := !slices.Contains(noRequestOpcodes, op); cs.acted != want {
+				t.Errorf("acted = %v, want %v", cs.acted, want)
 			}
 		})
 	}

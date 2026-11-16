@@ -93,6 +93,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x2a: true, // answer party invitation
 		0x2b: true, // leave party
 		0x2c: true, // expel party member
+		0x2d: true, // dismiss party (no request)
 		0x2e: true, // dummy packet
 		0x2f: true, // request magic skill use
 		0x30: true, // appearing
@@ -187,6 +188,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xa5: true, // castle lord's answer to a defender request
 		0xa7: true, // multisell exchange
 		0xaa: true, // user command
+		0xab: true, // snoop quit
 		0xac: true, // open recipe book
 		0xad: true, // delete a recipe
 		0xae: true, // recipe craft window
@@ -217,6 +219,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xca: true, // game guard reply
 		0xcc: true, // friend message
 		0xcd: true, // show mini map
+		0xce: true, // messenger dialogs (no request)
 		0xcf: true, // record info (view refresh)
 		0xd0: true, // extended packets
 	},

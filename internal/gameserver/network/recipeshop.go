@@ -15,9 +15,8 @@ import (
 // order a craft, measured between the two bodies' edges.
 const workshopOrderRange = 150
 
-// setWorkshopList answers RequestRecipeShopListSet. A packet naming a recipe
-// that is not loaded is dropped without a word, like any packet that cannot
-// be read. No recipes, more than the workshop holds, a recipe
+// setWorkshopList answers RequestRecipeShopListSet, whose recipes were all
+// found loaded while its frame was read. No recipes, more than the workshop holds, a recipe
 // missing from its book page, or a failed set-up check keeps live setting up
 // the workshop and shows the manage window again; otherwise live sits down
 // and the workshop opens.
