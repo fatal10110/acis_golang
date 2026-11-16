@@ -56,14 +56,16 @@ func npcStanceFrames(t *testing.T, frames [][]byte, objID int32) []npcStanceFram
 	return out
 }
 
-// TestChristmasTreeSpawnsWalkingThenTakesItsRunStance places a Christmas
-// Tree. Like every NPC it enters the world walking and then takes its run
-// stance (Npc.onSpawn -> setWalkOrRun(true)): the player who sees it appear
-// is shown its NpcInfo walking, with the walk-stance multiplier 30 * 1.1
-// over the walk base 30, then ChangeMoveType to running (not swimming), as
-// its run speed is not 0, then its NpcInfo again running, with the run
-// multiplier 60 * 1.1 over 60.
-func TestChristmasTreeSpawnsWalkingThenTakesItsRunStance(t *testing.T) {
+// TestItemPlacedChristmasTreeEndsWalking places a Christmas Tree with its
+// kit. Like every NPC it enters the world walking and then takes its run
+// stance (Npc.onSpawn -> setWalkOrRun(true)); the kit then puts it back to
+// walking (SummonItems: setWalkOrRun(false) after doSpawn). The player who
+// sees it appear is shown its NpcInfo walking, with the walk-stance
+// multiplier 30 * 1.1 over the walk base 30, then ChangeMoveType to running
+// (not swimming), as its run speed is not 0, then its NpcInfo running, with
+// the run multiplier 60 * 1.1 over 60, then ChangeMoveType to walking, as
+// its walk speed is not 0, and its NpcInfo walking again.
+func TestItemPlacedChristmasTreeEndsWalking(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: treeKitID, Count: 1})
 	h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))
@@ -80,6 +82,8 @@ func TestChristmasTreeSpawnsWalkingThenTakesItsRunStance(t *testing.T) {
 		{opcode: serverpackets.OpcodeNPCInfo, running: false, moveMultiplier: walk},
 		{opcode: serverpackets.OpcodeChangeMoveType, running: true},
 		{opcode: serverpackets.OpcodeNPCInfo, running: true, moveMultiplier: run},
+		{opcode: serverpackets.OpcodeChangeMoveType, running: false},
+		{opcode: serverpackets.OpcodeNPCInfo, running: false, moveMultiplier: walk},
 	}
 	got := npcStanceFrames(t, frames, treeID)
 	if len(got) != len(want) {

@@ -158,7 +158,7 @@ func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	ep.running.Store(false)
 	ep.world.Spawn(ep, x, y, z, heading)
 	ep.zones.enter()
-	takeRunStance(&ep.running, ep.stats, ep.sink)
+	takeStance(&ep.running, true, ep.stats, ep.sink)
 }
 
 // Despawn takes the actor out of its zones, while its observers still know

@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 
@@ -278,7 +279,7 @@ func (s *effectPointSink) Emit(ev event.Event) {
 }
 
 // decorationSink shows one placed decoration's observers its view again,
-// its stance changes, its death and its revive.
+// its stance changes, its death and its revive, and lands its aura.
 type decorationSink struct {
 	world *world.State
 	d     *npc.Decoration
@@ -299,6 +300,35 @@ func (s *decorationSink) Emit(ev event.Event) {
 		broadcastKnown(s.world, s.d, func() wire.Frame { return serverpackets.NpcFrameBuilder{}.Die(s.d.ObjectID(), false) })
 	case event.Revived:
 		broadcastKnown(s.world, s.d, func() wire.Frame { return serverpackets.FrameRevive(s.d.ObjectID()) })
+	case event.AuraPulse:
+		if s.link != nil {
+			s.link.landAura(s.d, e)
+		}
+	}
+}
+
+// landAura lands the aura pulse e of source: each player within e.Radius of
+// it that no effect of skill e.SkillID affects, held effects included,
+// lands that skill's effects on itself, as caster and target. A skill with
+// no data lands nothing.
+func (l *GameClientLink) landAura(source world.Tracked, e event.AuraPulse) {
+	if l.skills == nil {
+		return
+	}
+	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(e.SkillID), Level: e.SkillLevel})
+	if !ok {
+		return
+	}
+	var players []*livePlayer
+	l.world.ForEachKnownInRadius(source, e.Radius, func(o world.Tracked) {
+		if live, ok := o.(*livePlayer); ok {
+			players = append(players, live)
+		}
+	})
+	for _, live := range players {
+		if _, affected := live.Character.EffectList().ActiveBySkillID(e.SkillID); !affected {
+			zonePulseEffects{}.Land(live, *def)
+		}
 	}
 }
 
