@@ -29,7 +29,7 @@ var (
 // A response names only the account, and the login server answers a
 // link's requests in the order it reads them, so responses are matched to
 // requests per account in send order. A request whose client stopped
-// waiting (evicted by a newer login, timed out, canceled) keeps its place
+// waiting (evicted by a kick, timed out, canceled) keeps its place
 // in that order until its response arrives and is dropped: the response
 // can never reach a later request for the same account.
 //
@@ -100,8 +100,8 @@ func (v *SessionValidator) ResolveThen(accountName string, ok bool, approved fun
 
 // Evict rejects accountName's outstanding validation, if any, so its client
 // stops waiting at once. The request keeps its place in the queue, so the
-// login server's answer to it is dropped instead of reaching the request
-// of the client that evicted it.
+// login server's answer to it is dropped instead of reaching a later
+// request for the account.
 func (v *SessionValidator) Evict(accountName string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()

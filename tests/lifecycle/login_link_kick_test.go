@@ -89,31 +89,37 @@ func TestKickForAccountNotHereChangesNothing(t *testing.T) {
 	}
 }
 
-// TestEvictedRequestApprovalIsNotReportedInPlay holds the login server's
-// answers while a second AuthLogin evicts the first: the approval of the
-// evicted request, which no client waits on any more, must not report the
-// account in play to the login server.
-func TestEvictedRequestApprovalIsNotReportedInPlay(t *testing.T) {
+// TestKickStopsLoginStillValidating has the login server kick an account
+// whose only connection here still waits on its session check: that
+// connection is refused with AuthLoginFail and closed. The login server's
+// approval of its request, which no client waits on any more, is dropped
+// rather than taken as the answer to the next AuthLogin, whose keys the
+// login server never issued.
+func TestKickStopsLoginStillValidating(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t)
 	const account = "lateapproval"
+	loginAddr := srv.StartLoginClients(t)
 	hold := srv.HoldLoginAnswers()
 
 	issued := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
 	srv.IssueLoginSession(account, issued)
 	first := srv.DialAuthLogin(t, account, issued)
 	hold.Await(t, 1)
-	second := srv.DialAuthLogin(t, account, link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4})
-	if !first.AwaitClose(5 * time.Second) {
-		t.Fatal("evicted connection still open")
+
+	srv.ListOnLogin(account)
+	expectAccountInUse(t, loginAddr, account)
+	if got := srv.AwaitLoginKick(t); got != account {
+		t.Fatalf("kick handled for %q, want %s", got, account)
 	}
+	assertFrameOpcode(t, first.Read(), serverpackets.OpcodeAuthLoginFail, "kicked AuthLogin answer")
+	assertFrameOpcode(t, first.Read(), serverpackets.OpcodeServerClose, "kicked ServerClose")
+	first.ExpectClosed()
+
+	next := srv.DialAuthLogin(t, account, link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4})
 	hold.Await(t, 2)
 	hold.Release()
-	assertFrameOpcode(t, second.Read(), serverpackets.OpcodeAuthLoginFail, "replacement AuthLogin answer")
-
-	if srv.LoginAccountOnline(t, account) {
-		t.Fatal("login server lists the account in play on an approval no client waited on")
-	}
+	assertFrameOpcode(t, next.Read(), serverpackets.OpcodeAuthLoginFail, "next AuthLogin answer")
 }
 
 // TestApprovedLoginIsReportedInPlay checks a login whose client waited on

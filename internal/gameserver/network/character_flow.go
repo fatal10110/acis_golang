@@ -43,23 +43,20 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 		client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 		return false, nil
 	}
-	// A second AuthLogin for an account already claimed takes it over: the
-	// prior connection's own in-flight validation (if any) is unblocked with
-	// a rejection so it releases the account promptly, then its session is
-	// closed ahead of the new player-auth request to the login server. The
-	// login server's answer to the prior request is dropped, never taken as
-	// the answer to the new one.
+	// The account is claimed only once the login server approves the keys
+	// presented: a connection already holding it is closed then, never on
+	// an AuthLogin whose keys may be wrong, so presenting an online
+	// account's name cannot disconnect its player.
+	ok, err := l.flow.validator.Validate(ctx, client, req, loginLink)
+	if !ok || err != nil {
+		return ok, err
+	}
 	if l.clients != nil {
 		if evicted, replaced := l.clients.Take(req.LoginName, client); replaced {
-			l.flow.validator.Evict(req.LoginName)
 			evicted.Session.Close()
 		}
 	}
-	ok, err := l.flow.validator.Validate(ctx, client, req, loginLink)
-	if l.clients != nil && (!ok || err != nil) {
-		l.clients.Release(req.LoginName, client)
-	}
-	return ok, err
+	return true, nil
 }
 
 // maxAccountNameUnits is the longest account name, in UTF-16 code units,
