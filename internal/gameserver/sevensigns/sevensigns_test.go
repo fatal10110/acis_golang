@@ -76,6 +76,24 @@ func TestChangeAlreadyDue(t *testing.T) {
 		{"minor period with any save", StatusRow{Period: Results, LastSave: now.Add(-time.Second)}, now, true},
 		{"recruiting with any save", StatusRow{Period: Recruiting, LastSave: now.Add(-time.Minute)}, now, true},
 	}
+	paris, err := time.LoadLocation("Europe/Paris")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Restarted on a Monday morning, the scheduled end steps back a week of
+	// elapsed hours from this evening's 18:00: across the October change it
+	// lands on 19:00, across the March change on 17:00.
+	cases = append(cases, []struct {
+		name string
+		row  StatusRow
+		now  time.Time
+		want bool
+	}{
+		{"competition saved before the end, a week back across the autumn change", StatusRow{Period: Competition, LastSave: at(2026, time.October, 19, 18, 30, paris)}, at(2026, time.October, 26, 10, 0, paris), true},
+		{"competition saved after the end, a week back across the spring change", StatusRow{Period: Competition, LastSave: at(2026, time.March, 23, 17, 30, paris)}, at(2026, time.March, 30, 10, 0, paris), false},
+		{"competition saved before the end, a week back without a change", StatusRow{Period: Competition, LastSave: at(2026, time.November, 2, 17, 30, paris)}, at(2026, time.November, 9, 10, 0, paris), true},
+		{"competition saved after the end, a week back without a change", StatusRow{Period: Competition, LastSave: at(2026, time.November, 2, 18, 30, paris)}, at(2026, time.November, 9, 10, 0, paris), false},
+	}...)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := changeAlreadyDue(tc.row, tc.now); got != tc.want {
