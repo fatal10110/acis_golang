@@ -137,18 +137,6 @@ func storedAdena(t *testing.T, srv *gameservertest.Server, objID int32) int64 {
 	return n
 }
 
-// awaitAccepted waits until q has accepted more than n tasks.
-func awaitAccepted(t *testing.T, q *sim.Queue, n uint64, what string) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for q.Accepted() <= n {
-		if time.Now().After(deadline) {
-			t.Fatalf("%s never reached the player's queue", what)
-		}
-		time.Sleep(time.Millisecond)
-	}
-}
-
 // parkQueue posts a task that blocks q until the returned release is
 // called (also on cleanup), and waits for it to start.
 func parkQueue(t *testing.T, q *sim.Queue) (release func()) {
@@ -183,11 +171,13 @@ func commandBehindLogout(t *testing.T, line string) (*gameservertest.Server, int
 	exchange(t, gm, encodeAction(userID))
 	drain(t, user)
 
+	// Player's connection waits on its logout check, so it never returns to
+	// reading while the queue is parked: the waits below count queue posts.
 	gmQueue, userQueue := srv.PlayerQueue(t, gmID), srv.PlayerQueue(t, userID)
 	first := parkQueue(t, userQueue)
 	n := userQueue.Accepted()
 	user.Send(encodeLogout())
-	awaitAccepted(t, userQueue, n, "the logout check")
+	srv.AwaitQueueAccepted(t, userQueue, n) // the logout check
 	gate, parked := make(chan struct{}), make(chan struct{})
 	var opened sync.Once
 	second := func() { opened.Do(func() { close(gate) }) }
@@ -198,11 +188,11 @@ func commandBehindLogout(t *testing.T, line string) (*gameservertest.Server, int
 	})
 	n = gmQueue.Accepted()
 	gm.Send(encodeBuildCmd(line))
-	awaitAccepted(t, gmQueue, n, "the command")
+	srv.AwaitQueueAccepted(t, gmQueue, n) // the command
 	n = userQueue.Accepted()
 	first()
 	<-parked
-	awaitAccepted(t, userQueue, n, "the detach")
+	srv.AwaitQueueAccepted(t, userQueue, n) // the detach
 	second()
 
 	if !user.AwaitClose(5 * time.Second) {
