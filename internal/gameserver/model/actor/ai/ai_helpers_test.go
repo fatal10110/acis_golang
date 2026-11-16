@@ -137,6 +137,11 @@ func (a *fakeActor) Knows(target attackable.Combatant) bool {
 	return !ok || known
 }
 
+func (a *fakeActor) KnowsObject(target world.Tracked) bool {
+	known, ok := a.known[target.ObjectID()]
+	return !ok || known
+}
+
 // InWorld reports a target not listed in gone as still in the world.
 func (a *fakeActor) InWorld(target attackable.Combatant) bool {
 	return !a.gone[target.ObjectID()]
@@ -450,6 +455,7 @@ func (g *gateFake) BroadcastMoveToPawn(attackable.Combatant) {}
 func (g *gateFake) RefuseAttackTarget()                      { g.refusals++ }
 func (g *gateFake) GoneIdle() attackable.Combatant           { return nil }
 func (g *gateFake) SetFollowOwner(bool)                      {}
+func (g *gateFake) KnowsObject(world.Tracked) bool           { return true }
 func (g *gateFake) Owner() (attackable.Combatant, bool) {
 	if g.owner == nil {
 		return nil, false

@@ -28,6 +28,7 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 			a.tryToFollow(ctx.creature(), ctx.Shift)
 		} else {
 			a.setIntent(IntentInteractTarget)
+			a.tryToInteract(ctx.Target, ctx.Shift)
 		}
 	case CommandStop:
 		a.TryToIdle()
@@ -35,13 +36,14 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 		a.idle()
 		a.despawn(ctx.World)
 	case CommandMoveToTarget:
-		a.followOff.Store(true)
+		a.setFollowStatus(false)
 		a.SetTarget(ctx.Target)
 		if ctx.TargetIsCreature {
 			a.setIntent(IntentFollowTarget)
 			a.tryToFollow(ctx.creature(), ctx.Shift)
 		} else {
 			a.setIntent(IntentInteractTarget)
+			a.tryToInteract(ctx.Target, ctx.Shift)
 		}
 	}
 	result.Intent = a.Intent()

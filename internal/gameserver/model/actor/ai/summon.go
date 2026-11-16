@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 const summonFollowOffset = 70
@@ -25,6 +26,9 @@ type SummonActor interface {
 	attackable.Combatant
 	DenyAIAction() bool
 	Knows(attackable.Combatant) bool
+	// KnowsObject reports whether a world object that is no creature is
+	// still in the summon's sight.
+	KnowsObject(world.Tracked) bool
 	PhysicalAttackRange() int
 	SetHeadingTo(attackable.Combatant)
 	BroadcastMoveToPawn(attackable.Combatant)
@@ -572,6 +576,8 @@ func (s *Summon) thinkLocked() {
 		_, err = s.thinkCastLocked()
 	case IntentionPickUp:
 		err = s.thinkPickUpLocked()
+	case IntentionInteract:
+		s.thinkInteractLocked()
 	}
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
