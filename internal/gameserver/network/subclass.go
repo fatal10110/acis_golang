@@ -197,19 +197,12 @@ func (l *GameClientLink) subclassMenuAllowed(live *livePlayer) bool {
 }
 
 // subclassActionAllowed is the reuse gate of the add, change and replace
-// actions: one per SubclassDelay. A refused action answers nothing of its
-// own.
+// actions: one per SubclassDelay. The gate is the connection's, so a
+// restart and a new selection keep it. A refused action answers nothing of
+// its own. It runs in a bypass, which the connection's read loop waits on.
 func (l *GameClientLink) subclassActionAllowed(live *livePlayer) bool {
-	delay := l.playerConfig().SubclassDelay
-	if delay <= 0 {
-		return true
-	}
-	now := time.Now() // a reuse gate on wall time, as the other client gates are
-	if live.subclassReuseUntil.After(now) {
-		return false
-	}
-	live.subclassReuseUntil = now.Add(delay)
-	return true
+	// a reuse gate on wall time, as the other client gates are
+	return live.performFloodProtected(floodProtectorSubclass, l.playerConfig().SubclassDelay, time.Now())
 }
 
 // mayAddSubclass reports whether live may add a subclass: fewer than the
@@ -544,7 +537,7 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 	c.ClearDisabledSkills()
 	if l.skills != nil {
 		l.skills.StageClassSkillState(c, rows.skills)
-		l.skills.ReplayEffects(c, nil)
+		l.skills.ReplayClassEffects(c)
 	}
 	if c.EffectList().HasHeld() {
 		l.updateEffectIcons(live)

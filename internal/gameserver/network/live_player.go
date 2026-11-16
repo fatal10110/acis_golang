@@ -214,9 +214,11 @@ type livePlayer struct {
 	// on p's queue while the connection goroutine waits in onLive and taken
 	// by that goroutine once the wait returns; see finishPendingClassChange.
 	pendingClassChange *classChange
-	// subclassReuseUntil ends the reuse delay of the subclass actions. Set
-	// and read on p's queue.
-	subclassReuseUntil time.Time
+	// performFloodProtected consults one of the reuse gates of p's
+	// connection (Client.performFloodProtected), set once at attach. Those
+	// gates are the connection read loop's: call it only from a task that
+	// loop waits on in onLive, as a bypass is.
+	performFloodProtected func(protector int, delay time.Duration, now time.Time) bool
 
 	// shownMultisell is the multisell list p was last shown, the one its
 	// exchanges choose from, or nil. Set and read on p's queue.

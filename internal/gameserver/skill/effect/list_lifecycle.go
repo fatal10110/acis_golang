@@ -44,42 +44,63 @@ func (e *Effect) actionEnds() bool {
 
 // Add inserts e and activates it when it wins its stack group.
 func (l *List) Add(e *Effect) {
-	l.addAnnounced(e, true)
+	l.addAnnounced(e, true, nil)
 }
 
-// AddRestored is Add for an effect reinstated at login: it activates e the
-// same way, but sends the owner none of the felt/disappeared/expiry system
-// messages. Effects are restored before the player has a client, so those
-// messages go nowhere; only the later icon update reaches the client.
+// AddRestored is Add for an effect reinstated from saved state: it activates
+// e the same way, joining the open Restore without its own icon refresh.
+// Under a plain Restore, as at login, it sends the owner none of the
+// felt/disappeared/expiry system messages: the player has no client yet, so
+// those messages go nowhere and only the later icon update reaches it. Under
+// a RestoreAnnounced it sends them as Add does.
 //
 // It runs as a Restore of its own unless one is open (see Restore): once e
 // is active, the actions of its ticks already due run in order before the
 // one icon refresh, so an effect they end is not in it.
 func (l *List) AddRestored(e *Effect) {
-	l.Restore(func() { l.addAnnounced(e, false) })
+	l.Restore(func() {
+		l.mu.Lock()
+		b := l.restoring
+		l.mu.Unlock()
+		l.addAnnounced(e, b.announce, b)
+	})
 }
 
 // restoreBatch is what one Restore collects from the restored adds it runs:
 // the effects they added, and the exit hooks their insertions queued, to
-// run after its icon refresh as an Add runs them after its own.
+// run after its icon refresh as an Add runs them after its own. announce
+// is whether those adds send the owner the messages an Add sends.
 type restoreBatch struct {
-	added []*Effect
-	exits []func()
+	added    []*Effect
+	exits    []func()
+	announce bool
 }
 
-// Restore runs apply, whose AddRestored calls join l without their icon
-// refreshes, then the actions of the ticks of those effects that came due
-// by the instant Restore began, in time order across all of them (see
-// catchUp), and then refreshes the icons once. A tick that comes due while
-// apply runs is left to the effects sweep: an effect anchored at the replay
-// itself has its first tick at least restoreMinDelay after its add, so
-// however long apply takes, the replay never runs it. Every restored effect
-// is anchored at the restore instant on its own fixed-rate clock, so the
-// ticks due since then interleave by time, not by the order the effects
-// were saved in. A
-// Restore inside another one just runs apply: the outermost one catches up
-// and refreshes for all of them. Call it on the owner's queue.
+// Restore runs apply, whose AddRestored calls join l silently and without
+// their icon refreshes, then the actions of the ticks of those effects that
+// came due by the instant Restore began, in time order across all of them
+// (see catchUp), and then refreshes the icons once. A tick that comes due
+// while apply runs is left to the effects sweep: an effect anchored at the
+// replay itself has its first tick at least restoreMinDelay after its add,
+// so however long apply takes, the replay never runs it. Every restored
+// effect is anchored at the restore instant on its own fixed-rate clock, so
+// the ticks due since then interleave by time, not by the order the effects
+// were saved in. A Restore inside another one just runs apply: the
+// outermost one decides whether its adds are announced, and catches up and
+// refreshes for all of them. Call it on the owner's queue.
 func (l *List) Restore(apply func()) {
+	l.restore(apply, false)
+}
+
+// RestoreAnnounced is Restore for a character already in the world whose
+// saved effects come back, as on a class change: each AddRestored it runs
+// sends the owner the felt and disappeared messages an Add sends, while the
+// icons still refresh once for all of them.
+func (l *List) RestoreAnnounced(apply func()) {
+	l.restore(apply, true)
+}
+
+func (l *List) restore(apply func(), announce bool) {
 	if l == nil {
 		apply()
 		return
@@ -90,7 +111,7 @@ func (l *List) Restore(apply func()) {
 		apply()
 		return
 	}
-	b := &restoreBatch{}
+	b := &restoreBatch{announce: announce}
 	l.restoring = b
 	l.mu.Unlock()
 	start := l.now()
@@ -115,7 +136,10 @@ func (l *List) Restore(apply func()) {
 	l.notifyActivityTransition()
 }
 
-func (l *List) addAnnounced(e *Effect, announce bool) {
+// addAnnounced inserts e, sending the owner the stack messages when
+// announce is set. With batch set, e joins that open restore, which runs
+// its exit hooks and icon refresh; otherwise the add runs them itself.
+func (l *List) addAnnounced(e *Effect, announce bool, batch *restoreBatch) {
 	if !l.Admits(e) {
 		return
 	}
@@ -131,10 +155,6 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 	l.silent = false
 	exiting := l.exiting
 	l.exiting = nil
-	var batch *restoreBatch
-	if !announce {
-		batch = l.restoring
-	}
 	l.mu.Unlock()
 
 	runHooks(pending)
