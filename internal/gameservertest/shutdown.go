@@ -35,10 +35,14 @@ type shutdownHarness struct {
 
 	// hold queues the login server's answers while a test holds them.
 	hold loginAnswerQueue
+
+	// kicked carries each account the login server asked this server to
+	// kick, once the kick was handled.
+	kicked chan string
 }
 
 func newShutdownHarness(servers *manager.ServerRegistry) *shutdownHarness {
-	return &shutdownHarness{servers: servers, synced: make(chan struct{}, 1)}
+	return &shutdownHarness{servers: servers, synced: make(chan struct{}, 1), kicked: make(chan string, 16)}
 }
 
 // authResponse routes the login server's PlayerAuthResponse: LoginEntry's

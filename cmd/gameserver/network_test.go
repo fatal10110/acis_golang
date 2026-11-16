@@ -39,7 +39,7 @@ func TestOnlineAccountsEmptyWorldSendsNothing(t *testing.T) {
 
 func TestPlayerAuthResponseHandlerToleratesMissingLinkAndRejections(t *testing.T) {
 	validator := network.NewSessionValidator()
-	handler := playerAuthResponseHandler(provideLoginLinkState(), validator, zerolog.Nop())
+	handler := network.PlayerAuthAnswers(validator, provideLoginLinkState().get, zerolog.Nop())
 
 	handler("acc1", true)  // no login link up yet: must not panic
 	handler("acc2", false) // rejection: nothing to report

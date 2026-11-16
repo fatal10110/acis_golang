@@ -2103,12 +2103,29 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	shutdownState := newShutdownHarness(servers)
 
 	validator := network.NewSessionValidator()
+	// The link's handlers run on its reader goroutine, which starts before
+	// the link and the game client link exist; each reaches them through
+	// a pointer published once they do, as production's link holder does.
+	var linked atomic.Pointer[network.LoginLink]
+	var kicks atomic.Pointer[network.GameClientLink]
 	loginLink, err := network.DialLoginLink(context.Background(), loginAddr,
 		network.LoginServerAuth{ServerID: 1, HexID: HexID, HostName: "*", Port: 7777, MaxPlayers: 300},
-		network.LoginLinkHandlers{PlayerAuthResponse: shutdownState.authResponse(validator.Resolve)}, zerolog.Nop())
+		network.LoginLinkHandlers{
+			PlayerAuthResponse: shutdownState.authResponse(network.PlayerAuthAnswers(validator, linked.Load, zerolog.Nop())),
+			KickPlayer: func(account string) {
+				if gcl := kicks.Load(); gcl != nil {
+					gcl.KickPlayer(account)
+				}
+				select {
+				case shutdownState.kicked <- account:
+				default:
+				}
+			},
+		}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
+	linked.Store(loginLink)
 	cleanup(t, func() { loginLink.Close() })
 
 	state := world.New()
@@ -2533,6 +2550,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
 	}
+	kicks.Store(gcl)
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
 	if worldObjects != nil {
 		worldObjects.SetRegenSettings(gcl.PlayerRules())

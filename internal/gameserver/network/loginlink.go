@@ -121,10 +121,21 @@ func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, ha
 		return nil, fmt.Errorf("dial login server: %w", err)
 	}
 
+	// Canceling ctx closes the connection for as long as the handshake
+	// runs, so a stop never waits out a login server that stalls mid-way.
+	stopWatch := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	l := &LoginLink{conn: conn, crypt: crypt.NewLinkCrypt(), log: log, done: make(chan struct{}), frames: wire.NewFrameReader(conn), handshaking: true}
 	if err := l.handshake(auth); err != nil {
+		stopWatch()
 		conn.Close()
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("login link handshake: %w", ctx.Err())
+		}
 		return nil, err
+	}
+	if !stopWatch() {
+		// The cancel closed the connection just as the handshake ended.
+		return nil, fmt.Errorf("login link handshake: %w", ctx.Err())
 	}
 	l.handshaking = false
 
@@ -321,14 +332,27 @@ func (l *LoginLink) SendPlayerLogout(account string) error {
 	return l.send(link.EncodePlayerLogout(account))
 }
 
+// maxLinkPayload is the longest payload whose encrypted body (checksum
+// appended, padded to whole Blowfish blocks) still fits one frame.
+const maxLinkPayload = (wire.MaxFrameLength-wire.FrameHeaderSize)/crypt.BlockSize*crypt.BlockSize - linkChecksumSize
+
+// linkChecksumSize is the checksum the link cipher appends to each payload.
+const linkChecksumSize = 4
+
 // SendPlayerInGame reports accounts that just entered the game on this
-// server.
+// server, in order, over as many messages as one frame each needs: a
+// roster too large for one frame goes whole as several.
 func (l *LoginLink) SendPlayerInGame(accounts []string) error {
-	payload, err := link.EncodePlayerInGame(accounts)
+	batches, err := link.EncodePlayerInGameBatches(accounts, maxLinkPayload)
 	if err != nil {
 		return err
 	}
-	return l.send(payload)
+	for _, payload := range batches {
+		if err := l.send(payload); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SendAccessLevelChange asks the login server to change account's access
