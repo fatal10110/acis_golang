@@ -49,6 +49,12 @@ func spoiledMonsterTemplate() *npc.Template {
 // is zero, kills it with the player and gives the corpse a live deadline.
 func sweepScene(t *testing.T, spoilerFor func(srv *gameservertest.Server, sweeperID int32) int32) (*gameservertest.Server, int32, *npc.Hostile) {
 	t.Helper()
+	return sweepSceneOf(t, spoiledMonsterTemplate(), spoilerFor)
+}
+
+// sweepSceneOf is sweepScene against the monster template tmpl.
+func sweepSceneOf(t *testing.T, tmpl *npc.Template, spoilerFor func(srv *gameservertest.Server, sweeperID int32) int32) (*gameservertest.Server, int32, *npc.Hostile) {
+	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Sweeper", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -61,7 +67,7 @@ func sweepScene(t *testing.T, spoilerFor func(srv *gameservertest.Server, sweepe
 	srv.GiveItem(t, objID, item.AdenaID, 1)
 	startInWorld(t, c)
 
-	mob := srv.SpawnHostileNPCTemplateAt(t, spoiledMonsterTemplate(), location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	mob := srv.SpawnHostileNPCTemplateAt(t, tmpl, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, mob.ObjectID())
 	drainUntilQuiet(t, c)

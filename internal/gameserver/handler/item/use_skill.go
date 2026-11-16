@@ -59,19 +59,23 @@ type UseResult struct {
 	// Condition is set only when Outcome is ConditionRejected.
 	Condition modelskill.ConditionClause
 
-	// Apply runs the skill's effects on the caster (and the mirrored
-	// summon, for a herb), returning the merged caster-visible result so
-	// the caller can feed it to its ATTACK_FAILED/counterattack/etc.
-	// reporting seam. It is set only on Applied and is the caller's job to
-	// invoke after sending its own cast-acknowledgment packets: the cast is
-	// sent first, then applied.
+	// Apply runs the skill's effects on the caster, returning the
+	// caster-visible result so the caller can feed it to its
+	// ATTACK_FAILED/counterattack/etc. reporting seam. It is set only on
+	// Applied and is the caller's job to invoke after sending its own
+	// cast-acknowledgment packets: the cast is sent first, then applied.
 	Apply func() actorcast.EffectResult
 
-	// MirroredSummon is the servitor the herb's effect was mirrored onto,
-	// set only when that mirror happened. The caller broadcasts its own
-	// MagicSkillUse for it (caster and target both the servitor),
-	// independently of the caster's own cast packet.
-	MirroredSummon actorcast.Target
+	// MirroredSummon is the servitor a herb's cast is mirrored onto, set only
+	// when that mirror happens. The mirror is the servitor's own instant cast
+	// and follows the caster's whole cast: once Apply has run, the caller
+	// broadcasts the servitor's MagicSkillUse (caster and target both the
+	// servitor) to the servitor's observers, then calls ApplyMirror.
+	MirroredSummon HerbMirror
+
+	// ApplyMirror runs the skill's effects on MirroredSummon and returns
+	// the result it reports to the owner. Set only with MirroredSummon.
+	ApplyMirror func() actorcast.EffectResult
 
 	HasShortBuff             bool
 	ShortBuffSkillID         int32
@@ -103,6 +107,17 @@ type SkillCaster interface {
 	ShortBuffTaskSkillID() int32
 }
 
+// HerbMirror is the servitor a herb's cast is mirrored onto: it takes the
+// skill's effects and keeps its own reuse of the skill.
+type HerbMirror interface {
+	skilltarget.Actor
+	DisableSkill(key int32, delay time.Duration)
+}
+
+// herbMirrorMinReuse is the skill reuse delay, in milliseconds, a mirrored
+// herb cast must exceed before it puts the skill under reuse on the servitor.
+const herbMirrorMinReuse = 10
+
 // InventoryDestroyer decrements a stack by a count from an inventory.
 type InventoryDestroyer interface {
 	DestroyItem(inv *itemcontainer.Inventory, objectID int32, count int) (invops.Result, bool)
@@ -128,7 +143,7 @@ type UseRequest struct {
 	// Caster. Nil when the caster
 	// has no active servitor, or is itself one (IsPet), leaves the mirror
 	// unapplied.
-	Summon skilltarget.Actor
+	Summon HerbMirror
 
 	// Target is the caster's selected target, used by attached-skill conditions.
 	Target any
@@ -187,25 +202,22 @@ func UseAll(req UseRequest) []UseResult {
 		}
 
 		reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
-		mirrorToSummon := tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil
 		apply := func() actorcast.EffectResult {
-			result := actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Caster, *def)
-			if mirrorToSummon {
-				summonResult := actorcast.ApplyEffectsResult(req.Effects, req.Summon, req.Summon, *def)
-				result.Messages = append(result.Messages, summonResult.Messages...)
-				result.AttackFailed += summonResult.AttackFailed
-				result.Handled = result.Handled || summonResult.Handled
-				result.Counterattacks = append(result.Counterattacks, summonResult.Counterattacks...)
-				result.Lethals = append(result.Lethals, summonResult.Lethals...)
-				result.Dodges = append(result.Dodges, summonResult.Dodges...)
-				result.Resisted = append(result.Resisted, summonResult.Resisted...)
-			}
-			return result
+			return actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Caster, *def)
 		}
 
 		result := UseResult{Outcome: Applied, Skill: def, Apply: apply, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
-		if mirrorToSummon {
-			result.MirroredSummon = req.Summon
+		if tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil {
+			mirror := req.Summon
+			// The servitor's copy carries the skill's own reuse only — never
+			// the item's — and none at all for a delay of 10ms or less.
+			if def.ReuseDelay > herbMirrorMinReuse {
+				mirror.DisableSkill(reuseKey, time.Duration(def.ReuseDelay)*time.Millisecond)
+			}
+			result.MirroredSummon = mirror
+			result.ApplyMirror = func() actorcast.EffectResult {
+				return actorcast.ApplyEffectsResult(req.Effects, mirror, mirror, *def)
+			}
 		}
 		result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)
 		results = append(results, result)

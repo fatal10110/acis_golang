@@ -1134,10 +1134,11 @@ func TestSpoilPoolSweepOrder(t *testing.T) {
 	}
 }
 
-// TestRollKillRewardFillsSpoilPoolInDropOrder: a spoil category's items
-// enter the pool in the category's drop order, which decides the sweep
-// order of two items sharing a bucket (1876 and 116).
-func TestRollKillRewardFillsSpoilPoolInDropOrder(t *testing.T) {
+// TestRollKillRewardFillsSpoilPoolInRollMapOrder: a spoil category's items
+// enter the pool in the roll map's iteration order, so of two items sharing
+// a bucket (1876 and 116) the one rolled later sweeps first, whichever the
+// category lists first.
+func TestRollKillRewardFillsSpoilPoolInRollMapOrder(t *testing.T) {
 	rates := Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 	for _, order := range [][]int32{{1876, 116}, {116, 1876}} {
 		category := DropCategory{Kind: DropSpoil, Chance: 100}
@@ -1149,8 +1150,8 @@ func TestRollKillRewardFillsSpoilPoolInDropOrder(t *testing.T) {
 			pool.Mark(1)
 			RollKillReward([]DropCategory{category}, &pool, 1, false, rates, false)
 			swept := pool.Sweep()
-			if len(swept) != 2 || swept[0].ItemID != order[0] || swept[1].ItemID != order[1] {
-				t.Fatalf("swept %v, want the drop order %v", swept, order)
+			if len(swept) != 2 || swept[0].ItemID != order[1] || swept[1].ItemID != order[0] {
+				t.Fatalf("swept %v, want the later-listed item first of %v", swept, order)
 			}
 		}
 	}

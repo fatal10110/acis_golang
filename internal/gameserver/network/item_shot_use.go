@@ -10,6 +10,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
+// shotChargeVisualRadius bounds who sees a shot's charge visual: the user
+// and the players that know the user within this distance of it.
+const shotChargeVisualRadius = 600
+
 // shotMessageSet names the client messages one shot handler's rejections
 // and success map to.
 type shotMessageSet struct {
@@ -99,7 +103,7 @@ func (l *GameClientLink) chargeShot(live *livePlayer, inv *itemcontainer.Invento
 		live.SendFrame(serverpackets.FrameSystemMessage(msgs.enabled))
 		if res.SkillID != 0 {
 			self := skillCastObject(live)
-			l.broadcastLiveFrame(live, func() wire.Frame {
+			l.broadcastToSelfAndKnownInRadius(live, shotChargeVisualRadius, func() wire.Frame {
 				return serverpackets.FrameMagicSkillUse(self, self, res.SkillID, 1, 0, 0, false)
 			})
 		}
@@ -228,8 +232,10 @@ func (l *GameClientLink) chargeBeastShot(live *livePlayer, inv *itemcontainer.In
 	case itemhandler.BeastShotApplied:
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetUsesS1, tmpl.ID))
 		if res.SkillID != 0 && target != nil {
+			// The visual is the summon's, but its audience is measured from
+			// the owner who used the shot.
 			self := skillCastObject(target)
-			l.broadcastLiveFrame(live, func() wire.Frame {
+			l.broadcastToSelfAndKnownInRadius(live, shotChargeVisualRadius, func() wire.Frame {
 				return serverpackets.FrameMagicSkillUse(self, self, res.SkillID, 1, 0, 0, false)
 			})
 		}
