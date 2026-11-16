@@ -31,8 +31,8 @@ func TestStoreGroundRefusesStackGrownPastCountLimitAfterClaim(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	if herb, failure := ClaimGround(pet, petInv, ground); failure != PickupOK || herb {
-		t.Fatalf("ClaimGround = (%v, %v), want non-herb OK", herb, failure)
+	if herb, held, failure := ClaimGround(pet, petInv, ground); failure != PickupOK || herb || !held {
+		t.Fatalf("ClaimGround = (%v, %v, %v), want held non-herb OK", herb, held, failure)
 	}
 	held := petInv.AddNew(item.AdenaID, math.MaxInt32-10, 500)
 	petInv.DrainUpdates()

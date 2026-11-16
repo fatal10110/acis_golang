@@ -340,7 +340,10 @@ func (l *GameClientLink) petTakeGround(live *livePlayer, pet *summon.Actor, obje
 		return
 	}
 
-	herb, failure := petitem.ClaimGround(pet, petInv, ground)
+	herb, held, failure := petitem.ClaimGround(pet, petInv, ground)
+	if held && failure != petitem.PickupOK {
+		l.releaseGround(ground)
+	}
 	switch failure {
 	case petitem.PickupOK:
 	case petitem.PickupPetUnavailable:
