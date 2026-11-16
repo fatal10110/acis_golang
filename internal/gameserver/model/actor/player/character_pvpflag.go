@@ -57,7 +57,8 @@ func (c *Character) NoteServitorPvPAttack(target attackable.Combatant) {
 
 func (c *Character) notePvPAttack(target attackable.Combatant, byServitor bool) {
 	if victim := actingCharacter(target); victim != nil {
-		victim.notePvPHitFromAttacker(c, byServitor)
+		zoned, ok := target.(attackable.PvPZoneMember)
+		victim.notePvPHitFromAttacker(c, ok && zoned.InPvPZone(), byServitor)
 	}
 }
 
@@ -114,9 +115,11 @@ type attackableNPC interface {
 // innocent" duration applies. attacker resolves through *Character, so only
 // a live player attacker can ever be flagged — an NPC/monster attacker
 // (which never satisfies this assertion) is always a no-op: an attacker
-// with no acting player bails. byServitor marks the
-// attack as the attacker's summon's.
-func (c *Character) notePvPHitFromAttacker(attacker any, byServitor bool) {
+// with no acting player bails. hitInPvPZone is whether the creature hit, c
+// or c's summon, stands in a PvP zone: the hit flags nothing only when it
+// and the attacker both do. byServitor marks the attack as the attacker's
+// summon's.
+func (c *Character) notePvPHitFromAttacker(attacker any, hitInPvPZone, byServitor bool) {
 	pk, ok := attacker.(*Character)
 	if !ok || pk == c || c.Karma() != 0 {
 		return
@@ -125,7 +128,7 @@ func (c *Character) notePvPHitFromAttacker(attacker any, byServitor bool) {
 	if pk.InDuel() && pk.DuelID() == c.DuelID() {
 		return
 	}
-	if pk.InPvPZone() && c.InPvPZone() {
+	if pk.InPvPZone() && hitInPvPZone {
 		return
 	}
 	useFlagged := pk.Karma() == 0 && c.PvPFlagState() != task.PvPFlagNone

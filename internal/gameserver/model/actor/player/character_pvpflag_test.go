@@ -66,7 +66,7 @@ func TestNotePvPHitFromAttackerFlagsInnocentVictimHit(t *testing.T) {
 	victim := &Character{ID: 2}
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker, false)
+	victim.notePvPHitFromAttacker(attacker, victim.InPvPZone(), false)
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != false {
@@ -81,7 +81,7 @@ func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
 	victim.SetInPvPZone(true)
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker, false)
+	victim.notePvPHitFromAttacker(attacker, victim.InPvPZone(), false)
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
@@ -106,7 +106,7 @@ func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.
 	victim.pvpFlag = task.PvPFlagOn
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker, false)
+	victim.notePvPHitFromAttacker(attacker, victim.InPvPZone(), false)
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != true {
@@ -120,7 +120,7 @@ func TestNotePvPHitFromAttackerUsesNormalDurationWhenAttackerHasKarma(t *testing
 	victim.pvpFlag = task.PvPFlagOn
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker, false)
+	victim.notePvPHitFromAttacker(attacker, victim.InPvPZone(), false)
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != false {
@@ -133,7 +133,7 @@ func TestNotePvPHitFromAttackerSkipsWhenVictimHasKarma(t *testing.T) {
 	victim := &Character{ID: 2, KarmaPoints: 500}
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker, false)
+	victim.notePvPHitFromAttacker(attacker, victim.InPvPZone(), false)
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
@@ -145,20 +145,20 @@ func TestNotePvPHitFromAttackerSkipsNonPlayerAttacker(t *testing.T) {
 	victim := &Character{ID: 2}
 
 	// Should not panic and should be a no-op for a non-*Character attacker.
-	victim.notePvPHitFromAttacker(npcKiller{id: 99}, false)
+	victim.notePvPHitFromAttacker(npcKiller{id: 99}, victim.InPvPZone(), false)
 }
 
 func TestNotePvPHitFromAttackerSkipsNilAttacker(t *testing.T) {
 	victim := &Character{ID: 2}
 
-	victim.notePvPHitFromAttacker(nil, false)
+	victim.notePvPHitFromAttacker(nil, victim.InPvPZone(), false)
 }
 
 func TestNotePvPHitFromAttackerSkipsSelfHit(t *testing.T) {
 	c := &Character{ID: 1}
 	rec := recordEvents(c)
 
-	c.notePvPHitFromAttacker(c, false)
+	c.notePvPHitFromAttacker(c, c.InPvPZone(), false)
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
@@ -172,7 +172,7 @@ func TestNotePvPHitFromAttackerNoopWithoutHook(t *testing.T) {
 
 	// Should not panic when no hook is wired (e.g. character not attached
 	// to a live session).
-	victim.notePvPHitFromAttacker(attacker, false)
+	victim.notePvPHitFromAttacker(attacker, victim.InPvPZone(), false)
 }
 
 func TestCharacterNotePvPAttackFlagsInnocentVictim(t *testing.T) {

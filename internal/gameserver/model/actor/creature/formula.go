@@ -163,12 +163,17 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 
 // ResolvePhysicalAttackInput builds a non-skill physical auto-attack's
 // damage input. Shield is resolved first so a perfect block can skip the
-// damage formula; random variance is rolled after that shield check.
+// damage formula; random variance is rolled after that shield check. An
+// attacker without damage permission resolves to a NoDamage input right
+// after the shield roll, rolling no variance.
 func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formulas.PhysicalAttackInput, formulas.ShieldDefense) {
 	if attacker == nil || target == nil {
 		return formulas.PhysicalAttackInput{}, formulas.ShieldFailed
 	}
 	shield := target.ShieldDefense(attacker, modelskill.Definition{}, crit)
+	if damageBlocked(attacker) {
+		return formulas.PhysicalAttackInput{NoDamage: true}, shield
+	}
 	defence := target.Against(view(attacker), nil).PDef()
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
@@ -200,11 +205,15 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 }
 
 // ApplyPhysicalAttackDamage converts a resolved auto-attack input into the
-// integer damage one hit deals. A perfect shield block is a flat 1 before
-// dual-wield splitting. The formula result narrows to int32 first (a zero
+// integer damage one hit deals. An attacker without damage permission
+// deals 0, even through a perfect shield block; otherwise a perfect block is
+// a flat 1 before dual-wield splitting. The formula result narrows to int32 first (a zero
 // defence yields +Inf, which saturates, or NaN, which becomes 0), and only
 // then does a dual-wield hit halve it.
 func ApplyPhysicalAttackDamage(in formulas.PhysicalAttackInput, shield formulas.ShieldDefense, split bool) int {
+	if in.NoDamage {
+		return 0
+	}
 	damage := 1.0
 	if shield != formulas.ShieldPerfect {
 		damage = formulas.PhysicalAttackDamage(in)
@@ -434,9 +443,10 @@ func PhysicalSkillCrit(attacker FormulaActor, def modelskill.Definition) bool {
 // signal "no weapon" — a weapon with an explicit or defaulted 0 spread
 // (e.g. the "Elrokian Trap", item 8763, which has no random_damage
 // attribute) must NOT fall back to the level formula, since the gate is
-// "a weapon is active", not "spread > 0".
+// "a weapon is active", not "spread > 0". A skill whose landing effect type
+// is CHARGEDAM rolls no spread at all.
 func RandomDamageMultiplier(attacker FormulaActor, def modelskill.Definition) float64 {
-	if attacker == nil || SkillTypeKey(def.EffectType) == "CHARGEDAM" {
+	if attacker == nil || SkillTypeKey(def.LandingEffectType()) == "CHARGEDAM" {
 		return 1
 	}
 	spread := attacker.RandomDamageSpread()
