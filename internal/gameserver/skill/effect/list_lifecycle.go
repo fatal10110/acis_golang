@@ -482,11 +482,14 @@ func appendThunk(pending *[]func(), thunk func()) {
 	}
 }
 
-// activation is one queued stack-head (or plain effect) activation: e, and
-// whether its success tells the owner it feels e's effect.
+// activation is one queued stack-head (or plain effect) activation: e,
+// whether its success tells the owner it feels e's effect, and the exit
+// hooks of e's stack group that were open when it was decided, which run
+// before e starts (see exitTicket).
 type activation struct {
 	e        *Effect
 	announce bool
+	after    []*exitTicket
 }
 
 // beginActivate returns a thunk that activates e once the caller's lock is
@@ -500,14 +503,23 @@ type activation struct {
 // promoted stack loser resumes with whatever count it drained down to while
 // displaced instead of restarting from the template.
 func (l *List) beginActivate(e *Effect, announce bool) func() {
-	act := activation{e: e, announce: announce && !l.quietLocked()}
+	act := activation{e: e, announce: announce && !l.quietLocked(), after: l.exitsBeforeLocked(e)}
 	return func() { l.activate(act) }
 }
 
-// activate runs act, and every activation queued on l while it runs, one at
-// a time: an activation that finds another one running hands itself to that
-// goroutine and returns at once. The owner's stat refresh and felt message
-// of each successful activation run after the hand-over ends.
+// activate queues act and runs the list's queued activations (see
+// runActivations).
+func (l *List) activate(act activation) {
+	l.mu.Lock()
+	l.deferred = append(l.deferred, act)
+	l.runActivations()
+}
+
+// runActivations runs the queued activations one at a time: when another
+// run is already in progress it leaves them to that goroutine and returns at
+// once. The owner's stat refresh and felt message of each successful
+// activation run after the run ends. Caller must hold l.mu, which
+// runActivations releases.
 //
 // Running activations one at a time keeps a stale activation's start and
 // its undo (see activateOne) from interleaving with the start of the effect
@@ -515,14 +527,17 @@ func (l *List) beginActivate(e *Effect, announce bool) func() {
 // state the new head set, and an effect promoted twice starts once. Handing
 // over instead of waiting keeps a start or exit hook that changes this same
 // list from deadlocking; the activations it causes run once it returns.
-// The exit hooks of a displaced or removed head are not ordered by this:
-// one still running late can clear state a later head set (#5221).
+//
+// An activation starts only once the exit hooks of its stack group decided
+// before it have run, so a displaced or removed head's exit never clears
+// what a later head's start set. The run itself runs such a hook that has
+// not started yet. One that another goroutine is already running stops the
+// run instead: the remaining activations stay queued, in order, and that
+// goroutine resumes them once the hook returns.
 //
 // A hook that panics ends the run but not the list: the activations still
 // queued stay queued, in order, and run ahead of the next one added.
-func (l *List) activate(act activation) {
-	l.mu.Lock()
-	l.deferred = append(l.deferred, act)
+func (l *List) runActivations() {
 	if l.activating {
 		l.mu.Unlock()
 		return
@@ -539,13 +554,30 @@ func (l *List) activate(act activation) {
 	var after []func()
 	for len(l.deferred) > 0 {
 		next := l.deferred[0]
+		if !l.headsLocked(next.e) || next.e.inUse {
+			l.deferred = l.deferred[1:]
+			continue
+		}
+		if t := next.openExit(); t != nil {
+			if t.state == exitRunning {
+				t.parked = true
+				break
+			}
+			t.state = exitRunning
+			l.mu.Unlock()
+			l.runExit(t)
+			l.mu.Lock()
+			continue
+		}
 		l.deferred = l.deferred[1:]
 		l.mu.Unlock()
 		appendThunk(&after, l.activateOne(next))
 		l.mu.Lock()
 	}
 	l.activating = false
-	l.deferred = nil
+	if len(l.deferred) == 0 {
+		l.deferred = nil
+	}
 	l.mu.Unlock()
 	finished = true
 	runHooks(after)
@@ -554,23 +586,15 @@ func (l *List) activate(act activation) {
 // activateOne runs act's on-start hook unlocked, then briefly re-acquires
 // l.mu to apply the result: e becomes in use either way, and gains its stat
 // funcs only when its start succeeded (see Effect.startFailed). It returns
-// the owner's stat refresh and felt message, or nil.
+// the owner's stat refresh and felt message, or nil. The caller checked, under
+// l.mu, that e heads its stack group and is not yet active.
 //
-// An effect that is no longer held, no longer heads its stack group, or is
-// already active when its turn comes does not start. One that loses its
-// place while its start hook runs (a concurrent add or removal retired or
-// displaced it) changes nothing: it stays as that other path left it, gains
-// no stat funcs nothing would remove, and a start that succeeded is undone
-// through its exit hook.
+// An effect that loses its place while its start hook runs (a concurrent
+// add or removal retired or displaced it) changes nothing: it stays as that
+// other path left it, gains no stat funcs nothing would remove, and a start
+// that succeeded is undone through its exit hook.
 func (l *List) activateOne(act activation) func() {
 	e := act.e
-	l.mu.Lock()
-	live := l.headsLocked(e) && !e.inUse
-	l.mu.Unlock()
-	if !live {
-		return nil
-	}
-
 	ok := true
 	if e.OnStart != nil {
 		ok = e.OnStart(e)
@@ -685,7 +709,7 @@ func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
 	} else {
 		for _, existing := range slices.Clone(l.buffs) {
 			if existing.identical(e) {
-				retire(existing, pending, retiring)
+				l.retire(existing, pending, retiring)
 			}
 		}
 
@@ -716,10 +740,10 @@ func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
 // second retirement of the same effect (a cap eviction reaching a buff the
 // identical check already retired) queues the exit hook again, but no second
 // stop-task hook: e's schedule is already stopped.
-func retire(e *Effect, pending *[]func(), retiring *[]*Effect) {
+func (l *List) retire(e *Effect, pending *[]func(), retiring *[]*Effect) {
 	if !slices.Contains(*retiring, e) {
 		appendThunk(pending, e.stopTaskThunk())
 		*retiring = append(*retiring, e)
 	}
-	appendThunk(pending, e.retireExit())
+	appendThunk(pending, l.orderExit(e, e.retireExit()))
 }
