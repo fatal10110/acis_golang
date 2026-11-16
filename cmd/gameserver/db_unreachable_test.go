@@ -29,7 +29,7 @@ const unreachableDBBootEnv = "ACIS_TEST_UNREACHABLE_DB_BOOT"
 // fail on that port, and the child would then report the bind instead.
 func TestGameServerRefusesToBootWithUnreachableDatabase(t *testing.T) {
 	if dir := os.Getenv(unreachableDBBootEnv); dir != "" {
-		newGameServerApp(unreachableDBPaths(dir)).Run()
+		newGameServerApp(unreachableDBPaths(dir), processZone{}).Run()
 		t.Fatal("game server started without its database")
 	}
 

@@ -1169,9 +1169,9 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if !ok {
 		return gameServerConfig{}, fmt.Errorf("missing ServerID in hexid file")
 	}
-	serverID, err := strconv.Atoi(serverIDText)
+	serverID, err := strconv.ParseInt(serverIDText, 10, 32)
 	if err != nil {
-		return gameServerConfig{}, err
+		return gameServerConfig{}, fmt.Errorf("parse ServerID in hexid file: %w", err)
 	}
 	hexIDText, ok := hexProps.Lookup("HexID")
 	if !ok {
@@ -1220,7 +1220,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		AcceptFilter: acceptFilter,
 		LoginAddr:    net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
 		Auth: network.LoginServerAuth{
-			ServerID:          serverID,
+			ServerID:          int(serverID),
 			AcceptAlternateID: serverProps.Bool("AcceptAlternateID", true),
 			HexID:             hexID,
 			HostName:          host,
@@ -1253,9 +1253,15 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	}, nil
 }
 
+// listenAddress returns the game listener address for GameserverHostname:
+// "*" binds every address and an empty host binds the loopback address
+// only. A host name stays as written; gameBindAddress resolves it at bind.
 func listenAddress(host string, port int) string {
-	if host == "*" {
+	switch host {
+	case "*":
 		host = ""
+	case "":
+		host = "127.0.0.1"
 	}
 	return net.JoinHostPort(host, strconv.Itoa(port))
 }
@@ -1283,11 +1289,7 @@ func loadKillRewardSettings(paths gameServerPaths, serverProps *config.Propertie
 		return manager.KillRewardSettings{}, err
 	}
 
-	currencyKey := "RateDropCurrency"
-	if _, ok := serverProps.Lookup(currencyKey); !ok {
-		currencyKey = "RateDropAdena"
-	}
-	currency, err := serverProps.Float64(currencyKey, 1)
+	currency, err := serverProps.Float64("RateDropCurrency", 1)
 	if err != nil {
 		return manager.KillRewardSettings{}, err
 	}

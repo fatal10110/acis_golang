@@ -409,7 +409,7 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, paths gameServerPath
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
+		OnStart: func(startCtx context.Context) error {
 			runCtx, stop := context.WithCancel(context.Background())
 			cancel = stop
 
@@ -423,10 +423,11 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, paths gameServerPath
 				}, network.DefaultReconnectDelay, onLoginLink(links, status, state, paths.HexIDPath, cfg.Auth.HexID, log), log)
 			}()
 
-			ln, err := net.Listen("tcp", cfg.ListenAddr)
+			addr := gameBindAddress(startCtx, cfg.ListenAddr, net.DefaultResolver.LookupIPAddr, log)
+			ln, err := net.Listen("tcp", addr)
 			if err != nil {
 				stop()
-				return fmt.Errorf("listen for game clients on %s: %w", cfg.ListenAddr, err)
+				return fmt.Errorf("listen for game clients on %s: %w", addr, err)
 			}
 			wg.Add(1)
 			go func() {
@@ -436,10 +437,10 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, paths gameServerPath
 				// attempts do not count toward a burst.
 				filtered := netutil.FilterAccepts(netutil.RefuseBanned(ln, bans.bans), bans.filter, time.Now)
 				if err := network.Serve(runCtx, filtered, clients.Handle, log); err != nil {
-					log.Error().Err(err).Str("addr", cfg.ListenAddr).Msg("game client listener stopped")
+					log.Error().Err(err).Str("addr", addr).Msg("game client listener stopped")
 				}
 			}()
-			log.Info().Str("addr", cfg.ListenAddr).Msg("listening for game clients")
+			log.Info().Str("addr", addr).Msg("listening for game clients")
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {

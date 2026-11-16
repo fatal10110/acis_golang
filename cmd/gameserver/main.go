@@ -112,8 +112,9 @@ type gameServerPaths struct {
 }
 
 func main() {
+	zone := setProcessZone()
 	paths := parseGameServerFlags()
-	newGameServerApp(paths).Run()
+	newGameServerApp(paths, zone).Run()
 }
 
 func parseGameServerFlags() gameServerPaths {
@@ -135,8 +136,8 @@ func parseGameServerFlags() gameServerPaths {
 	return paths
 }
 
-func newGameServerApp(paths gameServerPaths) *fx.App {
-	return fx.New(newGameServerAppOptions(paths)...)
+func newGameServerApp(paths gameServerPaths, zone processZone) *fx.App {
+	return fx.New(append([]fx.Option{fx.Supply(zone), fx.Invoke(logProcessZone)}, newGameServerAppOptions(paths)...)...)
 }
 
 // newGameServerAppOptions is the fx option list for the game server's
