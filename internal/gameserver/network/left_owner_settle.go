@@ -28,17 +28,19 @@ type selectingOwners struct {
 	pending map[int32]*ownerSelection
 }
 
-// ownerSelection is the selections of one character under way, the settles
-// held for them, and whether the last selection to end is running those.
+// ownerSelection is the selection of one character under way, the settles
+// held for it, and whether the selection that ended is running those.
 type ownerSelection struct {
-	selections int
-	draining   bool
-	held       []func()
+	selecting bool
+	draining  bool
+	held      []func()
 }
 
-// begin marks a selection of ownerID under way. A selection beginning while
-// the held settles of an earlier one run holds the rest of them for itself.
-func (s *selectingOwners) begin(ownerID int32) {
+// begin claims ownerID for a selection, and reports false, claiming nothing,
+// while another selection of ownerID is under way: one character is selected
+// by one session at a time. A selection beginning while the held settles of
+// an earlier one run holds the rest of them for itself.
+func (s *selectingOwners) begin(ownerID int32) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.pending == nil {
@@ -49,13 +51,17 @@ func (s *selectingOwners) begin(ownerID int32) {
 		sel = &ownerSelection{}
 		s.pending[ownerID] = sel
 	}
-	sel.selections++
+	if sel.selecting {
+		return false
+	}
+	sel.selecting = true
+	return true
 }
 
-// end closes a selection of ownerID that begin opened. The last one to end
-// runs the settles held for it, in the order they were held, on the calling
-// goroutine, including those held while it runs them. It stops when a new
-// selection of ownerID begins, which then runs the rest as it ends.
+// end closes the selection of ownerID that begin claimed. It runs the settles
+// held for it, in the order they were held, on the calling goroutine,
+// including those held while it runs them. It stops when a new selection of
+// ownerID begins, which then runs the rest as it ends.
 func (s *selectingOwners) end(ownerID int32) {
 	s.mu.Lock()
 	sel, ok := s.pending[ownerID]
@@ -63,14 +69,14 @@ func (s *selectingOwners) end(ownerID int32) {
 		s.mu.Unlock()
 		return
 	}
-	sel.selections--
-	if sel.selections > 0 || sel.draining {
+	sel.selecting = false
+	if sel.draining {
 		s.mu.Unlock()
 		return
 	}
 	sel.draining = true
 	for {
-		if sel.selections > 0 {
+		if sel.selecting {
 			sel.draining = false
 			s.mu.Unlock()
 			return
@@ -105,7 +111,7 @@ func (s *selectingOwners) settle(ownerID int32, lookup func(int32) (*livePlayer,
 		case !draining:
 			sel.held = append(sel.held, retry)
 			return nil, false
-		case sel.selections > 0:
+		case sel.selecting:
 			sel.held = append([]func(){retry}, sel.held...)
 			return nil, false
 		}

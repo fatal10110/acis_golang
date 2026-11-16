@@ -52,7 +52,7 @@ func TestSettleConfirmedTradePartnerGoneCancelsConfirmer(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
 	session := readyTradeSession(t, context.Background(), link, first, second)
 
-	link.world.RemovePlayer(second.ObjectID())
+	link.world.RemovePlayer(second)
 	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.settleConfirmedTrade(session, first.ObjectID())
@@ -75,7 +75,7 @@ func TestCancelTradePartnerGoneCancelsCanceller(t *testing.T) {
 	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
 	link.handleAnswerTradeRequest(second, clientpackets.AnswerTradeRequest{Response: 1})
 
-	link.world.RemovePlayer(second.ObjectID())
+	link.world.RemovePlayer(second)
 	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.cancelTradeByID(first.ObjectID())

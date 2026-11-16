@@ -64,6 +64,13 @@ type PlayerClockEffects interface {
 // its own per-minute clock listener, calling GameClock.Minutes for the
 // monotonic counter that rescheduling is anchored to.
 //
+// clockEntry is a tracked actor and the absolute game minute at which its
+// next activity reminder falls due.
+type clockEntry struct {
+	actor PlayerClockActor
+	dueAt int
+}
+
 // mu guards activity.
 type PlayerClock struct {
 	clock   *GameClock
@@ -71,7 +78,7 @@ type PlayerClock struct {
 	effects PlayerClockEffects
 
 	mu       sync.Mutex
-	activity map[int32]int // actor id -> absolute game-minute at which the next reminder falls due
+	activity map[int32]clockEntry // keyed by actor id
 }
 
 // NewPlayerClock returns a PlayerClock wired to clock and state. clock is
@@ -90,7 +97,7 @@ func NewPlayerClock(clock *GameClock, state *world.State, effects PlayerClockEff
 		clock:    clock,
 		players:  state,
 		effects:  effects,
-		activity: make(map[int32]int),
+		activity: make(map[int32]clockEntry),
 	}
 	clock.OnDayNight(pc.onDayNight)
 	clock.OnMinute(pc.Tick)
@@ -106,15 +113,21 @@ func (p *PlayerClock) Add(actor PlayerClockActor) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.activity[actor.ObjectID()] = p.clock.Minutes() + activityReminderMinutes
+	p.activity[actor.ObjectID()] = clockEntry{actor: actor, dueAt: p.clock.Minutes() + activityReminderMinutes}
 }
 
-// Remove stops tracking actorID for the activity reminder; safe to call
-// for an unknown id.
-func (p *PlayerClock) Remove(actorID int32) {
+// Remove stops tracking actor for the activity reminder; safe to call for
+// an untracked actor. Another actor tracked under the same object id stays
+// tracked.
+func (p *PlayerClock) Remove(actor PlayerClockActor) {
+	if actor == nil {
+		return
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	delete(p.activity, actorID)
+	if e, ok := p.activity[actor.ObjectID()]; ok && e.actor == actor {
+		delete(p.activity, actor.ObjectID())
+	}
 }
 
 // tracked reports whether actorID was added and not removed since.
@@ -141,12 +154,13 @@ func (p *PlayerClock) Tick() {
 	current := p.clock.Minutes()
 	p.mu.Lock()
 	due := make([]int32, 0, len(p.activity))
-	for id, dueAt := range p.activity {
-		if current < dueAt {
+	for id, e := range p.activity {
+		if current < e.dueAt {
 			continue
 		}
 		due = append(due, id)
-		p.activity[id] = current + activityReminderMinutes
+		e.dueAt = current + activityReminderMinutes
+		p.activity[id] = e
 	}
 	p.mu.Unlock()
 

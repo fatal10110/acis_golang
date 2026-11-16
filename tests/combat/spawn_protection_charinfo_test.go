@@ -21,21 +21,29 @@ func charInfoTeam(frame []byte) (objectID int32, team byte) {
 
 // enterProtected selects slot 0 and enters the world with a protection
 // window configured, and returns every frame the login left, the
-// protection UserInfo that leads the burst excluded.
+// protection UserInfo that follows the EtcStatusUpdate excluded.
 func enterProtected(t *testing.T, c *scriptedClient) [][]byte {
 	t.Helper()
 	c.Send(encodeRequestGameStart(0))
 	assertFrameOpcode(t, mustRead(t, c, "SSQInfo"), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertFrameOpcode(t, mustRead(t, c, "CharSelected"), serverpackets.OpcodeCharSelected, "CharSelected")
 	c.Send(encodeEnterWorld())
-	assertFrameOpcode(t, mustRead(t, c, "protection UserInfo"), serverpackets.OpcodeUserInfo, "protection UserInfo")
 	var frames [][]byte
+	protection := false
 	for {
 		frame := mustRead(t, c, "EnterWorld burst")
+		if !protection && len(frames) > 0 && frames[len(frames)-1][0] == serverpackets.OpcodeEtcStatusUpdate {
+			assertFrameOpcode(t, frame, serverpackets.OpcodeUserInfo, "protection UserInfo")
+			protection = true
+			continue
+		}
 		frames = append(frames, frame)
 		if frame[0] == serverpackets.OpcodeActionFailed {
 			break
 		}
+	}
+	if !protection {
+		t.Fatal("EnterWorld burst has no EtcStatusUpdate ahead of the protection UserInfo")
 	}
 	return append(frames, c.ReadQueued()...)
 }

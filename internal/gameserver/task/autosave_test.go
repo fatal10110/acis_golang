@@ -87,7 +87,7 @@ func TestAutosaveRemoveStopsSaving(t *testing.T) {
 
 	actor := &autosaveFakeActor{id: 1}
 	a.Add(actor)
-	a.Remove(actor.ObjectID())
+	a.Remove(actor)
 
 	now = now.Add(AutosaveInitialDelay)
 	a.Tick()
@@ -101,7 +101,7 @@ func TestAutosaveRemoveUntrackedActorIsNoop(t *testing.T) {
 	effects := &autosaveFakeEffects{}
 	a, _ := NewAutosave(effects, nil)
 
-	a.Remove(1)
+	a.Remove(&autosaveFakeActor{id: 1})
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Remove on untracked actor = %v, want none", got)
 	}
@@ -150,7 +150,7 @@ func TestAutosaveConcurrentAccess(t *testing.T) {
 		defer wg.Done()
 		for range 200 {
 			for _, act := range actors {
-				a.Remove(act.ObjectID())
+				a.Remove(act)
 			}
 		}
 	}()

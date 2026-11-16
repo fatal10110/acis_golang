@@ -229,7 +229,7 @@ func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewShadowItems() error = %v", err)
 	}
-	shadowItems.Track(100, inst, tmpl)
+	shadowItems.Track(idOwner(100), inst, tmpl)
 
 	instances := NewItemInstances(&itemFlusherStub{}, templates, nil, nil, zerolog.Nop())
 

@@ -419,7 +419,7 @@ func TestShadowItems_TrackDecaysManaEachTick(t *testing.T) {
 	tmpl := &item.Template{Duration: 5} // 300 seconds of mana
 	inst := &item.Instance{ObjectID: 1, ManaLeft: tmpl.InitialManaLeft()}
 
-	s.Track(10, inst, tmpl)
+	s.Track(idOwner(10), inst, tmpl)
 	if !s.Tracked(inst) {
 		t.Fatalf("Track() should start tracking a shadow item")
 	}

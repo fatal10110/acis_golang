@@ -28,10 +28,11 @@ const (
 	selectionEntering
 )
 
-// selectCharacter selects c, the character in chars at slot, once the world
-// checks have let the selection through: it waits for the character's queued
-// saves, restores it from its fresh row, answers CharSelected, registers the
-// player and takes over what an earlier session left in the world. It returns
+// selectCharacter selects c, the character in chars at slot, unless another
+// selection of it is under way or the world checks refuse it: it waits for
+// the character's queued saves, restores it from its fresh row, answers
+// CharSelected, registers the player and takes over what an earlier session
+// left in the world. It returns
 // the player once one is registered, even when the selection then ends the
 // connection, so the read loop detaches it.
 //
@@ -40,8 +41,39 @@ const (
 // (selectingOwners), since the selection reads the rows such a settle writes.
 func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client *Client, chars []*player.Character, slot int32, c *player.Character) (*livePlayer, selectionOutcome) {
 	objectID := c.ObjectID()
-	l.flow.selections.begin(objectID)
+	// One selection of a character at a time: a second one while the first
+	// is under way aborts silently, as the world checks below do. The claim
+	// spans the checks, so a selection that registered its player before it
+	// ended is found by them.
+	if !l.flow.selections.begin(objectID) {
+		return nil, selectionRefused
+	}
 	defer l.flow.selections.end(objectID)
+	// A character already in the world belongs to another live
+	// session: that session is closed with ServerClose and this
+	// selection aborts silently.
+	if l.world != nil {
+		if obj, exists := l.world.Player(c.ObjectID()); exists {
+			if prev, isLive := obj.(*livePlayer); isLive {
+				l.log.Info().Int32("object_id", c.ObjectID()).
+					Msg("game client: duplicate character login, closing previous session")
+				prev.kickClient()
+			}
+			return nil, selectionRefused
+		}
+		// Another character of the account still in the world is a
+		// previous session of the account that has not finished
+		// leaving, and it may hold this character's freight, which it
+		// writes on its way out. The selection aborts silently until
+		// that session is gone; its writes are then on this
+		// character's lane, which the wait below covers.
+		if prev, ok := l.accountPlayerInWorld(chars); ok {
+			l.log.Info().Int32("object_id", prev.ObjectID()).
+				Msg("game client: account character still in the world, closing previous session")
+			prev.kickClient()
+			return nil, selectionRefused
+		}
+	}
 	// A previous session of this character has left the world, so every
 	// save it queued is on the lane. Wait for them, then read the row fresh:
 	// the character list may predate those saves, and selection restores the

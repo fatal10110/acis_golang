@@ -82,9 +82,11 @@ func (s *AccountStore) SetLastServer(ctx context.Context, login string, serverID
 }
 
 // UpsertAccount creates the account if login is new, or updates its password
-// and access level if it already exists. It reports whether the row was
-// created or changed.
-func (s *AccountStore) UpsertAccount(ctx context.Context, login, hashedPassword string, accessLevel int) (bool, error) {
+// and access level if it already exists. It reports whether a row was
+// created or matched. accessLevel is sent as typed: the database converts it
+// to the column's integer type and, under a strict sql_mode, rejects a value
+// it cannot convert.
+func (s *AccountStore) UpsertAccount(ctx context.Context, login, hashedPassword, accessLevel string) (bool, error) {
 	res, err := s.db.ExecContext(ctx,
 		"INSERT INTO accounts (login, password, access_level) VALUES (?, ?, ?) "+
 			"ON DUPLICATE KEY UPDATE password = VALUES(password), access_level = VALUES(access_level)",
@@ -101,8 +103,10 @@ func (s *AccountStore) UpsertAccount(ctx context.Context, login, hashedPassword 
 }
 
 // ChangeAccessLevel updates an existing account's access level. It reports
-// whether a row was changed.
-func (s *AccountStore) ChangeAccessLevel(ctx context.Context, login string, level int) (bool, error) {
+// whether the account exists, including one already at level. level is sent
+// as typed: the database converts it to the column's integer type and, under
+// a strict sql_mode, rejects a value it cannot convert.
+func (s *AccountStore) ChangeAccessLevel(ctx context.Context, login, level string) (bool, error) {
 	res, err := s.db.ExecContext(ctx, "UPDATE accounts SET access_level = ? WHERE login = ?", level, login)
 	if err != nil {
 		return false, fmt.Errorf("change access level for %q: %w", login, err)

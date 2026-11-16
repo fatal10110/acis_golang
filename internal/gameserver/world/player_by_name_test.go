@@ -66,7 +66,7 @@ func TestState_PlayerByName(t *testing.T) {
 	})
 
 	t.Run("removed", func(t *testing.T) {
-		s.RemovePlayer(p.id)
+		s.RemovePlayer(p)
 		if _, ok := s.PlayerByName("Newbie"); ok {
 			t.Error("PlayerByName() after RemovePlayer ok = true, want false")
 		}
@@ -98,7 +98,7 @@ func TestState_AddRemovePlayer_ConcurrentSameID_NoStaleName(t *testing.T) {
 
 	removeDone := make(chan struct{})
 	go func() {
-		s.RemovePlayer(p.id)
+		s.RemovePlayer(p)
 		close(removeDone)
 	}()
 
