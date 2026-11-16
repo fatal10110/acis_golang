@@ -82,13 +82,20 @@ func (a PlayerActor) scaleMP(def *modelskill.Definition, mp int) int {
 	if a.Character == nil {
 		return mp
 	}
-	rate := stat.PhysicalMpConsumeRate
-	if def.Dance {
-		rate = stat.DanceMpConsumeRate
-	} else if def.Magic {
-		rate = stat.MagicalMpConsumeRate
+	return int(a.Character.CalcStat(mpConsumeRateStat(def), float64(mp)))
+}
+
+// mpConsumeRateStat is the stat scaling def's MP costs: the dance rate for a
+// dance/song, else the magical or physical rate.
+func mpConsumeRateStat(def *modelskill.Definition) stat.Stat {
+	switch {
+	case def.Dance:
+		return stat.DanceMpConsumeRate
+	case def.Magic:
+		return stat.MagicalMpConsumeRate
+	default:
+		return stat.PhysicalMpConsumeRate
 	}
-	return int(a.Character.CalcStat(rate, float64(mp)))
 }
 
 // ReduceMP pays a skill's MP cost. Each payment that takes MP sends the

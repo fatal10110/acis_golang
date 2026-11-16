@@ -43,8 +43,31 @@ func (a SummonActor) HP() int {
 	}
 	return int(a.Summon.HP())
 }
-func (SummonActor) MPInitialCost(d *modelskill.Definition) int { return d.MPInitialConsume }
-func (SummonActor) MPCost(d *modelskill.Definition) int        { return d.MPConsume }
+
+// MPInitialCost is d's up-front MP cost, scaled by the summon's skill
+// MP-consume rate.
+func (a SummonActor) MPInitialCost(d *modelskill.Definition) int {
+	return a.scaleMP(d, d.MPInitialConsume)
+}
+
+// MPCost is d's per-cast MP cost: a dance/song pays the surcharge for each
+// dance/song already active on the summon, then the sum is scaled by the
+// summon's skill MP-consume rate.
+func (a SummonActor) MPCost(d *modelskill.Definition) int {
+	mp := d.MPConsume
+	if d.Dance && a.Summon != nil {
+		mp += a.Summon.EffectList().DanceCount() * d.NextDanceCost
+	}
+	return a.scaleMP(d, mp)
+}
+
+func (a SummonActor) scaleMP(d *modelskill.Definition, mp int) int {
+	if a.Summon == nil {
+		return mp
+	}
+	return int(a.Summon.CalcStat(mpConsumeRateStat(d), float64(mp)))
+}
+
 func (a SummonActor) ReduceMP(n int) {
 	if a.Summon != nil {
 		a.Summon.ReduceMP(float64(n))
