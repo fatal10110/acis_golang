@@ -30,11 +30,12 @@ const (
 // each player within 200 of it not affected by Special Tree Recovery Bonus
 // lands that buff on itself: its owner, standing on it, gets the buff's
 // icon on the first pulse and not before, and is not given it again while
-// it lasts; a player 400 away gets nothing. Once the tree is gone the aura
-// stops: the expired buff is not landed again.
+// it lasts, and lands it again once it has expired; a player 400 away gets
+// nothing. Once the tree is gone the aura stops: the expired buff is not
+// landed again.
 func TestSpecialChristmasTreeAura(t *testing.T) {
 	t.Parallel()
-	h, far, farClient := bootSpecialTree(t)
+	h, far, farClient := bootChristmasTree(t, true)
 
 	h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))
 	placed := drainFrames(t, h.client)
@@ -80,27 +81,78 @@ func TestSpecialChristmasTreeAura(t *testing.T) {
 		}
 	}
 
+	expired := false
+	for range 12 {
+		h.srv.AdvanceWithEffects(t, time.Second)
+		if _, ok := owner.EffectList().ActiveBySkillID(treeAuraSkill); !ok {
+			expired = true
+			break
+		}
+	}
+	if !expired {
+		t.Fatal("aura buff never expired")
+	}
+	drainFrames(t, h.client)
+	h.srv.AdvanceWithEffects(t, auraPeriod)
+	if level, ok := owner.EffectList().ActiveBySkillID(treeAuraSkill); !ok || level != 1 {
+		t.Fatalf("owner aura effect one pulse after it expired = level %d (%v), want level 1", level, ok)
+	}
+	if !auraIconShown(t, drainFrames(t, h.client)) {
+		t.Fatal("owner not shown the aura icon again after it expired")
+	}
+
 	obj, ok := h.srv.State.Object(treeID)
 	if !ok {
 		t.Fatal("special tree not in the world")
 	}
 	obj.(*npc.Decoration).Despawn()
-	h.srv.AdvanceWithEffects(t, 12*time.Second)
+	h.srv.AdvanceWithEffects(t, 15*time.Second)
 	if _, ok := owner.EffectList().ActiveBySkillID(treeAuraSkill); ok {
 		t.Fatal("aura landed again after the tree was removed")
 	}
 }
 
-// bootSpecialTree brings the owner in with a kit placing a Special
-// Christmas Tree, and a second player teleported 400 away along x, returning the
+// TestPlainChristmasTreeHasNoAura places a plain Christmas Tree with its
+// kit while Special Tree Recovery Bonus is defined: no pulse ever lands it
+// on the owner standing on the tree, nor shows its icon.
+func TestPlainChristmasTreeHasNoAura(t *testing.T) {
+	t.Parallel()
+	h, _, _ := bootChristmasTree(t, false)
+
+	h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))
+	placed := drainFrames(t, h.client)
+	if len(placed) == 0 || placed[0][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatal("placing the plain tree did not show its NpcInfo first")
+	}
+	if !h.srv.DrivesClock() {
+		return
+	}
+	owner := h.character(t)
+	h.srv.AdvanceWithEffects(t, 3*auraPeriod)
+	if _, ok := owner.EffectList().ActiveBySkillID(treeAuraSkill); ok {
+		t.Fatal("plain tree landed the aura on its owner")
+	}
+	if auraIconShown(t, drainFrames(t, h.client)) {
+		t.Fatal("plain tree showed the aura icon to its owner")
+	}
+}
+
+// auraPeriod is the special tree's pulse period.
+const auraPeriod = 3 * time.Second
+
+// bootChristmasTree brings the owner in with a kit placing a Special
+// Christmas Tree (special) or a plain one, with Special Tree Recovery Bonus
+// defined, and a second player teleported 400 away along x, returning the
 // owner's world, the second player's character and its client.
-func bootSpecialTree(t *testing.T) (*petWorld, *player.Character, *testsupport.ScriptedClient) {
+func bootChristmasTree(t *testing.T, special bool) (*petWorld, *player.Character, *testsupport.ScriptedClient) {
 	t.Helper()
-	special := treeTemplate()
-	special.ID, special.TemplateID, special.Name = specialTreeNPCID, specialTreeNPCID, "Special Tree"
+	tree := treeTemplate()
+	if special {
+		tree.ID, tree.TemplateID, tree.Name = specialTreeNPCID, specialTreeNPCID, "Special Tree"
+	}
 	items, err := item.NewSummonItemTable([]item.SummonItem{
 		{ItemID: wolfCollarID, NPCID: wolfNPCID, SummonType: 1},
-		{ItemID: treeKitID, NPCID: specialTreeNPCID, SummonType: 0},
+		{ItemID: treeKitID, NPCID: int32(tree.ID), SummonType: 0},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +169,7 @@ func bootSpecialTree(t *testing.T) (*petWorld, *player.Character, *testsupport.S
 		}},
 	}}), gamesql.NewCharacterSkillStore(db))
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
-		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), special})),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), tree})),
 		gameservertest.WithSummonItems(items),
 		gameservertest.WithSkills(skills),
 	}, seedItem{TemplateID: treeKitID, Count: 1})
