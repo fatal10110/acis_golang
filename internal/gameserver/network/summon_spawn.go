@@ -658,6 +658,12 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIControll
 				sendMagicCastFailureReason(owner, def, err)
 			}
 		},
+		// The owner reads USE_S1 for each cast its summon starts.
+		OnCastStart: func(def *modelskill.Definition) {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				owner.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(def.ID), int32(def.Level)))
+			}
+		},
 	}
 	// A summon forwards every packet sent to it to the owner (a plain
 	// creature drops them), but only some messages are sent to the caster

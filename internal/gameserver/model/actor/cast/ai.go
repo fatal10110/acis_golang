@@ -29,11 +29,16 @@ type AIController struct {
 	// system-message encoding.
 	OnTargetRejection func(skilltarget.CastRejection, *modelskill.Definition)
 	// OnCastRefusal sends the caster-visible reason of a playable cast
-	// refused by AttemptCast or CanCastPlayable: the error names the failed
-	// gate (ErrSkillDisabled, ErrNotEnoughMP, ErrCantSeeTarget, a
-	// *ConditionError, ...). Network wiring owns the system-message
-	// encoding.
+	// refused by AttemptCast or CanCastPlayable, or stopped at its hit for
+	// lack of the final MP or HP cost: the error names the failed gate
+	// (ErrSkillDisabled, ErrNotEnoughMP, ErrCantSeeTarget, a
+	// *ConditionError, ...). At the hit it runs before the cancel
+	// broadcast. Network wiring owns the system-message encoding.
 	OnCastRefusal func(error, *modelskill.Definition)
+	// OnCastStart sends the caster-visible cast-start message, right after
+	// the MagicSkillUse broadcast. Casters with no client to tell leave it
+	// nil. Network wiring owns the system-message encoding.
+	OnCastStart func(*modelskill.Definition)
 	// OnHitResult receives the EffectResult of a resolved Hit-phase cast.
 	// Summon casters wire it to forward the result to the owner, as a
 	// summon forwards its packets. Hostile NPC casters wire it to a
@@ -328,6 +333,9 @@ func (a *AIController) cast(target attackable.Combatant, ref modelskill.Ref, sta
 	tx, ty, tz := castTarget.Position()
 	a.Caster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
 		int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond))
+	if a.OnCastStart != nil {
+		a.OnCastStart(def)
+	}
 
 	// launchTargets is resolved once, in the Launch hook, and reused
 	// unchanged by Hit: the launch assigns the target list once and the
@@ -391,6 +399,11 @@ func (a *AIController) cast(target attackable.Combatant, ref modelskill.Ref, sta
 			result := ApplyResolvedEffectsResult(handlers, a.Caster, launchTargets, *def)
 			if a.OnHitResult != nil {
 				a.OnHitResult(result)
+			}
+		},
+		Failed: func(err error) {
+			if a.OnCastRefusal != nil {
+				a.OnCastRefusal(err, def)
 			}
 		},
 	})
