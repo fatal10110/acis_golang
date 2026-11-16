@@ -1889,17 +1889,33 @@ func (s *Server) Close() {
 // stores: Boot reserves the stored ids before allocating and again around
 // every seed hook that runs once allocation has begun.
 //
-// mu guards next, reserved and issued.
+// mu guards next, reserved, issued and released.
 type sequentialIDs struct {
 	mu       sync.Mutex
 	start    int32 // ids up to start are never handed out
 	next     int32 // last id handed out (start before the first)
 	reserved map[int32]struct{}
-	issued   int // ids handed out
+	issued   int                // ids handed out
+	released map[int32]struct{} // ids handed out and given back
 }
 
 func newSequentialIDs(start int32) *sequentialIDs {
-	return &sequentialIDs{start: start, next: start, reserved: make(map[int32]struct{})}
+	return &sequentialIDs{start: start, next: start, reserved: make(map[int32]struct{}), released: make(map[int32]struct{})}
+}
+
+// ReleaseID takes back an id NextID handed out. Like the production
+// allocator's cursor, NextID never hands it out again; an id it never
+// handed out is ignored.
+func (s *sequentialIDs) ReleaseID(id int32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id <= s.start || id > s.next {
+		return
+	}
+	if _, ok := s.reserved[id]; ok {
+		return
+	}
+	s.released[id] = struct{}{}
 }
 
 func (s *sequentialIDs) NextID() (int32, error) {

@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"slices"
 	"strings"
 	"time"
 
@@ -55,6 +54,17 @@ type makerGroup struct {
 	// that leaves after a DeleteAll takes the count below the NPCs in the
 	// world. Guarded by n.mu.
 	orphansAlive int
+	// left counts the drops in g's alive count other than by DespawnAll:
+	// each of its NPCs leaving the world, or deleted, and each orphan a
+	// DeleteAll stops counting. An NPC-deleted hook reads its alive count
+	// against it. Guarded by n.mu.
+	left int
+	// tickers are the tickers armed through g, stopped once DespawnAll or
+	// RespawnAll retires it. Guarded by n.mu.
+	tickers []*sim.Ticker
+	// retired is set once RespawnAll puts another npcmaker in g's place.
+	// Guarded by n.mu.
+	retired bool
 }
 
 // newGroups builds the run-time npcmakers of spawns for RespawnAll run gen
@@ -83,9 +93,46 @@ func (n *Npcs) newGroups(spawns *Spawns, gen int) []*makerGroup {
 		})
 	}
 	n.mu.Lock()
+	retired := n.groups
+	for _, g := range retired {
+		g.retired = true
+	}
 	n.groups = groups
+	stop := n.takeTickersLocked(retired)
 	n.mu.Unlock()
+	stopTickers(stop)
 	return groups
+}
+
+// takeTickersLocked takes the tickers armed through groups off them, for
+// the caller to stop once it lets n.mu go. The caller holds n.mu.
+func (n *Npcs) takeTickersLocked(groups []*makerGroup) []*sim.Ticker {
+	var out []*sim.Ticker
+	for _, g := range groups {
+		out = append(out, g.tickers...)
+		g.tickers = nil
+	}
+	return out
+}
+
+func stopTickers(tickers []*sim.Ticker) {
+	for _, t := range tickers {
+		t.Stop()
+	}
+}
+
+// currentLocked reports whether g is still in use as it was in the
+// DespawnAll run epoch: neither DespawnAll nor RespawnAll retired it since.
+// The caller holds n.mu.
+func (g *makerGroup) currentLocked(epoch int) bool {
+	return g.n.despawns == epoch && !g.retired
+}
+
+// epoch returns the DespawnAll run in progress.
+func (n *Npcs) epoch() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.despawns
 }
 
 // currentGroups returns the run-time npcmakers of the spawn list in use.
@@ -100,6 +147,11 @@ func (g *makerGroup) Maker() *spawn.Maker { return g.def }
 func (g *makerGroup) Alive() int {
 	g.n.mu.Lock()
 	defer g.n.mu.Unlock()
+	return g.aliveLocked()
+}
+
+// aliveLocked is Alive for a caller holding n.mu.
+func (g *makerGroup) aliveLocked() int {
 	alive := g.orphansAlive
 	for _, keys := range g.keys {
 		for _, key := range keys {
@@ -131,15 +183,45 @@ func (g *makerGroup) SendMakerEvent(maker, name string, int1, int2 int) bool {
 	return g.n.MakerEvent(maker, name, int1, int2)
 }
 
-// After runs fn on the makers' queue once d has passed. Each spawn fn
-// makes read-holds the population gate on its own, so fn runs unlocked.
+// After runs fn on the makers' queue once d has passed, unless DespawnAll
+// or RespawnAll retires g meanwhile. Each spawn fn makes read-holds the
+// population gate on its own, so fn runs unlocked.
 func (g *makerGroup) After(d time.Duration, fn func()) {
-	g.n.makerQueue.After(d, fn)
+	epoch := g.n.epoch()
+	g.n.makerQueue.After(d, func() {
+		if g.current(epoch) {
+			fn()
+		}
+	})
 }
 
-// Every is After every d.
+// Every is After every d. DespawnAll and RespawnAll stop the ticker as they
+// retire g.
 func (g *makerGroup) Every(d time.Duration, fn func()) *sim.Ticker {
-	return g.n.makerQueue.Every(d, fn)
+	n := g.n
+	epoch := n.epoch()
+	t := n.makerQueue.Every(d, func() {
+		if g.current(epoch) {
+			fn()
+		}
+	})
+	n.mu.Lock()
+	current := g.currentLocked(epoch)
+	if current {
+		g.tickers = append(g.tickers, t)
+	}
+	n.mu.Unlock()
+	if !current {
+		t.Stop()
+	}
+	return t
+}
+
+// current is currentLocked for a caller not holding n.mu.
+func (g *makerGroup) current(epoch int) bool {
+	g.n.mu.Lock()
+	defer g.n.mu.Unlock()
+	return g.currentLocked(epoch)
 }
 
 // DeleteAll deletes every NPC of g, one spawn after another, as each
@@ -150,6 +232,8 @@ func (g *makerGroup) DeleteAll() { g.deleteAll(nil) }
 // deleteAll is DeleteAll run by a hook in scope; a nil scope for none.
 func (g *makerGroup) deleteAll(scope *hookScope) {
 	g.n.mu.Lock()
+	g.left += g.orphansAlive
+	scope.ownLocked(g, g.orphansAlive)
 	g.orphansAlive = 0
 	g.n.mu.Unlock()
 	for i := range g.def.Entries {
@@ -177,6 +261,8 @@ func (g *makerGroup) deleteEntry(i int, scope *hookScope) {
 			ids = append(ids, slot.liveID)
 			delete(n.live, slot.liveID)
 			n.liveCount--
+			g.left++
+			scope.ownLocked(g, 1)
 		}
 		n.dropSlotLocked(key)
 		if slot.dbName != "" {
@@ -329,9 +415,15 @@ func (c groupNPC) Delete() {
 	slot := c.n.slot[key]
 	live := ok && c.n.liveLocked(key)
 	c.n.mu.Unlock()
-	if live {
-		c.n.deleteLive(slot.liveID)
+	if !live {
+		return
 	}
+	c.n.deleteLive(slot.liveID)
+	c.n.mu.Lock()
+	if _, still := c.n.live[slot.liveID]; !still {
+		c.scope.ownLocked(slot.group, 1)
+	}
+	c.n.mu.Unlock()
 }
 
 // ScheduleRespawn arms the slot's respawn. A slot that a DeleteAll or a
@@ -374,7 +466,7 @@ func orphanKey(slot slotInfo) task.SlotID {
 // npcmaker, nor one DespawnAll or RespawnAll dropped. The caller holds
 // n.mu.
 func (n *Npcs) adoptOrphanLocked(slot slotInfo) (task.SlotID, bool) {
-	if slot.group == nil || slot.key == 0 || slot.epoch != n.despawns || !slices.Contains(n.groups, slot.group) {
+	if slot.group == nil || slot.key == 0 || slot.epoch != n.despawns || slot.group.retired {
 		return 0, false
 	}
 	slot.key = orphanKey(slot)
@@ -393,6 +485,13 @@ func (n *Npcs) liveLocked(key task.SlotID) bool {
 // spawnGroupEntry places one more NPC of entry i of g. A database-tracked
 // entry keeps a single slot: once it has one, it spawns nothing more.
 func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
+	n.mu.Lock()
+	retired := g.retired
+	n.mu.Unlock()
+	if retired {
+		// RespawnAll put another npcmaker in its place.
+		return
+	}
 	entry := g.def.Entries[i]
 	tmpl, ok := n.templates.Get(int(entry.NPCID))
 	if !ok {

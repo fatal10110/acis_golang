@@ -71,6 +71,10 @@ type slotInfo struct {
 	// nil for any other slot.
 	master npc.PartyMember
 	liveID int32
+	// leftID is the object id of the NPC that last left the slot's world
+	// life, 0 for none: the slot's next respawn gives it back to the id
+	// allocator.
+	leftID int32
 	// tmpl is the template resolved when the slot was declared. Every
 	// respawn of the slot builds from it, so a //reload npc swapping the
 	// template table leaves the slot's existing spawn unchanged: only slots

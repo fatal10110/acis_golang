@@ -14,6 +14,7 @@ import (
 //     NPC comes back, not even one whose corpse decays meanwhile;
 //   - every database-tracked spawn row of the spawn list is reset to
 //     uninitialized, so the next save drops it;
+//   - every maker timer armed so far runs nothing, its tickers stopped;
 //   - every NPC in the world is deleted: the ones the spawn list placed,
 //     the standalone ones, and the ones no spawn placed (item decorations,
 //     signet points, NPCs other systems placed). Each leaves on its own
@@ -43,9 +44,11 @@ func (n *Npcs) DespawnAll() int {
 		g.orphansAlive = 0
 	}
 	n.despawns++
+	stop := n.takeTickersLocked(n.groups)
 	clear(n.live)
 	n.liveCount = 0
 	n.mu.Unlock()
+	stopTickers(stop)
 
 	deleted := 0
 	for _, obj := range n.state.Objects() {
