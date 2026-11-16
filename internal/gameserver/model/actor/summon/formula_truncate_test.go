@@ -17,7 +17,7 @@ func TestSummonCombatStatGettersTruncateTheFinalizedStat(t *testing.T) {
 	stats := CombatStats{
 		STR: 40, CON: 21, DEX: 30, INT: 20, WIT: 43, MEN: 20,
 		PAtk: 101, PDef: 51, MAtk: 64, MDef: 41,
-		MaxHP: 500, MaxMP: 200, BaseRandomDamage: 5,
+		MaxHP: 500, MaxMP: 200,
 	}
 	lm := (100.0 - 11 + level) / 100.0
 	intMod := statbonus.INTBonus[stats.INT]

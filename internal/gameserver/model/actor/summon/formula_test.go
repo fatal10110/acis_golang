@@ -63,7 +63,7 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	stats := CombatStats{
 		STR: 40, CON: 21, DEX: 30, INT: 20, WIT: 43, MEN: 20,
 		PAtk: 100, PDef: 50, MAtk: 64, MDef: 40,
-		MaxHP: 500, MaxMP: 200, BaseRandomDamage: 5,
+		MaxHP: 500, MaxMP: 200,
 	}
 
 	{
@@ -157,7 +157,7 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 	stats := CombatStats{
 		STR: 40, CON: 21, DEX: 30, INT: 20, WIT: 43, MEN: 20,
 		PAtk: 100, PDef: 50, MAtk: 64, MDef: 40,
-		MaxHP: 500, MaxMP: 200, BaseRandomDamage: 5,
+		MaxHP: 500, MaxMP: 200,
 	}
 	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: func(n int) int {
 		if n == 10000 {
@@ -200,7 +200,8 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 	if !phys.Crit {
 		t.Fatal("PhysicalSkillInput Crit = false, want true with zero roll")
 	}
-	if got, want := phys.RandomMul, 0.95; !closeSummonFloat(got, want) {
+	// A servitor holds no weapon: its spread is 5+sqrt(44) = 11.
+	if got, want := phys.RandomMul, 0.89; !closeSummonFloat(got, want) {
 		t.Fatalf("PhysicalSkillInput RandomMul = %v, want %v", got, want)
 	}
 	if got, want := phys.RaceMul, 1.0; !closeSummonFloat(got, want) {

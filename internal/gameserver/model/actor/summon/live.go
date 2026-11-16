@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -69,6 +70,10 @@ type AI interface {
 	// current intention (queued behind a swing or cast), reporting false
 	// when the summon cannot act on it.
 	TryToPickUp(itemObjectID int32) bool
+	// TryToInteract makes target, a world object that is no creature, the
+	// current intention (queued behind a swing or cast), reporting false
+	// when the summon cannot act on it.
+	TryToInteract(target world.Tracked, shift bool) bool
 	// AbortAll stops movement, the attack cycle and any in-flight cast.
 	AbortAll()
 	// AbortAllForEffect is AbortAll for an effect taking hold: a stopped
@@ -225,6 +230,8 @@ type Actor struct {
 	level    int
 	name     string
 	named    bool
+	// title is set once at creation and never changes.
+	title    string
 	lifetime LifetimeState
 	dead     bool
 	// corpseTime is how long a servitor's corpse lasts; see DecayDelay.
@@ -436,6 +443,9 @@ type PetConfig struct {
 	// RunSpeed and WalkSpeed are the npc template's base speeds.
 	RunSpeed, WalkSpeed float64
 	Name                string
+	// Title is the owner's name as the pet is created; the pet keeps it,
+	// cut to 16 characters, through any later rename of its owner.
+	Title string
 	// Named reports whether Name is a player-assigned custom name rather
 	// than a fallback to the npc template's name; it gates RequestChangePetName's
 	// "pet is already named" rejection.
@@ -489,8 +499,11 @@ type ServitorConfig struct {
 	// RunSpeed and WalkSpeed are the npc template's base speeds.
 	RunSpeed, WalkSpeed float64
 	Name                string
-	Level               int
-	Passive             bool
+	// Title is the owner's name as the servitor is created; the servitor
+	// keeps it, cut to 16 characters, through any later rename of its owner.
+	Title   string
+	Level   int
+	Passive bool
 	// Undead marks a servitor whose npc template is of the UNDEAD race.
 	Undead bool
 	// SiegeSummon marks a servitor whose npc template is of type
@@ -536,6 +549,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		runSpeed:         cfg.RunSpeed,
 		walkSpeed:        cfg.WalkSpeed,
 		name:             cfg.Name,
+		title:            commons.UTF16Cut(cfg.Title, maxTitleLength),
 		passive:          cfg.Passive,
 		undead:           cfg.Undead,
 		siegeSummon:      cfg.SiegeSummon,
@@ -580,6 +594,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		runSpeed:      cfg.RunSpeed,
 		walkSpeed:     cfg.WalkSpeed,
 		name:          cfg.Name,
+		title:         commons.UTF16Cut(cfg.Title, maxTitleLength),
 		named:         cfg.Named,
 		passive:       cfg.Passive,
 		intent:        IntentFollowOwner,

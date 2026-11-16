@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 const (
@@ -212,6 +213,9 @@ type CastController interface {
 type intention struct {
 	kind   Intention
 	target attackable.Combatant
+	// object is a summon interact intention's target, a world object that
+	// is no creature.
+	object world.Tracked
 	skill  skill.Ref
 	// ctrl is a summon cast's CTRL (forced-use) modifier.
 	ctrl bool

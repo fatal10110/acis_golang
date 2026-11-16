@@ -22,9 +22,7 @@ type CombatStats struct {
 	STR, CON, DEX, INT, WIT, MEN int
 	PAtk, PDef, MAtk, MDef       float64
 	MaxHP, MaxMP                 float64
-	BaseRandomDamage             int
 	SSCount, SPSCount            int
-	AttackRange                  int
 	AttackSpeed                  float64
 	CritRate                     float64
 	// HPRegen and MPRegen are the npc template's base regeneration per
@@ -516,15 +514,16 @@ func (a *Actor) Roll(n int) int {
 	return rand.IntN(n)
 }
 
-// RandomDamageSpread returns the summon's random-damage spread, or -1
-// (RandomDamageMultiplier's "use the weaponless fallback" sentinel) when no
-// spread is configured.
+// RandomDamageSpread returns the random-damage spread of the weapon a pet
+// holds, or -1 (RandomDamageMultiplier's "no weapon" sentinel, which falls
+// back to 5+sqrt(level)) for a servitor or a pet holding none. The npc
+// template's random damage plays no part.
 func (a *Actor) RandomDamageSpread() int {
-	spread := a.combatStats().BaseRandomDamage
-	if spread <= 0 {
+	weapon := a.heldWeapon()
+	if weapon == nil {
 		return -1
 	}
-	return spread
+	return int(weapon.RandomDamage)
 }
 
 // HP returns current HP as a floating-point skill-resource value.

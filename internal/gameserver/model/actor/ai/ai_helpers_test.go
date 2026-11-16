@@ -137,6 +137,11 @@ func (a *fakeActor) Knows(target attackable.Combatant) bool {
 	return !ok || known
 }
 
+func (a *fakeActor) KnowsObject(target world.Tracked) bool {
+	known, ok := a.known[target.ObjectID()]
+	return !ok || known
+}
+
 // InWorld reports a target not listed in gone as still in the world.
 func (a *fakeActor) InWorld(target attackable.Combatant) bool {
 	return !a.gone[target.ObjectID()]
@@ -242,6 +247,8 @@ type recordingMove struct {
 	// outOfReach is what HoldOffensiveFollow reports; holdCalls counts it.
 	outOfReach bool
 	holdCalls  int
+	// cancelFollows counts CancelFollow calls.
+	cancelFollows int
 }
 
 func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
@@ -267,7 +274,7 @@ func (m *recordingMove) CanMoveTo(location.Location) bool { return !m.denyMove }
 
 func (m *recordingMove) Stop() { m.stopCount++ }
 
-func (m *recordingMove) CancelFollow() {}
+func (m *recordingMove) CancelFollow() { m.cancelFollows++ }
 
 type recordingAttack struct {
 	canAttack       bool
@@ -450,6 +457,7 @@ func (g *gateFake) BroadcastMoveToPawn(attackable.Combatant) {}
 func (g *gateFake) RefuseAttackTarget()                      { g.refusals++ }
 func (g *gateFake) GoneIdle() attackable.Combatant           { return nil }
 func (g *gateFake) SetFollowOwner(bool)                      {}
+func (g *gateFake) KnowsObject(world.Tracked) bool           { return true }
 func (g *gateFake) Owner() (attackable.Combatant, bool) {
 	if g.owner == nil {
 		return nil, false

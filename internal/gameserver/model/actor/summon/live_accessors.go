@@ -178,6 +178,13 @@ func (a *Actor) Name() string {
 	return a.name
 }
 
+// maxTitleLength is the most UTF-16 code units a summon title keeps.
+const maxTitleLength = 16
+
+// Title returns the title this summon was created with: its owner's name
+// at that time.
+func (a *Actor) Title() string { return a.title }
+
 // CharacterName returns this summon's display name for character-name packets.
 func (a *Actor) CharacterName() string { return a.Name() }
 
@@ -545,6 +552,12 @@ func (a *Actor) Knows(target attackable.Combatant) bool {
 	return a.ownerSeesInvisible() || !attackable.HiddenActingPlayer(target)
 }
 
+// KnowsObject reports whether target, a world object that is no creature,
+// is still in the summon's sight.
+func (a *Actor) KnowsObject(target world.Tracked) bool {
+	return target != nil && world.Knows(a, target)
+}
+
 // ownerSeesInvisible reports whether the summon's owner is a game master,
 // whose sight past invisibility the summon shares.
 func (a *Actor) ownerSeesInvisible() bool {
@@ -556,8 +569,12 @@ func (a *Actor) ownerSeesInvisible() bool {
 // attack/cast intention on the follow-task cadence.
 func (*Actor) OwnsOffensiveFollowTicker() bool { return true }
 
+// summonAttackRange is every summon's melee attack range: that of its
+// weaponless or pet-weapon attack type, whatever its npc template says.
+const summonAttackRange = 40
+
 // PhysicalAttackRange returns this summon's melee attack range.
-func (a *Actor) PhysicalAttackRange() int { return a.combatStats().AttackRange }
+func (*Actor) PhysicalAttackRange() int { return summonAttackRange }
 
 // GetSkill returns the skill this summon's npc template grants at skillID.
 // ok is false when the template doesn't
@@ -661,6 +678,15 @@ func (a *Actor) tryToAttack(target attackable.Combatant, shift bool) {
 		return
 	}
 	a.brain.TryToAttack(target, shift)
+}
+
+// tryToInteract forwards an interact request on a world object that is no
+// creature to the attached AI.
+func (a *Actor) tryToInteract(target world.Tracked, shift bool) {
+	if target == nil || a.brain == nil {
+		return
+	}
+	a.brain.TryToInteract(target, shift)
 }
 
 // TryToFollow forwards a follow request to the attached AI when target is
@@ -842,19 +868,29 @@ func (a *Actor) PetInventory() *itemcontainer.Inventory {
 // its right hand. A servitor, and a pet holding none, hold no weapon; no
 // summon holds a shield.
 func (a *Actor) HeldItemTypeMask() int32 {
+	weapon := a.heldWeapon()
+	if weapon == nil {
+		return 0
+	}
+	return weapon.Type.Mask()
+}
+
+// heldWeapon returns the weapon a pet holds in its right hand, nil for a
+// servitor or a pet holding none.
+func (a *Actor) heldWeapon() *item.WeaponDetail {
 	inv := a.PetInventory()
 	if inv == nil {
-		return 0
+		return nil
 	}
 	inst := inv.ItemAt(itemcontainer.RHand)
 	if inst == nil {
-		return 0
+		return nil
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || tmpl == nil || tmpl.Weapon == nil {
-		return 0
+	if !ok || tmpl == nil {
+		return nil
 	}
-	return tmpl.Weapon.Type.Mask()
+	return tmpl.Weapon
 }
 
 // Fed returns a pet's current meal gauge.

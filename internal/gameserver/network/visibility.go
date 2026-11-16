@@ -505,7 +505,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		InCombat:          owner.InCombat(),
 		AlikeDead:         a.AlikeDead(),
 		Name:              a.Name(),
-		Title:             owner.CharacterName(),
+		Title:             a.Title(),
 		PvpFlag:           int(owner.PvPFlagState()),
 		Karma:             owner.Karma(),
 		CurFed:            curFed,
