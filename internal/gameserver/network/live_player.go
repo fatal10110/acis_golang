@@ -255,6 +255,10 @@ type livePlayer struct {
 	// player's own teleport was landing, in the order they were asked,
 	// run once it lands. teleportMu guards it.
 	deferredTeleports []func()
+	// deferredPunishTeleport is the jail or release move refused while this
+	// player's own teleport was landing, nil for none, run before
+	// deferredTeleports once it lands. teleportMu guards it.
+	deferredPunishTeleport func()
 
 	// interactMu is taken from another actor's queue for the same reason
 	// as pickupMu.

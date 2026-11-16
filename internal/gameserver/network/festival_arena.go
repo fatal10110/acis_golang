@@ -123,14 +123,14 @@ func (w festivalWorld) Admit(objectID int32, x, y, z int) {
 // Relocate stops what the player does and teleports it within 20 of at, or
 // to the nearest town, then tells it it left the arena. A teleport refused
 // while the player's own is landing is made once it lands, unless it is
-// jailed by then.
+// jailed or competing in the Olympiad by then.
 func (w festivalWorld) Relocate(objectID int32, at *festival.Spot) {
 	w.postOnline(objectID, func(live *livePlayer) {
 		live.tryToIdle(live.DenyAIAction())
 		if at != nil {
-			w.l.forceTeleportLivePlayer(live, location.Location{X: at.X, Y: at.Y, Z: at.Z}, restartTeleportOffset, notJailed(live))
+			w.l.forceTeleportLivePlayer(live, location.Location{X: at.X, Y: at.Y, Z: at.Z}, restartTeleportOffset, atLarge(live))
 		} else if dest, ok := w.l.restartDestination(live); ok {
-			w.l.forceTeleportLivePlayer(live, dest, restartTeleportOffset, notJailed(live))
+			w.l.forceTeleportLivePlayer(live, dest, restartTeleportOffset, atLarge(live))
 		}
 		sendText(live, "You have been removed from the festival arena.")
 	})

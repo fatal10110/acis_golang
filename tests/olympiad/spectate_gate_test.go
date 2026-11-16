@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -30,13 +31,24 @@ func (s *spectate) assertArenaChangeRefused(t *testing.T, p *competitor, why str
 	}
 }
 
+// flag sets p's PvP flag to state and reads what it sent.
+func (s *spectate) flag(t *testing.T, p *competitor, state task.PvPFlagState) {
+	t.Helper()
+	obj, ok := s.srv.State.Player(p.id)
+	if !ok {
+		t.Fatalf("%s not in world", p.name)
+	}
+	obj.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(state)
+	s.read(t)
+}
+
 // TestOlympiadSpectateGate pins the owner-approved gate on "arenachange"
 // (#5152): the stadium is watched only from within reach of the Olympiad
 // manager the player has selected now, and only by a player whose state
 // allows it. A manager out of reach, a manager selected and then traded
-// for another target, a player in combat, running a store, with karma or
-// dead are each refused with ActionFailed and left where they stand; once
-// the bar is lifted the same player enters as before.
+// for another target, a player in combat, running a store, PvP flagged,
+// with karma or dead are each refused with ActionFailed and left where
+// they stand; once the bar is lifted the same player enters as before.
 func TestOlympiadSpectateGate(t *testing.T) {
 	t.Parallel()
 	s := bootSpectate(t)
@@ -61,6 +73,10 @@ func TestOlympiadSpectateGate(t *testing.T) {
 	s.srv.SetPlayerOperating(t, w.id, true)
 	s.assertArenaChangeRefused(t, w, "running a store")
 	s.srv.SetPlayerOperating(t, w.id, false)
+
+	s.flag(t, w, task.PvPFlagOn)
+	s.assertArenaChangeRefused(t, w, "PvP flagged")
+	s.flag(t, w, task.PvPFlagNone)
 
 	// With nothing barring it any more, the same click watches stadium 0.
 	s.send(t, w, encodeHeroBypass("arenachange 0"))

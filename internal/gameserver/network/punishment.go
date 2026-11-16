@@ -67,7 +67,7 @@ func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minute
 		live.stopPunishTimer(true)
 		// A release refused mid-landing is made once live lands, unless
 		// it is jailed again or out of the jail by then.
-		l.forceTeleportLivePlayer(live, jailReleaseLocation, jailReleaseOffset, func() bool {
+		l.punishTeleportLivePlayer(live, jailReleaseLocation, jailReleaseOffset, func() bool {
 			return !jailed(live) && inJail(live)
 		})
 	case player.ChatBanStarted:
@@ -94,7 +94,7 @@ func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minute
 		// An observer stops watching where it stands first, so that
 		// nothing of its watch can take it back out of the jail.
 		l.endObservationInPlace(live)
-		l.forceTeleportLivePlayer(live, jailLocation, jailEntryOffset, jailedOutside(live))
+		l.punishTeleportLivePlayer(live, jailLocation, jailEntryOffset, jailedOutside(live))
 	}
 	l.storePunishment(live)
 }
@@ -112,7 +112,7 @@ func (l *GameClientLink) enterWorldPunishment(live *livePlayer) {
 		sendText(live, "You are still "+kind.Description()+" for "+strconv.Itoa(int(player.PunishmentMinutesLeft(timer)))+" minutes.")
 	}
 	if kind == player.PunishJail && !inJail(live) {
-		l.forceTeleportLivePlayer(live, jailLocation, jailReturnOffset, jailedOutside(live))
+		l.punishTeleportLivePlayer(live, jailLocation, jailReturnOffset, jailedOutside(live))
 	}
 }
 
@@ -127,10 +127,10 @@ func inJail(live *livePlayer) bool {
 	return live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagJail)
 }
 
-// notJailed is the condition of a move made once live's own teleport
-// lands that yields to a jail term begun meanwhile.
-func notJailed(live *livePlayer) func() bool {
-	return func() bool { return !jailed(live) }
+// atLarge is the condition of a move made once live's own teleport lands
+// that yields to a jail term or an Olympiad match begun meanwhile.
+func atLarge(live *livePlayer) func() bool {
+	return func() bool { return !jailed(live) && !live.OlympiadMode() }
 }
 
 // jailedOutside is the condition of taking live to the jail once its own

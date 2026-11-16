@@ -519,7 +519,7 @@ func (l *GameClientLink) restoreDuelCondition(live *livePlayer, abnormal bool) {
 		return
 	}
 	if cond.at != nil {
-		l.forceTeleportLivePlayer(live, *cond.at, 0, notJailed(live))
+		l.forceTeleportLivePlayer(live, *cond.at, 0, atLarge(live))
 	}
 	if abnormal {
 		return
@@ -562,7 +562,7 @@ func (l *GameClientLink) cancelPartyDuel(leader *livePlayer) {
 	for _, m := range v.All() {
 		postLive(m, func() {
 			if cond := m.duelCondition; cond != nil && cond.at != nil {
-				l.forceTeleportLivePlayer(m, *cond.at, 0, notJailed(m))
+				l.forceTeleportLivePlayer(m, *cond.at, 0, atLarge(m))
 			}
 			m.LeaveDuel()
 		})

@@ -174,7 +174,8 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 }
 
 // maxDeferredTeleports bounds the forced teleports held for one landing; a
-// client holding its landing back cannot pile up more.
+// client holding its landing back cannot pile up more. A jail or release
+// move is held apart and never counts against it.
 const maxDeferredTeleports = 8
 
 // forceTeleportLivePlayer is teleportLivePlayer for a move live may not
@@ -184,18 +185,41 @@ const maxDeferredTeleports = 8
 // they were asked, each re-checking its own condition, so a later one
 // that undoes an earlier one wins. The caller runs on live's queue.
 func (l *GameClientLink) forceTeleportLivePlayer(live *livePlayer, target location.Location, randomOffset int, still func() bool) {
+	l.retryAfterLanding(live, target, randomOffset, still, func(retry func()) {
+		if len(live.deferredTeleports) < maxDeferredTeleports {
+			live.deferredTeleports = append(live.deferredTeleports, retry)
+		}
+	})
+}
+
+// punishTeleportLivePlayer is forceTeleportLivePlayer for a jail or release
+// move. Held, it takes the one place kept for such a move, replacing the
+// one held there before, whose condition the newer one's supersedes, so
+// that no number of other held moves crowds it out; it is made before them
+// once live lands.
+func (l *GameClientLink) punishTeleportLivePlayer(live *livePlayer, target location.Location, randomOffset int, still func() bool) {
+	l.retryAfterLanding(live, target, randomOffset, still, func(retry func()) {
+		live.deferredPunishTeleport = retry
+	})
+}
+
+// retryAfterLanding teleports live to target, or, refused while live's own
+// teleport lands, has hold keep a retry for that landing, under live's
+// teleport lock. The retry jumps when still (nil for always) holds then,
+// and is held again when refused once more.
+func (l *GameClientLink) retryAfterLanding(live *livePlayer, target location.Location, randomOffset int, still func() bool, hold func(retry func())) {
 	var retry func()
 	retry = func() {
 		if still == nil || still() {
-			l.jumpOrDefer(live, target, randomOffset, retry)
+			l.jumpOrDefer(live, target, randomOffset, func() { hold(retry) })
 		}
 	}
-	l.jumpOrDefer(live, target, randomOffset, retry)
+	l.jumpOrDefer(live, target, randomOffset, func() { hold(retry) })
 }
 
-// jumpOrDefer is teleportLivePlayer, holding retry, nil for none, for
-// live's landing when live is still teleporting.
-func (l *GameClientLink) jumpOrDefer(live *livePlayer, target location.Location, randomOffset int, retry func()) {
+// jumpOrDefer is teleportLivePlayer, calling hold, nil for none, under
+// live's teleport lock when live is still teleporting.
+func (l *GameClientLink) jumpOrDefer(live *livePlayer, target location.Location, randomOffset int, hold func()) {
 	live.teleportMu.Lock()
 	locked := true
 	defer func() {
@@ -204,8 +228,8 @@ func (l *GameClientLink) jumpOrDefer(live *livePlayer, target location.Location,
 		}
 	}()
 	if !l.relocateLivePlayer(live, target, randomOffset) {
-		if retry != nil && len(live.deferredTeleports) < maxDeferredTeleports {
-			live.deferredTeleports = append(live.deferredTeleports, retry)
+		if hold != nil {
+			hold()
 		}
 		return
 	}
@@ -342,7 +366,10 @@ func (l *GameClientLink) landLivePlayer(live *livePlayer) (*summon.Actor, []func
 		return nil, nil
 	}
 	deferred := live.deferredTeleports
-	live.deferredTeleports = nil
+	if punish := live.deferredPunishTeleport; punish != nil {
+		deferred = append([]func(){punish}, deferred...)
+	}
+	live.deferredTeleports, live.deferredPunishTeleport = nil, nil
 	return followed, deferred
 }
 

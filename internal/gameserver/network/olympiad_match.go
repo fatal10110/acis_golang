@@ -328,7 +328,20 @@ func (a olympiadArena) Fitness(objectID int32) olympiad.Fitness {
 	return olympiad.Fitness{
 		Online: true, Detached: live.clientDetached(), Observer: live.ObserverMode(), Dead: live.Dead(),
 		Subclass: live.SubclassActive(), CursedWeaponID: live.CursedWeaponID(), Overweight: live.Overweight(),
+		Away: a.away(live),
 	}
+}
+
+// away reports whether live stands outside the stadium it competes in. Its
+// entry jump moves it there before it lands, so only a jump still held for
+// a landing of its own leaves it outside.
+func (a olympiadArena) away(live *livePlayer) bool {
+	z, ok := a.l.stadiumZone(live.OlympiadGameID())
+	if !ok {
+		return false
+	}
+	at := live.CurrentLocation()
+	return !z.ContainsXY(at.X, at.Y)
 }
 
 func (a olympiadArena) Standing(objectID int32) olympiad.Standing {
@@ -588,9 +601,7 @@ func (a olympiadArena) SendBack(objectID int32) {
 				dest = point.Points[a.l.olympiadRoll(len(point.Points))]
 			}
 		}
-		a.l.forceTeleportLivePlayer(live, dest, 0, func() bool {
-			return !jailed(live) && !live.OlympiadMode()
-		})
+		a.l.forceTeleportLivePlayer(live, dest, 0, atLarge(live))
 		live.ClearSavedLocation()
 	})
 }

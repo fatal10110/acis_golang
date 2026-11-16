@@ -493,8 +493,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 			break
 		}
 		// A forced move waiting for live's own landing yields to a jail
-		// term begun meanwhile.
-		onOwnQueue(live, e.OwnQueue, func() { l.forceTeleportLivePlayer(live, at, radius, notJailed(live)) })
+		// term or an Olympiad match begun meanwhile.
+		onOwnQueue(live, e.OwnQueue, func() { l.forceTeleportLivePlayer(live, at, radius, atLarge(live)) })
 	case event.InstantTeleportRequested:
 		// A script asks it from any queue (a swap moves two players from
 		// an NPC hook): the jump runs on live's own queue, inside the call
