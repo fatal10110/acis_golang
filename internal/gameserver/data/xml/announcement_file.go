@@ -1,12 +1,13 @@
 package xml
 
 import (
-	"encoding/xml"
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/rs/zerolog"
@@ -22,25 +23,45 @@ type AnnouncementFile struct {
 	Log  zerolog.Logger
 }
 
-// Load reads the file's announcements. A file that is missing or not
-// well-formed XML holds none, with a warning; a malformed schedule value is
-// an error.
+// Load reads the file's announcements. A missing file holds none, with a
+// warning; a file that is not well-formed XML, or holds a malformed
+// schedule value, is an error, so that a broken file is never read as an
+// empty one.
 func (f AnnouncementFile) Load() ([]admin.Announcement, error) {
 	list, err := LoadAnnouncements(f.Path)
 	if err == nil {
 		return list, nil
 	}
-	if _, malformed := errors.AsType[*xml.SyntaxError](err); malformed || errors.Is(err, fs.ErrNotExist) {
+	if errors.Is(err, fs.ErrNotExist) {
 		f.Log.Warn().Err(err).Str("path", f.Path).Msg("Could not parse file")
 		return nil, nil
 	}
 	return nil, err
 }
 
-// Save rewrites the file with list, in order. Each message is written as
-// it is, unescaped.
+// Save rewrites the file with list, in order. The new content is written
+// to a temporary file beside it and then renamed over it, so a save cut
+// short leaves the previous file whole.
 func (f AnnouncementFile) Save(list []admin.Announcement) error {
-	return os.WriteFile(f.Path, []byte(FormatAnnouncements(list)), 0o644)
+	tmp, err := os.CreateTemp(filepath.Dir(f.Path), "."+filepath.Base(f.Path)+".*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	_, err = tmp.WriteString(FormatAnnouncements(list))
+	if err == nil {
+		err = tmp.Chmod(0o644)
+	}
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), f.Path)
 }
 
 // FormatAnnouncements is the announcement file holding list.
@@ -49,8 +70,9 @@ func FormatAnnouncements(list []admin.Announcement) string {
 	b.WriteString(announcementHeader)
 	b.WriteString("<list> \n")
 	for _, a := range list {
-		b.WriteString(`<announcement message="` + a.Message +
-			`" critical="` + strconv.FormatBool(a.Critical) +
+		b.WriteString(`<announcement message="`)
+		writeAttrValue(&b, a.Message)
+		b.WriteString(`" critical="` + strconv.FormatBool(a.Critical) +
 			`" auto="` + strconv.FormatBool(a.Auto) +
 			`" initial_delay="` + strconv.Itoa(a.InitialDelay) +
 			`" delay="` + strconv.Itoa(a.Delay) +
@@ -58,4 +80,32 @@ func FormatAnnouncements(list []admin.Announcement) string {
 	}
 	b.WriteString("</list>")
 	return b.String()
+}
+
+// writeAttrValue writes s as the value of a double-quoted attribute: the
+// characters that would end or break it, and the white space a reader
+// folds into spaces, as references, and a character XML cannot hold at all
+// as U+FFFD. Any other character, apostrophes and '>' included, is written
+// as it is, so plain text is written unchanged.
+func writeAttrValue(b *strings.Builder, s string) {
+	for _, r := range s {
+		switch {
+		case r == '&':
+			b.WriteString("&amp;")
+		case r == '<':
+			b.WriteString("&lt;")
+		case r == '"':
+			b.WriteString("&quot;")
+		case r == '\t':
+			b.WriteString("&#x9;")
+		case r == '\n':
+			b.WriteString("&#xA;")
+		case r == '\r':
+			b.WriteString("&#xD;")
+		case r >= 0x20 && r <= 0xD7FF, r >= 0xE000 && r <= 0xFFFD, r >= 0x10000 && r <= 0x10FFFF:
+			b.WriteRune(r)
+		default:
+			b.WriteRune(utf8.RuneError)
+		}
+	}
 }

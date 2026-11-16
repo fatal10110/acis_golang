@@ -29,6 +29,7 @@ func (l *GameClientLink) schemeBufferBypass(live *livePlayer, f *npc.Folk, comma
 		l.broadcastCharacterInfo(live)
 		if pet != nil {
 			pet.EffectList().StopAllExceptThoseThatLastThroughDeath()
+			sendSummonInfosToOwner(pet)
 		}
 	case schemebuffer.ActionHeal:
 		live.SetMaxCpHpMp()

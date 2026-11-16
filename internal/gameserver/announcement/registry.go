@@ -80,20 +80,24 @@ func NewRegistry(store Store, out Announcer, log zerolog.Logger, queue *sim.Queu
 
 // Load reads the announcement file anew and starts the automatic
 // announcements' schedules. The announcements held before are dropped and
-// their schedules stopped first; a file that fails to load leaves none.
+// their schedules stopped first; a file that fails to load is an error and
+// leaves them held and running.
 func (r *Registry) Load() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	var list []admin.Announcement
+	if r.store != nil {
+		var err error
+		if list, err = r.store.Load(); err != nil {
+			return err
+		}
+	}
 	for _, e := range r.entries {
 		e.stop()
 	}
 	clear(r.entries)
 	if r.store == nil {
 		return nil
-	}
-	list, err := r.store.Load()
-	if err != nil {
-		return err
 	}
 	for _, a := range list {
 		r.putLocked(a)
