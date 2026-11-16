@@ -23,8 +23,8 @@ const (
 // HeartOfWarding is the Heart of Warding, the way into Antharas's lair.
 // While the three Antharas the global memo names live, none of them
 // awake past 1, a character holding a Portal Stone gives one up and is
-// teleported into the lair. The first entrant starts the boss wait; once
-// it ends the Heart wakes the small Antharas for up to 90 entrants, the
+// teleported into the lair. The first entrant starts the boss wait, which
+// outlives that entrant's logout; once it ends the Heart wakes the small Antharas for up to 90 entrants, the
 // normal one for up to 135, the large one beyond, and counts afresh.
 func HeartOfWarding() script.Script {
 	var base script.Hooks
@@ -110,7 +110,10 @@ func heartEvent(s *script.Script, e script.Event) string {
 						n.SetInt(slotEntrants, n.Int(slotEntrants)+1)
 
 						if n.Int(slotWaiting) == 0 {
-							s.StartTimer("3001", n, player, s.BossWaitTimes().Antharas)
+							// Bound to no player, so the first entrant
+							// logging out inside the wait does not cancel
+							// the wake (owner-approved divergence, #5132).
+							s.StartTimer("3001", n, nil, s.BossWaitTimes().Antharas)
 
 							n.SetSlot(script.SlotCreature0, c0)
 							n.SetSlot(script.SlotCreature1, c1)

@@ -121,6 +121,9 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 		},
 		// The save failing is logged and the load goes on.
 		SpawnList: func(ctx context.Context, current *manager.Spawns) (*manager.Spawns, error) {
+			if err := current.FlushRowWrites(ctx); err != nil {
+				log.Warn().Err(err).Msg("wait for the spawn row writes before the spawn list reload")
+			}
 			if err := current.Save(ctx, spawnStore); err != nil {
 				log.Warn().Err(err).Msg("save spawn data before the spawn list reload")
 			}

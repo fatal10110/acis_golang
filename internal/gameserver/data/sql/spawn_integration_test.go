@@ -77,23 +77,83 @@ func TestSpawnStoreRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSpawnStoreSaveStatesKeepsValidRowsWhenOneStateIsInvalid(t *testing.T) {
+// A save with one row the table refuses, or one with no name, commits
+// nothing: the rows saved before stay as they were (owner-approved
+// divergence, #4685).
+func TestSpawnStoreSaveStatesCommitsNothingWhenOneRowFails(t *testing.T) {
+	for name, bad := range map[string]*spawn.State{
+		"unnamed":          {Status: spawn.StatusAlive},
+		"refused_by_table": {Name: "refused", Status: spawn.StatusAlive, CurrentHP: -1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			store := NewSpawnStore(sqltest.SharedDB(t))
+			if err := store.SaveStates(ctx, map[string]*spawn.State{
+				"kept": {Name: "kept", Status: spawn.StatusAlive, CurrentHP: 100},
+			}); err != nil {
+				t.Fatalf("seed SaveStates() unexpected error: %v", err)
+			}
+
+			err := store.SaveStates(ctx, map[string]*spawn.State{
+				"kept":   {Name: "kept", Status: spawn.StatusAlive, CurrentHP: 120},
+				"other":  {Name: "other", Status: spawn.StatusAlive, CurrentHP: 50},
+				bad.Name: bad,
+			})
+			if err == nil {
+				t.Fatal("SaveStates() error = nil, want the failed row's error")
+			}
+
+			states, err := store.LoadStates(ctx)
+			if err != nil {
+				t.Fatalf("LoadStates() unexpected error: %v", err)
+			}
+			if len(states) != 1 || states["kept"] == nil || states["kept"].CurrentHP != 100 {
+				t.Fatalf("rows after the failed save = %v, want only kept with CurrentHP 100", states)
+			}
+		})
+	}
+}
+
+// SaveState replaces one row and leaves the others; an uninitialized row
+// is removed, as a whole-table save would leave it out.
+func TestSpawnStoreSaveStateWritesOneRow(t *testing.T) {
 	ctx := context.Background()
 	store := NewSpawnStore(sqltest.SharedDB(t))
-
-	err := store.SaveStates(ctx, map[string]*spawn.State{
-		"valid":   {Name: "valid", Status: spawn.StatusAlive, CurrentHP: 120},
-		"invalid": {Status: spawn.StatusAlive},
-	})
-	if err == nil {
-		t.Fatal("SaveStates() error = nil, want invalid state error")
+	if err := store.SaveStates(ctx, map[string]*spawn.State{
+		"boss":  {Name: "boss", Status: spawn.StatusAlive, CurrentHP: 100},
+		"other": {Name: "other", Status: spawn.StatusAlive, CurrentHP: 50},
+	}); err != nil {
+		t.Fatalf("seed SaveStates() unexpected error: %v", err)
 	}
 
+	dead := spawn.State{Name: "boss", Status: spawn.StatusDead, DBValue: 2, RespawnTime: 12345}
+	if err := store.SaveState(ctx, dead); err != nil {
+		t.Fatalf("SaveState(dead) unexpected error: %v", err)
+	}
+	if err := store.SaveState(ctx, spawn.State{Name: "fresh", Status: spawn.StatusAlive, CurrentHP: 7}); err != nil {
+		t.Fatalf("SaveState(fresh) unexpected error: %v", err)
+	}
 	states, err := store.LoadStates(ctx)
 	if err != nil {
 		t.Fatalf("LoadStates() unexpected error: %v", err)
 	}
-	if got := states["valid"]; got == nil || got.CurrentHP != 120 {
-		t.Fatalf("valid state = %+v, want persisted row with CurrentHP 120", got)
+	if got := states["boss"]; got == nil || *got != dead {
+		t.Fatalf("boss row = %+v, want %+v", got, dead)
+	}
+	if got := states["other"]; got == nil || got.CurrentHP != 50 {
+		t.Fatalf("other row = %+v, want untouched with CurrentHP 50", got)
+	}
+	if got := states["fresh"]; got == nil || got.CurrentHP != 7 {
+		t.Fatalf("fresh row = %+v, want inserted with CurrentHP 7", got)
+	}
+
+	if err := store.SaveState(ctx, spawn.State{Name: "boss", Status: spawn.StatusUninitialized}); err != nil {
+		t.Fatalf("SaveState(uninitialized) unexpected error: %v", err)
+	}
+	if states, err = store.LoadStates(ctx); err != nil {
+		t.Fatalf("LoadStates() unexpected error: %v", err)
+	}
+	if _, ok := states["boss"]; ok || len(states) != 2 {
+		t.Fatalf("rows after the uninitialized save = %v, want other and fresh", states)
 	}
 }

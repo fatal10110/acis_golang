@@ -1784,6 +1784,23 @@ func (s *Server) Shutdown(tb testing.TB) {
 	s.Effects.Reset()
 }
 
+// Halt stops serving and tears the stack down the way a killed process
+// stops: none of Drain's shutdown saves runs, only the persistence jobs
+// already queued land first. A restart test calls it on the first Boot cycle
+// to prove what the running server wrote on its own survives. Connected
+// players still detach (Stop).
+func (s *Server) Halt(tb testing.TB) {
+	tb.Helper()
+	s.Settle(tb)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+	defer cancel()
+	if err := s.persist.Flush(ctx); err != nil {
+		tb.Fatalf("halt persistence flush: %v", err)
+	}
+	s.Stop()
+	s.Effects.Reset()
+}
+
 // CrossDayNight ticks the in-game clock the player clock runs on, one
 // in-game minute at a time, until it crosses the day/night boundary, so the
 // day/night listeners run once; the per-minute listeners run on every tick.
@@ -2594,7 +2611,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	if o.npcSpawns != nil {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
-			spawnStore: spawnStore, makerCatalog: o.makerCatalog, makerHeard: o.makerHeard, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
+			spawnStore: spawnStore, spawnWrites: persistWorker, makerCatalog: o.makerCatalog, makerHeard: o.makerHeard, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.Combat.AttackStance, log: o.log, makers: o.npcSpawns, channels: o.lootChannels(gcl),
 			dropRates: o.npcDropRates, partyRange: o.partyRange, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes, walkerPath: o.walkerPath,

@@ -109,12 +109,14 @@ func onQueue(q *sim.Queue, fn func()) {
 // maker of it, the makers of the listed spawn events and the Seven Signs
 // groups, as //respawnall does after its despawn: the database-tracked spawns
 // come back as spawns' rows say. The slots of an earlier spawn list are not
-// touched; //respawnall runs DespawnAll first, which drops them all. Only the
+// touched; //respawnall runs DespawnAll first, which drops them all. spawns
+// takes over the row writes of the list it replaces (WriteRows). Only the
 // swap holds the gate: each NPC then read-holds it while it is placed, and its
 // created hooks run with no lock held.
 func (n *Npcs) RespawnAll(spawns *Spawns) {
 	n.gate.Lock()
 	n.mu.Lock()
+	spawns.writeRowsLike(n.spawns)
 	n.spawns = spawns
 	n.gen++
 	gen := n.gen
