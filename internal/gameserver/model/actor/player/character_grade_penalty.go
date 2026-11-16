@@ -10,12 +10,24 @@ const (
 	gradePenaltySkillID = 4267
 )
 
-// RefreshExpertisePenalty recalculates the equipped-item grade penalty.
+// RefreshExpertisePenalty recalculates the equipped-item grade penalty. It
+// runs from several queues: penaltyMu holds from the scan to the penalty
+// skill, so an older scan never lands after a newer one.
 func (c *Character) RefreshExpertisePenalty() {
 	if c == nil || c.Inventory() == nil {
 		return
 	}
+	if !c.refreshExpertisePenalty() {
+		return
+	}
+	c.emit(event.GradePenaltyChanged{})
+}
 
+// refreshExpertisePenalty is RefreshExpertisePenalty without the change
+// event, reporting whether the penalty changed.
+func (c *Character) refreshExpertisePenalty() bool {
+	c.penaltyMu.Lock()
+	defer c.penaltyMu.Unlock()
 	expertise := c.SkillLevel(expertiseSkillID)
 	armorPenalty := 0
 	weaponPenalty := false
@@ -46,7 +58,7 @@ func (c *Character) RefreshExpertisePenalty() {
 	}
 	c.stateMu.Unlock()
 	if !changed {
-		return
+		return false
 	}
 	c.refreshMoveSpeed()
 	if weaponPenalty || armorPenalty > 0 {
@@ -54,7 +66,7 @@ func (c *Character) RefreshExpertisePenalty() {
 	} else {
 		c.SetSkillLevel(gradePenaltySkillID, 0)
 	}
-	c.emit(event.GradePenaltyChanged{})
+	return true
 }
 
 // WeaponGradePenalty reports whether an equipped weapon exceeds Expertise.

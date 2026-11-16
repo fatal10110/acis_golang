@@ -318,6 +318,14 @@ type Character struct {
 	// with (see EquippedTemplate).
 	equipped equippedTemplates
 
+	// penaltyMu orders the grade and weight penalty refreshes: each reads
+	// the inventory and stats, commits its penalty and sets what follows
+	// from it under the lock, so the last refresh to run leaves what the
+	// latest state gives. speedMu orders the move-speed hand-offs the same
+	// way (refreshMoveSpeed). Both are taken from several queues.
+	penaltyMu sync.Mutex
+	speedMu   sync.Mutex
+
 	// stateMu guards transient live flags and item-use disabled timestamps.
 	// A killer's queue raises the death penalty (RaiseDeathPenaltyLevel).
 	// The effect list reads it under its own lock (MaxBuffCount), so it is

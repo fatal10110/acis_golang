@@ -8,10 +8,10 @@ import (
 
 // TickRegen restores each resource below its current maximum once, then
 // settles the regeneration task, so a tick that fills the character, or
-// finds it dead, stops it. A character feigning death keeps its task but
-// regenerates nothing.
+// finds it dead, stops it. A character feigning death regenerates as any
+// living one does.
 func (c *Character) TickRegen() {
-	if c.AlikeDead() {
+	if c.Dead() {
 		c.SettleRegen()
 		return
 	}
