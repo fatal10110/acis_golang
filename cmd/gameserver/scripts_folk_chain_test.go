@@ -31,7 +31,7 @@ func TestWarriorAggressiveChainRegistersOnFolk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kindOf := npcKindOf(npcs)
+	kindOf := script.NPCKindOf(npcs)
 	if k, ok := kindOf(35592); !ok || k != script.KindFolk {
 		t.Fatalf("kind of 35592 = %v, %v; want a civilian NPC", k, ok)
 	}

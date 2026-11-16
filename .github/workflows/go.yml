@@ -21,8 +21,13 @@ jobs:
       matrix:
         # The slowest behavior suites get their own runners. In a single
         # `go test ./...` they queue behind compiling every other package.
-        # `rest` runs cmd and internal, `suites` every other behavior suite;
-        # keep the `suites` exclusion list in sync with the suites named here.
+        # `rest` runs cmd and internal, `suites` every behavior suite no
+        # other `pkgs` list names (.github/scripts/test-shards.sh derives
+        # them from this matrix, so there is no second list to keep in sync).
+        #
+        # Every tests/ package also runs on the real pool, in a `pool` list
+        # below, unless POOL_EXCLUDED gives its reason; `rest` fails when a
+        # tests/ package is in neither.
         #
         # A shard runs either `pkgs` on the inline executor or `pool` on the
         # real pool, so the two passes over a suite run side by side. Each
@@ -54,6 +59,12 @@ jobs:
           - name: pool-rest
             cache: rest
             pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
+          - name: pool-admin-npcs
+            cache: rest
+            pool: ./tests/admin ./tests/npcs
+          - name: pool-small
+            cache: rest
+            pool: ./tests/bbs ./tests/boat ./tests/botswarm ./tests/clan ./tests/duel ./tests/fishchamp ./tests/idfactory ./tests/lottery ./tests/party ./tests/perf ./tests/petition ./tests/wedding
     env:
       # The datapack copy in aCis_datapack/ is part of the checkout, so a test
       # that cannot find it fails instead of skipping. Geodata and the
@@ -65,6 +76,12 @@ jobs:
       # replaying path searches. The race detector finds nothing in them and
       # slows them several times over, so the short pool-rest job runs them
       # in their own step without it.
+      # The tests/ packages the real pool does not run, each with its reason.
+      # A tests/ package on no `pool` list and not named here fails `rest`.
+      POOL_EXCLUDED: |
+        ai: its boss and hall scenarios wait out minutes of timers per test, so a pool pass cuts about 80 tests at long waits and still runs past 17 minutes; the wall-clock boundary assertions are tracked in #5301
+        olympiad: its match tests wait out wall-clock countdowns of 65-88 s each and a pool pass hit a 15 minute timeout; tracked in #5301
+        quest: a pool pass takes about 13 minutes and fails 19 tests on wall-clock boundary and timing assumptions; tracked in #5301
       STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:
@@ -124,10 +141,14 @@ jobs:
           PKGS: ${{ matrix.shard.pkgs }}
         run: |
           if [ "$PKGS" = suites ]; then
-            PKGS="$(go list ./tests/... | grep -vE '/tests/(skills|pets|combat|items|ai)$')"
+            PKGS="$(.github/scripts/test-shards.sh suites)"
           fi
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
           .github/scripts/gotest.sh -race -skip "$STATIC_TESTS" $PKGS
+
+      - name: Check test shards
+        if: matrix.shard.name == 'rest'
+        run: .github/scripts/test-shards.sh check
 
       - name: Test (static, no race)
         if: matrix.shard.name == 'pool-rest'

@@ -101,6 +101,9 @@ func TestWarriorPassiveWeaknessMakerOpensTheWallDoors(t *testing.T) {
 		gameservertest.WithNpcSpawns(batch1Table(t, weaknessSpawnlist)),
 		gameservertest.WithMakers(batch2Makers()),
 	)
+	if !w.srv.DrivesClock() {
+		t.Skip("the real pool cannot stop the wall clock one millisecond before the weakness timer")
+	}
 	mw := &makerWorld{srv: w.srv}
 	count := func(step string, want int) {
 		t.Helper()
@@ -281,6 +284,9 @@ func TestUndeadBandmasterMakerOpensTheNextPathways(t *testing.T) {
 		gameservertest.WithMakers(log.catalog()),
 		gameservertest.WithNPCScripts(kinds, []script.Listing{{Path: bandListenerKey}}, script.Catalog{bandListenerKey: log.script}),
 	)
+	if !w.srv.DrivesClock() {
+		t.Skip("the real pool cannot stop the wall clock one millisecond before the maker timers")
+	}
 	mw := &makerWorld{srv: w.srv}
 	inWorld := func() []int {
 		var out []int

@@ -49,6 +49,9 @@ func TestRhamphorhynchusMakerWakesTheTyrannosaurus(t *testing.T) {
 		gameservertest.WithMakers(batch3Makers(makers.catalog())),
 		log.option(),
 	)
+	if !w.srv.DrivesClock() {
+		t.Skip("the spawn and the 11049 timer chain on the wall clock on the real pool, so each Advance can land either side of its deadline")
+	}
 	mw := &makerWorld{srv: w.srv}
 	count := func(step string, want int) {
 		t.Helper()

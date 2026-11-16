@@ -63,6 +63,46 @@ ACIS_PERF_CLIENTS=200 ACIS_PERF_DURATION=30s ACIS_PERF_PROFILE_DIR=/tmp/acis-pro
 | `ACIS_PERF_DURATION` | `30s` | Length of the measured window. |
 | `ACIS_PERF_PROFILE_DIR` | unset | When set, the run writes `cpu.pprof` for the measured window, then `heap.pprof` and `goroutine.txt` (debug=1) at its end, while every client is still connected. Do not combine it with `-cpuprofile`. |
 
+### Variants
+
+The baseline puts every client at one spot, on the always-passable test geodata, with no scripts. Each
+variant below changes one thing, keeps the baseline's pass criteria (no disconnects, no timeouts,
+goroutines back to baseline) and skips unless `ACIS_PERF_CLIENTS` is set. Select one or more with
+`ACIS_PERF_VARIANT=<names>` (comma-separated):
+
+| Variant | What changes | Extra setting |
+|---|---|---|
+| `spread` | Clients stand in a square grid of regions, 4096 apart, instead of one spot, so the region fan-out and visibility bookkeeping see many occupied regions. | `ACIS_PERF_REGIONS` (default 16) |
+| `geo` | Clients and monsters stand on the shipped geodata of a Gludio tile, so movement and attacks go through `CanMove` and `Height`. Skips without geodata (it is not in the repository: `ACIS_GEODATA_DIR`, or an `aCis_datapack` that carries it). Does not combine with `spread`. | `ACIS_GEODATA_DIR` |
+| `scripts` | Every monster has a script on the production registry path, subscribed to the attack hook; the run logs how many hooks the scripts heard and fails if none ran. | none |
+
+Each variant is one command, the baseline command with the variant set:
+
+```bash
+ACIS_PERF_VARIANT=spread ACIS_PERF_CLIENTS=200 ACIS_PERF_DURATION=30s ACIS_PERF_PROFILE_DIR=/tmp/acis-prof-spread \
+  go -C acis_golang test ./tests/perf/ -run TestLoadBaseline -v -count=1 -timeout 12m
+```
+
+Measured on the 2026-11-17 host (4 vCPU, `GOMAXPROCS=3`), `ACIS_PERF_CLIENTS=200 ACIS_PERF_DURATION=30s`, every
+run passing:
+
+| Variant | Step p50 / p99 / max | Process CPU | Allocated |
+|---|---|---|---|
+| baseline | 4.5 / 68 / 167 ms | 20.7 s | 1029 MiB |
+| `spread` (16 regions) | 2.6 / 7.2 / 9.8 ms | 3.9 s | 109 MiB |
+| `geo` | 3.9 / 90 / 124 ms | 18.7 s | 1066 MiB |
+| `scripts` | 4.1 / 55 / 148 ms | 21.0 s | 1037 MiB |
+
+The spread run is cheap because a client then sees only its own region: the baseline's cost is the
+every-client-sees-every-client fan-out.
+
+The log's `load baseline: variant=...` line names the variant; the step p50 / p99, process CPU and
+the three profiles are reported as for the baseline. What a variant does not yet cover, and is
+tracked in the open issue for the gap: clients that cast and monsters that cast and retaliate, the
+production script catalog's own scripts (the `scripts` variant's script is a counter, so
+`go tool pprof -focus gameserver/script` shows no samples at this load), and a production-sized
+items and characters fixture with a measured stop.
+
 The run logs step latency, selection latency, process CPU, GC count and pauses, the GC's CPU time, bytes allocated in
 the window, heap size, and goroutines under load. After the window it closes every client and fails
 if the process does not return to its post-boot goroutine count within 25 s, which covers the 15 s

@@ -589,21 +589,28 @@ func TestAuctionSaleRegistersOnDeposit(t *testing.T) {
 	if price := w.page(t, "sale2"); !strings.Contains(price, ">500000</font> adena and the last trading price was <font color=\"aaccff\">500000<") {
 		t.Fatalf("price page:\n%s", price)
 	}
+	// The hall clock is the wall clock on the real pool: the end time is
+	// read between two readings of it.
 	now := w.srv.Halls.Now()
 	summary := w.page(t, "auction 7 30000000")
+	summaryEnd := w.srv.Halls.Now()
 	for _, want := range []string{
-		">30000000</font> adena", ">20000000</font> adena", "7 days", endTime(now + 7*dayMs),
+		">30000000</font> adena", ">20000000</font> adena", "7 days",
 		"bypass -h npc_" + oid + "_sale2", "bypass -h npc_" + oid + "_confirmAuction",
 	} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("sale summary lacks %q:\n%s", want, summary)
 		}
 	}
+	if !strings.Contains(summary, endTime(now+7*dayMs)) && !strings.Contains(summary, endTime(summaryEnd+7*dayMs)) {
+		t.Fatalf("sale summary lacks the end time %s or %s:\n%s", endTime(now+7*dayMs), endTime(summaryEnd+7*dayMs), summary)
+	}
 	if v, _ := w.srv.Halls.View(moonstone); v.Seller != nil {
 		t.Fatal("hall put up for sale before the deposit")
 	}
 
 	frames := w.bypass(t, "confirmAuction")
+	confirmed := w.srv.Halls.Now()
 	saleInfo := pageIn(t, frames)
 	for _, want := range []string{">Moonstone Hall<", ">Bidders<", ">Talker<", ">30000000<", "bypass -h npc_" + oid + "_bidlist 22", "bypass -h npc_" + oid + "_cancelAuction"} {
 		if !strings.Contains(saleInfo, want) {
@@ -615,8 +622,8 @@ func TestAuctionSaleRegistersOnDeposit(t *testing.T) {
 		t.Fatalf("clan adena after the deposit = %d, want 500000", got)
 	}
 	row := storedHall(t, w, moonstone)
-	if row.owner != auctionClanID || row.sellerBid != 30_000_000 || row.sellerName != "Talker" || row.sellerCln != "Bidders" || row.endDate != now+7*dayMs {
-		t.Fatalf("stored hall = %+v, want the sale at 30000000 ending %d", row, now+7*dayMs)
+	if row.owner != auctionClanID || row.sellerBid != 30_000_000 || row.sellerName != "Talker" || row.sellerCln != "Bidders" || row.endDate < now+7*dayMs || row.endDate > confirmed+7*dayMs {
+		t.Fatalf("stored hall = %+v, want the sale at 30000000 ending between %d and %d", row, now+7*dayMs, confirmed+7*dayMs)
 	}
 	v, _ := w.srv.Halls.View(moonstone)
 	if v.MinBid != 30_000_000 {

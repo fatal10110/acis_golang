@@ -127,6 +127,7 @@ func (w *folkWorld) tickAI(t *testing.T) [][]byte {
 	if err := w.srv.AI.Tick(); err != nil {
 		t.Fatalf("AI.Tick() = %v", err)
 	}
+	w.srv.Settle(t)
 	return drainFrames(t, w.c)
 }
 

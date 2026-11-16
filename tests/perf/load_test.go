@@ -5,6 +5,8 @@
 //
 //	ACIS_PERF_CLIENTS=50 ACIS_PERF_DURATION=30s go test ./tests/perf/ -run TestLoadBaseline -v -count=1
 //
+// ACIS_PERF_VARIANT=spread,geo,scripts selects the variants in variants_test.go
+// (clients spread over regions, a geodata-backed run, scripted monsters).
 // ACIS_PERF_PROFILE_DIR=<dir> also writes the run's CPU, heap and goroutine
 // profiles there; docs/profiling.md reads them.
 package perf
@@ -24,6 +26,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -71,18 +74,41 @@ func TestLoadBaseline(t *testing.T) {
 	}
 	duration := envDuration(t, "ACIS_PERF_DURATION", 30*time.Second)
 
-	srv := gameservertest.Boot(t,
-		gameservertest.WithCharacter("Perf0", 5, 0),
+	v := variantsFromEnv(t)
+	var geo move.Geo = gameservertest.Geo{}
+	if v.geo {
+		geo = loadGeo(t)
+	}
+	// The test class has 36 max HP at every level and the fixture monster
+	// hits for ~80 at its default attack, so each counter-attack would be a
+	// one-shot. A quarter point of PAtk (~6 per hit) keeps every swing, hate
+	// and broadcast real while the per-step heal below keeps the character
+	// in the fight.
+	tmpl := gameservertest.MovingHostileTemplate("Monster")
+	tmpl.PAtk = 0.25
+	ms := &monsterScript{templateID: int32(tmpl.ID)}
+
+	character := gameservertest.WithCharacter("Perf0", 5, 0)
+	if v.placed() {
+		character = gameservertest.WithCharacterAt("Perf0", 5, 0, v.place(0))
+	}
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
+		character,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithProductionTickers(),
 		gameservertest.WithRealPool(), // measures the production executor
-	)
+	}, v.options(tmpl, geo, ms)...)...)
 	goroutineBaseline := runtime.NumGoroutine()
 	conns := []*testsupport.ScriptedClient{srv.Client}
 	ids := []int32{srv.SoleObjectID(t)}
 	for i := 1; i < clients; i++ {
 		account := fmt.Sprintf("perf%d", i)
-		ids = append(ids, srv.SeedCharacterFor(t, account, fmt.Sprintf("Perf%d", i), 5, 0).ID)
+		name := fmt.Sprintf("Perf%d", i)
+		if v.placed() {
+			ids = append(ids, srv.SeedCharacterForAt(t, account, name, 5, 0, v.place(i)).ID)
+		} else {
+			ids = append(ids, srv.SeedCharacterFor(t, account, name, 5, 0).ID)
+		}
 		conns = append(conns, srv.DialClient(t, account, 1))
 	}
 
@@ -105,23 +131,19 @@ func TestLoadBaseline(t *testing.T) {
 	}
 	defer stopReaders()
 
-	x, y, z := srv.PlayerPosition(t, ids[0])
-	origin := location.Location{X: x, Y: y, Z: z}
-	// The test class has 36 max HP at every level and the fixture monster
-	// hits for ~80 at its default attack, so each counter-attack would be a
-	// one-shot. A quarter point of PAtk (~6 per hit) keeps every swing, hate
-	// and broadcast real while the per-step heal below keeps the character
-	// in the fight.
-	tmpl := gameservertest.MovingHostileTemplate("Monster")
-	tmpl.PAtk = 0.25
+	origins := make([]location.Location, clients)
+	for i := range origins {
+		x, y, z := srv.PlayerPosition(t, ids[i])
+		origins[i] = location.Location{X: x, Y: y, Z: z}
+	}
 	monsters := make([]*npc.Hostile, clients)
 	// Every monster starts 60+ away on x, out of melee reach, so each client
 	// walks to its first attack. At 40 the clients whose monster sat in reach
 	// from the start (0, 10, ...) attacked from the spawn point and their
 	// short walks never moved them, failing the "left the spawn point" check.
 	for i := range monsters {
-		at := location.Location{X: x + 60 + i%10*20, Y: y + i/10*20, Z: z}
-		monsters[i] = srv.SpawnMovingHostileNPCTemplate(t, tmpl, at, at)
+		at := v.monsterSpot(geo, origins[i], i)
+		monsters[i] = srv.SpawnMovingHostileNPCTemplateAtGeo(t, tmpl, at, at, geo)
 		srv.AI.Add(monsters[i])
 	}
 
@@ -144,7 +166,7 @@ func TestLoadBaseline(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range conns {
 		wg.Go(func() {
-			samples[i] = runClient(srv, conns[i], readers[i], monsters[i], origin, i, deadline, &timeouts)
+			samples[i] = runClient(srv, conns[i], readers[i], monsters[i], origins[i], i, deadline, &timeouts)
 		})
 	}
 	wg.Wait()
@@ -188,7 +210,7 @@ func TestLoadBaseline(t *testing.T) {
 	slices.Sort(all)
 	cpu := cpuTime(after) - cpuTime(before)
 	gcs := memAfter.NumGC - memBefore.NumGC
-	t.Logf("load baseline: clients=%d duration=%s GOMAXPROCS=%d", clients, elapsed.Round(time.Millisecond), runtime.GOMAXPROCS(0))
+	t.Logf("load baseline: variant=%s clients=%d duration=%s GOMAXPROCS=%d", v, clients, elapsed.Round(time.Millisecond), runtime.GOMAXPROCS(0))
 	t.Logf("  disconnected=%d steps=%d timeouts=%d frames_received=%d (%.0f/s)", disconnected, len(all), timeouts.Load(), frames, float64(frames)/elapsed.Seconds())
 	t.Logf("  step latency p50=%s p99=%s max=%s", percentile(all, 50), percentile(all, 99), all[len(all)-1])
 	t.Logf("  selection latency p50=%s p99=%s max=%s", percentile(selections, 50), percentile(selections, 99), selections[len(selections)-1])
@@ -200,6 +222,13 @@ func TestLoadBaseline(t *testing.T) {
 	}
 	if died > 0 || stationary > 0 || noAttack > 0 {
 		t.Errorf("workload not driven: of %d clients %d died, %d never left the spawn point, %d never landed an attack", clients, died, stationary, noAttack)
+	}
+	if v.scripts {
+		heard := ms.attacked.Load()
+		t.Logf("  script attacked hooks=%d", heard)
+		if heard == 0 {
+			t.Error("the scripts variant ran no script hook: the monsters' scripts were not bound")
+		}
 	}
 	if strayReplies > 0 {
 		t.Errorf("%d clients got a probe-reply count different from their probe count; an unsolicited SkillList would corrupt the latency samples", strayReplies)
@@ -407,6 +436,8 @@ func envInt(t *testing.T, name string, fallback int) int {
 	}
 	return n
 }
+
+func envString(name string) string { return os.Getenv(name) }
 
 func envDuration(t *testing.T, name string, fallback time.Duration) time.Duration {
 	t.Helper()
