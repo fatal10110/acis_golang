@@ -36,9 +36,19 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		n.liveCount--
 	}
 	slot, ok := n.slot[key]
+	// leftSeq is the npcmaker's leave count once this NPC no longer
+	// counts alive; 0 for an NPC of no npcmaker.
+	var leftSeq int
 	if tracked && ok {
-		slot.form, slot.left = form, left
+		slot.form, slot.left, slot.leftID = form, left, actorID
 		n.slot[key] = slot
+		if g := slot.group; g != nil {
+			if slot.orphan {
+				g.orphansAlive--
+			}
+			g.left++
+			leftSeq = g.left
+		}
 	}
 	n.mu.Unlock()
 	if !tracked || !ok {
@@ -70,7 +80,7 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	n.walker.StopRouteByID(actorID)
 
 	if g := slot.group; g != nil {
-		return func() { n.groupNPCDeleted(g, slot) }
+		return func() { n.groupNPCDeleted(g, slot, leftSeq) }
 	}
 
 	if slot.scripted {
@@ -99,14 +109,23 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 // its slot stays, decayed, whatever the respawn delay. A spawn that never
 // respawns drops the slot of an NPC its maker armed a respawn for anyway
 // from its list: the slot lives on as an orphan.
-func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
+//
+// The hook sees its group's alive count as it was once this NPC left, the
+// NPCs that entered since counted in and those it took out itself counted
+// out, but not those that left on their own meanwhile: of several NPCs of
+// one npcmaker leaving at once, each on its own queue, only the last to
+// leave finds none left (leftSeq is g's leave count as this NPC left).
+func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo, leftSeq int) {
 	if slot.orphan {
-		n.orphanNPCDeleted(g, slot)
+		n.orphanNPCDeleted(slot)
 		return
 	}
 	if !slot.first {
-		scope := &hookScope{}
+		scope := &hookScope{deleted: g, left: leftSeq}
 		g.behavior.NPCDeleted(g.in(scope), groupSpawn{g: g, i: slot.spawnIdx, scope: scope}, groupNPC{n: n, slot: slot, scope: scope})
+		n.mu.Lock()
+		scope.deleted = nil
+		n.mu.Unlock()
 	}
 
 	now := n.now()
@@ -127,18 +146,18 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 	n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(*slot.entry), now)
 }
 
-// orphanNPCDeleted answers the NPC of an orphan slot of g leaving the
-// world: no maker hook runs, it no longer counts alive, a database-tracked
-// row records a respawn time when the spawn respawns at all, and the slot
-// goes unless a respawn is armed for it.
-func (n *Npcs) orphanNPCDeleted(g *makerGroup, slot slotInfo) {
+// orphanNPCDeleted answers the NPC of an orphan slot leaving the
+// world: no maker hook runs, it no longer counts alive (RespawnHook took it
+// off as it left), a database-tracked row records a respawn time when the
+// spawn respawns at all, and the slot goes unless a respawn is armed for
+// it.
+func (n *Npcs) orphanNPCDeleted(slot slotInfo) {
 	now := n.now()
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if _, ok := n.slot[slot.key]; !ok {
 		return
 	}
-	g.orphansAlive--
 	if slot.dbName != "" && slot.entry.RespawnDelay > 0 {
 		n.spawns.SetRespawn(slot.dbName, spawn.CalculateRespawnDelay(*slot.entry), now)
 	}
@@ -216,10 +235,21 @@ func (n *Npcs) respawnSlot(key task.SlotID) {
 		n.mu.Unlock()
 		return
 	}
+	if slot.group != nil && !slices.Contains(n.groups, slot.group) {
+		// DespawnAll or RespawnAll retired its npcmaker since.
+		n.dropSlotLocked(key)
+		n.mu.Unlock()
+		return
+	}
 	slot.spawning = true
+	leftID := slot.leftID
+	slot.leftID = 0
 	n.slot[key] = slot
 	n.mu.Unlock()
 	defer n.endSpawn(key)
+	// The NPC that left the slot gives its object id back as the slot
+	// respawns, whether or not the respawn places one.
+	n.releaseID(leftID)
 
 	tmpl := slot.tmpl
 	if tmpl == nil {
@@ -255,6 +285,18 @@ func (n *Npcs) respawnSlot(key task.SlotID) {
 		return
 	}
 	n.spawnFresh(key, *slot.entry, tmpl, pos)
+}
+
+// releaseID gives the object id id back to the id allocator; nothing for
+// id 0 or an allocator that takes none back.
+func (n *Npcs) releaseID(id int32) {
+	if id == 0 {
+		return
+	}
+	// accepted: releasing ids is an optional allocator capability.
+	if r, ok := n.ids.(interface{ ReleaseID(int32) }); ok {
+		r.ReleaseID(id)
+	}
 }
 
 // despawnMinions takes master's minions out of the world as its spawn is
