@@ -3,20 +3,20 @@ package lifecycle
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/link"
 )
 
-// TestEvictedAuthLoginAnswerDoesNotAuthenticateReplacement holds the login
+// TestAuthLoginWhileAccountValidatesLeavesFirstAlone holds the login
 // server's answers so a second AuthLogin for the account, with keys the
 // login server never issued, lands while the answer to the first is still
-// in flight. The first connection is evicted; the login server's approval
-// of its request must be dropped, and the replacement is refused on its
-// own answer instead of entering on the evicted one's.
-func TestEvictedAuthLoginAnswerDoesNotAuthenticateReplacement(t *testing.T) {
+// in flight. The second connection is refused with AuthLoginFail and
+// ServerClose without reaching the login server, and the first, untouched, enters on its own approval. A pending
+// login is never displaced by an unapproved one: owner-approved divergence
+// (#4652).
+func TestAuthLoginWhileAccountValidatesLeavesFirstAlone(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t)
 	const account = "evictee"
@@ -28,15 +28,12 @@ func TestEvictedAuthLoginAnswerDoesNotAuthenticateReplacement(t *testing.T) {
 	hold.Await(t, 1) // the login server approved the first request
 
 	second := srv.DialAuthLogin(t, account, link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4})
-	if !first.AwaitClose(5 * time.Second) {
-		t.Fatal("evicted connection still open")
-	}
-	hold.Await(t, 2) // and refused the second
+	assertFrameOpcode(t, second.Read(), serverpackets.OpcodeAuthLoginFail, "second AuthLogin answer")
+	assertFrameOpcode(t, second.Read(), serverpackets.OpcodeServerClose, "second AuthLogin ServerClose")
+	second.ExpectClosed()
 	hold.Release()
 
-	assertFrameOpcode(t, second.Read(), serverpackets.OpcodeAuthLoginFail, "replacement AuthLogin answer")
-	assertFrameOpcode(t, second.Read(), serverpackets.OpcodeServerClose, "replacement ServerClose")
-	second.ExpectClosed()
+	assertFrameOpcode(t, first.Read(), serverpackets.OpcodeCharSelectInfo, "first AuthLogin answer")
 }
 
 // TestOverlongAuthLoginNameIsRefusedAndLoginLinkStays sends AuthLogin

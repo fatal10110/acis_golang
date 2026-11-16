@@ -177,8 +177,11 @@ func (l *GameClientLink) endConnection(ctx context.Context, cs *connState) {
 		onLive(leaving, func() { owners = l.detachLivePlayer(leaving) })
 		_ = l.awaitPersistence(cs.conn, owners...)
 	}
-	if l.clients != nil {
-		l.clients.Release(client.AccountName(), client)
+	// A connection replaced by a newer approved login leaves the account to
+	// it: the login server already holds the account in play for the newer
+	// one, so no logout is reported for the replaced connection.
+	if l.clients != nil && !l.clients.Release(client.AccountName(), client) {
+		return
 	}
 	l.notifyPlayerLogout(client.AccountName())
 }
