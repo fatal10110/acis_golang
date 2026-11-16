@@ -22,11 +22,12 @@ import (
 // the ticker reaches while its holder's logout is already queued finds the
 // holder still in the world, so its release is posted to the holder's queue
 // and runs after the logout. By then the logout has released the
-// inventory's persistence and queued its last item save, so destroying the
-// weapon in memory reaches no row. The release's own delete, queued on the
-// holder's lane after that save, must still take the weapon out of the
-// stored items, or the holder logs back in wielding an uncursed weapon the
-// manager is free to drop again.
+// inventory's persistence and queued its last item save, so the release
+// finds the holder detached and releases its stored state instead (#4689:
+// only the holder's queue touches the holder, and a detached one is out of
+// the world). That delete, queued on the holder's lane after the save, must
+// still take the weapon out of the stored items, or the holder logs back in
+// wielding an uncursed weapon the manager is free to drop again.
 func TestCursedWeaponEndBehindLogoutDeletesStoredWeapon(t *testing.T) {
 	const weaponID int32 = 30 // a weapon in testItemTemplates
 	const weaponObjectID int32 = 6100
@@ -104,9 +105,6 @@ func TestCursedWeaponEndBehindLogoutDeletesStoredWeapon(t *testing.T) {
 
 	if n := countStoredItem(t, db, id, weaponID); n != 0 {
 		t.Fatalf("stored weapons after the end = %d, want 0", n)
-	}
-	if inv.ItemByTemplateID(weaponID) != nil || holder.CursedWeaponEquipped() {
-		t.Fatal("the release left the weapon with its holder")
 	}
 }
 

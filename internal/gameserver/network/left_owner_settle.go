@@ -23,6 +23,11 @@ import "sync"
 // stays until they all have: a settle arriving while they run is held behind
 // them, so the corpse's items still reach the owner ahead of its collar's
 // delete.
+//
+// The end of a cursed weapon whose holder a selection is restoring is held
+// the same way: the selection may have loaded the weapon, its karma and its
+// skill already, so the end runs against the registered player instead of
+// leaving that copy live beside a free weapon.
 type selectingOwners struct {
 	mu      sync.Mutex
 	pending map[int32]*ownerSelection
@@ -125,7 +130,8 @@ func (s *selectingOwners) settle(ownerID int32, lookup func(int32) (*livePlayer,
 	return nil, false
 }
 
-// settleWithLeftOwner settles part of a pet corpse ownerID left behind: with
+// settleWithLeftOwner settles work owed to ownerID, such as part of a pet
+// corpse it left behind or the end of a cursed weapon it holds: with
 // the session the owner came back with, on that session's queue, through
 // online, or offline while the owner is out of the world. A session on its way
 // out has queued its inventory's last writes by the time it is marked detached
