@@ -562,7 +562,9 @@ func changeAlreadyDue(row StatusRow, now time.Time) bool {
 		offset := (int(now.Weekday()) - int(time.Monday) + 7) % 7
 		thisMonday := time.Date(now.Year(), now.Month(), now.Day(), periodStartHour, periodStartMin, 0, 0, now.Location()).AddDate(0, 0, -offset)
 		if now.Before(thisMonday) {
-			thisMonday = thisMonday.AddDate(0, 0, -7)
+			// A week of elapsed hours back, not a calendar week: across a
+			// daylight saving change the boundary lands an hour off 18:00.
+			thisMonday = thisMonday.Add(-7 * 24 * time.Hour)
 		}
 		scheduledEnd = thisMonday
 	default:

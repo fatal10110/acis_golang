@@ -2,6 +2,7 @@ package festival
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -22,9 +23,24 @@ type run struct {
 	initialized, inProgress bool
 	// arenas are the festival's open arenas, by side and festival id.
 	arenas [2][Count]*arena
-	// lastRun is set when the competition ended while a festival was
-	// under way: it runs to its end, then the schedule stops.
+	// lastRun is set when the competition ended while a cycle was under
+	// way: it keeps opening signup periods while nobody signs up and runs
+	// the festival a party signs up for to its end, then the schedule
+	// stops.
 	lastRun bool
+	// current is the festival under way, nil between festivals.
+	current *festivalRun
+}
+
+// festivalRun is one festival under way, from its parties' admission to
+// its end. It keeps a timer of its own: a schedule started in place of the
+// one that began it lets it run to its end.
+type festivalRun struct {
+	// generation is the schedule's that began the festival, and due when
+	// its cycle was due.
+	generation uint64
+	due        int64
+	timer      *time.Timer
 }
 
 func newRun() run {
@@ -100,7 +116,9 @@ func (m *Manager) beginFestivalLocked(generation uint64, due int64) []*arena {
 	}
 	m.initialized = true
 	m.nextFestivalStart = m.nowMillis() + m.cfg.CycleLength.Milliseconds()
-	m.armLocked(m.cfg.FirstSpawn.Milliseconds(), func() { m.festivalStarted(generation, due) })
+	fest := &festivalRun{generation: generation, due: due}
+	m.current = fest
+	m.armFestivalLocked(fest, m.cfg.FirstSpawn.Milliseconds(), func() { m.festivalStarted(fest) })
 	return opened
 }
 
@@ -180,8 +198,19 @@ func archer(npcID int) bool {
 // step runs fn, holding the lock, unless the schedule armed it under
 // another generation; fn returns what to do once the lock is released.
 func (m *Manager) step(generation uint64, fn func() func(World)) {
+	m.stepIf(func() bool { return generation == m.generation }, fn)
+}
+
+// festivalStep runs fn as step does, unless fest is no longer the festival
+// under way.
+func (m *Manager) festivalStep(fest *festivalRun, fn func() func(World)) {
+	m.stepIf(func() bool { return m.current == fest }, fn)
+}
+
+// stepIf runs fn, holding the lock, if live reports true under it.
+func (m *Manager) stepIf(live func() bool, fn func() func(World)) {
 	m.mu.Lock()
-	if generation != m.generation {
+	if !live() {
 		m.mu.Unlock()
 		return
 	}
@@ -194,11 +223,11 @@ func (m *Manager) step(generation uint64, fn func() func(World)) {
 }
 
 // festivalStarted spawns each arena's first monsters.
-func (m *Manager) festivalStarted(generation uint64, due int64) {
-	m.step(generation, func() func(World) {
+func (m *Manager) festivalStarted(fest *festivalRun) {
+	m.festivalStep(fest, func() func(World) {
 		m.inProgress = true
 		arenas := m.openArenasLocked()
-		m.armLocked((m.cfg.FirstSwarm - m.cfg.FirstSpawn).Milliseconds(), func() { m.firstSwarm(generation, due) })
+		m.armFestivalLocked(fest, (m.cfg.FirstSwarm - m.cfg.FirstSpawn).Milliseconds(), func() { m.firstSwarm(fest) })
 		return func(world World) {
 			for _, a := range arenas {
 				m.spawnMonsters(world, a, primarySpawns[side(a.cabal)][a.id], 1, false)
@@ -208,20 +237,20 @@ func (m *Manager) festivalStarted(generation uint64, due int64) {
 	})
 }
 
-func (m *Manager) firstSwarm(generation uint64, due int64) {
-	m.step(generation, func() func(World) {
+func (m *Manager) firstSwarm(fest *festivalRun) {
+	m.festivalStep(fest, func() func(World) {
 		arenas := m.openArenasLocked()
-		m.armLocked((m.cfg.SecondSpawn - m.cfg.FirstSwarm).Milliseconds(), func() { m.secondSpawn(generation, due) })
+		m.armFestivalLocked(fest, (m.cfg.SecondSpawn - m.cfg.FirstSwarm).Milliseconds(), func() { m.secondSpawn(fest) })
 		return func(world World) { m.swarm(world, arenas) }
 	})
 }
 
 // secondSpawn brings the archers in and tells each party how long is
 // left.
-func (m *Manager) secondSpawn(generation uint64, due int64) {
-	m.step(generation, func() func(World) {
+func (m *Manager) secondSpawn(fest *festivalRun) {
+	m.festivalStep(fest, func() func(World) {
 		arenas := m.openArenasLocked()
-		m.armLocked((m.cfg.SecondSwarm - m.cfg.SecondSpawn).Milliseconds(), func() { m.secondSwarm(generation, due) })
+		m.armFestivalLocked(fest, (m.cfg.SecondSwarm - m.cfg.SecondSpawn).Milliseconds(), func() { m.secondSwarm(fest) })
 		left := (m.cfg.Length - m.cfg.SecondSpawn).Milliseconds() / 60000
 		return func(world World) {
 			for _, a := range arenas {
@@ -232,19 +261,19 @@ func (m *Manager) secondSpawn(generation uint64, due int64) {
 	})
 }
 
-func (m *Manager) secondSwarm(generation uint64, due int64) {
-	m.step(generation, func() func(World) {
+func (m *Manager) secondSwarm(fest *festivalRun) {
+	m.festivalStep(fest, func() func(World) {
 		arenas := m.openArenasLocked()
-		m.armLocked((m.cfg.ChestSpawn - m.cfg.SecondSwarm).Milliseconds(), func() { m.chestsSpawn(generation, due) })
+		m.armFestivalLocked(fest, (m.cfg.ChestSpawn - m.cfg.SecondSwarm).Milliseconds(), func() { m.chestsSpawn(fest) })
 		return func(world World) { m.swarm(world, arenas) }
 	})
 }
 
 // chestsSpawn brings the chests in, each worth five blood offerings.
-func (m *Manager) chestsSpawn(generation uint64, due int64) {
-	m.step(generation, func() func(World) {
+func (m *Manager) chestsSpawn(fest *festivalRun) {
+	m.festivalStep(fest, func() func(World) {
 		arenas := m.openArenasLocked()
-		m.armLocked((m.cfg.Length - m.cfg.ChestSpawn).Milliseconds(), func() { m.festivalEnded(generation, due) })
+		m.armFestivalLocked(fest, (m.cfg.Length - m.cfg.ChestSpawn).Milliseconds(), func() { m.festivalEnded(fest) })
 		return func(world World) {
 			for _, a := range arenas {
 				m.spawnMonsters(world, a, chestSpawns[side(a.cabal)][a.id], chestBonus, false)
@@ -271,9 +300,10 @@ func (m *Manager) swarm(world World, arenas []*arena) {
 // festivalEnded ends the festival: each party is taken back where it came
 // from and waits for its leader to register its score, the arenas close
 // and a new signup period opens. The cycle that follows is due a cycle
-// length after this one was.
-func (m *Manager) festivalEnded(generation uint64, due int64) {
-	m.step(generation, func() func(World) {
+// length after this one was, unless the competition ended meanwhile or a
+// new schedule has started since the festival began.
+func (m *Manager) festivalEnded(fest *festivalRun) {
+	m.festivalStep(fest, func() func(World) {
 		m.inProgress = false
 		arenas := m.openArenasLocked()
 		for _, a := range arenas {
@@ -284,12 +314,17 @@ func (m *Manager) festivalEnded(generation uint64, due int64) {
 		m.arenas = [2][Count]*arena{}
 		m.participants = [2]roster{{}, {}}
 		m.initialized = false
-		if m.lastRun {
-			m.lastRun = false
-			m.timer = nil
-		} else {
-			next := due + m.cfg.CycleLength.Milliseconds()
-			m.armLocked(max(0, next-m.nowMillis()), func() { m.runCycle(generation, next) })
+		m.current = nil
+		// A schedule started since the festival began runs on its own.
+		if fest.generation == m.generation {
+			m.running = false
+			if m.lastRun {
+				m.lastRun = false
+				m.timer = nil
+			} else {
+				generation, next := fest.generation, fest.due+m.cfg.CycleLength.Milliseconds()
+				m.armLocked(max(0, next-m.nowMillis()), func() { m.runCycle(generation, next) })
+			}
 		}
 		return func(world World) {
 			for _, a := range arenas {
