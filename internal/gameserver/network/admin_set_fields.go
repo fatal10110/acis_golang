@@ -216,7 +216,8 @@ func (l *GameClientLink) adminRenamePlayer(gm, target *livePlayer, name string) 
 		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
 		return
 	}
-	if !onPlayer(gm, target, func() {
+	// A target leaving the world drops the rename unrun.
+	onPlayerOr(gm, target, func() {
 		defer release()
 		if !l.renamePlayer(target, name) {
 			// A player that took the name online since the check, or a
@@ -227,10 +228,7 @@ func (l *GameClientLink) adminRenamePlayer(gm, target *livePlayer, name string) 
 		l.broadcastCharacterInfo(target)
 		l.storeLive(target)
 		sendText(gm, "You successfully set your target's name to "+target.CharacterName()+".")
-	}) {
-		// A target that left the world drops the rename unrun.
-		release()
-	}
+	}, release)
 }
 
 // reserveName holds name against character creation and other renames

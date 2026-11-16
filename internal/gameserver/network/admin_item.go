@@ -142,7 +142,8 @@ func (l *GameClientLink) adminItemSet(gm, target *livePlayer, args []string) {
 		sendText(gm, "This chest has no set.")
 		return
 	}
-	if !onPlayer(gm, target, func() {
+	// A target leaving the world gets nothing; gm still gets the list.
+	onPlayerOr(gm, target, func() {
 		pieces := set.PieceIDs()
 		for _, id := range append(pieces[:], set.Shield) {
 			if id > 0 {
@@ -155,9 +156,7 @@ func (l *GameClientLink) adminItemSet(gm, target *livePlayer, args []string) {
 			}
 			list()
 		})
-	}) {
-		list()
-	}
+	}, list)
 }
 
 // sendArmorSets opens the armor set page listing every set as a link that
@@ -197,7 +196,9 @@ func (l *GameClientLink) createItem(gm, target *livePlayer, id int32, count, rad
 		done()
 		return
 	}
-	if !onPlayer(gm, target, func() {
+	// A target leaving the world gets nothing: no item lands in an
+	// inventory its logout has already flushed.
+	onPlayerOr(gm, target, func() {
 		fits := target.RewardItemFits(id, count)
 		if fits && radius <= 0 {
 			l.giveCreatedItem(target, id, count)
@@ -214,9 +215,7 @@ func (l *GameClientLink) createItem(gm, target *livePlayer, id int32, count, rad
 			}
 			done()
 		})
-	}) {
-		done()
-	}
+	}, done)
 }
 
 // giveAround gives count units of item id to every player within radius

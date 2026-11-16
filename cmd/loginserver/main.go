@@ -182,9 +182,15 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	}, nil
 }
 
+// listenAddress returns the listener address for a configured host: "*"
+// binds every address and an empty host binds the loopback address only.
+// A host name stays as written and resolves at bind.
 func listenAddress(host string, port int) string {
-	if host == "*" {
+	switch host {
+	case "*":
 		host = ""
+	case "":
+		host = "127.0.0.1"
 	}
 	return net.JoinHostPort(host, strconv.Itoa(port))
 }
@@ -324,7 +330,8 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 	var wg sync.WaitGroup
 
 	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
+		OnStart: func(ctx context.Context) error {
+			clientAddr := clientBindAddress(ctx, cfg.ClientAddr, net.DefaultResolver.LookupIPAddr, log)
 			runCtx, stop := context.WithCancel(context.Background())
 			cancel = stop
 
@@ -341,11 +348,11 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 			}()
 			log.Info().Str("addr", cfg.GameServerAddr).Msg("listening for gameservers")
 
-			clientLn, err := net.Listen("tcp", cfg.ClientAddr)
+			clientLn, err := net.Listen("tcp", clientAddr)
 			if err != nil {
 				stop()
 				_ = gameLn.Close()
-				return fmt.Errorf("listen for login clients on %s: %w", cfg.ClientAddr, err)
+				return fmt.Errorf("listen for login clients on %s: %w", clientAddr, err)
 			}
 			wg.Add(1)
 			go func() {
@@ -354,10 +361,10 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 				// accept, before the IP ban list is consulted.
 				filtered := netutil.FilterAccepts(clientLn, filter, time.Now)
 				if err := clients.Serve(runCtx, filtered); err != nil {
-					log.Error().Err(err).Str("addr", cfg.ClientAddr).Msg("login client listener stopped")
+					log.Error().Err(err).Str("addr", clientAddr).Msg("login client listener stopped")
 				}
 			}()
-			log.Info().Str("addr", cfg.ClientAddr).Msg("listening for login clients")
+			log.Info().Str("addr", clientAddr).Msg("listening for login clients")
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {

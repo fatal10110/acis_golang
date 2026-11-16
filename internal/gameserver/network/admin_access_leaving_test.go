@@ -33,8 +33,8 @@ func (s *recordingAccessStore) SetAccessLevel(_ context.Context, objectID int32,
 	return nil
 }
 
-func (s *recordingAccessStore) SetAccessLevelByName(context.Context, string, int) (bool, error) {
-	return false, nil
+func (s *recordingAccessStore) SetAccessLevelKeepingTitle(context.Context, int32, int) error {
+	return nil
 }
 
 func (s *recordingAccessStore) recorded() []accessWrite {

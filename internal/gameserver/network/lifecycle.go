@@ -82,7 +82,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.roster != nil || l.skills != nil {
 		roster, skills, log := l.roster, l.skills, l.log
 		character := live.Character
-		charState := character.SaveState()
+		charState := live.characterSaveState()
 		if at, ok := l.festivalDeparture(live); ok {
 			charState.Location = at
 		}

@@ -12,7 +12,7 @@ import (
 // accessLevelStore stores a character's access level.
 type accessLevelStore interface {
 	SetAccessLevel(ctx context.Context, objectID int32, level int, title string) error
-	SetAccessLevelByName(ctx context.Context, name string, level int) (bool, error)
+	SetAccessLevelKeepingTitle(ctx context.Context, objectID int32, level int) error
 }
 
 // accessLevelWriteTimeout bounds one access-level write.
@@ -60,8 +60,11 @@ func (l *GameClientLink) applyLoadedAccessLevel(c *player.Character) {
 
 // setAccessLevel moves live, on live's queue, to the access level level
 // reads as. The damage permission, title, colors and game-master roster
-// follow, live and its observers are shown the change, and the level is
-// stored.
+// follow, and live and its observers are shown the change. The level reaches
+// the character row with live's next save, as every value that save carries
+// does; a title the change gives is stored at once, as every title change
+// is, since the save does not carry the title the clan rows also write
+// (#5299).
 func (l *GameClientLink) setAccessLevel(live *livePlayer, level int) {
 	access := l.resolveAccessLevel(live.Character, level)
 	live.access.Store(&access)
@@ -77,12 +80,19 @@ func (l *GameClientLink) setAccessLevel(live *livePlayer, level int) {
 		l.gms.Remove(live)
 	}
 	l.broadcastCharacterInfo(live)
-	l.storeAccessLevel(live.ObjectID(), access.Level, live.Title())
+	if level > 0 {
+		id, title := live.ObjectID(), live.Title()
+		l.storeCharacterEdit(id, "store title", func(ctx context.Context, s characterEditStore) error {
+			return s.SetTitle(ctx, id, title)
+		})
+	}
 }
 
-// storeLeavingAccessLevel stores the level setAccessLevel would have stored
-// for target, whose queue closed as it left the world and so dropped the
-// change: the stored level must not depend on the target still playing.
+// storeLeavingAccessLevel stores the level and title setAccessLevel would
+// have given target, which has begun leaving the world and so missed the
+// change: the stored level must not depend on the target still playing. It
+// runs once target's logout saves are queued (onPlayerOr), so it lands
+// after them.
 func (l *GameClientLink) storeLeavingAccessLevel(target *livePlayer, level int) {
 	access := l.resolveAccessLevel(target.Character, level)
 	title := target.Title()
@@ -111,21 +121,22 @@ func (l *GameClientLink) storeAccessLevel(objectID int32, level int, title strin
 	}
 }
 
-// storeAccessLevelByName writes the access level of the character named
-// name, online or not, and reports whether one has that name. ok is false
-// when the write failed; it is logged.
-func (l *GameClientLink) storeAccessLevelByName(name string, level int) (found, ok bool) {
+// storeOfflineAccessLevel writes level as the access level of objectID, a
+// character out of the world, on its persistence lane; its title stays.
+func (l *GameClientLink) storeOfflineAccessLevel(objectID int32, level int) {
 	if l.accessLevels == nil {
-		return false, true
+		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), accessLevelWriteTimeout)
-	defer cancel()
-	found, err := l.accessLevels.SetAccessLevelByName(ctx, name, level)
-	if err != nil {
-		l.log.Error().Err(err).Str("name", name).Msg("store access level")
-		return false, false
+	store, log := l.accessLevels, l.log
+	if !l.persist.Enqueue(objectID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), accessLevelWriteTimeout)
+		defer cancel()
+		if err := store.SetAccessLevelKeepingTitle(ctx, objectID, level); err != nil {
+			log.Error().Err(err).Int32("object_id", objectID).Msg("store access level")
+		}
+	}) {
+		log.Error().Int32("object_id", objectID).Msg("store access level: persistence closed")
 	}
-	return found, true
 }
 
 // sendAccountAccessLevel asks the login server to give account level; a

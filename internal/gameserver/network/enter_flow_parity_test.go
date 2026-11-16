@@ -134,11 +134,11 @@ func TestRequestGameStartUnknownSlotKeepsConnectionOpen(t *testing.T) {
 // list.
 func TestRequestGameStartBannedCharacterRefusedSilently(t *testing.T) {
 	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
-		seedSelectableSQLCharacter(t, chars, "player1", "Banned", 1, 0)
+		banned := seedSelectableSQLCharacter(t, chars, "player1", "Banned", 1, 0)
 		// Banned before the client ever authenticates, so the character
 		// list it is shown already carries the access level.
-		if found, err := chars.SetAccessLevelByName(context.Background(), "Banned", -100); err != nil || !found {
-			t.Fatalf("ban seeded character: %v (found %v)", err, found)
+		if err := chars.SetAccessLevelKeepingTitle(context.Background(), banned.ObjectID(), -100); err != nil {
+			t.Fatalf("ban seeded character: %v", err)
 		}
 	}, 1)
 
