@@ -1,0 +1,13 @@
+# Owner-approved divergences from fly.golden (#4846): a line may not cross a
+# layer of any cell while it climbs or sinks inside it.
+# Block (0,0) has its floor at 0, so the same-cell drop to -500 is refused and
+# stops at the origin.
+fly	same cell	-131064 -262136 100	32.0	-131060 -262141 -500	false	-131064 -262136 100
+# Lines the reference already refuses at a border whose floor stands over the
+# line sink through the floor of the cell before it; they stop one cell
+# earlier, where they entered that cell.
+fly	descent into the floor	-131064 -262136 40	32.0	-131016 -262136 -40	false	-131041 -262136 2
+fly	shallow descent over steps and flat	-131064 -262136 250	32.0	-130822 -262044 40	false	-131009 -262115 203
+fly	steep descent into flat	-130936 -262136 300	32.0	-130840 -262136 -100	false	-130881 -262136 71
+fly	down into the trench	-130808 -262136 50	32.0	-130760 -262136 -150	false	-130801 -262136 21
+fly	diagonal through ceilings	-130936 -261880 200	32.0	-130824 -261768 20	false	-130912 -261857 163

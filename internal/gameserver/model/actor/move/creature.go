@@ -910,8 +910,9 @@ func (m *CreatureMove) setPawnLocked(pawn Pawn, offset int, tracks bool) {
 // origin carries geodata-snapped Z; target carries the requested Z.
 //
 // A player that swims or flies from the origin takes no routed search: a
-// flier's line is open by the fly corridor (a swimmer's by the ground line),
-// and a line that is not ends at the last point a flier reaches along it.
+// flier's line is open by the fly corridor (a swimmer's by the ground line,
+// to a target at or over a floor of its cell), and a line that is not ends
+// at the last point a flier reaches along it.
 // Any other mover resolves on the ground whatever its move type.
 func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Location, []location.Location, pathFindResult) {
 	moveType := MoveGround
@@ -923,6 +924,13 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 		open = m.geo.CanFly(m.origin.X, m.origin.Y, m.origin.Z, flyCorridorHeight, target.X, target.Y, target.Z)
 	} else {
 		open = m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z)
+		// The ground line only matches floors, whatever height the target
+		// asks for: a swimmer also never heads under every floor of the
+		// target's cell (#4846). A layer over the target, a deck or a pier
+		// over the water, does not count.
+		if f, ok := m.geo.(floorFinder); ok && open && moveType == MoveSwim {
+			open = f.HasLayerAtOrBelow(target.X, target.Y, target.Z)
+		}
 	}
 	if open {
 		return target, nil, pathDirect
