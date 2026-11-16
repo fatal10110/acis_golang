@@ -188,6 +188,14 @@ func (a *Actor) BroadcastPosition() {
 	a.emit(event.PositionCorrected{})
 }
 
+// ForceHeading spins the summon at once to heading, showing the turn to its
+// observers.
+func (a *Actor) ForceHeading(heading int) {
+	from := a.Heading()
+	a.SetHeading(heading)
+	a.emit(event.ForcedTurn{From: from, To: heading})
+}
+
 // UpdateEffectIcons reports that the summon's effect icons changed: its
 // owner's party, or its owner alone, is shown them.
 func (a *Actor) UpdateEffectIcons() { a.emit(event.EffectIconsChanged{}) }

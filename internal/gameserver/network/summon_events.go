@@ -145,6 +145,10 @@ func (s *summonSink) Emit(ev event.Event) {
 		x, y, z := actor.Position()
 		at, heading := location.Location{X: x, Y: y, Z: z}, actor.Heading()
 		l.broadcastSummon(actor, func() wire.Frame { return frames.ValidateLocation(actor.ObjectID(), at, heading) })
+	case event.ForcedTurn:
+		start, stop := forcedTurnFrames(actor.ObjectID(), e)
+		l.broadcastSummon(actor, start)
+		l.broadcastSummon(actor, stop)
 	case event.MagicSkillUse:
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)

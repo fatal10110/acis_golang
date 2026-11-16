@@ -223,6 +223,13 @@ type List struct {
 	exiting  []*Effect
 	dropHeld map[*Effect]bool
 
+	// activating is set while one goroutine runs this list's activations
+	// (see activate); activations queued meanwhile wait in deferred, in
+	// arrival order, and that goroutine runs them before it lets go. Both
+	// are read and written under mu.
+	activating bool
+	deferred   []activation
+
 	// queue is the owner's queue: periodic effect actions run on it and
 	// effect periods are measured on its clock. Set before the owner is
 	// published, and moved only with the owner's own work (a pet corpse

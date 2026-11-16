@@ -386,7 +386,7 @@ func (playerStubs) Sit() bool                            { return false }
 func (playerStubs) StartFakeDeath() bool                 { return false }
 func (playerStubs) StopFakeDeath() bool                  { return false }
 func (playerStubs) MarkRecentFakeDeath()                 {}
-func (playerStubs) HPFull() bool                         { return false }
+func (playerStubs) MaxHPValue() float64                  { return 0 }
 func (playerStubs) BroadcastStatus()                     {}
 func (playerStubs) SendRegenMax(int32, int32, float64)   {}
 func (playerStubs) NotifyEffectRemovedDueLackHP(*Effect) {}

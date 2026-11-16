@@ -45,7 +45,7 @@ func bluffStart(e *Effect) bool {
 	if e.Effected.RaidRelated() || e.Effected.BluffExempt() || e.Effector == nil {
 		return false
 	}
-	e.Effected.SetHeading(e.Effector.Heading())
+	e.Effected.ForceHeading(e.Effector.Heading())
 	return true
 }
 
