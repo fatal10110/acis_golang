@@ -1,9 +1,16 @@
 package loginserver
 
 import (
+	"bytes"
+	"errors"
+	"os"
 	"testing"
+	"time"
 
+	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/fatal10110/acis_golang/internal/loginserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
 )
 
@@ -80,6 +87,65 @@ func TestClientLinkDropsOpcodesOutsideTheirState(t *testing.T) {
 				if _, ok := accounts.getLastActive("other"); ok {
 					t.Fatal("a second account's login was processed on a logged-in connection")
 				}
+			}
+		})
+	}
+}
+
+// TestClientLinkDroppedPacketsDoNotExtendHandshakeDeadline keeps a client
+// that passed the GameGuard exchange sending packets the server drops
+// unanswered, faster than the handshake timeout: the connection still closes
+// once that timeout runs out.
+func TestClientLinkDroppedPacketsDoNotExtendHandshakeDeadline(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		payload []byte
+	}{
+		// Too short to carry the credential block.
+		{"truncated RequestAuthLogin", []byte{clientpackets.OpcodeRequestAuthLogin, 0, 0, 0, 0}},
+		{"opcode outside the state", encodeRequestServerList(0, 0)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false, func(l *ClientLink) {
+				l.handshakeTimeout = 300 * time.Millisecond
+			})
+			c := dialLoginClient(t, addr)
+			c.gameGuard()
+
+			// One encrypted frame, written again and again: the session
+			// cipher carries no state between frames.
+			buf := make([]byte, commoncrypt.PaddedSize(len(tt.payload)+4))
+			copy(buf, tt.payload)
+			commoncrypt.AppendChecksum(buf)
+			commoncrypt.EncryptBlocks(c.cipher, buf)
+			var frame bytes.Buffer
+			if err := wire.WriteFrame(&frame, buf); err != nil {
+				t.Fatalf("WriteFrame: %v", err)
+			}
+
+			stop := make(chan struct{})
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				tick := time.NewTicker(20 * time.Millisecond)
+				defer tick.Stop()
+				for {
+					select {
+					case <-stop:
+						return
+					case <-tick.C:
+						if _, err := c.conn.Write(frame.Bytes()); err != nil {
+							return
+						}
+					}
+				}
+			}()
+			defer func() { close(stop); <-done }()
+
+			c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+			b := make([]byte, 1)
+			if n, err := c.conn.Read(b); n != 0 || err == nil || errors.Is(err, os.ErrDeadlineExceeded) {
+				t.Fatalf("connection fed only dropped packets: n=%d err=%v, want closed", n, err)
 			}
 		})
 	}

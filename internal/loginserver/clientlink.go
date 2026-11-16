@@ -551,9 +551,13 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 				return
 			}
 		case op == clientpackets.OpcodeRequestAuthLogin && c.ggAuthed && !c.authed:
-			if !l.onRequestAuthLogin(ctx, c, payload) {
+			open, dropped := l.onRequestAuthLogin(ctx, c, payload)
+			if !open {
 				return
 			}
+			// A dropped packet keeps the current read deadline, so a
+			// client sending only truncated ones still runs into it.
+			rearm = !dropped
 		case op == clientpackets.OpcodeRequestServerList && c.authed:
 			if !l.onRequestServerList(c, payload) {
 				return
@@ -601,31 +605,32 @@ func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) bool {
 
 // onRequestAuthLogin authenticates the presented credentials, issues a
 // session, and replies LoginOk, or replies LoginFail/AccountKicked and
-// reports false when the connection must close.
-func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payload []byte) bool {
+// reports open false when the connection must close. It reports dropped
+// when the packet was ignored unanswered.
+func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payload []byte) (open, dropped bool) {
 	req, err := clientpackets.DecodeRequestAuthLogin(payload, c.key.Private)
 	if errors.Is(err, clientpackets.ErrCredentialBlockShort) {
 		// Too short to carry a credential block: the packet is dropped
 		// unanswered and the connection waits for a complete one.
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
-		return true
+		return true, true
 	}
 	if err != nil {
 		// A block the RSA key cannot decrypt is refused before any account
 		// lookup, so it never counts as a failed attempt.
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
 		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
-		return false
+		return false, false
 	}
 
 	account, ok := l.authenticate(ctx, c, req)
 	if !ok {
-		return false
+		return false, false
 	}
 
 	if account.AccessLevel < 0 {
 		c.closeWith(serverpackets.EncodeAccountKicked(serverpackets.AccountKickedPermanentlyBanned))
-		return false
+		return false, false
 	}
 
 	// The account is already in play on a linked game server: reject the
@@ -637,7 +642,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		if entry, ok := l.servers.Get(serverID); ok && entry.Authed && l.roster != nil {
 			l.roster.kick(serverID, account.Login)
 		}
-		return false
+		return false, false
 	}
 
 	l.authMu.Lock()
@@ -673,16 +678,16 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 			old.requestClose(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		}
 		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
-		return false
+		return false, false
 	}
 
 	c.authed = true
 	l.registerPurgeable(c)
 
 	if l.skipLicenceCheck {
-		return c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries(c.accessLevel, c.remoteIP))) == nil
+		return c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries(c.accessLevel, c.remoteIP))) == nil, false
 	}
-	return c.send(serverpackets.EncodeLoginOk(c.loginKey1, c.loginKey2)) == nil
+	return c.send(serverpackets.EncodeLoginOk(c.loginKey1, c.loginKey2)) == nil, false
 }
 
 // authenticate resolves req's account, auto-creating it on first login when
