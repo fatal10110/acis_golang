@@ -139,24 +139,32 @@ func (g *GroundItems) Start(log zerolog.Logger) *scheduler.Ticker {
 // reports opts.DropperID so those immediate observers receive the animated
 // drop packet; observers that discover it later see it simply sitting on
 // the ground (see grounditem.Item.DropperID).
+//
+// The drop holds ground's claim from before it becomes visible until its
+// loot owner and cleanup entry are in place: a pickup or cleanup arriving
+// in between loses its claim and leaves the item alone, so no pickup can
+// take an item whose entry is registered after it is gone, and none sees a
+// loot-protected drop unprotected.
 func (g *GroundItems) Drop(ground *grounditem.Item, opts DropOptions) {
 	if ground == nil {
 		return
 	}
-	ground.SetDropperID(opts.DropperID)
-	g.state.Spawn(ground, opts.X, opts.Y, opts.Z, opts.Heading)
-	ground.SetDropperID(0)
+	if ground.Claim() {
+		defer ground.Release()
+	}
 
 	var lootExpiresAt time.Time
 	if opts.ProtectOwnerID != 0 && opts.ProtectFor > 0 {
 		ground.Instance.SetOwner(opts.ProtectOwnerID)
 		lootExpiresAt = g.now().Add(opts.ProtectFor)
 	}
-
-	if ground.DestroyProtected() {
-		return
+	if !ground.DestroyProtected() {
+		g.track(ground, g.destroyDelay(ground, opts.PlayerDropped), lootExpiresAt)
 	}
-	g.track(ground, g.destroyDelay(ground, opts.PlayerDropped), lootExpiresAt)
+
+	ground.SetDropperID(opts.DropperID)
+	g.state.Spawn(ground, opts.X, opts.Y, opts.Z, opts.Heading)
+	ground.SetDropperID(0)
 }
 
 // SetKept sets fn to report whether an item, neither a herb nor equipment
@@ -200,6 +208,14 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table, lo
 		// correctly resume it. Drop protection is in-memory-only state, so the
 		// lock does not survive past this reload.
 		row.Instance.OwnerID = 0
+		g.mu.RLock()
+		_, dup := g.items[row.ObjectID]
+		g.mu.RUnlock()
+		if dup {
+			log.Error().Int32("object_id", row.ObjectID).Int32("item_id", row.TemplateID).
+				Msg("ground items: skipped a saved item whose object id is already on the ground")
+			continue
+		}
 		ground, err := grounditem.New(row.Instance, tmpl)
 		if err != nil {
 			return err
@@ -262,8 +278,10 @@ func (g *GroundItems) Len() int {
 	return len(g.items)
 }
 
-// Snapshots returns the persisted representation of tracked items. The skip
-// callback can filter item ids that should not be saved.
+// Snapshots returns the persisted representation of tracked items, one per
+// object id. The skip callback can filter item ids that should not be
+// saved. An item no longer in the world is held elsewhere (taken by a
+// pickup) or not yet placed, and is not saved as lying on the ground.
 func (g *GroundItems) Snapshots(skip func(itemID int32) bool) []item.GroundSnapshot {
 	now := g.now()
 	g.mu.RLock()
@@ -272,6 +290,9 @@ func (g *GroundItems) Snapshots(skip func(itemID int32) bool) []item.GroundSnaps
 	out := make([]item.GroundSnapshot, 0, len(g.items))
 	for _, entry := range g.items {
 		if skip != nil && skip(entry.item.ItemID()) {
+			continue
+		}
+		if !entry.item.Spawned() {
 			continue
 		}
 		var left int64

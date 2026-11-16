@@ -284,7 +284,8 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 // disappeared. A holder in the world gets its karma and PK kills back,
 // loses the weapon's skill and the weapon itself, and its status is
 // refreshed: on the calling queue when it is current, its own otherwise.
-// A holder out of the world has that done to its stored state. A weapon on
+// A holder out of the world has that done to its stored state, and one
+// being selected has it done once the selection is over. A weapon on
 // the ground leaves the world.
 func (l *GameClientLink) endCursedWeapon(end cursedweapon.EndOfLife, current *livePlayer) {
 	l.endCursedWeaponThen(end, current, nil)
@@ -304,18 +305,23 @@ func (l *GameClientLink) endCursedWeaponThen(end cursedweapon.EndOfLife, current
 	}
 	switch {
 	case end.Held:
-		live, online := l.livePlayerByID(end.HolderID)
-		if !online {
-			l.cursed.ReleaseHolder(end)
-			break
-		}
-		release := func() {
+		release := func(live *livePlayer) {
 			l.releaseCursedHolder(live, end)
 			announce()
 		}
-		if live == current || !postLive(live, release) {
-			release()
+		if current != nil && current.ObjectID() == end.HolderID {
+			release(current)
+			return
 		}
+		// Only the holder's queue touches the holder in the world. One out of
+		// it, or on its way out, has its stored state released; a selection
+		// of it under way holds the release until it has registered the
+		// holder, whose copy may already carry the weapon, or has failed
+		// (#4689).
+		l.settleWithLeftOwner(end.HolderID, release, func() {
+			l.cursed.ReleaseHolder(end)
+			announce()
+		})
 		return
 	case end.GroundObjectID != 0:
 		l.removeCursedGroundItem(end.GroundObjectID)

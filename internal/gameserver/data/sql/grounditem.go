@@ -18,12 +18,14 @@ func NewGroundItemStore(db *sql.DB) *GroundItemStore {
 	return &GroundItemStore{db: db}
 }
 
-// Load returns every persisted ground item without clearing the table.
+// Load returns every persisted ground item without clearing the table. A
+// row whose object id an items row holds is skipped: the item was taken
+// from the ground, and restoring it there too would duplicate it.
 // Callers must hydrate every returned row into the world before calling
 // Clear — clearing first would permanently lose any row that fails to
 // hydrate (e.g. an unknown item template after a datapack downgrade).
 func (s *GroundItemStore) Load(ctx context.Context) ([]item.GroundSnapshot, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT object_id,item_id,count,enchant_level,x,y,z,time FROM items_on_ground ORDER BY object_id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT g.object_id,g.item_id,g.count,g.enchant_level,g.x,g.y,g.z,g.time FROM items_on_ground g WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.object_id = g.object_id) ORDER BY g.object_id`)
 	if err != nil {
 		return nil, fmt.Errorf("load ground items: %w", err)
 	}
