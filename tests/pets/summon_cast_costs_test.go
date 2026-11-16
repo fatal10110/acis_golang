@@ -11,11 +11,12 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-// mpRatePassiveID is a wolf passive that halves its physical skill MP costs
-// and quarters its magic ones.
+// mpRatePassiveID is a wolf passive that halves its physical skill MP costs,
+// quarters its magic ones and scales its dance/song ones by 0.75.
 const mpRatePassiveID = 9601
 
 func mpRatePassive() modelskill.Definition {
@@ -24,6 +25,7 @@ func mpRatePassive() modelskill.Definition {
 		Funcs: []modelskill.FuncTemplate{
 			{Op: modelskill.FuncMul, Stat: "PhysicalMpConsumeRate", Value: 0.5},
 			{Op: modelskill.FuncMul, Stat: "MagicalMpConsumeRate", Value: 0.25},
+			{Op: modelskill.FuncMul, Stat: "DanceMpConsumeRate", Value: 0.75},
 		},
 	}
 }
@@ -109,29 +111,41 @@ func countSystemMessage(t *testing.T, frames [][]byte, id int) int {
 
 // TestSummonCastMPCostFollowsConsumeRate pins CreatureStatus.getMpConsume and
 // getMpInitialConsume (CreatureStatus.java:698-740) for a summon: both costs
-// scale by MagicalMpConsumeRate for a magic skill, else
-// PhysicalMpConsumeRate, and the cast gate (meetsHpMpConditions) checks
-// their scaled sum. The pet holds exactly that sum, well under the raw
-// 10+20, so the cast starts, pays the scaled initial cost at the start, the
+// scale by DanceMpConsumeRate for a dance/song, else MagicalMpConsumeRate
+// for a magic skill, else PhysicalMpConsumeRate, and the cast gate
+// (meetsHpMpConditions) checks their scaled sum. A dance/song's final cost
+// first adds NextDanceCost per dance/song already active on the pet; its
+// initial cost does not. The pet holds exactly that sum, well under the raw
+// costs, so the cast starts, pays the scaled initial cost at the start, the
 // scaled final cost at the hit, and ends on zero MP.
 func TestSummonCastMPCostFollowsConsumeRate(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name          string
-		magic         bool
+		magic, dance  bool
 		initial, last int
 	}{
 		// int(10*0.5) = 5, int(20*0.5) = 10.
 		{name: "physical", initial: 5, last: 10},
 		// int(10*0.25) = 2, int(20*0.25) = 5.
 		{name: "magic", magic: true, initial: 2, last: 5},
+		// The dance rate wins over the magic one. One dance active:
+		// int(10*0.75) = 7, int((20+1*8)*0.75) = 21.
+		{name: "dance", magic: true, dance: true, initial: 7, last: 21},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			strike := wolfStrike()
-			strike.Magic = tc.magic
+			strike.Magic, strike.Dance = tc.magic, tc.dance
 			strike.MPInitialConsume, strike.MPConsume = 10, 20
+			if tc.dance {
+				strike.NextDanceCost = 8
+			}
 			h, petActor, hostile := bootWolfStrikerWithPassive(t, strike)
+			if tc.dance {
+				addToPet(t, petActor, danceOn(t, petActor))
+				drainUntilQuiet(t, h.client)
+			}
 			total := float64(tc.initial + tc.last)
 			runOnPetQueue(t, petActor, func() { petActor.ReduceMP(petActor.MPValue() - total) })
 			if got := petActor.MPValue(); got != total {
@@ -205,4 +219,18 @@ func TestSummonCastFailingAtHitTellsOwner(t *testing.T) {
 			drainUntilQuiet(t, h.client)
 		})
 	}
+}
+
+// danceOn is an active dance effect on pet, counted by the per-cast
+// dance/song MP surcharge.
+func danceOn(t *testing.T, pet *summon.Actor) *effect.Effect {
+	t.Helper()
+	e, err := effect.New(effect.Skill{ID: 275, Level: 1, Dance: true}, modelskill.EffectTemplate{
+		Name: "Buff", Time: 120, StackType: "dance_of_fury", StackOrder: 1,
+	})
+	if err != nil {
+		t.Fatalf("effect.New(dance): %v", err)
+	}
+	e.Effector, e.Effected = pet, pet
+	return e
 }
