@@ -707,7 +707,7 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 			l.log.Error().Str("account", req.Username).Err(err).Msg("look up account")
 		}
 		if !l.autoCreateAccounts {
-			l.recordFailedAttempt(c.remoteIP, time.Now())
+			l.recordFailedAttempt(c.remoteIP, req.Username, time.Now())
 			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
 			return model.Account{}, false
 		}
@@ -737,11 +737,11 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 			return model.Account{}, false
 		}
 		if !match {
-			l.recordFailedAttempt(c.remoteIP, time.Now())
+			l.recordFailedAttempt(c.remoteIP, req.Username, time.Now())
 			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailPasswordWrong))
 			return model.Account{}, false
 		}
-		l.clearFailedAttempts(c.remoteIP)
+		l.clearFailedAttempts(c.remoteIP, req.Username)
 		activeCtx, cancel := context.WithTimeout(ctx, loginDBTimeout)
 		defer cancel()
 		if err := l.accounts.SetLastActive(activeCtx, account.Login, time.Now()); err != nil {
@@ -753,17 +753,23 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 	}
 }
 
-// failedAttempt is one IP's running count of failed credential attempts
-// and the time of the most recent one.
+// failedAttempt is one IP's running count of failed credential attempts,
+// split by the account each attempt named, and the time of the most recent
+// one. count is the sum of byAccount; the ban is decided on count, so
+// spreading guesses over many accounts reaches it as fast as guessing one,
+// while a good login takes back only its own account's failures. byAccount
+// never holds more than loginTryBeforeBan names, as each has at least one
+// failure and the entry is dropped once count reaches the threshold.
 type failedAttempt struct {
-	count int
-	last  time.Time
+	count     int
+	last      time.Time
+	byAccount map[string]int
 }
 
 // failedAttemptWindow is how long an IP's failed-attempt count survives
 // without a further failure; ok is false when counts never expire. Counts
-// are kept per IP until the ban threshold or a successful login clears
-// them; the window only exists so an address that fails a few times and
+// are kept per IP until the ban threshold or successful logins on every
+// account they name clear them; the window only exists so an address that fails a few times and
 // never returns does not hold memory forever.
 //
 // Deliberate trade-off: with temporary bans, an address whose consecutive
@@ -785,10 +791,11 @@ func (l *ClientLink) failedAttemptWindow() (window time.Duration, ok bool) {
 	return max(l.loginBlockAfterBan, minFailedAttemptWindow), true
 }
 
-// recordFailedAttempt counts a failed credential attempt from ip at now and
-// bans ip once loginTryBeforeBan consecutive failures accumulate within the
-// failed-attempt window.
-func (l *ClientLink) recordFailedAttempt(ip net.IP, now time.Time) {
+// recordFailedAttempt counts a failed credential attempt from ip naming
+// account at now and bans ip once loginTryBeforeBan failures, over all
+// accounts, accumulate within the failed-attempt window without a good
+// login clearing them.
+func (l *ClientLink) recordFailedAttempt(ip net.IP, account string, now time.Time) {
 	key := ip.String()
 	window, expires := l.failedAttemptWindow()
 
@@ -798,9 +805,13 @@ func (l *ClientLink) recordFailedAttempt(ip net.IP, now time.Time) {
 	}
 	entry := l.failedAttempts[key]
 	if expires && now.Sub(entry.last) > window {
-		entry.count = 0
+		entry = failedAttempt{}
+	}
+	if entry.byAccount == nil {
+		entry.byAccount = make(map[string]int)
 	}
 	entry.count++
+	entry.byAccount[account]++
 	entry.last = now
 	if entry.count < l.loginTryBeforeBan {
 		l.failedAttempts[key] = entry
@@ -814,12 +825,24 @@ func (l *ClientLink) recordFailedAttempt(ip net.IP, now time.Time) {
 	l.log.Info().Str("ip", key).Msg("IP address banned due to too many login attempts")
 }
 
-func (l *ClientLink) clearFailedAttempts(ip net.IP) {
+// clearFailedAttempts takes back ip's failures that named account after a
+// good login on it; failures against other accounts keep counting.
+func (l *ClientLink) clearFailedAttempts(ip net.IP, account string) {
 	key := ip.String()
 
 	l.failedMu.Lock()
-	delete(l.failedAttempts, key)
-	l.failedMu.Unlock()
+	defer l.failedMu.Unlock()
+	entry, ok := l.failedAttempts[key]
+	if !ok {
+		return
+	}
+	entry.count -= entry.byAccount[account]
+	delete(entry.byAccount, account)
+	if entry.count <= 0 {
+		delete(l.failedAttempts, key)
+		return
+	}
+	l.failedAttempts[key] = entry
 }
 
 // sweepFailedAttempts drops every failed-attempt count idle for longer than

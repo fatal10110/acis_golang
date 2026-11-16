@@ -159,7 +159,7 @@ func TestClientLinkPermanentBanCountsNeverExpire(t *testing.T) {
 
 	for i := range DefaultLoginTryBeforeBan - 1 {
 		at := t0.Add(time.Duration(i) * gap)
-		l.recordFailedAttempt(ip, at)
+		l.recordFailedAttempt(ip, "player1", at)
 		l.sweepFailedAttempts(at.Add(gap))
 		if bans.IsBanned(ip) {
 			t.Fatalf("attempt %d banned before the threshold", i+1)
@@ -168,7 +168,7 @@ func TestClientLinkPermanentBanCountsNeverExpire(t *testing.T) {
 	if got := failedAttemptCount(l); got != 1 {
 		t.Fatalf("tracked addresses after sweeps = %d, want 1", got)
 	}
-	l.recordFailedAttempt(ip, t0.Add(time.Duration(DefaultLoginTryBeforeBan-1)*gap))
+	l.recordFailedAttempt(ip, "player1", t0.Add(time.Duration(DefaultLoginTryBeforeBan-1)*gap))
 	if !bans.IsBanned(ip) {
 		t.Fatal("failures paced more than an hour apart were never banned under a permanent-ban config")
 	}
@@ -187,7 +187,7 @@ func TestClientLinkSubThresholdFailuresFromManyIPsAreSwept(t *testing.T) {
 	for i := range cycled {
 		ip := net.IPv4(10, byte(i>>16), byte(i>>8), byte(i))
 		for range DefaultLoginTryBeforeBan - 1 {
-			l.recordFailedAttempt(ip, t0)
+			l.recordFailedAttempt(ip, "player1", t0)
 		}
 		if bans.IsBanned(ip) {
 			t.Fatalf("ip %s banned below the threshold", ip)
@@ -195,7 +195,7 @@ func TestClientLinkSubThresholdFailuresFromManyIPsAreSwept(t *testing.T) {
 	}
 	recent := net.ParseIP("192.0.2.1")
 	for range DefaultLoginTryBeforeBan - 1 {
-		l.recordFailedAttempt(recent, t0.Add(window/2))
+		l.recordFailedAttempt(recent, "player1", t0.Add(window/2))
 	}
 	if got := failedAttemptCount(l); got != cycled+1 {
 		t.Fatalf("tracked addresses = %d, want %d", got, cycled+1)
@@ -207,7 +207,7 @@ func TestClientLinkSubThresholdFailuresFromManyIPsAreSwept(t *testing.T) {
 		t.Fatalf("tracked addresses after sweep = %d, want 1 (only the in-window address)", got)
 	}
 
-	l.recordFailedAttempt(recent, sweepAt)
+	l.recordFailedAttempt(recent, "player1", sweepAt)
 	if !bans.IsBanned(recent) {
 		t.Fatal("in-window address was not banned at the threshold after a sweep")
 	}
@@ -224,7 +224,7 @@ func TestClientLinkFailedAttemptsWithinWindowStillBan(t *testing.T) {
 
 	// Consecutive failures exactly one window apart still accumulate.
 	for i := range DefaultLoginTryBeforeBan {
-		l.recordFailedAttempt(ip, t0.Add(time.Duration(i)*window))
+		l.recordFailedAttempt(ip, "player1", t0.Add(time.Duration(i)*window))
 	}
 	if !bans.IsBanned(ip) {
 		t.Fatal("failures spaced exactly one window apart did not ban")
@@ -238,16 +238,16 @@ func TestClientLinkFailedAttemptsIdlePastWindowRestartCount(t *testing.T) {
 	t0 := time.Now()
 
 	for range DefaultLoginTryBeforeBan - 1 {
-		l.recordFailedAttempt(ip, t0)
+		l.recordFailedAttempt(ip, "player1", t0)
 	}
 	// No sweep ran: the stale count is discarded when the next failure lands.
 	restart := t0.Add(window + time.Second)
-	l.recordFailedAttempt(ip, restart)
+	l.recordFailedAttempt(ip, "player1", restart)
 	if bans.IsBanned(ip) {
 		t.Fatal("failure after an idle window counted toward the old attempts")
 	}
 	for range DefaultLoginTryBeforeBan - 1 {
-		l.recordFailedAttempt(ip, restart)
+		l.recordFailedAttempt(ip, "player1", restart)
 	}
 	if !bans.IsBanned(ip) {
 		t.Fatal("restarted count did not ban at the threshold")
@@ -280,9 +280,9 @@ func TestClientLinkFailedAttemptsConcurrentAccess(t *testing.T) {
 			for i := range 200 {
 				ip := net.IPv4(10, 1, byte(g), byte(i))
 				now := time.Now()
-				l.recordFailedAttempt(ip, now)
+				l.recordFailedAttempt(ip, "player1", now)
 				if i%3 == 0 {
-					l.clearFailedAttempts(ip)
+					l.clearFailedAttempts(ip, "player1")
 				}
 				l.sweepFailedAttempts(now.Add(2 * window))
 			}
@@ -327,7 +327,7 @@ func TestClientLinkBanSweepDropsExpiredBansWithoutReconnect(t *testing.T) {
 	for i := range 500 {
 		ip := net.IPv4(10, 3, byte(i>>8), byte(i))
 		for range DefaultLoginTryBeforeBan {
-			l.recordFailedAttempt(ip, now)
+			l.recordFailedAttempt(ip, "player1", now)
 		}
 		banned = append(banned, ip)
 	}

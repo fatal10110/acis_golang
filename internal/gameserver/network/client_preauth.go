@@ -199,9 +199,10 @@ func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connSta
 		return nil
 	}
 	c, ok := slotCharacter(cs.chars, req.Slot)
-	// An unknown slot or a banned character (AccessLevel < 0) aborts
-	// the selection silently; the connection stays open.
-	if !ok || c.AccessLevel < 0 {
+	// An unknown slot, a banned character (AccessLevel < 0) or one
+	// pending deletion (#4766) aborts the selection silently; the
+	// connection stays open.
+	if !ok || c.AccessLevel < 0 || c.DeleteAt > 0 {
 		return nil
 	}
 	selected, next := l.selectCharacter(ctx, cs.conn, client, cs.chars, req.Slot, c)
