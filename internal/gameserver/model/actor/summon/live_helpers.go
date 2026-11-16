@@ -55,18 +55,27 @@ func defaultRoll(roll func(int) int) func(int) int {
 	return rand.IntN
 }
 
-// SpawnBesideOwner places actor in state at owner plus offset and registers
-// it as the owner's active summon. A living summon starts its lifetime task
-// (a servitor's countdown, a pet's feeding), and a living baby pet starts
-// healing its owner.
+// SpawnBesideOwner is SpawnAt at owner plus offset, facing the way owner
+// faces.
 func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset location.Location) {
+	if owner == nil {
+		return
+	}
+	x, y, z := owner.Position()
+	SpawnAt(state, actor, owner, location.Location{X: x + offset.X, Y: y + offset.Y, Z: z + offset.Z}, owner.Heading())
+}
+
+// SpawnAt places actor in state at at, facing heading, and registers it as
+// owner's active summon. A living summon starts its lifetime task (a
+// servitor's countdown, a pet's feeding), and a living baby pet starts
+// healing its owner.
+func SpawnAt(state *world.State, actor *Actor, owner Owner, at location.Location, heading int) {
 	if state == nil || actor == nil || owner == nil {
 		return
 	}
 	actor.bindOwner(owner, actor.ownerInv())
 	actor.world = state
-	x, y, z := owner.Position()
-	state.Spawn(actor, x+offset.X, y+offset.Y, z+offset.Z, owner.Heading())
+	state.Spawn(actor, at.X, at.Y, at.Z, heading)
 	state.AddSummon(owner.ObjectID(), actor)
 	actor.EnterZones()
 	// Vitals restored short regenerate one period from the spawn.

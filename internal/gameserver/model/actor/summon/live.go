@@ -246,7 +246,7 @@ type Actor struct {
 	// sink.
 	cast CastControl
 	// sink receives this summon's events. Attach installs it before
-	// SpawnBesideOwner publishes this summon into world.State; that publish
+	// SpawnAt publishes this summon into world.State; that publish
 	// takes a registry mutex, giving every other goroutine's read a
 	// happens-before edge over this unsynchronized write.
 	sink event.Sink

@@ -371,7 +371,11 @@ func (e *Effect) claimAction(now time.Time) (runAction bool, remove bool) {
 		return false, true
 	}
 
-	e.remaining--
+	// The Contract Payment upkeep never counts down: it drains its owner
+	// until the summon it pays for leaves.
+	if e.Skill.ID != modelskill.ContractPaymentSkillID {
+		e.remaining--
+	}
 	remove = e.remaining <= 0
 	if remove {
 		e.nextAction = time.Time{}
