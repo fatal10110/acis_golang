@@ -35,7 +35,8 @@ import (
 //     the int32 maximum, vault-no.htm for a withdrawal the treasury does not
 //     cover; tax_set opens tax-leader.htm (limit 25/5/15 by the Seal of
 //     Strife) or, after noprivs.htm, tax-member.htm; tax_adjust sets the
-//     next rate within the limit, tax-toohigh.htm beyond it;
+//     next rate within the limit, tax-toohigh.htm beyond it, and needs the
+//     tax privilege as tax_set does (owner-approved divergence, #5014);
 //   - give_crown (leader only) adds item 6841 once; receive_report (leader
 //     only) names the owner, its leader, the castle, the period and seals;
 //   - manor_certificate / validate_certificate sell 10 certificates (6388)
