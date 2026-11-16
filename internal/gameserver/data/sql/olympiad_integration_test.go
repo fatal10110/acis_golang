@@ -71,7 +71,7 @@ func TestOlympiadStoreStatusOutOfRange(t *testing.T) {
 }
 
 // TestOlympiadStoreNobles pins the olympiad_nobles round trip: a save
-// inserts new records and updates stored ones, keeping their stored class;
+// inserts new records and updates stored ones, their class included;
 // a load joins the character's current name and skips records whose
 // character no longer exists; the month's copy takes every stored record
 // but its rewarded flag; a delete removes them all.
@@ -114,10 +114,12 @@ func TestOlympiadStoreNobles(t *testing.T) {
 	}
 	want = map[int32]olympiad.Noble{
 		0x10000001: {ClassID: 88, Name: "Alpha", Points: 18},
-		0x10000002: {ClassID: 90, Name: "Beta", Points: 41, CompDone: 10, CompWon: 6, CompLost: 4, CompDrawn: 1, Rewarded: true},
+		0x10000002: {ClassID: 12, Name: "Beta", Points: 41, CompDone: 10, CompWon: 6, CompLost: 4, CompDrawn: 1, Rewarded: true},
 	}
+	// An update writes the class the record counts for, which follows the
+	// noble's base class (owner-approved, #5116).
 	if !maps.Equal(got, want) {
-		t.Fatalf("LoadNobles() after save = %+v, want %+v (an update keeps the stored class)", got, want)
+		t.Fatalf("LoadNobles() after save = %+v, want %+v (an update writes the class)", got, want)
 	}
 
 	if err := store.SnapshotMonth(ctx); err != nil {
@@ -126,7 +128,7 @@ func TestOlympiadStoreNobles(t *testing.T) {
 	if n := countRows(t, db, "SELECT COUNT(*) FROM olympiad_nobles_eom"); n != 3 {
 		t.Fatalf("olympiad_nobles_eom rows = %d, want 3", n)
 	}
-	if n := countRows(t, db, "SELECT COUNT(*) FROM olympiad_nobles_eom WHERE char_id = ? AND class_id = 90 AND olympiad_points = 41 AND competitions_done = 10 AND competitions_won = 6 AND competitions_lost = 4 AND competitions_drawn = 1", 0x10000002); n != 1 {
+	if n := countRows(t, db, "SELECT COUNT(*) FROM olympiad_nobles_eom WHERE char_id = ? AND class_id = 12 AND olympiad_points = 41 AND competitions_done = 10 AND competitions_won = 6 AND competitions_lost = 4 AND competitions_drawn = 1", 0x10000002); n != 1 {
 		t.Fatalf("olympiad_nobles_eom row for Beta not copied")
 	}
 	// A second copy replaces the first.

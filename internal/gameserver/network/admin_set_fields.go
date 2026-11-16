@@ -53,7 +53,7 @@ func (l *GameClientLink) adminSetClass(gm, target *livePlayer, value string, has
 		}
 		l.adminRespawn(target, func() {
 			if l.changeOccupation(target, classID, tmpl) && !target.SubclassActive() {
-				target.SetBaseClass(classID, tmpl)
+				l.setLiveBaseClass(target, classID, tmpl)
 			}
 		}, func() {
 			l.storeLive(target)

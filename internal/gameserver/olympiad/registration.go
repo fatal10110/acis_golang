@@ -102,7 +102,7 @@ func (o *Olympiad) Register(a Applicant, kind GameType) RegisterResult {
 	case a.Overweight:
 		return RegisterOverweight
 	}
-	if r, ok := o.registeredLocked(a.ObjectID, a.BaseClass); ok {
+	if r, ok := o.registeredLocked(a.ObjectID); ok {
 		return r
 	}
 	if o.inMatchLocked(a.ObjectID) {
@@ -124,14 +124,18 @@ func (o *Olympiad) Register(a Applicant, kind GameType) RegisterResult {
 	return Registered
 }
 
-// registeredLocked reports which waiting list objectID is on, the
-// non-classed one first, as the refusal a second registration gets.
-func (o *Olympiad) registeredLocked(objectID int32, baseClass int) (RegisterResult, bool) {
+// registeredLocked reports which waiting list objectID is on, whatever
+// class that list is kept under, as the refusal a second registration gets.
+// A player is on at most one list: registering refuses a second one, and a
+// base class that moves leaves the list (ChangeClass, #5116).
+func (o *Olympiad) registeredLocked(objectID int32) (RegisterResult, bool) {
 	if slices.Contains(o.nonClassed, objectID) {
 		return RegisterAlreadyNonClassed, true
 	}
-	if slices.Contains(o.classed[baseClass], objectID) {
-		return RegisterAlreadyClassed, true
+	for _, list := range o.classed {
+		if slices.Contains(list, objectID) {
+			return RegisterAlreadyClassed, true
+		}
 	}
 	return 0, false
 }
@@ -141,10 +145,10 @@ func (o *Olympiad) inMatchLocked(objectID int32) bool {
 	return o.games != nil && o.games.inMatch(objectID)
 }
 
-// Unregister takes the player objectID, of base class baseClass, off the
-// waiting list it is on. The window must be open and the player a noble on
-// a waiting list and in no match.
-func (o *Olympiad) Unregister(objectID int32, baseClass int, noble bool) UnregisterResult {
+// Unregister takes the player objectID off the waiting list it is on. The
+// window must be open and the player a noble on a waiting list and in no
+// match.
+func (o *Olympiad) Unregister(objectID int32, noble bool) UnregisterResult {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	switch {
@@ -153,41 +157,40 @@ func (o *Olympiad) Unregister(objectID int32, baseClass int, noble bool) Unregis
 	case !noble:
 		return UnregisterNotNoble
 	}
-	if _, ok := o.registeredLocked(objectID, baseClass); !ok {
+	if _, ok := o.registeredLocked(objectID); !ok {
 		return UnregisterNotRegistered
 	}
 	if o.inMatchLocked(objectID) {
 		return UnregisterInMatch
 	}
-	o.removeLocked(objectID, baseClass)
+	o.removeLocked(objectID)
 	return Unregistered
 }
 
-// IsRegistered reports whether the player objectID, of base class
-// baseClass, is on a waiting list.
-func (o *Olympiad) IsRegistered(objectID int32, baseClass int) bool {
+// IsRegistered reports whether the player objectID is on a waiting list.
+func (o *Olympiad) IsRegistered(objectID int32) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	_, ok := o.registeredLocked(objectID, baseClass)
+	_, ok := o.registeredLocked(objectID)
 	return ok
 }
 
-// IsRegisteredInComp reports whether the player objectID, of base class
-// baseClass, is on a waiting list or competes in a running match.
-func (o *Olympiad) IsRegisteredInComp(objectID int32, baseClass int) bool {
+// IsRegisteredInComp reports whether the player objectID is on a waiting
+// list or competes in a running match.
+func (o *Olympiad) IsRegisteredInComp(objectID int32) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if _, ok := o.registeredLocked(objectID, baseClass); ok {
+	if _, ok := o.registeredLocked(objectID); ok {
 		return true
 	}
 	return o.period == Competition && o.inMatchLocked(objectID)
 }
 
-// RemoveDisconnectedCompetitor records, as the player objectID of base
-// class baseClass leaves the world or is jailed, that it left the match of
-// stadium gameID once that match brought its competitors in, then takes it
-// off the waiting list it is on.
-func (o *Olympiad) RemoveDisconnectedCompetitor(objectID int32, baseClass, gameID int) {
+// RemoveDisconnectedCompetitor records, as the player objectID leaves the
+// world or is jailed, that it left the match of stadium gameID once that
+// match brought its competitors in, then takes it off the waiting list it
+// is on.
+func (o *Olympiad) RemoveDisconnectedCompetitor(objectID int32, gameID int) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if s, ok := o.Stadium(gameID); ok && s.GameStarted() {
@@ -195,21 +198,51 @@ func (o *Olympiad) RemoveDisconnectedCompetitor(objectID int32, baseClass, gameI
 			g.Disconnect(objectID)
 		}
 	}
-	o.removeLocked(objectID, baseClass)
+	o.removeLocked(objectID)
 }
 
-// removeLocked takes objectID off the non-classed waiting list, or else
-// off the one of baseClass. The class keeps its (possibly empty) list.
-func (o *Olympiad) removeLocked(objectID int32, baseClass int) {
+// ChangeClass follows the player objectID's base class moving to
+// baseClass: the player leaves the waiting list it is on, whichever class
+// that list is kept under, and its record for the running cycle, if it has
+// one, counts for baseClass from now on, the record's row saved at once so
+// the hero election and the class ranking read the new class. It reports
+// whether the player left a waiting list. A player competing in a match is
+// on no list; its match goes on. Diverges, owner-approved, from keeping the
+// registration and the record under the class held when registering
+// (#5116).
+func (o *Olympiad) ChangeClass(objectID int32, baseClass int) bool {
+	o.order.Lock()
+	defer o.order.Unlock()
+	o.mu.Lock()
+	left := o.removeLocked(objectID)
+	n, ok := o.nobles[objectID]
+	moved := ok && n.ClassID != baseClass
+	if moved {
+		n.ClassID = baseClass
+		o.nobles[objectID] = n
+	}
+	o.mu.Unlock()
+	if moved {
+		saved := map[int32]Noble{objectID: n}
+		o.write("save noble class", func(ctx context.Context, st Store) error { return st.SaveNobles(ctx, saved) })
+	}
+	return left
+}
+
+// removeLocked takes objectID off the waiting list it is on and reports
+// whether it was on one. A class keeps its (possibly empty) list.
+func (o *Olympiad) removeLocked(objectID int32) bool {
 	if i := slices.Index(o.nonClassed, objectID); i >= 0 {
 		o.nonClassed = slices.Delete(o.nonClassed, i, i+1)
-		return
+		return true
 	}
-	if list := o.classed[baseClass]; list != nil {
+	for class, list := range o.classed {
 		if i := slices.Index(list, objectID); i >= 0 {
-			o.classed[baseClass] = slices.Delete(list, i, i+1)
+			o.classed[class] = slices.Delete(list, i, i+1)
+			return true
 		}
 	}
+	return false
 }
 
 // WaitingList returns the sizes the Olympiad manager shows: classed is the

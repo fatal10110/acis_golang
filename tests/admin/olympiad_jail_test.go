@@ -29,7 +29,7 @@ func TestJailDropsOlympiadRegistration(t *testing.T) {
 	assertTexts(t, messages(exchange(t, gm, encodeBuildCmd("jail Player 30"))), "Player is jailed for 30 minutes.")
 	settle(t, user)
 	waitPunishment(t, srv, userID, punishJail)
-	if srv.Olympiad.IsRegistered(userID, 0) {
+	if srv.Olympiad.IsRegistered(userID) {
 		t.Fatal("still on the Olympiad waiting list once jailed")
 	}
 }

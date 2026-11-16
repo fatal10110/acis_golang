@@ -191,12 +191,22 @@ func (g *games) draw() {
 		}
 	}()
 
+	// A player already competing is never drawn into a second match: it
+	// is dropped from the list like one found offline. Registration keeps
+	// such a player off every list; this holds the draw to it regardless
+	// (#5116).
+	roster := func(objectID int32) (Competitor, bool) {
+		if g.inMatch(objectID) {
+			return Competitor{}, false
+		}
+		return g.arena.Competitor(objectID)
+	}
 	classedOpen := true
 	nonClassedOpen := len(o.nonClassed) >= o.cfg.NonClassedParticipants
 	for i, s := range g.stadiums {
 		if !s.Running() {
 			if classedOpen && i%2 == 0 {
-				game, stop := o.ClassedGame(i, ready, g.arena.Competitor, g.rnd)
+				game, stop := o.ClassedGame(i, ready, roster, g.rnd)
 				if stop {
 					return
 				}
@@ -207,7 +217,7 @@ func (g *games) draw() {
 				classedOpen = false
 			}
 			if nonClassedOpen {
-				if game := o.NonClassedGame(i, &o.nonClassed, g.arena.Competitor, g.rnd); game != nil {
+				if game := o.NonClassedGame(i, &o.nonClassed, roster, g.rnd); game != nil {
 					g.start(s, game)
 					continue
 				}
