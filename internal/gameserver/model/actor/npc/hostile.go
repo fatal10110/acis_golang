@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -68,11 +69,16 @@ type Hostile struct {
 	// log is the logger shared by every NPC Attach wired; nil logs nothing.
 	log *zerolog.Logger
 
-	// rewards gives this NPC's drop/experience payout when TakeDamage
-	// kills it. It is nil until Attach installs one, in which case death
-	// still latches but grants nothing — matching Die's own "rewards may be
-	// nil" contract.
+	// rewards gives this NPC's drop/experience payout when it dies; only a
+	// Monster-family NPC's kill pays it (see deathRewards). Nil until Attach
+	// installs one, in which case a death grants nothing.
 	rewards RewardsSource
+	// drops places the items a script drops around this NPC; nil drops
+	// nothing. Installed by Attach.
+	drops ItemDropper
+	// decay takes this NPC's corpse out of the world once its corpse time
+	// has passed; nil leaves the corpse. Installed by Attach.
+	decay *task.Decay
 	// remover takes this NPC out of the world for DeleteMe; nil despawns it
 	// with no respawn. Installed by Attach.
 	remover Remover
@@ -374,8 +380,9 @@ func (h *Hostile) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.C
 // Runtime is everything a Hostile needs to act in the live world beyond its
 // template and controllers. A nil dependency leaves the matching behavior
 // off: no world means no spatial queries, no LOS means CanSee is permissive,
-// no Items leaves the NPC unarmed, no Rewards makes a kill reward-free, and
-// no Sink drops every event.
+// no Items leaves the NPC unarmed, no Rewards makes a kill reward-free, no
+// Drops drops nothing a script asks for, no Decay leaves its corpse, and no
+// Sink drops every event.
 type Runtime struct {
 	World *world.State
 	LOS   LineOfSight
@@ -383,11 +390,16 @@ type Runtime struct {
 	Log   *zerolog.Logger
 	Items *item.Table
 	// Rewards are the NPC's own death rewards; RewardsFor, when set, builds
-	// them instead each time the NPC needs them.
+	// them instead each time the NPC needs them. Only a Monster-family
+	// NPC's kill pays them.
 	Rewards    Rewards
 	RewardsFor RewardsSource
-	Sink       event.Sink
-	Remover    Remover
+	// Drops places the items the NPC's scripts drop around it.
+	Drops ItemDropper
+	// Decay takes the NPC's corpse out of the world after its corpse time.
+	Decay   *task.Decay
+	Sink    event.Sink
+	Remover Remover
 	// Spawns runs the hook of the spawn that placed the NPC when it is
 	// shown again in place; nil runs none.
 	Spawns SpawnHook
@@ -432,6 +444,8 @@ func (h *Hostile) Attach(rt Runtime) {
 	case rt.Rewards != nil:
 		h.rewards = fixedRewards{rt.Rewards}
 	}
+	h.drops = rt.Drops
+	h.decay = rt.Decay
 	h.sink = rt.Sink
 	h.remover = rt.Remover
 	h.spawns = rt.Spawns
@@ -1042,15 +1056,11 @@ func (h *Hostile) MarkDead() bool {
 
 // Die runs this NPC's death sequence: the once-only dead-state
 // transition, the strip of every effect that does not last through death,
-// then its reward hook, then its dying hooks, its party's and its clan's
-// calls (partyDied, raiseClanDied). rewards may be nil — the drop and
-// experience/SP systems land separately and plug in here once ready. It
-// reports whether the death was newly applied by this call.
-//
-// The caller is responsible for registering the corpse with the decay
-// task afterwards (using Instance.Template.CorpseTime as the display
-// interval) — Hostile does not hold a reference to that task, so the
-// scheduling stays at the orchestration layer that owns it.
+// the corpse's registration with the decay task, then its reward hook, then
+// its dying hooks, its party's and its clan's calls (partyDied,
+// raiseClanDied). rewards may be nil: the corpse still decays, and the kill
+// pays nothing. It reports whether the death was newly applied by this
+// call.
 func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bool {
 	if !h.MarkDead() {
 		return false
@@ -1062,6 +1072,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	// A death strip ends each effect's stat change silently; the status
 	// broadcast below is the only refresh observers get.
 	h.EffectListIfBuilt().StopAllExceptThoseThatLastThroughDeath()
+	h.scheduleDecay()
 	if rewards != nil {
 		rewards.CalculateRewards(killer)
 	}

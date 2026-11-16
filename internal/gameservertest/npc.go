@@ -148,11 +148,14 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
 	s.installZones(hostile)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		s.killRewards(), s.itemTable, s.ids, s.GroundItems, s.decay)
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
 	rt := npc.Runtime{
 		World:   s.State,
+		Log:     &s.log,
 		Items:   s.itemTable,
 		Rewards: rewards,
+		Drops:   gamemanager.NewGroundDrops(s.killRewards(), s.itemTable, s.ids, s.GroundItems),
+		Decay:   s.decay,
 		Hits:    hits,
 		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
@@ -479,11 +482,14 @@ func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at
 	control.hostile, control.move = hostile, moveCtl
 	s.hostileControls.Store(hostile, control)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		s.killRewards(), s.itemTable, s.ids, s.GroundItems, s.decay)
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
 	rt := npc.Runtime{
 		World:   s.State,
+		Log:     &s.log,
 		Items:   s.itemTable,
 		Rewards: rewards,
+		Drops:   gamemanager.NewGroundDrops(s.killRewards(), s.itemTable, s.ids, s.GroundItems),
+		Decay:   s.decay,
 		Hits:    hits,
 		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,

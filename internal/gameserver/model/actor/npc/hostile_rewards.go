@@ -63,3 +63,17 @@ func (h *Hostile) CorpseDeadline() (time.Time, bool) {
 func (h *Hostile) CorpseTime() time.Duration {
 	return time.Duration(h.Instance.Template.CorpseTime) * time.Second
 }
+
+// scheduleDecay registers this corpse with the decay task for its template
+// corpse time, twice that for a spoiled or sown corpse, so it lasts for the
+// sweep or the harvest. A template with no corpse time leaves the corpse.
+func (h *Hostile) scheduleDecay() {
+	if h.decay == nil || h.Instance.Template.CorpseTime <= 0 {
+		return
+	}
+	interval := h.CorpseTime()
+	if h.Spoiled() || h.Seeded() {
+		interval *= 2
+	}
+	h.SetCorpseDeadline(h.decay.Add(h, interval))
+}
