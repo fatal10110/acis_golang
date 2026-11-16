@@ -569,9 +569,9 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 		default:
 			// An unknown opcode, or one the connection's state does not
 			// accept, is dropped without a reply and the connection stays
-			// open: the reference server is silent here too, and the client
-			// only sends the opcode its own state calls for, so it awaits no
-			// answer. The frame keeps the current read deadline, like an
+			// open: the login protocol defines no answer for it, and the
+			// client only sends the opcode its own state calls for, so it
+			// awaits none. The frame keeps the current read deadline, like an
 			// empty one, so such frames cannot hold a connection open.
 			l.log.Debug().Str("ip", c.remoteIP.String()).Uint8("opcode", op).
 				Bool("gg_authed", c.ggAuthed).Bool("authed", c.authed).
